@@ -3,6 +3,12 @@ import { notFound } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { NoteBody } from '@/components/vault/note-body';
 import { NoteProperties } from '@/components/vault/note-properties';
+import {
+  FoldNoteListButton,
+  NoteListColumn,
+  NoteListFold,
+  UnfoldNoteListButton,
+} from '@/components/vault/note-list-fold';
 import { VaultPanel } from '@/components/vault/vault-panel';
 import { VaultSheet } from '@/components/vault/vault-sheet';
 import { createVaultClient } from '@/lib/vault/auth/server';
@@ -53,6 +59,12 @@ export const dynamic = 'force-dynamic';
  * slides in over it from a button in the header row (#577). Column and sheet
  * are one component, `components/vault/vault-panel.tsx`, so the search and the
  * folds behave the same at both widths.
+ *
+ * On a laptop the column can be folded away so the note has the width (#1380):
+ * a button beside the search box hides it, and one in the header row brings it
+ * back, in the spot the phone's sheet button takes below `lg`. The pieces are
+ * in `components/vault/note-list-fold.tsx`; the wrapper is keyed by the note's
+ * path, so for now a fold lasts until another note is opened.
  */
 export default async function NotePage({
   params,
@@ -102,25 +114,33 @@ export default async function NotePage({
   ]);
 
   return (
-    <div className="flex gap-8">
+    <NoteListFold key={note.path}>
       {/* Hidden below lg rather than stacked above the note: at that width the
           same panel arrives as a sheet instead, from the button beside "All
           notes" below. */}
       {hasVault && (
-        <aside aria-label="Vault" className="hidden w-60 shrink-0 lg:block">
+        <NoteListColumn>
           {/* At the offset the filter rail uses. The box is pinned and only the
               tree under it scrolls: a vault taller than the viewport must not
               make either the search or the bottom of the note reachable only by
               scrolling past a thousand titles. */}
           <div className="sticky top-20 flex max-h-[calc(100dvh-6rem)] flex-col">
-            <VaultPanel groups={groups} currentPath={note.path} search={search} />
+            <VaultPanel
+              groups={groups}
+              currentPath={note.path}
+              search={search}
+              beside={<FoldNoteListButton />}
+            />
           </div>
-        </aside>
+        </NoteListColumn>
       )}
 
-      <article className="mx-auto min-w-0 max-w-3xl flex-1">
+      {/* Folded, the note takes the column's width and the gap beside it:
+          15rem and 2rem on top of max-w-3xl's 48rem is max-w-5xl. */}
+      <article className="mx-auto min-w-0 max-w-3xl flex-1 group-data-[folded=true]/note:max-w-5xl">
         {/* The way back, and -- below lg, where the column is not drawn -- the
-            way into the same vault without leaving the note (#577). */}
+            way into the same vault without leaving the note (#577). From lg up
+            the same spot holds the way back to a folded column (#1380). */}
         <div className="mb-4 flex items-center justify-between gap-3">
           <Link
             href="/vault"
@@ -130,7 +150,12 @@ export default async function NotePage({
             All notes
           </Link>
 
-          {hasVault && <VaultSheet groups={groups} currentPath={note.path} search={search} />}
+          {hasVault && (
+            <>
+              <VaultSheet groups={groups} currentPath={note.path} search={search} />
+              <UnfoldNoteListButton />
+            </>
+          )}
         </div>
 
         <header className="mb-5">
@@ -180,7 +205,7 @@ export default async function NotePage({
           </>
         )}
       </article>
-    </div>
+    </NoteListFold>
   );
 }
 
