@@ -1,10 +1,7 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Target } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { segmentedFrame } from '@/components/ui/segmented';
-import { cn } from '@/lib/cn';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createLearnClient } from '@/lib/learn/auth/server';
@@ -15,6 +12,7 @@ import { answeredCount, lastAnsweredAt } from '@/lib/learn/graph/session';
 import { loadFlowGoal, nextQuestion } from '@/lib/learn/flow/ahead';
 import { loadTrackOffer } from '@/lib/learn/flow/offer';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { FlowFocus, ScopeFilter } from './scope';
 import { FlowSession, type FlowOnly } from './session';
 import { toFlowState } from './state';
 
@@ -163,27 +161,9 @@ export default async function PracticeFlowPage({
 
       {!track && !goal && <ScopeFilter filter={filter} />}
 
-      {goal && (
-        <p className="mt-4 flex flex-wrap items-baseline gap-x-3 text-ui text-ink-muted">
-          <span>
-            Only asking about <span className="font-medium text-ink">{goal.name}</span>
-          </span>
-          <Link href="/learn/flow" className="text-accent hover:underline">
-            Everything
-          </Link>
-        </p>
-      )}
+      {goal && <FlowFocus name={goal.name} back="Everything" />}
 
-      {track && (
-        <p className="mt-4 flex flex-wrap items-baseline gap-x-3 text-ui text-ink-muted">
-          <span>
-            Only asking about <span className="font-medium text-ink">{track.name}</span>
-          </span>
-          <Link href="/learn/flow" className="text-accent hover:underline">
-            All tracks
-          </Link>
-        </p>
-      )}
+      {track && <FlowFocus name={track.name} back="All tracks" />}
 
       <div className="mt-6">
         {asking ? (
@@ -243,49 +223,6 @@ export default async function PracticeFlowPage({
           />
         )}
       </div>
-    </div>
-  );
-}
-
-/**
- * What the mixed flow asks about (plan #842): everything, which mixes in
- * questions about subjects in your notes that are not tracks and about your
- * goals, your tracks alone, or your goals alone (plan #1387). Links onto the
- * page's own search parameter, as the ideas page's arrangement rows are, so
- * the choice survives a reload and the back button.
- */
-function ScopeFilter({ filter }: { filter: FlowOnly }) {
-  const options = [
-    { key: 'all', label: 'Everything', href: '/learn/flow', on: filter === null },
-    {
-      key: 'tracks',
-      label: 'Tracks only',
-      href: '/learn/flow?only=tracks',
-      on: filter === 'tracks',
-    },
-    { key: 'goals', label: 'Goals only', href: '/learn/flow?only=goals', on: filter === 'goals' },
-  ];
-  return (
-    <div className="mt-4">
-      <span role="group" aria-label="What to ask about" className={segmentedFrame}>
-        {options.map((option) => (
-          <Link
-            key={option.key}
-            href={option.href}
-            scroll={false}
-            aria-current={option.on ? 'true' : undefined}
-            className={cn(
-              'press inline-flex h-(--control-h) items-center px-2.5 text-ui font-medium',
-              'transition-colors duration-150 focus-visible:outline-2 focus-visible:-outline-offset-2',
-              option.on
-                ? 'bg-accent-tint text-accent'
-                : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
-            )}
-          >
-            {option.label}
-          </Link>
-        ))}
-      </span>
     </div>
   );
 }

@@ -46,6 +46,7 @@ import { noteHref } from '@/lib/vault/paths';
 import { PageHeader } from '@/components/shell/page-header';
 import { AddTranscript } from '@/app/vault/education/add-transcript';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
+import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
 import { SchoolCourses } from '@/app/vault/education/course-list';
 import { educationGroups, educationCounts } from './education-fixtures';
 import { ReadingCard } from '@/components/learn/reading-card';
@@ -2925,6 +2926,24 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnNowFeed first={deckCards} ready={20} low={10} />,
+  },
+  {
+    /* Learn's Goals list: each goal edited in place, with its plan, its place
+     * and the Practise link that opens Practice Flow on it (plan #1387). */
+    id: 'learn-goals-list',
+    label: 'Goals · The list, with Practise',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnGoalsPreview />,
+  },
+  {
+    /* Practice Flow's filter with Goals only chosen, and the line a goal's
+     * Practise link opens on in its place (plan #1387). */
+    id: 'learn-flow-scope',
+    label: 'Practice Flow · The filter and a goal focus',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <FlowScopePreview />,
   },
   {
     /* The chain a subject reads as: the doors it turns on, then everything
