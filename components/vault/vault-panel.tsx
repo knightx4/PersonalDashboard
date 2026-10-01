@@ -2,6 +2,7 @@ import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
 import { RememberedVaultTree } from '@/components/vault/vault-tree-remembered';
 import type { VaultFolderGroup } from '@/components/vault/vault-tree';
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 
 /**
@@ -30,6 +31,7 @@ export function VaultPanel({
   groups,
   currentPath,
   search,
+  beside,
   className,
 }: {
   groups: VaultFolderGroup[];
@@ -37,11 +39,25 @@ export function VaultPanel({
   currentPath: string;
   /** What the column was narrowed by, trimmed. '' is an unsearched vault. */
   search: string;
+  /**
+   * Drawn in a row with the search box: the column's fold button (#1380). The
+   * sheet passes nothing, so there the box keeps the full width.
+   */
+  beside?: ReactNode;
   className?: string;
 }) {
   return (
     <div className={cn('flex min-h-0 flex-1 flex-col gap-3', className)}>
-      <SearchField placeholder="Search your notes" />
+      {beside ? (
+        <div className="flex items-center gap-1">
+          <div className="min-w-0 flex-1">
+            <SearchField placeholder="Search your notes" />
+          </div>
+          {beside}
+        </div>
+      ) : (
+        <SearchField placeholder="Search your notes" />
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
         {groups.length === 0 && search ? (
