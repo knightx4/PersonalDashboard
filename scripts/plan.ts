@@ -7,7 +7,7 @@
  * session did is on the page the moment it is done.
  *
  *   npx tsx scripts/plan.ts list [--all] [--module <id>] [--claude]
- *   npx tsx scripts/plan.ts next [--claude] [--limit <n>]
+ *   npx tsx scripts/plan.ts next [--claude] [--limit <n>] [--module <id>]
  *   npx tsx scripts/plan.ts show <n>
  *   npx tsx scripts/plan.ts add "<title>" [--parent <n>] [--module <id>]
  *                                [--priority 1|2|3] [--size s|m|l]
@@ -75,7 +75,7 @@ import { findDuplicateIdea, ideaFirstLine } from '../lib/ideas/duplicate';
 import { FILED_IDEAS_SQL } from '../lib/ideas/load';
 import { IDEA_WINDOW_MINUTES, ideaAllowance, ideaCapRefusal } from '../lib/ideas/rate';
 import { isModuleId } from '../lib/modules';
-import { isPlanScope, planScopeLabel, planScopeOf } from '../lib/plan/projects';
+import { isAppScope, isPlanScope, planScopeLabel, planScopeOf } from '../lib/plan/projects';
 import { planBrief, STATUS_WORD } from '../lib/plan/brief';
 import type { VisionBodies } from '../lib/specs/vision';
 import { closeRefusal, commitOnMain } from '../lib/plan/github';
@@ -879,7 +879,14 @@ async function main(): Promise<void> {
       const { sections, liveness } = await loadState(sql, userId);
       const claude = has('--claude');
       const limit = Number(arg('--limit') ?? 10);
-      const order = workOrder(sections, claude ? { only: 'runner' } : {});
+      // A project's steps (lib/plan/projects) are built from its own
+      // repository by its own routine, so a session here never picks one up
+      // unless it asked for that project by name.
+      const onlyScope = arg('--module');
+      const here = sections.filter((section) =>
+        onlyScope ? section.module === onlyScope : isAppScope(section.module),
+      );
+      const order = workOrder(here, claude ? { only: 'runner' } : {});
 
       if (order.length === 0) {
         const summary = summarize(sections);
