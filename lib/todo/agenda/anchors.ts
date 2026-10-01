@@ -4,6 +4,7 @@ import { sessionClients, type AgendaClients } from '@/lib/todo/agenda/clients';
 import { goalItemHref, type GoalItemRow } from '@/lib/search/sources/goals-map';
 import { LINK_TARGETS, type AppointmentRef, type LinkTarget, type TaskLink } from '@/lib/todo/links/model';
 import { matchAppointments } from '@/lib/todo/links/appointment';
+import { loadStoryOrigins } from '@/lib/news/saved/stories';
 import { spanLabel, startDay, dayLabel, type Event } from '@/lib/todo/events/model';
 
 /**
@@ -305,6 +306,23 @@ async function lookup(
         const row = byId.get(id);
         if (!row) continue;
         into.set(`goal:${id}`, { label: row.title, href: goalItemHref(row, byId) });
+      }
+      return;
+    }
+
+    if (target === 'story') {
+      // A todo made from a newsletter story (plan #1369) is labelled with the
+      // newsletter and the headline, and opens the story where Learn's
+      // readings open it: on Saved while it is saved, in its newsletter once
+      // unsaved. Unsaved with the newsletter deleted too, the row still holds
+      // the headline but nothing in News shows it any more.
+      const origins = await loadStoryOrigins(await clients.news(), ids);
+      for (const [id, origin] of origins) {
+        into.set(`story:${id}`, {
+          label: `${origin.senderName} · ${origin.headline}`,
+          href: origin.href ?? '/news',
+          ...(origin.href ? {} : { gone: 'no longer in News' }),
+        });
       }
       return;
     }

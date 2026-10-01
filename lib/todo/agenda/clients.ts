@@ -6,12 +6,14 @@ import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { createNewsClient } from '@/lib/news/auth/server';
 import { createTodoClient } from '@/lib/todo/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 
@@ -33,6 +35,8 @@ export interface AgendaClients {
   core(): Promise<CoreSupabaseClient>;
   learn(): Promise<LearnSupabaseClient>;
   vault(): Promise<VaultSupabaseClient>;
+  /** For a task made from a newsletter story (plan #1369). */
+  news(): Promise<NewsSupabaseClient>;
 }
 
 /** The signed-in person's own clients, under RLS. What every page uses. */
@@ -44,4 +48,5 @@ export const sessionClients: AgendaClients = {
   core: () => createCoreClient(),
   learn: () => createLearnClient(),
   vault: () => createVaultClient(),
+  news: () => createNewsClient(),
 };

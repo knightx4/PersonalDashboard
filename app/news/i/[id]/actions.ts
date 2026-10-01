@@ -8,6 +8,9 @@ import { createNewsClient } from '@/lib/news/auth/server';
 import { markUnread } from '@/lib/news/issues/read';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { queueNewsStory, type QueuedStory } from '@/lib/learn/tracks/news';
+import { loadAccountSettings } from '@/lib/core/account/settings';
+import { createTodoClient } from '@/lib/todo/auth/server';
+import { makeStoryTask, type StoryTodo } from '@/lib/todo/links/story';
 import {
   findSavedStory,
   removeSavedStory,
@@ -100,6 +103,34 @@ export type SendToLearnResult =
   | { error: null; readingId: string; trackId: string };
 
 /**
+ * Save the story being sent, the way setStorySaved does, and return the saved
+ * row: what Send to Learn and Make a todo both point at.
+ */
+async function saveToSend(
+  userId: string,
+  input: SendStoryInput,
+  failed: string,
+): Promise<{ story: SavedStoryRef } | { error: string }> {
+  const parsed = SendInput.safeParse(input);
+  if (!parsed.success) return { error: 'That story could not be found.' };
+
+  const news = await createNewsClient();
+  let story: SavedStoryRef | null;
+  try {
+    if ('savedStoryId' in parsed.data) {
+      story = await resaveStoryById(news, parsed.data.savedStoryId);
+    } else {
+      const found = await saveStory(news, { userId, ...parsed.data });
+      if (!found) return { error: 'That story is no longer in the newsletter.' };
+      story = await findSavedStory(news, parsed.data);
+    }
+  } catch {
+    return { error: failed };
+  }
+  return story ? { story } : { error: 'That story could not be found.' };
+}
+
+/**
  * Put a story on the Learn reading queue, in the From News list (plan #1368).
  *
  * Sending saves the story first, the way setStorySaved does, and the reading
@@ -113,24 +144,10 @@ export type SendToLearnResult =
  */
 // latency: optimistic -- the button says Sent at once, and a refused write puts it back with a toast
 export async function sendStoryToLearn(input: SendStoryInput): Promise<SendToLearnResult> {
-  const parsed = SendInput.safeParse(input);
-  if (!parsed.success) return { error: 'That story could not be found.' };
-
   const user = await requireUser();
-  const news = await createNewsClient();
-  let story: SavedStoryRef | null;
-  try {
-    if ('savedStoryId' in parsed.data) {
-      story = await resaveStoryById(news, parsed.data.savedStoryId);
-    } else {
-      const found = await saveStory(news, { userId: user.id, ...parsed.data });
-      if (!found) return { error: 'That story is no longer in the newsletter.' };
-      story = await findSavedStory(news, parsed.data);
-    }
-  } catch {
-    return { error: 'That story did not reach Learn. Try again.' };
-  }
-  if (!story) return { error: 'That story could not be found.' };
+  const saved = await saveToSend(user.id, input, 'That story did not reach Learn. Try again.');
+  if ('error' in saved) return { error: saved.error };
+  const { story } = saved;
 
   let queued: QueuedStory;
   try {
@@ -144,4 +161,43 @@ export async function sendStoryToLearn(input: SendStoryInput): Promise<SendToLea
   revalidatePath('/news/saved');
   revalidatePath('/learn', 'layout');
   return { error: null, readingId: queued.readingId, trackId: queued.trackId };
+}
+
+export type MakeTodoResult =
+  | { error: string; taskId?: undefined }
+  | { error: null; taskId: string };
+
+/**
+ * Make a todo from a story, titled with its headline (plan #1369).
+ *
+ * Like Send to Learn, this saves the story first and the task points at the
+ * saved copy through task_links.saved_story_id, so the story's text stays in
+ * News, shows on Saved, and the task opens it. The two forms of input are the
+ * same as sendStoryToLearn's.
+ *
+ * A story that already has an open todo returns that task instead of adding
+ * another. The result carries the task, so the button can say where it went.
+ */
+// latency: optimistic -- the button says Added at once, and a refused write puts it back with a toast
+export async function makeTodoFromStory(input: SendStoryInput): Promise<MakeTodoResult> {
+  const failed = 'That story did not reach Todo. Try again.';
+  const user = await requireUser();
+  const saved = await saveToSend(user.id, input, failed);
+  if ('error' in saved) return { error: saved.error };
+  const { story } = saved;
+
+  let made: StoryTodo;
+  try {
+    const { timezone } = await loadAccountSettings(user.id);
+    made = await makeStoryTask(await createTodoClient(), user.id, story, timezone);
+  } catch {
+    return { error: failed };
+  }
+
+  if (story.issueId) revalidatePath(`/news/i/${story.issueId}`);
+  revalidatePath('/news');
+  revalidatePath('/news/saved');
+  revalidatePath('/todo', 'layout');
+  revalidatePath('/home');
+  return { error: null, taskId: made.taskId };
 }

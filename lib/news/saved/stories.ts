@@ -266,12 +266,13 @@ export async function resaveStoryById(
 }
 
 /**
- * Where a reading sent from News came from, for Learn to say so (plan #1368):
- * the newsletter's name, and where the story can be opened. That is its row on
+ * Where a reading or a todo sent from News came from, for Learn and Todo to
+ * say so (plans #1368, #1369): the newsletter's name, the headline, and where
+ * the story can be opened. That is its row on
  * the Saved tab while it is saved, its newsletter once it has been unsaved, and
  * nowhere when the newsletter is gone too.
  */
-export type StoryOrigin = { senderName: string; href: string | null };
+export type StoryOrigin = { senderName: string; headline: string; href: string | null };
 
 export async function loadStoryOrigins(
   client: NewsSupabaseClient,
@@ -283,7 +284,7 @@ export async function loadStoryOrigins(
 
   const { data, error } = await client
     .from('saved_stories')
-    .select('id, issue_id, sender_name, unsaved_at')
+    .select('id, issue_id, sender_name, headline, unsaved_at')
     .in('id', wanted);
   assertSchemaExposed(error, NEWS_SCHEMA);
   if (error) throw new Error(`news: reading where those stories came from failed (${error.message})`);
@@ -292,6 +293,7 @@ export async function loadStoryOrigins(
     id: string;
     issue_id: string | null;
     sender_name: string;
+    headline: string;
     unsaved_at: string | null;
   }[]) {
     const href = !row.unsaved_at
@@ -299,7 +301,7 @@ export async function loadStoryOrigins(
       : row.issue_id
         ? `/news/i/${row.issue_id}`
         : null;
-    origins.set(row.id, { senderName: row.sender_name, href });
+    origins.set(row.id, { senderName: row.sender_name, headline: row.headline, href });
   }
   return origins;
 }

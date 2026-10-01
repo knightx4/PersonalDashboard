@@ -80,6 +80,7 @@ function serviceClients(): AgendaClients {
   const core = createCoreServiceSupabase();
   const learn = createLearnServiceSupabase();
   const vault = createVaultServiceSupabase();
+  const news = createNewsServiceClient();
   return {
     shopping: async () => shopping,
     jobs: async () => jobs,
@@ -88,6 +89,7 @@ function serviceClients(): AgendaClients {
     core: async () => core,
     learn: async () => learn,
     vault: async () => vault,
+    news: async () => news,
   };
 }
 
