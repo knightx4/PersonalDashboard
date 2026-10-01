@@ -21,6 +21,8 @@ export function Meter({
   track = 'canvas',
   height = 'sm',
   minFraction = 0,
+  moves = false,
+  title,
   className,
 }: {
   value: number;
@@ -43,6 +45,13 @@ export function Meter({
    * too short to see says it did not.
    */
   minFraction?: number;
+  /**
+   * Slide to a new value instead of jumping to it (`progress-move`). It is a
+   * transition, so it plays only when the value changes on screen.
+   */
+  moves?: boolean;
+  /** Read on hover. */
+  title?: string;
   className?: string;
 }) {
   const fraction = max <= 0 ? 0 : Math.min(1, Math.max(0, value / max));
@@ -58,10 +67,14 @@ export function Meter({
       )}
       role="img"
       aria-label={label}
+      title={title}
     >
+      {/* The whole length, slid back by what is not drawn: a transform, so a
+          moving meter animates without layout. The track's own rounding
+          clips the left end. */}
       <span
-        className={cn('block h-full rounded-full', fill)}
-        style={{ width: `${Math.round(drawn * 100)}%` }}
+        className={cn('block h-full w-full rounded-full', fill, moves && 'progress-move')}
+        style={{ transform: `translateX(-${100 - Math.round(drawn * 100)}%)` }}
       />
     </span>
   );
@@ -107,6 +120,8 @@ export function Bands({
   label,
   track = 'canvas',
   height = 'sm',
+  moves = false,
+  minFraction = 0.04,
   className,
 }: {
   bands: readonly Band[];
@@ -114,9 +129,46 @@ export function Bands({
   label: string;
   track?: 'canvas' | 'sunken';
   height?: 'sm' | 'md';
+  /**
+   * Slide the bands to new lengths instead of jumping (`progress-move`), as a
+   * goal's bar does when a step closes. Every band stays drawn, a zero one at
+   * no length, so a band can grow from nothing and shrink to it.
+   */
+  moves?: boolean;
+  /**
+   * With `moves`, the floor for a non-zero band as a fraction of the bar,
+   * standing in for the 3px floor the still bar has: 0.04 is about 4px on a
+   * w-24 bar.
+   */
+  minFraction?: number;
   className?: string;
 }) {
   const drawn = bands.filter((band) => band.value > 0);
+  const name = drawn.length === 0 ? label : `${label}: ${drawn.map((band) => band.label).join(', ')}`;
+
+  if (moves) {
+    return (
+      <span
+        className={cn(
+          'relative block w-full overflow-hidden rounded-full',
+          height === 'md' ? 'h-2' : 'h-1.5',
+          track === 'sunken' ? 'bg-sunken' : 'bg-canvas',
+          className,
+        )}
+        role="img"
+        aria-label={name}
+      >
+        {bandSpans(bands, minFraction).map(({ band, start, size }) => (
+          <span
+            key={band.key}
+            className={cn('progress-move absolute inset-0 origin-left', band.fill)}
+            title={band.value > 0 ? band.label : undefined}
+            style={{ transform: `translateX(${pct(start)}%) scaleX(${size.toFixed(4)})` }}
+          />
+        ))}
+      </span>
+    );
+  }
 
   return (
     <span
@@ -127,9 +179,7 @@ export function Bands({
         className,
       )}
       role="img"
-      aria-label={
-        drawn.length === 0 ? label : `${label}: ${drawn.map((band) => band.label).join(', ')}`
-      }
+      aria-label={name}
     >
       {drawn.map((band) => (
         <span
@@ -141,4 +191,34 @@ export function Bands({
       ))}
     </span>
   );
+}
+
+function pct(fraction: number): string {
+  return (fraction * 100).toFixed(2);
+}
+
+/**
+ * Where each band starts and how much of the bar it takes, both as fractions,
+ * in the order given. A non-zero band gets at least `floor`, taken out of the
+ * bands with length to spare so they stay proportional to each other; a zero
+ * band takes none and starts where the last one ended.
+ */
+export function bandSpans(
+  bands: readonly Band[],
+  floor: number,
+): { band: Band; start: number; size: number }[] {
+  const whole = bands.reduce((sum, band) => sum + Math.max(0, band.value), 0);
+  const fractions = bands.map((band) => (whole > 0 ? Math.max(0, band.value) / whole : 0));
+  // The length the slivers are given, and what is left for the rest.
+  const floored = fractions.reduce((sum, f) => (f > 0 && f < floor ? sum + floor : sum), 0);
+  const spare = fractions.filter((f) => f >= floor).reduce((sum, f) => sum + f, 0);
+  const scale = spare > 0 ? Math.max(0, 1 - floored) / spare : 1;
+  let start = 0;
+  return bands.map((band, i) => {
+    const f = fractions[i];
+    const size = f === 0 ? 0 : spare > 0 ? (f < floor ? floor : f * scale) : f;
+    const span = { band, start, size };
+    start += size;
+    return span;
+  });
 }

@@ -1679,6 +1679,15 @@ body[data-keyhints] .keyhint {
   animation: landed-pulse 320ms var(--ease-out-soft) both;
 }
 
+/* A measure sliding to its new value: a goal's progress bar as a step closes
+ * (Meter and Bands with `moves`, plan #1342). A transition rather than an
+ * animation, so it plays only when the value changes on screen; a page that
+ * loads already there has nothing to move from. 300ms rather than 150ms, so
+ * the eye can follow the length change. */
+@utility progress-move {
+  transition: transform 300ms var(--ease-out-soft);
+}
+
 /* The Dash mark (components/ui/dash-mark.tsx). Working moves the node round
  * the grid at one pace and never fills, since a run reports no steps; done
  * swells once as it settles. Each state has its own shape as well, so both
@@ -1783,6 +1792,10 @@ body[data-keyhints] .keyhint {
 
   .press:active {
     transform: none;
+  }
+
+  .progress-move {
+    transition: none;
   }
 
   .skeleton::after {

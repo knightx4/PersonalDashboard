@@ -2,12 +2,12 @@ import { HelpCircle } from 'lucide-react';
 import { StateLabel } from '@/components/dev/state-label';
 import { Bands } from '@/components/ui/meter';
 import { cn } from '@/lib/cn';
+import { ProgressCount } from './progress-count';
 import {
   PROGRESS_BANDS,
   PROGRESS_BAND_FILL,
   PROGRESS_BAND_WORD,
   goalMoveLabel,
-  progressWords,
   type GoalProgress as Progress,
 } from '@/lib/goals/status';
 
@@ -18,6 +18,10 @@ import {
  * The bar is the plan's banded one: amber for what waits on you or on the
  * steps under it, blue for what Claude has, green for done, in that order
  * every time so the picture is comparable from one week to the next.
+ *
+ * When a step closes on screen the bands slide to their new lengths and the
+ * count counts to its new value over 300ms (plan #1342); a page that loads
+ * with steps already closed draws the final value at once.
  */
 export function GoalProgress({
   progress,
@@ -47,8 +51,9 @@ export function GoalProgress({
             track="sunken"
             className="w-24"
             label={label}
+            moves
           />
-          <span className="tabular text-small text-ink-muted">{progressWords(progress)}</span>
+          <ProgressCount progress={progress} />
         </span>
       )}
       <QuestionMark count={progress.questions} />
