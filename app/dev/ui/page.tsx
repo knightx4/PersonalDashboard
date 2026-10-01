@@ -39,6 +39,7 @@ import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { PlanHealth } from '@/lib/plan/tree';
 import type { TaskStatus } from '@/lib/todo/tasks/model';
 import { ActivePalette } from './palette';
+import { FlyChipDemo } from './fly-chip-demo';
 import { LAW_GROUPS } from './laws';
 import { ANATOMIES } from './anatomy';
 import * as C from './content';
@@ -1504,6 +1505,9 @@ export default function DevUiPage() {
           <span className="flex items-center gap-1 text-small text-ink-muted">
             hold <Kbd always>⌘</Kbd> for the hints
           </span>
+        </Card>
+        <Card padding="standard">
+          <FlyChipDemo />
         </Card>
         <Rows rows={M.MOTION} labelWidth="sm:grid-cols-[7rem_1fr]" />
         <Rules items={M.MOTION_RULES} />
