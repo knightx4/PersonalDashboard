@@ -64,18 +64,69 @@ import { loadTrackInterest, sharesFrom } from './interest-load';
  * goal. A waiting question about a goal archived since is thrown away unshown.
  * The Level 3 goal takes its turns too, with questions about the articles you
  * claimed and have not been tested on (plan #1386).
+ *
+ * `goalsOnly` asks about your goals and nothing else (plan #1387), and `aim`
+ * about one goal: every question written ahead is a goal question, and a
+ * track or survey question waiting in the queue is left there for the mixed
+ * flow, the same as Tracks only leaves the goal questions.
  */
 
 /**
  * Which questions the flow asks. `track` focuses it on one track (plan #779);
  * with none, `tracksOnly` asks across your tracks and nothing else, and
- * without it the survey is mixed in.
+ * without it the survey is mixed in. `goalsOnly` asks about your goals alone,
+ * and `aim` about the one goal with that id (plan #1387). A track wins over
+ * both, and `aim` over `goalsOnly`.
  */
-export type FlowScope = { track: string | null; tracksOnly?: boolean };
+export type FlowScope = {
+  track: string | null;
+  tracksOnly?: boolean;
+  goalsOnly?: boolean;
+  aim?: string | null;
+};
+
+/** Whether the flow asks about goals and nothing else: all of them, or one. */
+export function goalScoped(scope: FlowScope): boolean {
+  return scope.track === null && (Boolean(scope.aim) || scope.goalsOnly === true);
+}
 
 /** Whether the flow mixes in survey and goal questions. */
 function surveys(scope: FlowScope): boolean {
-  return scope.track === null && !scope.tracksOnly;
+  return scope.track === null && !scope.tracksOnly && !goalScoped(scope);
+}
+
+/** The goals a goal-scoped flow asks about: the one named, or all of them. */
+function goalsFor(goals: readonly GoalAim[], scope: FlowScope): GoalAim[] {
+  return scope.aim ? goals.filter((goal) => goal.id === scope.aim) : [...goals];
+}
+
+/**
+ * The goal a `?goal=` link names, as the flow should treat it: asked about
+ * on its own, sent to its track when it has one (a tracked goal's questions
+ * are that track's), or null when it is archived or not one of yours, which
+ * sends the link back to the plain flow.
+ */
+export async function loadFlowGoal(
+  supabase: LearnSupabaseClient,
+  aimId: string,
+): Promise<{ kind: 'goal'; id: string; name: string } | { kind: 'track'; subjectId: string } | null> {
+  // A goal has one subject at most (`aim_id` is unique): its hidden survey
+  // subject, or the track made for it.
+  const [aims, subjects] = await Promise.all([
+    supabase.from('aims').select('id, name, archived_at').eq('id', aimId),
+    supabase.from('subjects').select('id, aim_id, survey').eq('aim_id', aimId),
+  ]);
+  assertSchemaExposed(aims.error ?? subjects.error, LEARN_SCHEMA);
+  if (aims.error) throw fail('Reading that goal', aims.error);
+  if (subjects.error) throw fail("Reading that goal's track", subjects.error);
+  const aim = ((aims.data ?? []) as { id: string; name: string; archived_at: string | null }[]).find(
+    (row) => row.id === aimId,
+  );
+  if (!aim || aim.archived_at) return null;
+  const track = ((subjects.data ?? []) as { id: string; aim_id: string | null; survey: boolean }[]).find(
+    (row) => row.aim_id === aimId && !row.survey,
+  );
+  return track ? { kind: 'track', subjectId: track.id } : { kind: 'goal', id: aim.id, name: aim.name };
 }
 
 /** How many questions the flow keeps written ahead. */
@@ -433,10 +484,13 @@ async function pickRows(
 
 /**
  * Whether a claim is one the flow asks about: in the focused track, in any
- * track for Tracks only, and anything at all with no filter.
+ * track for Tracks only, about a goal for Goals only, about the one goal for
+ * a goal's link, and anything at all with no filter.
  */
 function fits(claim: ClaimNow, scope: FlowScope): boolean {
   if (scope.track !== null) return inTrack(claim) && claim.subjectId === scope.track;
+  if (scope.aim) return claim.goal?.aimId === scope.aim;
+  if (scope.goalsOnly) return claim.goal !== null;
   return scope.tracksOnly ? inTrack(claim) : true;
 }
 
@@ -755,7 +809,9 @@ function goalsOrNone(supabase: LearnSupabaseClient): Promise<GoalAim[]> {
  * under `write-probe`, the same as before there was a queue. It writes a
  * track's question when there is one to ask. With no filter and nothing left
  * in the tracks, it writes a question about an open goal instead, and failing
- * that a survey question, which needs `vault`.
+ * that a survey question, which needs `vault`. Goals only and a goal's link
+ * write a goal question and nothing else, and have nothing to ask when none
+ * can be written.
  */
 export async function nextQuestion(
   supabase: LearnSupabaseClient,
@@ -767,6 +823,18 @@ export async function nextQuestion(
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { kind: 'error', detail: 'Asking a question needs ANTHROPIC_API_KEY to be set.' };
+
+  if (goalScoped(options)) {
+    const [goal] = await writeGoals({
+      supabase,
+      userId,
+      apiKey,
+      count: 1,
+      goals: goalsFor(await goalsOrNone(supabase), options),
+      shownAt: new Date().toISOString(),
+    });
+    return goal ? { kind: 'question', question: goal } : { kind: 'nothing', because: 'all-settled' };
+  }
 
   const [subjects, { rows, shares }, answered] = await Promise.all([
     loadSubjects(supabase),
@@ -833,6 +901,9 @@ export async function nextQuestion(
  * tracks have fewer questions to ask than their slots, the survey takes the
  * rest, or the goals when there is no survey; when a goal or survey question
  * cannot be written, a track question takes its slot.
+ *
+ * Goals only and a goal's link fill every slot with goal questions, about the
+ * one goal for a link, and leave a slot empty when none can be written.
  */
 export async function fillQueue(
   supabase: LearnSupabaseClient,
@@ -848,6 +919,12 @@ export async function fillQueue(
     const waiting = valid.filter(({ claim }) => fits(claim, scope));
     const wanted = WRITE_AHEAD - waiting.length;
     if (wanted <= 0) return;
+
+    if (goalScoped(scope)) {
+      const goals = goalsFor(await goalsOrNone(supabase), scope);
+      await writeGoals({ supabase, userId, apiKey, count: wanted, goals, shownAt: null });
+      return;
+    }
 
     const waitingByTrack = new Map<string, number>();
     for (const { claim } of valid) {
