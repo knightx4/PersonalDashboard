@@ -6,11 +6,20 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from 'react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
+import {
+  columnFoldedServerSnapshot,
+  columnFoldedSnapshot,
+  foldedForView,
+  rememberColumnFolded,
+  type FoldPress,
+  subscribeToColumnFolded,
+} from '@/lib/vault/open-folders';
 
 /**
  * Folding the note list away on a laptop, so the note has the width (#1379).
@@ -21,10 +30,12 @@ import { cn } from '@/lib/cn';
  * parts of the page, and the page itself stays a server component, so the flag
  * travels by context from `NoteListFold`, which wraps the column and the note.
  *
- * The flag lives in `useFoldedFlag` and nowhere else. Today it is plain state,
- * so the fold lasts until another note is opened: the page keys this provider
- * by the note's path. Keeping it across notes means backing that one hook with
- * storage; nothing that reads the flag has to change.
+ * The flag lives in `useFoldedFlag` and nowhere else. It is kept in this
+ * browser's storage (#1381, `lib/vault/open-folders.ts`), so a fold lasts from
+ * note to note and through a reload until it is undone. The server cannot know
+ * it, so the page is drawn unfolded and a stored fold applies once the script
+ * has run. Without JavaScript the fold button is not drawn, because it could
+ * not work, and the column shows as it always has.
  *
  * Folding hides the column rather than unmounting it, so unfolding puts back
  * exactly what was there: the search box with whatever is typed in it and the
@@ -49,8 +60,51 @@ type FoldState = {
 
 const FoldContext = createContext<FoldState | null>(null);
 
-function useFoldedFlag(): [boolean, (folded: boolean) => void] {
-  return useState(false);
+/**
+ * The fold for the note in front of you. The rule is `foldedForView`; this
+ * hook feeds it.
+ *
+ * A press is held in state for the note it was made on as well as written to
+ * storage. The state change is what re-renders the page after the write, and
+ * it keeps a fold working on its own note where storage is blocked; the next
+ * note reads storage again, which there says shown.
+ *
+ * Whether a search was in the address is taken when the note is arrived at,
+ * not on every render: the search box writes to the address as you type, and
+ * clearing a search you arrived with must not fold the list away under you.
+ */
+function useFoldedFlag(notePath: string, search: boolean): [boolean, (folded: boolean) => void] {
+  const stored = useSyncExternalStore(
+    subscribeToColumnFolded,
+    columnFoldedSnapshot,
+    columnFoldedServerSnapshot,
+  );
+  const [pressed, setPressed] = useState<FoldPress | null>(null);
+  const [arrival, setArrival] = useState({ notePath, search });
+  if (arrival.notePath !== notePath) {
+    // Arriving at another note: what was pressed on the last one is done with.
+    setArrival({ notePath, search });
+    setPressed(null);
+  }
+  const arrivedWithSearch = arrival.notePath === notePath ? arrival.search : search;
+
+  const folded = foldedForView({ notePath, arrivedWithSearch, stored, pressed });
+
+  function setFolded(next: boolean) {
+    rememberColumnFolded(next);
+    setPressed({ notePath, folded: next });
+  }
+
+  return [folded, setFolded];
+}
+
+/** False on the server and in the first render; true once the script runs. */
+function useHydrated(): boolean {
+  return useSyncExternalStore(
+    subscribeToColumnFolded,
+    () => true,
+    () => false,
+  );
 }
 
 function useFold(): FoldState {
@@ -59,8 +113,18 @@ function useFold(): FoldState {
   return state;
 }
 
-export function NoteListFold({ children }: { children: ReactNode }) {
-  const [folded, setFlag] = useFoldedFlag();
+export function NoteListFold({
+  notePath,
+  search = '',
+  children,
+}: {
+  /** The note on the page, so a press holds for the note it was made on. */
+  notePath: string;
+  /** The search in the address, if any: one there on arrival opens the list. */
+  search?: string;
+  children: ReactNode;
+}) {
+  const [folded, setFlag] = useFoldedFlag(notePath, search !== '');
   const focusNextRef = useRef<'fold' | 'unfold' | null>(null);
 
   function setFolded(next: boolean) {
@@ -115,7 +179,9 @@ function useTakesFocus(which: 'fold' | 'unfold', drawn: boolean) {
 /** Beside the search box at the top of the column: folds the list away. */
 export function FoldNoteListButton() {
   const { folded, setFolded } = useFold();
-  const ref = useTakesFocus('fold', !folded);
+  const hydrated = useHydrated();
+  const ref = useTakesFocus('fold', hydrated && !folded);
+  if (!hydrated) return null;
   return (
     <button
       ref={ref}

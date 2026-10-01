@@ -9,7 +9,12 @@
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  columnFoldedServerSnapshot,
+  columnFoldedSnapshot,
+  foldedForView,
   openFoldersServerSnapshot,
+  readColumnFolded,
+  rememberColumnFolded,
   openFoldersSnapshot,
   readOpenFolders,
   rememberOpenFolder,
@@ -131,5 +136,125 @@ describe('the snapshot the column renders from', () => {
   it('is nothing on the server, which cannot know what this browser kept', () => {
     withStorage(fakeStorage({ [KEY]: JSON.stringify(['Money']) }));
     expect(openFoldersServerSnapshot()).toEqual([]);
+  });
+});
+
+/**
+ * Whether the note list is folded away (#1381), kept beside the folders under
+ * its own key and by the same rule: this browser, read through a snapshot,
+ * and nothing worse than the list shown where storage will not cooperate.
+ */
+describe('whether the note list is folded', () => {
+  const FOLDED_KEY = 'pt_vault_column_folded';
+
+  function storageWith(initial: Record<string, string> = {}) {
+    const store = new Map(Object.entries(initial));
+    return {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+      store,
+    };
+  }
+
+  it('reads a stored fold', () => {
+    withStorage(storageWith({ [FOLDED_KEY]: 'true' }));
+    expect(readColumnFolded()).toBe(true);
+  });
+
+  it('reads the list as shown when nothing is stored', () => {
+    withStorage(storageWith());
+    expect(readColumnFolded()).toBe(false);
+  });
+
+  it('remembers a fold and an unfold, under its own key and nothing else', () => {
+    const storage = storageWith({ [KEY]: JSON.stringify(['Money']) });
+    withStorage(storage);
+    rememberColumnFolded(true);
+    expect(readColumnFolded()).toBe(true);
+    rememberColumnFolded(false);
+    expect(readColumnFolded()).toBe(false);
+    expect([...storage.store.keys()].sort()).toEqual([KEY, FOLDED_KEY].sort());
+    expect(readOpenFolders()).toEqual(['Money']);
+  });
+
+  it('reads anything unreadable as shown', () => {
+    withStorage(storageWith({ [FOLDED_KEY]: '{"folded":true}' }));
+    expect(readColumnFolded()).toBe(false);
+    withStorage(storageWith({ [FOLDED_KEY]: 'yes' }));
+    expect(readColumnFolded()).toBe(false);
+  });
+
+  it('shows the list and does not throw where storage throws', () => {
+    withStorage({
+      getItem: () => {
+        throw new Error('The operation is insecure.');
+      },
+      setItem: () => {
+        throw new Error('The operation is insecure.');
+      },
+    });
+    expect(() => rememberColumnFolded(true)).not.toThrow();
+    expect(readColumnFolded()).toBe(false);
+    expect(columnFoldedSnapshot()).toBe(false);
+  });
+
+  it('shows the list where there is no browser at all', () => {
+    expect(readColumnFolded()).toBe(false);
+    expect(() => rememberColumnFolded(true)).not.toThrow();
+  });
+
+  it('gives one snapshot until a press changes it, and the server always shown', () => {
+    withStorage(storageWith({ [FOLDED_KEY]: 'false' }));
+    rememberColumnFolded(false);
+    expect(columnFoldedSnapshot()).toBe(false);
+    rememberColumnFolded(true);
+    expect(columnFoldedSnapshot()).toBe(true);
+    expect(columnFoldedServerSnapshot()).toBe(false);
+  });
+});
+
+/** Which way the list is drawn on the note in front of you. */
+describe('the fold on the note in front of you', () => {
+  const RENT = 'Money/Rent.md';
+  const BILLS = 'Money/Bills.md';
+
+  it('follows what is stored when nothing has been pressed', () => {
+    expect(
+      foldedForView({ notePath: RENT, arrivedWithSearch: false, stored: true, pressed: null }),
+    ).toBe(true);
+    expect(
+      foldedForView({ notePath: RENT, arrivedWithSearch: false, stored: false, pressed: null }),
+    ).toBe(false);
+  });
+
+  it('shows the list on a note arrived at with a search, whatever is stored', () => {
+    expect(
+      foldedForView({ notePath: RENT, arrivedWithSearch: true, stored: true, pressed: null }),
+    ).toBe(false);
+  });
+
+  it('folds that note once the list is folded there', () => {
+    const pressed = { notePath: RENT, folded: true };
+    expect(foldedForView({ notePath: RENT, arrivedWithSearch: true, stored: true, pressed })).toBe(
+      true,
+    );
+  });
+
+  it('keeps a press on the note it was made on where storage kept nothing', () => {
+    const pressed = { notePath: RENT, folded: true };
+    expect(
+      foldedForView({ notePath: RENT, arrivedWithSearch: false, stored: false, pressed }),
+    ).toBe(true);
+    // The next note reads storage, which a blocked browser says is shown.
+    expect(
+      foldedForView({ notePath: BILLS, arrivedWithSearch: false, stored: false, pressed }),
+    ).toBe(false);
+  });
+
+  it('carries a stored fold to the next note', () => {
+    const pressed = { notePath: RENT, folded: true };
+    expect(
+      foldedForView({ notePath: BILLS, arrivedWithSearch: false, stored: true, pressed }),
+    ).toBe(true);
   });
 });
