@@ -81,7 +81,7 @@ export async function loadAgenda(
     tasks.map((task) => task.id),
     todo,
   );
-  const anchors = await resolveAnchors(links, clients);
+  const anchors = await resolveAnchors(links, clients, account.timezone);
 
   // Only asked for when something might need it: the dismissal overlay exists
   // for sources, and a page with no sources on has nothing to overlay.

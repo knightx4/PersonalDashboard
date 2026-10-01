@@ -124,7 +124,7 @@ export function TaskRow({
   task: Task;
   timezone: string;
   /** What the task is about, when the list is not already inside that thing. */
-  anchor?: { label: string; href: string } | null;
+  anchor?: { label: string; href: string; gone?: string } | null;
   /**
    * The smaller todos written under this task, ticked ones included.
    *
@@ -460,6 +460,10 @@ export function TaskRow({
                 {anchor.label}
               </a>
             )}
+            {/* A subscribed appointment the calendar has dropped: the label is
+                the name and date saved when it was linked, and this says why
+                it is not the meeting as it stands now. */}
+            {anchor?.gone && <span className="truncate text-small text-ink-muted">{anchor.gone}</span>}
 
             {under && (
               <span className="truncate text-small text-ink-muted">
