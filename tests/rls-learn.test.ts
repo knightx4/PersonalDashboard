@@ -118,6 +118,7 @@ describe('RLS coverage', () => {
       'concept_state',
       'concept_subjects',
       'concepts',
+      'course_reads',
       'curriculum_units',
       'feed_cards',
       'goals',
@@ -1959,6 +1960,93 @@ describe('the channels found for a subject', () => {
     await admin`delete from subjects where id = ${subjectA}`;
     const left = await admin`select id from subject_channels where subject_id = ${subjectA}`;
     expect(left).toHaveLength(0);
+  });
+});
+
+describe('courses read in from a transcript', () => {
+  // 0086_course_reads.sql (plan #1389). One row per course from the vault's
+  // Education tab that has been read into Learn, with the track it went into.
+  let transcriptA = '';
+  let courseA = '';
+  let subjectA = '';
+
+  async function seedCourse(userId: string, transcriptId: string, title: string): Promise<string> {
+    const [row] = await admin<{ id: string }[]>`
+      insert into obsidian.courses (user_id, transcript_id, school, title, position)
+      values (${userId}, ${transcriptId}, 'State University', ${title}, 0)
+      returning id`;
+    return row.id;
+  }
+
+  beforeAll(async () => {
+    const [t] = await admin<{ id: string }[]>`
+      insert into obsidian.transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
+      values (${userA}, 'State University', 'record.pdf', ${`${userA}/${crypto.randomUUID()}-record.pdf`},
+              'application/pdf', 1000)
+      returning id`;
+    transcriptA = t.id;
+    courseA = await seedCourse(userA, transcriptA, 'Principles of Economics');
+    const [s] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Economics') returning id`;
+    subjectA = s.id;
+    await asUser(
+      userA,
+      (tx) => tx`insert into course_reads (user_id, course_id, subject_id, concepts_added)
+                 values (${userA}, ${courseA}, ${subjectA}, 7)`,
+    );
+  });
+
+  it('shows the owner their records and another user none', async () => {
+    const own = await asUser(userA, (tx) => tx`select course_id, concepts_added from course_reads`);
+    const other = await asUser(userB, (tx) => tx`select id from course_reads`);
+    expect(own).toEqual([{ course_id: courseA, concepts_added: 7 }]);
+    expect(other).toHaveLength(0);
+  });
+
+  it("does not let a user record another account's course, or change a record of theirs", async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into course_reads (user_id, course_id) values (${userB}, ${courseA})`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userA,
+        (tx) => tx`insert into course_reads (user_id, course_id) values (${userB}, ${courseA})`,
+      ),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update course_reads set concepts_added = 0`);
+    await asUser(userB, (tx) => tx`delete from course_reads`);
+    const [row] = await admin<{ concepts_added: number }[]>`
+      select concepts_added from course_reads where course_id = ${courseA}`;
+    expect(row.concepts_added).toBe(7);
+  });
+
+  it('holds a course once, and refuses a negative count', async () => {
+    await expect(
+      admin`insert into course_reads (user_id, course_id) values (${userA}, ${courseA})`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update course_reads set concepts_added = -1 where course_id = ${courseA}`,
+    ).rejects.toThrow();
+  });
+
+  it('keeps the record when its track is deleted, and drops it with the course', async () => {
+    await admin`delete from subjects where id = ${subjectA}`;
+    const [kept] = await admin<{ subject_id: string | null }[]>`
+      select subject_id from course_reads where course_id = ${courseA}`;
+    expect(kept.subject_id).toBeNull();
+
+    await admin`delete from obsidian.courses where id = ${courseA}`;
+    expect(await admin`select id from course_reads where course_id = ${courseA}`).toHaveLength(0);
+  });
+
+  it('drops the record with the transcript its course came from', async () => {
+    const course = await seedCourse(userA, transcriptA, 'Calculus I');
+    await admin`insert into course_reads (user_id, course_id) values (${userA}, ${course})`;
+    await admin`delete from obsidian.transcripts where id = ${transcriptA}`;
+    expect(await admin`select id from course_reads where course_id = ${course}`).toHaveLength(0);
   });
 });
 
