@@ -1,18 +1,18 @@
 /**
- * The search bar at rest.
+ * The ways into search, and where they land (plan #1363).
  *
- * What is worth pinning here is the state the bar is in before anybody touches
- * it, because that is the state it is in on every page load: a field, a chip
- * naming the workspace, no list, and no request. The keys and the chip's
- * effect on the list need a browser, which these tests do not have; what they
- * can hold is that the bar draws the workspace it was given, draws no chip
- * where there is no workspace to narrow to, and asks the hook for nothing
- * until the field has the cursor.
+ * The field in the top bar is a button drawn as a field: a press opens the
+ * search box over the page, and nothing drops under the field. ⌘K opens the
+ * same box at any width. Every opening starts on everything you own, so the
+ * box opened inside a workspace says "Everything" on its chip.
+ *
+ * These tests have no browser, so the click is the button's own handler called
+ * directly and the shortcut is the test the shell's listener runs on each key.
  */
 import { describe, expect, it, vi } from 'vitest';
+import { isValidElement, type ReactElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { NavSection } from '@/components/shell/app-shell';
-import type { ModuleId } from '@/lib/modules';
 import { SYSTEM_THEME } from '@/lib/theme';
 
 vi.mock('next/navigation', () => ({
@@ -21,11 +21,12 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-/** Every row the hook can offer comes from a fetch, so a bar that asks fails loudly. */
-const fetched = vi.fn(() => Promise.reject(new Error('the bar fetched before it was focused')));
+/** Every row the box can offer comes from a fetch, and a static render makes none. */
+const fetched = vi.fn(() => Promise.reject(new Error('fetched during a static render')));
 vi.stubGlobal('fetch', fetched);
 
-const { SearchBar } = await import('@/components/shell/search-bar');
+const { SearchBar, isSearchShortcut } = await import('@/components/shell/search-bar');
+const { CommandPalette } = await import('@/components/shell/command-palette');
 const { CaptureProvider } = await import('@/components/shell/capture');
 
 const sections: NavSection[] = [
@@ -33,66 +34,69 @@ const sections: NavSection[] = [
   { href: '/jobs/pipeline', label: 'Pipeline' },
 ];
 
-function render(module: ModuleId | null): string {
-  return renderToStaticMarkup(
-    <CaptureProvider>
-      <SearchBar
-        account="11111111-1111-4111-8111-111111111111"
-        module={module}
-        sections={sections}
-        theme={SYSTEM_THEME}
-      />
-    </CaptureProvider>,
-  );
+/** The first element of a type in a tree the component returned. */
+function find(node: ReactNode, type: string): ReactElement<Record<string, unknown>> | null {
+  if (!isValidElement<Record<string, unknown>>(node)) return null;
+  if (node.type === type) return node;
+  const children = node.props.children as ReactNode;
+  for (const child of Array.isArray(children) ? children : [children]) {
+    const hit = find(child, type);
+    if (hit) return hit;
+  }
+  return null;
 }
 
-describe('the chip', () => {
-  it('names the workspace the bar is standing in', () => {
-    const html = render('jobs');
-    expect(html).toContain('Job search');
-    // The word on the chip is the state it is in, and the press offers the
-    // choice rather than making it -- the menu is what carries both scopes.
-    expect(html).toContain('Searching Job search. Choose what to search');
-    expect(html).toContain('aria-haspopup="menu"');
+describe('the field in the top bar', () => {
+  it('opens the search box on a click', () => {
+    const onOpen = vi.fn();
+    const button = find(SearchBar({ onOpen }), 'button');
+    expect(button).not.toBeNull();
+    (button!.props.onClick as () => void)();
+    expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
-  it('is absent outside a workspace, where there is nothing to narrow to', () => {
-    const html = render(null);
-    expect(html).not.toContain('Searching');
-    expect(html).not.toContain('<button');
-  });
-});
-
-describe('the bar at rest', () => {
-  it('shows no list until the field has the cursor', () => {
-    // The rows are drawn in a floating panel, so the panel's own class is the
-    // thing to look for rather than any one row.
-    expect(render('jobs')).not.toContain('popover-panel');
-  });
-
-  it('fetches nothing', () => {
-    render('jobs');
+  it('is a button that opens a dialog, with nothing to type into and no list under it', () => {
+    const html = renderToStaticMarkup(<SearchBar onOpen={() => {}} />);
+    expect(html).toContain('aria-haspopup="dialog"');
+    expect(html).not.toContain('<input');
+    expect(html).not.toContain('popover-panel');
     expect(fetched).not.toHaveBeenCalled();
   });
-});
 
-describe('the chip at rest', () => {
-  it('shows the mark and leaves the name to its label and the menu', () => {
-    const html = render('jobs');
-    expect(html).toContain('title="Searching Job search"');
-    expect(html).not.toContain('>Job search</span>');
+  it('says ⌘K beside it, hidden until a modifier is held like every other hint', () => {
+    const html = renderToStaticMarkup(<SearchBar onOpen={() => {}} />);
+    expect(html).toContain('aria-keyshortcuts="Meta+K Control+K"');
+    expect(html).toMatch(/<kbd[^>]*class="keyhint [^"]*"[^>]*>⌘K<\/kbd>/);
   });
 });
 
 describe('the shortcut', () => {
-  it('says ⌘K beside the field, the key that puts the cursor there', () => {
-    const html = render('jobs');
-    expect(html).toContain('⌘K');
-    expect(html).toContain('aria-keyshortcuts="Meta+K Control+K"');
+  it('is ⌘K, or Ctrl+K off a Mac', () => {
+    expect(isSearchShortcut({ key: 'k', metaKey: true, ctrlKey: false })).toBe(true);
+    expect(isSearchShortcut({ key: 'K', metaKey: true, ctrlKey: false })).toBe(true);
+    expect(isSearchShortcut({ key: 'k', metaKey: false, ctrlKey: true })).toBe(true);
   });
 
-  it('hides the cap until a modifier is held, like every other hint', () => {
-    const html = render('jobs');
-    expect(html).toMatch(/<kbd[^>]*class="keyhint [^"]*"[^>]*>⌘K<\/kbd>/);
+  it('is not a plain k, or another key with the modifier', () => {
+    expect(isSearchShortcut({ key: 'k', metaKey: false, ctrlKey: false })).toBe(false);
+    expect(isSearchShortcut({ key: 'j', metaKey: true, ctrlKey: false })).toBe(false);
+  });
+});
+
+describe('the box it opens', () => {
+  it('starts on Everything inside a workspace', () => {
+    const html = renderToStaticMarkup(
+      <CaptureProvider>
+        <CommandPalette
+          account="11111111-1111-4111-8111-111111111111"
+          module="jobs"
+          sections={sections}
+          theme={SYSTEM_THEME}
+          open
+          onOpenChange={() => {}}
+        />
+      </CaptureProvider>,
+    );
+    expect(html).toContain('Searching Everything. Choose what to search');
   });
 });
