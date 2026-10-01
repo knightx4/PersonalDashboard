@@ -1,8 +1,8 @@
 /**
  * What a task can be about.
  *
- * Fourteen targets across six schemas, named once here so that adding a
- * fifteenth is a line in this file, a column in the migration and an edited
+ * Fifteen targets across seven schemas, named once here so that adding a
+ * sixteenth is a line in this file, a column in the migration and an edited
  * check constraint -- rather than a search for every place a target list was
  * written out by hand.
  *
@@ -14,6 +14,10 @@
  * date. lib/todo/links/appointment.ts finds the current copy. Wherever a
  * function here takes a target id, the id for `appointment` is the
  * feed_events row the person opened, which write.ts turns into that name.
+ *
+ * `story` arrived with migrations-goals/0065 (plan #1367): a newsletter
+ * story saved in News, so a todo made from a story opens it where its text
+ * lives. Unsaving the story keeps its row while a link points at it.
  *
  * `goal` arrived with migrations-goals/0062 (plan #1263): a task handed to
  * Dash as an errand points at the errand it became. It references
@@ -45,6 +49,7 @@ export const LINK_TARGETS = [
   'subject',
   'goal',
   'appointment',
+  'story',
 ] as const;
 
 export type LinkTarget = (typeof LINK_TARGETS)[number];
@@ -67,6 +72,7 @@ export const TARGET_COLUMNS: Record<LinkTarget, string> = {
   subject: 'subject_id',
   goal: 'goal_id',
   appointment: 'feed_id',
+  story: 'saved_story_id',
 };
 
 /**
