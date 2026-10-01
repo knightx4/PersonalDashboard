@@ -10,11 +10,12 @@ import { goalsInTurn } from './rate';
  * The goals Practice Flow takes goal turns for (plan #1385), in the order
  * they take them.
  *
- * Only open goals: the active ones with no list behind them. The Level 3 goal
- * is asked about through its claimed articles (#1386), and an archived goal is
- * not asked about at all. The one with the fewest questions written about it
- * goes first, counting the ones waiting in the queue, so two goals alternate
- * and a new goal is asked about straight away.
+ * Every active goal, the Level 3 goal included: its questions are about the
+ * articles claimed on it (#1386, `writeLevel3Question`), and they go in its
+ * survey subject like any other goal's, so they count towards its turn here.
+ * An archived goal is not asked about at all. The one with the fewest
+ * questions written about it goes first, counting the ones waiting in the
+ * queue, so two goals alternate and a new goal is asked about straight away.
  *
  * Read through the session, so RLS keeps every row to the viewer's own.
  */
@@ -41,17 +42,15 @@ async function inChunks<T>(
   return rows;
 }
 
-/** The open goals, the one asked about least first. Empty with none. */
+/** The active goals, the one asked about least first. Empty with none. */
 export async function loadGoalsInTurn(supabase: LearnSupabaseClient): Promise<GoalAim[]> {
-  const goals: GoalAim[] = (await loadActiveAims(supabase))
-    .filter((aim) => aim.listSource === null)
-    .map((aim) => ({
-      id: aim.id,
-      name: aim.name,
-      about: aim.about,
-      depth: aim.depth,
-      listSource: aim.listSource,
-    }));
+  const goals: GoalAim[] = (await loadActiveAims(supabase)).map((aim) => ({
+    id: aim.id,
+    name: aim.name,
+    about: aim.about,
+    depth: aim.depth,
+    listSource: aim.listSource,
+  }));
   if (goals.length === 0) return [];
 
   const { data, error } = await supabase

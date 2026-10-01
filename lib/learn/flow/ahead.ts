@@ -13,6 +13,7 @@ import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { loadSurveyPool } from '@/lib/learn/survey/load';
 import type { SurveyPool } from '@/lib/learn/survey/pick';
 import { writeGoalQuestion, type GoalAim } from '@/lib/learn/survey/goal-question';
+import { writeLevel3Question } from '@/lib/learn/survey/level3-question';
 import { loadGoalsInTurn } from '@/lib/learn/survey/goal-turns';
 import { writeSurveyQuestion } from '@/lib/learn/survey/question';
 import {
@@ -61,6 +62,8 @@ import { loadTrackInterest, sharesFrom } from './interest-load';
  * `flowSlots`. A goal question goes in the goal's hidden survey subject, so the
  * readers here tell it apart by the subject's `aim_id`, and name it after the
  * goal. A waiting question about a goal archived since is thrown away unshown.
+ * The Level 3 goal takes its turns too, with questions about the articles you
+ * claimed and have not been tested on (plan #1386).
  */
 
 /**
@@ -698,7 +701,9 @@ async function writeGoals(input: {
     while (written.length < input.count) {
       const aim = queue.shift();
       if (!aim) break;
-      const result = await writeGoalQuestion({
+      // The Level 3 goal asks about the articles claimed on it (plan #1386).
+      const write = aim.listSource ? writeLevel3Question : writeGoalQuestion;
+      const result = await write({
         supabase: input.supabase,
         userId: input.userId,
         aim,
@@ -734,7 +739,7 @@ async function writeGoals(input: {
   return written;
 }
 
-/** The open goals in turn, or none when they cannot be read. */
+/** The active goals in turn, or none when they cannot be read. */
 function goalsOrNone(supabase: LearnSupabaseClient): Promise<GoalAim[]> {
   return loadGoalsInTurn(supabase).catch((error: unknown) => {
     console.error('[learn flow] goals', error instanceof Error ? error.message : error);

@@ -41,8 +41,8 @@ Practice Flow, at `/learn/flow`, asks one question after another. Since plan
   a hidden subject that no list of your tracks shows (decision #838), and the
   screen names the vault subject and its field above the question, with a line
   saying it is not one of your tracks.
-- **Your open learning goals.** A goal you set on the Goals tab with no list
-  behind it, such as startup finance. See "Goal questions" below.
+- **Your learning goals.** A goal you set on the Goals tab, such as startup
+  finance, and the Level 3 goal. See "Goal questions" below.
 
 A filter at the top of the page chooses between them:
 
@@ -115,8 +115,17 @@ Goal questions are written ahead into the same queue. One that cannot be
 written gives its turn to a track question, and a goal that already has a
 track of its own name is asked about through that track. A waiting question
 about a goal you have since archived is thrown away unshown. Tracks only and a
-focused track leave goal questions out. The Level 3 goal is not asked about
-here; its questions are about the articles you claimed (plan #1386).
+focused track leave goal questions out.
+
+The Level 3 goal takes its goal turns like any other goal, but its questions
+are about the articles you claimed (a Got it or a save) and have not yet been
+tested on (plan #1386), read from `learn.level3_untested_claims`. The article
+asked about least goes first, the longest claimed between equals, and one with
+a question already waiting is skipped. The idea is written from a section one
+of the article's cards was cut from. It is kept in the Level 3 goal's hidden
+subject and cross-listed under the subject named after the article, which is
+what `learn.article_evidence` reads, so a right answer moves the article from
+claimed to tested on the Goals page.
 
 An answered goal question counts towards the goal's field on the Know grid,
 as a survey answer does, and so towards the survey rate above. A goal not
