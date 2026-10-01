@@ -13,8 +13,9 @@
 -- write these rows. The account owns them either way.
 --
 -- These rows are a copy and are treated as one: a refresh replaces what a
--- subscription contributed last time, and nothing else in the app may point at
--- a feed_events row, because the next read can drop it.
+-- subscription contributed last time, so nothing may hold a feed_events id,
+-- because the next read can drop it. A task about an appointment names it by
+-- subscription, UID and date instead (migrations-goals/0064, plan #1373).
 -- ---------------------------------------------------------------------------
 
 set search_path = todo, public, extensions;
