@@ -26,7 +26,7 @@ import { Disclosure, Group } from '@/components/ui/disclosure';
 import { MODULES } from '@/lib/modules';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { ModuleMark } from '@/components/ui/module-mark';
-import { DASH_STATES, DashMark, type DashState } from '@/components/ui/dash-mark';
+import { DASH_ACTIVITIES, DASH_STATES, DashMark, type DashActivity, type DashState } from '@/components/ui/dash-mark';
 import { SearchMark } from '@/components/ui/search-mark';
 import {
   APPLICATION_STATUS_GLYPHS,
@@ -471,11 +471,19 @@ const DENSITY_IDS = ['comfortable', 'snug', 'dense'] as const;
 /** The page in order, for the contents row. */
 /** What each state of the Dash mark looks like, for the Marks section. */
 const DASH_STATE_NOTES: Record<DashState, string> = {
-  idle: 'Three faint squares and the solid node, top right. The default.',
+  idle: 'The visor standing level, blinking now and then. The default.',
   working:
-    'The squares shrink to dots and the node circles them. Indeterminate: nothing fills, because a run does not report how far it has got. Under reduced motion the node stays put.',
-  done: 'All four squares solid, with one flash as it settles.',
-  failed: 'All four squares hollow, and nothing moves. Always beside the error text.',
+    'The visor leans forward and rattles, with speed lines streaming off the back. Indeterminate: nothing fills, because a run does not report how far it has got. Under reduced motion it keeps the lean.',
+  done: 'Happy eyes under a chequered flag, with one flash as it settles and the flag waving three times.',
+  failed: 'The visor hollow with flat eyes, under a plain flag hanging limp. Nothing moves. Always beside the error text.',
+};
+
+/** The kinds of work a working mark can show, for the Marks section. */
+const DASH_ACTIVITY_NOTES: Record<DashActivity, string> = {
+  reading: 'Eyes lowered and jumping along a line, over two lines of text.',
+  searching: 'Eyes sweeping wide while a ring pings out from the visor.',
+  writing: 'Eyes lowered to a line drawing out under the visor towards a blinking caret.',
+  thinking: 'Eyes glancing up to one corner, then the other. At rest they look up into the corner.',
 };
 
 const CONTENTS: readonly (readonly [string, string])[] = [
@@ -1545,7 +1553,7 @@ export default function DevUiPage() {
       <Section
         id="marks"
         title="Marks"
-        lead="One mark per workspace, one for the app, Dash's own mark beside them, and the ring and dot that opens search. Dash's mark is drawn in currentColor, so it takes the colour of where it sits, and each of its four states has its own shape so a still frame still says which it is."
+        lead="One mark per workspace, one for the app, Dash's own mark beside them, and the ring and dot that opens search. Dash's mark is a visor cut from the app icon's dash. It is drawn in currentColor, so it takes the colour of where it sits, and each of its four states, and each kind of work it can show, has its own shape so a still frame still says which it is."
       >
         <Card padding="none">
           <ul className="divide-y divide-border">
@@ -1563,6 +1571,15 @@ export default function DevUiPage() {
                 <DashMark state={state} size="icon" className="text-ink-muted" />
                 <span className="w-20 shrink-0 text-ui text-ink">{state}</span>
                 <span className="text-small text-ink-muted">{DASH_STATE_NOTES[state]}</span>
+              </li>
+            ))}
+            {DASH_ACTIVITIES.map((activity) => (
+              <li key={activity} className="card-pad-x row-pad flex items-center gap-3">
+                <DashMark state="working" activity={activity} size="md" className="text-accent" />
+                <DashMark state="working" activity={activity} size="xs" className="text-accent" />
+                <DashMark state="working" activity={activity} size="icon" className="text-ink-muted" />
+                <span className="w-20 shrink-0 text-ui text-ink">{activity}</span>
+                <span className="text-small text-ink-muted">{DASH_ACTIVITY_NOTES[activity]}</span>
               </li>
             ))}
             <li className="card-pad-x row-pad flex items-center gap-3">

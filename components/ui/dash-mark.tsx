@@ -1,31 +1,53 @@
+import { useId } from 'react';
 import { cn } from '@/lib/cn';
 import { GROUND } from './module-mark';
 
 /**
- * Dash's own mark, in four states: idle, working, done and failed.
+ * Dash's own mark: a visor with two eyes, cut from the fat dash of the app
+ * icon. It has four states, and working comes in five kinds.
  *
- * It is drawn from the parts the module marks were first built from: four
- * rounded squares in a two-by-two grid on the superellipse ground, one of them
- * the coloured node. Everything is in currentColor, so the mark takes the
- * accent (or the danger colour, or ink) of wherever it is placed.
+ * The visor is the app icon's dash grown tall enough to hold a pair of eyes,
+ * which are cut out of it the way the module marks cut their one detail: the
+ * tinted ground shows through, so the eyes are right in every theme without a
+ * branch. Everything is in currentColor, so the mark takes the accent (or the
+ * danger colour, or ink) of wherever it is placed.
  *
- * Each state has its own shape, so a still frame says which one it is and the
- * mark still reads under reduced motion, when nothing moves at all:
+ * The racing theme comes from Speed Racer, and it only shows when something is
+ * happening. At rest the visor stands level and calm beside text.
  *
- *   idle     three faint squares and the solid node, top right.
- *   working  the three squares shrink to dots and the node moves round them.
- *            Indeterminate: it circles at one pace and never fills, because a
- *            run does not yet report how far it has got.
- *   done     all four squares solid, with one flash as it settles.
- *   failed   all four squares hollow, and nothing moves.
+ *   idle      the visor, level, blinking now and then.
+ *   working   the visor leans forward with speed lines streaming off the back
+ *             and a slight rattle. Indeterminate: nothing fills, because a run
+ *             does not report how far it has got.
+ *   done      the visor stands back up with happy eyes, under a chequered flag
+ *             that waves on a pole above its corner, with one flash as it
+ *             settles.
+ *   failed    the same pole with a plain flag hanging limp, and the visor
+ *             hollow with flat eyes. Nothing moves.
  *
- * The motion is two utilities in app/globals.css, dash-mark-orbit and
- * dash-mark-flash, and both are switched off in the reduced-motion block.
+ * Working can say what kind of work it is, when the caller knows:
+ *
+ *   reading    level, eyes lowered and jumping along a line, over two lines of
+ *              text.
+ *   searching  level, eyes sweeping wide while a ring pings out from the visor.
+ *   writing    level, eyes lowered to a line being drawn out under the visor
+ *              towards a blinking caret.
+ *   thinking   level, eyes glancing up to one corner, then the other.
+ *
+ * Every state and every kind has its own still shape, so a single frame says
+ * which it is and the mark still reads under reduced motion, when nothing
+ * moves. The motion is the dash-mark-* utilities in app/globals.css, all of
+ * them switched off in the reduced-motion block.
  */
 
 export type DashState = 'idle' | 'working' | 'done' | 'failed';
 
 export const DASH_STATES: readonly DashState[] = ['idle', 'working', 'done', 'failed'];
+
+/** What kind of work a working mark shows. Without one it leans and races. */
+export type DashActivity = 'reading' | 'searching' | 'writing' | 'thinking';
+
+export const DASH_ACTIVITIES: readonly DashActivity[] = ['reading', 'searching', 'writing', 'thinking'];
 
 /** What a screen reader hears for each state when no label is passed. */
 export const DASH_STATE_LABELS: Record<DashState, string> = {
@@ -35,8 +57,16 @@ export const DASH_STATE_LABELS: Record<DashState, string> = {
   failed: 'Dash could not finish',
 };
 
+/** What a screen reader hears for a working mark that says what it is doing. */
+export const DASH_ACTIVITY_LABELS: Record<DashActivity, string> = {
+  reading: 'Dash is reading',
+  searching: 'Dash is searching',
+  writing: 'Dash is writing',
+  thinking: 'Dash is thinking',
+};
+
 /**
- * The first two match the Lucide icons the mark replaces (size-3.5 and
+ * The first two match the Lucide icons the mark replaced (size-3.5 and
  * size-4); the other four are ModuleMark's sizes, so the mark can stand beside
  * a module mark at the same size.
  */
@@ -51,136 +81,243 @@ const SIZES = {
 
 export type DashMarkSize = keyof typeof SIZES;
 
-/** The grid: top-left corner of each square, in reading order. */
-const CELLS = [
-  { x: 5, y: 5 },
-  { x: 13, y: 5 },
-  { x: 5, y: 13 },
-  { x: 13, y: 13 },
-] as const;
-/** The node's home: the top-right square, where the module marks kept their key. */
-const NODE = 1;
-const CELL = 6;
-const RADIUS = 1.8;
-/** Hollow squares keep their outer edge where the solid ones are. */
-const STROKE = 1.6;
-/** A working cell shrinks to this, about its own centre. */
-const DOT = 2.4;
-const FAINT = 0.32;
+/** The visor: the icon's dash, tall enough for eyes. */
+const VISOR = { x: 2.2, y: 7.6, width: 19.6, height: 8.8 } as const;
+/** The eyes' left edges; both are 2.4 wide and 4.4 tall, from y 9.8. */
+const EYES = [7.6, 14] as const;
+/** The leaning visor while working, a little shorter so the lines fit behind. */
+const LEANING = { x: 5.6, y: 7.8, width: 16.4, height: 8.4 } as const;
+const LEANING_EYES = [9.6, 15.6] as const;
+/** Done and failed sit lower, to leave room for the flag above. */
+const FLAG_DROP = 2.2;
+/** The flag pole's x, and the chequered flag's cell. */
+const POLE = 15.6;
+const CHECK = 1.4;
+const STROKE = 1.4;
 
-function Square({
+function Pill({
   x,
   y,
-  hollow,
-  opacity,
-}: {
-  x: number;
-  y: number;
-  hollow?: boolean;
-  opacity?: number;
-}) {
-  if (hollow) {
-    const inset = STROKE / 2;
-    return (
-      <rect
-        x={x + inset}
-        y={y + inset}
-        width={CELL - STROKE}
-        height={CELL - STROKE}
-        rx={RADIUS - inset}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={STROKE}
-        strokeOpacity={opacity}
-      />
-    );
-  }
+  width,
+  height,
+  ...rest
+}: { x: number; y: number; width: number; height: number } & React.SVGProps<SVGRectElement>) {
+  return <rect x={x} y={y} width={width} height={height} rx={height / 2} {...rest} />;
+}
+
+/** The visor outline, for failed: the outer edge stays where the solid one is. */
+function HollowVisor() {
+  const inset = STROKE / 2;
   return (
-    <rect
-      x={x}
-      y={y}
-      width={CELL}
-      height={CELL}
-      rx={RADIUS}
-      fill="currentColor"
-      fillOpacity={opacity}
+    <Pill
+      x={VISOR.x + inset}
+      y={VISOR.y + inset}
+      width={VISOR.width - STROKE}
+      height={VISOR.height - STROKE}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={STROKE}
     />
   );
 }
 
-function Glyph({ state }: { state: DashState }) {
-  const node = CELLS[NODE];
-  const others = CELLS.filter((_, index) => index !== NODE);
+/** The visor with whatever is drawn in `cuts` cut out of it (black cuts, white keeps). */
+function CutVisor({ id, cuts, box = VISOR }: { id: string; cuts: React.ReactNode; box?: typeof VISOR | typeof LEANING }) {
+  return (
+    <>
+      <mask id={id} maskUnits="userSpaceOnUse" x={0} y={0} width={24} height={24}>
+        <rect width={24} height={24} fill="#fff" />
+        {cuts}
+      </mask>
+      <Pill {...box} fill="currentColor" mask={`url(#${id})`} />
+    </>
+  );
+}
 
-  switch (state) {
-    case 'working': {
-      const offset = (CELL - DOT) / 2;
+function Eyes({
+  x = EYES,
+  y = 9.8,
+  className,
+  transform,
+}: {
+  x?: readonly number[];
+  y?: number;
+  className?: string;
+  /** Where the eyes rest when their motion is off. */
+  transform?: string;
+}) {
+  return (
+    <g className={className} transform={transform}>
+      {x.map((ex) => (
+        <rect key={ex} x={ex} y={y} width={2.4} height={4.4} rx={1.2} fill="#000" />
+      ))}
+    </g>
+  );
+}
+
+/** Two upturned arcs: the happy eyes of done. */
+const HAPPY = 'M7.4 13.3Q8.8 10.4 10.2 13.3M13.8 13.3Q15.2 10.4 16.6 13.3';
+
+function ChequeredFlag() {
+  const cells: React.ReactNode[] = [];
+  for (let col = 0; col < 5; col += 1) {
+    for (let row = 0; row < 3; row += 1) {
+      if ((col + row) % 2 === 0) {
+        cells.push(
+          <rect
+            key={`${col}-${row}`}
+            x={POLE + col * CHECK}
+            y={1.6 + row * CHECK}
+            width={CHECK}
+            height={CHECK}
+            fill="currentColor"
+          />,
+        );
+      }
+    }
+  }
+  return (
+    <g className="dash-mark-wave">
+      {cells}
+      <rect x={POLE} y={1.6} width={CHECK * 5} height={CHECK * 3} fill="none" stroke="currentColor" strokeWidth={0.5} />
+    </g>
+  );
+}
+
+const Pole = () => (
+  <path d={`M${POLE} ${VISOR.y + FLAG_DROP}V1.6`} stroke="currentColor" strokeWidth={1} strokeLinecap="round" />
+);
+
+function Working({ id, activity }: { id: string; activity?: DashActivity }) {
+  switch (activity) {
+    case 'reading':
       return (
         <>
-          {others.map((cell) => (
-            <rect
-              key={`${cell.x}-${cell.y}`}
-              x={cell.x + offset}
-              y={cell.y + offset}
-              width={DOT}
-              height={DOT}
-              rx={DOT / 2}
+          <CutVisor id={id} cuts={<Eyes y={10.6} className="dash-mark-read" />} />
+          <path d="M6 19H18M6 21.4H13" stroke="currentColor" strokeWidth={1.2} strokeLinecap="round" opacity={0.5} />
+        </>
+      );
+
+    case 'searching':
+      return (
+        <>
+          <circle
+            className="dash-mark-ping"
+            cx={12}
+            cy={12}
+            r={7}
+            stroke="currentColor"
+            strokeWidth={1}
+            opacity={0.45}
+          />
+          <CutVisor id={id} cuts={<Eyes className="dash-mark-sweep" />} />
+        </>
+      );
+
+    case 'writing':
+      return (
+        <>
+          <CutVisor id={id} cuts={<Eyes y={10.6} />} />
+          <Pill className="dash-mark-write" x={5} y={18.6} width={12} height={1.6} fill="currentColor" />
+          <rect className="dash-mark-caret" x={18.2} y={17.4} width={1.2} height={4} rx={0.4} fill="currentColor" />
+        </>
+      );
+
+    case 'thinking':
+      // At rest the eyes look up into the corner, so a still frame is not idle.
+      return <CutVisor id={id} cuts={<Eyes className="dash-mark-ponder" transform="translate(1.8 -1.5)" />} />;
+
+    default:
+      return (
+        <>
+          {[
+            { x: 0.8, y: 9.2, width: 3.8, opacity: 0.55 },
+            { x: 0, y: 12, width: 4.4, opacity: 1 },
+            { x: 0.8, y: 14.8, width: 3.8, opacity: 0.55 },
+          ].map((line, index) => (
+            <Pill
+              key={line.y}
+              className="dash-mark-streak"
+              style={{ animationDelay: `${index * 180}ms` }}
+              x={line.x}
+              y={line.y - 0.7}
+              width={line.width}
+              height={1.4}
               fill="currentColor"
-              fillOpacity={FAINT}
+              opacity={line.opacity}
             />
           ))}
-          <g className="dash-mark-orbit">
-            <Square x={node.x} y={node.y} />
+          <g className="dash-mark-rattle">
+            <g transform="translate(12 12) skewX(-14) translate(-12 -12)">
+              <CutVisor id={id} box={LEANING} cuts={<Eyes x={LEANING_EYES} y={10} />} />
+            </g>
           </g>
         </>
       );
-    }
+  }
+}
+
+function Glyph({ state, activity, id }: { state: DashState; activity?: DashActivity; id: string }) {
+  switch (state) {
+    case 'working':
+      return <Working id={id} activity={activity} />;
 
     case 'done':
       return (
         <g className="dash-mark-flash">
-          {CELLS.map((cell) => (
-            <Square key={`${cell.x}-${cell.y}`} x={cell.x} y={cell.y} />
-          ))}
+          <g transform={`translate(0 ${FLAG_DROP})`}>
+            <CutVisor
+              id={id}
+              cuts={<path d={HAPPY} fill="none" stroke="#000" strokeWidth={1.8} strokeLinecap="round" />}
+            />
+          </g>
+          <Pole />
+          <ChequeredFlag />
         </g>
       );
 
     case 'failed':
       return (
         <>
-          {CELLS.map((cell, index) => (
-            <Square
-              key={`${cell.x}-${cell.y}`}
-              x={cell.x}
-              y={cell.y}
-              hollow
-              opacity={index === NODE ? undefined : 0.6}
+          <g transform={`translate(0 ${FLAG_DROP})`}>
+            <HollowVisor />
+            <path
+              d="M7.6 12.4H10.2M13.8 12.4H16.4"
+              stroke="currentColor"
+              strokeWidth={1.7}
+              strokeLinecap="round"
+              opacity={0.7}
             />
-          ))}
+          </g>
+          <Pole />
+          {/* A plain flag, hanging limp. */}
+          <path
+            d={`M${POLE} 1.8Q17.6 2.6 17 4.6Q16.6 6.2 17.4 7.6L${POLE} 7.2Z`}
+            stroke="currentColor"
+            strokeWidth={1}
+            strokeLinejoin="round"
+            opacity={0.75}
+          />
         </>
       );
 
     case 'idle':
     default:
-      return (
-        <>
-          {others.map((cell) => (
-            <Square key={`${cell.x}-${cell.y}`} x={cell.x} y={cell.y} opacity={FAINT} />
-          ))}
-          <Square x={node.x} y={node.y} />
-        </>
-      );
+      return <CutVisor id={id} cuts={<Eyes className="dash-mark-blink" />} />;
   }
 }
 
 export function DashMark({
   state = 'idle',
+  activity,
   size = 'icon',
   label,
   decorative = false,
   className,
 }: {
   state?: DashState;
+  /** What kind of work, for a working mark. Ignored in every other state. */
+  activity?: DashActivity;
   size?: DashMarkSize;
   /** Overrides the state's own accessible name. */
   label?: string;
@@ -191,18 +328,21 @@ export function DashMark({
   decorative?: boolean;
   className?: string;
 }) {
+  const id = `dash-mark-${useId().replace(/:/g, '')}`;
   const sizing = SIZES[size];
-  const name = label ?? DASH_STATE_LABELS[state];
+  const kind = state === 'working' ? activity : undefined;
+  const name = label ?? (kind ? DASH_ACTIVITY_LABELS[kind] : DASH_STATE_LABELS[state]);
 
   return (
     <span
       className={cn('inline-flex shrink-0 items-center justify-center', sizing.box, className)}
       data-dash-state={state}
+      {...(kind ? { 'data-dash-activity': kind } : {})}
       {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': name })}
     >
       <svg width={sizing.px} height={sizing.px} viewBox="0 0 24 24" fill="none" aria-hidden>
         <path d={GROUND} fill="currentColor" fillOpacity={0.12} />
-        <Glyph state={state} />
+        <Glyph state={state} activity={kind} id={id} />
       </svg>
     </span>
   );
