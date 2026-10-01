@@ -192,6 +192,7 @@ export const MOTION: readonly Row4[] = [
   ['toast-in', '6px rise, fade in', 'A toast arriving. Nothing on the way out.', '180ms'],
   ['flight', 'a chip crossing, fading as it lands', 'An item filed from capture, flying to the list it went to (flyChip in components/ui/fly-chip.ts). Longer than 150ms so the eye can follow it across the screen. Skipped in code under reduced motion.', '420ms'],
   ['puff', 'five soft circles spreading out and fading', 'The point something just left: the capture input as an item is filed, before the flight (puffAt in components/ui/puff.ts). Keyframes in app/globals.css, hidden under reduced motion, and skipped in code as well.', '360ms'],
+  ['landed-pulse', 'scale(1.08) and back, once', 'The nav row or workspace switcher a captured item landed on, as its name appears beside it (markLanded in components/ui/landed.ts). The name stays under reduced motion; the pulse does not.', '320ms'],
   ['keyhint', 'fade', 'Shortcut hints while a modifier is held.', '120ms'],
   ['status line', 'fade back', 'The line settling after it has been read.', '1000ms'],
   ['shimmer', 'a highlight crossing', 'A skeleton, and nothing else.', '1.6s loop'],

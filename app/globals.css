@@ -1662,6 +1662,23 @@ body[data-keyhints] .keyhint {
   animation: puff 360ms var(--ease-out-soft) both;
 }
 
+/* The place a captured item landed: one small swell and back. markLanded in
+ * components/ui/landed.ts adds it to the nav row or the workspace switcher
+ * and takes it off again after LANDED_PULSE_MS. */
+@keyframes landed-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.08);
+  }
+}
+
+@utility landed-pulse {
+  animation: landed-pulse 320ms var(--ease-out-soft) both;
+}
+
 @keyframes shimmer {
   100% {
     transform: translateX(100%);
@@ -1728,6 +1745,10 @@ body[data-keyhints] .keyhint {
 
   .puff {
     display: none;
+    animation: none;
+  }
+
+  .landed-pulse {
     animation: none;
   }
 }
