@@ -45,6 +45,7 @@ import { loadFilesOf } from '@/lib/goals/files-store';
 import { flagsWaiting } from '@/lib/goals/flags';
 import { formatDay } from '@/lib/goals/dates';
 import { goalStatus } from '@/lib/goals/goal-status';
+import { goalGlyph, goalProgress } from '@/lib/goals/status';
 import { isCurrent, type GoalReview } from '@/lib/goals/reviews';
 import { loadLatestReviews } from '@/lib/goals/reviews-store';
 import { goalFindings, goalStages, rhythmSteps } from '@/lib/goals/goal-page';
@@ -57,6 +58,7 @@ import { GoalStatusCard } from './goal-status';
 import { GoalFindings, GoalRhythms } from './goal-found';
 import { GoalAddRow } from './goal-add-row';
 import { GoalAreaMenu } from './goal-area-menu';
+import { GoalGlyph, GoalStepsFold } from './goal-close';
 import type { Place } from '../move-goal';
 import { GoalContext } from './goal-context';
 import { GoalFlags } from './goal-flags';
@@ -294,6 +296,12 @@ export default async function GoalMapPage({
   const canLink = (aimChoices?.length ?? 0) > 0 || jobsOn;
 
   const stages = errand ? null : goalStages(map.steps);
+  // The goal's hexagon, and the line its steps fold into once it is closed
+  // (plan #1341).
+  const closed = map.goal.status === 'done';
+  const progress = goalProgress(map.steps);
+  const hexagon = goalGlyph(map.goal.status, progress);
+  const stepsMeta = progress.live > 0 ? `${progress.done} of ${progress.live} done` : undefined;
   const shapingView = shapeable
     ? shapingLines(map.goal.status, map.steps, shaping.approvedAt, history, account.timezone)
     : null;
@@ -333,16 +341,19 @@ export default async function GoalMapPage({
       </Link>
       <PageHeader
         title={
-          errand && map.goal.dueOn ? (
-            <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <GoalHeadingField goalId={map.goal.id} field="title" value={map.goal.title} />
-              <span className="tabular font-sans text-ui font-normal tracking-normal whitespace-nowrap text-ink-muted">
-                Due {formatDay(map.goal.dueOn)}
+          <span className="flex items-center gap-2.5">
+            <GoalGlyph glyph={hexagon.glyph} label={hexagon.label} closed={closed} />
+            {errand && map.goal.dueOn ? (
+              <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <GoalHeadingField goalId={map.goal.id} field="title" value={map.goal.title} />
+                <span className="tabular font-sans text-ui font-normal tracking-normal whitespace-nowrap text-ink-muted">
+                  Due {formatDay(map.goal.dueOn)}
+                </span>
               </span>
-            </span>
-          ) : (
-            <GoalHeadingField goalId={map.goal.id} field="title" value={map.goal.title} />
-          )
+            ) : (
+              <GoalHeadingField goalId={map.goal.id} field="title" value={map.goal.title} />
+            )}
+          </span>
         }
         actions={
           <GoalAreaMenu
@@ -352,6 +363,7 @@ export default async function GoalMapPage({
               areaId: map.goal.areaId,
               errand: map.goal.errand ?? false,
               dueOn: map.goal.dueOn ?? null,
+              status: map.goal.status,
             }}
             places={places}
           />
@@ -383,14 +395,16 @@ export default async function GoalMapPage({
         {flags.length > 0 && <GoalFlags flags={flags} />}
         {shapingUp && shapingPanel}
         {!numberEmpty && <GoalNumber {...number} />}
-        <StepTree
-          map={map}
-          view={view}
-          todoOn={moduleEnabled(account, 'todo')}
-          runs={stepRunLines(stepRuns)}
-          files={filesOf}
-          progress={summariseProgress(progressEntries)}
-        />
+        <GoalStepsFold closed={closed} meta={stepsMeta}>
+          <StepTree
+            map={map}
+            view={view}
+            todoOn={moduleEnabled(account, 'todo')}
+            runs={stepRunLines(stepRuns)}
+            files={filesOf}
+            progress={summariseProgress(progressEntries)}
+          />
+        </GoalStepsFold>
         <GoalRhythms steps={rhythmSteps(map.steps)} records={map.rhythms} />
         <GoalFindings findings={goalFindings(map.steps)} />
         <RelatedNotes notes={related} className="px-1" />

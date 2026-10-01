@@ -194,3 +194,27 @@ export function StatusGlyph({
     </svg>
   );
 }
+
+/**
+ * The hexagon's outline alone, laid over a glyph of the same size and played
+ * outward once as the thing it marks finishes: a goal closing (plan #1341).
+ * The animation is the caller's class (`goal-ring` in app/globals.css); this
+ * only draws the shape, in `currentColor`, so the caller gives it the accent.
+ */
+export function StatusRing({ size = 14, className }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${BOX} ${BOX}`}
+      className={cn('pointer-events-none', className)}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={STROKE}
+      aria-hidden
+      focusable="false"
+    >
+      <polygon points={HEXAGON} />
+    </svg>
+  );
+}

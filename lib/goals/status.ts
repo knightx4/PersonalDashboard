@@ -23,6 +23,7 @@ import { awaitsReview } from '@/lib/goals/daily';
 import { isStepBlocked } from '@/lib/goals/dependencies';
 import { awaitsAnswer } from '@/lib/goals/shaping';
 import type { StepNode } from '@/lib/goals/steps';
+import type { GoalStatus } from '@/lib/goals/tree';
 import { PLAN_HEALTH_GLYPHS, type StatusGlyph } from '@/lib/status-glyphs';
 
 /**
@@ -382,4 +383,43 @@ export function goalMoveLabel(progress: GoalProgress): { word: string; tone: Dev
 /** "3 of 8 done". */
 export function progressWords(progress: GoalProgress): string {
   return `${progress.done} of ${plural(progress.live, 'step', 'steps')} done`;
+}
+
+/** A goal's state as one word, for the label on its hexagon. */
+const GOAL_GLYPH_WORD: Record<GoalStatus, string> = {
+  proposed: 'Proposed',
+  open: 'Open',
+  parked: 'Parked',
+  done: 'Closed',
+  dropped: 'Dropped',
+};
+
+/**
+ * The goal's own hexagon, beside its title (plan #1341). An open goal fills
+ * by the share of its steps done, a quarter at a time, and stops at three
+ * quarters even with every step closed: solid is kept for the goal itself
+ * being closed, so closing it is what completes the shape. Parked waits
+ * (dashed) and dropped is struck, as on the plan.
+ */
+export function goalGlyph(
+  status: GoalStatus,
+  progress: Pick<GoalProgress, 'live' | 'done'>,
+): { glyph: StatusGlyph; label: string } {
+  const word = GOAL_GLYPH_WORD[status];
+  if (status !== 'open') {
+    const closed: Record<Exclude<GoalStatus, 'open'>, StatusGlyph> = {
+      proposed: 'empty',
+      parked: 'dashed',
+      done: 'full',
+      dropped: 'slash',
+    };
+    return { glyph: closed[status], label: word };
+  }
+  const { live, done } = progress;
+  const label = live > 0 ? `${word}, ${done} of ${live} steps done` : word;
+  if (live === 0 || done === 0) return { glyph: 'empty', label };
+  // Compared rather than divided: a quarter, a half, three quarters done.
+  if (done * 4 >= live * 3) return { glyph: 'three-quarters', label };
+  if (done * 2 >= live) return { glyph: 'half', label };
+  return { glyph: 'quarter', label };
 }
