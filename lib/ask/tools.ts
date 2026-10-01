@@ -1,6 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { ModuleId } from '@/lib/modules';
-import { AskInputError, type AskContext, type AskToolResult } from './db';
+import { AskInputError, isOpenableHref, type AskContext, type AskToolResult } from './db';
+import { mailLookup } from './mail';
 import {
   APPLICATION_STATUSES,
   HIT_KIND_IDS,
@@ -48,7 +49,15 @@ export const ASK_TOOL_NAMES = [
   'read_spec',
   'read_dev_row',
   'find_dev_text',
+  'search_mail',
 ] as const;
+
+/**
+ * Tools the connector (lib/connector/mcp.ts) does not offer. Mail is searched
+ * in Gmail as the person, which a connector token cannot do, and its results
+ * are not to leave the app for another client.
+ */
+export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail'];
 
 export type AskToolName = (typeof ASK_TOOL_NAMES)[number];
 
@@ -282,6 +291,27 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'search_mail',
+    description:
+      'Search the person\'s email in Gmail as it is right now, across every mailbox they have connected, whichever workspaces are on. Matches by sender, by words anywhere in the message, and by the days it arrived. Returns up to 20 messages, newest first, each with its sender, recipients, subject, the day and time it arrived in their timezone, Gmail\'s one-line preview and a link that opens it in Gmail; with more than one mailbox, which mailbox it is in. Use it for "when did Anthony last email me?" (from "Anthony"), "have I heard back from the landlord since Monday?" (from the landlord\'s name or words like "landlord", after Monday\'s date) or "which emails mention the lease?" (words "lease"). Gmail matches words and names, not meaning, so try another word or a shorter name before saying nothing was found. With no mailbox connected it returns an error saying so.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        from: {
+          type: 'string',
+          description: 'The sender: a name, part of a name, or an address ("Anthony", "landlord@example.com").',
+        },
+        words: {
+          type: 'string',
+          description: 'Words the message must contain, in its subject or text ("lease renewal"). Every word must match.',
+        },
+        after: { ...DATE_FIELD, description: 'Arrived on or after this day, YYYY-MM-DD, in their timezone.' },
+        before: { ...DATE_FIELD, description: 'Arrived before this day, YYYY-MM-DD, in their timezone; the day itself is not included.' },
+      },
+      additionalProperties: false,
+    },
+  },
 ];
 
 type Lookup = (ctx: AskContext, input: Record<string, unknown>) => Promise<AskToolResult>;
@@ -302,6 +332,8 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   read_spec: { run: readSpecLookup, module: null },
   read_dev_row: { run: readDevRowLookup, module: null },
   find_dev_text: { run: findDevTextLookup, module: null },
+  // The mailbox belongs to the whole app, so no workspace has to be on.
+  search_mail: { run: mailLookup, module: null },
 };
 
 export function isAskToolName(name: string): name is AskToolName {
@@ -345,8 +377,9 @@ export async function executeAskTool(
   try {
     const result = await run(ctx, args);
     if (!result.ok) return result;
-    // The promise to the page: every row a tool gives back opens somewhere.
-    return { ...result, rows: result.rows.filter((row) => row.href.startsWith('/')) };
+    // The promise to the page: every row a tool gives back opens somewhere,
+    // in the app or, for a message, in Gmail (isOpenableHref).
+    return { ...result, rows: result.rows.filter((row) => isOpenableHref(row.href)) };
   } catch (error) {
     if (error instanceof AskInputError) return { ok: false, error: error.message };
     console.error(`ask tool ${name} failed`, error);

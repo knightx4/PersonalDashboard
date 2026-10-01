@@ -14,6 +14,7 @@ import { recordSpendReports } from '@/lib/core/spend/record';
 import { todayInTimezone } from '@/lib/money';
 import { allSearchSources } from '@/lib/search/registry';
 import { createTask } from '@/lib/todo/tasks/write';
+import { searchMail } from '@/lib/inbox/search-mail';
 import { askDash, type AskDashResult } from './ask';
 import {
   attachProposals,
@@ -111,9 +112,12 @@ function askContext(
   return {
     userId,
     today: todayInTimezone(settings.timezone),
+    timezone: settings.timezone,
     enabledModules: settings.enabledModules,
     db: requestAskDb(),
     searchSources: allSearchSources(),
+    // Gmail as it is now, through the person's own mailboxes; nothing is kept.
+    searchMail: async (search) => searchMail(await createCoreClient(), userId, search),
   };
 }
 

@@ -112,7 +112,7 @@ describe('a request without a usable token', () => {
 });
 
 describe('the tool list', () => {
-  it('offers every Ask Dash lookup with their own descriptions and schemas, read only', async () => {
+  it('offers every Ask Dash lookup but mail search, with their own descriptions and schemas, read only', async () => {
     await call('initialize', {
       protocolVersion: '2025-06-18',
       capabilities: {},
@@ -122,7 +122,7 @@ describe('the tool list', () => {
       tools: { name: string; description: string; inputSchema: Record<string, unknown>; annotations: Record<string, unknown> }[];
     };
 
-    expect(tools.map((t) => t.name)).toEqual([...ASK_TOOL_NAMES]);
+    expect(tools.map((t) => t.name)).toEqual(ASK_TOOL_NAMES.filter((name) => name !== 'search_mail'));
     for (const tool of tools) {
       const ask = ASK_TOOLS.find((t) => t.name === tool.name)!;
       expect(tool.description).toBe(ask.description);

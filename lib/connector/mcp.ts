@@ -1,7 +1,7 @@
 import { fromJsonSchema, type CallToolResult, type McpServer } from '@modelcontextprotocol/server';
 import { createMcpHandler, generateProtectedResourceMetadata, getPublicOrigin } from 'mcp-handler';
 import type { AskToolResult, SchemaClient } from '@/lib/ask/db';
-import { ASK_TOOLS, executeAskTool } from '@/lib/ask/tools';
+import { ASK_TOOLS, IN_APP_ONLY_TOOLS, executeAskTool } from '@/lib/ask/tools';
 import type { ConnectorAccess } from './access';
 import { checkConnectorRate, recordConnectorCall, type ConnectorCall } from './calls';
 import type { ConnectorRefusal } from './token';
@@ -132,7 +132,9 @@ export async function runConnectorTool(
     return text(rate.message, true);
   }
 
-  const result = await executeAskTool(tool, input, ctx);
+  const result = (IN_APP_ONLY_TOOLS as readonly string[]).includes(tool)
+    ? ({ ok: false, error: `There is no tool called ${tool}.` } as const)
+    : await executeAskTool(tool, input, ctx);
   await logCall(log, { ...who, result });
   return result.ok ? text(JSON.stringify(withAbsoluteLinks(result, origin))) : text(result.error, true);
 }
@@ -147,9 +149,14 @@ function sessionOf(extra: Record<string, unknown> | undefined): ConnectorSession
   return session;
 }
 
+/** The lookups the connector offers: all of Ask Dash's but the ones kept in the app. */
+export const CONNECTOR_TOOLS = ASK_TOOLS.filter(
+  (tool) => !(IN_APP_ONLY_TOOLS as readonly string[]).includes(tool.name),
+);
+
 /** The lookups as MCP tools, with Ask Dash's own descriptions and input schemas. */
 export function registerAskTools(server: McpServer): void {
-  for (const tool of ASK_TOOLS) {
+  for (const tool of CONNECTOR_TOOLS) {
     server.registerTool(
       tool.name,
       {
