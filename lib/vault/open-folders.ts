@@ -79,3 +79,80 @@ export function openFoldersSnapshot(): readonly string[] {
 export function openFoldersServerSnapshot(): readonly string[] {
   return NOTHING;
 }
+
+/**
+ * Whether the note list is folded away on a laptop (#1381), under the same
+ * rule as the folders: this browser only, so nothing on the account and
+ * nothing in the address.
+ *
+ * Stored as `'true'` while folded. Anything else, an unreadable value or
+ * storage that throws, reads as unfolded, which is also what the server draws:
+ * a browser that cannot keep the fold gets the list on every note, as it did
+ * before the fold existed.
+ */
+const COLUMN_FOLDED_KEY = 'pt_vault_column_folded';
+
+export function readColumnFolded(): boolean {
+  try {
+    return window.localStorage.getItem(COLUMN_FOLDED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/** The snapshot, read once and thrown away on every write, as above. */
+let foldedCache: boolean | null = null;
+
+export function rememberColumnFolded(folded: boolean): void {
+  foldedCache = null;
+  try {
+    window.localStorage.setItem(COLUMN_FOLDED_KEY, String(folded));
+  } catch {
+    /* Storage blocked: the fold lasts for the note it was made on. */
+  }
+}
+
+/**
+ * Nothing changes under the page here either. The fold buttons re-render the
+ * page through the provider's own state when pressed, and that render reads
+ * the fresh snapshot.
+ */
+export function subscribeToColumnFolded(): () => void {
+  return () => {};
+}
+
+export function columnFoldedSnapshot(): boolean {
+  foldedCache ??= readColumnFolded();
+  return foldedCache;
+}
+
+export function columnFoldedServerSnapshot(): boolean {
+  return false;
+}
+
+/** A fold or unfold pressed on a page, and the note it was pressed on. */
+export type FoldPress = { notePath: string; folded: boolean };
+
+/**
+ * Whether the list is folded on the note in front of you.
+ *
+ * A press made on this note wins: it is what folds the list on the note where
+ * storage is blocked and the write went nowhere. Failing that, a note arrived
+ * at with a search in the address shows the list so the results are not
+ * hidden, and goes on showing it while that search is edited or cleared on the
+ * same note; nothing stored changes. Otherwise the stored fold applies.
+ */
+export function foldedForView({
+  notePath,
+  arrivedWithSearch,
+  stored,
+  pressed,
+}: {
+  notePath: string;
+  arrivedWithSearch: boolean;
+  stored: boolean;
+  pressed: FoldPress | null;
+}): boolean {
+  if (pressed?.notePath === notePath) return pressed.folded;
+  return !arrivedWithSearch && stored;
+}
