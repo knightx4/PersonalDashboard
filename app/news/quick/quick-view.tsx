@@ -4,6 +4,7 @@ import { AlsoInLine } from '@/components/news/also-in';
 import { StoryRating } from '@/components/news/story-rating';
 import { QueueCleared } from '@/components/ui/queue-cleared';
 import { SaveStoryButton } from '@/components/news/save-story-button';
+import { SendStoryButtons } from '@/components/news/send-story-buttons';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
 import { storyHref } from '@/lib/news/issues/list';
@@ -16,6 +17,7 @@ import { RelatedNotes } from '@/components/vault/related-notes';
 import { cn } from '@/lib/cn';
 import { cardPasses, type QuickCard } from '@/lib/news/quick/next';
 import type { Reaction } from '@/lib/news/quick/reactions';
+import type { StorySent } from '@/lib/news/saved/sent';
 import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 import {
   ArticleLink,
@@ -43,6 +45,11 @@ export type QuickReadViewProps = {
   progress?: { read: number; total: number } | null;
   /** Whether the card's story is on the Saved list (plan #869). */
   saved?: boolean;
+  /**
+   * Where the card's story has been sent already (plan #1370). Sending it is
+   * not passing it: the card stays until Next.
+   */
+  sent?: StorySent | null;
   /** The thumbs up or down already pressed on the card, if any. */
   reaction?: Reaction | null;
   /**
@@ -84,6 +91,8 @@ export type QuickPageStory = {
   card: QuickCard;
   arrived: string | null;
   saved: boolean;
+  /** Where it has been sent already; left out, nowhere. */
+  sent?: StorySent | null;
   /** The thumbs up or down already pressed on it; left out, none. */
   reaction?: Reaction | null;
   /** Your notes on its subject, as `related` on the card. */
@@ -104,6 +113,7 @@ export function QuickReadView({
   hiddenCount = 0,
   progress = null,
   saved = false,
+  sent = null,
   reaction = null,
   related = null,
   pictures,
@@ -226,6 +236,7 @@ export function QuickReadView({
               card={card}
               arrived={arrived}
               saved={saved}
+              sent={sent}
               reaction={reaction}
               related={related}
               pictures={pictures}
@@ -239,6 +250,7 @@ export function QuickReadView({
                 card={upNext.card}
                 arrived={upNext.arrived}
                 saved={upNext.saved}
+                sent={upNext.sent ?? null}
                 reaction={upNext.reaction ?? null}
                 related={upNext.related ?? null}
                 pictures={pictures}
@@ -296,6 +308,7 @@ function PhoneCard({
   card,
   arrived,
   saved,
+  sent,
   reaction,
   related,
   pictures,
@@ -305,6 +318,7 @@ function PhoneCard({
   card: QuickCard;
   arrived: string | null;
   saved: boolean;
+  sent: StorySent | null;
   reaction: Reaction | null;
   related: RelatedNotesProp;
   pictures: boolean;
@@ -375,6 +389,13 @@ function PhoneCard({
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {story && (
+                <SendStoryButtons
+                  story={{ issueId: card.issueId, headline: story.headline }}
+                  readingId={sent?.readingId}
+                  taskId={sent?.taskId}
+                />
+              )}
+              {story && (
                 <SaveStoryButton issueId={card.issueId} headline={story.headline} saved={saved} />
               )}
               {story && (
@@ -404,7 +425,7 @@ function PhoneCard({
  * counts as seen, and an essay, which has no article, links to its newsletter.
  */
 function gridStory(
-  { card, arrived, saved, reaction = null, related = null, issueHref }: QuickPageStory,
+  { card, arrived, saved, sent = null, reaction = null, related = null, issueHref }: QuickPageStory,
   pictures: boolean,
 ): GridStory {
   const from = [card.from ?? 'Unknown sender', arrived].filter(Boolean).join(' · ');
@@ -457,6 +478,11 @@ function gridStory(
         {story.link && (
           <ArticleLink href={story.link} issueId={card.issueId} storyIndex={card.storyIndex} />
         )}
+        <SendStoryButtons
+          story={{ issueId: card.issueId, headline: story.headline }}
+          readingId={sent?.readingId}
+          taskId={sent?.taskId}
+        />
         <SaveStoryButton issueId={card.issueId} headline={story.headline} saved={saved} />
         <DiscussButton
           issueId={card.issueId}

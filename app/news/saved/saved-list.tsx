@@ -10,6 +10,8 @@ import { RelatedNotes } from '@/components/vault/related-notes';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { savedStoryAnchor } from '@/lib/news/saved/anchor';
 import type { SavedStory } from '@/lib/news/saved/stories';
+import type { StorySent } from '@/lib/news/saved/sent';
+import { SendStoryButtons } from '@/components/news/send-story-buttons';
 import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 import { DiscussButton } from '../quick/discuss-sheet';
 import { removeSaved } from './actions';
@@ -23,6 +25,8 @@ import { removeSaved } from './actions';
 export type SavedListStory = SavedStory & {
   arrived: string;
   discussedIndex?: number | null;
+  /** Where it has been sent already (plan #1370); left out, nowhere. */
+  sent?: StorySent | null;
   related?: readonly RelatedNoteLink[] | Promise<readonly RelatedNoteLink[]> | null;
 };
 
@@ -36,6 +40,9 @@ export type SavedListStory = SavedStory & {
  *
  * A story discussed with Dash carries a Discussed button beside Remove, which
  * opens the same sheet as Discuss in Quick read with the exchange in it.
+ *
+ * Send to Learn and Make a todo sit beside Remove (plan #1370), and name the
+ * story by its saved row, since its newsletter may be gone.
  *
  * Each row carries an anchor, so a reading sent to Learn opens the tab at its
  * story (plan #1368).
@@ -117,7 +124,12 @@ export function SavedList({ stories }: { stories: SavedListStory[] }) {
                 ) : (
                   <span aria-hidden />
                 )}
-                <div className="-mr-2.5 flex items-center gap-1">
+                <div className="-mr-2.5 flex flex-wrap items-center gap-1">
+                  <SendStoryButtons
+                    story={{ savedStoryId: story.id }}
+                    readingId={story.sent?.readingId}
+                    taskId={story.sent?.taskId}
+                  />
                   {story.issueId && story.discussedIndex != null && (
                     <DiscussButton
                       issueId={story.issueId}

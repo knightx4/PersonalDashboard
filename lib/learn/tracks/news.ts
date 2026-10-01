@@ -143,3 +143,28 @@ async function findQueued(
   const row = data as { id: string; track_id: string };
   return { trackId: row.track_id, readingId: row.id };
 }
+
+/**
+ * The reading each saved story is on, keyed by the story's id, for News to
+ * show which stories are already on the queue (plan #1370). Stories with none
+ * are absent. One read whatever the number of stories.
+ */
+export async function findQueuedStories(
+  supabase: LearnSupabaseClient,
+  storyIds: readonly string[],
+): Promise<Map<string, string>> {
+  const found = new Map<string, string>();
+  const wanted = [...new Set(storyIds)];
+  if (wanted.length === 0) return found;
+
+  const { data, error } = await supabase
+    .from('readings')
+    .select('id, news_story_id')
+    .in('news_story_id', wanted);
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw new Error(`Looking for those stories in Learn failed: ${error.message}`);
+  for (const row of (data ?? []) as { id: string; news_story_id: string }[]) {
+    found.set(row.news_story_id, row.id);
+  }
+  return found;
+}

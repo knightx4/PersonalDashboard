@@ -13,11 +13,13 @@ import { Card, CardBody, CardSection } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { AlsoInLine } from '@/components/news/also-in';
 import { SaveStoryButton } from '@/components/news/save-story-button';
+import { SendStoryButtons } from '@/components/news/send-story-buttons';
 import { StoryGrid } from '@/components/news/story-grid';
 import { StoryRating } from '@/components/news/story-rating';
 import { StoryText } from '@/components/news/story-text';
 import type { AlsoIn } from '@/lib/news/quick/next';
 import type { NewsStory } from '@/lib/news/issues/stories';
+import type { StorySent } from '@/lib/news/saved/sent';
 import { markIssueUnread } from './actions';
 import { IssueFrame } from './issue-frame';
 
@@ -49,6 +51,12 @@ export type IssueViewProps = {
   /** Headlines of this issue's stories on the Saved list, so each reads Save or Saved. */
   savedHeadlines?: readonly string[];
   /**
+   * Where each story has been sent already, by headline (plan #1370), so Send
+   * to Learn and Make a todo say so after a reload. A story sent nowhere is
+   * left out.
+   */
+  sent?: Readonly<Record<string, StorySent>>;
+  /**
    * The other newsletters that ran each story's event (plan #865), by the
    * story's position in `digest.stories`. A story with none is left out.
    */
@@ -78,9 +86,11 @@ export function IssueView({
   originalHref,
   summaryHref,
   savedHeadlines = [],
+  sent = {},
   elsewhere = {},
 }: IssueViewProps) {
   const isSaved = (story: NewsStory) => savedHeadlines.includes(story.headline);
+  const sentOf = (story: NewsStory) => sent[story.headline.trim()];
   // From md up a summarised issue's stories are a grid (plan #942), so the
   // page widens to hold it. An essay, the original email and anything below
   // md keep the one column they had.
@@ -207,12 +217,19 @@ export function IssueView({
                   </>
                 ),
                 actions: (
-                  <SaveStoryButton
-                    issueId={issueId}
-                    headline={story.headline}
-                    saved={isSaved(story)}
-                    className="-mr-2.5"
-                  />
+                  <>
+                    <SendStoryButtons
+                      story={{ issueId, headline: story.headline }}
+                      readingId={sentOf(story)?.readingId}
+                      taskId={sentOf(story)?.taskId}
+                    />
+                    <SaveStoryButton
+                      issueId={issueId}
+                      headline={story.headline}
+                      saved={isSaved(story)}
+                      className="-mr-2.5"
+                    />
+                  </>
                 ),
               }))}
               pictures={pictures}
@@ -225,6 +242,7 @@ export function IssueView({
                 pictures={pictures}
                 issueId={issueId}
                 saved={isSaved(digest.stories[0])}
+                sent={sentOf(digest.stories[0])}
                 alsoIn={elsewhere[0] ?? []}
               />
             </div>
@@ -264,7 +282,12 @@ export function IssueView({
                       className="mt-1"
                     />
                     <StoryText text={story.text} summary={story.summary} />
-                    <StoryActions story={story} issueId={issueId} saved={isSaved(story)} />
+                    <StoryActions
+                      story={story}
+                      issueId={issueId}
+                      saved={isSaved(story)}
+                      sent={sentOf(story)}
+                    />
                   </li>
                 ))}
               </ul>
@@ -303,12 +326,14 @@ function LeadStory({
   pictures,
   issueId,
   saved,
+  sent,
   alsoIn,
 }: {
   story: NewsStory;
   pictures: boolean;
   issueId: string;
   saved: boolean;
+  sent: StorySent | undefined;
   alsoIn: readonly AlsoIn[];
 }) {
   return (
@@ -331,25 +356,27 @@ function LeadStory({
         <p className="mt-2 text-body leading-relaxed text-ink-muted">{story.summary}</p>
         <AlsoInLine alsoIn={alsoIn} pictures={pictures} className="mt-1.5" />
         <StoryText text={story.text} summary={story.summary} />
-        <StoryActions story={story} issueId={issueId} saved={saved} />
+        <StoryActions story={story} issueId={issueId} saved={saved} sent={sent} />
       </div>
     </Card>
   );
 }
 
 /**
- * Under each story: the article, when the email linked one, and Save (plan
- * #869). Save sits at the far end so it lands in the same place on every
- * story, linked or not.
+ * Under each story: the article, when the email linked one, then Send to
+ * Learn, Make a todo (plan #1370) and Save (plan #869). Save sits at the far
+ * end so it lands in the same place on every story, linked or not.
  */
 function StoryActions({
   story,
   issueId,
   saved,
+  sent,
 }: {
   story: NewsStory;
   issueId: string;
   saved: boolean;
+  sent: StorySent | undefined;
 }) {
   return (
     <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
@@ -366,12 +393,19 @@ function StoryActions({
       ) : (
         <span aria-hidden />
       )}
-      <SaveStoryButton
-        issueId={issueId}
-        headline={story.headline}
-        saved={saved}
-        className="-mr-2.5"
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <SendStoryButtons
+          story={{ issueId, headline: story.headline }}
+          readingId={sent?.readingId}
+          taskId={sent?.taskId}
+        />
+        <SaveStoryButton
+          issueId={issueId}
+          headline={story.headline}
+          saved={saved}
+          className="-mr-2.5"
+        />
+      </div>
     </div>
   );
 }

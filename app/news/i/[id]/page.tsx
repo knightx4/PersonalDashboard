@@ -7,6 +7,7 @@ import { formatArrival, issueHref, issueReturn, senderLabel } from '@/lib/news/i
 import { markRead } from '@/lib/news/issues/read';
 import { cleanIssueHtml } from '@/lib/news/issues/sanitize';
 import { loadSavedHeadlines } from '@/lib/news/saved/stories';
+import { loadSentInIssues, sentKey, type StorySent } from '@/lib/news/saved/sent';
 import { loadElsewhere } from '@/lib/news/issues/elsewhere';
 import { IssueView } from './issue-view';
 
@@ -61,12 +62,19 @@ export default async function IssuePage({
   // to mark Saved. After the notFound, since a saved-stories read on an id
   // that is not a uuid would fail rather than come back empty.
   // Where else each story ran (plan #865) is read beside it, for the same reason.
-  const [saved, elsewhere] = issue.digest
+  // Where each story has been sent (plan #1370) is read beside them too.
+  const [saved, elsewhere, sentIn] = issue.digest
     ? await Promise.all([
         loadSavedHeadlines(client, issue.id),
         loadElsewhere(client, issue.id, issue.sender?.id ?? null),
+        loadSentInIssues(client, [issue.id]),
       ])
-    : [new Set<string>(), {}];
+    : [new Set<string>(), {}, new Map<string, StorySent>()];
+  const sent: Record<string, StorySent> = {};
+  for (const story of issue.digest?.stories ?? []) {
+    const where = sentIn.get(sentKey(issue.id, story.headline));
+    if (where) sent[story.headline.trim()] = where;
+  }
 
   if (!issue.readAt) await markRead(client, issue.id);
 
@@ -105,6 +113,7 @@ export default async function IssuePage({
       originalHref={originalHref}
       summaryHref={summaryHref}
       savedHeadlines={[...saved]}
+      sent={sent}
       elsewhere={elsewhere}
     />
   );
