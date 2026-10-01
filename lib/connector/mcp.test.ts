@@ -122,7 +122,7 @@ describe('the tool list', () => {
       tools: { name: string; description: string; inputSchema: Record<string, unknown>; annotations: Record<string, unknown> }[];
     };
 
-    expect(tools.map((t) => t.name)).toEqual(ASK_TOOL_NAMES.filter((name) => name !== 'search_mail'));
+    expect(tools.map((t) => t.name)).toEqual(ASK_TOOL_NAMES.filter((name) => name !== 'search_mail' && name !== 'read_mail'));
     for (const tool of tools) {
       const ask = ASK_TOOLS.find((t) => t.name === tool.name)!;
       expect(tool.description).toBe(ask.description);

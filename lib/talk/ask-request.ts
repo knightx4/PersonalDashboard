@@ -15,6 +15,7 @@ import { todayInTimezone } from '@/lib/money';
 import { allSearchSources } from '@/lib/search/registry';
 import { createTask } from '@/lib/todo/tasks/write';
 import { searchMail } from '@/lib/inbox/search-mail';
+import { readMail } from '@/lib/inbox/read-mail';
 import { askDash, type AskDashResult } from './ask';
 import {
   attachProposals,
@@ -118,6 +119,7 @@ function askContext(
     searchSources: allSearchSources(),
     // Gmail as it is now, through the person's own mailboxes; nothing is kept.
     searchMail: async (search) => searchMail(await createCoreClient(), userId, search),
+    readMail: async (message) => readMail(await createCoreClient(), userId, message),
   };
 }
 

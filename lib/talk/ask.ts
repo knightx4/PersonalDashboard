@@ -118,7 +118,10 @@ them, with their currency. Name each order, application, note, step or other
 row you used by its title, and list each in cited by the table and ref the
 lookup returned for it. Cite only rows a lookup returned. For an email, say
 who sent it, the day it arrived and its subject, and cite it the same way:
-the person opens it in Gmail from there.
+the person opens it in Gmail from there. When the question is about what an
+email says, find it with search_mail, then open it with read_mail and answer
+from its text. Open only the messages the question is about, and quote no
+more of the text than the answer needs.
 
 YOU CAN PROPOSE FOUR CHANGES, AND ONLY WHEN ASKED. When they ask you to add
 a todo, add a step under one of their goals, or say they sent an item back,
@@ -215,7 +218,7 @@ const citationKey = (c: { table: string; ref: string }) => `${c.table}\u0000${c.
  */
 function keptResult(result: AskToolResult): unknown {
   if (!result.ok) return result;
-  // A lookup whose rows must not be stored (search_mail) says what to keep instead.
+  // A lookup whose rows must not be stored (search_mail, read_mail) says what to keep instead.
   if (result.kept) return { ok: true, ...result.kept };
   return {
     ok: true,

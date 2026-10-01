@@ -5,6 +5,7 @@ import type { TalkCitation } from '@/lib/talk/talk';
 import type { QuestionEmbedder } from '@/lib/memory/search';
 import type { SpecDoc } from '@/lib/specs/registry';
 import type { MailSearchInput, MailSearchResult } from '@/lib/inbox/search-mail';
+import type { MailReadInput, MailReadResult } from '@/lib/inbox/read-mail';
 
 /**
  * What Dash's lookups read with and hand back (plan #1088). No client and no
@@ -55,6 +56,12 @@ export type AskContext = {
    * then search_mail says so.
    */
   searchMail?: (input: MailSearchInput) => Promise<MailSearchResult>;
+  /**
+   * Reads one message's text from the person's connected Gmail
+   * (lib/inbox/read-mail.ts, bound to them). Absent where mail cannot be
+   * read, and then read_mail says so.
+   */
+  readMail?: (input: MailReadInput) => Promise<MailReadResult>;
 };
 
 /**
