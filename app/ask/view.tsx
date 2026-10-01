@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot } from 'lucide-react';
+import { DashMark } from '@/components/ui/dash-mark';
 import { AskThread, useAskDash } from '@/components/shell/ask-dash';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
@@ -29,7 +29,7 @@ export function AskButton() {
   if (!handle) return null;
   return (
     <Button type="button" variant="secondary" size="sm" onClick={() => handle.open()}>
-      <Bot className="size-3.5" strokeWidth={1.75} aria-hidden />
+      <DashMark size="2xs" decorative />
       Ask Dash
     </Button>
   );

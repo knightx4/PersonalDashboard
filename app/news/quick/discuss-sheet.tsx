@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bot, MessagesSquare, X } from 'lucide-react';
+import { MessagesSquare, X } from 'lucide-react';
+import { DashMark } from '@/components/ui/dash-mark';
 import { TalkThread } from '@/components/talk/talk-thread';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
@@ -144,7 +145,7 @@ function DiscussSheet({
         <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 py-3">
           <div className="flex gap-2">
             <div className="flex w-4 shrink-0 justify-center pt-1">
-              <Bot className="size-3.5 text-ink-ghost" strokeWidth={2} aria-hidden />
+              <DashMark size="2xs" decorative className="text-ink-ghost" />
             </div>
             <div className="min-w-0 flex-1 space-y-0.5">
               <span className="text-small font-semibold text-ink">Dash</span>

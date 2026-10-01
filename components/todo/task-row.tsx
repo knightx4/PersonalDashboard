@@ -4,7 +4,6 @@ import { useOptimistic, useState, useTransition } from 'react';
 import {
   ArrowDown,
   ArrowUp,
-  Bot,
   ChevronDown,
   ChevronRight,
   Clock,
@@ -17,6 +16,7 @@ import {
   Undo2,
   X,
 } from 'lucide-react';
+import { DashMark } from '@/components/ui/dash-mark';
 import { cn } from '@/lib/cn';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { ConfirmStep } from '@/components/ui/confirm-step';
@@ -567,7 +567,7 @@ export function TaskRow({
                 (plan #1263). Opens a form in place of the row, like Edit
                 everything. */}
               <IconButton label="Hand to Dash" onClick={() => setHanding(true)}>
-                <Bot className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <DashMark size="2xs" decorative />
               </IconButton>
             </span>
           )}
