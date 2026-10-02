@@ -332,7 +332,9 @@ function PhoneCard({
   const left = card.remainingInIssue - 1;
   return (
     <QuickSwipe key={`${card.issueId}:${card.storyIndex}`}>
-      <Card padding="none" className="overflow-hidden">
+      {/* Clip rather than hidden: hidden makes the card a scroll container,
+          and the row of buttons below could not stick to the window. */}
+      <Card padding="none" className="overflow-clip">
         <article>
           {pictures && image && (
             // A plain img for the reason given on the issue page: the address
@@ -410,8 +412,16 @@ function PhoneCard({
                 storyIndex={card.storyIndex}
                 reaction={reaction}
               />
-              <QuickNextForm stories={cardPasses(card)} />
             </div>
+          </div>
+          {/* Back and Next on a row of their own, held just above the tab bar
+              while a long story is read, so Next is in the same place on
+              every card and never needs a scroll to reach (note 1736597c).
+              Only these two: the whole row of buttons above would cover half
+              a phone screen. From lg there is no tab bar, and the status line
+              has the foot of the window. */}
+          <div className="card-pad-x sticky bottom-[calc(4.375rem+env(safe-area-inset-bottom))] z-10 flex items-center justify-end gap-2 border-t border-border bg-surface py-2.5 lg:static">
+            <QuickNextForm stories={cardPasses(card)} />
           </div>
         </article>
       </Card>
