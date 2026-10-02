@@ -9,7 +9,8 @@ Learn, and it slows the build loop while the cutting happens.
 Nothing in this spec deletes data. A cut page is hidden or merged into another;
 its tables stay, and anything frozen can be brought back.
 
-> **Status:** proposed, 2 October 2026. Not yet in the plan.
+> **Status:** decisions answered 2 October 2026, and shaped into proposed
+> features on `/dev/plan`.
 
 ## What the numbers say
 
@@ -109,9 +110,10 @@ The proposed shape is three tabs and one owner tab.
 Redirects already in place (`/learn`, `/learn/next`, `/learn/today`) are kept
 until page views show nobody opens them, then removed.
 
-Quizzes, clips and lesson plans are the three parts with almost no use. What to
-do with them is the first decision below, because the person may have plans for
-them that the numbers do not show.
+Quizzes, clips and lesson plans are the three parts with almost no use. The
+person chose to keep all three (decision 1), so they stay and only move in the
+nav: Quizzes under Subjects, clips under Videos, lesson plans where they are
+now, inside a subject.
 
 The feed's dropped cards are worth a look while this is open. Of 131 dropped
 cards, 33 failed because "the report did not match its schema" and 8 more for
@@ -159,8 +161,7 @@ For four weeks from when this spec is approved:
   page-view number. Features shaped from ideas a session filed wait.
 - The overnight runner keeps building approved steps, so work already decided
   on continues.
-- Whether the inspiration and X post routines keep running is the second
-  decision below.
+- The inspiration and X post routines keep running (decision 2).
 
 Two things found while writing this get fixed regardless. The Sunday week
 review is scheduled `11 * * * 0`, which fires every hour on Sundays, and
@@ -183,6 +184,8 @@ notification, so its open count says nothing about whether it is read on Home.
 Recommendation: B. Quizzes and clips have no use to point to. Lesson plans are
 tied to learning goals, which the person has written four of.
 
+**Decided 2 October 2026: C.** All three stay; only the nav changes.
+
 **2. Should the inspiration and X post routines pause during the four weeks?**
 
 - A. Pause both. Inspiration files new ideas and posts draft content about new
@@ -193,6 +196,8 @@ tied to learning goals, which the person has written four of.
 - C. Keep both.
 
 Recommendation: B. Posts take nothing from the build loop; inspiration feeds it.
+
+**Decided 2 October 2026: C.** Both keep running.
 
 **3. Does Learn keep its own Goals tab?**
 
@@ -206,13 +211,16 @@ Recommendation: A, but after Parts 1 to 3, since it is the one change here that
 moves data. It also fits [CORE-AND-DASH-SPEC.md](CORE-AND-DASH-SPEC.md), which
 gives every workspace one way to say what it is working towards.
 
+**Decided 2 October 2026: A**, after Parts 1 to 3.
+
 ## Order of work
 
 1. `core.page_views`, the proxy write, and the Usage tab. Nothing else waits on
    the four-week build rule, which starts on approval.
 2. Learn's nav down to Now, Subjects, Reading lists and Videos, with Home and
    Flow merged into Now and "track" renamed on screen.
-3. The outcome of decision 1, and the feed card writer's schema failures.
+3. The feed card writer's schema failures, and learning goals moved into Goals
+   (decision 3).
 4. The week review schedule and the brief's open record.
 5. After 30 days of page views, a proposed outcome for every page in Jobs,
    Shopping, Vault and News, for the person to decide on `/dev/plan`.

@@ -13,9 +13,9 @@ record what it did, and one thread to reply in. A shared thread or ledger with
 four different assistants writing into it would keep the inconsistency it was
 meant to remove.
 
-> **Status:** proposed, 2 October 2026. Not yet in the plan. Three features
-> already proposed on `/dev/plan` become parts of this one if it is approved;
-> they are named under **Order of work**.
+> **Status:** decisions answered 2 October 2026, and shaped into proposed
+> features on `/dev/plan`. Three features already proposed there became parts
+> of this one; they are named under **Order of work**.
 
 ## What there is today
 
@@ -181,8 +181,8 @@ the five capture moves, the cover letter, and goal facts. To those it adds the
 writes #1440 lists: a new goal, editing and rescheduling a todo, and closing a
 todo or step. Each write goes through Part 5.
 
-Whether a write happens straight away with Undo or waits as a proposal is
-decision #1439, already asked. Anything that acts outside the app, such as
+A write happens straight away and carries an Undo, which is how #1439 was
+answered on 2 October 2026. Anything that acts outside the app, such as
 sending an email or buying something, is always a proposal. Anything no tool
 can do goes to the hand-off routine (#1402).
 
@@ -220,6 +220,9 @@ they are; any change they make to the person's rows goes through Part 5.
 Recommendation: A. There are a few hundred rows, and B keeps the problem this
 spec exists to remove.
 
+**Decided 2 October 2026: A.** The old tables are removed only when the person
+says so, after the 30 days.
+
 **2. Does Maya become one of Dash's voices?**
 
 - A. Maya runs on the same loop, store and ledger, as a voice Dash takes in the
@@ -232,6 +235,8 @@ Recommendation: A. What Maya does differently is its tone and its model, and
 both can be settings of a voice. Moved onto the loop, its threads become
 searchable and its retrieval becomes available to Dash everywhere.
 
+**Decided 2 October 2026: A.**
+
 ## Order of work
 
 Each part is a feature on the plan, built in this order. Three already
@@ -243,7 +248,7 @@ proposed features become parts of this spec if it is approved.
 3. **Move vocabulary** (Part 3). This absorbs #1433.
 4. **The ledger and Dash today** (Part 5).
 5. **The loop and tool registry** (Part 6), with Ask moved onto it first, then
-   the write tools once #1439 is answered. This absorbs #1440.
+   the write tools. This absorbs #1440.
 6. **Threads** (Part 2), moving dev, goals, files and roles onto the shared
    store and component, then adding threads to the workspaces that have none.
    This absorbs #1441.
