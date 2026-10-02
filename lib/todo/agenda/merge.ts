@@ -66,7 +66,12 @@ export interface MergeInput {
   horizonDays: number;
 }
 
-const ORDER: Bucket[] = ['overdue', 'today', 'soon', 'later', 'someday'];
+/**
+ * Dated piles first, then "On you, no date". An undated thing is still on
+ * you, so it is listed rather than left off, and it sits under the dated ones
+ * because a date is what makes something more pressing than the rest.
+ */
+const ORDER: Bucket[] = ['overdue', 'today', 'soon', 'later', 'undated'];
 
 /**
  * Whether a dismissal still hides its item.
@@ -158,7 +163,7 @@ export function mergeAgenda(input: MergeInput): AgendaPile[] {
 
   return buckets.map((bucket) => ({
     bucket,
-    entries: [...(piles.get(bucket) ?? [])].sort(compare),
+    entries: [...(piles.get(bucket) ?? [])].sort(bucket === 'undated' ? compareUndated : compare),
     context: [...(contextByBucket.get(bucket) ?? [])].sort((a, b) =>
       (a.at ?? a.day) < (b.at ?? b.day) ? -1 : 1,
     ),
@@ -173,7 +178,7 @@ export function mergeAgenda(input: MergeInput): AgendaPile[] {
  * "is this soon" would eventually disagree about it.
  */
 function bucketOf(day: string | null, today: string, horizon: string): Bucket {
-  if (day === null) return 'someday';
+  if (day === null) return 'undated';
   if (day < today) return 'overdue';
   if (day === today) return 'today';
   if (day <= horizon) return 'soon';
@@ -226,6 +231,52 @@ function compare(a: AgendaEntry, b: AgendaEntry): number {
   const titleA = a.task?.title ?? a.item?.title ?? '';
   const titleB = b.task?.title ?? b.item?.title ?? '';
   return titleA.localeCompare(titleB);
+}
+
+/**
+ * Inside "On you, no date": what you placed by hand, then pinned, then how long
+ * each has been on you, oldest first, then title.
+ *
+ * There is no day to sort by, so age takes its place: the thing that has sat
+ * longest without a date is the one most likely to have been forgotten. A
+ * task has been on you since it was written; a source item since its
+ * `onYouSince`, and one without that sorts after the rest. The hand-placed
+ * order and the pin come first for the reason `compare` gives.
+ */
+function compareUndated(a: AgendaEntry, b: AgendaEntry): number {
+  const rankA = a.task ? rankOf(a.task) : UNPLACED;
+  const rankB = b.task ? rankOf(b.task) : UNPLACED;
+  if (rankA !== rankB) return rankA - rankB;
+
+  const pinnedA = a.task?.pinned ?? false;
+  const pinnedB = b.task?.pinned ?? false;
+  if (pinnedA !== pinnedB) return pinnedA ? -1 : 1;
+
+  const sinceA = onYouSince(a);
+  const sinceB = onYouSince(b);
+  if (sinceA !== sinceB) {
+    if (sinceA === null) return 1;
+    if (sinceB === null) return -1;
+    return sinceA < sinceB ? -1 : 1;
+  }
+
+  if (a.kind !== b.kind) return a.kind === 'task' ? -1 : 1;
+
+  const titleA = a.task?.title ?? a.item?.title ?? '';
+  const titleB = b.task?.title ?? b.item?.title ?? '';
+  return titleA.localeCompare(titleB);
+}
+
+/**
+ * When an entry became yours to move, as a comparable UTC instant. Parsed
+ * rather than compared as text, because a source may hand back an offset
+ * other than Z and two spellings of one instant must sort together.
+ */
+export function onYouSince(entry: AgendaEntry): number | null {
+  const iso = entry.task ? entry.task.createdAt : (entry.item?.onYouSince ?? null);
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? null : ms;
 }
 
 /** The UTC day of an instant, for ordering only. Display uses the real zone. */

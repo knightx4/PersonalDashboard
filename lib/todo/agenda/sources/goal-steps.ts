@@ -132,7 +132,7 @@ export const goalStepsSource: AgendaSource = {
       ...suggestionItems,
       ...steps
         // An undated step is always in the window: a goal's next step shows
-        // today, and one only flagged goes in "Someday", as an undated task
+        // today, and one only flagged goes in "On you, no date", as an undated task
         // does. A dated one waits until the horizon reaches it, and so does
         // one that cannot start yet, which shows on the day it starts when it
         // has no due date.
