@@ -1,5 +1,6 @@
 import { isModuleId, type ModuleId } from '@/lib/modules';
 import { watchAt } from '@/lib/learn/youtube/format';
+import { checkRunning } from './lock';
 
 /**
  * What the Inspiration tab draws (plan #1412), assembled from the rows the
@@ -54,6 +55,8 @@ export type SettingsRow = {
   youtube_playlist_id: string | null;
   playlist_read_at: string | null;
   playlist_error: string | null;
+  /** When the check going now began (plan #1411); absent from fixtures written before it. */
+  run_started_at?: string | null;
 };
 
 /** One video a takeaway came from, with what that video said and where. */
@@ -117,6 +120,8 @@ export type InspirationPage = {
   playlistId: string | null;
   playlistReadAt: string | null;
   playlistError: string | null;
+  /** A check of the playlist is going now, from the daily run or Check now. */
+  checking: boolean;
   videos: InspirationVideo[];
   /** Every takeaway not dismissed, once each, newest first. */
   list: Takeaway[];
@@ -154,6 +159,8 @@ export function buildInspirationPage(input: {
   planNumbers: ReadonlyMap<string, number>;
   /** ideas.plan_item_id by idea id, for every idea the takeaways name. */
   ideaPlanItems: ReadonlyMap<string, string | null>;
+  /** For whether a claimed check still holds; the clock when absent. */
+  now?: Date;
 }): InspirationPage {
   const videoById = new Map(input.videos.map((video) => [video.id, video]));
 
@@ -248,6 +255,7 @@ export function buildInspirationPage(input: {
     playlistId: input.settings?.youtube_playlist_id ?? null,
     playlistReadAt: input.settings?.playlist_read_at ?? null,
     playlistError: input.settings?.playlist_error ?? null,
+    checking: checkRunning(input.settings?.run_started_at, input.now ?? new Date()),
     videos,
     list: shown,
     dismissed,

@@ -17,6 +17,7 @@ import {
   type VideoState,
 } from '@/lib/dev/inspiration/view';
 import { PageHeader } from '@/components/shell/page-header';
+import { CheckNow } from './check-now';
 import { PlaylistSetting } from './playlist-setting';
 import { TakeawayRow } from './takeaway-row';
 
@@ -193,7 +194,7 @@ export function InspirationScreen({ page, view }: { page: InspirationPage; view:
         <PageHeader
           title="Inspiration"
           description="Ideas for this app that Dash took from the videos in your playlist."
-          // The Check now button goes here, as `actions` (plan #1411).
+          actions={page.playlistId ? <CheckNow checking={page.checking} /> : undefined}
         />
         <div className="-mt-3 space-y-1">
           <PlaylistSetting playlistId={page.playlistId} />
