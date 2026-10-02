@@ -136,7 +136,33 @@ describe('reading the lesson report', () => {
   });
 
   it('drops a report that does not match its schema', () => {
-    expect(readLessonReport({ claim: 'x' }, true)).toMatchObject({ verdict: 'dropped', contradicted: false });
+    expect(readLessonReport({ claim: 'x' }, true)).toEqual({
+      verdict: 'dropped',
+      reason: 'The report did not match its schema (can_teach).',
+      contradicted: false,
+    });
+  });
+
+  it('reads a verdict in another case or with words after it, and can_teach as a string', () => {
+    expect(readLessonReport({ ...reported, can_teach: 'true', source_verdict: 'Supports the claim' }, true)).toMatchObject({
+      verdict: 'ready',
+      source: { verdict: 'supports' },
+    });
+  });
+
+  it('reads a verdict it does not recognise as unrelated', () => {
+    expect(readLessonReport({ ...reported, source_verdict: 'partly relevant' }, true)).toMatchObject({
+      verdict: 'ready',
+      source: { verdict: 'unrelated' },
+    });
+  });
+
+  it('names a part that came back as something other than text', () => {
+    expect(readLessonReport({ ...reported, example: ['one', 'two'] }, true)).toEqual({
+      verdict: 'dropped',
+      reason: 'The lesson was not usable: no example.',
+      contradicted: false,
+    });
   });
 });
 

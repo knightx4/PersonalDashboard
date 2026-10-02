@@ -132,18 +132,42 @@ Style for every part: plain sentences. No slogans, no rhetorical questions outsi
 
 Report through ${TOOL_NAME}.`;
 
+/**
+ * A text part: a string, or anything else read as missing. The tool is not
+ * strict, so a part can come back as a number or a list; that leaves the part
+ * empty, and the length checks below name it, rather than failing the report.
+ */
+const text = z.preprocess((value) => (typeof value === 'string' ? value : null), z.string().nullable());
+
+/** `can_teach` as a boolean, also when it comes back as "true" or "false". */
+const yesNo = z.preprocess(
+  (value) => (typeof value === 'string' ? ({ true: true, false: false } as Record<string, boolean>)[value.trim().toLowerCase()] ?? value : value),
+  z.boolean(),
+);
+
+/**
+ * The verdict, matched loosely: "Supports" or "supports the claim" count as
+ * supports. Anything that names no verdict is null, which a sent source reads
+ * as unrelated.
+ */
+const verdict = z.preprocess((value) => {
+  if (typeof value !== 'string') return null;
+  const word = value.trim().toLowerCase();
+  return (['supports', 'contradicts', 'unrelated', 'none'] as const).find((option) => word.startsWith(option)) ?? null;
+}, z.enum(['supports', 'contradicts', 'unrelated', 'none']).nullable());
+
 const payloadSchema = z.object({
-  can_teach: z.boolean(),
-  fit: z.string().nullable().optional(),
-  source_verdict: z.enum(['supports', 'contradicts', 'unrelated', 'none']).nullable().optional(),
-  source_note: z.string().nullable().optional(),
-  claim: z.string().nullable().optional(),
-  context: z.string().nullable().optional(),
-  evidence: z.string().nullable().optional(),
-  why: z.string().nullable().optional(),
-  example: z.string().nullable().optional(),
-  question: z.string().nullable().optional(),
-  answer: z.string().nullable().optional(),
+  can_teach: yesNo,
+  fit: text.optional(),
+  source_verdict: verdict.optional(),
+  source_note: text.optional(),
+  claim: text.optional(),
+  context: text.optional(),
+  evidence: text.optional(),
+  why: text.optional(),
+  example: text.optional(),
+  question: text.optional(),
+  answer: text.optional(),
 });
 
 /** Collapse whitespace; empty for nothing. */
@@ -169,8 +193,10 @@ function badPart(label: string, value: string, cap: number): string | null {
  */
 export function readLessonReport(input: unknown, hasSource: boolean): LessonReport {
   const parsed = payloadSchema.safeParse(input);
-  if (!parsed.success)
-    return { verdict: 'dropped', reason: 'The report did not match its schema.', contradicted: false };
+  if (!parsed.success) {
+    const where = parsed.error.issues.map((issue) => issue.path.join('.') || 'the report').join(', ');
+    return { verdict: 'dropped', reason: `The report did not match its schema (${where}).`, contradicted: false };
+  }
   const data = parsed.data;
 
   const note = clean(data.source_note).slice(0, MAX_SOURCE_NOTE_CHARS);
