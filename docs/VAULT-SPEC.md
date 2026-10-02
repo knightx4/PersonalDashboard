@@ -11,10 +11,10 @@ that end cheap rather than to make v1 impressive.
 > stored beside them in `obsidian`. That is new scope for this module and the
 > foundation spec holds it.
 >
-> - **"Not an editor" stands, without qualification.** The map is derived from
->   the notes and never written back. The `outbox/` idea floated below is not
->   being built, the stored PAT stays `Contents: Read-only`, and the provider
->   keeps no write path.
+> - **The map is never written back.** It is derived from the notes and stays
+>   in `obsidian`. The `outbox/` idea floated below is not being built. The
+>   one write to the vault is editing an existing note from its page (plan
+>   #1422, under "Non-goals" below).
 > - **The map makes no claim about what its owner knows.** It says what is
 >   written and how much of it there is. What somebody knows is Learn's, and
 >   Learn starts everything at unknown.
@@ -53,10 +53,14 @@ stays safe. Let it overrule an order record and it becomes a liability.
 
 Listing these because they will otherwise get invented.
 
-- **Not an editor.** The app never writes to the vault. Obsidian is the only
-  writer, the vault is the master copy, and sync is one-way, always. If app-authored
-  notes ever happen they go in an `outbox/` folder the app owns exclusively, and
-  that is a separate decision, not this one.
+- **An editor for existing notes only.** Since plan #1422 a note's page has an
+  Edit button: the body is edited as markdown and saved as a commit to the
+  vault repository (`saveNoteEdit`), with the frontmatter kept as it was and a
+  note changed in Obsidian since it was opened refused rather than overwritten.
+  That needs a token with `Contents: Read and write`. Creating, renaming and
+  deleting notes stay out: the vault is the master copy, and other notes link
+  to the old path. If app-authored notes ever happen they go in an `outbox/`
+  folder the app owns exclusively, and that is a separate decision.
 - **No attachments beyond images, PDFs and audio.** Those three are copied into
   a private bucket and shown on the note page (plan #1298). SVG, video, canvas
   files and anything over 50 MB are never fetched, never stored and never
