@@ -162,6 +162,7 @@ const comments = await import('@/app/dev/comment-actions');
 const ideas = await import('@/app/dev/ideas/actions');
 const inspiration = await import('@/app/dev/inspiration/actions');
 const plan = await import('@/app/dev/plan/actions');
+const posts = await import('@/app/dev/posts/actions');
 const raised = await import('@/app/dev/raised/actions');
 const specs = await import('@/app/dev/specs/actions');
 const surfaces = await import('@/app/dev/surfaces/actions');
@@ -218,6 +219,37 @@ const LOCKED: ReadonlyArray<{ file: string; name: string; run: () => Promise<unk
     file: 'app/dev/plan/actions.ts',
     name: 'sendPlanItemToClaude',
     run: () => (plan.sendPlanItemToClaude as Action)({}, form({ id: SOME_UUID })),
+  },
+  {
+    file: 'app/dev/posts/actions.ts',
+    name: 'suggestPosts',
+    run: () => (posts.suggestPosts as Action)({}, form({})),
+  },
+  {
+    file: 'app/dev/posts/actions.ts',
+    name: 'suggestPostAbout',
+    run: () => (posts.suggestPostAbout as Action)({}, form({ number: '1420' })),
+  },
+  {
+    file: 'app/dev/posts/actions.ts',
+    name: 'editPostBody',
+    run: () => (posts.editPostBody as Action)({}, form({ id: SOME_UUID, body: '["a post"]' })),
+  },
+  {
+    file: 'app/dev/posts/actions.ts',
+    name: 'markPostPosted',
+    run: () =>
+      (posts.markPostPosted as Action)({}, form({ id: SOME_UUID, url: 'https://x.com/a/status/1' })),
+  },
+  {
+    file: 'app/dev/posts/actions.ts',
+    name: 'dropPost',
+    run: () => (posts.dropPost as Action)({}, form({ id: SOME_UUID })),
+  },
+  {
+    file: 'app/dev/posts/actions.ts',
+    name: 'restorePost',
+    run: () => (posts.restorePost as Action)({}, form({ id: SOME_UUID })),
   },
   {
     file: 'app/dev/raised/actions.ts',

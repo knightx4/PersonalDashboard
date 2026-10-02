@@ -22,7 +22,9 @@ turn it appends names the `user_id` and, when the press came from a changelog
 line, the one step to write about. If no turn names a `user_id`, stop and say
 so rather than guessing the account.
 
-You change rows, not code: no commit, no push, and no plan step is touched.
+You change rows, not code, and no plan step is touched. The one commit a run
+makes is the screenshots of section 6, which are files under `public/posts/`
+and nothing else.
 
 ## Working without the CLI
 
@@ -139,16 +141,67 @@ a rule cannot tell a sentence about the person's life from one about the app.
 If fewer than three pass, draft new angles and check again. Insert fewer than
 three only when the window holds no more material worth a post, and say so.
 
-## 6. Insert, then finish
+## 6. Attach a screenshot where one fits
 
-One statement for every draft that passed. `body` starts equal to `draft`:
+A draft about something you can see goes out with a picture of it. The
+picture comes from the Surfaces gallery (`/preview`), which renders the real
+components with typed sample data, so it never shows the person's rows. Never
+photograph a page of the running app, and never write a fixture in this run.
+
+**Choose the surface.** Every surface is an entry in `SURFACES` in
+`app/preview/surfaces.tsx` (some render from the `*-surfaces.tsx` files beside
+it), with an `id`, a `label` and its `module`. A surface fits a draft when it
+draws the component the cited steps built or changed: read each step's
+`commit_sha` with `git show --stat <sha>`, and find the surface whose render
+imports one of those files. A step that changed a procedure, a script or the
+database has no surface, and its draft goes without a picture. When two
+surfaces fit, take the one where the change is plainest at first glance. One
+picture per draft.
+
+**Photograph it.** The gallery serves from `next dev`, which skips the build:
+
+```
+UI_PREVIEW=1 NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
+  NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-anon-key \
+  NEXT_PUBLIC_APP_URL=http://localhost:3000 npx next dev -p 3400   # in the background
+SHOOT_WIDTHS=laptop SHOOT_THEMES=light npm run shoot -- <surface id>
+```
+
+`scripts/shoot.ts` is the script the UI passes use; it writes
+`.preview-shots/<id>--laptop-light.png` and leaves out the dev badge. Use
+`SHOOT_WIDTHS=phone` instead for a surface whose `width` is `narrow`, or when
+the angle is about using the app on a phone. Open the PNG and look at it
+before using it: it has to show the thing the draft is about, readably.
+
+**Commit it.** Copy it to `public/posts/<YYYY-MM-DD>-<surface id>.png` (the
+day of the run; if that file already exists, it is the same picture, so use
+it). Commit only the files under `public/posts/`, subject `Add screenshots for
+suggested posts`, then put the commit on main the way every session does:
+`git fetch origin`, merge `origin/main`, `npm run gate`, push only on `gate:
+all clear`. The picture shows on the Posts tab once that deploy finishes.
+
+The entry in `image_paths` is the site path, `/posts/<file>.png`, which
+`postImageSrc` in `lib/dev/posts.ts` draws. The files sit in `public/` rather
+than a storage bucket because a run reaches the database only through SQL,
+which cannot write a file; the pictures hold sample data and are meant for X,
+so a public path costs nothing.
+
+If the gate fails on something you cannot fix, or the push is refused, insert
+the drafts without pictures and say so in your reply. A draft is worth more
+than its picture.
+
+## 7. Insert, then finish
+
+One statement for every draft that passed. `body` starts equal to `draft`,
+and `image_paths` is empty for a draft with no picture:
 
 ```sql
 insert into social_posts (user_id, angle, draft, body, source_plan_item_ids,
-                          source_feedback_ids, run_id)
+                          source_feedback_ids, image_paths, run_id)
 values
   ('…', '…', '["…"]'::jsonb, '["…"]'::jsonb,
-   array['<step id>']::uuid[], array[]::uuid[], '<run id>'),
+   array['<step id>']::uuid[], array[]::uuid[],
+   array['/posts/2026-10-02-dev-plan-tree.png'], '<run id>'),
   …
 returning id, angle;
 ```
@@ -161,6 +214,7 @@ update plan_runs set status = 'finished' where id = '<run id>';
 
 ## What to reply
 
-The angles inserted, each with the step numbers it cites and its count per
-post, and any angle dropped with the check's reason. Write the reply as Dash.
+The angles inserted, each with the step numbers it cites, its count per
+post and the surface it carries, if any, and any angle dropped with the
+check's reason. Write the reply as Dash.
 Never quote a term from `avoid`.

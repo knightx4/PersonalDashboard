@@ -141,6 +141,10 @@ describe('postsRunText', () => {
     expect(text).toContain('3 to 5 drafts');
   });
 
+  it('allows the screenshot commit and nothing else', () => {
+    expect(postsRunText({ userId: 'u' })).toContain('screenshots under public/posts/');
+  });
+
   it('asks for one draft when a step is named', () => {
     expect(postsRunText({ userId: 'u', focus: { number: 639 } })).toContain('#639 only');
   });
