@@ -58,10 +58,13 @@ export function moveItems(video: Pick<ListVideo, 'videoId' | 'verdict'>): Action
 export function VideoRows({
   videos,
   cardCounts,
+  clipCounts,
 }: {
   videos: readonly ListVideo[];
   /** Cards each video became in Learn now, by video id. */
   cardCounts: ReadonlyMap<string, number>;
+  /** Clips each video was cut into, by video id; a video not cut yet is absent. */
+  clipCounts: ReadonlyMap<string, number>;
 }) {
   return (
     <ol className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
@@ -76,6 +79,7 @@ export function VideoRows({
         const cards = cardCounts.get(video.videoId) ?? 0;
         const detail = pileDetail(video, cards);
         const pile = PILE_LABEL[video.verdict ?? 'unjudged'];
+        const clips = clipCounts.get(video.videoId);
         return (
           <li key={video.videoId} className="flex items-start gap-3 px-3 py-2">
             <Link href={href} className="shrink-0" tabIndex={-1} aria-hidden>
@@ -108,6 +112,12 @@ export function VideoRows({
                     <span className="tabular-nums"> · {detail}</span>
                   ) : null}
                 </span>
+                {clips !== undefined && (
+                  <span className="tabular-nums">
+                    {' · '}
+                    {clips === 0 ? 'no clips in it' : clips === 1 ? '1 clip' : `${clips} clips`}
+                  </span>
+                )}
                 <span className="line-clamp-2">{verdictReason(video)}</span>
               </span>
             </span>

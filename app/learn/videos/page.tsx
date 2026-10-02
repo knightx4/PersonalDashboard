@@ -19,6 +19,8 @@ import {
   PILE_LABEL,
   type Pile,
 } from '@/lib/learn/youtube/videos';
+import { loadClipProgress } from '@/lib/learn/clips/progress';
+import { clipProgressLine } from '@/lib/learn/clips/progress-line';
 import { VideoRows } from './video-rows';
 
 export const dynamic = 'force-dynamic';
@@ -42,7 +44,11 @@ export default async function VideosPage({
   const pile = isPile(rawVerdict) ? rawVerdict : null;
 
   const learn = await createLearnClient();
-  const [all, cards] = await Promise.all([loadListVideos(learn, user.id), loadVideoCards(learn, user.id)]);
+  const [all, cards, clipProgress] = await Promise.all([
+    loadListVideos(learn, user.id),
+    loadVideoCards(learn, user.id),
+    loadClipProgress(learn, user.id),
+  ]);
   const videos = filterVideos(all, { q, verdict: pile });
   const cardCounts = new Map([...cards].map(([videoId, list]) => [videoId, list.length]));
 
@@ -73,6 +79,7 @@ export default async function VideosPage({
           </Link>
         }
       />
+      <p className="mb-3 text-small tabular-nums text-ink-muted">{clipProgressLine(clipProgress, new Date())}</p>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="w-full max-w-md">
           <SearchField placeholder="Search titles and channels" />
@@ -81,7 +88,7 @@ export default async function VideosPage({
       </div>
       {pile && <p className="mb-3 max-w-prose text-ui text-ink-muted">{PILE_NOTE[pile]}</p>}
       {videos.length > 0 ? (
-        <VideoRows videos={videos} cardCounts={cardCounts} />
+        <VideoRows videos={videos} cardCounts={cardCounts} clipCounts={clipProgress.perVideo} />
       ) : (
         <p className="text-ui text-ink-muted">
           {q ? `Nothing ${pile ? `in ${PILE_LABEL[pile]}` : 'on your list'} matches “${q}”.` : `Nothing in ${PILE_LABEL[pile ?? 'unjudged']} yet.`}
