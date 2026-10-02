@@ -12,6 +12,7 @@ import {
   type GoalHolders,
 } from '@/lib/goals/hand-off';
 import { STUCK_DAYS, stuckSteps, type HomeGoal, type WeekSpan } from '@/lib/goals/home';
+import { dashLane, laterLane, type DashLaneItem, type LaterLaneItem } from '@/lib/goals/lanes';
 import { weekInstants } from '@/lib/goals/links';
 import { isCurrent } from '@/lib/goals/reviews';
 import type { RunListing } from '@/lib/goals/runs';
@@ -46,6 +47,10 @@ export type Home = {
   offers: DashOffer[];
   /** The steps in Up next and below it that Dash could prepare. */
   preparable: string[];
+  /** The Dash has it lane (lib/goals/lanes.ts). */
+  dash: DashLaneItem[];
+  /** The Later lane: steps whose start date is still ahead. */
+  laterOn: LaterLaneItem[];
 };
 
 /** How far back the home reads runs: past QUIET_DAYS, so a quiet goal is told from one never worked. */
@@ -146,5 +151,7 @@ export async function loadHome(
     working: runs.filter((run) => isGoing(run, now)),
     offers: dashOffers({ goals, byGoal: tree.byGoal, onYou: ranked, holders, runs, now }),
     preparable: preparableSteps({ byGoal: tree.byGoal, onYou: ranked, runs, now }),
+    dash: dashLane({ goals: tree.goals, byGoal: tree.byGoal, runs, now }),
+    laterOn: laterLane({ goals: tree.goals, byGoal: tree.byGoal, today }),
   };
 }

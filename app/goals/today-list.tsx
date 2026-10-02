@@ -5,9 +5,7 @@ import { useActionState, useState } from 'react';
 import { ChevronDown, ExternalLink } from 'lucide-react';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { DashMark } from '@/components/ui/dash-mark';
-import { Disclosure } from '@/components/ui/disclosure';
 import { Input } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
@@ -28,15 +26,14 @@ import { answerGoalQuestion } from './[goalId]/tree-actions';
 import { reactToSuggestionAction, recordAttendedAction } from './suggestion-actions';
 
 /**
- * Up next on the Goals home (plan #1077): the five things most worth doing,
+ * A row of what is on you on the Goals home (plan #1077): everything worth doing,
  * ranked by lib/goals/today.ts, each with one button that does it here or
- * opens where it is done. The rest of what is on you folds underneath in the
- * same order, so nothing that was on the old home's lists is out of reach.
+ * opens where it is done. The rows are the On you lane (goal-lanes.tsx).
  *
  * Anything that is a step can be put aside with Not now (Tomorrow, This
  * weekend, Next week, Next month; lib/goals/set-aside.ts). The row leaves at
  * once, the toast offers Undo, and the step comes back on the day chosen. A
- * step of yours that Dash could prepare also offers Dash prepares it, which
+ * step of yours that Dash could prepare also offers Dash preps it, which
  * writes a draft, a script or a checklist onto the step and leaves it yours.
  *
  * Each kind's button is the write that already exists for it:
@@ -133,84 +130,20 @@ function hrefFor(item: TodayItem): string {
   }
 }
 
-export function TodayList({
-  today,
-  later,
-  preparable = [],
-}: {
-  today: TodayItem[];
-  later: TodayItem[];
-  /** The step ids Dash could prepare (preparableSteps). */
-  preparable?: string[];
-}) {
-  // Rows put aside on this page, hidden before the server's redraw arrives.
-  const [aside, setAside] = useState<ReadonlySet<string>>(new Set());
-  const hide = (key: string, hidden: boolean) =>
-    setAside((current) => {
-      const next = new Set(current);
-      if (hidden) next.add(key);
-      else next.delete(key);
-      return next;
-    });
-  const keyOf = (item: TodayItem) => `${item.kind}:${item.id}`;
-  const shown = today.filter((item) => !aside.has(keyOf(item)));
-  const rest = later.filter((item) => !aside.has(keyOf(item)));
-  const canPrepare = new Set(preparable);
-  const row = (item: TodayItem, rank: number | null) => (
-    <TodayRow
-      key={keyOf(item)}
-      item={item}
-      rank={rank}
-      preparable={canPrepare.has(item.id)}
-      onAside={(hidden) => hide(keyOf(item), hidden)}
-    />
-  );
-
-  return (
-    <section aria-labelledby="today-heading" className="space-y-2">
-      <div className="flex items-baseline justify-between gap-3 px-1">
-        <h2 id="today-heading" className="text-ui font-semibold text-ink">
-          Up next
-        </h2>
-        {shown.length > 0 && (
-          <span className="tabular text-small text-ink-muted">
-            {shown.length} {shown.length === 1 ? 'thing' : 'things'} on you
-          </span>
-        )}
-      </div>
-      {shown.length === 0 ? (
-        <p className="px-1 text-small text-ink-muted">Nothing is waiting on you right now.</p>
-      ) : (
-        <Card>
-          <ol className="divide-y divide-border">{shown.map((item, index) => row(item, index + 1))}</ol>
-        </Card>
-      )}
-      {rest.length > 0 && (
-        <Disclosure
-          title="Also on you"
-          meta={`${rest.length} more, in the same order`}
-          className="px-1"
-        >
-          <Card>
-            <ul className="divide-y divide-border">{rest.map((item) => row(item, null))}</ul>
-          </Card>
-        </Disclosure>
-      )}
-    </section>
-  );
-}
-
-function TodayRow({
+export function TodayRow({
   item,
   rank,
   preparable,
   onAside,
+  onHanded,
 }: {
   item: TodayItem;
   rank: number | null;
   preparable: boolean;
   /** Hide the row (true) or bring it back (false). */
   onAside: (hidden: boolean) => void;
+  /** Dash took it to prepare: the row moves to Dash's lane. */
+  onHanded?: () => void;
 }) {
   const [state, action, pending] = useActionState(
     (_prev: State, form: FormData) => act(item.kind, form),
@@ -249,8 +182,8 @@ function TodayRow({
             {item.title}
           </Link>
         )}
-        {meta && <p className="text-small break-words text-ink-muted">{meta}</p>}
-        <p className="text-small break-words">
+        <p className="text-small break-words text-ink-muted">
+          {meta && <>{meta} · </>}
           <Link
             href={`/goals/${item.goalId}`}
             className="text-ink-muted underline-offset-2 hover:text-ink hover:underline"
@@ -304,7 +237,7 @@ function TodayRow({
               </Button>
             )}
             <span className="ml-auto flex items-center gap-1">
-              {preparable && <PrepareButton item={item} />}
+              {preparable && <PrepareButton item={item} onHanded={onHanded} />}
               {canSetAside(item.kind) && <NotNow item={item} onAside={onAside} />}
             </span>
             {state.error && <span className="w-full text-small text-danger">{state.error}</span>}
@@ -373,7 +306,7 @@ function NotNow({ item, onAside }: { item: TodayItem; onAside: (hidden: boolean)
  * button of its own, outside the row's form, so its press never posts the
  * row's answer.
  */
-function PrepareButton({ item }: { item: TodayItem }) {
+function PrepareButton({ item, onHanded }: { item: TodayItem; onHanded?: () => void }) {
   const toast = useToast();
   const [asked, setAsked] = useState(false);
   const [pending, setPending] = useState(false);
@@ -403,10 +336,11 @@ function PrepareButton({ item }: { item: TodayItem }) {
           return;
         }
         setAsked(true);
+        onHanded?.();
       }}
     >
       <DashMark size="2xs" tone="brand" decorative />
-      {pending ? 'Asking Dash…' : 'Dash prepares it'}
+      {pending ? 'Asking…' : 'Dash preps it'}
     </Button>
   );
 }

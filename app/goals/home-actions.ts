@@ -108,6 +108,23 @@ export async function restoreAsideAction(form: FormData): Promise<SetAsideState>
   return { message: 'Put back.' };
 }
 
+/** Bring a set-aside step back now: its start date cleared, its due date left as it is. */
+// latency: optimistic
+export async function bringBackAction(form: FormData): Promise<SetAsideState> {
+  await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which step that was.' };
+  try {
+    if (!(await updateStep(await createGoalsClient(), id.data, { starts_on: null }))) {
+      return { error: 'That step is no longer on the page.' };
+    }
+  } catch {
+    return { error: 'It could not be brought back. Try again.' };
+  }
+  redraw();
+  return { message: 'Back on you.' };
+}
+
 export type AskDashState = { error?: string; message?: string; goalId?: string; done?: number };
 
 /**
