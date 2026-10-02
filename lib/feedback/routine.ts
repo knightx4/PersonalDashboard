@@ -110,6 +110,23 @@ export function visionRoutine(): RoutineTarget {
 }
 
 /**
+ * The routine Ask Dash hands a request to when none of its own tools can do
+ * it (plan #1402). It follows .claude/skills/dash-backup and replies in the
+ * conversation the request came from.
+ *
+ * No fallback to the shared id or the shared token: a hand-off sent to the
+ * plan routine would build a step instead, and the person would be told a
+ * reply is coming that never does. With either unset, Dash is not offered
+ * the hand-off at all and says it cannot do the thing yet.
+ */
+export function dashBackupRoutine(): RoutineTarget {
+  return {
+    id: firstSet(process.env.CLAUDE_DASH_BACKUP_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_DASH_BACKUP_ROUTINE_TOKEN),
+  };
+}
+
+/**
  * The routine that builds a project's steps (lib/plan/projects) -- "Send to
  * Dash" on a row in that project's section of /dev/plan.
  *

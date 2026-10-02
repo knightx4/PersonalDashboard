@@ -50,10 +50,12 @@ export function AskConversation({
   conversationRef,
   turns,
   changes,
+  openHandoffs,
 }: {
   conversationRef: string;
   turns: TalkTurn[];
   changes: DashChange[];
+  openHandoffs?: number;
 }) {
   return (
     <AskThread
@@ -61,6 +63,7 @@ export function AskConversation({
       conversationRef={conversationRef}
       turns={turns}
       changes={changes}
+      openHandoffs={openHandoffs}
       label="Ask a follow-up"
       placeholder="Ask more about this"
       hint={<PaidHint action="app/ask/actions.ts#askDashQuestion" what="Cost of each answer from Dash" />}

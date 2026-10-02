@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { askTitle } from '@/lib/talk/talk';
-import { loadAskChanges, loadAskConversation } from '@/lib/talk/ask-request';
+import { countOpenAskHandoffs, loadAskChanges, loadAskConversation } from '@/lib/talk/ask-request';
 import { AskConversation } from '../view';
 
 export const metadata = { title: 'Question to Dash' };
@@ -22,7 +22,11 @@ export default async function AskConversationPage({
 }) {
   const { ref } = await params;
   if (!UUID.test(ref)) notFound();
-  const [turns, changes] = await Promise.all([loadAskConversation(ref), loadAskChanges(ref)]);
+  const [turns, changes, openHandoffs] = await Promise.all([
+    loadAskConversation(ref),
+    loadAskChanges(ref),
+    countOpenAskHandoffs(ref).catch(() => 0),
+  ]);
   // Not there, or not theirs: RLS answers both with nothing.
   if (turns.length === 0) notFound();
   const first = turns.find((turn) => turn.role === 'user') ?? turns[0];
@@ -37,7 +41,7 @@ export default async function AskConversationPage({
         Questions to Dash
       </Link>
       <PageHeader title={askTitle(first.body)} />
-      <AskConversation conversationRef={ref} turns={turns} changes={changes} />
+      <AskConversation conversationRef={ref} turns={turns} changes={changes} openHandoffs={openHandoffs} />
     </>
   );
 }
