@@ -29,6 +29,7 @@ import { surfaceOf } from '@/lib/feedback/surfaces';
 import { KIND_TONE } from '@/components/feedback/kind-tone';
 import { TriageNote } from '@/components/feedback/triage-note';
 import { triageView } from '@/lib/feedback/triage';
+import { LinkedText } from '@/components/ui/linked-text';
 
 // Defined in lib/feedback so both workspaces' pages and this component agree
 // on one shape.
@@ -191,7 +192,9 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
           </div>
         </form>
       ) : (
-        <p className="whitespace-pre-wrap text-body text-ink">{row.body}</p>
+        <p className="whitespace-pre-wrap text-body text-ink">
+          <LinkedText text={row.body} />
+        </p>
       )}
 
       {row.resolutionNote && (

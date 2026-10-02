@@ -13,6 +13,7 @@ import {
   workOnGoalAction,
   type ShapingActionState,
 } from './shaping-actions';
+import { LinkedText } from '@/components/ui/linked-text';
 
 const initial: ShapingActionState = {};
 
@@ -167,7 +168,7 @@ function RunHistory({ runs, more }: { runs: GoalRunRow[]; more: boolean }) {
               <p
                 className={`line-clamp-2 text-small break-words whitespace-pre-wrap ${run.failed ? 'text-danger' : 'text-ink'}`}
               >
-                {run.text}
+                <LinkedText text={run.text} />
               </p>
             )}
           </li>

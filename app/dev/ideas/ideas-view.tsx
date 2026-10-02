@@ -44,6 +44,7 @@ import { cn } from '@/lib/cn';
 import { TriageNote } from '@/components/feedback/triage-note';
 import { triageView } from '@/lib/feedback/triage';
 import { SUGGESTION_SCORE_FLOOR, ideaScoreView } from '@/lib/ideas/score';
+import { LinkedText } from '@/components/ui/linked-text';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -300,7 +301,9 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
         </form>
       ) : (
         <>
-          <p className="whitespace-pre-wrap text-body text-ink">{idea.body}</p>
+          <p className="whitespace-pre-wrap text-body text-ink">
+            <LinkedText text={idea.body} />
+          </p>
           <CommentThread
             target="idea"
             id={idea.id}

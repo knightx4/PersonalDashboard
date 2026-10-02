@@ -23,6 +23,7 @@ import {
   type HandInResult,
   type PracticeResult,
 } from './actions';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * A piece's lessons in order, then its practice task, then its check (plans
@@ -303,7 +304,9 @@ function PracticeCard({
 
       {practice && (
         <>
-          <p className="mt-3 whitespace-pre-line text-body text-ink">{practice.task}</p>
+          <p className="mt-3 whitespace-pre-line text-body text-ink">
+            <LinkedText text={practice.task} />
+          </p>
           {practice.data && <PracticeData table={practice.data} />}
           {practice.spreadsheetNote && (
             <p className="mt-2 text-small text-ink-muted">Typed here rather than in a spreadsheet: {practice.spreadsheetNote}</p>
@@ -378,7 +381,9 @@ function PracticeCard({
                 <span className="group-open:hidden">Show a worked answer</span>
                 <span className="hidden group-open:inline">A worked answer</span>
               </summary>
-              <p className="mt-1 whitespace-pre-line text-body text-ink">{practice.worked}</p>
+              <p className="mt-1 whitespace-pre-line text-body text-ink">
+                <LinkedText text={practice.worked} />
+              </p>
             </details>
           )}
         </>

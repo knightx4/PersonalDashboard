@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardSection, cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ConfirmStep } from '@/components/ui/confirm-step';
-import { EditableProse } from '@/components/ui/editable-prose';
+import { EditableProse, ProseAtRest } from '@/components/ui/editable-prose';
 import { FoldingMarkdown } from '@/components/ui/folding-markdown';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
@@ -89,6 +89,7 @@ import { ReminderActions } from '@/app/jobs/(app)/_home/reminder-actions';
 import { ChipInput, ComposeTitle, InlineInput, Input, Label, Select } from '@/components/ui/field';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { GmailAnchor } from '@/components/ui/gmail-anchor';
+import { LinkedText } from '@/components/ui/linked-text';
 
 type Tab = 'timeline' | 'posting' | 'answers' | 'interviews' | 'notes' | 'mail';
 
@@ -1343,7 +1344,7 @@ function JobDescriptionCard({
         </div>
       ) : jdText ? (
         <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap font-sans text-ui leading-relaxed text-ink-muted">
-          {jdText}
+          <LinkedText text={jdText} />
         </pre>
       ) : (
         <p className="text-ui text-ink-muted">
@@ -1500,23 +1501,12 @@ function CoverLetter({
           onChange={(event) => setText(event.target.value)}
         />
       ) : (
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
+        <ProseAtRest
+          text={text}
+          onEdit={() => setEditing(true)}
           title="Edit the cover letter"
-          className="-mx-1.5 -my-1 block w-full rounded-card px-1.5 py-1 text-left transition-colors duration-150 hover:bg-sunken"
-        >
-          {text.trim() ? (
-            <span className="block max-w-prose whitespace-pre-wrap text-ui leading-relaxed text-ink">
-              {text}
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-ui text-ink-ghost">
-              <Pencil className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
-              No cover letter yet.
-            </span>
-          )}
-        </button>
+          empty="No cover letter yet."
+        />
       )}
       {(editing || saved) && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1640,23 +1630,13 @@ function AnswerCard({
           className="mt-2"
         />
       ) : (
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
+        <ProseAtRest
+          text={text}
+          onEdit={() => setEditing(true)}
           title="Edit this answer"
-          className="mt-2 -mx-1.5 -my-1 block w-full rounded-card px-1.5 py-1 text-left transition-colors duration-150 hover:bg-sunken"
-        >
-          {text.trim() ? (
-            <span className="block max-w-prose whitespace-pre-wrap text-ui leading-relaxed text-ink">
-              {text}
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-ui text-ink-ghost">
-              <Pencil className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
-              Not answered yet.
-            </span>
-          )}
-        </button>
+          empty="Not answered yet."
+          className="mt-2"
+        />
       )}
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1784,7 +1764,9 @@ function AnswerCard({
             </span>
           </div>
 
-          <p className="mt-2 whitespace-pre-wrap text-ui leading-relaxed text-ink">{draft.text}</p>
+          <p className="mt-2 whitespace-pre-wrap text-ui leading-relaxed text-ink">
+            <LinkedText text={draft.text} />
+          </p>
 
           <p className="mt-2 text-small text-ink-muted">
             Draws on{' '}

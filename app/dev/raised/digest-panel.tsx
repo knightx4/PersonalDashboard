@@ -6,6 +6,7 @@ import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { groupHappened, type DigestEvent, type DigestGroup } from '@/lib/digest/build';
 import type { Digest } from '@/lib/digest/load';
 import { nightBudgetLine, nightLine, nightRows, type DigestNight } from '@/lib/digest/night';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * The morning summary, at the top of the page.
@@ -261,7 +262,9 @@ export function DigestPanel({ digest }: { digest: Digest | null }) {
               call did not happen -- and then the fold is the whole card,
               which is why it says what is in it on its closed line. */}
           {digest.summary ? (
-            <p className="whitespace-pre-wrap text-body text-ink">{digest.summary}</p>
+            <p className="whitespace-pre-wrap text-body text-ink">
+              <LinkedText text={digest.summary} />
+            </p>
           ) : (
             <p className="text-body text-ink-muted">No account was written for this day.</p>
           )}

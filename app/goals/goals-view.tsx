@@ -412,6 +412,7 @@ function GoalRow({
         {goal.acceptance && (
           <Link
             href={`/goals/${goal.id}`}
+            // ui-ok: the done-when is itself the link to the goal, and a link cannot hold links.
             className="block px-1 py-0.5 whitespace-pre-line text-ink-muted underline-offset-2 hover:text-ink hover:underline"
           >
             {goal.acceptance}

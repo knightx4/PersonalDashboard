@@ -75,6 +75,7 @@ import {
   scopeLabel,
 } from './step-forms';
 import type { TreeActions } from '@/components/plan-tree/types';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * One row of the dev plan, drawn through the shared tree row.
@@ -196,7 +197,9 @@ function SetupJob({
     <div className="space-y-2.5 rounded-lg bg-caution-tint/40 px-3 py-2.5">
       <div className="space-y-0.5">
         <QuestionPartLabel>What to set up</QuestionPartLabel>
-        <p className="whitespace-pre-wrap text-ui text-ink">{node.detail?.trim() || node.title}</p>
+        <p className="whitespace-pre-wrap text-ui text-ink">
+          <LinkedText text={node.detail?.trim() || node.title} />
+        </p>
       </div>
       <form action={action} className="space-y-2">
         <input type="hidden" name="id" value={node.id} />

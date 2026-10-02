@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError, FieldHint, Label, Textarea } from '@/components/ui/field';
 import { optionAnswer, planOptions, recommendedLetter, type PlanOption } from '@/lib/plan/options';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * A question put to you, wherever it is read.
@@ -90,7 +91,9 @@ export function TheOptions({
     return (
       <div className="space-y-0.5">
         <QuestionPartLabel>The options</QuestionPartLabel>
-        <p className="whitespace-pre-wrap text-small text-ink-muted">{detail}</p>
+        <p className="whitespace-pre-wrap text-small text-ink-muted">
+          <LinkedText text={detail} />
+        </p>
       </div>
     );
   }
@@ -140,7 +143,9 @@ export function TheOptions({
         })}
       </ul>
       <Disclosure title="What each one costs" className="px-1.5">
-        <p className="whitespace-pre-wrap text-small text-ink-muted">{detail}</p>
+        <p className="whitespace-pre-wrap text-small text-ink-muted">
+          <LinkedText text={detail} />
+        </p>
       </Disclosure>
     </div>
   );
@@ -155,7 +160,9 @@ export function TheAnswered({ resolution }: { resolution: string }) {
   return (
     <div className="space-y-0.5">
       <QuestionPartLabel>Answered</QuestionPartLabel>
-      <p className="whitespace-pre-wrap text-ui text-ink">{resolution}</p>
+      <p className="whitespace-pre-wrap text-ui text-ink">
+        <LinkedText text={resolution} />
+      </p>
     </div>
   );
 }

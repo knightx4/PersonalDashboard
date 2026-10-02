@@ -22,6 +22,7 @@ import type { NewsStory } from '@/lib/news/issues/stories';
 import type { StorySent } from '@/lib/news/saved/sent';
 import { markIssueUnread } from './actions';
 import { IssueFrame } from './issue-frame';
+import { LinkedText } from '@/components/ui/linked-text';
 
 export type IssueViewProps = {
   issueId: string;
@@ -301,7 +302,7 @@ export function IssueView({
           <CardBody>
             {textBody ? (
               <div className="whitespace-pre-wrap break-words text-body leading-relaxed text-ink">
-                {textBody}
+                <LinkedText text={textBody} />
               </div>
             ) : (
               <p className="text-body text-ink-muted">

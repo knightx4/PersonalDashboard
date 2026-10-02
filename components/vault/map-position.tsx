@@ -2,6 +2,7 @@ import type { PositionKind } from '@/lib/learn/graph/position-prompt';
 import { POSITION_KIND_LABEL, STANCE_LABEL } from '@/lib/vault/map/labels';
 import type { ProposedStance } from '@/lib/vault/map/proposal';
 import { cn } from '@/lib/cn';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * One position as a reader checks it: what it says, what kind of thing it is,
@@ -75,7 +76,7 @@ export function MapQuote({ quote, className }: { quote: string; className?: stri
         className,
       )}
     >
-      {quote}
+      <LinkedText text={quote} />
     </span>
   );
 }
