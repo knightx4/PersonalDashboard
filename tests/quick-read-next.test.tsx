@@ -11,23 +11,35 @@ vi.mock('@/app/news/quick/discuss-sheet', () => ({ DiscussButton: () => null }))
 
 const { QuickReadView } = await import('@/app/news/quick/quick-view');
 
-function render() {
+const essay = {
+  kind: 'essay' as const,
+  summary: 'An essay about the projects that pile up.',
+  issueId: 'issue-2',
+  storyIndex: 0,
+  subject: 'On leaving things unfinished',
+  receivedAt: '2026-09-20T09:02:00Z',
+  sender: null,
+  from: 'Slow Letters',
+  remainingInIssue: 1,
+  alsoIn: [],
+  repeats: [],
+  reason: null,
+};
+
+function render(withNext = false) {
   return renderToStaticMarkup(
     <QuickReadView
-      card={{
-        kind: 'essay',
-        summary: 'An essay about the projects that pile up.',
-        issueId: 'issue-2',
-        storyIndex: 0,
-        subject: 'On leaving things unfinished',
-        receivedAt: '2026-09-20T09:02:00Z',
-        sender: null,
-        from: 'Slow Letters',
-        remainingInIssue: 1,
-        alsoIn: [],
-        repeats: [],
-        reason: null,
-      }}
+      upNext={
+        withNext
+          ? {
+              card: { ...essay, issueId: 'issue-3', subject: 'The one behind it' },
+              arrived: null,
+              saved: false,
+              issueHref: '/news/i/issue-3',
+            }
+          : null
+      }
+      card={essay}
       arrived="20 Sep, 09:02"
       nothingYet={false}
       pictures={false}
@@ -45,6 +57,14 @@ describe('the phone card', () => {
     const row = html.match(/<div class="[^"]*\bsticky\b[^"]*">(.*?)<\/div>/);
     expect(row).not.toBeNull();
     expect(row![1]).toContain('id="quick-read-next"');
+  });
+
+  it('draws the story behind it only once a swipe starts (note 3164d419)', () => {
+    // The story coming in carries its own Next form; drawn from the start, the
+    // page would hold two forms with one id and a story nobody can see.
+    const html = render(true);
+    expect(html.match(/id="quick-read-next"/g)).toHaveLength(1);
+    expect(html).not.toContain('The one behind it');
   });
 
   it('lets the card clip without becoming a scroll container', () => {
