@@ -26,6 +26,8 @@ import { layOutPlans, type PlanLayoutSummary } from '@/lib/learn/lessons/plan-la
 import { loadOutlinesDue, loadPlanLayoutsDue } from '@/lib/learn/lessons/plan-store';
 import { addTeachBackCard } from '@/lib/learn/feed/teach-back-store';
 import { writeVideoCards, type VideoCardPassResult } from '@/lib/learn/youtube/video-card-run';
+import { writeClipCards, type ClipCardPassResult } from '@/lib/learn/clips/clip-card-run';
+import { loadTranscript } from '@/lib/learn/youtube/transcripts';
 import { createFeedPicker, loadFeedFields, peopleToPickFor } from './feed-picks';
 import { createLessonPorts } from './lesson-top-up';
 
@@ -59,6 +61,12 @@ export const FEED_TOP_UP_AFTER_RESPONSE_MS = 120_000;
  * people after it have the rest of the budget.
  */
 export const VIDEO_CARDS_MS = 60_000;
+
+/**
+ * Time the saved-clip pass (plan #1405) may start writes in, after the video
+ * card pass's own minute. A person saves a few clips an hour, each one call.
+ */
+export const CLIP_CARDS_MS = 30_000;
 
 /**
  * The pieces pass (plan #1140) is not started with less than this left: it
@@ -439,7 +447,11 @@ async function topUpWith(
   return { ...withTeach, readyBefore, skipped: false, lessons };
 }
 
-export type FeedTopUpResult = { videos: VideoCardPassResult | null; people: TopUpSummary[] };
+export type FeedTopUpResult = {
+  videos: VideoCardPassResult | null;
+  clips: ClipCardPassResult | null;
+  people: TopUpSummary[];
+};
 
 /**
  * Spend for one card write, under the feed's own operations. Not named
@@ -464,7 +476,8 @@ async function keepCardSpend(
 
 /**
  * The hourly call. First the videos in everyone's card pile become cards
- * (plan #1067), whatever the deck holds, since the pile is a list of its own.
+ * (plan #1067), whatever the deck holds, since the pile is a list of its own,
+ * and then every clip saved since the last run (plan #1405).
  * Then everyone with placed themes or an active goal, and fewer than twenty
  * ready cards, is topped up, one person after another, inside one budget.
  */
@@ -483,12 +496,24 @@ export async function runFeedTopUp(): Promise<FeedTopUpResult> {
     console.error('[learn feed top-up] video cards', error instanceof Error ? error.message : error);
     return null;
   });
+  // Saved clips become cards the same way, within the hour of the save.
+  const clips = await writeClipCards(context.learn, {
+    deadline: Date.now() + CLIP_CARDS_MS,
+    write: (userId, card) =>
+      writePickedCard(context.learn, context.apiKey, userId, card, (spend, embedSpend) =>
+        keepCardSpend(context.core, userId, spend, embedSpend),
+      ),
+    transcript: (videoId) => loadTranscript(context.learn, videoId),
+  }).catch((error: unknown) => {
+    console.error('[learn feed top-up] clip cards', error instanceof Error ? error.message : error);
+    return null;
+  });
   const people: TopUpSummary[] = [];
   for (const userId of await peopleToPickFor(context.learn)) {
     if (Date.now() >= deadline) break;
     people.push(await topUpWith(context, userId, { threshold: READY_TARGET, deadline }));
   }
-  return { videos, people };
+  return { videos, clips, people };
 }
 
 /**
