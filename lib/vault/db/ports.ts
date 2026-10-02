@@ -231,6 +231,7 @@ export function vaultPortsFor(opts: {
       repoOwner: connection.repo_owner,
       repoName: connection.repo_name,
       branch: connection.branch,
+      subpath: connection.subpath,
       token: opts.accessToken,
     }),
 

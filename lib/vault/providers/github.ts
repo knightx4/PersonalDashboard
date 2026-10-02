@@ -2,6 +2,8 @@ import 'server-only';
 
 import {
   VaultAuthError,
+  VaultConflictError,
+  VaultReadOnlyError,
   VaultSourceError,
   type VaultAttachmentChange,
   type VaultAttachmentEntry,
@@ -9,8 +11,9 @@ import {
   type VaultChange,
   type VaultSnapshot,
   type VaultSource,
+  type VaultWriteResult,
 } from '@/lib/vault/providers/types';
-import { attachmentMimeType, isNotePath, isOverAttachmentLimit } from '@/lib/vault/paths';
+import { attachmentMimeType, isNotePath, isOverAttachmentLimit, toRepoPath } from '@/lib/vault/paths';
 
 /**
  * A vault kept in a GitHub repository.
@@ -34,7 +37,14 @@ export type GithubVaultConfig = {
   owner: string;
   repo: string;
   branch: string;
+  /** The vault's folder in the repository; only writes need it (plan #1423). */
+  subpath?: string;
   token: string;
+};
+
+type ContentsPutResponse = {
+  content?: { sha?: string };
+  commit?: { sha?: string };
 };
 
 type TreeResponse = {
@@ -279,5 +289,70 @@ export class GithubVaultSource implements VaultSource {
     }
 
     return res;
+  }
+
+  async writeNote(
+    path: string,
+    text: string,
+    expectedBlobSha: string,
+    message: string,
+  ): Promise<VaultWriteResult> {
+    const repoPath = toRepoPath(path, this.config.subpath ?? '');
+    const encodedPath = repoPath.split('/').map(encodeURIComponent).join('/');
+
+    // The contents API takes the blob SHA the change was based on and refuses
+    // the write when the file has moved on, which is the whole of the
+    // protection against overwriting an edit made in Obsidian meanwhile.
+    const res = await fetch(`${API}${this.base}/contents/${encodedPath}`, {
+      method: 'PUT',
+      headers: {
+        accept: 'application/vnd.github+json',
+        authorization: `Bearer ${this.config.token}`,
+        'content-type': 'application/json',
+        'x-github-api-version': '2022-11-28',
+        'user-agent': 'personal-dashboard-vault',
+      },
+      body: JSON.stringify({
+        message,
+        content: Buffer.from(text, 'utf8').toString('base64'),
+        sha: expectedBlobSha,
+        branch: this.config.branch,
+      }),
+      cache: 'no-store',
+    });
+
+    if (res.status === 409 || res.status === 422) {
+      throw new VaultConflictError(
+        `${path} changed in the vault since it was opened, so the edit was not saved.`,
+        path,
+      );
+    }
+    if (res.status === 401) {
+      throw new VaultAuthError(
+        'GitHub rejected the access token. Fine-grained tokens expire — reconnect the vault.',
+      );
+    }
+    if (res.status === 403) {
+      if (res.headers.get('x-ratelimit-remaining') === '0') {
+        throw new VaultSourceError('GitHub rate limit reached; try saving again later', 403);
+      }
+      throw new VaultReadOnlyError(
+        'The vault token can read the repository but not write to it. Replace it with one that has Contents: Read and write.',
+      );
+    }
+    if (res.status === 404) {
+      throw new VaultSourceError(`GitHub could not find ${repoPath} on ${this.config.branch}`, 404);
+    }
+    if (!res.ok) {
+      throw new VaultSourceError(`GitHub ${res.status} writing ${repoPath}`, res.status);
+    }
+
+    const body = (await res.json()) as ContentsPutResponse;
+    const blobSha = body.content?.sha;
+    const commitSha = body.commit?.sha;
+    if (!blobSha || !commitSha) {
+      throw new VaultSourceError(`GitHub saved ${repoPath} but did not say which commit`);
+    }
+    return { blobSha, commitSha };
   }
 }

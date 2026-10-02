@@ -104,7 +104,26 @@ export interface VaultSource {
 
   /** A file's bytes, for copying an attachment into storage. */
   readBlobBytes(blobSha: string): Promise<ArrayBuffer>;
+
+  /**
+   * Commit new text for an existing note on the configured branch (plan #1423).
+   *
+   * `path` is the vault path as stored in notes.path; the source puts the
+   * connection's subpath back in front. `expectedBlobSha` is the blob the
+   * editor opened, and the write is refused with VaultConflictError when the
+   * file has moved on since, so an edit made elsewhere is never overwritten.
+   * A token that can read but not write raises VaultReadOnlyError.
+   */
+  writeNote(path: string, text: string, expectedBlobSha: string, message: string): Promise<VaultWriteResult>;
 }
+
+/** What a committed note write left behind. */
+export type VaultWriteResult = {
+  /** The note's new blob SHA, to store so the next sync sees no change. */
+  blobSha: string;
+  /** The commit the write made on the branch. */
+  commitSha: string;
+};
 
 /** The source rejected our credentials; the connection needs reconnecting. */
 export class VaultAuthError extends Error {
@@ -122,5 +141,31 @@ export class VaultSourceError extends Error {
   ) {
     super(message);
     this.name = 'VaultSourceError';
+  }
+}
+
+/**
+ * The note changed in the source since the editor opened it: the blob SHA the
+ * write was based on is no longer the file's. Nothing was written.
+ */
+export class VaultConflictError extends Error {
+  constructor(
+    message: string,
+    readonly path: string,
+  ) {
+    super(message);
+    this.name = 'VaultConflictError';
+  }
+}
+
+/**
+ * The token reads the vault but is not allowed to write to it. Distinct from
+ * VaultAuthError: the connection still syncs, and the fix is a token with
+ * write permission rather than a reconnect after expiry.
+ */
+export class VaultReadOnlyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'VaultReadOnlyError';
   }
 }
