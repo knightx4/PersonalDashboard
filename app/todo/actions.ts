@@ -440,7 +440,7 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 /**
  * Hand a task to Dash as an errand (plan #1263): the task's title becomes the
  * errand, its notes the errand's detail, and Dash starts on it in the same
- * press (saveErrandAndStart, the same one Add an errand on Goals uses). The
+ * press (saveErrandAndStart, the same one Ask Dash on Goals uses for a new errand). The
  * task is then closed, pointing at the errand when it is not already about
  * something; when it is, that link is kept and a line in its notes says where
  * it went instead. The errand is the person's own goal, so it goes in open.

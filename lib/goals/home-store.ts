@@ -3,9 +3,19 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { dailyView } from '@/lib/goals/daily';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
+import {
+  dashOffers,
+  goalHolders,
+  isGoing,
+  preparableSteps,
+  type DashOffer,
+  type GoalHolders,
+} from '@/lib/goals/hand-off';
 import { STUCK_DAYS, stuckSteps, type HomeGoal, type WeekSpan } from '@/lib/goals/home';
 import { weekInstants } from '@/lib/goals/links';
 import { isCurrent } from '@/lib/goals/reviews';
+import type { RunListing } from '@/lib/goals/runs';
+import { loadRunsStartedSince } from '@/lib/goals/runs-store';
 import { periodOf } from '@/lib/goals/rhythms';
 import { goalProgress } from '@/lib/goals/status';
 import { loadLiveTree } from '@/lib/goals/steps-store';
@@ -28,7 +38,18 @@ export type Home = {
    * count of what is on you (weekHealth in lib/goals/home.ts).
    */
   week: WeekReads | null;
+  /** Each goal's holders by goal id: what is on you, Dash's open steps, the run going. */
+  holders: Record<string, GoalHolders>;
+  /** The runs going now, newest first. */
+  working: RunListing[];
+  /** What Put Dash to work offers (lib/goals/hand-off.ts). */
+  offers: DashOffer[];
+  /** The steps in Up next and below it that Dash could prepare. */
+  preparable: string[];
 };
+
+/** How far back the home reads runs: past QUIET_DAYS, so a quiet goal is told from one never worked. */
+const RUNS_READ_DAYS = 30;
 
 export type WeekReads = { span: WeekSpan; dashClosedAt: string[]; stuck: number };
 
@@ -91,12 +112,15 @@ export async function loadHome(
   }: { userId: string; today: string; timeZone: string; now: number },
 ): Promise<Home> {
   const tree = await loadLiveTree(client, { today });
-  const [input, week] = await Promise.all([
+  const since = new Date(now - RUNS_READ_DAYS * 86_400_000).toISOString();
+  const [input, week, runs] = await Promise.all([
     // Its reviews double as the goal lines' statuses; a failed read of them
     // leaves the statuses off the lines rather than the page.
     loadTodayInput(client, supabase, { userId, today, tree, now }),
     // A failed read says so in the week's section rather than failing the page.
     loadWeek(client, tree, { today, timeZone, now }).catch((): WeekReads | null => null),
+    // A failed read leaves the board without Dash's part and offers nothing.
+    loadRunsStartedSince(client, since).catch((): RunListing[] => []),
   ]);
   const { reviews } = input;
   const ranked = todayRanked(input);
@@ -112,5 +136,15 @@ export async function loadHome(
       hasSteps: daily.hasSteps,
     };
   });
-  return { today: ranked.slice(0, TODAY_CAP), later: ranked.slice(TODAY_CAP), goals, week };
+  const holders = goalHolders({ goals, byGoal: tree.byGoal, onYou: ranked, runs, now });
+  return {
+    today: ranked.slice(0, TODAY_CAP),
+    later: ranked.slice(TODAY_CAP),
+    goals,
+    week,
+    holders: Object.fromEntries(holders),
+    working: runs.filter((run) => isGoing(run, now)),
+    offers: dashOffers({ goals, byGoal: tree.byGoal, onYou: ranked, holders, runs, now }),
+    preparable: preparableSteps({ byGoal: tree.byGoal, onYou: ranked, runs, now }),
+  };
 }
