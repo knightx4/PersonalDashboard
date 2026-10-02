@@ -30,6 +30,8 @@ export type VideoRow = {
   processed_at: string | null;
   takeaway_count: number | null;
   process_error: string | null;
+  /** A few points on what the video says (note b0594be6); absent from fixtures written before it. */
+  summary_points?: string[] | null;
 };
 
 export type TakeawayRowData = {
@@ -106,6 +108,8 @@ export type InspirationVideo = {
   leftPlaylist: boolean;
   /** What happened when Dash went to read it, in words for the row. */
   state: VideoState;
+  /** What the video says in a few points, whether or not it applies; empty until Dash has summarised it. */
+  summary: string[];
   /** Its takeaways that are not dismissed, each in this video's own wording. */
   takeaways: Takeaway[];
 };
@@ -247,6 +251,7 @@ export function buildInspirationPage(input: {
         addedAt: row.added_at,
         leftPlaylist: row.left_playlist_at !== null,
         state: videoState(row),
+        summary: row.summary_points ?? [],
         takeaways: underVideo.get(row.id) ?? [],
       }),
     );

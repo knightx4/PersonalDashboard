@@ -1,11 +1,12 @@
 import 'server-only';
 
-import type Anthropic from '@anthropic-ai/sdk';
+import Anthropic from '@anthropic-ai/sdk';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { APP_VISION } from '@/lib/specs/vision';
 import { loadInspirationTranscript } from './sync';
 import { mergeNewTakeaways, supabaseMergeStore, type MergeOperation, type MergeStore } from './merge';
+import { summariseVideos, supabaseSummaryStore, type SummaryStore } from './summary';
 import { extractVideoTakeaways, type TakeawayCandidate, type Visions } from './takeaways';
 
 /**
@@ -103,7 +104,7 @@ export async function saveVideoTakeaways(
 }
 
 /** What each spend report is recorded as in core.model_spend. */
-export type InspirationOperation = 'read-inspiration-video' | MergeOperation;
+export type InspirationOperation = 'read-inspiration-video' | 'summarise-inspiration-video' | MergeOperation;
 
 export type InspirationReadOptions = {
   anthropicApiKey: string;
@@ -138,10 +139,11 @@ export type InspirationRead = {
 /**
  * Read every unread video of one person's until the deadline, then merge what
  * was stored. The merge also takes up takeaways an earlier run stored but did
- * not get to, so it runs even when there is nothing new to read.
+ * not get to, so it runs even when there is nothing new to read. Last, any
+ * read video without a summary gets one (note b0594be6).
  */
 export async function readInspirationVideos(
-  store: TakeawayStore & MergeStore,
+  store: TakeawayStore & MergeStore & SummaryStore,
   loadCues: (videoId: string) => Promise<Awaited<ReturnType<typeof loadInspirationTranscript>>>,
   userId: string,
   options: InspirationReadOptions,
@@ -156,6 +158,15 @@ export async function readInspirationVideos(
     deadline: options.deadline,
     onSpend: options.onSpend ? (report, operation) => options.onSpend!(userId, report, operation) : undefined,
   });
+  if (!merge.stopped) {
+    await summariseVideos(store, loadCues, userId, {
+      client: options.client ?? new Anthropic({ apiKey: options.anthropicApiKey }),
+      deadline: options.deadline,
+      onSpend: options.onSpend
+        ? (report) => options.onSpend!(userId, report, 'summarise-inspiration-video')
+        : undefined,
+    });
+  }
   return { ...result, merged: merge.merged, covered: merge.covered, stopped: merge.stopped };
 }
 
@@ -332,7 +343,7 @@ export async function readInspirationForEveryone(
     .not('youtube_playlist_id', 'is', null);
   if (error) throw new Error(`Reading the inspiration playlists failed: ${error.message}`);
 
-  const store = { ...supabaseTakeawayStore(learn), ...supabaseMergeStore(learn) };
+  const store = { ...supabaseTakeawayStore(learn), ...supabaseMergeStore(learn), ...supabaseSummaryStore(learn) };
   const loadCues = (videoId: string) => loadInspirationTranscript(learn, videoId);
   const out: InspirationRead[] = [];
   for (const row of (data ?? []) as { user_id: string }[]) {

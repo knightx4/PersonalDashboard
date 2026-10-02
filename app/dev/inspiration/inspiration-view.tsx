@@ -107,6 +107,13 @@ function VideoGroup({ video }: { video: InspirationVideo }) {
   return (
     <Group>
       <VideoHeader video={video} />
+      {video.summary.length > 0 && (
+        <ul aria-label="What the video says" className="list-disc space-y-0.5 pl-5 text-small text-ink-muted">
+          {video.summary.map((point, index) => (
+            <li key={index}>{point}</li>
+          ))}
+        </ul>
+      )}
       {video.takeaways.length > 0 ? (
         <ul className={cn(cardVariants(), 'divide-y divide-border')}>
           {video.takeaways.map((takeaway) => (

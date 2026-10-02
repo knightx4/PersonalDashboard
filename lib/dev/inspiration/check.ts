@@ -3,6 +3,7 @@ import 'server-only';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { supabaseMergeStore } from './merge';
+import { supabaseSummaryStore } from './summary';
 import {
   readInspirationVideos,
   supabaseTakeawayStore,
@@ -118,7 +119,7 @@ export function inspirationCheckSteps(
   options: InspirationCheckOptions,
   claimed = false,
 ): CheckSteps {
-  const store = { ...supabaseTakeawayStore(learn), ...supabaseMergeStore(learn) };
+  const store = { ...supabaseTakeawayStore(learn), ...supabaseMergeStore(learn), ...supabaseSummaryStore(learn) };
   const loadCues = (videoId: string) => loadInspirationTranscript(learn, videoId);
   const anthropicApiKey = options.anthropicApiKey;
   return {
