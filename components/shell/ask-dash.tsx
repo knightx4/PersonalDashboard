@@ -460,11 +460,15 @@ export function AskDashPanel({
   return (
     <div className="fixed inset-0 z-overlay">
       <button type="button" aria-label="Close Dash" onClick={onClose} className={scrim} />
+      {/* A floating panel like the menus, not a sheet of the page: in the
+          glass themes that makes it frosted and nearly opaque, where the
+          surface it used to take let the page show through it (note
+          a065b91b). */}
       <aside
         role="dialog"
         aria-modal="true"
         aria-labelledby="ask-dash-title"
-        className="absolute inset-x-0 bottom-0 flex max-h-[85dvh] flex-col rounded-t-xl border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-[min(30rem,100vw)] md:rounded-none md:border-l md:border-t-0 md:pb-0"
+        className="popover-panel absolute inset-x-0 bottom-0 flex max-h-[85dvh] flex-col rounded-t-xl border-t border-border bg-raised pb-[env(safe-area-inset-bottom)] md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-[min(30rem,100vw)] md:rounded-none md:border-l md:border-t-0 md:pb-0"
       >
         <PaidCostsProvider costs={costs}>
           <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">

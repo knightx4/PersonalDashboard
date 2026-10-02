@@ -1473,6 +1473,19 @@ body::before {
   backdrop-filter: blur(22px) saturate(1.5);
 }
 
+/* And nearly opaque as well (note a065b91b). The blur took the ghost away,
+ * but at 0.90 a panel you write in -- the note box, Ask Dash -- still let
+ * enough of the page through to be hard to read, and reading is what these
+ * are for. The room shows round the panel, which is enough of it. Same
+ * colour as --c-raised in each theme, more of it. */
+[data-theme='lightbox'] .popover-panel {
+  background-color: rgb(255 254 250 / 0.97);
+}
+
+[data-theme='darkroom'] .popover-panel {
+  background-color: rgb(22 32 52 / 0.95);
+}
+
 [data-theme='lightbox'] .sheet,
 [data-theme='darkroom'] .sheet {
   background-image: linear-gradient(
