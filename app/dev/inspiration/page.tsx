@@ -5,6 +5,10 @@ import { InspirationScreen } from './inspiration-view';
 
 export const metadata = { title: 'Inspiration' };
 
+// Check now reads new videos after its response, inside this page's five
+// minutes (app/dev/inspiration/actions.ts).
+export const maxDuration = 300;
+
 /**
  * What Dash took from the videos saved for this app (plan #1412).
  *
