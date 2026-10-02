@@ -4,8 +4,11 @@ import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { createLearnServiceSupabase } from '@/inngest/learn/supabase-admin';
+import { z } from 'zod';
+import { shapeIdea } from '@/app/dev/ideas/actions';
 import { createClient } from '@/lib/auth/server';
 import { recordSpend } from '@/lib/core/spend/record';
+import { craftTakeaway as fileTakeaway, matchedName } from '@/lib/dev/inspiration/craft';
 import { claimInspirationCheck, inspirationCheckSteps, runInspirationCheck } from '@/lib/dev/inspiration/check';
 import { requireOwner } from '@/lib/dev/owner';
 import { parsePlaylistInput } from '@/lib/learn/providers/youtube';
@@ -111,4 +114,92 @@ export async function checkInspirationNow(): Promise<InspirationActionState> {
 
   revalidatePath(INSPIRATION_PATH);
   return { message: 'Checking the playlist. New takeaways show here as Dash reads them.' };
+}
+
+/**
+ * Craft into a plan (plan #1413): file the takeaway as an idea in the
+ * workspace it touches, with its videos and moments, mark it crafted, and send
+ * the idea to the shape routine through the ideas page's own action. The
+ * proposed feature arrives when that session is done, and the row then reads
+ * "In the plan as #N".
+ *
+ * Filing and marking are lib/dev/inspiration/craft.ts. A routine that will not
+ * start leaves the idea filed and the takeaway crafted, and says so, so it can
+ * be shaped from the ideas page rather than filed twice.
+ */
+// latency: pending -- fires the shape routine, which answers within a few seconds
+export async function craftTakeaway(
+  _prev: InspirationActionState,
+  formData: FormData,
+): Promise<InspirationActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing takeaway.' };
+
+  const crafted = await fileTakeaway(supabase, user.id, id.data);
+  revalidatePath(INSPIRATION_PATH);
+  if (!crafted.ok) return { error: crafted.error };
+
+  const shape = new FormData();
+  shape.set('id', crafted.ideaId);
+  const shaped = await shapeIdea({}, shape);
+  revalidatePath(INSPIRATION_PATH);
+
+  const filed = crafted.matched
+    ? `This was already an idea ("${matchedName(crafted.matched)}"), so that one was used.`
+    : 'Filed as an idea.';
+  if (shaped.error) {
+    return { error: `${filed} It was not sent to be shaped: ${shaped.error} Shape it from the Ideas page.` };
+  }
+  return { message: `${filed} Sent to Dash to shape; a proposed feature will appear on the plan page.` };
+}
+
+/** Put a takeaway aside. Only an open one: a crafted or covered one already has its place. */
+// latency: pending
+export async function dismissTakeaway(
+  _prev: InspirationActionState,
+  formData: FormData,
+): Promise<InspirationActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing takeaway.' };
+
+  const { error } = await supabase
+    .from('inspiration_takeaways')
+    .update({ status: 'dismissed', dismissed_at: new Date().toISOString() })
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'open');
+  if (error) return { error: error.message };
+
+  revalidatePath(INSPIRATION_PATH);
+  return { message: 'Dismissed.' };
+}
+
+/** The way back from the dismissed fold, as an open takeaway. */
+// latency: pending
+export async function restoreTakeaway(
+  _prev: InspirationActionState,
+  formData: FormData,
+): Promise<InspirationActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing takeaway.' };
+
+  const { error } = await supabase
+    .from('inspiration_takeaways')
+    .update({ status: 'open', dismissed_at: null })
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'dismissed');
+  if (error) return { error: error.message };
+
+  revalidatePath(INSPIRATION_PATH);
+  return { message: 'Back in the list.' };
 }
