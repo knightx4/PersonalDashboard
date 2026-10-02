@@ -17,7 +17,12 @@ const USER = '11111111-1111-4111-8111-111111111111';
 const NOW = Date.parse('2026-10-04T14:41:00Z');
 const ROUTINE = { id: 'trig_vision', token: 'tok' };
 
-function fakeClient(fixture: { fires?: unknown[]; reviews?: unknown[] }) {
+function fakeClient(fixture: {
+  fires?: unknown[];
+  reviews?: unknown[];
+  views?: unknown[];
+  opens?: unknown[];
+}) {
   const inserts: { table: string; values: unknown }[] = [];
   function query(table: string) {
     let inserting = false;
@@ -29,7 +34,14 @@ function fakeClient(fixture: { fires?: unknown[]; reviews?: unknown[] }) {
       },
       then(resolve: (value: unknown) => unknown) {
         if (inserting) return Promise.resolve({ data: null, error: null }).then(resolve);
-        const data = table === 'plan_runs' ? (fixture.fires ?? []) : (fixture.reviews ?? []);
+        const data =
+          table === 'plan_runs'
+            ? (fixture.fires ?? [])
+            : table === 'page_views'
+              ? (fixture.views ?? [])
+              : table === 'page_view_days'
+                ? []
+                : (fixture.reviews ?? []);
         return Promise.resolve({ data, error: null }).then(resolve);
       },
     };
@@ -39,6 +51,10 @@ function fakeClient(fixture: { fires?: unknown[]; reviews?: unknown[] }) {
   const client = {
     from: query,
     rpc: async () => ({ data: { userId: USER, email: 'o@example.test' }, error: null }),
+    schema: () => ({
+      from: query,
+      rpc: async () => ({ data: fixture.opens ?? [], error: null }),
+    }),
   } as unknown as SupabaseClient;
   return { client, inserts };
 }
@@ -65,6 +81,24 @@ describe('the vision review tick', () => {
     expect(inserts).toHaveLength(1);
     expect(inserts[0]!.table).toBe('plan_runs');
     expect(inserts[0]!.values).toMatchObject({ user_id: USER, job: 'vision', plan_item_id: null });
+  });
+
+  it('tells the run the page opens per workspace since the last review', async () => {
+    const { client } = fakeClient({
+      reviews: [{ created_at: '2026-09-27T16:00:00Z' }],
+      views: [{ viewed_at: '2026-09-01T09:00:00Z' }],
+      opens: [
+        { workspace: 'jobs', opens: 12, pages: 3 },
+        { workspace: null, opens: 4, pages: 1 },
+      ],
+    });
+    const fetch = okFetch();
+    await runVisionReviewTick({ client, routine: ROUTINE, now: NOW, fetch });
+    const body = String((vi.mocked(fetch).mock.calls[0] as unknown as [string, RequestInit])[1].body);
+    expect(body).toContain('Page opens since the last review on 2026-09-27');
+    expect(body).toContain('jobs 12 opens across 3 pages');
+    expect(body).toContain('learn none');
+    expect(body).toContain('pages outside any workspace 4 opens across 1 page');
   });
 
   it('does not fire twice in one week', async () => {

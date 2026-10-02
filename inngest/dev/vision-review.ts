@@ -4,7 +4,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { visionRoutine, type RoutineTarget } from '@/lib/feedback/routine';
 import { startRoutineRun } from '@/lib/plan/runs';
-import { loadVisionRunFacts, visionReviewDue, visionRunText } from '@/lib/specs/vision-review-run';
+import {
+  loadVisionRunFacts,
+  loadWindowOpens,
+  visionReviewDue,
+  visionRunText,
+  type WindowOpens,
+} from '@/lib/specs/vision-review-run';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
 
 /**
@@ -47,15 +53,25 @@ export async function runVisionReviewTick(
   if (owner.error || !parsed.success) throw new Error('Could not resolve the owner to review for.');
   const userId = parsed.data.userId;
 
-  const due = visionReviewDue({ ...(await loadVisionRunFacts(client, userId)), now });
+  const facts = await loadVisionRunFacts(client, userId);
+  const due = visionReviewDue({ ...facts, now });
   if (!due.due) return { skipped: due.reason };
+
+  // The opens since the last review go in the turn (plan #1483). A failed
+  // read does not stop the review: the turn says so and the skill reads them.
+  let opens: WindowOpens | null = null;
+  try {
+    opens = await loadWindowOpens(client, userId, facts.lastReviewAt);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+  }
 
   const result = await startRoutineRun({
     supabase: client,
     userId,
     job: 'vision',
     routine,
-    text: visionRunText(userId),
+    text: visionRunText(userId, opens),
     fetch: deps?.fetch,
   });
   return result.ok ? { started: result.runId } : { failed: result.error };

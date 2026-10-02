@@ -99,6 +99,51 @@ where i.user_id = '…' and i.module = '<workspace>'
   );
 ```
 
+### Page opens
+
+What the person opens is the other half of the evidence (plan #1483):
+a workspace they file nothing about but open every day is in use, and one
+they never open is not, whatever its notes say. Since plan #1481 every page
+they open is recorded in `core.page_views`. `core.workspace_opens` counts
+the opens and the distinct pages opened per workspace since a time, reaching
+into the daily counts in `core.page_view_days` for anything older than 180
+days. A workspace with no opens in the window has no row, and `workspace`
+is null for pages outside every workspace (`/home`, `/ask`), which go under
+`app`.
+
+The turn that fires the run already lists the opens since the last review.
+Read them again for a workspace whose window differs from that:
+
+```sql
+-- opens and pages opened per workspace since the window's start
+select workspace, opens, pages
+from core.workspace_opens('…', '<window start>');
+
+-- when recording began: anything before this was never measured
+select least(
+  (select min(viewed_at) from core.page_views where user_id = '…'),
+  (select min(day)::timestamptz from core.page_view_days where user_id = '…')
+) as recording_since;
+
+-- which pages, when a count needs explaining
+select route, count(*) as opens from core.page_views
+where user_id = '…' and workspace = '<workspace>' and viewed_at >= '<window start>'
+group by route order by opens desc;
+```
+
+**Cite the opens in every row's note**, holds or edit: the count for the
+window and, where it matters, the pages behind it ("41 opens across 6 pages
+since 27 Sep, nearly all /jobs/board"). When `recording_since` is null,
+nothing has been recorded yet: say "no page opens recorded yet" and do not
+read it as disuse. When recording began after the window's start, say the
+count covers only the days since then.
+
+Opens weigh the vision the same way notes do. Steady opens of a part the
+vision leaves out can argue for naming it, and a workspace opened rarely is
+worth a sentence in a holds note. Opens alone never argue for an edit
+removing something: a cut is the person's call, not the
+review's.
+
 A note filed from a workspace's page is not always about that workspace. The
 header, the search bar, the module switcher and the mobile dock are on every
 page, so a note about them says nothing about the workspace it was filed
@@ -125,6 +170,7 @@ or three reviews, read against which edits the person accepts and which they
 dismiss, should show where the line is (the fog on plan #1104). Until then:
 
 - Lean towards holds.
+- In every note, give the window's page opens (see "Page opens").
 - In every note, say how many items the finding rests on and why they point
   at the vision rather than at one screen.
 - In a holds note, name anything that nearly made an edit.
