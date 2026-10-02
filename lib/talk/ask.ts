@@ -42,8 +42,16 @@ import {
  *
  * Three limits stop the looking, and when one is reached the next call is
  * made to answer with what it has: eight lookups, an input token budget, and
- * a time budget that keeps the whole answer near twenty seconds. An answer
+ * a time budget that leaves the last call room inside the request. An answer
  * written under a limit ends with a sentence saying so.
+ *
+ * When that last call still comes back with nothing to say, the answer is
+ * built from what the lookups found instead (plan #1437): the rows they
+ * returned, listed and cited, under a sentence saying the answer was not
+ * finished. Only a run whose lookups found nothing ends in an error.
+ *
+ * `onLookup` hears each lookup as it starts and as it finishes, which is what
+ * a page showing the lookups while they run listens to.
  *
  * `answerQuestion` is the loop alone. `askDash` below it keeps the turns and
  * the spend through the stores it is handed; lib/talk/ask-request.ts hands it
@@ -56,8 +64,19 @@ export const ASK_MODEL = TALK_MODEL;
 export const MAX_LOOKUPS = 8;
 /** Input tokens across the calls of one answer, cached and not, before it must answer. */
 export const INPUT_BUDGET = 150_000;
-/** Time spent before it must answer, so the answer lands within about twenty seconds. */
-export const TIME_BUDGET_MS = 14_000;
+/**
+ * Time spent looking before it must answer. Ask is a server action, so it runs
+ * under the maxDuration of whichever page the sheet is open over: none sets
+ * one below 300 seconds, and a page that sets none gets Vercel's default of
+ * 300 under fluid compute. Forty seconds fits five rounds of lookups (the
+ * jobs question that failed at fourteen took five), and leaves the answer
+ * call and the writes well inside even a sixty-second limit.
+ */
+export const TIME_BUDGET_MS = 40_000;
+/** Output tokens for one call. A list of every company in three months runs past 2000. */
+export const ANSWER_MAX_TOKENS = 4000;
+/** The most rows an answer built from the lookups lists by name. */
+export const FALLBACK_ROWS = 25;
 
 const ANSWER_TOOL = 'answer';
 
@@ -182,10 +201,14 @@ export function pageLine(page: PageContext | null | undefined): string | null {
 /** Said to the model when a limit is reached, in place of any further lookup. */
 const LIMIT_REACHED = 'No lookups are left for this answer. Answer now with what you have.';
 
-export type AskStop = 'answered' | 'lookups' | 'budget' | 'time';
+/**
+ * Why the answer stopped. 'unfinished': the model wrote nothing usable, and
+ * the answer was built from the lookups (answerFromLookups).
+ */
+export type AskStop = 'answered' | 'lookups' | 'budget' | 'time' | 'unfinished';
 
 /** The sentence an answer written under a limit ends with. */
-export function limitNote(stop: Exclude<AskStop, 'answered'>): string {
+export function limitNote(stop: Exclude<AskStop, 'answered' | 'unfinished'>): string {
   return stop === 'lookups'
     ? `I stopped after ${MAX_LOOKUPS} lookups, so this answer rests only on what those found.`
     : 'I stopped looking before I had checked everything, so this answer rests only on what I found by then.';
@@ -200,6 +223,18 @@ export type AskAnswer =
       stop: AskStop;
     }
   | { ok: false; detail: string; toolCalls: TalkToolCall[] };
+
+/**
+ * One lookup, heard as it starts and again as it finishes (plan #1438 shows
+ * them in the thread while they run). `id` is the model's tool_use id and
+ * pairs the two; `index` counts lookups in this answer from 0. The finished
+ * event carries the result as the turn keeps it (TalkToolCall.result), so
+ * what streams is what a reopened answer shows. Proposals and hand-offs are
+ * heard too; a call refused at the cap is heard only as finished.
+ */
+export type AskLookupEvent =
+  | { phase: 'started'; id: string; index: number; name: string; input: unknown }
+  | { phase: 'finished'; id: string; index: number; name: string; input: unknown; ok: boolean; result: unknown };
 
 /** Runs one lookup. Never throws; executeAskTool in lib/ask/tools.ts with its context bound. */
 export type AskExecutor = (name: string, input: unknown) => Promise<AskToolResult>;
@@ -265,6 +300,33 @@ function withRollingBreakpoint(messages: Anthropic.MessageParam[]): Anthropic.Me
   return [...messages.slice(0, -1), { ...last, content: blocks }];
 }
 
+/**
+ * The answer given when the model wrote nothing usable after its lookups
+ * (plan #1437): the rows they returned, each named once, in the order found,
+ * and cited so the person can open them. Null when no lookup returned a row,
+ * since a list of nothing is not an answer.
+ */
+export function answerFromLookups(found: readonly TalkCitation[]): { body: string; citations: TalkCitation[] } | null {
+  const seen = new Set<string>();
+  const rows: TalkCitation[] = [];
+  for (const row of found) {
+    const key = citationKey(row);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push(row);
+  }
+  if (rows.length === 0) return null;
+  const listed = rows.slice(0, FALLBACK_ROWS);
+  const lines = listed.map((row) => `- ${row.title.replace(/\s+/g, ' ').trim()}`);
+  const more = rows.length - listed.length;
+  if (more > 0) lines.push(`- and ${more} more`);
+  const body = [
+    'I could not finish writing the answer, so here is what my lookups found. Ask again for more about any of them.',
+    lines.join('\n'),
+  ].join('\n\n');
+  return { body: body.slice(0, MAX_TURN), citations: listed };
+}
+
 function answerInput(input: unknown): { answer: string; cited: { table: string; ref: string }[] } {
   const raw = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
   const answer = typeof raw.answer === 'string' ? raw.answer.trim() : '';
@@ -300,8 +362,25 @@ export async function answerQuestion(input: {
   onSpend?: SpendSink;
   /** For tests: the clock the time budget reads. */
   now?: () => number;
+  /** Hears each lookup start and finish. Whatever it throws is ignored. */
+  onLookup?: (event: AskLookupEvent) => void;
 }): Promise<AskAnswer> {
   const toolCalls: TalkToolCall[] = [];
+  // Every row a lookup in this answer returned, in the order found: what an
+  // answer is built from when the model writes none.
+  const found: TalkCitation[] = [];
+  const hear = (event: AskLookupEvent) => {
+    try {
+      input.onLookup?.(event);
+    } catch (error) {
+      console.error('ask lookup listener failed', error);
+    }
+  };
+  const fail = (detail: string): AskAnswer => {
+    const built = answerFromLookups(found);
+    if (!built) return { ok: false, detail, toolCalls };
+    return { ok: true, body: built.body, toolCalls, citations: built.citations, stop: 'unfinished' };
+  };
   const history = historyMessages(input.turns);
   if (history.length === 0 || history[history.length - 1].role !== 'user') {
     return { ok: false, detail: 'There is no question to answer.', toolCalls };
@@ -343,14 +422,14 @@ export async function answerQuestion(input: {
     try {
       response = await client.messages.create({
         model: ASK_MODEL,
-        max_tokens: 2000,
+        max_tokens: ANSWER_MAX_TOKENS,
         system,
         tools: TOOLS,
         tool_choice: mustAnswer ? { type: 'tool', name: ANSWER_TOOL } : { type: 'any' },
         messages: withRollingBreakpoint(messages),
       });
     } catch (error) {
-      return { ok: false, detail: error instanceof Error ? error.message : 'The answer failed.', toolCalls };
+      return fail(error instanceof Error ? error.message : 'The answer failed.');
     }
 
     const usage = usageFrom(response.usage);
@@ -361,7 +440,7 @@ export async function answerQuestion(input: {
     const answered = uses.find((c) => c.name === ANSWER_TOOL);
     if (answered) {
       const { answer, cited } = answerInput(answered.input);
-      if (!answer) return { ok: false, detail: 'The answer came back empty.', toolCalls };
+      if (!answer) return fail('The answer came back empty.');
       const citations: TalkCitation[] = [];
       const seen = new Set<string>();
       for (const c of cited) {
@@ -394,12 +473,15 @@ export async function answerQuestion(input: {
       // Refuse those lookups and ask once more with no tool allowed, so what
       // was already looked up still becomes an answer.
       if (uses.length > 0) {
+        const at = lookups;
         messages.push(
           { role: 'assistant', content: response.content },
           {
             role: 'user',
-            content: uses.map((use) => {
-              toolCalls.push({ name: use.name, input: use.input, result: keptResult({ ok: false, error: LIMIT_REACHED }) });
+            content: uses.map((use, i) => {
+              const result = keptResult({ ok: false, error: LIMIT_REACHED });
+              toolCalls.push({ name: use.name, input: use.input, result });
+              hear({ phase: 'finished', id: use.id, index: at + i, name: use.name, input: use.input, ok: false, result });
               return { type: 'tool_result', tool_use_id: use.id, content: LIMIT_REACHED, is_error: true };
             }),
           },
@@ -408,14 +490,14 @@ export async function answerQuestion(input: {
         try {
           prose = await client.messages.create({
             model: ASK_MODEL,
-            max_tokens: 2000,
+            max_tokens: ANSWER_MAX_TOKENS,
             system,
             tools: TOOLS,
             tool_choice: { type: 'none' },
             messages: withRollingBreakpoint(messages),
           });
         } catch (error) {
-          return { ok: false, detail: error instanceof Error ? error.message : 'The answer failed.', toolCalls };
+          return fail(error instanceof Error ? error.message : 'The answer failed.');
         }
         input.onSpend?.({ model: ASK_MODEL, usage: usageFrom(prose.usage) });
         const said = prose.content.find((c): c is Anthropic.TextBlock => c.type === 'text')?.text.trim();
@@ -424,15 +506,16 @@ export async function answerQuestion(input: {
           const note = `\n\n${limitNote(stop)}`;
           return { ok: true, body: `${said.slice(0, MAX_TURN - note.length)}${note}`, toolCalls, citations: [], stop };
         }
-        return { ok: false, detail: whyNoReport(prose), toolCalls };
+        return fail(whyNoReport(prose));
       }
-      return { ok: false, detail: whyNoReport(response), toolCalls };
+      return fail(whyNoReport(response));
     }
 
     // Run this round's lookups together, as many as the cap still allows.
     const results = await Promise.all(
       uses.map(async (use, i): Promise<AskToolResult> => {
         if (lookups + i >= MAX_LOOKUPS) return { ok: false, error: LIMIT_REACHED };
+        hear({ phase: 'started', id: use.id, index: lookups + i, name: use.name, input: use.input });
         if (use.name === HAND_OFF_TOOL_NAME) {
           if (!input.handOff) return { ok: false, error: NO_HANDOFF };
           return input.handOff(use.input);
@@ -444,12 +527,15 @@ export async function answerQuestion(input: {
         return input.execute(use.name, use.input);
       }),
     );
-    lookups += uses.length;
-
     const blocks: Anthropic.ToolResultBlockParam[] = uses.map((use, i) => {
       const result = results[i];
-      toolCalls.push({ name: use.name, input: use.input, result: keptResult(result) });
-      for (const c of citationsOf(result)) known.set(citationKey(c), c);
+      const kept = keptResult(result);
+      toolCalls.push({ name: use.name, input: use.input, result: kept });
+      hear({ phase: 'finished', id: use.id, index: lookups + i, name: use.name, input: use.input, ok: result.ok, result: kept });
+      for (const c of citationsOf(result)) {
+        known.set(citationKey(c), c);
+        found.push(c);
+      }
       return {
         type: 'tool_result',
         tool_use_id: use.id,
@@ -457,10 +543,11 @@ export async function answerQuestion(input: {
         ...(result.ok ? {} : { is_error: true }),
       };
     });
+    lookups += uses.length;
     messages.push({ role: 'assistant', content: response.content }, { role: 'user', content: blocks });
   }
 
-  return { ok: false, detail: 'The answer did not finish.', toolCalls };
+  return fail('The answer did not finish.');
 }
 
 // ---------------------------------------------------------------------------
@@ -536,6 +623,8 @@ export async function askDash(
     anthropicApiKey: string | null | undefined;
     client?: Anthropic;
     now?: () => number;
+    /** Hears each lookup start and finish (AskLookupEvent). */
+    onLookup?: (event: AskLookupEvent) => void;
   },
   stores: AskStores,
 ): Promise<AskDashResult> {
@@ -612,6 +701,7 @@ export async function askDash(
     anthropicApiKey: input.anthropicApiKey,
     client: input.client,
     now: input.now,
+    onLookup: input.onLookup,
     onSpend: (report) => spent.push(report),
   });
   await stores.recordSpend(spent);
