@@ -1,7 +1,7 @@
 'use client';
 
 import { formatDay } from '@/lib/goals/dates';
-import { useActionState, useState } from 'react';
+import { useActionState, useRef, useState, useTransition } from 'react';
 import { CircleUser, Repeat, Target } from 'lucide-react';
 import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
 import { FileBody } from '@/components/files/file-body';
@@ -9,20 +9,18 @@ import { FileLinks } from '@/components/files/file-links';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ChipInput, ChipSelect, ComposeTitle, InlineInput, Textarea } from '@/components/ui/field';
+import { EditableProse } from '@/components/ui/editable-prose';
+import { ChipInput, ChipSelect, ComposeTitle, InlineInput } from '@/components/ui/field';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import type { LinkedFile } from '@/lib/files/files';
 import type { StepPrep } from '@/lib/goals/goal-page';
 import { PROGRESS_UNIT_MAX } from '@/lib/goals/progress';
-import { linkBareDomains } from '@/lib/goals/result-links';
 import { countProposed } from '@/lib/goals/shaping';
 import {
   RHYTHM_COUNT_MAX,
   RHYTHM_PERIODS,
-  STEP_ACCEPTANCE_MAX,
-  STEP_DETAIL_MAX,
   STEP_KINDS,
   STEP_KIND_LABELS,
   STEP_TITLE_MAX,
@@ -31,7 +29,13 @@ import {
 } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import type { RhythmRecord } from '@/lib/goals/rhythms';
-import { addStep, editStep, linkStepAction, unlinkStepAction, type StepActionState } from './actions';
+import {
+  addStep,
+  editStep,
+  linkStepAction,
+  unlinkStepAction,
+  type StepActionState,
+} from './actions';
 import {
   answerQuestionAction,
   reviewResultAction,
@@ -44,7 +48,8 @@ import { DashCredit } from '@/components/ui/dash-mark';
 /**
  * What a goal step has that a plan step does not (plan #982): the answer box
  * on a question, what Claude produced, a rhythm's past periods, the approve
- * and turn-down pair on a proposal, and the forms that add and edit a step.
+ * and turn-down pair on a proposal, the composer that adds a step, and the
+ * pieces that edit one where it is read.
  * The goal's row in goal-row.tsx puts these in the shared tree row's slots.
  */
 
@@ -170,12 +175,14 @@ export function ClaudeResult({ node, files = [] }: { node: StepNode; files?: Lin
     <div className="mt-1 space-y-1 px-1">
       <p className="text-small text-ink-muted">
         <DashCredit />
-        {prepared ? 'What Dash prepared for this' : unread ? 'Dash’s result, to read' : 'Dash’s result'}
+        {prepared
+          ? 'What Dash prepared for this'
+          : unread
+            ? 'Dash’s result, to read'
+            : 'Dash’s result'}
       </p>
-      {node.result && <FileBody markdown={linkBareDomains(node.result)} compact />}
-      {files.length > 0 && (
-        <FileLinks files={files} />
-      )}
+      {node.result && <FileBody markdown={node.result} compact />}
+      {files.length > 0 && <FileLinks files={files} />}
       {node.resultUrl && (
         <a
           href={node.resultUrl}
@@ -333,117 +340,183 @@ function onlyChanged(form: FormData, node: StepNode): FormData {
   return form;
 }
 
-/** The step's fields as one form. Save puts the text view back; Cancel leaves it as it was. */
-export function StepEditForm({
+/** Send one change to a step: the fields in `values`, and nothing else. */
+async function saveStep(id: string, values: Record<string, string>): Promise<string | null> {
+  const form = new FormData();
+  form.set('id', id);
+  for (const [key, value] of Object.entries(values)) form.set(key, value);
+  const result = await editStep(initial, form);
+  return result.error ?? null;
+}
+
+/**
+ * The step's title, renamed where it is read (plan #1435). Enter or leaving
+ * the box saves it; Escape puts it back as it was.
+ */
+export function StepTitleEditor({ node, onDone }: { node: StepNode; onDone: () => void }) {
+  const toast = useToast();
+  const [pending, start] = useTransition();
+  const cancelled = useRef(false);
+  return (
+    <InlineInput
+      name="title"
+      required
+      maxLength={STEP_TITLE_MAX}
+      defaultValue={node.title}
+      aria-label={`Rename ${node.title}`}
+      autoFocus
+      disabled={pending}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          event.currentTarget.blur();
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          cancelled.current = true;
+          onDone();
+        }
+      }}
+      onBlur={(event) => {
+        const next = event.currentTarget.value.trim();
+        if (cancelled.current || !next || next === node.title) {
+          onDone();
+          return;
+        }
+        start(async () => {
+          const error = await saveStep(node.id, { title: next });
+          if (error) toast({ text: error });
+          onDone();
+        });
+      }}
+    />
+  );
+}
+
+/**
+ * What a step involves, or when it is done, as writing you press to change
+ * (plan #1435). It was a textarea in a form opened from the menu; now the
+ * words in the step's panel are the editor.
+ */
+export function StepText({ node, field }: { node: StepNode; field: 'detail' | 'acceptance' }) {
+  const detail = field === 'detail';
+  return (
+    <EditableProse
+      value={(detail ? node.detail : node.acceptance) ?? ''}
+      label={detail ? `What ${node.title} involves` : `When ${node.title} is done`}
+      empty={detail ? 'Say what it involves' : 'Say when it is done'}
+      placeholder={detail ? 'What it involves' : 'Done when…'}
+      onSave={(next) => saveStep(node.id, { [field]: next })}
+    />
+  );
+}
+
+/**
+ * The step's properties as chips that save as they change (plan #1435): the
+ * start and due days, its kind, how often a rhythm comes round, and about how
+ * many in all. Then the other goals it counts towards. These were the foot of
+ * a form with a Save button; each now saves on its own.
+ */
+export function StepFacts({
   node,
   links,
   otherGoals,
-  onDone,
 }: {
   node: StepNode;
   links: { linkId: string; goalId: string; title: string }[];
   otherGoals: OtherGoals;
-  onDone: () => void;
 }) {
   const menuAction = useMenuAction();
   const linkable = otherGoals.filter((goal) => !links.some((link) => link.goalId === goal.id));
   const [kind, setKind] = useState<StepKind>(node.kind);
-  const [state, save, saving] = useActionState(
-    async (prev: StepActionState, form: FormData) => {
-      const result = await editStep(prev, onlyChanged(form, node));
-      if (!result.error) onDone();
-      return result;
-    },
-    initial,
-  );
+  const formRef = useRef<HTMLFormElement>(null);
+  const [state, save, saving] = useActionState(async (prev: StepActionState, form: FormData) => {
+    // A step turned into a rhythm before its count is drawn comes round
+    // once a week until it is told otherwise.
+    if (form.get('kind') === 'rhythm' && !form.get('rhythmCount')) {
+      form.set('rhythmCount', '1');
+      form.set('rhythmPeriod', 'week');
+    }
+    return editStep(prev, onlyChanged(form, node));
+  }, initial);
+
+  // Saves once the change is whole: a total waits for what it counts, and
+  // what it counts for the total.
+  const commit = () => {
+    const form = formRef.current;
+    if (!form) return;
+    const data = new FormData(form);
+    const total = String(data.get('estimatedTotal') ?? '').trim();
+    const unit = String(data.get('totalUnit') ?? '').trim();
+    if (data.has('estimatedTotal') && Boolean(total) !== Boolean(unit)) return;
+    form.requestSubmit();
+  };
 
   return (
-    <div className="space-y-2 rounded-control bg-sunken px-2 py-2">
-      <form action={save} className="space-y-2">
+    <div className="space-y-1">
+      <form
+        ref={formRef}
+        action={save}
+        className="-ml-1.5 flex flex-wrap items-center gap-1"
+        aria-busy={saving}
+      >
         <input type="hidden" name="id" value={node.id} />
-        <InlineInput
-          name="title"
-          required
-          maxLength={STEP_TITLE_MAX}
-          defaultValue={node.title}
-          aria-label={`Rename ${node.title}`}
-          autoFocus
+        <ChipInput
+          type="date"
+          name="startsOn"
+          icon="Start"
+          defaultValue={node.startsOn ?? ''}
+          onChange={commit}
+          aria-label={`The first day ${node.title} can be done`}
+          title="Until this day the step stays off your list and out of Dash's runs"
         />
-        {/* ui-ok: composer-always-open -- this form only renders once Edit is pressed */}
-        <Textarea
-          name="detail"
-          rows={3}
-          maxLength={STEP_DETAIL_MAX}
-          defaultValue={node.detail ?? ''}
-          placeholder="What it involves"
-          aria-label={`What ${node.title} involves`}
+        <ChipInput
+          type="date"
+          name="dueOn"
+          icon="Due"
+          defaultValue={node.dueOn ?? ''}
+          onChange={commit}
+          aria-label={`When ${node.title} is due`}
         />
-        <InlineInput
-          name="acceptance"
-          maxLength={STEP_ACCEPTANCE_MAX}
-          defaultValue={node.acceptance ?? ''}
-          placeholder="Done when…"
-          aria-label={`When ${node.title} is done`}
+        <KindChip
+          value={kind}
+          onChange={(next) => {
+            setKind(next);
+            commit();
+          }}
+          label={`What kind of step ${node.title} is`}
         />
-        <div className="flex flex-wrap items-center gap-2">
-          <ChipInput
-            type="date"
-            name="startsOn"
-            icon="Start"
-            defaultValue={node.startsOn ?? ''}
-            aria-label={`The first day ${node.title} can be done`}
-            title="Until this day the step stays off your list and out of Dash's runs"
-          />
-          <ChipInput
-            type="date"
-            name="dueOn"
-            icon="Due"
-            defaultValue={node.dueOn ?? ''}
-            aria-label={`When ${node.title} is due`}
-          />
-          <KindChip
-            value={kind}
-            onChange={setKind}
-            label={`What kind of step ${node.title} is`}
-          />
-          {kind === 'rhythm' && (
-            <RhythmFields count={node.rhythmCount} period={node.rhythmPeriod} />
-          )}
-          {(kind === 'mine' || kind === 'claude') && (
-            <span className="inline-flex items-center">
-              <ChipInput
-                type="text"
-                inputMode="decimal"
-                name="estimatedTotal"
-                icon="About"
-                defaultValue={node.estimatedTotal ?? ''}
-                placeholder="how many"
-                size={8}
-                aria-label={`About how many in all for ${node.title}`}
-                title="An estimate: the step says roughly how much is left from it"
-              />
-              <ChipInput
-                type="text"
-                name="totalUnit"
-                maxLength={PROGRESS_UNIT_MAX}
-                defaultValue={node.totalUnit ?? ''}
-                placeholder="bags"
-                size={8}
-                aria-label={`What the total for ${node.title} counts`}
-              />
-            </span>
-          )}
-        </div>
-        {state.error && <p className="px-1 text-small text-danger">{state.error}</p>}
-        <div className="flex items-center gap-2">
-          <Button type="submit" size="sm" pending={saving}>
-            Save
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={onDone}>
-            Cancel
-          </Button>
-        </div>
+        {kind === 'rhythm' && (
+          <RhythmFields count={node.rhythmCount} period={node.rhythmPeriod} onCommit={commit} />
+        )}
+        {(kind === 'mine' || kind === 'claude') && (
+          <span className="inline-flex items-center">
+            <ChipInput
+              type="text"
+              inputMode="decimal"
+              name="estimatedTotal"
+              icon="About"
+              defaultValue={node.estimatedTotal ?? ''}
+              placeholder="how many"
+              size={8}
+              onBlur={commit}
+              aria-label={`About how many in all for ${node.title}`}
+              title="An estimate: the step says roughly how much is left from it"
+            />
+            <ChipInput
+              type="text"
+              name="totalUnit"
+              maxLength={PROGRESS_UNIT_MAX}
+              defaultValue={node.totalUnit ?? ''}
+              placeholder="bags"
+              size={8}
+              onBlur={commit}
+              aria-label={`What the total for ${node.title} counts`}
+            />
+          </span>
+        )}
+        {saving && <span className="text-small text-ink-muted">Saving…</span>}
       </form>
+      {state.error && <p className="px-1 text-small text-danger">{state.error}</p>}
       {(links.length > 0 || linkable.length > 0) && (
         <div className="space-y-1 px-1 text-small">
           {links.map((link) => (
@@ -521,10 +594,13 @@ function RhythmFields({
   count,
   period,
   submitLabel,
+  onCommit,
 }: {
   count: number | null;
   period: string | null;
   submitLabel?: string;
+  /** Saves the change where the fields stand on a step rather than in a composer. */
+  onCommit?: () => void;
 }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-0.5">
@@ -535,11 +611,17 @@ function RhythmFields({
         max={RHYTHM_COUNT_MAX}
         required
         defaultValue={count ?? 1}
+        onBlur={onCommit}
         aria-label="How many times"
         icon={<Repeat className="size-3.5" strokeWidth={2} />}
       />
       <span className="text-ui text-ink-muted">a</span>
-      <ChipSelect name="rhythmPeriod" defaultValue={period ?? 'week'} aria-label="Per">
+      <ChipSelect
+        name="rhythmPeriod"
+        defaultValue={period ?? 'week'}
+        onChange={onCommit}
+        aria-label="Per"
+      >
         {RHYTHM_PERIODS.map((option) => (
           <option key={option} value={option}>
             {option}

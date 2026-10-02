@@ -60,7 +60,9 @@ import {
   ProposalButtons,
   Question,
   StepComposer,
-  StepEditForm,
+  StepFacts,
+  StepText,
+  StepTitleEditor,
   formatDate,
   useMenuAction,
 } from './step-parts';
@@ -265,14 +267,11 @@ function BlockForm({
   inset: React.CSSProperties;
   onDone: () => void;
 }) {
-  const [state, action, pending] = useActionState(
-    async (prev: TreeActionState, form: FormData) => {
-      const result = await blockGoalStep(prev, form);
-      if (!result.error) onDone();
-      return result;
-    },
-    {} as TreeActionState,
-  );
+  const [state, action, pending] = useActionState(async (prev: TreeActionState, form: FormData) => {
+    const result = await blockGoalStep(prev, form);
+    if (!result.error) onDone();
+    return result;
+  }, {} as TreeActionState);
   return (
     <li style={inset} className="pb-2 pr-3">
       <form action={action} className="space-y-2 rounded-lg bg-sunken px-3 py-2.5">
@@ -487,9 +486,17 @@ export function GoalRow({
     ? [{ id: 'send', label: sendLabel, formAction: sendAction, formFields: { id: step.id } }]
     : [];
   const preparable = offersPrepare(step);
-  const prepareLabel = step.result || step.resultUrl ? 'Prepare it again' : 'Ask Dash to prepare this';
+  const prepareLabel =
+    step.result || step.resultUrl ? 'Prepare it again' : 'Ask Dash to prepare this';
   const prepareItems: ActionMenuItem[] = preparable
-    ? [{ id: 'prepare', label: prepareLabel, formAction: prepareAction, formFields: { id: step.id } }]
+    ? [
+        {
+          id: 'prepare',
+          label: prepareLabel,
+          formAction: prepareAction,
+          formFields: { id: step.id },
+        },
+      ]
     : [];
   const handedOver = (sendState.error ?? sendState.message) ? sendState : prepareState;
   const run = context.runs[step.id];
@@ -511,7 +518,7 @@ export function GoalRow({
     ...rhythmItems,
     ...todoItems,
     { id: 'add-child', label: 'Add a sub-step', onSelect: row.addChild },
-    { id: 'edit', label: 'Edit', onSelect: () => row.setEditing(true) },
+    { id: 'edit', label: 'Rename', onSelect: () => row.setEditing(true) },
     ...(unlinkId
       ? [
           {
@@ -666,16 +673,14 @@ export function GoalRow({
           )}
         </>
       }
-      edit={
-        <StepEditForm
-          node={step}
-          links={links}
-          otherGoals={context.otherGoals}
-          onDone={() => row.setEditing(false)}
-        />
-      }
+      // Edited where it is read (plan #1435): the title on the row, the
+      // detail and done-when as text you press, the rest as chips.
+      titleEditor={<StepTitleEditor node={step} onDone={() => row.setEditing(false)} />}
+      detailView={<StepText node={step} field="detail" />}
+      acceptanceView={isDecision ? undefined : <StepText node={step} field="acceptance" />}
       body={
         <>
+          {!isDecision && <StepFacts node={step} links={links} otherGoals={context.otherGoals} />}
           {isDecision &&
             step.status !== 'dropped' &&
             (step.status === 'open' || step.resolution !== null) && <Question node={step} />}
@@ -714,9 +719,7 @@ export function GoalRow({
           {step.kind === 'rhythm' && step.rhythmCount && step.rhythmPeriod && (
             <span>{describeRhythm(step.rhythmCount, step.rhythmPeriod)}</span>
           )}
-          {current && step.rhythmPeriod && (
-            <span>{progressLine(step.rhythmPeriod, current)}</span>
-          )}
+          {current && step.rhythmPeriod && <span>{progressLine(step.rhythmPeriod, current)}</span>}
           {step.waitsUntil && <span>Starts {formatDate(step.waitsUntil)}</span>}
           {step.dueOn && <span>Due {formatDate(step.dueOn)}</span>}
           {step.estimatedTotal && step.totalUnit && (

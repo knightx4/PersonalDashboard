@@ -4,8 +4,8 @@ import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
-import { Field, Select } from '@/components/ui/field';
-import { cardVariants } from '@/components/ui/card';
+import { FileText, Network } from 'lucide-react';
+import { ChipSelect } from '@/components/ui/field';
 import type { ProposedChain } from '@/lib/learn/graph/chain-payload';
 import { proposeFromNote, type FromNoteState } from './actions';
 import { Proposal } from './brief-form';
@@ -31,7 +31,7 @@ import { Proposal } from './brief-form';
 function ReadButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" size="sm" variant="secondary" disabled={pending}>
       {pending ? 'Reading it…' : 'Read this note'}
     </Button>
   );
@@ -52,41 +52,25 @@ export function FromVaultForm({
     return <Proposal chain={chain} onDiscard={() => setDiscarded(chain)} />;
   }
 
+  // Two choices and a button, so they are chips on one line rather than two
+  // labelled selects stacked over it (plan #1435).
   return (
-    <form action={propose} className={cardVariants({ padding: 'standard' })}>
-      {subjects.length > 0 && (
-        <Field
-          label="Into which track?"
-          id="vault-subject"
-          hint="Leave it unset and the note names its own track."
-        >
-          <Select id="vault-subject" name="subjectId" defaultValue="">
-            <option value="">Let it decide</option>
-            {subjects.map((subject) => (
-              <option key={subject.id} value={subject.id}>
-                {subject.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      )}
-
-      <Field
-        label="Which note?"
-        id="vault-note"
-        hint="Notes long enough to be arguing something. What it argues becomes ideas to learn, and what it only records does not."
-      >
+    <form action={propose}>
+      <div className="-ml-1.5 flex flex-wrap items-center gap-1">
         {/*
           The note that was read stays chosen. A proposal that failed is
           usually retried on the same note, and a picker that empties itself
           makes that a hunt through five hundred paths.
         */}
-        <Select
-          id="vault-note"
+        <ChipSelect
           name="notePath"
           key={state.verdict?.notePath ?? 'none'}
           defaultValue={state.verdict?.notePath ?? ''}
+          placeholderValue=""
           required
+          aria-label="Which note"
+          className="max-w-full"
+          icon={<FileText className="size-3.5" strokeWidth={1.75} />}
         >
           <option value="" disabled>
             Pick a note
@@ -96,8 +80,36 @@ export function FromVaultForm({
               {note.path}
             </option>
           ))}
-        </Select>
-      </Field>
+        </ChipSelect>
+        {subjects.length > 0 && (
+          <ChipSelect
+            name="subjectId"
+            defaultValue=""
+            placeholderValue=""
+            aria-label="Into which track"
+            icon={<Network className="size-3.5" strokeWidth={1.75} />}
+          >
+            <option value="">Let it name its track</option>
+            {subjects.map((subject) => (
+              <option key={subject.id} value={subject.id}>
+                {subject.name}
+              </option>
+            ))}
+          </ChipSelect>
+        )}
+        <span className="flex items-center gap-1">
+          <ReadButton />
+          <PaidHint
+            action="app/learn/know/actions.ts#proposeFromNote"
+            what="Cost of reading the note"
+          />
+        </span>
+      </div>
+
+      <p className="mt-2 text-small text-ink-muted">
+        Notes long enough to be arguing something. What it argues becomes ideas to learn, and what
+        it only records does not.
+      </p>
 
       {/*
         Shown whether or not the note was read. A note the classifier turns
@@ -114,14 +126,6 @@ export function FromVaultForm({
 
       {state.message && <p className="mt-2 text-ui text-ink-muted">{state.message}</p>}
       {state.error && <p className="mt-2 text-ui text-caution">{state.error}</p>}
-
-      <div className="mt-4 flex items-center gap-3">
-        <ReadButton />
-        <PaidHint
-          action="app/learn/know/actions.ts#proposeFromNote"
-          what="Cost of reading the note"
-        />
-      </div>
     </form>
   );
 }

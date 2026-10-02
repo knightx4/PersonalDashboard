@@ -2,10 +2,10 @@
 
 import { useActionState, useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { FileText } from 'lucide-react';
+import { FileText, Network } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
-import { Field, Select, Textarea } from '@/components/ui/field';
+import { ChipSelect, ComposeBody, ComposeBox } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
@@ -38,7 +38,7 @@ const key = (name: string) => name.trim().toLowerCase();
 function ReadButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" disabled={pending}>
+    <Button type="submit" size="sm" variant="secondary" disabled={pending}>
       <FileText className="size-4" strokeWidth={2} aria-hidden />
       {pending ? 'Reading it…' : 'Read the briefing'}
     </Button>
@@ -202,59 +202,63 @@ export function BriefForm({
     return <Proposal chain={chain} onDiscard={() => setDiscarded(chain)} />;
   }
 
+  // A box you paste into and send from rather than a labelled field (plan
+  // #1435): the track is a chip beside the button, and what the import can
+  // read is the line beneath.
   return (
-    <form action={propose} className={cardVariants({ padding: 'standard' })}>
-      {subjects.length > 0 && (
-        <Field
-          label="Which track?"
-          id="brief-subject"
-          hint="Leave it open and the import names one. Choosing a track you already have is what stops it proposing ideas that are in there already."
-        >
-          <Select id="brief-subject" name="subjectId" defaultValue="">
-            <option value="">A new track</option>
-            {subjects.map((subject) => (
-              <option key={subject.id} value={subject.id}>
-                {subject.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      )}
-
-      <Field
-        label="Paste the briefing"
-        id="briefing"
-        hint="Prose somebody prepared for you — a pass per topic, the background, the argument. It reads ideas, so a table of numbers or a list of names has nothing in it to take."
-        className={subjects.length > 0 ? 'mt-4' : undefined}
-      >
+    <form action={propose}>
+      <ComposeBox className="space-y-2 py-2.5">
         {/* ui-ok: composer-always-open -- the create. Pasting the briefing is
-          * the only thing this form does, and there is nothing to read before
-          * it has been pasted. */}
-        <Textarea
-          id="briefing"
+         * the only thing this does, and there is nothing to read before it
+         * has been pasted. */}
+        <ComposeBody
           name="briefing"
+          aria-label="Paste the briefing"
           required
-          rows={6}
+          rows={5}
           maxLength={maxChars}
-          placeholder="Ethereum Classic — the chain that kept the original ledger after the DAO fork. Its security budget is a fraction of Ethereum's, which is why…"
+          placeholder="Paste the briefing. Like: Ethereum Classic is the chain that kept the original ledger after the DAO fork. Its security budget is a fraction of Ethereum's, which is why…"
         />
-      </Field>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <ReadButton />
-        <PaidHint
-          action="app/learn/know/actions.ts#proposeBrief"
-          what="Cost of reading the briefing"
-        />
-        {state.error && <span className="text-ui text-danger">{state.error}</span>}
-        {/* Not an error: a briefing that argues nothing is a normal thing to
-            paste, and the sentence that comes back says what would work. */}
-        {state.message && <span className="text-ui text-ink-muted">{state.message}</span>}
-      </div>
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
+          {subjects.length > 0 && (
+            <ChipSelect
+              name="subjectId"
+              defaultValue=""
+              placeholderValue=""
+              aria-label="Which track"
+              title="Choosing a track you already have stops it proposing ideas that are in there already"
+              icon={<Network className="size-3.5" strokeWidth={1.75} />}
+            >
+              <option value="">A new track</option>
+              {subjects.map((subject) => (
+                <option key={subject.id} value={subject.id}>
+                  {subject.name}
+                </option>
+              ))}
+            </ChipSelect>
+          )}
+          <span className="ml-auto flex items-center gap-1">
+            <PaidHint
+              action="app/learn/know/actions.ts#proposeBrief"
+              what="Cost of reading the briefing"
+            />
+            <ReadButton />
+          </span>
+        </div>
+      </ComposeBox>
+      {state.error && (
+        <p role="alert" className="mt-1 text-small text-danger">
+          {state.error}
+        </p>
+      )}
+      {/* Not an error: a briefing that argues nothing is a normal thing to
+          paste, and the sentence that comes back says what would work. */}
+      {state.message && <p className="mt-1 text-ui text-ink-muted">{state.message}</p>}
 
       <p className="mt-2 text-small text-ink-muted">
-        Everything it finds is shown before any of it is saved, and lands as something still to
-        learn.
+        Prose somebody prepared for you: a pass per topic, the background, the argument. A table of
+        numbers or a list of names has nothing in it to take. Everything it finds is shown before
+        any of it is saved, and lands as something still to learn.
       </p>
     </form>
   );

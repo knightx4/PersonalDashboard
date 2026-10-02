@@ -5,7 +5,7 @@ import { useFormStatus } from 'react-dom';
 import { GraduationCap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
-import { Field, Textarea } from '@/components/ui/field';
+import { ComposeBody, ComposeBox } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
@@ -33,7 +33,7 @@ import { approvePrior, proposePrior, type PriorState } from './actions';
 function ReadButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" disabled={pending}>
+    <Button type="submit" size="sm" variant="secondary" disabled={pending}>
       <GraduationCap className="size-4" strokeWidth={2} aria-hidden />
       {pending ? 'Reading it…' : 'Read what I know'}
     </Button>
@@ -119,41 +119,43 @@ export function PriorForm({ subjectId }: { subjectId?: string }) {
 
   if (state.chain) return <Proposal chain={state.chain} />;
 
+  // The account is written in a box you send from rather than a labelled
+  // field (plan #1435), with what makes a good one in the line beneath.
   return (
-    <form action={propose} className={cardVariants({ padding: 'standard' })}>
+    <form action={propose}>
       {subjectId && <input type="hidden" name="subjectId" value={subjectId} />}
 
-      <Field
-        label="What do you already know?"
-        id="account"
-        hint="An essay, a syllabus you can say something about, a write-up of work you cannot paste. Say what you understood, not what you attended — a list of course titles has nothing in it to read."
-      >
-        {/* ui-ok: composer-always-open -- the create. This page is the form:
-          * writing the account of what you know is the only thing it does, and
-          * there is nothing to read before it exists. */}
-        <Textarea
-          id="account"
+      <ComposeBox className="space-y-2 py-2.5">
+        {/* ui-ok: composer-always-open -- the create. Writing the account of
+         * what you know is the only thing this does, and there is nothing to
+         * read before it exists. */}
+        <ComposeBody
           name="account"
+          aria-label="What do you already know?"
           required
-          rows={5}
+          rows={4}
           maxLength={20000}
-          placeholder="We spent Macro I on IS-LM and I never believed the LM curve — the central bank sets the rate, it does not sit on a money supply and let the rate clear."
+          placeholder="What do you already know? Like: we spent Macro I on IS-LM and I never believed the LM curve, because the central bank sets the rate."
         />
-      </Field>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <ReadButton />
-        <PaidHint action="app/learn/know/actions.ts#proposePrior" what="Cost of reading it" />
-        {state.error && <span className="text-ui text-danger">{state.error}</span>}
-        {/* Not an error: a paste with no claims in it is a normal thing to
-            happen here, and the sentence that comes back says what would work
-            instead. */}
-        {state.message && <span className="text-ui text-ink-muted">{state.message}</span>}
-      </div>
+        <div className="flex flex-wrap items-center justify-end gap-1 border-t border-border pt-2">
+          <PaidHint action="app/learn/know/actions.ts#proposePrior" what="Cost of reading it" />
+          <ReadButton />
+        </div>
+      </ComposeBox>
+      {state.error && (
+        <p role="alert" className="mt-1 text-small text-danger">
+          {state.error}
+        </p>
+      )}
+      {/* Not an error: a paste with no claims in it is a normal thing to
+          happen here, and the sentence that comes back says what would work
+          instead. */}
+      {state.message && <p className="mt-1 text-ui text-ink-muted">{state.message}</p>}
 
       <p className="mt-2 text-small text-ink-muted">
-        What comes back is marked known from the start, so it is shown to you before any of it is
-        real.
+        An essay, a syllabus, a write-up of work you cannot paste: say what you understood, not what
+        you attended. What comes back is marked known from the start, so it is shown to you before
+        any of it is real.
       </p>
     </form>
   );

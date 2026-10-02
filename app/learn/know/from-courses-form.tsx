@@ -5,7 +5,8 @@ import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
-import { Field, Select } from '@/components/ui/field';
+import { Network } from 'lucide-react';
+import { ChipSelect } from '@/components/ui/field';
 import { Card, CardSection, cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
@@ -53,7 +54,7 @@ function ReadButton({ again }: { again: boolean }) {
 function RetrackButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" disabled={pending}>
+    <Button type="submit" size="sm" variant="ghost" disabled={pending}>
       {pending ? 'Reading…' : 'Read for this track'}
     </Button>
   );
@@ -255,20 +256,23 @@ export function CourseCheck({
         {/* Another track means asking again: the ideas a track already holds
             are matched when the list is made, so the same list cannot simply
             be relabelled. */}
-        <form action={propose} className="mt-3 flex flex-wrap items-end gap-3">
+        <form action={propose} className="-ml-1.5 mt-2 flex flex-wrap items-center gap-1">
           <input type="hidden" name="courseId" value={course.id} />
-          <Field label="Into which track?" id="course-track" className="min-w-0 flex-1">
-            <Select id="course-track" name="subjectId" defaultValue={subjectId ?? ''}>
-              <option value="">
-                {subjectId === null ? `A new track: ${chain.subject}` : 'Let Dash choose'}
+          <ChipSelect
+            name="subjectId"
+            defaultValue={subjectId ?? ''}
+            aria-label="Into which track"
+            icon={<Network className="size-3.5" strokeWidth={1.75} />}
+          >
+            <option value="">
+              {subjectId === null ? `A new track: ${chain.subject}` : 'Let Dash choose'}
+            </option>
+            {tracks.map((track) => (
+              <option key={track.id} value={track.id}>
+                {track.name}
               </option>
-              {tracks.map((track) => (
-                <option key={track.id} value={track.id}>
-                  {track.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
+            ))}
+          </ChipSelect>
           <span className="flex items-center gap-1">
             <RetrackButton />
             <PaidHint

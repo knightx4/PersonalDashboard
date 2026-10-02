@@ -191,6 +191,9 @@ export function TreeRow<E extends TreeCatalogEntry>({
   quickActions,
   notices,
   edit,
+  titleEditor,
+  detailView,
+  acceptanceView,
   body,
   meta,
   panelActions,
@@ -241,6 +244,16 @@ export function TreeRow<E extends TreeCatalogEntry>({
   notices?: ReactNode;
   /** The edit form, drawn in place of the panel while the row is being edited. */
   edit?: ReactNode;
+  /**
+   * The title's own editor, drawn where the title is while the row is being
+   * edited, for a page whose step is edited in place rather than in a form
+   * (plan #1435). With it, Edit renames the row and the panel stays open.
+   */
+  titleEditor?: ReactNode;
+  /** The detail as the page draws it, in place of the plain text: an editor at rest, say. */
+  detailView?: ReactNode;
+  /** The done-when as the page draws it, under the Done when heading, even when empty. */
+  acceptanceView?: ReactNode;
   /** The page's own content in the opened panel, under the note. */
   body?: ReactNode;
   /** The line of facts near the foot of the opened panel. */
@@ -415,21 +428,25 @@ export function TreeRow<E extends TreeCatalogEntry>({
           )}
 
           {/* The title and the chevron beside it are one fold: either opens
-              the step's panel and its sub-steps together. */}
-          <button
-            type="button"
-            onClick={toggle}
-            aria-expanded={expanded}
-            title={expanded ? `Close #${handle}` : `Open #${handle}`}
-            className="min-w-0 flex-1 self-center text-left hover:text-accent"
-          >
-            <span
-              className={cn(
-                'flex min-w-0 items-baseline gap-1.5 text-ui',
-                trail.length === 0 ? 'font-medium text-ink' : 'text-ink',
-              )}
+              the step's panel and its sub-steps together. Renamed in place
+              where the page gives the title an editor. */}
+          {row.editing && titleEditor ? (
+            <div className="min-w-0 flex-1 self-center">{titleEditor}</div>
+          ) : (
+            <button
+              type="button"
+              onClick={toggle}
+              aria-expanded={expanded}
+              title={expanded ? `Close #${handle}` : `Open #${handle}`}
+              className="min-w-0 flex-1 self-center text-left hover:text-accent"
             >
-              {/* Where the row sits, not just what it is called: a feature
+              <span
+                className={cn(
+                  'flex min-w-0 items-baseline gap-1.5 text-ui',
+                  trail.length === 0 ? 'font-medium text-ink' : 'text-ink',
+                )}
+              >
+                {/* Where the row sits, not just what it is called: a feature
                   reads #595 and its second step reads #595.2, so a step says
                   which feature it belongs to and how far through it is
                   without the tree guides having to be traced up by eye.
@@ -437,78 +454,79 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   comments and the CLI say, it is the anchor a `#597` link
                   lands on, and the button around this says "Open #597" -- and
                   the search box takes either. */}
-              <span className="tabular shrink-0 text-small text-ink-ghost">#{node.outline}</span>
-              {/* Truncated closed, whole open. A row is a line and a long title
-               * has to give way to keep it one; but opening the step is the
-               * gesture that means "show me this one", and a name still cut
-               * off after it leaves no way to read it at all. On a phone it
-               * wraps closed as well: the name cell there is what is left
-               * after the health and the menu, which cut titles to two words
-               * (plan #1041). */}
-              <span
-                className={cn(
-                  'min-w-0',
-                  open ? 'break-words' : 'break-words sm:truncate',
-                  node.status === 'dropped' && 'text-ink-muted line-through',
-                )}
-              >
-                {node.title}
-              </span>
-              {/* A question waiting on this step, said on the row. The section
-               * that answers it is behind the fold, and a question nobody
-               * knows is there is the thing this whole section exists to
-               * stop. */}
-              {unanswered > 0 && !open && (
+                <span className="tabular shrink-0 text-small text-ink-ghost">#{node.outline}</span>
+                {/* Truncated closed, whole open. A row is a line and a long title
+                 * has to give way to keep it one; but opening the step is the
+                 * gesture that means "show me this one", and a name still cut
+                 * off after it leaves no way to read it at all. On a phone it
+                 * wraps closed as well: the name cell there is what is left
+                 * after the health and the menu, which cut titles to two words
+                 * (plan #1041). */}
                 <span
-                  title={`${unanswered} unanswered ${unanswered === 1 ? 'question' : 'questions'}`}
-                  className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution"
+                  className={cn(
+                    'min-w-0',
+                    open ? 'break-words' : 'break-words sm:truncate',
+                    node.status === 'dropped' && 'text-ink-muted line-through',
+                  )}
                 >
-                  <HelpCircle className="size-3" strokeWidth={2} aria-hidden />
-                  {unanswered}
-                  <span className="sr-only">
-                    unanswered {unanswered === 1 ? 'question' : 'questions'}
-                  </span>
+                  {node.title}
                 </span>
-              )}
-              {/* And whether anything has been said about it. */}
-              <CommentCount count={node.thread.length} />
-              {marks}
-            </span>
-            {/* Where it came from, when it did not come from you. On the row
+                {/* A question waiting on this step, said on the row. The section
+                 * that answers it is behind the fold, and a question nobody
+                 * knows is there is the thing this whole section exists to
+                 * stop. */}
+                {unanswered > 0 && !open && (
+                  <span
+                    title={`${unanswered} unanswered ${unanswered === 1 ? 'question' : 'questions'}`}
+                    className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution"
+                  >
+                    <HelpCircle className="size-3" strokeWidth={2} aria-hidden />
+                    {unanswered}
+                    <span className="sr-only">
+                      unanswered {unanswered === 1 ? 'question' : 'questions'}
+                    </span>
+                  </span>
+                )}
+                {/* And whether anything has been said about it. */}
+                <CommentCount count={node.thread.length} />
+                {marks}
+              </span>
+              {/* Where it came from, when it did not come from you. On the row
                 and not behind the fold, because a step that appeared under a
                 feature you approved last week is exactly the one you would
                 never think to open. */}
-            {origin && (
-              <span className="block truncate text-small text-ink-ghost">
-                From #{origin.number}&apos;s answer: {origin.gist}
-              </span>
-            )}
-            {/* The same, for a step a session wrote ready to build. Approval
+              {origin && (
+                <span className="block truncate text-small text-ink-ghost">
+                  From #{origin.number}&apos;s answer: {origin.gist}
+                </span>
+              )}
+              {/* The same, for a step a session wrote ready to build. Approval
                 stops at the feature, so this row never asked you; saying so
                 is what the Drop at the top of its menu is for. */}
-            {addedBy && (
-              <span
-                title={addedBy.session ? `Session ${addedBy.session}` : undefined}
-                className="block truncate text-small text-ink-ghost"
-              >
-                <DashCredit />
-                Added by Dash on {addedBy.date}
-              </span>
-            )}
-            {source && <span className="block truncate text-small text-ink-ghost">{source}</span>}
-            {need && !open && (
-              <span className="block truncate text-small text-ink">
-                <span className="font-medium text-caution">Needs: </span>
-                {need}
-              </span>
-            )}
-            {gloss && !open && !need && (
-              <span className="block truncate text-small text-ink-muted">
-                {!node.detail && 'Note: '}
-                {gloss}
-              </span>
-            )}
-          </button>
+              {addedBy && (
+                <span
+                  title={addedBy.session ? `Session ${addedBy.session}` : undefined}
+                  className="block truncate text-small text-ink-ghost"
+                >
+                  <DashCredit />
+                  Added by Dash on {addedBy.date}
+                </span>
+              )}
+              {source && <span className="block truncate text-small text-ink-ghost">{source}</span>}
+              {need && !open && (
+                <span className="block truncate text-small text-ink">
+                  <span className="font-medium text-caution">Needs: </span>
+                  {need}
+                </span>
+              )}
+              {gloss && !open && !need && (
+                <span className="block truncate text-small text-ink-muted">
+                  {!node.detail && 'Note: '}
+                  {gloss}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Health is a word you click to change, not a badge you have to open
@@ -627,7 +645,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
         </li>
       )}
 
-      {row.editing ? (
+      {row.editing && !titleEditor ? (
         <li style={inset} className="pr-3">
           {edit}
         </li>
@@ -663,19 +681,22 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   shown as options inside the question block rather than twice.
                   Nor on an open setup job, where the detail is the
                   instructions and is drawn inside the box that closes them. */}
-                  {node.detail && !isDecision && !setupOpen && (
+                  {!isDecision && !setupOpen && detailView}
+                  {node.detail && !isDecision && !setupOpen && !detailView && (
                     <p className="whitespace-pre-wrap text-ui text-ink-muted">
                       <LinkedText text={node.detail} />
                     </p>
                   )}
-                  {node.acceptance && (
+                  {(node.acceptance || acceptanceView) && (
                     <div>
                       <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
                         Done when
                       </p>
-                      <p className="whitespace-pre-wrap text-ui text-ink">
-                        <LinkedText text={node.acceptance} />
-                      </p>
+                      {acceptanceView ?? (
+                        <p className="whitespace-pre-wrap text-ui text-ink">
+                          <LinkedText text={node.acceptance ?? ''} />
+                        </p>
+                      )}
                     </div>
                   )}
                   {/* What it needs, in its own line above the history. The comment
@@ -729,7 +750,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                       variant="ghost"
                       onClick={() => row.setEditing(true)}
                     >
-                      Edit
+                      {titleEditor ? 'Rename' : 'Edit'}
                     </Button>
                     <Button type="button" size="sm" variant="ghost" onClick={row.addChild}>
                       Add a sub-step

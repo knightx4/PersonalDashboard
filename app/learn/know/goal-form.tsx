@@ -2,10 +2,10 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Sparkles } from 'lucide-react';
+import { Network, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
-import { Field, Input, Select } from '@/components/ui/field';
+import { ChipSelect, ComposeBox, ComposeTitle } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
@@ -30,7 +30,7 @@ import { approveChain, proposeGoal, type ApproveState, type ProposeState } from 
 function AskButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" disabled={pending}>
+    <Button type="submit" size="sm" variant="secondary" disabled={pending}>
       <Sparkles className="size-4" strokeWidth={2} aria-hidden />
       {pending ? 'Laying it out…' : 'Lay out the chain'}
     </Button>
@@ -56,7 +56,9 @@ function NodeRow({ node, isGoal }: { node: ChainNode; isGoal: boolean }) {
             Already in this track
           </span>
         ) : (
-          <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">New</span>
+          <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+            New
+          </span>
         )}
         {isGoal && (
           <span className="rounded-pill bg-accent-soft px-1.5 py-0.5 text-small text-accent">
@@ -163,62 +165,63 @@ export function GoalForm({
   const [state, propose] = useActionState<ProposeState, FormData>(proposeGoal, {});
 
   if (state.chain && state.asked) {
-    return <Proposal chain={state.chain} asked={state.asked} sweepId={sweepId} unitId={state.unitId} />;
+    return (
+      <Proposal chain={state.chain} asked={state.asked} sweepId={sweepId} unitId={state.unitId} />
+    );
   }
 
   const picker = subjects !== undefined && subjects.length > 0;
 
+  // Written as a question rather than filled in as a field (plan #1435): the
+  // goal is the title line, the track a chip beside the button that sends it.
   return (
-    <form
-      action={propose}
-      className={bare ? 'mt-3' : cn(cardVariants({ padding: 'standard' }), 'mt-6')}
-    >
+    <form action={propose} className={bare ? 'mt-3' : 'mt-6'}>
       {subjectId && <input type="hidden" name="subjectId" value={subjectId} />}
       {sweepId && <input type="hidden" name="sweepId" value={sweepId} />}
       {unitId && <input type="hidden" name="unitId" value={unitId} />}
 
-      {picker && (
-        <Field
-          label="Which track?"
-          id="goal-subject"
-          hint="What it lays out is joined onto what that track already holds, so it does not propose ideas that are in there already."
-          className="mb-4"
-        >
-          <Select id="goal-subject" name="subjectId" defaultValue={subjects[0].id}>
-            {subjects.map((subject) => (
-              <option key={subject.id} value={subject.id}>
-                {subject.name}
-              </option>
-            ))}
-            <option value="">A new track</option>
-          </Select>
-        </Field>
-      )}
-
-      <Field
-        label="What do you want to understand?"
-        id="goal"
-        hint="As specific as you can make it. A narrow goal gets a short chain that is actually right; a broad one gets a shallow sweep."
-      >
-        <Input
-          id="goal"
+      <ComposeBox className="space-y-2 py-2.5">
+        <ComposeTitle
           name="goal"
           required
           maxLength={300}
           defaultValue={goal}
-          placeholder="How raising a policy rate reaches the price of anything"
+          aria-label="What do you want to understand?"
+          placeholder="What do you want to understand? Like how a policy rate reaches prices"
         />
-      </Field>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        <AskButton />
-        <PaidHint action="app/learn/know/actions.ts#proposeGoal" what="Cost of laying it out" />
-        {state.error && <span className="text-ui text-danger">{state.error}</span>}
-      </div>
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
+          {picker && (
+            <ChipSelect
+              name="subjectId"
+              defaultValue={subjects[0].id}
+              aria-label="Which track"
+              title="What it lays out is joined onto what that track already holds"
+              icon={<Network className="size-3.5" strokeWidth={1.75} />}
+            >
+              {subjects.map((subject) => (
+                <option key={subject.id} value={subject.id}>
+                  {subject.name}
+                </option>
+              ))}
+              <option value="">A new track</option>
+            </ChipSelect>
+          )}
+          <span className="ml-auto flex items-center gap-1">
+            <PaidHint action="app/learn/know/actions.ts#proposeGoal" what="Cost of laying it out" />
+            <AskButton />
+          </span>
+        </div>
+      </ComposeBox>
+      {state.error && (
+        <p role="alert" className="mt-1 text-small text-danger">
+          {state.error}
+        </p>
+      )}
 
       <p className="mt-2 text-small text-ink-muted">
-        Lays out the things you would have to understand first, in order. Nothing is saved until you
-        have read it.
+        As specific as you can make it: a narrow question gets a short chain that is right. It lays
+        out what you would have to understand first, in order, and saves nothing until you have read
+        it.
       </p>
     </form>
   );
