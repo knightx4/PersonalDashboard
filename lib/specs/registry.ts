@@ -88,6 +88,14 @@ export const SPECS: readonly SpecDoc[] = [
     module: 'dev',
   },
   {
+    slug: 'x-posts',
+    title: 'Writing X posts about the app',
+    blurb:
+      'What a post about how the app is built should say, what the plan has to back, what never goes in one, and six examples from shipped steps. The posts run drafts to it.',
+    file: 'X-POSTS.md',
+    module: 'dev',
+  },
+  {
     slug: 'vault',
     title: 'The vault',
     blurb: 'The Obsidian mirror: one-way sync, markdown only, and what it is eventually for.',
