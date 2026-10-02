@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CommentThread } from '@/components/dev/comment-thread';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { StateLabel } from '@/components/dev/state-label';
 import { MODULES, type ModuleId } from '@/lib/modules';
@@ -163,6 +164,12 @@ export function TakeawayRow({ takeaway, inVideo = false }: { takeaway: Takeaway;
       )}
 
       {takeaway.status !== 'covered' && <TakeawayActions id={takeaway.id} status={takeaway.status} />}
+      <CommentThread
+        target="takeaway"
+        id={takeaway.id}
+        thread={takeaway.thread}
+        placeholder="What you think of this idea, or a question for Dash."
+      />
     </li>
   );
 }

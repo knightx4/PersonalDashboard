@@ -1,3 +1,4 @@
+import { threadFrom, type DevComment } from '@/lib/comments/load';
 import { scoreFrom, type IdeaScore } from '@/lib/ideas/score';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 import { watchAt } from '@/lib/learn/youtube/format';
@@ -46,6 +47,8 @@ export type TakeawayRowData = {
   created_at: string;
   /** Jev's score (note 790c745a); absent from fixtures written before it. */
   score?: unknown;
+  /** The thread under it (notes c934aefe and eef7e9f1); absent from fixtures written before it. */
+  dev_comments?: unknown;
 };
 
 export type LinkRow = {
@@ -99,6 +102,8 @@ export type Takeaway = {
   cover: TakeawayCover;
   /** Jev's score, as an idea's; null until scored. */
   score: IdeaScore | null;
+  /** What you and Dash wrote on it, oldest first. */
+  thread: DevComment[];
   sources: TakeawaySource[];
 };
 
@@ -228,6 +233,7 @@ export function buildInspirationPage(input: {
     createdAt: row.created_at,
     cover: coverOf(row),
     score: scoreFrom(row.score),
+    thread: threadFrom(row.dev_comments),
     sources: (linksByTakeaway.get(row.id) ?? []).map(sourceOf),
   }));
 
