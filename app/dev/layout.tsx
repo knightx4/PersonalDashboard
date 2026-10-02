@@ -116,6 +116,9 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
+    // What Dash took from the videos saved for this app (plan #1412); beside
+    // Ideas because a takeaway is an idea someone else had.
+    { href: '/dev/inspiration', label: 'Inspiration', icon: 'inspiration' },
     { href: '/dev/specs', label: 'Specs', icon: 'specs' },
     { href: '/dev/ui', label: 'UI', icon: 'ui' },
     { href: '/dev/surfaces', label: 'Surfaces', icon: 'surfaces' },
