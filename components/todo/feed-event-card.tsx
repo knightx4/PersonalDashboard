@@ -6,6 +6,7 @@ import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { spanLabel } from '@/lib/todo/events/model';
 import type { SubscribedEventDetail } from '@/lib/todo/feeds/load';
 import type { Task } from '@/lib/todo/tasks/model';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * A subscribed appointment, opened.
@@ -78,8 +79,11 @@ export function FeedEventCard({
 
       {event.body && (
         // Whatever the organiser wrote. Their line breaks are kept and nothing
-        // is parsed out of it: it is text from somebody else's calendar.
-        <p className="mt-3 whitespace-pre-wrap break-words text-ui text-ink">{event.body}</p>
+        // else is parsed out of it, since it is text from somebody else's
+        // calendar; only its web addresses open, in a new tab.
+        <p className="mt-3 whitespace-pre-wrap break-words text-ui text-ink">
+          <LinkedText text={event.body} />
+        </p>
       )}
 
       <div className="mt-4 border-t border-border pt-3">

@@ -7,6 +7,7 @@ import { PaidHint } from '@/components/ui/paid-hint';
 import { TalkThread, type TalkAssistant } from '@/components/talk/talk-thread';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { LinkedText } from '@/components/ui/linked-text';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { threadMarkdown, type ThreadMarkdownInput } from '@/lib/vault/maya/markdown';
 import { replyToMaya } from '../actions';
@@ -58,7 +59,9 @@ export function MayaConversation({
             Where you have got to
           </h2>
           <p className="mt-1 whitespace-pre-line text-body text-ink">
-            {summary ?? (
+            {summary !== null ? (
+              <LinkedText text={summary} />
+            ) : (
               <span className="text-ink-muted">
                 Nothing yet. Reply to Maya below, and after each answer this says what you now hold
                 and what is still open.

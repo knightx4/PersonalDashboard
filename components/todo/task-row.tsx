@@ -46,6 +46,7 @@ import { HandToDash } from './hand-to-dash';
 import { TaskAbout } from './task-about';
 import { EditTask } from './task-form';
 import { formatClock } from '@/lib/clock';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * One task, and what you can do to it without leaving the list.
@@ -482,7 +483,7 @@ export function TaskRow({
 
           {task.body && (
             <p className="mt-0.5 whitespace-pre-wrap text-small leading-snug text-ink-muted">
-              {task.body}
+              <LinkedText text={task.body} />
             </p>
           )}
         </div>

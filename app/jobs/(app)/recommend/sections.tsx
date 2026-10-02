@@ -48,6 +48,7 @@ import {
   type SuggestState,
 } from './actions';
 import { DashMark } from '@/components/ui/dash-mark';
+import { LinkedText } from '@/components/ui/linked-text';
 
 const CHANNEL_LABELS: Record<string, string> = {
   linkedin_dm: 'LinkedIn message',
@@ -620,14 +621,16 @@ function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
       </div>
       <p className="text-small text-ink-muted">{suggestion.why}</p>
       {suggestion.foundIn && <p className="text-small text-ink-muted">{suggestion.foundIn}</p>}
-      <p className="whitespace-pre-line text-ui text-ink">{suggestion.move}</p>
+      <p className="whitespace-pre-line text-ui text-ink">
+        <LinkedText text={suggestion.move} />
+      </p>
       {message && (
         <div className="rounded-card bg-canvas p-3">
           {email?.subject && (
             <p className="mb-1 text-small font-medium text-ink">Subject: {email.subject}</p>
           )}
           <p className="whitespace-pre-wrap text-ui leading-relaxed text-ink">
-            {email ? email.body : message}
+            <LinkedText text={email ? email.body : message} />
           </p>
         </div>
       )}
@@ -886,7 +889,9 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
                 ))}
               </ol>
             ) : (
-              <p className="whitespace-pre-line text-ui text-ink">{suggestion.move}</p>
+              <p className="whitespace-pre-line text-ui text-ink">
+        <LinkedText text={suggestion.move} />
+      </p>
             )}
             {suggestion.foundIn && (
               <p className="text-small text-ink-muted">{suggestion.foundIn}</p>

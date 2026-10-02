@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createPublicClient } from '@/lib/jobs/auth/public';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * The case page: the requirement map, with your evidence beside each line,
@@ -87,7 +88,7 @@ export default async function PublicCasePage({
 
       {page.body && (
         <section className="mt-6 whitespace-pre-wrap text-body leading-relaxed text-ink">
-          {page.body}
+          <LinkedText text={page.body} />
         </section>
       )}
 

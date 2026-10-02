@@ -8,6 +8,7 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { JOB_LABELS, runMeta, type RunListing, type RunOutcome } from '@/lib/goals/runs';
 import { loadRuns } from '@/lib/goals/runs-store';
+import { LinkedText } from '@/components/ui/linked-text';
 
 export const metadata = { title: 'Runs' };
 export const dynamic = 'force-dynamic';
@@ -94,10 +95,14 @@ function RunRow({ view: { run, outcome, meta } }: { view: RunView }) {
       </p>
       <p className={failed ? 'text-small text-danger' : 'text-small text-ink-muted'}>{meta}</p>
       {failed ? (
-        <p className="text-small break-words whitespace-pre-wrap text-danger">{run.error ?? 'No reason was recorded.'}</p>
+        <p className="text-small break-words whitespace-pre-wrap text-danger">
+          <LinkedText text={run.error ?? 'No reason was recorded.'} />
+        </p>
       ) : (
         run.summary && (
-          <p className="text-small break-words whitespace-pre-wrap text-ink">{run.summary}</p>
+          <p className="text-small break-words whitespace-pre-wrap text-ink">
+            <LinkedText text={run.summary} />
+          </p>
         )
       )}
     </li>
