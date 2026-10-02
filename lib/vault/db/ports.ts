@@ -3,7 +3,7 @@ import 'server-only';
 import { z } from 'zod';
 import { decryptToken } from '@/lib/crypto/tokens';
 import { ATTACHMENT_MAX_BYTES, VAULT_ATTACHMENTS_BUCKET, type AttachmentMimeType } from '@/lib/vault/paths';
-import { createVaultSource } from '@/lib/vault/providers';
+import { createVaultSource, type VaultSource } from '@/lib/vault/providers';
 import type { AttachmentPlan, KnownAttachment, KnownAttachments } from '@/lib/vault/sync/attachments';
 import type { SaveNotePorts, SavableNote } from '@/lib/vault/notes/save';
 import type { KnownNotes } from '@/lib/vault/sync/plan';
@@ -353,31 +353,7 @@ export function noteSavePorts(opts: {
       return note;
     },
 
-    async openSource() {
-      const { data, error } = await supabase
-        .from('vault_connections')
-        .select('repo_owner, repo_name, branch, subpath, access_token, status')
-        .maybeSingle();
-      if (error) throw new Error(`Reading the vault connection failed: ${error.message}`);
-      if (!data) return 'none';
-      const row = data as {
-        repo_owner: string;
-        repo_name: string;
-        branch: string;
-        subpath: string;
-        access_token: string | null;
-        status: string;
-      };
-      if (row.status !== 'active' || !row.access_token) return 'reauth';
-      return createVaultSource({
-        provider: 'github',
-        repoOwner: row.repo_owner,
-        repoName: row.repo_name,
-        branch: row.branch,
-        subpath: row.subpath,
-        token: decryptAccessToken(row.access_token),
-      });
-    },
+    openSource: () => openConnectedSource(supabase),
 
     async storeNote(noteId, expectedBlobSha, row) {
       const { error } = await supabase
@@ -397,6 +373,39 @@ export function noteSavePorts(opts: {
 
     afterSave: opts.afterSave,
   };
+}
+
+/**
+ * The connected vault as a source that can be written to, or why there is
+ * none: 'none' when nothing is connected, 'reauth' when the connection has no
+ * usable token. Shared by saving a note and by vault settings' write check.
+ */
+export async function openConnectedSource(
+  supabase: VaultSupabaseClient,
+): Promise<VaultSource | 'none' | 'reauth'> {
+  const { data, error } = await supabase
+    .from('vault_connections')
+    .select('repo_owner, repo_name, branch, subpath, access_token, status')
+    .maybeSingle();
+  if (error) throw new Error(`Reading the vault connection failed: ${error.message}`);
+  if (!data) return 'none';
+  const row = data as {
+    repo_owner: string;
+    repo_name: string;
+    branch: string;
+    subpath: string;
+    access_token: string | null;
+    status: string;
+  };
+  if (row.status !== 'active' || !row.access_token) return 'reauth';
+  return createVaultSource({
+    provider: 'github',
+    repoOwner: row.repo_owner,
+    repoName: row.repo_name,
+    branch: row.branch,
+    subpath: row.subpath,
+    token: decryptAccessToken(row.access_token),
+  });
 }
 
 /** The stored token, in usable form. Never logged, never returned to a client. */

@@ -115,8 +115,9 @@ Once, about twenty minutes, and then never again.
 1. **Make the vault a git repo.** Private GitHub repo, `git init` in the vault,
    push. Install the **Obsidian Git** community plugin and set auto-commit-and-push
    on an interval; hourly is plenty.
-2. **Generate a fine-grained PAT**, `Contents: Read-only`, scoped to that one
-   repository. Paste it into `/vault/settings`.
+2. **Generate a fine-grained PAT**, `Contents: Read and write`, scoped to that
+   one repository. Paste it into `/vault/settings`, which then says "Can edit
+   notes", or "Read-only: edits will not save" for a token that can only read.
 3. **Apply the migration** to Supabase, per [SETUP.md](SETUP.md) → Migrations.
 
 There is **no new environment variable.** The PAT is per-user, stored encrypted

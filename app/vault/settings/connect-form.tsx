@@ -75,7 +75,8 @@ export function ConnectVaultForm({
           autoComplete="off"
         />
         <p className="mt-1 text-ui text-ink-muted">
-          Needs <strong>Contents: Read-only</strong> on this one repository, and nothing else. It
+          Needs <strong>Contents: Read and write</strong> on this one repository, and nothing
+          else. Write access is what lets a note edited here save back to the vault. The token
           is encrypted before it is stored and never sent back to your browser.
         </p>
       </div>

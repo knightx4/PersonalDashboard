@@ -344,3 +344,59 @@ describe('writeNote', () => {
     await expect(source.writeNote('Ideas.md', 'x', 'old', 'm')).rejects.toBeInstanceOf(VaultAuthError);
   });
 });
+
+describe('canWrite', () => {
+  function stubCheck(status: number, headers: Record<string, string> = {}) {
+    const sent: Array<{ url: string; method?: string; body: Record<string, unknown> }> = [];
+    vi.stubGlobal('fetch', async (input: string | URL, init?: RequestInit) => {
+      sent.push({
+        url: String(input),
+        method: init?.method,
+        body: JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>,
+      });
+      return {
+        ok: status >= 200 && status < 300,
+        status,
+        headers: { get: (k: string) => headers[k.toLowerCase()] ?? null },
+        json: async () => ({}),
+      } as unknown as Response;
+    });
+    return sent;
+  }
+
+  it('asks for a branch at a commit that cannot exist, so nothing is ever made', async () => {
+    const sent = stubCheck(422);
+
+    expect(await new GithubVaultSource(config).canWrite()).toBe(true);
+    expect(sent).toEqual([
+      {
+        url: 'https://api.github.com/repos/knightx4/vault/git/refs',
+        method: 'POST',
+        body: { ref: 'refs/heads/dash-write-check', sha: '0'.repeat(40) },
+      },
+    ]);
+  });
+
+  it('reads a permission refusal as a token that cannot write', async () => {
+    stubCheck(403, { 'x-ratelimit-remaining': '4999' });
+    expect(await new GithubVaultSource(config).canWrite()).toBe(false);
+  });
+
+  it('does not mistake a rate limit, a rejected token or anything else for an answer', async () => {
+    const source = new GithubVaultSource(config);
+
+    stubCheck(403, { 'x-ratelimit-remaining': '0' });
+    await expect(source.canWrite()).rejects.toBeInstanceOf(VaultSourceError);
+
+    stubCheck(401);
+    await expect(source.canWrite()).rejects.toBeInstanceOf(VaultAuthError);
+
+    stubCheck(404);
+    await expect(source.canWrite()).rejects.toBeInstanceOf(VaultSourceError);
+
+    // A 201 would mean a branch was made, which the check must never claim as
+    // a plain yes.
+    stubCheck(201);
+    await expect(source.canWrite()).rejects.toBeInstanceOf(VaultSourceError);
+  });
+});
