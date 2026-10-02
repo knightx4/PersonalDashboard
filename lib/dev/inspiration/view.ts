@@ -120,7 +120,7 @@ export type InspirationVideo = {
   state: VideoState;
   /** What the video says in a few points, whether or not it applies; empty until Dash has summarised it. */
   summary: string[];
-  /** Its takeaways that are not dismissed, each in this video's own wording. */
+  /** Its open takeaways, each in this video's own wording. */
   takeaways: Takeaway[];
 };
 
@@ -137,10 +137,15 @@ export type InspirationPage = {
   /** A check of the playlist is going now, from the daily run or Check now. */
   checking: boolean;
   videos: InspirationVideo[];
-  /** Every takeaway not dismissed, once each, best score first. */
+  /**
+   * Every open takeaway, once each, best score first. One already an idea or
+   * in the plan is in `filed` instead (note 9f487b58).
+   */
   list: Takeaway[];
   /** Dismissed takeaways, newest first, for the fold. */
   dismissed: Takeaway[];
+  /** Covered or crafted: already an idea or in the plan. Best first, for a fold shut by default. */
+  filed: Takeaway[];
 };
 
 const STATUSES: readonly TakeawayStatus[] = ['open', 'covered', 'crafted', 'dismissed'];
@@ -237,7 +242,12 @@ export function buildInspirationPage(input: {
     sources: (linksByTakeaway.get(row.id) ?? []).map(sourceOf),
   }));
 
-  const shown = takeaways.filter((takeaway) => takeaway.status !== 'dismissed').sort(bestFirst);
+  // What is already an idea or in the plan is out of the way unless asked for
+  // (note 9f487b58): a fold of its own, under both views.
+  const shown = takeaways.filter((takeaway) => takeaway.status === 'open').sort(bestFirst);
+  const filed = takeaways
+    .filter((takeaway) => takeaway.status === 'covered' || takeaway.status === 'crafted')
+    .sort(bestFirst);
   const dismissed = takeaways.filter((takeaway) => takeaway.status === 'dismissed').sort(newestFirst);
 
   // The by-video view: each video's takeaways, with that video alone as the
@@ -286,6 +296,7 @@ export function buildInspirationPage(input: {
     videos,
     list: shown,
     dismissed,
+    filed,
   };
 }
 

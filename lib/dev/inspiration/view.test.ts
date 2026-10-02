@@ -165,12 +165,30 @@ describe('buildInspirationPage', () => {
       ]),
     });
 
-    expect(page.list.map((t) => t.cover)).toEqual([
+    expect(page.filed.map((t) => t.cover)).toEqual([
       { kind: 'plan', number: 1412 },
       { kind: 'plan', number: 99 },
       { kind: 'idea', ideaId: 'i2' },
-      null,
     ]);
+    expect(page.list.map((t) => t.cover)).toEqual([null]);
+  });
+
+  it('keeps what is already an idea or in the plan out of both views, in a fold of its own (note 9f487b58)', () => {
+    const page = buildInspirationPage({
+      settings: null,
+      videos: [video('v1', 'aaaaaaaaaaa')],
+      takeaways: [
+        takeaway('open', '2026-10-01T00:00:00Z'),
+        takeaway('covered', '2026-10-02T00:00:00Z', { status: 'covered', idea_id: 'i1' }),
+        takeaway('crafted', '2026-10-03T00:00:00Z', { status: 'crafted', idea_id: 'i2' }),
+      ],
+      links: [link('open', 'v1'), link('covered', 'v1'), link('crafted', 'v1')],
+      ...empty,
+    });
+
+    expect(page.list.map((t) => t.id)).toEqual(['open']);
+    expect(page.videos[0]!.takeaways.map((t) => t.id)).toEqual(['open']);
+    expect(page.filed.map((t) => t.id)).toEqual(['crafted', 'covered']);
   });
 
   it('says what happened to a video with nothing under it', () => {
