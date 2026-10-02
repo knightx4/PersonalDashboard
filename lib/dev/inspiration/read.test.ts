@@ -1,6 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import type { MergeStore } from './merge';
+import type { SummaryStore } from './summary';
 import { clearBeforeRead, readInspirationVideos, saveVideoTakeaways, type TakeawayStore, type UnreadVideo } from './read';
 import type { TakeawayCandidate } from './takeaways';
 
@@ -29,8 +30,11 @@ function memoryStore(videos: Video[]) {
     mergeInto: async () => {},
     markCovered: async () => {},
   };
-  const store: TakeawayStore & MergeStore = {
+  // So is the summary pass (summary.test.ts); here every video has one.
+  const summary: SummaryStore = { unsummarisedVideos: async () => [], saveSummary: async () => {} };
+  const store: TakeawayStore & MergeStore & SummaryStore = {
     ...merge,
+    ...summary,
     async unreadVideos() {
       return videos.filter((video) => video.processedAt === null);
     },

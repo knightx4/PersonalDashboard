@@ -15,7 +15,7 @@
  */
 
 /** Which row a comment is about. */
-export const COMMENT_TARGETS = ['idea', 'step', 'raise', 'note', 'spec'] as const;
+export const COMMENT_TARGETS = ['idea', 'step', 'raise', 'note', 'spec', 'takeaway'] as const;
 export type CommentTarget = (typeof COMMENT_TARGETS)[number];
 
 export function isCommentTarget(value: string): value is CommentTarget {
@@ -28,13 +28,15 @@ export function isCommentTarget(value: string): value is CommentTarget {
  */
 export const TARGET_COLUMN: Record<
   CommentTarget,
-  'idea_id' | 'plan_item_id' | 'raised_item_id' | 'feedback_item_id' | 'spec_section_id'
+  'idea_id' | 'plan_item_id' | 'raised_item_id' | 'feedback_item_id' | 'spec_section_id' | 'inspiration_takeaway_id'
 > = {
   idea: 'idea_id',
   step: 'plan_item_id',
   raise: 'raised_item_id',
   note: 'feedback_item_id',
   spec: 'spec_section_id',
+  // An inspiration takeaway (notes c934aefe and eef7e9f1, migration 0149).
+  takeaway: 'inspiration_takeaway_id',
 };
 
 /** The page each target is read on, which is what a write has to revalidate. */
@@ -48,6 +50,7 @@ export const TARGET_PATH: Record<CommentTarget, string> = {
   // revalidates the index, and the document's page is revalidated by the action
   // that knows which one it was.
   spec: '/dev/specs',
+  takeaway: '/dev/inspiration',
 };
 
 /**

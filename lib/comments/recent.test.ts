@@ -35,6 +35,18 @@ describe('conversationsFrom', () => {
     expect(conversation.thread.map((message) => message.id)).toEqual(['c1', 'c2']);
   });
 
+  it('names a takeaway conversation by its title and links to the Inspiration tab', () => {
+    const [conversation] = conversationsFrom([
+      comment({ inspiration_takeaway_id: 't1', takeaway: { title: 'Log every decision' } }),
+    ]);
+    expect(conversation).toMatchObject({
+      target: 'takeaway',
+      rowId: 't1',
+      about: 'Log every decision',
+      href: '/dev/inspiration',
+    });
+  });
+
   it('puts the most recently active conversation first', () => {
     const conversations = conversationsFrom([
       comment({ id: 'a', idea_id: 'i1', idea: { body: 'Older' }, created_at: '2026-09-11T09:00:00Z' }),

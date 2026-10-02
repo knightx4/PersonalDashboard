@@ -44,6 +44,28 @@ export function raiseContext(row: RaisedRow): string {
   return out.join('\n') + '\n';
 }
 
+/**
+ * An inspiration takeaway (notes c934aefe and eef7e9f1): the idea Dash took
+ * from a video for this app, with the videos it came from.
+ */
+export function takeawayContext(takeaway: {
+  title: string;
+  body: string;
+  module: string | null;
+  status: string;
+  videos: readonly string[];
+}): string {
+  const out = [
+    `# An inspiration takeaway — ${takeaway.title}`,
+    '',
+    `Module: ${moduleLabel(takeaway.module)}`,
+    `Status: ${takeaway.status}`,
+  ];
+  if (takeaway.videos.length > 0) out.push(`From: ${takeaway.videos.join('; ')}`);
+  out.push('', takeaway.body);
+  return out.join('\n') + '\n';
+}
+
 const NOTE_HEADING: Record<FeedbackRow['kind'], string> = {
   bug: '# A bug report',
   feature: '# A feature request',

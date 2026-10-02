@@ -95,9 +95,10 @@ export function isUnread(
  */
 export const CONVERSATION_COLUMNS =
   `${COMMENT_COLUMNS}, idea_id, plan_item_id, raised_item_id, feedback_item_id, ` +
-  'spec_section_id, ' +
+  'spec_section_id, inspiration_takeaway_id, ' +
   'idea:ideas(body), step:plan_items(number, title), raise:raised_items(title), ' +
-  'note:feedback_items(kind, body), spec:spec_sections(slug, heading)';
+  'note:feedback_items(kind, body), spec:spec_sections(slug, heading), ' +
+  'takeaway:inspiration_takeaways(title)';
 
 /** Long enough to tell two rows apart, short enough to sit on one line. */
 const ONE_LINE = 80;
@@ -123,6 +124,7 @@ const UNNAMED: Record<CommentTarget, string> = {
   raise: 'A raise',
   note: 'A note',
   spec: 'A spec section',
+  takeaway: 'An inspiration takeaway',
 };
 
 /** Exactly one of the five columns is set — `dev_comments_one_target_ck`. */
@@ -141,6 +143,7 @@ function aboutFrom(target: CommentTarget, parent: Record<string, unknown> | null
   }
 
   if (target === 'raise') return firstLine(parent.title) ?? UNNAMED.raise;
+  if (target === 'takeaway') return firstLine(parent.title) ?? UNNAMED.takeaway;
 
   // The heading, which is what somebody was actually arguing with.
   if (target === 'spec') return firstLine(parent.heading) ?? UNNAMED.spec;

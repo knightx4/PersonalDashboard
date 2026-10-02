@@ -112,7 +112,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   const sections: NavSection[] = [
     // The route stays /dev/raised, which keeps every link already written into
     // a notification, a comment and an old summary working.
-    { href: '/dev/raised', label: 'Dash', icon: 'raised', badge: raised.length + waiting.length },
+    { href: '/dev/raised', label: 'Home', icon: 'raised', badge: raised.length + waiting.length },
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },

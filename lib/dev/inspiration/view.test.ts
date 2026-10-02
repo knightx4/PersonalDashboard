@@ -93,7 +93,7 @@ describe('buildInspirationPage', () => {
     expect(page.videos[1]!.takeaways[0]!.sources[0]!.said).toBe('First wording');
   });
 
-  it('lists newest first and keeps dismissed ones out of both views', () => {
+  it('lists unscored ones newest first and keeps dismissed ones out of both views', () => {
     const page = buildInspirationPage({
       settings: null,
       videos: [video('v1', 'aaaaaaaaaaa')],
@@ -110,6 +110,38 @@ describe('buildInspirationPage', () => {
     expect(page.dismissed.map((t) => t.id)).toEqual(['gone']);
     expect(page.videos[0]!.takeaways.map((t) => t.id)).toEqual(['new', 'old']);
     expect(page.playlistId).toBeNull();
+  });
+
+  it('ranks by score best first, unscored last, in both views (note 790c745a)', () => {
+    const scored = (value: number) => ({ score: { value, confidence: 0.9, at: '2026-10-02T00:00:00Z' } });
+    const page = buildInspirationPage({
+      settings: null,
+      videos: [video('v1', 'aaaaaaaaaaa')],
+      takeaways: [
+        takeaway('low', '2026-10-03T00:00:00Z', scored(25)),
+        takeaway('none', '2026-10-04T00:00:00Z'),
+        takeaway('high', '2026-10-01T00:00:00Z', scored(75)),
+        takeaway('junk', '2026-10-02T00:00:00Z', { score: { value: 'x' } }),
+      ],
+      links: [link('low', 'v1'), link('none', 'v1'), link('high', 'v1'), link('junk', 'v1')],
+      ...empty,
+    });
+
+    expect(page.list.map((t) => t.id)).toEqual(['high', 'low', 'none', 'junk']);
+    expect(page.videos[0]!.takeaways.map((t) => t.id)).toEqual(['high', 'low', 'none', 'junk']);
+    expect(page.list[0]!.score?.value).toBe(75);
+    expect(page.list[3]!.score).toBeNull();
+  });
+
+  it('carries each video\'s summary points (note b0594be6)', () => {
+    const page = buildInspirationPage({
+      settings: null,
+      videos: [video('v1', 'aaaaaaaaaaa', { summary_points: ['One.', 'Two.'] }), video('v2', 'bbbbbbbbbbb')],
+      takeaways: [],
+      links: [],
+      ...empty,
+    });
+    expect(page.videos.map((v) => v.summary)).toEqual([['One.', 'Two.'], []]);
   });
 
   it('names the plan step a takeaway is covered by, directly or through its idea', () => {
