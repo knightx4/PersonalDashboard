@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Moon } from 'lucide-react';
 import { OvernightState } from '@/components/dev/overnight-state';
 import { Card } from '@/components/ui/card';
-import { Disclosure, SectionFold } from '@/components/ui/disclosure';
+import { Disclosure, Group, SectionFold } from '@/components/ui/disclosure';
 import { groupHappened, type DigestEvent, type DigestGroup } from '@/lib/digest/build';
 import type { Digest } from '@/lib/digest/load';
 import { nightBudgetLine, nightLine, nightRows, type DigestNight } from '@/lib/digest/night';
@@ -104,19 +104,24 @@ function Events({ events }: { events: DigestEvent[] }) {
 /**
  * One feature and what closed under it. The heading is the feature rather than
  * a line of its own, which is what stops six steps reading as six pieces of
- * work.
+ * work. The shared Group, folded by that heading and kept per feature.
  */
-function Group({ group }: { group: DigestGroup }) {
+function FeatureGroup({ group }: { group: DigestGroup }) {
   return (
-    <section className="space-y-1">
-      <div className="flex flex-wrap items-baseline gap-2">
-        {group.ref && <Ref value={group.ref} />}
-        <h3 className="min-w-0 flex-1 text-body font-semibold text-ink">{group.label}</h3>
-      </div>
+    <Group
+      fold
+      remember={`dev.fold.digest.${group.key}`}
+      title={
+        <span className="inline-flex flex-wrap items-baseline gap-2">
+          {group.ref && <Ref value={group.ref} />}
+          {group.label}
+        </span>
+      }
+    >
       <div className="ml-0.5 border-l border-border pl-3">
         <Events events={group.events} />
       </div>
-    </section>
+    </Group>
   );
 }
 
@@ -250,7 +255,7 @@ export function DigestPanel({ digest }: { digest: Digest | null }) {
   // leaves yesterday's summary here and the date is how you tell. Law 10.
   return (
     <Card padding="dense">
-      <SectionFold title="What happened" hint={`In the 24 hours to ${formatDay(digest.day)}`}>
+      <SectionFold remember="dev.fold.digest" title="What happened" hint={`In the 24 hours to ${formatDay(digest.day)}`}>
         <div className="space-y-3">
           {/* Above the account of the day, because it is the only new thing on
               the page that is not a question: the account says what closed,
@@ -274,6 +279,7 @@ export function DigestPanel({ digest }: { digest: Digest | null }) {
               rather than a check: a night that fired two features and a day
               that closed none are both legible without it. */}
           <Disclosure
+            remember="dev.fold.digest.detail"
             title="The detail"
             meta={[
               digest.night ? nightBudgetLine(digest.night) : null,
@@ -290,7 +296,7 @@ export function DigestPanel({ digest }: { digest: Digest | null }) {
               {groups.length > 0 ? (
                 <div className="space-y-3">
                   {groups.map((group) => (
-                    <Group key={group.key} group={group} />
+                    <FeatureGroup key={group.key} group={group} />
                   ))}
                 </div>
               ) : (

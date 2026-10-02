@@ -1,12 +1,11 @@
 'use client';
 
 import { useActionState } from 'react';
-import { ChevronRight, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
+import { Disclosure } from '@/components/ui/disclosure';
 import { FileBody } from '@/components/files/file-body';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/cn';
 import type { Finding } from '@/lib/goals/goal-page';
-import { linkBareDomains } from '@/lib/goals/result-links';
 import { reviewResultAction, type ShapingActionState } from './shaping-actions';
 
 const initial: ShapingActionState = {};
@@ -34,32 +33,23 @@ export function FindingRow({ finding }: { finding: Finding }) {
   const [state, review, reviewing] = useActionState(reviewResultAction, initial);
   return (
     <li className="card-pad-x row-pad">
-      <details className="group/finding">
-        <summary
-          className={cn(
-            'flex cursor-pointer list-none flex-col gap-x-4 gap-y-0.5 sm:flex-row sm:items-baseline sm:justify-between',
-            'rounded-control focus-visible:outline-2 focus-visible:outline-offset-2',
-            '[&::-webkit-details-marker]:hidden',
-          )}
-        >
-          <span className="flex min-w-0 items-baseline gap-1.5">
-            <ChevronRight
-              aria-hidden
-              strokeWidth={2}
-              className="size-3.5 shrink-0 translate-y-0.5 text-ink-muted transition-transform duration-150 group-open/finding:rotate-90"
-            />
-            <span className="min-w-0 text-ui break-words text-ink">
-              {finding.unread && <span className="sr-only">Unread. </span>}
-              {finding.fact}
-            </span>
+      <Disclosure
+        summaryClassName="items-baseline py-0"
+        bodyClassName="mt-2 space-y-2 pl-5"
+        title={
+          <span className="font-normal break-words">
+            {finding.unread && <span className="sr-only">Unread. </span>}
+            {finding.fact}
           </span>
-          <span className="shrink-0 pl-5 text-small text-ink-ghost sm:max-w-xs sm:truncate sm:pl-0 sm:text-right">
+        }
+        meta={
+          <span className="text-ink-ghost">
             {finding.unread ? 'To read · ' : ''}
             {finding.from}
           </span>
-        </summary>
-        <div className="mt-2 space-y-2 pl-5">
-          <FileBody markdown={linkBareDomains(finding.result)} compact />
+        }
+      >
+          <FileBody markdown={finding.result} compact />
           <div className="flex flex-wrap items-center gap-2">
             {finding.url && (
               <a
@@ -88,8 +78,7 @@ export function FindingRow({ finding }: { finding: Finding }) {
             </a>
             {state.error && <span className="text-small text-danger">{state.error}</span>}
           </div>
-        </div>
-      </details>
+      </Disclosure>
     </li>
   );
 }

@@ -21,6 +21,7 @@ import { ClipPlayer } from '@/components/learn/clip-player';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
 import { RelatedNotes } from '@/components/vault/related-notes';
 import { Field, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
@@ -628,13 +629,18 @@ function DeckCard({
             <section className="mt-4">
               <h3 className="text-small font-semibold text-ink-muted">Try this</h3>
               <p className="mt-1 text-body text-ink">{card.question}</p>
-              <details className="group mt-2">
-                <summary className="press inline-flex cursor-pointer list-none items-center rounded-control text-ui font-medium text-accent [&::-webkit-details-marker]:hidden">
-                  <span className="group-open:hidden">Show the answer</span>
-                  <span className="hidden group-open:inline">Answer</span>
-                </summary>
-                <p className="mt-1 text-body text-ink">{card.answer}</p>
-              </details>
+              <Disclosure
+                className="mt-2"
+                bodyClassName="mt-1"
+                title={
+                  <>
+                    <span className="group-open/disc:hidden">Show the answer</span>
+                    <span className="hidden group-open/disc:inline">Answer</span>
+                  </>
+                }
+              >
+                <p className="text-body text-ink">{card.answer}</p>
+              </Disclosure>
             </section>
           )}
 
@@ -676,18 +682,21 @@ function DeckCard({
               first, and this is there for when you want the whole section.
               A lesson that cites no section has none. */}
           {card.shown.length > 0 && (
-            <details className="group mt-4 border-t border-border pt-3">
-              <summary className="press inline-flex cursor-pointer list-none items-center gap-1.5 rounded-control text-ui font-medium text-accent [&::-webkit-details-marker]:hidden">
-                <span className="group-open:hidden">Read the section</span>
-                <span className="hidden group-open:inline">The section</span>
-                <span className="font-normal text-ink-muted">{readingMinutes(card)} min</span>
-              </summary>
-              <div className="mt-2 space-y-3 text-body break-words text-ink">
+            <Disclosure
+              className="mt-4 border-t border-border pt-3"
+              bodyClassName="mt-2 space-y-3 text-body break-words text-ink"
+              title={
+                <>
+                  <span className="group-open/disc:hidden">Read the section</span>
+                  <span className="hidden group-open/disc:inline">The section</span>
+                </>
+              }
+              meta={`${readingMinutes(card)} min`}
+            >
                 {[...card.shown, ...card.rest].map((paragraph, index) => (
                   <p key={index}>{paragraph}</p>
                 ))}
-              </div>
-            </details>
+            </Disclosure>
           )}
 
           {card.link && (

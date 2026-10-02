@@ -1,5 +1,7 @@
 import { cva, type VariantProps } from 'class-variance-authority';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { FoldDetails } from '@/components/ui/fold-details';
 
 /**
  * The container.
@@ -63,6 +65,14 @@ export function CardBody({ className, ...props }: React.HTMLAttributes<HTMLDivEl
 /**
  * A section of a page that looks like a card and has a heading. The shape
  * roughly half the app was hand-rolling.
+ *
+ * `fold` makes the heading fold the section away, and is the key the fold is
+ * kept under in this browser, so a section folded today is still folded next
+ * visit (plan #1432, lib/fold-memory.ts). Name it for the page and the
+ * section, such as `jobs.fold.Recommended roles`. The action stays opposite
+ * the heading rather than inside the summary, because a button in a summary
+ * folds the section as well, and it stays usable while the section is shut.
+ * `meta` is the fact on the closed line that says whether to open it (law 10).
  */
 export function CardSection({
   title,
@@ -72,6 +82,9 @@ export function CardSection({
   className,
   padding = 'dense',
   id,
+  fold,
+  defaultOpen = true,
+  meta,
 }: {
   title: React.ReactNode;
   hint?: React.ReactNode;
@@ -80,11 +93,72 @@ export function CardSection({
   className?: string;
   padding?: 'standard' | 'dense';
   id?: string;
+  /** Folds the section by its heading, kept in this browser under this key. */
+  fold?: string;
+  /** With `fold`: how the section opens when nothing has been kept. */
+  defaultOpen?: boolean;
+  /** Beside the heading: the count or the fact that makes opening it a choice. */
+  meta?: React.ReactNode;
 }) {
+  if (fold) {
+    return (
+      <Card
+        id={id}
+        padding={padding}
+        className={cn('relative', className)}
+        data-slot="section"
+      >
+        <FoldDetails remember={fold} defaultOpen={defaultOpen} className="group/section">
+          <summary
+            className={cn(
+              'press flex cursor-pointer list-none items-center rounded-control',
+              'focus-visible:outline-2 focus-visible:outline-offset-2',
+              '[&::-webkit-details-marker]:hidden',
+              action ? 'min-h-8 pr-44' : undefined,
+            )}
+          >
+            <h2 className="flex flex-wrap items-baseline gap-2 text-ui font-semibold text-ink">
+              <ChevronRight
+                aria-hidden
+                strokeWidth={2}
+                className="size-3.5 shrink-0 translate-y-0.5 text-ink-ghost transition-transform duration-150 group-open/section:rotate-90"
+              />
+              {title}
+              {meta !== undefined && meta !== null && (
+                <span className="tabular text-small font-normal text-ink-muted">{meta}</span>
+              )}
+            </h2>
+          </summary>
+          <div className="mt-2">
+            {hint && <p className="mb-2 text-small text-ink-muted">{hint}</p>}
+            {children}
+          </div>
+        </FoldDetails>
+        {action && (
+          <div
+            className={cn(
+              'absolute flex items-center gap-2',
+              padding === 'standard'
+                ? 'top-(--card-p) right-(--card-p)'
+                : 'top-(--card-p-dense) right-(--card-p-dense)',
+            )}
+          >
+            {action}
+          </div>
+        )}
+      </Card>
+    );
+  }
+
   return (
     <Card id={id} padding={padding} className={className} data-slot="section">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-ui font-semibold text-ink">{title}</h2>
+        <h2 className="text-ui font-semibold text-ink">
+          {title}
+          {meta !== undefined && meta !== null && (
+            <span className="tabular ml-2 text-small font-normal text-ink-muted">{meta}</span>
+          )}
+        </h2>
         {action}
       </div>
       {hint && <p className="mb-2 text-small text-ink-muted">{hint}</p>}

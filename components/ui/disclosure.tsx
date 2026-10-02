@@ -1,5 +1,51 @@
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { FoldDetails } from '@/components/ui/fold-details';
+
+/**
+ * The `<details>` every fold here is drawn with: plain markup, or, given a
+ * `remember` key, the client one that comes back the way it was left in this
+ * browser (plan #1432). Server pages can pass the key, since it is a string.
+ */
+function Details({
+  remember,
+  defaultOpen,
+  name,
+  onToggle,
+  className,
+  children,
+}: {
+  remember?: string;
+  defaultOpen: boolean;
+  name?: string;
+  onToggle?: (open: boolean) => void;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  if (remember) {
+    return (
+      <FoldDetails
+        remember={remember}
+        defaultOpen={defaultOpen}
+        name={name}
+        onToggle={onToggle}
+        className={className}
+      >
+        {children}
+      </FoldDetails>
+    );
+  }
+  return (
+    <details
+      name={name}
+      open={defaultOpen}
+      onToggle={onToggle ? (event) => onToggle(event.currentTarget.open) : undefined}
+      className={className}
+    >
+      {children}
+    </details>
+  );
+}
 
 /**
  * A section that folds away.
@@ -30,6 +76,9 @@ export function Disclosure({
   defaultOpen = false,
   name,
   onToggle,
+  remember,
+  summaryClassName,
+  bodyClassName,
   children,
   className,
 }: {
@@ -37,6 +86,16 @@ export function Disclosure({
   /** The one fact that makes opening it a choice rather than a check. */
   meta?: React.ReactNode;
   defaultOpen?: boolean;
+  /**
+   * Keep the fold in this browser under this key, so it is still folded next
+   * visit (lib/fold-memory.ts). Leave it out for a fold that belongs to one
+   * item rather than to the page, such as an answer under a question.
+   */
+  remember?: string;
+  /** Added to the summary row, for a fold that is a whole row of a list. */
+  summaryClassName?: string;
+  /** Replaces the body's indent, for content that has to sit flush. */
+  bodyClassName?: string;
   /** Shared across siblings to make them an accordion; only one stays open. */
   name?: string;
   /**
@@ -50,10 +109,11 @@ export function Disclosure({
   className?: string;
 }) {
   return (
-    <details
+    <Details
+      remember={remember}
       name={name}
-      open={defaultOpen}
-      onToggle={onToggle ? (event) => onToggle(event.currentTarget.open) : undefined}
+      defaultOpen={defaultOpen}
+      onToggle={onToggle}
       className={cn('group/disc', className)}
     >
       <summary
@@ -61,6 +121,7 @@ export function Disclosure({
           'press flex cursor-pointer list-none items-center gap-2 rounded-control py-1 text-ui',
           'text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2',
           '[&::-webkit-details-marker]:hidden',
+          summaryClassName,
         )}
       >
         <ChevronRight
@@ -68,12 +129,12 @@ export function Disclosure({
           strokeWidth={2}
           className="size-3.5 shrink-0 transition-transform duration-150 group-open/disc:rotate-90"
         />
-        <span className="font-medium text-ink">{title}</span>
+        <span className="min-w-0 font-medium text-ink">{title}</span>
         {meta ? <span className="text-small text-ink-muted">{meta}</span> : null}
       </summary>
       {/* The indent is the grouping, in place of the border law 11 forbids. */}
-      <div className="mt-2 ml-5.5">{children}</div>
-    </details>
+      <div className={bodyClassName ?? 'mt-2 ml-5.5'}>{children}</div>
+    </Details>
   );
 }
 
@@ -106,10 +167,13 @@ export function SectionFold({
   count,
   hint,
   defaultOpen = true,
+  remember,
   children,
   className,
 }: {
   title: React.ReactNode;
+  /** Keep the fold in this browser under this key (lib/fold-memory.ts). */
+  remember?: string;
   /** The number of things inside, on the closed line. */
   count?: number;
   /** A fact the count cannot carry -- the day a summary covers, say. */
@@ -119,7 +183,7 @@ export function SectionFold({
   className?: string;
 }) {
   return (
-    <details open={defaultOpen} className={cn('group/fold', className)}>
+    <Details remember={remember} defaultOpen={defaultOpen} className={cn('group/fold', className)}>
       <summary
         className={cn(
           'press cursor-pointer list-none rounded-control py-1',
@@ -141,7 +205,7 @@ export function SectionFold({
         </h2>
       </summary>
       <div className="mt-2 space-y-2">{children}</div>
-    </details>
+    </Details>
   );
 }
 
@@ -157,11 +221,14 @@ export function Group({
   title,
   action,
   fold = false,
+  remember,
   children,
   className,
 }: {
   title?: React.ReactNode;
   action?: React.ReactNode;
+  /** With `fold`, keep the fold in this browser under this key. */
+  remember?: string;
   /**
    * Folds the group away by its heading, open to begin with. The action stays
    * opposite the heading rather than going inside the summary, because a form
@@ -174,7 +241,7 @@ export function Group({
   if (fold && title) {
     return (
       <section className={cn('relative', className)}>
-        <details open className="group/grp space-y-2">
+        <Details remember={remember} defaultOpen className="group/grp space-y-2">
           <summary
             className={cn(
               'press flex cursor-pointer list-none items-center gap-1.5 rounded-control',
@@ -191,7 +258,7 @@ export function Group({
             <h3 className="text-small font-semibold text-ink-muted">{title}</h3>
           </summary>
           {children}
-        </details>
+        </Details>
         {action && <div className="absolute top-0 right-0">{action}</div>}
       </section>
     );
