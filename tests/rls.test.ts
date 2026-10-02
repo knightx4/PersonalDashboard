@@ -219,6 +219,33 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.check_backs = checkBack.id;
 
+  // The Inspiration tab's rows. Settings are keyed by the owner and the
+  // video links by their takeaway: see ROW_KEY below.
+  await admin`
+    insert into inspiration_settings (user_id, youtube_playlist_id)
+    values (${userId}, 'PLIBpAG8AqHoE')`;
+  ids.inspiration_settings = userId;
+
+  const [inspirationVideo] = await admin<{ id: string }[]>`
+    insert into inspiration_videos (user_id, video_id, title)
+    values (${userId}, 'dQw4w9WgXcQ', ${`${tag} saved a talk`})
+    returning id`;
+  ids.inspiration_videos = inspirationVideo.id;
+
+  const [takeaway] = await admin<{ id: string }[]>`
+    insert into inspiration_takeaways (user_id, title, body, module, status, plan_item_id)
+    values (
+      ${userId}, ${`${tag} heard an idea`}, ${`${tag} thinks it would help here`}, 'dev',
+      'covered', ${planItem.id}
+    )
+    returning id`;
+  ids.inspiration_takeaways = takeaway.id;
+
+  await admin`
+    insert into inspiration_takeaway_videos (takeaway_id, video_id, user_id, quote, start_seconds)
+    values (${takeaway.id}, ${inspirationVideo.id}, ${userId}, ${`${tag} said so`}, 42)`;
+  ids.inspiration_takeaway_videos = takeaway.id;
+
   const [commitCheck] = await admin<{ id: string }[]>`
     insert into plan_commit_checks (user_id, commit_sha, merge_sha, conclusion)
     values (${userId}, ${'abc1234'}, ${'def5678'}, 'passed')
@@ -553,6 +580,8 @@ describe('cross-user reads', () => {
    */
   const ROW_KEY: Record<string, string> = {
     dev_comment_reads: 'row_id',
+    inspiration_settings: 'user_id',
+    inspiration_takeaway_videos: 'takeaway_id',
     module_visions: 'user_id',
   };
 
