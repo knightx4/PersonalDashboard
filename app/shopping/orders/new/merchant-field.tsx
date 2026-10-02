@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
-import { Input } from '@/components/ui/field';
+import { ComposeTitle, Input } from '@/components/ui/field';
 import { resolveMerchant, suggestMerchants, type MerchantOption } from '@/lib/merchants/suggest';
 
 /**
@@ -13,13 +13,18 @@ import { resolveMerchant, suggestMerchants, type MerchantOption } from '@/lib/me
  * picking from a long list and switching modes for a new shop was two
  * controls for one answer. What the form submits is still the two fields the
  * action already reads, so the server side is unchanged.
+ *
+ * `compose` sets it as the title line of a compose surface rather than a
+ * boxed field: on a new order the shop is the name of the thing being written.
  */
 export function MerchantField({
   id,
   merchants,
   defaultValue,
+  compose = false,
 }: {
   id: string;
+  compose?: boolean;
   merchants: MerchantOption[];
   /** A name to start with, such as the merchant read out of an email. */
   defaultValue?: string;
@@ -84,13 +89,15 @@ export function MerchantField({
   }
 
   const showList = open && matches.length > 0;
+  const Control = compose ? ComposeTitle : Input;
 
   return (
     <div ref={wrapRef} className="relative">
-      <Input
+      <Control
         id={id}
         value={text}
-        placeholder="Type a merchant"
+        placeholder={compose ? 'Where from? Type a shop' : 'Type a merchant'}
+        aria-label={compose ? 'Merchant' : undefined}
         autoComplete="off"
         role="combobox"
         aria-expanded={showList}

@@ -3,7 +3,15 @@
 import Link from 'next/link';
 import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
-import { FieldError, Input, Label, Select, Textarea } from '@/components/ui/field';
+import { Banknote, CalendarDays, Tag } from 'lucide-react';
+import {
+  ChipInput,
+  ChipSelect,
+  ComposeBody,
+  ComposeBox,
+  ComposeTitle,
+  FieldError,
+} from '@/components/ui/field';
 import { saveManualItem, type ItemActionState } from './item-actions';
 
 export type CategoryOption = { id: string; name: string };
@@ -19,50 +27,62 @@ export function AddItemForm({ categories }: { categories: readonly CategoryOptio
   const [state, action, pending] = useActionState(saveManualItem, {} as ItemActionState);
 
   return (
-    <form action={action} className="flex flex-col gap-3">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <Label htmlFor="item_name">Name</Label>
-          <Input id="item_name" name="name" required autoComplete="off" />
-        </div>
-        <div className="sm:col-span-2">
-          <Label htmlFor="item_variant">Variant</Label>
-          <Input
-            id="item_variant"
-            name="variant"
-            placeholder="Colour, size, model — whatever tells two of them apart"
-            autoComplete="off"
-          />
-        </div>
-        <div>
-          <Label htmlFor="item_category">Category</Label>
-          <Select id="item_category" name="category_id" defaultValue="">
+    <form action={action} className="space-y-2">
+      {/* A compose surface (law 12): the name is the title line, the variant
+          and notes are the words under it, and category, cost and date are
+          chips. Same field names the action has always read. */}
+      <ComposeBox className="space-y-1.5 py-2">
+        <ComposeTitle
+          name="name"
+          required
+          autoComplete="off"
+          aria-label="Name"
+          placeholder="What is it?"
+        />
+        {/* ui-ok: composer-always-open -- this page is the create; there is
+          * nothing here to read yet, and law 14 lets a new thing open in edit. */}
+        <ComposeBody
+          name="variant"
+          rows={1}
+          autoComplete="off"
+          aria-label="Variant"
+          placeholder="Colour, size, model: whatever tells two of them apart"
+        />
+        {/* ui-ok: composer-always-open -- same create surface as the line above. */}
+        <ComposeBody name="notes" rows={1} aria-label="Notes" placeholder="Notes" />
+        <div className="-ml-1.5 flex flex-wrap items-center gap-1 pt-1">
+          <ChipSelect
+            icon={<Tag className="size-3.5" strokeWidth={1.75} />}
+            name="category_id"
+            aria-label="Category"
+            placeholderValue=""
+            defaultValue=""
+          >
             <option value="">Uncategorised</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
               </option>
             ))}
-          </Select>
+          </ChipSelect>
+          <ChipInput
+            icon={<Banknote className="size-3.5" strokeWidth={1.75} />}
+            name="cost"
+            inputMode="decimal"
+            aria-label="What it cost"
+            placeholder="What it cost"
+          />
+          <ChipInput
+            icon={<CalendarDays className="size-3.5" strokeWidth={1.75} />}
+            name="acquired_at"
+            type="date"
+            aria-label="Acquired"
+          />
+          <Button type="submit" size="sm" pending={pending} className="ml-auto">
+            {pending ? 'Saving…' : 'Add to inventory'}
+          </Button>
         </div>
-        <div>
-          <Label htmlFor="item_cost">What it cost</Label>
-          <Input id="item_cost" name="cost" inputMode="decimal" placeholder="0.00" />
-        </div>
-        <div className="sm:col-span-2">
-          <Label htmlFor="item_acquired">Acquired</Label>
-          <Input id="item_acquired" name="acquired_at" type="date" />
-        </div>
-        <div className="sm:col-span-2">
-          <Label htmlFor="item_notes">Notes</Label>
-          {/* ui-ok: composer-always-open -- a field of the create form, not a
-            * composer on a surface someone came to read. */}
-          <Textarea id="item_notes" name="notes" rows={3} />
-        </div>
-      </div>
-      <Button type="submit" disabled={pending} className="self-start">
-        {pending ? 'Saving…' : 'Add to inventory'}
-      </Button>
+      </ComposeBox>
       <FieldError>{state.error}</FieldError>
       {state.message && (
         <p className="text-body text-accent">

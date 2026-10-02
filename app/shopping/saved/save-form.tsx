@@ -10,7 +10,16 @@ import {
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
-import { Field, FieldError, FieldHint, Input, Label, Textarea } from '@/components/ui/field';
+import { Banknote, ImageIcon } from 'lucide-react';
+import {
+  ChipInput,
+  ComposeBody,
+  ComposeTitle,
+  FieldError,
+  FieldHint,
+  Input,
+  Label,
+} from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { formatMoney } from '@/lib/money';
 
@@ -120,51 +129,51 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
               </Card>
             </div>
 
-            <div className="min-w-0 flex-1 space-y-4">
-              <Field id="title" label="Title">
-                <Input
-                  id="title"
-                  name="title"
-                  required
-                  defaultValue={preview.title ?? ''}
-                  key={`title-${preview.url}`}
+            {/* What the page gave, as a compose surface to correct rather
+                than a form to fill (law 12): the title is the title line,
+                price and picture are chips, notes are the words beneath. */}
+            <div className="min-w-0 flex-1 space-y-2">
+              <ComposeTitle
+                name="title"
+                required
+                aria-label="Title"
+                placeholder="What is it?"
+                defaultValue={preview.title ?? ''}
+                key={`title-${preview.url}`}
+              />
+              <ComposeBody
+                name="notes"
+                rows={1}
+                aria-label="Notes"
+                placeholder="Size, colour, why you want it…"
+              />
+              <div className="-ml-1.5 flex flex-wrap items-center gap-1">
+                <ChipInput
+                  icon={<Banknote className="size-3.5" strokeWidth={1.75} />}
+                  name="price"
+                  inputMode="decimal"
+                  aria-label="Price"
+                  placeholder="Price"
+                  defaultValue={preview.price ?? ''}
+                  key={`price-${preview.url}`}
                 />
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field id="price" label="Price">
-                  <Input
-                    id="price"
-                    name="price"
-                    inputMode="decimal"
-                    placeholder="12.99"
-                    defaultValue={preview.price ?? ''}
-                    key={`price-${preview.url}`}
-                  />
-                </Field>
-                <Field id="image_url" label="Image URL">
-                  <Input
-                    id="image_url"
-                    name="image_url"
-                    type="url"
-                    defaultValue={preview.imageUrl ?? ''}
-                    key={`image-${preview.url}`}
-                  />
-                </Field>
+                <ChipInput
+                  icon={<ImageIcon className="size-3.5" strokeWidth={1.75} />}
+                  name="image_url"
+                  type="url"
+                  aria-label="Image link"
+                  placeholder="Image link"
+                  defaultValue={preview.imageUrl ?? ''}
+                  key={`image-${preview.url}`}
+                />
               </div>
-              <Field id="notes" label="Notes">
-                <Textarea
-                  id="notes"
-                  name="notes"
-                  placeholder="Size, colour, why you want it…"
-                />
-              </Field>
-              <p className="text-ui text-ink-muted">
+              <p className="text-small text-ink-muted">
                 {preview.merchantName
                   ? `Merchant: ${preview.merchantName}`
                   : 'Merchant unknown from this URL'}
                 {preview.source && preview.source !== 'none'
                   ? ` · filled from ${preview.source === 'json_ld' ? 'page data' : 'Open Graph'}`
-                  : ' · nothing useful on the page — fill in by hand'}
+                  : ' · nothing useful on the page, so fill in by hand'}
               </p>
             </div>
           </div>
