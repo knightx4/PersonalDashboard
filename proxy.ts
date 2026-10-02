@@ -1,7 +1,8 @@
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { sessionUser } from '@/lib/auth/session-user';
 import { signInRedirect } from '@/lib/paths';
+import { pageView } from '@/lib/usage/page-view';
 
 /**
  * Session refresh and route protection (Next 16 proxy convention; this file
@@ -70,7 +71,7 @@ function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-export default async function proxy(request: NextRequest) {
+export default async function proxy(request: NextRequest, event?: NextFetchEvent) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -124,6 +125,25 @@ export default async function proxy(request: NextRequest) {
     url.pathname = '/onboarding';
     url.search = '';
     return NextResponse.redirect(url);
+  }
+
+  // One row per page opened, for the Usage tab and the vision review (plan
+  // #1481). waitUntil lets the response go now and keeps the invocation alive
+  // until the insert settles, so the page never waits on it. A failed write
+  // is dropped: a missing page view is not worth an error on the page.
+  if (user && event) {
+    const view = pageView({ method: request.method, pathname, headers: request.headers });
+    if (view) {
+      event.waitUntil(
+        (async () => {
+          const { error } = await supabase
+            .schema('core')
+            .from('page_views')
+            .insert({ user_id: user.id, route: view.route, workspace: view.workspace, via: view.via });
+          if (error) console.warn(`page view not recorded for ${view.route}: ${error.message}`);
+        })().catch(() => {}),
+      );
+    }
   }
 
   return response;
