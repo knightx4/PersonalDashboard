@@ -17,10 +17,11 @@ by the owner on 23 September 2026.
 
 ## What changes in Learn
 
-- **Learn now is the tab after Home**, at `/learn/now`. It was the first tab,
-  and what Learn opened on, until plan #1310 put Home at `/learn/home` before
-  it and plan #1313 made Learn open there; your study plans are listed on Home
-  and not on Learn now. It replaces the Read now tab. The readings you queued yourself are still
+- **Now is Learn's first tab**, at `/learn/now`, and what Learn opens on
+  (plan #1486). It was called Learn now and sat after Home from plan #1310
+  until #1486 folded Home and Practice Flow into it: what Home listed as
+  waiting is a strip at its top, Practice Flow is its Practice only switch,
+  and your study plans are on each subject's page. It replaces the Read now tab. The readings you queued yourself are still
   there: they come first in the feed, ahead of anything the app picked.
 - **Practice Flow is questions only.** The readings #773 folded into the flow
   after an answer move to Learn now. The new-track card stays in the flow,
@@ -29,7 +30,8 @@ by the owner on 23 September 2026.
 
 ## Practice Flow
 
-Practice Flow, at `/learn/flow`, asks one question after another. Since plan
+Practice Flow, behind Now's Practice only switch (`/learn/now?practice=1`,
+plan #1486; `/learn/flow` before that, which redirects), asks one question after another. Since plan
 #842 it asks about two kinds of subject, and since #1385 a third:
 
 - **Your tracks.** The ideas in each track, shared between tracks by how much

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { topUpFeedAfterResponse } from '@/inngest/learn/feed-top-up';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { practiceHref } from '@/lib/learn/flow/href';
 import {
   ACTION_FROM,
   cardTitle,
@@ -272,12 +273,12 @@ export async function testMeOnCard(id: string): Promise<CardActionResult> {
       await recordFeedAction(supabase, card.data, 'tested').catch(() => false);
       after(() => topUpFeedAfterResponse(user.id));
     }
-    redirect(`/learn/flow?track=${row.subject_id}`);
+    redirect(practiceHref({ track: row.subject_id }));
   }
   if (!row?.item || !row.segment) return { error: 'That card is no longer there.' };
   // Pressed again after the track was started: go back to it rather than
   // paying for a second chain.
-  if (row.status === 'tested' && row.subject_id) redirect(`/learn/flow?track=${row.subject_id}`);
+  if (row.status === 'tested' && row.subject_id) redirect(practiceHref({ track: row.subject_id }));
 
   const started = await startTrackFromCard(supabase, user.id, {
     // The idea is what "this" is on an idea card; older cards are the section.
@@ -293,7 +294,7 @@ export async function testMeOnCard(id: string): Promise<CardActionResult> {
     () => false,
   );
   after(() => topUpFeedAfterResponse(user.id));
-  redirect(`/learn/flow?track=${started.subjectId}`);
+  redirect(practiceHref({ track: started.subjectId }));
 }
 
 export type NewTrackResult = { error?: string; track?: { id: string; name: string; units: number } };

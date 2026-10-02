@@ -1,17 +1,18 @@
 /**
- * What is waiting for you, as Learn's Home tab lists it (plan #1311): one
- * line each for ideas due for review, readings you said you would read, cards
- * ready in Learn now, and goals with no plan yet, each linking to where you
- * deal with it.
+ * What is waiting for you, as the strip at the top of Learn's Now tab lists it
+ * (plan #1311, moved from the Home tab by plan #1486): one line each for ideas
+ * due for review, readings you said you would read, and goals with no plan
+ * yet, each linking to where you deal with it.
  *
- * Tracks and quizzes are left off because neither has a number that says
- * something is waiting.
+ * Cards ready in the feed are left off, since the feed is the page the strip
+ * sits on. Tracks and quizzes are left off because neither has a number that
+ * says something is waiting.
  *
  * The page supplies one read per count. They run in parallel, and a read that
  * fails leaves its count null, which drops that line and nothing else.
  */
 
-export type WaitingKey = 'reviews' | 'readings' | 'cards' | 'goals';
+export type WaitingKey = 'reviews' | 'readings' | 'goals';
 
 /** A count that could not be read is null. */
 export type WaitingCounts = Record<WaitingKey, number | null>;
@@ -20,7 +21,7 @@ export type WaitingReads = Record<WaitingKey, () => Promise<number>>;
 
 export type WaitingLine = { key: WaitingKey; text: string; href: string };
 
-const ORDER: readonly WaitingKey[] = ['reviews', 'readings', 'cards', 'goals'];
+const ORDER: readonly WaitingKey[] = ['reviews', 'readings', 'goals'];
 
 /** Each count read in parallel; a read that throws gives null for its own count only. */
 export async function readWaiting(reads: WaitingReads): Promise<WaitingCounts> {
@@ -37,13 +38,22 @@ function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
+/**
+ * The reviews and readings are listed further down Now itself, so their lines
+ * jump to those lists; from the Practice only view the same links bring the
+ * feed back with the list in view.
+ */
+export const WAITING_ANCHORS = { reviews: 'due-for-review', readings: 'read-these' } as const;
+
 const LINES: Record<WaitingKey, { text: (count: number) => string; href: string }> = {
-  reviews: { text: (n) => `${plural(n, 'idea', 'ideas')} due for review`, href: '/learn/now' },
+  reviews: {
+    text: (n) => `${plural(n, 'idea', 'ideas')} due for review`,
+    href: `/learn/now#${WAITING_ANCHORS.reviews}`,
+  },
   readings: {
     text: (n) => `${plural(n, 'reading', 'readings')} you said you would read`,
-    href: '/learn/now',
+    href: `/learn/now#${WAITING_ANCHORS.readings}`,
   },
-  cards: { text: (n) => `${plural(n, 'card', 'cards')} ready in Learn now`, href: '/learn/now' },
   goals: { text: (n) => `${plural(n, 'goal', 'goals')} without a plan yet`, href: '/learn/goals' },
 };
 
@@ -57,7 +67,7 @@ export function waitingLines(counts: WaitingCounts): WaitingLine[] {
 }
 
 /**
- * What Home says when no line shows: `nothing` only when every count was read
+ * What the strip says when no line shows: `nothing` only when every count was read
  * and each is zero, `unread` when at least one could not be read (so "nothing
  * is waiting" would be a guess), and null when there are lines to show.
  */

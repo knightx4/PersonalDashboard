@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
+import { practiceHref } from '@/lib/learn/flow/href';
 import type { FlowOnly } from './session';
 
 /**
@@ -14,7 +15,7 @@ export function FlowFocus({ name, back }: { name: string; back: string }) {
       <span>
         Only asking about <span className="font-medium text-ink">{name}</span>
       </span>
-      <Link href="/learn/flow" className="text-accent hover:underline">
+      <Link href={practiceHref()} className="text-accent hover:underline">
         {back}
       </Link>
     </p>
@@ -30,14 +31,14 @@ export function FlowFocus({ name, back }: { name: string; back: string }) {
  */
 export function ScopeFilter({ filter }: { filter: FlowOnly }) {
   const options = [
-    { key: 'all', label: 'Everything', href: '/learn/flow', on: filter === null },
+    { key: 'all', label: 'Everything', href: practiceHref(), on: filter === null },
     {
       key: 'tracks',
       label: 'Tracks only',
-      href: '/learn/flow?only=tracks',
+      href: practiceHref({ only: 'tracks' }),
       on: filter === 'tracks',
     },
-    { key: 'goals', label: 'Goals only', href: '/learn/flow?only=goals', on: filter === 'goals' },
+    { key: 'goals', label: 'Goals only', href: practiceHref({ only: 'goals' }), on: filter === 'goals' },
   ];
   return (
     <div className="mt-4">

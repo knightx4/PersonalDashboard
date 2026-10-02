@@ -10,6 +10,7 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { ProbeOptions } from '@/components/learn/probe-options';
 import { trackChange, trackPercent, type TrackMove } from '@/lib/learn/flow/track';
+import { practiceHref } from '@/lib/learn/flow/href';
 import {
   answerTrackOffer,
   fillFlowQueue,
@@ -307,12 +308,12 @@ export function FlowSession({
             </span>
           )}
           {live.nothing && track && (
-            <Link href="/learn/flow" className="text-ui text-accent hover:underline">
+            <Link href={practiceHref()} className="text-ui text-accent hover:underline">
               Ask across all tracks
             </Link>
           )}
           {live.nothing && aboutGoals && (
-            <Link href="/learn/flow" className="text-ui text-accent hover:underline">
+            <Link href={practiceHref()} className="text-ui text-accent hover:underline">
               Ask about everything
             </Link>
           )}

@@ -170,9 +170,9 @@ export const MODULES: readonly AppModule[] = [
   {
     id: 'learn',
     prefix: '/learn',
-    // Home, the first tab (plan #1313). /learn redirects there too, but naming
+    // Now, the first tab (plan #1486). /learn redirects there too, but naming
     // it here saves the switcher a redirect.
-    home: '/learn/home',
+    home: '/learn/now',
     alwaysHome: true,
     label: 'Learn',
     description: 'Questions until you stop, and what to read',

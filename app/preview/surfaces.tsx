@@ -2971,7 +2971,7 @@ export const SURFACES: readonly Surface[] = [
     /* Learn now as a deck: one card, the three swipes at its foot. Nothing
      * here is recorded; the swipes only reach the server from the real page. */
     id: 'learn-now-deck',
-    label: 'Learn now · One card at a time',
+    label: 'Now · One card at a time',
     module: 'learn',
     width: 'narrow',
     render: () => <LearnNowFeed first={deckCards} ready={20} low={10} />,

@@ -467,7 +467,7 @@ function DeckCard({
   const testMe = () =>
     startTest(async () => {
       setError(null);
-      // Redirects to Practice Flow on success, so only a failure comes back.
+      // Redirects to the practice questions on success, so only a failure comes back.
       const result = await testMeOnCard(card.id);
       if (result?.error) setError(result.error);
     });
@@ -738,7 +738,7 @@ function DeckCard({
               <GraduationCap className="size-3.5" strokeWidth={2} aria-hidden />
               {testing
                 ? card.kind === 'lesson'
-                  ? 'Opening Practice Flow…'
+                  ? 'Opening the questions…'
                   : 'Starting a track…'
                 : 'Test me on this'}
             </Button>
@@ -833,8 +833,8 @@ function DeckCard({
 
           {testing && (
             <p className="mt-2 text-small text-ink-muted" aria-live="polite">
-              Writing the ideas to test you on. This takes about half a minute, then Practice Flow
-              opens on them.
+              Writing the ideas to test you on. This takes about half a minute, then the questions
+              open on them.
             </p>
           )}
           {making && (

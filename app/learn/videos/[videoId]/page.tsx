@@ -238,7 +238,7 @@ function Cards({ video, cards }: { video: ListVideoPage; cards: VideoCard[] }) {
     return (
       <p id="cards" className="mt-1 text-small text-ink-muted">
         {video.stretchCount > 0
-          ? 'Its cards are written on the next hourly run of Learn now.'
+          ? 'Its cards are written on the next hourly run of the feed on Now.'
           : 'No cards: the judge marked no part of it to make a card from, so move it to Watch if you want it kept.'}
       </p>
     );
