@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GithubVaultSource } from '@/lib/vault/providers/github';
-import { VaultAuthError, VaultSourceError } from '@/lib/vault/providers/types';
+import {
+  VaultAuthError,
+  VaultConflictError,
+  VaultReadOnlyError,
+  VaultSourceError,
+} from '@/lib/vault/providers/types';
 
 const config = { owner: 'knightx4', repo: 'vault', branch: 'main', token: 'ghp_test' };
 
@@ -252,5 +257,90 @@ describe('readBlob', () => {
     const bytes = await new GithubVaultSource(config).readBlobBytes('sha-2');
     expect(new TextDecoder().decode(bytes)).toBe('PNG');
     expect(calls[0]).toContain('/git/blobs/sha-2');
+  });
+});
+
+describe('writeNote', () => {
+  type Sent = { url: string; method?: string; body: Record<string, unknown> };
+
+  /** Like stubFetch, but keeps the method and body a write sends. */
+  function stubWrite(res: StubResponse) {
+    const sent: Sent[] = [];
+    vi.stubGlobal('fetch', async (input: string | URL, init?: RequestInit) => {
+      sent.push({
+        url: String(input),
+        method: init?.method,
+        body: JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>,
+      });
+      const { status = 200, body, headers = {} } = res;
+      return {
+        ok: status >= 200 && status < 300,
+        status,
+        headers: { get: (k: string) => headers[k.toLowerCase()] ?? null },
+        json: async () => body,
+      } as unknown as Response;
+    });
+    return sent;
+  }
+
+  it('commits the new text on the branch and returns the new SHAs', async () => {
+    const sent = stubWrite({ body: { content: { sha: 'new-blob' }, commit: { sha: 'new-commit' } } });
+
+    const source = new GithubVaultSource({ ...config, branch: 'notes' });
+    const result = await source.writeNote('Daily/Café notes.md', 'Hello — world\n', 'old-blob', 'Edit Café notes from Dash');
+
+    expect(result).toEqual({ blobSha: 'new-blob', commitSha: 'new-commit' });
+    expect(sent).toHaveLength(1);
+    expect(sent[0].method).toBe('PUT');
+    expect(sent[0].url).toBe('https://api.github.com/repos/knightx4/vault/contents/Daily/Caf%C3%A9%20notes.md');
+    expect(sent[0].body).toEqual({
+      message: 'Edit Café notes from Dash',
+      content: Buffer.from('Hello — world\n', 'utf8').toString('base64'),
+      sha: 'old-blob',
+      branch: 'notes',
+    });
+  });
+
+  it("puts the connection's subpath back in front of the note's path", async () => {
+    const sent = stubWrite({ body: { content: { sha: 'b' }, commit: { sha: 'c' } } });
+
+    const source = new GithubVaultSource({ ...config, subpath: '/Vault/' });
+    await source.writeNote('Ideas.md', 'x', 'old', 'Edit Ideas from Dash');
+
+    expect(sent[0].url).toBe('https://api.github.com/repos/knightx4/vault/contents/Vault/Ideas.md');
+  });
+
+  it.each([409, 422])('raises VaultConflictError when the SHA is stale (%i)', async (status) => {
+    stubWrite({ status, body: { message: 'does not match' } });
+
+    const source = new GithubVaultSource(config);
+    const write = source.writeNote('Ideas.md', 'x', 'stale', 'Edit Ideas from Dash');
+
+    await expect(write).rejects.toBeInstanceOf(VaultConflictError);
+    await expect(write).rejects.toMatchObject({ path: 'Ideas.md' });
+  });
+
+  it('raises VaultReadOnlyError when the token cannot write', async () => {
+    stubWrite({
+      status: 403,
+      body: { message: 'Resource not accessible by personal access token' },
+      headers: { 'x-ratelimit-remaining': '4999' },
+    });
+
+    const source = new GithubVaultSource(config);
+    const write = source.writeNote('Ideas.md', 'x', 'old', 'Edit Ideas from Dash');
+
+    await expect(write).rejects.toBeInstanceOf(VaultReadOnlyError);
+    await expect(write).rejects.not.toBeInstanceOf(VaultAuthError);
+  });
+
+  it('keeps a rate limit and a rejected token apart from a read-only one', async () => {
+    const source = new GithubVaultSource(config);
+
+    stubWrite({ status: 403, headers: { 'x-ratelimit-remaining': '0' } });
+    await expect(source.writeNote('Ideas.md', 'x', 'old', 'm')).rejects.toBeInstanceOf(VaultSourceError);
+
+    stubWrite({ status: 401 });
+    await expect(source.writeNote('Ideas.md', 'x', 'old', 'm')).rejects.toBeInstanceOf(VaultAuthError);
   });
 });

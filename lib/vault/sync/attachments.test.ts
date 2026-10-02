@@ -278,6 +278,9 @@ function harness(opts: {
       bytesRead.push(sha);
       return new ArrayBuffer(8);
     },
+    writeNote: async () => {
+      throw new Error('the sync never writes');
+    },
   };
 
   const ports = {
