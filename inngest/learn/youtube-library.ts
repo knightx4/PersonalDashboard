@@ -41,6 +41,7 @@ import {
   type WatchListSync,
 } from '@/lib/learn/youtube/watch-list';
 import { summariseWatchLists, type SummaryPassResult } from '@/lib/learn/youtube/summaries';
+import { cutClips, type ClipPassResult } from '@/lib/learn/youtube/clip-run';
 import { judgeWatchLists, type JudgePassResult } from '@/lib/learn/youtube/judging';
 import {
   judgeFoundChannels,
@@ -93,6 +94,16 @@ const TICK_TRANSCRIBE_MS = 230_000;
  * in gets its verdict.
  */
 const TICK_CHANNELS_MS = 250_000;
+/**
+ * Then clips are cut from stored transcripts (plan #1398): up to twelve
+ * videos, four Haiku calls at a time. No video is started after the first
+ * mark, and a call still running at the second is abandoned and tried again
+ * next run, so embedding keeps its slot. The deadlines are from the start of
+ * the run, so on a run where the passes above had little to do this one gets
+ * most of its two minutes back.
+ */
+const TICK_CLIPS_MS = 256_000;
+const TICK_CLIPS_HARD_MS = 268_000;
 const TICK_EMBED_MS = 270_000;
 
 const ownerSchema = z.object({ userId: z.string() });
@@ -168,6 +179,32 @@ async function judgeLists(learn: LearnSupabaseClient, deadline: number): Promise
   }
 }
 
+/**
+ * Cut clips from the videos whose transcripts are stored, playlist first,
+ * each call recorded against the person the clips are for.
+ */
+async function cutStoredClips(learn: LearnSupabaseClient, owner: string | null, started: number): Promise<ClipPassResult | null> {
+  const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!anthropicApiKey) return null;
+  const core = createCoreServiceSupabase();
+  const rows: Promise<unknown>[] = [];
+  try {
+    return await cutClips(learn, {
+      anthropicApiKey,
+      owner,
+      deadline: started + TICK_CLIPS_MS,
+      hardDeadline: started + TICK_CLIPS_HARD_MS,
+      onSpend: (userId, report) =>
+        void rows.push(recordSpend(core, userId, { module: 'learn', operation: 'cut-clips', model: report.model, usage: report.usage })),
+    });
+  } catch (error) {
+    console.error('[youtube-library] cutting clips', error instanceof Error ? error.message : error);
+    return null;
+  } finally {
+    await Promise.all(rows);
+  }
+}
+
 /** The operation a channel-judging call is recorded under. */
 function channelOperation(pass: ChannelJudgePass): 'judge-video' | 'judge-channel' {
   return pass === 'sample' ? 'judge-video' : 'judge-channel';
@@ -213,12 +250,14 @@ export type TickReport = {
   judging?: JudgePassResult | null;
   /** Channels found for a subject and judged on their samples (plan #1196). */
   foundChannels?: Awaited<ReturnType<typeof judgePendingChannels>> | null;
+  /** Clips cut from stored transcripts for the clip stream (plan #1398). */
+  clips?: ClipPassResult | null;
 };
 
 /**
  * The scheduled run: read your playlist into your list, summarise and judge what is new on it, re-list every channel, queue the videos that best match
  * your ideas, then work through the queue within this run's share of the
- * month's credits, then embed what is new.
+ * month's credits, cut clips from stored transcripts, then embed what is new.
  */
 export async function runYouTubeLibraryTick(): Promise<TickReport> {
   const started = Date.now();
@@ -272,6 +311,7 @@ export async function runYouTubeLibraryTick(): Promise<TickReport> {
     });
   }
   report.foundChannels = await judgeChannels(learn, started + TICK_CHANNELS_MS);
+  report.clips = await cutStoredClips(learn, owner, started);
 
   report.embedding = await embedNew(learn, started + TICK_EMBED_MS);
   return report;

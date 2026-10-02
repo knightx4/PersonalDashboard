@@ -50,10 +50,10 @@ export type Verdict = 'watch' | 'card' | 'skip';
 // ---------------------------------------------------------------------------
 
 export type LearnerProfile = {
-  /** Your tracks, each with where you are in it. */
-  tracks: { name: string; note: string | null; frontier: string[]; settled: number }[];
-  /** Open goals from Goals. */
-  goals: { title: string; detail: string | null }[];
+  /** Your tracks, each with where you are in it. `id` is the learn.subjects row, where it was read. */
+  tracks: { id?: string; name: string; note: string | null; frontier: string[]; settled: number }[];
+  /** Open goals from Goals. `id` is the goals.items row, where it was read. */
+  goals: { id?: string; title: string; detail: string | null }[];
   /** Ideas from Learn now, by the theme each belongs to. */
   ideas: { theme: string; names: string[] }[];
   /**

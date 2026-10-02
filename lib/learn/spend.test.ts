@@ -118,6 +118,7 @@ describe('the operation names', () => {
       'judge-video',
       'find-channels',
       'judge-channel',
+      'cut-clips',
     ]);
   });
 });

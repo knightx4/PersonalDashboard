@@ -6,7 +6,6 @@ import { requireUser } from '@/lib/auth/server';
 import { isOwner } from '@/lib/dev/owner';
 import { goalsRoutine } from '@/lib/feedback/routine';
 import { createGoalsClient } from '@/lib/goals/auth/server';
-import { saveErrandAndStart } from '@/lib/goals/errand-store';
 import { runInFlight } from '@/lib/goals/shaping';
 import { approveGoal, loadAreaRuns, startAreaRun } from '@/lib/goals/shaping-store';
 import {
@@ -254,41 +253,6 @@ export async function addGoal(_prev: GoalsActionState, form: FormData): Promise<
     return { error: 'The goal could not be saved. Try again.' };
   }
   return saved();
-}
-
-/**
- * Add an errand from the Goals home and start Dash on it in the same press
- * (plan #1262), through saveErrandAndStart: a goal with `errand` set and the
- * date it is due by, then a goal run whose brief says it is an errand. The
- * errand is kept when the run cannot start, and the message says why nothing
- * started, so the one press never loses what was typed.
- */
-// latency: pending
-export async function addErrand(
-  _prev: GoalsActionState,
-  form: FormData,
-): Promise<GoalsActionState> {
-  const user = await requireUser();
-  const areaId = Id.safeParse(form.get('areaId'));
-  if (!areaId.success) return { error: 'Choose which area the errand is for.' };
-  const parsed = parseGoalFields(
-    (key) => (key === 'errand' ? 'true' : key === 'title' || key === 'due' ? form.get(key) : null),
-    { requireTitle: true },
-  );
-  if (!parsed.ok) return { error: parsed.error };
-  const { title, ...rest } = parsed.value;
-  if (!title) return { error: 'Say what the errand is.' };
-  if (!rest.dueOn) return { error: 'An errand needs a date it is due by.' };
-
-  const result = await saveErrandAndStart({
-    client: await createGoalsClient(),
-    user,
-    areaId: areaId.data,
-    title,
-    dueOn: rest.dueOn,
-  });
-  if (!result.ok) return { error: result.error };
-  return { ...saved(), message: result.message };
 }
 
 /**

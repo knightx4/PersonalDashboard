@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { Flag } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
 import { Card } from '@/components/ui/card';
@@ -6,46 +5,48 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatInstant } from '@/lib/goals/dates';
 import type { DoneSince } from '@/lib/goals/done-since';
+import type { DashOffer, GoalHolders } from '@/lib/goals/hand-off';
 import {
   errandAreaDefault,
-  homeAreas,
   homeSummary,
   splitErrands,
   type HomeGoal,
   type WeekHealth,
 } from '@/lib/goals/home';
+import type { RunListing } from '@/lib/goals/runs';
 import type { TodayItem } from '@/lib/goals/today';
+import { DashDesk } from './dash-desk';
 import { DoneSinceList } from './done-since-list';
-import { ErrandComposer } from './errand-composer';
-import { GoalLine } from './goal-line';
+import { GoalBoard } from './goal-board';
 import { TodayList } from './today-list';
 import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
- * The Goals home (plan #1077, under #1072), for a once-a-day visit. It
- * answers three questions and nothing sits above them: what to do today, how
- * each goal is doing, and what Dash did since you last looked.
+ * The Goals home (plan #1077, under #1072), for a once-a-day visit. Where
+ * every goal stands comes first, then what is on you, then what Dash can
+ * take, then what Dash did.
  *
  * 1. One sentence on where the goals stand, from their statuses, with Dash's
  *    latest note folded under it when there is one.
- * 2. Today: at most five things, each with one button, and the rest folded
- *    under them (today-list.tsx).
- * 3. Errands (plan #1262): the open errands, soonest due first, and Add an
- *    errand, which saves one and starts Dash on it in the same press
- *    (errand-composer.tsx). An errand is listed here and not under its area.
- * 4. Your goals, one line each under their area: progress, status, and the
- *    next move with its date (goal-line.tsx).
+ * 2. Your goals: a board of cards, errands first (goal-board.tsx). Each says
+ *    its status, a bar of its steps by who holds them, the next move, and
+ *    how much is on you and whether Dash is on it now.
+ * 3. Up next: at most five things on you, each with one button, Not now to
+ *    put it aside until a later day, and Dash prepares it where Dash can.
+ *    The rest is folded under them (today-list.tsx).
+ * 4. Put Dash to work: the runs going now, a few things Dash could take in
+ *    one press, and Ask Dash, which goes to a goal or starts a new errand
+ *    (dash-desk.tsx).
  * 5. What Dash did since your last visit, with Read and Undo
  *    (done-since-list.tsx).
+ * 6. This week: four numbers that say whether Goals is working (plan #1079),
+ *    counted by weekHealth in lib/goals/home.ts.
  *
  * What the old home listed in its own sections is reached from these: the
  * steps of yours, questions, approvals, flags, rhythms and suggestions are
- * all in Today or folded under it; results to read, the context and drafts
+ * all in Up next or folded under it; results to read, the context and drafts
  * Dash found, and the Claude steps waiting on an approval are on each goal's
- * page; the runs going now are on the Runs tab.
- *
- * 6. This week: four numbers that say whether Goals is working (plan #1079),
- *    counted by weekHealth in lib/goals/home.ts.
+ * page; every run is on the Runs tab.
  */
 
 export type HomeViewProps = {
@@ -58,10 +59,20 @@ export type HomeViewProps = {
   brief: { body: string; when: string | null } | null;
   /** The account's zone, for the time of your last visit. */
   timeZone: string;
+  /** YYYY-MM-DD in that zone, for how long an errand has left. */
+  todayOn?: string;
   /** The week's four numbers; null when they could not be read. */
   health: WeekHealth | null;
   /** Your live areas, for the area an errand goes in; none when they could not be read. */
   areas?: { id: string; name: string }[];
+  /** Each goal's holders by goal id (lib/goals/hand-off.ts). */
+  holders?: Record<string, GoalHolders>;
+  /** The runs going now. */
+  working?: RunListing[];
+  /** What Put Dash to work offers. */
+  offers?: DashOffer[];
+  /** The step ids in Up next that Dash could prepare. */
+  preparable?: string[];
 };
 
 export function HomeView({
@@ -71,8 +82,13 @@ export function HomeView({
   done,
   brief,
   timeZone,
+  todayOn,
   health,
   areas = [],
+  holders = {},
+  working = [],
+  offers = [],
+  preparable = [],
 }: HomeViewProps) {
   if (goals.length === 0 && today.length === 0 && later.length === 0) {
     return (
@@ -101,85 +117,24 @@ export function HomeView({
         </div>
       )}
 
-      <TodayList today={today} later={later} />
-
-      {(errands.length > 0 || errandArea) && (
-        <ErrandLines errands={errands} areas={areas} defaultAreaId={errandArea} />
+      {goals.length > 0 && (
+        <GoalBoard goals={[...errands, ...others]} holders={holders} today={todayOn} />
       )}
 
-      {others.length > 0 && <GoalLines goals={others} />}
+      <TodayList today={today} later={later} preparable={preparable} />
+
+      <DashDesk
+        working={working}
+        offers={offers}
+        goals={goals.map(({ goal }) => ({ id: goal.id, title: goal.title }))}
+        areas={areas}
+        defaultAreaId={errandArea}
+      />
 
       <DoneSection done={done} timeZone={timeZone} />
 
       <WeekSection health={health} />
     </div>
-  );
-}
-
-function GoalLines({ goals }: { goals: HomeGoal[] }) {
-  return (
-    <section aria-labelledby="goals-heading" className="space-y-2">
-      <div className="flex items-baseline justify-between gap-3 px-1">
-        <h2 id="goals-heading" className="text-ui font-semibold text-ink">
-          Your goals
-        </h2>
-        <span className="tabular text-small text-ink-muted">{goals.length} open</span>
-      </div>
-      <div className="space-y-4">
-        {homeAreas(goals).map((area) => (
-          <div key={area.areaId} className="space-y-1">
-            <h3 className="px-1 text-small font-semibold text-ink-muted">
-              <Link
-                href={`/goals/area/${area.areaId}`}
-                className="underline-offset-2 hover:text-ink hover:underline"
-              >
-                {area.areaName}
-              </Link>
-            </h3>
-            <Card>
-              <ul className="divide-y divide-border">
-                {area.goals.map((line) => (
-                  <GoalLine key={line.goal.id} line={line} />
-                ))}
-              </ul>
-            </Card>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ErrandLines({
-  errands,
-  areas,
-  defaultAreaId,
-}: {
-  errands: HomeGoal[];
-  areas: { id: string; name: string }[];
-  defaultAreaId: string | null;
-}) {
-  return (
-    <section aria-labelledby="errands-heading" className="space-y-2">
-      <div className="flex items-baseline justify-between gap-3 px-1">
-        <h2 id="errands-heading" className="text-ui font-semibold text-ink">
-          Errands
-        </h2>
-        {errands.length > 0 && (
-          <span className="tabular text-small text-ink-muted">{errands.length} open</span>
-        )}
-      </div>
-      {errands.length > 0 && (
-        <Card>
-          <ul className="divide-y divide-border">
-            {errands.map((line) => (
-              <GoalLine key={line.goal.id} line={line} />
-            ))}
-          </ul>
-        </Card>
-      )}
-      {defaultAreaId && <ErrandComposer areas={areas} defaultAreaId={defaultAreaId} />}
-    </section>
   );
 }
 

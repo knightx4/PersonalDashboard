@@ -27,11 +27,10 @@ function now(): number {
 }
 
 /**
- * The Goals home (plan #1077): a sentence on where the goals stand, Today,
- * the errands with Add an errand (plan #1262), each open goal on one line,
- * what Dash did since your last visit, and the week's four numbers
- * (plan #1079). The layout and what moved where from the old home are in
- * home-view.tsx.
+ * The Goals home (plan #1077): a sentence on where the goals stand, a board
+ * of every open goal, Up next with Not now, Put Dash to work, what Dash did
+ * since your last visit, and the week's four numbers (plan #1079). The
+ * layout and what moved where from the old home are in home-view.tsx.
  *
  * Each visit is recorded (plan #1019), and what Dash did is read from the
  * visit before this sitting (plan #1076); after time away that is the visit
@@ -88,6 +87,7 @@ export default async function GoalsPage() {
         health={health}
         brief={brief ? { body: brief.body, when: noteWhen(brief, account.timezone) } : null}
         timeZone={account.timezone}
+        todayOn={today}
         areas={areas.map((area) => ({ id: area.id, name: area.name }))}
       />
     </div>

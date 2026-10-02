@@ -147,6 +147,8 @@ describe('RLS coverage', () => {
       'track_offers',
       'tracks',
       'transcript_calls',
+      'video_clip_cuts',
+      'video_clips',
       'video_transcripts',
       'watch_list',
     ]);
@@ -2047,6 +2049,153 @@ describe('courses read in from a transcript', () => {
     await admin`insert into course_reads (user_id, course_id) values (${userA}, ${course})`;
     await admin`delete from obsidian.transcripts where id = ${transcriptA}`;
     expect(await admin`select id from course_reads where course_id = ${course}`).toHaveLength(0);
+  });
+});
+
+describe('clips cut from video transcripts', () => {
+  // 0087_video_clips.sql (plan #1397). Short clips for the clip stream, with
+  // their score and what the person did with each, and one cut record per
+  // video so a video that gave no clips is not cut again.
+  const VIDEO = 'dQw4w9WgXcQ';
+  let itemId = '';
+  let subjectA = '';
+
+  beforeAll(async () => {
+    const [provider] = await admin<{ id: string }[]>`
+      insert into catalogue_providers (slug, name, home_url, licence, ingest_note)
+      values ('youtube', 'YouTube', 'https://www.youtube.com', 'Standard YouTube licence',
+              'Data API, transcripts by TranscriptAPI')
+      on conflict (slug) do update set name = excluded.name
+      returning id`;
+    const [item] = await admin<{ id: string }[]>`
+      insert into catalogue_items (provider_id, external_id, title, kind, canonical_url)
+      values (${provider.id}, ${VIDEO}, 'A talk on prices', 'video',
+              ${`https://www.youtube.com/watch?v=${VIDEO}`})
+      on conflict (provider_id, external_id) do update set title = excluded.title
+      returning id`;
+    itemId = item.id;
+    const [s] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Clip economics') returning id`;
+    subjectA = s.id;
+  });
+
+  it('writes a clip for one video and reads it back, to its owner only', async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into video_clips (user_id, video_id, item_id, came_from, start_seconds,
+                                          end_seconds, caption, idea, serves, subject_id)
+                 values (${userA}, ${VIDEO}, ${itemId}, 'playlist', 125, 180,
+                         'Why prices carry knowledge', 'A price sums up what nobody knows alone.',
+                         'Clip economics', ${subjectA})`,
+    );
+    await asUser(
+      userA,
+      (tx) => tx`update video_clips set score = 87, score_by = 'jev', score_confidence = 0.92,
+                 scored_at = now(), shown_at = now(), show_count = show_count + 1,
+                 watched_seconds = 55, finished_at = now()
+                 where video_id = ${VIDEO} and start_seconds = 125`,
+    );
+    const own = await asUser(
+      userA,
+      (tx) => tx`select video_id, item_id, came_from, start_seconds, end_seconds, caption,
+                        subject_id, score, score_by, score_confidence::float as score_confidence,
+                        show_count, finished_at is not null as finished
+                 from video_clips`,
+    );
+    expect(own).toEqual([
+      {
+        video_id: VIDEO,
+        item_id: itemId,
+        came_from: 'playlist',
+        start_seconds: 125,
+        end_seconds: 180,
+        caption: 'Why prices carry knowledge',
+        subject_id: subjectA,
+        score: 87,
+        score_by: 'jev',
+        score_confidence: 0.92,
+        show_count: 1,
+        finished: true,
+      },
+    ]);
+    expect(await asUser(userB, (tx) => tx`select id from video_clips`)).toHaveLength(0);
+  });
+
+  it("does not let a user write another account's clip, or change one of theirs", async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into video_clips (user_id, video_id, came_from, start_seconds, end_seconds, caption)
+                   values (${userA}, ${VIDEO}, 'channel', 300, 340, 'Not yours')`,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into video_clips (user_id, video_id, came_from, start_seconds, end_seconds,
+                                            caption, subject_id)
+                   values (${userB}, ${VIDEO}, 'channel', 300, 340, 'Their track', ${subjectA})`,
+      ),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update video_clips set not_interested_at = now()`);
+    await asUser(userB, (tx) => tx`delete from video_clips`);
+    const [row] = await admin<{ not_interested_at: Date | null }[]>`
+      select not_interested_at from video_clips where user_id = ${userA} and start_seconds = 125`;
+    expect(row.not_interested_at).toBeNull();
+  });
+
+  it('keeps one clip per start second, and refuses a bad span, score or source', async () => {
+    await expect(
+      admin`insert into video_clips (user_id, video_id, came_from, start_seconds, end_seconds, caption)
+            values (${userA}, ${VIDEO}, 'playlist', 125, 170, 'Again')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into video_clips (user_id, video_id, came_from, start_seconds, end_seconds, caption)
+            values (${userA}, ${VIDEO}, 'playlist', 400, 900, 'Far too long')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into video_clips (user_id, video_id, came_from, start_seconds, end_seconds, caption)
+            values (${userA}, ${VIDEO}, 'somewhere', 400, 440, 'Unknown source')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update video_clips set score = 101 where user_id = ${userA}`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update video_clips set score_by = 'gpt' where user_id = ${userA}`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update video_clips set score = null where user_id = ${userA}`,
+    ).rejects.toThrow();
+  });
+
+  it('keeps the clip when its track is deleted', async () => {
+    await admin`delete from subjects where id = ${subjectA}`;
+    const [kept] = await admin<{ subject_id: string | null; serves: string }[]>`
+      select subject_id, serves from video_clips where user_id = ${userA} and start_seconds = 125`;
+    expect(kept).toEqual({ subject_id: null, serves: 'Clip economics' });
+  });
+
+  it('records a video as cut once, even with no clips, for its owner only', async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into video_clip_cuts (user_id, video_id, item_id, came_from, clip_count)
+                 values (${userA}, ${VIDEO}, ${itemId}, 'playlist', 0)`,
+    );
+    expect(
+      await asUser(userA, (tx) => tx`select video_id, clip_count from video_clip_cuts`),
+    ).toEqual([{ video_id: VIDEO, clip_count: 0 }]);
+    expect(await asUser(userB, (tx) => tx`select id from video_clip_cuts`)).toHaveLength(0);
+    await expect(
+      admin`insert into video_clip_cuts (user_id, video_id, came_from)
+            values (${userA}, ${VIDEO}, 'playlist')`,
+    ).rejects.toThrow();
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into video_clip_cuts (user_id, video_id, came_from)
+                   values (${userA}, 'abcdefghijk', 'channel')`,
+      ),
+    ).rejects.toThrow();
   });
 });
 

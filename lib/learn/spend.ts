@@ -278,6 +278,10 @@ export const LEARN_OPERATIONS = [
   // transcript excerpts and marks the channel follow or pass. The three
   // videos themselves are judged under 'judge-video'.
   'judge-channel',
+  // Cutting a video's transcript into short clips for the clip stream (plan
+  // #1398): one Haiku call per video, from the library run, reading the
+  // transcript as numbered sentences and naming the clips in it.
+  'cut-clips',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

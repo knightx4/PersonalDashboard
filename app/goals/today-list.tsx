@@ -1,14 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { useActionState } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { useActionState, useState } from 'react';
+import { ChevronDown, ExternalLink } from 'lucide-react';
+import { ActionMenu } from '@/components/ui/action-menu';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { DashMark } from '@/components/ui/dash-mark';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Input } from '@/components/ui/field';
+import { useToast } from '@/components/ui/toast';
+import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
+import {
+  SET_ASIDE_CHOICES,
+  SET_ASIDE_LABELS,
+  canSetAside,
+} from '@/lib/goals/set-aside';
 import type { TodayItem, TodayKind } from '@/lib/goals/today';
+import { prepareStepAction } from './[goalId]/shaping-actions';
+import { restoreAsideAction, setAsideAction } from './home-actions';
 import { countRhythmAction, setStepStatusAction } from './[goalId]/actions';
 import { addGoalComment } from './[goalId]/comment-actions';
 import { settleGoalAction } from './actions';
@@ -17,10 +28,16 @@ import { answerGoalQuestion } from './[goalId]/tree-actions';
 import { reactToSuggestionAction, recordAttendedAction } from './suggestion-actions';
 
 /**
- * Today on the Goals home (plan #1077): the five things most worth doing,
+ * Up next on the Goals home (plan #1077): the five things most worth doing,
  * ranked by lib/goals/today.ts, each with one button that does it here or
  * opens where it is done. The rest of what is on you folds underneath in the
  * same order, so nothing that was on the old home's lists is out of reach.
+ *
+ * Anything that is a step can be put aside with Not now (Tomorrow, This
+ * weekend, Next week, Next month; lib/goals/set-aside.ts). The row leaves at
+ * once, the toast offers Undo, and the step comes back on the day chosen. A
+ * step of yours that Dash could prepare also offers Dash prepares it, which
+ * writes a draft, a script or a checklist onto the step and leaves it yours.
  *
  * Each kind's button is the write that already exists for it:
  *
@@ -116,42 +133,66 @@ function hrefFor(item: TodayItem): string {
   }
 }
 
-export function TodayList({ today, later }: { today: TodayItem[]; later: TodayItem[] }) {
+export function TodayList({
+  today,
+  later,
+  preparable = [],
+}: {
+  today: TodayItem[];
+  later: TodayItem[];
+  /** The step ids Dash could prepare (preparableSteps). */
+  preparable?: string[];
+}) {
+  // Rows put aside on this page, hidden before the server's redraw arrives.
+  const [aside, setAside] = useState<ReadonlySet<string>>(new Set());
+  const hide = (key: string, hidden: boolean) =>
+    setAside((current) => {
+      const next = new Set(current);
+      if (hidden) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  const keyOf = (item: TodayItem) => `${item.kind}:${item.id}`;
+  const shown = today.filter((item) => !aside.has(keyOf(item)));
+  const rest = later.filter((item) => !aside.has(keyOf(item)));
+  const canPrepare = new Set(preparable);
+  const row = (item: TodayItem, rank: number | null) => (
+    <TodayRow
+      key={keyOf(item)}
+      item={item}
+      rank={rank}
+      preparable={canPrepare.has(item.id)}
+      onAside={(hidden) => hide(keyOf(item), hidden)}
+    />
+  );
+
   return (
     <section aria-labelledby="today-heading" className="space-y-2">
       <div className="flex items-baseline justify-between gap-3 px-1">
         <h2 id="today-heading" className="text-ui font-semibold text-ink">
-          Today
+          Up next
         </h2>
-        {today.length > 0 && (
+        {shown.length > 0 && (
           <span className="tabular text-small text-ink-muted">
-            {today.length} {today.length === 1 ? 'thing' : 'things'}
+            {shown.length} {shown.length === 1 ? 'thing' : 'things'} on you
           </span>
         )}
       </div>
-      {today.length === 0 ? (
-        <p className="px-1 text-small text-ink-muted">Nothing is waiting on you today.</p>
+      {shown.length === 0 ? (
+        <p className="px-1 text-small text-ink-muted">Nothing is waiting on you right now.</p>
       ) : (
         <Card>
-          <ol className="divide-y divide-border">
-            {today.map((item, index) => (
-              <TodayRow key={`${item.kind}:${item.id}`} item={item} rank={index + 1} />
-            ))}
-          </ol>
+          <ol className="divide-y divide-border">{shown.map((item, index) => row(item, index + 1))}</ol>
         </Card>
       )}
-      {later.length > 0 && (
+      {rest.length > 0 && (
         <Disclosure
           title="Also on you"
-          meta={`${later.length} more, in the same order`}
+          meta={`${rest.length} more, in the same order`}
           className="px-1"
         >
           <Card>
-            <ul className="divide-y divide-border">
-              {later.map((item) => (
-                <TodayRow key={`${item.kind}:${item.id}`} item={item} rank={null} />
-              ))}
-            </ul>
+            <ul className="divide-y divide-border">{rest.map((item) => row(item, null))}</ul>
           </Card>
         </Disclosure>
       )}
@@ -159,7 +200,18 @@ export function TodayList({ today, later }: { today: TodayItem[]; later: TodayIt
   );
 }
 
-function TodayRow({ item, rank }: { item: TodayItem; rank: number | null }) {
+function TodayRow({
+  item,
+  rank,
+  preparable,
+  onAside,
+}: {
+  item: TodayItem;
+  rank: number | null;
+  preparable: boolean;
+  /** Hide the row (true) or bring it back (false). */
+  onAside: (hidden: boolean) => void;
+}) {
   const [state, action, pending] = useActionState(
     (_prev: State, form: FormData) => act(item.kind, form),
     initial,
@@ -251,10 +303,110 @@ function TodayRow({ item, rank }: { item: TodayItem; rank: number | null }) {
                 {second[2]}
               </Button>
             )}
-            {state.error && <span className="text-small text-danger">{state.error}</span>}
+            <span className="ml-auto flex items-center gap-1">
+              {preparable && <PrepareButton item={item} />}
+              {canSetAside(item.kind) && <NotNow item={item} onAside={onAside} />}
+            </span>
+            {state.error && <span className="w-full text-small text-danger">{state.error}</span>}
           </form>
         )}
       </div>
     </li>
+  );
+}
+
+/**
+ * Not now: a menu of days. Choosing one hides the row at once and sets the
+ * step's start date; the toast's Undo puts the dates back and the row with
+ * them. A refusal brings the row back and says why.
+ */
+function NotNow({ item, onAside }: { item: TodayItem; onAside: (hidden: boolean) => void }) {
+  const toast = useToast();
+  const choose = async (choice: string) => {
+    onAside(true);
+    const form = new FormData();
+    form.set('id', item.id);
+    form.set('choice', choice);
+    const result = await setAsideAction(form);
+    if (result.error || !result.before) {
+      onAside(false);
+      toast({ text: result.error ?? 'It could not be set aside.' });
+      return;
+    }
+    const before = result.before;
+    toast({
+      text: result.message ?? 'Set aside.',
+      undone: 'Put back.',
+      undo: async () => {
+        const back = new FormData();
+        back.set('id', before.id);
+        back.set('startsOn', before.startsOn ?? '');
+        back.set('dueOn', before.dueOn ?? '');
+        const restored = await restoreAsideAction(back);
+        if (restored.error) throw new Error(restored.error);
+        onAside(false);
+      },
+    });
+  };
+  return (
+    <ActionMenu
+      label={`Not now: ${item.title}`}
+      align="end"
+      triggerClassName={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'w-auto')}
+      trigger={
+        <span className="inline-flex items-center gap-1">
+          Not now
+          <ChevronDown className="size-3.5" strokeWidth={2} aria-hidden />
+        </span>
+      }
+      items={SET_ASIDE_CHOICES.map((choice) => ({
+        id: choice,
+        label: SET_ASIDE_LABELS[choice],
+        onSelect: () => void choose(choice),
+      }))}
+    />
+  );
+}
+
+/**
+ * Dash prepares it: a prepare run on one step of yours (plan #1001). It is a
+ * button of its own, outside the row's form, so its press never posts the
+ * row's answer.
+ */
+function PrepareButton({ item }: { item: TodayItem }) {
+  const toast = useToast();
+  const [asked, setAsked] = useState(false);
+  const [pending, setPending] = useState(false);
+  if (asked) {
+    return (
+      <span className="inline-flex items-center gap-1 text-small text-ink-muted" role="status">
+        <DashMark state="working" activity="writing" size="2xs" tone="brand" decorative />
+        Dash is preparing it
+      </span>
+    );
+  }
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      pending={pending}
+      title="Dash writes a draft, a script or a checklist onto the step. It stays yours."
+      onClick={async () => {
+        setPending(true);
+        const form = new FormData();
+        form.set('id', item.id);
+        const result = await prepareStepAction({}, form);
+        setPending(false);
+        if (result.error) {
+          toast({ text: result.error });
+          return;
+        }
+        setAsked(true);
+      }}
+    >
+      <DashMark size="2xs" tone="brand" decorative />
+      {pending ? 'Asking Dash…' : 'Dash prepares it'}
+    </Button>
   );
 }
