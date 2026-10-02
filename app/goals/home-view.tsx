@@ -1,7 +1,7 @@
 import { Flag } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
 import { Card } from '@/components/ui/card';
-import { Disclosure } from '@/components/ui/disclosure';
+import { DashMark } from '@/components/ui/dash-mark';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatInstant } from '@/lib/goals/dates';
 import type { DoneSince } from '@/lib/goals/done-since';
@@ -13,40 +13,34 @@ import {
   type HomeGoal,
   type WeekHealth,
 } from '@/lib/goals/home';
+import type { DashLaneItem, LaterLaneItem } from '@/lib/goals/lanes';
 import type { RunListing } from '@/lib/goals/runs';
 import type { TodayItem } from '@/lib/goals/today';
-import { DashDesk } from './dash-desk';
+import { AskDash } from './ask-dash';
 import { DoneSinceList } from './done-since-list';
-import { GoalBoard } from './goal-board';
-import { TodayList } from './today-list';
+import { GoalLanes } from './goal-lanes';
 import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
- * The Goals home (plan #1077, under #1072), for a once-a-day visit. Where
- * every goal stands comes first, then what is on you, then what Dash can
- * take, then what Dash did.
+ * The Goals home (plan #1077, under #1072), for a once-a-day visit.
  *
- * 1. One sentence on where the goals stand, from their statuses, with Dash's
- *    latest note folded under it when there is one.
- * 2. Your goals: a board of cards, errands first (goal-board.tsx). Each says
- *    its status, a bar of its steps by who holds them, the next move, and
- *    how much is on you and whether Dash is on it now.
- * 3. Up next: at most five things on you, each with one button, Not now to
- *    put it aside until a later day, and Dash prepares it where Dash can.
- *    The rest is folded under them (today-list.tsx).
- * 4. Put Dash to work: the runs going now, a few things Dash could take in
- *    one press, and Ask Dash, which goes to a goal or starts a new errand
- *    (dash-desk.tsx).
- * 5. What Dash did since your last visit, with Read and Undo
+ * 1. The briefing: Dash's morning note on all the goals (goals.briefs), with
+ *    one sentence on where the goals stand under it, and Ask Dash, which
+ *    goes to a goal or starts a new errand (ask-dash.tsx). Before the first
+ *    note is written, the sentence stands alone.
+ * 2. Your goals and the lanes (goal-lanes.tsx): every goal as a small tile,
+ *    and what is next sorted into On you, Dash has it, and Later. A tile
+ *    filters the lanes to its goal.
+ * 3. What Dash did since your last visit, with Read and Undo
  *    (done-since-list.tsx).
- * 6. This week: four numbers that say whether Goals is working (plan #1079),
+ * 4. This week: four numbers that say whether Goals is working (plan #1079),
  *    counted by weekHealth in lib/goals/home.ts.
  *
  * What the old home listed in its own sections is reached from these: the
  * steps of yours, questions, approvals, flags, rhythms and suggestions are
- * all in Up next or folded under it; results to read, the context and drafts
- * Dash found, and the Claude steps waiting on an approval are on each goal's
- * page; every run is on the Runs tab.
+ * all in On you; results to read, the context and drafts Dash found, and the
+ * Claude steps waiting on an approval are on each goal's page; every run is
+ * on the Runs tab.
  */
 
 export type HomeViewProps = {
@@ -69,10 +63,14 @@ export type HomeViewProps = {
   holders?: Record<string, GoalHolders>;
   /** The runs going now. */
   working?: RunListing[];
-  /** What Put Dash to work offers. */
+  /** What Dash could take: goals it has left alone. */
   offers?: DashOffer[];
-  /** The step ids in Up next that Dash could prepare. */
+  /** The step ids on you that Dash could prepare. */
   preparable?: string[];
+  /** The Dash has it lane. */
+  dash?: DashLaneItem[];
+  /** The Later lane. */
+  laterOn?: LaterLaneItem[];
 };
 
 export function HomeView({
@@ -89,6 +87,8 @@ export function HomeView({
   working = [],
   offers = [],
   preparable = [],
+  dash = [],
+  laterOn = [],
 }: HomeViewProps) {
   if (goals.length === 0 && today.length === 0 && later.length === 0) {
     return (
@@ -103,33 +103,46 @@ export function HomeView({
 
   const summary = homeSummary(goals);
   const { errands, others } = splitErrands(goals);
-  const errandArea = errandAreaDefault(errands, areas);
   return (
     <div className="space-y-8">
-      {(summary || brief) && (
-        <div className="space-y-1 px-1">
-          {summary && <p className="text-body text-ink">{summary}</p>}
+      <section aria-labelledby="briefing-heading">
+        <Card padding="standard" className="space-y-3">
+          <div className="flex items-center gap-2">
+            <DashMark size="sm" tone="brand" decorative />
+            <h2 id="briefing-heading" className="text-ui font-semibold text-ink">
+              Dash
+            </h2>
+            {brief?.when && <span className="text-small text-ink-muted">written {brief.when}</span>}
+          </div>
           {brief && (
-            <Disclosure title={<><DashCredit className="text-ink-muted" />Dash’s note</>} meta={brief.when ? `written ${brief.when}` : undefined}>
-              <FileBody markdown={brief.body} compact />
-            </Disclosure>
+            <div className="max-w-prose">
+              <FileBody markdown={brief.body} />
+            </div>
           )}
-        </div>
-      )}
+          {summary && (
+            <p className={brief ? 'text-small text-ink-muted' : 'text-body text-ink'}>{summary}</p>
+          )}
+          <AskDash
+            goals={goals.map(({ goal }) => ({ id: goal.id, title: goal.title }))}
+            areas={areas}
+            defaultAreaId={errandAreaDefault(errands, areas)}
+          />
+        </Card>
+      </section>
 
       {goals.length > 0 && (
-        <GoalBoard goals={[...errands, ...others]} holders={holders} today={todayOn} />
+        <GoalLanes
+          goals={[...errands, ...others]}
+          holders={holders}
+          todayOn={todayOn}
+          onYou={[...today, ...later]}
+          preparable={preparable}
+          dash={dash}
+          laterOn={laterOn}
+          working={working}
+          offers={offers}
+        />
       )}
-
-      <TodayList today={today} later={later} preparable={preparable} />
-
-      <DashDesk
-        working={working}
-        offers={offers}
-        goals={goals.map(({ goal }) => ({ id: goal.id, title: goal.title }))}
-        areas={areas}
-        defaultAreaId={errandArea}
-      />
 
       <DoneSection done={done} timeZone={timeZone} />
 

@@ -319,6 +319,36 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
     },
   ],
   preparable: ['standing'],
+  dash: [
+    {
+      id: 'apr',
+      title: 'List every card with its APR and minimum',
+      goalId: cards.id,
+      goalTitle: cards.title,
+      kind: 'step',
+      working: false,
+      needs: null,
+    },
+    {
+      id: 'login',
+      title: 'Pull the last three statements',
+      goalId: cards.id,
+      goalTitle: cards.title,
+      kind: 'step',
+      working: false,
+      needs: 'Which bank is the Visa with?',
+    },
+  ],
+  laterOn: [
+    {
+      id: 'raise',
+      title: 'Raise the standing order to $300',
+      goalId: fund.id,
+      goalTitle: fund.title,
+      startsOn: '2026-11-01',
+      dueOn: null,
+    },
+  ],
   brief: {
     body: 'The card balance is down to **$6,980**, $730 lower than August. The one thing waiting on you is *Which card first?* on **Pay off the credit cards**: it decides the next three steps.',
     when: 'today',
