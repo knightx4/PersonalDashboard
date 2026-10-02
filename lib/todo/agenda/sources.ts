@@ -72,9 +72,17 @@ export interface AgendaItem {
   title: string;
   /**
    * A calendar day, YYYY-MM-DD. What the item sorts by. Null for something
-   * with no date, which goes in "Someday" as an undated task does.
+   * with no date, which goes in "On you, no date" as an undated task does.
    */
   day: string | null;
+  /**
+   * An instant: when this became yours to move. Orders the undated pile,
+   * oldest first, so the thing left longest is at the top. A source that
+   * knows when the move passed to the person (a question Dash raised, the
+   * last turn of a thread) sets that; one that does not uses when the row was
+   * written. Left out, the item sorts after every undated one that has it.
+   */
+  onYouSince?: string | null;
   /** An instant, when the item has a clock rather than only a day. */
   at: string | null;
   /** Where to go to actually deal with it. */

@@ -252,16 +252,69 @@ describe('mergeAgenda', () => {
     expect(piles[0].bucket).toBe('overdue');
   });
 
-  it('files an item with no day under someday, not under overdue', () => {
+  it('files an item with no day under "On you, no date", not under overdue', () => {
     // An undated goal step is one (plan #927), and "unknown" must never
     // present as "late".
     const piles = merge({ tasks: [task({ id: 'x' })] });
-    expect(piles[0].bucket).toBe('someday');
+    expect(piles[0].bucket).toBe('undated');
 
     const items = merge({
       items: [item({ key: 'goal_steps:s1', source: 'goal_steps', day: null })],
     });
-    expect(items.map((pile) => pile.bucket)).toEqual(['someday']);
+    expect(items.map((pile) => pile.bucket)).toEqual(['undated']);
+  });
+
+  describe('the "On you, no date" pile (plan #1474)', () => {
+    it('lists undated things under every dated pile', () => {
+      const piles = merge({
+        tasks: [task({ id: 'undated' }), task({ id: 'late', dueOn: '2026-02-01' })],
+        items: [item({ key: 'k-later', day: '2026-04-30' })],
+      });
+      expect(piles.map((pile) => pile.bucket)).toEqual(['overdue', 'later', 'undated']);
+    });
+
+    it('orders tasks and source items together by how long each has been on you, oldest first', () => {
+      const piles = merge({
+        tasks: [
+          task({ id: 'new', title: 'Written last week', createdAt: '2026-03-03T00:00:00.000Z' }),
+          task({ id: 'old', title: 'Written in January', createdAt: '2026-01-05T00:00:00.000Z' }),
+        ],
+        items: [
+          item({ key: 'q', day: null, title: 'A question from February', onYouSince: '2026-02-10T12:00:00+01:00' }),
+          item({ key: 'none', day: null, title: 'A source that cannot say' }),
+        ],
+      });
+
+      const undated = piles.find((pile) => pile.bucket === 'undated')!;
+      expect(undated.entries.map((e) => e.task?.id ?? e.item?.key)).toEqual(['old', 'q', 'new', 'none']);
+    });
+
+    it('keeps a hand-placed or pinned task above the age order', () => {
+      const piles = merge({
+        tasks: [
+          task({ id: 'oldest', createdAt: '2026-01-01T00:00:00.000Z' }),
+          task({ id: 'pinned', pinned: true, createdAt: '2026-03-01T00:00:00.000Z' }),
+          task({ id: 'placed', position: 1, createdAt: '2026-03-09T00:00:00.000Z' }),
+        ],
+      });
+      expect(piles[0].entries.map((e) => e.task!.id)).toEqual(['placed', 'pinned', 'oldest']);
+    });
+
+    it('drops a task from the pile once it is done', () => {
+      const open = merge({ tasks: [task({ id: 'a' }), task({ id: 'b', createdAt: '2026-02-01T00:00:00.000Z' })] });
+      expect(open[0].entries.map((e) => e.task!.id)).toEqual(['a', 'b']);
+
+      const after = merge({
+        tasks: [
+          task({ id: 'a', status: 'done', completedAt: '2026-03-10T08:00:00.000Z' }),
+          task({ id: 'b', createdAt: '2026-02-01T00:00:00.000Z' }),
+        ],
+      });
+      expect(after[0].entries.map((e) => e.task!.id)).toEqual(['b']);
+
+      const none = merge({ tasks: [task({ id: 'a', status: 'done', completedAt: '2026-03-10T08:00:00.000Z' })] });
+      expect(none).toEqual([]);
+    });
   });
 
   it('puts a hand-placed pile in the order it was placed in', () => {
