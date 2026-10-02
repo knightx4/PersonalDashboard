@@ -79,15 +79,19 @@ export function openCount(children: Task[]): number {
   return children.filter((child) => child.status === 'open').length;
 }
 
-/** The piles the list is shown in, in the order they matter. */
-export type Bucket = 'overdue' | 'today' | 'soon' | 'later' | 'someday';
+/**
+ * The piles the list is shown in, in the order they matter. Everything with
+ * no date goes in the last, under the dated ones (docs/CORE-AND-DASH-SPEC.md,
+ * part 4; plan #1474).
+ */
+export type Bucket = 'overdue' | 'today' | 'soon' | 'later' | 'undated';
 
 export const BUCKET_LABELS: Record<Bucket, string> = {
   overdue: 'Overdue',
   today: 'Today',
   soon: 'This week',
   later: 'Later',
-  someday: 'Someday',
+  undated: 'On you, no date',
 };
 
 /** How far "This week" reaches. Seven days, which is what a week is. */
@@ -169,7 +173,7 @@ export function isSnoozed(task: Task, now: Date): boolean {
 
 export function bucketFor(task: Task, timezone: string, now: Date): Bucket {
   const day = dueDay(task, timezone);
-  if (day === null) return 'someday';
+  if (day === null) return 'undated';
 
   const today = todayIn(timezone, now);
   if (day < today) return 'overdue';
@@ -213,7 +217,7 @@ export function bucketTasks(
     piles.set(bucket, pile);
   }
 
-  const order: Bucket[] = ['overdue', 'today', 'soon', 'later', 'someday'];
+  const order: Bucket[] = ['overdue', 'today', 'soon', 'later', 'undated'];
 
   return order
     .filter((bucket) => (piles.get(bucket)?.length ?? 0) > 0)

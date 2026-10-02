@@ -4,7 +4,7 @@ import type { TodoQuestion, TodoStep } from '@/lib/goals/todo';
 /**
  * The day Todo gives a goal step (plan #1266). A goal's next step with no
  * date shows today; a step only flagged with Show on Todo keeps going in
- * "Someday". Which steps come back is goalTodoSteps, tested in
+ * "On you, no date". Which steps come back is goalTodoSteps, tested in
  * lib/goals/todo.test.ts; the loader here is a stand-in handing back its
  * output.
  */
