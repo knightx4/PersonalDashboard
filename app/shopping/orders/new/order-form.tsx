@@ -1,11 +1,12 @@
 'use client';
 
 import { useActionState, useMemo, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, Hash, Trash2, User } from 'lucide-react';
 import { createManualOrder, type ActionState } from '@/app/shopping/orders/actions';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Field, FieldError, Input, Select } from '@/components/ui/field';
+import { AddTrigger } from '@/components/ui/add-trigger';
+import { ChipInput, ChipSelect, FieldError, InlineInput } from '@/components/ui/field';
 import type { Person } from '@/lib/people/load';
 import type { OrderFormPrefill } from '@/lib/review/read-order';
 import {
@@ -100,246 +101,235 @@ export function OrderForm({
     return { subtotalCents, totalCents };
   }, [lines, tax, shipping, discount]);
 
+  const setLine = (index: number, patch: Partial<LineDraft>) =>
+    setLines((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+
+  /*
+   * A compose surface rather than a form (law 12): the shop is the title line,
+   * the date, order number and whose it is are chips beneath it, each line
+   * item is one row of values with the column names said once, and tax,
+   * shipping and discount sit in the sum they change. The field names are the
+   * ones createManualOrder has always read, so the action is unchanged.
+   */
   return (
-    <form action={action} className="space-y-8">
+    <form action={action} className="space-y-6">
       {sourceMessageId && (
         <input type="hidden" name="source_message_id" value={sourceMessageId} />
       )}
       {prefill && <input type="hidden" name="currency" value={prefill.currency} />}
-      <section className="grid gap-4 sm:grid-cols-2">
-        <Field id="merchant" label="Merchant" className="sm:col-span-2">
-          <MerchantField
-            id="merchant"
-            merchants={merchants}
-            defaultValue={
-              prefill
-                ? (merchants.find((merchant) => merchant.id === prefill.merchantId)?.name ??
-                  prefill.merchantName)
-                : undefined
-            }
-          />
-        </Field>
 
-        <Field id="external_order_number" label="Order number">
-          <Input
-            id="external_order_number"
-            name="external_order_number"
-            placeholder="Optional"
-            defaultValue={prefill?.externalOrderNumber}
-          />
-        </Field>
-
-        <Field id="order_date" label="Order date">
-          <Input
-            id="order_date"
+      <Card padding="dense" className="space-y-2">
+        <MerchantField
+          id="merchant"
+          compose
+          merchants={merchants}
+          defaultValue={
+            prefill
+              ? (merchants.find((merchant) => merchant.id === prefill.merchantId)?.name ??
+                prefill.merchantName)
+              : undefined
+          }
+        />
+        <div className="-ml-1.5 flex flex-wrap items-center gap-1">
+          <ChipInput
+            icon={<CalendarDays className="size-3.5" strokeWidth={1.75} />}
             name="order_date"
             type="date"
             required
+            aria-label="Order date"
             defaultValue={prefill?.orderDate ?? defaultDate}
           />
-        </Field>
-
-        {/*
-          Only shown once there is somebody to choose between. On a
-          single-person account this is a field with one answer, and asking it
-          every time would be noise.
-        */}
-        {people.length > 1 && (
-          <Field id="person_id" label="Whose is it">
-            <Select id="person_id" name="person_id" defaultValue={defaultPersonId ?? ''}>
+          <ChipInput
+            icon={<Hash className="size-3.5" strokeWidth={1.75} />}
+            name="external_order_number"
+            aria-label="Order number"
+            placeholder="Order number"
+            defaultValue={prefill?.externalOrderNumber}
+          />
+          {/*
+            Only shown once there is somebody to choose between. On a
+            single-person account this is a question with one answer, and
+            asking it every time would be noise.
+          */}
+          {people.length > 1 && (
+            <ChipSelect
+              icon={<User className="size-3.5" strokeWidth={1.75} />}
+              name="person_id"
+              aria-label="Whose is it"
+              placeholderValue=""
+              defaultValue={defaultPersonId ?? ''}
+            >
               <option value="">Nobody in particular</option>
               {people.map((person) => (
                 <option key={person.id} value={person.id}>
                   {person.name}
                 </option>
               ))}
-            </Select>
-          </Field>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-ui font-semibold text-ink">Line items</h2>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => setLines((current) => [...current, newLine()])}
-          >
-            <Plus className="size-4" strokeWidth={1.75} aria-hidden />
-            Add line
-          </Button>
+            </ChipSelect>
+          )}
         </div>
+      </Card>
 
-        <div className="space-y-3">
-          {/* ui-ok: card-per-row -- law 13 is about lists you read, and these
-            * are not rows of anything: each is a twelve-column editor for one
-            * order line on a create form. The card is what keeps two half-typed
-            * lines from running into each other. */}
+      <section>
+        <h2 className="text-ui font-semibold text-ink">What you bought</h2>
+        {/* The column names, once, where there is room for columns. */}
+        <div
+          aria-hidden
+          className="mt-2 hidden gap-2 px-1 text-small text-ink-muted sm:grid sm:grid-cols-12"
+        >
+          <span className="sm:col-span-4">Item</span>
+          <span className="sm:col-span-2">Variant</span>
+          <span className="sm:col-span-2">Category</span>
+          <span className="sm:col-span-1">Qty</span>
+          <span className="sm:col-span-2">Unit price</span>
+        </div>
+        <ul className="mt-1 divide-y divide-border border-y border-border">
           {lines.map((line, index) => (
-            <Card key={line.key} padding="dense" className="grid gap-3 sm:grid-cols-12">
-              <Field id={`line_name_${line.key}`} label="Item" className="sm:col-span-4">
-                <Input
-                  id={`line_name_${line.key}`}
-                  name="line_name"
-                  required
-                  value={line.name}
-                  onChange={(event) =>
-                    setLines((current) =>
-                      current.map((row, i) =>
-                        i === index ? { ...row, name: event.target.value } : row,
-                      ),
-                    )
-                  }
-                  placeholder="What did you buy?"
-                />
-              </Field>
-              <Field id={`line_variant_${line.key}`} label="Variant" className="sm:col-span-2">
-                <Input
-                  id={`line_variant_${line.key}`}
-                  name="line_variant"
-                  value={line.variant}
-                  onChange={(event) =>
-                    setLines((current) =>
-                      current.map((row, i) =>
-                        i === index ? { ...row, variant: event.target.value } : row,
-                      ),
-                    )
-                  }
-                  placeholder="Size, color…"
-                />
-              </Field>
-              <Field id={`line_category_${line.key}`} label="Category" className="sm:col-span-2">
-                <Select
-                  id={`line_category_${line.key}`}
-                  name="line_category_id"
-                  value={line.categoryId}
-                  onChange={(event) =>
-                    setLines((current) =>
-                      current.map((row, i) =>
-                        i === index ? { ...row, categoryId: event.target.value } : row,
-                      ),
-                    )
-                  }
-                >
-                  <option value="">Uncategorized</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field id={`line_qty_${line.key}`} label="Qty" className="sm:col-span-1">
-                <Input
-                  id={`line_qty_${line.key}`}
-                  name="line_quantity"
-                  inputMode="numeric"
-                  required
-                  value={line.quantity}
-                  onChange={(event) =>
-                    setLines((current) =>
-                      current.map((row, i) =>
-                        i === index ? { ...row, quantity: event.target.value } : row,
-                      ),
-                    )
-                  }
-                />
-              </Field>
-              <Field id={`line_price_${line.key}`} label="Unit price" className="sm:col-span-2">
-                <Input
-                  id={`line_price_${line.key}`}
-                  name="line_unit_price"
-                  inputMode="decimal"
-                  required
-                  placeholder="0.00"
-                  value={line.unitPrice}
-                  onChange={(event) =>
-                    setLines((current) =>
-                      current.map((row, i) =>
-                        i === index ? { ...row, unitPrice: event.target.value } : row,
-                      ),
-                    )
-                  }
-                />
-              </Field>
-              <div className="flex items-end sm:col-span-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="w-full"
-                  disabled={lines.length === 1}
-                  onClick={() =>
-                    setLines((current) => current.filter((_, i) => i !== index))
-                  }
-                  aria-label="Remove line"
-                >
-                  <Trash2 className="size-4" strokeWidth={1.75} aria-hidden />
-                </Button>
-              </div>
-            </Card>
+            <li key={line.key} className="row-pad grid grid-cols-6 items-center gap-1 sm:grid-cols-12 sm:gap-2">
+              <InlineInput
+                name="line_name"
+                required
+                aria-label="Item"
+                placeholder="What did you buy?"
+                className="col-span-6 sm:col-span-4"
+                value={line.name}
+                onChange={(event) => setLine(index, { name: event.target.value })}
+              />
+              <InlineInput
+                name="line_variant"
+                aria-label="Variant"
+                placeholder="Size, colour…"
+                className="col-span-3 sm:col-span-2"
+                value={line.variant}
+                onChange={(event) => setLine(index, { variant: event.target.value })}
+              />
+              <ChipSelect
+                name="line_category_id"
+                aria-label="Category"
+                placeholderValue=""
+                className="col-span-3 sm:col-span-2"
+                value={line.categoryId}
+                onChange={(event) => setLine(index, { categoryId: event.target.value })}
+              >
+                <option value="">Uncategorized</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </ChipSelect>
+              <InlineInput
+                name="line_quantity"
+                inputMode="numeric"
+                required
+                aria-label="Quantity"
+                className="tabular col-span-1 sm:col-span-1"
+                value={line.quantity}
+                onChange={(event) => setLine(index, { quantity: event.target.value })}
+              />
+              <InlineInput
+                name="line_unit_price"
+                inputMode="decimal"
+                required
+                aria-label="Unit price"
+                placeholder="0.00"
+                className="tabular col-span-4 sm:col-span-2"
+                value={line.unitPrice}
+                onChange={(event) => setLine(index, { unitPrice: event.target.value })}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="col-span-1 justify-self-end"
+                disabled={lines.length === 1}
+                onClick={() => setLines((current) => current.filter((_, i) => i !== index))}
+                aria-label="Remove line"
+              >
+                <Trash2 className="size-4" strokeWidth={1.75} aria-hidden />
+              </Button>
+            </li>
           ))}
-        </div>
+        </ul>
+        <AddTrigger
+          label="Add line"
+          className="mt-1"
+          onClick={() => setLines((current) => [...current, newLine()])}
+        />
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        <Field id="tax" label="Tax">
-          <Input
-            id="tax"
+      <Card padding="dense" className="space-y-1 text-ui">
+        <SumRow label="Subtotal">
+          <span className="tabular px-1 text-ink">{formatMoney(preview.subtotalCents)}</span>
+        </SumRow>
+        <SumRow label="Tax">
+          <InlineInput
             name="tax"
             inputMode="decimal"
+            aria-label="Tax"
             placeholder="0.00"
+            className="tabular w-28 text-right"
             value={tax}
             onChange={(event) => setTax(event.target.value)}
           />
-        </Field>
-        <Field id="shipping" label="Shipping">
-          <Input
-            id="shipping"
+        </SumRow>
+        <SumRow label="Shipping">
+          <InlineInput
             name="shipping"
             inputMode="decimal"
+            aria-label="Shipping"
             placeholder="0.00"
+            className="tabular w-28 text-right"
             value={shipping}
             onChange={(event) => setShipping(event.target.value)}
           />
-        </Field>
-        <Field id="discount" label="Discount">
-          <Input
-            id="discount"
+        </SumRow>
+        <SumRow label="Discount">
+          <InlineInput
             name="discount"
             inputMode="decimal"
+            aria-label="Discount"
             placeholder="0.00"
+            className="tabular w-28 text-right"
             value={discount}
             onChange={(event) => setDiscount(event.target.value)}
           />
-        </Field>
-      </section>
-
-      <Card padding="dense" className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1 text-body text-ink-muted">
-          <p>
-            Subtotal{' '}
-            <span className="tabular text-ink">{formatMoney(preview.subtotalCents)}</span>
-          </p>
-          <p>
-            Total{' '}
-            <span className="tabular font-semibold text-ink">
-              {formatMoney(preview.totalCents)}
-            </span>
-          </p>
+        </SumRow>
+        <SumRow label="Total" strong>
+          <span className="tabular px-1 font-semibold text-ink">
+            {formatMoney(preview.totalCents)}
+          </span>
+        </SumRow>
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3">
           <p className="text-small text-ink-muted">
             Each physical unit lands in inventory with a proportional share of tax,
             shipping and discount.
           </p>
+          <Button type="submit" pending={pending}>
+            {pending ? 'Saving…' : 'Save order'}
+          </Button>
         </div>
-        <Button type="submit" pending={pending}>
-          {pending ? 'Saving…' : 'Save order'}
-        </Button>
       </Card>
 
       <FieldError>{state.error}</FieldError>
     </form>
+  );
+}
+
+/** One line of the sum: its name on the left, its amount on the right. */
+function SumRow({
+  label,
+  strong = false,
+  children,
+}: {
+  label: string;
+  strong?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className={strong ? 'font-semibold text-ink' : 'text-ink-muted'}>{label}</span>
+      {children}
+    </div>
   );
 }

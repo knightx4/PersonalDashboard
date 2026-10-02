@@ -6,9 +6,10 @@ import {
   saveReceiptPhotoOrder,
   type ReceiptActionState,
 } from './actions';
-import { Button } from '@/components/ui/button';
+import { Camera } from 'lucide-react';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
-import { Field, FieldError } from '@/components/ui/field';
+import { FieldError } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import {
   PHOTO_ACCEPT,
@@ -59,16 +60,18 @@ export function ReceiptPhotoForm() {
         Photograph a paper receipt. We extract an order the same way as email
         import, then attach book details when lines look like books.
       </p>
-      {/* A file input keeps its native control; only the label is ours. */}
-      <Field id="receipt" label="Receipt photo">
+      {/* One button that opens the camera or the photo library; the native
+          file input sits inside it, so there is no labelled field to fill. */}
+      <label className={cn(buttonVariants({ variant: 'secondary' }), 'cursor-pointer self-start focus-within:ring-2 focus-within:ring-accent/40')}>
+        <Camera className="size-4" strokeWidth={1.75} aria-hidden />
+        {preview ? 'Choose another photo' : 'Take or choose a photo'}
         <input
-          id="receipt"
           type="file"
           accept={PHOTO_ACCEPT}
-          className="block w-full text-body text-ink-muted"
+          className="sr-only"
           onChange={(e) => onFile(e.target.files?.[0] ?? null)}
         />
-      </Field>
+      </label>
       {preview && (
         <Card padding="none" className="overflow-hidden bg-canvas">
           {/* eslint-disable-next-line @next/next/no-img-element */}

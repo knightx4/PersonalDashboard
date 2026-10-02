@@ -4,29 +4,41 @@ import { Pencil, Plus } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Field, FieldError, Input, Textarea, Select } from '@/components/ui/field';
+import { ChipSelect, Field, FieldError, InlineInput, Input, Textarea } from '@/components/ui/field';
 import { formatDate } from '@/lib/jobs/applications/load';
-import { logTouch, markTouchAnswered, updateContact } from '../actions';
+import { logTouch, markTouchAnswered, updateContact, updateTouch } from '../actions';
 import type { ContactRow } from '../view';
 
 const CHANNELS = ['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 'other'] as const;
+type Channel = (typeof CHANNELS)[number];
 
 /**
  * Everything about one person: their details (editable), and the log of
- * sends to them, with the reply state. Split out of the contacts list so the
+ * sends to them, with the reply state. A send is logged with one press and
+ * described on its own line afterwards. Split out of the contacts list so the
  * list can be a plain table -- this is what "click into the person" opens.
  */
 export function ContactDetail({ contact: initial, timezone }: { contact: ContactRow; timezone: string }) {
   const [contact, setContact] = useState(initial);
   const [editing, setEditing] = useState(false);
-  const [logging, setLogging] = useState(false);
-  const [channel, setChannel] = useState<(typeof CHANNELS)[number]>('linkedin_dm');
-  const [message, setMessage] = useState('');
+  // The send just logged, whose words are where the caret goes next.
+  const [freshId, setFreshId] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const outbound = contact.touches.filter((t) => t.direction === 'outbound');
   const pendingReply = outbound.filter((t) => t.respondedAt === null);
+  // A new send goes out the way the last one did; LinkedIn when there is none.
+  const lastChannel = (CHANNELS as readonly string[]).includes(outbound[0]?.channel ?? '')
+    ? (outbound[0].channel as Channel)
+    : 'linkedin_dm';
+
+  function patchTouch(id: string, patch: Partial<ContactRow['touches'][number]>) {
+    setContact((current) => ({
+      ...current,
+      touches: current.touches.map((touch) => (touch.id === id ? { ...touch, ...patch } : touch)),
+    }));
+  }
 
   return (
     <Card padding="dense">
@@ -83,72 +95,36 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
         </>
       )}
 
-      {/* The send form stays closed until asked for, so the page opens on
-          the person and their log rather than an empty form (law 14). */}
-      <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-border pt-3">
-        {logging ? (
-          <>
-            <Field id={`channel-${contact.id}`} label="Log a send" className="w-40">
-              <Select
-                id={`channel-${contact.id}`}
-                value={channel}
-                onChange={(event) => setChannel(event.target.value as (typeof CHANNELS)[number])}
-              >
-                {CHANNELS.map((entry) => (
-                  <option key={entry} value={entry}>
-                    {entry.replace(/_/g, ' ')}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Input
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              placeholder="What you said, roughly"
-              className="min-w-48 flex-1"
-              autoFocus
-            />
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              disabled={pending}
-              onClick={() =>
-                startTransition(async () => {
-                  const result = await logTouch({
-                    contactId: contact.id,
-                    channel,
-                    direction: 'outbound',
-                    message,
-                  });
-                  setNote(result.error ?? 'Logged.');
-                  if (!result.error) {
-                    setMessage('');
-                    setLogging(false);
-                  }
-                })
-              }
-            >
-              Log
-            </Button>
-            <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setLogging(false)}>
-              Cancel
-            </Button>
-          </>
-        ) : (
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={() => {
+      {/* Logging a send is one press: it records the send now, on the
+          channel the last one went out on, and the new line in the log is
+          where its channel and words are filled in (law 12). */}
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          pending={pending}
+          onClick={() =>
+            startTransition(async () => {
               setNote(null);
-              setLogging(true);
-            }}
-          >
-            <Plus className="size-4" strokeWidth={1.75} aria-hidden />
-            Log a send
-          </Button>
-        )}
+              const result = await logTouch({
+                contactId: contact.id,
+                channel: lastChannel,
+                direction: 'outbound',
+              });
+              if (result.error || !result.touch) {
+                setNote(result.error ?? 'Could not log that send.');
+                return;
+              }
+              const touch = result.touch;
+              setFreshId(touch.id);
+              setContact((current) => ({ ...current, touches: [touch, ...current.touches] }));
+            })
+          }
+        >
+          <Plus className="size-4" strokeWidth={1.75} aria-hidden />
+          Log a send
+        </Button>
         {note && <span className="text-small text-ink-muted">{note}</span>}
       </div>
 
@@ -159,7 +135,24 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
               <span className="tabular w-24 text-ink-muted">
                 {formatDate(touch.sentAt, timezone)}
               </span>
-              <span className="text-ink-muted">{touch.channel.replace(/_/g, ' ')}</span>
+              <ChipSelect
+                aria-label="How it went out"
+                value={touch.channel}
+                onChange={(event) => {
+                  const channel = event.target.value as Channel;
+                  patchTouch(touch.id, { channel });
+                  startTransition(async () => {
+                    const result = await updateTouch(touch.id, { channel });
+                    if (result.error) setNote(result.error);
+                  });
+                }}
+              >
+                {CHANNELS.map((entry) => (
+                  <option key={entry} value={entry}>
+                    {entry.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </ChipSelect>
               <span className="text-ink-muted">{touch.direction}</span>
               {/* `sm:order-last` puts the answer back at the end of the row
                   where there is room for one; below `sm` it stays where the
@@ -177,7 +170,11 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
                   onClick={() =>
                     startTransition(async () => {
                       const result = await markTouchAnswered(touch.id, '');
-                      setNote(result.error ?? 'Marked as answered.');
+                      if (result.error) {
+                        setNote(result.error);
+                        return;
+                      }
+                      patchTouch(touch.id, { respondedAt: new Date().toISOString() });
                     })
                   }
                 >
@@ -186,14 +183,28 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
               ) : null}
               {/* Last in the row, so on a phone -- where it takes the whole of
                   the next line -- the date, the channel and the answer stay
-                  together above it. As one more `flex-1 truncate` item on that
-                  row it came out as "S..": two characters of the only part of
-                  a send anybody writes by hand. */}
-              {touch.message && (
-                <span className="min-w-0 basis-full text-ink-muted sm:flex-1 sm:basis-auto sm:truncate">
-                  {touch.message}
-                </span>
-              )}
+                  together above it. The words are the send's own text, edited
+                  where they are read; a send just logged opens on them. */}
+              <InlineInput
+                aria-label="What you said"
+                defaultValue={touch.message ?? ''}
+                placeholder="What you said, roughly"
+                autoFocus={touch.id === freshId}
+                className="min-w-0 basis-full text-ink-muted sm:flex-1 sm:basis-auto"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') event.currentTarget.blur();
+                }}
+                onBlur={(event) => {
+                  if (touch.id === freshId) setFreshId(null);
+                  const message = event.currentTarget.value.trim();
+                  if (message === (touch.message ?? '')) return;
+                  patchTouch(touch.id, { message: message || null });
+                  startTransition(async () => {
+                    const result = await updateTouch(touch.id, { message });
+                    if (result.error) setNote(result.error);
+                  });
+                }}
+              />
             </li>
           ))}
         </ul>

@@ -114,26 +114,43 @@ export async function updateContact(
   return { error: null };
 }
 
+const CHANNELS = ['linkedin_dm', 'linkedin_connect', 'email', 'intro', 'event', 'other'] as const;
+type Channel = (typeof CHANNELS)[number];
+
+/** A send as the contact page lists it. */
+export interface LoggedTouch {
+  id: string;
+  channel: string;
+  direction: string;
+  sentAt: string;
+  respondedAt: string | null;
+  message: string | null;
+}
+
 // latency: pending
 export async function logTouch(input: {
   contactId: string;
-  channel: 'linkedin_dm' | 'linkedin_connect' | 'email' | 'intro' | 'event' | 'other';
+  channel: Channel;
   direction: 'outbound' | 'inbound';
   message?: string;
   applicationId?: string;
-}): Promise<{ error: string | null }> {
+}): Promise<{ error: string | null; touch?: LoggedTouch }> {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase.from('contact_touches').insert({
-    user_id: user.id,
-    contact_id: input.contactId,
-    application_id: input.applicationId ?? null,
-    channel: input.channel,
-    direction: input.direction,
-    message: input.message?.trim() || null,
-    sent_at: new Date().toISOString(),
-  });
+  const { data, error } = await supabase
+    .from('contact_touches')
+    .insert({
+      user_id: user.id,
+      contact_id: input.contactId,
+      application_id: input.applicationId ?? null,
+      channel: input.channel,
+      direction: input.direction,
+      message: input.message?.trim() || null,
+      sent_at: new Date().toISOString(),
+    })
+    .select('id, channel, direction, sent_at, responded_at, message')
+    .single();
 
   if (error) return { error: error.message };
 
@@ -148,6 +165,48 @@ export async function logTouch(input: {
   }
 
   revalidatePath('/jobs/contacts');
+  revalidatePath('/jobs/contacts/[id]', 'page');
+  return {
+    error: null,
+    touch: {
+      id: data.id as string,
+      channel: data.channel as string,
+      direction: data.direction as string,
+      sentAt: data.sent_at as string,
+      respondedAt: (data.responded_at as string | null) ?? null,
+      message: (data.message as string | null) ?? null,
+    },
+  };
+}
+
+/**
+ * Change how a send went out, or what it said, on the send itself. A send is
+ * logged first and described after, so both are edited where the log shows
+ * them.
+ */
+// latency: optimistic -- the chip and the line show the new value at once
+export async function updateTouch(
+  touchId: string,
+  patch: { channel?: Channel; message?: string },
+): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const update: { channel?: Channel; message?: string | null } = {};
+  if (patch.channel !== undefined) {
+    if (!CHANNELS.includes(patch.channel)) return { error: 'Not a channel this log knows.' };
+    update.channel = patch.channel;
+  }
+  if (patch.message !== undefined) update.message = patch.message.trim() || null;
+  if (Object.keys(update).length === 0) return { error: null };
+
+  const { error } = await supabase
+    .from('contact_touches')
+    .update(update)
+    .eq('id', touchId)
+    .eq('user_id', user.id);
+
+  if (error) return { error: error.message };
   revalidatePath('/jobs/contacts/[id]', 'page');
   return { error: null };
 }
