@@ -409,6 +409,30 @@ const RULES: Rule[] = [
     },
   },
   {
+    id: 'unlinked-text',
+    law: '-',
+    says: 'text printed with its line breaks kept and its web addresses left as plain text',
+    instead: '<LinkedText text={…} />, or <RefText> where step numbers should link too',
+    /**
+     * A `whitespace-pre-wrap` or `whitespace-pre-line` block with no
+     * LinkedText or RefText in it.
+     *
+     * Kept line breaks are the mark of text somebody wrote: a note, a run's
+     * summary, an email, a raise. That is the text that carries addresses, and
+     * forty-odd places printed it as it came, so a link in it could be read and
+     * not opened (plan #1430). The block is the class line and the six below
+     * it, which is where the children of every such element in the tree start.
+     * A textarea keeps line breaks for the opposite reason and is left alone.
+     */
+    find: (line, { after }) => {
+      if (!/\bwhitespace-pre-(?:wrap|line)\b/.test(line)) return [];
+      if (/<(?:textarea|Textarea|input|Input)\b/.test(line)) return [];
+      const block = [line, ...after];
+      if (block.some((next) => /<(?:LinkedText|RefText)\b/.test(next))) return [];
+      return ['pre-wrapped text without links'];
+    },
+  },
+  {
     id: 'action-without-tier',
     law: '-',
     says: 'an action with no latency tier',

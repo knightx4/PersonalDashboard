@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Field, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { MAX_NOTE, type CardNote, type NoteWrite } from '@/lib/learn/notes/notes';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * Your notes on a Learn card or on an idea's page, and the box to add one
@@ -86,7 +87,7 @@ export function CardNotes({
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-body break-words whitespace-pre-line text-ink">
-                      {note.body}
+                      <LinkedText text={note.body} />
                     </p>
                     {from && <p className="mt-0.5 text-small text-ink-muted">{from}</p>}
                   </div>

@@ -11,6 +11,7 @@ import { noteHref } from '@/lib/vault/paths';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { MayaConversation } from './conversation';
 import { QuestionField } from './question-field';
+import { LinkedText } from '@/components/ui/linked-text';
 
 export const dynamic = 'force-dynamic';
 
@@ -131,7 +132,9 @@ function Point({ point, cited }: { point: MayaPoint; cited: Map<string, MayaThre
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-body font-semibold text-ink">{point.claim}</p>
-        <p className="mt-1 whitespace-pre-line text-body text-ink">{point.argument}</p>
+        <p className="mt-1 whitespace-pre-line text-body text-ink">
+          <LinkedText text={point.argument} />
+        </p>
 
         {point.notes.length > 0 && (
           <ul className="mt-3 space-y-3" aria-label="From your notes">
@@ -199,7 +202,9 @@ function Synthesis({ synthesis }: { synthesis: MayaSynthesis }) {
       <p className="text-ui font-medium text-ink">
         Reconciling &ldquo;{left}&rdquo; and &ldquo;{right}&rdquo;
       </p>
-      <p className="mt-1 whitespace-pre-line text-body text-ink">{synthesis.resolution}</p>
+      <p className="mt-1 whitespace-pre-line text-body text-ink">
+        <LinkedText text={synthesis.resolution} />
+      </p>
     </div>
   );
 }

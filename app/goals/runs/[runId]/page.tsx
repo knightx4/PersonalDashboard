@@ -11,6 +11,7 @@ import { loadRunChanges } from '@/lib/goals/run-changes-store';
 import { JOB_LABELS, runMeta, type RunListing } from '@/lib/goals/runs';
 import { loadRun } from '@/lib/goals/runs-store';
 import { RunChanges } from './run-changes';
+import { LinkedText } from '@/components/ui/linked-text';
 
 export const metadata = { title: 'Run' };
 export const dynamic = 'force-dynamic';
@@ -80,11 +81,13 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
       />
       {failed ? (
         <p className="text-small break-words whitespace-pre-wrap text-danger">
-          {run.error ?? 'No reason was recorded.'}
+          <LinkedText text={run.error ?? 'No reason was recorded.'} />
         </p>
       ) : (
         run.summary && (
-          <p className="text-small break-words whitespace-pre-wrap text-ink">{run.summary}</p>
+          <p className="text-small break-words whitespace-pre-wrap text-ink">
+            <LinkedText text={run.summary} />
+          </p>
         )
       )}
       {lines.length === 0 ? (

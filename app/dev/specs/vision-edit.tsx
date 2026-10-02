@@ -15,6 +15,7 @@ import { FEEDBACK_KIND_LABEL, type FeedbackKind } from '@/lib/feedback/load';
 import { useClockNow } from '@/lib/use-clock-now';
 import type { VisionReview } from '@/lib/specs/vision-review';
 import { DashCredit } from '@/components/ui/dash-mark';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * An edit the weekly vision review proposed, under the vision it would change
@@ -71,8 +72,12 @@ export function VisionEditPanel({
           {commentWhen(edit.createdAt, now)}
         </time>
       </p>
-      <p className="whitespace-pre-wrap text-body text-ink">{edit.proposedBody}</p>
-      <p className="whitespace-pre-wrap text-ui text-ink-muted">{edit.note}</p>
+      <p className="whitespace-pre-wrap text-body text-ink">
+        <LinkedText text={edit.proposedBody ?? ''} />
+      </p>
+      <p className="whitespace-pre-wrap text-ui text-ink-muted">
+        <LinkedText text={edit.note ?? ''} />
+      </p>
       {stale && (
         <p className="text-caption text-ink-muted">
           The vision has changed since this was written. Accepting replaces what it says now.

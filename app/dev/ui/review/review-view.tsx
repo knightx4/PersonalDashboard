@@ -19,6 +19,7 @@ import {
   startUiReview,
   type UiReviewActionState,
 } from './actions';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /** One module's standing: the gate, the surfaces, and the last pass. */
 export type Standing = {
@@ -90,7 +91,9 @@ function StandingRow({ standing }: { standing: Standing }) {
       </div>
 
       {lastReview?.note && (
-        <p className="whitespace-pre-wrap text-body text-ink">{lastReview.note}</p>
+        <p className="whitespace-pre-wrap text-body text-ink">
+          <LinkedText text={lastReview.note} />
+        </p>
       )}
 
       <div className="flex flex-wrap items-center gap-3">
@@ -159,7 +162,9 @@ function FindingRow({ finding }: { finding: UiFinding }) {
         )}
       </div>
 
-      <p className="whitespace-pre-wrap text-body text-ink">{finding.body}</p>
+      <p className="whitespace-pre-wrap text-body text-ink">
+        <LinkedText text={finding.body} />
+      </p>
       {finding.note && <p className="text-small text-ink-muted">{finding.note}</p>}
 
       <form action={action} className="flex flex-wrap items-center gap-2">

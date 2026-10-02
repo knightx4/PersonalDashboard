@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn';
 import { planHref } from '@/lib/search/sources/dev-map';
 import type { Takeaway, TakeawaySource } from '@/lib/dev/inspiration/view';
 import { TakeawayActions } from './takeaway-actions';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * One takeaway, drawn the same way in both views (plan #1412).
@@ -124,7 +125,9 @@ export function TakeawayRow({ takeaway, inVideo = false }: { takeaway: Takeaway;
         </span>
       </div>
       <h3 className="text-ui font-semibold text-ink">{takeaway.title}</h3>
-      <p className="whitespace-pre-wrap text-body text-ink">{body}</p>
+      <p className="whitespace-pre-wrap text-body text-ink">
+        <LinkedText text={body} />
+      </p>
 
       {own ? (
         <div className="flex flex-col gap-0.5">

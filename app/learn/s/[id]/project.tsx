@@ -10,6 +10,7 @@ import { PaidHint } from '@/components/ui/paid-hint';
 import { PROJECT_ANSWER_MAX, type ProjectView } from '@/lib/learn/lessons/project';
 import { PracticeData } from './p/[piece]/piece-view';
 import { handInPlanProject, writePlanProject, type ProjectResult } from './project-actions';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * The final project at the foot of a goal's plan (plan #1146,
@@ -115,7 +116,9 @@ export function ProjectCard({
 
       {project && (
         <>
-          <p className="mt-3 whitespace-pre-line text-body text-ink">{project.task}</p>
+          <p className="mt-3 whitespace-pre-line text-body text-ink">
+            <LinkedText text={project.task} />
+          </p>
           {project.data && <PracticeData table={project.data} />}
           {project.spreadsheetNote && (
             <p className="mt-2 text-small text-ink-muted">Typed here rather than in a spreadsheet: {project.spreadsheetNote}</p>
@@ -190,7 +193,9 @@ export function ProjectCard({
                 <span className="group-open:hidden">Show a worked answer</span>
                 <span className="hidden group-open:inline">A worked answer</span>
               </summary>
-              <p className="mt-1 whitespace-pre-line text-body text-ink">{project.worked}</p>
+              <p className="mt-1 whitespace-pre-line text-body text-ink">
+                <LinkedText text={project.worked} />
+              </p>
             </details>
           )}
         </>

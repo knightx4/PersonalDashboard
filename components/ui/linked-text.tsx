@@ -5,6 +5,10 @@ import { linkParts } from '@/lib/goals/result-links';
  * Text written as plain text, with every link in it clickable (notes 91885079
  * and 28d33a48). What Dash writes on a step carries markdown links, which a
  * plain paragraph showed as brackets and a raw address.
+ *
+ * Every block of plain text the app prints with its line breaks kept goes
+ * through this (or through RefText, which calls it), and `npm run check:ui`
+ * reports one that does not as `unlinked-text`.
  */
 export function LinkedText({ text }: { text: string }) {
   return (
@@ -26,4 +30,9 @@ export function LinkedText({ text }: { text: string }) {
       )}
     </>
   );
+}
+
+/** Whether the text holds anything LinkedText would draw as a link. */
+export function hasLinks(text: string): boolean {
+  return linkParts(text).some((part) => 'href' in part);
 }

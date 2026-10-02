@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
 import { BackButton, EmailFrame } from './reader';
+import { LinkedText } from '@/components/ui/linked-text';
 
 export const metadata = { title: 'Email' };
 
@@ -113,7 +114,7 @@ export default async function MailPage({ params }: { params: Promise<{ id: strin
                       <EmailFrame html={message.html} title={message.subject ?? 'Email'} />
                     ) : (
                       <p className="whitespace-pre-wrap break-words text-body text-ink">
-                        {message.text || '(no text)'}
+                        <LinkedText text={message.text || '(no text)'} />
                       </p>
                     )}
                   </li>
