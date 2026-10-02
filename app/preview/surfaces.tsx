@@ -41,6 +41,8 @@ import {
 } from '@/lib/todo/calendar/month';
 import { NoteProperties } from '@/components/vault/note-properties';
 import { NoteBody } from '@/components/vault/note-body';
+import { NoteEdit } from '@/app/vault/n/[...path]/note-edit';
+import { NoteEditingPreview } from './note-edit-surfaces';
 import { buildAttachmentIndex, type AttachmentEntry } from '@/lib/vault/markdown/attachments';
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
 import { noteHref } from '@/lib/vault/paths';
@@ -2838,6 +2840,41 @@ export const SURFACES: readonly Surface[] = [
         <NoteBody markdown={noteMarkdown} />
       </>
     ),
+  },
+  {
+    /* Editing a note in place (plan #1425): at rest, the note with Edit beside
+     * its title; the editor is the same component after a press. */
+    id: 'vault-note-edit',
+    label: 'Note · Edit button',
+    module: 'vault',
+    width: 'narrow',
+    render: () => (
+      <NoteEdit
+        notePath="Work/Nightly close.md"
+        body={noteMarkdown}
+        blobSha="preview"
+        heading={
+          <header>
+            <h1 className="font-display text-title font-semibold tracking-tight text-ink">
+              Nightly close
+            </h1>
+            <p className="mt-1 text-ui text-ink-muted">Work/ · updated 30 Aug 2026</p>
+          </header>
+        }
+        properties={<NoteProperties frontmatter={noteFrontmatter} />}
+      >
+        <NoteBody markdown={noteMarkdown} />
+      </NoteEdit>
+    ),
+  },
+  {
+    /* The editor open, and the two refusals that come with a way forward:
+     * changed in Obsidian (reload) and a token that cannot write (settings). */
+    id: 'vault-note-editing',
+    label: 'Note · Editing, and a refused save',
+    module: 'vault',
+    width: 'narrow',
+    render: () => <NoteEditingPreview body={noteMarkdown} />,
   },
   {
     /* A note's embedded files (plan #1302): an image, a sized one, a PDF, a
