@@ -13,6 +13,10 @@ export const devSources: ModuleSources = {
   notSources: [
     'public.check_backs',
     'public.ideas',
+    'public.inspiration_settings',
+    'public.inspiration_takeaway_videos',
+    'public.inspiration_takeaways',
+    'public.inspiration_videos',
     'public.plan_items',
     'public.plan_dependencies',
     'public.plan_runs',
