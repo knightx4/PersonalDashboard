@@ -36,6 +36,7 @@ function source(opts: { raw?: string; fail?: Error } = {}): VaultSource & { writ
     snapshot: vi.fn(),
     diff: vi.fn(),
     readBlobBytes: vi.fn(),
+    canWrite: vi.fn(),
     async readBlob() {
       return opts.raw ?? RAW;
     },

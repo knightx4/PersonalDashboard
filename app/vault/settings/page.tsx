@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { openConnectedSource } from '@/lib/vault/db/ports';
 import { loadConnection, loadSyncRuns } from '@/lib/vault/notes/load';
+import { checkWriteAccess, type WriteAccess } from '@/lib/vault/notes/write-access';
 import { describeRun, syncProgress, type SyncProgress } from '@/lib/vault/sync/progress';
 import { ConnectVaultForm } from './connect-form';
 import { SyncNowButton } from './sync-now-button';
@@ -20,13 +22,25 @@ const STATUS_LABEL: Record<string, string> = {
   error: 'Error',
 };
 
+const WRITE_ACCESS_LABEL: Record<Exclude<WriteAccess, 'reconnect'>, string> = {
+  yes: 'Can edit notes',
+  no: 'Read-only: edits will not save',
+  unknown: 'Could not check just now',
+};
+
 export default async function VaultSettingsPage() {
   const supabase = await createVaultClient();
   const connection = await loadConnection(supabase);
 
-  const [{ count }, runs] = await Promise.all([
+  // The write check asks GitHub, so it runs beside the database reads rather
+  // than after them. A connection that needs reconnecting is not asked: its
+  // status already says the token is the problem.
+  const [{ count }, runs, writeAccess] = await Promise.all([
     supabase.from('notes').select('id', { count: 'exact', head: true }).is('deleted_at', null),
     connection ? loadSyncRuns(supabase) : Promise.resolve([]),
+    connection?.status === 'active'
+      ? checkWriteAccess(() => openConnectedSource(supabase))
+      : Promise.resolve<WriteAccess>('reconnect'),
   ]);
 
   const progress = connection
@@ -99,6 +113,15 @@ export default async function VaultSettingsPage() {
                 <dd className="text-ink">
                   {connection.lastSyncedAt ? formatWhen(connection.lastSyncedAt) : 'Not yet'}
                 </dd>
+
+                {writeAccess !== 'reconnect' && (
+                  <>
+                    <dt className="text-ink-muted">Editing</dt>
+                    <dd className={writeAccess === 'no' ? 'text-caution' : 'text-ink'}>
+                      {WRITE_ACCESS_LABEL[writeAccess]}
+                    </dd>
+                  </>
+                )}
               </dl>
 
               {progress && <SyncProgressBar progress={progress} />}
@@ -182,8 +205,15 @@ export default async function VaultSettingsPage() {
               {connection.status === 'needs_reauth' && (
                 <p className="text-body leading-relaxed text-ink-muted">
                   Fine-grained tokens expire — a year at most — so this is routine rather than a
-                  fault. Generate a new one with <strong>Contents: Read-only</strong> and paste it
-                  below. Your notes and sync position are kept, so nothing is re-read.
+                  fault. Generate a new one with <strong>Contents: Read and write</strong> and paste
+                  it below. Your notes and sync position are kept, so nothing is re-read.
+                </p>
+              )}
+              {writeAccess === 'no' && (
+                <p className="text-body leading-relaxed text-ink-muted">
+                  This token can read the vault but not write to it, so edits made here will not
+                  save. Generate one with <strong>Contents: Read and write</strong> on this
+                  repository and paste it below. Your notes and sync position are kept.
                 </p>
               )}
               <ConnectVaultForm

@@ -115,6 +115,15 @@ export interface VaultSource {
    * A token that can read but not write raises VaultReadOnlyError.
    */
   writeNote(path: string, text: string, expectedBlobSha: string, message: string): Promise<VaultWriteResult>;
+
+  /**
+   * Whether the token is allowed to write to the repository (plan #1426), for
+   * the line on vault settings. Answered by a write that cannot succeed, so
+   * nothing in the repository changes either way. Raises VaultAuthError when
+   * the token is rejected outright, and VaultSourceError when GitHub's answer
+   * says neither yes nor no.
+   */
+  canWrite(): Promise<boolean>;
 }
 
 /** What a committed note write left behind. */
