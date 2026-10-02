@@ -94,7 +94,7 @@ async function readWaitingRows(sections: readonly PlanSection[], userId: string)
  * pages, so the first question of the morning was the one this page could not
  * answer -- see `StatusPanel`.
  *
- * The route stays /dev/raised though the tab is called Dash -- #431 -- because
+ * The route stays /dev/raised though the tab is called Home -- #431, note a0897727 -- because
  * every notification, comment and old summary already links to it.
  */
 export default async function DevRaisedPage() {
@@ -190,7 +190,7 @@ export default async function DevRaisedPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
-        title="Dash"
+        title="Home"
         description="What happened in the last day, the questions waiting on you, and every conversation you have had with Dash. Answer a question and the next run reads it; reply to a conversation and it goes back on the row it was started on."
       />
       <StatusPanel
