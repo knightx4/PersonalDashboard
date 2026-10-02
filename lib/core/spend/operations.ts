@@ -131,6 +131,10 @@ export const SPEND_OPERATIONS = {
     // meaning (plan #1248). Voyage, one short call per recall lookup, from
     // Ask Dash.
     'recall-question',
+    // Reading one inspiration video's transcript for takeaways about this
+    // app (plan #1409). Sonnet, one call per video not read yet, from the
+    // inspiration run and its Check now button.
+    'read-inspiration-video',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one

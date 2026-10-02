@@ -299,6 +299,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'embed-memory': background(unit(VOYAGE_LITE, 450, 0)),
   // One question of a sentence or so.
   'recall-question': unit(VOYAGE_LITE, 30, 0),
+  // Up to an hour of transcript (about 25,000 tokens) with the app and dev
+  // visions and the workspace list; up to eight takeaways with quotes out.
+  'read-inspiration-video': unit(SONNET, 25_000, 1_500),
 
   // News. All but the last two from the digest cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),
