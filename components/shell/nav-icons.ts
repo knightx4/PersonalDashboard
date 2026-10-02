@@ -42,6 +42,7 @@ import {
   StickyNote,
   Tag,
   Target,
+  Telescope,
   Timer,
   Undo2,
   Users,
@@ -93,6 +94,8 @@ export const NAV_ICONS = {
   bugs: Bug,
   raised: MessageCircleQuestion,
   ideas: Lightbulb,
+  // Looking outward for ideas, as Ideas is the ones you had yourself.
+  inspiration: Telescope,
   plan: Map,
   changelog: History,
   ui: Shapes,
