@@ -99,6 +99,11 @@ import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { WatchingSurface } from './watching-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface } from './clip-surfaces';
 import {
+  InspirationByVideoSurface,
+  InspirationListSurface,
+  InspirationUnreadSurface,
+} from './inspiration-surfaces';
+import {
   GoalBareSurface,
   GoalLinkingSurface,
   GoalTopSurface,
@@ -3134,6 +3139,32 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <ClipsEmptySurface />,
+  },
+  {
+    /* Dev's Inspiration tab (plan #1412), by video: a point two videos made,
+     * one already in the plan, a video with no transcript, and the dismissed
+     * fold. Fixtures in inspiration-surfaces.tsx. */
+    id: 'dev-inspiration',
+    label: 'Dev · Inspiration, by video',
+    module: 'dev',
+    width: 'page',
+    render: () => <InspirationByVideoSurface />,
+  },
+  {
+    /* The same takeaways as one list, each naming every video it came from. */
+    id: 'dev-inspiration-list',
+    label: 'Dev · Inspiration, one list',
+    module: 'dev',
+    width: 'page',
+    render: () => <InspirationListSurface />,
+  },
+  {
+    /* Before the playlist has been read. */
+    id: 'dev-inspiration-unread',
+    label: 'Dev · Inspiration, not read yet',
+    module: 'dev',
+    width: 'page',
+    render: () => <InspirationUnreadSurface />,
   },
   {
     /* The home page's Watching section (plan #1295): a watch that fired, one
