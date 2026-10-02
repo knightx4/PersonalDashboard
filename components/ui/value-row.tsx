@@ -39,10 +39,13 @@ export function ValueList({
  */
 export function ValueRow({
   label,
+  labelView,
   value,
   className,
 }: {
   label: string;
+  /** The label as the page draws it, when it can be changed where it is read. */
+  labelView?: React.ReactNode;
   /** A string, or a rendered value -- a link, a chip, a formatted number. */
   value: React.ReactNode;
   className?: string;
@@ -52,7 +55,7 @@ export function ValueRow({
 
   return (
     <div className={cn('@md:flex @md:items-baseline @md:gap-3', className)}>
-      <dt className="shrink-0 text-small text-ink-muted @md:w-40">{label}</dt>
+      <dt className="shrink-0 text-small text-ink-muted @md:w-40">{labelView ?? label}</dt>
       {/* Breaking mid-word is not optional here: a homepage, a careers page
           and a LinkedIn URL are all values in this list, and a URL offers no
           break opportunity at all -- it ran straight out of the side of the

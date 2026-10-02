@@ -1,11 +1,11 @@
 'use client';
 
-import { useActionState, useId, useState } from 'react';
+import { useActionState, useId, useRef, useState, useTransition } from 'react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Disclosure, Group } from '@/components/ui/disclosure';
-import { Field, Input } from '@/components/ui/field';
+import { Field, FieldError, InlineTextarea } from '@/components/ui/field';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { useToast } from '@/components/ui/toast';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
@@ -143,7 +143,8 @@ function Questions({
   fields: CollectionField[];
   records: CollectionRecord[];
 }) {
-  const [editing, setEditing] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const saveQuestion = useSaveQuestions(stepId, questions);
   const byKey = new Map(answers.map((a) => [a.key, a]));
   const listed = new Set(questions.map((q) => q.key));
   const rows = [
@@ -153,11 +154,6 @@ function Questions({
       .map((a) => ({ key: a.key, question: a.question, answer: a })),
   ];
 
-  if (editing) {
-    return (
-      <QuestionsForm stepId={stepId} questions={questions} onDone={() => setEditing(false)} />
-    );
-  }
   return (
     <div className="space-y-1">
       {rows.length > 0 && (
@@ -166,6 +162,15 @@ function Questions({
             <ValueRow
               key={key}
               label={question}
+              labelView={
+                listed.has(key) ? (
+                  <QuestionText
+                    key={`${key}:${question}`}
+                    question={question}
+                    onSave={(next) => saveQuestion(key, next)}
+                  />
+                ) : undefined
+              }
               value={
                 answer ? (
                   <div className="space-y-0.5">
@@ -188,10 +193,29 @@ function Questions({
           ))}
         </ValueList>
       )}
-      <AddTrigger
-        label={questions.length > 0 ? 'Edit the questions' : 'Add the questions it answers'}
-        onClick={() => setEditing(true)}
-      />
+      {adding ? (
+        <QuestionText
+          question=""
+          adding
+          onSave={async (next) => {
+            const error = next ? await saveQuestion('new', next) : null;
+            if (!error) setAdding(false);
+            return error;
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      ) : (
+        <AddTrigger
+          label={questions.length > 0 ? 'Add a question' : 'Add the questions it answers'}
+          onClick={() => setAdding(true)}
+        />
+      )}
+      {(questions.length > 0 || adding) && (
+        <p className="text-small text-ink-muted">
+          The step closes once each question has an answer with the rows it came from. Clear a
+          question to take it off.
+        </p>
+      )}
     </div>
   );
 }
@@ -248,80 +272,80 @@ function SeenItButton({ stepId }: { stepId: string }) {
 }
 
 /**
- * The step's questions as inputs, one per question and one blank for a new
- * one. Clearing a question's text takes it off the step. Escape or Cancel
- * closes it.
+ * Save the step's questions with one of them changed (plan #1435). The action
+ * takes the whole list, so the others go with it as they stand; `new` adds
+ * one, and an empty question takes it off. Says in a toast when the save
+ * closed the step.
  */
-function QuestionsForm({
-  stepId,
-  questions,
-  onDone,
-}: {
-  stepId: string;
-  questions: StepQuestion[];
-  onDone: () => void;
-}) {
+function useSaveQuestions(stepId: string, questions: StepQuestion[]) {
   const toast = useToast();
-  const formId = useId();
-  const [state, save, saving] = useActionState(
-    async (prev: InformationActionState, form: FormData) => {
-      const result = await saveQuestionsAction(prev, form);
-      if (!result.error) {
-        toast({
-          text: result.closed
-            ? 'Saved. Every question has its answer, so the step is closed.'
-            : 'Questions saved.',
-        });
-        onDone();
-      }
-      return result;
-    },
-    initial,
-  );
+  return async (key: string, next: string): Promise<string | null> => {
+    const form = new FormData();
+    form.set('stepId', stepId);
+    for (const q of questions) {
+      form.set(`${QUESTION_PREFIX}${q.key}`, q.key === key ? next : q.question);
+    }
+    if (key === 'new') form.set(`${QUESTION_PREFIX}new`, next);
+    const result = await saveQuestionsAction(initial, form);
+    if (result.error) return result.error;
+    if (result.closed)
+      toast({ text: 'Saved. Every question has its answer, so the step is closed.' });
+    return null;
+  };
+}
+
+/**
+ * One question, edited where it is read (plan #1435): it was a form of
+ * labelled inputs opened from Edit the questions. Enter or leaving the box
+ * saves it, and Escape puts it back.
+ */
+function QuestionText({
+  question,
+  adding = false,
+  onSave,
+  onCancel,
+}: {
+  question: string;
+  adding?: boolean;
+  onSave: (next: string) => Promise<string | null>;
+  onCancel?: () => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const cancelled = useRef(false);
   return (
-    <form
-      action={save}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') onDone();
-      }}
-      className="space-y-3 rounded-control bg-sunken p-3"
-    >
-      <input type="hidden" name="stepId" value={stepId} />
-      {questions.map((q, i) => (
-        <Field key={q.key} id={`${formId}-${q.key}`} label={`Question ${i + 1}`}>
-          <Input
-            id={`${formId}-${q.key}`}
-            name={`${QUESTION_PREFIX}${q.key}`}
-            defaultValue={q.question}
-            maxLength={MAX_QUESTION_LENGTH}
-          />
-        </Field>
-      ))}
-      <Field
-        id={`${formId}-new`}
-        label={questions.length > 0 ? 'Another question (optional)' : 'What does this step answer?'}
-      >
-        <Input
-          id={`${formId}-new`}
-          name={`${QUESTION_PREFIX}new`}
-          maxLength={MAX_QUESTION_LENGTH}
-          placeholder="When does my first payment fall due?"
-        />
-      </Field>
-      <p className="text-small text-ink-muted">
-        The step closes once each question has an answer with the rows it came from. Clear a
-        question to take it off.
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" size="sm" pending={saving}>
-          Save
-        </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={onDone}>
-          Cancel
-        </Button>
-        {state.error && <span className="text-small text-danger">{state.error}</span>}
-      </div>
-    </form>
+    <span className="block">
+      <InlineTextarea
+        defaultValue={question}
+        maxLength={MAX_QUESTION_LENGTH}
+        autoFocus={adding}
+        disabled={pending}
+        aria-label={adding ? 'A question this step answers' : `Question: ${question}`}
+        placeholder={adding ? 'When does my first payment fall due?' : 'Clear it to take it off'}
+        className="-mx-1"
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            cancelled.current = true;
+            event.currentTarget.value = question;
+            event.currentTarget.blur();
+          }
+        }}
+        onBlur={(event) => {
+          const next = event.currentTarget.value.trim().replace(/\s+/g, ' ');
+          if (cancelled.current || next === question) {
+            cancelled.current = false;
+            if (adding) onCancel?.();
+            return;
+          }
+          start(async () => {
+            const failed = await onSave(next);
+            setError(failed);
+          });
+        }}
+      />
+      <FieldError>{error}</FieldError>
+    </span>
   );
 }
 
@@ -629,7 +653,7 @@ function RecordTable({
           <AddRecordForm
             stepId={node.id}
             collection={collection}
-                asked={asked}
+            asked={asked}
             onDone={() => setAdding(false)}
             onCancel={() => setAdding(false)}
           />
@@ -697,7 +721,13 @@ function SourceNote({ record }: { record: CollectionRecord }) {
  * Cut short in a table's action cell, where it shares the width with the
  * row's buttons; whole on a line of its own.
  */
-function SourceLink({ record, truncate = false }: { record: CollectionRecord; truncate?: boolean }) {
+function SourceLink({
+  record,
+  truncate = false,
+}: {
+  record: CollectionRecord;
+  truncate?: boolean;
+}) {
   if (record.source === 'typed') return null;
   const label = sourceLabel(record.source, record.sourceRef);
   const href = sourceHref(record.source, record.sourceRef);
