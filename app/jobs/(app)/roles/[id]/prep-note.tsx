@@ -14,13 +14,12 @@
  * bottom.
  */
 import Link from 'next/link';
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { useRef, useState, useTransition } from 'react';
 import { ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
+import { Markdown } from '@/components/ui/markdown';
 import { formatDateTime } from '@/lib/jobs/applications/load';
 import type { MatchVerdict } from '@/lib/jobs/evidence/match-payload';
 import type { PrepNote } from '@/lib/jobs/interview/prep-payload';
@@ -53,19 +52,9 @@ const VERDICT_TEXT: Record<MatchVerdict, string> = {
   gap: 'text-danger',
 };
 
-/**
- * A sentence or two of the note's own prose.
- *
- * `rehype-raw` is absent here for the same reason it is absent from the vault
- * note body, and its absence is the sanitizer: with raw HTML off,
- * react-markdown will not render embedded markup at all.
- */
+/** A sentence or two of the note's own prose, through the shared renderer. */
 function Prose({ children }: { children: string }) {
-  return (
-    <div className="jobs-prose">
-      <Markdown remarkPlugins={[remarkGfm]}>{children}</Markdown>
-    </div>
-  );
+  return <Markdown markdown={children} className="jobs-prose" />;
 }
 
 function Section({ heading, children }: { heading: string; children: React.ReactNode }) {

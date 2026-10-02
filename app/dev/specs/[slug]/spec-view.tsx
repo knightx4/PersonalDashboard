@@ -1,7 +1,6 @@
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { CommentThread } from '@/components/dev/comment-thread';
 import { cardVariants } from '@/components/ui/card';
+import { Markdown } from '@/components/ui/markdown';
 import { cn } from '@/lib/cn';
 import type { DevComment } from '@/lib/comments/load';
 import type { SpecSectionWithThread } from '@/lib/specs/load';
@@ -15,42 +14,17 @@ import { specLinkHref } from '@/lib/specs/links';
  * keeps react-markdown and its plugins out of the browser bundle entirely,
  * which matters on a document with eleven of these on one page.
  *
- * `rehype-raw` is deliberately absent here as it is in the vault, so embedded
- * HTML is not rendered. These documents are the repository's own, so this is
- * belt rather than braces -- but the rule is worth keeping uniform, because the
- * next thing rendered through this component might not be.
+ * The markdown goes through the shared renderer (components/ui/markdown.tsx),
+ * so embedded HTML is not rendered here any more than in the vault.
  */
 
+/**
+ * A link to a repository file with no page of its own keeps its text and
+ * loses the link, which says what it points at without offering a click that
+ * 404s. That is what `specLinkHref` returning null means.
+ */
 function Prose({ markdown }: { markdown: string }) {
-  return (
-    <div className="vault-prose">
-      <Markdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          a({ href, children, ...props }) {
-            const resolved = specLinkHref(href);
-            // A link to a repository file with no page of its own. The text is
-            // kept and the link is not, which says what it points at without
-            // offering a click that 404s.
-            if (resolved === null) return <span className="text-ink-muted">{children}</span>;
-
-            const external = /^https?:\/\//i.test(resolved);
-            return (
-              <a
-                href={resolved}
-                {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                {...props}
-              >
-                {children}
-              </a>
-            );
-          },
-        }}
-      >
-        {markdown}
-      </Markdown>
-    </div>
-  );
+  return <Markdown markdown={markdown} className="vault-prose" resolveHref={specLinkHref} />;
 }
 
 export function SpecSectionCard({ section }: { section: SpecSectionWithThread }) {
