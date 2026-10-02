@@ -420,7 +420,7 @@ function PhoneCard({
               Only these two: the whole row of buttons above would cover half
               a phone screen. From lg there is no tab bar, and the status line
               has the foot of the window. */}
-          <div className="card-pad-x sticky bottom-[calc(4.375rem+env(safe-area-inset-bottom))] z-10 flex items-center justify-end gap-2 border-t border-border bg-surface py-2.5 lg:static">
+          <div className="card-pad-x sticky bottom-[calc(4.375rem+env(safe-area-inset-bottom))] flex items-center justify-end gap-2 border-t border-border bg-surface py-2.5 lg:static">
             <QuickNextForm stories={cardPasses(card)} />
           </div>
         </article>
