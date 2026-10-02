@@ -17,6 +17,8 @@ export type VaultConnectionConfig = {
   repoOwner: string;
   repoName: string;
   branch: string;
+  /** The vault's folder within the repository, '' for the whole of it. */
+  subpath?: string;
   /** Decrypted at the call site; never stored or logged in this form. */
   token: string;
 };
@@ -28,6 +30,7 @@ export function createVaultSource(config: VaultConnectionConfig): VaultSource {
         owner: config.repoOwner,
         repo: config.repoName,
         branch: config.branch,
+        subpath: config.subpath,
         token: config.token,
       });
     default: {
@@ -37,5 +40,10 @@ export function createVaultSource(config: VaultConnectionConfig): VaultSource {
   }
 }
 
-export type { VaultSource } from '@/lib/vault/providers/types';
-export { VaultAuthError, VaultSourceError } from '@/lib/vault/providers/types';
+export type { VaultSource, VaultWriteResult } from '@/lib/vault/providers/types';
+export {
+  VaultAuthError,
+  VaultConflictError,
+  VaultReadOnlyError,
+  VaultSourceError,
+} from '@/lib/vault/providers/types';

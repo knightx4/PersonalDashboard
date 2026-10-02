@@ -47,6 +47,9 @@ function harness(opts: {
       return opts.blob ? opts.blob(sha) : `# Note ${sha}`;
     },
     readBlobBytes: async () => new ArrayBuffer(0),
+    writeNote: async () => {
+      throw new Error('the sync never writes');
+    },
   };
 
   const ports = {
