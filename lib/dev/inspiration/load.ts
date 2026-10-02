@@ -24,7 +24,7 @@ export async function loadInspiration(supabase: SupabaseClient, userId: string):
   const [settings, videos, takeaways, links] = await Promise.all([
     supabase
       .from('inspiration_settings')
-      .select('youtube_playlist_id, playlist_read_at, playlist_error')
+      .select('youtube_playlist_id, playlist_read_at, playlist_error, run_started_at')
       .eq('user_id', userId)
       .maybeSingle(),
     supabase.from('inspiration_videos').select(VIDEO_COLUMNS).eq('user_id', userId),

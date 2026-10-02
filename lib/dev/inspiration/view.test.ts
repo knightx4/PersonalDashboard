@@ -54,6 +54,21 @@ const link = (takeawayId: string, videoRowId: string, extra: Partial<LinkRow> = 
 const empty = { planNumbers: new Map<string, number>(), ideaPlanItems: new Map<string, string | null>() };
 
 describe('buildInspirationPage', () => {
+  it('says a check is going while its claim holds, and not once it is stale', () => {
+    const at = (started: string | null) =>
+      buildInspirationPage({
+        settings: { youtube_playlist_id: 'PLabcdefghij', playlist_read_at: null, playlist_error: null, run_started_at: started },
+        videos: [],
+        takeaways: [],
+        links: [],
+        ...empty,
+        now: new Date('2026-10-02T14:40:00Z'),
+      }).checking;
+    expect(at(null)).toBe(false);
+    expect(at('2026-10-02T14:35:00Z')).toBe(true);
+    expect(at('2026-10-02T14:20:00Z')).toBe(false);
+  });
+
   it('shows a merged takeaway once in the list, with both videos, and under each video in its own words', () => {
     const page = buildInspirationPage({
       settings: { youtube_playlist_id: 'PLabcdefghij', playlist_read_at: null, playlist_error: null },
