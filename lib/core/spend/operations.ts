@@ -135,6 +135,14 @@ export const SPEND_OPERATIONS = {
     // app (plan #1409). Sonnet, one call per video not read yet, from the
     // inspiration run and its Check now button.
     'read-inspiration-video',
+    // Embedding each new inspiration takeaway, with the plan features and
+    // ideas it might repeat, to find the nearest (plan #1410). Voyage, one
+    // call per run that stored new takeaways.
+    'embed-inspiration-takeaways',
+    // Asking whether a new inspiration takeaway is the same idea as an
+    // earlier one or is already covered by the plan (plan #1410). Haiku, one
+    // short call per new takeaway with something near it.
+    'merge-inspiration-takeaways',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one

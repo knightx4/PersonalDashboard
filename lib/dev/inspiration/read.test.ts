@@ -1,5 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
+import type { MergeStore } from './merge';
 import { clearBeforeRead, readInspirationVideos, saveVideoTakeaways, type TakeawayStore, type UnreadVideo } from './read';
 import type { TakeawayCandidate } from './takeaways';
 
@@ -19,7 +20,17 @@ function memoryStore(videos: Video[]) {
   const takeaways: Takeaway[] = [];
   const links: Link[] = [];
   let next = 0;
-  const store: TakeawayStore = {
+  // The merge pass has its own tests (merge.test.ts); here it finds nothing new.
+  const merge: MergeStore = {
+    fresh: async () => [],
+    known: async () => [],
+    coverRows: async () => [],
+    saveVector: async () => {},
+    mergeInto: async () => {},
+    markCovered: async () => {},
+  };
+  const store: TakeawayStore & MergeStore = {
+    ...merge,
     async unreadVideos() {
       return videos.filter((video) => video.processedAt === null);
     },
@@ -100,15 +111,17 @@ function stubClient(replies: unknown[]) {
 }
 
 describe('clearBeforeRead', () => {
-  it('removes open takeaways only this video makes and unlinks shared ones, leaving acted-on ones alone', () => {
+  it('removes open takeaways only this video makes and unlinks shared ones, leaving ones the person acted on alone', () => {
     expect(
       clearBeforeRead([
         { takeawayId: 'a', status: 'open', videoCount: 1 },
         { takeawayId: 'b', status: 'open', videoCount: 2 },
         { takeawayId: 'c', status: 'crafted', videoCount: 1 },
         { takeawayId: 'd', status: 'dismissed', videoCount: 3 },
+        { takeawayId: 'e', status: 'covered', videoCount: 1 },
+        { takeawayId: 'f', status: 'covered', videoCount: 2 },
       ]),
-    ).toEqual({ remove: ['a'], unlink: ['b'] });
+    ).toEqual({ remove: ['a', 'e'], unlink: ['b', 'f'] });
   });
 });
 
@@ -173,15 +186,16 @@ describe('readInspirationVideos', () => {
     const onSpend = vi.fn();
 
     const first = await readInspirationVideos(store, loadCues, USER, { anthropicApiKey: 'k', client, onSpend, now: () => NOW });
-    expect(first).toEqual({ userId: USER, read: 2, takeaways: 1, failed: 0, stopped: null });
+    expect(first).toEqual({ userId: USER, read: 2, takeaways: 1, merged: 0, covered: 0, failed: 0, stopped: null });
     expect(takeaways.map((row) => row.title)).toEqual(['Keep a decision log']);
     expect(links).toEqual([{ takeawayId: 't1', videoRowId: 'v1', quote: reply.takeaways[0].quote, startSeconds: 40 }]);
     expect(videos.map((row) => row.count)).toEqual([1, 0]);
     expect(onSpend).toHaveBeenCalledTimes(2);
     expect(onSpend.mock.calls[0][0]).toBe(USER);
+    expect(onSpend.mock.calls[0][2]).toBe('read-inspiration-video');
 
     const second = await readInspirationVideos(store, loadCues, USER, { anthropicApiKey: 'k', client, now: () => NOW });
-    expect(second).toEqual({ userId: USER, read: 0, takeaways: 0, failed: 0, stopped: null });
+    expect(second).toEqual({ userId: USER, read: 0, takeaways: 0, merged: 0, covered: 0, failed: 0, stopped: null });
     expect(create).toHaveBeenCalledTimes(2);
     expect(takeaways).toHaveLength(1);
   });

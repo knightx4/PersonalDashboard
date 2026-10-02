@@ -5,6 +5,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { APP_VISION } from '@/lib/specs/vision';
 import { loadInspirationTranscript } from './sync';
+import { mergeNewTakeaways, supabaseMergeStore, type MergeOperation, type MergeStore } from './merge';
 import { extractVideoTakeaways, type TakeawayCandidate, type Visions } from './takeaways';
 
 /**
@@ -27,9 +28,13 @@ import { extractVideoTakeaways, type TakeawayCandidate, type Visions } from './t
  * storing and marking, or a deliberate re-read, ends in the same rows as one
  * clean read.
  *
- * The steps are separate so #1410 can put its merge between them: extract
- * (lib/dev/inspiration/takeaways.ts) gives candidates, and `saveVideoTakeaways`
- * stores whatever list it is handed, one row per candidate.
+ * Extract (lib/dev/inspiration/takeaways.ts) gives candidates, and
+ * `saveVideoTakeaways` stores one row per candidate. Once the videos are read,
+ * the merge pass (lib/dev/inspiration/merge.ts, #1410) folds each new row into
+ * an earlier one that makes the same point and marks the ones a plan feature
+ * or idea already covers. `covered` is that pass's judgement rather than the
+ * person's, so a re-read clears it the same as `open` and the pass decides it
+ * again.
  */
 
 /** One video waiting to be read. `id` is the row's uuid, `videoId` YouTube's. */
@@ -62,13 +67,16 @@ export type TakeawayStore = {
   markRead(userId: string, videoRowId: string, outcome: { count: number | null; error: string | null; at: string }): Promise<void>;
 };
 
+/** Statuses nobody chose: what a read stored and what the merge pass judged. */
+const CLEARED_ON_REREAD = new Set(['open', 'covered']);
+
 /**
  * Which of an earlier read's takeaways to clear before a video is stored
- * again: open ones only this video makes are removed, and this video's link
- * comes off open ones other videos make too.
+ * again: open or covered ones only this video makes are removed, and this
+ * video's link comes off those other videos make too.
  */
 export function clearBeforeRead(earlier: EarlierTakeaway[]): { remove: string[]; unlink: string[] } {
-  const open = earlier.filter((row) => row.status === 'open');
+  const open = earlier.filter((row) => CLEARED_ON_REREAD.has(row.status));
   return {
     remove: open.filter((row) => row.videoCount <= 1).map((row) => row.takeawayId),
     unlink: open.filter((row) => row.videoCount > 1).map((row) => row.takeawayId),
@@ -94,13 +102,20 @@ export async function saveVideoTakeaways(
   return takeaways.length;
 }
 
+/** What each spend report is recorded as in core.model_spend. */
+export type InspirationOperation = 'read-inspiration-video' | MergeOperation;
+
 export type InspirationReadOptions = {
   anthropicApiKey: string;
   client?: Pick<Anthropic, 'messages'>;
+  /** Falls back to EMBEDDING_API_KEY; the merge pass waits for a run that has one. */
+  embeddingApiKey?: string | null;
+  /** Injected by the tests, so no test embeds over the network. */
+  embed?: Parameters<typeof mergeNewTakeaways>[2]['embed'];
   /** Epoch ms after which no further video is started. */
   deadline?: number;
-  /** Called once per model call, with the person the video belongs to. */
-  onSpend?: (userId: string, report: SpendReport) => void;
+  /** Called once per model or embedding call, with the person it was for. */
+  onSpend?: (userId: string, report: SpendReport, operation: InspirationOperation) => void;
   now?: () => Date;
 };
 
@@ -108,23 +123,50 @@ export type InspirationRead = {
   userId: string;
   /** Videos read, with or without takeaways. */
   read: number;
-  /** Takeaways stored across them. */
+  /** Takeaways stored across them, before merging. */
   takeaways: number;
+  /** New takeaways folded into an earlier one that makes the same point. */
+  merged: number;
+  /** New takeaways a plan feature or idea already covers. */
+  covered: number;
   /** Videos whose read failed; each says why in its row's process_error. */
   failed: number;
   /** Set when the run stopped before reading every video. */
   stopped: string | null;
 };
 
-/** Read every unread video of one person's, until the deadline. */
+/**
+ * Read every unread video of one person's until the deadline, then merge what
+ * was stored. The merge also takes up takeaways an earlier run stored but did
+ * not get to, so it runs even when there is nothing new to read.
+ */
 export async function readInspirationVideos(
+  store: TakeawayStore & MergeStore,
+  loadCues: (videoId: string) => Promise<Awaited<ReturnType<typeof loadInspirationTranscript>>>,
+  userId: string,
+  options: InspirationReadOptions,
+): Promise<InspirationRead> {
+  const result = await readUnreadVideos(store, loadCues, userId, options);
+  if (result.stopped) return result;
+  const merge = await mergeNewTakeaways(store, userId, {
+    anthropicApiKey: options.anthropicApiKey,
+    client: options.client,
+    embeddingApiKey: options.embeddingApiKey,
+    embed: options.embed,
+    deadline: options.deadline,
+    onSpend: options.onSpend ? (report, operation) => options.onSpend!(userId, report, operation) : undefined,
+  });
+  return { ...result, merged: merge.merged, covered: merge.covered, stopped: merge.stopped };
+}
+
+async function readUnreadVideos(
   store: TakeawayStore,
   loadCues: (videoId: string) => Promise<Awaited<ReturnType<typeof loadInspirationTranscript>>>,
   userId: string,
   options: InspirationReadOptions,
 ): Promise<InspirationRead> {
   const now = options.now ?? (() => new Date());
-  const result: InspirationRead = { userId, read: 0, takeaways: 0, failed: 0, stopped: null };
+  const result: InspirationRead = { userId, read: 0, takeaways: 0, merged: 0, covered: 0, failed: 0, stopped: null };
   const videos = await store.unreadVideos(userId);
   if (videos.length === 0) return result;
   const visions = await store.visions(userId);
@@ -141,7 +183,7 @@ export async function readInspirationVideos(
           visions,
           anthropicApiKey: options.anthropicApiKey,
           client: options.client,
-          onSpend: options.onSpend ? (report) => options.onSpend!(userId, report) : undefined,
+          onSpend: options.onSpend ? (report) => options.onSpend!(userId, report, 'read-inspiration-video') : undefined,
         })
       : ({ outcome: 'failed', detail: 'The transcript is not in the cache.' } as const);
 
@@ -224,7 +266,7 @@ export function supabaseTakeawayStore(learn: LearnSupabaseClient): TakeawayStore
         .from('inspiration_takeaways')
         .delete()
         .eq('user_id', userId)
-        .eq('status', 'open')
+        .in('status', [...CLEARED_ON_REREAD])
         .in('id', takeawayIds);
       fail('Clearing the earlier takeaways', error);
     },
@@ -290,7 +332,7 @@ export async function readInspirationForEveryone(
     .not('youtube_playlist_id', 'is', null);
   if (error) throw new Error(`Reading the inspiration playlists failed: ${error.message}`);
 
-  const store = supabaseTakeawayStore(learn);
+  const store = { ...supabaseTakeawayStore(learn), ...supabaseMergeStore(learn) };
   const loadCues = (videoId: string) => loadInspirationTranscript(learn, videoId);
   const out: InspirationRead[] = [];
   for (const row of (data ?? []) as { user_id: string }[]) {
@@ -302,6 +344,8 @@ export async function readInspirationForEveryone(
         userId: row.user_id,
         read: 0,
         takeaways: 0,
+        merged: 0,
+        covered: 0,
         failed: 0,
         stopped: failure instanceof Error ? failure.message : String(failure),
       });
