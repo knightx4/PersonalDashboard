@@ -16,6 +16,9 @@ import { allSearchSources } from '@/lib/search/registry';
 import { createTask } from '@/lib/todo/tasks/write';
 import { searchMail } from '@/lib/inbox/search-mail';
 import { readMail } from '@/lib/inbox/read-mail';
+import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
+import { handoffBrief } from './handoff';
+import { attachHandoffs, discardHandoffs, insertHandoff, loadOpenHandoffs, markHandoffFired } from './handoffs';
 import { askDash, type AskDashResult } from './ask';
 import {
   attachProposals,
@@ -54,6 +57,9 @@ export async function askDashInRequest(input: {
   const ctx = askContext(user.id, settings);
 
   const page = input.page ? await pageFor(ctx, input.page) : null;
+  // Dash is offered the hand-off only when the backup routine can be started.
+  const backup = dashBackupRoutine();
+  const canHandOff = Boolean(backup.id && backup.token);
 
   return askDash(
     {
@@ -75,6 +81,23 @@ export async function askDashInRequest(input: {
       saveProposal: (conversationId, change) => insertProposal(core, user.id, conversationId, change),
       attachProposals: (ids, turnId) => attachProposals(core, ids, turnId),
       discardProposals: (ids) => discardProposals(core, ids),
+      ...(canHandOff
+        ? {
+            saveHandoff: (conversationId: string, request: string) =>
+              insertHandoff(core, user.id, conversationId, request),
+            attachHandoffs: (ids: readonly string[], turnId: string) => attachHandoffs(core, ids, turnId),
+            discardHandoffs: (ids: readonly string[]) => discardHandoffs(core, ids),
+            fireHandoff: async (handoff) => {
+              const fired = await fireFeatureRoutine({
+                apiKey: backup.token,
+                routineId: backup.id,
+                text: handoffBrief(handoff, user.id),
+              });
+              const status = await markHandoffFired(core, handoff.id, fired);
+              return fired.ok ? { status } : { status, error: fired.error };
+            },
+          }
+        : {}),
     },
   );
 }
@@ -133,6 +156,15 @@ export async function listAskConversations(limit = 50): Promise<ConversationSumm
 export async function loadAskConversation(ref: string): Promise<TalkTurn[]> {
   await requireUser();
   return loadConversation(await createCoreClient(), { kind: 'ask', ref });
+}
+
+/**
+ * How many requests in one past question are still with the backup routine
+ * (plan #1402): the thread keeps checking for its reply while any are.
+ */
+export async function countOpenAskHandoffs(ref: string): Promise<number> {
+  await requireUser();
+  return (await loadOpenHandoffs(await createCoreClient(), ref)).length;
 }
 
 /**

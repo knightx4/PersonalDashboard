@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { ArrowUp, CircleUser, CornerDownRight } from 'lucide-react';
 import { CommentBody } from '@/components/dev/comment-body';
@@ -219,6 +219,7 @@ export function TalkThread({
   below,
   assistant = DASH,
   activity,
+  incoming,
 }: {
   /** Unique on the page: the textarea's id is built from it. */
   id: string;
@@ -263,8 +264,22 @@ export function TalkThread({
    * an answer. Left out, the working mark leans and races.
    */
   activity?: DashActivity;
+  /**
+   * Turns written elsewhere since the thread was drawn, such as the backup
+   * routine's reply to an Ask Dash hand-off (plan #1402). Any not already in
+   * the thread are added at the end.
+   */
+  incoming?: readonly TalkTurn[];
 }) {
-  const [turns, setTurns] = useState<TalkTurn[]>([...initial]);
+  const [own, setTurns] = useState<TalkTurn[]>([...initial]);
+  // The thread's own turns, with any written elsewhere slotted in by time.
+  const turns = useMemo(() => {
+    if (!incoming?.length) return own;
+    const have = new Set(own.map((turn) => turn.id));
+    const added = incoming.filter((turn) => !have.has(turn.id));
+    if (added.length === 0) return own;
+    return [...own, ...added].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }, [own, incoming]);
   const [writing, setWriting] = useState(startWriting && !ask);
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);

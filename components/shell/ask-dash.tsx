@@ -33,6 +33,7 @@ import {
   confirmDashChange,
   declineDashChange,
   openAskQuestion,
+  pollAskQuestion,
   recentAskQuestions,
   undoDashChange,
 } from '@/app/ask/actions';
@@ -65,6 +66,7 @@ export type AskSource = ChangePresses & {
   ask: typeof askDashQuestion;
   recent: typeof recentAskQuestions;
   open: typeof openAskQuestion;
+  poll: typeof pollAskQuestion;
   costs: typeof askDashCosts;
   label: typeof askDashPageLabel;
 };
@@ -73,6 +75,7 @@ const ACTIONS: AskSource = {
   ask: askDashQuestion,
   recent: recentAskQuestions,
   open: openAskQuestion,
+  poll: pollAskQuestion,
   costs: askDashCosts,
   label: askDashPageLabel,
   confirm: confirmDashChange,
@@ -198,12 +201,13 @@ export function useAskSend(
   page: string | null,
   onConversation?: (ref: string) => void,
   onChanges?: (changes: DashChange[]) => void,
+  onHandedOff?: (count: number) => void,
 ): TalkSend {
   const source = useAskDash()?.source ?? ACTIONS;
   const ref = useRef(initialRef);
-  const heard = useRef({ onConversation, onChanges, page });
+  const heard = useRef({ onConversation, onChanges, onHandedOff, page });
   useEffect(() => {
-    heard.current = { onConversation, onChanges, page };
+    heard.current = { onConversation, onChanges, onHandedOff, page };
   });
   return useCallback<TalkSend>(async (body) => {
     const result = await source.ask(body, ref.current, heard.current.page);
@@ -212,6 +216,8 @@ export function useAskSend(
       heard.current.onConversation?.(result.conversation.ref);
     }
     if (result.changes && result.changes.length > 0) heard.current.onChanges?.(result.changes);
+    const started = result.handoffs?.filter((h) => h.status === 'fired').length ?? 0;
+    if (started > 0) heard.current.onHandedOff?.(started);
     return { turns: result.turns, error: result.error };
   }, [source]);
 }
@@ -235,12 +241,15 @@ export function AskThread({
   page = null,
   turns,
   changes: initialChanges = [],
+  openHandoffs = 0,
   onConversation,
   onSend,
   ...thread
 }: {
   id: string;
   conversationRef: string | null;
+  /** Requests already with the backup routine and not yet replied to (plan #1402). */
+  openHandoffs?: number;
   /** The app address each question is asked from; null tells Dash no page. */
   page?: string | null;
   turns: readonly TalkTurn[];
@@ -258,8 +267,18 @@ export function AskThread({
 }) {
   const source = useAskDash()?.source ?? ACTIONS;
   const [changes, setChanges] = useState<DashChange[]>([...initialChanges]);
-  const send = useAskSend(conversationRef, page, onConversation, (added) =>
-    setChanges((current) => [...current.filter((c) => !added.some((a) => a.id === c.id)), ...added]),
+  const [ref, setRef] = useState(conversationRef);
+  const [open, setOpen] = useState(openHandoffs);
+  const incoming = useHandoffReplies(source, ref, open > 0, setOpen);
+  const send = useAskSend(
+    conversationRef,
+    page,
+    (next) => {
+      setRef(next);
+      onConversation?.(next);
+    },
+    (added) => setChanges((current) => [...current.filter((c) => !added.some((a) => a.id === c.id)), ...added]),
+    (count) => setOpen((current) => current + count),
   );
   const onChanged = useCallback(
     (next: DashChange) => setChanges((current) => current.map((c) => (c.id === next.id ? next : c))),
@@ -286,6 +305,7 @@ export function AskThread({
       }}
       waiting={ASK_WAITING}
       activity="searching"
+      incoming={incoming}
       below={(turn) => {
         const mine = turn.role === 'assistant' ? byTurn.get(turn.id) : undefined;
         return mine ? (
@@ -295,6 +315,50 @@ export function AskThread({
       {...thread}
     />
   );
+}
+
+/** How often a thread waiting on the backup routine checks for its reply. */
+const HANDOFF_POLL_MS = 20_000;
+/** How long it keeps checking before leaving it to a reopen: a run past this has likely failed. */
+const HANDOFF_POLL_FOR_MS = 30 * 60_000;
+
+/**
+ * While requests in this conversation are with the backup routine (plan
+ * #1402), reads the conversation every twenty seconds and hands back its
+ * turns, so the routine's reply appears without a reload. Stops when none
+ * are open, or after half an hour.
+ */
+function useHandoffReplies(
+  source: AskSource,
+  ref: string | null,
+  waiting: boolean,
+  setOpen: (open: number) => void,
+): readonly TalkTurn[] | undefined {
+  const [incoming, setIncoming] = useState<readonly TalkTurn[]>();
+  useEffect(() => {
+    if (!ref || !waiting) return;
+    const until = Date.now() + HANDOFF_POLL_FOR_MS;
+    let live = true;
+    const timer = setInterval(() => {
+      if (Date.now() > until) {
+        clearInterval(timer);
+        return;
+      }
+      source
+        .poll(ref)
+        .then((found) => {
+          if (!live) return;
+          if (found.turns.length > 0) setIncoming(found.turns);
+          setOpen(found.open);
+        })
+        .catch(() => {});
+    }, HANDOFF_POLL_MS);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [source, ref, waiting, setOpen]);
+  return incoming;
 }
 
 /** What Dash says while it looks: long enough that the wait needs a reason. */
@@ -637,6 +701,7 @@ function EarlierQuestion({
         page={page}
         turns={loaded.turns}
         changes={loaded.changes}
+        openHandoffs={loaded.openHandoffs}
         label="Ask a follow-up"
         placeholder="Ask more about this"
         hint={hint}

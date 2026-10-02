@@ -23,6 +23,7 @@ const SOURCE: AskSource = {
   ask: never,
   recent: never,
   open: never,
+  poll: never,
   costs: never,
   label: never,
   confirm: never,
