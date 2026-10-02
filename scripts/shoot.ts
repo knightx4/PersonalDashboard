@@ -47,10 +47,34 @@ const PROBE = 9500;
 const MAX_SIDE = 16_384;
 const MAX_AREA = 14_000_000;
 
-const WIDTHS = [
+const ALL_WIDTHS = [
   { name: 'phone', width: 390, height: 844 },
   { name: 'laptop', width: 1280, height: 900 },
 ] as const;
+
+/**
+ * Both widths unless told otherwise. A posts run (.claude/skills/posts) wants
+ * one picture to attach to a draft, so it asks for one:
+ *
+ *   SHOOT_WIDTHS=laptop SHOOT_THEMES=light npm run shoot -- dev-plan-tree
+ */
+const WIDTHS = (() => {
+  const asked = process.env.SHOOT_WIDTHS?.split(',').map((value) => value.trim()).filter(Boolean);
+  if (!asked || asked.length === 0) return ALL_WIDTHS;
+  const known = ALL_WIDTHS.filter((size) => asked.includes(size.name));
+  if (known.length !== asked.length) {
+    throw new Error(`SHOOT_WIDTHS: use ${ALL_WIDTHS.map((size) => size.name).join(' or ')}`);
+  }
+  return known;
+})();
+
+/**
+ * The badge `next dev` draws in the corner. Shots are usually taken against
+ * `npm run preview`, a production build with no badge, but a posts run serves
+ * the gallery from `next dev` to skip the build, and a screenshot going on X
+ * should not carry it.
+ */
+const HIDE_DEV_BADGE = "document.querySelectorAll('nextjs-portal').forEach(function(e){e.remove()});";
 
 /**
  * Light and dark with no colour by default: the two poles, and a surface right
@@ -204,7 +228,7 @@ async function main() {
         });
         await wait(2200);
         await send('Runtime.evaluate', {
-          expression: applyExpression(theme),
+          expression: applyExpression(theme) + HIDE_DEV_BADGE,
         });
         await wait(400);
 
