@@ -30,6 +30,7 @@ import { whyNotRead } from '@/lib/vault/map/rules';
 import { loadNoteThread } from '@/lib/vault/maya/store';
 import { MapReview } from './map-review';
 import { MayaAsk } from './maya-ask';
+import { NoteEdit } from './note-edit';
 
 export const dynamic = 'force-dynamic';
 
@@ -159,23 +160,32 @@ export default async function NotePage({
           )}
         </div>
 
-        <header className="mb-5">
-          <h1 className="font-display text-title font-semibold tracking-tight text-ink">
-            {note.title}
-          </h1>
-          <p className="mt-1 text-ui text-ink-muted">
-            {folder ? `${folder}/` : 'Vault root'}
-            {note.gitUpdatedAt && <> · updated {formatDay(note.gitUpdatedAt)}</>}
-          </p>
-        </header>
-
-        <NoteProperties frontmatter={note.frontmatter} />
-
-        <NoteBody
-          markdown={markdown}
+        {/* Edit swaps the rendered body for a text box in the same place
+            (#1425); the title and properties stay, since a save keeps the
+            frontmatter it opened with. */}
+        <NoteEdit
           notePath={note.path}
-          attachments={buildAttachmentIndex(attachments)}
-        />
+          body={note.body}
+          blobSha={note.blobSha}
+          heading={
+            <header>
+              <h1 className="font-display text-title font-semibold tracking-tight text-ink">
+                {note.title}
+              </h1>
+              <p className="mt-1 text-ui text-ink-muted">
+                {folder ? `${folder}/` : 'Vault root'}
+                {note.gitUpdatedAt && <> · updated {formatDay(note.gitUpdatedAt)}</>}
+              </p>
+            </header>
+          }
+          properties={<NoteProperties frontmatter={note.frontmatter} />}
+        >
+          <NoteBody
+            markdown={markdown}
+            notePath={note.path}
+            attachments={buildAttachmentIndex(attachments)}
+          />
+        </NoteEdit>
 
         {/* Tasks ABOUT this note, which is not the same thing as the checkboxes
           inside it -- those belong to Obsidian and are not read here at all.
