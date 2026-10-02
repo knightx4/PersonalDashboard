@@ -5,13 +5,16 @@
  *
  * Runs lib/dev/inspiration/read.ts for every person with a playlist set, with
  * no time limit: each video whose transcript is in and that has not been read
- * gets one model call, and its takeaways are stored. Run `npm run
+ * gets one model call, and its takeaways are stored and then merged with the
+ * ones already found (plan #1410). Run `npm run
  * inspiration:sync` first to fetch the transcripts. Running it again reads
  * nothing already read.
  *
  * Needs NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and
- * ANTHROPIC_API_KEY, from the environment or from .env.local and .env. Each
- * call is recorded in core.model_spend as read-inspiration-video.
+ * ANTHROPIC_API_KEY, from the environment or from .env.local and .env, and
+ * EMBEDDING_API_KEY for the merge (without it the takeaways are stored
+ * unmerged and the next run with the key merges them). Each call is recorded
+ * in core.model_spend under its own operation.
  */
 import { existsSync } from 'node:fs';
 import { config as loadEnvFile } from 'dotenv';
@@ -31,11 +34,11 @@ async function main(): Promise<void> {
   const spend: Promise<unknown>[] = [];
   const results = await readInspirationForEveryone(createLearnServiceSupabase(), {
     anthropicApiKey,
-    onSpend: (userId, report) =>
+    onSpend: (userId, report, operation) =>
       void spend.push(
         recordSpend(core, userId, {
           module: 'core',
-          operation: 'read-inspiration-video',
+          operation,
           model: report.model,
           usage: report.usage,
         }),
@@ -45,7 +48,8 @@ async function main(): Promise<void> {
   if (results.length === 0) console.log('Nobody has an inspiration playlist set.');
   for (const result of results) {
     console.log(
-      `${result.userId}: ${result.read} read, ${result.takeaways} takeaways, ${result.failed} failed` +
+      `${result.userId}: ${result.read} read, ${result.takeaways} takeaways, ` +
+        `${result.merged} merged, ${result.covered} already covered, ${result.failed} failed` +
         (result.stopped ? `; stopped: ${result.stopped}` : '.'),
     );
   }

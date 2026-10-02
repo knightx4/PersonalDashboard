@@ -302,6 +302,11 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // Up to an hour of transcript (about 25,000 tokens) with the app and dev
   // visions and the workspace list; up to eight takeaways with quotes out.
   'read-inspiration-video': unit(SONNET, 25_000, 1_500),
+  // A run's new takeaways with every plan feature and idea, about 330 texts
+  // of a hundred tokens or so.
+  'embed-inspiration-takeaways': unit(VOYAGE_LITE, 35_000, 0),
+  // One takeaway and its six nearest neighbours in; three labels out.
+  'merge-inspiration-takeaways': unit(HAIKU, 900, 40),
 
   // News. All but the last two from the digest cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),
