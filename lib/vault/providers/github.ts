@@ -355,4 +355,38 @@ export class GithubVaultSource implements VaultSource {
     }
     return { blobSha, commitSha };
   }
+
+  async canWrite(): Promise<boolean> {
+    // Creating a branch needs Contents: Read and write. Pointing it at a commit
+    // that cannot exist means a token with write access is refused on the
+    // missing commit (422) and a read-only one on permission (403), and no
+    // branch is ever made. GitHub checks the permission before the body.
+    const res = await fetch(`${API}${this.base}/git/refs`, {
+      method: 'POST',
+      headers: {
+        accept: 'application/vnd.github+json',
+        authorization: `Bearer ${this.config.token}`,
+        'content-type': 'application/json',
+        'x-github-api-version': '2022-11-28',
+        'user-agent': 'personal-dashboard-vault',
+      },
+      body: JSON.stringify({ ref: 'refs/heads/dash-write-check', sha: '0'.repeat(40) }),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (res.status === 422) return true;
+    if (res.status === 401) {
+      throw new VaultAuthError(
+        'GitHub rejected the access token. Fine-grained tokens expire — reconnect the vault.',
+      );
+    }
+    if (res.status === 403) {
+      if (res.headers.get('x-ratelimit-remaining') === '0') {
+        throw new VaultSourceError('GitHub rate limit reached', 403);
+      }
+      return false;
+    }
+    throw new VaultSourceError(`GitHub ${res.status} checking write access`, res.status);
+  }
 }
