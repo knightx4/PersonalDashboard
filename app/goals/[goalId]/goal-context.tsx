@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { useToast } from '@/components/ui/toast';
 import { contextTitle, type ContextItem } from '@/lib/goals/context';
 import { setContextStatusAction, type ContextActionState } from './context-actions';
+import { LinkedText } from '@/components/ui/linked-text';
 
 const initial: ContextActionState = {};
 
@@ -63,7 +64,7 @@ function ContextRow({ item }: { item: ContextItem }) {
         <p className="text-small text-ink-muted">{item.why}</p>
         {item.excerpt && (
           <blockquote className="border-l-2 border-border pl-2 text-small break-words whitespace-pre-wrap text-ink">
-            {item.excerpt}
+            <LinkedText text={item.excerpt} />
           </blockquote>
         )}
         {proposed && (

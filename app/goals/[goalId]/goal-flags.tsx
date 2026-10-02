@@ -12,6 +12,7 @@ import {
   dismissFlagAction,
   type FlagActionState,
 } from './flag-actions';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * What Claude flagged on this goal (plan #1015): something a run found that
@@ -50,7 +51,9 @@ function FlagCard({ flag }: { flag: GoalFlag }) {
       <div className="space-y-1">
         <p className="text-ui font-medium break-words text-ink">{flag.title}</p>
         {flag.detail && (
-          <p className="text-small break-words whitespace-pre-line text-ink-muted">{flag.detail}</p>
+          <p className="text-small break-words whitespace-pre-line text-ink-muted">
+            <LinkedText text={flag.detail} />
+          </p>
         )}
         {flag.ask && <p className="text-small break-words text-ink">{flag.ask}</p>}
         {!open && (

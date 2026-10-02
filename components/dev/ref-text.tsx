@@ -5,6 +5,7 @@ import {
   splitOnRefs,
   type PlanRefTitles,
 } from '@/lib/comments/refs';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * Plain text, with its step numbers turned into links.
@@ -20,17 +21,21 @@ import {
  * So this is the same reading over the same splitter, with nothing else
  * changed: the text is still the text, and the numbers in it are now links.
  * The caller keeps its own `whitespace-pre-wrap`, and the fragments preserve
- * every newline and run of spaces the raise was written with.
+ * every newline and run of spaces the raise was written with. Addresses in
+ * the text are links too, through LinkedText, so a raise that names a page
+ * opens it.
  */
 export function RefText({ text, titles }: { text: string; titles?: PlanRefTitles }) {
   const parts = splitOnRefs(text);
-  if (!parts.some((part) => part.ref !== null)) return <>{text}</>;
+  if (!parts.some((part) => part.ref !== null)) return <LinkedText text={text} />;
 
   return (
     <>
       {parts.map((part, index) =>
         part.ref === null ? (
-          <span key={index}>{part.text}</span>
+          <span key={index}>
+            <LinkedText text={part.text} />
+          </span>
         ) : (
           <a
             key={index}

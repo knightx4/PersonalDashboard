@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * A patch of fog: what is not known yet about a feature on the dev plan, or
@@ -30,7 +31,9 @@ export function FogNote({
       <p className="text-micro font-semibold uppercase tracking-wide text-ink-ghost">
         Not yet specified
       </p>
-      <p className="whitespace-pre-wrap text-small text-ink-muted">{fog}</p>
+      <p className="whitespace-pre-wrap text-small text-ink-muted">
+        <LinkedText text={fog} />
+      </p>
       <form action={action} className="mt-1">
         <input type="hidden" name="id" value={id} />
         <input type="hidden" name="dismissed" value={aside ? '0' : '1'} />

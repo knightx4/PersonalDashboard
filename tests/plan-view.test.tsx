@@ -1183,7 +1183,8 @@ describe('a setup step on the plan', () => {
 
   it('says the detail once, not once in the box and once above it', () => {
     const html = drawSetup();
-    const detail = 'Make a key at resend.com';
+    // resend.com is a link now (#1430), so count the words before it.
+    const detail = 'Make a key at ';
     expect(html.split(detail)).toHaveLength(2);
   });
 

@@ -16,6 +16,7 @@ import {
   restorePost,
   type PostsActionState,
 } from './actions';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * One draft on the Posts tab (plan #1419): its angle, its post and any thread
@@ -268,12 +269,15 @@ export function PostItem({ card }: { card: PostCard }) {
                       type="button"
                       onClick={() => setEditing(index)}
                       aria-label={`Edit ${label.toLowerCase()}`}
+                      // ui-ok: a draft being edited is the button that opens its editor; the posted text below links.
                       className="-mx-1 whitespace-pre-wrap rounded-control px-1 py-0.5 text-left text-body text-ink hover:bg-sunken focus-visible:outline-2"
                     >
                       {text}
                     </button>
                   ) : (
-                    <p className="whitespace-pre-wrap text-body text-ink">{text}</p>
+                    <p className="whitespace-pre-wrap text-body text-ink">
+                      <LinkedText text={text} />
+                    </p>
                   )}
                   <div className="flex items-center justify-end gap-2">
                     {thread && editable && (

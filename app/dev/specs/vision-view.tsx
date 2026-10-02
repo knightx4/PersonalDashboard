@@ -9,6 +9,7 @@ import { FieldError, FieldHint, Textarea } from '@/components/ui/field';
 import { commentWhen } from '@/lib/comments/when';
 import { useClockNow } from '@/lib/use-clock-now';
 import type { ModuleVision, VisionScope } from '@/lib/specs/vision';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * A workspace's vision, at the head of its group on the specs page.
@@ -93,7 +94,9 @@ export function ModuleVisionPanel({
   return (
     <div className="space-y-1 pb-2">
       <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 whitespace-pre-wrap text-body text-ink">{vision.body}</p>
+        <p className="min-w-0 whitespace-pre-wrap text-body text-ink">
+          <LinkedText text={vision.body} />
+        </p>
         <button
           type="button"
           onClick={() => setEditing(true)}

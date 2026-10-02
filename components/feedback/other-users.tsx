@@ -3,6 +3,7 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { FEEDBACK_KIND_LABEL, type OtherFeedbackRow } from '@/lib/feedback/load';
 import { KIND_TONE } from '@/components/feedback/kind-tone';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * What the other accounts have filed, under your own two sections.
@@ -56,7 +57,9 @@ export function OtherUsersFeedback({ rows }: { rows: OtherFeedbackRow[] }) {
                 {row.pagePath ? ` · ${row.pagePath}` : ''}
               </span>
             </div>
-            <p className="whitespace-pre-wrap text-body text-ink">{row.body}</p>
+            <p className="whitespace-pre-wrap text-body text-ink">
+              <LinkedText text={row.body} />
+            </p>
           </li>
         ))}
       </ul>

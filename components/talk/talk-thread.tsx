@@ -17,6 +17,7 @@ import {
   type TalkTurn,
 } from '@/lib/talk/talk';
 import { useClockNow } from '@/lib/use-clock-now';
+import { LinkedText } from '@/components/ui/linked-text';
 
 /**
  * A saved conversation with Dash about a card or a story, and the box to add
@@ -153,7 +154,9 @@ function Turn({
             <CommentBody body={turn.body} refs={false} />
           </div>
         ) : (
-          <p className="text-body whitespace-pre-wrap text-ink">{turn.body}</p>
+          <p className="text-body whitespace-pre-wrap text-ink">
+            <LinkedText text={turn.body} />
+          </p>
         )}
         {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} />}
         {below}

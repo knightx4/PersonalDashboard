@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { FieldError, Textarea } from '@/components/ui/field';
 import { FoldingMarkdown } from '@/components/ui/folding-markdown';
+import { hasLinks, LinkedText } from '@/components/ui/linked-text';
 import { popoverSurface, scrim } from '@/components/ui/popover';
 
 /**
@@ -177,28 +178,12 @@ export function EditableProse({
           </button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={begin}
+        <ProseAtRest
+          text={value}
+          onEdit={begin}
           title={editLabel ?? `Edit ${label.toLowerCase()}`}
-          className={cn(
-            'group/prose -mx-1.5 -my-1 block w-full rounded-card px-1.5 py-1 text-left',
-            'transition-colors duration-150 hover:bg-sunken',
-          )}
-        >
-          {value.trim() ? (
-            // A measure and a leading, because this is prose and the point of
-            // showing it outside a textarea is that it can be read.
-            <span className="block max-w-prose whitespace-pre-wrap text-ui leading-relaxed text-ink">
-              {value}
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-ui text-ink-ghost">
-              <Pencil className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
-              {empty}
-            </span>
-          )}
-        </button>
+          empty={empty}
+        />
       )}
     </div>
   );
@@ -298,5 +283,75 @@ function Expanded({
         {children}
       </div>
     </div>
+  );
+}
+
+/**
+ * Plain writing at rest, which opens its editor when pressed.
+ *
+ * The whole block is the button while the text holds no links: the biggest
+ * target there is for the one thing the block does. A link cannot sit inside a
+ * button (pressing it would open the editor, and a screen reader hears one
+ * control), so text with a link in it is set as a block with its links live
+ * and a small Edit beside it, the shape the markdown read state already has.
+ */
+export function ProseAtRest({
+  text,
+  onEdit,
+  title,
+  empty,
+  className,
+}: {
+  text: string;
+  onEdit: () => void;
+  /** The button's tooltip: what pressing it edits. */
+  title: string;
+  /** What the read state says when there is nothing to read. */
+  empty: string;
+  className?: string;
+}) {
+  if (text.trim() && hasLinks(text)) {
+    return (
+      <div className={cn('group/prose relative', className)}>
+        <p className="max-w-prose whitespace-pre-wrap pr-12 text-ui leading-relaxed text-ink">
+          <LinkedText text={text} />
+        </p>
+        <button
+          type="button"
+          onClick={onEdit}
+          title={title}
+          className="press absolute right-0 top-0 inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-small text-ink-ghost transition-colors duration-150 hover:bg-sunken hover:text-ink-muted"
+        >
+          <Pencil className="size-3" strokeWidth={1.75} aria-hidden />
+          Edit
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onEdit}
+      title={title}
+      className={cn(
+        'group/prose -mx-1.5 -my-1 block w-full rounded-card px-1.5 py-1 text-left',
+        'transition-colors duration-150 hover:bg-sunken',
+        className,
+      )}
+    >
+      {text.trim() ? (
+        // A measure and a leading, because this is prose and the point of
+        // showing it outside a textarea is that it can be read.
+        <span className="block max-w-prose whitespace-pre-wrap text-ui leading-relaxed text-ink">
+          {text}
+        </span>
+      ) : (
+        <span className="flex items-center gap-1.5 text-ui text-ink-ghost">
+          <Pencil className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
+          {empty}
+        </span>
+      )}
+    </button>
   );
 }
