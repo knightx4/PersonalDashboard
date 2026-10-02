@@ -227,6 +227,11 @@ const LOCKED: ReadonlyArray<{ file: string; name: string; run: () => Promise<unk
   },
   {
     file: 'app/dev/posts/actions.ts',
+    name: 'suggestPostAbout',
+    run: () => (posts.suggestPostAbout as Action)({}, form({ number: '1420' })),
+  },
+  {
+    file: 'app/dev/posts/actions.ts',
     name: 'editPostBody',
     run: () => (posts.editPostBody as Action)({}, form({ id: SOME_UUID, body: '["a post"]' })),
   },
