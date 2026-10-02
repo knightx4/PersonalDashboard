@@ -149,9 +149,10 @@ export function PipelineBoard({
 
       if (mode === 'list') {
         return (
-          <details
+          // A wrapper for the drop target and the tint, and the shared fold
+          // inside it, kept per column in this browser (plan #1432).
+          <div
             key={column.setStatus}
-            open={columnRows.length > 0}
             onDragOver={(event) => {
               event.preventDefault();
               setOver(column.setStatus);
@@ -165,12 +166,19 @@ export function PipelineBoard({
               over === column.setStatus && 'bg-accent-tint',
             )}
           >
-            <summary className="flex cursor-pointer items-baseline gap-2 px-3 py-2">
-              <span className="text-ui font-semibold text-ink">{column.label}</span>
-              <span className="tabular text-ui text-ink-muted">{columnRows.length}</span>
-              {column.hint && <span className="text-small text-ink-muted">{column.hint}</span>}
-            </summary>
-            <div className="space-y-2 px-2 pb-2">
+            <Disclosure
+              remember={`jobs.fold.pipeline.${column.setStatus}`}
+              defaultOpen={columnRows.length > 0}
+              summaryClassName="px-3 py-2"
+              bodyClassName="space-y-2 px-2 pb-2"
+              title={column.label}
+              meta={
+                <>
+                  <span className="tabular text-ui">{columnRows.length}</span>
+                  {column.hint && <span className="ml-2">{column.hint}</span>}
+                </>
+              }
+            >
               {columnRows.map((row) => (
                 <PipelineCard
                   key={row.applicationId}
@@ -183,8 +191,8 @@ export function PipelineBoard({
               {columnRows.length === 0 && (
                 <p className="px-1.5 py-2 text-ui text-ink-muted">Nothing here</p>
               )}
-            </div>
-          </details>
+            </Disclosure>
+          </div>
         );
       }
 
@@ -247,7 +255,7 @@ export function PipelineBoard({
         * the closed line as the primitive's `meta`. Law 10. */}
       {closedRows.length > 0 && (
         <Card padding="dense">
-          <Disclosure title="Closed" meta={`${closedRows.length} pursuit${closedRows.length === 1 ? '' : 's'}`}>
+          <Disclosure remember="jobs.fold.pipeline.closed" title="Closed" meta={`${closedRows.length} pursuit${closedRows.length === 1 ? '' : 's'}`}>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {closedRows.map((row) => (
                 <PipelineCard key={row.applicationId} row={row} dragging={false} muted />

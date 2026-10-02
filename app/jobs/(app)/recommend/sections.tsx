@@ -4,16 +4,9 @@ import Form from 'next/form';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState, useTransition } from 'react';
-import {
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  ExternalLink,
-  Mail,
-  Search,
-} from 'lucide-react';
+import { Copy, ExternalLink, Mail, Search } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { CardSection } from '@/components/ui/card';
 import { ChipSelect } from '@/components/ui/field';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
@@ -111,28 +104,6 @@ function RecommendedSection({
     const timer = window.setInterval(() => router.refresh(), every);
     return () => window.clearInterval(timer);
   }, [status?.running, every, router]);
-  // Folds to its header (note b4a23b56), and stays folded on this device.
-  // Read after mounting, so the server and the first paint agree.
-  const foldKey = `jobs.fold.${title}`;
-  const [folded, setFolded] = useState(false);
-  useEffect(() => {
-    try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- the stored choice exists only in the browser
-      setFolded(window.localStorage.getItem(foldKey) === '1');
-    } catch {
-      // Storage refused: the section starts open, as it always did.
-    }
-  }, [foldKey]);
-  const fold = () => {
-    const next = !folded;
-    setFolded(next);
-    try {
-      window.localStorage.setItem(foldKey, next ? '1' : '0');
-    } catch {
-      // Not remembered, which only costs the next visit a press.
-    }
-  };
-
   const ask = () => {
     setNotice(null);
     run(async () => {
@@ -142,62 +113,44 @@ function RecommendedSection({
     });
   };
 
+  // Folds to its header (note b4a23b56), and stays folded in this browser.
+  // The key is the one this section kept its fold under before CardSection
+  // could fold, so a fold made then still holds (plan #1432).
   return (
-    <Card padding="dense">
-      <header
-        className={cn('flex flex-wrap items-center justify-between gap-2', !folded && 'mb-1')}
-      >
-        <button
-          type="button"
-          onClick={fold}
-          aria-expanded={!folded}
-          title={folded ? `Show ${title.toLowerCase()}` : `Fold ${title.toLowerCase()}`}
-          className="press flex items-baseline gap-2 rounded-control text-left"
-        >
-          <ChevronDown
-            className={cn(
-              'size-3.5 self-center text-ink-muted transition-transform duration-150',
-              folded && '-rotate-90',
-            )}
-            strokeWidth={1.75}
-            aria-hidden
-          />
+    <CardSection
+      fold={`jobs.fold.${title}`}
+      title={
+        <>
           <DashMark size="icon" decorative className="self-center text-accent" />
-          <h2 className="text-ui font-semibold text-ink">{title}</h2>
-          {count > 0 && <span className="tabular text-small text-ink-muted">{count}</span>}
-        </button>
-        <span className="flex items-center gap-2">
+          {title}
+        </>
+      }
+      meta={count > 0 ? count : undefined}
+      action={
+        <>
           <Button type="button" size="sm" variant="ghost" pending={searching} onClick={ask}>
             {searching ? searchingLabel : button}
           </Button>
           {paidHint}
-        </span>
-      </header>
-      {!folded && (
-        <>
-          {(count > 0 ? hint : empty) && (
-            <p className="mb-2 text-small text-ink-muted">{count > 0 ? hint : empty}</p>
-          )}
-          {status && (
-            <p
-              role="status"
-              className={cn(
-                'mb-2 text-small',
-                status.tone === 'warn' ? 'text-caution' : 'text-ink-muted',
-              )}
-            >
-              {status.text}
-            </p>
-          )}
-          {notice && <p className="mb-2 text-small text-ink-muted">{notice}</p>}
-          {count > 0 && toolbar}
-          {count > 0 && <ul className="divide-y divide-border">{children}</ul>}
-          {footer}
         </>
+      }
+    >
+      {(count > 0 ? hint : empty) && (
+        <p className="mb-2 text-small text-ink-muted">{count > 0 ? hint : empty}</p>
       )}
-      {folded && status?.running && <p className="mt-1 text-small text-ink-muted">{status.text}</p>}
-      {folded && notice && <p className="mt-1 text-small text-ink-muted">{notice}</p>}
-    </Card>
+      {status && (
+        <p
+          role="status"
+          className={cn('mb-2 text-small', status.tone === 'warn' ? 'text-caution' : 'text-ink-muted')}
+        >
+          {status.text}
+        </p>
+      )}
+      {notice && <p className="mb-2 text-small text-ink-muted">{notice}</p>}
+      {count > 0 && toolbar}
+      {count > 0 && <ul className="divide-y divide-border">{children}</ul>}
+      {footer}
+    </CardSection>
   );
 }
 
@@ -339,26 +292,23 @@ function OpeningControls({
       ))}
       {/* Filters first: it takes the whole line when open, and its summary
           stays where it was rather than jumping below the sort. */}
-      <details open={active > 0} className="group/filters [&[open]]:basis-full">
-        <summary
-          className={cn(
-            'press flex cursor-pointer list-none items-center gap-1 rounded-control px-2 py-1 font-medium',
-            '[&::-webkit-details-marker]:hidden',
-            active > 0 ? 'text-ink' : 'text-ink-muted hover:text-ink',
-          )}
-        >
-          <ChevronRight
-            className="size-3.5 transition-transform duration-150 group-open/filters:rotate-90"
-            strokeWidth={1.75}
-            aria-hidden
-          />
-          {active > 0 ? `Filters · ${active}` : 'Filters'}
-          {active > 0 && (
-            <span className="tabular ml-1 font-normal text-ink-muted">
+      <Disclosure
+        defaultOpen={active > 0}
+        className="[&[open]]:basis-full"
+        summaryClassName={cn(
+          'px-2 text-small font-medium',
+          active > 0 ? 'text-ink' : undefined,
+        )}
+        bodyClassName="mt-1"
+        title={active > 0 ? `Filters · ${active}` : 'Filters'}
+        meta={
+          active > 0 ? (
+            <span className="tabular">
               {shown} of {total}
             </span>
-          )}
-        </summary>
+          ) : undefined
+        }
+      >
         <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1">
           <ChipSelect
             name={OPENING_PARAMS.workplace}
@@ -464,7 +414,7 @@ function OpeningControls({
             </Link>
           )}
         </div>
-      </details>
+      </Disclosure>
       <ChipSelect
         name={OPENING_PARAMS.sort}
         aria-label="Sort recommended roles"
@@ -864,22 +814,17 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
       </p>
 
       <div className="flex flex-wrap items-center gap-2 has-[>details[open]]:flex-col has-[>details[open]]:items-stretch">
-        <details className="group/details min-w-0">
-          <summary
-            className={cn(
-              'press flex w-fit cursor-pointer list-none items-center gap-1 rounded-control text-small font-medium',
-              'text-ink-muted hover:text-ink [&::-webkit-details-marker]:hidden',
-            )}
-          >
-            <ChevronRight
-              className="size-3.5 transition-transform duration-150 group-open/details:rotate-90"
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            <span className="group-open/details:hidden">Details</span>
-            <span className="hidden group-open/details:inline">Less</span>
-          </summary>
-          <div className="mt-2 space-y-2">
+        <Disclosure
+          className="min-w-0"
+          summaryClassName="w-fit py-0 text-small"
+          bodyClassName="mt-2 space-y-2"
+          title={
+            <>
+              <span className="group-open/disc:hidden">Details</span>
+              <span className="hidden group-open/disc:inline">Less</span>
+            </>
+          }
+        >
             <ScoreReasons note={suggestion.scoreNote} />
             <OpeningAnswers suggestion={suggestion} />
             {steps ? (
@@ -896,8 +841,7 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
             {suggestion.foundIn && (
               <p className="text-small text-ink-muted">{suggestion.foundIn}</p>
             )}
-          </div>
-        </details>
+        </Disclosure>
         <span className="ml-auto flex items-center justify-end gap-2">
           <Button
             type="button"

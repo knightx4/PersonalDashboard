@@ -1,1 +1,9 @@
-{}
+{
+  "hand-rolled-fold app/dev/changelog/page.tsx": 2,
+  "hand-rolled-fold app/dev/ideas/ideas-view.tsx": 6,
+  "hand-rolled-fold app/dev/plan/plan-view.tsx": 2,
+  "hand-rolled-fold app/jobs/(app)/roles/[id]/prep-note.tsx": 1,
+  "hand-rolled-fold app/learn/s/[id]/p/[piece]/piece-view.tsx": 2,
+  "hand-rolled-fold app/learn/s/[id]/project.tsx": 1,
+  "hand-rolled-fold components/news/story-text.tsx": 1
+}

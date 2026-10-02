@@ -445,6 +445,29 @@ const RULES: Rule[] = [
     find: (line) => (/from\s+['"]react-markdown['"]/.test(line) ? ['react-markdown imported'] : []),
   },
   {
+    id: 'hand-rolled-fold',
+    law: '10',
+    says: 'a fold written as a raw <details>, with its own summary and chevron',
+    instead:
+      'Disclosure, SectionFold or Group from components/ui/disclosure.tsx, or CardSection with `fold`; pass `remember` so it stays folded next visit',
+    /**
+     * A `<details>` element anywhere but components/ui.
+     *
+     * Each page that folded something wrote its own summary, its own chevron
+     * and its own idea of whether the fold should be remembered, so a box
+     * folded on one page sprang open on the next visit while the same box on
+     * another page stayed shut (plan #1432). The primitives in
+     * components/ui/disclosure.tsx now carry the fold and the memory, and a
+     * new raw `<details>` is what this catches. Only where an element can
+     * start -- the head of a line, or after `(`, `{`, `&&` or `?` -- because
+     * the word in prose, a string or a JSX comment's running text is not the
+     * element.
+     */
+    only: /\.tsx$/,
+    find: (line) =>
+      /(?:^\s*|[({]\s*|&&\s*|\?\s*)<details\b/.test(line) ? ['raw <details>'] : [],
+  },
+  {
     id: 'action-without-tier',
     law: '-',
     says: 'an action with no latency tier',

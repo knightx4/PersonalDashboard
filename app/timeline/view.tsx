@@ -14,7 +14,7 @@ import { ObservationList } from './observations';
  * The timeline page's body (plan #1118), apart from the reads so the surface
  * gallery can draw it from fixtures. Everything here is markup: the months
  * fold with native `<details>`, the filter is links, and nothing needs
- * JavaScript to work.
+ * JavaScript to work. With it, a month you fold stays folded (plan #1432).
  */
 
 export type TimelineViewProps = {
@@ -69,6 +69,7 @@ export function TimelineView({
           {months.map((month, index) => (
             <SectionFold
               key={month.key}
+              remember={`timeline.fold.${month.key}`}
               title={month.label}
               hint={<span className="tabular">{month.counts.map((c) => kindCount(c.kind, c.count)).join(' · ')}</span>}
               // The newest month is the one being lived in; the rest are

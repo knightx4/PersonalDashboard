@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
+import { Disclosure } from '@/components/ui/disclosure';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { deadlineLabel } from '@/lib/returns/deadline';
@@ -63,23 +63,24 @@ export function ReturnsOrderList({
             key={group.orderId}
             className={cn(cardVariants({ padding: 'none' }), 'overflow-hidden')}
           >
-            <details className="group/order open:[&_summary_.chevron]:rotate-90">
-              <summary className="row-pad flex cursor-pointer list-none items-start gap-3 px-4 outline-none transition-colors duration-150 marker:content-none hover:bg-sunken [&::-webkit-details-marker]:hidden">
-                <ChevronRight
-                  className="chevron mt-0.5 size-4 shrink-0 text-ink-muted transition-transform duration-150"
-                  strokeWidth={1.75}
-                  aria-hidden
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-ink">{orderTitle(group)}</p>
-                  <p className="mt-0.5 truncate text-ui text-ink-muted">
+            <Disclosure
+              remember={`shopping.fold.return.${group.orderId}`}
+              summaryClassName="row-pad items-start gap-3 rounded-none px-4 py-0 hover:bg-sunken"
+              bodyClassName=""
+              title={
+                <span className="block min-w-0">
+                  <span className="block truncate">{orderTitle(group)}</span>
+                  <span className="mt-0.5 block truncate text-ui font-normal text-ink-muted">
                     {orderMeta(group)}
-                  </p>
+                  </span>
                   {deadline && (
-                    <p className={`mt-1 text-small ${deadline.className}`}>{deadline.text}</p>
+                    <span className={`mt-1 block text-small font-normal ${deadline.className}`}>
+                      {deadline.text}
+                    </span>
                   )}
-                </div>
-              </summary>
+                </span>
+              }
+            >
               <div className="row-pad flex items-center justify-end border-t border-border px-4">
                 <Link
                   href={`/shopping/orders/${group.orderId}`}
@@ -93,7 +94,7 @@ export function ReturnsOrderList({
                   <ReturnItemRow key={row.inventoryItemId} row={row} nested />
                 ))}
               </ul>
-            </details>
+            </Disclosure>
           </li>
         );
       })}
