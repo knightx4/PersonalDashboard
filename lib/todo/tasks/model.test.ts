@@ -70,7 +70,7 @@ describe('bucketFor', () => {
     expect(bucketFor(task({ dueOn: '2026-03-13' }), 'UTC', NOW)).toBe('soon');
     expect(bucketFor(task({ dueOn: '2026-03-17' }), 'UTC', NOW)).toBe('soon');
     expect(bucketFor(task({ dueOn: '2026-03-18' }), 'UTC', NOW)).toBe('later');
-    expect(bucketFor(task(), 'UTC', NOW)).toBe('someday');
+    expect(bucketFor(task(), 'UTC', NOW)).toBe('undated');
   });
 
   it('is overdue only against the reader\'s own day', () => {
@@ -139,7 +139,7 @@ describe('bucketTasks', () => {
       { timezone: 'UTC', now: NOW },
     );
 
-    expect(result.map((r) => r.bucket)).toEqual(['overdue', 'today', 'soon', 'later', 'someday']);
+    expect(result.map((r) => r.bucket)).toEqual(['overdue', 'today', 'soon', 'later', 'undated']);
   });
 
   it('puts pinned first, then the clock, then what came first', () => {
