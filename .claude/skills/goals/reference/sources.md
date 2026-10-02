@@ -459,6 +459,15 @@ Conversations they had with Dash: about a Learn card or a newsletter story, one 
 - Name a row by `title`; link it by `id`
 - subject_kind says what it is about: 'feed_card' with subject_ref the learn.feed_cards id, 'news_story', or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id.
 
+### `public.social_posts` (Dev)
+
+Posts about building this app that Dash drafted for X, and which ones they posted, with the link.
+
+- Search: `angle`, `body`
+- Name a row by `angle`; link it by `id`
+- Opens at `/dev/posts`
+- Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread.
+
 ## Mentions (leads only)
 
 ### `learn.phrase_explanations` (Learn)

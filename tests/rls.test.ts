@@ -246,6 +246,15 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     values (${takeaway.id}, ${inspirationVideo.id}, ${userId}, ${`${tag} said so`}, 42)`;
   ids.inspiration_takeaway_videos = takeaway.id;
 
+  const [socialPost] = await admin<{ id: string }[]>`
+    insert into social_posts (user_id, angle, draft, body, source_plan_item_ids, run_id)
+    values (
+      ${userId}, ${`${tag} shipped a thing`}, ${admin.json([`${tag} drafted`])}::jsonb,
+      ${admin.json([`${tag} edited`])}::jsonb, ${[planItem.id]}::uuid[], ${planRun.id}
+    )
+    returning id`;
+  ids.social_posts = socialPost.id;
+
   const [commitCheck] = await admin<{ id: string }[]>`
     insert into plan_commit_checks (user_id, commit_sha, merge_sha, conclusion)
     values (${userId}, ${'abc1234'}, ${'def5678'}, 'passed')
