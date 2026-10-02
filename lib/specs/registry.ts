@@ -37,6 +37,22 @@ export const SPECS: readonly SpecDoc[] = [
     module: null,
   },
   {
+    slug: 'core-and-dash',
+    title: 'One core and one Dash',
+    blurb:
+      'One way to point at a row, one thread on any row, one whose-move label, one list of what is on you, one record of what Dash did, and one Dash working through all of them.',
+    file: 'CORE-AND-DASH-SPEC.md',
+    module: null,
+  },
+  {
+    slug: 'cut-back',
+    title: 'Cutting back',
+    blurb:
+      'Record which pages are opened, cut each workspace to the screens that are used, starting with Learn, and slow the build loop while that happens.',
+    file: 'CUT-BACK-SPEC.md',
+    module: null,
+  },
+  {
     slug: 'knowledge',
     title: 'The vault map',
     blurb:
