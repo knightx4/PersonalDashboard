@@ -156,14 +156,47 @@ export function SectionFold({
 export function Group({
   title,
   action,
+  fold = false,
   children,
   className,
 }: {
   title?: React.ReactNode;
   action?: React.ReactNode;
+  /**
+   * Folds the group away by its heading, open to begin with. The action stays
+   * opposite the heading rather than going inside the summary, because a form
+   * is not allowed in one, and it stays usable while the group is shut.
+   */
+  fold?: boolean;
   children: React.ReactNode;
   className?: string;
 }) {
+  if (fold && title) {
+    return (
+      <section className={cn('relative', className)}>
+        <details open className="group/grp space-y-2">
+          <summary
+            className={cn(
+              'press flex cursor-pointer list-none items-center gap-1.5 rounded-control',
+              'focus-visible:outline-2 focus-visible:outline-offset-2',
+              '[&::-webkit-details-marker]:hidden',
+              action ? 'pr-32' : undefined,
+            )}
+          >
+            <ChevronRight
+              aria-hidden
+              strokeWidth={2}
+              className="size-3.5 shrink-0 text-ink-ghost transition-transform duration-150 group-open/grp:rotate-90"
+            />
+            <h3 className="text-small font-semibold text-ink-muted">{title}</h3>
+          </summary>
+          {children}
+        </details>
+        {action && <div className="absolute top-0 right-0">{action}</div>}
+      </section>
+    );
+  }
+
   return (
     <section className={cn('space-y-2', className)}>
       {(title || action) && (

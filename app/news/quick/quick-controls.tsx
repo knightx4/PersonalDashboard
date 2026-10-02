@@ -105,6 +105,14 @@ function PassFields({ stories }: { stories: readonly StoryPass[] }) {
 /** What QuickDeck hands the Next button: move to the story already drawn behind this one. */
 const AdvanceContext = createContext<(() => void) | null>(null);
 
+/**
+ * What QuickDeck hands the swipe: the story drawn behind this one, so a drag
+ * can bring it in from the right as the current card goes out (note
+ * 3164d419). Null inside that drawing, so the card it draws does not draw one
+ * of its own.
+ */
+const PeekContext = createContext<ReactNode>(null);
+
 function NextButton() {
   const { pending } = useFormStatus();
   const advance = useContext(AdvanceContext);
@@ -146,7 +154,9 @@ export function QuickDeck({
   const advance = next ? () => setAdvanced(true) : null;
   return (
     <AdvanceContext.Provider value={advance}>
-      {advanced && next ? next : current}
+      <PeekContext.Provider value={advanced ? null : next}>
+        {advanced && next ? next : current}
+      </PeekContext.Provider>
       {!advanced && nextImage && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={nextImage} alt="" referrerPolicy="no-referrer" hidden />
@@ -359,13 +369,41 @@ export function ArticleLink({
  * fold keeps its tap, and nothing is sent while a Next is still pending or
  * while text is selected.
  *
- * The card follows the finger and springs back when let go. Under
- * prefers-reduced-motion it stays still and the swipe still works. Keyed on
- * the story by the caller, so a drag never carries over to the next card.
+ * The card follows the finger, with the story QuickDeck has drawn behind it
+ * coming in from the right as it goes (note 3164d419). Let go short and both
+ * spring back; let go far enough and the card slides the rest of the way out
+ * before the form is sent, so the deck swaps to a story already in place.
+ * Under prefers-reduced-motion it stays still and the swipe still works.
+ * Keyed on the story by the caller, so a drag never carries over to the next
+ * card.
  */
 export function QuickSwipe({ children }: { children: ReactNode }) {
   const surface = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState<number | null>(null);
+  // Let go far enough: the card is sliding the rest of the way out, and the
+  // form is sent when it has gone.
+  const [leaving, setLeaving] = useState(false);
+  const sent = useRef(false);
+  const peek = useContext(PeekContext);
+  // Read by the touch handlers, which are attached once.
+  const hasPeek = useRef(false);
+  useEffect(() => {
+    hasPeek.current = Boolean(peek);
+  }, [peek]);
+
+  // Sends the Next form once, when the card has finished leaving.
+  const send = () => {
+    if (sent.current) return;
+    sent.current = true;
+    submitNext();
+  };
+
+  // A transitionend that never comes (the tab hidden mid-slide) still sends.
+  useEffect(() => {
+    if (!leaving) return;
+    const timer = window.setTimeout(send, LEAVE_MS + 100);
+    return () => window.clearTimeout(timer);
+  });
 
   // Attached by hand rather than through React so the move handler can be
   // non-passive: it cancels the page's own scroll once a drag is a swipe.
@@ -413,12 +451,14 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
       axis = null;
       setOffset(null);
       if (!claimed || !swipeFarEnough(dx, element.offsetWidth) || selecting()) return;
-      const form = document.getElementById(QUICK_NEXT_FORM);
-      if (!(form instanceof HTMLFormElement)) return;
       // The button is disabled while Next is pending, so a second swipe
       // before the next card arrives sends nothing.
-      if (form.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled) return;
-      form.requestSubmit();
+      if (!nextForm() || nextPending()) return;
+      // Without motion there is nothing to watch go, and with no story
+      // drawn behind this one there is nothing to bring in: send at once,
+      // and the card springs back to wait for the page as it did before.
+      if (still?.matches || !hasPeek.current) submitNext();
+      else setLeaving(true);
     };
 
     element.addEventListener('touchstart', onStart, { passive: true });
@@ -433,13 +473,70 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // The story behind this one rides a card's width and a gap to the right,
+  // in the same track, so it comes in exactly as far as this one goes out.
+  // Only drawn while a drag or the slide out is under way.
+  const showPeek = Boolean(peek) && (offset !== null || leaving);
+  const transform = leaving
+    ? `translateX(calc(-100% - ${PEEK_GAP}))`
+    : offset === null
+      ? undefined
+      : `translateX(${offset}px)`;
+
   return (
-    <div
-      ref={surface}
-      className={offset === null ? 'transition-transform duration-150 ease-out-soft' : undefined}
-      style={offset === null ? undefined : { transform: `translateX(${offset}px)` }}
-    >
-      {children}
+    // Clip rather than hidden, so the sticky Next row inside still sticks to
+    // the window; it keeps the story coming in from widening the page.
+    <div ref={surface} className={cn(showPeek && 'overflow-clip')}>
+      <div
+        className={cn(
+          'relative',
+          offset === null && 'transition-transform ease-out-soft',
+          leaving ? 'duration-200' : 'duration-150',
+        )}
+        style={{ transform }}
+        onTransitionEnd={(event) => {
+          if (leaving && event.target === event.currentTarget) send();
+        }}
+      >
+        {children}
+        {showPeek && (
+          <PeekContext.Provider value={null}>
+            <div
+              inert
+              aria-hidden
+              className="absolute top-0 w-full"
+              style={{ left: `calc(100% + ${PEEK_GAP})` }}
+            >
+              {peek}
+            </div>
+          </PeekContext.Provider>
+        )}
+      </div>
     </div>
   );
+}
+
+/** The space between the card going out and the one coming in. */
+const PEEK_GAP = '1rem';
+
+/** How long the card takes to finish leaving once let go; `duration-200` above. */
+const LEAVE_MS = 200;
+
+/**
+ * The Next form. The story coming in carries one with the same id while a
+ * drag is under way, and it comes after this card in the document, so the
+ * first is always the current card's.
+ */
+function nextForm(): HTMLFormElement | null {
+  const form = document.getElementById(QUICK_NEXT_FORM);
+  return form instanceof HTMLFormElement ? form : null;
+}
+
+function nextPending(): boolean {
+  return Boolean(nextForm()?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled);
+}
+
+function submitNext() {
+  const form = nextForm();
+  if (form && !nextPending()) form.requestSubmit();
 }

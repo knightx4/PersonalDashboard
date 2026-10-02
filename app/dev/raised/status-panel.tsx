@@ -2,6 +2,7 @@ import { OvernightControl } from '@/app/dev/plan/overnight-control';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { Card } from '@/components/ui/card';
 import { DashMark } from '@/components/ui/dash-mark';
+import { SectionFold } from '@/components/ui/disclosure';
 import type { GoalsStatus } from '@/lib/goals/runner-status';
 import type { NotesLastRun } from '@/lib/feedback/last-worked';
 import { overnightStanding, type OvernightRun } from '@/lib/plan/overnight';
@@ -57,48 +58,57 @@ export function StatusPanel({
   now: number;
 }) {
   return (
-    <Card padding="dense" className="space-y-3">
+    <Card padding="dense">
       {/* Dash's own mark beside the heading (note 414ead16), working while
           the plan runner is firing and resting otherwise, so the answer to
-          "is anything going" is there before the rows are read. */}
-      <h2 className="flex items-center gap-1.5 text-ui font-semibold text-ink">
-        <DashMark
-          size="icon"
-          state={overnightStanding(run) === 'running' ? 'working' : 'idle'}
-          className="text-accent"
-        />
-        Status
-      </h2>
-      <OvernightControl
-        run={run}
-        canSend={canSend}
-        night={card.night}
-        on={card.on}
-        progress={card.progress}
-        refreshReadings
-        push={card.push}
-        ready={card.ready}
-        readySteps={card.readySteps}
-        goals={goals}
-        next={card.next}
-        fresh
-        label="Plan"
-        bare
-        showBlocked={false}
-      />
-      <div className="border-t border-border pt-3">
-        <RunRoutineButton
-          openCount={openNotes}
-          allHref="/dev/bugs"
-          divider="none"
-          lastRun={notesLastRun}
-        />
-      </div>
-      {vision && (
-        <div className="border-t border-border pt-3">
-          <VisionReviewLine status={vision} now={now} />
+          "is anything going" is there before the rows are read -- and on the
+          closed line too, since the card folds like the rest of the page
+          (note 16a5d186). */}
+      <SectionFold
+        title={
+          <span className="inline-flex items-center gap-1.5">
+            <DashMark
+              size="icon"
+              state={overnightStanding(run) === 'running' ? 'working' : 'idle'}
+              className="text-accent"
+            />
+            Status
+          </span>
+        }
+      >
+        <div className="space-y-3">
+          <OvernightControl
+            run={run}
+            canSend={canSend}
+            night={card.night}
+            on={card.on}
+            progress={card.progress}
+            refreshReadings
+            push={card.push}
+            ready={card.ready}
+            readySteps={card.readySteps}
+            goals={goals}
+            next={card.next}
+            fresh
+            label="Plan"
+            bare
+            showBlocked={false}
+          />
+          <div className="border-t border-border pt-3">
+            <RunRoutineButton
+              openCount={openNotes}
+              allHref="/dev/bugs"
+              divider="none"
+              lastRun={notesLastRun}
+            />
+          </div>
+          {vision && (
+            <div className="border-t border-border pt-3">
+              <VisionReviewLine status={vision} now={now} />
+            </div>
+          )}
         </div>
-      )}
+      </SectionFold>
     </Card>
   );
 }
