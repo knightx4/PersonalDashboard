@@ -10,7 +10,7 @@ import {
 
 const VIDEO_COLUMNS =
   'id, video_id, title, channel_title, duration_seconds, thumbnail_url, playlist_position, added_at, left_playlist_at, transcript_state, transcript_error, processed_at, takeaway_count, process_error, summary_points';
-const TAKEAWAY_COLUMNS = 'id, title, body, module, status, idea_id, plan_item_id, created_at';
+const TAKEAWAY_COLUMNS = 'id, title, body, module, status, idea_id, plan_item_id, created_at, score';
 const LINK_COLUMNS = 'takeaway_id, video_id, said, quote, start_seconds';
 
 /**

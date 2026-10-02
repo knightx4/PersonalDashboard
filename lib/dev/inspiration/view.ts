@@ -1,3 +1,4 @@
+import { scoreFrom, type IdeaScore } from '@/lib/ideas/score';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 import { watchAt } from '@/lib/learn/youtube/format';
 import { checkRunning } from './lock';
@@ -43,6 +44,8 @@ export type TakeawayRowData = {
   idea_id: string | null;
   plan_item_id: string | null;
   created_at: string;
+  /** Jev's score (note 790c745a); absent from fixtures written before it. */
+  score?: unknown;
 };
 
 export type LinkRow = {
@@ -94,6 +97,8 @@ export type Takeaway = {
   status: TakeawayStatus;
   createdAt: string;
   cover: TakeawayCover;
+  /** Jev's score, as an idea's; null until scored. */
+  score: IdeaScore | null;
   sources: TakeawaySource[];
 };
 
@@ -127,7 +132,7 @@ export type InspirationPage = {
   /** A check of the playlist is going now, from the daily run or Check now. */
   checking: boolean;
   videos: InspirationVideo[];
-  /** Every takeaway not dismissed, once each, newest first. */
+  /** Every takeaway not dismissed, once each, best score first. */
   list: Takeaway[];
   /** Dismissed takeaways, newest first, for the fold. */
   dismissed: Takeaway[];
@@ -153,6 +158,16 @@ export function playlistUrl(playlistId: string): string {
 
 const newestFirst = (a: { createdAt: string }, b: { createdAt: string }) =>
   b.createdAt.localeCompare(a.createdAt);
+
+/**
+ * Best to worst by Jev's score (note 790c745a), as the Ideas tab ranks ideas.
+ * An unscored takeaway goes after every scored one; ties are newest first.
+ */
+export function bestFirst(a: Takeaway, b: Takeaway): number {
+  const left = a.score?.value ?? -1;
+  const right = b.score?.value ?? -1;
+  return right !== left ? right - left : newestFirst(a, b);
+}
 
 export function buildInspirationPage(input: {
   settings: SettingsRow | null;
@@ -212,10 +227,11 @@ export function buildInspirationPage(input: {
     status: statusOf(row.status),
     createdAt: row.created_at,
     cover: coverOf(row),
+    score: scoreFrom(row.score),
     sources: (linksByTakeaway.get(row.id) ?? []).map(sourceOf),
   }));
 
-  const shown = takeaways.filter((takeaway) => takeaway.status !== 'dismissed').sort(newestFirst);
+  const shown = takeaways.filter((takeaway) => takeaway.status !== 'dismissed').sort(bestFirst);
   const dismissed = takeaways.filter((takeaway) => takeaway.status === 'dismissed').sort(newestFirst);
 
   // The by-video view: each video's takeaways, with that video alone as the

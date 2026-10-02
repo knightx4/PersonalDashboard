@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { StateLabel } from '@/components/dev/state-label';
 import { MODULES, type ModuleId } from '@/lib/modules';
+import { ideaScoreView } from '@/lib/ideas/score';
 import { clockTime } from '@/lib/learn/youtube/format';
+import { cn } from '@/lib/cn';
 import { planHref } from '@/lib/search/sources/dev-map';
 import type { Takeaway, TakeawaySource } from '@/lib/dev/inspiration/view';
 import { TakeawayActions } from './takeaway-actions';
@@ -61,6 +63,30 @@ function TakeawayState({ takeaway }: { takeaway: Takeaway }) {
   return null;
 }
 
+/**
+ * Jev's score, drawn as the Ideas tab draws an idea's (note 790c745a): ink
+ * when sure, grey when unsure, with the long form for a screen reader.
+ */
+function ScoreLabel({ takeaway }: { takeaway: Takeaway }) {
+  const view = ideaScoreView(takeaway.score);
+  if (!takeaway.score || view.state === 'unscored') {
+    return (
+      <span title="Jev has not scored this takeaway yet" className="text-small text-ink-ghost">
+        Unscored
+      </span>
+    );
+  }
+  return (
+    <span
+      title={view.title}
+      className={cn('tabular text-small', view.state === 'sure' ? 'font-semibold text-ink' : 'text-ink-muted')}
+    >
+      <span aria-hidden>Score {Math.round(takeaway.score.value)}</span>
+      <span className="sr-only">{view.title}</span>
+    </span>
+  );
+}
+
 /** "at 12:34", linking to that moment; "from the start" when there is none. */
 function Moment({ source, label }: { source: TakeawaySource; label?: string }) {
   const at = source.startSeconds !== null ? clockTime(source.startSeconds) : null;
@@ -92,6 +118,9 @@ export function TakeawayRow({ takeaway, inVideo = false }: { takeaway: Takeaway;
       <div className="flex flex-wrap items-center gap-2">
         <WorkspaceChip module={takeaway.module} />
         <TakeawayState takeaway={takeaway} />
+        <span className="ml-auto">
+          <ScoreLabel takeaway={takeaway} />
+        </span>
       </div>
       <h3 className="text-ui font-semibold text-ink">{takeaway.title}</h3>
       <p className="whitespace-pre-wrap text-body text-ink">{body}</p>

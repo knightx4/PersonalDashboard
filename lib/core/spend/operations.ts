@@ -147,6 +147,10 @@ export const SPEND_OPERATIONS = {
     // earlier one or is already covered by the plan (plan #1410). Haiku, one
     // short call per new takeaway with something near it.
     'merge-inspiration-takeaways',
+    // Jev's score on one inspiration takeaway, with the ideas' question
+    // (note 790c745a). One short call per takeaway not yet scored; background,
+    // from the daily idea-score catch-up.
+    'score-inspiration-takeaway',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one

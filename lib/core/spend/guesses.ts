@@ -309,6 +309,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'embed-inspiration-takeaways': unit(VOYAGE_LITE, 35_000, 0),
   // One takeaway and its six nearest neighbours in; three labels out.
   'merge-inspiration-takeaways': unit(HAIKU, 900, 40),
+  // One takeaway, its workspace and that workspace's vision in; one
+  // five-level score out, as score-idea.
+  'score-inspiration-takeaway': background(unit(JEV, 600, 0)),
 
   // News. All but the last two from the digest cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),
