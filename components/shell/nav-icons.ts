@@ -29,6 +29,7 @@ import {
   ListVideo,
   ListTodo,
   Mail,
+  Megaphone,
   Map,
   Network,
   PencilLine,
@@ -98,6 +99,8 @@ export const NAV_ICONS = {
   inspiration: Telescope,
   plan: Map,
   changelog: History,
+  // Drafts for X about building the app (plan #1419): saying it out loud.
+  posts: Megaphone,
   ui: Shapes,
   surfaces: Frame,
   // A project Dev builds outside this app (lib/plan/projects): a site.

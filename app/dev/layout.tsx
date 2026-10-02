@@ -107,7 +107,8 @@ export default async function DevLayout({ children }: { children: React.ReactNod
    * something you go there to do; it is the one page you go to to look
    * something up, and its lines are the closed rows of the three lists at the
    * top. Finished work is consulted, not worked, so it sits at the end rather
-   * than in the middle of the things that still want doing.
+   * than in the middle of the things that still want doing. Posts sits below
+   * it, since a post is written from what the changelog lists.
    */
   const sections: NavSection[] = [
     // The route stays /dev/raised, which keeps every link already written into
@@ -123,6 +124,8 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     { href: '/dev/ui', label: 'UI', icon: 'ui' },
     { href: '/dev/surfaces', label: 'Surfaces', icon: 'surfaces' },
     { href: '/dev/changelog', label: 'Changelog', icon: 'changelog' },
+    // X posts Dash drafts about building the app (plan #1419).
+    { href: '/dev/posts', label: 'Posts', icon: 'posts' },
     // No entry per project built outside this app (lib/plan/projects): each
     // already has its own section on the plan, and a tab beside it was the
     // same list twice (note 4308875b).
