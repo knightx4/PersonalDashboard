@@ -84,7 +84,9 @@ async function readStored(learn: LearnSupabaseClient, userId?: string): Promise<
   let query = learn
     .from('feed_cards')
     .select('id, user_id, video_id, video_start_seconds, status, drop_reason, summary')
-    .eq('reason', 'video');
+    .eq('reason', 'video')
+    // A saved clip's card (plan #1405) is not the pile's to set aside.
+    .is('clip_id', null);
   if (userId) query = query.eq('user_id', userId);
   const { data, error } = await query;
   if (error) throw new Error(`Reading the video cards failed: ${error.message}`);

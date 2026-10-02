@@ -77,7 +77,11 @@ export async function markClipSkipped(
   );
 }
 
-/** Call when the person saves a clip, or un-saves it with saved false. Saving counts for its channel and theme. */
+/**
+ * Call when the person saves a clip, or un-saves it with saved false. Saving
+ * counts for its channel and theme, and queues a Learn now card about the
+ * clip, which the next hourly feed run writes (clip-card-run.ts, plan #1405).
+ */
 export async function markClipSaved(
   learn: LearnSupabaseClient,
   clipId: string,
