@@ -51,45 +51,32 @@ export default async function LearnLayout({ children }: { children: React.ReactN
   const brief = await loadLearnBrief();
 
   /**
-   * Home first (plan #1310), with each learning goal's plan and what Learn
-   * opens on (plan #1313), then Learn now, then Practice Flow, then the
-   * subjects the flow asks about, then the rest. A
-   * subject and a single idea are reached through Tracks, and a reading list
-   * and a reading through Reading lists, so they are `alsoMatches` rather than
-   * tabs of their own -- a nav that grows an entry per depth level stops being
+   * Now first (plan #1486): the feed, with what is waiting in a strip at the
+   * top and the practice questions behind its Practice only switch. Home and
+   * Practice Flow were tabs of their own until then, and /learn/home and
+   * /learn/flow redirect to Now. Then the subjects, then the rest. A subject
+   * and a single idea are reached through Tracks, and a reading list and a
+   * reading through Reading lists, so they are `alsoMatches` rather than tabs
+   * of their own -- a nav that grows an entry per depth level stops being
    * navigation.
    *
-   * There is no Learn next tab. Its re-checks are asked in the flow, its
-   * readings are on Learn now, and /learn/next redirects.
+   * There is no Learn next tab. Its re-checks are asked in the practice
+   * questions, its readings are on Now, and /learn/next redirects.
    */
   const learnClient = await createLearnClient();
   const readNow = await countReadNow(learnClient);
 
   const sections: NavSection[] = [
-    {
-      href: '/learn/home',
-      label: 'Home',
-      icon: 'learnHome',
-      exact: true,
-    },
-    // Learn now replaced the Read now tab (plan #805). The badge counts the
-    // readings you queued, which the feed shows first, and not the cards it
-    // wrote: there are always about twenty of those, and a number that never
-    // goes down is not information (plan #808).
+    // Learn now replaced the Read now tab (plan #805) and became Now (plan
+    // #1486). The badge counts the readings you queued, which the feed shows
+    // first, and not the cards it wrote: there are always about twenty of
+    // those, and a number that never goes down is not information (plan #808).
     {
       href: '/learn/now',
-      label: 'Learn now',
+      label: 'Now',
       icon: 'readNow',
       exact: true,
       badge: readNow,
-    },
-    // No badge, because there is always a question waiting and a number that
-    // never goes down is not information.
-    {
-      href: '/learn/flow',
-      label: 'Practice Flow',
-      icon: 'practiceFlow',
-      exact: true,
     },
     // The subjects, which are what "track" means on screen now (#774).
     {

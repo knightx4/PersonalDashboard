@@ -48,7 +48,7 @@ export function LearningTracks({
       action={action}
       hint={
         hasEntries
-          ? 'Subjects to learn for the job you describe below. Starting one adds it to your Learn goals, and Learn now brings you its lessons.'
+          ? 'Subjects to learn for the job you describe below. Starting one adds it to your Learn goals, and Now in Learn brings you its lessons.'
           : 'Write a career goals entry and Dash can suggest what to learn for it.'
       }
     >

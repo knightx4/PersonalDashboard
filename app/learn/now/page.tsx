@@ -11,16 +11,30 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { countReadyCards, loadFeedPage } from '@/lib/learn/feed/load';
 import { relatedNotesForCards } from '@/lib/learn/feed/related-notes';
 import { READY_LOW } from '@/lib/learn/feed/top-up';
-import { loadReadNow } from '@/lib/learn/tracks/load';
+import { loadReadNow, type ReadingDetail } from '@/lib/learn/tracks/load';
 import { REVIEWS_IN_LEARN_NOW, type DueReview } from '@/lib/learn/lessons/review';
 import { loadDueReviews } from '@/lib/learn/lessons/review-store';
+import { loadActiveAims } from '@/lib/learn/aims-store';
+import { loadPlannedGoals } from '@/lib/learn/lessons/plan-store';
+import { countGoalsWithoutPlan, WAITING_ANCHORS, waitingEmpty, waitingLines } from '@/lib/learn/feed/waiting';
+import { wantsPractice } from '@/lib/learn/flow/href';
+import { PracticeFlow } from '../flow/practice';
 import { ReviewList } from '../review/review-list';
 import { openReading } from '../r/[id]/actions';
 import { LearnNowFeed } from './feed';
 import { FinishButton } from './finish-button';
+import { PracticeSwitch } from './switch';
+import { WaitingStrip } from './waiting-strip';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Learn now' };
+export const metadata = { title: 'Now' };
+
+/**
+ * The most due ideas read, for the strip's count. The query behind the
+ * reviews stops at two hundred as well, so a larger limit would count no
+ * more. The list below the strip shows the first few of the same read.
+ */
+const REVIEWS_COUNTED = 200;
 
 /**
  * Long enough for the page's actions and what they start afterwards. Test me
@@ -30,9 +44,17 @@ export const metadata = { title: 'Learn now' };
 export const maxDuration = 300;
 
 /**
- * Learn now, the tab after Home (plan #1310), as the endless feed of
- * docs/LEARN-NOW-SPEC.md (plan #808). Opening Learn landed here from plan
- * #805 until #1313 moved that to Home.
+ * Now, Learn's first tab and the one place to start (plan #1486), as the
+ * endless feed of docs/LEARN-NOW-SPEC.md (plan #808). It was Learn now, the
+ * tab after Home, until Home and Practice Flow were folded into it.
+ *
+ * At the top, what is waiting for you, as one short strip (Home's list until
+ * plan #1486): ideas due for review, readings you said you would read, and
+ * goals with no plan yet. Beside the title, the Practice only switch:
+ * `?practice=1` shows Practice Flow's questions (`../flow/practice.tsx`) in
+ * place of the feed, and an old flow link's `track`, `goal` or `only` turns it
+ * on too (`lib/learn/flow/href.ts`). Each learning goal's plan, which Home
+ * listed, is on its subject's page.
  *
  * The readings you queued come first, in the order you queued them, as the
  * thin shelf they always were: what it is, why you put it there, Open, and
@@ -46,24 +68,61 @@ export const maxDuration = 300;
  * here (note 8a1789df): the deck is for reading.
  *
  * Above the deck, the ideas of passed pieces that are due for review (plan
- * #1145), up to five, most overdue first. Each learning goal's plan, where a
- * goal's lessons are, is on the Home tab (plan #1310) rather than here.
+ * #1145), up to five, most overdue first.
  *
  * A card shows up to two of your own notes on its idea (plan #1113). For the
  * first cards the lookup is started here and passed down unawaited, one
  * promise a card, so the deck paints first and the notes stream in under the
  * card's material. Cards loaded later carry theirs.
  */
-export default async function LearnNowPage() {
+export default async function NowPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    practice?: string | string[];
+    track?: string | string[];
+    goal?: string | string[];
+    only?: string | string[];
+  }>;
+}) {
+  const params = await searchParams;
+  const practice = wantsPractice(params);
   const user = await requireUser();
   const supabase = await createLearnClient();
-  const [readings, cards, ready, reviews] = await Promise.all([
-    loadReadNow(supabase),
-    loadFeedPage(supabase, []),
-    countReadyCards(supabase),
-    // A review list that cannot be read leaves the list off rather than the page.
-    loadDueReviews(supabase, user.id, { limit: REVIEWS_IN_LEARN_NOW }).catch((): DueReview[] => []),
+
+  // Each read that feeds the strip fails on its own: a count that cannot be
+  // read is null and drops its line, and the lists below fall back to empty.
+  const [readings, reviews, goals] = await Promise.all([
+    loadReadNow(supabase).then(
+      (rows) => rows,
+      (): ReadingDetail[] | null => null,
+    ),
+    loadDueReviews(supabase, user.id, { limit: REVIEWS_COUNTED }).then(
+      (rows) => rows,
+      (): DueReview[] | null => null,
+    ),
+    Promise.all([loadActiveAims(supabase), loadPlannedGoals(supabase, user.id)]).then(
+      ([aims, planned]) => countGoalsWithoutPlan(aims, planned),
+      (): number | null => null,
+    ),
   ]);
+  const counts = { reviews: reviews?.length ?? null, readings: readings?.length ?? null, goals };
+  const strip = <WaitingStrip lines={waitingLines(counts)} empty={waitingEmpty(counts)} />;
+  const header = (description: string) => (
+    <PageHeader title="Now" description={description} actions={<PracticeSwitch practice={practice} />} />
+  );
+
+  if (practice) {
+    return (
+      <div className="mx-auto max-w-3xl">
+        {header('Questions about what you are ready for next, for as long as you want to keep going.')}
+        {strip}
+        <PracticeFlow track={params.track} goal={params.goal} only={params.only} />
+      </div>
+    );
+  }
+
+  const [cards, ready] = await Promise.all([loadFeedPage(supabase, []), countReadyCards(supabase)]);
   // Opening the page counts as a response: when seven or fewer are ready,
   // more are written while you read the first.
   after(() => topUpFeedAfterResponse(user.id));
@@ -71,28 +130,28 @@ export default async function LearnNowPage() {
   const firstRelated = Object.fromEntries(
     cards.map((card) => [card.id, related.then((found) => found.get(card.id) ?? [])]),
   );
+  const queued = readings ?? [];
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title="Learn now"
-        description={
-          readings.length === 0
-            ? 'One card at a time. Swipe down if you know it, right to work on it, left for later.'
-            : 'What you said you would read next, then one card at a time.'
-        }
-      />
+      {header(
+        queued.length === 0
+          ? 'One card at a time. Swipe down if you know it, right to work on it, left for later.'
+          : 'What you said you would read next, then one card at a time.',
+      )}
 
-      {readings.length > 0 && (
+      {strip}
+
+      {queued.length > 0 && (
         /* One surface with hairlines, not a card per reading. Law 13: the
          * shelf is scanned, so it is a list, and a card each cost every row
          * its own border and eight pixels of margin for nothing. */
-        <Card padding="none" className="mb-4">
+        <Card padding="none" id={WAITING_ANCHORS.readings} className="mb-4 scroll-mt-4">
           <h2 className="card-pad-x pt-(--card-p) text-ui font-semibold text-ink">
             You said you would read these
           </h2>
           <ul className="divide-y divide-border">
-            {readings.map((reading) => {
+            {queued.map((reading) => {
               const url = reading.openUrl ?? reading.source?.canonicalUrl ?? null;
 
               return (
@@ -151,12 +210,14 @@ export default async function LearnNowPage() {
         </Card>
       )}
 
-      <ReviewList
-        reviews={reviews}
-        title="Due for review"
-        description="Ideas from pieces you passed. A right answer brings the next question later; a miss brings it back tomorrow."
-        showPlan
-      />
+      <div id={WAITING_ANCHORS.reviews} className="scroll-mt-4">
+        <ReviewList
+          reviews={(reviews ?? []).slice(0, REVIEWS_IN_LEARN_NOW)}
+          title="Due for review"
+          description="Ideas from pieces you passed. A right answer brings the next question later; a miss brings it back tomorrow."
+          showPlan
+        />
+      </div>
 
       <LearnNowFeed first={cards} firstRelated={firstRelated} ready={ready} low={READY_LOW} />
     </div>

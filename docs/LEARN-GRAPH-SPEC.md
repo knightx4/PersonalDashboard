@@ -540,9 +540,9 @@ and a per-module cost table would be three tables with the same columns.
 | `/learn/s/[id]` | one subject: the graph, its goals, what you know and what is shaky |
 | `/learn/s/[id]/probe` | a probe session: one question at whichever rung is next, the bar, and afterwards the reason or the answer that was expected |
 | `/learn/c/[id]` | one concept: the claim, where it stands, what it sits between, what was asked |
-| `/learn` | redirects to Home at `/learn/home` (plan #1313; Learn now from #805 until then), or to the flow when the link carries `?track=` |
-| `/learn/flow` | Practice Flow: one question after another across every track, and a new track offered when it runs low. It was `/learn` from plan #773 to #805. Since #842 it also asks about subjects in your notes that are not tracks, unless Tracks only is set ([LEARN-NOW-SPEC](LEARN-NOW-SPEC.md), "Practice Flow") |
-| `/learn/next` | redirects to `/learn/home` (plan #1313). Its list went in plan #773: the flow asks its re-checks and Learn now holds its readings |
+| `/learn` | redirects to Now at `/learn/now` (plan #1486; Home from #1313 and Learn now from #805 until then), or to Now's practice questions on that track when the link carries `?track=` |
+| `/learn/now?practice=1` | Practice Flow, behind Now's Practice only switch since plan #1486: one question after another across every track, and a new track offered when it runs low. It was `/learn` from plan #773 to #805. Since #842 it also asks about subjects in your notes that are not tracks, unless Tracks only is set ([LEARN-NOW-SPEC](LEARN-NOW-SPEC.md), "Practice Flow"). `/learn/flow` and `/learn/home` redirect to Now with their query kept |
+| `/learn/next` | redirects to `/learn/now` (plan #1486). Its list went in plan #773: the flow asks its re-checks and Learn now holds its readings |
 
 Same shell and design system as the other four workspaces. The graph view shows
 the pruned graph by default with a toggle for everything, because the pruned one

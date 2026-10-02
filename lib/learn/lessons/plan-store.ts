@@ -33,6 +33,18 @@ async function goalsWithTracks(learn: LearnSupabaseClient, userId: string): Prom
   return (data ?? []) as AimRow[];
 }
 
+/**
+ * The active goals that have a plan, by id: those whose track has been made.
+ * What the waiting strip on Now counts goals without a plan against, without
+ * reading every plan's units and pieces (plan #1486).
+ */
+export async function loadPlannedGoals(
+  learn: LearnSupabaseClient,
+  userId: string,
+): Promise<{ aimId: string }[]> {
+  return (await goalsWithTracks(learn, userId)).map((aim) => ({ aimId: aim.id }));
+}
+
 /** The goal whose plan this track is, or null for a track that is no goal's. */
 export async function planGoalFor(
   learn: LearnSupabaseClient,

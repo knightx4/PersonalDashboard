@@ -45,7 +45,6 @@ import {
   Tag,
   Target,
   Telescope,
-  Timer,
   Undo2,
   Users,
   Waypoints,
@@ -133,18 +132,12 @@ export const NAV_ICONS = {
   education: GraduationCap,
 
   // Learn
-  // Home: your study plans and what is waiting (plan #1310). The house Jobs'
-  // home uses, since both tabs are the workspace's front page.
-  learnHome: House,
   tracks: BookOpen,
+  // Now: the feed, what is waiting, and the practice questions (plan #1486).
   readNow: BookOpenCheck,
   know: Network,
   // Goals: the things you want to learn and how well (plan #897).
   goals: Target,
-  // Practice Flow, and so Learn's front page. Still the clock it had as the
-  // five-minute session: the question mark is already the dev workspace's
-  // raised tab.
-  practiceFlow: Timer,
   // A quiz is answered in writing, which is the whole of what separates it
   // from being asked to recognise something, so it gets the pencil.
   quiz: PencilLine,

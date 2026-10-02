@@ -466,7 +466,7 @@ export function ClipStream({
               <p className="max-w-sm text-ui text-white/70">
                 Dash cuts more from your videos a few times a day.{' '}
                 <Link href="/learn/now" className="underline underline-offset-2 hover:text-white">
-                  Go to Learn now
+                  Go to Now
                 </Link>
               </p>
             )}

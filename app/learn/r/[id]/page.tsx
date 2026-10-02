@@ -208,7 +208,7 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
         <h2 className="mb-2 text-ui font-semibold text-ink-muted">Read next</h2>
         <ReadNowButton readingId={reading.id} on={reading.readNowAt !== null} />
         <p className="mt-1.5 text-small text-ink-muted">
-          Puts it on <Link href="/learn/now" className="underline underline-offset-2 hover:text-ink">Learn now</Link>
+          Puts it on <Link href="/learn/now" className="underline underline-offset-2 hover:text-ink">Now</Link>
           , where it comes first. Finishing it takes it off again.
         </p>
       </section>

@@ -11,7 +11,7 @@ export function ClipsEmpty() {
         icon={Clapperboard}
         title="No clips yet"
         description="Dash is cutting short clips from your videos, each making one point, a few times a day. The first ones play here once they are cut and scored."
-        action={{ label: 'Go to Learn now', href: '/learn/now' }}
+        action={{ label: 'Go to Now', href: '/learn/now' }}
       />
     </>
   );

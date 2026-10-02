@@ -10,6 +10,7 @@ import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ChipSelect, ComposeBody, ComposeTitle, InlineInput } from '@/components/ui/field';
+import { practiceHref } from '@/lib/learn/flow/href';
 import {
   AIM_ABOUT_MAX,
   AIM_DEPTHS,
@@ -209,7 +210,7 @@ function GoalRow({
         <p className="flex items-center gap-1 px-1.5 text-small text-ink-muted">
           <Timer className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
           <Link
-            href={`/learn/flow?goal=${aim.id}`}
+            href={practiceHref({ goal: aim.id })}
             aria-label={`Practise ${aim.name}`}
             className="text-accent hover:underline"
           >

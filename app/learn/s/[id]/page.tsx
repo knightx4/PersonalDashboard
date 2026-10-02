@@ -11,6 +11,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { weightReason } from '@/lib/learn/flow/interest';
 import { loadTrackInterest } from '@/lib/learn/flow/interest-load';
+import { practiceHref } from '@/lib/learn/flow/href';
 import { GoalForm } from '@/app/learn/know/goal-form';
 import { ConceptList } from '@/components/learn/concept-list';
 import { ConfirmStep } from '@/components/ui/confirm-step';
@@ -337,7 +338,7 @@ export default async function SubjectPage({
                 {/* The flow limited to this track (plan #779), left again with
                   All tracks on the flow itself. */}
                 <Link
-                  href={`/learn/flow?track=${id}`}
+                  href={practiceHref({ track: id })}
                   className={buttonVariants({ variant: 'primary' })}
                 >
                   Practice this

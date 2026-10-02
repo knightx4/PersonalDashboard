@@ -70,7 +70,7 @@ export default async function GoalsPage() {
     <>
       <PageHeader
         title="Goals"
-        description="A few broad things you want to learn, and how well. Learn now brings you cards towards them."
+        description="A few broad things you want to learn, and how well. Now brings you cards towards them."
       />
       {aims ? (
         <GoalsView aims={aims} places={places} level3Counts={level3Counts} plans={plans} />

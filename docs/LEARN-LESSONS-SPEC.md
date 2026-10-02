@@ -284,14 +284,15 @@ Next up is worked out in `planProgress` (`lib/learn/lessons/plan-view.ts`),
 and the reads are in `lib/learn/lessons/plan-store.ts`. A piece skipped
 earlier becomes Next up again once the pieces after it are passed.
 
-Learn's Home tab, `/learn/home`, lists each plan with its progress and a
-link to its Next up piece (plan #1310; the list sat above the Learn now deck
-until then), and each goal on the Goals page links to its plan. Above the
-plans, Home lists what is waiting for you (plan #1311): ideas due for review,
-readings you said you would read, cards ready in Learn now, and goals with no
-plan yet, one line each with a link to its page. A line at zero is left out,
-a count that cannot be read drops only its own line, and with nothing waiting
-Home says so in one sentence (`lib/learn/home/waiting.ts`).
+Each plan, with its progress and a link to its Next up piece, is on its
+subject's page, and each goal on the Goals page links to its plan. Learn's
+Home tab listed them too from plan #1310 until plan #1486 folded Home into
+Now. What Home listed above the plans is now the strip at the top of Now
+(plan #1311, moved by #1486): ideas due for review, readings you said you
+would read, and goals with no plan yet, one line each with a link to where you
+deal with it. A line at zero is left out, a count that cannot be read drops
+only its own line, and with nothing waiting the strip is not drawn
+(`lib/learn/feed/waiting.ts`).
 
 A goal's lessons live on its plan, so Learn now deals none of them. The
 chooser gives a goal's track no lesson slot, and the deck and the count that

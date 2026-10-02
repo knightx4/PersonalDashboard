@@ -386,7 +386,7 @@ export async function deleteSubject(formData: FormData): Promise<void> {
   if ((data ?? []).length === 0) throw new Error('That track is already gone.');
 
   revalidatePath('/learn/know');
-  revalidatePath('/learn/flow');
+  revalidatePath('/learn/now');
   redirect('/learn/know');
 }
 

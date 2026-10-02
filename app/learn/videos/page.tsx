@@ -101,7 +101,7 @@ export default async function VideosPage({
 /** What each pile is for, said above it when it is the one shown. */
 const PILE_NOTE: Record<Pile, string> = {
   watch: 'Worth watching. Each opens at the stretch the judge picked, and plays on from there.',
-  card: 'Enough as a card or two. What each says is in Learn now as cards, which open the video at the minute they came from.',
+  card: 'Enough as a card or two. What each says is on Now as cards, which open the video at the minute they came from.',
   skip: 'Nothing here serves what you are learning. The app only reads your Dash playlist, so take these off it on YouTube when you want them gone.',
   unjudged: 'Not sorted yet. The judge reads new videos on each library run, and one that passed its first look waits for its transcript.',
 };

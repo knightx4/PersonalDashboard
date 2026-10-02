@@ -24,11 +24,11 @@ describe('rememberedPath', () => {
     expect(rememberedPath('jobs', '/jobs')).toBe('/jobs/pipeline');
   });
 
-  it('lands Learn on Home whatever page you left it on', () => {
+  it('lands Learn on Now whatever page you left it on', () => {
     rememberLastPaths({ learn: '/learn/lists' });
     const home = moduleById('learn')?.home;
-    expect(home).toBe('/learn/home');
-    expect(rememberedPath('learn', home!)).toBe('/learn/home');
+    expect(home).toBe('/learn/now');
+    expect(rememberedPath('learn', home!)).toBe('/learn/now');
   });
 
   it('lands on the home when nothing is remembered', () => {
