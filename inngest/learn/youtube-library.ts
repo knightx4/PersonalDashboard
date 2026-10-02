@@ -41,6 +41,8 @@ import {
   type WatchListSync,
 } from '@/lib/learn/youtube/watch-list';
 import { summariseWatchLists, type SummaryPassResult } from '@/lib/learn/youtube/summaries';
+import { haikuClient } from '@/lib/learn/clips/score-jev';
+import { scoreClips, type ScorePassResult } from '@/lib/learn/clips/score-run';
 import { cutClips, type ClipPassResult } from '@/lib/learn/youtube/clip-run';
 import { judgeWatchLists, type JudgePassResult } from '@/lib/learn/youtube/judging';
 import {
@@ -102,8 +104,17 @@ const TICK_CHANNELS_MS = 250_000;
  * the run, so on a run where the passes above had little to do this one gets
  * most of its two minutes back.
  */
-const TICK_CLIPS_MS = 256_000;
-const TICK_CLIPS_HARD_MS = 268_000;
+const TICK_CLIPS_MS = 254_000;
+const TICK_CLIPS_HARD_MS = 262_000;
+/**
+ * Then the clips are scored (plan #1401): Jev, under a second a clip, eight
+ * at a time, then one Haiku call per forty clips Jev could not answer. No
+ * call is started after the first mark, no Haiku call with under six seconds
+ * left before the second, and one still running at the second is abandoned,
+ * so embedding keeps its slot. Clips left unscored come up next run.
+ */
+const TICK_SCORE_MS = 266_000;
+const TICK_SCORE_HARD_MS = 269_000;
 const TICK_EMBED_MS = 270_000;
 
 const ownerSchema = z.object({ userId: z.string() });
@@ -205,6 +216,31 @@ async function cutStoredClips(learn: LearnSupabaseClient, owner: string | null, 
   }
 }
 
+/**
+ * Score the clips waiting for one, Jev first and Haiku for the rest, each
+ * model's spend recorded against the person the clips are for. Runs without
+ * an Anthropic key too, on Jev alone.
+ */
+async function scoreCutClips(learn: LearnSupabaseClient, started: number): Promise<ScorePassResult | null> {
+  const core = createCoreServiceSupabase();
+  const rows: Promise<unknown>[] = [];
+  try {
+    return await scoreClips(learn, {
+      client: haikuClient(process.env.ANTHROPIC_API_KEY),
+      jevEnabled: (userId) => jevEnabledFor(core, userId),
+      deadline: started + TICK_SCORE_MS,
+      hardDeadline: started + TICK_SCORE_HARD_MS,
+      onSpend: (userId, report) =>
+        void rows.push(recordSpend(core, userId, { module: 'learn', operation: 'score-clips', model: report.model, usage: report.usage })),
+    });
+  } catch (error) {
+    console.error('[youtube-library] scoring clips', error instanceof Error ? error.message : error);
+    return null;
+  } finally {
+    await Promise.all(rows);
+  }
+}
+
 /** The operation a channel-judging call is recorded under. */
 function channelOperation(pass: ChannelJudgePass): 'judge-video' | 'judge-channel' {
   return pass === 'sample' ? 'judge-video' : 'judge-channel';
@@ -252,12 +288,14 @@ export type TickReport = {
   foundChannels?: Awaited<ReturnType<typeof judgePendingChannels>> | null;
   /** Clips cut from stored transcripts for the clip stream (plan #1398). */
   clips?: ClipPassResult | null;
+  /** Clips scored for the clip stream (plan #1401). */
+  clipScores?: ScorePassResult | null;
 };
 
 /**
  * The scheduled run: read your playlist into your list, summarise and judge what is new on it, re-list every channel, queue the videos that best match
  * your ideas, then work through the queue within this run's share of the
- * month's credits, cut clips from stored transcripts, then embed what is new.
+ * month's credits, cut clips from stored transcripts and score them, then embed what is new.
  */
 export async function runYouTubeLibraryTick(): Promise<TickReport> {
   const started = Date.now();
@@ -312,6 +350,7 @@ export async function runYouTubeLibraryTick(): Promise<TickReport> {
   }
   report.foundChannels = await judgeChannels(learn, started + TICK_CHANNELS_MS);
   report.clips = await cutStoredClips(learn, owner, started);
+  report.clipScores = await scoreCutClips(learn, started);
 
   report.embedding = await embedNew(learn, started + TICK_EMBED_MS);
   return report;

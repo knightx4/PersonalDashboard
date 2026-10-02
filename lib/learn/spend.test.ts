@@ -119,6 +119,7 @@ describe('the operation names', () => {
       'find-channels',
       'judge-channel',
       'cut-clips',
+      'score-clips',
     ]);
   });
 });

@@ -22,6 +22,7 @@
     "news:digest": "tsx --conditions=react-server scripts/news-digest.ts",
     "news:repeats": "tsx --conditions=react-server scripts/news-repeats.ts",
     "clips:cut": "tsx --conditions=react-server scripts/cut-clips.ts",
+    "clips:score": "tsx --conditions=react-server scripts/score-clips.ts",
     "mail:piles": "tsx --conditions=react-server scripts/mail-piles.ts",
     "writing:scores": "tsx scripts/writing-scores.ts",
     "gate": "./scripts/gate.sh"
