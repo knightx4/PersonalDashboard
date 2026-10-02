@@ -10,6 +10,7 @@ import {
   askDashInRequest,
   askPageLabel,
   confirmAskChange,
+  countOpenAskHandoffs,
   declineAskChange,
   listAskConversations,
   loadAskChanges,
@@ -113,6 +114,8 @@ export type OpenedAsk = {
   error?: string;
   /** Set when the turns were read and the changes were not. */
   changesError?: string;
+  /** Requests handed to the backup routine with no reply yet (plan #1402). */
+  openHandoffs?: number;
 };
 
 /** One earlier question's turns and changes, to reopen it in the sheet. */
@@ -132,11 +135,30 @@ export async function openAskQuestion(ref: string): Promise<OpenedAsk> {
       ),
     ]);
     if (turns.length === 0) return { turns, changes: [], error: 'That conversation is not there any more.' };
+    const openHandoffs = await countOpenAskHandoffs(parsed.data).catch(() => 0);
     return 'failed' in changes
-      ? { turns, changes: [], changesError: CHANGES_UNREAD }
-      : { turns, changes: changes.found };
+      ? { turns, changes: [], changesError: CHANGES_UNREAD, openHandoffs }
+      : { turns, changes: changes.found, openHandoffs };
   } catch {
     return { turns: [], changes: [], error: 'That conversation could not be read. Try again.' };
+  }
+}
+
+/**
+ * A thread waiting on the backup routine checks back with this (plan #1402):
+ * the conversation's turns as they now stand, and how many hand-offs are
+ * still open. Never throws; a failed read says nothing is open, which stops
+ * the checking until the thread is reopened.
+ */
+// latency: pending
+export async function pollAskQuestion(ref: string): Promise<{ turns: TalkTurn[]; open: number }> {
+  const parsed = Ref.safeParse(ref);
+  if (!parsed.success) return { turns: [], open: 0 };
+  try {
+    const [turns, open] = await Promise.all([loadAskConversation(parsed.data), countOpenAskHandoffs(parsed.data)]);
+    return { turns, open };
+  } catch {
+    return { turns: [], open: 0 };
   }
 }
 

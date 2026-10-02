@@ -14,6 +14,7 @@ import {
   type AskStores,
 } from './ask';
 import type { DashChange, NewDashChange } from './changes';
+import type { DashHandoff } from './handoff';
 import type { NewTalkTurn, TalkSubject, TalkTurn } from './talk';
 
 /**
@@ -640,5 +641,109 @@ describe('the page a question was asked from (plan #1271)', () => {
     expect(goal).toContain('goal_status');
     expect(goal).not.toContain('open_row with');
     expect(pageLine(null)).toBeNull();
+  });
+});
+
+describe('handing a request on to the backup routine (plan #1402)', () => {
+  const ASK = 'I want to make a new song and publish it on Spotify. Add that as a goal';
+  const REQUEST = 'Create a goal "Make a new song and publish it on Spotify".';
+
+  function handoffStores(fire: (h: DashHandoff) => { status: DashHandoff['status']; error?: string }) {
+    const memory = memoryStores();
+    const handoffs: DashHandoff[] = [];
+    const fired: string[] = [];
+    const stores: AskStores = {
+      ...memory.stores,
+      saveHandoff: async (conversationId, request) => {
+        const kept: DashHandoff = {
+          id: `h${handoffs.length + 1}`,
+          conversationId,
+          turnId: null,
+          request,
+          status: 'pending',
+          runId: null,
+          error: null,
+          createdAt: '2026-10-02T10:00:00Z',
+        };
+        handoffs.push(kept);
+        return kept;
+      },
+      attachHandoffs: async (ids, turnId) => {
+        for (const h of handoffs) if (ids.includes(h.id)) h.turnId = turnId;
+      },
+      discardHandoffs: async (ids) => {
+        for (let i = handoffs.length - 1; i >= 0; i--) if (ids.includes(handoffs[i].id)) handoffs.splice(i, 1);
+      },
+      fireHandoff: async (h) => {
+        fired.push(h.id);
+        return fire(h);
+      },
+    };
+    return { ...memory, stores, handoffs, fired };
+  }
+
+  it('offers the tool, keeps the request, and starts the routine once the answer is kept', async () => {
+    const { client, sent } = stubClient([
+      reply([use('u1', 'hand_off', { request: REQUEST })]),
+      reply([use('a', 'answer', { answer: 'I have passed that on; the reply will appear here.', cited: [] })]),
+    ]);
+    const { stores, handoffs, fired, written } = handoffStores(() => ({ status: 'fired' }));
+    const result = await askDash(
+      { question: ASK, today: '2026-10-02', execute: stubExecute().execute, anthropicApiKey: 'k', client },
+      stores,
+    );
+    expect(sent[0].tools.map((t) => t.name)).toContain('hand_off');
+    expect(sent[0].system[0].text).toMatch(/HAND ON/);
+    expect(handoffs).toHaveLength(1);
+    expect(handoffs[0]).toMatchObject({ conversationId: 'conv-new', request: REQUEST, turnId: 't2' });
+    expect(fired).toEqual(['h1']);
+    expect(result.handoffs?.map((h) => h.status)).toEqual(['fired']);
+    // The question and the answer, and no turn saying it failed.
+    expect(written.flatMap((w) => w.turns.map((t) => t.role))).toEqual(['user', 'assistant']);
+  });
+
+  it('refuses a hand-off where nothing can take it, so Dash says it cannot', async () => {
+    const { client } = stubClient([
+      reply([use('u1', 'hand_off', { request: REQUEST })]),
+      reply([use('a', 'answer', { answer: 'I cannot do that yet.', cited: [] })]),
+    ]);
+    const { stores } = memoryStores();
+    const result = await askDash(
+      { question: ASK, today: '2026-10-02', execute: stubExecute().execute, anthropicApiKey: 'k', client },
+      stores,
+    );
+    const call = result.turns.at(-1)?.toolCalls?.[0];
+    expect(call?.name).toBe('hand_off');
+    expect((call?.result as { error: string }).error).toMatch(/not set up/);
+    expect(result.handoffs).toBeUndefined();
+  });
+
+  it('says in the thread when the routine could not be started', async () => {
+    const { client } = stubClient([
+      reply([use('u1', 'hand_off', { request: REQUEST })]),
+      reply([use('a', 'answer', { answer: 'Passed on.', cited: [] })]),
+    ]);
+    const { stores } = handoffStores(() => ({ status: 'failed', error: 'The routine answered 401.' }));
+    const result = await askDash(
+      { question: ASK, today: '2026-10-02', execute: stubExecute().execute, anthropicApiKey: 'k', client },
+      stores,
+    );
+    expect(result.handoffs?.[0].status).toBe('failed');
+    expect(result.turns.at(-1)?.body).toMatch(/did not get passed on after all: The routine answered 401/);
+  });
+
+  it('removes the hand-offs of an answer that failed, and starts nothing', async () => {
+    const { client } = stubClient([
+      reply([use('u1', 'hand_off', { request: REQUEST })]),
+      reply([{ type: 'text', text: 'Hmm' }], 'max_tokens'),
+    ]);
+    const { stores, handoffs, fired } = handoffStores(() => ({ status: 'fired' }));
+    const result = await askDash(
+      { question: ASK, today: '2026-10-02', execute: stubExecute().execute, anthropicApiKey: 'k', client },
+      stores,
+    );
+    expect(result.error).toMatch(/^Dash could not answer/);
+    expect(handoffs).toEqual([]);
+    expect(fired).toEqual([]);
   });
 });

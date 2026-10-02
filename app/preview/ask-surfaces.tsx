@@ -189,6 +189,7 @@ const FIXTURES: AskSource = {
     return page === TRIP_GOAL ? 'Trip ideas' : null;
   },
   open: async () => ({ turns: answerTo(RECENT[0].title ?? ''), changes: [] }),
+  poll: async () => ({ turns: [], open: 0 }),
   confirm: pressed('confirmed'),
   decline: pressed('declined'),
   undo: pressed('undone'),
