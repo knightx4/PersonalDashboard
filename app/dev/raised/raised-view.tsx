@@ -378,6 +378,7 @@ export function RaisedView({
             .map((group) => (
               <Group
                 key={group.key}
+                fold
                 title={
                   <>
                     {group.title}

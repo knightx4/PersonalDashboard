@@ -480,6 +480,12 @@ describe('the three groups', () => {
     expect(html).toContain('(4)');
   });
 
+  it('folds each group away by its heading (note 16a5d186)', () => {
+    const html = render([], [waitingRow({ id: 'p1', number: 610 })]);
+
+    expect(html).toMatch(/<summary[^>]*><svg[^]*?<\/svg><h3[^>]*>Your actions/);
+  });
+
   it('leaves out a group with nothing in it', () => {
     const html = render([], [waitingRow()]);
 
