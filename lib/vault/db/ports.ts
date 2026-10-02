@@ -5,6 +5,7 @@ import { decryptToken } from '@/lib/crypto/tokens';
 import { ATTACHMENT_MAX_BYTES, VAULT_ATTACHMENTS_BUCKET, type AttachmentMimeType } from '@/lib/vault/paths';
 import { createVaultSource } from '@/lib/vault/providers';
 import type { AttachmentPlan, KnownAttachment, KnownAttachments } from '@/lib/vault/sync/attachments';
+import type { SaveNotePorts, SavableNote } from '@/lib/vault/notes/save';
 import type { KnownNotes } from '@/lib/vault/sync/plan';
 import type {
   NoteWrite,
@@ -309,6 +310,92 @@ export function vaultPortsFor(opts: {
         .eq('id', connection.id);
       if (error) throw new Error(`Saving sync progress failed: ${error.message}`);
     },
+  };
+}
+
+/**
+ * The ports for saving an edited note (plan #1424), over the session client.
+ *
+ * RLS decides which note and which connection come back, so a path that is
+ * not the viewer's reads as no note at all. The token is decrypted here and
+ * goes no further than the source.
+ */
+export function noteSavePorts(opts: {
+  supabase: VaultSupabaseClient;
+  afterSave: (noteId: string) => void;
+}): SaveNotePorts {
+  const { supabase } = opts;
+
+  return {
+    async loadNote(path) {
+      const { data, error } = await supabase
+        .from('notes')
+        .select('id, path, title, body, blob_sha')
+        .eq('path', path)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (error) throw new Error(`Reading ${path} failed: ${error.message}`);
+      if (!data) return null;
+      const row = data as {
+        id: string;
+        path: string;
+        title: string;
+        body: string;
+        blob_sha: string;
+      };
+      const note: SavableNote = {
+        id: row.id,
+        path: row.path,
+        title: row.title,
+        body: row.body,
+        blobSha: row.blob_sha,
+      };
+      return note;
+    },
+
+    async openSource() {
+      const { data, error } = await supabase
+        .from('vault_connections')
+        .select('repo_owner, repo_name, branch, subpath, access_token, status')
+        .maybeSingle();
+      if (error) throw new Error(`Reading the vault connection failed: ${error.message}`);
+      if (!data) return 'none';
+      const row = data as {
+        repo_owner: string;
+        repo_name: string;
+        branch: string;
+        subpath: string;
+        access_token: string | null;
+        status: string;
+      };
+      if (row.status !== 'active' || !row.access_token) return 'reauth';
+      return createVaultSource({
+        provider: 'github',
+        repoOwner: row.repo_owner,
+        repoName: row.repo_name,
+        branch: row.branch,
+        subpath: row.subpath,
+        token: decryptAccessToken(row.access_token),
+      });
+    },
+
+    async storeNote(noteId, expectedBlobSha, row) {
+      const { error } = await supabase
+        .from('notes')
+        .update({
+          title: row.title,
+          body: row.body,
+          frontmatter: row.frontmatter,
+          blob_sha: row.blobSha,
+          size_bytes: row.sizeBytes,
+          git_updated_at: row.gitUpdatedAt,
+        })
+        .eq('id', noteId)
+        .eq('blob_sha', expectedBlobSha);
+      if (error) throw new Error(`Storing the saved note failed: ${error.message}`);
+    },
+
+    afterSave: opts.afterSave,
   };
 }
 

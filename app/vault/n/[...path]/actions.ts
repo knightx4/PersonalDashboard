@@ -16,6 +16,10 @@ import { loadNote } from '@/lib/vault/notes/load';
 import { loadNoteThread, saveThought } from '@/lib/vault/maya/store';
 import { MAYA_THOUGHT_OPERATION, writeThought } from '@/lib/vault/maya/thought';
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
+import { noteSavePorts } from '@/lib/vault/db/ports';
+import { embedVaultNotes } from '@/lib/vault/notes/embed';
+import { saveNote, type SaveNoteFailure } from '@/lib/vault/notes/save';
 import { mayaThreadHref, noteHref } from '@/lib/vault/paths';
 
 /**
@@ -231,4 +235,100 @@ export async function askMaya(_prev: AskMayaState, formData: FormData): Promise<
 
   revalidatePath(noteHref(note.path));
   return { threadHref: mayaThreadHref(saved.threadId) };
+}
+
+export type SaveNoteState = {
+  /** The blob SHA the note is now at, once a save has gone through. */
+  savedBlobSha?: string;
+  /** What went wrong, for the page to choose its way forward (reload, settings). */
+  reason?: SaveNoteFailure;
+  error?: string;
+};
+
+/** What the person reads when a save does not go through. */
+const SAVE_ERRORS: Record<SaveNoteFailure, string> = {
+  'not-found': 'That note is not in the vault any more.',
+  changed: 'This note changed since you opened it. Reload it to see the new version.',
+  'read-only':
+    'The vault token can read notes but not save them. Add a token that can write in vault settings.',
+  reconnect: 'The vault needs reconnecting before notes can be saved.',
+  'too-large': 'The note is too large to save from here.',
+  error: 'The note could not be saved. Try again in a moment.',
+};
+
+const SaveInput = z.object({
+  notePath,
+  text: z.string().max(1_000_000, 'The note is too large to save from here.'),
+  blobSha: z.string().trim().min(1),
+});
+
+/** How long the embedding after a save may run. One note is one call. */
+const EMBED_AFTER_SAVE_MS = 20_000;
+
+/**
+ * Save an edited note (plan #1424): commit it to the vault repository as
+ * "Edit <note> from Dash" and rewrite the stored note with the blob SHA the
+ * commit made, so the next sync leaves it alone.
+ *
+ * Takes `notePath`, `text` (the new body, as the editor holds it, without the
+ * frontmatter) and `blobSha` (the one the editor opened at). The note and the
+ * connection are read again on the session client, so RLS decides whether
+ * they are yours. Once saved, the note's embedding is redone after the
+ * response, as a sync does for the notes it writes.
+ */
+// latency: pending
+export async function saveNoteEdit(
+  _prev: SaveNoteState,
+  formData: FormData,
+): Promise<SaveNoteState> {
+  const user = await requireUser();
+
+  const input = SaveInput.safeParse({
+    notePath: formData.get('notePath') ?? '',
+    text: formData.get('text') ?? '',
+    blobSha: formData.get('blobSha') ?? '',
+  });
+  if (!input.success)
+    return { reason: 'error', error: input.error.issues[0]?.message ?? SAVE_ERRORS.error };
+
+  const vault = await createVaultClient();
+  const ports = noteSavePorts({
+    supabase: vault,
+    afterSave: () => {
+      after(async () => {
+        try {
+          await embedVaultNotes(vault, await createCoreClient(), {
+            userId: user.id,
+            deadline: Date.now() + EMBED_AFTER_SAVE_MS,
+          });
+        } catch (error) {
+          console.error(
+            '[vault save] note embedding',
+            error instanceof Error ? error.message : error,
+          );
+        }
+      });
+    },
+  });
+
+  let result;
+  try {
+    result = await saveNote(ports, {
+      path: input.data.notePath,
+      text: input.data.text,
+      expectedBlobSha: input.data.blobSha,
+    });
+  } catch (error) {
+    console.error('[vault save]', error instanceof Error ? error.message : error);
+    return { reason: 'error', error: SAVE_ERRORS.error };
+  }
+
+  if (!result.ok) {
+    if (result.reason === 'error') console.error('[vault save]', result.detail);
+    return { reason: result.reason, error: SAVE_ERRORS[result.reason] };
+  }
+
+  revalidatePath(noteHref(input.data.notePath));
+  revalidatePath('/vault');
+  return { savedBlobSha: result.blobSha };
 }
