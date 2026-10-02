@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { MonitorPlay } from 'lucide-react';
+import { Clapperboard, MonitorPlay } from 'lucide-react';
+import { buttonVariants } from '@/components/ui/button';
 import { PageHeader } from '@/components/shell/page-header';
 import { SearchField } from '@/components/shell/search-field';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -65,6 +66,12 @@ export default async function VideosPage({
       <PageHeader
         title="Videos"
         description={`${all.length} on your list${watched > 0 ? `, ${watched} watched` : ''}`}
+        actions={
+          <Link href="/learn/clips" className={buttonVariants({ variant: 'secondary' })}>
+            <Clapperboard className="size-4" strokeWidth={1.75} aria-hidden />
+            Watch as clips
+          </Link>
+        }
       />
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="w-full max-w-md">

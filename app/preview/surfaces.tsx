@@ -97,6 +97,7 @@ import {
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { WatchingSurface } from './watching-surfaces';
+import { ClipStreamSurface, ClipsEmptySurface } from './clip-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
@@ -3116,6 +3117,24 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AskMadeChangesSurface />,
   },
 
+  {
+    /* Learn's clip player (plan #1400): three clips queued, before the first
+     * tap. Full screen below lg, in the page pane above. Fixtures in
+     * clip-surfaces.tsx. */
+    id: 'learn-clips',
+    label: 'Learn · Clips',
+    module: 'learn',
+    width: 'page',
+    render: () => <ClipStreamSurface />,
+  },
+  {
+    /* Clips before any are cut. */
+    id: 'learn-clips-empty',
+    label: 'Learn · Clips, none cut yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <ClipsEmptySurface />,
+  },
   {
     /* The home page's Watching section (plan #1295): a watch that fired, one
      * reporting only, and one whose page stopped reading. Fixtures in
