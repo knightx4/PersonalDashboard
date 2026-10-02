@@ -1,15 +1,27 @@
 import type { ModuleSources } from '@/lib/sources/types';
 
 /**
- * The dev workspace's tables, as Goals reads them (lib/sources/types.ts): all
- * of them are about building this app rather than the person's life, so none
- * is a source. A new dev table goes in one of these two lists, or the gate
- * says so.
+ * The dev workspace's tables, as Goals reads them (lib/sources/types.ts).
+ * Almost all are about building this app rather than the person's life, so
+ * they are not sources. The exception is the posts they put up about it: what
+ * they posted is a record of something they did in public. A new dev table
+ * goes in one of these two lists, or the gate says so.
  */
 const ABOUT_THE_APP = 'About building this app, not the person’s life.';
 
 export const devSources: ModuleSources = {
-  sources: [],
+  sources: [
+    {
+      table: 'public.social_posts',
+      module: 'Dev',
+      holds: 'Posts about building this app that Dash drafted for X, and which ones they posted, with the link.',
+      weight: 'record',
+      search: ['angle', 'body'],
+      title: 'angle',
+      href: () => '/dev/posts',
+      note: 'Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread.',
+    },
+  ],
   notSources: [
     'public.check_backs',
     'public.ideas',
