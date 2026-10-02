@@ -433,6 +433,18 @@ const RULES: Rule[] = [
     },
   },
   {
+    id: 'own-markdown',
+    law: '-',
+    says: 'react-markdown set up outside the shared renderer',
+    instead: '<Markdown markdown={…} /> from components/ui/markdown.tsx, with an option for what differs',
+    /**
+     * Six surfaces each configured react-markdown for themselves, so links,
+     * images and headings behaved differently from page to page (plan #1431).
+     * They now share one component, and a seventh setup is what this catches.
+     */
+    find: (line) => (/from\s+['"]react-markdown['"]/.test(line) ? ['react-markdown imported'] : []),
+  },
+  {
     id: 'action-without-tier',
     law: '-',
     says: 'an action with no latency tier',
