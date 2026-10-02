@@ -207,5 +207,10 @@ export const learnSources: ModuleSources = {
     { table: 'learn.track_offers', reason: 'Tracks the feed offered.' },
     { table: 'learn.transcript_calls', reason: 'Transcript fetch bookkeeping.' },
     { table: 'learn.video_transcripts', reason: 'Transcript storage.' },
+    {
+      table: 'learn.video_clips',
+      reason: "Dash's clips cut from someone else's video, with their scores and whether they were watched.",
+    },
+    { table: 'learn.video_clip_cuts', reason: 'Which videos have been cut into clips.' },
   ],
 };
