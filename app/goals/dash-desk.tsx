@@ -6,6 +6,7 @@ import { Folder, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DashMark } from '@/components/ui/dash-mark';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { ChipInput, ChipSelect, ComposeBody, ComposeBox } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import type { DashOffer } from '@/lib/goals/hand-off';
@@ -230,7 +231,16 @@ function AskDash({
               </ChipSelect>
             </>
           )}
-          <Button type="submit" size="sm" className="ml-auto" disabled={asking || !body.trim()}>
+          {/* An ask on a goal is a reply from Dash; a new errand starts a run, which is not metered here. */}
+          {!errand && (
+            <PaidHint
+              action="app/goals/home-actions.ts#askDashAction"
+              what="Cost of Dash's reply"
+              align="end"
+              className="ml-auto self-center"
+            />
+          )}
+          <Button type="submit" size="sm" className={errand ? 'ml-auto' : undefined} disabled={asking || !body.trim()}>
             {asking ? 'Asking Dash…' : errand ? 'Hand it to Dash' : 'Ask Dash'}
           </Button>
         </div>
