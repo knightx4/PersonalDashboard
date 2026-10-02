@@ -78,6 +78,8 @@ export const coreSources: ModuleSources = {
     { table: 'core.drafted_messages', reason: 'Follow-ups and return requests Dash wrote from the pipeline and orders, waiting to be sent.' },
     { table: 'core.email_accounts', reason: 'Mailbox connections and their tokens.' },
     { table: 'core.inbox_catch_ups', reason: 'Sync bookkeeping.' },
+    { table: 'core.page_views', reason: 'Which pages they opened and when, by route pattern, for the Usage tab in Dev and the vision review.' },
+    { table: 'core.page_view_days', reason: 'Daily counts of page opens older than 180 days, rolled up from core.page_views.' },
     { table: 'core.ingested_messages', reason: 'Mail sync bookkeeping; the Gmail connector reads mail.' },
     { table: 'core.mail_piles', reason: 'The pile Jev sorted each ingested email into, compared with the linkers\' rules.' },
     { table: 'core.memory_chunks', reason: 'Vectors of passages from other tables, for search by meaning; read through the rows they point at.' },
