@@ -4,9 +4,9 @@ import { buildPostsPage } from '@/lib/dev/posts-page';
 
 /**
  * Dev's Posts tab (plan #1419) in the surface gallery: two drafts waiting,
- * one of them a thread with a post past 280, one posted and one dropped;
- * then the tab while Dash is drafting the first batch. Fixtures run through
- * the same builder the page uses.
+ * the first with a screenshot (#1418) and the second a thread with a post
+ * past 280, one posted and one dropped; then the tab while Dash is drafting
+ * the first batch. Fixtures run through the same builder the page uses.
  */
 
 const NOW = Date.parse('2026-10-02T12:00:00Z');
@@ -32,6 +32,9 @@ const ROWS = [
       'Every button in my app that calls a model shows what one press costs, from what that press cost before. A test walks every server action and fails the merge when one reaches a model with no hint beside its button.',
     ],
     source_plan_item_ids: ['s1', 's2'],
+    // A screenshot committed by a posts run (#1418): a Surfaces gallery shot,
+    // so sample data only. Any file under public/posts/ draws the same way.
+    image_paths: ['/posts/2026-10-02-dev-plan-tree.png'],
     created_at: '2026-10-02T09:00:00Z',
   },
   {

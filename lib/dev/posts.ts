@@ -184,8 +184,8 @@ export function postsRunText(input: { userId: string; focus?: PostsRunFocus | nu
         'Skip the search for what shipped, but still check the step is one a post may come from.'
       : `Write ${MIN_SUGGESTIONS} to ${MAX_SUGGESTIONS} drafts about what shipped since the last posted row.`,
     '',
-    'Dash never posts. You change rows, not code: do not commit or push, and do not touch ' +
-      'any plan step.',
+    'Dash never posts. You change rows, not code, and do not touch any plan step. The one ' +
+      'commit you may push is screenshots under public/posts/, as the skill describes.',
   ];
   return lines.join('\n');
 }
@@ -322,11 +322,13 @@ export function parsePostedUrl(
 /**
  * Where the card's screenshot is drawn from, for one entry of `image_paths`.
  *
- * #1418 decides what those entries are. Until it does, a full https link or
- * a path on this site (such as a file under public/) is drawn as it is, and
- * anything else is not drawn, so a path into storage nobody can read yet
- * shows nothing rather than a broken image. When the screenshots move into a
- * bucket, this is the one place that turns a path into a link.
+ * A posts run photographs a Surfaces gallery fixture and commits the PNG
+ * under public/posts/ (#1418), so an entry is a site path such as
+ * `/posts/2026-10-02-dev-plan-tree.png`, served once that commit deploys.
+ * Not a storage bucket: the run reaches the database only through SQL, which
+ * cannot write a file, and the shots hold sample data meant for X anyway.
+ * A full https link is drawn as it is too; anything else is not drawn, so a
+ * malformed entry shows nothing rather than a broken image.
  */
 export function postImageSrc(path: string): string | null {
   if (/^https:\/\//.test(path) || /^\/(?!\/)/.test(path)) return path;

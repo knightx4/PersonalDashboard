@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { Check, Copy, Plus } from 'lucide-react';
+import { Check, Copy, Download, Plus } from 'lucide-react';
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { FieldError, Input, Textarea } from '@/components/ui/field';
 import { StateLabel } from '@/components/dev/state-label';
 import { cn } from '@/lib/cn';
@@ -320,17 +320,24 @@ export function PostItem({ card }: { card: PostCard }) {
       )}
 
       {card.images.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-3">
           {card.images.map((src) => (
-            <a key={src} href={src} target="_blank" rel="noreferrer" className="block max-w-full">
-              {/* eslint-disable-next-line @next/next/no-img-element -- a screenshot the person saves to post; the image optimiser would hand them a resized copy */}
-              <img
-                src={src}
-                alt="Screenshot to post with this draft"
-                loading="lazy"
-                className="max-h-64 max-w-full rounded-sm bg-sunken object-contain"
-              />
-            </a>
+            <div key={src} className="flex max-w-full flex-col items-start gap-1">
+              <a href={src} target="_blank" rel="noreferrer" className="block max-w-full">
+                {/* eslint-disable-next-line @next/next/no-img-element -- a screenshot the person saves to post; the image optimiser would hand them a resized copy */}
+                <img
+                  src={src}
+                  alt="Screenshot to post with this draft"
+                  loading="lazy"
+                  className="max-h-64 max-w-full rounded-sm bg-sunken object-contain"
+                />
+              </a>
+              {/* The file itself, at full size, to attach on X. */}
+              <a href={src} download className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                <Download className="size-3.5" aria-hidden />
+                Save image
+              </a>
+            </div>
           ))}
         </div>
       )}
