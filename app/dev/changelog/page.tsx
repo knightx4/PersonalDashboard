@@ -23,7 +23,9 @@ import {
   type ChangelogModuleFilter,
 } from '@/lib/changelog/entries';
 import { cn } from '@/lib/cn';
+import { sourceProblems } from '@/lib/dev/post-check';
 import { moduleById } from '@/lib/modules';
+import { PostAbout } from './post-about';
 
 export const metadata = { title: 'Changelog' };
 
@@ -419,9 +421,27 @@ function Entry({
               <span className="font-mono break-all">{entry.commitSha}</span>
             )}
           </p>
+          {postable(entry) && entry.number !== null && <PostAbout number={entry.number} />}
         </div>
       </details>
     </li>
+  );
+}
+
+/**
+ * Whether a line can be posted about (plan #1420): a plan step in Dev or the
+ * app as a whole whose title and detail pass the posts source check. Any other
+ * line goes without the button rather than offering one that would only
+ * refuse. The action reads the step again, close note included.
+ */
+function postable(entry: ChangelogEntry): boolean {
+  if (entry.source !== 'plan' || entry.number === null) return false;
+  return (
+    sourceProblems({
+      label: `#${entry.number}`,
+      module: entry.module,
+      text: [entry.title, entry.detail].filter(Boolean).join('\n'),
+    }).length === 0
   );
 }
 

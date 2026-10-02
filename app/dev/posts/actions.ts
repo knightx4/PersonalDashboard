@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
+import { sourceProblems } from '@/lib/dev/post-check';
 import { cleanThread, MAX_THREAD_POSTS, parsePostedUrl } from '@/lib/dev/posts';
 import { startPostsRun } from '@/lib/dev/posts-run';
 
@@ -44,6 +45,66 @@ export async function suggestPosts(): Promise<PostsActionState> {
   const user = await requireOwner({ supabase });
 
   const result = await startPostsRun({ supabase, userId: user.id });
+  revalidatePath(POSTS_PATH);
+  if (!result.ok) return { error: result.error };
+  return { message: result.message };
+}
+
+/**
+ * Post about this (plan #1420): the button on a changelog line. It starts the
+ * same run as Suggest posts, told to write one draft about that one step.
+ *
+ * The changelog hides the button on lines a post may not come from, but an
+ * action can be posted without the page, so the step is read again here: it
+ * has to be a done build step in Dev or the app as a whole whose text passes
+ * the source check, and not already the subject of a draft waiting on the
+ * Posts tab.
+ */
+// latency: pending -- starts a routine, which answers within a few seconds
+export async function suggestPostAbout(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const number = z.coerce.number().int().positive().safeParse(formData.get('number'));
+  if (!number.success) return { error: 'Missing step.' };
+
+  const { data: step, error } = await supabase
+    .from('plan_items')
+    .select('id, number, module, kind, status, title, detail, comment')
+    .eq('user_id', user.id)
+    .eq('number', number.data)
+    .maybeSingle();
+  if (error) return { error: error.message };
+  if (!step || step.status !== 'done' || step.kind !== 'build') {
+    return { error: 'Only a step that has shipped can be posted about.' };
+  }
+  const problems = sourceProblems({
+    label: `#${step.number}`,
+    module: step.module ?? null,
+    text: [step.title, step.detail, step.comment].filter(Boolean).join('\n'),
+  });
+  if (problems.length > 0) {
+    return { error: 'This step touches another workspace, so Dash will not post about it.' };
+  }
+
+  const { data: waiting, error: waitingError } = await supabase
+    .from('social_posts')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('status', 'suggested')
+    .contains('source_plan_item_ids', [step.id])
+    .limit(1);
+  if (waitingError) return { error: waitingError.message };
+  if (waiting?.length) return { error: 'A draft about this step is already on the Posts tab.' };
+
+  const result = await startPostsRun({
+    supabase,
+    userId: user.id,
+    focus: { number: number.data },
+  });
   revalidatePath(POSTS_PATH);
   if (!result.ok) return { error: result.error };
   return { message: result.message };
