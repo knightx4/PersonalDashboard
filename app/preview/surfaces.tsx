@@ -103,6 +103,7 @@ import {
   InspirationListSurface,
   InspirationUnreadSurface,
 } from './inspiration-surfaces';
+import { PostsDraftingSurface, PostsSurface } from './posts-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
@@ -3165,6 +3166,24 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <InspirationUnreadSurface />,
+  },
+  {
+    /* Dev's Posts tab (plan #1419): two drafts waiting, one a thread with a
+     * post past 280, then the posted and dropped folds. Fixtures in
+     * posts-surfaces.tsx. */
+    id: 'dev-posts',
+    label: 'Dev · Posts',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsSurface />,
+  },
+  {
+    /* The first press: Dash drafting, nothing written yet. */
+    id: 'dev-posts-drafting',
+    label: 'Dev · Posts, while Dash drafts',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsDraftingSurface />,
   },
   {
     /* The home page's Watching section (plan #1295): a watch that fired, one
