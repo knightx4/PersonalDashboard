@@ -362,7 +362,7 @@ function useHandoffReplies(
 }
 
 /** What Dash says while it looks: long enough that the wait needs a reason. */
-export const ASK_WAITING = 'Dash is looking it up. This can take up to twenty seconds.';
+export const ASK_WAITING = 'Dash is looking it up. A question that needs several lookups can take up to a minute.';
 
 /** The sheet shows a new question, or an earlier one reopened. */
 type View =

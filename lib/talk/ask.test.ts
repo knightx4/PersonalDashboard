@@ -4,9 +4,13 @@ import type { AskContext, AskToolResult, SchemaClient } from '@/lib/ask/db';
 import { executeProposal } from '@/lib/ask/propose';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import {
+  ANSWER_MAX_TOKENS,
+  answerFromLookups,
   answerQuestion,
   askDash,
   ASK_MODEL,
+  FALLBACK_ROWS,
+  type AskLookupEvent,
   limitNote,
   MAX_LOOKUPS,
   pageLine,
@@ -24,6 +28,7 @@ import type { NewTalkTurn, TalkSubject, TalkTurn } from './talk';
 
 type Sent = {
   model: string;
+  max_tokens: number;
   tool_choice: { type: string; name?: string };
   tools: { name: string }[];
   system: { text: string }[];
@@ -745,5 +750,174 @@ describe('handing a request on to the backup routine (plan #1402)', () => {
     expect(result.error).toMatch(/^Dash could not answer/);
     expect(handoffs).toEqual([]);
     expect(fired).toEqual([]);
+  });
+});
+
+describe('questions that need several lookups (plan #1437)', () => {
+  // The question that failed: every company interviewed with in three months.
+  const COMPANIES = ['Acme', 'Birch Labs', 'Cobalt', 'Dune Health', 'Ember'];
+  const app = (i: number) => ({
+    table: 'jobs.applications',
+    ref: `a-${i}`,
+    title: `${COMPANIES[i]}: Product designer`,
+    href: `/jobs/applications/a-${i}`,
+  });
+
+  /** Five rounds of lookups, each finding one application, with `step` milliseconds passing on each. */
+  function fiveLookups(step = 7_000) {
+    let clock = 0;
+    const calls: string[] = [];
+    const execute = async (name: string, input: unknown): Promise<AskToolResult> => {
+      const i = calls.length;
+      calls.push(JSON.stringify([name, input]));
+      clock += step;
+      return { ok: true, rows: [{ ...app(i), detail: { stage: 'interview' } }] };
+    };
+    const rounds = COMPANIES.map((_, i) => reply([use(`u${i}`, 'search', { query: `interview ${i}` })]));
+    return { execute, calls, now: () => clock, rounds };
+  }
+
+  it('answers a five-lookup run that the old fourteen-second budget cut short', async () => {
+    const { execute, calls, now, rounds } = fiveLookups();
+    const { client, sent } = stubClient([
+      ...rounds,
+      reply([
+        use('a', 'answer', {
+          answer: `You interviewed with ${COMPANIES.join(', ')}.`,
+          cited: COMPANIES.map((_, i) => ({ table: 'jobs.applications', ref: `a-${i}` })),
+        }),
+      ]),
+    ]);
+    const answer = await answerQuestion({
+      turns: [{ role: 'user', body: 'Every company I interviewed with in the past 3 months?' }],
+      today: '2026-10-02',
+      execute,
+      anthropicApiKey: 'k',
+      client,
+      now,
+    });
+
+    expect(calls).toHaveLength(5);
+    expect(sent).toHaveLength(6);
+    // Thirty-five seconds of looking is inside the budget, so it was never forced.
+    expect(sent.every((s) => s.tool_choice.type === 'any')).toBe(true);
+    expect(sent.every((s) => s.max_tokens === ANSWER_MAX_TOKENS)).toBe(true);
+    expect(answer).toMatchObject({
+      ok: true,
+      stop: 'answered',
+      body: 'You interviewed with Acme, Birch Labs, Cobalt, Dune Health, Ember.',
+    });
+    expect(answer.ok && answer.citations).toEqual(COMPANIES.map((_, i) => app(i)));
+  });
+
+  it('builds the answer from the lookups when the last call comes back empty, and keeps it', async () => {
+    // Eight seconds a lookup: the fifth reaches the budget.
+    const { execute, now, rounds } = fiveLookups(TIME_BUDGET_MS / 5);
+    // Past the budget, it is told to answer, looks something up instead, and
+    // the prose call after that writes nothing.
+    const { client, sent } = stubClient([
+      ...rounds,
+      reply([use('u9', 'search', { query: 'one more' })]),
+      reply([], 'end_turn'),
+    ]);
+    const { stores, written } = memoryStores();
+    const result = await askDash(
+      {
+        question: 'Every company I interviewed with in the past 3 months?',
+        today: '2026-10-02',
+        execute,
+        anthropicApiKey: 'k',
+        client,
+        now,
+      },
+      stores,
+    );
+
+    expect(sent.at(-1)?.tool_choice).toEqual({ type: 'none' });
+    expect(result.error).toBeUndefined();
+    expect(result.stop).toBe('unfinished');
+    const kept = written[1].turns[0];
+    expect(kept.body).toContain('I could not finish writing the answer');
+    for (const company of COMPANIES) expect(kept.body).toContain(`- ${company}: Product designer`);
+    expect(kept.body).not.toContain('could not answer');
+    expect(kept.citations).toEqual(COMPANIES.map((_, i) => app(i)));
+    // The refused lookup is still on the turn, as refused.
+    expect(kept.toolCalls).toHaveLength(6);
+  });
+
+  it('builds the answer from the lookups when the answer tool comes back with no text', async () => {
+    const { execute, now, rounds } = fiveLookups();
+    const { client } = stubClient([...rounds, reply([use('a', 'answer', { answer: '  ', cited: [] })])]);
+    const answer = await answerQuestion({
+      turns: [{ role: 'user', body: 'q' }],
+      today: '2026-10-02',
+      execute,
+      anthropicApiKey: 'k',
+      client,
+      now,
+    });
+    expect(answer).toMatchObject({ ok: true, stop: 'unfinished' });
+    expect(answer.ok && answer.citations).toHaveLength(5);
+  });
+
+  it('still says it could not answer when the lookups found nothing', async () => {
+    const { client } = stubClient([
+      reply([use('u1', 'nope', {})]),
+      reply([], 'end_turn'),
+    ]);
+    const { execute } = stubExecute();
+    const answer = await answerQuestion({
+      turns: [{ role: 'user', body: 'q' }],
+      today: '2026-10-02',
+      execute,
+      anthropicApiKey: 'k',
+      client,
+    });
+    expect(answer).toMatchObject({ ok: false });
+    expect(!answer.ok && answer.detail).toContain('reported nothing');
+  });
+
+  it('names each row once and stops listing past the cap', () => {
+    const rows = Array.from({ length: FALLBACK_ROWS + 3 }, (_, i) => ({
+      table: 'public.orders',
+      ref: `o-${i}`,
+      title: `Order\n ${i}`,
+      href: `/shopping/orders/o-${i}`,
+    }));
+    const built = answerFromLookups([rows[0], ...rows]);
+    expect(built?.citations).toHaveLength(FALLBACK_ROWS);
+    expect(built?.body).toContain('- Order 0\n- Order 1\n');
+    expect(built?.body).toContain('- and 3 more');
+    expect(answerFromLookups([])).toBeNull();
+  });
+
+  it('tells a listener each lookup as it starts and as it finishes', async () => {
+    const { execute, rounds } = fiveLookups();
+    const { client } = stubClient([
+      rounds[0],
+      reply([use('u1', 'search', { query: 'b' }), use('u2', 'search', { query: 'c' })]),
+      reply([use('a', 'answer', { answer: 'Three.', cited: [] })]),
+    ]);
+    const events: AskLookupEvent[] = [];
+    await answerQuestion({
+      turns: [{ role: 'user', body: 'q' }],
+      today: '2026-10-02',
+      execute,
+      anthropicApiKey: 'k',
+      client,
+      onLookup: (event) => {
+        events.push(event);
+        throw new Error('a listener that fails changes nothing');
+      },
+    });
+    expect(events.map((e) => `${e.phase} ${e.id} ${e.index}`)).toEqual([
+      'started u0 0',
+      'finished u0 0',
+      'started u1 1',
+      'started u2 2',
+      'finished u1 1',
+      'finished u2 2',
+    ]);
+    expect(events[1]).toMatchObject({ ok: true, result: { ok: true, rows: [app(0)] } });
   });
 });
