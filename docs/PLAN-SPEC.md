@@ -514,6 +514,8 @@ says what this firing is for, and wins:
   once, at the end. The press writes no row: it starts the session and nothing
   else, because approving is what the runner reads now (#672).
 - ***Shape into a plan*** on an idea — write the proposal and nothing else.
+- ***Suggest posts*** on the Posts tab — draft X posts into `social_posts`
+  following `.claude/skills/posts`, and nothing else (job `posts`, #1417).
 
 The batch button is the one to think twice about. There is no review point
 between its steps, so a step that gets something wrong early has the rest

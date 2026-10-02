@@ -78,7 +78,9 @@ not say it, the post does not say it.
 ## Never in a post
 
 The run checks every draft for each of these before inserting it, and drops a
-draft that fails rather than editing around it.
+draft that fails rather than editing around it. The part a rule can catch is
+`scripts/posts-check.ts` (`lib/dev/post-check.ts`); the rest is the run
+reading the draft.
 
 - **Anything from a workspace other than Dev.** Jobs, goals, the vault, Learn,
   news, shopping, todo, mail and calendar hold the person's life, and a step
