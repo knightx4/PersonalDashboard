@@ -138,6 +138,14 @@ export default async function LearnLayout({ children }: { children: React.ReactN
             exact: true,
             alsoMatches: ['/learn/videos/'],
           },
+          // Short clips cut from those videos, played one after another
+          // (plan #1400). The owner's for the same reason.
+          {
+            href: '/learn/clips',
+            label: 'Clips',
+            icon: 'clips' as const,
+            exact: true,
+          },
           {
             href: '/learn/youtube',
             label: 'YouTube',

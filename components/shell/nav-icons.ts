@@ -14,6 +14,7 @@ import {
   Globe,
   CalendarClock,
   CalendarDays,
+  Clapperboard,
   CalendarRange,
   Compass,
   ClipboardCheck,
@@ -145,6 +146,9 @@ export const NAV_ICONS = {
   // Your own list of videos to watch (plan #1069): a list with a play mark,
   // so it reads as the list rather than the library above it.
   watchList: ListVideo,
+  // Clips (plan #1400): short cuts played one after another, so the
+  // clapperboard, which marks a cut rather than a whole video.
+  clips: Clapperboard,
   // News. An envelope, the same object the workspace's own mark draws, because
   // the tab and the mark name the same thing and picking a second object for
   // it would say there are two.
