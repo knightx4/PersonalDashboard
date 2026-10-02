@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { visionReviewDue, visionReviewStatus, visionRunText } from './vision-review-run';
+import { opensText, visionReviewDue, visionReviewStatus, visionRunText } from './vision-review-run';
 
 const NOW = Date.parse('2026-10-04T14:41:00Z');
 const daysAgo = (days: number) => new Date(NOW - days * 24 * 60 * 60 * 1000).toISOString();
@@ -66,5 +66,39 @@ describe('visionRunText', () => {
     const text = visionRunText('11111111-1111-4111-8111-111111111111');
     expect(text).toContain('user_id 11111111-1111-4111-8111-111111111111');
     expect(text).toContain('.claude/skills/vision-review/SKILL.md');
+  });
+});
+
+describe('opensText', () => {
+  it('says nothing is recorded yet rather than reading zero as disuse', () => {
+    const text = opensText({ since: '2026-09-27T16:00:00Z', recordingSince: null, counts: {} });
+    expect(text).toContain('No page opens have been recorded yet');
+    expect(text).not.toContain('none');
+  });
+
+  it('names every workspace and marks a window that began before recording', () => {
+    const text = opensText({
+      since: '2026-09-27T16:00:00+00:00',
+      recordingSince: '2026-10-02T22:10:00.000Z',
+      counts: { dev: { opens: 1, pages: 1 } },
+    });
+    expect(text).toContain('since recording began on 2026-10-02');
+    expect(text).toContain('dev 1 open across 1 page');
+    expect(text).toContain('shopping none');
+    expect(text).toContain('core.workspace_opens');
+  });
+
+  it('counts from the last review once recording covers it', () => {
+    const text = opensText({
+      since: '2026-10-04T14:41:00Z',
+      recordingSince: '2026-10-02T22:10:00.000Z',
+      counts: {},
+    });
+    expect(text).toContain('Page opens since the last review on 2026-10-04');
+  });
+
+  it('is appended to the run text when given', () => {
+    expect(visionRunText('u', null)).toContain('could not be read');
+    expect(visionRunText('u')).not.toContain('page opens');
   });
 });

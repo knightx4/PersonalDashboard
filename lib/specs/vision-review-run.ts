@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { MODULE_IDS, type ModuleId } from '@/lib/modules';
 
 /**
  * The weekly vision review's clock (plan #1108): when it is due, what the
@@ -55,15 +56,102 @@ export function visionReviewDue(input: {
   return { due: true };
 }
 
-/** The turn appended to the routine's session: whose visions, and how. */
-export function visionRunText(userId: string): string {
+/**
+ * Page opens per workspace over the review's window (plan #1483), from
+ * core.workspace_opens. Recording began with plan #1481, so `recordingSince`
+ * is when the first open was recorded, or null when none has been: a zero
+ * before that is not disuse, only nothing measured.
+ */
+export type WindowOpens = {
+  /** The window's start: the last review, or null on the first run. */
+  since: string | null;
+  recordingSince: string | null;
+  /** Opens and distinct pages per workspace; `outside` is /home, /ask and the rest. */
+  counts: Partial<Record<ModuleId | 'outside', { opens: number; pages: number }>>;
+};
+
+const dateOf = (at: string) => at.slice(0, 10);
+
+/** The opens as the routine is told them: one sentence per fact, every workspace named. */
+export function opensText(input: WindowOpens | null): string {
+  const cite =
+    "Cite each workspace's page opens in its note, and read them for a workspace's own window " +
+    'with core.workspace_opens as the skill says.';
+  if (input === null) {
+    return `The page opens could not be read when this run was fired. ${cite}`;
+  }
+  if (input.recordingSince === null) {
+    return (
+      'No page opens have been recorded yet, so there is no measure of use for any workspace. ' +
+      'Say so in each note rather than reading it as a workspace going unused.'
+    );
+  }
+  const partial =
+    input.since === null || Date.parse(input.recordingSince) > Date.parse(input.since);
+  const head = partial
+    ? `Page opens since recording began on ${dateOf(input.recordingSince)}; ` +
+      'use before then was not recorded, so a low count is not yet disuse'
+    : `Page opens since the last review on ${dateOf(input.since as string)}`;
+  const one = (key: ModuleId | 'outside') => {
+    const count = input.counts[key];
+    const name = key === 'outside' ? 'pages outside any workspace' : key;
+    if (!count || count.opens === 0) return `${name} none`;
+    return `${name} ${count.opens} ${count.opens === 1 ? 'open' : 'opens'} across ${count.pages} ${
+      count.pages === 1 ? 'page' : 'pages'
+    }`;
+  };
+  const list = [...MODULE_IDS, 'outside' as const].map(one).join(', ');
+  return `${head}: ${list}. ${cite}`;
+}
+
+/** The turn appended to the routine's session: whose visions, how, and the opens. */
+export function visionRunText(userId: string, opens?: WindowOpens | null): string {
   return (
     `Run the weekly vision review for user_id ${userId}. Read ` +
     '.claude/skills/vision-review/SKILL.md first and follow it: one vision_reviews row per ' +
     'workspace under one review_id, a dated "still holds" or a proposed edit citing its ' +
     'evidence, the likes it read closed, and nothing written to module_visions. You change ' +
-    'rows, not code. Do not commit or push.'
+    'rows, not code. Do not commit or push.' +
+    (opens === undefined ? '' : `\n\n${opensText(opens)}`)
   );
+}
+
+/**
+ * The opens per workspace since `since` (all recorded opens when null), and
+ * when recording began. Under the service role, so every read names the
+ * account.
+ */
+export async function loadWindowOpens(
+  supabase: SupabaseClient,
+  userId: string,
+  since: string | null,
+): Promise<WindowOpens> {
+  const core = supabase.schema('core');
+  const [counted, firstView, firstDay] = await Promise.all([
+    core.rpc('workspace_opens', { p_user_id: userId, p_since: since ?? '1970-01-01T00:00:00Z' }),
+    core.from('page_views').select('viewed_at').eq('user_id', userId).order('viewed_at').limit(1),
+    core.from('page_view_days').select('day').eq('user_id', userId).order('day').limit(1),
+  ]);
+  if (counted.error) throw new Error(`Could not count the page opens: ${counted.error.message}`);
+  if (firstView.error) throw new Error(`Could not read the page views: ${firstView.error.message}`);
+  if (firstDay.error) throw new Error(`Could not read the daily page views: ${firstDay.error.message}`);
+
+  const firsts = [
+    (firstView.data?.[0] as { viewed_at: string } | undefined)?.viewed_at,
+    (firstDay.data?.[0] as { day: string } | undefined)?.day,
+  ]
+    .filter((at): at is string => typeof at === 'string')
+    .map((at) => new Date(at).toISOString())
+    .sort();
+
+  const counts: WindowOpens['counts'] = {};
+  const known = new Set<string>(MODULE_IDS);
+  for (const row of (counted.data ?? []) as { workspace: string | null; opens: number; pages: number }[]) {
+    const key = row.workspace !== null && known.has(row.workspace) ? (row.workspace as ModuleId) : 'outside';
+    const before = counts[key] ?? { opens: 0, pages: 0 };
+    counts[key] = { opens: before.opens + row.opens, pages: before.pages + row.pages };
+  }
+  return { since, recordingSince: firsts[0] ?? null, counts };
 }
 
 /** What the Dash tab shows about the review. */
