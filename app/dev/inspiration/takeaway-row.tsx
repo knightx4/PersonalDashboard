@@ -5,6 +5,7 @@ import { MODULES, type ModuleId } from '@/lib/modules';
 import { clockTime } from '@/lib/learn/youtube/format';
 import { planHref } from '@/lib/search/sources/dev-map';
 import type { Takeaway, TakeawaySource } from '@/lib/dev/inspiration/view';
+import { TakeawayActions } from './takeaway-actions';
 
 /**
  * One takeaway, drawn the same way in both views (plan #1412).
@@ -14,8 +15,8 @@ import type { Takeaway, TakeawaySource } from '@/lib/dev/inspiration/view';
  * without naming the video again. In the one-list view every video the point
  * came from is named under it, each with its own moment.
  *
- * A server component with no state, so the buttons that act on a takeaway
- * (#1413) go in as a client component of their own in the footer below.
+ * A server component with no state; the buttons that act on a takeaway
+ * (#1413) are the client component in the footer, takeaway-actions.tsx.
  */
 
 const MODULE_LABEL = new Map<ModuleId, string>(MODULES.map((module) => [module.id, module.label]));
@@ -45,9 +46,15 @@ function TakeawayState({ takeaway }: { takeaway: Takeaway }) {
     );
   }
   if (cover?.kind === 'idea') {
+    // Crafted and linked to an idea with no feature yet: the shape routine has
+    // it, and the feature number replaces this when the proposal is written.
     return (
       <Link href={`/dev/ideas#idea-${cover.ideaId}`} className="hover:underline">
-        <StateLabel glyph="dashed" word="Already an idea" tone="info" />
+        <StateLabel
+          glyph="dashed"
+          word={status === 'crafted' ? 'Sent to be shaped' : 'Already an idea'}
+          tone="info"
+        />
       </Link>
     );
   }
@@ -126,7 +133,7 @@ export function TakeawayRow({ takeaway, inVideo = false }: { takeaway: Takeaway;
         )
       )}
 
-      {/* The footer is where an open takeaway's buttons go (#1413). */}
+      {takeaway.status !== 'covered' && <TakeawayActions id={takeaway.id} status={takeaway.status} />}
     </li>
   );
 }

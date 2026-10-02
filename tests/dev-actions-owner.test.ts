@@ -160,6 +160,7 @@ const { NotTheOwnerError } = await import('@/lib/dev/owner');
 const bugs = await import('@/app/dev/bugs/actions');
 const comments = await import('@/app/dev/comment-actions');
 const ideas = await import('@/app/dev/ideas/actions');
+const inspiration = await import('@/app/dev/inspiration/actions');
 const plan = await import('@/app/dev/plan/actions');
 const raised = await import('@/app/dev/raised/actions');
 const specs = await import('@/app/dev/specs/actions');
@@ -202,6 +203,11 @@ const LOCKED: ReadonlyArray<{ file: string; name: string; run: () => Promise<unk
     file: 'app/dev/ideas/actions.ts',
     name: 'shapeIdea',
     run: () => (ideas.shapeIdea as Action)({}, form({ id: SOME_UUID })),
+  },
+  {
+    file: 'app/dev/inspiration/actions.ts',
+    name: 'craftTakeaway',
+    run: () => (inspiration.craftTakeaway as Action)({}, form({ id: SOME_UUID })),
   },
   {
     file: 'app/dev/plan/actions.ts',
