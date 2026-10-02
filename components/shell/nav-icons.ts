@@ -11,6 +11,7 @@ import {
   FileText,
   Flag,
   GalleryHorizontalEnd,
+  Gauge,
   Globe,
   CalendarClock,
   CalendarDays,
@@ -103,6 +104,8 @@ export const NAV_ICONS = {
   posts: Megaphone,
   ui: Shapes,
   surfaces: Frame,
+  // Which pages are opened and what each workspace spends (plan #1482).
+  usage: Gauge,
   // A project Dev builds outside this app (lib/plan/projects): a site.
   project: Globe,
   // A specification is a document you read and argue with, so it gets the

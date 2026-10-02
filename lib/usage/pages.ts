@@ -22,6 +22,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/dev/surfaces',
   '/dev/ui',
   '/dev/ui/review',
+  '/dev/usage',
   '/goals',
   '/goals/[goalId]',
   '/goals/all',

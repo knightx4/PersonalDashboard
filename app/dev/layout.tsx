@@ -123,6 +123,9 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     { href: '/dev/specs', label: 'Specs', icon: 'specs' },
     { href: '/dev/ui', label: 'UI', icon: 'ui' },
     { href: '/dev/surfaces', label: 'Surfaces', icon: 'surfaces' },
+    // Which pages are opened, and the model spend of each workspace (plan
+    // #1482): what the cut-back is decided from.
+    { href: '/dev/usage', label: 'Usage', icon: 'usage' },
     { href: '/dev/changelog', label: 'Changelog', icon: 'changelog' },
     // X posts Dash drafts about building the app (plan #1419).
     { href: '/dev/posts', label: 'Posts', icon: 'posts' },
