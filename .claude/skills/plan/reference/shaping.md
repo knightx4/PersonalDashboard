@@ -6,6 +6,26 @@ user says "shape idea …", or a routine is fired from the *Shape into a plan*
 button with an idea in its brief, the job is to write a **proposal** — and
 nothing else.
 
+## Until 30 October 2026: only from what the person wrote
+
+For four weeks from 2 October 2026 (docs/CUT-BACK-SPEC.md part 5), a new
+feature is shaped only from something the person wrote, meaning a note, an
+idea of theirs or an answer, or from a page-view number in `core.page_opens`
+(the Usage tab in Dev). An idea a session filed (`ideas.source = 'claude'`,
+shown on the ideas page as a suggestion) waits until the hold ends. The end
+date is `SESSION_IDEA_HOLD_ENDS` in `lib/plan/hold.ts`, and it is the only
+place the date is kept; read it there if this paragraph and the code disagree.
+
+The *Shape into a plan* button already refuses such an idea and says why. A
+run that starts some other way, such as "shape idea …" typed in a session,
+checks the idea's `source` first. If it is `'claude'` and the date is before
+the end date, do not write a proposal: say that the idea was filed by a
+session, that it can be shaped from 30 October 2026, and that the person can
+file it again in their own words to shape it now. Then stop.
+
+Building approved steps, the inspiration routine and the X post routine are
+not held.
+
 1. **Read the idea.** `ideas` lists the ones not yet shaped, with their id
    prefix. The brief a routine was fired with carries the full text.
 2. **Read the code it touches.** The module's spec in `docs/`, the routes and
