@@ -139,6 +139,7 @@ export async function loadLearnerProfile(learn: LearnSupabaseClient, userId: str
     subjects.map(async (subject) => {
       const rooting = rootingFor(await loadGraph(learn, subject.id, userId), null);
       return {
+        id: subject.id,
         name: subject.name,
         note: subject.note,
         frontier: rooting.frontier,
@@ -150,7 +151,7 @@ export async function loadLearnerProfile(learn: LearnSupabaseClient, userId: str
   const goalRows = await learn
     .schema('goals')
     .from('items')
-    .select('title, detail')
+    .select('id, title, detail')
     .eq('user_id', userId)
     .eq('level', 'goal')
     .eq('status', 'open')
@@ -206,7 +207,11 @@ export async function loadLearnerProfile(learn: LearnSupabaseClient, userId: str
   return {
     filed,
     tracks,
-    goals: ((goalRows.data ?? []) as { title: string; detail: string | null }[]).map((goal) => ({ title: goal.title, detail: goal.detail })),
+    goals: ((goalRows.data ?? []) as { id: string; title: string; detail: string | null }[]).map((goal) => ({
+      id: goal.id,
+      title: goal.title,
+      detail: goal.detail,
+    })),
     ideas: [...byTheme].map(([theme, names]) => ({ theme, names })),
   };
 }

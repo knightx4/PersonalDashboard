@@ -215,6 +215,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // Per channel: up to 200 titles in and three numbers out, then the profile,
   // three verdicts and three 5,000-character excerpts in and a reason out.
   'judge-channel': unit(HAIKU, 9_000, 200),
+  // One video's transcript as numbered sentences in, most of them half an
+  // hour or less (about 8,000 tokens), and up to fifteen clips out.
+  'cut-clips': background(unit(HAIKU, 9_000, 1_500)),
 
   // Jobs.
   'enrich-company': run(HAIKU, 10_000, 500),
