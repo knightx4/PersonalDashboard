@@ -34,6 +34,7 @@ import {
   noteContext,
   raiseContext,
   specContext,
+  takeawayContext,
   threadText,
 } from './context';
 import { TARGET_COLUMN, threadFrom, type CommentTarget, type DevComment } from './load';
@@ -118,6 +119,32 @@ async function subjectOf(input: AskInput): Promise<Subject | null> {
     if (!data) return null;
     const row = raisedRowFrom(data as unknown as Record<string, unknown>);
     return { context: raiseContext(row), thread: row.thread, label: row.title };
+  }
+
+  if (target === 'takeaway') {
+    const { data } = await supabase
+      .from('inspiration_takeaways')
+      .select(
+        'title, body, module, status, dev_comments (id, author, body, created_at), ' +
+          'inspiration_takeaway_videos (inspiration_videos (title))',
+      )
+      .eq('user_id', userId)
+      .eq('id', id)
+      .maybeSingle();
+    if (!data) return null;
+    const row = data as unknown as Record<string, unknown>;
+    const links = (row.inspiration_takeaway_videos ?? []) as Array<{ inspiration_videos: { title: string | null } | null }>;
+    return {
+      context: takeawayContext({
+        title: String(row.title),
+        body: String(row.body),
+        module: typeof row.module === 'string' ? row.module : null,
+        status: String(row.status),
+        videos: links.map((link) => link.inspiration_videos?.title).filter((title): title is string => !!title),
+      }),
+      thread: threadFrom(row.dev_comments),
+      label: `the inspiration takeaway "${String(row.title)}"`,
+    };
   }
 
   if (target === 'spec') {

@@ -135,6 +135,10 @@ export const SPEND_OPERATIONS = {
     // app (plan #1409). Sonnet, one call per video not read yet, from the
     // inspiration run and its Check now button.
     'read-inspiration-video',
+    // Summarising one inspiration video in a few points for the tab (note
+    // b0594be6). Haiku, one call per read video without a summary, from the
+    // inspiration run and its Check now button.
+    'summarise-inspiration-video',
     // Embedding each new inspiration takeaway, with the plan features and
     // ideas it might repeat, to find the nearest (plan #1410). Voyage, one
     // call per run that stored new takeaways.
@@ -143,6 +147,10 @@ export const SPEND_OPERATIONS = {
     // earlier one or is already covered by the plan (plan #1410). Haiku, one
     // short call per new takeaway with something near it.
     'merge-inspiration-takeaways',
+    // Jev's score on one inspiration takeaway, with the ideas' question
+    // (note 790c745a). One short call per takeaway not yet scored; background,
+    // from the daily idea-score catch-up.
+    'score-inspiration-takeaway',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one

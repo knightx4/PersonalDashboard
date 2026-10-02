@@ -1,3 +1,5 @@
+import { threadFrom, type DevComment } from '@/lib/comments/load';
+import { scoreFrom, type IdeaScore } from '@/lib/ideas/score';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 import { watchAt } from '@/lib/learn/youtube/format';
 import { checkRunning } from './lock';
@@ -30,6 +32,8 @@ export type VideoRow = {
   processed_at: string | null;
   takeaway_count: number | null;
   process_error: string | null;
+  /** A few points on what the video says (note b0594be6); absent from fixtures written before it. */
+  summary_points?: string[] | null;
 };
 
 export type TakeawayRowData = {
@@ -41,6 +45,10 @@ export type TakeawayRowData = {
   idea_id: string | null;
   plan_item_id: string | null;
   created_at: string;
+  /** Jev's score (note 790c745a); absent from fixtures written before it. */
+  score?: unknown;
+  /** The thread under it (notes c934aefe and eef7e9f1); absent from fixtures written before it. */
+  dev_comments?: unknown;
 };
 
 export type LinkRow = {
@@ -92,6 +100,10 @@ export type Takeaway = {
   status: TakeawayStatus;
   createdAt: string;
   cover: TakeawayCover;
+  /** Jev's score, as an idea's; null until scored. */
+  score: IdeaScore | null;
+  /** What you and Dash wrote on it, oldest first. */
+  thread: DevComment[];
   sources: TakeawaySource[];
 };
 
@@ -106,6 +118,8 @@ export type InspirationVideo = {
   leftPlaylist: boolean;
   /** What happened when Dash went to read it, in words for the row. */
   state: VideoState;
+  /** What the video says in a few points, whether or not it applies; empty until Dash has summarised it. */
+  summary: string[];
   /** Its takeaways that are not dismissed, each in this video's own wording. */
   takeaways: Takeaway[];
 };
@@ -123,7 +137,7 @@ export type InspirationPage = {
   /** A check of the playlist is going now, from the daily run or Check now. */
   checking: boolean;
   videos: InspirationVideo[];
-  /** Every takeaway not dismissed, once each, newest first. */
+  /** Every takeaway not dismissed, once each, best score first. */
   list: Takeaway[];
   /** Dismissed takeaways, newest first, for the fold. */
   dismissed: Takeaway[];
@@ -149,6 +163,16 @@ export function playlistUrl(playlistId: string): string {
 
 const newestFirst = (a: { createdAt: string }, b: { createdAt: string }) =>
   b.createdAt.localeCompare(a.createdAt);
+
+/**
+ * Best to worst by Jev's score (note 790c745a), as the Ideas tab ranks ideas.
+ * An unscored takeaway goes after every scored one; ties are newest first.
+ */
+export function bestFirst(a: Takeaway, b: Takeaway): number {
+  const left = a.score?.value ?? -1;
+  const right = b.score?.value ?? -1;
+  return right !== left ? right - left : newestFirst(a, b);
+}
 
 export function buildInspirationPage(input: {
   settings: SettingsRow | null;
@@ -208,10 +232,12 @@ export function buildInspirationPage(input: {
     status: statusOf(row.status),
     createdAt: row.created_at,
     cover: coverOf(row),
+    score: scoreFrom(row.score),
+    thread: threadFrom(row.dev_comments),
     sources: (linksByTakeaway.get(row.id) ?? []).map(sourceOf),
   }));
 
-  const shown = takeaways.filter((takeaway) => takeaway.status !== 'dismissed').sort(newestFirst);
+  const shown = takeaways.filter((takeaway) => takeaway.status !== 'dismissed').sort(bestFirst);
   const dismissed = takeaways.filter((takeaway) => takeaway.status === 'dismissed').sort(newestFirst);
 
   // The by-video view: each video's takeaways, with that video alone as the
@@ -247,6 +273,7 @@ export function buildInspirationPage(input: {
         addedAt: row.added_at,
         leftPlaylist: row.left_playlist_at !== null,
         state: videoState(row),
+        summary: row.summary_points ?? [],
         takeaways: underVideo.get(row.id) ?? [],
       }),
     );
