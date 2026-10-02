@@ -66,7 +66,7 @@ function stateLine(state: VideoState): string {
     case 'read':
       return state.count === 0
         ? 'Read. Nothing in it applies to this app.'
-        : 'Read. Everything it gave is dismissed.';
+        : 'Read. Everything it gave is already an idea, in the plan, or dismissed.';
   }
 }
 
@@ -178,6 +178,12 @@ export function InspirationView({ page, view }: { page: InspirationPage; view: I
         <p className="text-small text-ink-muted">
           No takeaways yet. They show here as Dash reads the videos.
         </p>
+      )}
+
+      {page.filed.length > 0 && (
+        <SectionFold title="Already an idea or in the plan" count={page.filed.length} defaultOpen={false}>
+          <TakeawayList takeaways={page.filed} />
+        </SectionFold>
       )}
 
       {page.dismissed.length > 0 && (
