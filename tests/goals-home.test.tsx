@@ -1,9 +1,8 @@
 /**
- * The Goals home (plan #1077): a sentence on where the goals stand, Today
- * with one button a row and the rest folded under it, one line per goal
- * under its area, and what Dash did since your last visit with Read and
- * Undo. None of the old home's sections are left. Errands (plan #1262) sit
- * above the areas, soonest due first, with Add an errand under them.
+ * The Goals home (plan #1077): a sentence on where the goals stand, a board
+ * of every goal with errands first, Up next with one button a row, Not now
+ * and the rest folded under it, Put Dash to work, and what Dash did since
+ * your last visit with Read and Undo.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -24,7 +23,15 @@ vi.mock('@/app/goals/[goalId]/actions', () => ({
 vi.mock('@/app/goals/[goalId]/comment-actions', () => ({ addGoalComment: vi.fn() }));
 vi.mock('@/app/goals/[goalId]/flag-actions', () => ({ answerFlagAction: vi.fn() }));
 vi.mock('@/app/goals/[goalId]/tree-actions', () => ({ answerGoalQuestion: vi.fn() }));
-vi.mock('@/app/goals/actions', () => ({ addErrand: vi.fn() }));
+vi.mock('@/app/goals/[goalId]/shaping-actions', () => ({
+  prepareStepAction: vi.fn(),
+  workOnGoalAction: vi.fn(),
+}));
+vi.mock('@/app/goals/home-actions', () => ({
+  askDashAction: vi.fn(),
+  setAsideAction: vi.fn(),
+  restoreAsideAction: vi.fn(),
+}));
 
 const { HomeView } = await import('@/app/goals/home-view');
 
@@ -126,14 +133,16 @@ function render(extra: Partial<Parameters<typeof HomeView>[0]> = {}): string {
 }
 
 describe('the Goals home', () => {
-  it('reads summary, Today, the goals, then what Dash did', () => {
+  it('reads summary, the goals, Up next, Put Dash to work, then what Dash did', () => {
     const html = render();
     const order = [
       'Your one goal is waiting on you.',
-      'Today',
-      'Avalanche or snowball?',
       'Your goals',
       'Choose avalanche or snowball',
+      'Up next',
+      'Avalanche or snowball?',
+      'Put Dash to work',
+      'Ask Dash',
       'What Dash did since',
       'Drafted the payoff order',
       'This week',
@@ -169,10 +178,13 @@ describe('the Goals home', () => {
     expect(render({ health: null })).toContain('The week’s numbers could not be read just now.');
   });
 
-  it('gives each thing today one button, and folds the rest under them', () => {
+  it('gives each thing up next one button and Not now, and folds the rest under them', () => {
     const html = render();
     expect(html).toContain('>Answer<');
     expect(html).toContain('>Done<');
+    expect(html).toContain('Not now');
+    expect(html).not.toContain('Dash prepares it');
+    expect(render({ preparable: ['a'] })).toContain('Dash prepares it');
     expect(html).toContain('frees 3 steps');
     expect(html).toContain('Also on you');
     expect(html).toContain('Call the card company');
@@ -199,7 +211,7 @@ describe('the Goals home', () => {
     );
   });
 
-  it('lists errands soonest first above the areas, each with its date, and not again under its area', () => {
+  it('puts errands first on the board, soonest due first, each with how long it has', () => {
     const errand = (id: string, title: string, dueOn: string): HomeGoal => ({
       ...goal,
       goal: { ...goal.goal, id, title, errand: true, dueOn },
@@ -211,28 +223,44 @@ describe('the Goals home', () => {
         errand('e2', 'Book the car service', '2026-10-20'),
         errand('e1', 'Give Sam a live electronic show for her birthday', '2026-10-09'),
       ],
+      todayOn: '2026-10-02',
       areas: [{ id: 'area', name: 'Money' }],
     });
+    const board = html.slice(html.indexOf('Your goals'), html.indexOf('Up next'));
     const order = [
-      'Errands',
-      'Give Sam a live electronic show',
       'Due 9 Oct',
-      'Book the car service',
+      'in 7 days',
+      'Give Sam a live electronic show',
       'Due 20 Oct',
-      'Add an errand',
-      'Your goals',
+      'Book the car service',
+      'Pay off the debts',
     ];
-    const positions = order.map((text) => html.indexOf(text));
+    const positions = order.map((text) => board.indexOf(text));
     expect(positions.every((p) => p >= 0)).toBe(true);
     expect([...positions].sort((a, b) => a - b)).toEqual(positions);
-    expect(html.slice(html.indexOf('Your goals'))).not.toContain('Book the car service');
-    expect(html).toContain('1 open');
-    expect(html).toContain('2 open');
   });
 
-  it('offers Add an errand once there is an area to put it in', () => {
-    expect(render({ areas: [{ id: 'area', name: 'Money' }] })).toContain('Add an errand');
-    expect(render()).not.toContain('Errands');
+  it('says on each card how much is on you and whether Dash is on it', () => {
+    const html = render({
+      holders: { g1: { onYou: 3, dashOpen: 2, working: null, lastDashAt: null } },
+    });
+    expect(html).toContain('3 on you');
+    expect(html).toContain('2 with Dash');
+  });
+
+  it('offers what Dash could take, and a new errand once there is an area for it', () => {
+    const html = render({
+      offers: [
+        { kind: 'prepare', stepId: 'a', title: 'Call the card company', goalId: 'g1', goalTitle: 'Pay off the debts' },
+        { kind: 'goal', goalId: 'g1', title: 'Pay off the debts', reason: 'Dash has not worked on it yet.' },
+      ],
+    });
+    expect(html).toContain('Dash could take these');
+    expect(html).toContain('Call the card company');
+    expect(html).toContain('>Prepare it<');
+    expect(html).toContain('>Work on it<');
+    expect(html).not.toContain('A new errand');
+    expect(render({ areas: [{ id: 'area', name: 'Money' }] })).toContain('A new errand');
   });
 
   it('offers to add a goal when there are none', () => {

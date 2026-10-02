@@ -89,3 +89,21 @@ export async function loadStartedGoalRuns(client: GoalsSupabaseClient): Promise<
   if (error) throw new Error(`Could not read the goal runs going: ${error.message}`);
   return toRunListings((data ?? []) as unknown as RunRowWithItem[]);
 }
+
+/**
+ * Runs started after `since`, newest first, for the Goals home: who is on each
+ * goal now, and when Dash last worked on it (lib/goals/hand-off.ts).
+ */
+export async function loadRunsStartedSince(
+  client: GoalsSupabaseClient,
+  since: string,
+): Promise<RunListing[]> {
+  const { data, error } = await client
+    .from('runs')
+    .select(RUN_SELECT)
+    .gt('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(RUNS_LIMIT);
+  if (error) throw new Error(`Could not read recent runs: ${error.message}`);
+  return toRunListings((data ?? []) as unknown as RunRowWithItem[]);
+}

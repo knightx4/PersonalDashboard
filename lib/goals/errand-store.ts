@@ -9,8 +9,9 @@ import { errandAreaDefault } from '@/lib/goals/home';
 import { insertGoal, loadAreas } from '@/lib/goals/store';
 
 /**
- * Save an errand and start Dash on it, the one press behind Add an errand on
- * the Goals home (plan #1262) and Hand to Dash on a Todo task (plan #1263).
+ * Save an errand and start Dash on it, the one press behind Ask Dash on the
+ * Goals home when it is a new errand (plan #1262) and Hand to Dash on a Todo
+ * task (plan #1263).
  *
  * The errand goes in as the person's own goal, open and approved like any
  * goal they add. The run is started in the same press, and when it cannot
