@@ -1,10 +1,9 @@
 import { FileText } from 'lucide-react';
-import Markdown from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
-import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 
 import { cardVariants } from '@/components/ui/card';
+import { Markdown } from '@/components/ui/markdown';
 import { cn } from '@/lib/cn';
 import {
   attachmentHref,
@@ -42,9 +41,9 @@ const KATEX = {
 /**
  * A note, rendered.
  *
- * `rehype-raw` is deliberately absent, and its absence is the sanitizer. With
- * raw HTML disabled, react-markdown will not render embedded HTML at all --
- * which matters more than it looks here, because Obsidian web-clipper notes
+ * The rendering is the shared one (components/ui/markdown.tsx), with maths and
+ * vault attachments added. Raw HTML is not rendered there, and that is the
+ * sanitizer, which matters more than it looks here, because Obsidian web-clipper notes
  * routinely carry whatever markup the page they clipped contained. "It is only
  * my own data" is not a defence when the data came from the open web, and this
  * is the one place in the app where a note's author and its content have
@@ -79,42 +78,26 @@ export function NoteBody({
   hrefForAttachment?: (entry: AttachmentEntry) => string;
 }) {
   return (
-    <div className={cn(cardVariants({ padding: 'standard' }), 'vault-prose')}>
-      <Markdown
-        remarkPlugins={[remarkGfm, remarkMath, remarkObsidianMath]}
-        rehypePlugins={[[rehypeKatex, KATEX]]}
-        components={{
-          a({ href, children, ...props }) {
-            const external = /^https?:\/\//i.test(href ?? '');
-            return (
-              <a
-                href={href}
-                {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-                {...props}
-              >
-                {children}
-              </a>
-            );
-          },
-          img({ src, alt }) {
-            const view = viewAttachment(
-              typeof src === 'string' ? src : '',
-              alt ?? '',
-              notePath,
-              attachments ?? EMPTY_INDEX,
-              hrefForAttachment,
-            );
-            if (view) return <Attachment view={view} alt={alt ?? ''} />;
-            // An image on somebody else's host. Rendering it would leak a
-            // page view to whoever owns that host every time the note is
-            // opened, so it stays a label.
-            return <em className="text-ink-muted">{alt ? `(image: ${alt})` : '(image)'}</em>;
-          },
-        }}
-      >
-        {markdown}
-      </Markdown>
-    </div>
+    <Markdown
+      markdown={markdown}
+      className={cn(cardVariants({ padding: 'standard' }), 'vault-prose')}
+      remarkPlugins={[remarkMath, remarkObsidianMath]}
+      rehypePlugins={[[rehypeKatex, KATEX]]}
+      image={({ src, alt }) => {
+        const view = viewAttachment(
+          src,
+          alt,
+          notePath,
+          attachments ?? EMPTY_INDEX,
+          hrefForAttachment,
+        );
+        if (view) return <Attachment view={view} alt={alt} />;
+        // An image on somebody else's host. Rendering it would leak a page
+        // view to whoever owns that host every time the note is opened, so it
+        // stays a label.
+        return <em className="text-ink-muted">{alt ? `(image: ${alt})` : '(image)'}</em>;
+      }}
+    />
   );
 }
 
