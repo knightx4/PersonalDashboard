@@ -21,7 +21,8 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
           [&_h2]:mt-9 [&_h2]:mb-2 [&_h2]:text-body [&_h2]:font-normal [&_h2]:text-ink
           [&_li]:mb-1.5 [&_li]:text-body [&_li]:leading-relaxed [&_li]:text-ink-muted
           [&_p]:mb-3 [&_p]:text-body [&_p]:leading-relaxed [&_p]:text-ink-muted
-          [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5"
+          [&_ul]:mb-3 [&_ul]:list-disc [&_ul]:pl-5
+          [&_code]:break-words"
       >
         {children}
       </main>
