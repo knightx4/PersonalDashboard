@@ -9,6 +9,7 @@ import {
   isGmailRateLimit,
 } from '@/lib/email/providers/gmail-api-error';
 import { emailFromIdToken } from '@/lib/email/id-token';
+import { gmailInternalDate } from '@/lib/email/providers/gmail-date';
 import {
   gmailPayloadToCalendar,
   gmailPayloadToHtml,
@@ -217,7 +218,7 @@ function messageContent(data: GmailApiMessage, full: boolean): GmailMessageConte
   return {
     id: data.id,
     threadId: data.threadId ?? null,
-    internalDate: data.internalDate ? new Date(Number(data.internalDate)) : null,
+    internalDate: gmailInternalDate(data.internalDate),
     fromAddress: headerValue(headers, 'From'),
     // Reply-To carries the employer far more often than From does, because
     // From is usually the ATS. Capturing it is what makes domain linking work.
@@ -269,7 +270,7 @@ export async function getGmailMessageMetadata(
   return {
     id: data.id,
     threadId: data.threadId ?? null,
-    internalDate: data.internalDate ? new Date(Number(data.internalDate)) : null,
+    internalDate: gmailInternalDate(data.internalDate),
     from: headerValue(headers, 'From'),
     to: headerValue(headers, 'To'),
     subject: headerValue(headers, 'Subject'),
@@ -297,7 +298,7 @@ export async function getGmailMessageText(
   return {
     id: data.id,
     threadId: data.threadId ?? null,
-    internalDate: data.internalDate ? new Date(Number(data.internalDate)) : null,
+    internalDate: gmailInternalDate(data.internalDate),
     from: headerValue(headers, 'From'),
     to: headerValue(headers, 'To'),
     subject: headerValue(headers, 'Subject'),
