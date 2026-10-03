@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { forceTool } from '@/lib/learn/graph/tool-call';
 import { MAX_PARAGRAPH_EVIDENCE, YEAR_TOPICS, type RawParagraph } from './year-review';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * The model call behind the year in review (plan #1121). Sonnet reads the
@@ -13,7 +14,7 @@ import { MAX_PARAGRAPH_EVIDENCE, YEAR_TOPICS, type RawParagraph } from './year-r
  * same way as the weekly observations (observations-model.ts).
  */
 
-export const YEAR_REVIEW_MODEL = 'claude-sonnet-5';
+export const YEAR_REVIEW_MODEL = MODELS.timelineYearReview;
 const TOOL_NAME = 'write_year_review';
 
 const SYSTEM = `You read a summary of one year of a person's life as their own

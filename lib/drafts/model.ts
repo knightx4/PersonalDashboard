@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { forceTool } from '@/lib/learn/graph/tool-call';
 import { draftPrompt, type DraftContext } from './write';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * The model call behind a drafted follow-up or return request (plan #1129).
@@ -14,7 +15,7 @@ import { draftPrompt, type DraftContext } from './write';
  * (lib/drafts/find.ts) reads what comes back before it is stored.
  */
 
-export const DRAFT_MODEL = 'claude-sonnet-5';
+export const DRAFT_MODEL = MODELS.drafts;
 const TOOL_NAME = 'write_message';
 
 const SYSTEM = `You write short emails that a person sends from their own

@@ -19,6 +19,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { Requirement } from '../jd/requirements';
 import { parseMatchPayload, type MatchResult } from './match-payload';
 import type { ShortlistItem } from './shortlist';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Judgment, and low volume: a few dozen roles you are actually deciding about,
@@ -26,7 +27,7 @@ import type { ShortlistItem } from './shortlist';
  * is retrieval; deciding whether a story really answers a requirement is not
  * retrieval, and a wrong "covered" costs an hour of writing.
  */
-const MODEL = 'claude-opus-5';
+const MODEL = MODELS.jobsEvidenceMatch;
 const TOOL_NAME = 'report_match';
 
 const SYSTEM = `You match someone's own evidence against the requirements of a job

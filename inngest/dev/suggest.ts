@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { z } from 'zod';
 import { MAX_SUGGESTIONS } from '@/lib/digest/build';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * The half of the morning summary that is a reading rather than a query.
@@ -20,7 +21,7 @@ import { MAX_SUGGESTIONS } from '@/lib/digest/build';
  * summary is stored rather than computed on load.
  */
 
-const MODEL = 'claude-haiku-4-5';
+const MODEL = MODELS.devDigestSuggest;
 const TOOL_NAME = 'report_morning';
 
 const morningSchema = z.object({

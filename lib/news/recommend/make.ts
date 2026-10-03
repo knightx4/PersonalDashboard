@@ -16,6 +16,7 @@ import {
   type NewsletterPick,
   type RecommendTopic,
 } from './picks';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Making the list of free newsletters recommended on the Newsletters tab
@@ -34,7 +35,7 @@ import {
  * whether or not its reply was usable.
  */
 
-export const RECOMMEND_MODEL = 'claude-opus-5';
+export const RECOMMEND_MODEL = MODELS.newsRecommend;
 
 /** The name this call has in core.model_spend. Stable: renaming it splits the history. */
 export const RECOMMEND_OPERATION: NewsOperation = 'recommend-newsletters';

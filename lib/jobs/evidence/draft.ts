@@ -20,9 +20,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { parseDraftPayload, type DraftResult } from './draft-payload';
 import type { ShortlistItem } from './shortlist';
+import { MODELS } from '@/lib/core/models';
 
 /** Writing in someone else's voice off their own material. Judgment again. */
-const MODEL = 'claude-opus-5';
+const MODEL = MODELS.jobsEvidenceDraft;
 const TOOL_NAME = 'report_draft';
 
 const SYSTEM = `You draft an application answer for someone, out of their own

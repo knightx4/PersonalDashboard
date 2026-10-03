@@ -7,6 +7,7 @@ import {
   type ReferenceCandidate,
 } from '@/lib/learn/import/parse-heuristic';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Reading a pasted list into references, and nothing more.
@@ -24,7 +25,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
  * is developable without one.
  */
 
-const MODEL = 'claude-haiku-4-5-20251001';
+const MODEL = MODELS.learnImportParse;
 
 /** Past this a paste is a document, not a list. */
 const MAX_INPUT_CHARS = 24_000;

@@ -6,6 +6,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { TranscriptCue } from '@/lib/learn/catalogue/segment';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { MODULES, type ModuleId } from '@/lib/modules';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Reading one inspiration video for takeaways about this app (plan #1409,
@@ -23,7 +24,7 @@ import { MODULES, type ModuleId } from '@/lib/modules';
  * ones already found in #1410, then stored) is lib/dev/inspiration/read.ts.
  */
 
-export const TAKEAWAY_MODEL = 'claude-sonnet-5';
+export const TAKEAWAY_MODEL = MODELS.inspirationTakeaways;
 const TOOL = 'report_takeaways';
 
 /** The most takeaways one video gives. */

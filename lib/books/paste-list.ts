@@ -15,10 +15,11 @@ import {
   heuristicParseLines,
   type PasteCandidate,
 } from '@/lib/books/paste-list-heuristic';
+import { MODELS } from '@/lib/core/models';
 
 export type { PasteCandidate };
 
-const PASTE_MODEL = 'claude-haiku-4-5-20251001';
+const PASTE_MODEL = MODELS.booksPasteList;
 
 export const pasteLineSchema = z.object({
   title: z.string().trim().min(1).optional(),

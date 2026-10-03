@@ -2,6 +2,7 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * The sentence above each weekly connection (plan #1115): what a week's notes
@@ -13,7 +14,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
  * without one and the page shows the notes alone.
  */
 
-export const CONNECTIONS_MODEL = 'claude-haiku-4-5';
+export const CONNECTIONS_MODEL = MODELS.vaultConnections;
 const TOOL_NAME = 'write_sentences';
 
 /** Characters of a note's opening passed to the model. */

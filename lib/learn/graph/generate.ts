@@ -14,6 +14,7 @@ import {
 import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Turning a goal you typed into the chain of concepts leading to it.
@@ -35,7 +36,7 @@ import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
  * the cheapest check there is.
  */
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = MODELS.learnGraphGenerate;
 const TOOL_NAME = 'report_chain';
 
 const SYSTEM = `You are laying out the prerequisite chain leading to something somebody

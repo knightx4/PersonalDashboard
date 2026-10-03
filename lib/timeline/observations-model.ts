@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { forceTool } from '@/lib/learn/graph/tool-call';
 import { MAX_EVIDENCE, MAX_OBSERVATIONS, type RawObservation } from './observations';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * The model call behind the weekly observations (plan #1119). Sonnet reads
@@ -12,7 +13,7 @@ import { MAX_EVIDENCE, MAX_OBSERVATIONS, type RawObservation } from './observati
  * What comes back is checked by checkObservations before anything is stored.
  */
 
-export const OBSERVATIONS_MODEL = 'claude-sonnet-5';
+export const OBSERVATIONS_MODEL = MODELS.timelineObservations;
 const TOOL_NAME = 'report_observations';
 
 const SYSTEM = `You read a summary of twelve weeks of one person's life as their

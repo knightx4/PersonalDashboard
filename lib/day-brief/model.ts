@@ -6,6 +6,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { forceTool } from '@/lib/learn/graph/tool-call';
 import { BODY_MAX, picksPrompt, TITLE_MAX } from './notification';
 import { PICKS_MAX, shortlistPrompt, type DayBriefPick, type Shortlisted } from './picks';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * The model calls behind the morning brief. choosePicks (plan #1239) has
@@ -16,7 +17,7 @@ import { PICKS_MAX, shortlistPrompt, type DayBriefPick, type Shortlisted } from 
  * (notification.ts) reads what comes back before it is stored.
  */
 
-export const BRIEF_MODEL = 'claude-haiku-4-5';
+export const BRIEF_MODEL = MODELS.dayBrief;
 const TOOL_NAME = 'write_notification';
 
 const SYSTEM = `You are Dash, the assistant in a personal app. Each morning

@@ -14,8 +14,9 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { parseCompanyLookupPayload, type CompanyLookupResult } from './ai-company-payload';
+import { MODELS } from '@/lib/core/models';
 
-const MODEL = 'claude-haiku-4-5';
+const MODEL = MODELS.jobsCompanyEnrich;
 const TOOL_NAME = 'report_company';
 /** Each search is billed. Three covers a homepage search and a fallback. */
 const MAX_SEARCHES = 3;

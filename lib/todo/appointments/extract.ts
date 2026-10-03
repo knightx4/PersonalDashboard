@@ -12,6 +12,7 @@ import {
 } from './extraction';
 import { APPOINTMENT_QUESTION, appointmentState } from './jev-question';
 import type { AppointmentHint } from './rules';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Reading a claimed email's body into an appointment.
@@ -27,7 +28,7 @@ import type { AppointmentHint } from './rules';
  * extractAppointmentFromEmail.
  */
 
-const EXTRACT_MODEL = 'claude-haiku-4-5-20251001';
+const EXTRACT_MODEL = MODELS.appointmentsExtract;
 
 const SYSTEM = `You read one email about an appointment or reservation a person has booked: a doctor, dentist or therapist, a haircut or spa, a class or session, a restaurant table, a repair or service visit.
 Return ONLY a JSON object with these fields:

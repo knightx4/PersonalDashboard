@@ -9,6 +9,7 @@ import { embedTexts, type EmbedOutcome } from '@/lib/learn/embed/embed';
 import type { EmbeddingClient } from '@/lib/learn/embed/voyage';
 import { forceTool } from '@/lib/learn/graph/tool-call';
 import { cosine } from '@/lib/news/issues/repeats';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Merging takeaways that make the same point, and naming the plan feature or
@@ -42,7 +43,7 @@ import { cosine } from '@/lib/news/issues/repeats';
  * against what the first real run makes of the playlist.
  */
 /** The short pass that says whether two takeaways are one idea. */
-export const MERGE_MODEL = 'claude-haiku-4-5';
+export const MERGE_MODEL = MODELS.inspirationMerge;
 /** How many of the nearest takeaways are put to the pass. */
 export const MERGE_NEIGHBOURS = 3;
 /** Cosine similarity below which two takeaways are never asked about. */

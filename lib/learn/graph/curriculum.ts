@@ -16,6 +16,7 @@ import {
   type OutlineResult,
   type UnitDescription,
 } from './curriculum-payload';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Writing a track's curriculum (LEARN-GRAPH-SPEC, "The curriculum";
@@ -42,7 +43,7 @@ import {
  * everybody who teaches the subject already agrees on.
  */
 
-export const CURRICULUM_MODEL = 'claude-sonnet-5';
+export const CURRICULUM_MODEL = MODELS.learnCurriculum;
 
 const TOOL_NAME = 'report_curriculum';
 

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { MAX_TURN, toModelMessages, type SubjectKind, type TalkTurn } from './talk';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Dash's reply in a conversation about something you are reading (plan
@@ -15,7 +16,7 @@ import { MAX_TURN, toModelMessages, type SubjectKind, type TalkTurn } from './ta
  * `reply-about-card` for a Learn card, through the `onSpend` sink.
  */
 
-export const TALK_MODEL = 'claude-sonnet-5';
+export const TALK_MODEL = MODELS.talk;
 const TOOL_NAME = 'reply';
 
 /** How much of the subject's text goes in the prompt. A card's section is well under this. */

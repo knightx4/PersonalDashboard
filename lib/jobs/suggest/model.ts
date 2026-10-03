@@ -26,8 +26,9 @@ import {
 } from './payload';
 import type { BoardPosting } from './board-pick';
 import { preferenceLines, type JobPreferences } from './preferences';
+import { MODELS } from '@/lib/core/models';
 
-export const SUGGEST_MODEL = 'claude-sonnet-5';
+export const SUGGEST_MODEL = MODELS.jobsSuggest;
 /** Each search is billed, and its results come back as input. */
 const MAX_SEARCHES = 5;
 /**

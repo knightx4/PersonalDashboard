@@ -10,6 +10,7 @@ import {
   TARGET_CLAIMS,
   type OpeningClaim,
 } from '@/lib/learn/graph/opening-payload';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Ten claims spread across a subject, from the thing somebody typed.
@@ -27,7 +28,7 @@ import {
  * what gets stored.
  */
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = MODELS.learnOpeningClaims;
 const TOOL_NAME = 'report_claims';
 
 const SYSTEM = `Somebody has named something they want to learn and has never studied it

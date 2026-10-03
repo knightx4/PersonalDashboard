@@ -8,6 +8,7 @@ import {
   type PlanStep,
 } from '@/lib/learn/import/plan-payload';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Turning a topic you named into a route through it.
@@ -26,7 +27,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
  * from a list that looks finished.
  */
 
-const MODEL = 'claude-opus-5';
+const MODEL = MODELS.learnImportPlanTopic;
 const MAX_SEARCHES = 12;
 const TOOL_NAME = 'report_plan';
 

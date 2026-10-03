@@ -13,6 +13,7 @@ import {
   mapClassState,
 } from '@/lib/vault/map/jev-question';
 import { mapClassifySchema, tooShortForMap, type MapVerdict } from '@/lib/vault/map/rules';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Stage 0 for the map: whether a note argues anything, in one cheap call.
@@ -31,7 +32,7 @@ import { mapClassifySchema, tooShortForMap, type MapVerdict } from '@/lib/vault/
  * before and its reason is kept.
  */
 
-const MODEL = 'claude-haiku-4-5';
+const MODEL = MODELS.vaultMapClassify;
 const TOOL_NAME = 'classify_note';
 
 const SYSTEM = `You sort personal notes so that only the ones worth reading

@@ -11,8 +11,9 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
+import { MODELS } from '@/lib/core/models';
 
-export const GOAL_REPLY_MODEL = 'claude-haiku-4-5';
+export const GOAL_REPLY_MODEL = MODELS.goalCommentReply;
 const TOOL_NAME = 'reply';
 
 const SYSTEM = `You are Dash, replying to a comment the owner of a personal

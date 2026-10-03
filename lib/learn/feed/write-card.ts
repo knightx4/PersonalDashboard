@@ -6,6 +6,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { describeDepth, type Depth } from './depth';
 import { keepMentions, MAX_MENTIONS, type CardMention } from './mentions';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Writing the Learn now cards for one fetched section (LEARN-NOW-SPEC, "How
@@ -39,7 +40,7 @@ import { keepMentions, MAX_MENTIONS, type CardMention } from './mentions';
  */
 
 
-export const WRITE_CARD_MODEL = 'claude-sonnet-5';
+export const WRITE_CARD_MODEL = MODELS.learnWriteCard;
 
 /**
  * The most section text sent in one call. Wikipedia sections stored so far
