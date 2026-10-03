@@ -61,4 +61,16 @@ describe('a hand-off', () => {
             values (${userA}, ${CONVERSATION}, 'x', 'sent')`,
     ).rejects.toThrow();
   });
+
+  it('names the row it is about as a ref, or nothing (plan #1568)', async () => {
+    const [row] = await admin<{ subject_ref: string | null }[]>`
+      insert into dash_handoffs (user_id, conversation_id, request, subject_ref)
+      values (${userA}, ${CONVERSATION}, 'Split it in two', 'todo.tasks:t1')
+      returning subject_ref`;
+    expect(row.subject_ref).toBe('todo.tasks:t1');
+    await expect(
+      admin`insert into dash_handoffs (user_id, conversation_id, request, subject_ref)
+            values (${userA}, ${CONVERSATION}, 'x', 'not a ref')`,
+    ).rejects.toThrow();
+  });
 });

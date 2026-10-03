@@ -10,6 +10,8 @@ import { loadTasksFor } from '@/lib/todo/links/load';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { MoveLabel } from '@/components/ui/move-label';
 import { applicationMove, lastTurnEvent } from '@/lib/jobs/move';
+import { rowRef, withRun } from '@/lib/core/move';
+import { workingRefsForPage } from '@/lib/talk/handoffs';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { formatCompBand, formatDate } from '@/lib/jobs/applications/load';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
@@ -335,11 +337,16 @@ export default async function RoleDetailPage({
 
   // Whose move the pursuit is (plan #1454), from its stage and the newest
   // event that says whose turn it is. Null once it has closed.
-  const move = applicationMove({
-    status: current.status as ApplicationStatus,
-    lastEvent: lastTurnEvent((events ?? []).map((event) => event.kind as string)),
-    companyName: company.name,
-  });
+  // "Dash is on it" while an Ask Dash hand-off about it is open (plan #1568).
+  const move = withRun(
+    applicationMove({
+      status: current.status as ApplicationStatus,
+      lastEvent: lastTurnEvent((events ?? []).map((event) => event.kind as string)),
+      companyName: company.name,
+    }),
+    await workingRefsForPage(user.id),
+    [rowRef('job_search.applications', current.id as string), rowRef('job_search.roles', id)],
+  );
 
   return (
     <DetailLayout

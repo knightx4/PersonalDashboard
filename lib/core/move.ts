@@ -114,3 +114,35 @@ export const VIEW_LABEL = {
   dismissed: 'Dismissed',
   read: 'To read',
 } as const satisfies Record<string, string>;
+
+/** What a row reads while an Ask Dash hand-off about it is open (plan #1568). */
+export const HANDOFF_WORKING_TITLE = 'Dash is working on what you asked about this in Ask Dash.';
+
+/**
+ * A row's move with the runs in progress laid over it (plan #1568). `running`
+ * is the refs (`schema.table:id`, lib/core/refs.ts) that an open run or Ask
+ * Dash hand-off is about, and `refs` are the ones the row answers to: an
+ * application and its role, a return and its item and order. A row a run is
+ * about reads "Dash is on it" whatever its own move says. A row with no move
+ * (closed, returned, ticked) stays without one, since nothing is left for a
+ * run to change about whose move it is.
+ *
+ * Kept apart from each workspace's move function so those stay pure: the
+ * page reads the runs and passes them here where it renders the label.
+ */
+export function withRun<T extends { move: Move; title: string }>(
+  rowMove: T | null,
+  running: readonly string[] | ReadonlySet<string> | undefined,
+  refs: readonly (string | null | undefined)[],
+  title: string = HANDOFF_WORKING_TITLE,
+): T | { move: Move; title: string } | null {
+  if (!rowMove || !running) return rowMove;
+  const has = (ref: string) => ('has' in running ? running.has(ref) : running.includes(ref));
+  const working = refs.some((ref) => ref != null && has(ref));
+  return working ? { move: { state: 'dash_working' }, title } : rowMove;
+}
+
+/** The ref a row is named by: `schema.table:id`, as lib/core/refs.ts toRef writes it. */
+export function rowRef(table: string, id: string | null | undefined): string | null {
+  return id ? `${table}:${id}` : null;
+}

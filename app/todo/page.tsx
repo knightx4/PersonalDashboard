@@ -1,6 +1,7 @@
 import { CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { requireUser } from '@/lib/auth/server';
+import { workingRefsForPage } from '@/lib/talk/handoffs';
 import { loadAgenda } from '@/lib/todo/agenda/load';
 import { loadDashResultsCount } from '@/lib/todo/agenda/dash-results';
 import { BUCKET_LABELS, todayIn } from '@/lib/todo/tasks/model';
@@ -30,9 +31,11 @@ export const metadata = { title: 'Agenda' };
  */
 export default async function TodoPage() {
   const user = await requireUser();
-  const [agenda, dashResults] = await Promise.all([
+  const [agenda, dashResults, working] = await Promise.all([
     loadAgenda(user.id),
     loadDashResultsCount(user.id),
+    // What an Ask Dash hand-off is working on (plan #1568).
+    workingRefsForPage(user.id),
   ]);
 
   const empty = agenda.piles.length === 0;
@@ -140,6 +143,7 @@ export default async function TodoPage() {
                         anchor={entry.anchor}
                         pile={pile}
                         items={entry.children}
+                        working={working}
                       />
                     ) : entry.item ? (
                       <AgendaItemRow key={entry.key} item={entry.item} timezone={agenda.timezone} />

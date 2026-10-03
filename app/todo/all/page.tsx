@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ListChecks } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
+import { workingRefsForPage } from '@/lib/talk/handoffs';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { loadAllTasks, loadParentTitles } from '@/lib/todo/tasks/load';
 import { loadLinksForTasks } from '@/lib/todo/links/load';
@@ -51,12 +52,14 @@ export default async function AllTasksPage({
   // palette sends you here with the row named. Absent, nothing changes.
   const focus = params.focus?.trim() ?? '';
 
-  const [settings, tasks] = await Promise.all([
+  const [settings, tasks, working] = await Promise.all([
     loadAccountSettings(user.id),
     loadAllTasks(user.id, {
       status: status === 'all' ? 'all' : (status as TaskStatus),
       search,
     }),
+    // What an Ask Dash hand-off is working on (plan #1568).
+    workingRefsForPage(user.id),
   ]);
 
   // What each task is about, in one pass for the page. The naive shape resolves
@@ -131,6 +134,7 @@ export default async function AllTasksPage({
               <TaskRow
                 task={task}
                 timezone={settings.timezone}
+                working={working}
                 anchor={anchors.get(task.id) ?? null}
                 under={
                   parents.has(task.id)
