@@ -5,6 +5,7 @@ import {
   OVERNIGHT_NOTHING_READY,
   readyFeatureCount,
   readyFeaturesLine,
+  runnerOrder,
   type OvernightChoice,
 } from '@/lib/plan/overnight-choice';
 import { budgetSpentReason, OVERNIGHT_TIME_UP, type OvernightRun } from '@/lib/plan/overnight';
@@ -26,6 +27,7 @@ function item(over: Partial<PlanItem> & { id: string }): PlanItem {
     acceptance: null,
     status: 'not_started',
     kind: 'build',
+    track: 'feature',
     fog: null,
     resolution: null,
     dismissedAt: null,
@@ -281,6 +283,51 @@ describe('readyFeatureCount', () => {
       act: 'end',
       reason: OVERNIGHT_NOTHING_READY,
     });
+  });
+});
+
+describe('overhauls', () => {
+  // An overhaul is worked by its own routine (docs/SPEC-LAYER-SPEC.md Part 4),
+  // so the runner must never name one, however urgent its steps are.
+  function withOverhaul() {
+    return tree([
+      item({ id: 'overhaul', track: 'overhaul' }),
+      item({ id: 'phase', parentId: 'overhaul' }),
+      item({ id: 'deep', parentId: 'phase', priority: 1 }),
+      item({ id: 'urgent', parentId: 'overhaul', priority: 1 }),
+      item({ id: 'feature' }),
+      item({ id: 'step', parentId: 'feature', priority: 3 }),
+    ]);
+  }
+
+  it('never names a step under an overhaul, however urgent', () => {
+    const sections = withOverhaul();
+    const choice = chooseOvernightFeature(sections, night(), MIDNIGHT);
+
+    expect(named(choice)).toBe('feature');
+    expect(choice.act === 'fire' && choice.step.id).toBe('step');
+    expect(runnerOrder(sections).map((node) => node.id)).toEqual(['step']);
+    expect(readyFeatureCount(sections)).toBe(1);
+  });
+
+  it('ends the night when an overhaul is all that is ready', () => {
+    const sections = tree([
+      item({ id: 'overhaul', track: 'overhaul' }),
+      item({ id: 'step', parentId: 'overhaul' }),
+    ]);
+
+    expect(readyFeatureCount(sections)).toBe(0);
+    expect(chooseOvernightFeature(sections, night(), MIDNIGHT)).toEqual({
+      act: 'end',
+      reason: OVERNIGHT_NOTHING_READY,
+    });
+  });
+
+  it('leaves the steps in the plain work order, where the overhaul routine reads them', () => {
+    const ids = workOrder(withOverhaul(), { only: 'runner' }).map((node) => node.id);
+
+    expect(ids).toContain('urgent');
+    expect(ids).toContain('deep');
   });
 });
 

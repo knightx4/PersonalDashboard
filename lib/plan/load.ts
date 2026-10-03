@@ -186,6 +186,14 @@ export function isPlanKind(value: string): value is PlanKind {
   return (PLAN_KINDS as readonly string[]).includes(value);
 }
 
+/** The two orders a feature can be built in. Mirrors plan_items_track_ck. */
+export const PLAN_TRACKS = ['feature', 'overhaul'] as const;
+export type PlanTrack = (typeof PLAN_TRACKS)[number];
+
+export function isPlanTrack(value: string): value is PlanTrack {
+  return (PLAN_TRACKS as readonly string[]).includes(value);
+}
+
 export type PlanItem = {
   id: string;
   /** The short, stable handle: "#12". Per account, never reused. */
@@ -202,6 +210,13 @@ export type PlanItem = {
   status: PlanStatus;
   /** Whether it closes on a commit or on an answer. */
   kind: PlanKind;
+  /**
+   * Which order the feature is built in. `overhaul` marks a feature that
+   * replaces how something works (docs/SPEC-LAYER-SPEC.md Part 4): the
+   * overnight runner leaves it alone and its own routine works it. Read on
+   * the feature at the top of a plan; the steps beneath it are `feature`.
+   */
+  track: PlanTrack;
   /**
    * What is not yet known. One paragraph admitting the part of a feature
    * nobody can see far enough into to write steps for. Null once it can be.
@@ -271,7 +286,7 @@ export type PlanData = {
 
 /** Every column the app reads off a plan row. Shared with the changelog. */
 export const ITEM_COLUMNS =
-  'id, number, module, parent_id, title, detail, acceptance, status, kind, fog, resolution, ' +
+  'id, number, module, parent_id, title, detail, acceptance, status, kind, track, fog, resolution, ' +
   'comment, block_ask, block_kind, priority, size, assignee, commit_sha, position, ' +
   'started_at, completed_at, ' +
   'created_at, updated_at, dismissed_at, fog_dismissed_at';
@@ -344,6 +359,7 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
     value instanceof Date ? value.toISOString() : value == null ? null : String(value);
   const status = String(row.status ?? '');
   const kind = String(row.kind ?? '');
+  const track = String(row.track ?? '');
   const blockKind = row.block_kind as string | null;
   const size = row.size as string | null;
   const assignee = row.assignee as string | null;
@@ -359,6 +375,7 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
     acceptance: (row.acceptance as string | null) ?? null,
     status: isPlanStatus(status) ? status : 'not_started',
     kind: isPlanKind(kind) ? kind : 'build',
+    track: isPlanTrack(track) ? track : 'feature',
     fog: (row.fog as string | null) ?? null,
     resolution: (row.resolution as string | null) ?? null,
     dismissedAt: stamp(row.dismissed_at),

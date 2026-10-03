@@ -15,6 +15,7 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     acceptance: null,
     status: 'not_started',
     kind: 'build',
+    track: 'feature',
     fog: null,
     resolution: null,
     dismissedAt: null,

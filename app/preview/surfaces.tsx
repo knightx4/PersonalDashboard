@@ -312,6 +312,7 @@ const pipelineRow = (
   nextActionDue: null,
   lastActivityAt: '2026-09-05T10:00:00.000Z',
   daysSinceActivity: 4,
+  lastTurnEvent: null,
   compMinCents: null,
   compMaxCents: null,
   coverage: { covered: 0, total: 0, gaps: 0, rate: null },
