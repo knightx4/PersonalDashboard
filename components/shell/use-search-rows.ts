@@ -25,7 +25,10 @@ import {
   modeOf,
   THEME_ROOMS,
   SKIES,
+  PALETTES,
   auroraFor,
+  paletteOf,
+  posterFor,
   skyOf,
   type Theme,
 } from '@/lib/theme';
@@ -194,9 +197,19 @@ function themeCommands(theme: Theme): SearchCommand[] {
     ...THEME_ROOMS.map((option) => ({
       id: `theme:${option.id}`,
       label: `Theme: ${option.label}`,
-      hint: 'Keeps the colour you are in',
+      hint: option.id === 'lightbox' ? 'The poster, in its last palette' : 'Keeps the colour you are in',
       icon: 'theme' as const,
-      run: applying({ kind: 'generated', mode: option.id, hue, way }),
+      // Lightbox in light is the poster now, a written theme with palettes.
+      run: applying(
+        option.id === 'lightbox' ? posterFor(paletteOf(theme)) : { kind: 'generated', mode: option.id, hue, way },
+      ),
+    })),
+    ...PALETTES.map((palette) => ({
+      id: `theme:poster:${palette.id}`,
+      label: `Lightbox: ${palette.label}`,
+      hint: palette.mood,
+      icon: 'theme' as const,
+      run: applying(posterFor(palette.id)),
     })),
     ...COLOURWAYS.map((colour) => ({
       id: `theme:${colour.id}`,

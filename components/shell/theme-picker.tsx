@@ -17,8 +17,12 @@ import {
   THEME_POLARITIES,
   THEME_SURFACES,
   SKIES,
+  PALETTES,
   auroraFor,
   isAurora,
+  isPoster,
+  paletteOf,
+  posterFor,
   modeFor,
   partsOf,
   skyOf,
@@ -31,6 +35,7 @@ import {
 } from '@/lib/theme';
 import { colourwayById, POOL_TOKENS, WASH_LIFT, type Colourway } from '@/lib/theme/colourway';
 import type { Sky } from '@/lib/theme/sky';
+import type { Palette as PosterPalette } from '@/lib/theme/poster';
 import { applyTheme, shouldRepairTheme } from '@/lib/theme/apply';
 import { generatePalette } from '@/lib/theme/palette';
 import { DENSITIES, parseDensity, type Density } from '@/lib/density';
@@ -221,10 +226,16 @@ export function ThemePicker({ value }: { value: Theme }) {
   // Aurora is the third surface, and it is a written theme rather than a mode,
   // so it is read apart here instead of through `partsOf`.
   const aurora = isAurora(showing);
+  // Lightbox in light is the poster, a written theme like Aurora; in dark it
+  // is still the generated glass room.
+  const poster = isPoster(showing);
   const here: { polarity: Polarity; surface: Surface } = aurora
     ? { polarity: showing.id === 'dawn' ? 'light' : 'dark', surface: 'aurora' }
-    : partsOf(mode);
+    : poster
+      ? { polarity: 'light', surface: 'lightbox' }
+      : partsOf(mode);
   const sky = skyOf(showing);
+  const palette = paletteOf(showing);
   // The colour survives a change of room, which means carrying the colourway
   // and not just its hue: dropping it here would turn Ember into "330 degrees"
   // the first time somebody switched to dark, and the pools would go back to
@@ -234,13 +245,17 @@ export function ThemePicker({ value }: { value: Theme }) {
   const inPolarity = (next: Polarity): Theme =>
     here.surface === 'aurora'
       ? auroraFor(next, sky)
-      : { kind: 'generated', mode: modeFor(next, here.surface), hue, way };
+      : here.surface === 'lightbox' && next === 'light'
+        ? posterFor(palette)
+        : { kind: 'generated', mode: modeFor(next, here.surface), hue, way };
   // Into Aurora keeps the polarity and starts from the default sky, since a
   // colourway is not a sky. Out of it keeps the polarity and drops the sky.
   const inSurface = (next: Surface): Theme =>
     next === 'aurora'
       ? auroraFor(here.polarity, sky)
-      : { kind: 'generated', mode: modeFor(here.polarity, next), hue, way };
+      : next === 'lightbox' && here.polarity === 'light'
+        ? posterFor(palette)
+        : { kind: 'generated', mode: modeFor(here.polarity, next), hue, way };
   /** The strip and "no colour": a hue with no name for its pools. */
   const inHue = (next: number | null): GeneratedTheme => ({ kind: 'generated', mode, hue: next });
   const inWay = (next: Colourway): GeneratedTheme => ({
@@ -338,7 +353,22 @@ export function ThemePicker({ value }: { value: Theme }) {
             Colour
           </p>
 
-          {aurora ? (
+          {poster ? (
+            <div className="flex flex-wrap gap-1.5 px-2 pb-2">
+              {PALETTES.map((option) => {
+                const next = posterFor(option.id);
+                return (
+                  <PaletteSwatch
+                    key={option.id}
+                    palette={option}
+                    label={`${option.label} - ${option.mood}`}
+                    chosen={same(showing, next)}
+                    onChoose={() => save(next)}
+                  />
+                );
+              })}
+            </div>
+          ) : aurora ? (
             <div className="flex flex-wrap gap-1.5 px-2 pb-2">
               {SKIES.map((option) => {
                 const next = auroraFor(here.polarity, option.id);
@@ -508,6 +538,43 @@ function Swatch({
       // ui-ok: raw-hex -- this is the generated colour itself, which is the
       // one thing on the screen that cannot be a token.
       style={style}
+    >
+      {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={3} aria-hidden />}
+      <span className="sr-only">{label}</span>
+    </button>
+  );
+}
+
+/**
+ * A poster palette, drawn as its three bands stacked on its paper, outlined in
+ * its ink.
+ */
+function PaletteSwatch({
+  palette,
+  label,
+  chosen,
+  onChoose,
+}: {
+  palette: PosterPalette;
+  label: string;
+  chosen: boolean;
+  onChoose: () => void;
+}) {
+  const [b1, b2, b3] = palette.bands;
+  return (
+    <button
+      type="button"
+      onClick={onChoose}
+      aria-pressed={chosen}
+      title={label}
+      className="press flex size-8 items-center justify-center transition-transform hover:scale-105"
+      // ui-ok: raw-hex -- the palette itself, which is the one thing on the
+      // screen that cannot be a token.
+      style={{
+        background: `linear-gradient(to bottom, ${b1.fill} 0 33%, ${b2.fill} 33% 66%, ${b3.fill} 66%)`,
+        border: `2px solid ${palette.ink}`,
+        boxShadow: `2px 2px 0 ${palette.ink}`,
+      }}
     >
       {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={3} aria-hidden />}
       <span className="sr-only">{label}</span>

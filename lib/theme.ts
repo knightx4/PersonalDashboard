@@ -80,6 +80,16 @@ export const THEMES = [
     swatch: '#e6eaf6',
     ink: '#121733',
   },
+  {
+    // What the picker calls Lightbox. Its own id, because `lightbox` names the
+    // glass room the generator still turns for Darkroom's side of the switch.
+    id: 'poster',
+    label: 'Lightbox',
+    mood: 'A printed poster: outlines, hard shadows, bands of colour',
+    scheme: 'light',
+    swatch: '#f3efe6',
+    ink: '#111111',
+  },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]['id'];
@@ -103,9 +113,10 @@ export function isThemeId(value: string | null | undefined): value is ThemeId {
 import type { ThemeMode } from '@/lib/theme/reference';
 import { COLOURWAYS, colourwayById, type ColourwayId } from '@/lib/theme/colourway';
 import { DEFAULT_SKY, isSkyId, SKIES, type SkyId } from '@/lib/theme/sky';
+import { DEFAULT_PALETTE, isPaletteId, PALETTES, type PaletteId } from '@/lib/theme/poster';
 
-export type { ThemeMode, ColourwayId, SkyId };
-export { COLOURWAYS, SKIES };
+export type { ThemeMode, ColourwayId, SkyId, PaletteId };
+export { COLOURWAYS, SKIES, PALETTES };
 
 /**
  * What somebody chose, read out of the one string that holds it.
@@ -132,7 +143,7 @@ export { COLOURWAYS, SKIES };
  */
 export type Theme =
   | { kind: 'system' }
-  | { kind: 'written'; id: ThemeId; sky?: SkyId }
+  | { kind: 'written'; id: ThemeId; sky?: SkyId; palette?: PaletteId }
   | { kind: 'generated'; mode: ThemeMode; hue: number | null; way?: ColourwayId };
 
 /** The shape the picker works in: a polarity, and a colour or none. */
@@ -149,9 +160,20 @@ export function parseTheme(value: string | null | undefined): Theme {
   if (!value) return SYSTEM_THEME;
 
   const text = value.trim().toLowerCase();
-  if (isThemeId(text)) return { kind: 'written', id: text };
-
   const [mode, colour] = text.split(':');
+
+  // Lightbox is the poster now. Every stored Lightbox -- the written one, and
+  // one with a colour or a colourway -- reads as the poster in its first
+  // palette, so nobody who chose Lightbox lands somewhere they did not.
+  if (mode === 'lightbox') return { kind: 'written', id: 'poster' };
+
+  // The poster takes a palette by name, the default stored as the bare id.
+  if (mode === 'poster') {
+    if (!colour || !isPaletteId(colour) || colour === DEFAULT_PALETTE) return { kind: 'written', id: 'poster' };
+    return { kind: 'written', id: 'poster', palette: colour };
+  }
+
+  if (isThemeId(text)) return { kind: 'written', id: text };
 
   // Aurora and Dawn take a sky by name: `aurora:polar`. The default sky is the
   // block as written and is stored as the bare name, so there is one spelling
@@ -181,6 +203,7 @@ export function parseTheme(value: string | null | undefined): Theme {
 export function formatTheme(theme: Theme): string | null {
   if (theme.kind === 'system') return null;
   if (theme.kind === 'written') {
+    if (theme.palette && theme.palette !== DEFAULT_PALETTE) return `${theme.id}:${theme.palette}`;
     return theme.sky && theme.sky !== DEFAULT_SKY ? `${theme.id}:${theme.sky}` : theme.id;
   }
   // The colourway's name, not its hue: the hue is one of the things the name
@@ -224,6 +247,21 @@ export function skyOf(theme: Theme): SkyId {
   return theme.kind === 'written' && theme.sky ? theme.sky : DEFAULT_SKY;
 }
 
+/** Whether a theme is Lightbox's poster, and so takes a palette rather than a colour. */
+export function isPoster(theme: Theme): boolean {
+  return theme.kind === 'written' && theme.id === 'poster';
+}
+
+/** The palette a poster is printed in; the default for anything else. */
+export function paletteOf(theme: Theme): PaletteId {
+  return theme.kind === 'written' && theme.palette ? theme.palette : DEFAULT_PALETTE;
+}
+
+/** Lightbox in a palette. */
+export function posterFor(palette: PaletteId): Theme {
+  return palette === DEFAULT_PALETTE ? { kind: 'written', id: 'poster' } : { kind: 'written', id: 'poster', palette };
+}
+
 /** Aurora in a polarity, keeping its sky. Night is Aurora; first light is Dawn. */
 export function auroraFor(polarity: Polarity, sky: SkyId): Theme {
   const id = polarity === 'light' ? 'dawn' : 'aurora';
@@ -258,7 +296,7 @@ export const THEME_POLARITIES: readonly { id: Polarity; label: string; mood: str
 
 export const THEME_SURFACES: readonly { id: Surface; label: string; mood: string }[] = [
   { id: 'solid', label: 'Solid', mood: 'One flat ground, edge to edge' },
-  { id: 'lightbox', label: 'Lightbox', mood: 'Sheets floating on a lit bench' },
+  { id: 'lightbox', label: 'Lightbox', mood: 'A printed poster, in light; glass sheets, in dark' },
   { id: 'aurora', label: 'Aurora', mood: 'Glass under a moving sky' },
 ];
 

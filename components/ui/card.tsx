@@ -51,7 +51,9 @@ export const cardVariants = card;
  * title in whatever heading the page needs instead.
  */
 export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('card-pad-x pt-(--card-p) pb-3', className)} {...props} />;
+  // `data-card-header` is how a theme finds a card's title row without knowing
+  // the card: Lightbox paints it as a band of colour.
+  return <div data-card-header="" className={cn('card-pad-x pt-(--card-p) pb-3', className)} {...props} />;
 }
 
 export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
