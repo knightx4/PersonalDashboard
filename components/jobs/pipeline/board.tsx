@@ -10,6 +10,8 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { ScoreLine } from '@/components/jobs/ui/score-figures';
+import { MoveLabel } from '@/components/ui/move-label';
+import { applicationMove } from '@/lib/jobs/move';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { shortAge } from '@/lib/jobs/applications/load';
 import { formatCoverage, type ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -287,6 +289,12 @@ function PipelineCard({
   // Null on a role that has never been matched, which is most of them. The
   // card says nothing rather than showing 0/0 and reading as a hopeless fit.
   const coverage = formatCoverage(row.coverage);
+  // Whose move it is (plan #1454). Null on a closed card, whose badge says it.
+  const move = applicationMove({
+    status: row.status,
+    lastEvent: row.lastTurnEvent,
+    companyName: row.companyName,
+  });
 
   return (
     <article
@@ -373,6 +381,7 @@ function PipelineCard({
             </div>
           </div>
           <ScoreLine note={row.scoreNote} />
+          {move && <MoveLabel move={move.move} title={move.title} className="mt-0.5 max-w-full" />}
         </div>
         {row.excitement !== null && (
           <span className="tabular shrink-0 text-small text-ink-muted" title="Excitement">

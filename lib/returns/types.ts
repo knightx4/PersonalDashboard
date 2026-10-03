@@ -30,6 +30,8 @@ export type ReturnsTrackerRow = {
   returnPlanned: boolean;
   returnWindowDays: number | null;
   delivered: boolean;
+  /** Who is bringing it, from the order's shipments, when an email named one. */
+  carrier: string | null;
   status: 'owned' | 'returned';
   /** When status is returned, the linked refunded return row (for undo). */
   returnId: string | null;

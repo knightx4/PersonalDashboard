@@ -2,6 +2,7 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import {
   highWaterFromRejectionStage,
   requirementCoverage,
+  type ApplicationEventKind,
   type ApplicationSource,
   type ApplicationStatus,
   type CoverageEntry,
@@ -12,6 +13,7 @@ import {
 import { safeTimeZone } from '@/lib/core/timezone';
 import { formatClock } from '@/lib/clock';
 import type { ScoreNote } from '@/lib/jobs/suggest/score-notes';
+import { lastTurnEvent } from '@/lib/jobs/move';
 
 /**
  * Reading the pipeline.
@@ -56,6 +58,11 @@ export interface PipelineRow {
    * and makes "stale" flicker.
    */
   daysSinceActivity: number | null;
+  /**
+   * The newest event that says whose turn it is (lib/jobs/move.ts), which
+   * with the status gives the card its move.
+   */
+  lastTurnEvent: ApplicationEventKind | null;
   compMinCents: number | null;
   compMaxCents: number | null;
   /**
@@ -139,14 +146,18 @@ export async function loadPipeline(
   // it is loaded once for the whole pipeline rather than per card.
   const { data: activity } = await supabase
     .from('application_events')
-    .select('application_id, occurred_at')
+    .select('application_id, occurred_at, kind')
     .eq('user_id', userId)
     .order('occurred_at', { ascending: false });
 
   const lastActivity = new Map<string, string>();
+  const kinds = new Map<string, string[]>();
   for (const event of activity ?? []) {
     const id = event.application_id as string;
     if (!lastActivity.has(id)) lastActivity.set(id, event.occurred_at as string);
+    const list = kinds.get(id);
+    if (list) list.push(event.kind as string);
+    else kinds.set(id, [event.kind as string]);
   }
 
   return rows.map((row) => ({
@@ -177,6 +188,7 @@ export async function loadPipeline(
     nextActionDue: row.next_action_due,
     lastActivityAt: lastActivity.get(row.id) ?? row.created_at,
     daysSinceActivity: daysSince(lastActivity.get(row.id) ?? row.created_at),
+    lastTurnEvent: lastTurnEvent(kinds.get(row.id) ?? []),
     compMinCents: row.roles.comp_min_cents,
     compMaxCents: row.roles.comp_max_cents,
     coverage: requirementCoverage(row.roles.requirement_matches),
