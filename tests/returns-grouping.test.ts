@@ -19,6 +19,7 @@ function row(
     returnPlanned: false,
     returnWindowDays: 30,
     delivered: true,
+    carrier: null,
     status: 'owned',
     returnId: null,
     refundedAt: null,

@@ -4,11 +4,9 @@ import { deadlineLabel } from '@/lib/returns/deadline';
 import { ReturnFuse } from '@/components/ui/return-fuse';
 import { displayVariant } from '@/lib/inventory/display';
 import type { ReturnsTrackerRow } from '@/lib/returns/types';
-import {
-  MarkReturnedButton,
-  PlanReturnButton,
-  UndoReturnedButton,
-} from './plan-return-button';
+import { returnMove } from '@/lib/returns/move';
+import { MoveLabel } from '@/components/ui/move-label';
+import { MarkReturnedButton, PlanReturnButton, UndoReturnedButton } from './plan-return-button';
 
 export function ReturnItemRow({
   row,
@@ -19,10 +17,11 @@ export function ReturnItemRow({
   nested?: boolean;
 }) {
   const urgency =
-    row.daysLeft != null && row.daysLeft <= 7
-      ? 'text-caution font-medium'
-      : 'text-ink-muted';
+    row.daysLeft != null && row.daysLeft <= 7 ? 'text-caution font-medium' : 'text-ink-muted';
   const returned = row.status === 'returned';
+  // Whose move it is (plan #1454): on you inside the window, waiting on the
+  // carrier before it arrives, nothing once it is back.
+  const move = returnMove(row);
 
   return (
     <li className="row-pad flex flex-col gap-3 px-4 sm:flex-row sm:items-center">
@@ -61,17 +60,20 @@ export function ReturnItemRow({
             className="mt-2 max-w-48"
           />
         )}
-        <p className={`mt-1 text-small ${returned ? 'text-ink-muted' : urgency}`}>
-          {returned
-            ? row.refundedAt
-              ? `Returned ${row.refundedAt}`
-              : 'Returned'
-            : row.returnDeadline && row.daysLeft != null
-              ? deadlineLabel(row.daysLeft, row.returnDeadline)
-              : row.returnWindowDays == null
-                ? 'No return window set for this merchant'
-                : 'Awaiting delivery for deadline'}
-        </p>
+        <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          {move && <MoveLabel move={move.move} title={move.title} />}
+          <p className={`text-small ${returned ? 'text-ink-muted' : urgency}`}>
+            {returned
+              ? row.refundedAt
+                ? `Returned ${row.refundedAt}`
+                : 'Returned'
+              : row.returnDeadline && row.daysLeft != null
+                ? deadlineLabel(row.daysLeft, row.returnDeadline)
+                : row.returnWindowDays == null
+                  ? 'No return window set for this merchant'
+                  : 'Awaiting delivery for deadline'}
+          </p>
+        </div>
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-col sm:items-end">
         {returned && row.returnId ? (
