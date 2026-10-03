@@ -21,6 +21,10 @@ import { parseRef } from '@/lib/core/refs';
  * the table's guard allows only from `done`, so a second press finds nothing
  * to move.
  *
+ * Everything else that writes for Dash records its change with
+ * recordDashAction, alongside the write: the role thread's cover letter, the
+ * dev comment actions and goal comment filing (plan #1459).
+ *
  * Ask Dash's own changes keep their per-kind undo in lib/ask/changes.ts,
  * because some of them touch two rows (a return writes the item and a
  * returns row) and the generic rule sees only one. undoDashAction refuses
@@ -126,6 +130,32 @@ const SCHEMAS: ReadonlySet<string> = new Set<AskSchema>([
 const MANAGED = new Set(['id', 'user_id', 'created_at', 'updated_at']);
 
 const GONE = 'That change is not there any more.';
+
+/**
+ * The rows that can hang off a row Dash added, by the table it added it to.
+ * Undoing an add deletes the row, and the database would take these with it
+ * (or blank the link to it), so an add that has gained any is not undone:
+ * the comment, sub-step or idea written on it since is later work too.
+ * Rows a trigger derives from the row itself, such as a record's readings,
+ * are not listed, since they go with it rightly.
+ */
+const DEPENDENTS: Record<string, { schema: AskSchema; table: string; column: string }[]> = {
+  'public.plan_items': [
+    { schema: 'public', table: 'plan_items', column: 'parent_id' },
+    { schema: 'public', table: 'dev_comments', column: 'plan_item_id' },
+    { schema: 'public', table: 'plan_dependencies', column: 'item_id' },
+    { schema: 'public', table: 'plan_dependencies', column: 'depends_on_id' },
+    { schema: 'public', table: 'plan_runs', column: 'plan_item_id' },
+    { schema: 'public', table: 'ideas', column: 'from_plan_item_id' },
+    { schema: 'public', table: 'ideas', column: 'plan_item_id' },
+    { schema: 'public', table: 'spec_changes', column: 'plan_item_id' },
+  ],
+  'public.ideas': [
+    { schema: 'public', table: 'dev_comments', column: 'idea_id' },
+    { schema: 'public', table: 'inspiration_takeaways', column: 'idea_id' },
+  ],
+  'public.feedback_items': [{ schema: 'public', table: 'dev_comments', column: 'feedback_item_id' }],
+};
 
 /** A refusal the person reads. */
 class Refused extends Error {}
@@ -268,6 +298,19 @@ export async function readSubject(db: AskDb, ref: string): Promise<Values | null
   return (data as Values | null) ?? null;
 }
 
+/** Whether anything has been written on the row since Dash added it. */
+async function hasDependents(db: AskDb, ref: string): Promise<boolean> {
+  const parsed = parseRef(ref);
+  const dependents = parsed ? (DEPENDENTS[parsed.table] ?? []) : [];
+  for (const { schema, table, column } of dependents) {
+    const client = await db(schema);
+    const { data, error } = await client.from(table).select('id').eq(column, parsed!.id).limit(1);
+    if (error) throw new Error(`Reading what hangs off ${ref} failed: ${error.message}`);
+    if ((data ?? []).length > 0) return true;
+  }
+  return false;
+}
+
 async function laterActionOn(deps: DashActionDeps, action: DashAction): Promise<boolean> {
   const { data, error } = await deps.core
     .from(DASH_ACTIONS_TABLE)
@@ -336,6 +379,14 @@ export async function undoDashAction(deps: DashActionDeps, id: string): Promise<
   const decided = planUndo(action, current, later);
   if (!decided.ok) return { ok: false, error: decided.reason, action };
 
+  if (decided.plan.op === 'delete' && (await hasDependents(deps.db, ref!))) {
+    return {
+      ok: false,
+      error: 'Something has been added to it since, so undoing would lose that too.',
+      action,
+    };
+  }
+
   try {
     await apply(deps, ref!, decided.plan, current);
   } catch (error) {
@@ -357,4 +408,93 @@ export async function undoDashAction(deps: DashActionDeps, id: string): Promise<
     return { ok: false, error: now ? notDone(now.status) : GONE, action: now };
   }
   return { ok: true, action: toDashAction(rows[0]) };
+}
+
+// ---------------------------------------------------------------------------
+// Recording a change, from the paths that write without asking first
+// ---------------------------------------------------------------------------
+
+/** What a writer says about the change it just made. */
+export type DashActionEntry = {
+  surface: Exclude<DashActionSurface, 'ask'>;
+  /** What was done, in snake_case: `file_idea`, `write_cover_letter`. */
+  kind: string;
+  /** `schema.table:id`, the row written. */
+  subjectRef: string;
+  op: DashActionOp;
+  /** The sentence the person reads for it. */
+  summary: string;
+  /**
+   * The whole row before the write, from readSubjectOrNull, for an update
+   * or a delete. Left out for an insert.
+   */
+  beforeValues?: Values | null;
+};
+
+/** Longest summary kept; a longer one is cut at a word. */
+const SUMMARY_MAX = 300;
+
+function clipped(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  if (flat.length <= SUMMARY_MAX) return flat;
+  const cut = flat.slice(0, SUMMARY_MAX - 1);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > SUMMARY_MAX / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
+/**
+ * readSubject for a recorder: the row as it is, or null when it could not be
+ * read. A writer reads it before an update or a delete for before_values. A
+ * null leaves the record saying what happened without an undo, and never
+ * stops the write.
+ */
+export async function readSubjectOrNull(deps: DashActionDeps, ref: string): Promise<Values | null> {
+  try {
+    return await readSubject(deps.db, ref);
+  } catch (error) {
+    console.error(`dash action: could not read ${ref}`, error);
+    return null;
+  }
+}
+
+/**
+ * Record a change Dash has just made, as done: the row it touched, what
+ * happened to it, its values before (from the caller) and after (read here,
+ * for an insert or an update), and the sentence the person reads.
+ *
+ * Called after the write has landed, and best-effort: the write is what the
+ * person asked for, so a record that cannot be written is logged and the
+ * write stands. The id of the record comes back, or null when it was not
+ * kept.
+ */
+export async function recordDashAction(
+  deps: DashActionDeps,
+  entry: DashActionEntry,
+): Promise<string | null> {
+  try {
+    const after = entry.op === 'delete' ? null : await readSubjectOrNull(deps, entry.subjectRef);
+    const before = entry.op === 'insert' ? null : (entry.beforeValues ?? null);
+    const now = deps.now ? deps.now() : new Date().toISOString();
+    const { data, error } = await deps.core
+      .from(DASH_ACTIONS_TABLE)
+      .insert({
+        user_id: deps.userId,
+        surface: entry.surface,
+        kind: entry.kind,
+        status: 'done',
+        done_at: now,
+        subject_ref: entry.subjectRef,
+        op: entry.op,
+        before_values: before,
+        after_values: after,
+        summary: clipped(entry.summary),
+      })
+      .select('id')
+      .single();
+    if (error) throw new Error(error.message);
+    return (data as { id: string }).id;
+  } catch (error) {
+    console.error(`dash action: could not record ${entry.kind} on ${entry.subjectRef}`, error);
+    return null;
+  }
 }

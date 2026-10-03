@@ -8,9 +8,15 @@
  * The same rule as lib/goals/ask.ts: every outcome is written into the
  * thread, including the ones where nothing could be done, because a question
  * that went nowhere silently looks the same as one being worked on.
+ *
+ * A letter filed into the application is recorded in core.dash_actions with
+ * the application as it was before and after (plan #1459), so it can be
+ * undone while nobody has edited the letter since.
  */
 import 'server-only';
 
+import { readSubjectOrNull, recordDashAction, type DashActionDeps } from '@/lib/core/dash-actions';
+import { toRef } from '@/lib/core/refs';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
@@ -26,6 +32,8 @@ export type RoleAskInput = {
   commentId: string;
   question: string;
   apiKey: string | null;
+  /** The person's clients, for recording the letter in core.dash_actions. */
+  dash: DashActionDeps;
 };
 
 export type RoleAskOutcome = { ok: true; message: string } | { ok: false; error: string };
@@ -177,12 +185,22 @@ async function produceReply(input: RoleAskInput): Promise<RoleAskOutcome> {
     return refuse(`I could not produce a reply: ${reply.error} Your comment is saved.`);
 
   if (reply.coverLetter) {
+    const ref = toRef('job_search.applications', application.id as string);
+    const before = await readSubjectOrNull(input.dash, ref);
     const { error } = await client
       .from('applications')
       .update({ cover_letter: reply.coverLetter })
       .eq('id', application.id as string)
       .eq('user_id', userId);
     if (error) return refuse(`I wrote a letter but could not save it: ${error.message}`);
+    await recordDashAction(input.dash, {
+      surface: 'thread',
+      kind: 'write_cover_letter',
+      subjectRef: ref,
+      op: 'update',
+      beforeValues: before,
+      summary: `${coverLetter?.trim() ? 'Rewrote' : 'Wrote'} the cover letter for ${role.title as string} at ${company.name}.`,
+    });
   }
 
   await say(input, replyBody(reply, coverLetter));

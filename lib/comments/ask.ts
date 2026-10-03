@@ -28,6 +28,7 @@ import { startRoutineRun } from '@/lib/plan/runs';
 import { buildPlanTree, findNode } from '@/lib/plan/tree';
 import { raisedRowFrom, RAISED_COLUMNS } from '@/lib/raised/load';
 import { carryOut } from './act';
+import type { DashActionDeps } from '@/lib/core/dash-actions';
 import {
   askMessage,
   ideaContext,
@@ -64,6 +65,8 @@ export type AskInput = {
   /** The comment carrying the question, left out of the history. */
   commentId: string;
   question: string;
+  /** The person's clients, for recording what an instruction writes (plan #1459). */
+  dash: DashActionDeps;
 };
 
 /** What the row says, and what has already been said about it. */
@@ -380,6 +383,7 @@ async function produceReply(input: AskInput): Promise<AskOutcome> {
     const outcome = await carryOut({
       supabase: input.supabase,
       userId: input.userId,
+      dash: input.dash,
       target: input.target,
       id: input.id,
       action: reply.action,

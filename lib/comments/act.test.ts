@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { carryOut, type ActInput } from './act';
 import { handStepToClaude } from '@/lib/plan/handover';
 import type { DashAction } from './reply-payload';
+import { fakeDashDeps } from '../../tests/stubs/fake-schema-db';
 
 // The hand-over is its own tested unit and reads the whole plan tree; what
 // matters here is which step id reaches it.
@@ -99,7 +100,14 @@ function action(over: Partial<DashAction> & { name: string }): DashAction {
 }
 
 function input(over: Partial<ActInput> & { action: DashAction }): ActInput {
-  return { supabase: db().supabase, userId: 'user-1', target: 'step', id: 'row-1', ...over };
+  return {
+    supabase: db().supabase,
+    userId: 'user-1',
+    target: 'step',
+    id: 'row-1',
+    dash: fakeDashDeps({}, 'user-1'),
+    ...over,
+  };
 }
 
 describe('filing an idea from a comment', () => {
