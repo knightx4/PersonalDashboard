@@ -5,6 +5,7 @@ import { cn } from '@/lib/cn';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
+import { completionMoment } from '@/components/motion/complete';
 import { answerItem, completeItem, deferItem, dismissItem } from '@/app/todo/source-actions';
 import type { AgendaItem, AgendaItemOption } from '@/lib/todo/agenda/sources';
 import { formatClock } from '@/lib/clock';
@@ -38,6 +39,9 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
     value: 'open',
     apply: (_current, change) => change.state,
     write: (change) => change.write(),
+    onDone: (change) => {
+      if (change.state === 'done') completionMoment();
+    },
   });
 
   const acted = shown !== 'open';

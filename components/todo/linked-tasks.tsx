@@ -11,6 +11,7 @@ import { cardVariants } from '@/components/ui/card';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { FieldError, Input } from '@/components/ui/field';
 import { completeTask, reopenTask } from '@/app/todo/actions';
+import { completionMoment } from '@/components/motion/complete';
 import { addLinkedTask, detachTask, type LinkedTaskState } from '@/app/todo/link-actions';
 import type { LinkTarget } from '@/lib/todo/links/model';
 import type { Task, TaskStatus } from '@/lib/todo/tasks/model';
@@ -151,7 +152,12 @@ function LinkedRow({
   const { shown, run, failed } = useOptimisticWrite<TaskStatus, TaskStatus>({
     value: task.status,
     apply: (_current, next) => next,
-    write: (next) => (next === 'done' ? completeTask(task.id) : reopenTask(task.id)),
+    write: async (next) => {
+      if (next !== 'done') return reopenTask(task.id);
+      const result = await completeTask(task.id);
+      if (!result.error) completionMoment();
+      return result;
+    },
   });
 
   const done = shown === 'done';

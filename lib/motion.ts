@@ -71,3 +71,10 @@ export function springAt(t: number): number {
  * has the whole screen to cross.
  */
 export const FLIGHT_MS = MOTION_MS.move + MOTION_MS.quick;
+
+/**
+ * The completion buzz, in milliseconds (plan #1552): one short tap on a phone
+ * that can vibrate, felt rather than heard. Played by completionMoment in
+ * components/motion/complete.ts and nowhere else.
+ */
+export const HAPTIC_MS = 10;
