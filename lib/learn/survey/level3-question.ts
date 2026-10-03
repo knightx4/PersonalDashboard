@@ -133,7 +133,7 @@ export async function writeLevel3Question(input: {
 
   const subject = await surveySubjectForAim(supabase, userId, aim);
   if (!subject)
-    return { ok: false, reason: 'tracked', detail: `"${aim.name}" already has a track.` };
+    return { ok: false, reason: 'tracked', detail: `"${aim.name}" already has a subject.` };
 
   const [claims, ideas] = await Promise.all([
     loadLevel3Claims(supabase),

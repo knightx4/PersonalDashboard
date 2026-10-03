@@ -304,7 +304,7 @@ export async function conceptsFromCourse(input: {
     return {
       ok: false,
       reason: 'nothing-new',
-      detail: `Dash found nothing from ${course.title.trim()} that the track does not already hold.`,
+      detail: `Dash found nothing from ${course.title.trim()} that the subject does not already hold.`,
     };
   }
 

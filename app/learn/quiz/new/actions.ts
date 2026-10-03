@@ -110,6 +110,6 @@ export async function startQuiz(
     sources,
   });
 
-  revalidatePath('/learn/quiz');
+  revalidatePath('/learn/know');
   redirect(`/learn/quiz/${quizId}`);
 }

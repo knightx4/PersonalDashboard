@@ -255,7 +255,7 @@ const WHY_PREREQUISITES = 2;
  * Supply and Demand curves."
  */
 export function lessonWhy(trackName: string, prerequisites: readonly string[]): string {
-  const lead = `Next in your ${trackName.trim()} track.`;
+  const lead = `Next in your ${trackName.trim()} subject.`;
   const named = prerequisites.map((name) => name.trim()).filter(Boolean);
   if (named.length === 0) return lead;
   const shown = named.slice(0, WHY_PREREQUISITES);

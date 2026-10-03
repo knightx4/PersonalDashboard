@@ -132,7 +132,7 @@ export async function loadTrackInterest(
       loadSurveySubjectIds(supabase, userId),
     ]);
     assertSchemaExposed(error, LEARN_SCHEMA);
-    if (error) throw fail('Reading which track those ideas are in', error);
+    if (error) throw fail('Reading which subject those ideas are in', error);
     for (const concept of (data ?? []) as { id: string; subject_id: string }[]) {
       // A survey question is not a track's (plan #838): it neither weighs as
       // a track nor counts as answering elsewhere.

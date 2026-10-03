@@ -106,15 +106,15 @@ export async function addLessonFloor(
       .eq('id', due.subjectId)
       .eq('user_id', userId)
       .maybeSingle();
-    if (subjectError) throw new Error(`Reading the track failed: ${subjectError.message}`);
-    if (!subject) return { outcome: 'failed', detail: 'No track of this person has that id.' };
+    if (subjectError) throw new Error(`Reading the subject failed: ${subjectError.message}`);
+    if (!subject) return { outcome: 'failed', detail: 'No subject of this person has that id.' };
     const name = (subject as { name: string }).name;
 
     if (!(await claim(learn, userId, due.cardId))) return { outcome: 'taken' };
 
     const graph = await loadGraph(learn, due.subjectId, userId);
     const concept = graph.concepts.find((c) => c.id === due.conceptId);
-    if (!concept) return { outcome: 'failed', detail: 'The lesson’s concept is no longer in its track.' };
+    if (!concept) return { outcome: 'failed', detail: 'The lesson’s concept is no longer in its subject.' };
     if (isSettled(concept)) {
       return { outcome: 'nothing-missing', detail: `${concept.name} is known by now.` };
     }

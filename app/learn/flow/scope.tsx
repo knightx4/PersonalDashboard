@@ -34,7 +34,7 @@ export function ScopeFilter({ filter }: { filter: FlowOnly }) {
     { key: 'all', label: 'Everything', href: practiceHref(), on: filter === null },
     {
       key: 'tracks',
-      label: 'Tracks only',
+      label: 'Subjects only',
       href: practiceHref({ only: 'tracks' }),
       on: filter === 'tracks',
     },

@@ -145,7 +145,7 @@ async function startOfferedTrack(
   const started = await startTrackFromTheme(supabase, vault, userId, themeId.data).catch(
     (error: unknown) => ({
       ok: false as const,
-      detail: error instanceof Error ? error.message : 'Could not start that track.',
+      detail: error instanceof Error ? error.message : 'Could not start that subject.',
     }),
   );
   if (!started.ok) return { ...prev, offerError: started.detail };

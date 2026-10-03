@@ -58,7 +58,7 @@ export function fingerprintOf(trackIds: readonly string[], goalIds: readonly str
  */
 export async function profileFingerprint(learn: LearnSupabaseClient, userId: string): Promise<string> {
   const subjects = await learn.from('subjects').select('id').eq('user_id', userId).eq('survey', false);
-  if (subjects.error) throw new Error(`Reading your tracks failed: ${subjects.error.message}`);
+  if (subjects.error) throw new Error(`Reading your subjects failed: ${subjects.error.message}`);
   const goals = await learn
     .schema('goals')
     .from('items')

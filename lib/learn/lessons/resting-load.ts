@@ -29,7 +29,7 @@ export async function loadRestingRecord(
     .order('happened_at', { ascending: false });
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw new Error(`Reading what you did with resting tracks failed: ${error.message}`);
+  if (error) throw new Error(`Reading what you did with resting subjects failed: ${error.message}`);
 
   return ((data ?? []) as { subject_id: string; outcome: RestingOutcome; happened_at: string }[]).map(
     (row) => ({ subjectId: row.subject_id, outcome: row.outcome, happenedAt: row.happened_at }),
@@ -76,7 +76,7 @@ export async function recordRestingPress(
     .eq('survey', false)
     .maybeSingle();
   assertSchemaExposed(readError, LEARN_SCHEMA);
-  if (readError) throw new Error(`Reading that track failed: ${readError.message}`);
+  if (readError) throw new Error(`Reading that subject failed: ${readError.message}`);
   if (!track) return false;
 
   const { error } = await supabase.from('track_offers').insert({
@@ -86,6 +86,6 @@ export async function recordRestingPress(
     outcome,
   });
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw new Error(`Keeping what you did with that track failed: ${error.message}`);
+  if (error) throw new Error(`Keeping what you did with that subject failed: ${error.message}`);
   return true;
 }

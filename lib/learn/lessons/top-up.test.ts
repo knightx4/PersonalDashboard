@@ -331,16 +331,16 @@ describe('lessons rated too hard', () => {
 
 describe('the why line', () => {
   it('names the track', () => {
-    expect(lessonWhy('Economics', [])).toBe('Next in your Economics track.');
+    expect(lessonWhy('Economics', [])).toBe('Next in your Economics subject.');
   });
 
   it('names what the concept builds on, two at most', () => {
-    expect(lessonWhy('Economics', ['Supply'])).toBe('Next in your Economics track. It builds on Supply.');
+    expect(lessonWhy('Economics', ['Supply'])).toBe('Next in your Economics subject. It builds on Supply.');
     expect(lessonWhy('Economics', ['Supply', 'Demand'])).toBe(
-      'Next in your Economics track. It builds on Supply and Demand.',
+      'Next in your Economics subject. It builds on Supply and Demand.',
     );
     expect(lessonWhy('Economics', ['Supply', 'Demand', 'Elasticity', 'Tax'])).toBe(
-      'Next in your Economics track. It builds on Supply, Demand and 2 more.',
+      'Next in your Economics subject. It builds on Supply, Demand and 2 more.',
     );
   });
 });

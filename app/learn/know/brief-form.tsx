@@ -74,7 +74,7 @@ function ClaimRow({
               nothing for it, and it is here because the edges around it are
               what join the new claims to what you have. */}
           <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-            Already in this track
+            Already in this subject
           </span>
         </p>
         {node.claim && <p className="mt-0.5 text-ui text-ink">{node.claim}</p>}
@@ -225,11 +225,11 @@ export function BriefForm({
               name="subjectId"
               defaultValue=""
               placeholderValue=""
-              aria-label="Which track"
-              title="Choosing a track you already have stops it proposing ideas that are in there already"
+              aria-label="Which subject"
+              title="Choosing a subject you already have stops it proposing ideas that are in there already"
               icon={<Network className="size-3.5" strokeWidth={1.75} />}
             >
-              <option value="">A new track</option>
+              <option value="">A new subject</option>
               {subjects.map((subject) => (
                 <option key={subject.id} value={subject.id}>
                   {subject.name}

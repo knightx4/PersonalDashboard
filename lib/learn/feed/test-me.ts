@@ -27,7 +27,7 @@ export async function startTrackFromCard(
   card: { title: string; article: string },
 ): Promise<StartedTrack> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { ok: false, detail: 'Starting a track needs ANTHROPIC_API_KEY to be set.' };
+  if (!apiKey) return { ok: false, detail: 'Starting a subject needs ANTHROPIC_API_KEY to be set.' };
 
   // Read, not created: a track is only made once there is a chain to put in it.
   // The same case-insensitive match `saveChain` makes when it files the chain.
@@ -57,6 +57,6 @@ export async function startTrackFromCard(
     });
     return { ok: true, subjectId: saved.subjectId, name: card.article };
   } catch (error) {
-    return { ok: false, detail: error instanceof Error ? error.message : 'Could not save that track.' };
+    return { ok: false, detail: error instanceof Error ? error.message : 'Could not save that subject.' };
   }
 }

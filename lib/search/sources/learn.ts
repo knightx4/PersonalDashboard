@@ -99,7 +99,7 @@ async function read(ctx: Read): Promise<SearchHit[]> {
       kind: 'track',
       id: row.id,
       title: row.title,
-      subtitle: 'Track',
+      subtitle: 'Reading list',
       href: `/learn/t/${row.id}`,
     });
   }

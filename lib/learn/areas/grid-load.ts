@@ -59,7 +59,7 @@ export async function loadAreaGrid(
   if (domainRead.error) throw new Error(`Reading the domains failed: ${domainRead.error.message}`);
   if (fieldRead.error) throw new Error(`Reading the fields failed: ${fieldRead.error.message}`);
   if (placementRead.error) {
-    throw new Error(`Reading where your tracks are placed failed: ${placementRead.error.message}`);
+    throw new Error(`Reading where your subjects are placed failed: ${placementRead.error.message}`);
   }
 
   const domains: GridDomain[] = (

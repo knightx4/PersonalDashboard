@@ -118,7 +118,7 @@ export async function loadFlowGoal(
   ]);
   assertSchemaExposed(aims.error ?? subjects.error, LEARN_SCHEMA);
   if (aims.error) throw fail('Reading that goal', aims.error);
-  if (subjects.error) throw fail("Reading that goal's track", subjects.error);
+  if (subjects.error) throw fail("Reading that goal's subject", subjects.error);
   const aim = ((aims.data ?? []) as { id: string; name: string; archived_at: string | null }[]).find(
     (row) => row.id === aimId,
   );
@@ -342,7 +342,7 @@ async function claimsNow(
   ]);
 
   assertSchemaExposed(homes.error ?? surveyRead.error, LEARN_SCHEMA);
-  if (homes.error) throw fail('Reading which track those ideas are in', homes.error);
+  if (homes.error) throw fail('Reading which subject those ideas are in', homes.error);
   if (surveyRead.error) throw fail('Reading the survey subjects', surveyRead.error);
 
   const subjectOf = new Map(
@@ -638,7 +638,7 @@ async function recentTurns(supabase: LearnSupabaseClient): Promise<FlowTurn[]> {
     supabase.from('subjects').select('id, aim_id').eq('survey', true),
   ]);
   assertSchemaExposed(homes.error ?? hidden.error, LEARN_SCHEMA);
-  if (homes.error) throw fail('Reading which track those ideas are in', homes.error);
+  if (homes.error) throw fail('Reading which subject those ideas are in', homes.error);
   if (hidden.error) throw fail('Reading the survey subjects', hidden.error);
   const subjectOf = new Map(
     ((homes.data ?? []) as { id: string; subject_id: string }[]).map((row) => [

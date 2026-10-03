@@ -40,7 +40,7 @@ async function markOutlined(learn: LearnSupabaseClient, userId: string, subjectI
     .eq('id', subjectId)
     .eq('user_id', userId)
     .is('outlined_at', null);
-  if (error) throw new Error(`Marking the track outlined failed: ${error.message}`);
+  if (error) throw new Error(`Marking the subject outlined failed: ${error.message}`);
 }
 
 /**
@@ -62,8 +62,8 @@ export async function ensureOutline(
       .eq('id', track.subjectId)
       .eq('user_id', userId)
       .maybeSingle();
-    if (subjectError) throw new Error(`Reading the track failed: ${subjectError.message}`);
-    if (!subject) return { outcome: 'failed', detail: 'No track of this person has that id.' };
+    if (subjectError) throw new Error(`Reading the subject failed: ${subjectError.message}`);
+    if (!subject) return { outcome: 'failed', detail: 'No subject of this person has that id.' };
     if ((subject as { outlined_at: string | null }).outlined_at) return { outcome: 'already' };
 
     const units = await loadCurriculum(learn, track.subjectId, userId);

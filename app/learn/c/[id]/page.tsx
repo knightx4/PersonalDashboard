@@ -369,7 +369,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
       {opening && (
         <CardSection
           title="Asked before you started"
-          hint="Answered from memory, before anything about this track was laid out."
+          hint="Answered from memory, before anything about this subject was laid out."
           className="mb-5"
         >
           <p className="text-ui text-ink">{opening.question}</p>
@@ -397,7 +397,7 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
               href={`/learn/s/${subject.id}/probe`}
               className="underline underline-offset-2 hover:text-ink"
             >
-              Ask about this track
+              Ask about this subject
             </Link>{' '}
             and it will come up.
           </p>

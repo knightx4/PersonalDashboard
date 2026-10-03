@@ -133,7 +133,7 @@ describe('a unit check on the deck', () => {
       answer: null,
       link: null,
     });
-    expect(card?.why).toBe('You finished this unit of your Economics track. One question on it, if you want it.');
+    expect(card?.why).toBe('You finished this unit of your Economics subject. One question on it, if you want it.');
   });
 
   it('is not shown without its question', () => {

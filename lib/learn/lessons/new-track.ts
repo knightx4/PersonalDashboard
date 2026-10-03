@@ -77,7 +77,7 @@ export async function makeTrackFromCard(
   card: { article: string; idea: string },
 ): Promise<NewTrack> {
   const name = card.article.trim();
-  if (!name) return { ok: false, detail: 'This card names no article to make a track of.' };
+  if (!name) return { ok: false, detail: 'This card names no article to make a subject of.' };
 
   const subject = await findOrCreateSubject(supabase, userId, name);
   if (!subject.placed) {

@@ -125,10 +125,10 @@ function FeedOfferCard({
     startStart(async () => {
       setError(null);
       const result: NewTrackResult = await startTrackOffer(offer.themeId).catch(() => ({
-        error: 'Could not start that track. Check your connection.',
+        error: 'Could not start that subject. Check your connection.',
       }));
       if (result.track) onDone(result.track);
-      else setError(result.error ?? 'Could not start that track.');
+      else setError(result.error ?? 'Could not start that subject.');
     });
 
   const setAside = (outcome: 'not_now' | 'never') => {
@@ -145,7 +145,7 @@ function FeedOfferCard({
     <Card padding="standard">
       <p className="flex items-center gap-1.5 text-small text-ink-muted">
         <Sprout className="size-3.5" strokeWidth={2} aria-hidden />
-        A new track
+        A new subject
       </p>
       <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">
         {offer.name}
@@ -164,11 +164,11 @@ function FeedOfferCard({
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1">
           <Button type="button" variant="primary" onClick={start} pending={starting}>
-            {starting ? 'Writing the track…' : 'Start'}
+            {starting ? 'Writing the subject…' : 'Start'}
           </Button>
           <PaidHint
             action="app/learn/now/actions.ts#startTrackOffer"
-            what="Cost of starting the track"
+            what="Cost of starting the subject"
           />
         </span>
         <Button
@@ -186,7 +186,7 @@ function FeedOfferCard({
 
       {starting && (
         <p className="mt-2 text-small text-ink-muted" aria-live="polite">
-          Writing the track&apos;s first ideas and its units. This takes about a minute.
+          Writing the subject&apos;s first ideas and its units. This takes about a minute.
         </p>
       )}
       {error && <p className="mt-2 text-small text-danger">{error}</p>}
@@ -218,7 +218,7 @@ function RestingTrackCard({
     startPicking(async () => {
       setError(null);
       const result = await answerRestingTrack(track.subjectId, 'picked_up').catch(() => ({
-        error: 'Could not pick that track up. Check your connection.',
+        error: 'Could not pick that subject up. Check your connection.',
       }));
       if (result.error) setError(result.error);
       else onDone(track);
@@ -237,7 +237,7 @@ function RestingTrackCard({
     <Card padding="standard">
       <p className="flex items-center gap-1.5 text-small text-ink-muted">
         <Moon className="size-3.5" strokeWidth={2} aria-hidden />
-        A resting track
+        A resting subject
       </p>
       <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">
         <Link href={`/learn/s/${track.subjectId}`} className="hover:underline underline-offset-2">

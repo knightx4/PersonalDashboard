@@ -306,7 +306,7 @@ export default async function SubjectPage({
           className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
           <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          Tracks
+          Subjects
         </Link>
       </p>
 
@@ -350,15 +350,15 @@ export default async function SubjectPage({
               fields={{ subjectId: id }}
               prompt={
                 counts.total === 0
-                  ? 'Deletes this track and its curriculum.'
-                  : `Deletes this track, its curriculum, its ${counts.total} ${
+                  ? 'Deletes this subject and its curriculum.'
+                  : `Deletes this subject, its curriculum, its ${counts.total} ${
                       counts.total === 1 ? 'idea' : 'ideas'
                     } and everything you answered on them. Readings stay on their lists.`
               }
               confirmLabel="Yes, delete it"
               pendingLabel="Deleting…"
             >
-              Delete track
+              Delete subject
             </ConfirmStep>
           </>
         }
@@ -451,13 +451,13 @@ export default async function SubjectPage({
             'border-dashed px-4 py-6 text-center text-body text-ink-muted',
           )}
         >
-          No ideas in this track yet. An idea is one thing you can be right or wrong about, not a
+          No ideas in this subject yet. An idea is one thing you can be right or wrong about, not a
           heading.
         </p>
       ) : showEverything ? (
         <>
           <p className="mb-2 text-ui text-ink-muted">
-            Everything in this track, prerequisites first, including what you already know.
+            Everything in this subject, prerequisites first, including what you already know.
           </p>
           <ConceptList
             concepts={learningOrder(
@@ -476,7 +476,7 @@ export default async function SubjectPage({
             'border-dashed px-4 py-6 text-center text-body text-ink-muted',
           )}
         >
-          No goals in this track yet. A goal is what you actually want to understand, and the chain
+          No goals in this subject yet. A goal is what you actually want to understand, and the chain
           leading to it is what gets shown here.
         </p>
       ) : (

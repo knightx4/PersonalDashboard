@@ -32,7 +32,7 @@ export function WriteCurriculum({ subjectId }: { subjectId: string }) {
         <input type="hidden" name="subjectId" value={subjectId} />
         <h2 className="text-body font-semibold text-ink">No curriculum yet</h2>
         <p className="mt-1 text-ui text-ink-muted">
-          A curriculum lays out the whole track as a fixed list of units, in the order they are
+          A curriculum lays out the whole subject as a fixed list of units, in the order they are
           learned. It is written once and does not change; you open one unit at a time and its ideas
           are laid out then. Takes about twenty seconds.
         </p>

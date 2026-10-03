@@ -81,7 +81,7 @@ export async function askQuestion(_prev: AskState, formData: FormData): Promise<
   const user = await requireUser();
 
   const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
-  if (!subjectId.success) return { error: 'Could not work out which track this is.' };
+  if (!subjectId.success) return { error: 'Could not work out which subject this is.' };
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { error: 'Asking questions needs ANTHROPIC_API_KEY to be set.' };
@@ -89,7 +89,7 @@ export async function askQuestion(_prev: AskState, formData: FormData): Promise<
   const supabase = await createLearnClient();
   const graph = await loadGraph(supabase, subjectId.data);
   if (graph.concepts.length === 0) {
-    return { error: 'Nothing in this track to ask about yet.' };
+    return { error: 'Nothing in this subject to ask about yet.' };
   }
 
   // A concept can be named, which is what the row on /learn/next does: ask
@@ -108,7 +108,7 @@ export async function askQuestion(_prev: AskState, formData: FormData): Promise<
     // in somebody else's subject or none. Said rather than swallowed: asking
     // about a different claim than the one pressed would be worse.
     concept = graph.concepts.find((c) => c.id === wanted.data) ?? null;
-    if (!concept) return { error: 'That idea is not in this track.' };
+    if (!concept) return { error: 'That idea is not in this subject.' };
   } else {
     const asked = new Map<string, number>();
     for (const c of graph.concepts) {
@@ -125,7 +125,7 @@ export async function askQuestion(_prev: AskState, formData: FormData): Promise<
     concept = nextConcept(graph.concepts, asked, { answered, now: new Date() });
   }
 
-  if (!concept) return { error: 'Nothing in this track to ask about yet.' };
+  if (!concept) return { error: 'Nothing in this subject to ask about yet.' };
 
   const previous = await probesFor(supabase, concept.id);
   // Which rung this question is asked at, and which check of understanding it
@@ -424,7 +424,7 @@ async function answerApplied(input: {
 }): Promise<AskState> {
   const parsed = TypedAnswer.safeParse({ response: input.typed });
   if (!parsed.success) return { ...input.prev, error: 'Write an answer first.' };
-  if (!input.concept) return { ...input.prev, error: 'That idea is not in this track.' };
+  if (!input.concept) return { ...input.prev, error: 'That idea is not in this subject.' };
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return { ...input.prev, error: 'Grading needs ANTHROPIC_API_KEY to be set.' };
@@ -628,7 +628,7 @@ export async function approveFloor(_prev: FloorState, formData: FormData): Promi
   const user = await requireUser();
 
   const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
-  if (!subjectId.success) return { error: 'Could not work out which track that was.' };
+  if (!subjectId.success) return { error: 'Could not work out which subject that was.' };
 
   const raw = formData.get('chain');
   if (typeof raw !== 'string') return { error: 'There is nothing here to approve.' };

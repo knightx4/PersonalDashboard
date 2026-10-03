@@ -268,7 +268,7 @@ export async function testMeOnCard(id: string): Promise<CardActionResult> {
 
   const row = await loadFeedCardRow(supabase, card.data).catch(() => null);
   if (row?.reason === 'lesson') {
-    if (!row.subject_id) return { error: 'The track this lesson was from is no longer there.' };
+    if (!row.subject_id) return { error: 'The subject this lesson was from is no longer there.' };
     if (ACTION_FROM.tested.includes(row.status)) {
       await recordFeedAction(supabase, card.data, 'tested').catch(() => false);
       after(() => topUpFeedAfterResponse(user.id));
@@ -286,7 +286,7 @@ export async function testMeOnCard(id: string): Promise<CardActionResult> {
     article: row.item.title,
   }).catch((error: unknown) => ({
     ok: false as const,
-    detail: error instanceof Error ? error.message : 'Could not start that track.',
+    detail: error instanceof Error ? error.message : 'Could not start that subject.',
   }));
   if (!started.ok) return { error: started.detail };
 
@@ -315,7 +315,7 @@ export async function startTrackOffer(themeId: string): Promise<NewTrackResult> 
   const started = await startTrackFromOffer(supabase, vault, user.id, theme.data).catch(
     (error: unknown) => ({
       ok: false as const,
-      detail: error instanceof Error ? error.message : 'Could not start that track.',
+      detail: error instanceof Error ? error.message : 'Could not start that subject.',
     }),
   );
   if (!started.ok) return { error: started.detail };
@@ -351,7 +351,7 @@ export async function makeTrackOfCard(id: string): Promise<NewTrackResult> {
     idea: row.idea_name?.trim() || cardTitle(row.item.title, row.segment.heading),
   }).catch((error: unknown) => ({
     ok: false as const,
-    detail: error instanceof Error ? error.message : 'Could not make that track.',
+    detail: error instanceof Error ? error.message : 'Could not make that subject.',
   }));
   if (!made.ok) return { error: made.detail };
 
@@ -705,14 +705,14 @@ export async function answerRestingTrack(
   const user = await requireUser();
   const track = CardId.safeParse(subjectId);
   const answer = RestingAnswer.safeParse(outcome);
-  if (!track.success || !answer.success) return { error: 'Could not tell which track that was.' };
+  if (!track.success || !answer.success) return { error: 'Could not tell which subject that was.' };
 
   const supabase = await createLearnClient();
   const kept = await recordRestingPress(supabase, user.id, track.data, answer.data).catch(
     () => null,
   );
   if (kept === null) return { error: 'Could not keep that. Check your connection.' };
-  if (!kept) return { error: 'That track is no longer there.' };
+  if (!kept) return { error: 'That subject is no longer there.' };
 
   if (answer.data === 'picked_up') after(() => topUpFeedAfterResponse(user.id));
   return {};

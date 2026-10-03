@@ -54,10 +54,10 @@ export default async function LearnLayout({ children }: { children: React.ReactN
    * Now first (plan #1486): the feed, with what is waiting in a strip at the
    * top and the practice questions behind its Practice only switch. Home and
    * Practice Flow were tabs of their own until then, and /learn/home and
-   * /learn/flow redirect to Now. Then the subjects, then the rest. A subject
-   * and a single idea are reached through Tracks, and a reading list and a
-   * reading through Reading lists, so they are `alsoMatches` rather than tabs
-   * of their own -- a nav that grows an entry per depth level stops being
+   * /learn/flow redirect to Now. Then the subjects, then the rest. A subject,
+   * a single idea and a quiz are reached through Subjects, and a reading list
+   * and a reading through Reading lists, so they are `alsoMatches` rather
+   * than tabs of their own -- a nav that grows an entry per depth level stops being
    * navigation.
    *
    * There is no Learn next tab. Its re-checks are asked in the practice
@@ -78,13 +78,15 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       exact: true,
       badge: readNow,
     },
-    // The subjects, which are what "track" means on screen now (#774).
+    // The subjects (plan #1487; the code still says subject, and the
+    // database's `tracks` are reading lists). Quizzes are a section of this
+    // page, so one quiz and the screen you answer it on light this tab too.
     {
       href: '/learn/know',
-      label: 'Tracks',
+      label: 'Subjects',
       icon: 'know',
       exact: true,
-      alsoMatches: ['/learn/s/', '/learn/c/'],
+      alsoMatches: ['/learn/s/', '/learn/c/', '/learn/quiz'],
     },
     // What you want to learn and how well, which Learn now draws cards
     // towards (plan #895). The page says Goals; the code says aims.
@@ -100,17 +102,6 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       icon: 'tracks',
       exact: true,
       alsoMatches: ['/learn/t/', '/learn/r/', '/learn/new'],
-    },
-    // Quizzes are not a deeper view of anything else here: they are over
-    // material you chose out of the vault rather than over a subject the graph
-    // holds, and they are where you go when there is a date in the diary. One
-    // quiz and the screen you answer it on are both reached through the list.
-    {
-      href: '/learn/quiz',
-      label: 'Quizzes',
-      icon: 'quiz',
-      exact: true,
-      alsoMatches: ['/learn/quiz/'],
     },
     // The owner's alone, because every transcript it fetches spends the
     // owner's TranscriptAPI credits.

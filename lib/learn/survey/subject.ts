@@ -66,7 +66,7 @@ export async function surveySubjectForTheme(
     .ilike('name', theme.name)
     .maybeSingle();
   assertSchemaExposed(nameError, LEARN_SCHEMA);
-  if (nameError) throw fail('Looking up a track with that name', nameError);
+  if (nameError) throw fail('Looking up a subject with that name', nameError);
   if (named) return null;
 
   const { data: created, error } = await supabase
@@ -143,7 +143,7 @@ export async function surveySubjectForAim(
     .ilike('name', aim.name)
     .maybeSingle();
   assertSchemaExposed(nameError, LEARN_SCHEMA);
-  if (nameError) throw fail('Looking up a track with that name', nameError);
+  if (nameError) throw fail('Looking up a subject with that name', nameError);
   if (named) {
     const row = named as SubjectRow & { aim_id: string | null };
     if (!row.survey || row.aim_id != null) return null;

@@ -103,8 +103,8 @@ export async function addNextUnit(
       .eq('id', subjectId)
       .eq('user_id', userId)
       .maybeSingle();
-    if (subjectError) throw new Error(`Reading the track failed: ${subjectError.message}`);
-    if (!subject) return { outcome: 'failed', detail: 'No track of this person has that id.' };
+    if (subjectError) throw new Error(`Reading the subject failed: ${subjectError.message}`);
+    if (!subject) return { outcome: 'failed', detail: 'No subject of this person has that id.' };
     const name = (subject as { name: string }).name;
 
     const [units, graph, tooHard] = await Promise.all([

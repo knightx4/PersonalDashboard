@@ -59,7 +59,7 @@ function ClaimRow({ node }: { node: ChainNode }) {
           // button does: a concept already in the graph keeps whatever state
           // it arrived at, and approving does not reach it.
           <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-            Already in this track, left as it is
+            Already in this subject, left as it is
           </span>
         ) : (
           <span className="rounded-pill bg-accent-soft px-1.5 py-0.5 text-small text-accent">
@@ -107,7 +107,7 @@ function Proposal({ chain }: { chain: ProposedChain }) {
 
       <div className="mt-4 flex items-center gap-3">
         <KeepButton />
-        <PaidHint action="app/learn/know/actions.ts#approvePrior" what="Cost of saving the track" />
+        <PaidHint action="app/learn/know/actions.ts#approvePrior" what="Cost of saving the subject" />
         {state.error && <span className="text-ui text-danger">{state.error}</span>}
       </div>
     </form>

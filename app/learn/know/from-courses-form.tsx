@@ -55,7 +55,7 @@ function RetrackButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" size="sm" variant="ghost" disabled={pending}>
-      {pending ? 'Reading…' : 'Read for this track'}
+      {pending ? 'Reading…' : 'Read for this subject'}
     </Button>
   );
 }
@@ -182,7 +182,7 @@ function IdeaRow({
           {/* No tick: approving writes nothing for an idea the track already
               holds, and its state stays whatever it was. */}
           <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-            Already in this track, left as it is
+            Already in this subject, left as it is
           </span>
         </p>
         {node.claim && <p className="mt-0.5 text-ui text-ink">{node.claim}</p>}
@@ -261,11 +261,11 @@ export function CourseCheck({
           <ChipSelect
             name="subjectId"
             defaultValue={subjectId ?? ''}
-            aria-label="Into which track"
+            aria-label="Into which subject"
             icon={<Network className="size-3.5" strokeWidth={1.75} />}
           >
             <option value="">
-              {subjectId === null ? `A new track: ${chain.subject}` : 'Let Dash choose'}
+              {subjectId === null ? `A new subject: ${chain.subject}` : 'Let Dash choose'}
             </option>
             {tracks.map((track) => (
               <option key={track.id} value={track.id}>
@@ -289,7 +289,7 @@ export function CourseCheck({
 
         <p className="mb-2 text-body text-ink-muted">
           {`What a course by this name usually teaches, for ${chain.subject}${
-            already > 0 ? `, beside ${already} the track already holds` : ''
+            already > 0 ? `, beside ${already} the subject already holds` : ''
           }. Untick any you do not really know. The rest are marked known on your word, and nothing is saved until you approve.`}
         </p>
 

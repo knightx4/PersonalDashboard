@@ -283,7 +283,7 @@ function Explanation({
               />
               <Button type="submit" variant="ghost" size="sm" pending={startingTrack}>
                 <Sprout className="size-3.5" strokeWidth={2} aria-hidden />
-                {startingTrack ? 'Starting a track…' : 'Start a track'}
+                {startingTrack ? 'Starting a subject…' : 'Start a subject'}
               </Button>
             </form>
           </div>

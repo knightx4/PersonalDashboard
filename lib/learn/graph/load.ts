@@ -73,7 +73,7 @@ export async function loadSubjects(
   const { data, error } = await query.order('name');
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Reading your tracks', error);
+  if (error) throw fail('Reading your subjects', error);
 
   return (data ?? []).map((row) => {
     const subject = row as { id: string; name: string; note: string | null; created_at: string };
@@ -97,7 +97,7 @@ export async function loadSubject(
     .maybeSingle();
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Reading that track', error);
+  if (error) throw fail('Reading that subject', error);
   if (!data) return null;
 
   const subject = data as { id: string; name: string; note: string | null; created_at: string };

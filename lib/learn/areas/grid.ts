@@ -375,7 +375,7 @@ export function testedLine(tested: Tested, day: (at: string | null) => string | 
     tested.surveyed > 0 ? plural(tested.surveyed, 'survey answer', 'survey answers') : null;
   let size: string;
   if (tested.tracks.length === 0) {
-    if (!survey) return 'No track here';
+    if (!survey) return 'No subject here';
     size = survey;
   } else if (tested.total === 0 && !survey) {
     return 'No ideas yet';

@@ -162,7 +162,7 @@ export function readNextUnit(input: unknown, existingTitles: readonly string[]):
     return { ok: false, detail: 'The unit came back too long.' };
   }
   if (existingTitles.some((existing) => existing.trim().toLowerCase() === title.toLowerCase())) {
-    return { ok: false, detail: `The unit repeats "${title}", which the track already has.` };
+    return { ok: false, detail: `The unit repeats "${title}", which the subject already has.` };
   }
   return { ok: true, unit: { title, covers, outcome } };
 }

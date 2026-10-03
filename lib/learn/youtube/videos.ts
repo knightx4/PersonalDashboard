@@ -432,7 +432,7 @@ export async function loadRelatedIdeas(learn: LearnSupabaseClient, userId: strin
     .select('id, subject:subjects!concepts_subject_fk(id, name)')
     .eq('user_id', userId)
     .in('id', ideas.map((idea) => idea.conceptId));
-  if (concepts.error) throw new Error(`Reading the ideas' tracks failed: ${concepts.error.message}`);
+  if (concepts.error) throw new Error(`Reading the ideas' subjects failed: ${concepts.error.message}`);
   const subjects = new Map(
     ((concepts.data ?? []) as unknown as { id: string; subject: { id: string; name: string } | { id: string; name: string }[] | null }[]).map(
       (row) => [row.id, one(row.subject)],

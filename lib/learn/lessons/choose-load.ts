@@ -47,7 +47,7 @@ async function loadHeld(supabase: LearnSupabaseClient, userId: string, now: Date
     .select('id')
     .eq('user_id', userId)
     .gt('lessons_held_until', now.toISOString());
-  if (error) throw new Error(`Reading which tracks are held failed: ${error.message}`);
+  if (error) throw new Error(`Reading which subjects are held failed: ${error.message}`);
   return new Set(((data ?? []) as { id: string }[]).map((row) => row.id));
 }
 
@@ -76,7 +76,7 @@ async function loadOutlined(supabase: LearnSupabaseClient, userId: string): Prom
     .select('id')
     .eq('user_id', userId)
     .not('outlined_at', 'is', null);
-  if (error) throw new Error(`Reading which tracks are outlined failed: ${error.message}`);
+  if (error) throw new Error(`Reading which subjects are outlined failed: ${error.message}`);
   return new Set(((data ?? []) as { id: string }[]).map((row) => row.id));
 }
 

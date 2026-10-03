@@ -378,12 +378,12 @@ export async function findSubjectChannels(
 export async function deleteSubject(formData: FormData): Promise<void> {
   await requireUser();
   const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
-  if (!subjectId.success) throw new Error('Could not work out which track to delete.');
+  if (!subjectId.success) throw new Error('Could not work out which subject to delete.');
 
   const supabase = await createLearnClient();
   const { data, error } = await supabase.from('subjects').delete().eq('id', subjectId.data).select('id');
-  if (error) throw new Error(`Deleting the track failed: ${error.message}`);
-  if ((data ?? []).length === 0) throw new Error('That track is already gone.');
+  if (error) throw new Error(`Deleting the subject failed: ${error.message}`);
+  if ((data ?? []).length === 0) throw new Error('That subject is already gone.');
 
   revalidatePath('/learn/know');
   revalidatePath('/learn/now');
@@ -401,14 +401,14 @@ export type CurriculumState = { error?: string };
 export async function writeTrackCurriculum(_prev: CurriculumState, formData: FormData): Promise<CurriculumState> {
   const user = await requireUser();
   const subjectId = z.string().uuid().safeParse(formData.get('subjectId'));
-  if (!subjectId.success) return { error: 'Could not work out which track this was.' };
+  if (!subjectId.success) return { error: 'Could not work out which subject this was.' };
 
   const supabase = await createLearnClient();
   const [subject, goals] = await Promise.all([
     loadSubject(supabase, subjectId.data),
     loadGoals(supabase, subjectId.data),
   ]);
-  if (!subject) return { error: 'That track is gone.' };
+  if (!subject) return { error: 'That subject is gone.' };
 
   // The oldest goal is what the track was started for.
   const first = goals.at(-1) ?? null;

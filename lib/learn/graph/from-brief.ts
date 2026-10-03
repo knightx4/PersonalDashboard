@@ -139,7 +139,7 @@ export type FromBriefResult =
 export type BriefSection = { title: string; text: string };
 
 const NOTHING_IN_IT =
-  'Nothing in that states an idea this track does not already have. A briefing this can read argues things, such as what something is, why it works and what follows from it, rather than listing names and numbers.';
+  'Nothing in that states an idea this subject does not already have. A briefing this can read argues things, such as what something is, why it works and what follows from it, rather than listing names and numbers.';
 
 const key = (name: string) => name.trim().toLowerCase();
 
@@ -411,7 +411,7 @@ export async function conceptsFromBrief(input: {
     if (pass.kind === 'nothing') {
       dropped.push({
         name: section.title,
-        reason: 'no idea in it that this track does not already have',
+        reason: 'no idea in it that this subject does not already have',
       });
       continue;
     }

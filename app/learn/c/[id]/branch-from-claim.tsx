@@ -65,7 +65,7 @@ function NodeRow({ node, isGoal }: { node: ChainNode; isGoal: boolean }) {
       <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="text-ui font-medium text-ink">{node.name}</span>
         <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-          {node.existingId ? 'Already in this track' : 'New'}
+          {node.existingId ? 'Already in this subject' : 'New'}
         </span>
         {isGoal && (
           <span className="rounded-pill bg-accent-soft px-1.5 py-0.5 text-small text-accent">

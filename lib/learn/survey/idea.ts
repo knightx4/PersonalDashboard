@@ -339,7 +339,7 @@ export async function writeSurveyIdea(input: {
 
   const subject = await surveySubjectForTheme(input.supabase, input.userId, source.theme);
   if (!subject) {
-    return { ok: false, reason: 'tracked', detail: `"${source.theme.name}" already has a track.` };
+    return { ok: false, reason: 'tracked', detail: `"${source.theme.name}" already has a subject.` };
   }
 
   const existing = await loadSurveyIdeaNames(input.supabase, subject.id);

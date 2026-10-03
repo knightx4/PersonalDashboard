@@ -142,7 +142,7 @@ export async function writeGoalQuestion(input: {
   }
 
   const subject = await surveySubjectForAim(supabase, userId, aim);
-  if (!subject) return { ok: false, reason: 'tracked', detail: `"${aim.name}" already has a track.` };
+  if (!subject) return { ok: false, reason: 'tracked', detail: `"${aim.name}" already has a subject.` };
 
   const state = await loadGoalSubjectState(supabase, userId, subject.id);
   const depth = goalQuestionDepth(aim.depth, state.rightAnswers);

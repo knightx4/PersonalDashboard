@@ -42,7 +42,7 @@ describe('readLine', () => {
       'Read into Economics, 1 idea known',
     );
     expect(readLine({ subject: null, conceptsAdded: 4, readAt: '' })).toBe(
-      'Read, 4 ideas known; that track has since been removed',
+      'Read, 4 ideas known; that subject has since been removed',
     );
   });
 });

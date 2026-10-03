@@ -68,7 +68,7 @@ function Rooting({ note }: { note: RootingNote }) {
     return (
       <p className="mb-2 text-ui text-ink-muted">
         Nothing in {note.subject} is known yet, so this is not rooted in what you know. It is a
-        search on the idea alone. Answer some questions on the track and it gets better.
+        search on the idea alone. Answer some questions on the subject and it gets better.
       </p>
     );
   }
