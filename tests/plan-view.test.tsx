@@ -785,13 +785,18 @@ describe('health and status, as two columns', () => {
     expect(row).not.toContain('Not started');
   });
 
-  it('says a blocked step and a proposal need you', () => {
+  // The words are lib/core/move.ts's. "On you" is a view chip too, so the
+  // tooltip is what places the word in a row's Status cell.
+  it('says a blocked step and a proposal are on you', () => {
     const html = render('all');
-    expect(html).toContain('Needs you');
+    expect(html).toContain('On you');
+    expect(html).toContain('Stopped on you');
   });
 
-  it('says a step held up by another is held up', () => {
-    expect(render('all')).toContain('Held up');
+  it('says a step held up by another is waiting', () => {
+    const html = render('all');
+    expect(html).toContain('Waiting');
+    expect(html).toContain('Waiting on another step that has not closed.');
   });
 
   // #694. The runner takes anything approved that is not yours, so "handed
@@ -803,7 +808,7 @@ describe('health and status, as two columns', () => {
     expect(html).not.toContain('Handed to Dash');
   });
 
-  it('says Yours for a step you marked, underway or not', () => {
+  it('says On you for a step you marked, underway or not', () => {
     const marked = buildPlanTree({
       items: [
         item({ id: 'resting', title: 'Outlook ingestion', assignee: 'me' }),
@@ -835,10 +840,10 @@ describe('health and status, as two columns', () => {
     );
     // Both marked rows say it, and the underway one is not read as a
     // session's: marking a step is what holds the runner off it, whoever
-    // started it.
-    expect((html.match(/>Yours</g) ?? []).length).toBe(2);
+    // started it. The word is the shared On you (lib/core/move.ts); the
+    // tooltip is what tells a kept step from one stopped on you.
+    expect((html.match(/You kept this one, so the runner will not take it\./g) ?? []).length).toBe(2);
     expect(html).not.toContain('With Dash');
-    expect(html).toContain('You kept this one, so the runner will not take it.');
   });
 
   it('says With Dash for an underway step you did not mark', () => {

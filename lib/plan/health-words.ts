@@ -7,7 +7,8 @@
  * its own way and hands over the few facts a tooltip needs.
  */
 import type { DevTone } from '@/components/dev/state-label';
-import { DEV_STATE_WORD, PLAN_MOVE_WORD } from '@/lib/dev/words';
+import { MOVE_TONE, MOVE_WORD, type MoveState } from '@/lib/core/move';
+import { DEV_STATE_WORD } from '@/lib/dev/words';
 import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import type { PlanHealth, PlanMove } from '@/lib/plan/tree';
 
@@ -175,35 +176,42 @@ export function healthOf(
 }
 
 /**
- * The Status column, worded and toned.
+ * The Status column: which of the five moves in lib/core/move.ts a plan move
+ * is said as.
  *
- * The same three colours as the health column (note 42aa1fa4). What is being
- * worked right now -- "With Dash", or a re-shape resolving answers -- is blue.
- * Everything still to do that nobody is working is amber: a step on you, one
- * you kept, one another step is holding up. A step waiting its turn has no
- * word to tone, and nor does one that is settled.
+ * The plan reads seven moves off a step because its rules need them, and
+ * says them with the five words every workspace shares. A re-shape running
+ * against a feature is a Dash run in progress, so it says "Dash is on it". A
+ * step you kept is on you, the same as one stopped on you; the tooltip tells
+ * the two apart. A step held up by another step is waiting.
  *
+ * Two say nothing at all. A settled row has no next move and the health
+ * column already says Done, and an approved step waiting its turn has nothing
+ * happening to it yet (#694). A word in either cell would be a fact nobody
+ * needed on the rows nobody is scanning (law 1).
+ */
+export const PLAN_MOVE_STATE: Record<PlanMove, MoveState | null> = {
+  resolving: 'dash_working',
+  on_you: 'on_you',
+  with_dash: 'with_dash',
+  waiting: 'waiting',
+  yours: 'on_you',
+  none: null,
+  settled: null,
+};
+
+/**
  * The tooltip is where the rollup is explained. A feature reporting "With Dash"
  * because its third step is with a session would otherwise be a word with no
  * visible cause, which is the complaint the whole column exists to answer.
  */
-export const MOVE_TONE: Record<PlanMove, DevTone> = {
-  resolving: 'info',
-  on_you: 'caution',
-  with_dash: 'info',
-  waiting: 'caution',
-  yours: 'caution',
-  none: 'ghost',
-  settled: 'ghost',
-};
-
-export const MOVE_TITLE: Record<PlanMove, string> = {
+export const PLAN_MOVE_TITLE: Record<PlanMove, string> = {
   resolving:
     'Re-reading this feature against the answers you just gave. What it proposes will be here when it is done; sending it anywhere until then would send a plan that is mid-edit.',
   on_you:
     'Stopped on you: a question to answer, a proposal to approve, or something only you can supply.',
   with_dash: 'A session is working on this now.',
-  waiting: 'Held up by another step that has not closed.',
+  waiting: 'Waiting on another step that has not closed.',
   yours: 'You kept this one, so the runner will not take it.',
   none: 'Approved and waiting its turn. Nothing is on it and nothing is needed from you.',
   settled: 'Nothing left to do on this one.',
@@ -220,12 +228,16 @@ export function moveFor(
   move: PlanMove,
   own: PlanMove,
 ): { word: string; tone: DevTone; title?: string } {
+  const state = PLAN_MOVE_STATE[move];
   return {
-    word: PLAN_MOVE_WORD[move],
-    tone: MOVE_TONE[move],
+    word: state ? MOVE_WORD[state] : '',
+    tone: state ? MOVE_TONE[state] : 'ghost',
     // Said only where it is not obvious from the row itself: a leaf reporting
     // its own move needs no explanation of where the word came from.
-    title: own === move ? MOVE_TITLE[move] : `${MOVE_TITLE[move]} (from a step beneath this one.)`,
+    title:
+      own === move
+        ? PLAN_MOVE_TITLE[move]
+        : `${PLAN_MOVE_TITLE[move]} (from a step beneath this one.)`,
   };
 }
 

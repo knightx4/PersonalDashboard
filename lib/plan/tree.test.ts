@@ -1822,7 +1822,7 @@ describe('moveOf', () => {
     });
 
     // The run writes proposed rows as it goes, and each one is something to
-    // approve. Ranked under "on you", the feature would flip to "Needs you"
+    // approve. Ranked under "on you", the feature would flip to "On you"
     // halfway through a run that is still rewriting it.
     it('outranks a proposal the run itself has just written', () => {
       expect(moveOf(feature([at('proposed', 's1', { parentId: 'f' })]), whileResolving)).toBe(

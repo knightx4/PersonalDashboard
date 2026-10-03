@@ -27,6 +27,7 @@
  *
  * Pure, so the mapping is tested without a page.
  */
+import { MOVE_WORD } from '@/lib/core/move';
 import type { DevComment } from '@/lib/comments/load';
 import { awaitsReview } from '@/lib/goals/daily';
 import { planStatusOf, readySteps, type StepRef } from '@/lib/goals/dependencies';
@@ -471,7 +472,7 @@ export type GoalView = (typeof GOAL_VIEWS)[number];
 export const GOAL_VIEW_LABEL: Record<GoalView, string> = {
   all: 'Everything',
   open: 'Open',
-  you: 'On you',
+  you: MOVE_WORD.on_you,
   ready: 'Ready',
   read: REVIEW_WORD,
 };

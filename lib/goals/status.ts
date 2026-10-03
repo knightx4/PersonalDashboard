@@ -5,8 +5,9 @@
  * The same idea as `healthOf` and `moveOf` in lib/plan/tree.ts, cut to what a
  * goal has. A step's health is what state it is in, drawn as the plan's
  * hexagon for the same state; its move is which of three words it carries:
- * On you, With Claude or Waiting. The words, shapes and tones are the plan's
- * own, so a question looks the same on /goals as on /dev/plan.
+ * On you, With Dash or Waiting. The words and tones are lib/core/move.ts's
+ * and the shapes are the plan's, so a question looks the same on /goals as on
+ * /dev/plan.
  *
  * A step waits on the steps it is declared to wait on, as a plan step does
  * (plan #981, lib/goals/dependencies.ts), and on the open steps under it,
@@ -17,6 +18,7 @@
  * Pure, so the rules are tested without a database or a page.
  */
 import type { DevTone } from '@/components/dev/state-label';
+import { MOVE_TONE, MOVE_WORD, moveInline } from '@/lib/core/move';
 import { DEV_STATE_WORD } from '@/lib/dev/words';
 import { formatDay } from '@/lib/goals/dates';
 import { awaitsReview } from '@/lib/goals/daily';
@@ -57,25 +59,28 @@ export const STEP_HEALTHS = [
 export type StepHealth = (typeof STEP_HEALTHS)[number];
 
 /** Whose move it is. `settled` is a closed step, which has none. */
-export type StepMove = 'on_you' | 'with_claude' | 'waiting' | 'settled';
+export type StepMove = 'on_you' | 'with_dash' | 'waiting' | 'settled';
 
-/** The three words, and what a closed step says instead. */
+/**
+ * The three words, from lib/core/move.ts, and what a closed step says
+ * instead: nothing here, since the step's own closed word (Done, Answered,
+ * Dropped) says more than the move would.
+ */
 export const STEP_MOVE_WORD: Record<StepMove, string> = {
-  on_you: 'On you',
-  with_claude: 'With Dash',
-  waiting: 'Waiting',
+  on_you: MOVE_WORD.on_you,
+  with_dash: MOVE_WORD.with_dash,
+  waiting: MOVE_WORD.waiting,
   settled: '',
 };
 
 /**
- * The plan's three colours (note 42aa1fa4): anything that cannot move until
- * you do, or until the steps under it do, is amber; what Claude is on is
- * blue. A closed step takes its health's tone instead.
+ * The shared tones (lib/core/move.ts). A closed step takes its health's tone
+ * instead, so `settled` is only ever read as the fallback.
  */
 export const STEP_MOVE_TONE: Record<StepMove, DevTone> = {
-  on_you: 'caution',
-  with_claude: 'info',
-  waiting: 'caution',
+  on_you: MOVE_TONE.on_you,
+  with_dash: MOVE_TONE.with_dash,
+  waiting: MOVE_TONE.waiting,
   settled: 'ghost',
 };
 
@@ -85,7 +90,7 @@ const MOVE_OF: Record<StepHealth, StepMove> = {
   review: 'on_you',
   blocked: 'on_you',
   yours: 'on_you',
-  working: 'with_claude',
+  working: 'with_dash',
   waiting: 'waiting',
   later: 'waiting',
   aside: 'waiting',
@@ -177,7 +182,7 @@ function flatten(nodes: readonly StepNode[]): StepNode[] {
 
 /** How many of each move a list of steps holds. */
 function countMoves(nodes: readonly StepNode[]): Record<StepMove, number> {
-  const counts: Record<StepMove, number> = { on_you: 0, with_claude: 0, waiting: 0, settled: 0 };
+  const counts: Record<StepMove, number> = { on_you: 0, with_dash: 0, waiting: 0, settled: 0 };
   for (const node of nodes) counts[stepMove(node)] += 1;
   return counts;
 }
@@ -186,12 +191,12 @@ function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
-/** "2 on you, 1 with Claude". Empty when nothing is open. */
+/** "2 on you, 1 with Dash". Empty when nothing is open. */
 function movesLine(counts: Record<StepMove, number>): string {
   return [
-    counts.on_you > 0 ? `${counts.on_you} on you` : null,
-    counts.with_claude > 0 ? `${counts.with_claude} with Dash` : null,
-    counts.waiting > 0 ? `${counts.waiting} waiting` : null,
+    counts.on_you > 0 ? `${counts.on_you} ${moveInline('on_you')}` : null,
+    counts.with_dash > 0 ? `${counts.with_dash} ${moveInline('with_dash')}` : null,
+    counts.waiting > 0 ? `${counts.waiting} ${moveInline('waiting')}` : null,
   ]
     .filter(Boolean)
     .join(', ');
@@ -202,7 +207,7 @@ export type StepState = {
   health: StepHealth;
   move: StepMove;
   glyph: StatusGlyph;
-  /** On you, With Claude, Waiting; Done, Answered or Dropped once closed. */
+  /** On you, With Dash, Waiting; Done, Answered or Dropped once closed. */
   word: string;
   tone: DevTone;
   title: string;
@@ -292,20 +297,20 @@ export function stepNeeds(node: StepNode): string | null {
 }
 
 /** The bands a goal's bar is drawn in, left to right, as the plan orders them. */
-export const PROGRESS_BANDS = ['on_you', 'waiting', 'with_claude', 'done'] as const;
+export const PROGRESS_BANDS = ['on_you', 'waiting', 'with_dash', 'done'] as const;
 export type ProgressBand = (typeof PROGRESS_BANDS)[number];
 
 export const PROGRESS_BAND_WORD: Record<ProgressBand, string> = {
-  on_you: 'on you',
-  waiting: 'waiting',
-  with_claude: 'with Dash',
-  done: 'done',
+  on_you: moveInline('on_you'),
+  waiting: moveInline('waiting'),
+  with_dash: moveInline('with_dash'),
+  done: moveInline('settled'),
 };
 
 export const PROGRESS_BAND_FILL: Record<ProgressBand, string> = {
   on_you: 'bg-caution',
   waiting: 'bg-caution',
-  with_claude: 'bg-status-submitted',
+  with_dash: 'bg-status-submitted',
   done: 'bg-positive',
 };
 
@@ -333,7 +338,7 @@ export type GoalProgress = {
  * all. So is a question put aside, which is out of view until you ask for it.
  */
 export function goalProgress(nodes: readonly StepNode[]): GoalProgress {
-  const bands: Record<ProgressBand, number> = { on_you: 0, waiting: 0, with_claude: 0, done: 0 };
+  const bands: Record<ProgressBand, number> = { on_you: 0, waiting: 0, with_dash: 0, done: 0 };
   const counts = (node: StepNode) =>
     node.status !== 'proposed' && node.status !== 'dropped' && !isAside(node);
 
@@ -352,7 +357,7 @@ export function goalProgress(nodes: readonly StepNode[]): GoalProgress {
   const all = flatten(nodes);
   const moves = countMoves(all);
   const move =
-    (['on_you', 'with_claude', 'waiting'] as const).find((name) => moves[name] > 0) ?? 'settled';
+    (['on_you', 'with_dash', 'waiting'] as const).find((name) => moves[name] > 0) ?? 'settled';
   const live = PROGRESS_BANDS.reduce((sum, band) => sum + bands[band], 0);
   return {
     live,
@@ -369,7 +374,7 @@ export function goalMoveLabel(progress: GoalProgress): { word: string; tone: Dev
   const line = movesLine(progress.moves);
   const titles: Record<StepMove, string> = {
     on_you: 'Something here is waiting on you',
-    with_claude: 'Dash has the next move here',
+    with_dash: 'Dash has the next move here',
     waiting: 'Every open step here waits on the steps under it',
     settled: 'Nothing open on this goal',
   };

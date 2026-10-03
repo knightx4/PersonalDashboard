@@ -61,7 +61,7 @@ function progress(
   return {
     live,
     done: extra.bands.done,
-    moves: { on_you: 0, with_claude: 0, waiting: 0, settled: 0 },
+    moves: { on_you: 0, with_dash: 0, waiting: 0, settled: 0 },
     questions: 0,
     ...extra,
   };
@@ -84,7 +84,7 @@ const marathon = goal('g-run', 'a-health', 'Run a half marathon', {
 });
 
 const cardsProgress = progress({
-  bands: { on_you: 3, waiting: 1, with_claude: 1, done: 2 },
+  bands: { on_you: 3, waiting: 1, with_dash: 1, done: 2 },
   move: 'on_you',
   questions: 1,
 });
@@ -200,7 +200,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       goal: fund,
       areaName: 'Money',
       progress: progress({
-        bands: { on_you: 1, waiting: 0, with_claude: 0, done: 1 },
+        bands: { on_you: 1, waiting: 0, with_dash: 0, done: 1 },
         move: 'on_you',
       }),
       review: review(fund.id, {
@@ -217,7 +217,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       goal: job,
       areaName: 'Career',
       progress: progress({
-        bands: { on_you: 0, waiting: 2, with_claude: 0, done: 3 },
+        bands: { on_you: 0, waiting: 2, with_dash: 0, done: 3 },
         move: 'waiting',
       }),
       review: review(job.id, {
@@ -235,7 +235,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       goal: marathon,
       areaName: 'Health',
       progress: progress({
-        bands: { on_you: 0, waiting: 0, with_claude: 0, done: 0 },
+        bands: { on_you: 0, waiting: 0, with_dash: 0, done: 0 },
         move: 'settled',
       }),
       review: null,

@@ -13,9 +13,9 @@ import type { GoalProgress as Progress } from '@/lib/goals/status';
 const progress: Progress = {
   live: 5,
   done: 2,
-  bands: { on_you: 2, waiting: 0, with_claude: 1, done: 2 },
+  bands: { on_you: 2, waiting: 0, with_dash: 1, done: 2 },
   move: 'on_you',
-  moves: { on_you: 2, with_claude: 1, waiting: 0, settled: 0 },
+  moves: { on_you: 2, with_dash: 1, waiting: 0, settled: 0 },
   questions: 0,
 };
 

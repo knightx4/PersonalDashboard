@@ -29,7 +29,7 @@ import type {
   IdeaHealth,
   RaisedHealth,
 } from '@/lib/dev/health';
-import type { PlanHealth, PlanMove } from '@/lib/plan/tree';
+import type { PlanHealth } from '@/lib/plan/tree';
 
 /** The five states every dev queue has, whatever it calls them in its column. */
 export const DEV_STATES = ['waiting', 'ready', 'working', 'done', 'dropped'] as const;
@@ -70,39 +70,6 @@ export const DEV_STATE_WORD: Record<DevState, string> = {
  * inventing a fifth.
  */
 export const DISMISSED_WORD = 'Dismissed';
-
-/**
- * What the plan's Status column says -- whose move it is, not how far along.
- *
- * None of these is one of the five shared states, and that is the point: every
- * word above answers "how far through is this", and every word here answers
- * "who has to act next". A row is in exactly one of each, which is why the two
- * are now two columns.
- *
- * "Needs you" and "Yours" are both you and they are not the same thing. Needs
- * you is a stop: a question to answer, a proposal to approve, a step blocked on
- * a credential -- until you do something, nothing can. Yours is a step you
- * marked as yours, which is what holds the runner off it, and it reads the
- * same whether or not you have started.
- *
- * "Held up" rather than a second "waiting": the shared vocabulary already
- * spends "Waiting on you" on the person, and this one means the opposite --
- * another step is in the way and you are not what it needs.
- *
- * Two of these say nothing at all. A settled row has no next move, and an
- * approved step waiting its turn has nothing happening to it yet. An em dash
- * in either cell would be a fact nobody needed on the rows nobody is scanning
- * (law 1).
- */
-export const PLAN_MOVE_WORD: Record<PlanMove, string> = {
-  resolving: 'Resolving answers',
-  on_you: 'Needs you',
-  with_dash: 'With Dash',
-  waiting: 'Held up',
-  yours: 'Yours',
-  none: '',
-  settled: '',
-};
 
 /**
  * What a note in the bugs queue is called.
