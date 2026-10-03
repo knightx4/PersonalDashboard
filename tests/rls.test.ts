@@ -156,6 +156,21 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.vision_reviews = visionReview.id;
 
+  const [specChange] = await admin<{ id: string }[]>`
+    insert into spec_changes (user_id, spec, title, why, diff)
+    values (
+      ${userId}, 'spec-layer', ${`${tag} adds a rule`}, ${`${tag} filed three notes asking for it`},
+      ${'--- a/docs/X.md\n+++ b/docs/X.md\n@@ -1 +1,2 @@\n context\n+a rule'}
+    )
+    returning id`;
+  ids.spec_changes = specChange.id;
+
+  const [specFinding] = await admin<{ id: string }[]>`
+    insert into spec_findings (user_id, spec, kind, finding, proposal, spec_change_id)
+    values (${userId}, 'spec-layer', 'missing_rule', ${`${tag} notes ask for a rule`}, 'change_spec', ${specChange.id})
+    returning id`;
+  ids.spec_findings = specFinding.id;
+
   // Keyed by (user_id, target, row_id) rather than an id of its own, so what
   // goes in `ids` is the row the thread hangs off -- see ROW_KEY below.
   await admin`
