@@ -248,7 +248,10 @@ A fourth moment in a workspace is a decision for the person.
 The critic in Part 2 also judges craft. `scripts/shoot.ts` records each
 gallery surface's declared interaction (a press, a swipe, a completion) as a
 strip of frames, 50ms apart for up to a second, because the critic reads
-images and cannot watch a video. Against the strip it checks that a press
+images and cannot watch a video. A gallery entry declares its interaction in
+its `interaction` field; `npm run record` plays it at 390 pixels and writes
+the strip to `.preview-shots/strips/`, beside a JSON file giving each frame's
+time and what the finger was doing. Against the strip it checks that a press
 shows a response in the first frame after it, that motion follows the finger
 and ends settled without a jump, that the moment the catalogue lists for the
 screen is there, and that the wording names real counts and things.

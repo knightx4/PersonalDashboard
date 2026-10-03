@@ -17,6 +17,7 @@
     "pages:write": "tsx scripts/pages-write.ts",
     "preview": "UI_PREVIEW=1 next build && UI_PREVIEW=1 next start -p ${PREVIEW_PORT:-3400}",
     "shoot": "tsx scripts/shoot.ts",
+    "record": "tsx scripts/shoot.ts --record",
     "check:ebay": "tsx scripts/check-ebay.ts",
     "typecheck": "tsc --noEmit",
     "share:add": "tsx scripts/share-add.ts",
