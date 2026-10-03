@@ -208,7 +208,8 @@ describe('the Goals home', () => {
         { id: 'l1', title: 'Turn on autopay', goalId: 'g1', goalTitle: 'Pay off the debts', startsOn: '2026-11-01', dueOn: null },
       ],
     });
-    expect(html).toContain('Working on it now');
+    expect(html).toContain('Dash is on it');
+    expect(html).toContain('Dash is working on this now.');
     expect(html).toContain('Needs you: Which cards do you have?');
     expect(html).toContain('Turn on autopay');
     expect(html).toContain('back 1 Nov');

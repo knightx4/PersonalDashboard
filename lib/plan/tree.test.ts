@@ -1704,8 +1704,14 @@ describe('moveOf', () => {
     expect(moveOf(only([at('not_started', 'a')]))).toBe('none');
   });
 
-  it('is with Dash while a session is on it', () => {
+  it('is with Dash while claimed and nothing is reporting from it', () => {
     expect(moveOf(only([at('in_progress', 'a')]))).toBe('with_dash');
+  });
+
+  // plan #1455: the runs in progress are what say "Dash is on it".
+  it('is being worked while its session is going', () => {
+    expect(moveOf(only([at('in_progress', 'a')]), { working: new Set(['a']) })).toBe('working');
+    expect(moveOf(only([at('not_started', 'a')]), { working: new Set(['a']) })).toBe('none');
   });
 
   it('is yours once you mark it, before anything has started', () => {
@@ -1748,6 +1754,9 @@ describe('moveOf', () => {
 
     it('reports a session working beneath it', () => {
       expect(moveOf(feature([at('in_progress', 's1', { parentId: 'f' })]))).toBe('with_dash');
+      expect(
+        moveOf(feature([at('in_progress', 's1', { parentId: 'f' })]), { working: new Set(['s1']) }),
+      ).toBe('working');
     });
 
     it('reports a step you marked yours beneath it', () => {

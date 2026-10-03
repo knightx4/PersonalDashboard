@@ -447,7 +447,11 @@ export function withSessionDrop(
   ];
 }
 
-function useResolving(lastRuns: Readonly<Record<string, LastRun>>, now: number): MoveContext {
+function useResolving(
+  lastRuns: Readonly<Record<string, LastRun>>,
+  liveness: PlanLiveness,
+  now: number,
+): MoveContext {
   return useMemo(
     () => ({
       resolving: new Set(
@@ -455,8 +459,15 @@ function useResolving(lastRuns: Readonly<Record<string, LastRun>>, now: number):
           .filter(([, run]) => isResolvingAnswers(run, now))
           .map(([id]) => id),
       ),
+      // The claims a session is working now, which say "Dash is on it" (plan
+      // #1455). Read from the same liveness the health column uses.
+      working: new Set(
+        Object.entries(liveness)
+          .filter(([, claim]) => claim === 'working' || claim === 'claimed')
+          .map(([id]) => id),
+      ),
     }),
-    [lastRuns, now],
+    [lastRuns, liveness, now],
   );
 }
 
@@ -626,7 +637,7 @@ export function PlanRow({
   // mount, since `runNow` is 0 there and no claim reads quiet at that instant,
   // which is what keeps the server render and the first client one agreeing.
   const quietAsk = claim === 'quiet' && run ? quietSendAsk(node.number, run, runNow) : null;
-  const resolving = useResolving(lastRuns, runNow);
+  const resolving = useResolving(lastRuns, liveness, runNow);
   // What a "#494" written in a comment on this page is called. The catalog is
   // already every step's number and title, so no page needs to hand it over.
   const refTitles = useMemo(
