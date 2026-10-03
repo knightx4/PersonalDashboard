@@ -10,7 +10,9 @@ the plan and the code from it.
 The plan stays as it is for small features and for the notes queue. This adds
 a layer above it.
 
-> **Status:** proposed, 3 October 2026. Not yet in the plan. The seven
+> **Status:** shaped 3 October 2026 into proposed features #1499 (rules), #1504
+> (spec changes), #1510 (overhauls), #1517 (the core design on job roles) and
+> #1521 (the weekly audit). The seven
 > features of [CORE-AND-DASH-SPEC.md](CORE-AND-DASH-SPEC.md) (#1448, #1452,
 > #1456, #1462, #1467, #1472, #1477) are held until this is in place, so that
 > spec can be the first overhaul built this way.
