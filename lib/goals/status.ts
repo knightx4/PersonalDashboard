@@ -18,7 +18,7 @@
  * Pure, so the rules are tested without a database or a page.
  */
 import type { DevTone } from '@/components/dev/state-label';
-import { MOVE_TONE, MOVE_WORD, moveInline } from '@/lib/core/move';
+import { MOVE_TONE, MOVE_WORD, moveInline, type Move } from '@/lib/core/move';
 import { DEV_STATE_WORD } from '@/lib/dev/words';
 import { formatDay } from '@/lib/goals/dates';
 import { awaitsReview } from '@/lib/goals/daily';
@@ -369,8 +369,16 @@ export function goalProgress(nodes: readonly StepNode[]): GoalProgress {
   };
 }
 
-/** The goal's word and its tooltip, for the line above its steps. */
-export function goalMoveLabel(progress: GoalProgress): { word: string; tone: DevTone; title: string } {
+/**
+ * The goal's move and its tooltip, for the line above its steps. `move` is
+ * null on a goal with nothing open, which says nothing there.
+ */
+export function goalMoveLabel(progress: GoalProgress): {
+  move: Move | null;
+  word: string;
+  tone: DevTone;
+  title: string;
+} {
   const line = movesLine(progress.moves);
   const titles: Record<StepMove, string> = {
     on_you: 'Something here is waiting on you',
@@ -379,6 +387,7 @@ export function goalMoveLabel(progress: GoalProgress): { word: string; tone: Dev
     settled: 'Nothing open on this goal',
   };
   return {
+    move: progress.move === 'settled' ? null : { state: progress.move },
     word: STEP_MOVE_WORD[progress.move],
     tone: STEP_MOVE_TONE[progress.move],
     title: line ? `${titles[progress.move]}. Open steps: ${line}.` : `${titles[progress.move]}.`,

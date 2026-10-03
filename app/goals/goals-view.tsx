@@ -19,7 +19,8 @@ import {
   type AllGoalsView,
   type AreaInView,
 } from '@/lib/goals/all-goals';
-import { GOAL_VIEW_LABEL, goalViewHref } from '@/lib/goals/plan-rows';
+import { VIEW_LABEL } from '@/lib/core/move';
+import { goalViewHref } from '@/lib/goals/plan-rows';
 import type { AreaRunView } from '@/lib/goals/shaping';
 import type { GoalProgress as GoalProgressData } from '@/lib/goals/status';
 import {
@@ -171,7 +172,7 @@ export function GoalsView({
           <ViewChips
             view={view}
             chips={ALL_GOALS_VIEWS}
-            labels={GOAL_VIEW_LABEL}
+            labels={VIEW_LABEL}
             hrefOf={(candidate) => goalViewHref('/goals/all', candidate)}
             counts={{
               open: countAllGoalsView(allAreas, 'open', onYou),

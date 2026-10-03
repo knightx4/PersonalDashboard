@@ -95,3 +95,22 @@ export function moveLabel(move: Move): { state: MoveState; word: string; tone: D
     title: MOVE_TITLE[move.state],
   };
 }
+
+/**
+ * The view chips over a tree of steps, for the dev plan and a goal's steps
+ * alike (plan #1433). One list, so a view both pages have is called the same
+ * on both, and the two that are moves use the move words. Each page offers
+ * the views it has; a view only one page has is still named here.
+ */
+export const VIEW_LABEL = {
+  all: 'Everything',
+  open: 'Open',
+  you: MOVE_WORD.on_you,
+  ready: 'Ready',
+  proposed: 'Proposed',
+  claude: "Dash's",
+  blocked: MOVE_WORD.waiting,
+  fog: 'Not specified',
+  dismissed: 'Dismissed',
+  read: 'To read',
+} as const satisfies Record<string, string>;

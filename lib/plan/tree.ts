@@ -10,7 +10,6 @@ import {
 } from './load';
 import { claimLiveness, type ClaimLiveness, type ClaimRun, type ClaimStep } from './liveness';
 import { PLAN_SCOPES, planScopeLabel, type PlanScope } from '@/lib/plan/projects';
-import { MOVE_WORD } from '@/lib/core/move';
 
 /**
  * The plan, read.
@@ -147,18 +146,6 @@ export const PLAN_VIEW_CHIPS = ['open', 'ready', 'you', 'claude', 'all'] as cons
 export const PLAN_VIEW_MENU: readonly PlanView[] = PLAN_VIEWS.filter(
   (view) => !(PLAN_VIEW_CHIPS as readonly PlanView[]).includes(view),
 );
-
-export const PLAN_VIEW_LABEL: Record<PlanView, string> = {
-  all: 'Everything',
-  open: 'Open',
-  you: MOVE_WORD.on_you,
-  ready: 'Ready',
-  proposed: 'Proposed',
-  claude: "Dash's",
-  blocked: 'Waiting',
-  fog: 'Not specified',
-  dismissed: 'Dismissed',
-};
 
 /** The numbers across the whole plan, for the strip at the top of the page. */
 export type PlanSummary = {

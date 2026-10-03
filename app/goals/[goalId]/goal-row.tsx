@@ -3,7 +3,8 @@
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
 import { CircleUser, ClipboardList, Play, Repeat } from 'lucide-react';
-import { RowIconButton } from '@/app/dev/plan/plan-run-status';
+import { RowIconButton } from '@/components/plan-tree/row-icon-button';
+import { StateLabel } from '@/components/dev/state-label';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
 import type { TreeActionState, TreeActions, TreeCatalogEntry } from '@/components/plan-tree/types';
 import type { ActionMenuItem } from '@/components/ui/action-menu';
@@ -572,8 +573,10 @@ export function GoalRow({
       trail={trail}
       row={row}
       health={node.health}
-      // Who the step is on, where the plan says whose move it is (note 6d242e62).
-      move={node.who}
+      // Who the step is on, where the plan says whose move it is (note
+      // 6d242e62). That is a different fact from the move, so it keeps its own
+      // words rather than MoveLabel's; the goal's move is on GoalProgress.
+      move={<StateLabel glyph={null} word={node.who.word} tone={node.who.tone} title={node.who.title} />}
       statusMenu={statusMenu}
       menu={menu}
       actions={GOAL_TREE_ACTIONS}

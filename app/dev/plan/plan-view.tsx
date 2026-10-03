@@ -15,9 +15,9 @@ import {
   FieldError,
   Input,
 } from '@/components/ui/field';
+import { VIEW_LABEL } from '@/lib/core/move';
 import {
   PLAN_VIEW_CHIPS,
-  PLAN_VIEW_LABEL,
   PLAN_VIEW_MENU,
   countMatches,
   flatten,
@@ -161,7 +161,7 @@ function SummaryStrip({
         view={view}
         chips={PLAN_VIEW_CHIPS}
         menu={PLAN_VIEW_MENU}
-        labels={PLAN_VIEW_LABEL}
+        labels={VIEW_LABEL}
         hrefOf={(chip) => viewHref(chip, basePath)}
       />
     </div>

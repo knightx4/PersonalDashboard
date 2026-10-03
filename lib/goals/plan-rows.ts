@@ -27,7 +27,7 @@
  *
  * Pure, so the mapping is tested without a page.
  */
-import { MOVE_WORD } from '@/lib/core/move';
+import { VIEW_LABEL } from '@/lib/core/move';
 import type { DevComment } from '@/lib/comments/load';
 import { awaitsReview } from '@/lib/goals/daily';
 import { planStatusOf, readySteps, type StepRef } from '@/lib/goals/dependencies';
@@ -59,7 +59,7 @@ export const REVIEW_ASK = 'Read what Dash found and mark it read.';
  * it, Waiting on you, sat on a finished row beside Needs you and read as if
  * the step were stuck, when all it asks is to be read.
  */
-export const REVIEW_WORD = 'To read';
+export const REVIEW_WORD = VIEW_LABEL.read;
 
 /** What a ready step of yours waits on you for. */
 export const YOURS_ASK = 'Yours to do. Do it and mark it done, or answer what is in the way.';
@@ -468,14 +468,6 @@ export function goalCatalog(
  */
 export const GOAL_VIEWS = ['all', 'open', 'you', 'ready', 'read'] as const;
 export type GoalView = (typeof GOAL_VIEWS)[number];
-
-export const GOAL_VIEW_LABEL: Record<GoalView, string> = {
-  all: 'Everything',
-  open: 'Open',
-  you: MOVE_WORD.on_you,
-  ready: 'Ready',
-  read: REVIEW_WORD,
-};
 
 /**
  * The views drawn as chips on a goal's steps, in their order on the row, and

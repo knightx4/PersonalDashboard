@@ -57,7 +57,6 @@ import {
 import {
   CheckMark,
   LastRunLine,
-  RowIconButton,
   RunWork,
   RunningFor,
   Underway,
@@ -66,6 +65,8 @@ import {
 import { type PlanCatalogEntry } from './plan-catalog';
 import { cn } from '@/lib/cn';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
+import { RowIconButton } from '@/components/plan-tree/row-icon-button';
+import { MoveLabel } from '@/components/ui/move-label';
 import {
   ASSIGNEE_LABEL,
   AddStep,
@@ -401,7 +402,10 @@ function healthOf(node: PlanNode, liveness?: PlanLiveness) {
 }
 
 function moveFor(node: PlanNode, context?: MoveContext) {
-  return moveWordsFor(planMoveOf(node, context), ownMoveWord(node, context));
+  // A step held up by exactly one other says which, by number: "Waiting on
+  // #1453". More than one, and the tooltip and the Needs line name them.
+  const waitingOn = node.waitingOn.length === 1 ? `#${node.waitingOn[0].number}` : undefined;
+  return moveWordsFor(planMoveOf(node, context), ownMoveWord(node, context), waitingOn);
 }
 
 /** What this row alone would say, to tell a rollup from a row's own state. */
@@ -805,7 +809,7 @@ export function PlanRow({
       trail={trail}
       row={row}
       health={health}
-      move={move}
+      move={move.move && <MoveLabel move={move.move} title={move.title} />}
       statusMenu={statusMenu}
       menu={menu}
       actions={PLAN_TREE_ACTIONS}

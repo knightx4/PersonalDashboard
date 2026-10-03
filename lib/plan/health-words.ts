@@ -7,7 +7,7 @@
  * its own way and hands over the few facts a tooltip needs.
  */
 import type { DevTone } from '@/components/dev/state-label';
-import { MOVE_TONE, MOVE_WORD, type MoveState } from '@/lib/core/move';
+import { MOVE_TONE, moveWord, type Move, type MoveState, type WaitingOn } from '@/lib/core/move';
 import { DEV_STATE_WORD } from '@/lib/dev/words';
 import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import type { PlanHealth, PlanMove } from '@/lib/plan/tree';
@@ -218,19 +218,29 @@ export const PLAN_MOVE_TITLE: Record<PlanMove, string> = {
 };
 
 /**
- * The Status word for a step's move.
+ * The Status word for a step's move, and the move itself for `MoveLabel`
+ * (components/ui/move-label.tsx) to draw. `move` is null where the plan says
+ * nothing: a settled row, or an approved one waiting its turn.
  *
  * `own` is what the row alone would say, with nothing beneath it counted. When
  * it differs from `move`, the word came up from a step further down and the
- * tooltip says so.
+ * tooltip says so. `waitingOn` names what a waiting row waits on, and is only
+ * used where the wait is the row's own.
  */
 export function moveFor(
   move: PlanMove,
   own: PlanMove,
-): { word: string; tone: DevTone; title?: string } {
+  waitingOn?: WaitingOn,
+): { move: Move | null; word: string; tone: DevTone; title?: string } {
   const state = PLAN_MOVE_STATE[move];
+  const shared: Move | null = !state
+    ? null
+    : state === 'waiting'
+      ? { state, waitingOn: own === move ? waitingOn : undefined }
+      : { state };
   return {
-    word: state ? MOVE_WORD[state] : '',
+    move: shared,
+    word: shared ? moveWord(shared) : '',
     tone: state ? MOVE_TONE[state] : 'ghost',
     // Said only where it is not obvious from the row itself: a leaf reporting
     // its own move needs no explanation of where the word came from.
