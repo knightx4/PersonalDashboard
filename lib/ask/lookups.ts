@@ -16,6 +16,7 @@ import { noteHref } from '@/lib/vault/paths';
 import { transcriptHref } from '@/lib/vault/education';
 import { recordSpend, type SpendClient } from '@/lib/core/spend/record';
 import { fileHref } from '@/lib/files/files';
+import { refHref } from '@/lib/core/refs';
 import type { Author } from '@/lib/memory/passages';
 import {
   DEV_MEMORY_SOURCES,
@@ -808,9 +809,19 @@ const RECALL_KINDS: Record<string, string> = {
   'public.plan_items': 'Plan step (Dev)',
   'public.raised_items': 'Raise (Dev)',
   'docs.specs': 'Spec section (Dev)',
+  'core.conversations': 'What the person said in a thread or to Ask',
 };
 
 const key = (table: string, ref: string) => `${table}\u0000${ref}`;
+
+/**
+ * Where a thread recall found opens: the row a row thread sits under, by its
+ * ref, or the Ask conversation, whose ref is its own id (plan #1466).
+ */
+function threadHref(ref: string): string | null {
+  if (ref.includes(':')) return refHref(ref);
+  return isUuid(ref) ? `/ask/${ref}` : null;
+}
 
 /**
  * The page each row opens on. Most are the row's ref run through a fixed
@@ -830,7 +841,9 @@ async function recallHrefs(ctx: AskContext, hits: readonly MemoryRowHit[]): Prom
           ? fileHref(hit.sourceRef)
           : hit.sourceTable === 'obsidian.transcripts'
             ? transcriptHref(hit.sourceRef)
-            : RECALL_LANDING[hit.sourceTable];
+            : hit.sourceTable === 'core.conversations'
+              ? threadHref(hit.sourceRef)
+              : RECALL_LANDING[hit.sourceTable];
     if (direct) out.set(key(hit.sourceTable, hit.sourceRef), direct);
   }
 
