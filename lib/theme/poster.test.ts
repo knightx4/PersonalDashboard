@@ -12,7 +12,14 @@ import {
   POSTER_TOKENS,
   paletteTokens,
   posterTokens,
+  sideOf,
 } from '@/lib/theme/poster';
+
+/** Every side of every palette, named for the failure message. */
+const SIDES = PALETTES.flatMap((palette) => [
+  { name: `${palette.id} day`, side: sideOf(palette, 'day') },
+  { name: `${palette.id} night`, side: sideOf(palette, 'night') },
+]);
 
 /**
  * Lightbox is a poster: hand-picked palettes over one written block. The
@@ -23,6 +30,7 @@ import {
 
 const CSS = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
 const BLOCK = readTheme(CSS, THEME_SELECTORS.poster!);
+const NIGHT_BLOCK = readTheme(CSS, THEME_SELECTORS['poster-dark']!);
 
 function ratio(a: string, b: string): number {
   const x = relativeLuminance(a);
@@ -37,39 +45,46 @@ describe('the poster block', () => {
       expect(`${token} ${BLOCK[token]}`).toBe(`${token} ${value}`);
     }
   });
+
+  it('prints its dark side as Primary\'s night, token for token', () => {
+    const night = paletteTokens(PALETTES.find((palette) => palette.id === DEFAULT_PALETTE)!.night);
+    for (const [token, value] of Object.entries(night)) {
+      expect(`${token} ${NIGHT_BLOCK[token]}`).toBe(`${token} ${value}`);
+    }
+  });
 });
 
 describe('every palette', () => {
   it('is listed once, in flat colours', () => {
     expect(PALETTES.map((palette) => palette.id)).toEqual([...PALETTE_IDS]);
-    for (const palette of PALETTES) {
-      for (const value of Object.values(paletteTokens(palette))) expect(value).toMatch(/^#[0-9a-f]{6}$/);
+    for (const { side } of SIDES) {
+      for (const value of Object.values(paletteTokens(side))) expect(value).toMatch(/^#[0-9a-f]{6}$/);
     }
   });
 
   it('puts a readable label on each of its bands and on its highlight', () => {
-    for (const palette of PALETTES) {
-      for (const band of [...palette.bands, palette.highlight]) {
-        expect(ratio(band.ink, band.fill), `${palette.id} ${band.ink} on ${band.fill}`).toBeGreaterThanOrEqual(4.5);
+    for (const { name, side } of SIDES) {
+      for (const band of [...side.bands, side.highlight]) {
+        expect(ratio(band.ink, band.fill), `${name} ${band.ink} on ${band.fill}`).toBeGreaterThanOrEqual(4.5);
       }
     }
   });
 
   it('draws its outline and its shadow hard enough to see on its paper and its cards', () => {
-    for (const palette of PALETTES) {
-      expect(ratio(palette.ink, palette.paper), palette.id).toBeGreaterThanOrEqual(7);
-      expect(ratio(palette.ink, palette.card), palette.id).toBeGreaterThanOrEqual(7);
+    for (const { name, side } of SIDES) {
+      expect(ratio(side.ink, side.paper), name).toBeGreaterThanOrEqual(7);
+      expect(ratio(side.ink, side.card), name).toBeGreaterThanOrEqual(7);
     }
   });
 
   it('keeps every band apart from the next, so three cards read as three colours', () => {
-    for (const palette of PALETTES) {
+    for (const { name: id, side: palette } of SIDES) {
       // The middle band is always the light one, so neighbouring cards differ
       // in lightness as well as hue, which survives colour blindness and
       // greyscale.
       const [first, middle, last] = palette.bands.map((band) => band.fill);
-      expect(ratio(first!, middle!), palette.id).toBeGreaterThanOrEqual(1.8);
-      expect(ratio(middle!, last!), palette.id).toBeGreaterThanOrEqual(1.8);
+      expect(ratio(first!, middle!), id).toBeGreaterThanOrEqual(1.8);
+      expect(ratio(middle!, last!), id).toBeGreaterThanOrEqual(1.8);
     }
   });
 });
@@ -87,6 +102,15 @@ describe('choosing Lightbox', () => {
       expect(isPoster(theme), value).toBe(true);
       expect(paletteOf(theme)).toBe(DEFAULT_PALETTE);
     }
+  });
+
+  it('keeps the palette across light and dark', () => {
+    const dark = posterFor('ocean', 'dark');
+    expect(formatTheme(dark)).toBe('poster-dark:ocean');
+    expect(themeAttribute(dark)).toBe('poster-dark');
+    expect(themeStyle(dark)).toEqual(posterTokens('ocean', 'night'));
+    expect(paletteOf(parseTheme('poster-dark:ocean'))).toBe('ocean');
+    expect(formatTheme(posterFor(paletteOf(dark), 'light'))).toBe('poster:ocean');
   });
 
   it('renders on the poster block with the palette inline', () => {

@@ -35,7 +35,7 @@ import {
 } from '@/lib/theme';
 import { colourwayById, POOL_TOKENS, WASH_LIFT, type Colourway } from '@/lib/theme/colourway';
 import type { Sky } from '@/lib/theme/sky';
-import type { Palette as PosterPalette } from '@/lib/theme/poster';
+import { sideOf, type PaletteSide as PosterPalette } from '@/lib/theme/poster';
 import { applyTheme, shouldRepairTheme } from '@/lib/theme/apply';
 import { generatePalette } from '@/lib/theme/palette';
 import { DENSITIES, parseDensity, type Density } from '@/lib/density';
@@ -232,7 +232,7 @@ export function ThemePicker({ value }: { value: Theme }) {
   const here: { polarity: Polarity; surface: Surface } = aurora
     ? { polarity: showing.id === 'dawn' ? 'light' : 'dark', surface: 'aurora' }
     : poster
-      ? { polarity: 'light', surface: 'lightbox' }
+      ? { polarity: showing.kind === 'written' && showing.id === 'poster-dark' ? 'dark' : 'light', surface: 'lightbox' }
       : partsOf(mode);
   const sky = skyOf(showing);
   const palette = paletteOf(showing);
@@ -245,16 +245,16 @@ export function ThemePicker({ value }: { value: Theme }) {
   const inPolarity = (next: Polarity): Theme =>
     here.surface === 'aurora'
       ? auroraFor(next, sky)
-      : here.surface === 'lightbox' && next === 'light'
-        ? posterFor(palette)
+      : here.surface === 'lightbox'
+        ? posterFor(palette, next)
         : { kind: 'generated', mode: modeFor(next, here.surface), hue, way };
   // Into Aurora keeps the polarity and starts from the default sky, since a
   // colourway is not a sky. Out of it keeps the polarity and drops the sky.
   const inSurface = (next: Surface): Theme =>
     next === 'aurora'
       ? auroraFor(here.polarity, sky)
-      : next === 'lightbox' && here.polarity === 'light'
-        ? posterFor(palette)
+      : next === 'lightbox'
+        ? posterFor(palette, here.polarity)
         : { kind: 'generated', mode: modeFor(here.polarity, next), hue, way };
   /** The strip and "no colour": a hue with no name for its pools. */
   const inHue = (next: number | null): GeneratedTheme => ({ kind: 'generated', mode, hue: next });
@@ -356,11 +356,11 @@ export function ThemePicker({ value }: { value: Theme }) {
           {poster ? (
             <div className="flex flex-wrap gap-1.5 px-2 pb-2">
               {PALETTES.map((option) => {
-                const next = posterFor(option.id);
+                const next = posterFor(option.id, here.polarity);
                 return (
                   <PaletteSwatch
                     key={option.id}
-                    palette={option}
+                    palette={sideOf(option, here.polarity === 'dark' ? 'night' : 'day')}
                     label={`${option.label} - ${option.mood}`}
                     chosen={same(showing, next)}
                     onChoose={() => save(next)}

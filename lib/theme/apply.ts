@@ -50,7 +50,7 @@ export function themeStyle(theme: Theme): Record<string, string> | undefined {
   if (theme.kind === 'written') {
     // The poster's palettes write their colours the same way.
     if (theme.palette) {
-      const tokens = posterTokens(theme.palette);
+      const tokens = posterTokens(theme.palette, theme.id === 'poster-dark' ? 'night' : 'day');
       return Object.keys(tokens).length > 0 ? tokens : undefined;
     }
     if (!theme.sky) return undefined;

@@ -1262,6 +1262,110 @@
   --grain-opacity: 0;
 }
 
+/* ---------------------------------------------------------------------------
+ * POSTER-DARK — Lightbox in dark: the same poster on dark stock.
+ *
+ * Dark paper, cards a step lighter than it, and the outline and the hard
+ * shadow drawn in the paper's own light colour, so the poster reads as light
+ * ink printed on black rather than as a dark theme with borders. The bands are
+ * the same three colours as the day side, which already carried their own
+ * labels, and the sidebar is the darkest thing on screen.
+ *
+ * This block is Primary's night side; lib/theme/poster.ts holds the other
+ * palettes' night sides and lib/theme/poster.test.ts holds this block to
+ * Primary's. The workspace colours, the meanings and the pipeline are
+ * Darkroom's, which were tuned for light ink on dark panels.
+ * ------------------------------------------------------------------------- */
+[data-theme='poster-dark'] {
+  color-scheme: dark;
+  --c-sheet-scheme: dark;
+
+  --c-page-ground: #151412;
+  --c-page: #151412;
+  --c-surface: #201f1c;
+  --c-raised: #201f1c;
+  --c-canvas: #1a1917;
+  --c-sunken: #1a1917;
+  --c-border: #34322e;
+  --c-page-border: #34322e;
+  --c-border-strong: #f3efe6;
+  --c-page-border-strong: #f3efe6;
+  --c-border-control: #f3efe6;
+  --c-page-border-control: #f3efe6;
+  --c-sheet-outline: #f3efe6;
+  --c-ink: #f3efe6;
+  --c-page-ink: #f3efe6;
+  --c-ink-muted: #b9b3a8;
+  --c-page-ink-muted: #b9b3a8;
+  --c-ink-ghost: #8a857c;
+  --c-page-ink-ghost: #8a857c;
+  --c-accent-base: #8fa8ff;
+  --c-accent-hover: #b3c3ff;
+  --c-accent-tint-base: #1d2440;
+  --c-accent-base-lit: #8fa8ff;
+  --c-accent-hover-lit: #b3c3ff;
+  --c-fill-ink: #111111;
+  --c-shell: #0b0b0a;
+  --c-shell-ink: #f3efe6;
+  --c-shell-muted: #a8a297;
+  --c-shell-border: #262421;
+  --c-shell-hover: #262421;
+  --c-poster-band-1: #1f4bd8;
+  --c-poster-band-1-ink: #ffffff;
+  --c-poster-band-2: #f4c430;
+  --c-poster-band-2-ink: #111111;
+  --c-poster-band-3: #db2e1f;
+  --c-poster-band-3-ink: #ffffff;
+  --c-poster-hi: #f4c430;
+  --c-poster-hi-ink: #111111;
+
+
+  --c-page-positive: #6fe0b0;
+  --c-page-caution: #f5b459;
+  --c-page-danger: #ff9d9d;
+  --c-w-shopping: #ffa3b8;
+  --c-w-shopping-tint: #33202c;
+  --c-w-jobs: #c3b0ff;
+  --c-w-jobs-tint: #241f42;
+  --c-w-todo: #6ccdf5;
+  --c-w-todo-tint: #12283a;
+  --c-w-vault: #eda6f6;
+  --c-w-vault-tint: #2e1e3c;
+  --c-w-learn: #6fdcd2;
+  --c-w-learn-tint: #0f2b2e;
+  --c-w-news: #debf69;
+  --c-w-news-tint: #2a2410;
+  --c-w-goals: #b0dc6e;
+  --c-w-goals-tint: #1f2a10;
+  --c-w-dev: #bcc7d6;
+  --c-w-dev-tint: #1f2836;
+  --c-positive: #6fe0b0;
+  --c-positive-tint: #102b22;
+  --c-caution: #f5b459;
+  --c-caution-fill: #f5b459;
+  --c-caution-tint: #2d2410;
+  --c-danger: #ff9d9d;
+  --c-danger-tint: #32202a;
+  --c-status-lead: #a3b0c4;
+  --c-status-lead-tint: #212b3a;
+  --c-status-submitted: #8fb4ff;
+  --c-status-submitted-tint: #1a2340;
+  --c-status-process: #f5b459;
+  --c-status-process-tint: #2d2410;
+  --c-status-final: #c3b0ff;
+  --c-status-final-tint: #241f42;
+  --c-status-offer: #6fe0b0;
+  --c-status-offer-tint: #102b22;
+  --c-status-rejected: #ff9d9d;
+  --c-status-rejected-tint: #32202a;
+  --c-status-ghosted: #93a2b8;
+  --c-status-ghosted-tint: #1e2735;
+
+  --sheet-edge: 4px 4px 0 var(--c-sheet-outline);
+  --lift-shadow: 6px 6px 0 var(--c-sheet-outline);
+  --grain-opacity: 0;
+}
+
 /* An unset choice follows the system, and the system dark is Ink. Kept in sync
  * with the [data-theme='ink'] block above by scripts/check-contrast.ts. */
 @media (prefers-color-scheme: dark) {
@@ -3454,38 +3558,38 @@ form[data-auto-submit] [data-fallback-submit] {
  * label colour, so a heading, its hint and its icon read on yellow and on red
  * alike without any of them knowing which they are on.
  * ------------------------------------------------------------------------- */
-[data-theme='poster'] {
+:is([data-theme='poster'], [data-theme='poster-dark']) {
   --radius-pane: 0;
   --radius-card: 0;
   --radius-control: 0;
 }
 
-[data-theme='poster'] .sheet {
+:is([data-theme='poster'], [data-theme='poster-dark']) .sheet {
   border: 2px solid var(--c-sheet-outline);
 }
 
-[data-theme='poster'] .popover-panel {
+:is([data-theme='poster'], [data-theme='poster-dark']) .popover-panel {
   border: 2px solid var(--c-sheet-outline);
   box-shadow: 6px 6px 0 var(--c-sheet-outline);
 }
 
-[data-theme='poster'] .sheet:nth-child(3n + 1 of .sheet) {
+:is([data-theme='poster'], [data-theme='poster-dark']) .sheet:nth-child(3n + 1 of .sheet) {
   --band: var(--c-poster-band-1);
   --band-ink: var(--c-poster-band-1-ink);
 }
 
-[data-theme='poster'] .sheet:nth-child(3n + 2 of .sheet) {
+:is([data-theme='poster'], [data-theme='poster-dark']) .sheet:nth-child(3n + 2 of .sheet) {
   --band: var(--c-poster-band-2);
   --band-ink: var(--c-poster-band-2-ink);
 }
 
-[data-theme='poster'] .sheet:nth-child(3n of .sheet) {
+:is([data-theme='poster'], [data-theme='poster-dark']) .sheet:nth-child(3n of .sheet) {
   --band: var(--c-poster-band-3);
   --band-ink: var(--c-poster-band-3-ink);
 }
 
-[data-theme='poster'] .sheet > header:first-child,
-[data-theme='poster'] .sheet > [data-card-header]:first-child {
+:is([data-theme='poster'], [data-theme='poster-dark']) .sheet > header:first-child,
+:is([data-theme='poster'], [data-theme='poster-dark']) .sheet > [data-card-header]:first-child {
   --c-ink: var(--band-ink);
   --c-ink-muted: var(--band-ink);
   --c-accent: var(--band-ink);
@@ -3496,30 +3600,30 @@ form[data-auto-submit] [data-fallback-submit] {
 
 /* A band runs edge to edge, so in a padded card it reaches out through the
  * card's padding and takes the same padding back inside itself. */
-[data-theme='poster'] .card-pad-dense > header:first-child {
+:is([data-theme='poster'], [data-theme='poster-dark']) .card-pad-dense > header:first-child {
   margin: calc(-1 * var(--card-p-dense)) calc(-1 * var(--card-p-dense)) 0.5rem;
   padding: 0.5rem var(--card-p-dense);
 }
 
-[data-theme='poster'] .card-pad > header:first-child {
+:is([data-theme='poster'], [data-theme='poster-dark']) .card-pad > header:first-child {
   margin: calc(-1 * var(--card-p)) calc(-1 * var(--card-p)) 0.75rem;
   padding: 0.625rem var(--card-p);
 }
 
-[data-theme='poster'] .card-pad-dense > header:first-child,
-[data-theme='poster'] .card-pad > header:first-child,
-[data-theme='poster'] .sheet > [data-card-header]:first-child {
+:is([data-theme='poster'], [data-theme='poster-dark']) .card-pad-dense > header:first-child,
+:is([data-theme='poster'], [data-theme='poster-dark']) .card-pad > header:first-child,
+:is([data-theme='poster'], [data-theme='poster-dark']) .sheet > [data-card-header]:first-child {
   padding-bottom: 0.5rem;
 }
 
 /* Where you are: the current row in the sidebar takes the highlight. */
-[data-theme='poster'] .shell-ground a[aria-current='page'] {
+:is([data-theme='poster'], [data-theme='poster-dark']) .shell-ground a[aria-current='page'] {
   --c-shell-hover: var(--c-poster-hi);
   --c-shell-ink: var(--c-poster-hi-ink);
 }
 
 /* The top bar is printed on the same paper, ruled off in the ink. */
-[data-theme='poster'] .page-pane > header {
+:is([data-theme='poster'], [data-theme='poster-dark']) .page-pane > header {
   /* The bar normally wears the sidebar's ground and ink; here it is paper,
    * so it takes the page's ink instead. */
   --c-shell-ink: var(--c-ink);
@@ -3532,7 +3636,7 @@ form[data-auto-submit] [data-fallback-submit] {
 }
 
 /* The primary button sits on its own small shadow, like the cards. */
-[data-theme='poster'] .bg-accent {
+:is([data-theme='poster'], [data-theme='poster-dark']) .bg-accent {
   box-shadow: 2px 2px 0 var(--c-sheet-outline);
 }
 

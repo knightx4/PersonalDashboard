@@ -90,6 +90,15 @@ export const THEMES = [
     swatch: '#f3efe6',
     ink: '#111111',
   },
+  {
+    // Lightbox in dark: the same poster printed in light ink on dark stock.
+    id: 'poster-dark',
+    label: 'Lightbox',
+    mood: 'The poster on dark stock',
+    scheme: 'dark',
+    swatch: '#151412',
+    ink: '#f3efe6',
+  },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]['id'];
@@ -168,9 +177,10 @@ export function parseTheme(value: string | null | undefined): Theme {
   if (mode === 'lightbox') return { kind: 'written', id: 'poster' };
 
   // The poster takes a palette by name, the default stored as the bare id.
-  if (mode === 'poster') {
-    if (!colour || !isPaletteId(colour) || colour === DEFAULT_PALETTE) return { kind: 'written', id: 'poster' };
-    return { kind: 'written', id: 'poster', palette: colour };
+  // The dark poster takes the same names.
+  if (mode === 'poster' || mode === 'poster-dark') {
+    if (!colour || !isPaletteId(colour) || colour === DEFAULT_PALETTE) return { kind: 'written', id: mode };
+    return { kind: 'written', id: mode, palette: colour };
   }
 
   if (isThemeId(text)) return { kind: 'written', id: text };
@@ -247,9 +257,9 @@ export function skyOf(theme: Theme): SkyId {
   return theme.kind === 'written' && theme.sky ? theme.sky : DEFAULT_SKY;
 }
 
-/** Whether a theme is Lightbox's poster, and so takes a palette rather than a colour. */
+/** Whether a theme is Lightbox's poster, light or dark, and so takes a palette rather than a colour. */
 export function isPoster(theme: Theme): boolean {
-  return theme.kind === 'written' && theme.id === 'poster';
+  return theme.kind === 'written' && (theme.id === 'poster' || theme.id === 'poster-dark');
 }
 
 /** The palette a poster is printed in; the default for anything else. */
@@ -257,9 +267,10 @@ export function paletteOf(theme: Theme): PaletteId {
   return theme.kind === 'written' && theme.palette ? theme.palette : DEFAULT_PALETTE;
 }
 
-/** Lightbox in a palette. */
-export function posterFor(palette: PaletteId): Theme {
-  return palette === DEFAULT_PALETTE ? { kind: 'written', id: 'poster' } : { kind: 'written', id: 'poster', palette };
+/** Lightbox in a palette, light unless asked for dark. */
+export function posterFor(palette: PaletteId, polarity: Polarity = 'light'): Theme {
+  const id = polarity === 'dark' ? 'poster-dark' : 'poster';
+  return palette === DEFAULT_PALETTE ? { kind: 'written', id } : { kind: 'written', id, palette };
 }
 
 /** Aurora in a polarity, keeping its sky. Night is Aurora; first light is Dawn. */
@@ -296,7 +307,7 @@ export const THEME_POLARITIES: readonly { id: Polarity; label: string; mood: str
 
 export const THEME_SURFACES: readonly { id: Surface; label: string; mood: string }[] = [
   { id: 'solid', label: 'Solid', mood: 'One flat ground, edge to edge' },
-  { id: 'lightbox', label: 'Lightbox', mood: 'A printed poster, in light; glass sheets, in dark' },
+  { id: 'lightbox', label: 'Lightbox', mood: 'A printed poster: outlines, hard shadows, bands of colour' },
   { id: 'aurora', label: 'Aurora', mood: 'Glass under a moving sky' },
 ];
 
