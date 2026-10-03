@@ -57,7 +57,7 @@ import { markMentions } from '@/lib/learn/feed/mentions';
 import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 import { Mentioned, PhraseExplainer, usePhraseExplainer } from './phrase-explainer';
 import { TeachBackCard } from './teach-back-card';
-import { MOTION_MS } from '@/lib/motion';
+import { SWIPE_RELEASE_MS, follow, release } from '@/components/motion/swipe';
 
 /**
  * The Learn now deck (LEARN-NOW-SPEC, "Cards after the first week").
@@ -86,7 +86,7 @@ import { MOTION_MS } from '@/lib/motion';
 
 const SWIPE_X = 90;
 const SWIPE_Y = 110;
-const LEAVE_MS = MOTION_MS.quick;
+const LEAVE_MS = SWIPE_RELEASE_MS;
 
 type Leaving = { id: string; swipe: SwipeAction } | null;
 
@@ -433,7 +433,12 @@ function DeckCard({
   /** A card made from a phrase on this one, to go next in the deck. */
   onMadeCard: (card: FeedCard) => void;
 }) {
-  const [drag, setDrag] = useState<Drag | null>(null);
+  // Which swipe a drag is heading for, and whether one is under way. The
+  // card's position itself is written by follow and release
+  // (components/motion/swipe.ts) and never goes through a render, so the
+  // card stays under the finger (plan #1551).
+  const [aiming, setAiming] = useState<SwipeAction | null>(null);
+  const [dragging, setDragging] = useState(false);
   const [saved, setSaved] = useState<{ id: string; title: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, startSave] = useTransition();
@@ -482,6 +487,11 @@ function DeckCard({
       axis = null;
       last = { x: 0, y: 0 };
     };
+    const back = () =>
+      void release(element, '').then(() => {
+        setAiming(null);
+        setDragging(false);
+      });
     const onMove = (event: TouchEvent) => {
       if (!start) return;
       const dx = event.touches[0]!.clientX - start.x;
@@ -497,17 +507,21 @@ function DeckCard({
       if (axis === 'none') return;
       event.preventDefault();
       last = axis === 'x' ? { x: dx, y: 0 } : { x: 0, y: Math.max(0, dy) };
-      setDrag(last);
+      follow(element, `translate(${last.x}px, ${last.y}px) rotate(${last.x / 24}deg)`);
+      setDragging(true);
+      setAiming(heading(last));
     };
     const onEnd = () => {
       if (!start) return;
       const claimed = axis;
       start = null;
       axis = null;
-      setDrag(null);
       if (claimed === 'x' && Math.abs(last.x) >= SWIPE_X)
         swipeRef.current(last.x > 0 ? 'review' : 'skipped');
       else if (claimed === 'y' && last.y >= SWIPE_Y) swipeRef.current('known');
+      // Short, or not a swipe at all: spring back to rest. A swipe that
+      // counted springs away instead, from the effect on `leaving` below.
+      else if (claimed === 'x' || claimed === 'y') back();
     };
 
     element.addEventListener('touchstart', onStart, { passive: true });
@@ -570,14 +584,19 @@ function DeckCard({
       .catch(() => failed('That rating was not recorded. Check your connection.'));
   };
 
-  const toward = leaving ?? heading(drag);
-  const transform = leaving
-    ? leaving === 'known'
-      ? 'translate(0, 70vh)'
-      : `translate(${leaving === 'review' ? '' : '-'}120vw, 0) rotate(${leaving === 'review' ? 8 : -8}deg)`
-    : drag
-      ? `translate(${drag.x}px, ${drag.y}px) rotate(${drag.x / 24}deg)`
-      : undefined;
+  // Gone, by a swipe, a key or a button: spring away the way it went.
+  useEffect(() => {
+    const element = surface.current;
+    if (!leaving || !element) return;
+    void release(
+      element,
+      leaving === 'known'
+        ? 'translate(0, 70vh)'
+        : `translate(${leaving === 'review' ? '' : '-'}120vw, 0) rotate(${leaving === 'review' ? 8 : -8}deg)`,
+    );
+  }, [leaving]);
+
+  const toward = leaving ?? aiming;
 
   return (
     <div
@@ -586,11 +605,10 @@ function DeckCard({
         'relative',
         // Text on the card can be selected to have it explained (plan #1057);
         // a drag already claimed as a swipe selects nothing.
-        drag && 'select-none',
-        !drag && 'transition-[transform,opacity] duration-quick ease-out-soft',
+        dragging && 'select-none',
+        'transition-opacity duration-move ease-out-soft',
         leaving && 'opacity-0',
       )}
-      style={{ transform }}
     >
       {toward && (
         <div
