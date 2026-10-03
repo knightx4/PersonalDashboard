@@ -28,8 +28,14 @@ vi.mock('@/lib/specs/vision', async (original) => ({
   ...(await original<typeof import('@/lib/specs/vision')>()),
   loadVisionBodies: async () => ({}),
 }));
+// The thread comes from the shared store (plan #1470); the idea here has none.
+vi.mock('@/lib/thread/store', async (original) => ({
+  ...(await original<typeof import('@/lib/thread/store')>()),
+  withThreads: async (_client: unknown, _table: string, rows: unknown[]) => rows,
+}));
 vi.mock('@/lib/ideas/load', () => ({
   IDEA_COLUMNS: '*',
+  IDEAS_TABLE: 'public.ideas',
   ideaRowFrom: () => ({
     id: IDEA_ID,
     body: 'a search box',

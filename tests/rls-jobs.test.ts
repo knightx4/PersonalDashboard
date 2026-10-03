@@ -428,8 +428,8 @@ describe('integrity constraints the database enforces itself', () => {
   it('refuses a note attached to two parents at once', async () => {
     await expect(
       admin`
-        insert into notes (user_id, body, company_id, role_id)
-        values (${userA}, 'attached to two things', ${seedA.companies}, ${seedA.roles})`,
+        insert into notes (user_id, body, company_id, application_id)
+        values (${userA}, 'attached to two things', ${seedA.companies}, ${seedA.applications})`,
     ).rejects.toThrow(/notes_exactly_one_parent_ck/);
   });
 
