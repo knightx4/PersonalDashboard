@@ -69,6 +69,13 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
 
 If `DATABASE_URL` is missing, read `reference/offline.md` rather than guessing.
 
+**Writing by hand, record each write** to `plan_items` or `ideas` with
+`core.record_dash_action`, so Home lists it under what Dash did today with an
+Undo: a step or decision added, a step closed, blocked, dropped or given fog,
+an idea filed or linked. A claim (`in_progress`) is not recorded; the close
+that follows it is. `reference/offline.md` shows the calls. The CLI's own
+writes are not recorded yet.
+
 ## Which steps are yours
 
 - A **proposed** step is nobody's to build. It is a proposal waiting on the

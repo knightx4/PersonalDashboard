@@ -23,7 +23,9 @@ import { parseRef } from '@/lib/core/refs';
  *
  * Everything else that writes for Dash records its change with
  * recordDashAction, alongside the write: the role thread's cover letter, the
- * dev comment actions and goal comment filing (plan #1459).
+ * dev comment actions and goal comment filing (plan #1459). Routines, which
+ * write through the Supabase connector, call core.record_dash_action
+ * (migration 0163, plan #1460), which writes the same row.
  *
  * Ask Dash's own changes keep their per-kind undo in lib/ask/changes.ts,
  * because some of them touch two rows (a return writes the item and a
@@ -155,6 +157,30 @@ const DEPENDENTS: Record<string, { schema: AskSchema; table: string; column: str
     { schema: 'public', table: 'inspiration_takeaways', column: 'idea_id' },
   ],
   'public.feedback_items': [{ schema: 'public', table: 'dev_comments', column: 'feedback_item_id' }],
+  // What routines add through core.record_dash_action (plan #1460).
+  'goals.items': [
+    { schema: 'goals', table: 'items', column: 'parent_id' },
+    { schema: 'goals', table: 'comments', column: 'item_id' },
+    { schema: 'goals', table: 'answers', column: 'item_id' },
+    { schema: 'goals', table: 'dependencies', column: 'item_id' },
+    { schema: 'goals', table: 'dependencies', column: 'depends_on_id' },
+    { schema: 'goals', table: 'links', column: 'item_id' },
+    { schema: 'goals', table: 'progress_entries', column: 'item_id' },
+    { schema: 'todo', table: 'task_links', column: 'goal_id' },
+    { schema: 'learn', table: 'aims', column: 'goal_id' },
+    { schema: 'public', table: 'raised_items', column: 'goal_id' },
+  ],
+  'goals.collections': [
+    { schema: 'goals', table: 'records', column: 'collection_id' },
+    { schema: 'goals', table: 'items', column: 'collection_id' },
+    { schema: 'goals', table: 'collection_goals', column: 'collection_id' },
+  ],
+  'goals.records': [{ schema: 'goals', table: 'answers', column: 'changed_record_id' }],
+  'core.files': [{ schema: 'core', table: 'file_comments', column: 'file_id' }],
+  'todo.tasks': [
+    { schema: 'todo', table: 'tasks', column: 'parent_id' },
+    { schema: 'todo', table: 'task_links', column: 'task_id' },
+  ],
 };
 
 /** A refusal the person reads. */

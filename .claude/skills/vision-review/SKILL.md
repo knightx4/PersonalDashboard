@@ -261,6 +261,19 @@ set status = 'done', completed_at = now(), commit_sha = null,
 where user_id = '…' and kind = 'like' and status = 'open' and id in ('<id>', …);
 ```
 
+Record each like it closed with `core.record_dash_action`, in the same call
+as the update, keeping the rows first with `core.dash_before`, so Home lists
+them under what Dash did today with an Undo:
+
+```sql
+select core.dash_before('public.feedback_items:' || id) from feedback_items
+where user_id = '…' and kind = 'like' and status = 'open' and id in ('<id>', …);
+update feedback_items set … ;  -- the update above
+select core.record_dash_action('…', 'public.feedback_items:' || id, 'update', 'close_like',
+  $s$Dash read your like in the review of the <workspace> vision and closed it.$s$)
+from feedback_items where user_id = '…' and id in ('<id>', …);
+```
+
 `done` is the status because a like asks for nothing, so reading it is all
 there is to do. A like is never `declined`. `commit_sha` stays null: no
 commit closed it.
@@ -304,8 +317,11 @@ Each dismissal is two writes, and the comment is what the person reads under
 the idea on `/dev/ideas`:
 
 ```sql
+select core.dash_before('public.ideas:<idea>');
 update ideas set dismissed_at = now()
 where id = '<idea>' and user_id = '…' and source = 'claude' and dismissed_at is null;
+select core.record_dash_action('…', 'public.ideas:<idea>', 'update', 'dismiss_idea',
+  $s$Dash set aside the idea "<its first words>" in the vision review: <why, in a few words>.$s$);
 
 insert into dev_comments (user_id, idea_id, author, body)
 values ('…', '<idea>', 'claude',
@@ -313,7 +329,8 @@ values ('…', '<idea>', 'claude',
 ```
 
 Keep the opening words exactly. The next run finds its own dismissals by
-them, so it does not count them as the person's.
+them, so it does not count them as the person's. The comment is written after
+the record call: it hangs off the idea and does not change the idea's row.
 
 ## Before stopping
 
