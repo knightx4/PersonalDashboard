@@ -84,10 +84,29 @@ where user_id = '…' and audit_id = (
   order by created_at desc limit 1)
   and proposal <> 'none' and spec_change_id is null;
 
+-- rules the notes routine proposed since the last audit (plan #1526). A
+-- spec page shows these only until the next audit starts, so re-record each
+-- one that still stands under this run's audit_id, with the same
+-- spec_change_id, or it drops off the page
+select spec, section, finding, evidence, proposal, spec_change_id from spec_findings
+where user_id = '…' and audit_id is null and kind = 'missing_rule'
+  and created_at >= coalesce((
+    select min(created_at) from spec_findings
+    where user_id = '…' and audit_id = (
+      select audit_id from spec_findings
+      where user_id = '…' and audit_id is not null
+      order by created_at desc limit 1)), '-infinity');
+
 -- changes the person declined, so the run does not propose them again
 select spec, title, why from spec_changes
 where user_id = '…' and status = 'declined';
 ```
+
+A notes rule still stands while its change is proposed or approved, or when
+it was drafted with no change because five were waiting. Re-record it as a
+`missing_rule` finding of this run. One whose change was applied is now a rule
+in the spec and is checked like the others; one whose change was declined is
+left out.
 
 ## One subagent per spec
 
