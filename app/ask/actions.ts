@@ -45,8 +45,9 @@ const PagePath = z
 /**
  * Ask a question, or carry on the conversation `conversationRef` names. Never
  * throws: a failure comes back as `error`, and the question is kept whenever
- * it could be. Takes up to about twenty seconds. `page` is the app address
- * it was asked from (plan #1271); null when there is none or it was dropped.
+ * it could be. Takes up to about a minute (TIME_BUDGET_MS). `page` is the app
+ * address it was asked from (plan #1271); null when there is none or it was
+ * dropped.
  */
 // latency: pending
 export async function askDashQuestion(

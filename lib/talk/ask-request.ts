@@ -43,7 +43,8 @@ import type { TalkTurn } from './talk';
 /**
  * Ask a question, or continue the `ask` conversation `conversationRef` names.
  * Never throws for a failed answer: the result carries the error, and the
- * question is kept either way. Takes up to about twenty seconds.
+ * question is kept either way. Usually takes a few seconds, and up to about a
+ * minute for a question that needs several lookups (TIME_BUDGET_MS).
  */
 export async function askDashInRequest(input: {
   question: string;
