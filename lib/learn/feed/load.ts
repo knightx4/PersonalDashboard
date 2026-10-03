@@ -17,6 +17,7 @@ import { youtubeVideoId } from '@/lib/learn/youtube/format';
 import { loadNotesForCards } from '@/lib/learn/notes/store';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { loadConversations } from '@/lib/talk/store';
+import { rowSubject } from '@/lib/talk/talk';
 import { TEACH_BACK_DEFAULT_EVERY } from './teach-back';
 import { ARTICLE_GAP, POOL_FACTOR, spreadDeck, type Spreadable } from './spread';
 import { goalTrackIds, notPlanLessons } from './plan-lessons';
@@ -156,13 +157,14 @@ async function withConversations(
   if (cards.length === 0) return cards;
   try {
     const core = supabase.schema(CORE_SCHEMA) as unknown as CoreSupabaseClient;
+    const refOf = (id: string) => rowSubject('learn.feed_cards', id).ref;
     const byCard = await loadConversations(
       core,
-      'feed_card',
-      cards.map((card) => card.id),
+      'row',
+      cards.map((card) => refOf(card.id)),
     );
     return cards.map((card) => {
-      const conversation = byCard.get(card.id);
+      const conversation = byCard.get(refOf(card.id));
       return conversation ? { ...card, conversation } : card;
     });
   } catch (error) {

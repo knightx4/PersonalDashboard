@@ -1,19 +1,15 @@
-import type { TalkSubject, TalkTurn } from '@/lib/talk/talk';
+import { rowSubject, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import type { NewsStory } from '@/lib/news/issues/stories';
 
 /**
  * Discussing a Quick read story with Dash (plan #1060).
  *
- * The exchange is a saved conversation (lib/talk, plan #1053) whose subject is
- * the story. A story is not a row of its own: it is a position in the stories
- * array on news.issues, which is how saved_stories and story_passes name one
- * too. So the conversation's ref is the issue id and the story index, joined
- * by a colon, the same key reactionKey in reactions.ts uses.
- *
- * Re-summarising a newsletter rewrites that array, so an index can later name
- * another story. The conversation keeps the headline it began with as its
- * title (core.conversations.title), which is what to show when the two
- * disagree.
+ * The exchange is a saved conversation (lib/talk, plan #1053). A story is not
+ * a row of its own: it is a position in the stories array on news.issues. But
+ * discussing a story saves it (plan #1061), so the conversation is the row
+ * thread under its saved copy, `news.saved_stories:<id>` (plan #1468), found
+ * by issue and headline, the key saved_stories is unique on. The Quick read
+ * sheet and the Saved tab therefore open the same thread.
  *
  * This file needs no database, so the sheet can import it.
  */
@@ -21,24 +17,12 @@ import type { NewsStory } from '@/lib/news/issues/stories';
 /** How many replies Dash gives before the discussion closes. */
 export const DISCUSS_ROUNDS = 3;
 
-/** The conversation's subject_ref for a story: `<issue id>:<story index>`. */
-export function storyRef(issueId: string, storyIndex: number): string {
-  return `${issueId}:${storyIndex}`;
-}
+/** The table a story's thread sits under. */
+export const STORY_TABLE = 'news.saved_stories';
 
-/**
- * The issue id and story index a ref names, or null when it is not one
- * storyRef wrote.
- */
-export function parseStoryRef(ref: string): { issueId: string; storyIndex: number } | null {
-  const match = /^([0-9a-f-]{36}):(\d+)$/i.exec(ref);
-  if (!match) return null;
-  return { issueId: match[1], storyIndex: Number(match[2]) };
-}
-
-/** The story as a conversation subject, titled with its headline. */
-export function storySubject(issueId: string, storyIndex: number, headline: string): TalkSubject {
-  return { kind: 'news_story', ref: storyRef(issueId, storyIndex), title: headline };
+/** The saved story as a conversation subject, titled with its headline. */
+export function storySubject(savedStoryId: string, headline: string): TalkSubject {
+  return rowSubject(STORY_TABLE, savedStoryId, headline);
 }
 
 /**

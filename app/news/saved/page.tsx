@@ -4,7 +4,7 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { formatArrival } from '@/lib/news/issues/list';
 import { discussedIndexes } from '@/lib/news/saved/discussed';
-import { loadStoryConversations } from '@/lib/news/saved/discussed-store';
+import { loadDiscussedStoryIds, loadIssueStories } from '@/lib/news/saved/discussed-store';
 import { loadSavedStories } from '@/lib/news/saved/stories';
 import { loadSentBySaved } from '@/lib/news/saved/sent';
 import { createVaultClient } from '@/lib/vault/auth/server';
@@ -22,9 +22,10 @@ export const dynamic = 'force-dynamic';
  *
  * A story discussed with Dash is saved when the discussion starts, and is
  * marked Discussed here with the exchange a tap away (plan #1061). The
- * conversations are read alongside the stories and matched by issue and
- * headline (lib/news/saved/discussed.ts); a failed read of them leaves the
- * list without the marks rather than failing the page.
+ * discussion is the thread under the saved story (plan #1468); each discussed
+ * story is found in its newsletter by headline so the sheet can open it
+ * (lib/news/saved/discussed.ts). A failed read of either leaves the list
+ * without the marks rather than failing the page.
  *
  * Each story shows up to two of your own notes on its subject (plan #1113),
  * matched on its headline and summary. A saved story is a copy that outlives
@@ -43,12 +44,16 @@ export default async function SavedPage() {
     createCoreClient(),
     createVaultClient(),
   ]);
-  const [settings, stories, conversations] = await Promise.all([
+  const [settings, stories, discussedIds] = await Promise.all([
     loadAccountSettings(user.id),
     loadSavedStories(client),
-    loadStoryConversations(core).catch(() => []),
+    loadDiscussedStoryIds(core).catch(() => new Set<string>()),
   ]);
-  const discussed = discussedIndexes(stories, conversations);
+  const discussedIssues = stories
+    .filter((story) => story.issueId && discussedIds.has(story.id))
+    .map((story) => story.issueId as string);
+  const issueStories = await loadIssueStories(client, discussedIssues).catch(() => new Map<string, unknown[]>());
+  const discussed = discussedIndexes(stories, discussedIds, issueStories);
   const sent = await loadSentBySaved(stories.map((story) => story.id));
 
   return (

@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
-import { MAX_TURN, toModelMessages, type SubjectKind, type TalkTurn } from './talk';
+import { MAX_TURN, toModelMessages, type TalkTurn } from './talk';
 import { MODELS } from '@/lib/core/models';
 
 /**
@@ -22,8 +22,12 @@ const TOOL_NAME = 'reply';
 /** How much of the subject's text goes in the prompt. A card's section is well under this. */
 export const MAX_MATERIAL = 12_000;
 
-/** The kinds this reply is for: something being read. An `ask` question is answered by calling tools instead. */
-type ReadingKind = Exclude<SubjectKind, 'ask'>;
+/**
+ * What is being read, which names the material in the prompt. Not a
+ * conversation kind: every such thread is a `row` thread now (plan #1468), and
+ * an `ask` question is answered by calling tools instead.
+ */
+export type ReadingKind = 'feed_card' | 'news_story';
 
 const SUBJECT_NAME: Record<ReadingKind, string> = {
   feed_card: 'a card from their reading feed',

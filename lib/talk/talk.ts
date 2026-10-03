@@ -1,8 +1,9 @@
 /**
- * A saved conversation with Dash (plan #1053): about a Learn now card or a
- * news story, or a question asked from anywhere in the app (kind `ask`, plan
+ * A saved conversation with Dash: a thread under any row in the app (kind
+ * `row`, plan #1468), or a question asked from anywhere (kind `ask`, plan
  * #1086). The tables are core.conversations and core.conversation_turns (core
- * migrations 0104 and 0108).
+ * migrations 0104, 0109 and 0165), the one thread store of
+ * docs/CORE-AND-DASH-SPEC.md Part 2.
  *
  * This file is the shape and the rules that need no database, so the thread
  * component can import it. Reading and writing are in store.ts, the model
@@ -10,23 +11,39 @@
  */
 
 /**
- * What a conversation can be about. `news_story` is a newsletter story, and
- * its ref format is the News feature's (lib/news/saved/discussed-store.ts).
+ * What a conversation can be about.
+ *
+ * `row` is a thread under one row, and its ref is that row's ref,
+ * `schema.table:id` (lib/core/refs.ts). The database refuses a ref that does
+ * not name a row of the writer's own (core.refs_check), so a thread can sit
+ * under a row of any table with an id and a user_id. A Learn now card's
+ * thread is under `learn.feed_cards:<id>`; a newsletter story's is under its
+ * saved copy, `news.saved_stories:<id>` (lib/news/quick/discuss.ts).
+ *
  * `ask` is a question asked from anywhere: it is about nothing in particular,
  * so its ref is the conversation's own id (the table checks this), and every
  * new question starts one with startAsk in store.ts.
  */
-export const SUBJECT_KINDS = ['feed_card', 'news_story', 'ask'] as const;
+export const SUBJECT_KINDS = ['row', 'ask'] as const;
 export type SubjectKind = (typeof SUBJECT_KINDS)[number];
 
 /** What a conversation is about, as the table keys it. */
 export type TalkSubject = {
   kind: SubjectKind;
-  /** For `feed_card`, the learn.feed_cards id; for `ask`, the conversation's own id. */
+  /** For `row`, the row's ref; for `ask`, the conversation's own id. */
   ref: string;
   /** What the subject is called, kept on the conversation when it begins. */
   title?: string | null;
 };
+
+/**
+ * The thread under one row: `table` is `schema.table` and `id` the row's id,
+ * joined as toRef in lib/core/refs.ts joins them. Written out here rather than
+ * imported so the thread component does not pull in the sources catalogue.
+ */
+export function rowSubject(table: string, id: string, title?: string | null): TalkSubject & { kind: 'row' } {
+  return { kind: 'row', ref: `${table}:${id}`, title: title ?? null };
+}
 
 /** 'user' is the person, 'assistant' is Dash: the roles the model is sent. */
 export type TalkRole = 'user' | 'assistant';

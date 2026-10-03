@@ -3,7 +3,9 @@
  * docs/CORE-AND-DASH-SPEC.md Part 1). For each entry in the registry this
  * writes one row, resolves `schema.table:id` through refTitles to its title
  * and page, and resolves a ref to a row that does not exist to "no longer
- * there". Each row is written inside a transaction that is rolled back.
+ * there". It also checks core.ref_owned says the row is its owner's and no one
+ * else's, which is what lets a thread sit under it (plan #1468, Part 2). Each
+ * row is written inside a transaction that is rolled back.
  *
  * The row is filled in generically: every column that must be set and has no
  * default gets a value of its type, the first value its check allows when
@@ -116,8 +118,16 @@ async function valueFor(tx: postgres.TransactionSql, column: Column, checks: Map
   }
 }
 
-/** Writes one row of `table` with `title` in its title column, and returns its id. */
-async function writeRow(tx: postgres.TransactionSql, table: string, titleColumn: string | null): Promise<string> {
+/**
+ * Writes one row of `table` with `title` in its title column, and returns its
+ * id and the account it belongs to: its user_id, or, for a table keyed by the
+ * account itself, its id.
+ */
+async function writeRow(
+  tx: postgres.TransactionSql,
+  table: string,
+  titleColumn: string | null,
+): Promise<{ id: string; owner: string }> {
   const user = randomUUID();
   const id = randomUUID();
   const columns = await columnsOf(tx, table);
@@ -141,7 +151,7 @@ async function writeRow(tx: postgres.TransactionSql, table: string, titleColumn:
      values (${names.map((n, i) => `$${i + 1}::text::${types.get(n)}`).join(', ')}) returning id::text as id`,
     names.map((n) => (values[n] === null ? null : String(values[n]))),
   );
-  return row.id;
+  return { id: row.id, owner: 'user_id' in values ? user : row.id };
 }
 
 function readerIn(tx: postgres.TransactionSql): ReadRows {
@@ -186,8 +196,15 @@ describe('refs against the database', () => {
         expect(pageColumns(page).filter((c) => !named.has(c)), table).toEqual([]);
         expect(columns.find((c) => c.name === 'id')?.type, `${table}.id`).toBe('uuid');
 
-        const id = await writeRow(tx, table, titleColumn);
+        const { id, owner } = await writeRow(tx, table, titleColumn);
         const ref = toRef(table, id);
+
+        // A thread can sit under it (plan #1468): the check a row thread's ref
+        // passes on insert says it is the owner's, and nobody else's.
+        const [owned] = await tx<{ mine: boolean; theirs: boolean }[]>`
+          select core.ref_owned(${ref}, ${owner}::uuid) as mine,
+                 core.ref_owned(${ref}, ${randomUUID()}::uuid) as theirs`;
+        expect(owned, ref).toEqual({ mine: true, theirs: false });
         const gone = toRef(table, randomUUID());
         const resolved = await refTitles([ref, gone], readerIn(tx));
 

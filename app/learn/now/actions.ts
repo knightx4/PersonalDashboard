@@ -39,7 +39,7 @@ import { SAVED_FROM_FEED, saveFeedSection } from '@/lib/learn/tracks/save';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { cardMaterial, CARD_REPLY_GUIDANCE } from '@/lib/learn/feed/ask';
-import { turnBody, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
+import { rowSubject, turnBody, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import { appendTurns, loadConversation } from '@/lib/talk/store';
 import { replyAbout } from '@/lib/talk/reply';
 import { makeAskedCard } from '@/inngest/learn/asked-card';
@@ -386,7 +386,7 @@ export async function askAboutCard(id: string, question: string): Promise<AskRes
   if (!material) return { error: 'That card is no longer there.' };
 
   const core = await createCoreClient();
-  const subject: TalkSubject = { kind: 'feed_card', ref: card.data, title: material.title };
+  const subject: TalkSubject = rowSubject('learn.feed_cards', card.data, material.title);
   let earlier: TalkTurn[];
   let asked: TalkTurn[];
   try {
@@ -475,7 +475,7 @@ export async function explainPhrase(id: string, selection: string): Promise<Expl
   if (!phraseOnCard(checked.phrase, texts)) {
     // Not in the card itself: perhaps in one of Dash's answers about it.
     const core = await createCoreClient();
-    const turns = await loadConversation(core, { kind: 'feed_card', ref: card.data }).catch(
+    const turns = await loadConversation(core, rowSubject('learn.feed_cards', card.data)).catch(
       () => [] as TalkTurn[],
     );
     if (!phraseOnCard(checked.phrase, turns.map((turn) => turn.body))) {
@@ -780,7 +780,7 @@ export async function explainBack(id: string, body: string): Promise<TeachBackRe
   const idea = conceptRow as TeachBackIdea;
 
   const core = await createCoreClient();
-  const subject: TalkSubject = { kind: 'feed_card', ref: card.data, title: row.idea_name };
+  const subject: TalkSubject = rowSubject('learn.feed_cards', card.data, row.idea_name);
   let asked: TalkTurn[];
   try {
     asked = await appendTurns(core, user.id, subject, [{ role: 'user', body: checked.body }]);

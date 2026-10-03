@@ -5,31 +5,22 @@ import {
   discussGuidance,
   discussionClosed,
   roundsTaken,
-  parseStoryRef,
   storyMaterial,
-  storyRef,
   storySubject,
 } from './discuss';
 
 const ISSUE = '6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d';
+const SAVED = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
 
 const turn = (role: TalkRole, body = 'x'): Pick<TalkTurn, 'role' | 'body'> => ({ role, body });
 
 describe('discuss rules', () => {
-  it('names a story by issue id and story index', () => {
-    expect(storyRef(ISSUE, 3)).toBe(`${ISSUE}:3`);
-    expect(storySubject(ISSUE, 0, 'Rates held')).toEqual({
-      kind: 'news_story',
-      ref: `${ISSUE}:0`,
+  it('puts a story\'s thread under its saved copy, titled with the headline', () => {
+    expect(storySubject(SAVED, 'Rates held')).toEqual({
+      kind: 'row',
+      ref: `news.saved_stories:${SAVED}`,
       title: 'Rates held',
     });
-  });
-
-  it('reads the issue id and story index back from a ref', () => {
-    expect(parseStoryRef(storyRef(ISSUE, 12))).toEqual({ issueId: ISSUE, storyIndex: 12 });
-    expect(parseStoryRef('card-1')).toBeNull();
-    expect(parseStoryRef(`${ISSUE}:`)).toBeNull();
-    expect(parseStoryRef(`${ISSUE}:-1`)).toBeNull();
   });
 
   it('gives Dash the summary and the story text, skipping what is missing', () => {
@@ -108,6 +99,10 @@ vi.mock('@/lib/news/saved/stories', () => ({
     store.saved.push(input);
     return true;
   },
+  findSavedStory: async (_c: unknown, input: { issueId: string; headline: string }) =>
+    store.saved.some((s) => s.issueId === input.issueId && s.headline === input.headline)
+      ? { id: SAVED, issueId: input.issueId, headline: input.headline, link: null, senderName: 'A' }
+      : null,
 }));
 vi.mock('@/lib/talk/store', () => ({
   loadConversation: async () => [...store.turns],
@@ -117,7 +112,7 @@ vi.mock('@/lib/talk/store', () => ({
     subject: { ref: string },
     turns: { role: TalkRole; body: string }[],
   ) => {
-    expect(subject.ref).toBe(`${ISSUE}:1`);
+    expect(subject.ref).toBe(`news.saved_stories:${SAVED}`);
     const kept = turns.map((t) => ({
       id: `t${++store.clock}`,
       role: t.role,
@@ -199,12 +194,17 @@ describe('discussQuickStory', () => {
     expect(store.saved[0]).toEqual({ userId: 'user-1', issueId: ISSUE, headline: 'Rates held' });
   });
 
-  it('still replies when saving the story fails', async () => {
+  it('keeps nothing when saving the story fails, since the thread sits under it', async () => {
     store.saveFails = true;
     const { discussQuickStory } = await import('@/app/news/quick/actions');
     const result = await discussQuickStory(ISSUE, 1, 'A view.');
-    expect(result.error).toBeUndefined();
-    expect(result.turns?.map((t) => t.role)).toEqual(['user', 'assistant']);
+    expect(result.error).toMatch(/not kept/);
+    expect(store.turns).toHaveLength(0);
+  });
+
+  it('opens an empty discussion for a story never saved', async () => {
+    const { loadStoryDiscussion } = await import('@/app/news/quick/actions');
+    expect(await loadStoryDiscussion(ISSUE, 1)).toEqual({ turns: [], error: null });
   });
 
   it('refuses a story index the newsletter does not have', async () => {

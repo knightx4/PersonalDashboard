@@ -1,49 +1,49 @@
-import { parseStoryRef } from '@/lib/news/quick/discuss';
+import { readStories } from '@/lib/news/issues/stories';
+import { STORY_TABLE } from '@/lib/news/quick/discuss';
 
 /**
- * Which saved stories have been discussed with Dash (plan #1061).
+ * Which saved stories have been discussed with Dash (plan #1061), and where
+ * each sits in its newsletter so the Discussed button can open the sheet.
  *
- * The two tables name a story differently. A saved story is its issue and its
- * headline (news.saved_stories); a discussion is its issue and its index in the
- * issue's stories array (core.conversations.subject_ref, from storyRef). The
- * conversation keeps the headline it began with as its title, so a saved story
- * and a discussion are the same story when the issue matches and the title is
- * the saved headline. Matching on the title rather than on the index read from
- * the issue today means a re-summarised newsletter, which can move a story to
- * another index, still finds the discussion its headline began.
+ * A discussion is the row thread under the saved story,
+ * `news.saved_stories:<id>` (lib/news/quick/discuss.ts, plan #1468), so which
+ * stories were discussed is read straight off the threads' refs. The sheet
+ * still works from the newsletter, by issue and index, so each discussed
+ * story is found in its issue's stories array by headline. Matching on the
+ * headline rather than a stored index means a re-summarised newsletter, which
+ * can move a story to another index, still finds it.
  *
- * This file needs no database, so it is tested on its own; the read is in
+ * This file needs no database, so it is tested on its own; the reads are in
  * discussed-store.ts.
  */
 
-/** A news_story conversation as the Saved tab needs it. */
-export type StoryConversation = { ref: string; title: string | null };
+/** The saved story id a thread's ref names, or null when it is not a story's thread. */
+export function savedStoryIdOf(ref: string): string | null {
+  const prefix = `${STORY_TABLE}:`;
+  if (!ref.startsWith(prefix)) return null;
+  const id = ref.slice(prefix.length).trim();
+  return id || null;
+}
 
 /**
- * The story index each discussed saved story's conversation names, by saved
- * story id. Stories whose newsletter is gone (issueId null) have nothing to
- * match on and are left out, as are stories nobody discussed. When two
- * conversations in one issue carry the same headline, the lower index wins.
+ * The story index of each discussed saved story, by saved story id. Indexed
+ * in the raw stories array, as reactions.ts and the discuss actions are.
+ * Stories whose newsletter is gone (issueId null, or not in `issueStories`),
+ * stories nobody discussed, and stories no longer in their newsletter are left
+ * out. When two stories in one issue carry the headline, the first wins.
  */
 export function discussedIndexes(
   saved: readonly { id: string; issueId: string | null; headline: string }[],
-  conversations: readonly StoryConversation[],
+  discussed: ReadonlySet<string>,
+  issueStories: ReadonlyMap<string, readonly unknown[]>,
 ): Map<string, number> {
-  const byKey = new Map<string, number>();
-  for (const conversation of conversations) {
-    const parsed = parseStoryRef(conversation.ref);
-    const title = conversation.title?.trim();
-    if (!parsed || !title) continue;
-    const key = `${parsed.issueId}\n${title}`;
-    const known = byKey.get(key);
-    if (known === undefined || parsed.storyIndex < known) byKey.set(key, parsed.storyIndex);
-  }
-
   const out = new Map<string, number>();
   for (const story of saved) {
-    if (!story.issueId) continue;
-    const index = byKey.get(`${story.issueId}\n${story.headline.trim()}`);
-    if (index !== undefined) out.set(story.id, index);
+    if (!story.issueId || !discussed.has(story.id)) continue;
+    const entries = issueStories.get(story.issueId) ?? [];
+    const headline = story.headline.trim();
+    const index = entries.findIndex((entry) => readStories([entry])[0]?.headline.trim() === headline);
+    if (index >= 0) out.set(story.id, index);
   }
   return out;
 }

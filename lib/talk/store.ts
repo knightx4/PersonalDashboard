@@ -19,11 +19,14 @@ import {
  * composite foreign key stops a turn being added to another account's
  * conversation.
  *
- * Nothing here checks that the subject is yours: the caller reads the card or
- * story through its own module's client first, which RLS has already scoped,
- * and passes the subject on. A conversation naming somebody else's card would
- * hold only what you wrote in it.
+ * A `row` thread's ref must name a row of the writer's own: the database
+ * checks it when the conversation starts (core.refs_check, migration 0165),
+ * so starting a thread under somebody else's row, or under a row that is gone,
+ * fails here with ROW_NOT_YOURS.
  */
+
+/** What appendTurns says when the database refuses a row thread's ref. */
+export const ROW_NOT_YOURS = 'That row is not one of yours, or it is no longer there.';
 
 type ConversationRow = {
   subject_ref: string;
@@ -100,6 +103,7 @@ export async function appendTurns(
     { onConflict: 'user_id,subject_kind,subject_ref', ignoreDuplicates: true },
   );
   assertSchemaExposed(startError, CORE_SCHEMA);
+  if (startError && /is not a row of yours/.test(startError.message)) throw new Error(ROW_NOT_YOURS);
   if (startError) throw new Error(`Starting the conversation failed: ${startError.message}`);
 
   const { data: conversation, error: readError } = await core
