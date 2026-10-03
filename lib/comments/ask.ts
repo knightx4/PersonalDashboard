@@ -1,22 +1,32 @@
 /**
- * What happens when a comment is addressed to Claude.
+ * What happens when a comment is addressed to Dash.
  *
- * A comment tagged `@dash` is a question, and this is the whole of answering
- * it: read the row it was asked on, try the fast reply, and write what comes
- * back into the same thread as `claude`. When the fast reply says the question
- * needs the code, the plan routine is started on it and the thread says so, so
- * the person is not left watching a box that never fills in.
+ * A comment tagged `@dash` is answered here: read the row it was asked on,
+ * reply through the shared loop (lib/dash/thread.ts, plan #1465) with Ask
+ * Dash's lookups and writes and the dev row's own tools, and write what comes
+ * back into the same thread as `claude`. When the question needs the code,
+ * Dash passes it to a session (pass_to_session), the plan routine is started
+ * on it, and the page says so, so the person is not left watching a box that
+ * never fills in.
  *
- * A comment that asks for something to be done is carried out instead, inside
- * the fixed list in lib/comments/act.ts, and the thread says what was done.
- * Everything left off that list stays the person's: a question asked on a
- * decision leaves that decision open, a question asked on an idea leaves it
- * unshaped, and nothing here approves, answers, starts, assigns or dismisses
- * anything — asking is not deciding, and those moves are made on the page.
+ * A comment that asks for something to be done is carried out instead, by
+ * the dev row's own tools (lib/dash/thread-tools.ts), which run the fixed list
+ * in lib/comments/act.ts, and the thread says what was done. Everything left
+ * off that list stays the person's: a question asked on a decision leaves that
+ * decision open, a question asked on an idea leaves it unshaped, and nothing
+ * here approves, answers, starts, assigns or dismisses anything. Asking is not
+ * deciding, and those moves are made on the page.
  */
 import 'server-only';
 
+import type Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { DASH_MODELS } from '@/lib/dash/models';
+import type { DashThreadActs } from '@/lib/dash/registry';
+import { replyInThread, subjectLine, threadVoice, type ThreadDash, type ThreadHandOff } from '@/lib/dash/thread';
+import { DEV_THREAD_TABLES } from '@/lib/dash/thread-tools';
+import { toRef } from '@/lib/core/refs';
+import { MODULE_IDS } from '@/lib/modules';
 import { loadVisionBodies } from '@/lib/specs/vision';
 import { serverEnv } from '@/lib/env';
 import { FEEDBACK_COLUMNS, feedbackRowFrom } from '@/lib/feedback/load';
@@ -45,7 +55,7 @@ import { splitSections } from '@/lib/specs/sections';
 import { SPEC_CHANGE_COLUMNS, sectionsTouched, specChangeFrom } from '@/lib/specs/changes';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
-import { replyToComment } from './reply';
+import { actionSchema } from './reply-payload';
 import { checkReplyAfterResponse } from '@/lib/writing/reply-check';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,7 +77,64 @@ export type AskInput = {
   question: string;
   /** The person's clients, for recording what an instruction writes (plan #1459). */
   dash: DashActionDeps;
+  /** The person's lookups and writes, for the shared loop (threadDashInRequest). */
+  dashThread: ThreadDash;
+  /** For tests: the model client. */
+  anthropic?: Anthropic;
 };
+
+/** The model a reply on a dev row is written with (Sonnet since plan #1465). */
+export const DEV_REPLY_MODEL = DASH_MODELS.devThread;
+
+/** What a reply on a dev row is told, after the rules every thread shares. */
+const DEV_RULES = `THIS THREAD IS ON ONE ROW OF THEIR DEVELOPMENT PAGES: a plan step, a
+question under a plan feature, an idea, a bug report they filed, something a
+previous session raised with them, a spec section, an inspiration takeaway, or
+a proposed change to one of their specs. The message names which. Most
+comments are questions about what is written on the row; some are
+instructions. You are talking to the person who owns the app, so no file paths
+unless they asked about one.
+
+Do not decide anything. A question asked on a plan decision is a question
+about the options, not an answer to it: explain what the options mean and what
+each would cost, and say which you would pick if they ask, but the choice
+stays theirs.
+
+Do not guess at what the code currently does. When answering properly means
+reading a file, a table or the state of the repository, call pass_to_session
+with the one sentence saying what would have to be read. A session that can
+read the code takes it from there and writes into this thread. The same goes
+for an instruction none of your tools can carry out without reading the code
+first ("fix this", "change how this works"): pass_to_session with instruction
+true. Never reply that you cannot do something they told you to do.
+
+When the comment tells you to do something, do it with this row's tools rather
+than describing it:
+
+- file_idea writes a new idea on the ideas page. The module is one of
+  ${MODULE_IDS.join(', ')}, or left out for the app as a whole.
+- file_note writes a bug report or a feature request into the notes queue,
+  which is what "write this up as a bug" and "file that as a request" mean.
+- add_step adds a row to the plan as a proposal: on a plan step, a step beneath
+  it ("add a step under this", "break this in two"); anywhere else a feature
+  at the top of the workspace named. On a raise, "put this in the plan" is
+  add_step.
+- reword rewrites the row the comment is on: an idea or a bug note whole, a
+  plan step's title, detail or done-when, a proposed spec change's diff, title
+  or why. A raise has no wording of its own to rewrite.
+- send_step starts a session building the plan step the comment is on now; on
+  a raise, the step it names by number.
+- build_step writes a new step ready to be worked and starts a session on it,
+  for "do it", "just do this", "go ahead and build that", most often on a
+  raise that already describes the work. Pick add_step when they are adding
+  something to the plan for later, and build_step when they are telling you
+  to do the work now.
+
+Six moves are theirs and stay theirs however the comment was phrased:
+approving a proposal, answering a question put to them, answering or
+dismissing a raise, setting a status, assigning a step, and deleting
+anything. Asked for one of those, change nothing and say in one sentence that
+it is theirs to make, and where on the page it is made.`;
 
 /** What the row says, and what has already been said about it. */
 type Subject = { context: string; thread: DevComment[]; label: string };
@@ -365,61 +432,94 @@ async function produceReply(input: AskInput): Promise<AskOutcome> {
     return { ok: false, error: why };
   }
 
-  const spend: SpendReport[] = [];
-  const reply = await replyToComment({ apiKey: key, onSpend: (report) => spend.push(report) }, message);
-  await recordSessionSpend(input.userId, { module: 'core', operation: 'reply-to-comment' }, spend);
-
-  if (reply.kind === 'answer') {
-    await say(input, reply.body);
-    checkReplyAfterResponse(input.userId, reply.body, `${input.target} ${input.id}`);
-    return { ok: true, message: 'Answered in the thread.' };
-  }
-
-  // An instruction, which #359 settled is carried out rather than offered back
-  // for a second press. The thread is told either way: what was done, or why
-  // nothing was, so a comment never disappears into a box that fills in with
-  // nothing.
-  if (reply.kind === 'action') {
+  // The row's own tools: the fixed list in act.ts, each recorded as it writes.
+  let redraw: string | undefined;
+  const acts: DashThreadActs = async (name, args) => {
+    const parsed = actionSchema.safeParse({ ...(args && typeof args === 'object' ? args : {}), name });
+    if (!parsed.success) return { ok: false, error: 'That was not something I could read, so nothing was done.' };
     const outcome = await carryOut({
       supabase: input.supabase,
       userId: input.userId,
       dash: input.dash,
       target: input.target,
       id: input.id,
-      action: reply.action,
+      action: parsed.data,
     });
+    if (!outcome.ok) return { ok: false, error: outcome.why };
+    redraw = outcome.redraw ?? redraw;
+    return { ok: true, recorded: true, kind: name, said: outcome.said };
+  };
 
-    // Told to do something this call has no way to do, and that is not the
-    // person's own move either. Refusing it here is the dead end the note in
-    // this batch was about: "I asked it to update my plan and it said it
-    // couldn't." A session can read the code and do it, so it goes there
-    // instead of into the thread as a no.
-    if (!outcome.ok && outcome.route) {
-      return handToSession(input, subject, history, true, outcome.why);
+  let session: string | null = null;
+  const handOff = async (name: string, args: unknown): Promise<ThreadHandOff> => {
+    const raw = args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
+    if (name === 'send_step') {
+      const parsed = actionSchema.safeParse({ ...raw, name });
+      if (!parsed.success) return { ok: false, error: 'That named no step I could read, so nothing was started.' };
+      const outcome = await carryOut({
+        supabase: input.supabase,
+        userId: input.userId,
+        dash: input.dash,
+        target: input.target,
+        id: input.id,
+        action: parsed.data,
+      });
+      if (!outcome.ok) return { ok: false, error: outcome.why };
+      redraw = outcome.redraw ?? redraw;
+      return { ok: true, note: 'Started.', said: outcome.said };
     }
+    if (name === 'pass_to_session') {
+      const why = typeof raw.why === 'string' && raw.why.trim() ? raw.why.trim() : 'This needs the code read.';
+      const started = await handToSession(input, subject, history, raw.instruction === true);
+      if (!started.ok) return { ok: false, error: `${why} The session could not be started: ${started.error}` };
+      session = started.message;
+      return {
+        ok: true,
+        passedOn: true,
+        note: 'A session that can read the code has it and writes into this thread. Say in one sentence that you passed it on.',
+      };
+    }
+    return { ok: false, error: 'That cannot be done on this row.' };
+  };
 
-    await say(input, outcome.ok ? outcome.said : outcome.why);
-    return outcome.ok
-      ? { ok: true, message: 'Done, and said in the thread.', redraw: outcome.redraw }
-      : { ok: false, error: outcome.why };
-  }
+  const spend: SpendReport[] = [];
+  const subjectRef = toRef(DEV_THREAD_TABLES[input.target], input.id);
+  const reply = await replyInThread({
+    voice: threadVoice(DEV_REPLY_MODEL, DEV_RULES, DEV_THREAD_TABLES[input.target]),
+    subject: { ref: subjectRef, title: subject.label },
+    message: `${subjectLine(subjectRef)}\n\n${message}`,
+    dash: input.dashThread,
+    acts,
+    handOff,
+    anthropicApiKey: key,
+    client: input.anthropic,
+    onSpend: (report) => spend.push(report),
+  });
+  await recordSessionSpend(input.userId, { module: 'core', operation: 'reply-to-comment' }, spend);
 
-  if (reply.kind === 'error') {
-    const why = `I could not produce a reply: ${reply.error} Your comment is saved.`;
+  if (!reply.ok) {
+    const why = `I could not produce a reply: ${reply.detail} Your comment is saved.`;
     await say(input, why);
     return { ok: false, error: why };
   }
 
-  // Needs the repository, so the session that can read the code is started and
-  // its answer is the next thing in the thread.
-  return handToSession(input, subject, history, reply.instruction, reply.why);
+  // A session has it and its answer is the next thing in the thread. Which
+  // route a question took is not part of the conversation, so Dash's sentence
+  // saying so is only written when it changed something as well.
+  if (session && reply.made.length === 0) return { ok: true, message: session };
+
+  await say(input, reply.body);
+  checkReplyAfterResponse(input.userId, reply.body, `${input.target} ${input.id}`);
+  return reply.made.length > 0
+    ? { ok: true, message: 'Done, and said in the thread.', redraw }
+    : { ok: true, message: 'Answered in the thread.' };
 }
 
 /**
  * Start the session that can read the code, and say which of the two is coming.
  *
- * Both ways of arriving here end the same: the fast reply could not do it from
- * the message alone, and the thing that can is a session. It used to say so
+ * Dash calls pass_to_session when it cannot answer or do it from the row and
+ * its lookups, and the thing that can is a session. It used to say so
  * first -- a `claude` comment reading "I have started a session on it; the
  * answer will land here", and then the real answer under it. That is a thing
  * nobody wrote, standing above every answer that ever took the slow path, and
@@ -433,8 +533,7 @@ async function handToSession(
   subject: Subject,
   history: readonly DevComment[],
   instruction: boolean,
-  why: string,
-): Promise<AskOutcome> {
+): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
   const started = await startRoutineRun({
     supabase: input.supabase,
     userId: input.userId,
@@ -446,14 +545,10 @@ async function handToSession(
     text: sessionTurn(input, subject, history, instruction),
   });
 
-  // A failure is different, and it is still written down. This is the end of
-  // the question: nothing else is coming, and a thread that went quiet is the
-  // one outcome the person cannot tell from working.
-  if (!started.ok) {
-    const said = `${why} I could not start a session to look: ${started.error}`;
-    await say(input, said);
-    return { ok: false, error: said };
-  }
+  // A failure goes back to Dash, whose reply says so: nothing else is coming,
+  // and a thread that went quiet is the one outcome the person cannot tell
+  // from working.
+  if (!started.ok) return { ok: false, error: started.error };
 
   // The page is told which of the two is coming, because "what it did" and
   // "its answer" are different things to be waiting for. It is said as the

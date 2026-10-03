@@ -2,8 +2,11 @@
  * What happens when a comment on a role is addressed to Dash (note 89ad8bef).
  *
  * Read the role, its description, the requirement map, the evidence bank and
- * the thread; ask; file any cover letter into the application; write the
- * reply into the thread as `claude`.
+ * the thread; reply through the shared loop (lib/dash/thread.ts, plan #1465)
+ * with Ask Dash's lookups and writes, so "@dash remind me to follow up on
+ * Friday" adds the todo; file any cover letter into the application through
+ * the role's own tool, write_cover_letter; write the reply into the thread
+ * as `claude`.
  *
  * The same rule as lib/goals/ask.ts: every outcome is written into the
  * thread, including the ones where nothing could be done, because a question
@@ -19,10 +22,51 @@ import { readSubjectOrNull, recordDashAction, type DashActionDeps } from '@/lib/
 import { toRef } from '@/lib/core/refs';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
+import type Anthropic from '@anthropic-ai/sdk';
+import { DASH_MODELS } from '@/lib/dash/models';
+import { replyInThread, subjectLine, threadVoice, type ThreadDash } from '@/lib/dash/thread';
+import { ROLE_THREAD_TABLE } from '@/lib/dash/thread-tools';
+import type { DashThreadActs } from '@/lib/dash/registry';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
-import { askRoleReplyModel } from './model';
 import { parseRoleReply, renderBank, replyBody, roleReplyMessage, type Turn } from './reply';
+
+/** The model a role reply is written with: Sonnet, since a letter goes out under their name. */
+export const ROLE_REPLY_MODEL = DASH_MODELS.roleThread;
+
+/** What a reply on a role is told, after the rules every thread shares. */
+const ROLE_RULES = `THIS THREAD IS ON A ROLE in their job search. The message gives the role:
+its description, how their record was matched against its requirements, the
+cover letter on file if there is one, how they write, and the conversation on
+it so far. Their evidence bank follows these rules, each item with a ref like
+e1. A question about the role, the company, their fit, what to say or what to
+do next is answered from that.
+
+WRITING THE COVER LETTER. When the comment asks for a cover letter, or asks to
+change the one on file ("make it shorter", "lead with the migration work"),
+call write_cover_letter with the whole letter: the full text they would send,
+not a diff and not an outline. It replaces the letter on file, so a change to
+an existing letter keeps everything they did not ask to change. List the bank
+refs it draws on in evidence_refs, and in unsupported_claims every factual
+claim in it that no bank item carries (a number, a scale, a title, a result),
+copied as it appears in the letter. Then say in one sentence what you did.
+
+How the letter is written:
+
+Every claim of substance traces to a bank item. You are arranging their
+material for this role, not adding to it. Where the role wants something the
+bank does not show, leave it out or name it plainly; never invent it.
+
+Their words, not yours. Reuse the vocabulary and rhythm of the items you
+cite, and follow the notes on how they write. A letter that reads better
+than they write is one they have to rewrite.
+
+Short: three or four paragraphs, under 350 words unless they ask otherwise.
+Open with why this role, from the description, not with who they are. Pick
+two or three pieces of evidence that answer the requirements marked must
+have. No paragraph about how exciting the opportunity is, no closing
+paragraph about enthusiasm, and no sign-off beyond their first name if the
+thread gives it.`;
 
 export type RoleAskInput = {
   client: AppSupabaseClient;
@@ -34,6 +78,10 @@ export type RoleAskInput = {
   apiKey: string | null;
   /** The person's clients, for recording the letter in core.dash_actions. */
   dash: DashActionDeps;
+  /** The person's lookups and writes, for the shared loop (threadDashInRequest). */
+  dashThread: ThreadDash;
+  /** For tests: the model client. */
+  anthropic?: Anthropic;
 };
 
 export type RoleAskOutcome = { ok: true; message: string } | { ok: false; error: string };
@@ -142,6 +190,7 @@ async function produceReply(input: RoleAskInput): Promise<RoleAskOutcome> {
       body: note.body as string,
     }));
   const coverLetter = (application.cover_letter as string | null) ?? null;
+  const subjectRef = toRef(ROLE_THREAD_TABLE, roleId);
 
   const message = roleReplyMessage(
     {
@@ -171,28 +220,21 @@ async function produceReply(input: RoleAskInput): Promise<RoleAskOutcome> {
     rendered.refs,
   );
 
-  const spend: SpendReport[] = [];
-  const asked = await askRoleReplyModel(
-    { apiKey: input.apiKey, onSpend: (report) => spend.push(report) },
-    { bank: rendered.text, message },
-  );
-  await recordSessionSpend(userId, { module: 'jobs', operation: 'reply-to-role-comment' }, spend);
-  if (!asked.ok)
-    return refuse(`I could not produce a reply: ${asked.error} Your comment is saved.`);
-
-  const reply = parseRoleReply(asked.input, rendered.refs, banned);
-  if (reply.kind === 'error')
-    return refuse(`I could not produce a reply: ${reply.error} Your comment is saved.`);
-
-  if (reply.coverLetter) {
+  // The one thing only this thread can do: file a letter into the application.
+  let letterWritten = false;
+  const writeLetter = async (args: unknown): ReturnType<DashThreadActs> => {
+    const raw = args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
+    const parsed = parseRoleReply({ ...raw, answer: '' }, rendered.refs, banned);
+    if (parsed.kind === 'error') return { ok: false, error: parsed.error };
+    if (!parsed.coverLetter) return { ok: false, error: 'The letter was empty, so nothing was filed.' };
     const ref = toRef('job_search.applications', application.id as string);
     const before = await readSubjectOrNull(input.dash, ref);
     const { error } = await client
       .from('applications')
-      .update({ cover_letter: reply.coverLetter })
+      .update({ cover_letter: parsed.coverLetter })
       .eq('id', application.id as string)
       .eq('user_id', userId);
-    if (error) return refuse(`I wrote a letter but could not save it: ${error.message}`);
+    if (error) return { ok: false, error: `The letter could not be saved: ${error.message}` };
     await recordDashAction(input.dash, {
       surface: 'thread',
       kind: 'write_cover_letter',
@@ -201,13 +243,36 @@ async function produceReply(input: RoleAskInput): Promise<RoleAskOutcome> {
       beforeValues: before,
       summary: `${coverLetter?.trim() ? 'Rewrote' : 'Wrote'} the cover letter for ${role.title as string} at ${company.name}.`,
     });
-  }
+    letterWritten = true;
+    return { ok: true, recorded: true, kind: 'write_cover_letter', said: replyBody(parsed, coverLetter) };
+  };
 
-  await say(input, replyBody(reply, coverLetter));
+  const spend: SpendReport[] = [];
+  const reply = await replyInThread({
+    voice: threadVoice(
+      ROLE_REPLY_MODEL,
+      `${ROLE_RULES}\n\n${rendered.text ? `The evidence bank:\n\n${rendered.text}` : 'The evidence bank is empty. There is nothing to cite.'}`,
+      ROLE_THREAD_TABLE,
+    ),
+    subject: { ref: subjectRef, title: role.title as string },
+    message: `${subjectLine(subjectRef)}\n\n${message}`,
+    dash: input.dashThread,
+    acts: async (name, args) =>
+      name === 'write_cover_letter' ? writeLetter(args) : { ok: false, error: 'That cannot be done on a role.' },
+    anthropicApiKey: input.apiKey,
+    client: input.anthropic,
+    onSpend: (report) => spend.push(report),
+  });
+  await recordSessionSpend(userId, { module: 'jobs', operation: 'reply-to-role-comment' }, spend);
+  if (!reply.ok) return refuse(`I could not produce a reply: ${reply.detail} Your comment is saved.`);
+
+  await say(input, reply.body);
   return {
     ok: true,
-    message: reply.coverLetter
+    message: letterWritten
       ? 'Cover letter written, under Application.'
-      : 'Answered in the thread.',
+      : reply.made.length > 0
+        ? 'Done, and said in the thread.'
+        : 'Answered in the thread.',
   };
 }

@@ -18,7 +18,7 @@ import {
   type DashVoice,
   type DashWriter,
 } from './loop';
-import { DASH_TOOLS, type DashWriteResult, type DashWriteTool } from './registry';
+import { ASK_DASH_TOOLS, type DashRecordedWrite, type DashWriteResult, type DashWriteTool } from './registry';
 
 /**
  * Ask Dash: Dash answering a question about anything in the app (plan
@@ -103,8 +103,8 @@ points at that row, by "this", "here", "it" or by its subject, look the row up
 first with the tool the line names, and answer about it. When the question is
 about anything else, ignore the page and answer as if it had not been said.`;
 
-/** How Dash speaks on Ask: Sonnet, the rules above, and every registered tool. */
-export const ASK_VOICE: DashVoice = { model: ASK_MODEL, system: SYSTEM, tools: DASH_TOOLS };
+/** How Dash speaks on Ask: Sonnet, the rules above, and every registered tool but a thread's own. */
+export const ASK_VOICE: DashVoice = { model: ASK_MODEL, system: SYSTEM, tools: ASK_DASH_TOOLS };
 
 export type AskStop = DashStop;
 export type AskAnswer = DashAnswer;
@@ -183,7 +183,11 @@ export type AskProposalRunner = (
 ) => Promise<AskToolResult>;
 
 /** A write tool run as the person: the tool's apply with their context bound. */
-export type AskWriteRunner = (tool: DashWriteTool, input: unknown, seen: DashSeen) => Promise<DashWriteResult>;
+export type AskWriteRunner = (
+  tool: DashWriteTool,
+  input: unknown,
+  seen: DashSeen,
+) => Promise<DashWriteResult | DashRecordedWrite | { ok: false; error: string }>;
 
 /** What the model is told once a change is made and kept. */
 function madeNote(summary: string): string {
@@ -285,6 +289,8 @@ export async function askDash(
       ? async (tool, args, seen) => {
           const result = await apply(tool, args, seen);
           if (!result.ok) return { ok: false, error: result.error };
+          // A thread's own tool, which Ask never offers.
+          if ('recorded' in result) return { ok: false, error: 'That cannot be done from Ask. Answer in words.' };
           const { row } = result;
           const made = {
             kind: result.kind,

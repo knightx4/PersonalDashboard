@@ -20,6 +20,7 @@ import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
 import { handoffBrief } from './handoff';
 import { attachHandoffs, discardHandoffs, insertHandoff, loadOpenHandoffs, markHandoffFired } from './handoffs';
 import { askDash, type AskDashResult, type AskLookupEvent } from '@/lib/dash/ask';
+import type { ThreadDash } from '@/lib/dash/thread';
 import {
   attachProposals,
   discardProposals,
@@ -109,6 +110,24 @@ export async function askDashInRequest(input: {
         : {}),
     },
   );
+}
+
+/**
+ * What a thread needs to reply through the shared loop (plan #1465): the
+ * signed-in person's lookups, their writes through their own clients, and
+ * where a write's record is kept (core.dash_actions, surface 'thread').
+ * Only inside a request.
+ */
+export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
+  const [settings, core] = await Promise.all([loadAccountSettings(userId), createCoreClient()]);
+  const ctx = askContext(userId, settings);
+  return {
+    today: todayInTimezone(settings.timezone),
+    execute: (name, args) => executeAskTool(name, args, ctx),
+    apply: (tool, args, seen, acts) =>
+      tool.apply({ ...ctx, seen, goals: (history) => createGoalsClient(history), createTask, thread: acts }, args),
+    saveChange: (made) => insertMadeChange(core, userId, null, made),
+  };
 }
 
 /**

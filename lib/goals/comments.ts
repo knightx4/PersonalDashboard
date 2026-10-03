@@ -11,13 +11,13 @@
  * reply cannot: file the facts a comment gives ("the Navient loan is $12,450
  * at 6.8%") into a collection, as a draft you confirm on the step.
  *
- * Anything the fast reply cannot do from the message alone goes to the goals
- * routine, whose reply lands in the same thread.
+ * Anything the reply cannot do from the message and its lookups goes to the
+ * goals routine, whose reply lands in the same thread.
  *
- * This file holds what needs no database and no model: the message, the tool
- * the model answers through, reading its answer, and what the reply says about
- * what it filed. The model call is lib/goals/comment-model.ts, the reads and
- * writes lib/goals/comments-store.ts, and the whole round lib/goals/ask.ts.
+ * This file holds what needs no database and no model: the message, reading
+ * what a filing or a date asks for, and what the reply says about what it
+ * filed. The reads and writes are lib/goals/comments-store.ts, and the whole
+ * round, on Dash's shared loop since plan #1465, lib/goals/ask.ts.
  */
 import type { DevComment } from '@/lib/comments/load';
 import { askMessage } from '@/lib/comments/context';

@@ -28,8 +28,8 @@ export const MODELS = {
   booksPasteList: HAIKU_DATED,
   /** lib/books/receipt-photo.ts */
   booksReceiptPhoto: HAIKU_DATED,
-  /** lib/comments/reply.ts */
-  devCommentReply: HAIKU,
+  /** lib/comments/ask.ts, Dash's reply on a dev row (lib/dash/models.ts devThread) */
+  devCommentReply: SONNET,
   /** lib/day-brief/model.ts */
   dayBrief: HAIKU,
   /** lib/dev/inspiration/merge.ts */
@@ -46,8 +46,8 @@ export const MODELS = {
   gamesShelfPhoto: OPUS,
   /** lib/goals/capture-model.ts */
   goalCapture: HAIKU,
-  /** lib/goals/comment-model.ts */
-  goalCommentReply: HAIKU,
+  /** lib/goals/ask.ts, Dash's reply on a goal (lib/dash/models.ts goalThread) */
+  goalCommentReply: SONNET,
   /** lib/goals/extract-model.ts */
   goalExtract: HAIKU,
   /** lib/goals/hold-acts-model.ts */
@@ -66,7 +66,7 @@ export const MODELS = {
   jobsInterviewPrep: OPUS,
   /** lib/jobs/learning/suggest.ts */
   jobsLearningSuggest: OPUS,
-  /** lib/jobs/role-thread/model.ts */
+  /** lib/jobs/role-thread/ask.ts, Dash's reply on a role (lib/dash/models.ts roleThread) */
   roleCommentReply: SONNET,
   /** lib/jobs/suggest/model.ts */
   jobsSuggest: SONNET,

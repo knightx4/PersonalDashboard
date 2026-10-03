@@ -5,6 +5,7 @@ import type { ChangeDeps } from '@/lib/ask/changes';
 import type { AskContext, AskRow } from '@/lib/ask/db';
 import type { DashAction, DashActionOp } from '@/lib/core/dash-actions';
 import { HAND_OFF_TOOL } from '@/lib/talk/handoff';
+import { THREAD_TOOLS } from './thread-tools';
 import { WRITE_TOOLS } from './writes';
 
 /**
@@ -37,6 +38,13 @@ import { WRITE_TOOLS } from './writes';
  * and how, which is what core.dash_actions records (Part 5), and `undo` is
  * there only when undoDashAction's generic rule cannot put it back.
  *
+ * A tool with `subjects` belongs to the row a thread hangs from (plan
+ * #1465): what a comment on a dev row, a goal or a role could already do
+ * there (lib/dash/thread-tools.ts), such as filing an idea, filing a fact
+ * into a goal's collection, or writing a role's cover letter. It is offered
+ * only in a thread on a row of one of those tables, never in Ask, and the
+ * thread binds what it does (`DashWriteContext.thread`).
+ *
  * `answer` is not here. It is how the loop ends a turn, not something Dash
  * can do, and the loop adds it after a surface's tools.
  */
@@ -49,6 +57,12 @@ type DashToolBase = {
   definition: Anthropic.Tool;
   /** Kept in the app: the connector (lib/connector/mcp.ts) does not offer it. */
   inAppOnly?: boolean;
+  /**
+   * The tables (`schema.table`) whose rows this tool acts on: offered only in
+   * a thread hanging from a row of one of them, and never in Ask. Absent:
+   * offered wherever its kind is.
+   */
+  subjects?: readonly string[];
 };
 
 export type DashLookupTool = DashToolBase & { kind: 'lookup' };
@@ -68,6 +82,32 @@ export type DashWriteContext = AskContext & {
   goals: ChangeDeps['goals'];
   /** createTask from lib/todo/tasks/write.ts. */
   createTask: ChangeDeps['createTask'];
+  /**
+   * What the thread's own tools do, bound by the thread to the row it hangs
+   * from (lib/dash/thread.ts). Absent outside a thread, where those tools are
+   * refused.
+   */
+  thread?: DashThreadActs;
+};
+
+/** Runs one of a thread's own write tools by name, against the row the thread hangs from. Never throws. */
+export type DashThreadActs = (name: string, input: unknown) => Promise<DashRecordedWrite | { ok: false; error: string }>;
+
+/**
+ * What one of a thread's own tools reports: it kept its own core.dash_actions
+ * row as it wrote (those writes record alongside themselves, plan #1459), so
+ * the surface records nothing more.
+ */
+export type DashRecordedWrite = {
+  ok: true;
+  recorded: true;
+  /** What was done, in snake_case: the tool's name. */
+  kind: string;
+  /**
+   * What was done, in the words the thread shows under Dash's reply as they
+   * are: the idea filed, the letter it replaced.
+   */
+  said: string;
 };
 
 /** What a write tool reports about the change it made, in the shape core.dash_actions keeps. */
@@ -101,10 +141,10 @@ export type DashWriteResult =
     }
   | { ok: false; error: string };
 
-export type DashWriteTool = DashToolBase & {
+export type DashWriteTool<R = DashWriteResult | DashRecordedWrite> = DashToolBase & {
   kind: 'write';
   /** Validates the input, makes the change, and says what it changed. Never throws. */
-  apply: (ctx: DashWriteContext, input: unknown) => Promise<DashWriteResult>;
+  apply: (ctx: DashWriteContext, input: unknown) => Promise<R | { ok: false; error: string }>;
   /**
    * Puts the change back, for a write the generic rule (undoDashAction in
    * lib/core/dash-actions.ts) cannot undo, such as one that touches two rows.
@@ -131,6 +171,7 @@ export const DASH_TOOLS: readonly DashTool[] = [
     }),
   ),
   ...WRITE_TOOLS,
+  ...THREAD_TOOLS,
   ...PROPOSAL_TOOLS.filter((definition) => REGISTERED_PROPOSALS.has(definition.name)).map(
     (definition): DashProposalTool => ({ name: definition.name, kind: 'proposal', definition }),
   ),
@@ -150,4 +191,27 @@ export function dashToolsOf<K extends DashToolKind>(
   tools: readonly DashTool[] = DASH_TOOLS,
 ): Extract<DashTool, { kind: K }>[] {
   return tools.filter((tool): tool is Extract<DashTool, { kind: K }> => tool.kind === kind);
+}
+
+/** Whether a tool is offered on a thread hanging from a row of `table`. */
+function offeredOn(tool: DashTool, table: string | null): boolean {
+  if (!tool.subjects) return true;
+  return table !== null && tool.subjects.includes(table);
+}
+
+/** The tools Ask offers: every tool but the ones that belong to a thread's row. */
+export const ASK_DASH_TOOLS: readonly DashTool[] = DASH_TOOLS.filter((tool) => offeredOn(tool, null));
+
+/**
+ * The tools a thread on a row of `table` offers (plan #1465): every lookup,
+ * every write, and the row's own tools. Not the watch proposal or Ask's
+ * hand-off, which keep what they start in an Ask conversation a thread does
+ * not have.
+ */
+export function threadDashTools(table: string): DashTool[] {
+  return DASH_TOOLS.filter(
+    (tool) =>
+      (tool.kind === 'lookup' || tool.kind === 'write' || (tool.kind === 'handoff' && tool.subjects)) &&
+      offeredOn(tool, table),
+  );
 }

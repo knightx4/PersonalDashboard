@@ -536,7 +536,7 @@ function tool(
   description: string,
   input_schema: Anthropic.Tool['input_schema'],
   run: (ctx: DashWriteContext, args: Args) => Promise<DashWriteResult>,
-): DashWriteTool {
+): DashWriteTool<DashWriteResult> {
   return {
     name,
     kind: 'write',
@@ -546,7 +546,7 @@ function tool(
 }
 
 /** The write tools, in the order the model is sent them. */
-export const WRITE_TOOLS: readonly DashWriteTool[] = [
+export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   tool(
     'add_todo',
     "Add a todo to the person's list, when they ask you to.",

@@ -5,25 +5,20 @@ import { fakeDashDeps, fakeId, type FakeTables } from '../../tests/stubs/fake-sc
 /**
  * What a goal comment files is recorded in core.dash_actions (plan #1459):
  * each draft record, and a change to the step's date or Todo. Undoing the
- * record takes the draft away or puts the step back. The model and the reply
- * parser are stubbed, and the stores write into one in-memory database.
+ * record takes the draft away or puts the step back. The model is a scripted
+ * client calling the goal's own tools, and the stores write into one
+ * in-memory database.
  */
 
 const tables: FakeTables = {};
 const ME = '00000000-0000-4000-8000-0000000000cc';
 const STEP = '00000000-0000-4000-8000-000000000301';
-const COLLECTION = { id: 'col-1', name: 'Loans', shape: 'many', fields: [], records: [] as unknown[] };
+const COLLECTION = vi.hoisted(() => ({ id: 'col-1', name: 'Loans', shape: 'many', fields: [], records: [] as unknown[] }));
 
-const mocks = vi.hoisted(() => ({ reply: { current: null as unknown } }));
-
-vi.mock('@/lib/goals/comment-model', () => ({
-  askGoalReplyModel: vi.fn(async () => ({ ok: true, input: {} })),
-}));
 vi.mock('@/lib/core/spend/session', () => ({ recordSessionSpend: vi.fn() }));
 vi.mock('@/lib/goals/comments', async (original) => ({
   ...(await original<typeof import('@/lib/goals/comments')>()),
-  goalReplyMessage: () => ({ message: 'm', refs: { collections: new Map() } }),
-  parseGoalReply: () => mocks.reply.current,
+  goalReplyMessage: () => ({ message: 'm', refs: { collections: new Map([['c1', COLLECTION]]) } }),
 }));
 vi.mock('@/lib/goals/comments-store', () => ({
   loadThreads: vi.fn(async () => ({})),
@@ -56,12 +51,13 @@ vi.mock('@/lib/goals/steps-store', () => ({
   }),
 }));
 
+import { answerCall, scriptedModel, stubThreadDash, toolCall } from '../../tests/stubs/dash-model';
 import { askDashOnGoal } from './ask';
 import type { GoalsSupabaseClient } from './db/schema-name';
 
 const client = {} as GoalsSupabaseClient;
 
-function ask(dash: ReturnType<typeof fakeDashDeps>) {
+function ask(dash: ReturnType<typeof fakeDashDeps>, ...replies: unknown[]) {
   return askDashOnGoal({
     client,
     claude: client,
@@ -76,6 +72,8 @@ function ask(dash: ReturnType<typeof fakeDashDeps>) {
     canRun: true,
     routine: { id: 'routine', token: 'token' },
     dash,
+    dashThread: stubThreadDash(),
+    anthropic: scriptedModel(replies).client,
   });
 }
 
@@ -88,9 +86,13 @@ beforeEach(() => {
 
 describe('goal comment filing', () => {
   it('records each draft it files, and undoing it takes the draft away', async () => {
-    mocks.reply.current = { kind: 'answer', body: 'Filed it.', filings: [{ collection: COLLECTION, values: { balance: 12450 } }], schedule: null };
     const dash = fakeDashDeps(tables, ME);
-    expect((await ask(dash)).ok).toBe(true);
+    const outcome = await ask(
+      dash,
+      toolCall('f', 'file_goal_record', { collection: 'c1', values: { balance: 12450 } }),
+      answerCall('Filed it.'),
+    );
+    expect(outcome).toEqual({ ok: true, message: 'Answered, and filed as drafts.' });
 
     const [record] = tables['goals.records'];
     const [action] = tables['core.dash_actions'];
@@ -109,9 +111,8 @@ describe('goal comment filing', () => {
   });
 
   it('records a new date and Todo on the step, and undoing it puts both back', async () => {
-    mocks.reply.current = { kind: 'answer', body: '', filings: [], schedule: { dueOn: '2026-10-05', onTodo: true } };
     const dash = fakeDashDeps(tables, ME);
-    await ask(dash);
+    await ask(dash, toolCall('s', 'schedule_goal_step', { due_on: '2026-10-05', on_todo: true }), answerCall('Done.'));
 
     expect(tables['goals.items'][0]).toMatchObject({ due_on: '2026-10-05', on_todo: true });
     const [action] = tables['core.dash_actions'];

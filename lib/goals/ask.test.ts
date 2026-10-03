@@ -1,12 +1,12 @@
 /**
- * "@dash draft this for me" on a step hands that step to Dash (plan #1003).
- * The model, the stores and the hand-over are stubbed: what is checked is
- * which hand-over the comment starts and what the thread is told.
+ * "@dash draft this for me" on a step hands that step to Dash (plan #1003),
+ * through the take_step tool of the shared loop since plan #1465. The model,
+ * the stores and the hand-over are stubbed: what is checked is which
+ * hand-over the comment starts and what the thread is told.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  askGoalReplyModel: vi.fn(),
   sendGoalStep: vi.fn(),
   recordAndFire: vi.fn(),
   writeComment: vi.fn(),
@@ -15,7 +15,6 @@ const mocks = vi.hoisted(() => ({
   setStepOnTodo: vi.fn(),
 }));
 
-vi.mock('@/lib/goals/comment-model', () => ({ askGoalReplyModel: mocks.askGoalReplyModel }));
 vi.mock('@/lib/goals/handover-store', () => ({ sendGoalStep: mocks.sendGoalStep }));
 vi.mock('@/lib/core/spend/session', () => ({ recordSessionSpend: vi.fn() }));
 vi.mock('@/lib/feedback/routine', () => ({ resolveRoutineId: (id: string | null) => id }));
@@ -54,6 +53,13 @@ vi.mock('@/lib/goals/steps-store', () => ({
 import { askDashOnGoal, type GoalAskInput } from './ask';
 import type { GoalsSupabaseClient } from './db/schema-name';
 import { fakeDashDeps } from '../../tests/stubs/fake-schema-db';
+import { answerCall, scriptedModel, stubThreadDash, toolCall, toolResults } from '../../tests/stubs/dash-model';
+
+/** What the model says this test: take the step, then answer. */
+let model = scriptedModel([]);
+function script(...replies: unknown[]) {
+  model = scriptedModel(replies);
+}
 
 function step(id: string, kind: string, title: string, children: unknown[] = []) {
   return {
@@ -96,6 +102,8 @@ function input(extra: Partial<GoalAskInput> = {}): GoalAskInput {
     canRun: true,
     routine: { id: 'routine', token: 'token' },
     dash: fakeDashDeps({}, 'u'),
+    dashThread: stubThreadDash(),
+    anthropic: model.client,
     ...extra,
   };
 }
@@ -105,7 +113,7 @@ const said = () => mocks.writeComment.mock.calls.map((call) => (call[1] as { bod
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.loadThreads.mockResolvedValue({});
-  mocks.askGoalReplyModel.mockResolvedValue({ ok: true, input: { send_step: true, needs_routine: false } });
+  script(toolCall('t', 'take_step', {}), answerCall('On it.'));
 });
 
 describe('an @dash comment asking Dash to take the step', () => {
@@ -117,7 +125,7 @@ describe('an @dash comment asking Dash to take the step', () => {
     );
     expect(outcome.ok).toBe(true);
     expect(said()).toEqual([
-      'Dash is preparing "Email the servicer" for you. What it writes will show on the step, which stays yours.',
+      'On it.\n\nDash is preparing "Email the servicer" for you. What it writes will show on the step, which stays yours.',
     ]);
   });
 
@@ -126,21 +134,23 @@ describe('an @dash comment asking Dash to take the step', () => {
     await askDashOnGoal(input({ itemId: 'claude-1', itemTitle: 'Compare the repayment plans', question: 'do this' }));
     expect(mocks.sendGoalStep).toHaveBeenCalledWith(expect.objectContaining({ stepId: 'claude-1', mode: 'send' }));
     expect(said()[0]).toBe(
-      'Dash is working on "Compare the repayment plans". What it produces will show on the step when it is done.',
+      'On it.\n\nDash is working on "Compare the repayment plans". What it produces will show on the step when it is done.',
     );
   });
 
-  it('says in the thread why the hand-over refused it', async () => {
+  it('tells Dash why the hand-over refused it, and Dash says so in the thread', async () => {
     mocks.sendGoalStep.mockResolvedValue({ ok: false, error: 'That step is blocked.', refused: true });
+    script(toolCall('t', 'take_step', {}), answerCall('I did not start it: that step is blocked.'));
     const outcome = await askDashOnGoal(input());
-    expect(outcome).toEqual({ ok: false, error: 'I did not start it: That step is blocked.' });
-    expect(said()).toEqual(['I did not start it: That step is blocked.']);
+    expect(toolResults(model.sent)).toEqual(['It was not started: That step is blocked.']);
+    expect(outcome.ok).toBe(true);
+    expect(said()).toEqual(['I did not start it: that step is blocked.']);
   });
 
   it('starts nothing for an account that may not run the routine', async () => {
     await askDashOnGoal(input({ canRun: false }));
     expect(mocks.sendGoalStep).not.toHaveBeenCalled();
-    expect(said()[0]).toContain('only the account that owns this app can start one');
+    expect(toolResults(model.sent)[0]).toContain('only the account that owns this app can start one');
   });
 
   it('passes what was said on the row before the comment into the hand-over', async () => {
@@ -169,7 +179,9 @@ describe('an @dash comment asking Dash to take the step', () => {
     const brief = (mocks.recordAndFire.mock.calls[0][0] as { text: (runId: string) => string }).text('r');
     expect(brief).toContain('holds only your own steps');
     expect(brief).toContain('no i want you to review it');
-    expect(outcome.ok).toBe(true);
+    // The routine replies in the thread itself, so Dash's sentence is not written.
+    expect(outcome).toEqual({ ok: true, message: 'Dash is working on this goal. Its reply lands in this thread.' });
+    expect(said()).toEqual([]);
   });
 
   it('still sends a phase that has steps of Dash\'s in it', async () => {
@@ -189,30 +201,45 @@ describe('an @dash comment asking Dash to take the step', () => {
 });
 
 describe('an @dash comment asking for a date and Todo', () => {
-  const dated = { needs_routine: false, schedule: { due_on: '2026-10-04', on_todo: true } };
+  const dated = toolCall('s', 'schedule_goal_step', { due_on: '2026-10-04', on_todo: true });
 
   it('dates the step and puts it on Todo, and says so', async () => {
-    mocks.askGoalReplyModel.mockResolvedValue({ ok: true, input: dated });
+    script(dated, answerCall('Done.'));
     mocks.updateStep.mockResolvedValue(true);
     mocks.setStepOnTodo.mockResolvedValue(true);
     const outcome = await askDashOnGoal(input({ question: 'make it Oct 4 and put it on my todos' }));
     expect(mocks.updateStep).toHaveBeenCalledWith(client, 'mine-1', { due_on: '2026-10-04' });
     expect(mocks.setStepOnTodo).toHaveBeenCalledWith(client, 'mine-1', true);
-    expect(said()).toEqual(['Set the due date to Sun, Oct 4, 2026. Put it on your Todo.']);
+    expect(said()).toEqual(['Done.\n\nSet the due date to Sun, Oct 4, 2026. Put it on your Todo.']);
     expect(outcome.ok).toBe(true);
   });
 
-  it('says so when Todo refuses the step', async () => {
-    mocks.askGoalReplyModel.mockResolvedValue({ ok: true, input: { needs_routine: false, schedule: { on_todo: true } } });
+  it('tells Dash when Todo refuses the step', async () => {
+    script(toolCall('s', 'schedule_goal_step', { on_todo: true }), answerCall('It could not go on Todo.'));
     mocks.setStepOnTodo.mockResolvedValue(false);
     await askDashOnGoal(input({ itemId: 'claude-1' }));
-    expect(said()[0]).toContain('It did not go on Todo');
+    expect(toolResults(model.sent)[0]).toContain('It did not go on Todo');
   });
 
   it('writes nothing on the goal itself', async () => {
-    mocks.askGoalReplyModel.mockResolvedValue({ ok: true, input: dated });
+    script(dated, answerCall('That belongs to a step.'));
     await askDashOnGoal(input({ itemId: 'g' }));
     expect(mocks.updateStep).not.toHaveBeenCalled();
-    expect(said()[0]).toContain('belong to a step');
+    expect(toolResults(model.sent)[0]).toContain('belong to a step');
+  });
+});
+
+describe('the goal thread on the shared loop', () => {
+  it('offers the lookups, the writes and the goal\'s own tools, on Sonnet', async () => {
+    script(answerCall('Start with the servicer.'));
+    await askDashOnGoal(input({ question: 'what first?' }));
+    expect(model.sent[0].model).toBe('claude-sonnet-5');
+    const names = model.sent[0].tools.map((t) => t.name);
+    expect(names).toEqual(
+      expect.arrayContaining(['search', 'goal_status', 'add_todo', 'close_goal_step', 'file_goal_record', 'schedule_goal_step', 'take_step', 'pass_to_routine']),
+    );
+    expect(names).not.toContain('write_cover_letter');
+    expect(names).not.toContain('hand_off');
+    expect(said()).toEqual(['Start with the servicer.']);
   });
 });

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requestDashDeps } from '@/lib/ask/clients';
+import { threadDashInRequest } from '@/lib/talk/ask-request';
 import { mentionsDash, questionFrom } from '@/lib/comments/mention';
 import { COMMENT_MAX } from '@/lib/goals/comments';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
@@ -55,6 +56,7 @@ export async function addRoleComment(
     question: questionFrom(body.data),
     apiKey: process.env.ANTHROPIC_API_KEY ?? null,
     dash: await requestDashDeps(user.id),
+    dashThread: await threadDashInRequest(user.id),
   });
 
   // One redraw after the reply, so the question, its answer and any letter

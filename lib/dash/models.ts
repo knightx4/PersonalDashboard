@@ -5,9 +5,9 @@ import { MODELS } from '@/lib/core/models';
  * ids themselves live in lib/core/models.ts; this names which entry each
  * surface reads.
  *
- * The threads still differ by the row they hang on: replies on dev rows and
- * goals are Haiku and replies on a role are Sonnet. Moving the first two to
- * Sonnet is #1465, when the threads run through the shared loop.
+ * Every thread replies with Sonnet since they moved onto the shared loop
+ * (plan #1465): a reply on a dev row or a goal was Haiku before, and now
+ * looks things up and makes changes as Ask does, for about a cent more.
  */
 export const DASH_MODELS = {
   ask: MODELS.dashAsk,

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requestDashDeps } from '@/lib/ask/clients';
+import { threadDashInRequest } from '@/lib/talk/ask-request';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
@@ -89,6 +90,7 @@ export async function addGoalComment(
     canRun: await isOwner({ user }),
     routine: goalsRoutine(),
     dash: await requestDashDeps(user.id),
+    dashThread: await threadDashInRequest(user.id),
   });
 
   // One redraw after the reply, so the question and its answer arrive

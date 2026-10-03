@@ -6,6 +6,7 @@ import {
   noUndoReason,
   toDashAction,
   undoDashAction,
+  undoneByAsk,
   type DashAction,
   type DashActionDeps,
   type DashActionSurface,
@@ -211,7 +212,7 @@ export async function undoDashTodayWith(
   if (result.action?.surface === 'capture' && result.action.status === 'done' && undoCapture) {
     return undoCapture(result.action);
   }
-  if (result.action?.surface !== 'ask') return { ok: false, error: result.error };
+  if (!result.action || !undoneByAsk(result.action)) return { ok: false, error: result.error };
   const outcome = await undoAsk(id);
   if (!outcome.ok) return { ok: false, error: outcome.error };
   return { ok: true, paths: askPaths(outcome) };

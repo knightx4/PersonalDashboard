@@ -3,8 +3,7 @@
  * against your open goals and steps, answered through a single tool.
  *
  * Haiku, with a forced tool call and nothing else, because the box has to
- * answer in seconds, the same fast path as Dash's replies to comments
- * (lib/comments/reply.ts). The rules for what the answer may do are in
+ * answer in seconds. The rules for what the answer may do are in
  * lib/goals/capture.ts, which checks every ref before anything is written.
  */
 import 'server-only';

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import { requestDashDeps } from '@/lib/ask/clients';
+import { threadDashInRequest } from '@/lib/talk/ask-request';
 import { askDash } from '@/lib/comments/ask';
 import {
   COMMENT_TARGETS,
@@ -122,6 +123,7 @@ export async function addComment(
     commentId: writtenId,
     question: questionFrom(body.data),
     dash: await requestDashDeps(user.id),
+    dashThread: await threadDashInRequest(user.id),
   });
 
   // One redraw, after the reply, so the question and the answer under it
