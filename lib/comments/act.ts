@@ -39,6 +39,8 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isModuleId, MODULES, type ModuleId } from '@/lib/modules';
 import { handStepToClaude } from '@/lib/plan/handover';
+import { countChangedLines, diffFits, MAX_CHANGED_LINES, rebaseDiff } from '@/lib/specs/changes';
+import { readSpec, specBySlug } from '@/lib/specs/registry';
 import { nextPlanPosition } from '@/lib/plan/position';
 import { TARGET_PATH, type CommentTarget } from './load';
 import type { DashAction } from './reply-payload';
@@ -395,8 +397,8 @@ async function addStep(input: ActInput): Promise<ActOutcome> {
 /**
  * Rewrite the wording of the row the comment is on.
  *
- * An idea's text, a bug note's report, or a step's title, detail or done-when,
- * and nothing else. The old wording goes back into the thread with the new:
+ * An idea's text, a bug note's report, a step's title, detail or done-when,
+ * or a proposed spec change's diff, title or why, and nothing else. The old wording goes back into the thread with the new:
  * that is what makes this reversible by hand, and it is the whole of why
  * acting straight away is safe -- a misread instruction costs a copy and paste
  * rather than a row nobody can reconstruct.
@@ -483,6 +485,8 @@ async function reword(input: ActInput): Promise<ActOutcome> {
     return { ok: true, said: rewritten('the note', text, was) };
   }
 
+  if (input.target === 'change') return rewordSpecChange(input, text);
+
   // A raise is a message, not a row with wording of its own, so there is
   // nothing on it to rewrite -- and what "put this in the plan" arrives as,
   // when the fast reply reads it as a rewording, is this. Refusing it was a
@@ -494,6 +498,103 @@ async function reword(input: ActInput): Promise<ActOutcome> {
     ...added,
     said: `A raise has no wording of its own to rewrite, so I put it on the plan instead.\n\n${added.said}`,
   };
+}
+
+/** What a spec change's title and why hold, from migration 0155. */
+const MAX_CHANGE_TITLE = 120;
+const MAX_CHANGE_WHY = 2000;
+
+/** What a comment's body holds, from migration 0064. */
+const MAX_COMMENT = 4000;
+
+/** A diff handed back inside a fence, as a model often writes one. */
+function unfenced(text: string): string {
+  const fenced = /^```[a-z]*\n([\s\S]*?)\n?```$/.exec(text.trim());
+  return fenced ? fenced[1] : text;
+}
+
+/**
+ * Reword a proposed spec change (plan #1507): its diff, by default, or its
+ * title or its why.
+ *
+ * Only while it is proposed. An approved change is on its way into docs/, and
+ * rewording it then would commit something the person did not approve.
+ *
+ * A new diff is placed against the spec as it stands before it is written
+ * (`rebaseDiff`), so a draft whose lines are not in the spec is refused here
+ * rather than by the run that commits it, and checked against the 60-line cap
+ * the table enforces, so the thread can say why rather than relay a
+ * constraint name. The old diff goes into the thread when it fits, as every
+ * reword's old wording does.
+ */
+async function rewordSpecChange(input: ActInput, text: string): Promise<ActOutcome> {
+  const named = (input.action.field ?? '').trim().toLowerCase().replace(/^the\s+/, '');
+  const field = named === '' || named === 'diff' ? 'diff' : named === 'title' || named === 'why' ? named : null;
+  if (!field) {
+    return {
+      ok: false,
+      why:
+        `I did not change anything: "${input.action.field}" is not a part of a spec change I can ` +
+        'rewrite. The diff, the title and the why are; approving or declining it is yours, with ' +
+        'the buttons on the change.',
+    };
+  }
+
+  const { data } = await input.supabase
+    .from('spec_changes')
+    .select('spec, title, why, diff, status')
+    .eq('id', input.id)
+    .maybeSingle();
+  const change = data as { spec: string; title: string; why: string; diff: string; status: string } | null;
+  if (!change) return { ok: false, why: 'That change is not there any more, so nothing was changed.' };
+  if (change.status !== 'proposed') {
+    return {
+      ok: false,
+      why: `That change is ${change.status} already, so I left it as it is. Only a proposed change can be reworded.`,
+    };
+  }
+
+  if (field === 'title' || field === 'why') {
+    const limit = field === 'title' ? MAX_CHANGE_TITLE : MAX_CHANGE_WHY;
+    if (text.length > limit) {
+      return { ok: false, why: `That is longer than the ${field} can be (${limit} characters), so nothing was changed.` };
+    }
+    const { error } = await input.supabase
+      .from('spec_changes')
+      .update({ [field]: text })
+      .eq('id', input.id)
+      .eq('status', 'proposed');
+    if (error) return { ok: false, why: `I could not change it: ${error.message}` };
+    return { ok: true, said: rewritten(`the ${field}`, text, change[field]) };
+  }
+
+  const doc = specBySlug(change.spec);
+  const markdown = doc ? await readSpec(doc) : null;
+  const placed = rebaseDiff(unfenced(text), markdown);
+  if (!placed.ok) return { ok: false, why: `I did not change the diff. ${placed.why}` };
+  if (!diffFits(placed.diff)) {
+    const n = countChangedLines(placed.diff);
+    return {
+      ok: false,
+      why:
+        n === 0
+          ? 'I did not change the diff: the new one changes no lines.'
+          : `I did not change the diff: the new one changes ${n} lines, and ${MAX_CHANGED_LINES} is the most a change can. Split it into two changes.`,
+    };
+  }
+
+  const { error } = await input.supabase
+    .from('spec_changes')
+    .update({ diff: placed.diff })
+    .eq('id', input.id)
+    .eq('status', 'proposed');
+  if (error) return { ok: false, why: `I could not change it: ${error.message}` };
+
+  const was = countChangedLines(change.diff);
+  const now = countChangedLines(placed.diff);
+  const said = `Rewrote the diff, which the change above now shows. It changes ${now} ${now === 1 ? 'line' : 'lines'}; the old one changed ${was}.`;
+  const withOld = `${said}\n\nThe old diff:\n\n\`\`\`diff\n${change.diff.trimEnd()}\n\`\`\``;
+  return { ok: true, said: withOld.length <= MAX_COMMENT ? withOld : said };
 }
 
 /** What was written, and what was there before it. */

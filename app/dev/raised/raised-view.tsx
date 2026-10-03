@@ -16,6 +16,7 @@ import { MODULES, type ModuleId } from '@/lib/modules';
 import { needsFollowThrough, type RaisedQueue, type RaisedRow } from '@/lib/raised/load';
 import type { WaitingGroup } from '@/lib/plan/waiting';
 import { ApproveAll, WaitingCard } from './waiting-view';
+import { SpecChangeCard } from '@/app/dev/specs/spec-change-card';
 import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
 import { CommentThread } from '@/components/dev/comment-thread';
@@ -403,6 +404,13 @@ export function RaisedView({
                   {group.entries.map((entry) =>
                     entry.kind === 'plan' ? (
                       <WaitingCard key={entry.id} row={entry.row} titles={titles} />
+                    ) : entry.kind === 'spec' ? (
+                      <SpecChangeCard
+                        key={entry.id}
+                        change={entry.spec.change}
+                        specTitle={entry.spec.specTitle}
+                        foldDiff
+                      />
                     ) : (
                       <RaiseCard key={entry.id} row={entry.raise} titles={titles} />
                     ),

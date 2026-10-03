@@ -33,6 +33,7 @@ import {
   ideaContext,
   noteContext,
   raiseContext,
+  specChangeContext,
   specContext,
   takeawayContext,
   threadText,
@@ -40,6 +41,7 @@ import {
 import { TARGET_COLUMN, threadFrom, type CommentTarget, type DevComment } from './load';
 import { readSpec, specBySlug } from '@/lib/specs/registry';
 import { splitSections } from '@/lib/specs/sections';
+import { SPEC_CHANGE_COLUMNS, sectionsTouched, specChangeFrom } from '@/lib/specs/changes';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { replyToComment } from './reply';
@@ -144,6 +146,36 @@ async function subjectOf(input: AskInput): Promise<Subject | null> {
       }),
       thread: threadFrom(row.dev_comments),
       label: `the inspiration takeaway "${String(row.title)}"`,
+    };
+  }
+
+  // A proposed change to a spec (plan #1507): the diff, and the sections of
+  // the spec it touches, so a question about it and a request to reword it
+  // both see the wording it changes.
+  if (target === 'change') {
+    const { data } = await supabase
+      .from('spec_changes')
+      .select(SPEC_CHANGE_COLUMNS)
+      .eq('user_id', userId)
+      .eq('id', id)
+      .maybeSingle();
+    if (!data) return null;
+    const change = specChangeFrom(data as unknown as Parameters<typeof specChangeFrom>[0]);
+    const doc = specBySlug(change.spec);
+    const markdown = doc ? await readSpec(doc) : null;
+    return {
+      context: specChangeContext({
+        title: change.title,
+        why: change.why,
+        diff: change.diff,
+        status: change.status,
+        madeBy: change.madeBy,
+        spec: doc ? { title: doc.title, file: doc.file } : null,
+        slug: change.spec,
+        sections: sectionsTouched(markdown, change.diff),
+      }),
+      thread: change.thread,
+      label: `the spec change "${change.title}"`,
     };
   }
 

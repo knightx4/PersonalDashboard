@@ -4,12 +4,14 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cardVariants } from '@/components/ui/card';
 import { createClient, requireUser } from '@/lib/auth/server';
-import { SPECS, groupSpecs, type SpecDoc } from '@/lib/specs/registry';
+import { SPECS, groupSpecs, specBySlug, type SpecDoc } from '@/lib/specs/registry';
+import { loadOpenSpecChanges } from '@/lib/specs/changes';
 import { specCommentCounts } from '@/lib/specs/load';
 import { APP_VISION, loadModuleVisions, visionAnchor } from '@/lib/specs/vision';
 import { loadPendingVisionEdits } from '@/lib/specs/vision-review';
 import { ModuleVisionPanel } from './vision-view';
 import { VisionEditPanel } from './vision-edit';
+import { SpecChangeCard } from './spec-change-card';
 import { cn } from '@/lib/cn';
 
 export const metadata = { title: 'Specs' };
@@ -64,10 +66,11 @@ function SpecRow({ spec, comments }: { spec: SpecDoc; comments: number }) {
 export default async function SpecsPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const [counts, visions, edits] = await Promise.all([
+  const [counts, visions, edits, changes] = await Promise.all([
     specCommentCounts(supabase, user.id),
     loadModuleVisions(supabase, user.id),
     loadPendingVisionEdits(supabase, user.id),
+    loadOpenSpecChanges(supabase, user.id),
   ]);
   const groups = groupSpecs(SPECS, counts);
 
@@ -77,6 +80,27 @@ export default async function SpecsPage() {
         title="Specs"
         description="The vision for the app and each workspace, and the documents behind it read from the repository. Comment on any section; tag @dash in one to ask about it."
       />
+
+      {/* Changes Dash proposes to the specs, above the documents they change
+          (plan #1506). First because they are the one thing on the page
+          waiting on you; not drawn at all when nothing is. */}
+      {changes.length > 0 && (
+        <section aria-labelledby="spec-changes" className="space-y-2">
+          <h2 id="spec-changes" className="text-body font-semibold text-ink">
+            Changes to specs
+            <span className="tabular ml-2 font-normal text-ink-muted">{changes.length}</span>
+          </h2>
+          <ul className={cn(cardVariants(), 'divide-y divide-border')}>
+            {changes.map((change) => (
+              <SpecChangeCard
+                key={change.id}
+                change={change}
+                specTitle={specBySlug(change.spec)?.title ?? null}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="space-y-2">
         {groups.map((group) => (

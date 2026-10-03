@@ -47,6 +47,18 @@ describe('conversationsFrom', () => {
     });
   });
 
+  it('names a spec change conversation by its title and links to its card', () => {
+    const [conversation] = conversationsFrom([
+      comment({ spec_change_id: 'sc1', change: { title: 'Say what a change is' } }),
+    ]);
+    expect(conversation).toMatchObject({
+      target: 'change',
+      rowId: 'sc1',
+      about: 'Say what a change is',
+      href: '/dev/specs#spec-change-sc1',
+    });
+  });
+
   it('puts the most recently active conversation first', () => {
     const conversations = conversationsFrom([
       comment({ id: 'a', idea_id: 'i1', idea: { body: 'Older' }, created_at: '2026-09-11T09:00:00Z' }),

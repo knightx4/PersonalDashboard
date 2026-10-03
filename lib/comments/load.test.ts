@@ -57,6 +57,7 @@ describe('targets', () => {
     expect(TARGET_COLUMN.step).toBe('plan_item_id');
     expect(TARGET_COLUMN.note).toBe('feedback_item_id');
     expect(TARGET_COLUMN.spec).toBe('spec_section_id');
+    expect(TARGET_COLUMN.change).toBe('spec_change_id');
     expect(new Set(Object.values(TARGET_COLUMN)).size).toBe(COMMENT_TARGETS.length);
   });
 
