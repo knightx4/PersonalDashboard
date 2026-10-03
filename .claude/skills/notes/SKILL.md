@@ -323,9 +323,33 @@ One commit per law, not per note — the exception to "one note per commit"
 above. Name the law in the subject: `Make scrolled lists lists, not cards
 (law 13)`.
 
-`check:ui` reads zero on plenty of surfaces that read badly. Shoot what you
-changed (`npm run shoot -- <surface-id>`) and look at the pictures before
-closing.
+`check:ui` reads zero on plenty of surfaces that read badly, so a fix that
+touches a screen goes through the critic before it closes. This is the same
+loop the plan's building reference states under **Building a screen**
+(`.claude/skills/plan/reference/building.md`), which has the commands, and it
+applies to any note whose fix changes a surface, not only notes filed from the
+gallery:
+
+1. Shoot each surface the fix touches as main has it, for the before shots,
+   then make the fix in its gallery entry (`app/preview/surfaces.tsx`) with
+   fixtures and shoot it again (`npm run shoot -- <surface-id>`, one surface
+   per run, with the placeholder Supabase variables set).
+2. Give the four after shots, the before shots, the round and the note's text
+   as the done-when to the `ui-critic` agent, as a subagent or headless with
+   `claude -p --agent ui-critic`.
+3. Record the round whatever the verdict: save its `json` block unchanged as
+   `.preview-shots/checks/<note-id>--<surface>--r<round>.json`, and add
+   `UI-check: <surface> round <n> <pass|fix> (<k> fixes)` to the commit body.
+   Plan #1533 replaces the commit line with a row in `public.ui_checks`.
+4. On `fix`, make the changes, shoot again and run the next round. You never
+   write the verdict yourself.
+5. Three rounds at most. If round 3 fails, stop: what follows a third failed
+   round is the person's open decision #1535 on the plan, so do not run a
+   fourth round and do not decide what happens to the note. List the
+   surface, the last fixes and where the shots are in the report.
+
+A note closes on a pass for every surface its fix touched. With a cluster
+fixed by one law, each surface the commit changed goes through the loop.
 
 ## Pushing the batch
 
@@ -498,6 +522,8 @@ Then, below the table:
   unblocks it.
 - **Raised** — anything written to `/dev/raised` during the run, by title, so
   the user knows a question is waiting there.
+- **Critic rounds** — for each surface a fix touched, how many rounds it
+  took and the last verdict; after a third failed round, its fixes in full.
 - **Proposed rules** — each spec change drafted from notes on three pages:
   its title, its spec, and the notes now waiting on it.
 - **Still open** — anything not reached, and why the batch stopped there.
