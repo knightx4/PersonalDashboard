@@ -169,6 +169,12 @@ Undo would be. A payment the mail sync worked out again from a new charge is
 one, and so is a charge the receipt re-read moved between payments: the first
 would leave the charge behind, and the second touched three rows at once.
 
+An order the mail sync imports is one record, though it adds the order, its
+items and the inventory items they make. Its Undo removes the order and the
+database takes the rest with it. The undo is refused once later mail has
+added a shipment or return, or the person has given one of its things a use,
+a list, a family or a task.
+
 A **Dash today** panel lists what Dash did today, grouped by workspace, each
 with its Undo, and what is running now. Home shows its count. The runs in
 progress (`goals.runs`, `plan_runs` and hand-offs in flight) are what set

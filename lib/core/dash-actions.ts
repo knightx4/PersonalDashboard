@@ -160,7 +160,26 @@ export function noUndoReason(action: Pick<DashAction, 'undo'>): string | null {
  * Rows a trigger derives from the row itself, such as a record's readings,
  * are not listed, since they go with it rightly.
  */
-const DEPENDENTS: Record<string, { schema: AskSchema; table: string; column: string }[]> = {
+/** From an order to its inventory items, by way of its order items. */
+const ORDER_INVENTORY: Dependent['through'] = [
+  { schema: 'public', table: 'order_items', column: 'order_id' },
+  { schema: 'public', table: 'inventory_items', column: 'order_item_id' },
+];
+
+type Dependent = {
+  schema: AskSchema;
+  table: string;
+  column: string;
+  /**
+   * Rows reached by way of others: each hop reads the ids of `table` whose
+   * `column` holds the ids so far, starting from the subject's. For a row
+   * whose children hang off its own children, such as an order's inventory
+   * items, which hang off its order items.
+   */
+  through?: { schema: AskSchema; table: string; column: string }[];
+};
+
+const DEPENDENTS: Record<string, Dependent[]> = {
   'public.plan_items': [
     { schema: 'public', table: 'plan_items', column: 'parent_id' },
     { schema: 'public', table: 'dev_comments', column: 'plan_item_id' },
@@ -209,6 +228,23 @@ const DEPENDENTS: Record<string, { schema: AskSchema; table: string; column: str
   'todo.tasks': [
     { schema: 'todo', table: 'tasks', column: 'parent_id' },
     { schema: 'todo', table: 'task_links', column: 'task_id' },
+  ],
+  // What the mail sync adds (plan #1576): an order imported from a
+  // confirmation, with its items and the inventory items they made. Those and
+  // the book or game details looked up for them go with it; a shipment or
+  // return from later mail, a task, and a use, list or family the person put
+  // an item in are later work.
+  'public.orders': [
+    { schema: 'public', table: 'shipments', column: 'order_id' },
+    { schema: 'public', table: 'returns', column: 'order_id' },
+    { schema: 'todo', table: 'task_links', column: 'order_id' },
+    ...(['item_uses', 'inventory_item_lists', 'inventory_item_families'] as const).map((table) => ({
+      schema: 'public' as const,
+      table,
+      column: 'inventory_item_id',
+      through: ORDER_INVENTORY,
+    })),
+    { schema: 'todo', table: 'task_links', column: 'inventory_item_id', through: ORDER_INVENTORY },
   ],
 };
 
@@ -381,9 +417,18 @@ export async function readSubject(db: AskDb, ref: string): Promise<Values | null
 async function hasDependents(db: AskDb, ref: string): Promise<boolean> {
   const parsed = parseRef(ref);
   const dependents = parsed ? (DEPENDENTS[parsed.table] ?? []) : [];
-  for (const { schema, table, column } of dependents) {
+  for (const { schema, table, column, through } of dependents) {
+    let ids = [parsed!.id];
+    for (const hop of through ?? []) {
+      const { data, error } = await (await db(hop.schema)).from(hop.table).select('id').in(hop.column, ids);
+      if (error) throw new Error(`Reading what hangs off ${ref} failed: ${error.message}`);
+      ids = ((data ?? []) as { id: string }[]).map((row) => row.id);
+      if (ids.length === 0) break;
+    }
+    if (ids.length === 0) continue;
     const client = await db(schema);
-    const { data, error } = await client.from(table).select('id').eq(column, parsed!.id).limit(1);
+    const query = client.from(table).select('id');
+    const { data, error } = await (through ? query.in(column, ids) : query.eq(column, ids[0])).limit(1);
     if (error) throw new Error(`Reading what hangs off ${ref} failed: ${error.message}`);
     if ((data ?? []).length > 0) return true;
   }

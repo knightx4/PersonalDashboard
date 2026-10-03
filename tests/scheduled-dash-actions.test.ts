@@ -17,6 +17,7 @@
  *   the mail sync's bills (the inbox-incremental cron and the daily inbox
  *   stage) and the receipt re-read (/api/cron/recurring-reread and its daily
  *   stage), on the person's recurring payments (plan #1571)
+ *   the mail sync's orders, with the inventory items they make (plan #1576)
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { SchemaClient } from '@/lib/ask/db';
@@ -24,6 +25,7 @@ import { undoDashAction } from '@/lib/core/dash-actions';
 import type { RecurringExtraction } from '@/lib/recurring/extraction';
 import type { RecurringReading } from '@/lib/recurring/extract';
 import { memoryClient } from '@/lib/recurring/memory-client';
+import { orderImportedSummary, recordOrderImport } from '@/lib/orders/record';
 import { MOVED_NO_UNDO, UPDATED_NO_UNDO } from '@/lib/recurring/record';
 import { dashTodayEntry } from '@/lib/shell/dash-today';
 import { fakeDashDeps, fakeSchemaDb, type FakeTables } from '@/tests/stubs/fake-schema-db';
@@ -683,5 +685,91 @@ describe('the mail sync and the receipt re-read, on recurring payments (plan #15
     );
     const refused = await undoDashAction(fakeDashDeps(fake, USER), String(moved.id));
     expect(refused).toMatchObject({ ok: false, error: MOVED_NO_UNDO });
+  });
+});
+
+describe('the mail sync, on the orders it imports (plan #1576)', () => {
+  /** An order as the sync leaves it: two lines, three inventory items, a book's details. */
+  function orderWorld(): FakeTables {
+    return {
+      'public.orders': [{ id: 'order-1', user_id: USER, order_date: '2026-09-28', total_cents: 4200 }],
+      'public.order_items': [
+        { id: 'oi-1', order_id: 'order-1', name: 'Desk lamp', quantity: 1 },
+        { id: 'oi-2', order_id: 'order-1', name: 'Dune', quantity: 2 },
+      ],
+      'public.inventory_items': [
+        { id: 'inv-1', user_id: USER, order_item_id: 'oi-1', name: 'Desk lamp' },
+        { id: 'inv-2', user_id: USER, order_item_id: 'oi-2', name: 'Dune' },
+        { id: 'inv-3', user_id: USER, order_item_id: 'oi-2', name: 'Dune' },
+      ],
+      'public.book_details': [{ id: 'bd-1', inventory_item_id: 'inv-2' }],
+    };
+  }
+
+  const imported = {
+    orderId: 'order-1',
+    merchant: 'Bookshop',
+    orderDate: '2026-09-28',
+    lines: [
+      { name: 'Desk lamp', quantity: 1 },
+      { name: 'Dune', quantity: 2 },
+    ],
+    units: 3,
+  };
+
+  it('records the order and its inventory items as one change, and Home can undo it', async () => {
+    const fake = orderWorld();
+    await recordOrderImport(serviceClient(fake, 'public'), USER, imported);
+
+    const rows = records(fake);
+    expect(rows).toHaveLength(1);
+    expectScheduled(rows);
+    expect(rows[0]).toMatchObject({ kind: 'import_order', subject_ref: 'public.orders:order-1', op: 'insert', undo: null });
+    expect(rows[0].summary).toBe(
+      'Dash added your order from Bookshop of 28 Sept, and 3 things to your inventory: Desk lamp and 2 × Dune.',
+    );
+
+    const entry = dashTodayEntry(
+      { ...(rows[0] as Parameters<typeof dashTodayEntry>[0]), conversation_id: null, turn_id: null, input: null, declined_at: null },
+      '2026-10-03',
+    );
+    expect(entry).toMatchObject({ workspace: 'shopping', noUndo: null });
+
+    // The book's details came with the order, so they do not stop the undo.
+    const undone = await undoDashAction(fakeDashDeps(fake, USER), String(rows[0].id));
+    expect(undone.ok).toBe(true);
+    expect(fake['public.orders']).toHaveLength(0);
+  });
+
+  it('refuses the undo once the person has used or listed one of its things, or later mail added a shipment', async () => {
+    for (const [table, row] of [
+      ['public.item_uses', { id: 'use-1', inventory_item_id: 'inv-3' }],
+      ['public.inventory_item_lists', { id: 'list-1', inventory_item_id: 'inv-1' }],
+      ['todo.task_links', { id: 'link-1', inventory_item_id: 'inv-2' }],
+      ['public.shipments', { id: 'ship-1', order_id: 'order-1' }],
+    ] as const) {
+      const fake = orderWorld();
+      await recordOrderImport(serviceClient(fake, 'public'), USER, imported);
+      fake[table] = [row];
+
+      const refused = await undoDashAction(fakeDashDeps(fake, USER), String(records(fake)[0].id));
+      expect(refused.ok, table).toBe(false);
+      expect(fake['public.orders'], table).toHaveLength(1);
+    }
+  });
+
+  it('names at most three lines, and says so when nothing went into the inventory', () => {
+    const many = orderImportedSummary({
+      merchant: null,
+      orderDate: '2026-09-28',
+      lines: ['A', 'B', 'C', 'D', 'E'].map((name) => ({ name: `${name} ${'x'.repeat(80)}`, quantity: 1 })),
+      units: 5,
+    });
+    expect(many).toMatch(/^Dash added your order of 28 Sept, and 5 things to your inventory: .* and 2 more\.$/);
+    expect(many.length).toBeLessThanOrEqual(300);
+
+    expect(orderImportedSummary({ merchant: 'Shop', orderDate: '2026-09-28', lines: [], units: 0 })).toBe(
+      'Dash added your order from Shop of 28 Sept. Nothing in it went into your inventory.',
+    );
   });
 });
