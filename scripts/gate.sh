@@ -19,7 +19,8 @@
 #   types   typecheck, then build. The build rewrites .next/types, which tsc
 #           reads, so the two cannot overlap.
 #   lint    lint, contrast, UI laws, spec counts
-#   test    the whole vitest suite, tests/ included
+#   test    the whole vitest suite, tests/ included, and with it the
+#           whole-flow tests in tests/flows/ (tests/flows-in-gate.test.ts)
 #
 # Every lane runs to the end. Each failing step is named, with the tail of its
 # output, and the gate fails if any did.
