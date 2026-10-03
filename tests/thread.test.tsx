@@ -165,6 +165,6 @@ describe('one thread for any row', () => {
   });
 
   it('will not draw a thread under a table that has none', () => {
-    expect(() => open({ subject: `public.orders:${ROW}` })).toThrow(/not a row that has a thread/);
+    expect(() => open({ subject: `public.shipments:${ROW}` })).toThrow(/not a row that has a thread/);
   });
 });

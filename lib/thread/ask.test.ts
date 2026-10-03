@@ -130,3 +130,55 @@ describe('Dash under a file', () => {
     expect(replies(state.tables)).toEqual([]);
   });
 });
+
+describe('Dash under a vault note', () => {
+  const NOTE = '00000000-0000-4000-8000-000000000401';
+  const NOTE_REF = `obsidian.notes:${NOTE}`;
+
+  function noteState(path: string) {
+    const state = setup();
+    state.tables['obsidian.notes'] = [
+      { id: NOTE, user_id: ME, path, title: 'Monday', body: 'Slept badly and skipped the run.' },
+    ];
+    state.tables['core.conversation_turns'].push({
+      id: 'nq', user_id: ME, ref: NOTE_REF, author: 'me', role: 'user', body: '@dash what next?', created_at: '2026-10-03T09:00:00Z',
+    });
+    return state;
+  }
+
+  function askNote(state: ReturnType<typeof setup>, anthropic: Anthropic) {
+    return askDashOnRow({
+      client: state.client,
+      userId: ME,
+      ref: NOTE_REF,
+      commentId: 'nq',
+      question: 'what next?',
+      apiKey: 'key',
+      dash: state.dash,
+      dashThread: state.dashThread,
+      anthropic,
+    });
+  }
+
+  it('sends a journal nothing and says why in the thread', async () => {
+    const state = noteState('Me/2026-10-03.md');
+    const { client, sent } = model([]);
+    const outcome = await askNote(state, client);
+    expect(outcome.ok).toBe(false);
+    expect(sent).toHaveLength(0);
+    const said = state.tables['core.conversation_turns'].filter((t) => t.ref === NOTE_REF && t.author === 'claude');
+    expect(said.map((t) => t.body)).toEqual([
+      'I do not read this note. Not read: notes in Me/ are journals. Your comment is saved.',
+    ]);
+  });
+
+  it('answers on any other note without its path reaching the model', async () => {
+    const state = noteState('Health/Monday.md');
+    const { client, sent } = model([call('a', 'answer', { answer: 'Run on Wednesday.', cited: [] })]);
+    const outcome = await askNote(state, client);
+    expect(outcome.ok).toBe(true);
+    const message = JSON.stringify(sent[0].messages[0].content);
+    expect(message).toContain('Slept badly and skipped the run.');
+    expect(message).not.toContain('Health/');
+  });
+});

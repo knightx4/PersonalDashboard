@@ -15,9 +15,20 @@ import type { CommentTarget } from '@/lib/comments/load';
 
 /**
  * The targets a thread can sit under today: a dev row, a goal or step
- * (plan #957), a role in Jobs (note 89ad8bef), or a file (note 7a6a37aa).
+ * (plan #957), a role in Jobs (note 89ad8bef), a file (note 7a6a37aa), or a
+ * todo, an order, an inventory item, a saved news story or a vault note
+ * (plan #1471).
  */
-export type ThreadTarget = CommentTarget | 'goal' | 'role' | 'file';
+export type ThreadTarget =
+  | CommentTarget
+  | 'goal'
+  | 'role'
+  | 'file'
+  | 'task'
+  | 'order'
+  | 'item'
+  | 'story'
+  | 'vault_note';
 
 /** The table each target's rows live in, which is the table half of its ref. */
 export const THREAD_TABLES = {
@@ -31,6 +42,11 @@ export const THREAD_TABLES = {
   goal: 'goals.items',
   role: 'job_search.roles',
   file: 'core.files',
+  task: 'todo.tasks',
+  order: 'public.orders',
+  item: 'public.inventory_items',
+  story: 'news.saved_stories',
+  vault_note: 'obsidian.notes',
 } as const satisfies Record<ThreadTarget, string>;
 
 const TARGET_OF = new Map<string, ThreadTarget>(

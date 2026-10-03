@@ -16,9 +16,19 @@ describe('thread subjects', () => {
     expect(threadRef('goal', ID)).toBe(`goals.items:${ID}`);
   });
 
+  it('keys the rows of plan #1471 by their own tables', () => {
+    expect(threadRef('task', ID)).toBe(`todo.tasks:${ID}`);
+    expect(threadRef('order', ID)).toBe(`public.orders:${ID}`);
+    expect(threadRef('item', ID)).toBe(`public.inventory_items:${ID}`);
+    // The same ref a discussion on Quick read writes under (lib/news/quick/discuss.ts).
+    expect(threadRef('story', ID)).toBe(`news.saved_stories:${ID}`);
+    // A vault note by its id, never its path.
+    expect(threadRef('vault_note', ID)).toBe(`obsidian.notes:${ID}`);
+  });
+
   it('has nothing for a malformed ref or a table with no thread yet', () => {
     expect(threadSubject('public.plan_items')).toBeNull();
     expect(threadSubject('public.plan_items:')).toBeNull();
-    expect(threadSubject(`public.orders:${ID}`)).toBeNull();
+    expect(threadSubject(`public.shipments:${ID}`)).toBeNull();
   });
 });

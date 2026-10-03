@@ -27,8 +27,9 @@ import { PaidHint } from '@/components/ui/paid-hint';
  * (docs/CORE-AND-DASH-SPEC.md, Part 2).
  *
  * One component wherever a thread is: plan steps and questions, ideas, raises,
- * goals and their steps, files, roles, bug notes, spec sections, takeaways and
- * spec changes. The thing being written is the same in all of them: something
+ * goals and their steps, files, roles, bug notes, spec sections, takeaways,
+ * spec changes, todos, orders, inventory items, saved news stories and vault
+ * notes. The thing being written is the same in all of them: something
  * you want attached to that row rather than to a transcript. It is a note
  * until `@dash` appears in it, which is what makes it worth having on rows
  * nobody is waiting on.
@@ -105,6 +106,11 @@ const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
   goal: GOALS_STORE,
   role: ROLE_STORE,
   file: ROW_STORE,
+  task: ROW_STORE,
+  order: ROW_STORE,
+  item: ROW_STORE,
+  story: ROW_STORE,
+  vault_note: ROW_STORE,
 };
 
 function DeleteComment({
@@ -307,8 +313,9 @@ export function Thread({
    *
    * The box is a trigger until it is pressed -- law 14 -- so it is only ever
    * on screen while somebody is part-way through a sentence, which is a state
-   * a fixture cannot reach and a screenshot cannot catch. Left off everywhere
-   * in the app.
+   * a fixture cannot reach and a screenshot cannot catch. In the app it is
+   * set only where a control of the caller's own was the trigger: a todo's
+   * Comment, which mounts the thread already open (plan #1471).
    */
   composerOpen?: boolean;
   /**

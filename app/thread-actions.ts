@@ -27,11 +27,21 @@ export type RowCommentState = { error?: string; message?: string };
 const Id = z.string().uuid();
 const Body = z.string().trim().min(1, 'Write something.').max(COMMENT_MAX);
 
-/** Redraw the page the row opens on, or every page when that cannot be told from the ref. */
+/**
+ * Redraw the page the row opens on, or every page when that cannot be told
+ * from the ref. A row that opens on a list by a query (a todo, plan #1471) is
+ * also drawn on the other pages of its workspace, so the whole workspace is
+ * redrawn.
+ */
 function redraw(ref: string): void {
   const href = refHref(ref);
-  if (href && !href.startsWith(OPEN_PATH)) revalidatePath(href);
-  else revalidatePath('/', 'layout');
+  if (!href || href.startsWith(OPEN_PATH)) {
+    revalidatePath('/', 'layout');
+    return;
+  }
+  const [path, query] = href.split('?');
+  if (query === undefined) revalidatePath(path);
+  else revalidatePath(`/${path.split('/')[1]}`, 'layout');
 }
 
 // latency: pending

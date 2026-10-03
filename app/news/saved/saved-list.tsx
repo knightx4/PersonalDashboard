@@ -14,6 +14,9 @@ import type { StorySent } from '@/lib/news/saved/sent';
 import { SendStoryButtons } from '@/components/news/send-story-buttons';
 import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 import { DiscussButton } from '../quick/discuss-sheet';
+import { Thread } from '@/components/thread/thread';
+import type { DevComment } from '@/lib/comments/load';
+import { threadRef } from '@/lib/thread/subjects';
 import { removeSaved } from './actions';
 
 /**
@@ -28,6 +31,8 @@ export type SavedListStory = SavedStory & {
   /** Where it has been sent already (plan #1370); left out, nowhere. */
   sent?: StorySent | null;
   related?: readonly RelatedNoteLink[] | Promise<readonly RelatedNoteLink[]> | null;
+  /** The thread under the saved story (plan #1471), its discussion included; left out, none. */
+  thread?: readonly DevComment[];
 };
 
 /**
@@ -46,6 +51,12 @@ export type SavedListStory = SavedStory & {
  *
  * Each row carries an anchor, so a reading sent to Learn opens the tab at its
  * story (plan #1368).
+ *
+ * Under each story is its thread (plan #1471). The list is where a saved
+ * story opens, having no page of its own, so the thread sits here. It is the
+ * same thread a discussion writes to, so a discussed story shows that
+ * exchange here as well as in the Discussed sheet, and @dash on a comment
+ * gets a reply that has read the story.
  */
 export function SavedList({ stories }: { stories: SavedListStory[] }) {
   const { shown, run } = useOptimisticWrite<SavedListStory[], string>({
@@ -149,6 +160,13 @@ export function SavedList({ stories }: { stories: SavedListStory[] }) {
                     Remove
                   </Button>
                 </div>
+              </div>
+              <div className="mt-2">
+                <Thread
+                  subject={threadRef('story', story.id)}
+                  turns={story.thread ?? []}
+                  placeholder="A note on this story, or a question for Dash."
+                />
               </div>
             </article>
           </li>

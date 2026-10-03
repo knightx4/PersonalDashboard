@@ -20,10 +20,19 @@ export const COLUMN_MAX = 40_000;
 export const ROW_MAX = 60_000;
 
 /** Columns that are bookkeeping or machine-only, never worth the tokens. */
-const SKIPPED = new Set(['user_id', 'embedding', 'search_vector', 'fts', 'tsv']);
+const SKIPPED = new Set(['user_id', 'embedding', 'search_vector', 'search_tsv', 'fts', 'tsv']);
 
-function isMachineOnly(name: string, value: unknown): boolean {
-  if (SKIPPED.has(name) || name.endsWith('_embedding')) return true;
+/**
+ * Columns one table keeps from Dash. A vault note's path names its folder,
+ * and the privacy page promises a note's folder and path never reach a model
+ * (lib/vault/map/rules.ts); the rest are sync bookkeeping.
+ */
+const HIDDEN: Readonly<Record<string, ReadonlySet<string>>> = {
+  'obsidian.notes': new Set(['path', 'connection_id', 'blob_sha']),
+};
+
+function isMachineOnly(name: string, value: unknown, hidden?: ReadonlySet<string>): boolean {
+  if (SKIPPED.has(name) || hidden?.has(name) || name.endsWith('_embedding')) return true;
   // A vector read through the API arrives as a long array of numbers.
   return Array.isArray(value) && value.length > 64 && value.every((item) => typeof item === 'number');
 }
@@ -50,9 +59,10 @@ export function rowText(table: string, row: Readonly<Record<string, unknown>>): 
   if (source?.note) lines.push(`About this table: ${source.note}`);
   if (title) lines.push(`Called: ${title}`);
 
+  const hidden = HIDDEN[table];
   let left = ROW_MAX;
   for (const [name, value] of Object.entries(row)) {
-    if (isMachineOnly(name, value)) continue;
+    if (isMachineOnly(name, value, hidden)) continue;
     const text = asText(value);
     if (!text) continue;
     if (left <= 0) {
