@@ -2359,6 +2359,25 @@ tr:has([data-link-pending]) {
   }
 }
 
+/* Home's first visit of the day (plan #1558): the greeting, the date, the
+ * brief and then the rest of the column each rise a quick beat after the one
+ * before. HomeArrival in app/home/arrival.tsx puts the class on only when the
+ * server read no visit today from the cookie, and takes it off when the last
+ * step lands. Each part says its place as --arrive; the last is in by 740ms. */
+@keyframes home-arrive {
+  from {
+    transform: translateY(0.375rem);
+    opacity: 0;
+  }
+}
+
+@utility home-arrive {
+  & [data-arrive] {
+    animation: home-arrive var(--motion-move) var(--ease-out-soft) both;
+    animation-delay: calc(var(--arrive, 0) * var(--motion-quick));
+  }
+}
+
 /* The Dash mark (components/ui/dash-mark.tsx). Every state and every kind of
  * work has its own still shape as well as its motion, so all of these stop
  * under reduced motion without the state being lost. Distances are in the
@@ -2696,6 +2715,10 @@ tr:has([data-link-pending]) {
 
   .goal-ring {
     display: none;
+    animation: none;
+  }
+
+  .home-arrive [data-arrive] {
     animation: none;
   }
 
