@@ -25,8 +25,8 @@ const TOOL_NAME = 'reply';
 
 const SYSTEM = `You are reading a comment the owner of a personal dashboard
 wrote on one row of their development pages: a plan step, a question under a
-plan feature, an idea, a bug report they filed, or something a previous session
-raised with them. Most comments are questions; some are instructions.
+plan feature, an idea, a bug report they filed, something a previous session
+raised with them, or a proposed change to one of their specs. Most comments are questions; some are instructions.
 
 You have been given that row written out, the conversation on it so far, and
 what they wrote. You have no access to the repository, the database, or
@@ -75,7 +75,15 @@ the thread is told afterwards what was done. There are six things you can do:
   not an instruction about it and not a diff, written the way the rest of the
   page is written. On an idea it replaces the idea; on a bug note it replaces
   the report; on a plan step "field" says which part: title, detail or
-  done_when. The old wording goes into the thread with the reply, so it can be
+  done_when. On a spec change "field" is diff, title or why, and diff is what
+  "reword it", "make it shorter" and "say X instead" mean there: "text" is
+  then the whole new unified diff of the spec's markdown, the one exception to
+  "not a diff" above. Write it as hunks starting "@@ @@", each line marked " "
+  for a line kept, "-" for a line removed and "+" for a line added, and copy
+  every kept and removed line exactly as the spec section you were given has
+  it, a line or two of context around each change. The line numbers are
+  worked out afterwards, so leave them out. At most 60 lines added and
+  removed. The old wording goes into the thread with the reply, so it can be
   put back.
 - send_step — hand the plan step this comment is on to a session and start it
   building now. It takes no arguments, and it only works on a plan step. A
@@ -105,6 +113,9 @@ row is named at the top of the message you were given:
   build_step. reword replaces the idea or the report itself, so it takes no
   "field"; add_step writes a feature at the top of the workspace "module"
   names, not a step underneath, because there is no step to go underneath.
+- On a spec change: file_idea, file_note and reword. Approving or declining
+  it is theirs, with the buttons on the change, and a change already approved
+  or declined cannot be reworded.
 - On a raise: file_idea, file_note, add_step and build_step. A raise is
   something a session said to them, not a row with wording of its own, so there
   is nothing on it to reword. "Put this in the plan", "add that to the plan"
@@ -153,7 +164,8 @@ export async function replyToComment(options: ReplyOptions, message: string): Pr
   try {
     response = await client.messages.create({
       model: MODEL,
-      max_tokens: 1024,
+      // A reworded diff runs to sixty lines and the context around them.
+      max_tokens: 4096,
       system: SYSTEM,
       tools: [
         {
@@ -174,7 +186,7 @@ export async function replyToComment(options: ReplyOptions, message: string): Pr
                   name: { type: 'string', enum: [...ACTIONS] },
                   text: { type: ['string', 'null'] },
                   module: { type: ['string', 'null'] },
-                  field: { type: ['string', 'null'], enum: ['title', 'detail', 'done_when', null] },
+                  field: { type: ['string', 'null'], enum: ['title', 'detail', 'done_when', 'diff', 'why', null] },
                   detail: { type: ['string', 'null'] },
                   kind: { type: ['string', 'null'], enum: ['bug', 'feature', null] },
                 },

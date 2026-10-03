@@ -95,10 +95,10 @@ export function isUnread(
  */
 export const CONVERSATION_COLUMNS =
   `${COMMENT_COLUMNS}, idea_id, plan_item_id, raised_item_id, feedback_item_id, ` +
-  'spec_section_id, inspiration_takeaway_id, ' +
+  'spec_section_id, inspiration_takeaway_id, spec_change_id, ' +
   'idea:ideas(body), step:plan_items(number, title), raise:raised_items(title), ' +
   'note:feedback_items(kind, body), spec:spec_sections(slug, heading), ' +
-  'takeaway:inspiration_takeaways(title)';
+  'takeaway:inspiration_takeaways(title), change:spec_changes(title)';
 
 /** Long enough to tell two rows apart, short enough to sit on one line. */
 const ONE_LINE = 80;
@@ -125,9 +125,10 @@ const UNNAMED: Record<CommentTarget, string> = {
   note: 'A note',
   spec: 'A spec section',
   takeaway: 'An inspiration takeaway',
+  change: 'A spec change',
 };
 
-/** Exactly one of the five columns is set — `dev_comments_one_target_ck`. */
+/** Exactly one of the target columns is set — `dev_comments_one_target_ck`. */
 function targetOf(row: Record<string, unknown>): CommentTarget | null {
   return COMMENT_TARGETS.find((target) => row[TARGET_COLUMN[target]]) ?? null;
 }
@@ -144,6 +145,7 @@ function aboutFrom(target: CommentTarget, parent: Record<string, unknown> | null
 
   if (target === 'raise') return firstLine(parent.title) ?? UNNAMED.raise;
   if (target === 'takeaway') return firstLine(parent.title) ?? UNNAMED.takeaway;
+  if (target === 'change') return firstLine(parent.title) ?? UNNAMED.change;
 
   // The heading, which is what somebody was actually arguing with.
   if (target === 'spec') return firstLine(parent.heading) ?? UNNAMED.spec;
@@ -161,15 +163,17 @@ function aboutFrom(target: CommentTarget, parent: Record<string, unknown> | null
 /**
  * Where the conversation is read.
  *
- * Every target but one is a list, so its path is fixed. A spec section lives on
+ * Most targets are a list, so their path is fixed. A spec section lives on
  * its own document's page, and which document that is can only be read off the
  * embedded row -- so a thread whose section has gone falls back to the index
- * rather than to a 404.
+ * rather than to a 404. A spec change lands on its own card on /dev/specs.
  */
-function hrefFor(target: CommentTarget, parent: Record<string, unknown> | null): string {
+function hrefFor(target: CommentTarget, rowId: string, parent: Record<string, unknown> | null): string {
   if (target === 'spec' && typeof parent?.slug === 'string') {
     return `${TARGET_PATH.spec}/${parent.slug}`;
   }
+  // The change's own card, which is where its thread is drawn (plan #1507).
+  if (target === 'change') return `${TARGET_PATH.change}#spec-change-${rowId}`;
   return TARGET_PATH[target];
 }
 
@@ -209,7 +213,7 @@ export function conversationsFrom(
         target,
         rowId,
         about: aboutFrom(target, (row[target] as Record<string, unknown> | null) ?? null),
-        href: hrefFor(target, (row[target] as Record<string, unknown> | null) ?? null),
+        href: hrefFor(target, rowId, (row[target] as Record<string, unknown> | null) ?? null),
       },
       comments: [row],
     });

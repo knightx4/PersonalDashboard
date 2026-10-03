@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { countChangedLines, diffFits, diffLines, MAX_CHANGED_LINES } from './changes';
+import {
+  countChangedLines,
+  diffAnchorLines,
+  diffFits,
+  diffLines,
+  MAX_CHANGED_LINES,
+  rebaseDiff,
+  sectionsTouched,
+} from './changes';
 
 function diffOf(added: number, removed = 0): string {
   return [
@@ -79,5 +87,77 @@ describe('diffLines', () => {
     const diff = ['--- a/x', '+++ b/x', '@@ -1,2 +1,3 @@', ' a', '-b', '+c', '+d'].join('\n');
     const changed = diffLines(diff).filter((line) => line.kind === 'add' || line.kind === 'remove');
     expect(changed).toHaveLength(countChangedLines(diff));
+  });
+});
+
+describe('rebaseDiff', () => {
+  const spec = ['# Title', '', '## One', '', 'First rule.', 'Second rule.', '', '## Two', '', 'Third rule.', ''].join('\n');
+
+  it('rewrites a hunk header from where its lines are in the spec', () => {
+    const drafted = ['--- a/docs/X.md', '+++ b/docs/X.md', '@@ -1,2 +1,2 @@ ## One', ' First rule.', '-Second rule.', '+Second rule, reworded.'].join('\n');
+    const result = rebaseDiff(drafted, spec);
+    expect(result).toEqual({
+      ok: true,
+      diff: ['--- a/docs/X.md', '+++ b/docs/X.md', '@@ -5,2 +5,2 @@ ## One', ' First rule.', '-Second rule.', '+Second rule, reworded.', ''].join('\n'),
+    });
+  });
+
+  it('carries the line count of an earlier hunk into a later one', () => {
+    const drafted = ['@@ @@', ' First rule.', '+A new rule.', '@@ @@', '-Third rule.', '+Third rule, changed.'].join('\n');
+    const result = rebaseDiff(drafted, spec);
+    expect(result.ok && result.diff.split('\n').filter((line) => line.startsWith('@@'))).toEqual([
+      '@@ -5 +5,2 @@',
+      '@@ -10 +11 @@',
+    ]);
+  });
+
+  it('puts the spec own wording back on a line drafted with its trailing space lost', () => {
+    const withSpace = spec.replace('First rule.', 'First rule.  ');
+    const result = rebaseDiff(['@@ @@', ' First rule.', '+Added.'].join('\n'), withSpace);
+    expect(result.ok && result.diff).toContain(' First rule.  \n');
+  });
+
+  it('refuses a diff whose lines are not in the spec', () => {
+    const result = rebaseDiff(['@@ @@', '-A rule nobody wrote.', '+Something.'].join('\n'), spec);
+    expect(result).toMatchObject({ ok: false });
+    expect(!result.ok && result.why).toContain('A rule nobody wrote.');
+  });
+
+  it('refuses a diff with no hunks', () => {
+    expect(rebaseDiff('Make the rule shorter.', spec).ok).toBe(false);
+  });
+
+  it('takes a diff that writes a new spec from nothing', () => {
+    const result = rebaseDiff(['@@ @@', '+# New', '+', '+A rule.'].join('\n'), null);
+    expect(result.ok && result.diff.split('\n')[0]).toBe('@@ -0,0 +1,3 @@');
+  });
+
+  it('keeps the count the database makes', () => {
+    const drafted = ['@@ @@', ' First rule.', '-Second rule.', '+Second rule, reworded.'].join('\n');
+    const result = rebaseDiff(drafted, spec);
+    expect(result.ok && countChangedLines(result.diff)).toBe(2);
+  });
+});
+
+describe('diffAnchorLines', () => {
+  it('names the lines a diff removes or stands beside, not what it adds', () => {
+    expect(diffAnchorLines(['@@ @@', ' First rule.', '-Second rule.', '+New.', ' '].join('\n'))).toEqual([
+      'First rule.',
+      'Second rule.',
+    ]);
+  });
+});
+
+describe('sectionsTouched', () => {
+  const spec = ['# Title', '', '## One', '', 'First rule.', '', '## Two', '', 'Second rule.', ''].join('\n');
+
+  it('picks the section holding the lines the diff changes', () => {
+    const touched = sectionsTouched(spec, ['@@ @@', '-Second rule.', '+Changed.'].join('\n'));
+    expect(touched.map((section) => section.heading)).toEqual(['Two']);
+  });
+
+  it('falls back to every section when none can be told apart, and none for a new spec', () => {
+    expect(sectionsTouched(spec, ['@@ @@', '+Only added.'].join('\n'))).toHaveLength(2);
+    expect(sectionsTouched(null, ['@@ @@', '+Only added.'].join('\n'))).toEqual([]);
   });
 });
