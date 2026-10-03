@@ -28,6 +28,7 @@ import {
   ReactionButtons,
 } from './quick-controls';
 import { DiscussButton } from './discuss-sheet';
+import { GotThrough, type GotThroughSummary } from './got-through';
 
 export type QuickReadViewProps = {
   /** The story to show, or null when there is none left. */
@@ -84,6 +85,11 @@ export type QuickReadViewProps = {
    * (note 11ec91c5). Left out or empty, Next page waits for the page.
    */
   nextPage?: readonly QuickPageStory[];
+  /**
+   * What you got through today, for the card at the end of the deck (plan
+   * #1557). Drawn only once no story is left; left out, no card.
+   */
+  gotThrough?: GotThroughSummary | null;
 };
 
 /** One story of the laptop page, with what the grid card needs beside the story. */
@@ -124,6 +130,7 @@ export function QuickReadView({
   page = [],
   upNext = null,
   nextPage = [],
+  gotThrough = null,
 }: QuickReadViewProps) {
   const topic = topics.selected;
   // No description under the title, and the chips pulled up to it: the page is
@@ -142,35 +149,38 @@ export function QuickReadView({
             page can tell a clear made on screen from one that loaded empty;
             keyed by topic, so opening a finished topic is not a clear. */}
         <QueueCleared key={topic ?? ''} cleared={Boolean(topic) || !nothingYet}>
-        {topic ? (
-          <EmptyState
-            tone="finished"
-            seed={seed}
-            title={`Nothing left on ${topic}`}
-            description="You have been through every story on this topic from the newsletters you have not muted. The other topics are still waiting."
-            action={{ label: 'Show every topic', href: topics.allHref }}
-          />
-        ) : nothingYet ? (
-          <EmptyState
-            icon={Mail}
-            title="Nothing to read yet"
-            description="Each newsletter's stories show here once it has been summarised, a few seconds after it arrives. Sign one up with the address in News settings."
-            action={{ label: 'Show me my address', href: '/news/settings' }}
-          />
-        ) : (
-          <EmptyState
-            tone="finished"
-            seed={seed}
-            title="You are caught up"
-            description={
-              hiddenCount
-                ? `You have been through every story from the newsletters you have not muted, apart from the ${hiddenCount === 1 ? 'topic' : `${hiddenCount} topics`} you hid. New ones show here as they arrive.`
-                : 'You have been through every story from the newsletters you have not muted. New ones show here as they arrive.'
-            }
-            action={{ label: 'All newsletters', href: '/news/all' }}
-          />
-        )}
+          {topic ? (
+            <EmptyState
+              tone="finished"
+              seed={seed}
+              title={`Nothing left on ${topic}`}
+              description="You have been through every story on this topic from the newsletters you have not muted. The other topics are still waiting."
+              action={{ label: 'Show every topic', href: topics.allHref }}
+            />
+          ) : nothingYet ? (
+            <EmptyState
+              icon={Mail}
+              title="Nothing to read yet"
+              description="Each newsletter's stories show here once it has been summarised, a few seconds after it arrives. Sign one up with the address in News settings."
+              action={{ label: 'Show me my address', href: '/news/settings' }}
+            />
+          ) : (
+            <EmptyState
+              tone="finished"
+              seed={seed}
+              title="You are caught up"
+              description={
+                hiddenCount
+                  ? `You have been through every story from the newsletters you have not muted, apart from the ${hiddenCount === 1 ? 'topic' : `${hiddenCount} topics`} you hid. New ones show here as they arrive.`
+                  : 'You have been through every story from the newsletters you have not muted. New ones show here as they arrive.'
+              }
+              action={{ label: 'All newsletters', href: '/news/all' }}
+            />
+          )}
         </QueueCleared>
+        {/* What you got through (plan #1557). In the same place below, so it
+            stays mounted as the last story goes and can tell the two apart. */}
+        <GotThrough done summary={gotThrough} className="mt-4" />
       </div>
     );
   }
@@ -227,59 +237,60 @@ export function QuickReadView({
       {chips}
 
       <QueueCleared key={topic ?? ''} cleared={false}>
-      {/* One card below md and the grid from md up, chosen by CSS so the server never needs the screen size. */}
-      <div className={grid ? 'md:hidden' : undefined}>
-        <QuickDeck
-          key={`${card.issueId}:${card.storyIndex}`}
-          current={
-            <PhoneCard
-              card={card}
-              arrived={arrived}
-              saved={saved}
-              sent={sent}
-              reaction={reaction}
-              related={related}
-              pictures={pictures}
-              issueHref={issueHref}
-              topic={topic}
-            />
-          }
-          next={
-            upNext && (
+        {/* One card below md and the grid from md up, chosen by CSS so the server never needs the screen size. */}
+        <div className={grid ? 'md:hidden' : undefined}>
+          <QuickDeck
+            key={`${card.issueId}:${card.storyIndex}`}
+            current={
               <PhoneCard
-                card={upNext.card}
-                arrived={upNext.arrived}
-                saved={upNext.saved}
-                sent={upNext.sent ?? null}
-                reaction={upNext.reaction ?? null}
-                related={upNext.related ?? null}
+                card={card}
+                arrived={arrived}
+                saved={saved}
+                sent={sent}
+                reaction={reaction}
+                related={related}
                 pictures={pictures}
-                issueHref={upNext.issueHref}
+                issueHref={issueHref}
                 topic={topic}
               />
-            )
-          }
-          nextImage={
-            pictures && upNext?.card.kind === 'story' ? (upNext.card.story.image ?? null) : null
-          }
-          passes={cardPasses(card)}
-          stack="stories"
-        />
-      </div>
-
-      {grid && (
-        <div className="hidden md:block">
-          <QuickDeck
-            key={page.map(({ card: c }) => `${c.issueId}:${c.storyIndex}`).join(',')}
-            current={gridPage(page, pictures)}
-            next={nextPage.length > 0 ? gridPage(nextPage, pictures) : null}
-            nextImage={null}
-            passes={page.flatMap(({ card: c }) => cardPasses(c))}
-            stack="pages"
+            }
+            next={
+              upNext && (
+                <PhoneCard
+                  card={upNext.card}
+                  arrived={upNext.arrived}
+                  saved={upNext.saved}
+                  sent={upNext.sent ?? null}
+                  reaction={upNext.reaction ?? null}
+                  related={upNext.related ?? null}
+                  pictures={pictures}
+                  issueHref={upNext.issueHref}
+                  topic={topic}
+                />
+              )
+            }
+            nextImage={
+              pictures && upNext?.card.kind === 'story' ? (upNext.card.story.image ?? null) : null
+            }
+            passes={cardPasses(card)}
+            stack="stories"
           />
         </div>
-      )}
+
+        {grid && (
+          <div className="hidden md:block">
+            <QuickDeck
+              key={page.map(({ card: c }) => `${c.issueId}:${c.storyIndex}`).join(',')}
+              current={gridPage(page, pictures)}
+              next={nextPage.length > 0 ? gridPage(nextPage, pictures) : null}
+              nextImage={null}
+              passes={page.flatMap(({ card: c }) => cardPasses(c))}
+              stack="pages"
+            />
+          </div>
+        )}
       </QueueCleared>
+      <GotThrough done={false} summary={gotThrough} />
     </div>
   );
 }

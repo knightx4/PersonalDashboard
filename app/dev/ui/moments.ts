@@ -78,15 +78,14 @@ export const MOMENTS: readonly Moment[] = [
     workspace: 'news',
     name: 'The end of Quick read',
     trigger: 'Passing or reading the last story in Quick read.',
-    sees: 'A line saying how many stories were read and how many skipped, and which one held attention longest.',
-    reducedMotion: 'The same line, with no count-up.',
+    sees: 'The day’s sigil draws in and a card lifts in below it: how many stories were read and how many skipped, counting up, which one held attention longest, and which newsletters are due next.',
+    reducedMotion: 'The same card and sigil, there at once, with no count-up.',
     state: {
-      built: 'partly',
+      built: 'yes',
       where:
-        'The deck ends with the sigil drawing in (app/news/quick/quick-view.tsx). The counts and the longest-held story are not built.',
-      step: 1557,
+        "GotThrough in app/news/quick/got-through.tsx, under the caught-up mark on Quick read, with the counts and the longest story worked out from today's passes by lib/news/quick/got-through.ts.",
     },
-    demo: 'motion-clear',
+    demo: 'motion-got-through',
   },
   {
     workspace: 'home',
