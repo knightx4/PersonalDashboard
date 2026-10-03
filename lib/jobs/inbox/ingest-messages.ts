@@ -587,42 +587,124 @@ async function writeEvent(
   // No invite: the model's date, on the same terms as before.
   const interviewDate = opts.extracted?.dates?.find((d) => d.kind === 'interview');
   if (interviewDate && (kind === 'interview_scheduled' || kind === 'screen_scheduled')) {
-    const groupId = await newRoundFor(supabase, {
-      userId: opts.userId,
-      applicationId: opts.applicationId,
-    });
-    if (!groupId) return;
+    await oneAtATime(interviewLockKey(opts.applicationId), async () => {
+      const people = contactsFromNames(namesForSlot(opts.extracted, interviewDate));
 
-    const { data: created } = await supabase
-      .from('interviews')
-      .insert({
-        user_id: opts.userId,
-        application_id: opts.applicationId,
-        group_id: groupId,
-        round: 1,
-        kind: interviewKind ?? 'recruiter_screen',
-        scheduled_at: interviewDate.at,
-        format: 'video',
-        status: 'scheduled',
-      })
-      .select('id')
-      .maybeSingle();
-
-    if (created) {
-      await recordParticipants(supabase, {
-        userId: opts.userId,
-        companyId: await companyForApplication(supabase, opts.applicationId),
-        applicationId: opts.applicationId,
-        interviewId: created.id as string,
-        interviewFresh: true,
-        people: contactsFromNames(namesForSlot(opts.extracted, interviewDate)),
-        rec: opts.rec,
-      });
-      if (!opts.fresh) {
-        opts.rec.interviewBooked({ groupId, interviewId: created.id as string, applicationId: opts.applicationId });
+      // The same interview told twice: an invite already booked it, or another
+      // message about it came first. Nothing stops a second row at the same
+      // time except this, because the unique index only covers invites.
+      const already = interviewInSlot(
+        await interviewsFor(supabase, opts.userId, opts.applicationId),
+        interviewDate.at,
+      );
+      if (already) {
+        await recordParticipants(supabase, {
+          userId: opts.userId,
+          companyId: await companyForApplication(supabase, opts.applicationId),
+          applicationId: opts.applicationId,
+          interviewId: already.id,
+          interviewFresh: false,
+          people,
+          rec: opts.rec,
+        });
+        return;
       }
-    }
+
+      const groupId = await newRoundFor(supabase, {
+        userId: opts.userId,
+        applicationId: opts.applicationId,
+      });
+      if (!groupId) return;
+
+      const { data: created } = await supabase
+        .from('interviews')
+        .insert({
+          user_id: opts.userId,
+          application_id: opts.applicationId,
+          group_id: groupId,
+          round: 1,
+          kind: interviewKind ?? 'recruiter_screen',
+          scheduled_at: interviewDate.at,
+          format: 'video',
+          status: 'scheduled',
+        })
+        .select('id')
+        .maybeSingle();
+
+      if (created) {
+        await recordParticipants(supabase, {
+          userId: opts.userId,
+          companyId: await companyForApplication(supabase, opts.applicationId),
+          applicationId: opts.applicationId,
+          interviewId: created.id as string,
+          interviewFresh: true,
+          people,
+          rec: opts.rec,
+        });
+        if (!opts.fresh) {
+          opts.rec.interviewBooked({ groupId, interviewId: created.id as string, applicationId: opts.applicationId });
+        }
+      }
+    });
   }
+}
+
+/** How far apart two times can be and still be one interview. */
+export const SAME_SLOT_MS = 5 * 60_000;
+
+export type BookedInterview = {
+  id: string;
+  scheduled_at: string | null;
+  status: string | null;
+  ics_uid: string | null;
+};
+
+/**
+ * The interview already booked at this time, if there is one.
+ *
+ * Within SAME_SLOT_MS either side, because a time read out of prose and the
+ * same time on an invite can differ by the odd minute. A cancelled interview
+ * no longer holds the slot, so it is passed over. With `uidless`, only an
+ * interview no invite has claimed qualifies: an invite with a different uid at
+ * the same time is a different calendar event. Where several qualify, the
+ * nearest in time is taken.
+ */
+export function interviewInSlot(
+  booked: readonly BookedInterview[],
+  at: string,
+  opts: { uidless?: boolean } = {},
+): BookedInterview | null {
+  const wanted = new Date(at).getTime();
+  if (Number.isNaN(wanted)) return null;
+  let best: { row: BookedInterview; gap: number } | null = null;
+  for (const row of booked) {
+    if (row.status === 'cancelled' || !row.scheduled_at) continue;
+    if (opts.uidless && row.ics_uid) continue;
+    const time = new Date(row.scheduled_at).getTime();
+    if (Number.isNaN(time)) continue;
+    const gap = Math.abs(time - wanted);
+    if (gap <= SAME_SLOT_MS && (!best || gap < best.gap)) best = { row, gap };
+  }
+  return best?.row ?? null;
+}
+
+/** The pursuit's interviews, for interviewInSlot. A pursuit has a handful. */
+async function interviewsFor(
+  supabase: AppSupabaseClient,
+  userId: string,
+  applicationId: string,
+): Promise<BookedInterview[]> {
+  const { data } = await supabase
+    .from('interviews')
+    .select('id, scheduled_at, status, ics_uid')
+    .eq('application_id', applicationId)
+    .eq('user_id', userId);
+  return (data ?? []) as BookedInterview[];
+}
+
+/** One message at a time books interviews on a pursuit; see oneAtATime. */
+function interviewLockKey(applicationId: string): string {
+  return `interviews:${applicationId}`;
 }
 
 /**
@@ -771,7 +853,18 @@ async function applyInvite(
     ...(invite.timeZone ? { time_zone: invite.timeZone } : {}),
   };
 
-  const existing = invite.icsUid
+  await oneAtATime(interviewLockKey(opts.applicationId), () => bookInvite(supabase, opts, companyId, patch));
+}
+
+async function bookInvite(
+  supabase: AppSupabaseClient,
+  opts: Parameters<typeof applyInvite>[1],
+  companyId: string | null,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const { invite } = opts;
+
+  const byUid = invite.icsUid
     ? await supabase
         .from('interviews')
         .select('id, ics_sequence')
@@ -779,6 +872,21 @@ async function applyInvite(
         .eq('ics_uid', invite.icsUid)
         .maybeSingle()
     : { data: null };
+
+  // The invite for an interview a covering note already booked from its prose:
+  // the same slot with no uid yet. The invite claims that row rather than
+  // booking a second one beside it.
+  const bySlot =
+    byUid.data || !invite.scheduledAt
+      ? null
+      : interviewInSlot(await interviewsFor(supabase, opts.userId, opts.applicationId), invite.scheduledAt, {
+          uidless: true,
+        });
+  const existing = byUid.data
+    ? byUid
+    : bySlot
+      ? { data: { id: bySlot.id, ics_sequence: null as number | null } }
+      : { data: null };
 
   if (existing.data) {
     // Mail arrives out of order. A stale redelivery must not un-cancel a slot.

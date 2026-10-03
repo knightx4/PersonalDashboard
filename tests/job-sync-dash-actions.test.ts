@@ -447,3 +447,121 @@ describe('the mail sync in the job search', () => {
     expect(tables['job_search.contacts'][0].email).toBeNull();
   });
 });
+
+describe('an interview told twice', () => {
+  const booked = (over: Row = {}): Row => ({
+    id: 'interview-1',
+    user_id: USER,
+    application_id: APP,
+    ics_uid: null,
+    ics_sequence: null,
+    scheduled_at: '2026-10-08T14:00:00Z',
+    status: 'scheduled',
+    updated_at: '2026-09-30T00:00:00Z',
+    ...over,
+  });
+
+  const linked = { action: 'link', candidate: CANDIDATE, confidence: 0.95, method: 'thread', reasons: [] } as unknown as LinkDecision;
+
+  function proseDate(at: string) {
+    stub.classification = 'interview_invite';
+    stub.extracted = {
+      interviewKind: 'hiring_manager',
+      dates: [{ kind: 'interview', at }],
+      interviewerNames: [],
+    };
+    stub.decision = linked;
+  }
+
+  function calendarInvite() {
+    stub.classification = 'scheduling';
+    stub.message = { ...stub.message, calendar: ['BEGIN:VCALENDAR'] };
+    stub.invite = invite();
+    stub.decision = linked;
+  }
+
+  it('adopts the invite-booked interview for a date read from prose a few minutes off', async () => {
+    const tables: FakeTables = {};
+    seedPursuit(tables, { status: 'in_process' });
+    tables['job_search.interviews'] = [booked({ ics_uid: 'uid-1', ics_sequence: 0 })];
+    proseDate('2026-10-08T14:03:00Z');
+
+    await sync(tables);
+
+    expect(tables['job_search.interviews']).toHaveLength(1);
+    expect(tables['job_search.interview_groups'] ?? []).toHaveLength(0);
+    expect(records(tables).map((r) => r.kind)).not.toContain('book_interview');
+  });
+
+  it('books a second interview when the times are further apart, or the first was cancelled', async () => {
+    const apart: FakeTables = {};
+    seedPursuit(apart, { status: 'in_process' });
+    apart['job_search.interviews'] = [booked({ scheduled_at: '2026-10-08T15:00:00Z' })];
+    proseDate('2026-10-08T14:00:00Z');
+    await sync(apart);
+    expect(apart['job_search.interviews']).toHaveLength(2);
+
+    const cancelled: FakeTables = {};
+    seedPursuit(cancelled, { status: 'in_process' });
+    cancelled['job_search.interviews'] = [booked({ status: 'cancelled' })];
+    await sync(cancelled);
+    expect(cancelled['job_search.interviews']).toHaveLength(2);
+  });
+
+  it('gives the invite to the interview a covering note already booked at that time', async () => {
+    const tables: FakeTables = {};
+    seedPursuit(tables, { status: 'in_process' });
+    tables['job_search.interviews'] = [booked()];
+    calendarInvite();
+
+    await sync(tables);
+
+    expect(tables['job_search.interviews']).toHaveLength(1);
+    expect(tables['job_search.interviews'][0]).toMatchObject({ id: 'interview-1', ics_uid: 'uid-1' });
+  });
+
+  it('leaves an interview another invite holds at the same time alone', async () => {
+    const tables: FakeTables = {};
+    seedPursuit(tables, { status: 'in_process' });
+    tables['job_search.interviews'] = [booked({ ics_uid: 'other-uid', ics_sequence: 0 })];
+    calendarInvite();
+
+    await sync(tables);
+
+    expect(tables['job_search.interviews'].map((r) => r.ics_uid).sort()).toEqual(['other-uid', 'uid-1']);
+  });
+
+  it('books one interview for two messages about it read in the same sync', async () => {
+    const tables: FakeTables = {};
+    seedPursuit(tables, { status: 'in_process' });
+    proseDate('2026-10-08T14:00:00Z');
+
+    const envelope = (n: number) => ({
+      id: `e0000000-0000-4000-8000-00000000000${n}`,
+      providerMessageId: `gmail-${n}`,
+      threadId: 'thread-1',
+      receivedAt: '2026-10-03T07:00:00Z',
+      fromAddress: 'no-reply@acme.com',
+      replyToAddress: null,
+      subject: 'Your interview',
+      isNew: true,
+    });
+    await linkEnvelopes(
+      serviceClient(tables, 'job_search') as never,
+      {
+        userId: USER,
+        accountId: 'account',
+        accessToken: 'token',
+        accountEmail: 'me@example.com',
+        timezone: 'UTC',
+        companies: [],
+        candidates: [],
+        excludedDomains: [],
+        counters: emptyCounters(),
+      },
+      [envelope(1), envelope(2)],
+    );
+
+    expect(tables['job_search.interviews']).toHaveLength(1);
+  });
+});
