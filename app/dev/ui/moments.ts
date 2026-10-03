@@ -178,7 +178,11 @@ export const MOMENTS: readonly Moment[] = [
     trigger: 'Marking a concept as known.',
     sees: 'The concept lights on the map and traces a line to each concept it unlocks.',
     reducedMotion: 'The concept and what it unlocks are lit at once.',
-    state: { built: 'no', step: 1562 },
+    state: {
+      built: 'yes',
+      where:
+        'UnlocksMap in app/learn/c/[id]/unlocks-map.tsx, under Rests on it on the concept page, for concepts lib/learn/graph/lit.ts finds known in the last two weeks.',
+    },
   },
   {
     workspace: 'shopping',
