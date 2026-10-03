@@ -190,7 +190,11 @@ export const MOMENTS: readonly Moment[] = [
     trigger: 'A refund arriving inside its return window.',
     sees: 'The amount counts up into the year’s “saved by returning on time” figure.',
     reducedMotion: 'The figure shows its new total without counting.',
-    state: { built: 'no', step: 1563 },
+    state: {
+      built: 'yes',
+      where:
+        'OnTimeSavingsFigure in app/shopping/returns/on-time-savings.tsx, under the header on /shopping/returns, with the year of on-time refunds summed by lib/returns/savings.ts.',
+    },
   },
   {
     workspace: 'dash',

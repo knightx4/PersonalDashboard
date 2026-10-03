@@ -8,6 +8,7 @@ import {
   isDueSoon,
   isOverdue,
 } from '@/lib/returns/deadline';
+import { onTimeSavings, type OnTimeSavings, type SavingsRefund } from '@/lib/returns/savings';
 import type { ReturnsTrackerData, ReturnsTrackerRow, ReturnsView } from '@/lib/returns/types';
 
 export type {
@@ -282,4 +283,43 @@ export async function loadReturnsTracker(
     rows: allRows.sort(sortRows),
     counts,
   };
+}
+
+/**
+ * This year's refunds with their order's deadline and currency, summed into
+ * the "saved by returning on time" figure (plan #1563). The deadline survives
+ * the return: sync_order_state keeps it from the delivery date and window.
+ */
+export async function loadOnTimeSavings(
+  supabase: SupabaseClient,
+  userId: string,
+  today: string,
+): Promise<OnTimeSavings[]> {
+  const { data, error } = await supabase
+    .from('returns')
+    .select('id, refunded_at, refund_amount_cents, orders!inner(return_deadline, currency, deleted_at)')
+    .eq('user_id', userId)
+    .eq('status', 'refunded')
+    .gte('refunded_at', `${today.slice(0, 4)}-01-01`)
+    .lte('refunded_at', today)
+    .is('orders.deleted_at', null);
+  if (error) throw error;
+  const refunds: SavingsRefund[] = [];
+  for (const row of data ?? []) {
+    const order = one(
+      row.orders as unknown as
+        | { return_deadline: string | null; currency: string }
+        | { return_deadline: string | null; currency: string }[]
+        | null,
+    );
+    if (!order || !row.refunded_at) continue;
+    refunds.push({
+      id: row.id as string,
+      refundedAt: row.refunded_at as string,
+      amountCents: row.refund_amount_cents as number,
+      returnDeadline: order.return_deadline,
+      currency: order.currency,
+    });
+  }
+  return onTimeSavings(refunds, today);
 }

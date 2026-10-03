@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn';
 import {
   filterReturnsRows,
   groupReturnsByOrder,
+  loadOnTimeSavings,
   loadReturnsTracker,
   parseReturnsGroup,
   parseReturnsView,
@@ -18,6 +19,7 @@ import {
   type ReturnsGroupMode,
   type ReturnsView,
 } from '@/lib/returns/load';
+import { OnTimeSavingsFigure } from './on-time-savings';
 import { ReturnItemRow } from './return-item-row';
 import { ReturnsOrderList } from './returns-order-list';
 
@@ -51,6 +53,8 @@ export default async function ReturnsPage({
     // What an Ask Dash hand-off is working on (plan #1568).
     workingRefsForPage(user.id),
   ]);
+  // The year's on-time refunds, and which are recent enough to count up (plan #1563).
+  const savings = await loadOnTimeSavings(supabase, user.id, data.today);
   const merchantOptions = [
     ...new Map(
       data.rows
@@ -141,6 +145,8 @@ export default async function ReturnsPage({
             </Link>
           }
         />
+
+        <OnTimeSavingsFigure savings={savings} />
 
         {rows.length === 0 ? (
           <EmptyState
