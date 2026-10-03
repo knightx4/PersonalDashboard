@@ -1,7 +1,9 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { recordScheduled, scheduledBefore, scheduledChanged } from '@/lib/core/scheduled-actions';
 import { payeeKey, type RecurringExtraction, type RecurringKind } from './extraction';
+import { addedSummary, paymentRef, updatedSummary, UPDATED_NO_UNDO } from './record';
 import { summariseCharges, type ChargeRow } from './summarise';
 
 /**
@@ -10,6 +12,12 @@ import { summariseCharges, type ChargeRow } from './summarise';
  *
  * Service role only (the linker runs in the sync), so every read and write
  * names the user explicitly rather than leaning on RLS.
+ *
+ * With `record`, what the filing did to the payment is recorded as a scheduled
+ * change Home lists (plan #1571): a payment the email added, with an Undo that
+ * removes it and its charge, or one whose amount or dates it changed, with
+ * the sentence saying why that has none. A filing that changed nothing (the
+ * same email read twice) records nothing.
  */
 
 type ChargeDbRow = {
@@ -31,12 +39,14 @@ export async function fileRecurringReading(
     messageId: string;
     senderDomain: string | null;
     reading: RecurringExtraction;
+    /** Record the change as Dash's, on the scheduled surface. The sync sets it. */
+    record?: boolean;
   },
 ): Promise<{ paymentId: string; chargeId: string | null }> {
   const { userId, reading } = opts;
   const key = payeeKey(reading.payee);
 
-  const paymentId = await ensurePayment(supabase, {
+  const { id: paymentId, created } = await ensurePayment(supabase, {
     userId,
     key,
     payee: reading.payee,
@@ -45,6 +55,8 @@ export async function fileRecurringReading(
     currency: reading.currency,
     cardStatement: reading.cardStatement === true,
   });
+  const ref = paymentRef(paymentId);
+  const before = opts.record && !created ? await scheduledBefore(supabase, userId, ref) : null;
 
   // One row per email (recurring_charges_message_uq). A message read twice,
   // on a retried page, hits the key and changes nothing.
@@ -69,6 +81,24 @@ export async function fileRecurringReading(
 
   await resummarisePayment(supabase, { userId, paymentId });
 
+  if (opts.record && created) {
+    await recordScheduled(supabase, userId, {
+      kind: 'file_recurring_payment',
+      subjectRef: ref,
+      op: 'insert',
+      summary: addedSummary(reading.payee, reading, reading.cardStatement === true),
+    });
+  } else if (opts.record && (await scheduledChanged(supabase, userId, ref, before))) {
+    await recordScheduled(supabase, userId, {
+      kind: 'update_recurring_payment',
+      subjectRef: ref,
+      op: 'update',
+      summary: updatedSummary(typeof before?.payee === 'string' ? before.payee : reading.payee, reading),
+      beforeValues: before,
+      noUndo: UPDATED_NO_UNDO,
+    });
+  }
+
   const chargeId = (inserted?.[0]?.id as string | undefined) ?? null;
   return { paymentId, chargeId };
 }
@@ -84,7 +114,7 @@ async function ensurePayment(
     currency: string;
     cardStatement: boolean;
   },
-): Promise<string> {
+): Promise<{ id: string; created: boolean }> {
   // A key the person corrected (renamed, merged or moved on the Recurring
   // page) files onto the payment they chose, not a new row under the name the
   // mail gives (plan #1208).
@@ -95,7 +125,7 @@ async function ensurePayment(
     .eq('payee_key', opts.key)
     .maybeSingle();
   if (aliasError) throw new Error(`recurring alias lookup failed: ${aliasError.message}`);
-  if (alias) return alias.payment_id as string;
+  if (alias) return { id: alias.payment_id as string, created: false };
 
   const { data: existing, error } = await supabase
     .from('recurring_payments')
@@ -104,7 +134,7 @@ async function ensurePayment(
     .eq('payee_key', opts.key)
     .maybeSingle();
   if (error) throw new Error(`recurring payment lookup failed: ${error.message}`);
-  if (existing) return existing.id as string;
+  if (existing) return { id: existing.id as string, created: false };
 
   // Two readings of the same new payee in one page race here; the unique key
   // makes the loser read the winner's row instead of failing.
@@ -128,7 +158,7 @@ async function ensurePayment(
     )
     .select('id');
   if (createError) throw new Error(`recurring payment insert failed: ${createError.message}`);
-  if (created?.[0]?.id) return created[0].id as string;
+  if (created?.[0]?.id) return { id: created[0].id as string, created: true };
 
   const { data: again } = await supabase
     .from('recurring_payments')
@@ -136,7 +166,7 @@ async function ensurePayment(
     .eq('user_id', opts.userId)
     .eq('payee_key', opts.key)
     .single();
-  return again!.id as string;
+  return { id: again!.id as string, created: false };
 }
 
 /**

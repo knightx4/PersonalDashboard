@@ -1,7 +1,7 @@
 /**
  * Home's "What Dash did today" section (plan #1461): grouped by workspace,
- * Undo on every change still standing, long groups folded, and nothing at
- * all on a day Dash changed nothing.
+ * Undo on every change still standing (or the sentence saying why it has
+ * none), long groups folded, and nothing at all on a day Dash changed nothing.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -24,6 +24,7 @@ function entry(n: number, over: Partial<DashTodayEntry> = {}): DashTodayEntry {
     href: `/open/public.plan_items%3A${n}`,
     at: `2026-10-03T${String(10 + n).padStart(2, '0')}:00:00Z`,
     workspace: 'dev',
+    noUndo: null,
     ...over,
   };
 }
@@ -59,6 +60,20 @@ describe('DashTodaySection', () => {
       { workspace: 'dev', label: 'Dev', entries: [entry(1, { status: 'undone', href: null })] },
     ]);
     expect(html).toContain('Undone');
+    expect(html).not.toMatch(/>Undo</);
+  });
+
+  it('says why a change has no Undo in place of the button (plan #1571)', () => {
+    const why = 'Its amount is worked out from every charge on it, so correct it on the Recurring page.';
+    const html = render([
+      {
+        workspace: 'shopping',
+        label: 'Shopping',
+        entries: [entry(1, { sentence: 'Dash updated Netflix from an email.', noUndo: why })],
+      },
+    ]);
+    expect(html).toContain('Dash updated Netflix from an email.');
+    expect(html).toContain(why);
     expect(html).not.toMatch(/>Undo</);
   });
 

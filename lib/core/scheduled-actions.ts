@@ -1,5 +1,6 @@
 import type { AskSchema, SchemaClient } from '@/lib/ask/db';
 import {
+  movedColumns,
   readSubjectOrNull,
   recordDashAction,
   type DashActionDeps,
@@ -51,7 +52,9 @@ export async function scheduledBefore(
   ref: string,
 ): Promise<Record<string, unknown> | null> {
   try {
-    return await readSubjectOrNull(scheduledDashDeps(client, userId), ref);
+    const row = await readSubjectOrNull(scheduledDashDeps(client, userId), ref);
+    // A copy, so a client that hands back its own row object cannot change it under us.
+    return row ? { ...row } : null;
   } catch (error) {
     console.error(`scheduled action: could not read ${ref}`, error);
     return null;
@@ -71,4 +74,22 @@ export async function recordScheduled(
     console.error(`scheduled action: could not record ${entry.kind} on ${entry.subjectRef}`, error);
     return null;
   }
+}
+
+/**
+ * Whether a write that may have changed nothing did change the row: what the
+ * row holds now differs from `before` in a column a person would see. For a
+ * run that rewrites a row on every pass (a payment worked out again from its
+ * charges), so a pass that left it as it was records nothing. False when
+ * either side could not be read.
+ */
+export async function scheduledChanged(
+  client: unknown,
+  userId: string,
+  ref: string,
+  before: Record<string, unknown> | null,
+): Promise<boolean> {
+  if (!before) return false;
+  const after = await scheduledBefore(client, userId, ref);
+  return after !== null && movedColumns(after, before).length > 0;
 }
