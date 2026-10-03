@@ -234,7 +234,7 @@ function themeCommands(theme: Theme): SearchCommand[] {
       icon: 'theme' as const,
       run: applying(auroraFor(polarity, skyOf(theme))),
     },
-    ...SKIES.map((sky) => ({
+    ...SKIES.filter((sky) => sky[polarity === 'light' ? 'dawn' : 'night']).map((sky) => ({
       id: `theme:sky:${sky.id}`,
       label: `Sky: ${sky.label}`,
       hint: sky.mood,

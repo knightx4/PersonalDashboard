@@ -45,7 +45,7 @@ export default function HomePage() {
         <Link href="/" className="flex items-center gap-2.5">
           <ModuleMark module={null} size="md" />
           <span className={cn('text-body font-semibold tracking-tight whitespace-nowrap', s.ink)}>
-            Personal Dashboard
+            Dash
           </span>
         </Link>
         <nav className="flex items-center gap-1 sm:gap-2">
@@ -86,7 +86,7 @@ export default function HomePage() {
           >
             Your inbox fills in your orders and interviews. Return deadlines, job reminders and goal
             steps land on one agenda. Goals tick themselves off when the work shows up elsewhere, and
-            Dash, the assistant, can answer questions across all of it.
+            you can ask questions across all of it.
           </p>
 
           <div
@@ -223,7 +223,7 @@ export default function HomePage() {
           <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
             <div>
               <p className={cn(s.hueText, 'text-small font-semibold tracking-wide uppercase')} style={hue(byId('vault'))}>
-                Dash
+                Ask Dash
               </p>
               <h2 className={cn(s.ink, 'font-display mt-3 text-figure font-semibold tracking-[-0.03em]')}>
                 Ask a question instead of opening five pages.
@@ -340,7 +340,7 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-ui sm:px-6">
           <span className={cn(s.ghost, 'flex items-center gap-2')}>
             <ModuleMark module={null} size="xs" />
-            Personal Dashboard
+            Dash
           </span>
           <nav className="flex gap-5">
             <Link href="/privacy" className={s.quiet}>

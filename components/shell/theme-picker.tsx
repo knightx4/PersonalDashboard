@@ -370,7 +370,7 @@ export function ThemePicker({ value }: { value: Theme }) {
             </div>
           ) : aurora ? (
             <div className="flex flex-wrap gap-1.5 px-2 pb-2">
-              {SKIES.map((option) => {
+              {SKIES.filter((option) => option[here.polarity === 'light' ? 'dawn' : 'night']).map((option) => {
                 const next = auroraFor(here.polarity, option.id);
                 return (
                   <SkySwatch
@@ -602,7 +602,17 @@ function SkySwatch({
   onChoose: () => void;
 }) {
   const style = useMemo(() => {
-    const colours = sky[side];
+    // The picker only offers a sky in a polarity it has, so this side exists.
+    const colours = sky[side]!;
+    // A painted scene shows the scene itself, shrunk.
+    if (colours.art) {
+      return {
+        backgroundColor: colours.bench,
+        backgroundImage: `url("${colours.art}")`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center bottom',
+      } as React.CSSProperties;
+    }
     return {
       backgroundColor: colours.bench,
       [WASH_LIFT]: String(CHIP_LIFT),

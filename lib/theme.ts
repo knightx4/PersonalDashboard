@@ -121,7 +121,7 @@ export function isThemeId(value: string | null | undefined): value is ThemeId {
  */
 import type { ThemeMode } from '@/lib/theme/reference';
 import { COLOURWAYS, colourwayById, type ColourwayId } from '@/lib/theme/colourway';
-import { DEFAULT_SKY, isSkyId, SKIES, type SkyId } from '@/lib/theme/sky';
+import { DEFAULT_SKY, hasSide, isSkyId, SKIES, type SkyId } from '@/lib/theme/sky';
 import { DEFAULT_PALETTE, isPaletteId, PALETTES, type PaletteId } from '@/lib/theme/poster';
 
 export type { ThemeMode, ColourwayId, SkyId, PaletteId };
@@ -191,6 +191,8 @@ export function parseTheme(value: string | null | undefined): Theme {
   // default rather than to no choice, which keeps the person in Aurora.
   if (mode === 'aurora' || mode === 'dawn') {
     if (!colour || !isSkyId(colour) || colour === DEFAULT_SKY) return { kind: 'written', id: mode };
+    // A night-only sky stored against Dawn has nothing to show; Dawn keeps its own.
+    if (!hasSide(colour, mode === 'dawn' ? 'dawn' : 'night')) return { kind: 'written', id: mode };
     return { kind: 'written', id: mode, sky: colour };
   }
 
@@ -276,7 +278,9 @@ export function posterFor(palette: PaletteId, polarity: Polarity = 'light'): The
 /** Aurora in a polarity, keeping its sky. Night is Aurora; first light is Dawn. */
 export function auroraFor(polarity: Polarity, sky: SkyId): Theme {
   const id = polarity === 'light' ? 'dawn' : 'aurora';
-  return sky === DEFAULT_SKY ? { kind: 'written', id } : { kind: 'written', id, sky };
+  // A sky that only exists at night falls back to the default by day.
+  const shown = hasSide(sky, polarity === 'light' ? 'dawn' : 'night') ? sky : DEFAULT_SKY;
+  return shown === DEFAULT_SKY ? { kind: 'written', id } : { kind: 'written', id, sky: shown };
 }
 
 /** The colour a theme is, in degrees, or null for one with no colour. */

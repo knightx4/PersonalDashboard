@@ -20,8 +20,8 @@ const display = Bricolage_Grotesque({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Personal Dashboard',
-    template: '%s · Personal Dashboard',
+    default: 'Dash',
+    template: '%s · Dash',
   },
   description:
     'What you own, what you spent, and where your job search stands, in one account.',
