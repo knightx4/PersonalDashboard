@@ -9,18 +9,21 @@
  * are not completions and do not call it: the list clears because its last
  * item was finished, and that item has already had its moment.
  *
- * The moment plays each effect in COMPLETION_EFFECTS. Today that is one short
- * buzz on a phone that can vibrate. An iPhone gives web apps no vibration, so
- * there the buzz does nothing and the motion is the whole moment. A second
- * effect (the optional completion sound, plan #1553) joins by adding an entry
- * to the list; the callers do not change.
+ * The moment plays each effect in COMPLETION_EFFECTS: one short buzz on a
+ * phone that can vibrate, and a soft click for whoever has switched it on. An
+ * iPhone gives web apps no vibration, so there the buzz does nothing and the
+ * motion is the whole moment. Another effect joins by adding an entry to the
+ * list; the callers do not change.
  *
- * The buzz can be switched off on the account page. The choice is kept on the
- * device, like the notifications switch beside it, because whether a phone
- * buzzes is a question about that phone.
+ * Both are switched on the account page, and both choices are kept on the
+ * device, like the notifications switch beside them, because whether a phone
+ * buzzes or makes a sound is a question about that phone. The buzz is on until
+ * switched off; the click is off until switched on (docs/UI-QUALITY-SPEC.md,
+ * Part 8). Reduced motion silences neither: it is a request about movement,
+ * and the click is its own opt-in.
  */
 
-import { HAPTIC_MS, MOTION_MS } from '@/lib/motion';
+import { CLICK_MS, HAPTIC_MS, MOTION_MS } from '@/lib/motion';
 
 /** Where the buzz switch is kept, in this browser's local storage. */
 export const HAPTICS_KEY = 'pt_haptics';
@@ -67,6 +70,126 @@ export function buzzOnce(): boolean {
   }
 }
 
+/** Where the click switch is kept, in this browser's local storage. */
+export const CLICK_KEY = 'pt_click';
+
+/** The click itself: CLICK_MS of soft tick, served from public/. */
+export const CLICK_URL = '/sounds/click.wav';
+
+type AudioContextClass = typeof AudioContext;
+
+function audioContextClass(): AudioContextClass | null {
+  const g = globalThis as { AudioContext?: AudioContextClass; webkitAudioContext?: AudioContextClass };
+  return g.AudioContext ?? g.webkitAudioContext ?? null;
+}
+
+/** Whether this browser can play the click. False outside a browser. */
+export function canClick(): boolean {
+  return audioContextClass() !== null;
+}
+
+/** Whether the click is on for this device. Off unless it has been switched on. */
+export function clickOn(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(CLICK_KEY) === 'on';
+  } catch {
+    return false;
+  }
+}
+
+let audio: AudioContext | null = null;
+let clickBuffer: Promise<AudioBuffer | null> | null = null;
+let clickReady: AudioBuffer | null = null;
+
+/**
+ * Make the click playable: create the audio context, wake it, and fetch and
+ * decode the file once. Browsers only let a page start sound after the person
+ * has touched it, and a completion's write can come back a few hundred
+ * milliseconds after the tap, outside that window. So this runs on the tap
+ * itself (armClick), and by the time the write returns the context is awake
+ * and the sound is in memory.
+ */
+export function primeClick(): void {
+  const Ctx = audioContextClass();
+  if (!Ctx) return;
+  try {
+    audio ??= new Ctx();
+    if (audio.state === 'suspended') void audio.resume().catch(() => {});
+    if (!clickBuffer) {
+      const ctx = audio;
+      clickBuffer = fetch(CLICK_URL)
+        .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error(String(res.status)))))
+        .then((bytes) => ctx.decodeAudioData(bytes))
+        .then((buffer) => (clickReady = buffer))
+        .catch(() => {
+          // Try again on the next tap rather than staying silent for the visit.
+          clickBuffer = null;
+          return null;
+        });
+    }
+  } catch {
+    // No audio for this page; the moment is the motion and the buzz.
+  }
+}
+
+let armed = false;
+
+/**
+ * Listen for the person's taps and keys, and prime the click on each while it
+ * is switched on. Cheap when it is off: one storage read per tap. Called when
+ * this module loads in a browser, so every page that can complete something
+ * has it.
+ */
+export function armClick(): void {
+  if (armed || typeof document === 'undefined') return;
+  armed = true;
+  const onGesture = () => {
+    if (clickOn()) primeClick();
+  };
+  for (const type of ['pointerdown', 'touchend', 'keydown']) {
+    document.addEventListener(type, onGesture, { capture: true, passive: true });
+  }
+}
+
+/**
+ * One click, when it is switched on and the browser can play it. Returns
+ * whether it started. Never throws, and never plays late: a click that is not
+ * ready when the moment comes is skipped rather than heard after it.
+ */
+export function clickOnce(): boolean {
+  if (!clickOn() || !canClick()) return false;
+  try {
+    primeClick();
+    if (!audio || !clickReady || audio.state !== 'running') return false;
+    const source = audio.createBufferSource();
+    source.buffer = clickReady;
+    source.connect(audio.destination);
+    source.start();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Switch the click on or off for this device. Switching it on is a tap, so it
+ * primes the sound there and then and plays it once, so the person hears what
+ * they chose.
+ */
+export function setClickOn(on: boolean): void {
+  try {
+    if (on) globalThis.localStorage?.setItem(CLICK_KEY, 'on');
+    else globalThis.localStorage?.removeItem(CLICK_KEY);
+  } catch {
+    // Nowhere to keep it; the switch still shows what was chosen this visit.
+  }
+  if (!on) return;
+  primeClick();
+  void Promise.all([audio?.resume(), clickBuffer])
+    .then(() => clickOnce())
+    .catch(() => {});
+}
+
 export interface CompletionEffect {
   /** A short name, for /dev/ui's list of moments. */
   id: string;
@@ -77,8 +200,11 @@ export interface CompletionEffect {
 
 /** What a completion plays, in order. */
 export const COMPLETION_EFFECTS: readonly CompletionEffect[] = [
-  { id: 'buzz', label: 'one 10ms buzz, on a phone that can vibrate', play: buzzOnce },
+  { id: 'buzz', label: `one ${HAPTIC_MS}ms buzz, on a phone that can vibrate`, play: buzzOnce },
+  { id: 'click', label: `one soft ${CLICK_MS}ms click, once switched on`, play: clickOnce },
 ];
+
+armClick();
 
 /**
  * Two completions inside one move are one moment: a task ticked with its
