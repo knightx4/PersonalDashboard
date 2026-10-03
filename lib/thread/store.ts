@@ -159,6 +159,25 @@ export async function removeThreadTurn(
 const BY_TABLE_PAST = 300;
 
 /**
+ * The threads under the given rows of one table, keyed by ref: by ref for a
+ * short list, by table past BY_TABLE_PAST rows.
+ */
+export async function loadRowThreads(
+  client: AnyClient,
+  table: string,
+  ids: readonly string[],
+  options: { userId?: string } = {},
+): Promise<Map<string, DevComment[]>> {
+  if (ids.length === 0) return new Map();
+  if (ids.length > BY_TABLE_PAST) return loadTableThreads(client, table, options);
+  return loadThreads(
+    client,
+    ids.map((id) => rowRef(table, id)),
+    options,
+  );
+}
+
+/**
  * The rows given, each with `thread` set to the turns of the thread under it:
  * for a loader that used to embed the thread in its select, so the mapping
  * that reads `row.thread` stays as it was. Rows without an id are passed on
@@ -171,16 +190,7 @@ export async function withThreads<T extends Record<string, unknown>>(
   options: { userId?: string } = {},
 ): Promise<(T & { thread: DevComment[] })[]> {
   const ids = rows.map((row) => row.id).filter((id): id is string => typeof id === 'string');
-  const threads =
-    ids.length === 0
-      ? new Map<string, DevComment[]>()
-      : ids.length > BY_TABLE_PAST
-        ? await loadTableThreads(client, table, options)
-        : await loadThreads(
-            client,
-            ids.map((id) => rowRef(table, id)),
-            options,
-          );
+  const threads = await loadRowThreads(client, table, ids, options);
   return rows.map((row) => ({
     ...row,
     thread: typeof row.id === 'string' ? (threads.get(rowRef(table, row.id)) ?? []) : [],

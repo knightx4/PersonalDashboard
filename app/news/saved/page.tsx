@@ -8,6 +8,9 @@ import { loadDiscussedStoryIds, loadIssueStories } from '@/lib/news/saved/discus
 import { loadSavedStories } from '@/lib/news/saved/stories';
 import { loadSentBySaved } from '@/lib/news/saved/sent';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import type { DevComment } from '@/lib/comments/load';
+import { loadThreads } from '@/lib/thread/store';
+import { threadRef } from '@/lib/thread/subjects';
 import { relatedNotes, toLink } from '@/lib/vault/notes/related';
 import { SavedView } from './saved-view';
 
@@ -36,6 +39,7 @@ export const dynamic = 'force-dynamic';
  *
  * Where each story has been sent, to Learn or Todo (plan #1370), is read once
  * the stories are, so Send to Learn and Make a todo say so after a reload.
+ * Each story's thread (plan #1471) is read at the same time.
  */
 export default async function SavedPage() {
   const user = await requireUser();
@@ -54,7 +58,15 @@ export default async function SavedPage() {
     .map((story) => story.issueId as string);
   const issueStories = await loadIssueStories(client, discussedIssues).catch(() => new Map<string, unknown[]>());
   const discussed = discussedIndexes(stories, discussedIds, issueStories);
-  const sent = await loadSentBySaved(stories.map((story) => story.id));
+  const [sent, threads] = await Promise.all([
+    loadSentBySaved(stories.map((story) => story.id)),
+    // A failed read leaves the threads empty rather than the page broken.
+    loadThreads(
+      core,
+      stories.map((story) => threadRef('story', story.id)),
+      { userId: user.id },
+    ).catch(() => new Map<string, DevComment[]>()),
+  ]);
 
   return (
     <SavedView
@@ -63,6 +75,7 @@ export default async function SavedPage() {
         arrived: formatArrival(story.receivedAt, settings.timezone),
         discussedIndex: discussed.get(story.id) ?? null,
         sent: sent.get(story.id) ?? null,
+        thread: threads.get(threadRef('story', story.id)) ?? [],
         related: relatedNotes(vault, user.id, `${story.headline}\n${story.summary}`, {
           core,
         }).then((notes) => notes.map(toLink)),

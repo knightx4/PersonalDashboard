@@ -28,6 +28,10 @@ import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { whyNotRead } from '@/lib/vault/map/rules';
 import { loadNoteThread } from '@/lib/vault/maya/store';
+import { Thread } from '@/components/thread/thread';
+import type { DevComment } from '@/lib/comments/load';
+import { loadThread } from '@/lib/thread/store';
+import { threadRef } from '@/lib/thread/subjects';
 import { MapReview } from './map-review';
 import { MayaAsk } from './maya-ask';
 import { NoteEdit } from './note-edit';
@@ -109,10 +113,14 @@ export default async function NotePage({
   const notRead = whyNotRead(note);
 
   const user = await requireUser();
-  const [{ timezone }, linkedTasks, mayaThread] = await Promise.all([
+  const [{ timezone }, linkedTasks, mayaThread, comments] = await Promise.all([
     loadAccountSettings(user.id),
     loadTasksFor(user.id, 'note', note.id),
     notRead ? null : loadNoteThread(supabase, note.id),
+    // A failed read leaves the thread empty rather than the page broken.
+    loadThread(supabase, threadRef('vault_note', note.id), { userId: user.id }).catch(
+      (): DevComment[] => [],
+    ),
   ]);
 
   return (
@@ -200,6 +208,17 @@ export default async function NotePage({
             timezone={timezone}
           />
         </div>
+
+        {/* Notes on the note, kept in the app rather than written into the
+            vault (plan #1471). One tagged @dash is answered from the note,
+            unless the map turns the note away, when Dash says so instead. */}
+        <section aria-label="Comments" className="mt-8">
+          <Thread
+            subject={threadRef('vault_note', note.id)}
+            turns={comments}
+            placeholder="A note on this note, or a question for Dash."
+          />
+        </section>
 
         {/* Reading the note for the map (#763). A note the map never reads --
             a journal, or one carrying what looks like a key -- says so in the

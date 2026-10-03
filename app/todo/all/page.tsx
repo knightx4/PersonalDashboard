@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ListChecks } from 'lucide-react';
-import { requireUser } from '@/lib/auth/server';
+import { createClient, requireUser } from '@/lib/auth/server';
 import { workingRefsForPage } from '@/lib/talk/handoffs';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { loadAllTasks, loadParentTitles } from '@/lib/todo/tasks/load';
@@ -14,6 +14,9 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { QueueCleared } from '@/components/ui/queue-cleared';
 import { TaskRow } from '@/components/todo/task-row';
+import type { DevComment } from '@/lib/comments/load';
+import { loadRowThreads } from '@/lib/thread/store';
+import { THREAD_TABLES, threadRef } from '@/lib/thread/subjects';
 import { cn } from '@/lib/cn';
 import { FocusTask } from './focus';
 
@@ -68,11 +71,23 @@ export default async function AllTasksPage({
   // in. A workspace that cannot be read costs its labels and nothing else;
   // resolveAnchors swallows that per target.
   const links = await loadLinksForTasks(tasks.map((task) => task.id));
-  const [anchors, parents] = await Promise.all([
+  const [anchors, parents, threads] = await Promise.all([
     resolveAnchors(links, undefined, settings.timezone),
     // Which task an item came out of. Only the titles, and only for the rows
     // on this page -- the list here is not nested, so the row has to say it.
     loadParentTitles(user.id, tasks),
+    // The thread under each task (plan #1471). A failed read leaves them
+    // empty rather than the page broken.
+    createClient()
+      .then((client) =>
+        loadRowThreads(
+          client,
+          THREAD_TABLES.task,
+          tasks.map((task) => task.id),
+          { userId: user.id },
+        ),
+      )
+      .catch(() => new Map<string, DevComment[]>()),
   ]);
 
   return (
@@ -135,6 +150,7 @@ export default async function AllTasksPage({
                 task={task}
                 timezone={settings.timezone}
                 working={working}
+                thread={threads.get(threadRef('task', task.id))}
                 anchor={anchors.get(task.id) ?? null}
                 under={
                   parents.has(task.id)

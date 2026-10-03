@@ -1,6 +1,9 @@
 import { CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { requireUser } from '@/lib/auth/server';
+import { createClient, requireUser } from '@/lib/auth/server';
+import type { DevComment } from '@/lib/comments/load';
+import { loadRowThreads } from '@/lib/thread/store';
+import { THREAD_TABLES, threadRef } from '@/lib/thread/subjects';
 import { workingRefsForPage } from '@/lib/talk/handoffs';
 import { loadAgenda } from '@/lib/todo/agenda/load';
 import { loadDashResultsCount } from '@/lib/todo/agenda/dash-results';
@@ -39,6 +42,15 @@ export default async function TodoPage() {
   ]);
 
   const empty = agenda.piles.length === 0;
+
+  // The thread under each task on the agenda (plan #1471). A failed read
+  // leaves them empty rather than the page broken.
+  const taskIds = agenda.piles.flatMap(({ entries }) =>
+    entries.flatMap((entry) => (entry.kind === 'task' && entry.task ? [entry.task.id] : [])),
+  );
+  const threads = await createClient()
+    .then((client) => loadRowThreads(client, THREAD_TABLES.task, taskIds, { userId: user.id }))
+    .catch(() => new Map<string, DevComment[]>());
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -144,6 +156,7 @@ export default async function TodoPage() {
                         pile={pile}
                         items={entry.children}
                         working={working}
+                        thread={threads.get(threadRef('task', entry.task.id))}
                       />
                     ) : entry.item ? (
                       <AgendaItemRow key={entry.key} item={entry.item} timezone={agenda.timezone} />

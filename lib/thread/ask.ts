@@ -25,6 +25,7 @@ import { askMessage } from '@/lib/comments/context';
 import { DASH_MODELS } from '@/lib/dash/models';
 import { replyInThread, subjectLine, threadVoice, type ThreadDash } from '@/lib/dash/thread';
 import { pageFor } from '@/lib/sources/catalogue';
+import { whyNotRead } from '@/lib/vault/map/rules';
 import { addThreadTurn, loadThread, type AnyClient } from './store';
 import { rowText } from './row-text';
 
@@ -96,6 +97,11 @@ async function produceReply(input: RowAskInput): Promise<RowAskOutcome> {
     return refuse('No ANTHROPIC_API_KEY on the deployment, so I cannot answer. Your comment is saved.');
   }
 
+  // A vault note the map turns away (a journal, one carrying a key) is not
+  // sent to a model from its thread either.
+  const notRead = parsed.table === 'obsidian.notes' ? noteNotRead(row) : null;
+  if (notRead) return refuse(`I do not read this note. ${notRead} Your comment is saved.`);
+
   const page = pageFor(parsed.table)?.page;
   const title = page ? pageTitle(page, row) : null;
   const message = askMessage({
@@ -120,4 +126,11 @@ async function produceReply(input: RowAskInput): Promise<RowAskOutcome> {
 
   await say(input, reply.body);
   return { ok: true, message: reply.made.length > 0 ? 'Done, and said in the thread.' : 'Answered in the thread.' };
+}
+
+/** Why a vault note is kept from a model, or null when it may be read. */
+function noteNotRead(row: Readonly<Record<string, unknown>>): string | null {
+  const path = typeof row.path === 'string' ? row.path : '';
+  const body = typeof row.body === 'string' ? row.body : '';
+  return whyNotRead({ path, body })?.detail ?? null;
 }

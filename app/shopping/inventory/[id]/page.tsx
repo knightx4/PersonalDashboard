@@ -28,6 +28,10 @@ import { ItemSellPanel } from './sell-panel';
 import { CopiesPanel } from './copies-panel';
 import { MarkForSaleButton } from './mark-for-sale-button';
 import { stackContaining, stackUnits } from '@/lib/inventory/item-groups';
+import { Thread } from '@/components/thread/thread';
+import type { DevComment } from '@/lib/comments/load';
+import { loadThread } from '@/lib/thread/store';
+import { threadRef } from '@/lib/thread/subjects';
 
 export const metadata = { title: 'Inventory item' };
 
@@ -176,7 +180,7 @@ export default async function InventoryItemPage({
 
   // The other copies of this same item. Everything above is about the item;
   // this is where the boxes differ. See lib/inventory/item-groups.ts.
-  const [{ data: unitRows }, { data: groupRows }] = await Promise.all([
+  const [{ data: unitRows }, { data: groupRows }, thread] = await Promise.all([
     supabase
       .from('inventory_items')
       .select(
@@ -190,6 +194,10 @@ export default async function InventoryItemPage({
       .eq('user_id', user.id)
       .eq('status', 'owned'),
     supabase.from('item_groups').select('id, name, group_key').eq('user_id', user.id),
+    // A failed read leaves the thread empty rather than the page broken.
+    loadThread(supabase, threadRef('item', item.id), { userId: user.id }).catch(
+      (): DevComment[] => [],
+    ),
   ]);
 
   const units = ((unitRows ?? []) as unknown as CopyUnitRow[]).map((row) => {
@@ -546,6 +554,15 @@ export default async function InventoryItemPage({
           <DisposeForm itemId={item.id} />
         </div>
       )}
+
+      {/* Notes on the item; one tagged @dash is answered here, from the item (plan #1471). */}
+      <section aria-label="Comments" className="px-1">
+        <Thread
+          subject={threadRef('item', item.id)}
+          turns={thread}
+          placeholder="A note on this item, or a question for Dash."
+        />
+      </section>
     </div>
   );
 }

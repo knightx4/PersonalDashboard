@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Clock,
   GripVertical,
+  MessageSquare,
   Pencil,
   Pin,
   Plus,
@@ -47,6 +48,9 @@ import { TaskAbout } from './task-about';
 import { EditTask } from './task-form';
 import { formatClock } from '@/lib/clock';
 import { LinkedText } from '@/components/ui/linked-text';
+import { Thread } from '@/components/thread/thread';
+import type { DevComment } from '@/lib/comments/load';
+import { threadRef } from '@/lib/thread/subjects';
 import { MoveLabel } from '@/components/ui/move-label';
 import { taskMove } from '@/lib/todo/tasks/move';
 import { rowRef, withRun } from '@/lib/core/move';
@@ -125,6 +129,7 @@ export function TaskRow({
   items = [],
   under,
   working,
+  thread = [],
 }: {
   task: Task;
   timezone: string;
@@ -156,8 +161,16 @@ export function TaskRow({
   pile?: readonly string[];
   /** Refs an open Ask Dash hand-off is about (plan #1568); this row reads "Dash is on it" when it is one. */
   working?: readonly string[];
+  /**
+   * The thread under the task (plan #1471). A task has no page of its own, so
+   * its thread opens under the row: drawn whenever it has turns, and from
+   * Comment when it has none.
+   */
+  thread?: readonly DevComment[];
 }) {
   const [editing, setEditing] = useState(false);
+  /** Whether the thread is open under a task that has no comments yet. */
+  const [commenting, setCommenting] = useState(false);
   /** Whether the box for writing the next item is open under this task. */
   const [adding, setAdding] = useState(false);
   /** The anchor finder on a narrow row, which has no button of its own. */
@@ -292,6 +305,7 @@ export function TaskRow({
         }
       : { id: 'later', label: 'Later', onSelect: later },
     { id: 'add', label: 'Add an item', onSelect: () => setAdding(true) },
+    { id: 'comment', label: 'Comment', onSelect: () => setCommenting(true) },
     {
       id: 'about',
       label: anchor ? 'Point it at something else' : 'What is this about?',
@@ -574,6 +588,10 @@ export function TaskRow({
               <IconButton label="Edit everything" onClick={() => setEditing(true)}>
                 <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
               </IconButton>
+              {/* A note on the task, or a question for Dash about it (plan #1471). */}
+              <IconButton label="Comment" onClick={() => setCommenting(true)}>
+                <MessageSquare className="size-3.5" strokeWidth={1.75} aria-hidden />
+              </IconButton>
               {/* Last in the group, because it is the one action here that opens
                 something rather than doing something. `anchor` is what the
                 page resolved, so the unlink half only appears where there is
@@ -648,6 +666,19 @@ export function TaskRow({
           adding={adding}
           onDoneAdding={() => setAdding(false)}
         />
+      )}
+
+      {/* The thread under the task, at the indent of its items. Nothing at all
+          when there is none and Comment has not been pressed. */}
+      {(thread.length > 0 || commenting) && (
+        <div className="pb-2 pl-9 pr-3">
+          <Thread
+            subject={threadRef('task', task.id)}
+            turns={thread}
+            composerOpen={commenting && thread.length === 0}
+            placeholder="A note on this task, or a question for Dash."
+          />
+        </div>
       )}
     </div>
   );

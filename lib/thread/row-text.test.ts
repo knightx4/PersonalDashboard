@@ -29,4 +29,20 @@ describe('rowText', () => {
     expect(text).toContain('A row of public.somewhere.');
     expect(text).toContain('### note\n\n{"a":1}');
   });
+
+  it('keeps the path and folder of a vault note from Dash', () => {
+    const text = rowText('obsidian.notes', {
+      id: 'n1',
+      path: 'Health/Running plan.md',
+      title: 'Running plan',
+      body: 'Three runs a week.',
+      blob_sha: 'abc123',
+      search_tsv: "'run':1",
+    });
+    expect(text).toContain('### body\n\nThree runs a week.');
+    expect(text).not.toContain('Health/');
+    expect(text).not.toContain('### path');
+    expect(text).not.toContain('### blob_sha');
+    expect(text).not.toContain('### search_tsv');
+  });
 });

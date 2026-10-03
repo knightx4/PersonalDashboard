@@ -20,6 +20,10 @@ import { restoreDeletedOrder } from '@/app/shopping/orders/actions';
 import { Button } from '@/components/ui/button';
 import { orderItemTags } from '@/lib/orders/search';
 import { GmailAnchor } from '@/components/ui/gmail-anchor';
+import { Thread } from '@/components/thread/thread';
+import type { DevComment } from '@/lib/comments/load';
+import { loadThread } from '@/lib/thread/store';
+import { threadRef } from '@/lib/thread/subjects';
 
 export const metadata = { title: 'Order' };
 
@@ -81,6 +85,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     .select('id, status, refund_amount_cents, initiated_at, refunded_at, source_message_id')
     .eq('order_id', id)
     .order('initiated_at', { ascending: false });
+
+  // A failed read leaves the thread empty rather than the page broken.
+  const thread = await loadThread(supabase, threadRef('order', order.id), { userId: user.id }).catch(
+    (): DevComment[] => [],
+  );
 
   const merchant = Array.isArray(order.merchants) ? order.merchants[0] : order.merchants;
   const items = order.order_items ?? [];
@@ -555,6 +564,15 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             </dd>
           </div>
         </dl>
+
+        {/* Notes on the order; one tagged @dash is answered here, from the order (plan #1471). */}
+        <section aria-label="Comments" className="px-1">
+          <Thread
+            subject={threadRef('order', order.id)}
+            turns={thread}
+            placeholder="A note on this order, or a question for Dash."
+          />
+        </section>
       </div>
     </DetailLayout>
   );
