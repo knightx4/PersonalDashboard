@@ -22,6 +22,7 @@ function aim(id: string, name: string, about: string | null, extra: Partial<Aim>
     domainId: null,
     placedAt: STAMP,
     archivedAt: null,
+    goalId: null,
     createdAt: STAMP,
     updatedAt: STAMP,
     ...extra,

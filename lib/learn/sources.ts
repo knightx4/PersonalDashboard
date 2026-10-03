@@ -15,7 +15,7 @@ export const learnSources: ModuleSources = {
       search: ['name', 'about'],
       title: 'name',
       href: () => '/learn/goals',
-      note: 'An aim can be linked under a goal (goals.links kind aim), which shows its progress on the goal page.',
+      note: 'Each aim is a goal in the Learn area on /goals (aims.goal_id, goals 0066), and the goal owns its name, line and whether it is active. Read the goal rather than counting both.',
     },
     {
       table: 'learn.subjects',

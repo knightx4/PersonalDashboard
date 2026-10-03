@@ -20,12 +20,17 @@ describe('toAim', () => {
     domain_id: null,
     placed_at: null,
     archived_at: null,
+    goal_id: '00000000-0000-4000-8000-0000000000g1',
     created_at: '2026-09-24T00:00:00Z',
     updated_at: '2026-09-24T00:00:00Z',
   };
 
   it('reads a list aim', () => {
-    expect(toAim(row)).toMatchObject({ listSource: 'level3', depth: 'familiar' });
+    expect(toAim(row)).toMatchObject({
+      listSource: 'level3',
+      depth: 'familiar',
+      goalId: '00000000-0000-4000-8000-0000000000g1',
+    });
   });
 
   it('reads an unknown depth or list as the defaults', () => {
