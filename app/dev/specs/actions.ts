@@ -12,6 +12,7 @@ import { startRoutineRun } from '@/lib/plan/runs';
 import { buildPlanTree } from '@/lib/plan/tree';
 import { openFeaturesIn, scopeLabel, visionReshapeText } from '@/lib/plan/vision-reshape';
 import { decideVisionEdit, type DecidedVisionEdit } from '@/lib/specs/vision-review';
+import { decideSpecChange, type SpecChange, type SpecChangeDecision } from '@/lib/specs/changes';
 
 /**
  * Writing the vision for a workspace.
@@ -195,4 +196,73 @@ export async function dismissVisionEdit(
   formData: FormData,
 ): Promise<VisionEditActionState> {
   return (await decide(formData, false)).state;
+}
+
+/**
+ * Deciding a change Dash proposed to a spec (plan #1506, docs/SPEC-LAYER-SPEC.md
+ * Part 3).
+ *
+ * Both presses only record the answer here. Approving is its own action rather
+ * than a flag on a shared one for the same reason accepting a vision edit is:
+ * plan #1509 starts the run that commits the diff to docs/ and shapes the
+ * change into work, and that start belongs after the decision has landed, in
+ * `approveSpecChange` only.
+ */
+
+export type SpecChangeActionState = {
+  error?: string;
+  message?: string;
+};
+
+const changeIdSchema = z.string().uuid('That change is not one this page can find.');
+
+async function decideChange(
+  formData: FormData,
+  decision: SpecChangeDecision,
+): Promise<{ state: SpecChangeActionState; change?: SpecChange }> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = changeIdSchema.safeParse(String(formData.get('id') ?? ''));
+  if (!id.success) return { state: { error: id.error.issues[0].message } };
+
+  const result = await decideSpecChange(supabase, user.id, id.data, decision);
+  // Whether it failed or was decided elsewhere, the page should show the
+  // change as it now stands.
+  revalidatePath('/dev/specs');
+  // Home lists the changes waiting on you and its tab counts them.
+  revalidatePath('/dev/raised');
+  if ('error' in result) return { state: { error: result.error } };
+
+  return {
+    state: {
+      message:
+        decision === 'approved'
+          ? 'Approved. It stays on Specs until it is written into the spec.'
+          : 'Declined.',
+    },
+    change: result.change,
+  };
+}
+
+// latency: pending
+export async function approveSpecChange(
+  _prev: SpecChangeActionState,
+  formData: FormData,
+): Promise<SpecChangeActionState> {
+  const decided = await decideChange(formData, 'approved');
+  if (!decided.change) return decided.state;
+  // Plan #1509 hooks in here: with the change approved, start the run that
+  // commits `decided.change.diff` to docs/, marks it applied, and shapes it
+  // into approved features (or an overhaul, per #1508's answer), then return
+  // what that start says in place of the message below.
+  return decided.state;
+}
+
+// latency: pending
+export async function declineSpecChange(
+  _prev: SpecChangeActionState,
+  formData: FormData,
+): Promise<SpecChangeActionState> {
+  return (await decideChange(formData, 'declined')).state;
 }

@@ -12,6 +12,7 @@ import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { loadPlanForRequest } from '@/lib/plan/request-plan';
 import { buildPlanTree } from '@/lib/plan/tree';
 import { waitingOnYou } from '@/lib/plan/waiting';
+import { countProposedSpecChanges } from '@/lib/specs/changes';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { estimatePaidActions, paidActionsUnder } from '@/lib/core/spend/paid-actions';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
@@ -55,19 +56,23 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     return <NoPermission what="The Dev workspace" />;
   }
 
-  const [settings, counts, activity, raised, plan, mainCheck, costs] = await Promise.all([
-    loadAccountSettings(user.id),
-    loadModuleCounts(user.id),
-    loadActivity(),
-    loadRaisedNotifications(user.id),
-    loadPlanForRequest(user.id),
-    loadMainCheck(),
-    // The $ hint on a comment that asks Dash, and on a raise's "Yes, and…"
-    // (plan #918).
-    createCoreClient()
-      .then((core) => estimatePaidActions(core, user.id, paidActionsUnder('app/dev/')))
-      .catch(() => ({})),
-  ]);
+  const [settings, counts, activity, raised, plan, mainCheck, costs, specChanges] =
+    await Promise.all([
+      loadAccountSettings(user.id),
+      loadModuleCounts(user.id),
+      loadActivity(),
+      loadRaisedNotifications(user.id),
+      loadPlanForRequest(user.id),
+      loadMainCheck(),
+      // The $ hint on a comment that asks Dash, and on a raise's "Yes, and…"
+      // (plan #918).
+      createCoreClient()
+        .then((core) => estimatePaidActions(core, user.id, paidActionsUnder('app/dev/')))
+        .catch(() => ({})),
+      // Changes to specs waiting on a yes, which Home lists under To approve
+      // (plan #1506).
+      countProposedSpecChanges(supabase, user.id),
+    ]);
 
   /**
    * The badge is everything waiting on you, which is more than the raises.
@@ -113,7 +118,12 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   const sections: NavSection[] = [
     // The route stays /dev/raised, which keeps every link already written into
     // a notification, a comment and an old summary working.
-    { href: '/dev/raised', label: 'Home', icon: 'raised', badge: raised.length + waiting.length },
+    {
+      href: '/dev/raised',
+      label: 'Home',
+      icon: 'raised',
+      badge: raised.length + waiting.length + specChanges,
+    },
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
     { href: '/dev/ideas', label: 'Ideas', icon: 'ideas' },
