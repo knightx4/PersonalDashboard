@@ -5,7 +5,8 @@ import type { PageContext } from '@/lib/ask/page';
 import { whyNoReport } from '@/lib/learn/graph/tool-call';
 import { NO_HANDOFF } from '@/lib/talk/handoff';
 import { MAX_TURN, toModelMessages, type TalkCitation, type TalkToolCall, type TalkTurn } from '@/lib/talk/talk';
-import { dashTool, type DashTool, type DashWriteTool } from './registry';
+import { parseRef } from '@/lib/core/refs';
+import { dashTool, type DashHandoffTool, type DashTool, type DashWriteTool } from './registry';
 
 /**
  * The one loop every Dash conversation runs on (plan #1463, feature #1462;
@@ -310,9 +311,10 @@ export type DashRun = {
   propose?: DashProposer;
   /**
    * Keeps a hand-off and returns what to tell the model. Absent: every
-   * hand-off is refused. `seen` says whether Dash has seen the row it names.
+   * hand-off is refused. `seen` says whether Dash has seen the row it names;
+   * `tool` is which hand-off was called, since a thread has more than one.
    */
-  handOff?: (input: unknown, seen: DashSeen) => Promise<AskToolResult>;
+  handOff?: (input: unknown, seen: DashSeen, tool: DashHandoffTool) => Promise<AskToolResult>;
   /** Absent: every write is refused. */
   write?: DashWriter;
   anthropicApiKey: string;
@@ -358,10 +360,14 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   const known = new Map<string, TalkCitation>();
   for (const turn of input.turns) for (const c of turn.citations ?? []) known.set(citationKey(c), c);
   const seenByLookup: DashSeen = (table, ref) => known.has(citationKey({ table, ref }));
-  // A hand-off or a write may also name the row the page shows.
+  // A hand-off or a write may also name the row the page shows, or the row
+  // the thread hangs from (plan #1465).
   const row = context.page?.row;
+  const subject = context.subject ? parseRef(context.subject.ref) : null;
   const seenOrShown: DashSeen = (table, ref) =>
-    seenByLookup(table, ref) || (row?.table === table && row.ref === ref);
+    seenByLookup(table, ref) ||
+    (row?.table === table && row.ref === ref) ||
+    (subject?.table === table && subject.id === ref);
 
   const now = input.now ?? Date.now;
   const started = now();
@@ -378,7 +384,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     const tool = dashTool(name, voice.tools);
     if (tool?.kind === 'handoff') {
       if (!input.handOff) return Promise.resolve({ ok: false, error: NO_HANDOFF });
-      return input.handOff(args, seenOrShown);
+      return input.handOff(args, seenOrShown, tool);
     }
     if (tool?.kind === 'write') {
       if (!input.write) return Promise.resolve({ ok: false, error: NO_WRITES });

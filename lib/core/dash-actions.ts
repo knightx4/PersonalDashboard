@@ -140,6 +140,28 @@ const MANAGED = new Set(['id', 'user_id', 'created_at', 'updated_at']);
 const GONE = 'That change is not there any more.';
 
 /**
+ * The kinds Dash's write tools record (lib/dash/writes.ts, WRITE_TOOL_NAMES).
+ * Ask's own undo (lib/ask/changes.ts) puts these back whichever surface made
+ * them, since a return touches two rows and a ticked-off todo closes its
+ * items too. A thread makes them as well since plan #1465.
+ */
+export const WRITE_TOOL_KINDS: readonly string[] = [
+  'add_todo',
+  'change_todo',
+  'close_todo',
+  'add_goal',
+  'add_goal_step',
+  'close_goal_step',
+  'mark_returned',
+  'add_role_note',
+];
+
+/** Whether Ask's own undo puts this change back, rather than the generic rule here. */
+export function undoneByAsk(action: Pick<DashAction, 'surface' | 'kind'>): boolean {
+  return action.surface === 'ask' || (action.surface === 'thread' && WRITE_TOOL_KINDS.includes(action.kind));
+}
+
+/**
  * Why a change has no Undo, when its writer said so (plan #1571). Some writes
  * cannot sensibly be put back by restoring one row: a payment's amount is
  * worked out from every charge filed on it, and a charge moved between
@@ -336,8 +358,14 @@ export function planUndo(
   if (action.status !== 'done') return { ok: false, reason: notDone(action.status) };
   const none = noUndoReason(action);
   if (none) return { ok: false, reason: none };
-  if (action.surface === 'ask' && !fromAsk) {
-    return { ok: false, reason: 'This change was made in Ask Dash, and is undone from there.' };
+  if (undoneByAsk(action) && !fromAsk) {
+    return {
+      ok: false,
+      reason:
+        action.surface === 'ask'
+          ? 'This change was made in Ask Dash, and is undone from there.'
+          : 'This change is undone by Ask Dash\'s own rule, from Home.',
+    };
   }
   // A capture line can touch more than its one row (an added step and the
   // progress filed on it), so it is undone by capture's own rule
@@ -506,7 +534,7 @@ export async function undoDashAction(
   const fromAsk = options.fromAsk === true;
   const ref = action.subjectRef;
   const [current, later] =
-    action.status === 'done' && ref && (action.surface !== 'ask' || fromAsk) && action.surface !== 'capture'
+    action.status === 'done' && ref && (!undoneByAsk(action) || fromAsk) && action.surface !== 'capture'
       ? await Promise.all([readSubject(deps.db, ref), laterActionOn(deps, action)])
       : [null, false];
   const decided = planUndo(action, current, later, fromAsk);

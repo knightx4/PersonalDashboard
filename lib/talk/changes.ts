@@ -192,11 +192,14 @@ export type MadeDashChange = NewDashChange & {
  * conversation: done from the start, with the row it wrote and that row's
  * values before and after, so its card under the answer offers Undo. Tied to
  * the answer by attachProposals once the answer is kept, like a proposal.
+ * A change made in a thread is kept the same way with surface 'thread' and
+ * no conversation, and Home offers its Undo.
  */
 export async function insertMadeChange(
   core: CoreSupabaseClient,
   userId: string,
-  conversationId: string,
+  /** The `ask` conversation; null for a change made in a thread (plan #1465), which has none. */
+  conversationId: string | null,
   made: MadeDashChange,
   now: string = new Date().toISOString(),
 ): Promise<DashChange> {
@@ -205,7 +208,7 @@ export async function insertMadeChange(
     .insert({
       user_id: userId,
       conversation_id: conversationId,
-      surface: 'ask',
+      surface: conversationId === null ? 'thread' : 'ask',
       kind: made.kind,
       input: made.input,
       status: 'done',

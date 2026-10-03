@@ -1,23 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import { ASK_TOOLS, ASK_TOOL_NAMES, IN_APP_ONLY_TOOLS } from '@/lib/ask/tools';
 import { HAND_OFF_TOOL_NAME } from '@/lib/talk/handoff';
-import { DASH_TOOLS, dashTool, dashToolsOf } from './registry';
+import { WRITE_TOOL_KINDS } from '@/lib/core/dash-actions';
+import { ASK_DASH_TOOLS, DASH_TOOLS, dashTool, dashToolsOf, threadDashTools } from './registry';
+import { DEV_THREAD_TABLES, GOAL_THREAD_TABLE, ROLE_THREAD_TABLE, THREAD_TOOL_NAMES } from './thread-tools';
 import { WRITE_TOOL_NAMES } from './writes';
 import { isShownLookup, WRITE_TOOL_NAMES_SHOWN_AS_CARDS } from '@/lib/talk/lookups';
 
 /** Dash's one tool registry (plan #1463): every tool Ask had, each declared once. */
 describe('DASH_TOOLS', () => {
-  it('lists every lookup, the writes, the watch proposal and the hand-off, in the order sent', () => {
+  it('lists every lookup, the writes, the thread tools, the watch proposal and the hand-off, in the order sent', () => {
     expect(DASH_TOOLS.map((t) => t.name)).toEqual([
       ...ASK_TOOL_NAMES,
       ...WRITE_TOOL_NAMES,
+      ...THREAD_TOOL_NAMES,
       'propose_watch',
       HAND_OFF_TOOL_NAME,
     ]);
     expect(dashToolsOf('lookup').map((t) => t.name)).toEqual([...ASK_TOOL_NAMES]);
     // The other three proposals became writes (plan #1440); a watch acts outside the app.
     expect(dashToolsOf('proposal').map((t) => t.name)).toEqual(['propose_watch']);
-    expect(dashToolsOf('handoff').map((t) => t.name)).toEqual([HAND_OFF_TOOL_NAME]);
+    expect(dashToolsOf('handoff').map((t) => t.name)).toEqual([
+      'send_step',
+      'pass_to_session',
+      'take_step',
+      'pass_to_routine',
+      HAND_OFF_TOOL_NAME,
+    ]);
     expect(WRITE_TOOL_NAMES).toEqual([
       'add_todo',
       'change_todo',
@@ -28,7 +37,46 @@ describe('DASH_TOOLS', () => {
       'mark_returned',
       'add_role_note',
     ]);
-    expect(dashToolsOf('write').map((t) => t.name)).toEqual(WRITE_TOOL_NAMES);
+    expect(dashToolsOf('write').map((t) => t.name)).toEqual([
+      ...WRITE_TOOL_NAMES,
+      'file_idea',
+      'file_note',
+      'add_step',
+      'reword',
+      'build_step',
+      'file_goal_record',
+      'schedule_goal_step',
+      'write_cover_letter',
+    ]);
+    // Ask's undo puts back exactly the kinds the write tools record.
+    expect([...WRITE_TOOL_KINDS]).toEqual(WRITE_TOOL_NAMES);
+  });
+
+  it('keeps a thread\'s own tools out of Ask', () => {
+    expect(ASK_DASH_TOOLS.map((t) => t.name)).toEqual([
+      ...ASK_TOOL_NAMES,
+      ...WRITE_TOOL_NAMES,
+      'propose_watch',
+      HAND_OFF_TOOL_NAME,
+    ]);
+  });
+
+  it('offers each thread the lookups, the writes and its own row\'s tools, without the watch or the hand-off', () => {
+    const own = (table: string) =>
+      threadDashTools(table)
+        .map((t) => t.name)
+        .filter((name) => !ASK_TOOL_NAMES.includes(name as never) && !WRITE_TOOL_NAMES.includes(name));
+    for (const table of [...Object.values(DEV_THREAD_TABLES), GOAL_THREAD_TABLE, ROLE_THREAD_TABLE]) {
+      const names = threadDashTools(table).map((t) => t.name);
+      expect(names.slice(0, ASK_TOOL_NAMES.length + WRITE_TOOL_NAMES.length)).toEqual([...ASK_TOOL_NAMES, ...WRITE_TOOL_NAMES]);
+      expect(names).not.toContain('propose_watch');
+      expect(names).not.toContain(HAND_OFF_TOOL_NAME);
+    }
+    expect(own(DEV_THREAD_TABLES.step)).toEqual(['file_idea', 'file_note', 'add_step', 'reword', 'build_step', 'send_step', 'pass_to_session']);
+    expect(own(DEV_THREAD_TABLES.raise)).toEqual(['file_idea', 'file_note', 'add_step', 'build_step', 'send_step', 'pass_to_session']);
+    expect(own(DEV_THREAD_TABLES.change)).toEqual(['file_idea', 'file_note', 'reword', 'pass_to_session']);
+    expect(own(GOAL_THREAD_TABLE)).toEqual(['file_goal_record', 'schedule_goal_step', 'take_step', 'pass_to_routine']);
+    expect(own(ROLE_THREAD_TABLE)).toEqual(['write_cover_letter']);
   });
 
   it('names each tool once, by the name its definition sends', () => {

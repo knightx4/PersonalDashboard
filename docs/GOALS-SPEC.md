@@ -622,8 +622,9 @@ yours".
 
 ### From a comment
 
-The quick `@dash` reply on a step (`lib/goals/comment-model.ts`) has four
-outcomes: answer, file facts as drafts, pass the comment to the goals
+The `@dash` reply on a step (`lib/goals/ask.ts`) runs on Dash's shared loop,
+with Ask Dash's lookups and writes. Beside answering, it can file facts as
+drafts, date the step or put it on Todo, pass the comment to the goals
 routine, or take the step. When it takes the step, `commentMode` picks the
 job: a step of yours with no sub-steps is prepared, and anything else is
 sent (`lib/goals/ask.ts`). The comment goes into the brief under "What they

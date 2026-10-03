@@ -165,13 +165,13 @@ function now(deps: ChangeDeps): string {
   return deps.now ? deps.now() : new Date().toISOString();
 }
 
-async function loadOne(deps: ChangeDeps, id: string): Promise<DashChange | null> {
+async function loadOne(deps: ChangeDeps, id: string, surface: 'ask' | 'thread' = 'ask'): Promise<DashChange | null> {
   const { data, error } = await deps.core
     .from(DASH_ACTIONS)
     .select(DASH_CHANGE_SELECT)
     .eq('id', id)
     .eq('user_id', deps.userId)
-    .eq('surface', 'ask')
+    .eq('surface', surface)
     .maybeSingle();
   if (error) throw new Error(`Reading the change failed: ${error.message}`);
   return data ? toDashChange(data) : null;
@@ -622,13 +622,20 @@ export async function declineChange(deps: ChangeDeps, id: string): Promise<Chang
  * saying why, once the row it wrote has moved on.
  */
 export async function undoChange(deps: ChangeDeps, id: string): Promise<ChangeOutcome> {
-  const change = await loadOne(deps, id);
+  // A change a thread made with one of Dash's write tools is undone here too
+  // (plan #1465; undoneByAsk in lib/core/dash-actions.ts).
+  let surface: 'ask' | 'thread' = 'ask';
+  let change = await loadOne(deps, id);
+  if (!change) {
+    surface = 'thread';
+    change = await loadOne(deps, id, surface);
+  }
   if (!change) return { ok: false, error: GONE, change: null };
   if (change.status !== 'done' || !change.writtenRef) {
     return { ok: false, error: notConfirmed(change.status), change };
   }
 
-  if (!isProposalKind(change)) return undoWrite(deps, change);
+  if (!isProposalKind(change)) return undoWrite(deps, change, surface);
 
   try {
     await takeBack(deps, change, change.writtenRef);
@@ -646,7 +653,7 @@ export async function undoChange(deps: ChangeDeps, id: string): Promise<ChangeOu
   if (error) throw new Error(`Marking the change undone failed: ${error.message}`);
   const rows = (data ?? []) as Parameters<typeof toDashChange>[0][];
   if (rows.length === 0) {
-    const current = await loadOne(deps, id);
+    const current = await loadOne(deps, id, surface);
     return { ok: false, error: current ? notConfirmed(current.status) : GONE, change: current };
   }
   return { ok: true, change: toDashChange(rows[0]) };
@@ -691,13 +698,15 @@ export async function writeChange(
  * (undoDashAction), then reopen the items a ticked-off todo closed with it,
  * where they are still ticked. The record is marked undone by the rule.
  */
-async function undoWrite(deps: ChangeDeps, change: DashChange): Promise<ChangeOutcome> {
+async function undoWrite(deps: ChangeDeps, change: DashChange, surface: 'ask' | 'thread'): Promise<ChangeOutcome> {
   const result = await undoDashAction(
     { userId: deps.userId, core: deps.core, db: deps.db, now: deps.now },
     change.id,
     { fromAsk: true },
   );
-  if (!result.ok) return { ok: false, error: result.error, change: result.action ? await loadOne(deps, change.id) : null };
+  if (!result.ok) {
+    return { ok: false, error: result.error, change: result.action ? await loadOne(deps, change.id, surface) : null };
+  }
 
   const items = change.undo?.items;
   if (change.kind === 'close_todo' && Array.isArray(items) && items.length > 0) {
@@ -710,6 +719,6 @@ async function undoWrite(deps: ChangeDeps, change: DashChange): Promise<ChangeOu
       .eq('status', 'done');
     if (error) console.error(`ask change ${change.id}: reopening the todo's items failed`, error);
   }
-  const now = await loadOne(deps, change.id);
+  const now = await loadOne(deps, change.id, surface);
   return now ? { ok: true, change: now } : { ok: false, error: GONE, change: null };
 }

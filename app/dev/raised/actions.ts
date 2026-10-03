@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import { requestDashDeps } from '@/lib/ask/clients';
+import { threadDashInRequest } from '@/lib/talk/ask-request';
 import { carryOut } from '@/lib/comments/act';
 import { askDash } from '@/lib/comments/ask';
 import { isCommentTarget, type CommentTarget } from '@/lib/comments/load';
@@ -153,6 +154,7 @@ export async function decideRaise(
         commentId: said,
         question: extra,
         dash: await requestDashDeps(user.id),
+        dashThread: await threadDashInRequest(user.id),
       })
     : null;
   if (asked?.ok && asked.redraw) revalidatePath(asked.redraw);
