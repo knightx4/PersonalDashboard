@@ -81,6 +81,10 @@ export const MEMORY_SOURCE_MODULES: Readonly<Record<string, ModuleId | null>> = 
   'learn.card_notes': 'learn',
   'learn.feed_cards': 'learn',
   'public.order_items': 'shopping',
+  // What the person said in a thread or in Ask, one row per conversation
+  // (plan #1466). Searched whichever workspaces are on: a thread is keyed by
+  // its row's ref, not by a workspace's table.
+  'core.conversations': null,
   // Dev (plan #1321): embedded for the owner only, and searched only when the
   // asker is the owner as well (recall checks is_owner before asking for them).
   'public.ideas': 'dev',
