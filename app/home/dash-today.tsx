@@ -21,7 +21,8 @@ export const GROUP_SHOWN = 4;
  * A busy day can put dozens of plan closes under Dev, so each group shows its
  * newest few and folds the rest. An undo that goes through leaves the row in
  * place, said as undone, so the press has something to answer it; the next
- * load lists it the same way.
+ * load lists it the same way. A change recorded with no Undo (plan #1571)
+ * says why beneath its sentence instead of offering the button.
  */
 export function DashTodaySection({
   groups,
@@ -136,7 +137,7 @@ function DashTodayRow({
             <Undo2 className="size-3.5" strokeWidth={2} aria-hidden />
             Undone
           </span>
-        ) : (
+        ) : entry.noUndo ? null : (
           <Button
             type="button"
             size="sm"
@@ -151,6 +152,7 @@ function DashTodayRow({
           </Button>
         )}
       </div>
+      {entry.noUndo && !undone && <p className="pl-15 text-small text-ink-muted">{entry.noUndo}</p>}
       {error && (
         <div className="pl-15">
           <FieldError>{error}</FieldError>

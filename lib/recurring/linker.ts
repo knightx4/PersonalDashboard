@@ -227,6 +227,8 @@ async function readOne(
       messageId: envelope.id,
       senderDomain: domainFromAddress(bareAddress(envelope.fromAddress) ?? envelope.fromAddress),
       reading: reading.value,
+      // Home lists what the sync filed, as Dash's (plan #1571).
+      record: true,
     });
     return { ...base, claimed: true, parse_status: 'parsed', error: null, charge_id: filed.chargeId };
   } catch (err) {

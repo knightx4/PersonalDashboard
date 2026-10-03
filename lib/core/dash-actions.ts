@@ -140,6 +140,19 @@ const MANAGED = new Set(['id', 'user_id', 'created_at', 'updated_at']);
 const GONE = 'That change is not there any more.';
 
 /**
+ * Why a change has no Undo, when its writer said so (plan #1571). Some writes
+ * cannot sensibly be put back by restoring one row: a payment's amount is
+ * worked out from every charge filed on it, and a charge moved between
+ * payments touches three rows. The writer records the change anyway, so Home
+ * lists it, with the sentence saying why in `undo.none`; Home shows that
+ * sentence in place of the button, and an undo is refused with it.
+ */
+export function noUndoReason(action: Pick<DashAction, 'undo'>): string | null {
+  const none = action.undo?.none;
+  return typeof none === 'string' && none.trim() !== '' ? none.trim() : null;
+}
+
+/**
  * The rows that can hang off a row Dash added, by the table it added it to.
  * Undoing an add deletes the row, and the database would take these with it
  * (or blank the link to it), so an add that has gained any is not undone:
@@ -186,6 +199,12 @@ const DEPENDENTS: Record<string, { schema: AskSchema; table: string; column: str
   // What scheduled runs add (plan #1570): the job sweep's withdrawal events.
   'job_search.application_events': [
     { schema: 'job_search', table: 'waiting_dismissals', column: 'application_event_id' },
+  ],
+  // What the mail sync adds (plan #1571): a payment filed from a bill. Its
+  // charges come from the same mail and go with it; a name the person
+  // corrected onto it is their later work.
+  'public.recurring_payments': [
+    { schema: 'public', table: 'recurring_payee_aliases', column: 'payment_id' },
   ],
   'todo.tasks': [
     { schema: 'todo', table: 'tasks', column: 'parent_id' },
@@ -266,9 +285,15 @@ function notDone(status: DashActionStatus): string {
 export function planUndo(
   action: DashAction,
   current: Values | null,
-  laterAction: boolean,
+  /**
+   * Whether Dash has changed the same row again since: true, or 'fixed' when
+   * that later change is one with no Undo of its own.
+   */
+  laterAction: boolean | 'fixed',
 ): { ok: true; plan: UndoPlan } | { ok: false; reason: string } {
   if (action.status !== 'done') return { ok: false, reason: notDone(action.status) };
+  const none = noUndoReason(action);
+  if (none) return { ok: false, reason: none };
   if (action.surface === 'ask') {
     return { ok: false, reason: 'This change was made in Ask Dash, and is undone from there.' };
   }
@@ -286,6 +311,12 @@ export function planUndo(
       (op === 'delete' && before !== null));
   if (!recorded) {
     return { ok: false, reason: 'Dash did not keep what this changed, so it cannot be undone.' };
+  }
+  if (laterAction === 'fixed') {
+    return {
+      ok: false,
+      reason: 'Dash has changed this again since, in a way it cannot undo, so this cannot be undone either.',
+    };
   }
   if (laterAction) {
     return { ok: false, reason: 'Dash has changed this again since. Undo that later change first.' };
@@ -353,18 +384,20 @@ async function hasDependents(db: AskDb, ref: string): Promise<boolean> {
   return false;
 }
 
-async function laterActionOn(deps: DashActionDeps, action: DashAction): Promise<boolean> {
+async function laterActionOn(deps: DashActionDeps, action: DashAction): Promise<boolean | 'fixed'> {
   const { data, error } = await deps.core
     .from(DASH_ACTIONS_TABLE)
-    .select('id')
+    .select('id, undo')
     .eq('user_id', deps.userId)
     .eq('subject_ref', action.subjectRef)
     .eq('status', 'done')
     .gt('created_at', action.createdAt)
     .neq('id', action.id)
-    .limit(1);
+    .limit(20);
   if (error) throw new Error(`Reading later changes failed: ${error.message}`);
-  return (data ?? []).length > 0;
+  const later = (data ?? []) as { undo?: Values | null }[];
+  if (later.length === 0) return false;
+  return later.some((row) => noUndoReason({ undo: row.undo ?? null })) ? 'fixed' : true;
 }
 
 /**
@@ -474,6 +507,11 @@ export type DashActionEntry = {
   beforeValues?: Values | null;
   /** What undoing needs beyond the row, kept in the `undo` column. */
   undo?: Values | null;
+  /**
+   * The sentence saying why this change has no Undo, for a write that cannot
+   * be put back by restoring its row (noUndoReason). Kept as `undo.none`.
+   */
+  noUndo?: string;
 };
 
 /** Longest summary kept; a longer one is cut at a word. */
@@ -533,7 +571,7 @@ export async function recordDashAction(
         before_values: before,
         after_values: after,
         summary: clipped(entry.summary),
-        undo: entry.undo ?? null,
+        undo: entry.noUndo ? { ...(entry.undo ?? {}), none: entry.noUndo } : (entry.undo ?? null),
       })
       .select('id')
       .single();

@@ -163,6 +163,12 @@ Undo restores the before values, and is refused when the row has changed since
 Dash wrote it, the same rule `goals.history` uses. Goal runs keep writing
 `goals.history` and also write here, so there is one place to read.
 
+A write that restoring one row cannot put back is still recorded, with the
+sentence saying why in `undo.none`, and Home shows that sentence where the
+Undo would be. A payment the mail sync worked out again from a new charge is
+one, and so is a charge the receipt re-read moved between payments: the first
+would leave the charge behind, and the second touched three rows at once.
+
 A **Dash today** panel lists what Dash did today, grouped by workspace, each
 with its Undo, and what is running now. Home shows its count. The runs in
 progress (`goals.runs`, `plan_runs` and hand-offs in flight) are what set

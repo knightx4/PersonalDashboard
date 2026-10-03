@@ -14,10 +14,18 @@
  *   morning goals run's held steps
  *   /api/cron/youtube-library: the skip verdicts on the watch list (plan #1572),
  *   and a skip put back from Home staying put back (plan #1574)
+ *   the mail sync's bills (the inbox-incremental cron and the daily inbox
+ *   stage) and the receipt re-read (/api/cron/recurring-reread and its daily
+ *   stage), on the person's recurring payments (plan #1571)
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { SchemaClient } from '@/lib/ask/db';
 import { undoDashAction } from '@/lib/core/dash-actions';
+import type { RecurringExtraction } from '@/lib/recurring/extraction';
+import type { RecurringReading } from '@/lib/recurring/extract';
+import { memoryClient } from '@/lib/recurring/memory-client';
+import { MOVED_NO_UNDO, UPDATED_NO_UNDO } from '@/lib/recurring/record';
+import { dashTodayEntry } from '@/lib/shell/dash-today';
 import { fakeDashDeps, fakeSchemaDb, type FakeTables } from '@/tests/stubs/fake-schema-db';
 
 vi.mock('@/lib/jobs/jd/lookup', () => ({
@@ -34,6 +42,8 @@ const { releaseStaleClaims } = await import('@/inngest/dev/claims');
 const { fileNightIdeas } = await import('@/lib/ideas/file');
 const { holdActingSteps } = await import('@/lib/goals/hold-acts-store');
 const { judgeWatchLists } = await import('@/lib/learn/youtube/judging');
+const { fileRecurringReading } = await import('@/lib/recurring/store');
+const { rereadStoreReceipts } = await import('@/lib/recurring/reread');
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const DAY = 24 * 60 * 60 * 1000;
@@ -497,5 +507,181 @@ describe('the YouTube library (/api/cron/youtube-library)', () => {
 
     expect(tables['learn.watch_list'][1]).toMatchObject({ verdict: 'watch', verdict_by: 'you' });
     expect(records(tables)).toHaveLength(0);
+  });
+});
+
+describe('the mail sync and the receipt re-read, on recurring payments (plan #1571)', () => {
+  const RECURRING = ['recurring_payments', 'recurring_charges', 'recurring_payee_aliases', 'recurring_messages'];
+
+  /**
+   * lib/recurring's code over its own in-memory client (which upserts), with
+   * `schema` for the record: public is the same tables, core is the fake
+   * schema db. The arrays are shared, so Home's undo over fakeDashDeps sees
+   * the rows the run wrote.
+   */
+  function recurringWorld(now = '2026-10-03T08:00:00Z') {
+    const t: Record<string, Row[]> = Object.fromEntries(RECURRING.map((name) => [name, []]));
+    const fake: FakeTables = Object.fromEntries(RECURRING.map((name) => [`public.${name}`, t[name]]));
+    const client = (at = now) => {
+      const mem = memoryClient(t);
+      const db = fakeSchemaDb(fake, at);
+      return Object.assign(mem, {
+        schema: (name: string) => (name === 'public' ? mem : db(name)),
+      });
+    };
+    return { t, fake, client };
+  }
+
+  const reading = (over: Partial<RecurringExtraction> = {}): RecurringExtraction => ({
+    payee: 'Netflix',
+    kind: 'subscription',
+    event: 'charge',
+    amountCents: 1549,
+    previousAmountCents: null,
+    currency: 'USD',
+    period: 'month',
+    occurredOn: '2026-09-21',
+    dueOn: null,
+    ...over,
+  });
+
+  it('records a payment the sync adds from a bill, and Home can undo it', async () => {
+    const { t, fake, client } = recurringWorld();
+    const { paymentId } = await fileRecurringReading(client(), {
+      userId: USER,
+      messageId: 'm-1',
+      senderDomain: 'netflix.com',
+      reading: reading(),
+      record: true,
+    });
+
+    expect(records(fake)).toHaveLength(1);
+    expectScheduled(records(fake));
+    expect(records(fake)[0]).toMatchObject({
+      kind: 'file_recurring_payment',
+      subject_ref: `public.recurring_payments:${paymentId}`,
+      op: 'insert',
+      undo: null,
+    });
+    expect(String(records(fake)[0].summary)).toContain('Dash added Netflix to your recurring payments');
+    expect(String(records(fake)[0].summary)).toContain('$15.49 charge on 21 Sept');
+
+    const undone = await undoDashAction(fakeDashDeps(fake, USER), String(records(fake)[0].id));
+    expect(undone.ok).toBe(true);
+    expect(t.recurring_payments).toHaveLength(0);
+  });
+
+  it('records a later bill on the same payment with the sentence saying why it has no Undo', async () => {
+    const { fake, client } = recurringWorld();
+    await fileRecurringReading(client(), {
+      userId: USER,
+      messageId: 'm-1',
+      senderDomain: 'netflix.com',
+      reading: reading(),
+      record: true,
+    });
+    await fileRecurringReading(client('2026-10-03T09:00:00Z'), {
+      userId: USER,
+      messageId: 'm-2',
+      senderDomain: 'netflix.com',
+      reading: reading({ occurredOn: '2026-10-21' }),
+      record: true,
+    });
+
+    const [added, updated] = records(fake);
+    expect(updated).toMatchObject({ kind: 'update_recurring_payment', op: 'update', undo: { none: UPDATED_NO_UNDO } });
+    expect(updated.before_values).toMatchObject({ payee: 'Netflix', last_charged_on: '2026-09-21' });
+    expect(updated.after_values).toMatchObject({ last_charged_on: '2026-10-21' });
+    expectScheduled(records(fake));
+
+    // Home shows the sentence in place of the button, and the undo says the same.
+    const entry = dashTodayEntry(
+      { ...(updated as Parameters<typeof dashTodayEntry>[0]), conversation_id: null, turn_id: null, input: null, declined_at: null },
+      '2026-10-03',
+    );
+    expect(entry?.noUndo).toBe(UPDATED_NO_UNDO);
+    const refused = await undoDashAction(fakeDashDeps(fake, USER), String(updated.id));
+    expect(refused).toMatchObject({ ok: false, error: UPDATED_NO_UNDO });
+
+    // The add can no longer be taken back either, since the second bill hangs off it.
+    const blocked = await undoDashAction(fakeDashDeps(fake, USER), String(added.id));
+    expect(blocked.ok).toBe(false);
+    expect(blocked.ok ? '' : blocked.error).toMatch(/in a way it cannot undo/);
+  });
+
+  it('records nothing when a filing changes nothing, or when the caller does not ask', async () => {
+    const { fake, client } = recurringWorld();
+    await fileRecurringReading(client(), {
+      userId: USER,
+      messageId: 'm-1',
+      senderDomain: 'netflix.com',
+      reading: reading(),
+    });
+    expect(records(fake)).toHaveLength(0);
+    await fileRecurringReading(client(), {
+      userId: USER,
+      messageId: 'm-1',
+      senderDomain: 'netflix.com',
+      reading: reading(),
+      record: true,
+    });
+    expect(records(fake)).toHaveLength(0);
+  });
+
+  it('records each charge the re-read moves off a store, saying why it has no Undo', async () => {
+    const { t, fake, client } = recurringWorld();
+    t.recurring_payments.push(
+      { id: 'apple', user_id: USER, payee: 'Apple', payee_key: 'apple', kind: 'subscription', sender_domain: 'email.apple.com', status: 'active', currency: 'USD' },
+      { id: 'yt', user_id: USER, payee: 'YouTube Premium', payee_key: 'youtubepremium', kind: 'subscription', sender_domain: 'email.apple.com', status: 'active', currency: 'USD' },
+    );
+    t.recurring_charges.push({
+      id: 'a',
+      user_id: USER,
+      payment_id: 'apple',
+      message_id: 'm-a',
+      event: 'charge',
+      amount_cents: 1899,
+      previous_amount_cents: null,
+      currency: 'USD',
+      period: null,
+      occurred_on: '2026-04-13',
+      due_on: null,
+      created_at: '2026-04-13T09:00:00Z',
+    });
+    t.recurring_messages.push({ id: 'm-a', user_id: USER, parse_status: 'parsed', error: null });
+
+    const read = vi.fn(
+      async (input: { receivedOn: string }): Promise<RecurringReading> => ({
+        ok: true,
+        source: 'llm',
+        value: reading({ payee: 'YouTube Premium', amountCents: 100, occurredOn: input.receivedOn }),
+      }),
+    );
+    const result = await rereadStoreReceipts(client() as never, {
+      userId: USER,
+      providerIds: async (ids) => new Map(ids.map((id) => [id, `g-${id}`])),
+      fetchMessage: async () => ({
+        subject: 'Your receipt from Apple.',
+        text: 'YouTube Premium',
+        fromAddress: 'Apple <no_reply@email.apple.com>',
+      }),
+      read,
+    });
+
+    expect(result.moved).toHaveLength(1);
+    expect(records(fake)).toHaveLength(1);
+    expectScheduled(records(fake));
+    const [moved] = records(fake);
+    expect(moved).toMatchObject({
+      kind: 'reread_recurring_charge',
+      subject_ref: 'public.recurring_payments:yt',
+      op: 'update',
+      undo: { none: MOVED_NO_UNDO },
+    });
+    expect(moved.summary).toBe(
+      'Dash read a receipt again and moved its $18.99 charge of 13 Apr from Apple to YouTube Premium. Apple had nothing left on it, so Dash removed it.',
+    );
+    const refused = await undoDashAction(fakeDashDeps(fake, USER), String(moved.id));
+    expect(refused).toMatchObject({ ok: false, error: MOVED_NO_UNDO });
   });
 });
