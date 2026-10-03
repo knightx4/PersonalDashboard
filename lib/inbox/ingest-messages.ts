@@ -11,6 +11,7 @@ import { gmailProvider } from '@/lib/email/providers/gmail';
 import type { MessageEnvelope } from '@/lib/core/inbox/envelopes';
 import { attachBookDetailsForInventory } from '@/lib/books/attach-order-books';
 import { buildEmailOrder } from '@/lib/orders/create-email-order';
+import { recordOrderImport } from '@/lib/orders/record';
 import { applyLifecycleToOrder } from '@/lib/orders/apply-lifecycle';
 import { findOrderForLifecycleEmail } from '@/lib/orders/find-for-lifecycle';
 import {
@@ -404,6 +405,17 @@ async function handleOrderConfirmation(
     counters.errors += 1;
     return;
   }
+
+  // The order and the inventory items it made, as one change Home lists with
+  // an Undo (plan #1576). Recorded now, before the book lookup below adds its
+  // details, which go with the order on an undo.
+  await recordOrderImport(supabase, userId, {
+    orderId: bundle.order.id,
+    merchant: resolvedMerchant?.name ?? extraction.result.order.merchantName ?? null,
+    orderDate: bundle.order.orderDate,
+    lines: bundle.orderItems,
+    units: bundle.inventoryItems.length,
+  });
 
   // Books get their ISBN identity here so the sell assistant can route them
   // without the user re-entering anything. Soft-failure: the order stands
