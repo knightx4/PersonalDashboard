@@ -282,7 +282,7 @@ closes.
 Checked by: test `lib/plan/ui-check-guard.test.ts`, pending #1534.
 
 **R5.** Every preference names the note it came from.
-Checked by: test `tests/dev-ui-taste.test.ts`, pending #1529.
+Checked by: test `tests/dev-ui-taste.test.ts`.
 
 **R6.** Every animation has a reduced-motion version.
 Checked by: test `tests/dev-ui-moments.test.ts`.
