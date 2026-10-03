@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Image as ImageIcon, ImageOff, Mail } from 'lucide-react';
 import { AlsoInLine } from '@/components/news/also-in';
 import { StoryRating } from '@/components/news/story-rating';
-import { QueueCleared } from '@/components/ui/queue-cleared';
+import { QueueCleared } from '@/components/motion/clear';
 import { SaveStoryButton } from '@/components/news/save-story-button';
 import { SendStoryButtons } from '@/components/news/send-story-buttons';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';

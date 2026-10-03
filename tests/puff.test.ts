@@ -9,7 +9,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PUFF_MS, puffAt, puffOffsets, puffOrigin } from '@/components/ui/puff';
+import { PUFF_MS, puffAt, puffOffsets, puffOrigin } from '@/components/motion/clear';
 import { MOTION_MS } from '@/lib/motion';
 
 type Stub = {

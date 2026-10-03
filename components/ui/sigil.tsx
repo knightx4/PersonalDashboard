@@ -24,7 +24,7 @@ import { MOTION_MS } from '@/lib/motion';
  * Each cell carries `data-sigil-cell` and its place in reading order as
  * `--sigil-cell`, so an ancestor with `sigil-draw-in` (app/globals.css) can
  * draw the mark in cell by cell when a queue is cleared on screen
- * (QueueCleared in components/ui/queue-cleared.tsx). Without that class the
+ * (QueueCleared in components/motion/clear.tsx). Without that class the
  * cells are simply there.
  */
 

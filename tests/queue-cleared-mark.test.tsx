@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { EmptyState } from '@/components/ui/empty-state';
-import { QUEUE_CLEARED_MS, QueueCleared } from '@/components/ui/queue-cleared';
+import { QUEUE_CLEARED_MS, QueueCleared } from '@/components/motion/clear';
 import { Sigil, sigilCells, sigilDrawMs } from '@/components/ui/sigil';
 
 describe('a list loaded already empty', () => {

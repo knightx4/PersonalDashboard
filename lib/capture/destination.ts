@@ -8,7 +8,7 @@
  * phone's dock link to, so the panel can find that row on screen.
  *
  * Pure, so the wording is checked without a browser; finding the row and
- * drawing the name is components/ui/landed.ts.
+ * drawing the name is components/motion/settle.ts.
  */
 
 import { moduleById, type ModuleId } from '@/lib/modules';

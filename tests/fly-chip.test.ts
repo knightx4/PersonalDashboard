@@ -6,7 +6,7 @@
  * and options it hands to element.animate, so a stub element records them.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FLY_CHIP_MS, chipLabel, flightKeyframes, flyChip } from '@/components/ui/fly-chip';
+import { TRAVEL_MS, chipLabel, flightKeyframes, travel } from '@/components/motion/travel';
 
 type Recorded = { keyframes: Keyframe[]; options: KeyframeAnimationOptions };
 
@@ -70,33 +70,33 @@ describe('flightKeyframes', () => {
   });
 });
 
-describe('flyChip', () => {
+describe('travel', () => {
   it('flies a chip in under 600ms and removes it when it lands', async () => {
     const browser = stubBrowser(false);
-    await flyChip({ from: rect(0, 0), to: rect(400, 200), label: 'File this somewhere' });
-    expect(FLY_CHIP_MS).toBeLessThan(600);
+    await travel({ from: rect(0, 0), to: rect(400, 200), label: 'File this somewhere' });
+    expect(TRAVEL_MS).toBeLessThan(600);
     expect(browser.recorded).toHaveLength(1);
-    expect(browser.recorded[0].options.duration).toBe(FLY_CHIP_MS);
+    expect(browser.recorded[0].options.duration).toBe(TRAVEL_MS);
     expect(browser.appended).toHaveLength(1);
     expect(browser.removed).toEqual(browser.appended);
   });
 
   it('does nothing under reduced motion', async () => {
     const browser = stubBrowser(true);
-    await flyChip({ from: rect(0, 0), to: rect(400, 200), label: 'File this somewhere' });
+    await travel({ from: rect(0, 0), to: rect(400, 200), label: 'File this somewhere' });
     expect(browser.appended).toHaveLength(0);
     expect(browser.recorded).toHaveLength(0);
   });
 
   it('does nothing when an end has no size', async () => {
     const browser = stubBrowser(false);
-    await flyChip({ from: rect(0, 0, 0, 0), to: rect(400, 200), label: 'File this' });
+    await travel({ from: rect(0, 0, 0, 0), to: rect(400, 200), label: 'File this' });
     expect(browser.appended).toHaveLength(0);
   });
 
   it('resolves outside a browser', async () => {
     await expect(
-      flyChip({ from: rect(0, 0), to: rect(1, 1), label: 'x' }),
+      travel({ from: rect(0, 0), to: rect(1, 1), label: 'x' }),
     ).resolves.toBeUndefined();
   });
 });

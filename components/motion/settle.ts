@@ -1,9 +1,11 @@
 /**
- * The end of a capture's flight: the place an item landed pulses once and is
- * named beside it, "Todo · Today".
+ * Settle, one of the three shared motion pieces (plan #1550): the end of an
+ * item's journey. `settle` pulses the place an item landed once and names it
+ * beside it, "Todo · Today". `settleIn` springs an element that has just
+ * arrived into its place, for a row that appears where the item went.
  *
- * Capture plays the puff at its input, flies a chip here (fly-chip.ts), then
- * calls `markLanded`. The place is the workspace's own row in the shell's
+ * Capture plays the puff at its input, flies a chip here (./travel.ts), then
+ * calls `settle`, all through sendToPlace in ./place.ts. The place is the workspace's own row in the shell's
  * column or the phone's dock when that row is on screen, and the workspace
  * switcher when it is not (`landingTarget`). The shell marks both with data
  * attributes, so nothing here knows how the shell is laid out.
@@ -14,7 +16,8 @@
  * name is how the person learns where the item went.
  */
 
-import { MOTION_MS } from '@/lib/motion';
+import { EASE, MOTION_MS } from '@/lib/motion';
+import { prefersReducedMotion } from './reduced';
 
 /** The `landed-pulse` utility's duration in app/globals.css: one move. */
 export const LANDED_PULSE_MS = MOTION_MS.move;
@@ -90,14 +93,8 @@ export function namePosition(
   return { left: Math.round(left), top: Math.round(top) };
 }
 
-function reducedMotion(): boolean {
-  return (
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
-}
-
 const NAME_CLASS =
+  /* ui-ok: a floating pill appended to <body>, not a grouping box; it was exempt as a components/ui primitive before moving here */
   'toast-in pointer-events-none fixed z-toast max-w-xs truncate rounded-full border border-border bg-raised px-2.5 py-1 text-small font-medium text-ink shadow-lg';
 
 /** The name on screen now, so a second filing replaces it rather than stacking. */
@@ -107,11 +104,11 @@ let shown: { element: HTMLElement; timer: ReturnType<typeof setTimeout> } | null
  * Pulse `target` once and name it. The pulse is skipped under reduced motion;
  * the name never is. Does nothing outside a browser or for an empty name.
  */
-export function markLanded(target: Element, name: string): void {
+export function settle(target: Element, name: string): void {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   if (!name.trim()) return;
 
-  if (!reducedMotion() && target instanceof HTMLElement) {
+  if (!prefersReducedMotion() && target instanceof HTMLElement) {
     // Off and on again, with a read between, so a second filing restarts it.
     target.classList.remove('landed-pulse');
     void target.offsetWidth;
@@ -148,4 +145,34 @@ export function markLanded(target: Element, name: string): void {
     if (shown?.element === label) shown = null;
   }, LANDED_NAME_MS);
   shown = { element: label, timer };
+}
+
+/**
+ * The keyframes `settleIn` plays: from a little low, a little small and
+ * clear, into place. The spring easing gives it the overshoot.
+ */
+export const SETTLE_IN_KEYFRAMES: Keyframe[] = [
+  { transform: 'translateY(6px) scale(0.97)', opacity: 0 },
+  { transform: 'none', opacity: 1 },
+];
+
+/**
+ * Spring `element` into its place, as a row that has just arrived where an
+ * item went: a move on the spring, with only transform and opacity animated
+ * so nothing around it reflows. Resolves when it has settled, and at once,
+ * leaving the element simply there, under reduced motion, outside a browser,
+ * or when the browser has no Web Animations.
+ */
+export function settleIn(element: Element): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  if (prefersReducedMotion()) return Promise.resolve();
+  if (typeof element.animate !== 'function') return Promise.resolve();
+  const animation = element.animate(SETTLE_IN_KEYFRAMES, {
+    duration: MOTION_MS.move,
+    easing: EASE.spring,
+  });
+  return animation.finished.then(
+    () => undefined,
+    () => undefined,
+  );
 }

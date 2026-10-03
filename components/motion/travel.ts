@@ -1,8 +1,13 @@
 /**
- * A chip that flies from one place on screen to another, then removes itself.
+ * Travel, one of the three shared motion pieces (plan #1550): a chip carrying
+ * an item's first words flies from one place on screen to another, then
+ * removes itself.
  *
  * Capture uses it to show where an item went: the first words of what was
- * typed leave the input and land on the list that now holds them. It is
+ * typed leave the input and land on the list that now holds them. Any screen
+ * showing something going to its place uses it the same way, usually through
+ * sendToPlace in ./place.ts, which puts the leaving and the settling either
+ * side of it. It is
  * chrome, so it never holds anything up. The promise resolves when the chip
  * has landed and gone, and at once when there is nothing to animate.
  *
@@ -15,23 +20,24 @@
  */
 
 import { EASE, FLIGHT_MS } from '@/lib/motion';
+import { prefersReducedMotion } from './reduced';
 
 /**
  * Long enough to follow across a 1280px screen; still well under a second.
  * A move and a quick together (FLIGHT_MS in lib/motion.ts).
  */
-export const FLY_CHIP_MS = FLIGHT_MS;
+export const TRAVEL_MS = FLIGHT_MS;
 
 /** How many words of the item the chip carries, and the most characters. */
 const LABEL_WORDS = 4;
 const LABEL_CHARS = 32;
 
 /** Either an element, read at the moment of the call, or a rect taken earlier. */
-export type FlyChipPoint = Element | DOMRectReadOnly;
+export type TravelPoint = Element | DOMRectReadOnly;
 
-export type FlyChipInput = {
-  from: FlyChipPoint;
-  to: FlyChipPoint;
+export type TravelInput = {
+  from: TravelPoint;
+  to: TravelPoint;
   /** The item's text. The chip shows its first few words. */
   label: string;
 };
@@ -75,19 +81,13 @@ export function flightKeyframes(
   ];
 }
 
-function boxOf(point: FlyChipPoint): Box {
+function boxOf(point: TravelPoint): Box {
   const rect = 'getBoundingClientRect' in point ? point.getBoundingClientRect() : point;
   return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
 }
 
-function reducedMotion(): boolean {
-  return (
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
-}
-
 const CHIP_CLASS =
+  /* ui-ok: a floating pill appended to <body>, not a grouping box; it was exempt as a components/ui primitive before moving here */
   'pointer-events-none fixed left-0 top-0 z-toast max-w-xs truncate rounded-full border border-border bg-raised px-2.5 py-1 font-mono text-micro text-ink shadow-lg';
 
 /**
@@ -96,9 +96,9 @@ const CHIP_CLASS =
  * nothing, under reduced motion, outside a browser, when the browser has no
  * Web Animations, or when either end has no size (hidden or unmounted).
  */
-export function flyChip({ from, to, label }: FlyChipInput): Promise<void> {
+export function travel({ from, to, label }: TravelInput): Promise<void> {
   if (typeof window === 'undefined' || typeof document === 'undefined') return Promise.resolve();
-  if (reducedMotion()) return Promise.resolve();
+  if (prefersReducedMotion()) return Promise.resolve();
 
   const a = boxOf(from);
   const b = boxOf(to);
@@ -122,7 +122,7 @@ export function flyChip({ from, to, label }: FlyChipInput): Promise<void> {
 
   const size = { width: chip.offsetWidth, height: chip.offsetHeight };
   const animation = chip.animate(flightKeyframes(a, b, size), {
-    duration: FLY_CHIP_MS,
+    duration: TRAVEL_MS,
     easing: EASE.outSoft,
     fill: 'forwards',
   });

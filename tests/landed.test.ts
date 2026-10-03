@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { captureAction } from '@/lib/capture/actions';
 import { captureDestination, goalsPlaceName, todoDayName } from '@/lib/capture/destination';
-import { LANDED_PULSE_MS, markLanded, namePosition } from '@/components/ui/landed';
+import { LANDED_PULSE_MS, settle, namePosition } from '@/components/motion/settle';
 import { MOTION_MS } from '@/lib/motion';
 import type { FiledEntry } from '@/lib/goals/capture';
 
@@ -118,12 +118,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('markLanded', () => {
+describe('settle', () => {
   it('pulses the place and names it beside it', async () => {
     vi.useFakeTimers();
     const { appended } = stubBrowser(false);
     const target = new StubElement();
-    markLanded(target as unknown as Element, 'Todo · Today');
+    settle(target as unknown as Element, 'Todo · Today');
     expect(target.classes.has('landed-pulse')).toBe(true);
     expect(appended).toHaveLength(1);
     expect(appended[0].textContent).toBe('Todo · Today');
@@ -137,7 +137,7 @@ describe('markLanded', () => {
     vi.useFakeTimers();
     const { appended } = stubBrowser(true);
     const target = new StubElement();
-    markLanded(target as unknown as Element, 'Goals · Home');
+    settle(target as unknown as Element, 'Goals · Home');
     expect(target.classes.size).toBe(0);
     expect(appended.map((el) => el.textContent)).toEqual(['Goals · Home']);
   });
@@ -146,8 +146,8 @@ describe('markLanded', () => {
     vi.useFakeTimers();
     const { appended } = stubBrowser(true);
     const target = new StubElement();
-    markLanded(target as unknown as Element, 'Todo · Today');
-    markLanded(target as unknown as Element, 'Todo · Tomorrow');
+    settle(target as unknown as Element, 'Todo · Today');
+    settle(target as unknown as Element, 'Todo · Tomorrow');
     expect(appended[0].removed).toBe(true);
     expect(appended[1].removed).toBe(false);
   });
