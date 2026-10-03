@@ -8,9 +8,13 @@ import { billsSource } from '@/lib/todo/agenda/sources/bills';
 import { deliveriesSource } from '@/lib/todo/agenda/sources/deliveries';
 import { draftsSource } from '@/lib/todo/agenda/sources/drafts';
 import { goalStepsSource } from '@/lib/todo/agenda/sources/goal-steps';
+import { goalWaitingSource } from '@/lib/todo/agenda/sources/goal-waiting';
 import { jobInterviewsSource } from '@/lib/todo/agenda/sources/job-interviews';
 import { jobRemindersSource } from '@/lib/todo/agenda/sources/job-reminders';
+import { planStepsSource } from '@/lib/todo/agenda/sources/plan-steps';
+import { raisedSource } from '@/lib/todo/agenda/sources/raised';
 import { returnDeadlinesSource } from '@/lib/todo/agenda/sources/return-deadlines';
+import { threadsSource } from '@/lib/todo/agenda/sources/threads';
 
 /**
  * Every source there is, in one place.
@@ -29,6 +33,10 @@ const SOURCES: AgendaSource[] = [
   billsSource,
   draftsSource,
   applicationsSource,
+  planStepsSource,
+  goalWaitingSource,
+  raisedSource,
+  threadsSource,
 ];
 
 export function allSources(): AgendaSource[] {

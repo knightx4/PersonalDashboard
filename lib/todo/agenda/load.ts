@@ -14,6 +14,7 @@ import { eventContext, subscribedContext } from '@/lib/todo/agenda/events';
 import { sessionClients, type AgendaClients } from '@/lib/todo/agenda/clients';
 import { mergeAgenda, type AgendaPile } from '@/lib/todo/agenda/merge';
 import type { AgendaItem, DayContext, SourceContext } from '@/lib/todo/agenda/sources';
+import { withoutCoveredThreads } from '@/lib/todo/agenda/sources/threads';
 
 /**
  * Everything the agenda needs, fetched in parallel and merged by a pure
@@ -131,5 +132,6 @@ async function runSources(
     }
   });
 
-  return [items, context, failed];
+  // A row listed by its own source and by a thread under it shows once, as itself.
+  return [withoutCoveredThreads(items), context, failed];
 }
