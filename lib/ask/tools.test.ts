@@ -179,6 +179,7 @@ describe('search', () => {
     module: 'jobs',
     kind: 'company',
     id: `${userId}-company`,
+    ref: `job_search.companies:${userId}-company`,
     title,
     subtitle: 'Company',
     href: `/jobs/companies/${title.toLowerCase()}`,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { eventContext, subscribedContext } from '@/lib/todo/agenda/events';
 import type { Event } from '@/lib/todo/events/model';
+import { parseRef } from '@/lib/core/refs';
 
 const TIMEZONE = 'Europe/London';
 const TODAY = '2026-03-10';
@@ -115,6 +116,14 @@ describe('subscribedContext', () => {
 
     expect(row.link?.href).toBe('/todo/calendar?date=2026-03-12');
     expect(row.key).toBe('feed:feed-1');
+  });
+
+  it('names its row by a ref, as an event of your own does', () => {
+    const [own] = eventContext([event()], TIMEZONE, TODAY);
+    const [feed] = subscribedContext([event({ id: 'feed-1' })], TIMEZONE, TODAY);
+    expect([own.ref, feed.ref]).toEqual(['todo.events:e1', 'todo.feed_events:feed-1']);
+    expect(parseRef(own.ref)?.table).toBe('todo.events');
+    expect(parseRef(feed.ref)?.table).toBe('todo.feed_events');
   });
 
   it('leaves out an appointment that is already over', () => {

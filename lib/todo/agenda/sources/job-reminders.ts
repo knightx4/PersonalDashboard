@@ -99,6 +99,7 @@ export const jobRemindersSource: AgendaSource = {
       return {
         key: reminderKey(row.id as string),
         source: 'job_reminders',
+        ref: `job_search.reminders:${row.id as string}`,
         title: (row.body as string) ?? KIND_LABELS[kind] ?? 'Reminder',
         // The day in the reader's zone, not the UTC slice: a reminder due at
         // 23:30 UTC is tomorrow's problem in Tokyo and today's in London.

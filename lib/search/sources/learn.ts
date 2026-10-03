@@ -37,6 +37,7 @@ function readingHit(row: ReadingRow): SearchHit {
     module: 'learn',
     kind: 'reading',
     id: row.id,
+    ref: `learn.readings:${row.id}`,
     // A reading whose subject came from its source has a null title, so the
     // source's title stands in -- the same fallback lib/learn/tracks/load.ts
     // already makes.
@@ -98,6 +99,7 @@ async function read(ctx: Read): Promise<SearchHit[]> {
       module: 'learn',
       kind: 'track',
       id: row.id,
+      ref: `learn.tracks:${row.id}`,
       title: row.title,
       subtitle: 'Reading list',
       href: `/learn/t/${row.id}`,

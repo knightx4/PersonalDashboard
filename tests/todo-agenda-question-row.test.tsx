@@ -22,6 +22,7 @@ const { AgendaItemRow } = await import('@/components/todo/agenda-item-row');
 const question: AgendaItem = {
   key: 'goal_questions:q1',
   source: 'goal_steps',
+  ref: 'goals.items:q1',
   title: 'Which bank?',
   day: '2026-09-29',
   at: null,

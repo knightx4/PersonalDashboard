@@ -48,6 +48,7 @@ function item(title: string, day: string, source: AgendaItem['source'] = 'return
   const i: AgendaItem = {
     key: `${source}:${title}`,
     source,
+    ref: `public.orders:${title}`,
     title,
     day,
     at: null,
@@ -60,7 +61,7 @@ function item(title: string, day: string, source: AgendaItem['source'] = 'return
 }
 
 function booked(label: string, at: string | null, detail: string | null = null): DayContext {
-  return { key: label, day: TODAY, at, label, detail, link: null };
+  return { key: label, ref: `todo.appointments:${label}`, day: TODAY, at, label, detail, link: null };
 }
 
 describe('briefDay', () => {
@@ -189,6 +190,7 @@ describe('agendaCandidates', () => {
   it('marks interviews by the interview source, not every booked entry', () => {
     const interview: DayContext = {
       key: 'interview-round:g1:2026-09-28',
+      ref: 'job_search.interview_groups:g1',
       day: TODAY,
       at: '2026-09-28T14:30:00Z',
       label: 'Respark · Product Designer',

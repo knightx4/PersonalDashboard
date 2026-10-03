@@ -10,10 +10,10 @@ const { observationsPrompt, writeObservations } = await import('./observations-m
 const { runObservationsFor } = await import('./observations-run');
 import type { ObservationRow, ObservationRunPorts } from './observations-run';
 import type { RawObservation } from './observations';
-import { eventRef, type TimelineEvent } from './timeline';
+import { eventRef, withRefs, type TimelineEvent } from './timeline';
 
 function event(partial: Partial<TimelineEvent> & Pick<TimelineEvent, 'occurred_at' | 'module' | 'kind'>): TimelineEvent {
-  return {
+  return withRefs([{
     title: 'Something',
     detail: null,
     amount_cents: null,
@@ -22,7 +22,7 @@ function event(partial: Partial<TimelineEvent> & Pick<TimelineEvent, 'occurred_a
     source_id: Math.random().toString(36).slice(2),
     link_ref: null,
     ...partial,
-  };
+  }])[0];
 }
 
 const rejection = event({

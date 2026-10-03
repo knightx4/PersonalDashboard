@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { parseRef } from '@/lib/core/refs';
 import type { TodoQuestion, TodoStep } from '@/lib/goals/todo';
 
 /**
@@ -11,6 +12,8 @@ import type { TodoQuestion, TodoStep } from '@/lib/goals/todo';
 
 const steps: TodoStep[] = [];
 const questions: TodoQuestion[] = [];
+const rhythms: unknown[] = [];
+const going: unknown[] = [];
 const answerQuestion = vi.fn(async () => true);
 
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
@@ -18,13 +21,13 @@ vi.mock('@/lib/goals/auth/server', () => ({ createGoalsClient: vi.fn() }));
 vi.mock('@/lib/todo/agenda/clients', () => ({ sessionClients: { goals: async () => ({}) } }));
 vi.mock('@/lib/goals/rhythms-store', () => ({ countTowards: vi.fn() }));
 vi.mock('@/lib/goals/suggestions-store', () => ({
-  loadGoingSuggestions: async () => [],
+  loadGoingSuggestions: async () => going,
   recordAttended: vi.fn(),
 }));
 vi.mock('@/lib/goals/shaping-store', () => ({ answerQuestion }));
 vi.mock('@/lib/todo/agenda/dismissals', () => ({ dismiss: vi.fn(), undismiss: vi.fn() }));
 vi.mock('@/lib/goals/steps-store', () => ({
-  loadTodoGoals: async () => ({ steps, questions, rhythms: [] }),
+  loadTodoGoals: async () => ({ steps, questions, rhythms }),
   setStepStatus: vi.fn(),
 }));
 
@@ -46,7 +49,25 @@ describe('goalStepsSource', () => {
   beforeEach(() => {
     steps.length = 0;
     questions.length = 0;
+    rhythms.length = 0;
+    going.length = 0;
     answerQuestion.mockClear();
+  });
+
+  it('names the row behind every kind of item by a ref', async () => {
+    steps.push(todoStep('s1', { next: true }));
+    questions.push({ id: 'q1', title: 'Which bank?', detail: null, goalId: 'g', goalTitle: 'Goal' });
+    rhythms.push({ id: 'r1', startsOn: '2026-09-28', title: 'Run', goalId: 'g', goalTitle: 'Goal', period: 'week', target: 3, count: 1 });
+    going.push({ id: 'e1', title: 'Concert', happensOn: '2026-10-01', startsAt: null, url: null, source: null, place: null, reaction: 'going', attended: null });
+
+    const items = await goalStepsSource.fetch(ctx);
+    expect(items.map((item) => item.ref)).toEqual([
+      'goals.items:q1',
+      'goals.items:r1',
+      'goals.suggestions:e1',
+      'goals.items:s1',
+    ]);
+    for (const item of items) expect(parseRef(item.ref)).not.toBeNull();
   });
 
   it("shows an undated next step today and an undated flagged step with no day", async () => {

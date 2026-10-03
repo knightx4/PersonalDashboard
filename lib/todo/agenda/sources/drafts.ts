@@ -92,6 +92,7 @@ export const draftsSource: AgendaSource = {
       return {
         key: `drafts:${row.id}`,
         source: 'drafts',
+        ref: `core.drafted_messages:${row.id}`,
         title: draftTitle(row.kind, row.about_label),
         day: row.show_on,
         at: null,

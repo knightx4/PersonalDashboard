@@ -3,7 +3,7 @@ import 'server-only';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { CoreOperation } from '@/lib/core/spend/operations';
 import { recordSpend } from '@/lib/core/spend/record';
-import { TIMELINE_COLUMNS, type TimelineEvent } from './timeline';
+import { TIMELINE_COLUMNS, withRefs, type TimelineEvent, type TimelineRow } from './timeline';
 import { writeYearParagraphs, YEAR_REVIEW_MODEL } from './year-review-model';
 import type { YearReviewPorts } from './year-review-run';
 
@@ -46,7 +46,7 @@ export function yearReviewPorts(core: CoreSupabaseClient): YearReviewPorts {
           .order('source_id', { ascending: true })
           .range(offset, offset + PAGE - 1);
         if (error) throw new Error(`Reading the timeline failed: ${error.message}`);
-        const page = (data ?? []) as unknown as TimelineEvent[];
+        const page = withRefs((data ?? []) as unknown as TimelineRow[]);
         events.push(...page);
         if (page.length < PAGE) return events;
       }

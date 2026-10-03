@@ -93,6 +93,7 @@ describe('vaultSearchSource', () => {
     const hits = await find('value, price');
 
     expect(hits.map((hit) => hit.id)).toEqual(['n1']);
+    expect(hits.map((hit) => hit.ref)).toEqual(['obsidian.notes:n1']);
     // The comma goes out as part of an `ilike` value, not as part of an `or`
     // expression, which is the whole of the fix.
     expect(ors).toEqual([]);

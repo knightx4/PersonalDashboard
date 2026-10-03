@@ -69,6 +69,7 @@ export const deliveriesSource: AgendaSource = {
 
       return {
         key: `delivery:${row.id as string}`,
+        ref: `public.shipments:${row.id as string}`,
         day: row.expected_on as string,
         at: null,
         label: name ? `Parcel from ${name}` : 'A parcel',
