@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
 import type { PostCard, PostsPage } from '@/lib/dev/posts-page';
 import { PostItem } from './post-item';
-import { SuggestPosts } from './suggest-posts';
+import { AskForPost, SuggestPosts } from './suggest-posts';
 
 /**
  * The Posts tab in Dev (plan #1419): X posts Dash drafted about building this
@@ -55,8 +55,9 @@ export function PostsScreen({ page }: { page: PostsPage }) {
           description="Drafts for X about building this app. Dash never posts; you do."
           actions={<SuggestPosts runState={page.runState} />}
         />
-        <div className="-mt-3">
+        <div className="-mt-3 space-y-1">
           <RunLine page={page} />
+          <AskForPost runState={page.runState} />
         </div>
       </div>
 

@@ -3,6 +3,7 @@ import {
   ACTION_FROM,
   SWIPES,
   appendCards,
+  bringForward,
   canMakeTrack,
   cardTitle,
   feedEnd,
@@ -233,6 +234,13 @@ describe('the feed', () => {
     const a = { id: 'a' } as FeedCard;
     const b = { id: 'b' } as FeedCard;
     expect(appendCards([a], [a, b]).map((card) => card.id)).toEqual(['a', 'b']);
+  });
+
+  it('brings a picked card to the top and keeps the one it replaces next', () => {
+    const deck = ['a', 'b', 'c', 'd'].map((id) => ({ id }) as FeedCard);
+    expect(bringForward(deck, 'c').map((card) => card.id)).toEqual(['c', 'a', 'b', 'd']);
+    expect(bringForward(deck, 'a')).toBe(deck);
+    expect(bringForward(deck, 'missing')).toBe(deck);
   });
 
   it('says more are being written only when the ready pool is low', () => {
