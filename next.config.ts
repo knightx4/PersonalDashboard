@@ -33,6 +33,10 @@ const nextConfig: NextConfig = {
    */
   outputFileTracingIncludes: {
     '/dev/specs/[slug]': ['./docs/**/*.md'],
+    // An overhaul's row reads its spec's Contract for the rule counts it
+    // shows (plan #1516), on the plan and on a project's copy of it.
+    '/dev/plan': ['./docs/**/*.md'],
+    '/dev/projects/[id]': ['./docs/**/*.md'],
     // The memory sweep copies the specs into search by meaning (plan #1321),
     // and Ask Dash reads them in the app and over MCP (read_spec, find_dev_text).
     '/api/cron/memory-sweep': ['./docs/**/*.md'],

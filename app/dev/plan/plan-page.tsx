@@ -10,6 +10,7 @@ import {
   loadStartedRuns,
 } from '@/lib/plan/runs';
 import { loadCommitChecks } from '@/lib/plan/ci';
+import { loadOverhaulProgress } from '@/lib/plan/overhaul-progress-load';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
 import { keyRefusal } from '@/lib/plan/work';
@@ -190,6 +191,15 @@ export async function renderPlanPage({
   const { sections, finished } =
     view === 'all' ? splitFinished(narrowed) : { sections: narrowed, finished: [] };
 
+  // Each overhaul's rule counts against their targets, for its row. Read
+  // after the tree because which features are overhauls is on the rows, and
+  // nothing is read when there are none, which is most loads.
+  const overhaulProgress = await loadOverhaulProgress(
+    supabase,
+    user.id,
+    flattenSections(whole).filter((node) => node.track === 'overhaul'),
+  );
+
   // Every step, for the pickers: a parent to move under, a step to wait on.
   // Light on purpose -- the tree is already on the page once.
   const catalog: PlanCatalogEntry[] = flattenSections(everything).map((node) => ({
@@ -263,6 +273,7 @@ export async function renderPlanPage({
         keyRefusal={refusedKey}
         liveness={liveness}
         commitChecks={commitChecks}
+        overhaulProgress={overhaulProgress}
         empty={project ? flattenSections(whole).length === 0 : data.items.length === 0}
         canSend={canSend}
       />
