@@ -840,6 +840,19 @@ export function PlanRow({
               <span className="sr-only">Marked yours</span>
             </span>
           )}
+          {/* An overhaul, on its feature row. It is built in its own order
+           * by its own routine and the runner never fires it, which is the
+           * one thing about it a resting plan would otherwise hide: its ready
+           * steps look like any other's. A word rather than an icon, because
+           * there is no glyph that already means "replaces how this works". */}
+          {node.track === 'overhaul' && (
+            <span
+              title="Overhaul. Built by its own routine; the runner will not take it."
+              className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1.5 py-0.5 text-micro text-accent"
+            >
+              Overhaul
+            </span>
+          )}
           {/* And whether the checks passed on what it shipped in. */}
           {node.status === 'done' && node.commitSha && (
             <CheckMark check={commitChecks[node.commitSha]} />

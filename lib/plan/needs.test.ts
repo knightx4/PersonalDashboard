@@ -154,6 +154,7 @@ describe('the plan after a needs', () => {
     // Off blocked, because the dependency is now what says it is waiting.
     status: 'not_started',
     kind: 'build',
+    track: 'feature',
     fog: null,
     resolution: null,
     dismissedAt: null,

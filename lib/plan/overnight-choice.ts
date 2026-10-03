@@ -10,11 +10,12 @@
  *
  * The choice itself is the one a person would make standing at the plan: the
  * most urgent thing that is ready and the runner may take, and the feature it
- * belongs to. `workOrder(sections, { only: 'runner' })` is
+ * belongs to. `runnerOrder(sections)` is
  * already exactly that list -- ready steps only, decisions and dismissed rows
  * out, priority then reading order -- and `isReady` has already dropped
  * anything blocked, waiting on an open dependency, or sitting under a blocked,
- * dropped or proposed parent. So there is nothing to re-derive here: the answer
+ * dropped or proposed parent. Steps under an overhaul are left out too, since
+ * an overhaul is worked by its own routine. So there is nothing to re-derive here: the answer
  * is the feature above the first row that comes back, and a feature that is
  * itself that row is its own answer.
  *
@@ -28,7 +29,36 @@
  * next without firing anything.
  */
 import { overnightVerdict, type OvernightRun } from './overnight';
-import { topFeatureOf, workOrder, type PlanNode, type PlanSection } from './tree';
+import { ancestorsOf, topFeatureOf, workOrder, type PlanNode, type PlanSection } from './tree';
+
+/**
+ * Whether a row is an overhaul or sits beneath one.
+ *
+ * An overhaul (docs/SPEC-LAYER-SPEC.md Part 4) has one owner, its own
+ * routine, which builds it in its own order: design first, then three
+ * phases, each reviewed against the design before it merges. A step of it
+ * fired by the runner as an ordinary feature would skip all of that. The
+ * track is read on the feature, but any overhaul above the row counts, so a
+ * sub-feature of one is skipped too.
+ */
+export function isUnderOverhaul(sections: readonly PlanSection[], node: PlanNode): boolean {
+  if (node.track === 'overhaul') return true;
+  return ancestorsOf(sections, node.id).some((above) => above.track === 'overhaul');
+}
+
+/**
+ * What the runner may take, in the order it takes it: `workOrder`'s runner
+ * list less every step under an overhaul.
+ *
+ * Here rather than in `workOrder`, because `next --claude` reads that list
+ * too, and the overhaul routine working its own feature needs its steps to
+ * stay in it. The runner is the one reader that must never see them.
+ */
+export function runnerOrder(sections: readonly PlanSection[]): PlanNode[] {
+  return workOrder(sections, { only: 'runner' }).filter(
+    (step) => !isUnderOverhaul(sections, step),
+  );
+}
 
 /**
  * The night ran out of work rather than out of budget or clock.
@@ -82,7 +112,7 @@ export function chooseOvernightFeature(
   const verdict = overnightVerdict(run, now);
   if (verdict.act !== 'fire') return verdict;
 
-  const step = workOrder(sections, { only: 'runner' })[0];
+  const step = runnerOrder(sections)[0];
   if (!step) return { act: 'end', reason: OVERNIGHT_NOTHING_READY };
 
   return { act: 'fire', feature: topFeatureOf(sections, step), step };
@@ -109,7 +139,7 @@ export function chooseOvernightFeature(
  */
 export function readyFeatureCount(sections: readonly PlanSection[]): number {
   const features = new Set<string>();
-  for (const step of workOrder(sections, { only: 'runner' })) {
+  for (const step of runnerOrder(sections)) {
     features.add(topFeatureOf(sections, step).id);
   }
   return features.size;

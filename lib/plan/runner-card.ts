@@ -25,8 +25,8 @@ import type { PlanItem } from './load';
 import { lastStoredPush, type StoredPush } from './liveness';
 import { runEnd, type StoredRunReading } from './run-end';
 import { overnightStanding, type OvernightRun } from './overnight';
-import { readyFeatureCount } from './overnight-choice';
-import { topFeatureOf, workOrder, type PlanSection } from './tree';
+import { readyFeatureCount, runnerOrder } from './overnight-choice';
+import { topFeatureOf, type PlanSection } from './tree';
 
 /** A row a session is on, with how far through its feature the plan is. */
 export type OnLine = OnNow & { progress: FeatureProgress | null };
@@ -99,7 +99,7 @@ export function runnerCard(input: {
   const busy = new Set([...on.map((line) => line.ref), night?.lastFire?.ref]);
   const next: DigestNightRef[] = [];
   const seen = new Set<string>();
-  const order = workOrder(sections, { only: 'runner' });
+  const order = runnerOrder(sections);
   for (const step of order) {
     const feature = topFeatureOf(sections, step);
     const ref = `#${feature.number}`;
