@@ -15,7 +15,7 @@ import type { MetadataRoute } from 'next';
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Personal Dashboard',
+    name: 'Dash',
     short_name: 'Dash',
     // The workspaces in lib/modules.ts, less Dev, which only the owner sees.
     // Change this when a workspace is added.

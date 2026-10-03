@@ -22,7 +22,7 @@ export default async function OnboardingLayout({
         <Link href="/onboarding" className="flex items-center gap-2">
           <ModuleMark module={null} size="md" />
           <span className="text-body font-semibold tracking-tight text-ink">
-            Personal Dashboard
+            Dash
           </span>
         </Link>
         <form action={signOut}>

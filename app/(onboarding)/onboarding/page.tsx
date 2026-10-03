@@ -117,7 +117,7 @@ export default async function OnboardingPage({
               Know what you own before you buy it again
             </h1>
             <p className="mt-3 text-body leading-relaxed text-ink-muted">
-              Personal Dashboard turns order confirmations into inventory and a spending picture.
+              Dash turns order confirmations into inventory and a spending picture.
               It is not a delivery tracker and never handles payment.
             </p>
           </div>
