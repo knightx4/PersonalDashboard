@@ -103,7 +103,7 @@ async function readAims(learn: LearnSupabaseClient, links: Link[]): Promise<Link
   if (ids.length === 0) return [];
 
   const [aims, cards] = await Promise.all([
-    learn.from('aims').select('id, name, list_source, archived_at, subject_id').in('id', ids),
+    learn.from('aims').select('id, name, list_source, archived_at, subject_id, goal_id').in('id', ids),
     learn
       .from('feed_cards')
       .select('aim_id, status')
@@ -119,6 +119,7 @@ async function readAims(learn: LearnSupabaseClient, links: Link[]): Promise<Link
     list_source: string | null;
     archived_at: string | null;
     subject_id: string | null;
+    goal_id: string | null;
   };
   const byId = new Map(((aims.data ?? []) as AimRow[]).map((row) => [row.id, row]));
 
@@ -158,6 +159,7 @@ async function readAims(learn: LearnSupabaseClient, links: Link[]): Promise<Link
       linkId: link.id,
       aimId: link.targetId,
       name: row?.name ?? null,
+      goalId: row?.goal_id ?? null,
       archived: row?.archived_at != null,
       level3: row?.list_source === 'level3' ? level3 : null,
       cardsRead: read.get(link.targetId) ?? 0,

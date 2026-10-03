@@ -3004,10 +3004,10 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnCourseCheckPreview />,
   },
   {
-    /* Learn's Goals list: each goal edited in place, with its plan, its place
-     * and the Practise link that opens Practice Flow on it (plan #1387). */
+    /* A Learn-area goal's Learning section: how well you want to know it,
+     * its plan and the Practise link (plan #1491, from Learn's old Goals tab). */
     id: 'learn-goals-list',
-    label: 'Goals · The list, with Practise',
+    label: 'Goals · A learning goal, with Practise',
     module: 'learn',
     width: 'narrow',
     render: () => <LearnGoalsPreview />,

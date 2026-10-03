@@ -189,14 +189,14 @@ export async function startTrack(id: string): Promise<TrackActionState> {
   if (error) console.error('[jobs learning tracks] start', error.message);
 
   // Placed in the area grid, then given its track and first units, once the
-  // response has gone, as a goal added on Learn's Goals page is.
+  // response has gone, as a goal added to the Learn area on /goals is.
   after(async () => {
     await placeAims(learn, user.id);
     await giveAimsTracks(learn, user.id);
   });
 
   revalidatePath('/jobs/thoughts');
-  revalidatePath('/learn/goals');
+  revalidatePath('/goals', 'layout');
   return { error: null };
 }
 

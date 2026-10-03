@@ -36,6 +36,9 @@ import { groupCourses, type SchoolGroup } from '@/lib/vault/education';
 import type { Course, Transcript } from '@/lib/vault/transcripts';
 import { loadQuizzes, type QuizListItem } from '@/lib/learn/quiz/load';
 import { QuizzesSection } from './quizzes';
+import { LearnGoalsLine } from './learn-goals-line';
+import { loadLearnAreaHref } from '@/lib/goals/learn-area';
+import { loadActiveAims } from '@/lib/learn/aims-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,6 +86,16 @@ export default async function KnowPage({
   const subjects = await loadSubjects(supabase);
   const unfinished = await unfinishedSweep(supabase);
   const settings = await loadAccountSettings(user.id);
+  // The learning goals live in the Learn area on /goals (plan #1491). The
+  // Level 3 offer shows only when the goals were read and it is not among
+  // them, so a failed read hides it rather than offering a second one.
+  const [goalsHref, hasLevel3] = await Promise.all([
+    loadLearnAreaHref(),
+    loadActiveAims(supabase).then(
+      (aims) => aims.some((aim) => aim.listSource === 'level3'),
+      () => true,
+    ),
+  ]);
 
   // One track offer a visit (note 8a1789df, moved here from Learn now): a
   // resting track first (plan #1045), else a theme from your notes (plan
@@ -197,6 +210,8 @@ export default async function KnowPage({
           )
         }
       />
+
+      <LearnGoalsLine href={goalsHref} offerLevel3={!hasLevel3} />
 
       {making && <CustomTrackForm />}
 
