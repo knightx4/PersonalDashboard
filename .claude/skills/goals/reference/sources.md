@@ -91,7 +91,7 @@ What they want to learn and why, each a named aim.
 - Search: `name`, `about`
 - Name a row by `name`; link it by `id`
 - Opens at `/learn/goals`
-- An aim can be linked under a goal (goals.links kind aim), which shows its progress on the goal page.
+- Each aim is a goal in the Learn area on /goals (aims.goal_id, goals 0066), and the goal owns its name, line and whether it is active. Read the goal rather than counting both.
 
 ### `learn.subjects` (Learn)
 

@@ -9,6 +9,7 @@ import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { ComposeBody, ComposeTitle, InlineInput, InlineTextarea } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import {
@@ -324,7 +325,7 @@ function AreaSection({
         </Card>
       )}
       <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} />
-      <GoalComposer areaId={area.id} areaName={area.name} />
+      <GoalComposer areaId={area.id} areaName={area.name} learn={area.learn ?? false} />
     </section>
   );
 }
@@ -560,7 +561,16 @@ export function ApproveArea({ areaId, count }: { areaId: string; count: number }
  * yet. A goal you cannot describe yet still goes in, with fog in place of the
  * done-when.
  */
-function GoalComposer({ areaId, areaName }: { areaId: string; areaName: string }) {
+function GoalComposer({
+  areaId,
+  areaName,
+  learn,
+}: {
+  areaId: string;
+  areaName: string;
+  /** The Learn area, where a new goal is placed and given a plan, which costs. */
+  learn: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [vague, setVague] = useState(false);
   const [state, add, adding] = useActionState(async (prev: GoalsActionState, form: FormData) => {
@@ -630,6 +640,13 @@ function GoalComposer({ areaId, areaName }: { areaId: string; areaName: string }
             <Button type="submit" size="sm" disabled={adding}>
               {adding ? 'Adding…' : 'Add goal'}
             </Button>
+            {learn && (
+              <PaidHint
+                action="app/goals/actions.ts#addGoal"
+                what="Cost of placing the goal and writing its plan"
+                align="end"
+              />
+            )}
           </span>
         </div>
       </form>

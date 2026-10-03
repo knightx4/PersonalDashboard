@@ -54,6 +54,9 @@ export const PAID_ACTIONS = {
   'app/learn/s/[id]/actions.ts#pullLectureCourse': ['embed-catalogue'],
   'app/learn/s/[id]/actions.ts#findSubjectChannels': ['find-channels', 'judge-channel'],
   'app/learn/goals/actions.ts#addGoal': ['place-aim', 'write-curriculum'],
+  // Only a goal added to the Learn area costs: it is placed and given a plan
+  // (plan #1490). The hint shows in that area alone.
+  'app/goals/actions.ts#addGoal': ['place-aim', 'write-curriculum'],
   'app/learn/now/actions.ts#testMeOnCard': ['generate-chain', 'place-track'],
   'app/learn/now/actions.ts#startTrackOffer': [
     'generate-track-from-theme',
@@ -177,6 +180,8 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'Called by the header panel once a note or idea has saved, to show its type, workspace, priority and any open item it repeats (plan #1179), and to score an idea against the vision of its workspace (plan #1327). Send files the note for free; this runs after it, and there is no button of its own.',
   'app/goals/capture-actions.ts#sortGoalCapture':
     'Called by the capture box when typing pauses, to guess what the sentence will do (plan #1177). There is no button, only the field; the File it hint prices the filing.',
+  'app/goals/actions.ts#editGoal':
+    'Saved when a goal\'s title or done-when loses focus after a change, or when it is moved to another area. Only a goal in the Learn area costs: it is placed again and, if it has no plan yet, given one (plan #1490). There is no button, only the field.',
   'app/learn/goals/actions.ts#editGoal':
     'Saved when a goal\'s name or line loses focus after a change, and a reworded goal is placed again (place-aim). There is no button, only the field.',
   'app/shopping/review/actions.ts#readOrderFromEmail':

@@ -22,7 +22,7 @@ import {
  * `archive`, and every read filters archived rows out.
  */
 
-type AreaRow = { id: string; name: string; note: string | null; position: number };
+type AreaRow = { id: string; name: string; note: string | null; position: number; learn?: boolean };
 type GoalRow = {
   id: string;
   area_id: string;
@@ -43,6 +43,7 @@ const toArea = (row: AreaRow): Area => ({
   name: row.name,
   note: row.note ?? null,
   position: row.position,
+  learn: row.learn ?? false,
 });
 
 const toGoal = (row: GoalRow): Goal => ({
@@ -63,7 +64,7 @@ const toGoal = (row: GoalRow): Goal => ({
 export async function loadAreas(client: GoalsSupabaseClient): Promise<Area[]> {
   const { data, error } = await client
     .from('areas')
-    .select('id, name, note, position')
+    .select('id, name, note, position, learn')
     .is('archived_at', null)
     .order('position')
     .order('created_at');
