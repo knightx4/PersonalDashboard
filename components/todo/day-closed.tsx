@@ -85,7 +85,6 @@ export function DayClosed({
                   {
                     '--pile-i': String(index),
                     transform: `translateY(${index * 6}px) scale(${1 - index * 0.05})`,
-                    zIndex: PILE_CARDS - index,
                   } as CSSProperties
                 }
                 className={cn(
@@ -98,6 +97,7 @@ export function DayClosed({
                 <span className="truncate line-through decoration-ink-ghost">{task.title}</span>
               </Card>
             ))
+            // Reversed so the top card paints last and sits over the rest.
             .reverse()}
         </div>
         <p data-day-close-line="" className="mt-3 text-small text-ink-muted" role="status">
