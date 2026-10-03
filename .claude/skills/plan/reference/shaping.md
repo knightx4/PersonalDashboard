@@ -6,6 +6,9 @@ user says "shape idea …", or a routine is fired from the *Shape into a plan*
 button with an idea in its brief, the job is to write a **proposal** — and
 nothing else.
 
+A run started by approving a spec change is the one exception: its work
+goes in approved, and its procedure is the last section of this file.
+
 ## Until 30 October 2026: only from what the person wrote
 
 For four weeks from 2 October 2026 (docs/CUT-BACK-SPEC.md part 5), a new
@@ -145,3 +148,94 @@ If the idea is already in the plan (`ideas` does not list it), say so and
 stop rather than shaping it twice. If the idea is really a bug or a one-line
 request, say that it belongs in the notes queue instead, and stop.
 
+
+## From an approved spec change
+
+A run the Approve button on `/dev/specs` starts (plan #1509,
+`docs/SPEC-LAYER-SPEC.md` Part 3). Its brief carries the change's id, title,
+why, the spec's file and the diff. The person has read the diff and approved
+it, so this run writes it into the spec and shapes the work, and what it
+shapes goes in approved. The hold above does not apply: an approved change is
+something the person decided.
+
+1. **Re-read the change.** `select status, spec, title, diff from spec_changes
+   where id = '<id>' and user_id = '<user>'`. Stop unless the status is
+   `approved`. `applied` means an earlier run already wrote it in;
+   `proposed` means it was put back.
+2. **Write it into the spec.** Branch from an up-to-date `origin/main`, save
+   the row's diff to a file in your scratchpad, and run
+   `npx tsx scripts/apply-spec-diff.ts docs/<file> <diff file>`. The script
+   places the diff by its lines rather than its line numbers, writes the
+   spec, and prints the diff as placed. Never edit the diff or the spec by
+   hand to make it fit: the person approved those lines. If the script says
+   *Not applied*, the spec has moved under the change. Put the change back to
+   proposed (`update spec_changes set status = 'proposed', decided_at = null
+   where id = '<id>' and user_id = '<user>' and status = 'approved'`), write a
+   comment on its thread (`dev_comments`, `spec_change_id`, author `claude`)
+   saying which lines are gone and that `@dash` can redraft it, and stop.
+
+   For a spec the change creates, the file does not exist yet and the script
+   creates it. Add its entry to `SPECS` in `lib/specs/registry.ts` in the
+   same commit, with a one-sentence blurb.
+3. **Put it on main.** Commit the spec on its own, subject `Write "<change
+   title>" into the <spec title> spec`, with the change's id in the body.
+   Then `git fetch origin`, merge `origin/main`, `npm run gate`, and merge to
+   main and push as in step 4 of the Building section in `SKILL.md`. If the
+   gate fails because of the change itself, such as a spec rule check, put
+   the change back to proposed as in step 2 with the gate's reason in the
+   comment, and stop.
+4. **Mark it applied**, in one statement, with the sha of the commit that
+   changed the spec:
+
+   ```sql
+   update spec_changes
+   set status = 'applied', applied_at = now(), commit_sha = '<sha>'
+   where id = '<id>' and user_id = '<user>' and status = 'approved';
+   ```
+
+   The table requires `applied_at` exactly when the status is `applied`, so
+   the three go together. The change then leaves `/dev/specs`.
+5. **Decide what the change asks for.** Read the spec around the diff and the
+   code it describes, then sort the change into one of three:
+
+   - **Nothing to build.** The change brings the spec up to what the code
+     already does, often from a `drifted` finding whose proposal was
+     `change_spec`, or it only rewords. Shape nothing and say so in the
+     report.
+   - **An addition.** It adds behaviour without replacing how something
+     already works. Shape it as below.
+   - **A replacement.** It changes how something that exists works, which
+     Part 4 of the spec builds as an overhaul. Shape it as below.
+
+6. **Shape an addition** with steps 2 to 5 of "Shaping an idea", with these
+   differences:
+
+   - The feature is written `not_started`, not proposed, and so are the
+     steps beneath it: approving the change approved them. Each carries the
+     session stamp on its own line of `comment` (`Added by session cse_… on
+     <date>.`, as `offline.md` writes it), so the page marks it as written
+     for the person and offers the drop.
+   - After the vision line, the detail's second sentence names the change:
+     `From the spec change "<title>", approved on <date>.`
+   - A step that acts outside the repository is still proposed, and a
+     decision is still the person's to answer. Neither is approved by the
+     change.
+   - The module is the workspace the work changes. The spec's own `module` in
+     the registry is a hint, and `null` there usually means `dev`.
+   - Link the change to the feature: `update spec_changes set plan_item_id =
+     '<feature id>' where id = '<id>' and user_id = '<user>'`. One change
+     should make one feature. If it really makes two, link the first and name
+     both in the report.
+
+7. **Shape a replacement** as one feature with its steps, all `proposed`,
+   whose detail says in its first sentence what it replaces and, in its
+   last, that it comes back for approval because overhauls cannot yet be held
+   at their design. Link it to the change as in step 6. Decision #1508 chose
+   to approve a replacement with the change except for one stop: its build
+   steps wait until the person has tried the design in one workspace and
+   accepted it. That stop needs the overhaul track (plan #1511), and the
+   shaping for it is plan #1527, which replaces this step when it lands.
+   Until then a proposed feature is the nearest honest form of the stop.
+8. **Report** the commit on main, the change marked applied, and every row
+   you wrote by number and title, or which of steps 1 to 3 stopped the run
+   and why.

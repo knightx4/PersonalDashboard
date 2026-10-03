@@ -267,6 +267,16 @@ const LOCKED: ReadonlyArray<{ file: string; name: string; run: () => Promise<unk
     run: () => (specs.dismissVisionEdit as Action)({}, form({ id: SOME_UUID })),
   },
   {
+    file: 'app/dev/specs/actions.ts',
+    name: 'approveSpecChange',
+    run: () => (specs.approveSpecChange as Action)({}, form({ id: SOME_UUID })),
+  },
+  {
+    file: 'app/dev/specs/actions.ts',
+    name: 'declineSpecChange',
+    run: () => (specs.declineSpecChange as Action)({}, form({ id: SOME_UUID })),
+  },
+  {
     file: 'app/dev/surfaces/actions.ts',
     name: 'noteOnSurface',
     run: () =>
