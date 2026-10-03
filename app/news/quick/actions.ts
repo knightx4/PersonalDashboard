@@ -17,11 +17,10 @@ import {
   discussionClosed,
   roundsTaken,
   storyMaterial,
-  storyRef,
   storySubject,
 } from '@/lib/news/quick/discuss';
 import { setReaction } from '@/lib/news/quick/reactions';
-import { saveStory } from '@/lib/news/saved/stories';
+import { findSavedStory, saveStory } from '@/lib/news/saved/stories';
 import { replyAbout } from '@/lib/talk/reply';
 import { appendTurns, loadConversation } from '@/lib/talk/store';
 import { turnBody, type TalkTurn } from '@/lib/talk/talk';
@@ -191,12 +190,14 @@ export async function loadStoryDiscussion(
   if (!parsed.success) return { turns: [], error: 'That story could not be found.' };
 
   await requireUser();
-  const core = await createCoreClient();
+  const [news, core] = await Promise.all([createNewsClient(), createCoreClient()]);
   try {
-    const turns = await loadConversation(core, {
-      kind: 'news_story',
-      ref: storyRef(parsed.data.issueId, parsed.data.storyIndex),
-    });
+    const story = await storyAt(news, parsed.data.issueId, parsed.data.storyIndex);
+    if (!story) return { turns: [], error: null };
+    // The thread sits under the story's saved copy, which discussing it made.
+    const saved = await findSavedStory(news, { issueId: parsed.data.issueId, headline: story.headline });
+    if (!saved) return { turns: [], error: null };
+    const turns = await loadConversation(core, storySubject(saved.id, story.headline));
     return { turns, error: null };
   } catch {
     return { turns: [], error: 'Your discussion could not be read. Try again.' };
@@ -212,24 +213,49 @@ function anthropicKey(): string | undefined {
 }
 
 /**
- * Save a story that is being discussed, and refresh the pages that show
- * whether it is saved. saveStory ignores a story already on the list, so this
- * runs on every round without moving its saved_at.
+ * The story at one index of a newsletter's stories, or null when the issue or
+ * the story is gone. Indexed in the raw array, as reactions.ts does:
+ * readStories drops malformed entries, which would shift every index after
+ * them. Throws when the read fails.
+ */
+async function storyAt(
+  news: Awaited<ReturnType<typeof createNewsClient>>,
+  issueId: string,
+  storyIndex: number,
+): Promise<ReturnType<typeof readStories>[number] | null> {
+  const { data: issue, error } = await news.from('issues').select('stories').eq('id', issueId).maybeSingle();
+  assertSchemaExposed(error, NEWS_SCHEMA);
+  if (error) throw new Error(`news: reading the newsletter failed (${error.message})`);
+  const stories = (issue as { stories: unknown } | null)?.stories;
+  const entry = Array.isArray(stories) ? stories[storyIndex] : undefined;
+  const [story] = entry === undefined ? [] : readStories([entry]);
+  return story ?? null;
+}
+
+/**
+ * Save a story that is being discussed, refresh the pages that show whether
+ * it is saved, and return the saved row's id, which the discussion's thread
+ * sits under (plan #1468). saveStory ignores a story already on the list, so
+ * this runs on every round without moving its saved_at. Null when the story
+ * could not be saved.
  */
 async function keepDiscussedStory(
   news: Awaited<ReturnType<typeof createNewsClient>>,
   userId: string,
   issueId: string,
   headline: string,
-): Promise<void> {
+): Promise<string | null> {
+  let saved: Awaited<ReturnType<typeof findSavedStory>>;
   try {
     await saveStory(news, { userId, issueId, headline });
+    saved = await findSavedStory(news, { issueId, headline });
   } catch {
-    return;
+    return null;
   }
   revalidatePath('/news');
   revalidatePath('/news/saved');
   revalidatePath(`/news/i/${issueId}`);
+  return saved?.id ?? null;
 }
 
 /**
@@ -245,11 +271,11 @@ async function keepDiscussedStory(
  * failed reply keeps it, and the turns returned are what the table holds.
  * The reply's cost is recorded under news, discuss-story.
  *
- * Once the person's turn is kept, the story is saved as well (plan #1061), so
- * the Saved tab lists it with its exchange. That is the first moment the
- * conversation exists to be found. A story already saved keeps its row, and a
- * save that fails is left for the Save button rather than failing the
- * discussion.
+ * The story is saved first (plan #1061), so the Saved tab lists it with its
+ * exchange, and the discussion is the thread under that saved row
+ * (`news.saved_stories:<id>`, plan #1468). A story already saved keeps its
+ * row. A save that fails fails the round, since the thread has nothing to sit
+ * under without it.
  */
 // latency: pending -- the view shows in the thread at once and "Dash is replying" holds the place of the reply
 export async function discussQuickStory(
@@ -265,21 +291,18 @@ export async function discussQuickStory(
   const user = await requireUser();
   const [news, core] = await Promise.all([createNewsClient(), createCoreClient()]);
 
-  const { data: issue, error: issueError } = await news
-    .from('issues')
-    .select('stories')
-    .eq('id', parsed.data.issueId)
-    .maybeSingle();
-  assertSchemaExposed(issueError, NEWS_SCHEMA);
-  if (issueError) return { error: 'The story could not be read. Try again.' };
-  // Indexed in the raw array, as reactions.ts does: readStories drops
-  // malformed entries, which would shift every index after them.
-  const stories = (issue as { stories: unknown } | null)?.stories;
-  const entry = Array.isArray(stories) ? stories[parsed.data.storyIndex] : undefined;
-  const [story] = entry === undefined ? [] : readStories([entry]);
+  let story: Awaited<ReturnType<typeof storyAt>>;
+  try {
+    story = await storyAt(news, parsed.data.issueId, parsed.data.storyIndex);
+  } catch {
+    return { error: 'The story could not be read. Try again.' };
+  }
   if (!story) return { error: 'That story is no longer in its newsletter.' };
 
-  const subject = storySubject(parsed.data.issueId, parsed.data.storyIndex, story.headline);
+  const savedId = await keepDiscussedStory(news, user.id, parsed.data.issueId, story.headline);
+  if (!savedId) return { error: 'That was not kept. Try again.' };
+
+  const subject = storySubject(savedId, story.headline);
   let earlier: TalkTurn[];
   let kept: TalkTurn[];
   try {
@@ -289,8 +312,6 @@ export async function discussQuickStory(
   } catch {
     return { error: 'That was not kept. Try again.' };
   }
-
-  await keepDiscussedStory(news, user.id, parsed.data.issueId, story.headline);
 
   const key = anthropicKey();
   if (!key) return { turns: kept, error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot reply.' };

@@ -457,7 +457,7 @@ Conversations they had with Dash: about a Learn card or a newsletter story, one 
 
 - Search: `title`
 - Name a row by `title`; link it by `id`
-- subject_kind says what it is about: 'feed_card' with subject_ref the learn.feed_cards id, 'news_story', or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id.
+- subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as learn.feed_cards:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id.
 
 ### `public.social_posts` (Dev)
 

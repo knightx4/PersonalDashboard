@@ -107,10 +107,10 @@ export async function saveStory(
 /**
  * Take a story off the Saved list. Removing one that is not saved does nothing.
  *
- * news.unsave_story (migrations-goals/0065) deletes the row, or, when a
- * reading in Learn or a task in Todo points at it, keeps it with unsaved_at
- * set so the Saved tab hides it and the reading or task still opens it
- * (plan #1367).
+ * news.unsave_story (migrations-goals/0065, 0067) deletes the row, or, when a
+ * reading in Learn, a task in Todo or a thread (plan #1468) points at it,
+ * keeps it with unsaved_at set so the Saved tab hides it and what points at it
+ * still opens it (plan #1367).
  */
 export async function removeSavedStory(
   client: NewsSupabaseClient,

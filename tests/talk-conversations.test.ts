@@ -1,10 +1,12 @@
 /**
- * A saved conversation about a card (plan #1053), against the database.
+ * A saved conversation under a row (plans #1053, #1468), against the database.
  *
- * Done when a conversation started on a card can be closed mid-way and
- * reopened with every turn in place, and another account cannot read it. The
- * writes here are the ones lib/talk/store.ts makes through PostgREST: start
- * the conversation if it is not there, add turns, read them back in order.
+ * Done when a conversation started under a row can be closed mid-way and
+ * reopened with every turn in place, and another account cannot read it or
+ * start one under that row. The writes here are the ones lib/talk/store.ts
+ * makes through PostgREST: start the conversation if it is not there, add
+ * turns, read them back in order. The row here is a todo task; that a thread
+ * can sit under a row of every registry table is tests/refs.test.ts's.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type postgres from 'postgres';
@@ -12,7 +14,10 @@ import { admin, asUser, closeDb, createUser, truncateAll } from './helpers/db-co
 
 let userA = '';
 let userB = '';
-const CARD = '6f1c1f5e-0000-4000-8000-000000000001';
+/** A row thread's ref: a todo task of userA's, and one of userB's. */
+let CARD = '';
+let OTHER = '';
+let CARD_B = '';
 const ASK = '6f1c1f5e-0000-4000-8000-0000000000a5';
 
 /** appendTurns, as the person: start it without replacing one, then add turns. */
@@ -21,7 +26,7 @@ async function append(
   userId: string,
   ref: string,
   turns: { role: string; body: string }[],
-  kind = 'feed_card',
+  kind = 'row',
 ): Promise<void> {
   // An ask conversation's id is its ref, and appendTurns sends it with the ref.
   await tx`
@@ -44,7 +49,7 @@ async function load(userId: string, ref: string): Promise<{ role: string; body: 
     (tx) => tx<{ role: string; body: string }[]>`
       select t.role, t.body
       from conversations c join conversation_turns t on t.conversation_id = c.id
-      where c.subject_kind = 'feed_card' and c.subject_ref = ${ref}
+      where c.subject_kind = 'row' and c.subject_ref = ${ref}
       order by t.created_at`,
   );
 }
@@ -53,6 +58,14 @@ beforeAll(async () => {
   await truncateAll();
   userA = await createUser('talk-a@example.com');
   userB = await createUser('talk-b@example.com');
+  const task = async (userId: string, title: string) => {
+    const [row] = await admin<{ id: string }[]>`
+      insert into todo.tasks (user_id, title) values (${userId}, ${title}) returning id`;
+    return `todo.tasks:${row.id}`;
+  };
+  CARD = await task(userA, 'Read the AlphaGo paper');
+  OTHER = await task(userA, 'Write it up');
+  CARD_B = await task(userB, 'Their own task');
 });
 
 afterAll(async () => {
@@ -60,7 +73,7 @@ afterAll(async () => {
   await closeDb();
 });
 
-describe('a conversation about a card', () => {
+describe('a conversation under a row', () => {
   it('keeps every turn across sittings, in order, in one conversation', async () => {
     // First sitting: a question and its reply, then the tab is closed.
     await asUser(userA, (tx) =>
@@ -83,11 +96,11 @@ describe('a conversation about a card', () => {
   });
 
   it('keeps a question and its reply in the order given when written in one statement', async () => {
-    const ref = 'one-statement';
+    const ref = OTHER;
     await asUser(userA, async (tx) => {
       await tx`
         insert into conversations (user_id, subject_kind, subject_ref)
-        values (${userA}, 'feed_card', ${ref})`;
+        values (${userA}, 'row', ${ref})`;
       await tx`
         insert into conversation_turns (conversation_id, user_id, role, body)
         select c.id, ${userA}, v.role, v.body
@@ -97,6 +110,21 @@ describe('a conversation about a card', () => {
         order by v.n`;
     });
     expect((await load(userA, ref)).map((turn) => turn.body)).toEqual(['First', 'Second', 'Third']);
+  });
+
+  it('refuses a ref that is not schema.table:id, a row that is gone, and the old kinds', async () => {
+    for (const ref of ['card-1', 'todo.tasks:00000000-0000-4000-8000-000000000000']) {
+      await expect(
+        asUser(userA, (tx) => tx`insert into conversations (user_id, subject_kind, subject_ref) values (${userA}, 'row', ${ref})`),
+        ref,
+      ).rejects.toThrow();
+    }
+    for (const kind of ['feed_card', 'news_story']) {
+      await expect(
+        asUser(userA, (tx) => tx`insert into conversations (user_id, subject_kind, subject_ref) values (${userA}, ${kind}, ${CARD})`),
+        kind,
+      ).rejects.toThrow();
+    }
   });
 
   it('refuses a blank turn, an unknown role and an unknown kind', async () => {
@@ -155,10 +183,26 @@ describe('another account', () => {
     expect(await load(userA, CARD)).toHaveLength(3);
   });
 
-  it('keeps its own conversation about the same card apart', async () => {
-    await asUser(userB, (tx) => append(tx, userB, CARD, [{ role: 'user', body: 'My own question' }]));
-    expect(await load(userB, CARD)).toEqual([{ role: 'user', body: 'My own question' }]);
+  it('cannot start a thread under the other account\'s row', async () => {
+    await expect(
+      asUser(userB, (tx) => append(tx, userB, CARD, [{ role: 'user', body: 'My own question' }])),
+    ).rejects.toThrow(/is not a row of yours/);
+    // Nor can a run on the service role put one there for them.
+    await expect(
+      admin`insert into core.conversations (user_id, subject_kind, subject_ref) values (${userB}, 'row', ${CARD})`,
+    ).rejects.toThrow(/is not a row of yours/);
     expect(await load(userA, CARD)).toHaveLength(3);
+  });
+
+  it('keeps its own threads under its own rows', async () => {
+    await asUser(userB, (tx) => append(tx, userB, CARD_B, [{ role: 'user', body: 'My own question' }]));
+    expect(await load(userB, CARD_B)).toEqual([{ role: 'user', body: 'My own question' }]);
+  });
+
+  it('cannot move a thread under the other account\'s row', async () => {
+    await expect(
+      asUser(userB, (tx) => tx`update conversations set subject_ref = ${CARD} where subject_ref = ${CARD_B}`),
+    ).rejects.toThrow(/is not a row of yours/);
   });
 });
 

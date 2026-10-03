@@ -99,7 +99,11 @@ which is the rule `goals.links` already enforces with its trigger.
 conversation per user and subject, and turns marked by author. It becomes the
 one thread store. Its kinds become `row`, for a thread under any ref, and
 `ask`, for an Ask Dash conversation with no subject. The existing `feed_card`
-and `news_story` threads become `row` threads under their refs.
+and `news_story` threads become `row` threads under their refs. A newsletter
+story is a position in its issue rather than a row, so its thread sits under
+its saved copy, `news.saved_stories:<id>`, which discussing a story already
+creates. The ref is checked on insert like any other: a thread under a row of
+another account's is refused.
 
 One component, `<Thread subject={ref} />`, shows a thread, takes a new comment,
 recognises `@dash`, and shows Dash's reply when it lands. It replaces the

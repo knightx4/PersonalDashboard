@@ -144,6 +144,17 @@ describe('news.unsave_story', () => {
     expect(rows).toHaveLength(0);
   });
 
+  it('keeps a story a thread sits under, off the Saved tab (plan #1468)', async () => {
+    const story = await saveStory(userA, 'Discussed with Dash');
+    await asUser(userA, (tx) => tx`
+      insert into core.conversations (user_id, subject_kind, subject_ref, title)
+      values (${userA}, 'row', ${`news.saved_stories:${story}`}, 'Discussed with Dash')`);
+    await unsave(userA, story);
+    const rows = await admin`select 1 from news.saved_stories where id = ${story}`;
+    expect(rows).toHaveLength(1);
+    expect(await savedTab(userA)).not.toContain(story);
+  });
+
   it('cannot unsave another account\'s story', async () => {
     const theirs = await saveStory(userB, 'Not yours');
     await unsave(userA, theirs);
