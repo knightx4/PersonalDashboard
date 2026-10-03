@@ -114,6 +114,207 @@ export function choosePursuit(open: readonly OpenPursuit[], title: string): Purs
   return { kind: 'create' };
 }
 
+/** A pursuit at the company, open or closed, as the dedupe reads it. */
+export type KnownPursuit = OpenPursuit & {
+  atsJobId: string | null;
+  closed: boolean;
+  /** When a closed pursuit closed; null while it is open or where nobody recorded it. */
+  closedAt: Date | null;
+  createdAt: Date | null;
+};
+
+/** What the message says about the pursuit it belongs to. */
+export type PursuitMessage = {
+  title: string;
+  atsJobId: string | null;
+  receivedAt: Date | null;
+  /**
+   * Whether this kind of mail begins a pursuit: a confirmation that you
+   * applied, or a recruiter's first approach. Anything else (a rejection, an
+   * assessment, an offer) continues one that already exists.
+   */
+  startsPursuit: boolean;
+};
+
+/** Mail that can begin a pursuit; see PursuitMessage.startsPursuit. */
+export const STARTS_PURSUIT: ReadonlySet<MessageClassification> = new Set<MessageClassification>([
+  'application_confirmation',
+  'recruiter_outreach',
+]);
+
+function sameAtsJobId(a: string | null, b: string | null): boolean {
+  return a !== null && b !== null && a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+function latestPursuit(pursuits: readonly KnownPursuit[]): KnownPursuit {
+  return [...pursuits].sort(
+    (a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
+  )[0];
+}
+
+/**
+ * Whether the message is a fresh attempt at a pursuit that has closed.
+ *
+ * Only mail that begins a pursuit, dated after the closed one closed, reads
+ * that way. A confirmation dated before the rejection is the old attempt's own
+ * confirmation arriving late, which is what a rescan of old mail produces for
+ * every pursuit it touches, and it belongs on the closed row. A message with no
+ * date cannot show it came later, so it is read as the old attempt's too.
+ */
+function reapplies(closed: KnownPursuit, message: PursuitMessage): boolean {
+  return (
+    message.startsPursuit &&
+    message.receivedAt !== null &&
+    closed.closedAt !== null &&
+    message.receivedAt.getTime() > closed.closedAt.getTime()
+  );
+}
+
+/**
+ * Which pursuit at this company an inferred message belongs to, closed ones
+ * included.
+ *
+ * choosePursuit only looks at open pursuits, so a confirmation for a role
+ * already rejected or ghosted opened a second role and application beside the
+ * first; a rescan of old mail did this for dozens of roles at once. In order:
+ *
+ *   1. The posting's ATS job id. An open pursuit with it is adopted; otherwise
+ *      the latest closed one is, unless the message is a re-application.
+ *   2. The open pursuits, by choosePursuit's rules, unchanged.
+ *   3. A closed pursuit with exactly the same title, and no conflicting job
+ *      id, on the same terms as step 1. A placeholder title never matches a
+ *      closed pursuit: it says nothing about which role the mail is about.
+ *
+ * A re-application (see reapplies) still opens its own pursuit, as it always
+ * has. Adopting a closed pursuit files the message's event on it; the
+ * transition gate in writeEvent keeps that event from reopening it.
+ */
+export function choosePursuitFor(
+  known: readonly KnownPursuit[],
+  message: PursuitMessage,
+): PursuitChoice {
+  const atsJobId = message.atsJobId?.trim() || null;
+
+  if (atsJobId) {
+    const posting = known.filter((pursuit) => sameAtsJobId(pursuit.atsJobId, atsJobId));
+    const open = posting.filter((pursuit) => !pursuit.closed);
+    if (open.length > 0) return { kind: 'adopt', applicationId: latestPursuit(open).applicationId };
+    if (posting.length > 0) {
+      const last = latestPursuit(posting);
+      if (!reapplies(last, message)) return { kind: 'adopt', applicationId: last.applicationId };
+    }
+  }
+
+  const openChoice = choosePursuit(
+    known.filter((pursuit) => !pursuit.closed),
+    message.title,
+  );
+  if (openChoice.kind !== 'create') return openChoice;
+
+  const wanted = message.title.trim().toLowerCase();
+  if (wanted !== PLACEHOLDER_ROLE_TITLE.toLowerCase()) {
+    const sameTitle = known.filter(
+      (pursuit) =>
+        pursuit.closed &&
+        pursuit.roleTitle.trim().toLowerCase() === wanted &&
+        !(pursuit.atsJobId && atsJobId && !sameAtsJobId(pursuit.atsJobId, atsJobId)),
+    );
+    if (sameTitle.length > 0) {
+      const last = latestPursuit(sameTitle);
+      if (!reapplies(last, message)) return { kind: 'adopt', applicationId: last.applicationId };
+    }
+  }
+
+  return { kind: 'create' };
+}
+
+type RoleWithApplications = {
+  id: unknown;
+  title: unknown;
+  ats_job_id?: unknown;
+  created_at?: unknown;
+  applications?: unknown;
+};
+
+type ApplicationAttempt = {
+  id: string;
+  status: string;
+  attempt?: number | null;
+  closed_at?: string | null;
+  created_at?: string | null;
+};
+
+function dateOrNull(value: unknown): Date | null {
+  if (typeof value !== 'string' || value === '') return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * The company's roles as pursuits: each role's live application, or its
+ * latest attempt when every attempt has closed. A role with no application is
+ * left out, as it always was.
+ */
+export function pursuitsFromRoles(roles: readonly RoleWithApplications[]): KnownPursuit[] {
+  const pursuits: KnownPursuit[] = [];
+  for (const role of roles) {
+    const applications = (role.applications ?? []) as ApplicationAttempt[];
+    if (applications.length === 0) continue;
+    const live = applications.find((a) => !isTerminal(a.status as ApplicationStatus));
+    const chosen =
+      live ??
+      [...applications].sort(
+        (a, b) =>
+          (b.attempt ?? 0) - (a.attempt ?? 0) ||
+          (dateOrNull(b.created_at)?.getTime() ?? 0) - (dateOrNull(a.created_at)?.getTime() ?? 0),
+      )[0];
+    pursuits.push({
+      roleId: role.id as string,
+      roleTitle: (role.title as string | null) ?? '',
+      applicationId: chosen.id,
+      atsJobId: (role.ats_job_id as string | null | undefined) ?? null,
+      closed: !live,
+      closedAt: live ? null : dateOrNull(chosen.closed_at),
+      createdAt: dateOrNull(chosen.created_at) ?? dateOrNull(role.created_at),
+    });
+  }
+  return pursuits;
+}
+
+/**
+ * Run work for one key at a time, in the order it was asked for.
+ *
+ * The linker reads up to EXTRACT_CONCURRENCY messages at once, and two of them
+ * about one company both looked for a pursuit before either had made one, so
+ * both made one: Uber's job 159366 got two roles 0.2 seconds apart. Holding the
+ * company for the length of the look-then-create makes the second message find
+ * the first one's role. It holds within this server process only; two syncs
+ * running in separate invocations can still race, which is what a unique index
+ * would close (see the report on this change).
+ */
+const pursuitLocks = new Map<string, Promise<void>>();
+
+export async function oneAtATime<T>(
+  key: string,
+  work: () => Promise<T>,
+  locks: Map<string, Promise<void>> = pursuitLocks,
+): Promise<T> {
+  const before = locks.get(key) ?? Promise.resolve();
+  let release: () => void = () => {};
+  const mine = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const tail = before.then(() => mine);
+  locks.set(key, tail);
+  try {
+    await before;
+    return await work();
+  } finally {
+    release();
+    if (locks.get(key) === tail) locks.delete(key);
+  }
+}
+
 export type IngestCounters = {
   messagesSeen: number;
   messagesClassified: number;
@@ -386,42 +587,124 @@ async function writeEvent(
   // No invite: the model's date, on the same terms as before.
   const interviewDate = opts.extracted?.dates?.find((d) => d.kind === 'interview');
   if (interviewDate && (kind === 'interview_scheduled' || kind === 'screen_scheduled')) {
-    const groupId = await newRoundFor(supabase, {
-      userId: opts.userId,
-      applicationId: opts.applicationId,
-    });
-    if (!groupId) return;
+    await oneAtATime(interviewLockKey(opts.applicationId), async () => {
+      const people = contactsFromNames(namesForSlot(opts.extracted, interviewDate));
 
-    const { data: created } = await supabase
-      .from('interviews')
-      .insert({
-        user_id: opts.userId,
-        application_id: opts.applicationId,
-        group_id: groupId,
-        round: 1,
-        kind: interviewKind ?? 'recruiter_screen',
-        scheduled_at: interviewDate.at,
-        format: 'video',
-        status: 'scheduled',
-      })
-      .select('id')
-      .maybeSingle();
-
-    if (created) {
-      await recordParticipants(supabase, {
-        userId: opts.userId,
-        companyId: await companyForApplication(supabase, opts.applicationId),
-        applicationId: opts.applicationId,
-        interviewId: created.id as string,
-        interviewFresh: true,
-        people: contactsFromNames(namesForSlot(opts.extracted, interviewDate)),
-        rec: opts.rec,
-      });
-      if (!opts.fresh) {
-        opts.rec.interviewBooked({ groupId, interviewId: created.id as string, applicationId: opts.applicationId });
+      // The same interview told twice: an invite already booked it, or another
+      // message about it came first. Nothing stops a second row at the same
+      // time except this, because the unique index only covers invites.
+      const already = interviewInSlot(
+        await interviewsFor(supabase, opts.userId, opts.applicationId),
+        interviewDate.at,
+      );
+      if (already) {
+        await recordParticipants(supabase, {
+          userId: opts.userId,
+          companyId: await companyForApplication(supabase, opts.applicationId),
+          applicationId: opts.applicationId,
+          interviewId: already.id,
+          interviewFresh: false,
+          people,
+          rec: opts.rec,
+        });
+        return;
       }
-    }
+
+      const groupId = await newRoundFor(supabase, {
+        userId: opts.userId,
+        applicationId: opts.applicationId,
+      });
+      if (!groupId) return;
+
+      const { data: created } = await supabase
+        .from('interviews')
+        .insert({
+          user_id: opts.userId,
+          application_id: opts.applicationId,
+          group_id: groupId,
+          round: 1,
+          kind: interviewKind ?? 'recruiter_screen',
+          scheduled_at: interviewDate.at,
+          format: 'video',
+          status: 'scheduled',
+        })
+        .select('id')
+        .maybeSingle();
+
+      if (created) {
+        await recordParticipants(supabase, {
+          userId: opts.userId,
+          companyId: await companyForApplication(supabase, opts.applicationId),
+          applicationId: opts.applicationId,
+          interviewId: created.id as string,
+          interviewFresh: true,
+          people,
+          rec: opts.rec,
+        });
+        if (!opts.fresh) {
+          opts.rec.interviewBooked({ groupId, interviewId: created.id as string, applicationId: opts.applicationId });
+        }
+      }
+    });
   }
+}
+
+/** How far apart two times can be and still be one interview. */
+export const SAME_SLOT_MS = 5 * 60_000;
+
+export type BookedInterview = {
+  id: string;
+  scheduled_at: string | null;
+  status: string | null;
+  ics_uid: string | null;
+};
+
+/**
+ * The interview already booked at this time, if there is one.
+ *
+ * Within SAME_SLOT_MS either side, because a time read out of prose and the
+ * same time on an invite can differ by the odd minute. A cancelled interview
+ * no longer holds the slot, so it is passed over. With `uidless`, only an
+ * interview no invite has claimed qualifies: an invite with a different uid at
+ * the same time is a different calendar event. Where several qualify, the
+ * nearest in time is taken.
+ */
+export function interviewInSlot(
+  booked: readonly BookedInterview[],
+  at: string,
+  opts: { uidless?: boolean } = {},
+): BookedInterview | null {
+  const wanted = new Date(at).getTime();
+  if (Number.isNaN(wanted)) return null;
+  let best: { row: BookedInterview; gap: number } | null = null;
+  for (const row of booked) {
+    if (row.status === 'cancelled' || !row.scheduled_at) continue;
+    if (opts.uidless && row.ics_uid) continue;
+    const time = new Date(row.scheduled_at).getTime();
+    if (Number.isNaN(time)) continue;
+    const gap = Math.abs(time - wanted);
+    if (gap <= SAME_SLOT_MS && (!best || gap < best.gap)) best = { row, gap };
+  }
+  return best?.row ?? null;
+}
+
+/** The pursuit's interviews, for interviewInSlot. A pursuit has a handful. */
+async function interviewsFor(
+  supabase: AppSupabaseClient,
+  userId: string,
+  applicationId: string,
+): Promise<BookedInterview[]> {
+  const { data } = await supabase
+    .from('interviews')
+    .select('id, scheduled_at, status, ics_uid')
+    .eq('application_id', applicationId)
+    .eq('user_id', userId);
+  return (data ?? []) as BookedInterview[];
+}
+
+/** One message at a time books interviews on a pursuit; see oneAtATime. */
+function interviewLockKey(applicationId: string): string {
+  return `interviews:${applicationId}`;
 }
 
 /**
@@ -570,7 +853,18 @@ async function applyInvite(
     ...(invite.timeZone ? { time_zone: invite.timeZone } : {}),
   };
 
-  const existing = invite.icsUid
+  await oneAtATime(interviewLockKey(opts.applicationId), () => bookInvite(supabase, opts, companyId, patch));
+}
+
+async function bookInvite(
+  supabase: AppSupabaseClient,
+  opts: Parameters<typeof applyInvite>[1],
+  companyId: string | null,
+  patch: Record<string, unknown>,
+): Promise<void> {
+  const { invite } = opts;
+
+  const byUid = invite.icsUid
     ? await supabase
         .from('interviews')
         .select('id, ics_sequence')
@@ -578,6 +872,21 @@ async function applyInvite(
         .eq('ics_uid', invite.icsUid)
         .maybeSingle()
     : { data: null };
+
+  // The invite for an interview a covering note already booked from its prose:
+  // the same slot with no uid yet. The invite claims that row rather than
+  // booking a second one beside it.
+  const bySlot =
+    byUid.data || !invite.scheduledAt
+      ? null
+      : interviewInSlot(await interviewsFor(supabase, opts.userId, opts.applicationId), invite.scheduledAt, {
+          uidless: true,
+        });
+  const existing = byUid.data
+    ? byUid
+    : bySlot
+      ? { data: { id: bySlot.id, ics_sequence: null as number | null } }
+      : { data: null };
 
   if (existing.data) {
     // Mail arrives out of order. A stale redelivery must not un-cancel a slot.
@@ -1022,6 +1331,8 @@ async function createInferredApplication(
     asLead: boolean;
     /** What the pursuit was inferred from, for the seed event's summary. */
     seededBy?: MessageClassification;
+    /** The message's classification, which says whether it can begin a pursuit. */
+    classification: MessageClassification;
     /** Whether opening this is a judgement only the user can make. */
     needsReview: boolean;
     rec: JobRecorder;
@@ -1029,28 +1340,28 @@ async function createInferredApplication(
     freshCompany: boolean;
   },
 ): Promise<{ applicationId: string; roleId: string | null; adopted: boolean } | null> {
+  // One message per company at a time: see oneAtATime.
+  return oneAtATime(`${opts.userId}:${opts.companyId}`, () => findOrCreatePursuit(supabase, opts));
+}
+
+async function findOrCreatePursuit(
+  supabase: AppSupabaseClient,
+  opts: Parameters<typeof createInferredApplication>[1],
+): Promise<{ applicationId: string; roleId: string | null; adopted: boolean } | null> {
   const title = opts.roleTitle?.trim() || PLACEHOLDER_ROLE_TITLE;
 
   const { data: existingRoles } = await supabase
     .from('roles')
-    .select('id, title, applications ( id, status )')
+    .select('id, title, ats_job_id, created_at, applications ( id, status, attempt, closed_at, created_at )')
     .eq('user_id', opts.userId)
     .eq('company_id', opts.companyId);
 
-  const open: OpenPursuit[] = [];
-  for (const role of existingRoles ?? []) {
-    const applications = (role.applications ?? []) as Array<{ id: string; status: string }>;
-    const live = applications.find((a) => !isTerminal(a.status as ApplicationStatus));
-    if (live) {
-      open.push({
-        roleId: role.id as string,
-        roleTitle: role.title as string,
-        applicationId: live.id,
-      });
-    }
-  }
-
-  const choice = choosePursuit(open, title);
+  const choice = choosePursuitFor(pursuitsFromRoles(existingRoles ?? []), {
+    title,
+    atsJobId: opts.atsJobId,
+    receivedAt: opts.receivedAt,
+    startsPursuit: STARTS_PURSUIT.has(opts.classification),
+  });
 
   if (choice.kind === 'rename') {
     // The message that names the role arrives after one that could not. Adopt
@@ -1539,6 +1850,7 @@ async function applyLinkDecision(
         receivedAt: message.internalDate,
         asLead: false,
         seededBy: classification,
+        classification,
         needsReview: inferredApplicationNeedsReview({
           path: 'application',
           classification,
@@ -1602,6 +1914,7 @@ async function applyLinkDecision(
         atsJobId: tierB?.atsJobId ?? null,
         receivedAt: message.internalDate,
         asLead: true,
+        classification,
         needsReview: inferredApplicationNeedsReview({
           path: 'lead',
           classification,

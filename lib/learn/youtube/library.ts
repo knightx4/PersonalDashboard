@@ -206,6 +206,51 @@ export function videoRow(providerId: string, video: YouTubeVideo) {
   };
 }
 
+/**
+ * The catalogue rows of kind video these ids already have, under any provider,
+ * one per id: the oldest where there are several.
+ */
+export async function catalogueItems(learn: LearnSupabaseClient, videoIds: string[]): Promise<Map<string, string>> {
+  const found = new Map<string, string>();
+  for (let from = 0; from < videoIds.length; from += WRITE_BATCH) {
+    const { data, error } = await learn
+      .from('catalogue_items')
+      .select('id, external_id')
+      .eq('kind', 'video')
+      .in('external_id', videoIds.slice(from, from + WRITE_BATCH))
+      .order('created_at');
+    if (error) throw new Error(`Looking for videos in the catalogue failed: ${error.message}`);
+    for (const row of (data ?? []) as { id: string; external_id: string }[]) {
+      if (!found.has(row.external_id)) found.set(row.external_id, row.id);
+    }
+  }
+  return found;
+}
+
+/**
+ * Videos to store, after taking out those the catalogue already has under
+ * another provider.
+ *
+ * Followed channels share videos: TED-Ed's playlists hold TED's talks, and
+ * Numberphile's hold 3Blue1Brown's. Each channel used to store what it found
+ * under itself, which put 71 videos in the catalogue twice. A video already
+ * stored keeps its row, and its id goes into `known` so the playlist's order
+ * points at it.
+ */
+async function adoptStoredVideos(
+  learn: LearnSupabaseClient,
+  videoIds: string[],
+  known: Map<string, string>,
+): Promise<{ adopted: string[]; missing: string[] }> {
+  if (videoIds.length === 0) return { adopted: [], missing: [] };
+  const elsewhere = await catalogueItems(learn, videoIds);
+  for (const [videoId, itemId] of elsewhere) known.set(videoId, itemId);
+  return {
+    adopted: videoIds.filter((id) => elsewhere.has(id)),
+    missing: videoIds.filter((id) => !elsewhere.has(id)),
+  };
+}
+
 /** Upsert videos and return their item ids by video id. */
 async function storeVideos(
   learn: LearnSupabaseClient,
@@ -286,23 +331,32 @@ export async function listChannel(
     return result;
   }
 
-  const newIds = order.videoIds.filter((id) => !known.has(id));
+  const { adopted, missing: newIds } = await adoptStoredVideos(
+    learn,
+    order.videoIds.filter((id) => !known.has(id)),
+    known,
+  );
+  const stored = new Map<string, string>();
   if (newIds.length > 0) {
     const details = await fetchVideosByIds(newIds);
     if (!details.ok) {
       result.error = details.detail;
       return result;
     }
-    const stored = await storeVideos(learn, channel.id, details.videos);
-    for (const [videoId, itemId] of stored) known.set(videoId, itemId);
-    result.newVideos = stored.size;
-
-    // Only uploads that appeared after the channel was first listed. The
-    // first listing of a big channel would otherwise queue its whole
-    // back catalogue.
-    if (channel.auto_transcribe && !firstListing && stored.size > 0) {
-      result.queued = await queueTranscripts(learn, [...stored.keys()], 'auto');
+    for (const [videoId, itemId] of await storeVideos(learn, channel.id, details.videos)) {
+      stored.set(videoId, itemId);
+      known.set(videoId, itemId);
     }
+    result.newVideos = stored.size;
+  }
+
+  // Only uploads that appeared after the channel was first listed. The first
+  // listing of a big channel would otherwise queue its whole back catalogue.
+  // An upload another channel's playlist stored first is still this
+  // channel's new upload, so it is queued too.
+  const uploaded = [...stored.keys(), ...adopted];
+  if (channel.auto_transcribe && !firstListing && uploaded.length > 0) {
+    result.queued = await queueTranscripts(learn, uploaded, 'auto');
   }
 
   const stale =
@@ -406,9 +460,15 @@ async function storePlaylists(
       break;
     }
 
-    // A playlist can hold videos from other channels. They are stored under
-    // this channel too, since that is where this playlist found them.
-    const missing = order.videoIds.filter((id) => !videoItems.has(id));
+    // A playlist can hold videos from other channels. One the catalogue
+    // already has, under any provider, is linked as it is; one it has never
+    // seen is stored under this channel, since that is where this playlist
+    // found it.
+    const { missing } = await adoptStoredVideos(
+      learn,
+      order.videoIds.filter((id) => !videoItems.has(id)),
+      videoItems,
+    );
     if (missing.length > 0) {
       const details = await fetchVideosByIds(missing);
       if (!details.ok) {
