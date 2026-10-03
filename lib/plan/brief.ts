@@ -10,6 +10,7 @@ import {
   type PlanSection,
 } from './tree';
 import { isAppScope, planScopeLabel } from '@/lib/plan/projects';
+import { SURFACE_ROUTES, surfacesInText } from '@/lib/preview/routes';
 
 /**
  * A step written out for whoever is about to build it.
@@ -262,7 +263,42 @@ export type BriefOptions = {
    * carries no vision at all.
    */
   visions?: VisionBodies;
+  /**
+   * Gallery surfaces the step's changed files serve, from `surfacesForFiles`
+   * in lib/preview/routes.ts. Only the plan CLI can read the files, so the
+   * brief adds these to the surfaces the step's own words name.
+   */
+  surfaces?: readonly string[];
 };
+
+/** More than this and the list is cut, since a change to the shell reaches every surface. */
+const SURFACES_LISTED = 20;
+
+/**
+ * The gallery surfaces a build step should photograph (Part 1 of
+ * docs/UI-QUALITY-SPEC.md): those its title, detail and done-when name, by
+ * page address, gallery link or screen file, and those its changed files
+ * serve. Empty for a step that touches no surface.
+ */
+function surfaceLines(node: PlanNode, extra: readonly string[] = []): string[] {
+  if (node.kind !== 'build') return [];
+  const text = [node.title, node.detail ?? '', node.acceptance ?? ''].join('\n');
+  const named = new Set([...surfacesInText(text), ...extra]);
+  const ids = Object.keys(SURFACE_ROUTES).filter((id) => named.has(id));
+  if (ids.length === 0) return [];
+  const lines = ids
+    .slice(0, SURFACES_LISTED)
+    .map((id) => `- ${id}: /preview?s=${id}, for ${SURFACE_ROUTES[id].join(', ')}`);
+  if (ids.length > SURFACES_LISTED) lines.push(`- and ${ids.length - SURFACES_LISTED} more`);
+  return [
+    '',
+    '## Gallery surfaces',
+    '',
+    'Draw and photograph these before wiring the screen to real data:',
+    '',
+    ...lines,
+  ];
+}
 
 /**
  * The vision a step is briefed with, or null for none.
@@ -418,6 +454,8 @@ export function planBrief(
   if (node.acceptance) {
     out.push('', '## Done when', '', node.acceptance);
   }
+
+  out.push(...surfaceLines(node, options.surfaces));
 
   // What nobody can see yet. Said plainly, because the alternative a proposal
   // reaches for is plausible steps invented to fill the gap. A patch that has
