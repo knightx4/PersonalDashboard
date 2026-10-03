@@ -6,7 +6,14 @@
  * and options it hands to element.animate, so a stub element records them.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { TRAVEL_MS, chipLabel, flightKeyframes, travel } from '@/components/motion/travel';
+import {
+  TRAVEL_MS,
+  chipLabel,
+  flightKeyframes,
+  moveKeyframes,
+  travel,
+  travelElement,
+} from '@/components/motion/travel';
 
 type Recorded = { keyframes: Keyframe[]; options: KeyframeAnimationOptions };
 
@@ -98,5 +105,41 @@ describe('travel', () => {
     await expect(
       travel({ from: rect(0, 0), to: rect(1, 1), label: 'x' }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('travelElement', () => {
+  const element = (left: number, top: number) => {
+    const recorded: Recorded[] = [];
+    return {
+      recorded,
+      getBoundingClientRect: () => rect(left, top),
+      animate: (keyframes: Keyframe[], options: KeyframeAnimationOptions) => {
+        recorded.push({ keyframes, options });
+        return { finished: Promise.resolve() };
+      },
+    };
+  };
+
+  it('springs the element from its old place to its new one, by transform only', async () => {
+    stubBrowser(false);
+    const card = element(300, 40);
+    await travelElement(card as unknown as Element, rect(0, 100));
+    expect(card.recorded).toHaveLength(1);
+    expect(card.recorded[0].keyframes).toEqual(moveKeyframes(rect(0, 100), rect(300, 40)));
+    expect(card.recorded[0].keyframes[0].transform).toBe('translate(-300px, 60px)');
+    expect(card.recorded[0].options.duration).toBe(TRAVEL_MS);
+    expect(String(card.recorded[0].options.easing)).toMatch(/^linear\(/);
+  });
+
+  it('does nothing under reduced motion, or when it has not moved', async () => {
+    stubBrowser(true);
+    const card = element(300, 40);
+    await travelElement(card as unknown as Element, rect(0, 100));
+    expect(card.recorded).toHaveLength(0);
+    vi.unstubAllGlobals();
+    stubBrowser(false);
+    await travelElement(card as unknown as Element, rect(300, 40));
+    expect(card.recorded).toHaveLength(0);
   });
 });

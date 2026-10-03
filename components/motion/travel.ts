@@ -132,3 +132,39 @@ export function travel({ from, to, label }: TravelInput): Promise<void> {
     () => chip.remove(),
   );
 }
+
+/**
+ * The keyframes that carry an element from `from` to where it is now, `to`:
+ * it starts drawn over its old place and springs into its new one. Only the
+ * transform moves, so the element is in its new place for layout throughout.
+ */
+export function moveKeyframes(from: Box, to: Box): Keyframe[] {
+  const dx = Math.round(from.left - to.left);
+  const dy = Math.round(from.top - to.top);
+  return [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }];
+}
+
+/**
+ * Travel for the item itself rather than a chip of it (plan #1560): an element
+ * that has just been drawn in its new place, such as a card in its new column,
+ * springs there from `from`, a rect taken before the screen changed. Resolves
+ * when it has arrived, and at once, leaving the element simply in its new
+ * place, under reduced motion, outside a browser, without Web Animations, or
+ * when either end has no size or the two are the same place.
+ */
+export function travelElement(element: Element, from: DOMRectReadOnly): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  if (prefersReducedMotion()) return Promise.resolve();
+  if (typeof element.animate !== 'function') return Promise.resolve();
+  const to = boxOf(element);
+  if (!from.width || !from.height || !to.width || !to.height) return Promise.resolve();
+  if (Math.abs(from.left - to.left) < 1 && Math.abs(from.top - to.top) < 1) return Promise.resolve();
+  const animation = element.animate(moveKeyframes(boxOf(from), to), {
+    duration: FLIGHT_MS,
+    easing: EASE.spring,
+  });
+  return animation.finished.then(
+    () => undefined,
+    () => undefined,
+  );
+}
