@@ -98,6 +98,16 @@ describe('readCutReply', () => {
     expect(readCutReply({ clips: [] }, [], PROFILE)).toEqual([]);
   });
 
+  it('keeps what a clip serves only when it names a track or goal, and takes em dashes out of captions', () => {
+    const sentences = sentencesFromCues(CLIP_TRANSCRIPT);
+    const clips = readCutReply(
+      { clips: [{ start: 21, end: 47, caption: 'Profit is not cash—timing is', idea: 'Gaps.', serves: 'Working capital', stands_alone: true }] },
+      sentences,
+      PROFILE,
+    );
+    expect(clips?.[0]).toMatchObject({ caption: 'Profit is not cash, timing is', serves: null, subjectId: null, goalId: null });
+  });
+
   it('matches what a clip serves by name only', () => {
     expect(matchServes('startup finance', PROFILE)).toEqual({ subjectId: 'subject-1', goalId: null });
     expect(matchServes('Cooking', PROFILE)).toEqual({ subjectId: null, goalId: null });

@@ -132,7 +132,7 @@ For each clip report:
   it shows, in plain words. No hype, no em dashes, no "in this clip".
 - idea: the point it makes, in one sentence.
 - serves: the name of the track or goal it serves, copied exactly from the
-  list, or empty when it serves none.
+  list, or empty when it serves none. Never the video's own title.
 - stands_alone: true only if it makes sense to someone who saw nothing before
   it.
 
@@ -201,6 +201,23 @@ export function matchServes(
   return { subjectId: null, goalId: goal?.id ?? null };
 }
 
+/**
+ * Whether a name is one of the person's tracks or goals. A reply that names
+ * anything else, most often the video's own title, serves nothing.
+ */
+function namesProfile(serves: string, profile: LearnerProfile): boolean {
+  const wanted = key(serves);
+  return (
+    profile.tracks.some((track) => key(track.name) === wanted) ||
+    profile.goals.some((goal) => key(goal.title) === wanted)
+  );
+}
+
+/** A caption with its em dashes turned into commas, which the prompt asks for and Haiku does not always give. */
+function plainCaption(text: string): string {
+  return tidy(text.replace(/\s*—\s*/g, ', '));
+}
+
 /** The sentence a number names: the one starting at that second, or the nearest within two seconds. */
 function sentenceAt(sentences: readonly Sentence[], second: number): number {
   let best = -1;
@@ -221,7 +238,8 @@ function sentenceAt(sentences: readonly Sentence[], second: number): number {
  * Dropped: a clip whose start or end names no sentence, one reported as not
  * standing alone, one with no caption, one shorter than ten seconds or longer
  * than ninety, and one that overlaps a clip before it. What is left is in
- * order, at most thirty.
+ * order, at most thirty. What a clip serves is kept only when it names one of
+ * the person's tracks or goals.
  */
 export function readCutReply(input: unknown, sentences: readonly Sentence[], profile: LearnerProfile): Clip[] | null {
   const parsed = cutReplySchema.safeParse(input);
@@ -229,7 +247,7 @@ export function readCutReply(input: unknown, sentences: readonly Sentence[], pro
   const candidates: Clip[] = [];
   for (const row of parsed.data.clips) {
     if (!row.stands_alone) continue;
-    const caption = tidy(row.caption);
+    const caption = plainCaption(row.caption);
     if (!caption) continue;
     let first = sentenceAt(sentences, Math.round(row.start));
     let last = sentenceAt(sentences, Math.round(row.end));
@@ -239,7 +257,8 @@ export function readCutReply(input: unknown, sentences: readonly Sentence[], pro
     const endSeconds = Math.ceil(sentences[last].endSeconds);
     const span = endSeconds - startSeconds;
     if (span < MIN_CLIP_SECONDS || span > MAX_CLIP_SECONDS) continue;
-    const serves = tidy(row.serves ?? '') || null;
+    const named = tidy(row.serves ?? '');
+    const serves = named && namesProfile(named, profile) ? named : null;
     candidates.push({
       startSeconds,
       endSeconds,
