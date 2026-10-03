@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { YOUTUBE_HREF } from '@/app/learn/videos/library-section';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
@@ -83,9 +84,9 @@ export default async function ChannelPage({
   return (
     <>
       <p className="mb-3">
-        <Link href="/learn/youtube" className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink">
+        <Link href={YOUTUBE_HREF} className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink">
           <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          YouTube
+          YouTube library
         </Link>
       </p>
 

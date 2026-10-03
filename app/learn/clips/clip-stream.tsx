@@ -42,7 +42,8 @@ import {
  * play button inside the frame.
  *
  * Below lg it covers the whole screen, shell included, with a close button
- * back to Learn now. From lg up it sits in the page pane.
+ * back to Videos, whose Clips section it plays in (plan #1488). From lg up it
+ * sits in the page pane.
  */
 
 // -- The parts of the YouTube IFrame API this uses ---------------------------
@@ -403,7 +404,7 @@ export function ClipStream({
       {/* Top: the way out, on a phone where the shell is covered. */}
       <div className="flex items-center gap-2 px-3 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-2 lg:hidden">
         <Link
-          href="/learn/now"
+          href="/learn/videos"
           className="press flex size-9 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white"
         >
           <X className="size-5" strokeWidth={2} aria-hidden />

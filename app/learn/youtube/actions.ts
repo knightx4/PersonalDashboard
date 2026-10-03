@@ -62,6 +62,7 @@ export async function addChannelAction(_prev: PressState, formData: FormData): P
     const report = await addAndListChannel(raw);
     if (!report.ok) return { error: report.error };
     revalidatePath('/learn/youtube');
+    revalidatePath('/learn/videos');
     const lead = report.created ? `${report.name} added` : `${report.name} is already followed`;
     const listing = listingLine(report.listing);
     return report.listing.error
@@ -79,6 +80,7 @@ export async function relistChannelAction(_prev: PressState, formData: FormData)
     const result = await relistChannel(String(formData.get('providerId') ?? ''));
     if (!result) return { error: 'That channel is not followed any more.' };
     revalidatePath('/learn/youtube', 'layout');
+    revalidatePath('/learn/videos');
     const line = listingLine(result);
     return result.error ? { error: `${line} YouTube refused part of it: ${result.error}` } : { message: line };
   } catch (error) {
@@ -91,6 +93,7 @@ export async function setAutoTranscribeAction(formData: FormData): Promise<void>
   await requireOwner();
   await setChannelAutoTranscribe(String(formData.get('providerId') ?? ''), formData.get('on') === 'true');
   revalidatePath('/learn/youtube', 'layout');
+  revalidatePath('/learn/videos');
 }
 
 // latency: pending
@@ -98,6 +101,7 @@ export async function removeChannelAction(formData: FormData): Promise<void> {
   await requireOwner();
   await removeChannel(String(formData.get('providerId') ?? ''));
   revalidatePath('/learn/youtube', 'layout');
+  revalidatePath('/learn/videos');
 }
 
 /**
@@ -112,6 +116,7 @@ export async function unfollowSubjectChannelAction(_prev: PressState, formData: 
     const result = await unfollowSubjectChannelNow(owner.id, String(formData.get('channelId') ?? ''));
     if (!result.ok) return { error: result.error };
     revalidatePath('/learn/youtube', 'layout');
+    revalidatePath('/learn/videos');
     revalidatePath('/learn/s', 'layout');
     return {
       message:
@@ -151,6 +156,7 @@ export async function transcribeVideoAction(_prev: PressState, formData: FormDat
     await requireOwner();
     const report = await transcribeNow([String(formData.get('videoId') ?? '')], 'press');
     revalidatePath('/learn/youtube', 'layout');
+    revalidatePath('/learn/videos');
     return transcribeLine(report);
   } catch (error) {
     return failed(error);
@@ -165,6 +171,7 @@ export async function transcribePlaylistAction(_prev: PressState, formData: Form
     if (videoIds.length === 0) return { error: 'That playlist has no videos stored.' };
     const report = await transcribeNow(videoIds, 'course');
     revalidatePath('/learn/youtube', 'layout');
+    revalidatePath('/learn/videos');
     return transcribeLine(report);
   } catch (error) {
     return failed(error);
@@ -182,6 +189,7 @@ export async function setWatchListPlaylistAction(_prev: PressState, formData: Fo
     const report = await setWatchListPlaylist(user.id, String(formData.get('playlist') ?? ''));
     if (!report.ok) return { error: report.error };
     revalidatePath('/learn/youtube');
+    revalidatePath('/learn/videos');
     if (!report.sync) return { message: 'Playlist forgotten. The videos already on your list stay.' };
     if (report.sync.error) return { error: `Playlist kept, but YouTube did not answer: ${report.sync.error}` };
     const parts = [

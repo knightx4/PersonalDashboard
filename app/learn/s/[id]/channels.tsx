@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { YOUTUBE_HREF } from '@/app/learn/videos/library-section';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { Press } from '@/app/learn/youtube/press';
@@ -74,7 +75,7 @@ function ChannelRow({ channel, kept }: { channel: SubjectChannelView; kept: Read
       {note && <p className="mt-1 text-small text-ink-muted">{note}</p>}
       {channel.state === 'following' && (
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <Link href="/learn/youtube" className="text-small text-accent hover:underline">
+          <Link href={YOUTUBE_HREF} className="text-small text-accent hover:underline">
             In your YouTube library
           </Link>
           <Press

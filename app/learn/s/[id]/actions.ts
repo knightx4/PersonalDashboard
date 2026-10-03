@@ -359,6 +359,7 @@ export async function findSubjectChannels(
 
   revalidatePath(`/learn/s/${subject.id}`);
   revalidatePath('/learn/youtube', 'layout');
+  revalidatePath('/learn/videos');
   revalidatePath('/learn/videos', 'layout');
 
   const report = channelsPressLines(search, judge);

@@ -15,7 +15,6 @@ import {
   Globe,
   CalendarClock,
   CalendarDays,
-  Clapperboard,
   CalendarRange,
   Compass,
   ClipboardCheck,
@@ -27,7 +26,6 @@ import {
   LayoutDashboard,
   Lightbulb,
   List,
-  ListVideo,
   ListTodo,
   Mail,
   Megaphone,
@@ -137,16 +135,10 @@ export const NAV_ICONS = {
   know: Network,
   // Goals: the things you want to learn and how well (plan #897).
   goals: Target,
-  // The YouTube library: channels, playlists and the transcripts fetched for
-  // them. A screen with a play mark, not the YouTube logo, because a brand
+  // Videos: your list, its clips and the YouTube library on one page (plan
+  // #1488). A screen with a play mark, not the YouTube logo, because a brand
   // mark in the nav would be the only one.
   videos: MonitorPlay,
-  // Your own list of videos to watch (plan #1069): a list with a play mark,
-  // so it reads as the list rather than the library above it.
-  watchList: ListVideo,
-  // Clips (plan #1400): short cuts played one after another, so the
-  // clapperboard, which marks a cut rather than a whole video.
-  clips: Clapperboard,
   // News. An envelope, the same object the workspace's own mark draws, because
   // the tab and the mark name the same thing and picking a second object for
   // it would say there are two.

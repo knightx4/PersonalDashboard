@@ -103,33 +103,20 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       exact: true,
       alsoMatches: ['/learn/t/', '/learn/r/', '/learn/new'],
     },
-    // The owner's alone, because every transcript it fetches spends the
+    // Everything video on one page (plan #1488): your list (plan #1069), the
+    // clips cut from it (plan #1400) and the YouTube library, which were three
+    // tabs until then. /learn/clips and /learn/youtube redirect to their
+    // sections, and a library channel, playlist or video lights this tab. The
+    // owner's alone, because every transcript the library fetches spends the
     // owner's TranscriptAPI credits.
-    // Your list of videos to watch (plan #1069), read from the playlist set on
-    // the YouTube page, so the owner's for the same reason.
     ...(owner
       ? [
           {
             href: '/learn/videos',
             label: 'Videos',
-            icon: 'watchList' as const,
-            exact: true,
-            alsoMatches: ['/learn/videos/'],
-          },
-          // Short clips cut from those videos, played one after another
-          // (plan #1400). The owner's for the same reason.
-          {
-            href: '/learn/clips',
-            label: 'Clips',
-            icon: 'clips' as const,
-            exact: true,
-          },
-          {
-            href: '/learn/youtube',
-            label: 'YouTube',
             icon: 'videos' as const,
             exact: true,
-            alsoMatches: ['/learn/youtube/'],
+            alsoMatches: ['/learn/videos/', '/learn/clips', '/learn/youtube'],
           },
         ]
       : []),
