@@ -12,7 +12,7 @@ export const coreSources: ModuleSources = {
     {
       table: 'core.conversations',
       module: 'Learn',
-      holds: 'Every comment thread and conversation with Dash: the thread under any row (a plan step, an idea, a goal or step, a role, a file, a Learn card, a newsletter story), or a question they asked from anywhere in the app.',
+      holds: 'Every comment thread and conversation with Dash: the thread under any row (a plan step, an idea, a goal or step, a role, a file, a Learn card, a newsletter story, a vault note with Maya), or a question they asked from anywhere in the app.',
       weight: 'record',
       search: ['title'],
       title: 'title',
@@ -22,7 +22,7 @@ export const coreSources: ModuleSources = {
         reads: ['subject_kind', 'subject_ref'],
         href: (row) => (row.subject_kind === 'ask' && row.subject_ref ? `/ask/${row.subject_ref}` : null),
       },
-      note: "subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as goals.items:<id>, job_search.roles:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id; core.thread_turns lists a row thread's turns with the ref beside each.",
+      note: "subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as goals.items:<id>, job_search.roles:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id; core.thread_turns lists a row thread's turns with the ref beside each. voice 'maya' marks a note's thread with Maya (obsidian.notes:<id>): its title is the question the note is working on, summary is where they have got to, and origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked.",
     },
     {
       table: 'core.conversation_turns',
@@ -31,7 +31,7 @@ export const coreSources: ModuleSources = {
       weight: 'intent',
       search: ['body'],
       title: 'body',
-      note: "role 'user' is theirs and 'assistant' is Dash's: read their turns as what they wanted to know, and Dash's only for context. On Dash's answers to an 'ask', citations lists the rows it relied on. conversation_id joins core.conversations, which says what the turn is about.",
+      note: "role 'user' is theirs and 'assistant' is Dash's: read their turns as what they wanted to know, and Dash's only for context. On Dash's answers to an 'ask', citations lists the rows it relied on. In a thread with Maya the assistant's turns are Maya's, and detail holds a thought's points. conversation_id joins core.conversations, which says what the turn is about.",
     },
     {
       table: 'core.observations',

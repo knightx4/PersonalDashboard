@@ -16,6 +16,12 @@ export const DASH_MODELS = {
   roleThread: MODELS.roleCommentReply,
   rowThread: MODELS.rowCommentReply,
   capture: MODELS.goalCapture,
+  /**
+   * Maya, the voice Dash takes on the vault's notes (plan #1479): Opus for its
+   * thoughts and its replies, as decided on 2 October 2026. Its replies were
+   * Sonnet before.
+   */
+  maya: MODELS.maya,
 } as const;
 
 export type DashSurfaceModel = keyof typeof DASH_MODELS;

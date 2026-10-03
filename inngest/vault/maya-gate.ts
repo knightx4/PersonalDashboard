@@ -16,7 +16,7 @@ import {
   type GateRunResult,
   type PriorCheck,
 } from '@/lib/vault/maya/gate-run';
-import { saveThought } from '@/lib/vault/maya/store';
+import { noteRef, saveThought } from '@/lib/vault/maya/store';
 import { MAYA_THOUGHT_OPERATION, writeThought } from '@/lib/vault/maya/thought';
 
 /**
@@ -92,13 +92,21 @@ export function mayaGatePorts(vault: VaultSupabaseClient, started = Date.now()):
     },
 
     async threadedNotes(userId, noteIds) {
-      const { data, error } = await vault
-        .from('maya_threads')
-        .select('note_id')
+      // Maya's threads are the notes' threads in core.conversations (plan #1479).
+      const { data, error } = await core
+        .from('conversations')
+        .select('subject_ref')
         .eq('user_id', userId)
-        .in('note_id', noteIds);
+        .eq('subject_kind', 'row')
+        .eq('voice', 'maya')
+        .in(
+          'subject_ref',
+          noteIds.map((id) => noteRef(id)),
+        );
       if (error) throw new Error(`Reading Maya's threads failed: ${error.message}`);
-      return new Set(((data ?? []) as { note_id: string }[]).map((row) => row.note_id));
+      return new Set(
+        ((data ?? []) as { subject_ref: string }[]).map((row) => row.subject_ref.slice('obsidian.notes:'.length)),
+      );
     },
 
     jevEnabled: (userId) => jevEnabledFor(core, userId),
@@ -115,10 +123,11 @@ export function mayaGatePorts(vault: VaultSupabaseClient, started = Date.now()):
     },
 
     async automaticSince(userId, since) {
-      const { count, error } = await vault
-        .from('maya_threads')
+      const { count, error } = await core
+        .from('conversations')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
+        .eq('voice', 'maya')
         .eq('origin', 'automatic')
         .gte('created_at', since.toISOString());
       if (error) throw new Error(`Counting today's thoughts failed: ${error.message}`);
@@ -140,7 +149,7 @@ export function mayaGatePorts(vault: VaultSupabaseClient, started = Date.now()):
       if (written.points.length === 0) {
         return { ok: false, empty: true, detail: 'Maya had nothing worth saying about this note yet.' };
       }
-      const saved = await saveThought(vault, { userId, noteId: note.id, origin: 'automatic', written });
+      const saved = await saveThought({ core, vault }, { userId, noteId: note.id, origin: 'automatic', written });
       return saved.ok ? { ok: true, threadId: saved.threadId } : { ok: false, empty: false, detail: saved.detail };
     },
 

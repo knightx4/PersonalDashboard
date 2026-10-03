@@ -94,8 +94,13 @@ const ANSWER: Anthropic.Tool = {
  * The same list in the same order every time, with the cache breakpoint on
  * the last, so the prefix is cached across rounds and across questions.
  */
-export function modelTools(tools: readonly DashTool[]): Anthropic.Tool[] {
-  return [...tools.map((tool) => tool.definition), { ...ANSWER, cache_control: { type: 'ephemeral' } }];
+export function modelTools(tools: readonly DashTool[], finish: Anthropic.Tool = ANSWER): Anthropic.Tool[] {
+  return [...tools.map((tool) => tool.definition), { ...finish, cache_control: { type: 'ephemeral' } }];
+}
+
+/** Every tool a voice is sent: its server tools first, then modelTools. */
+function voiceTools(voice: DashVoice): Anthropic.ToolUnion[] {
+  return [...(voice.serverTools ?? []), ...modelTools(voice.tools, voice.finish)];
 }
 
 /** The surfaces Dash talks on, as core.dash_actions names them. */
@@ -108,6 +113,21 @@ export type DashVoice = {
   system: string;
   /** The registry tools offered, in the order sent. */
   tools: readonly DashTool[];
+  /**
+   * Anthropic's own tools, run on their side, sent ahead of the registry
+   * tools: Maya's web search (plan #1479). A voice with any is let choose
+   * between them and its tools each round rather than made to call one, and
+   * asked once more for its answer if it stops without one.
+   */
+  serverTools?: readonly Anthropic.ToolUnion[];
+  /**
+   * The tool that ends a turn in place of `answer`, for a voice whose answer
+   * has a shape of its own, such as Maya's thought. Its input comes back as
+   * the answer's `report`, and its `answer` field, when it has one, as the body.
+   */
+  finish?: Anthropic.Tool;
+  /** Output tokens for one call; ANSWER_MAX_TOKENS when absent. */
+  maxTokens?: number;
 };
 
 /** Where the conversation is happening. */
@@ -170,6 +190,13 @@ export type DashAnswer =
       toolCalls: TalkToolCall[];
       citations: TalkCitation[];
       stop: DashStop;
+      /** For a voice with its own `finish` tool: that call's input, as the model gave it. */
+      report?: unknown;
+      /**
+       * For a voice with server tools: the passages a web search returned and
+       * the model cited, which an exact quote can be checked against.
+       */
+      webCited?: string[];
     }
   | { ok: false; detail: string; toolCalls: TalkToolCall[] };
 
@@ -298,6 +325,25 @@ function answerInput(input: unknown): { answer: string; cited: { table: string; 
   return { answer, cited };
 }
 
+/**
+ * The passages a web search returned and the model cited in its text. Result
+ * pages come back encrypted, so a cited passage (`cited_text` on a
+ * `web_search_result_location` citation) is the only search text the app can
+ * read.
+ */
+export function citedSearchText(content: readonly { type: string; citations?: unknown }[]): string[] {
+  const out: string[] = [];
+  for (const block of content) {
+    if (block.type !== 'text' || !Array.isArray(block.citations)) continue;
+    for (const citation of block.citations as { type?: unknown; cited_text?: unknown }[]) {
+      if (citation?.type === 'web_search_result_location' && typeof citation.cited_text === 'string') {
+        out.push(citation.cited_text);
+      }
+    }
+  }
+  return out;
+}
+
 /** What runDash is handed. */
 export type DashRun = {
   voice: DashVoice;
@@ -333,7 +379,15 @@ export type DashRun = {
 export async function runDash(input: DashRun): Promise<DashAnswer> {
   const { voice, context } = input;
   const model = voice.model;
-  const tools = modelTools(voice.tools);
+  const tools = voiceTools(voice);
+  const finishName = voice.finish?.name ?? ANSWER_TOOL;
+  const maxTokens = voice.maxTokens ?? ANSWER_MAX_TOKENS;
+  // A voice with server tools chooses each round; one without must call a tool.
+  const choose = (voice.serverTools?.length ?? 0) > 0;
+  const webCited: string[] = [];
+  const extras = (): { report?: unknown; webCited?: string[] } => ({
+    ...(choose ? { webCited } : {}),
+  });
   const toolCalls: TalkToolCall[] = [];
   // Every row a lookup in this answer returned, in the order found: what an
   // answer is built from when the model writes none.
@@ -399,8 +453,17 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   };
 
   const messages: Anthropic.MessageParam[] = [...history];
+  // A voice that chooses may search and be paused, and every round resends
+  // the opening message, which for Maya is the note and all its material:
+  // cached, so the rounds after the first read it at a tenth of the price.
+  const opening = messages[0];
+  if (choose && opening && typeof opening.content === 'string') {
+    messages[0] = { ...opening, content: [{ type: 'text', text: opening.content, cache_control: { type: 'ephemeral' } }] };
+  }
   let lookups = 0;
   let inputTokens = 0;
+  // Set when a voice that chooses stopped without its answer: the next round must give it.
+  let asked = false;
 
   // Each round either answers or makes at least one lookup, and the lookups
   // are capped, so this ends; the bound is a second guard.
@@ -413,16 +476,16 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
           : now() - started >= TIME_BUDGET_MS
             ? 'time'
             : null;
-    const mustAnswer = limit !== null || round === MAX_LOOKUPS + 1;
+    const mustAnswer = limit !== null || asked || round === MAX_LOOKUPS + 1;
 
     let response: Anthropic.Message;
     try {
       response = await client.messages.create({
         model,
-        max_tokens: ANSWER_MAX_TOKENS,
+        max_tokens: maxTokens,
         system,
         tools,
-        tool_choice: mustAnswer ? { type: 'tool', name: ANSWER_TOOL } : { type: 'any' },
+        tool_choice: mustAnswer ? { type: 'tool', name: finishName } : choose ? { type: 'auto' } : { type: 'any' },
         messages: withRollingBreakpoint(messages),
       });
     } catch (error) {
@@ -432,9 +495,10 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     const usage = usageFrom(response.usage);
     input.onSpend?.({ model, usage });
     inputTokens += usage.inputTokens + usage.cachedInputTokens + usage.cacheWriteTokens;
+    if (choose) webCited.push(...citedSearchText(response.content as { type: string; citations?: unknown }[]));
 
     const uses = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');
-    const answered = uses.find((c) => c.name === ANSWER_TOOL);
+    const answered = uses.find((c) => c.name === finishName);
     if (answered) {
       // Writes made in the same round as the answer are made first (plan
       // #1478): the answer says they are done, and capture files every move
@@ -460,7 +524,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       });
       lookups += writes.length;
       const { answer, cited } = answerInput(answered.input);
-      if (!answer) return fail('The answer came back empty.');
+      if (!answer && !voice.finish) return fail('The answer came back empty.');
       const citations: TalkCitation[] = [];
       const seen = new Set<string>();
       for (const c of cited) {
@@ -475,11 +539,35 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       const note = stop === 'answered' ? '' : `\n\n${limitNote(stop)}`;
       return {
         ok: true,
-        body: `${answer.slice(0, MAX_TURN - note.length)}${note}`,
+        body: answer ? `${answer.slice(0, MAX_TURN - note.length)}${note}` : '',
         toolCalls,
         citations,
         stop,
+        ...extras(),
+        ...(voice.finish ? { report: answered.input } : {}),
       };
+    }
+
+    // Server tools paused the turn (a long search): send it back as it is.
+    // Widened: the installed SDK's type may predate the reason.
+    const stopped: string | null = response.stop_reason;
+    if (uses.length === 0 && stopped === 'pause_turn' && !mustAnswer) {
+      messages.push({ role: 'assistant', content: response.content });
+      continue;
+    }
+    // A voice that chooses stopped without its answer: ask for it once, keeping
+    // what it searched and wrote.
+    if (choose && uses.length === 0 && !mustAnswer && stopped !== 'max_tokens' && stopped !== 'refusal') {
+      messages.push(
+        { role: 'assistant', content: response.content },
+        { role: 'user', content: `Now give it through ${finishName}.` },
+      );
+      asked = true;
+      continue;
+    }
+    if (voice.finish && (uses.length === 0 || mustAnswer)) {
+      // Its answer has a shape prose cannot give.
+      return fail(stopped === 'refusal' ? 'The model declined to answer.' : whyNoReport(response));
     }
 
     if (uses.length === 0 || mustAnswer) {
@@ -510,7 +598,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         try {
           prose = await client.messages.create({
             model,
-            max_tokens: ANSWER_MAX_TOKENS,
+            max_tokens: maxTokens,
             system,
             tools,
             tool_choice: { type: 'none' },

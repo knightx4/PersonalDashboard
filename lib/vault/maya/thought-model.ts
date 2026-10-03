@@ -1,29 +1,32 @@
 import 'server-only';
 
-import Anthropic from '@anthropic-ai/sdk';
+import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import type { SpendSink } from '@/lib/core/spend/pricing';
+import { runDash } from '@/lib/dash/loop';
 import type { MayaMaterial } from './retrieve';
-import { MODELS } from '@/lib/core/models';
+import { MAX_SEARCHES, MAYA_MODEL, mayaVoice } from './voice';
+
+export { MAX_SEARCHES };
 
 /**
  * The call that writes Maya's thought on one note (plan #1284).
  *
- * Opus, with the web search tool for the exact wording of an outside source
- * and one report tool. The report cannot be forced on the first request,
- * because a forced tool leaves no room to search, so the first request lets
- * the model choose; if it stops without reporting, one more request forces
- * the report with the searches already in the conversation. A turn the server
- * pauses after ten rounds of searching is sent back as it is, as in
- * lib/news/recommend/make.ts.
+ * In Maya's voice on Dash's loop (plan #1479, lib/vault/maya/voice.ts):
+ * Opus, with the web search tool for the exact wording of an outside source,
+ * and report_thought as the tool that ends the turn. The loop lets the model
+ * choose on the first request, because a forced tool leaves no room to
+ * search; if it stops without reporting, one more request forces the report
+ * with the searches already in the conversation, and a turn the server
+ * pauses is sent back as it is. The thought makes no lookups: its material is
+ * read beforehand (retrieve.ts) and sent as the one message.
  *
  * Notes and positions are labelled N1, P1 and so on in the prompt, so the
  * model copies a short label rather than a uuid; verify.ts maps them back.
  * Nothing here checks what the model said. That is verify.ts.
  */
 
-export const THOUGHT_MODEL = MODELS.mayaThought;
+export const THOUGHT_MODEL = MAYA_MODEL;
 const TOOL_NAME = 'report_thought';
 
 /** At most this many points reach the person. */
@@ -42,13 +45,6 @@ export const SUBJECT_CHARS = 12_000;
  */
 export const RELATED_CHARS = 1_500;
 
-/**
- * Searches are for a source's exact wording; the sources themselves come from
- * what the model already knows. Each result is read back as input on every
- * later round, so this was cut from 5 with RELATED_CHARS.
- */
-export const MAX_SEARCHES = 2;
-const MAX_CONTINUATIONS = 3;
 
 export const MAYA_SYSTEM = `You are Maya, a thought partner for one person who keeps their notes in
 Obsidian. You are given one of their notes, the other notes of theirs nearest
@@ -187,7 +183,7 @@ export function buildThoughtPrompt(material: MayaMaterial): { prompt: string; la
 // The tool and what it reports
 // ---------------------------------------------------------------------------
 
-const REPORT_TOOL = {
+const REPORT_TOOL: Anthropic.Tool = {
   name: TOOL_NAME,
   description: 'Report the thought: the question, up to three ranked points, and a synthesis only on a listed conflict.',
   input_schema: {
@@ -249,10 +245,6 @@ const REPORT_TOOL = {
   },
 };
 
-const TOOLS = [
-  { type: 'web_search_20260209', name: 'web_search', max_uses: MAX_SEARCHES } as unknown as Anthropic.Tool,
-  REPORT_TOOL,
-];
 
 const text = z.string().trim();
 
@@ -320,93 +312,39 @@ export function parseReport(input: unknown): RawThought | null {
 // The call
 // ---------------------------------------------------------------------------
 
-type Block = { type: string; name?: string; input?: unknown; citations?: unknown };
-
-/**
- * The passages the web search tool returned and the model cited, across every
- * response of the call. Result pages come back encrypted, so a cited passage
- * (`cited_text` on a text block's `web_search_result_location` citation) is
- * the only search text the app can read, and the only text an exact quote can
- * be checked against.
- */
-export function citedSearchText(content: readonly Block[]): string[] {
-  const out: string[] = [];
-  for (const block of content) {
-    if (block.type !== 'text' || !Array.isArray(block.citations)) continue;
-    for (const citation of block.citations as { type?: unknown; cited_text?: unknown }[]) {
-      if (citation?.type === 'web_search_result_location' && typeof citation.cited_text === 'string') {
-        out.push(citation.cited_text);
-      }
-    }
-  }
-  return out;
-}
-
 export type ThoughtCall =
   | { ok: true; raw: RawThought; labels: ThoughtLabels; searchText: string[] }
   | { ok: false; detail: string };
 
-/** Ask the model for a thought on the material. Never throws. */
+/** Ask the model for a thought on the material, in Maya's voice on Dash's loop. Never throws. */
 export async function callThoughtModel(
   material: MayaMaterial,
   options: {
     anthropicApiKey?: string;
     client?: Pick<Anthropic, 'messages'>;
     onSpend?: SpendSink;
+    /** YYYY-MM-DD; today in UTC when absent. */
+    today?: string;
   },
 ): Promise<ThoughtCall> {
   if (!options.client && !options.anthropicApiKey) return { ok: false, detail: 'ANTHROPIC_API_KEY is not set.' };
-  const client = options.client ?? new Anthropic({ apiKey: options.anthropicApiKey });
   const { prompt, labels } = buildThoughtPrompt(material);
-  // Cached: every search round and the forced follow-up resend the system
-  // prompt and the material, which then cost a tenth as much after the first.
-  const system: Anthropic.TextBlockParam[] = [
-    { type: 'text', text: MAYA_SYSTEM, cache_control: { type: 'ephemeral' } },
-  ];
-  const messages: Anthropic.MessageParam[] = [
-    { role: 'user', content: [{ type: 'text', text: prompt, cache_control: { type: 'ephemeral' } }] },
-  ];
-  const searchText: string[] = [];
-  let forced = false;
-
-  try {
-    for (let turn = 0; turn <= MAX_CONTINUATIONS + 1; turn += 1) {
-      const response = await client.messages.create({
-        model: THOUGHT_MODEL,
-        max_tokens: 6_000,
-        system,
-        tools: TOOLS,
-        ...(forced ? { tool_choice: forceTool(TOOL_NAME) } : {}),
-        messages,
-      });
-      options.onSpend?.({ model: THOUGHT_MODEL, usage: usageFrom(response.usage) });
-      const content = response.content as unknown as Block[];
-      searchText.push(...citedSearchText(content));
-
-      const block = content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-      if (block) {
-        const raw = parseReport(block.input);
-        if (!raw) return { ok: false, detail: 'The thought came back in a shape that could not be read.' };
-        return { ok: true, raw, labels, searchText };
-      }
-
-      // Widened: the installed SDK's type predates these reasons.
-      const stop: string | null = response.stop_reason;
-      if (stop === 'pause_turn') {
-        messages.push({ role: 'assistant', content: response.content });
-        continue;
-      }
-      if (stop === 'refusal') return { ok: false, detail: 'The model declined to write a thought.' };
-      if (forced || stop === 'max_tokens') return { ok: false, detail: whyNoReport(response) };
-      // It stopped without reporting. Ask once more with the report forced,
-      // keeping what it searched and wrote.
-      messages.push({ role: 'assistant', content: response.content });
-      messages.push({ role: 'user', content: `Now report the thought through ${TOOL_NAME}.` });
-      forced = true;
-    }
-  } catch (error) {
-    if (error instanceof Anthropic.RateLimitError) return { ok: false, detail: 'Rate limited. Try again shortly.' };
-    return { ok: false, detail: error instanceof Error ? error.message : 'The thought failed.' };
-  }
-  return { ok: false, detail: 'The thought did not finish.' };
+  const answer = await runDash({
+    voice: mayaVoice({ system: MAYA_SYSTEM, tools: [], finish: REPORT_TOOL, maxTokens: 6_000 }),
+    context: {
+      surface: 'thread',
+      subject: { ref: `obsidian.notes:${material.note.id}`, title: material.note.title },
+      page: null,
+    },
+    turns: [{ role: 'user', body: prompt }],
+    today: options.today ?? new Date().toISOString().slice(0, 10),
+    execute: async (name) => ({ ok: false, error: `There is no tool called ${name}.` }),
+    anthropicApiKey: options.anthropicApiKey ?? '',
+    client: options.client as Anthropic | undefined,
+    onSpend: options.onSpend,
+  });
+  if (!answer.ok) return { ok: false, detail: answer.detail };
+  const raw = parseReport(answer.report);
+  if (!raw) return { ok: false, detail: 'The thought came back in a shape that could not be read.' };
+  return { ok: true, raw, labels, searchText: answer.webCited ?? [] };
 }

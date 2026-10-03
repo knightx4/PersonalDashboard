@@ -62,20 +62,20 @@ Each week, notes they wrote recently that come back to an older note of theirs, 
 
 ### `obsidian.maya_threads` (Vault)
 
-The questions they are working through with Maya, one per note, and where they have got to on each.
+The questions they were working through with Maya before plan #1479, one per note. Read-only: the threads are in core.conversations now.
 
 - Search: `question`, `summary`
 - Name a row by `question`; link it by `id`
 - Opens at `/vault/maya/<id>`
-- note_id points at obsidian.notes. summary is where they have got to, rewritten after each exchange. origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked.
+- note_id points at obsidian.notes. summary is where they have got to, rewritten after each exchange. origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked. Every thread here was copied into core.conversations (voice 'maya', same id), which is the one to read.
 
 ### `obsidian.maya_messages` (Vault)
 
-Their exchanges with Maya about their notes.
+Their exchanges with Maya about their notes before plan #1479. Read-only: the turns are in core.conversation_turns now.
 
 - Search: `body`
 - Name a row by `body`; link it by `id`
-- Read their turns (role = 'person') as intent and Maya's (role = 'maya') only as context for them, like core.conversation_turns. thread_id points at maya_threads.
+- Read their turns (role = 'person') as intent and Maya's (role = 'maya') only as context for them, like core.conversation_turns. thread_id points at maya_threads. Every message here was copied into core.conversation_turns with the same id.
 
 ### `obsidian.tensions` (Vault)
 
@@ -146,7 +146,7 @@ What they asked or explained, and what Dash replied, turn by turn.
 
 - Search: `body`
 - Name a row by `body`; link it by `id`
-- role 'user' is theirs and 'assistant' is Dash's: read their turns as what they wanted to know, and Dash's only for context. On Dash's answers to an 'ask', citations lists the rows it relied on. conversation_id joins core.conversations, which says what the turn is about.
+- role 'user' is theirs and 'assistant' is Dash's: read their turns as what they wanted to know, and Dash's only for context. On Dash's answers to an 'ask', citations lists the rows it relied on. In a thread with Maya the assistant's turns are Maya's, and detail holds a thought's points. conversation_id joins core.conversations, which says what the turn is about.
 
 ### `core.watches` (Home)
 
@@ -453,11 +453,11 @@ Longer pieces written for them and kept as pages: research notes, breakdowns of 
 
 ### `core.conversations` (Learn)
 
-Every comment thread and conversation with Dash: the thread under any row (a plan step, an idea, a goal or step, a role, a file, a Learn card, a newsletter story), or a question they asked from anywhere in the app.
+Every comment thread and conversation with Dash: the thread under any row (a plan step, an idea, a goal or step, a role, a file, a Learn card, a newsletter story, a vault note with Maya), or a question they asked from anywhere in the app.
 
 - Search: `title`
 - Name a row by `title`; link it by `id`
-- subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as goals.items:<id>, job_search.roles:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id; core.thread_turns lists a row thread's turns with the ref beside each.
+- subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as goals.items:<id>, job_search.roles:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id; core.thread_turns lists a row thread's turns with the ref beside each. voice 'maya' marks a note's thread with Maya (obsidian.notes:<id>): its title is the question the note is working on, summary is where they have got to, and origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked.
 
 ### `public.social_posts` (Dev)
 

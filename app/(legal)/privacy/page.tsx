@@ -218,7 +218,10 @@ export default function PrivacyPage() {
         with inngest/vault/map-sweep.ts (plan #757), and Maya in lib/vault/maya
         (retrieve.ts, thought-model.ts) with app/vault/n/[...path]/actions.ts
         (askMaya, plan #1285), and replies to Maya in lib/vault/maya/reply.ts with
-        app/vault/maya/actions.ts (replyToMaya, plan #1286), and Maya's hourly
+        app/vault/maya/actions.ts (replyToMaya, plan #1286), both on Dash's loop
+        in lib/dash/loop.ts in Maya's voice (lib/vault/maya/voice.ts, plan #1479),
+        the reply with Dash's lookups (lib/ask/tools.ts, note_positions in
+        lib/ask/positions.ts), and Maya's hourly
         job in lib/vault/maya/gate-run.ts with inngest/vault/maya-gate.ts (plan
         #1289), which asks Jev (lib/vault/maya/gate.ts) before Maya writes. The
         map sweep's first read also goes to Jev for an account that has opted in
@@ -275,7 +278,10 @@ export default function PrivacyPage() {
           the sentences it quoted from your other notes), the summary of where you have got to,
           and every reply in the thread, yours and Maya&rsquo;s. If the note has since moved into
           a folder that is never read, or now contains what looks like an API key, its text is
-          left out and Maya answers from the thread alone.
+          left out and Maya answers from the thread alone. When your reply turns on something the
+          thread does not hold, Maya can look it up with the same lookups Dash uses to answer a
+          question, such as the notes and positions nearest the note, and what those return is
+          sent too. Like a thought, a reply may also search the web for a source&rsquo;s exact words.
         </li>
         <li>
           <strong>Maya writing without being asked.</strong> Once an hour, the notes that are new

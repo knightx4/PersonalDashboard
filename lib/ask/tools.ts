@@ -18,6 +18,7 @@ import {
 } from './lookups';
 import type { AskSchema } from './db';
 import { coursesLookup } from './courses';
+import { notePositionsLookup } from './positions';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
 
 /**
@@ -45,6 +46,7 @@ export const ASK_TOOL_NAMES = [
   'todos',
   'goal_status',
   'vault_notes',
+  'note_positions',
   'courses',
   'read_spec',
   'read_dev_row',
@@ -213,6 +215,19 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
     },
   },
   {
+    name: 'note_positions',
+    description:
+      'For one vault note, what Maya reads before writing a thought on it: the person\'s other notes nearest it by meaning, each with an excerpt; the positions their notes have been read as holding that bear on it (from this note, from a nearby note, or through a shared theme), each with its stance, its statement and the passages it was read from; and which of those positions conflict. Name the note by the ref vault_notes, search or recall returned for it. Use it to see how a note sits among the rest of their thinking, where their notes agree or disagree, or what they hold on its question.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        ref: { type: 'string', description: 'The note\'s ref, as vault_notes, search or recall returned it (its path).' },
+      },
+      required: ['ref'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'courses',
     description:
       'The courses on the academic transcripts the person saved on the vault\'s Education tab: each with its school, term, credits and grade as the transcript writes them, and a link to its row. Narrow by term ("Fall 2019", "Spring"), year, school, or words in the course code or title; every word given must match. Leave everything out to list them all. Returns up to 80, in the order they were taken. Use it for "what courses did I take in Fall 2019?", "what did I study at <school>?" or "what grade did I get in statistics?"; for what they wrote about a subject they studied, use recall.',
@@ -341,6 +356,7 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   todos: { run: todosLookup, module: 'todo' },
   goal_status: { run: goalsLookup, module: 'goals' },
   vault_notes: { run: vaultLookup, module: 'vault' },
+  note_positions: { run: notePositionsLookup, module: 'vault' },
   courses: { run: coursesLookup, module: 'vault' },
   // Checks the owner and the Dev workspace itself (lib/ask/dev.ts).
   read_spec: { run: readSpecLookup, module: null },
