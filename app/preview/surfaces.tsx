@@ -8,6 +8,8 @@ import { ANATOMIES } from '@/app/dev/ui/anatomy';
 import { TravelDemo } from '@/app/dev/ui/travel-demo';
 import { SettleDemo } from '@/app/dev/ui/settle-demo';
 import { ClearDemo } from '@/app/dev/ui/clear-demo';
+import { DayCloseDemo } from '@/app/dev/ui/day-close-demo';
+import { DayClosed } from '@/components/todo/day-closed';
 import { ItemDetailsPanel } from '@/app/shopping/inventory/[id]/item-details-panel';
 import { EstimatesTable } from '@/app/account/spend/estimates-table';
 import { compareEstimate } from '@/lib/core/spend/comparison';
@@ -3542,6 +3544,47 @@ export const SURFACES: readonly Surface[] = [
       <div className={cardVariants({ padding: 'standard' })}>
         <ClearDemo items={['Return the kettle']} />
       </div>
+    ),
+  },
+
+  /* The day closing on the agenda (plan #1556): played by ticking the last
+   * thing due today, and as a page that loads with the day already closed. */
+  {
+    id: 'todo-day-close',
+    label: 'Todo · The day closing',
+    module: 'todo',
+    width: 'narrow',
+    interaction: {
+      kind: 'completion',
+      target: '[data-motion-demo="day-close"]',
+      shows:
+        'The two done tasks spring from their rows into a pile that folds shut, the day\'s sigil draws in beside it, and "You finished all 2 things due today." arrives last.',
+    },
+    render: () => (
+      <div className={cardVariants({ padding: 'standard' })}>
+        <DayCloseDemo
+          due={['Return the kettle', 'Book the dentist']}
+          alreadyDone={['Return the kettle']}
+        />
+      </div>
+    ),
+  },
+  {
+    id: 'todo-day-closed',
+    label: 'Todo · A day already closed',
+    module: 'todo',
+    width: 'narrow',
+    render: () => (
+      <DayClosed
+        closed
+        seed="preview:day-closed"
+        done={[
+          { id: 'a', title: 'Renew the parking permit' },
+          { id: 'b', title: 'Book the dentist' },
+          { id: 'c', title: 'Return the kettle' },
+          { id: 'd', title: 'Pay the window cleaner' },
+        ]}
+      />
     ),
   },
 

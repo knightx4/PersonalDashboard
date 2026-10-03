@@ -2305,6 +2305,42 @@ tr:has([data-link-pending]) {
   }
 }
 
+/* The day closing on the agenda (plan #1556): the done tasks spring from
+ * where they sat as rows into a pile folded shut, the day's sigil starts
+ * drawing in as the pile lands, and the line saying how many rises once the
+ * pile has settled. DayClosed in components/todo/day-closed.tsx puts the class
+ * on only for a close made while you watch, so a reload shows the folded
+ * pile, the sigil and the line at once, and takes it off when the sigil's
+ * last cell is in. Each card's resting transform is inline; the keyframe only
+ * says where it starts. The busiest sigil is in by 1105ms. */
+@keyframes day-pile-fold {
+  from {
+    transform: translateY(calc(var(--pile-i, 0) * (100% + 0.25rem)));
+  }
+}
+
+@keyframes day-close-line {
+  from {
+    transform: translateY(0.25rem);
+    opacity: 0;
+  }
+}
+
+@utility day-close-in {
+  & [data-pile-card] {
+    animation: day-pile-fold var(--motion-moment) var(--ease-spring) both;
+  }
+  & [data-sigil-cell] {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: sigil-cell var(--motion-move) var(--ease-out-soft) both;
+    animation-delay: calc(var(--motion-move) + var(--sigil-cell, 0) * var(--motion-instant) / 2);
+  }
+  & [data-day-close-line] {
+    animation: day-close-line var(--motion-move) var(--ease-out-soft) var(--motion-moment) both;
+  }
+}
+
 /* The Dash mark (components/ui/dash-mark.tsx). Every state and every kind of
  * work has its own still shape as well as its motion, so all of these stop
  * under reduced motion without the state being lost. Distances are in the
@@ -2666,6 +2702,12 @@ tr:has([data-link-pending]) {
   }
 
   .sigil-draw-in [data-sigil-cell] {
+    animation: none;
+  }
+
+  .day-close-in [data-pile-card],
+  .day-close-in [data-sigil-cell],
+  .day-close-in [data-day-close-line] {
     animation: none;
   }
 }

@@ -7,12 +7,15 @@ import { THREAD_TABLES, threadRef } from '@/lib/thread/subjects';
 import { workingRefsForPage } from '@/lib/talk/handoffs';
 import { loadAgenda } from '@/lib/todo/agenda/load';
 import { loadDashResultsCount } from '@/lib/todo/agenda/dash-results';
+import { dayClosed, doneToday } from '@/lib/todo/agenda/day-close';
+import { loadDoneSinceMidnight } from '@/lib/todo/tasks/load';
 import { BUCKET_LABELS, todayIn } from '@/lib/todo/tasks/model';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { QueueCleared } from '@/components/motion/clear';
+import { DayClosed } from '@/components/todo/day-closed';
 import { AddTask } from '@/components/todo/task-form';
 import { TaskRow } from '@/components/todo/task-row';
 import { AgendaItemRow } from '@/components/todo/agenda-item-row';
@@ -42,6 +45,18 @@ export default async function TodoPage() {
   ]);
 
   const empty = agenda.piles.length === 0;
+
+  // The day closing (plan #1556): what was due by today and has been
+  // finished since midnight. A failed read leaves the day open rather than
+  // the page broken; the list itself is still right.
+  const now = new Date();
+  const today = todayIn(agenda.timezone, now);
+  const done = doneToday(
+    await loadDoneSinceMidnight(user.id, agenda.timezone, now).catch(() => []),
+    agenda.timezone,
+    now,
+  );
+  const closed = dayClosed(agenda.piles, done);
 
   // The thread under each task on the agenda (plan #1471). A failed read
   // leaves them empty rather than the page broken.
@@ -77,98 +92,125 @@ export default async function TodoPage() {
           read on the Goals home (plan #1268). Absent at zero. */}
       <DashResultsLine count={dashResults} className="mt-4 px-1" />
 
-      {/* Ticking off the last thing draws the day's sigil in (plan #1340). */}
-      <QueueCleared cleared={empty}>
-      {empty ? (
-        <EmptyState
-          tone="finished"
-          seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:todo`}
-          title="Nothing on the list."
-          description="Write the next thing down and it will be here."
-          className="mt-6"
-        />
-      ) : (
-        <div className="mt-6 space-y-6">
-          {agenda.piles.map(({ bucket, entries, context }) => {
-            // The pile in the order it is about to be drawn in, so a row can
-            // send it back with a move. Tasks only: an interview or a return
-            // deadline is not a row this account owns, so there is nowhere to
-            // write an order for it.
-            const pile = entries
-              .filter((entry) => entry.kind === 'task' && entry.task)
-              .map((entry) => entry.task!.id);
+      {/* Ticking the last thing due today closes the day: the done tasks
+          fold into a pile, the sigil draws in and a line gives the count
+          (plan #1556). Mounted all day so it can tell a close made on screen
+          from a page that loads closed. */}
+      <DayClosed
+        key={today}
+        closed={closed}
+        done={done}
+        seed={`${user.id}:${today}:todo`}
+        nothingElse={empty}
+        className="mt-6"
+      />
 
-            return (
-            <section key={bucket}>
-              <h2
-                className={cn(
-                  'text-ui font-semibold',
-                  bucket === 'overdue' ? 'text-status-rejected' : 'text-ink',
-                )}
-              >
-                {BUCKET_LABELS[bucket]}
-                {entries.length > 0 && (
-                  <span className="tabular ml-2 text-small font-normal text-ink-muted">
-                    {entries.length}
-                  </span>
-                )}
-              </h2>
-              {/* What is already in these days. No checkbox: you do not tick
+      {/* Ticking off the last thing draws the day's sigil in (plan #1340),
+          unless the day closing above already holds it. */}
+      <QueueCleared cleared={empty}>
+        {empty ? (
+          closed ? null : (
+            <EmptyState
+              tone="finished"
+              seed={`${user.id}:${today}:todo`}
+              title="Nothing on the list."
+              description="Write the next thing down and it will be here."
+              className="mt-6"
+            />
+          )
+        ) : (
+          <div className="mt-6 space-y-6">
+            {agenda.piles.map(({ bucket, entries, context }) => {
+              // The pile in the order it is about to be drawn in, so a row can
+              // send it back with a move. Tasks only: an interview or a return
+              // deadline is not a row this account owns, so there is nowhere to
+              // write an order for it.
+              const pile = entries
+                .filter((entry) => entry.kind === 'task' && entry.task)
+                .map((entry) => entry.task!.id);
+
+              return (
+                <section key={bucket}>
+                  <h2
+                    className={cn(
+                      'text-ui font-semibold',
+                      bucket === 'overdue' ? 'text-status-rejected' : 'text-ink',
+                    )}
+                  >
+                    {BUCKET_LABELS[bucket]}
+                    {entries.length > 0 && (
+                      <span className="tabular ml-2 text-small font-normal text-ink-muted">
+                        {entries.length}
+                      </span>
+                    )}
+                  </h2>
+                  {/* What is already in these days. No checkbox: you do not tick
                   off a meeting, and offering to would be inviting someone to
                   lie to their own list. */}
-              {context.length > 0 && (
-                <ul className="mt-1 space-y-1">
-                  {context.map((entry) => (
-                    <li
-                      key={entry.key}
-                      className="flex flex-wrap items-baseline gap-x-2 rounded-lg bg-accent-tint px-3 py-1.5 text-small text-ink"
-                    >
-                      <CalendarClock className="size-3.5 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
-                      {entry.at && (
-                        <span className="tabular font-medium">
-                          {formatClock(entry.at, { timeZone: agenda.timezone, weekday: 'short' })}
-                        </span>
-                      )}
-                      <span className="font-medium">{entry.label}</span>
-                      {entry.detail && <span className="text-ink-muted">{entry.detail}</span>}
-                      {entry.link && (
-                        <a
-                          href={entry.link.href}
-                          className="font-medium text-accent underline underline-offset-2"
+                  {context.length > 0 && (
+                    <ul className="mt-1 space-y-1">
+                      {context.map((entry) => (
+                        <li
+                          key={entry.key}
+                          className="flex flex-wrap items-baseline gap-x-2 rounded-lg bg-accent-tint px-3 py-1.5 text-small text-ink"
                         >
-                          {entry.link.label}
-                        </a>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {entries.length > 0 && (
-                <Card padding="none" className="mt-1 divide-y divide-border px-3">
-                  {entries.map((entry) =>
-                    entry.kind === 'task' && entry.task ? (
-                      <TaskRow
-                        key={entry.key}
-                        task={entry.task}
-                        timezone={agenda.timezone}
-                        anchor={entry.anchor}
-                        pile={pile}
-                        items={entry.children}
-                        working={working}
-                        thread={threads.get(threadRef('task', entry.task.id))}
-                      />
-                    ) : entry.item ? (
-                      <AgendaItemRow key={entry.key} item={entry.item} timezone={agenda.timezone} />
-                    ) : null,
+                          <CalendarClock
+                            className="size-3.5 shrink-0 text-accent"
+                            strokeWidth={1.75}
+                            aria-hidden
+                          />
+                          {entry.at && (
+                            <span className="tabular font-medium">
+                              {formatClock(entry.at, {
+                                timeZone: agenda.timezone,
+                                weekday: 'short',
+                              })}
+                            </span>
+                          )}
+                          <span className="font-medium">{entry.label}</span>
+                          {entry.detail && <span className="text-ink-muted">{entry.detail}</span>}
+                          {entry.link && (
+                            <a
+                              href={entry.link.href}
+                              className="font-medium text-accent underline underline-offset-2"
+                            >
+                              {entry.link.label}
+                            </a>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                </Card>
-              )}
-            </section>
-            );
-          })}
-        </div>
-      )}
+
+                  {entries.length > 0 && (
+                    <Card padding="none" className="mt-1 divide-y divide-border px-3">
+                      {entries.map((entry) =>
+                        entry.kind === 'task' && entry.task ? (
+                          <TaskRow
+                            key={entry.key}
+                            task={entry.task}
+                            timezone={agenda.timezone}
+                            anchor={entry.anchor}
+                            pile={pile}
+                            items={entry.children}
+                            working={working}
+                            thread={threads.get(threadRef('task', entry.task.id))}
+                          />
+                        ) : entry.item ? (
+                          <AgendaItemRow
+                            key={entry.key}
+                            item={entry.item}
+                            timezone={agenda.timezone}
+                          />
+                        ) : null,
+                      )}
+                    </Card>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        )}
       </QueueCleared>
     </div>
   );
