@@ -48,6 +48,12 @@ export type ObservationRunPorts = {
   /** What a model call cost, against this person. */
   ledger(userId: string, report: SpendReport): Promise<void>;
   write(rows: ObservationRow[]): Promise<void>;
+  /**
+   * Whether the model was paid to write this person's observations between
+   * two instants. What tells a week that had nothing to say, which stores no
+   * rows, from one whose run failed before the model answered.
+   */
+  asked?(userId: string, from: string, to: string): Promise<boolean>;
 };
 
 export type ObservationRunResult =
@@ -98,4 +104,29 @@ export async function runObservationsFor(
   }));
   if (rows.length > 0) await ports.write(rows);
   return { status: 'written', events: events.length, observations: rows.length, dropped };
+}
+
+/**
+ * The week before `now`'s, written now if the run that should have written it
+ * failed.
+ *
+ * Nothing retries a weekly run: on 28 September the model credit ran out, the
+ * route answered 200 with the failure inside, and the week was lost. So each
+ * run first looks at the week before. A week with rows is done. A week with
+ * none whose run still paid for a model call had nothing worth saying, and is
+ * left alone too, so a quiet week is not paid for twice. Anything else is run
+ * now, as of a week ago, which reads the same twelve weeks that run would have.
+ */
+export async function catchUpObservations(
+  ports: ObservationRunPorts,
+  userId: string,
+  now: Date,
+): Promise<ObservationRunResult> {
+  const then = new Date(now.getTime() - 7 * DAY_MS);
+  const missed = observationWeek(then);
+  if (await ports.hasWeek(userId, missed.week)) return { status: 'already-run' };
+  if (ports.asked && (await ports.asked(userId, missed.to, observationWeek(now).to))) {
+    return { status: 'already-run' };
+  }
+  return runObservationsFor(ports, userId, then);
 }

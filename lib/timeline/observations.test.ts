@@ -7,7 +7,7 @@ const { checkObservations, observationWeek, overlap, parseEventRef, stripEventLa
   './observations'
 );
 const { observationsPrompt, writeObservations } = await import('./observations-model');
-const { runObservationsFor } = await import('./observations-run');
+const { catchUpObservations, runObservationsFor } = await import('./observations-run');
 import type { ObservationRow, ObservationRunPorts } from './observations-run';
 import type { RawObservation } from './observations';
 import { eventRef, withRefs, type TimelineEvent } from './timeline';
@@ -358,5 +358,31 @@ describe('one person’s run', () => {
     const { ports: p, observe } = ports({ timeline: vi.fn(async () => []) });
     expect(await runObservationsFor(p, 'user-1', MONDAY)).toEqual({ status: 'no-events' });
     expect(observe).not.toHaveBeenCalled();
+  });
+
+  describe('catching up the week before', () => {
+    const NEXT_MONDAY = new Date('2026-10-05T14:07:00Z');
+
+    it('writes a week whose run failed before the model answered, under that week', async () => {
+      // 28 September: the credit ran out and nothing retried the week.
+      const { ports: p, written } = ports({ asked: vi.fn(async () => false) });
+      const result = await catchUpObservations(p, 'user-1', NEXT_MONDAY);
+      expect(result).toMatchObject({ status: 'written', observations: 1 });
+      expect(written[0]!.week).toBe('2026-09-28');
+      expect(p.asked).toHaveBeenCalledWith('user-1', '2026-09-28T00:00:00.000Z', '2026-10-05T00:00:00.000Z');
+      expect(p.timeline).toHaveBeenCalledWith('user-1', '2026-07-06T00:00:00.000Z', '2026-09-28T00:00:00.000Z');
+    });
+
+    it('leaves a week alone that has rows', async () => {
+      const { ports: p, observe } = ports({ hasWeek: vi.fn(async () => true) });
+      expect(await catchUpObservations(p, 'user-1', NEXT_MONDAY)).toEqual({ status: 'already-run' });
+      expect(observe).not.toHaveBeenCalled();
+    });
+
+    it('does not pay twice for a week that had nothing to say', async () => {
+      const { ports: p, observe } = ports({ asked: vi.fn(async () => true) });
+      expect(await catchUpObservations(p, 'user-1', NEXT_MONDAY)).toEqual({ status: 'already-run' });
+      expect(observe).not.toHaveBeenCalled();
+    });
   });
 });

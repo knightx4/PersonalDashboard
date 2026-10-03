@@ -6,6 +6,7 @@ import { recordSpend } from '@/lib/core/spend/record';
 import type { CoreOperation } from '@/lib/core/spend/operations';
 import { OBSERVATIONS_MODEL, writeObservations } from '@/lib/timeline/observations-model';
 import {
+  catchUpObservations,
   runObservationsFor,
   type ObservationRunPorts,
   type ObservationRunResult,
@@ -24,6 +25,7 @@ import { TIMELINE_COLUMNS, withRefs, type TimelineEvent, type TimelineRow } from
 
 const OPERATION: CoreOperation = 'write-observations';
 const PAGE = 1000;
+const WEEK_MS = 7 * 86_400_000;
 
 export function observationPorts(core: CoreSupabaseClient): ObservationRunPorts {
   const apiKey = process.env.ANTHROPIC_API_KEY ?? null;
@@ -102,6 +104,19 @@ export function observationPorts(core: CoreSupabaseClient): ObservationRunPorts 
       });
     },
 
+    async asked(userId, from, to) {
+      const { data, error } = await core
+        .from('model_spend')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('operation', OPERATION)
+        .gte('created_at', from)
+        .lt('created_at', to)
+        .limit(1);
+      if (error) throw new Error(`Reading what the observations cost failed: ${error.message}`);
+      return (data ?? []).length > 0;
+    },
+
     async write(rows) {
       const { error } = await core
         .from('observations')
@@ -114,6 +129,8 @@ export function observationPorts(core: CoreSupabaseClient): ObservationRunPorts 
 export type ObservationsSummary = {
   people: number;
   results: { userId: string; result: ObservationRunResult }[];
+  /** The week before, for everyone who had events in it. */
+  caughtUp: { userId: string; result: ObservationRunResult }[];
   failed: string[];
 };
 
@@ -137,18 +154,37 @@ async function peopleWithEvents(core: CoreSupabaseClient, from: string, to: stri
   }
 }
 
+/**
+ * This week's observations for everyone, after the week before for anyone
+ * whose run then failed (`catchUpObservations`).
+ *
+ * The week before goes first, so this week's run reads its sentences among the
+ * recent ones and does not repeat them. A person who fails is carried past
+ * rather than thrown, so nobody else loses their week; the route answers 207
+ * when anything lands in `failed`, and the next week's run catches it up.
+ */
 export async function runObservations(now: Date = new Date()): Promise<ObservationsSummary> {
   const core = createCoreServiceSupabase();
-  const { from, to } = observationWeek(now);
-  const people = await peopleWithEvents(core, from, to);
-
   const ports = observationPorts(core);
-  const summary: ObservationsSummary = { people: people.length, results: [], failed: [] };
+  const { week, from, to } = observationWeek(now);
+  const earlier = observationWeek(new Date(now.getTime() - WEEK_MS));
+
+  const summary: ObservationsSummary = { people: 0, results: [], caughtUp: [], failed: [] };
+  for (const userId of await peopleWithEvents(core, earlier.from, earlier.to)) {
+    try {
+      summary.caughtUp.push({ userId, result: await catchUpObservations(ports, userId, now) });
+    } catch (err) {
+      summary.failed.push(`${userId} (${earlier.week}): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  const people = await peopleWithEvents(core, from, to);
+  summary.people = people.length;
   for (const userId of people) {
     try {
       summary.results.push({ userId, result: await runObservationsFor(ports, userId, now) });
     } catch (err) {
-      summary.failed.push(err instanceof Error ? err.message : String(err));
+      summary.failed.push(`${userId} (${week}): ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   return summary;

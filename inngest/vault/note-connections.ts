@@ -138,7 +138,10 @@ export async function runNoteConnections(now: Date = new Date()): Promise<NoteCo
     try {
       summary.results.push({ userId, result: await runConnectionsFor(ports, userId, now) });
     } catch (err) {
-      summary.failed.push(err instanceof Error ? err.message : String(err));
+      // Carried on rather than thrown, so one person's failure costs nobody
+      // else their week. The route answers 207 when anything lands here, and
+      // the next week's run reads this week again.
+      summary.failed.push(`${userId}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   return summary;
