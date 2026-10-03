@@ -59,6 +59,12 @@ export type DashTodayEntry = {
    * Undo is offered.
    */
   noUndo: string | null;
+  /**
+   * For a change made in a thread, the page of the row whose thread asked
+   * for it (plan #1518): the role a todo was added from. Null otherwise, and
+   * for a thread write recorded before the comment was kept.
+   */
+  from: string | null;
 };
 
 export type DashTodayGroup = {
@@ -84,8 +90,15 @@ export function dayBounds(today: string, timezone: string): { start: string; end
   };
 }
 
-/** One row as Home lists it, or null for a row that wrote nothing. */
-export function dashTodayEntry(row: Row, today: string): DashTodayEntry | null {
+/**
+ * One row as Home lists it, or null for a row that wrote nothing.
+ * `threads` maps a row thread's conversation id to the ref it sits under.
+ */
+export function dashTodayEntry(
+  row: Row,
+  today: string,
+  threads: ReadonlyMap<string, string> = new Map(),
+): DashTodayEntry | null {
   const action = toDashAction(row);
   if (action.status !== 'done' && action.status !== 'undone') return null;
   const at = action.doneAt ?? action.createdAt;
@@ -107,8 +120,12 @@ export function dashTodayEntry(row: Row, today: string): DashTodayEntry | null {
       at,
       workspace,
       noUndo: null,
+      from: null,
     };
   }
+
+  const threadRef =
+    action.surface === 'thread' && row.conversation_id ? (threads.get(row.conversation_id) ?? null) : null;
 
   return {
     id: action.id,
@@ -123,6 +140,7 @@ export function dashTodayEntry(row: Row, today: string): DashTodayEntry | null {
     at,
     workspace,
     noUndo: action.status === 'done' ? noUndoReason(action) : null,
+    from: threadRef ? refHref(threadRef) : null,
   };
 }
 
@@ -174,10 +192,33 @@ export async function loadDashToday(
     .order('done_at', { ascending: false })
     .limit(DASH_TODAY_LIMIT);
   if (error) throw new Error(`Reading what Dash did today failed: ${error.message}`);
-  const entries = ((data ?? []) as Row[])
-    .map((row) => dashTodayEntry(row, input.today))
+  const rows = (data ?? []) as Row[];
+  const threads = await threadSubjects(core, input.userId, rows);
+  const entries = rows
+    .map((row) => dashTodayEntry(row, input.today, threads))
     .filter((entry): entry is DashTodayEntry => entry !== null);
   return groupDashToday(entries, input.shown);
+}
+
+/**
+ * The row each thread write's conversation sits under, by conversation id.
+ * Best-effort: a list that cannot say where a change came from still lists it.
+ */
+async function threadSubjects(core: SchemaClient, userId: string, rows: readonly Row[]): Promise<Map<string, string>> {
+  const ids = [
+    ...new Set(
+      rows.filter((row) => row.surface === 'thread' && row.conversation_id).map((row) => row.conversation_id as string),
+    ),
+  ];
+  if (ids.length === 0) return new Map();
+  const { data, error } = await core
+    .from('conversations')
+    .select('id, subject_ref')
+    .eq('user_id', userId)
+    .eq('subject_kind', 'row')
+    .in('id', ids);
+  if (error) return new Map();
+  return new Map(((data ?? []) as { id: string; subject_ref: string }[]).map((c) => [c.id, c.subject_ref]));
 }
 
 export type DashTodayUndo =

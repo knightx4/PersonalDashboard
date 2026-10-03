@@ -22,7 +22,8 @@ export const GROUP_SHOWN = 4;
  * newest few and folds the rest. An undo that goes through leaves the row in
  * place, said as undone, so the press has something to answer it; the next
  * load lists it the same way. A change recorded with no Undo (plan #1571)
- * says why beneath its sentence instead of offering the button.
+ * says why beneath its sentence instead of offering the button. A change
+ * made in a thread links to the row whose thread asked for it (plan #1518).
  */
 export function DashTodaySection({
   groups,
@@ -153,6 +154,13 @@ function DashTodayRow({
         )}
       </div>
       {entry.noUndo && !undone && <p className="pl-15 text-small text-ink-muted">{entry.noUndo}</p>}
+      {entry.from && (
+        <p className="pl-15 text-small text-ink-muted">
+          <Link href={entry.from} className="hover:text-accent">
+            From your comment
+          </Link>
+        </p>
+      )}
       {error && (
         <div className="pl-15">
           <FieldError>{error}</FieldError>

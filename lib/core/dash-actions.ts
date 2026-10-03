@@ -693,6 +693,11 @@ export type DashActionEntry = {
    * be put back by restoring its row (noUndoReason). Kept as `undo.none`.
    */
   noUndo?: string;
+  /**
+   * For a thread's write, the comment that asked for it (plan #1518): its
+   * row thread and the person's turn, kept as conversation_id and turn_id.
+   */
+  cause?: { conversationId: string; turnId: string } | null;
 };
 
 /** Longest summary kept; a longer one is cut at a word. */
@@ -753,6 +758,7 @@ export async function recordDashAction(
         after_values: after,
         summary: clipped(entry.summary),
         undo: entry.noUndo ? { ...(entry.undo ?? {}), none: entry.noUndo } : (entry.undo ?? null),
+        ...(entry.cause ? { conversation_id: entry.cause.conversationId, turn_id: entry.cause.turnId } : {}),
       })
       .select('id')
       .single();

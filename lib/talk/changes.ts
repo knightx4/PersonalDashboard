@@ -188,27 +188,40 @@ export type MadeDashChange = NewDashChange & {
 };
 
 /**
+ * The comment a thread write answered (plan #1518): the row thread it sits
+ * in, in core.conversations, and the person's turn in it. Kept on the record
+ * as conversation_id and turn_id, so Home can say where the change came from.
+ */
+export type ThreadCause = { conversationId: string; turnId: string };
+
+/**
  * Keeps a change Dash made straight away (plan #1440) in an `ask`
  * conversation: done from the start, with the row it wrote and that row's
  * values before and after, so its card under the answer offers Undo. Tied to
  * the answer by attachProposals once the answer is kept, like a proposal.
- * A change made in a thread is kept the same way with surface 'thread' and
- * no conversation, and Home offers its Undo.
+ * A change made in a thread is kept the same way with surface 'thread', under
+ * the comment that asked for it when the thread names one, and Home offers
+ * its Undo.
  */
 export async function insertMadeChange(
   core: CoreSupabaseClient,
   userId: string,
-  /** The `ask` conversation; null for a change made in a thread (plan #1465), which has none. */
-  conversationId: string | null,
+  /**
+   * The `ask` conversation, as its id. For a change made in a thread (plan
+   * #1465), the comment it answered, or null when the thread names none.
+   */
+  where: string | ThreadCause | null,
   made: MadeDashChange,
   now: string = new Date().toISOString(),
 ): Promise<DashChange> {
+  const ask = typeof where === 'string';
   const { data, error } = await core
     .from(DASH_ACTIONS)
     .insert({
       user_id: userId,
-      conversation_id: conversationId,
-      surface: conversationId === null ? 'thread' : 'ask',
+      conversation_id: ask ? where : (where?.conversationId ?? null),
+      ...(where && !ask ? { turn_id: where.turnId } : {}),
+      surface: ask ? 'ask' : 'thread',
       kind: made.kind,
       input: made.input,
       status: 'done',
