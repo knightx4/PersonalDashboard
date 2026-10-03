@@ -913,6 +913,288 @@
   --grain-blend: overlay;
 }
 
+/* ---------------------------------------------------------------------------
+ * AURORA — glass under a moving night sky.
+ *
+ * Darkroom's idea taken to its end. The bench is a near-black night, the four
+ * pools are brighter and larger, and they move: a fixed layer drifts across
+ * the viewport once every minute or so (see "The sky" near the foot of this
+ * file). The sheets are smoked glass, so the sky shows through as colour and
+ * the text on them stays light on dark.
+ *
+ * One polarity, like Darkroom: the page and the sheets are both dark, and the
+ * --c-page-* half agrees with the sheet half rather than opposing it.
+ *
+ * The inks, the workspace colours and the meanings are Darkroom's. They were
+ * tuned to clear a bench lighter than this one, and every one of them is light
+ * ink, so a darker bench only adds to what they already measured.
+ *
+ * This block is the default sky, Borealis: the app mark's blue, violet and
+ * pink. The other skies in lib/theme/sky.ts write their bench, pools and
+ * accent over it as inline tokens, the way a colourway does.
+ *
+ * The glass is darker than the bench rather than lighter, for Darkroom's
+ * reason: --c-surface is also where a solid button's label used to come from,
+ * and a lifted panel failed that at 1.6:1. The pools are what make the glass
+ * look lit; the glass itself only has to be smoked.
+ * ------------------------------------------------------------------------- */
+[data-theme='aurora'] {
+  --c-fill-ink: #0c1022;
+  color-scheme: dark;
+  --c-sheet-scheme: dark;
+
+  /* ---- The bench ---- */
+  --c-page-ground: #0c1022;
+  --c-page: #0c1022;
+  --c-page-ink: #eef1fb;
+  --c-page-ink-muted: #b3bad0;
+  --c-page-ink-ghost: #858ca6;
+  --c-page-border: #262d48;
+  --c-page-border-strong: #4b5578;
+  --c-page-border-control: #858ca6;
+  --c-page-positive: #6fe0b0;
+  --c-page-caution: #f5b459;
+  --c-page-danger: #ff9d9d;
+
+  /* Borealis: the ramp across the app icon's dash, and a deep indigo floor.
+   * Brighter than the glass rooms' pools, and lifted a little further, because
+   * this bench is darker and the sky is the point of the theme. Measured: the
+   * brightest point of the field stays under the light the free-hue wash
+   * already spends, so the glass over it keeps its contrast. */
+  --c-wash-near: #5b7cff;
+  --c-wash-mid: #8b5cf6;
+  --c-wash-far: #ff6b9d;
+  --c-wash-floor: #2a2fd0;
+  --wash-lift: 1.15;
+
+  --c-accent-base-lit: #aab6ff;
+  --c-accent-hover-lit: #c3ccff;
+  --c-w-shopping-lit: #ffa3b8;
+  --c-w-jobs-lit: #c3b0ff;
+  --c-w-todo-lit: #6ccdf5;
+  --c-w-vault-lit: #eda6f6;
+  --c-w-learn-lit: #6fdcd2;
+  --c-w-news-lit: #debf69;
+  --c-w-goals-lit: #b0dc6e;
+  --c-w-dev-lit: #bcc7d6;
+
+  /* ---- The glass ----
+   * Three altitudes. A sheet is half-smoked; a floating panel is nearly
+   * opaque, because it is where a person types; a well inside a sheet is a
+   * darker smoke with no blur of its own. */
+  --c-surface: rgb(16 20 42 / 0.5);
+  --c-raised: rgb(20 25 50 / 0.86);
+  --c-canvas: rgb(6 9 22 / 0.5);
+  --c-sunken: rgb(4 6 16 / 0.55);
+  --c-border: #2a3150;
+  --c-border-strong: #4a5478;
+
+  /* A lit top edge and a spill of the sky's own colour around each sheet. The
+   * drops keep their black, so the glass reads as clear rather than tinted. */
+  --c-sheet-outline: rgb(170 185 255 / 0.18);
+  --sheet-edge:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 1px 3px rgb(0 0 0 / 0.4),
+    0 18px 40px -18px rgb(0 0 0 / 0.7),
+    0 0 110px -10px color-mix(in oklab, var(--c-wash-near) 34%, transparent),
+    0 24px 80px -16px color-mix(in oklab, var(--c-wash-mid) 22%, transparent);
+  --lift-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    0 2px 5px rgb(0 0 0 / 0.45),
+    0 22px 46px -16px rgb(0 0 0 / 0.75),
+    0 0 124px -6px color-mix(in oklab, var(--c-wash-near) 42%, transparent);
+
+  --c-shell: #0c1022;
+  --c-shell-ink: #eef1fb;
+  --c-shell-muted: #b3bad0;
+  --c-shell-border: rgb(255 255 255 / 0.08);
+  --c-shell-hover: rgb(255 255 255 / 0.07);
+
+  --c-ink: #eef1fb;
+  --c-ink-muted: #b3bad0;
+  --c-ink-ghost: #858ca6;
+  --c-border-control: #858ca6;
+
+  --c-accent-base: #aab6ff;
+  --c-accent-hover: #c3ccff;
+  --c-accent-tint-base: #1c2147;
+
+  --c-w-shopping: #ffa3b8;
+  --c-w-shopping-tint: #33202c;
+  --c-w-jobs: #c3b0ff;
+  --c-w-jobs-tint: #241f42;
+  --c-w-todo: #6ccdf5;
+  --c-w-todo-tint: #12283a;
+  --c-w-vault: #eda6f6;
+  --c-w-vault-tint: #2e1e3c;
+  --c-w-learn: #6fdcd2;
+  --c-w-learn-tint: #0f2b2e;
+  --c-w-news: #debf69;
+  --c-w-news-tint: #2a2410;
+  --c-w-goals: #b0dc6e;
+  --c-w-goals-tint: #1f2a10;
+  --c-w-dev: #bcc7d6;
+  --c-w-dev-tint: #1f2836;
+
+  --c-positive: #6fe0b0;
+  --c-positive-tint: #102b22;
+  --c-caution: #f5b459;
+  --c-caution-fill: #f5b459;
+  --c-caution-tint: #2d2410;
+  --c-danger: #ff9d9d;
+  --c-danger-tint: #32202a;
+
+  --c-status-lead: #a3b0c4;
+  --c-status-lead-tint: #212b3a;
+  --c-status-submitted: #8fb4ff;
+  --c-status-submitted-tint: #1a2340;
+  --c-status-process: #f5b459;
+  --c-status-process-tint: #2d2410;
+  --c-status-final: #c3b0ff;
+  --c-status-final-tint: #241f42;
+  --c-status-offer: #6fe0b0;
+  --c-status-offer-tint: #102b22;
+  --c-status-rejected: #ff9d9d;
+  --c-status-rejected-tint: #32202a;
+  --c-status-ghosted: #93a2b8;
+  --c-status-ghosted-tint: #1e2735;
+
+  --grain-opacity: 0.06;
+  --grain-blend: overlay;
+}
+
+/* ---------------------------------------------------------------------------
+ * DAWN — Aurora at first light.
+ *
+ * The same sky, the same glass, the same motion, on a pale bench. The pools
+ * are the night's colours lifted to pastel, and the sheets are frosted white
+ * at about two thirds, so the sky reads through them as a tint and the text
+ * stays dark on light.
+ *
+ * The inks, the workspace colours, the meanings and the pipeline are
+ * Lightbox's sheet set. Those were tuned to clear lit paper composited over a
+ * blue-grey bench, which is darker than anything this theme puts behind text,
+ * so they clear it with room to spare.
+ *
+ * One polarity: the page half is the sheet half, said again.
+ * ------------------------------------------------------------------------- */
+[data-theme='dawn'] {
+  --c-fill-ink: #ffffff;
+  color-scheme: light;
+  --c-sheet-scheme: light;
+
+  /* ---- The bench ---- */
+  --c-page-ground: #e6eaf6;
+  --c-page: #e6eaf6;
+  --c-page-ink: #121733;
+  --c-page-ink-muted: #474f6e;
+  --c-page-ink-ghost: #6b7290;
+  --c-page-border: #cdd3e6;
+  --c-page-border-strong: #a3abc6;
+  --c-page-border-control: #6b7290;
+  --c-page-positive: #17624a;
+  --c-page-caution: #8a480a;
+  --c-page-danger: #9e1a1a;
+
+  /* Borealis at dawn: the same three colours and floor, lighter and softer.
+   * Mid-toned rather than pale, because a wash only reaches the bench at a
+   * third of itself and a pale pool at a third is no colour at all. */
+  --c-wash-near: #7d95ff;
+  --c-wash-mid: #b48cff;
+  --c-wash-far: #ff8fb8;
+  --c-wash-floor: #8fb0ff;
+  --wash-lift: 1;
+
+  --c-accent-base-lit: #3346b8;
+  --c-accent-hover-lit: #26348f;
+  --c-w-shopping-lit: #a30f46;
+  --c-w-jobs-lit: #6420cf;
+  --c-w-todo-lit: #035b79;
+  --c-w-vault-lit: #891489;
+  --c-w-learn-lit: #0a5d54;
+  --c-w-news-lit: #6e5600;
+  --c-w-goals-lit: #41610a;
+  --c-w-dev-lit: #434e5f;
+
+  /* ---- The glass: frosted white ---- */
+  --c-surface: rgb(255 255 255 / 0.62);
+  --c-raised: rgb(255 255 255 / 0.9);
+  --c-canvas: rgb(240 243 251 / 0.7);
+  --c-sunken: rgb(226 231 245 / 0.72);
+  --c-border: #d3d9ea;
+  --c-border-strong: #a9b1cb;
+
+  --c-sheet-outline: rgb(255 255 255 / 0.7);
+  --sheet-edge:
+    inset 0 1px 0 rgb(255 255 255 / 0.95),
+    0 1px 2px rgb(30 40 90 / 0.08),
+    0 16px 36px -18px rgb(30 40 90 / 0.28),
+    0 0 90px -12px color-mix(in oklab, var(--c-wash-near) 30%, transparent);
+  --lift-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 1),
+    0 2px 5px rgb(30 40 90 / 0.1),
+    0 24px 48px -18px rgb(30 40 90 / 0.36),
+    0 0 110px -8px color-mix(in oklab, var(--c-wash-near) 38%, transparent);
+
+  --c-shell: #e6eaf6;
+  --c-shell-ink: #121733;
+  --c-shell-muted: #474f6e;
+  --c-shell-border: rgb(20 30 70 / 0.1);
+  --c-shell-hover: rgb(255 255 255 / 0.55);
+
+  --c-ink: #121733;
+  --c-ink-muted: #474f6e;
+  --c-ink-ghost: #6b7290;
+  --c-border-control: #6b7290;
+
+  --c-accent-base: #3346b8;
+  --c-accent-hover: #26348f;
+  --c-accent-tint-base: #e1e6fb;
+
+  --c-w-shopping: #a30f46;
+  --c-w-shopping-tint: #f6dde6;
+  --c-w-jobs: #6420cf;
+  --c-w-jobs-tint: #e8dffa;
+  --c-w-todo: #035b79;
+  --c-w-todo-tint: #d9e9f1;
+  --c-w-vault: #891489;
+  --c-w-vault-tint: #f2def2;
+  --c-w-learn: #0a5d54;
+  --c-w-learn-tint: #d8ebe7;
+  --c-w-news: #6e5600;
+  --c-w-news-tint: #ece4cf;
+  --c-w-goals: #41610a;
+  --c-w-goals-tint: #e3ecd2;
+  --c-w-dev: #434e5f;
+  --c-w-dev-tint: #e6eaf0;
+
+  --c-positive: #17624a;
+  --c-positive-tint: #d8ece4;
+  --c-caution: #8a480a;
+  --c-caution-fill: #e8992f;
+  --c-caution-tint: #f2e6d6;
+  --c-danger: #9e1a1a;
+  --c-danger-tint: #f5dcdc;
+
+  --c-status-lead: #4f5862;
+  --c-status-lead-tint: #e3e8ee;
+  --c-status-submitted: #1a48cc;
+  --c-status-submitted-tint: #dde4fa;
+  --c-status-process: #8a480a;
+  --c-status-process-tint: #f2e6d6;
+  --c-status-final: #6420cf;
+  --c-status-final-tint: #e8dffa;
+  --c-status-offer: #17624a;
+  --c-status-offer-tint: #d8ece4;
+  --c-status-rejected: #9e1a1a;
+  --c-status-rejected-tint: #f5dcdc;
+  --c-status-ghosted: #515a64;
+  --c-status-ghosted-tint: #dfe5eb;
+
+  --grain-opacity: 0.05;
+  --grain-blend: multiply;
+}
+
 /* An unset choice follows the system, and the system dark is Ink. Kept in sync
  * with the [data-theme='ink'] block above by scripts/check-contrast.ts. */
 @media (prefers-color-scheme: dark) {
@@ -1451,7 +1733,9 @@ body::before {
  * opaque again, this override should go with them.
  */
 [data-theme='lightbox'] body::before,
-[data-theme='darkroom'] body::before {
+[data-theme='darkroom'] body::before,
+[data-theme='aurora'] body::before,
+[data-theme='dawn'] body::before {
   z-index: -1;
 }
 
@@ -1491,7 +1775,9 @@ body::before {
  * blurring, and the point is to keep some of the bench's gradient.
  */
 [data-theme='lightbox'] .popover-panel,
-[data-theme='darkroom'] .popover-panel {
+[data-theme='darkroom'] .popover-panel,
+[data-theme='aurora'] .popover-panel,
+[data-theme='dawn'] .popover-panel {
   backdrop-filter: blur(22px) saturate(1.5);
 }
 
@@ -1508,8 +1794,19 @@ body::before {
   background-color: rgb(22 32 52 / 0.95);
 }
 
+/* Aurora's two: --c-raised, nearly opaque, as above. */
+[data-theme='aurora'] .popover-panel {
+  background-color: rgb(20 25 50 / 0.95);
+}
+
+[data-theme='dawn'] .popover-panel {
+  background-color: rgb(255 255 255 / 0.96);
+}
+
 [data-theme='lightbox'] .sheet,
-[data-theme='darkroom'] .sheet {
+[data-theme='darkroom'] .sheet,
+[data-theme='aurora'] .sheet,
+[data-theme='dawn'] .sheet {
   background-image: linear-gradient(
     155deg,
     rgb(255 255 255 / 0.16) 0%,
@@ -2620,6 +2917,10 @@ form[data-auto-submit] [data-fallback-submit] {
 [data-theme='darkroom'] body,
 [data-theme='lightbox'] .bg-page,
 [data-theme='darkroom'] .bg-page,
+[data-theme='aurora'] .bg-page,
+[data-theme='dawn'] .bg-page,
+[data-theme='aurora'] body::after,
+[data-theme='dawn'] body::after,
 .wash-chip {
   background-image:
     radial-gradient(
@@ -2674,7 +2975,9 @@ form[data-auto-submit] [data-fallback-submit] {
 /* One bench, and the body already owns it. The shell paints no ground here so
  * those three pools read through; the workspace pool goes on top of them. */
 [data-theme='lightbox'] .shell-ground,
-[data-theme='darkroom'] .shell-ground {
+[data-theme='darkroom'] .shell-ground,
+[data-theme='aurora'] .shell-ground,
+[data-theme='dawn'] .shell-ground {
   background-color: transparent;
   background-image: var(--workspace-pool);
   background-attachment: fixed;
@@ -2748,7 +3051,9 @@ form[data-auto-submit] [data-fallback-submit] {
  * app, on the one theme whose sheets are already alpha-composited.
  */
 [data-theme='lightbox'] .page-pane,
-[data-theme='darkroom'] .page-pane {
+[data-theme='darkroom'] .page-pane,
+[data-theme='aurora'] .page-pane,
+[data-theme='dawn'] .page-pane {
   background-color: rgb(255 255 255 / 0.03);
   /* The same light, on the biggest piece of glass in the room. Weaker than a
    * sheet's, because it is behind them and a lit ground competing with lit
@@ -2763,10 +3068,77 @@ form[data-auto-submit] [data-fallback-submit] {
 
 @media (min-width: 1024px) {
   [data-theme='lightbox'] .page-pane,
-  [data-theme='darkroom'] .page-pane {
+  [data-theme='darkroom'] .page-pane,
+  [data-theme='aurora'] .page-pane,
+  [data-theme='dawn'] .page-pane {
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.10),
       0 18px 48px -20px rgb(0 0 0 / 0.55);
+  }
+}
+
+/* Dawn's pane is frosted a little more than the night's: three percent of
+ * white is invisible on a pale bench, and the corner needs something to cut. */
+[data-theme='dawn'] .page-pane {
+  background-color: rgb(255 255 255 / 0.22);
+}
+
+@media (min-width: 1024px) {
+  [data-theme='dawn'] .page-pane {
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.8),
+      0 18px 48px -22px rgb(30 40 90 / 0.3);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * The sky -- Aurora and Dawn only.
+ *
+ * The glass rooms paint their wash on <body>, which holds still. Aurora's
+ * moves: the same five-layer wash, on a fixed layer a little larger than the
+ * viewport, drifting and breathing once a minute. It is the one thing in the
+ * app that moves without being asked, so it is slow enough that nobody sees
+ * it happen -- the screen just never looks quite the same twice.
+ *
+ * Transform only. Moving a background-position repaints the whole viewport on
+ * every frame; moving a layer is the compositor's job and costs nothing to
+ * paint. Under the grain (-1) and under everything else, so it is a ground and
+ * never a film over the work.
+ *
+ * Under prefers-reduced-motion it holds its first frame.
+ * ------------------------------------------------------------------------- */
+[data-theme='aurora'] body,
+[data-theme='dawn'] body {
+  background-image: none;
+}
+
+[data-theme='aurora'] body::after,
+[data-theme='dawn'] body::after {
+  position: fixed;
+  z-index: -2;
+  inset: -12%;
+  content: "";
+  pointer-events: none;
+  will-change: transform;
+  animation: sky-drift 64s ease-in-out infinite alternate;
+}
+
+@keyframes sky-drift {
+  0% {
+    transform: translate3d(-4%, -3%, 0) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(2%, 1%, 0) scale(1.08) rotate(1.5deg);
+  }
+  100% {
+    transform: translate3d(5%, 3%, 0) scale(1.03) rotate(-1deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='aurora'] body::after,
+  [data-theme='dawn'] body::after {
+    animation: none;
   }
 }
 

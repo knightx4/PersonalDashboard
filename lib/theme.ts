@@ -62,6 +62,24 @@ export const THEMES = [
     swatch: '#191426',
     ink: '#f2eefa',
   },
+  {
+    id: 'aurora',
+    label: 'Aurora',
+    mood: 'Glass under a moving night sky',
+    // Glass on a night bench, one polarity: the sheets are smoked rather than
+    // lit, so the browser's widgets are dark everywhere.
+    scheme: 'dark',
+    swatch: '#0c1022',
+    ink: '#eef1fb',
+  },
+  {
+    id: 'dawn',
+    label: 'Dawn',
+    mood: 'Aurora at first light',
+    scheme: 'light',
+    swatch: '#e6eaf6',
+    ink: '#121733',
+  },
 ] as const;
 
 export type ThemeId = (typeof THEMES)[number]['id'];
@@ -84,9 +102,10 @@ export function isThemeId(value: string | null | undefined): value is ThemeId {
  */
 import type { ThemeMode } from '@/lib/theme/reference';
 import { COLOURWAYS, colourwayById, type ColourwayId } from '@/lib/theme/colourway';
+import { DEFAULT_SKY, isSkyId, SKIES, type SkyId } from '@/lib/theme/sky';
 
-export type { ThemeMode, ColourwayId };
-export { COLOURWAYS };
+export type { ThemeMode, ColourwayId, SkyId };
+export { COLOURWAYS, SKIES };
 
 /**
  * What somebody chose, read out of the one string that holds it.
@@ -113,7 +132,7 @@ export { COLOURWAYS };
  */
 export type Theme =
   | { kind: 'system' }
-  | { kind: 'written'; id: ThemeId }
+  | { kind: 'written'; id: ThemeId; sky?: SkyId }
   | { kind: 'generated'; mode: ThemeMode; hue: number | null; way?: ColourwayId };
 
 /** The shape the picker works in: a polarity, and a colour or none. */
@@ -133,6 +152,16 @@ export function parseTheme(value: string | null | undefined): Theme {
   if (isThemeId(text)) return { kind: 'written', id: text };
 
   const [mode, colour] = text.split(':');
+
+  // Aurora and Dawn take a sky by name: `aurora:polar`. The default sky is the
+  // block as written and is stored as the bare name, so there is one spelling
+  // of each theme. A sky that has since been renamed falls back to the
+  // default rather than to no choice, which keeps the person in Aurora.
+  if (mode === 'aurora' || mode === 'dawn') {
+    if (!colour || !isSkyId(colour) || colour === DEFAULT_SKY) return { kind: 'written', id: mode };
+    return { kind: 'written', id: mode, sky: colour };
+  }
+
   if (mode !== 'light' && mode !== 'dark' && mode !== 'lightbox' && mode !== 'darkroom')
     return SYSTEM_THEME;
   if (colour === undefined) return { kind: 'generated', mode, hue: null };
@@ -151,7 +180,9 @@ export function parseTheme(value: string | null | undefined): Theme {
 /** The string to store. Null means store nothing: follow the system. */
 export function formatTheme(theme: Theme): string | null {
   if (theme.kind === 'system') return null;
-  if (theme.kind === 'written') return theme.id;
+  if (theme.kind === 'written') {
+    return theme.sky && theme.sky !== DEFAULT_SKY ? `${theme.id}:${theme.sky}` : theme.id;
+  }
   // The colourway's name, not its hue: the hue is one of the things the name
   // stands for, and storing the number would lose the pools.
   if (theme.way) return `${theme.mode}:${theme.way}`;
@@ -178,6 +209,25 @@ export function modeOf(theme: Theme): ThemeMode {
   if (theme.id === 'lightbox') return 'lightbox';
   if (theme.id === 'darkroom') return 'darkroom';
   return THEMES.find((written) => written.id === theme.id)?.scheme ?? 'light';
+}
+
+/**
+ * Whether a theme is one of the two Aurora themes, and so takes a sky rather
+ * than a colour.
+ */
+export function isAurora(theme: Theme): theme is { kind: 'written'; id: 'aurora' | 'dawn'; sky?: SkyId } {
+  return theme.kind === 'written' && (theme.id === 'aurora' || theme.id === 'dawn');
+}
+
+/** The sky an Aurora theme is wearing; the default for anything else. */
+export function skyOf(theme: Theme): SkyId {
+  return theme.kind === 'written' && theme.sky ? theme.sky : DEFAULT_SKY;
+}
+
+/** Aurora in a polarity, keeping its sky. Night is Aurora; first light is Dawn. */
+export function auroraFor(polarity: Polarity, sky: SkyId): Theme {
+  const id = polarity === 'light' ? 'dawn' : 'aurora';
+  return sky === DEFAULT_SKY ? { kind: 'written', id } : { kind: 'written', id, sky };
 }
 
 /** The colour a theme is, in degrees, or null for one with no colour. */
@@ -209,13 +259,19 @@ export const THEME_POLARITIES: readonly { id: Polarity; label: string; mood: str
 export const THEME_SURFACES: readonly { id: Surface; label: string; mood: string }[] = [
   { id: 'solid', label: 'Solid', mood: 'One flat ground, edge to edge' },
   { id: 'lightbox', label: 'Lightbox', mood: 'Sheets floating on a lit bench' },
+  { id: 'aurora', label: 'Aurora', mood: 'Glass under a moving sky' },
 ];
 
 export type Polarity = 'light' | 'dark';
-export type Surface = 'solid' | 'lightbox';
+/**
+ * Aurora is the third answer. It is not a mode: it has no generated palettes
+ * and takes a named sky rather than a hue, so it is said as a written theme
+ * (see `auroraFor`) and the two answers below stay the four rooms they were.
+ */
+export type Surface = 'solid' | 'lightbox' | 'aurora';
 
 /** The two answers, as the one mode everything downstream keys off. */
-export function modeFor(polarity: Polarity, surface: Surface): ThemeMode {
+export function modeFor(polarity: Polarity, surface: Exclude<Surface, 'aurora'>): ThemeMode {
   if (surface === 'solid') return polarity;
   return polarity === 'light' ? 'lightbox' : 'darkroom';
 }

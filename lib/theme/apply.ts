@@ -2,6 +2,7 @@ import { generatePalette } from '@/lib/theme/palette';
 import { formatTheme, parseTheme, THEME_CHOICE_ATTRIBUTE, type Theme, type ThemeId } from '@/lib/theme';
 import { TOKEN_NAMES } from '@/lib/theme/reference';
 import { colourwayById, paintsWash, WASH_LIFT } from '@/lib/theme/colourway';
+import { skyTokens } from '@/lib/theme/sky';
 
 /**
  * Putting a chosen theme onto the document.
@@ -43,6 +44,13 @@ export function themeAttribute(theme: Theme): ThemeId | undefined {
  * says better than a hundred inline declarations would.
  */
 export function themeStyle(theme: Theme): Record<string, string> | undefined {
+  // Aurora and Dawn are written blocks that take a sky. The default sky is the
+  // block itself; any other writes its bench, pools and accent over it.
+  if (theme.kind === 'written') {
+    if (!theme.sky) return undefined;
+    const tokens = skyTokens(theme.id === 'dawn' ? 'dawn' : 'night', theme.sky);
+    return Object.keys(tokens).length > 0 ? tokens : undefined;
+  }
   if (theme.kind !== 'generated' || theme.hue === null) return undefined;
   const palette = generatePalette(theme.mode, theme.hue, theme.way);
 
