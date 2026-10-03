@@ -21,36 +21,66 @@ import {
 } from '@/lib/learn/youtube/videos';
 import { loadClipProgress } from '@/lib/learn/clips/progress';
 import { clipProgressLine } from '@/lib/learn/clips/progress-line';
+import { loadPlayerClips } from '@/lib/learn/clips/player-clips';
+import { loadChannelSummaries, loadUsage } from '@/lib/learn/youtube/load';
+import { loadWatchListSettings } from '@/lib/learn/youtube/watch-list';
 import { VideoRows } from './video-rows';
+import { CLIPS_HREF, ClipsSection } from './clips-section';
+import { LibrarySection, YOUTUBE_HREF } from './library-section';
 
 export const dynamic = 'force-dynamic';
+// Following a channel from the YouTube library section lists every video and
+// playlist it has, which for a big channel is a few hundred Data API calls.
+export const maxDuration = 300;
 export const metadata = { title: 'Videos' };
 
 /**
- * Videos: the ones you saved to your Dash playlist (plan #1069), newest added
- * first. Only your list, never the channel videos the YouTube library
- * catalogues. The owner's alone, like the library the playlist is set on.
+ * Videos: everything video in Learn on one page (plan #1488). First the ones
+ * you saved to your Dash playlist (plan #1069), newest added first; then the
+ * clips cut from them; then the YouTube library the playlist is set in. The
+ * owner's alone, because every transcript the library fetches spends the
+ * owner's TranscriptAPI credits.
  *
- * `?verdict=` narrows it to one pile (#1068): watch, card, skip, or unjudged.
+ * `?verdict=` narrows the list to one pile (#1068): watch, card, skip, or
+ * unjudged. `?open=clips` opens the Clips section and starts the player, and
+ * `?open=youtube` opens the library: the old /learn/clips and /learn/youtube
+ * tabs redirect to those.
  */
 export default async function VideosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; verdict?: string }>;
+  searchParams: Promise<{ q?: string; verdict?: string; open?: string }>;
 }) {
   const user = await getUser();
   if (!user || !(await isOwner({ user }))) notFound();
-  const { q, verdict: rawVerdict } = await searchParams;
+  const { q, verdict: rawVerdict, open } = await searchParams;
   const pile = isPile(rawVerdict) ? rawVerdict : null;
+  const playing = open === 'clips';
 
   const learn = await createLearnClient();
-  const [all, cards, clipProgress] = await Promise.all([
+  const startedAt = new Date().toISOString();
+  const [all, cards, clipProgress, channels, usage, list, clips] = await Promise.all([
     loadListVideos(learn, user.id),
     loadVideoCards(learn, user.id),
     loadClipProgress(learn, user.id),
+    loadChannelSummaries(learn),
+    loadUsage(learn),
+    loadWatchListSettings(learn, user.id),
+    playing ? loadPlayerClips(learn, user.id, { sessionStartedAt: startedAt }) : Promise.resolve(null),
   ]);
   const videos = filterVideos(all, { q, verdict: pile });
   const cardCounts = new Map([...cards].map(([videoId, list]) => [videoId, list.length]));
+  const now = new Date(startedAt);
+
+  const sections = (
+    <>
+      <ClipsSection
+        progress={clipProgressLine(clipProgress, now)}
+        player={clips === null ? null : { clips, startedAt }}
+      />
+      <LibrarySection channels={channels} usage={usage} list={list} now={now.getTime()} open={open === 'youtube'} />
+    </>
+  );
 
   if (all.length === 0) {
     return (
@@ -59,9 +89,10 @@ export default async function VideosPage({
         <EmptyState
           icon={MonitorPlay}
           title="No videos yet"
-          description="Save videos to a YouTube playlist of your own and paste its link on the YouTube page. Every video on it is listed here with a short summary, read again four times a day."
-          action={{ label: 'Set your playlist', href: '/learn/youtube' }}
+          description="Save videos to a YouTube playlist of your own and paste its link in the YouTube library below. Every video on it is listed here with a short summary, read again four times a day."
+          action={{ label: 'Set your playlist', href: YOUTUBE_HREF }}
         />
+        {sections}
       </>
     );
   }
@@ -73,13 +104,12 @@ export default async function VideosPage({
         title="Videos"
         description={`${all.length} on your list${watched > 0 ? `, ${watched} watched` : ''}`}
         actions={
-          <Link href="/learn/clips" className={buttonVariants({ variant: 'secondary' })}>
+          <Link href={CLIPS_HREF} className={buttonVariants({ variant: 'secondary' })}>
             <Clapperboard className="size-4" strokeWidth={1.75} aria-hidden />
             Watch as clips
           </Link>
         }
       />
-      <p className="mb-3 text-small tabular-nums text-ink-muted">{clipProgressLine(clipProgress, new Date())}</p>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="w-full max-w-md">
           <SearchField placeholder="Search titles and channels" />
@@ -94,6 +124,7 @@ export default async function VideosPage({
           {q ? `Nothing ${pile ? `in ${PILE_LABEL[pile]}` : 'on your list'} matches “${q}”.` : `Nothing in ${PILE_LABEL[pile ?? 'unjudged']} yet.`}
         </p>
       )}
+      {sections}
     </>
   );
 }
