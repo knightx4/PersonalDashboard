@@ -338,9 +338,12 @@ gallery:
    as the done-when to the `ui-critic` agent, as a subagent or headless with
    `claude -p --agent ui-critic`.
 3. Record the round whatever the verdict: save its `json` block unchanged as
-   `.preview-shots/checks/<note-id>--<surface>--r<round>.json`, and add
-   `UI-check: <surface> round <n> <pass|fix> (<k> fixes)` to the commit body.
-   Plan #1533 replaces the commit line with a row in `public.ui_checks`.
+   `.preview-shots/checks/<note-id>--<surface>--r<round>.json`, then run
+   `npm run ui-check -- <note-id> <surface> <round>`. That writes the round
+   to `public.ui_checks` keyed by the note, and uploads the shots where the
+   service key is set. Without any database access it prints the insert for
+   the connector's `execute_sql`; the building reference's "Recording a
+   round" says what each kind of session can reach.
 4. On `fix`, make the changes, shoot again and run the next round. You never
    write the verdict yourself.
 5. Three rounds at most. If round 3 fails, stop: what follows a third failed

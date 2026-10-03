@@ -126,8 +126,8 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    and say so in your report.
 7. **Commit the step on its own.** One step per commit. End the subject with
    the step: `Add the anonymous share page (plan #14)`. A step that changed a
-   screen carries one `UI-check:` line per critic round in the commit body
-   (see **Building a screen**). **Do not push and do
+   screen has each critic round recorded in `public.ui_checks` before it
+   commits (see **Building a screen**). **Do not push and do
    not merge.** The session that sent you puts your commit on main and closes
    your step from there, so stop at the commit and say in your report that you
    made it. If nobody sent you and this step is the whole job, the merge is
@@ -264,26 +264,43 @@ the step with the last verdict's fixes and where the shots are, and leave the
 next move to the session that sent you or, with nobody, to the person. Once
 #1535 is answered, its answer replaces this paragraph.
 
-**Recording a round.** Every round goes on record, passed or failed, in two
-places:
+**Recording a round.** Every round goes on record, passed or failed, before
+you make its fixes:
 
-- Save the critic's `json` block, unchanged, as
-  `.preview-shots/checks/<step>--<surface>--r<round>.json`, beside the shots
-  it judged. That folder is gitignored; the file is what the recorder reads.
-- Add one line per round to the step's commit body:
+1. Save the critic's `json` block, unchanged, as
+   `.preview-shots/checks/<step>--<surface>--r<round>.json`. That folder is
+   gitignored.
+2. Run the recorder:
 
-  ```
-  UI-check: <surface> round <n> <pass|fix> (<k> fixes)
-  ```
+   ```
+   npm run ui-check -- <step> <surface> <round>
+   ```
 
-  The commit is the record that lasts until the table below exists.
+   It checks the file is the critic's shape and is for that surface and
+   round, keeps a copy of the four shots beside it as
+   `<step>--<surface>--r<round>--<shot>.png` (the next shoot overwrites the
+   originals), and writes one row to `public.ui_checks`: step, surface,
+   round, verdict, the fixes and the `earlier` list as the critic wrote them,
+   its notes, and the shots' paths in the private `ui-shots` bucket. A round
+   recorded twice is replaced, not duplicated.
 
-Plan #1533 adds the table for this, `public.ui_checks` (step, surface, round,
-verdict, fixes), and a bucket for the shots that only the account can read.
-When it lands, the command it adds takes the place of the commit line: it
-reads the saved verdict file, uploads the shots and writes the row. Plan #1534
-then makes `done` refuse a step whose commit changes a `.tsx` file under
-`app/` or `components/` while one of its surfaces has no passing round.
+What the recorder can reach depends on the session:
+
+- With `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, it uploads
+  the shots to `ui-shots/<user id>/<step>/<surface>/r<round>/<shot>.png`,
+  which only the account can read, and writes the row.
+- With only `DATABASE_URL`, it writes the row with no shots.
+- With neither, as on the web, it prints the insert. Run that through the
+  connector's `execute_sql` as it is printed. The critic's text is in base64
+  inside it, so no apostrophe reaches the connector. The row is written with
+  no shots, and the shots stay in `.preview-shots/checks/` for the report.
+  Storage uploads do not go through SQL, so the connector cannot put them in
+  the bucket.
+
+A round whose recorder you could not run at all is not recorded: say so in
+the report rather than leaving it out. Plan #1534 makes `done` refuse a step
+whose commit changes a `.tsx` file under `app/` or `components/` while one of
+its surfaces has no `pass` row in `ui_checks`.
 
 ## When you reach something you should not decide
 
