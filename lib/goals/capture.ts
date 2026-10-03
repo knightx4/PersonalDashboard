@@ -594,7 +594,7 @@ export function parseFiling(
  * because routines read it with SQL. `undone_at` is set by Undo and the entry
  * is never removed, so the capture keeps the whole story.
  */
-export type FiledEntry =
+export type FiledEntry = (
   | {
       kind: 'close';
       step_id: string;
@@ -682,7 +682,15 @@ export type FiledEntry =
        */
       progress?: AddedFiledProgress;
       undone_at: string | null;
-    };
+    }
+) & {
+  /**
+   * The core.dash_actions row that records this line (plan #1569), so
+   * capture's Undo marks it undone and Home's Undo finds the line. Absent on
+   * lines filed before, and when the record could not be written.
+   */
+  action_id?: string;
+};
 
 /** The progress an added step was filed with, as kept on its line. */
 export type AddedFiledProgress = {
@@ -750,6 +758,19 @@ export function describeFiled(entry: FiledEntry): string {
       return left ? `${logged}, ${left}` : logged;
     }
   }
+}
+
+/**
+ * The sentence Home shows for a line in what Dash did today (plan #1569):
+ * the line's own words, said as Dash's, from the capture.
+ */
+export function captureSummary(entry: FiledEntry): string {
+  const line =
+    entry.kind === 'add' && entry.step_kind === 'claude'
+      ? describeFiled(entry).replace('a step for Dash', 'a step for itself')
+      : describeFiled(entry);
+  const said = `From your capture, Dash ${line.charAt(0).toLowerCase()}${line.slice(1)}`;
+  return /[.!?…]$/.test(said) ? said : `${said}.`;
 }
 
 /**
