@@ -2,6 +2,8 @@ import 'server-only';
 
 import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 import { providerKey, type AppointmentExtraction } from './extraction';
+import { appointmentRef, recordAppointmentAdded, recordAppointmentChanged } from './record';
+import { scheduledBefore } from '@/lib/core/scheduled-actions';
 import { resolveAppointment, type StoredAppointment } from './resolve';
 
 /**
@@ -9,7 +11,8 @@ import { resolveAppointment, type StoredAppointment } from './resolve';
  * appointments with that provider, and insert, move or cancel it.
  *
  * Service role only (the linker runs in the sync), so every read and write
- * names the user explicitly rather than leaning on RLS.
+ * names the user explicitly rather than leaning on RLS. Each add, move or
+ * cancellation is recorded as Dash's for Home (record.ts, plan #1577).
  */
 export async function fileAppointmentReading(
   supabase: TodoSupabaseClient,
@@ -80,6 +83,7 @@ export async function fileAppointmentReading(
         .select('id')
         .single();
       if (insertError) throw new Error(`appointment insert failed: ${insertError.message}`);
+      await recordAppointmentAdded(supabase, userId, inserted.id as string);
       return { appointmentId: inserted.id as string, unmatched: false };
     }
 
@@ -99,12 +103,15 @@ export async function fileAppointmentReading(
       if (reading.reference) patch.reference = reading.reference;
       if (reading.location) patch.location = reading.location;
 
-      const { error: updateError } = await supabase
+      const before = await scheduledBefore(supabase, userId, appointmentRef(decision.id));
+      const { data: updated, error: updateError } = await supabase
         .from('appointments')
         .update(patch)
         .eq('id', decision.id)
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .select('id');
       if (updateError) throw new Error(`appointment update failed: ${updateError.message}`);
+      if ((updated ?? []).length > 0) await recordAppointmentChanged(supabase, userId, decision.id, before);
       return { appointmentId: decision.id, unmatched: false };
     }
   }
