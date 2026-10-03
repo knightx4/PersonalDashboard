@@ -6,6 +6,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
 import { DashMark } from '@/components/ui/dash-mark';
 import { Bands } from '@/components/ui/meter';
+import { MoveLabel } from '@/components/ui/move-label';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
@@ -410,13 +411,22 @@ function DashRow({ item }: { item: DashLaneItem }) {
       <p className="text-small break-words text-ink-muted">{item.goalTitle}</p>
       {item.needs ? (
         <p className="text-small break-words text-caution">Needs you: {item.needs}</p>
-      ) : item.working ? (
-        <p className="inline-flex items-center gap-1 text-small text-ink">
-          <DashMark state="working" activity="writing" size="2xs" tone="brand" decorative />
-          {item.kind === 'preparing' ? 'Preparing it for you now' : 'Working on it now'}
-        </p>
       ) : (
-        <p className="text-small text-ink-muted">Queued for Dash’s next run</p>
+        // The move, in the words every row uses (plan #1455): Dash is on it
+        // while a run on the step or its goal is going, and With Dash while it
+        // waits for the next one.
+        <p className="text-small">
+          <MoveLabel
+            move={{ state: item.working ? 'dash_working' : 'with_dash' }}
+            title={
+              item.working
+                ? item.kind === 'preparing'
+                  ? 'Dash is preparing this for you now.'
+                  : 'Dash is working on this now.'
+                : 'Queued for Dash’s next run.'
+            }
+          />
+        </p>
       )}
     </li>
   );
@@ -441,9 +451,8 @@ function QuietGoalRow({ offer }: { offer: Extract<DashOffer, { kind: 'goal' }> }
       <p className="text-small break-words text-ink-muted">{offer.reason}</p>
       {state.error && <p className="text-small text-danger">{state.error}</p>}
       {started ? (
-        <p className="inline-flex items-center gap-1 text-small text-ink" role="status">
-          <DashMark state="working" activity="thinking" size="2xs" tone="brand" decorative />
-          Dash is on it
+        <p className="text-small" role="status">
+          <MoveLabel move={{ state: 'dash_working' }} />
         </p>
       ) : (
         <form action={action} className="pt-1">

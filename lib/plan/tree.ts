@@ -848,6 +848,7 @@ function startedBeneath(node: { children?: readonly PlanNode[] }): boolean {
 export const PLAN_MOVES = [
   'resolving',
   'on_you',
+  'working',
   'with_dash',
   'yours',
   'waiting',
@@ -859,13 +860,20 @@ export type PlanMove = (typeof PLAN_MOVES)[number];
 /**
  * What the move cannot be worked out from the tree alone.
  *
- * `resolving` is the only one: a re-shape is a run against a feature, and a
- * run is a row in another table. Passed in as the ids rather than read here,
- * because this file is pure and the page is what holds the runs.
+ * Both come from the runs: a re-shape is a run against a feature, a session
+ * building a step is a run against the step, and a run is a row in another
+ * table. Passed in as the ids rather than read here, because this file is
+ * pure and the page is what holds the runs.
  */
 export type MoveContext = {
   /** Feature ids a re-shape is running against right now. */
   resolving?: ReadonlySet<string>;
+  /**
+   * Claimed steps whose session is working now (plan #1455): the claim reads
+   * `working` or `claimed` against its last run (lib/plan/liveness.ts). A
+   * claim gone quiet or abandoned is not here, and stays with Dash.
+   */
+  working?: ReadonlySet<string>;
 };
 
 /**
@@ -880,6 +888,7 @@ export type MoveContext = {
 const MOVE_RANK: readonly PlanMove[] = [
   'resolving',
   'on_you',
+  'working',
   'with_dash',
   'yours',
   'waiting',
@@ -909,7 +918,11 @@ function ownMove(node: MoveInput, context?: MoveContext): PlanMove {
   // read before the status -- a step you kept and then began is still yours,
   // not with a session.
   if (node.assignee === 'me') return 'yours';
-  if (node.status === 'in_progress') return 'with_dash';
+  // Claimed: a session is on it now while its run is going, and otherwise it
+  // is Dash's but nothing is reporting from it.
+  if (node.status === 'in_progress') {
+    return context?.working?.has(node.id) ? 'working' : 'with_dash';
+  }
   // Approved, ready, nothing on it. The runner will fire it when it reaches
   // it, and until then there is no move to report.
   return 'none';

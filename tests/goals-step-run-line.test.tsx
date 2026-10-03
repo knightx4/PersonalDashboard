@@ -127,7 +127,7 @@ function rowOf(id: string, next: string | null): string {
 describe('a sent step read with the page', () => {
   it('shows a running run and what it is on now', () => {
     const row = rowOf('draft', 'compare');
-    expect(row).toContain('Dash is on this');
+    expect(row).toContain('Dash is on it');
     expect(row).toContain('on Reading the loan statements, 3 minutes ago');
     expect(row).toContain('/goals/runs/run-draft');
   });
@@ -141,12 +141,12 @@ describe('a sent step read with the page', () => {
   it('shows what a finished run did', () => {
     const row = rowOf('rates', 'untouched');
     expect(row).toContain('Wrote the three current rates into the result.');
-    expect(row).not.toContain('Dash is on this');
+    expect(row).not.toContain('Dash is on it');
   });
 
   it('says nothing on a step no run was on', () => {
     const row = rowOf('untouched', null);
-    expect(row).not.toContain('Dash is on this');
+    expect(row).not.toContain('Dash is on it');
     expect(row).not.toContain('Last run');
     expect(row).not.toContain('did not finish');
   });
