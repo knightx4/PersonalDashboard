@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { emptyLinkerCounters, type DomainLinker } from '@/lib/core/inbox/fan-out';
+import { recordScheduled } from '@/lib/core/scheduled-actions';
 import { JEV_CONFIDENCE_FLOOR } from '@/lib/jev/decide';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
@@ -25,7 +26,16 @@ import {
  *
  * It claims nothing and fetches no bodies. For an account that has not agreed
  * to Jev there is no pile to read, so it does nothing.
+ *
+ * Each task it files is recorded as Dash's for Home (plan #1577), with an
+ * Undo that removes the task. The thread stays judged, so an undone task is
+ * not filed again on the next pass.
  */
+
+/** The sentence Home reads for a reply task. */
+export function replyTaskSummary(title: string): string {
+  return `Dash added "${title}" to Todo, for an email waiting on your answer.`;
+}
 
 /** Threads filed in one pass at most. */
 const FILE_LIMIT = 20;
@@ -54,8 +64,15 @@ export async function fileReplyTasks(
       p_body: skip ? null : replyTaskBody(candidate),
     });
     if (fileError) throw new Error(`reply task failed: ${fileError.message}`);
-    if (taskId) filed += 1;
-    else skipped += 1;
+    if (taskId) {
+      filed += 1;
+      await recordScheduled(todo, opts.userId, {
+        kind: 'file_reply_task',
+        subjectRef: `todo.tasks:${taskId as string}`,
+        op: 'insert',
+        summary: replyTaskSummary(replyTaskTitle(candidate)),
+      });
+    } else skipped += 1;
   }
   return { filed, skipped };
 }

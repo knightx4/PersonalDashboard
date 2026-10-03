@@ -11,7 +11,7 @@ import { gmailProvider } from '@/lib/email/providers/gmail';
 import type { MessageEnvelope } from '@/lib/core/inbox/envelopes';
 import { attachBookDetailsForInventory } from '@/lib/books/attach-order-books';
 import { buildEmailOrder } from '@/lib/orders/create-email-order';
-import { recordOrderImport } from '@/lib/orders/record';
+import { recordLifecycleChange, recordOrderImport } from '@/lib/orders/record';
 import { applyLifecycleToOrder } from '@/lib/orders/apply-lifecycle';
 import { findOrderForLifecycleEmail } from '@/lib/orders/find-for-lifecycle';
 import {
@@ -200,6 +200,10 @@ async function handleLifecycleMessage(
     error: null,
   });
   counters.messagesParsed += 1;
+
+  // What the email changed on the order, for Home (plan #1577). After the
+  // verdict, the last write this email makes.
+  if (applied.change) await recordLifecycleChange(supabase, userId, order.id, applied.change);
 }
 
 async function handleOrderConfirmation(
