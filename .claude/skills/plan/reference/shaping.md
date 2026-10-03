@@ -227,15 +227,33 @@ something the person decided.
      should make one feature. If it really makes two, link the first and name
      both in the report.
 
-7. **Shape a replacement** as one feature with its steps, all `proposed`,
-   whose detail says in its first sentence what it replaces and, in its
-   last, that it comes back for approval because overhauls cannot yet be held
-   at their design. Link it to the change as in step 6. Decision #1508 chose
-   to approve a replacement with the change except for one stop: its build
-   steps wait until the person has tried the design in one workspace and
-   accepted it. That stop needs the overhaul track (plan #1511), and the
-   shaping for it is plan #1527, which replaces this step when it lands.
-   Until then a proposed feature is the nearest honest form of the stop.
+7. **Shape a replacement** as an approved overhaul held at its design
+   (plan #1527). Decision #1508 approved a replacement with the change except
+   for one stop: nothing of its phases is written or built until the person
+   has tried the design on one workspace and accepted it. So the overhaul
+   starts with three rows and no more, written by one script:
+
+   ```
+   npx tsx scripts/overhaul-opening.ts --user <user> --module <m> \
+     --spec docs/<file> --change <id> --workspace "<the workspace to move first>" \
+     --title "<the overhaul>" --detail "<vision line, the change sentence, what it replaces>" \
+     --done-when "<the overhaul's done-when>"
+   ```
+
+   It prints the statements that write the feature (`track = 'overhaul'`,
+   not started, stamped with your session), the design session, the
+   person's try-it step (a setup step of theirs, waiting on the design), and
+   the step that writes the phases, which waits on the try-it step and the
+   design. It also links the change to the feature. Pass the statements to
+   the connector in order, or add `--write` where `DATABASE_URL` is set. Leave
+   `--workspace` out when the spec does not name one, and the design session
+   takes the smallest workspace the change touches.
+
+   The detail follows step 6: the vision line, then `From the spec change
+   "<title>", approved on <date>.`, then what the change replaces. Write
+   nothing else under the overhaul: its phases come from the Contract the
+   design session writes, by the third row, after the person accepts the
+   design. `overhaul.md` is how the overhaul's own run works the three.
 8. **Report** the commit on main, the change marked applied, and every row
    you wrote by number and title, or which of steps 1 to 3 stopped the run
    and why.
