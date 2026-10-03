@@ -110,6 +110,9 @@ export type JudgePassResult = {
 const SELECT =
   'id, user_id, video_id, summary, key_points, item:catalogue_items!watch_list_item_id_fkey(title, author, description, duration_seconds, provider:catalogue_providers!catalogue_items_provider_id_fkey(name))';
 
+/** How a core.dash_actions record names a watch-list row. */
+const WATCH_LIST_REF = 'learn.watch_list:';
+
 function toVideo(row: ListRow): ListVideo | null {
   if (!row.item) return null;
   const provider = Array.isArray(row.item.provider) ? row.item.provider[0] : row.item.provider;
@@ -132,7 +135,40 @@ async function listVideos(learn: LearnSupabaseClient, screened: boolean): Promis
   query = screened ? query.not('screened_at', 'is', null) : query.is('screened_at', null);
   const { data, error } = await query.order('added_at', { ascending: false });
   if (error) throw new Error(`Reading the list to judge failed: ${error.message}`);
-  return ((data ?? []) as unknown as ListRow[]).map(toVideo).filter((video): video is ListVideo => video !== null);
+  const videos = ((data ?? []) as unknown as ListRow[]).map(toVideo).filter((video): video is ListVideo => video !== null);
+  const putBack = await putBackRows(learn, [...new Set(videos.map((video) => video.userId))]);
+  return videos.filter((video) => !putBack.has(video.rowId));
+}
+
+/**
+ * The watch-list rows whose skip you put back from Home (plan #1574). Undo
+ * returns the row to no verdict, so without this the next run would judge it
+ * again and most likely skip it again. These rows are left out of both passes
+ * and stay on your list unjudged, with no call spent on them; your own verdict
+ * on one still stands, since a row with a verdict is never listed.
+ *
+ * Read from core.dash_actions through the service client's `schema`. When the
+ * read fails the run goes on without it, logged, as the records themselves do.
+ */
+async function putBackRows(learn: LearnSupabaseClient, userIds: string[]): Promise<Set<string>> {
+  const rows = new Set<string>();
+  if (userIds.length === 0) return rows;
+  try {
+    const { data, error } = await learn
+      .schema('core')
+      .from('dash_actions')
+      .select('subject_ref')
+      .in('user_id', userIds)
+      .eq('kind', 'skip_video')
+      .eq('status', 'undone');
+    if (error) throw new Error(error.message);
+    for (const { subject_ref } of (data ?? []) as { subject_ref: string | null }[]) {
+      if (subject_ref?.startsWith(WATCH_LIST_REF)) rows.add(subject_ref.slice(WATCH_LIST_REF.length));
+    }
+  } catch (error) {
+    console.error('[video judge] could not read the skips put back', error);
+  }
+  return rows;
 }
 
 /** What Learn knows about one person: tracks and where they are, open Goals, Learn now ideas. */
@@ -244,7 +280,7 @@ async function transcriptStatuses(learn: LearnSupabaseClient, videoIds: string[]
  */
 async function writeRow(learn: LearnSupabaseClient, video: ListVideo, update: Record<string, unknown>): Promise<void> {
   const skip = update.verdict === 'skip';
-  const ref = `learn.watch_list:${video.rowId}`;
+  const ref = `${WATCH_LIST_REF}${video.rowId}`;
   const before = skip ? await scheduledBefore(learn, video.userId, ref) : null;
   const { data, error } = await learn
     .from('watch_list')

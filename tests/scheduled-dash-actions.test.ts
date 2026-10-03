@@ -12,7 +12,8 @@
  *   /api/cron/jd-backfill and the daily cron's jd-backfill stage
  *   /api/cron/daily: the claim sweep, the night digest's ideas and the
  *   morning goals run's held steps
- *   /api/cron/youtube-library: the skip verdicts on the watch list (plan #1572)
+ *   /api/cron/youtube-library: the skip verdicts on the watch list (plan #1572),
+ *   and a skip put back from Home staying put back (plan #1574)
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { SchemaClient } from '@/lib/ask/db';
@@ -428,6 +429,50 @@ describe('the YouTube library (/api/cron/youtube-library)', () => {
     const undone = await undoDashAction(fakeDashDeps(tables, USER), String(rows[0].id));
     expect(undone.ok).toBe(true);
     expect(tables['learn.watch_list'][1]).toMatchObject({ verdict: null, judge_verdict: null, verdict_by: null, screened_at: null });
+  });
+
+  it('leaves a skip you put back from Home unskipped on later runs (plan #1574)', async () => {
+    const tables: FakeTables = {
+      'learn.watch_list': [
+        listRow('wl-1', 'aaaaaaaaaaa', 'Cash flow in ten minutes'),
+        listRow('wl-2', 'bbbbbbbbbbb', 'Minecraft speedrun'),
+      ],
+      'learn.video_transcripts': [],
+    };
+    const run = (create: () => Promise<unknown>) =>
+      judgeWatchLists(serviceClient(tables, 'learn') as never, {
+        anthropicApiKey: 'k',
+        deadline: Date.now() + 60_000,
+        client: { messages: { create } } as never,
+        profileFor: async () => ({ tracks: [], goals: [], ideas: [] }) as never,
+        now: () => new Date('2026-10-03T06:00:00Z'),
+      });
+
+    await run(anthropic.messages.create);
+    const [skip] = records(tables);
+    expect((await undoDashAction(fakeDashDeps(tables, USER), String(skip.id))).ok).toBe(true);
+
+    // The next two runs would skip it again if they were asked.
+    const again = vi.fn(async () => ({
+      content: [
+        {
+          type: 'tool_use',
+          name: 'report_screen',
+          input: { videos: [{ number: 1, decision: 'skip', why: 'Touches none of your tracks.' }] },
+        },
+      ],
+      stop_reason: 'tool_use',
+      usage: { input_tokens: 500, output_tokens: 80 },
+    }));
+    for (let i = 0; i < 2; i++) {
+      const result = await run(again);
+      expect(result.skipped).toBe(0);
+    }
+
+    expect(again).not.toHaveBeenCalled();
+    expect(tables['learn.watch_list'][1]).toMatchObject({ verdict: null, verdict_by: null, left_playlist_at: null });
+    expect(records(tables)).toHaveLength(1);
+    expect(records(tables)[0]).toMatchObject({ status: 'undone' });
   });
 
   it('records nothing when you set the verdict while the run was working', async () => {
