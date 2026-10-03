@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { swipeAxis, swipeFarEnough } from '@/lib/news/quick/swipe';
+import { swipeAxis, swipeBackFarEnough, swipeFarEnough } from '@/lib/news/quick/swipe';
 
 describe('swipeAxis', () => {
   it('waits until the drag has moved past the slop', () => {
@@ -18,8 +18,24 @@ describe('swipeAxis', () => {
     expect(swipeAxis(-30, -30)).toBe('page');
   });
 
-  it('leaves a drag to the right to the page', () => {
+  it('leaves a drag to the right to the page when there is nothing to go back to', () => {
     expect(swipeAxis(40, 0)).toBe('page');
+  });
+
+  it('claims a drag mostly to the right as back once there is a card behind', () => {
+    expect(swipeAxis(40, 0, true)).toBe('back');
+    expect(swipeAxis(12, -3, true)).toBe('back');
+    expect(swipeAxis(30, 30, true)).toBe('page');
+    expect(swipeAxis(-12, 3, true)).toBe('swipe');
+  });
+});
+
+describe('swipeBackFarEnough', () => {
+  it('needs a third of the card, to the right', () => {
+    expect(swipeBackFarEnough(119, 360)).toBe(false);
+    expect(swipeBackFarEnough(120, 360)).toBe(true);
+    expect(swipeBackFarEnough(-200, 360)).toBe(false);
+    expect(swipeBackFarEnough(50, 0)).toBe(false);
   });
 });
 

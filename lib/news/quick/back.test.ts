@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BACK_PAGES, parseBack, pushBack } from './back';
+import { BACK_PAGES, parseBack, passKey, pushBack } from './back';
 
 const page = (n: number) => [{ issueId: `issue-${n}`, storyIndex: n }];
 
@@ -25,5 +25,16 @@ describe('the Previous page stack', () => {
 
   it('does not push an empty page', () => {
     expect(pushBack([page(1)], [])).toEqual([page(1)]);
+  });
+});
+
+describe('passKey', () => {
+  it('names a page by its passes in order', () => {
+    expect(
+      passKey([
+        { issueId: 'a', storyIndex: 0 },
+        { issueId: 'b', storyIndex: 3 },
+      ]),
+    ).toBe('a:0,b:3');
   });
 });
