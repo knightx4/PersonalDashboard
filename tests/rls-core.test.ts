@@ -23,6 +23,13 @@ let accountA = '';
 let messageA = '';
 let personA = '';
 
+/** A ref to a new row of the account's own, for evidence that must name one. */
+async function ownRef(userId: string): Promise<string> {
+  const [task] = await admin<{ id: string }[]>`
+    insert into todo.tasks (user_id, title) values (${userId}, 'Return the parcel') returning id`;
+  return `todo.tasks:${task.id}`;
+}
+
 async function seedMessage(
   accountId: string,
   providerId: string,
@@ -149,10 +156,12 @@ describe('observations', () => {
    * sentence and its evidence are what the verdict is about.
    */
   async function seedObservation(userId: string, week: string): Promise<string> {
+    // Evidence has to name rows of the account's own (0156).
+    const evidence = [await ownRef(userId), await ownRef(userId)];
     const [row] = await admin<{ id: string }[]>`
       insert into core.observations (user_id, week, position, sentence, evidence, modules, model)
       values (${userId}, ${week}, 1, 'You placed 2 orders in the 3 days after a rejection.',
-              ${['job_search.application_events:a', 'public.orders:b']}, ${['shopping', 'jobs']},
+              ${evidence}, ${['shopping', 'jobs']},
               'claude-sonnet-5')
       returning id`;
     return row.id;
@@ -208,11 +217,12 @@ describe('year reviews', () => {
    * written after its year ended is kept as it is, by the trigger.
    */
   async function writeReview(userId: string, year: number, complete: boolean) {
+    const paragraphs = JSON.stringify([{ topic: 'todo', text: 'You closed 3 tasks.', evidence: [await ownRef(userId)] }]);
     return asUser(
       userId,
       (tx) => tx`insert into core.year_reviews (user_id, year, timezone, through, complete, events, totals, paragraphs, model)
                  values (${userId}, ${year}, 'UTC', now(), ${complete}, 25, '{}'::jsonb,
-                         '[{"topic":"shopping","text":"You placed 3 orders.","evidence":["public.orders:a"]}]'::jsonb,
+                         ${paragraphs}::text::jsonb,
                          'claude-sonnet-5')
                  returning id`,
     );

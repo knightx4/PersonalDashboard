@@ -16,9 +16,11 @@ let goalA = '';
 let goalB = '';
 
 async function newFile(userId: string, title = 'Applications by role family'): Promise<string> {
+  // The origin has to be a row of the file's own account (0156).
+  const origin = `goals.items:${userId === userB ? goalB : goalA}`;
   const [row] = await admin<{ id: string }[]>`
     insert into core.files (user_id, title, body, made_by, origin)
-    values (${userId}, ${title}, '283 applications since March.', 'claude', ${`goals.items:${goalA}`})
+    values (${userId}, ${title}, '283 applications since March.', 'claude', ${origin})
     returning id`;
   return row.id;
 }
