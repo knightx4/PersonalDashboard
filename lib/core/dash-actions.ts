@@ -199,7 +199,77 @@ type Dependent = {
    * items, which hang off its order items.
    */
   through?: { schema: AskSchema; table: string; column: string }[];
+  /**
+   * Only rows created after the change was recorded count. For a child the
+   * same run writes alongside the row, such as the event the mail sync files
+   * on the application it has just made: that one goes with it, and one a
+   * later email files is later work. The run records its change after the
+   * last of its own writes, so its rows are always older than the record.
+   */
+  since?: true;
 };
+
+/** Each dependent, reached from the subject by way of `hop` first. */
+function under(hop: { schema: AskSchema; table: string; column: string }, dependents: Dependent[]): Dependent[] {
+  return dependents.map((dependent) => ({ ...dependent, through: [hop, ...(dependent.through ?? [])] }));
+}
+
+const JOB = 'job_search' as const;
+
+/** What hangs off an interview: the person's notes, files and tasks, and who is on it. */
+const INTERVIEW_DEPENDENTS: Dependent[] = [
+  ...(['notes', 'attachments'] as const).map((table) => ({ schema: JOB, table, column: 'interview_id' })),
+  { schema: 'todo', table: 'task_links', column: 'interview_id' },
+  { schema: JOB, table: 'interview_participants', column: 'interview_id', since: true },
+];
+
+/** What hangs off a round of interviews. */
+const INTERVIEW_GROUP_DEPENDENTS: Dependent[] = [
+  { schema: JOB, table: 'interviews', column: 'group_id', since: true },
+  { schema: JOB, table: 'interview_group_messages', column: 'group_id' },
+  ...under({ schema: JOB, table: 'interviews', column: 'group_id' }, INTERVIEW_DEPENDENTS),
+];
+
+/**
+ * What hangs off an application. The events, rounds and interviews the mail
+ * sync writes with it count only when they came later; the rest are only
+ * ever the person's or a later run's.
+ */
+const APPLICATION_DEPENDENTS: Dependent[] = [
+  ...(['application_events', 'interview_groups', 'interviews'] as const).map((table) => ({
+    schema: JOB,
+    table,
+    column: 'application_id',
+    since: true as const,
+  })),
+  ...(
+    [
+      'notes',
+      'attachments',
+      'cover_letters',
+      'application_answers',
+      'reminders',
+      'message_link_dismissals',
+      'quiet_dismissals',
+    ] as const
+  ).map((table) => ({ schema: JOB, table, column: 'application_id' })),
+  { schema: 'todo', table: 'task_links', column: 'application_id' },
+  ...under({ schema: JOB, table: 'application_events', column: 'application_id' }, [
+    { schema: JOB, table: 'waiting_dismissals', column: 'application_event_id' },
+  ]),
+  ...under({ schema: JOB, table: 'interview_groups', column: 'application_id' }, [
+    { schema: JOB, table: 'interview_group_messages', column: 'group_id' },
+  ]),
+  ...under({ schema: JOB, table: 'interviews', column: 'application_id' }, INTERVIEW_DEPENDENTS),
+];
+
+/** What hangs off a role: a second application, and everything on its applications. */
+const ROLE_DEPENDENTS: Dependent[] = [
+  { schema: JOB, table: 'applications', column: 'role_id', since: true },
+  ...(['notes', 'attachments'] as const).map((table) => ({ schema: JOB, table, column: 'role_id' })),
+  { schema: 'todo', table: 'task_links', column: 'role_id' },
+  ...under({ schema: JOB, table: 'applications', column: 'role_id' }, APPLICATION_DEPENDENTS),
+];
 
 const DEPENDENTS: Record<string, Dependent[]> = {
   'public.plan_items': [
@@ -267,6 +337,27 @@ const DEPENDENTS: Record<string, Dependent[]> = {
       through: ORDER_INVENTORY,
     })),
     { schema: 'todo', table: 'task_links', column: 'inventory_item_id', through: ORDER_INVENTORY },
+  ],
+  // What the mail sync files in the job search (plan #1575). A company or a
+  // role it adds is one change with the application, events and interviews
+  // the same email made; anything written on them since is later work.
+  'job_search.companies': [
+    { schema: JOB, table: 'roles', column: 'company_id', since: true },
+    ...(['notes', 'attachments'] as const).map((table) => ({ schema: JOB, table, column: 'company_id' })),
+    { schema: 'todo', table: 'task_links', column: 'company_id' },
+    ...under({ schema: JOB, table: 'roles', column: 'company_id' }, ROLE_DEPENDENTS),
+  ],
+  'job_search.roles': ROLE_DEPENDENTS,
+  'job_search.interview_groups': INTERVIEW_GROUP_DEPENDENTS,
+  'job_search.contacts': [
+    { schema: JOB, table: 'interview_participants', column: 'contact_id', since: true },
+    ...(['notes', 'attachments', 'contact_touches', 'reminders', 'suggestions'] as const).map((table) => ({
+      schema: JOB,
+      table,
+      column: 'contact_id',
+    })),
+    { schema: 'todo', table: 'task_links', column: 'contact_id' },
+    { schema: JOB, table: 'applications', column: 'referral_contact_id' },
   ],
 };
 
@@ -442,10 +533,10 @@ export async function readSubject(db: AskDb, ref: string): Promise<Values | null
 }
 
 /** Whether anything has been written on the row since Dash added it. */
-async function hasDependents(db: AskDb, ref: string): Promise<boolean> {
+async function hasDependents(db: AskDb, ref: string, recordedAt: string): Promise<boolean> {
   const parsed = parseRef(ref);
   const dependents = parsed ? (DEPENDENTS[parsed.table] ?? []) : [];
-  for (const { schema, table, column, through } of dependents) {
+  for (const { schema, table, column, through, since } of dependents) {
     let ids = [parsed!.id];
     for (const hop of through ?? []) {
       const { data, error } = await (await db(hop.schema)).from(hop.table).select('id').in(hop.column, ids);
@@ -456,7 +547,8 @@ async function hasDependents(db: AskDb, ref: string): Promise<boolean> {
     if (ids.length === 0) continue;
     const client = await db(schema);
     const query = client.from(table).select('id');
-    const { data, error } = await (through ? query.in(column, ids) : query.eq(column, ids[0])).limit(1);
+    const narrowed = through ? query.in(column, ids) : query.eq(column, ids[0]);
+    const { data, error } = await (since ? narrowed.gt('created_at', recordedAt) : narrowed).limit(1);
     if (error) throw new Error(`Reading what hangs off ${ref} failed: ${error.message}`);
     if ((data ?? []).length > 0) return true;
   }
@@ -540,7 +632,7 @@ export async function undoDashAction(
   const decided = planUndo(action, current, later, fromAsk);
   if (!decided.ok) return { ok: false, error: decided.reason, action };
 
-  if (decided.plan.op === 'delete' && (await hasDependents(deps.db, ref!))) {
+  if (decided.plan.op === 'delete' && (await hasDependents(deps.db, ref!, action.createdAt))) {
     return {
       ok: false,
       error: 'Something has been added to it since, so undoing would lose that too.',

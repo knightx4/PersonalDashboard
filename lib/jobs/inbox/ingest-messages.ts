@@ -40,6 +40,8 @@ import {
 import { parseIcs, primaryEvent } from '@/lib/jobs/calendar/ics';
 import { interviewFromInvite, inviteSupersedes, type InviteInterview } from '@/lib/jobs/calendar/invite';
 import { pairSlots } from '@/lib/jobs/calendar/slots';
+import { scheduledChanged } from '@/lib/core/scheduled-actions';
+import { JobRecorder, jobRef } from '@/lib/jobs/inbox/record';
 
 
 /** Parallel Gmail metadata fetches — well under the per-user rate quota. */
@@ -255,6 +257,13 @@ async function writeEvent(
     invite: InviteInterview | null;
     /** The connected mailbox: you are not one of your own contacts. */
     accountEmail: string | null;
+    /** Where this email's changes are recorded as Dash's (plan #1575). */
+    rec: JobRecorder;
+    /**
+     * Whether this email made the pursuit. Its event and interviews then go
+     * with the pursuit's own record rather than one each.
+     */
+    fresh: boolean;
   },
 ): Promise<void> {
   const kind = eventKindFor(opts.classification);
@@ -278,7 +287,7 @@ async function writeEvent(
     ? invite.interviewerNames
     : (opts.extracted?.interviewerNames ?? []);
 
-  await supabase.from('application_events').insert({
+  const { data: event } = await supabase.from('application_events').insert({
     user_id: opts.userId,
     application_id: opts.applicationId,
     kind,
@@ -313,7 +322,15 @@ async function writeEvent(
     // pursuit the app believes is closed means the app is probably wrong. A
     // second rejection is an echo, and an echo is not a decision.
     needs_review: !legal && unappliedEventNeedsReview(kind),
-  });
+  })
+    .select('id')
+    .maybeSingle();
+
+  // The status moves by trigger from the events, so deleting this one on an
+  // undo puts the status back as well.
+  if (event?.id && !opts.fresh) {
+    opts.rec.eventFiled({ eventId: event.id as string, applicationId: opts.applicationId, statusBefore: status });
+  }
 
   // Whoever wrote it, if a person wrote it. Contacts and interview
   // participants were both empty after six months because both were things
@@ -330,6 +347,8 @@ async function writeEvent(
       userId: opts.userId,
       companyId: await companyForApplication(supabase, opts.applicationId),
       contact: sender,
+      rec: opts.rec,
+      interviewFor: null,
     });
   }
 
@@ -343,6 +362,7 @@ async function writeEvent(
     applicationId: opts.applicationId,
     names: opts.extracted?.interviewerNames ?? [],
     dates: opts.extracted?.dates ?? [],
+    rec: opts.rec,
   });
 
   if (!legal) return;
@@ -357,6 +377,8 @@ async function writeEvent(
       invite,
       fallbackKind: interviewKind,
       namedInterviewers: contactsFromNames(opts.extracted?.interviewerNames ?? []),
+      rec: opts.rec,
+      fresh: opts.fresh,
     });
     return;
   }
@@ -389,9 +411,15 @@ async function writeEvent(
       await recordParticipants(supabase, {
         userId: opts.userId,
         companyId: await companyForApplication(supabase, opts.applicationId),
+        applicationId: opts.applicationId,
         interviewId: created.id as string,
+        interviewFresh: true,
         people: contactsFromNames(namesForSlot(opts.extracted, interviewDate)),
+        rec: opts.rec,
       });
+      if (!opts.fresh) {
+        opts.rec.interviewBooked({ groupId, interviewId: created.id as string, applicationId: opts.applicationId });
+      }
     }
   }
 }
@@ -453,6 +481,7 @@ async function attachNamedInterviewers(
     applicationId: string;
     names: readonly string[];
     dates: NonNullable<ExtractedMessage['dates']>;
+    rec: JobRecorder;
   },
 ): Promise<void> {
   const slots = opts.dates.filter((date) => date.kind === 'interview');
@@ -484,8 +513,11 @@ async function attachNamedInterviewers(
     await recordParticipants(supabase, {
       userId: opts.userId,
       companyId,
+      applicationId: opts.applicationId,
       interviewId: pair.interviewId,
+      interviewFresh: false,
       people: contactsFromNames(names),
+      rec: opts.rec,
     });
   }
 }
@@ -518,6 +550,9 @@ async function applyInvite(
     fallbackKind: string | null;
     /** People the covering note named, where the attendees are the robot. */
     namedInterviewers: readonly CandidateContact[];
+    rec: JobRecorder;
+    /** Whether this email made the pursuit; see writeEvent. */
+    fresh: boolean;
   },
 ): Promise<void> {
   const { invite } = opts;
@@ -549,12 +584,24 @@ async function applyInvite(
     if (!inviteSupersedes(invite, { icsSequence: existing.data.ics_sequence as number | null })) {
       return;
     }
-    await supabase.from('interviews').update(patch).eq('id', existing.data.id);
+    const interviewId = existing.data.id as string;
+    const before = await opts.rec.before('interviews', interviewId);
+    const { data: updated } = await supabase.from('interviews').update(patch).eq('id', interviewId).select('id');
+    // A redelivery of the same invite rewrites the row with what it held.
+    if (
+      (updated ?? []).length > 0 &&
+      (await scheduledChanged(supabase, opts.userId, jobRef('interviews', interviewId), before))
+    ) {
+      opts.rec.interviewChanged({ interviewId, applicationId: opts.applicationId, before });
+    }
     await recordParticipants(supabase, {
       userId: opts.userId,
       companyId,
-      interviewId: existing.data.id as string,
+      applicationId: opts.applicationId,
+      interviewId,
+      interviewFresh: false,
       people: [...contactsFromInvite(invite), ...opts.namedInterviewers],
+      rec: opts.rec,
     });
     return;
   }
@@ -586,9 +633,15 @@ async function applyInvite(
     await recordParticipants(supabase, {
       userId: opts.userId,
       companyId,
+      applicationId: opts.applicationId,
       interviewId: created.id as string,
+      interviewFresh: true,
       people: [...contactsFromInvite(invite), ...opts.namedInterviewers],
+      rec: opts.rec,
     });
+    if (!opts.fresh) {
+      opts.rec.interviewBooked({ groupId, interviewId: created.id as string, applicationId: opts.applicationId });
+    }
   }
 }
 
@@ -620,8 +673,15 @@ async function companyForApplication(
  */
 async function upsertContact(
   supabase: AppSupabaseClient,
-  opts: { userId: string; companyId: string | null; contact: CandidateContact },
-): Promise<string | null> {
+  opts: {
+    userId: string;
+    companyId: string | null;
+    contact: CandidateContact;
+    rec: JobRecorder;
+    /** The application whose interview named them, or null for a sender. */
+    interviewFor: string | null;
+  },
+): Promise<{ id: string; created: boolean } | null> {
   const { contact } = opts;
   const email = contact.email?.toLowerCase() ?? null;
 
@@ -635,10 +695,18 @@ async function upsertContact(
       .maybeSingle();
 
     if (byName?.id) {
+      const contactId = byName.id as string;
       if (email && !byName.email) {
-        await supabase.from('contacts').update({ email }).eq('id', byName.id);
+        const before = await opts.rec.before('contacts', contactId);
+        const { data: filled } = await supabase
+          .from('contacts')
+          .update({ email })
+          .eq('id', contactId)
+          .is('email', null)
+          .select('id');
+        if ((filled ?? []).length > 0) opts.rec.contactEmailAdded({ contactId, email, before });
       }
-      return byName.id as string;
+      return { id: contactId, created: false };
     }
   }
 
@@ -649,7 +717,7 @@ async function upsertContact(
       .eq('user_id', opts.userId)
       .eq('email', email)
       .maybeSingle();
-    if (byEmail?.id) return byEmail.id as string;
+    if (byEmail?.id) return { id: byEmail.id as string, created: false };
   }
 
   const { data: created, error } = await supabase
@@ -665,7 +733,14 @@ async function upsertContact(
     .select('id')
     .maybeSingle();
 
-  if (created?.id) return created.id as string;
+  if (created?.id) {
+    opts.rec.contactAdded({
+      contactId: created.id as string,
+      companyId: opts.companyId,
+      interviewFor: opts.interviewFor,
+    });
+    return { id: created.id as string, created: true };
+  }
 
   // Lost a race against another message from the same person in this batch.
   // Both unique keys are partial, so which one caught it depends on the row.
@@ -684,7 +759,7 @@ async function upsertContact(
           .eq('company_id', opts.companyId ?? '')
           .ilike('full_name', contact.fullName)
           .maybeSingle();
-    return (raced?.id as string) ?? null;
+    return raced?.id ? { id: raced.id as string, created: false } : null;
   }
 
   return null;
@@ -696,25 +771,42 @@ async function recordParticipants(
   opts: {
     userId: string;
     companyId: string | null;
+    applicationId: string;
     interviewId: string;
+    /**
+     * Whether this email booked the interview. Its panel then goes with the
+     * interview's record rather than one record per person.
+     */
+    interviewFresh: boolean;
     /** The invite's attendees, the body's named panel, or both. */
     people: readonly CandidateContact[];
+    rec: JobRecorder;
   },
 ): Promise<void> {
   for (const person of opts.people) {
-    const contactId = await upsertContact(supabase, {
+    const contact = await upsertContact(supabase, {
       userId: opts.userId,
       companyId: opts.companyId,
       contact: person,
+      rec: opts.rec,
+      interviewFor: opts.applicationId,
     });
-    if (!contactId) continue;
+    if (!contact) continue;
 
-    await supabase
+    // Only a row that was not there comes back, so a person already on the
+    // interview records nothing. A contact this email added takes its place
+    // on the interview with it.
+    const { data: added } = await supabase
       .from('interview_participants')
       .upsert(
-        { interview_id: opts.interviewId, contact_id: contactId, role: 'interviewer' },
+        { interview_id: opts.interviewId, contact_id: contact.id, role: 'interviewer' },
         { onConflict: 'interview_id,contact_id', ignoreDuplicates: true },
-      );
+      )
+      .select('id');
+    const participantId = (added ?? [])[0]?.id as string | undefined;
+    if (participantId && !contact.created && !opts.interviewFresh) {
+      opts.rec.participantAdded({ participantId, contactId: contact.id, interviewId: opts.interviewId });
+    }
   }
 }
 
@@ -762,7 +854,8 @@ async function resolveCompanyId(
   supabase: AppSupabaseClient,
   userId: string,
   company: LinkCompany,
-): Promise<string | null> {
+  rec: JobRecorder,
+): Promise<{ id: string; created: boolean } | null> {
   if (company.kind === 'existing') {
     // A name match proves the domain belongs to this company just as surely
     // as the domain match below does -- recording it is what lets the next
@@ -776,13 +869,10 @@ async function resolveCompanyId(
         .maybeSingle();
       const domains = (current?.domains as string[] | null) ?? [];
       if (!domains.includes(company.domainToLearn)) {
-        await supabase
-          .from('companies')
-          .update({ domains: [...domains, company.domainToLearn] })
-          .eq('id', company.id);
+        await learnDomain(supabase, rec, company.id, domains, company.domainToLearn);
       }
     }
-    return company.id;
+    return { id: company.id, created: false };
   }
 
   const slug = slugify(company.name);
@@ -799,12 +889,9 @@ async function resolveCompanyId(
     // *next* message from the same employer link by domain instead of guessing.
     const domains = (existing.domains as string[] | null) ?? [];
     if (company.domain && !domains.includes(company.domain)) {
-      await supabase
-        .from('companies')
-        .update({ domains: [...domains, company.domain] })
-        .eq('id', existing.id);
+      await learnDomain(supabase, rec, existing.id as string, domains, company.domain);
     }
-    return existing.id as string;
+    return { id: existing.id as string, created: false };
   }
 
   const { data, error } = await supabase
@@ -826,12 +913,30 @@ async function resolveCompanyId(
       .eq('user_id', userId)
       .eq('slug', slug)
       .maybeSingle();
-    if (raced) return raced.id as string;
+    if (raced) return { id: raced.id as string, created: false };
     console.error('inferred company insert failed', error.message);
     return null;
   }
 
-  return data.id as string;
+  // Recorded by the caller once the role and application are under it.
+  return { id: data.id as string, created: true };
+}
+
+/** Add a domain to a company's list, recorded as Dash's. */
+async function learnDomain(
+  supabase: AppSupabaseClient,
+  rec: JobRecorder,
+  companyId: string,
+  domains: readonly string[],
+  domain: string,
+): Promise<void> {
+  const before = await rec.before('companies', companyId);
+  const { data } = await supabase
+    .from('companies')
+    .update({ domains: [...domains, domain] })
+    .eq('id', companyId)
+    .select('id');
+  if ((data ?? []).length > 0) rec.companyDomainLearned({ companyId, domain, before });
 }
 
 /**
@@ -855,6 +960,9 @@ async function learnBoardHint(
   companyId: string,
   hint: string | null,
   vendor: AtsVendor,
+  rec: JobRecorder,
+  /** A company this email added, whose record already covers this. */
+  freshCompany: boolean,
 ): Promise<void> {
   const knownVendor = isBoardVendor(vendor);
   if (!hint && !knownVendor) return;
@@ -877,7 +985,16 @@ async function learnBoardHint(
   }
   if (Object.keys(patch).length === 0) return;
 
-  await supabase.from('companies').update(patch).eq('id', companyId);
+  const before = freshCompany ? null : await rec.before('companies', companyId);
+  const { data } = await supabase.from('companies').update(patch).eq('id', companyId).select('id');
+  if (!freshCompany && (data ?? []).length > 0) {
+    rec.companyBoardLearned({
+      companyId,
+      hint: (patch.ats_board_hint as string | undefined) ?? null,
+      vendor: (patch.ats_type as string | undefined) ?? null,
+      before,
+    });
+  }
 }
 
 /**
@@ -907,8 +1024,11 @@ async function createInferredApplication(
     seededBy?: MessageClassification;
     /** Whether opening this is a judgement only the user can make. */
     needsReview: boolean;
+    rec: JobRecorder;
+    /** A company this email added, whose record covers whatever is made under it. */
+    freshCompany: boolean;
   },
-): Promise<{ applicationId: string; adopted: boolean } | null> {
+): Promise<{ applicationId: string; roleId: string | null; adopted: boolean } | null> {
   const title = opts.roleTitle?.trim() || PLACEHOLDER_ROLE_TITLE;
 
   const { data: existingRoles } = await supabase
@@ -936,17 +1056,20 @@ async function createInferredApplication(
     // The message that names the role arrives after one that could not. Adopt
     // the placeholder and give it the name, rather than leaving a nameless row
     // beside a named one.
-    await supabase
+    const before = await opts.rec.before('roles', choice.roleId);
+    const { data: renamed } = await supabase
       .from('roles')
       .update({ title, ...(opts.atsJobId ? { ats_job_id: opts.atsJobId } : {}) })
       .eq('id', choice.roleId)
-      .eq('user_id', opts.userId);
+      .eq('user_id', opts.userId)
+      .select('id');
+    if ((renamed ?? []).length > 0) opts.rec.roleRenamed({ roleId: choice.roleId, before });
   }
 
   // Adopted, not created. The caller has to know: an interview invite for a
   // pursuit that already exists is an event that moves it forward, not the
   // birth of a lead.
-  if (choice.kind !== 'create') return { applicationId: choice.applicationId, adopted: true };
+  if (choice.kind !== 'create') return { applicationId: choice.applicationId, roleId: null, adopted: true };
 
   const { data: role, error: roleError } = await supabase
     .from('roles')
@@ -985,6 +1108,10 @@ async function createInferredApplication(
 
   if (error || !application) {
     console.error('inferred application insert failed', error?.message);
+    // The role is there without one, and is still Dash's to put back.
+    if (!opts.freshCompany) {
+      opts.rec.roleAdded({ roleId: role.id as string, applicationId: null, asLead: opts.asLead });
+    }
     return null;
   }
 
@@ -1006,7 +1133,7 @@ async function createInferredApplication(
     });
   }
 
-  return { applicationId: application.id, adopted: false };
+  return { applicationId: application.id, roleId: role.id as string, adopted: false };
 }
 
 export interface IngestContext {
@@ -1245,6 +1372,25 @@ async function handleMessage(
   });
 }
 
+/**
+ * The record for a pursuit this email made: one for the company where the
+ * email added that too, else one for the role. Its application, events and
+ * interviews go with it. An adopted pursuit records nothing here; its event
+ * recorded itself.
+ */
+function recordPursuit(
+  rec: JobRecorder,
+  company: { id: string; created: boolean },
+  pursuit: { applicationId: string; roleId: string | null; adopted: boolean },
+  asLead: boolean,
+): void {
+  if (company.created) {
+    rec.companyAdded({ companyId: company.id, roleId: pursuit.roleId, applicationId: pursuit.applicationId, asLead });
+  } else if (!pursuit.adopted && pursuit.roleId) {
+    rec.roleAdded({ roleId: pursuit.roleId, applicationId: pursuit.applicationId, asLead });
+  }
+}
+
 async function applyDecision(
   supabase: AppSupabaseClient,
   ctx: IngestContext,
@@ -1258,7 +1404,7 @@ async function applyDecision(
     invite: InviteInterview | null;
   },
 ): Promise<void> {
-  const { message, classification, tierA, tierB, decision, coreId, invite } = input;
+  const { message, classification, tierB, coreId } = input;
 
   const ledger = async (
     parseStatus: 'parsed' | 'needs_review' | 'failed',
@@ -1277,6 +1423,40 @@ async function applyDecision(
       parseConfidence: tierB?.confidence ?? null,
       ...extra,
     });
+
+  // Every change this email makes is recorded as Dash's once its writes are
+  // done (plan #1575), including when one of them fails part way.
+  const rec = new JobRecorder(supabase, ctx.userId, classification, ctx.timezone);
+  try {
+    await applyLinkDecision(supabase, ctx, { ...input, rec, ledger });
+  } finally {
+    await rec.flush();
+  }
+}
+
+async function applyLinkDecision(
+  supabase: AppSupabaseClient,
+  ctx: IngestContext,
+  input: {
+    message: FetchedMessage;
+    classification: MessageClassification;
+    tierA: ClassifyResult;
+    tierB: ExtractedMessage | null;
+    decision: LinkDecision;
+    invite: InviteInterview | null;
+    rec: JobRecorder;
+    ledger: (
+      parseStatus: 'parsed' | 'needs_review' | 'failed',
+      extra?: {
+        applicationId?: string | null;
+        linkConfidence?: number | null;
+        linkMethod?: string | null;
+        error?: string | null;
+      },
+    ) => Promise<string | null>;
+  },
+): Promise<void> {
+  const { message, classification, tierA, tierB, decision, invite, rec, ledger } = input;
 
   switch (decision.action) {
     case 'link': {
@@ -1323,6 +1503,8 @@ async function applyDecision(
         message,
         invite,
         accountEmail: ctx.accountEmail,
+        rec,
+        fresh: false,
       });
       ctx.counters.messagesParsed += 1;
       return;
@@ -1339,14 +1521,15 @@ async function applyDecision(
     }
 
     case 'create_inferred_application': {
-      const companyId = await resolveCompanyId(supabase, ctx.userId, decision.company);
-      if (!companyId) {
+      const company = await resolveCompanyId(supabase, ctx.userId, decision.company, rec);
+      if (!company) {
         await ledger('needs_review', { error: 'Could not record the company for this message.' });
         ctx.counters.heldForReview += 1;
         return;
       }
+      const companyId = company.id;
 
-      await learnBoardHint(supabase, companyId, tierA.companyHint, tierA.ats);
+      await learnBoardHint(supabase, companyId, tierA.companyHint, tierA.ats, rec, company.created);
 
       const created = await createInferredApplication(supabase, {
         userId: ctx.userId,
@@ -1363,9 +1546,12 @@ async function applyDecision(
           ats: tierA.ats,
           companyKind: decision.company.kind,
         }),
+        rec,
+        freshCompany: company.created,
       });
 
       if (!created) {
+        if (company.created) rec.companyAdded({ companyId, roleId: null, applicationId: null, asLead: false });
         await ledger('failed', { error: 'Could not create the inferred application.' });
         ctx.counters.errors += 1;
         return;
@@ -1388,7 +1574,10 @@ async function applyDecision(
         message,
         invite,
         accountEmail: ctx.accountEmail,
+        rec,
+        fresh: !created.adopted,
       });
+      recordPursuit(rec, company, created, false);
 
       ctx.counters.applicationsCreated += 1;
       ctx.counters.messagesParsed += 1;
@@ -1396,14 +1585,15 @@ async function applyDecision(
     }
 
     case 'create_lead': {
-      const companyId = await resolveCompanyId(supabase, ctx.userId, decision.company);
-      if (!companyId) {
+      const company = await resolveCompanyId(supabase, ctx.userId, decision.company, rec);
+      if (!company) {
         await ledger('needs_review', { error: 'Could not record the company for this message.' });
         ctx.counters.heldForReview += 1;
         return;
       }
+      const companyId = company.id;
 
-      await learnBoardHint(supabase, companyId, tierA.companyHint, tierA.ats);
+      await learnBoardHint(supabase, companyId, tierA.companyHint, tierA.ats, rec, company.created);
 
       const lead = await createInferredApplication(supabase, {
         userId: ctx.userId,
@@ -1419,9 +1609,12 @@ async function applyDecision(
           ats: tierA.ats,
           companyKind: decision.company.kind,
         }),
+        rec,
+        freshCompany: company.created,
       });
 
       if (!lead) {
+        if (company.created) rec.companyAdded({ companyId, roleId: null, applicationId: null, asLead: true });
         await ledger('failed', { error: 'Could not create the lead.' });
         ctx.counters.errors += 1;
         return;
@@ -1451,6 +1644,8 @@ async function applyDecision(
           message,
           invite,
           accountEmail: ctx.accountEmail,
+          rec,
+          fresh: !lead.adopted,
         });
       } else {
         // Nothing writeEvent would recognize as a status-moving kind, so
@@ -1465,6 +1660,7 @@ async function applyDecision(
           summary: tierB?.summary ?? 'Inbound about a role you have not applied to',
         });
       }
+      recordPursuit(rec, company, lead, true);
 
       ctx.counters.leadsCreated += 1;
       ctx.counters.messagesParsed += 1;
