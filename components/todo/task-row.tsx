@@ -1,6 +1,6 @@
 'use client';
 
-import { useOptimistic, useState, useTransition } from 'react';
+import { useOptimistic, useRef, useState, useTransition } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -44,6 +44,7 @@ import { InlineInput } from '@/components/ui/field';
 import { clockIn, dayIn } from '@/lib/todo/time';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { completionMoment } from '@/components/motion/complete';
+import { putAway } from '@/components/motion/place';
 import { HandToDash } from './hand-to-dash';
 import { TaskAbout } from './task-about';
 import { EditTask } from './task-form';
@@ -183,6 +184,8 @@ export function TaskRow({
   /** Which edge of this row the dragged task would land on, while it is over. */
   const [edge, setEdge] = useState<'top' | 'bottom' | null>(null);
   const toast = useToast();
+  /** The row's glyph, where a finished or set-aside task leaves from. */
+  const glyph = useRef<HTMLButtonElement>(null);
 
   /**
    * The checkbox, the pin and the snooze, drawn before the round trip.
@@ -230,7 +233,20 @@ export function TaskRow({
     });
   }
 
+  /**
+   * Show the task going to where it now lives (plan #1578): All, under the
+   * filter that will find it. The rect is taken before the write, because the
+   * agenda drops the row once the page comes back without it. Nothing plays
+   * on All itself, where the row stays and shows the change.
+   */
+  function sendAway(filter: 'Done' | 'Dropped' | 'Open') {
+    const from = glyph.current?.getBoundingClientRect();
+    return () =>
+      void putAway({ from, href: '/todo/all', label: task.title, name: `All · ${filter}` });
+  }
+
   function complete() {
+    const away = sendAway('Done');
     // Which items the tick took down with it, filled in by the write and read
     // by the undo. The toast is built before the write returns, so the way
     // back cannot be handed the ids -- it is handed the array they land in.
@@ -242,7 +258,10 @@ export function TaskRow({
       write: async () => {
         const result = await completeTask(task.id);
         ticked.push(...result.items);
-        if (!result.error) completionMoment();
+        if (!result.error) {
+          completionMoment();
+          away();
+        }
         return result;
       },
       toast: {
@@ -254,9 +273,14 @@ export function TaskRow({
   }
 
   function drop() {
+    const away = sendAway('Dropped');
     run({
       patch: { status: 'dropped' },
-      write: () => dropTask(task.id),
+      write: async () => {
+        const result = await dropTask(task.id);
+        if (!result.error) away();
+        return result;
+      },
       // reopenTask is the inverse of a drop: bringBackTask undoes a snooze.
       toast: {
         text: 'dropped',
@@ -267,9 +291,14 @@ export function TaskRow({
   }
 
   function later() {
+    const away = sendAway('Open');
     run({
       patch: { snoozedUntil: snoozedFrom(Date.now()) },
-      write: () => laterTask(task.id),
+      write: async () => {
+        const result = await laterTask(task.id);
+        if (!result.error) away();
+        return result;
+      },
       toast: {
         text: 'until later',
         undo: undoWith(() => bringBackTask(task.id)),
@@ -421,6 +450,7 @@ export function TaskRow({
           rather than nothing at all -- it used to be findable only by reading
           the title's strike-through. */}
         <button
+          ref={glyph}
           type="button"
           aria-label={done ? 'Reopen' : 'Mark done'}
           onClick={() =>

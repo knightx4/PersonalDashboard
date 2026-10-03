@@ -6,6 +6,8 @@ import { ModuleMark } from '@/components/ui/module-mark';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { completionMoment } from '@/components/motion/complete';
+import { putAway } from '@/components/motion/place';
+import { moduleById, moduleForPath } from '@/lib/modules';
 import { answerItem, completeItem, deferItem, dismissItem } from '@/app/todo/source-actions';
 import type { AgendaItem, AgendaItemOption } from '@/lib/todo/agenda/sources';
 import { formatClock } from '@/lib/clock';
@@ -22,6 +24,9 @@ type ItemState = 'open' | 'done' | 'answered' | 'deferred' | 'dismissed';
  * a date is not a task.
  */
 export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: string }) {
+  const owner = moduleById(moduleForPath(item.link?.href ?? null));
+  const home = owner ? { href: owner.home, name: owner.label } : null;
+
   /**
    * What has been done to this item, before the source has confirmed it.
    *
@@ -34,13 +39,24 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
    */
   const { shown, run, failed } = useOptimisticWrite<
     ItemState,
-    { state: ItemState; write: () => Promise<{ error: string | null }> }
+    {
+      state: ItemState;
+      write: () => Promise<{ error: string | null }>;
+      /** The control it was pressed from, taken before the write. */
+      from?: DOMRectReadOnly;
+    }
   >({
     value: 'open',
     apply: (_current, change) => change.state,
     write: (change) => change.write(),
     onDone: (change) => {
       if (change.state === 'done') completionMoment();
+      // Finished, put off or set aside, the item goes back to the workspace
+      // that owns it (plan #1578): that is where it lives, and the agenda only
+      // ever borrowed it. An item with no link names no workspace and stays.
+      if (home && change.state !== 'answered') {
+        void putAway({ from: change.from, href: home.href, label: item.title, name: home.name });
+      }
     },
   });
 
@@ -76,7 +92,13 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
         <button
           type="button"
           aria-label="Mark done"
-          onClick={() => run({ state: 'done', write: () => completeItem(item.source, item.key) })}
+          onClick={(event) =>
+            run({
+              state: 'done',
+              write: () => completeItem(item.source, item.key),
+              from: event.currentTarget.getBoundingClientRect(),
+            })
+          }
           className={cn(
             'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-quick',
             shown === 'done' ? 'text-status-offer' : 'text-ink-muted hover:text-accent',
@@ -177,7 +199,13 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
         <button
           type="button"
           title="Later"
-          onClick={() => run({ state: 'deferred', write: () => deferItem(item.source, item.key) })}
+          onClick={(event) =>
+            run({
+              state: 'deferred',
+              write: () => deferItem(item.source, item.key),
+              from: event.currentTarget.getBoundingClientRect(),
+            })
+          }
           className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
         >
           <Clock className="size-3.5" strokeWidth={1.75} aria-hidden />
@@ -186,8 +214,12 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
         <button
           type="button"
           title="Not this one"
-          onClick={() =>
-            run({ state: 'dismissed', write: () => dismissItem(item.source, item.key) })
+          onClick={(event) =>
+            run({
+              state: 'dismissed',
+              write: () => dismissItem(item.source, item.key),
+              from: event.currentTarget.getBoundingClientRect(),
+            })
           }
           className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
         >

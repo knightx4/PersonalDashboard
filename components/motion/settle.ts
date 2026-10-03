@@ -17,6 +17,7 @@
  */
 
 import { EASE, MOTION_MS } from '@/lib/motion';
+import { moduleForPath } from '@/lib/modules';
 import { prefersReducedMotion } from './reduced';
 
 /** The `landed-pulse` utility's duration in app/globals.css: one move. */
@@ -29,6 +30,11 @@ export const LANDED_NAME_MS = 2400;
 export const CAPTURE_NAV_ATTR = 'data-capture-nav';
 /** The attribute on every workspace switcher trigger. */
 export const CAPTURE_SWITCHER_ATTR = 'data-capture-switcher';
+/**
+ * The attribute on the phone dock's More button, which holds the sections the
+ * dock has no room for.
+ */
+export const CAPTURE_MORE_ATTR = 'data-capture-more';
 
 const GAP_PX = 8;
 const EDGE_PX = 8;
@@ -59,14 +65,18 @@ function firstOnScreen(selector: string): Element | null {
 }
 
 /**
- * Where an item filed into the workspace whose home is `href` lands: that
- * workspace's nav row when one is on screen, otherwise the switcher that is,
- * otherwise nothing.
+ * Where an item going to `href` lands: that section's nav row when one is on
+ * screen; the dock's More button when `href` is a section of the workspace on
+ * screen that the dock folded away (Todo's All on a phone); otherwise the
+ * switcher, which is how another workspace is reached; otherwise nothing.
  */
 export function landingTarget(href: string): Element | null {
   if (typeof document === 'undefined' || typeof window === 'undefined') return null;
+  const here = moduleForPath(window.location?.pathname ?? null);
+  const sameWorkspace = here !== null && moduleForPath(href) === here;
   return (
     firstOnScreen(`[${CAPTURE_NAV_ATTR}="${CSS.escape(href)}"]`) ??
+    (sameWorkspace ? firstOnScreen(`[${CAPTURE_MORE_ATTR}]`) : null) ??
     firstOnScreen(`[${CAPTURE_SWITCHER_ATTR}]`)
   );
 }
