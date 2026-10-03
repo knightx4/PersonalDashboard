@@ -1,0 +1,360 @@
+import type { AskDb, AskSchema, SchemaClient } from '@/lib/ask/db';
+import { parseRef } from '@/lib/core/refs';
+
+/**
+ * Undoing any change Dash made, by one rule (plan #1458, feature #1456;
+ * docs/CORE-AND-DASH-SPEC.md, Part 5).
+ *
+ * Every change Dash makes is a row in core.dash_actions naming the row it
+ * touched (`subject_ref`), what happened to it (`op`) and the row's values
+ * before and after. Undo puts the before values back, but only while the row
+ * still holds the after values. Once anything has changed it since, whether
+ * the person, a page or a later run, the undo is refused with a sentence
+ * saying why, so it never throws away later work. goals.history's Undo
+ * (lib/goals/run-changes.ts) works the same way.
+ *
+ *   insert  the row Dash added is deleted.
+ *   update  the columns Dash changed get their before values back.
+ *   delete  the row Dash removed is inserted again as it was.
+ *
+ * The undo itself is not a new action: the action is marked `undone`, which
+ * the table's guard allows only from `done`, so a second press finds nothing
+ * to move.
+ *
+ * Ask Dash's own changes keep their per-kind undo in lib/ask/changes.ts,
+ * because some of them touch two rows (a return writes the item and a
+ * returns row) and the generic rule sees only one. undoDashAction refuses
+ * them and says where they are undone.
+ *
+ * No `server-only` and no clients made here: callers hand in the person's
+ * clients (requestAskDb() in a request), and the tests hand in stubs. Every
+ * read and write goes through those clients, so row level security keeps an
+ * undo to the person's own rows.
+ */
+
+/** The table, in the core schema. */
+export const DASH_ACTIONS_TABLE = 'dash_actions';
+
+export type DashActionSurface = 'ask' | 'thread' | 'capture' | 'scheduled' | 'routine';
+export type DashActionStatus = 'proposed' | 'done' | 'declined' | 'undone';
+export type DashActionOp = 'insert' | 'update' | 'delete';
+
+type Values = Record<string, unknown>;
+
+/** One row of core.dash_actions, whatever surface wrote it. */
+export type DashAction = {
+  id: string;
+  surface: DashActionSurface;
+  kind: string;
+  status: DashActionStatus;
+  subjectRef: string | null;
+  op: DashActionOp | null;
+  beforeValues: Values | null;
+  afterValues: Values | null;
+  summary: string | null;
+  createdAt: string;
+  doneAt: string | null;
+  undoneAt: string | null;
+};
+
+export const DASH_ACTION_SELECT =
+  'id, surface, kind, status, subject_ref, op, before_values, after_values, summary, created_at, done_at, undone_at';
+
+type DashActionRow = {
+  id: string;
+  surface: string;
+  kind: string;
+  status: string;
+  subject_ref: string | null;
+  op: string | null;
+  before_values: Values | null;
+  after_values: Values | null;
+  summary: string | null;
+  created_at: string;
+  done_at: string | null;
+  undone_at: string | null;
+};
+
+export function toDashAction(row: DashActionRow): DashAction {
+  return {
+    id: row.id,
+    surface: row.surface as DashActionSurface,
+    kind: row.kind,
+    status: row.status as DashActionStatus,
+    subjectRef: row.subject_ref,
+    op: row.op as DashActionOp | null,
+    beforeValues: row.before_values,
+    afterValues: row.after_values,
+    summary: row.summary,
+    createdAt: row.created_at,
+    doneAt: row.done_at,
+    undoneAt: row.undone_at,
+  };
+}
+
+export type DashActionDeps = {
+  userId: string;
+  /** The person's core client, for core.dash_actions. */
+  core: SchemaClient;
+  /** The person's client per schema, for the row the action touched. */
+  db: AskDb;
+  /** Now, as an ISO timestamp. */
+  now?: () => string;
+};
+
+export type DashActionUndo =
+  | { ok: true; action: DashAction }
+  | { ok: false; error: string; action: DashAction | null };
+
+/** The schemas a subject can live in: the ones the person has a client for. */
+const SCHEMAS: ReadonlySet<string> = new Set<AskSchema>([
+  'public',
+  'core',
+  'job_search',
+  'obsidian',
+  'todo',
+  'learn',
+  'news',
+  'goals',
+]);
+
+/**
+ * Columns left out of both the check and the restore: the row's identity,
+ * which an undo never rewrites, and updated_at, which a trigger moves on any
+ * write, including a reorder that changes nothing the person sees.
+ */
+const MANAGED = new Set(['id', 'user_id', 'created_at', 'updated_at']);
+
+const GONE = 'That change is not there any more.';
+
+/** A refusal the person reads. */
+class Refused extends Error {}
+
+// ---------------------------------------------------------------------------
+// The rule, pure
+// ---------------------------------------------------------------------------
+
+const ISO_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
+/**
+ * Whether two stored values are the same. Timestamps are compared as
+ * instants, since the app and the connector write the same moment in
+ * different forms (`…Z` and `…+00:00`).
+ */
+export function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null || a === undefined || b === undefined) {
+    return (a ?? null) === (b ?? null);
+  }
+  if (typeof a === 'string' && typeof b === 'string') {
+    if (ISO_TIME.test(a) && ISO_TIME.test(b)) {
+      const ta = Date.parse(a);
+      const tb = Date.parse(b);
+      return !Number.isNaN(ta) && ta === tb;
+    }
+    return false;
+  }
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((v, i) => sameValue(v, b[i]));
+  }
+  if (typeof a === 'object' && typeof b === 'object') {
+    const ka = Object.keys(a as Values);
+    const kb = Object.keys(b as Values);
+    if (ka.length !== kb.length) return false;
+    return ka.every((k) => sameValue((a as Values)[k], (b as Values)[k]));
+  }
+  return false;
+}
+
+/** The columns where the row no longer holds what Dash left in it. */
+export function movedColumns(current: Values, after: Values): string[] {
+  return Object.keys(after).filter((k) => !MANAGED.has(k) && !sameValue(current[k], after[k]));
+}
+
+/** What an undo will do to the row, once the rule allows it. */
+export type UndoPlan =
+  | { op: 'delete' }
+  | { op: 'update'; values: Values }
+  | { op: 'insert'; values: Values };
+
+/** Why an action in this status cannot be undone. */
+function notDone(status: DashActionStatus): string {
+  switch (status) {
+    case 'proposed':
+      return 'Nothing has been written yet, so there is nothing to undo.';
+    case 'declined':
+      return 'This change was declined, so nothing was written.';
+    case 'undone':
+      return 'This change has already been undone.';
+    default:
+      return 'This change cannot be undone.';
+  }
+}
+
+/**
+ * Whether an action can be undone, given the row as it is now (null when it
+ * is not there) and whether Dash has changed the same row again since. The
+ * answer is what the undo will write, or the sentence the person reads.
+ */
+export function planUndo(
+  action: DashAction,
+  current: Values | null,
+  laterAction: boolean,
+): { ok: true; plan: UndoPlan } | { ok: false; reason: string } {
+  if (action.status !== 'done') return { ok: false, reason: notDone(action.status) };
+  if (action.surface === 'ask') {
+    return { ok: false, reason: 'This change was made in Ask Dash, and is undone from there.' };
+  }
+  const { op, beforeValues: before, afterValues: after } = action;
+  const recorded =
+    action.subjectRef !== null &&
+    ((op === 'insert' && after !== null) ||
+      (op === 'update' && after !== null && before !== null) ||
+      (op === 'delete' && before !== null));
+  if (!recorded) {
+    return { ok: false, reason: 'Dash did not keep what this changed, so it cannot be undone.' };
+  }
+  if (laterAction) {
+    return { ok: false, reason: 'Dash has changed this again since. Undo that later change first.' };
+  }
+
+  if (op === 'delete') {
+    if (current) return { ok: false, reason: 'It is back already, so there is nothing to undo.' };
+    return { ok: true, plan: { op: 'insert', values: { ...before } } };
+  }
+
+  if (!current) return { ok: false, reason: 'It has since been deleted, so there is nothing to undo.' };
+  if (movedColumns(current, after!).length > 0) {
+    return {
+      ok: false,
+      reason: 'It has changed since Dash wrote it, so undoing would lose the later change.',
+    };
+  }
+  if (op === 'insert') return { ok: true, plan: { op: 'delete' } };
+
+  // Only what Dash changed goes back: a column it left alone keeps its value.
+  const values = Object.fromEntries(
+    Object.entries(before!).filter(([k, v]) => !MANAGED.has(k) && k in after! && !sameValue(v, after![k])),
+  );
+  return { ok: true, plan: { op: 'update', values } };
+}
+
+// ---------------------------------------------------------------------------
+// Reading and writing the subject row
+// ---------------------------------------------------------------------------
+
+/** The client and table a ref points into, or null when it is not one Dash can reach. */
+async function subjectTable(db: AskDb, ref: string): Promise<{ client: SchemaClient; table: string; id: string } | null> {
+  const parsed = parseRef(ref);
+  if (!parsed || !SCHEMAS.has(parsed.schema)) return null;
+  return { client: await db(parsed.schema as AskSchema), table: parsed.name, id: parsed.id };
+}
+
+/**
+ * The whole row a ref points at, as the person's client sees it, or null
+ * when it is not there. What a writer records as before_values and
+ * after_values.
+ */
+export async function readSubject(db: AskDb, ref: string): Promise<Values | null> {
+  const subject = await subjectTable(db, ref);
+  if (!subject) return null;
+  const { data, error } = await subject.client
+    .from(subject.table)
+    .select('*')
+    .eq('id', subject.id)
+    .maybeSingle();
+  if (error) throw new Error(`Reading ${ref} failed: ${error.message}`);
+  return (data as Values | null) ?? null;
+}
+
+async function laterActionOn(deps: DashActionDeps, action: DashAction): Promise<boolean> {
+  const { data, error } = await deps.core
+    .from(DASH_ACTIONS_TABLE)
+    .select('id')
+    .eq('user_id', deps.userId)
+    .eq('subject_ref', action.subjectRef)
+    .eq('status', 'done')
+    .gt('created_at', action.createdAt)
+    .neq('id', action.id)
+    .limit(1);
+  if (error) throw new Error(`Reading later changes failed: ${error.message}`);
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Carry the plan out. Each write is narrowed to the row as it was just read
+ * (its updated_at, where it has one), so a change landing between the read
+ * and the write leaves the row alone and the undo refused.
+ */
+async function apply(deps: DashActionDeps, ref: string, plan: UndoPlan, current: Values | null): Promise<void> {
+  const subject = await subjectTable(deps.db, ref);
+  if (!subject) throw new Refused('Dash cannot reach that row any more, so it cannot be undone.');
+  const { client, table, id } = subject;
+  const CHANGED = 'It changed while Dash was undoing it, so Dash left it alone.';
+
+  if (plan.op === 'insert') {
+    const { error } = await client.from(table).insert(plan.values).select('id');
+    if (error) throw new Refused(`Dash could not put it back: ${error.message}`);
+    return;
+  }
+
+  let query =
+    plan.op === 'delete' ? client.from(table).delete() : client.from(table).update(plan.values);
+  query = query.eq('id', id);
+  if (current && typeof current.updated_at === 'string') query = query.eq('updated_at', current.updated_at);
+  const { data, error } = await query.select('id');
+  if (error) throw new Refused(`Dash could not undo it: ${error.message}`);
+  if ((data ?? []).length === 0) throw new Refused(CHANGED);
+}
+
+async function loadAction(deps: DashActionDeps, id: string): Promise<DashAction | null> {
+  const { data, error } = await deps.core
+    .from(DASH_ACTIONS_TABLE)
+    .select(DASH_ACTION_SELECT)
+    .eq('id', id)
+    .eq('user_id', deps.userId)
+    .maybeSingle();
+  if (error) throw new Error(`Reading the change failed: ${error.message}`);
+  return data ? toDashAction(data as DashActionRow) : null;
+}
+
+/**
+ * Undo one of Dash's changes: put the row back as it was before, and mark
+ * the action undone. Refused, with the sentence the person reads, when the
+ * row has moved on since Dash wrote it.
+ */
+export async function undoDashAction(deps: DashActionDeps, id: string): Promise<DashActionUndo> {
+  const action = await loadAction(deps, id);
+  if (!action) return { ok: false, error: GONE, action: null };
+
+  const ref = action.subjectRef;
+  const [current, later] =
+    action.status === 'done' && ref && action.surface !== 'ask'
+      ? await Promise.all([readSubject(deps.db, ref), laterActionOn(deps, action)])
+      : [null, false];
+  const decided = planUndo(action, current, later);
+  if (!decided.ok) return { ok: false, error: decided.reason, action };
+
+  try {
+    await apply(deps, ref!, decided.plan, current);
+  } catch (error) {
+    if (error instanceof Refused) return { ok: false, error: error.message, action };
+    throw error;
+  }
+
+  const { data, error } = await deps.core
+    .from(DASH_ACTIONS_TABLE)
+    .update({ status: 'undone', undone_at: deps.now ? deps.now() : new Date().toISOString() })
+    .eq('id', action.id)
+    .eq('user_id', deps.userId)
+    .eq('status', 'done')
+    .select(DASH_ACTION_SELECT);
+  if (error) throw new Error(`Marking the change undone failed: ${error.message}`);
+  const rows = (data ?? []) as DashActionRow[];
+  if (rows.length === 0) {
+    const now = await loadAction(deps, id);
+    return { ok: false, error: now ? notDone(now.status) : GONE, action: now };
+  }
+  return { ok: true, action: toDashAction(rows[0]) };
+}
