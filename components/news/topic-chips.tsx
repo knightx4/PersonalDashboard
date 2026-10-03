@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 import type { NewsTopic } from '@/lib/news/issues/topics';

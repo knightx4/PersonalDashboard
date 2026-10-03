@@ -1632,6 +1632,25 @@ body[data-keyhints] .keyhint {
   }
 }
 
+/* A link whose page is on the way (plan #1444): it holds the press by dimming,
+ * and pulses while it waits. The 100ms delay means a quick navigation shows
+ * nothing at all. The marker is LinkPending (components/ui/link-pending.tsx),
+ * placed inside the link; a table row whose name links dims as a whole. */
+@keyframes link-pending {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.4;
+  }
+}
+
+a:has([data-link-pending]),
+tr:has([data-link-pending]) {
+  cursor: progress;
+  animation: link-pending 600ms ease-in-out 100ms infinite alternate;
+}
+
 @keyframes toast-in {
   from {
     transform: translateY(6px);
@@ -2056,6 +2075,12 @@ body[data-keyhints] .keyhint {
 
   .press:active {
     transform: none;
+  }
+
+  a:has([data-link-pending]),
+  tr:has([data-link-pending]) {
+    animation: none;
+    opacity: 0.6;
   }
 
   .progress-move {

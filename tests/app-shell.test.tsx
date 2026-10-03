@@ -392,7 +392,7 @@ describe('the top bar title', () => {
   });
 
   it('follows the workspace with a link back to the section below its first page', () => {
-    expect(title('/news/story/1')).toContain('href="/news">Quick read</a>');
-    expect(title('/news/saved/2')).toContain('href="/news/saved">Saved</a>');
+    expect(title('/news/story/1')).toContain('href="/news">Quick read<');
+    expect(title('/news/saved/2')).toContain('href="/news/saved">Saved<');
   });
 });
