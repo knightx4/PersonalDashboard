@@ -37,6 +37,14 @@ export const SPECS: readonly SpecDoc[] = [
     module: null,
   },
   {
+    slug: 'ui-quality',
+    title: 'Checking screens while they are built',
+    blurb:
+      'Every new or changed screen is drawn in the gallery first, photographed at phone width, and passed by a separate design critic before it merges, with your own preferences written down where the critic reads them.',
+    file: 'UI-QUALITY-SPEC.md',
+    module: null,
+  },
+  {
     slug: 'spec-layer',
     title: 'Specs as the layer you work at',
     blurb:
