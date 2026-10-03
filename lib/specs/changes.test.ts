@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyDiff,
   countChangedLines,
   diffAnchorLines,
   diffFits,
@@ -159,5 +160,33 @@ describe('sectionsTouched', () => {
   it('falls back to every section when none can be told apart, and none for a new spec', () => {
     expect(sectionsTouched(spec, ['@@ @@', '+Only added.'].join('\n'))).toHaveLength(2);
     expect(sectionsTouched(null, ['@@ @@', '+Only added.'].join('\n'))).toEqual([]);
+  });
+});
+
+describe('applyDiff', () => {
+  const spec = ['# Title', '', '## One', '', 'First rule.', 'Second rule.', '', '## Two', '', 'Third rule.', ''].join('\n');
+
+  it('writes every hunk into the spec, wherever its line numbers said it was', () => {
+    const drafted = ['@@ -1 +1 @@', ' First rule.', '+A new rule.', '@@ -2 +2 @@', '-Third rule.', '+Third rule, changed.'].join('\n');
+    const result = applyDiff(drafted, spec);
+    expect(result.ok && result.markdown).toBe(
+      ['# Title', '', '## One', '', 'First rule.', 'A new rule.', 'Second rule.', '', '## Two', '', 'Third rule, changed.', ''].join('\n'),
+    );
+    expect(result.ok && result.diff).toContain('@@ -10 +11 @@');
+  });
+
+  it('removes lines without leaving a gap', () => {
+    const result = applyDiff(['@@ @@', ' First rule.', '-Second rule.'].join('\n'), spec);
+    expect(result.ok && result.markdown).toBe(spec.replace('Second rule.\n', ''));
+  });
+
+  it('writes a new spec from nothing, ending in a newline', () => {
+    const result = applyDiff(['@@ @@', '+# New', '+', '+A rule.'].join('\n'), null);
+    expect(result.ok && result.markdown).toBe('# New\n\nA rule.\n');
+  });
+
+  it('refuses a diff whose lines have left the spec, writing nothing', () => {
+    const result = applyDiff(['@@ @@', '-A rule nobody wrote.', '+Something.'].join('\n'), spec);
+    expect(result.ok).toBe(false);
   });
 });

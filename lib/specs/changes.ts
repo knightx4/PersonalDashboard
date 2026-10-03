@@ -175,6 +175,42 @@ export async function decideSpecChange(
   return { change: specChangeFrom(data as unknown as SpecChangeRow) };
 }
 
+/** One change, with an empty thread, or null when it is not the user's. */
+export async function loadSpecChange(
+  supabase: SupabaseClient,
+  userId: string,
+  id: string,
+): Promise<SpecChange | null> {
+  const { data } = await supabase
+    .from('spec_changes')
+    .select('id, spec, title, why, diff, status, made_by, plan_item_id, decided_at, created_at')
+    .eq('user_id', userId)
+    .eq('id', id)
+    .maybeSingle();
+  if (!data) return null;
+  return specChangeFrom(data as SpecChangeRow);
+}
+
+/**
+ * Put an approved change back to proposed, for when the run that writes it in
+ * could not be started (plan #1509). Approving is the press that commits and
+ * shapes it, so a press that started neither should leave the change as it
+ * found it, ready to be pressed again.
+ */
+export async function reopenSpecChange(
+  supabase: SupabaseClient,
+  userId: string,
+  id: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('spec_changes')
+    .update({ status: 'proposed', decided_at: null })
+    .eq('user_id', userId)
+    .eq('id', id)
+    .eq('status', 'approved');
+  if (error) console.error(`Could not put spec change ${id} back to proposed: ${error.message}`);
+}
+
 /** One line of a diff as the page draws it. */
 export type DiffLine =
   | { kind: 'add' | 'remove' | 'context'; text: string }
@@ -340,6 +376,45 @@ export function rebaseDiff(diff: string, markdown: string | null): RebasedDiff {
   }
 
   return { ok: true, diff: out.join('\n') + '\n' };
+}
+
+export type AppliedDiff = { ok: true; markdown: string; diff: string } | { ok: false; why: string };
+
+/**
+ * The spec with an approved change written into it (plan #1509).
+ *
+ * Placed first with `rebaseDiff`, so a spec that has moved since the change
+ * was drafted still takes it and one whose lines have gone refuses it with
+ * the same sentence. The returned `diff` is the placed one, which is what the
+ * commit records. `markdown` is null for a spec the change creates.
+ */
+export function applyDiff(diff: string, markdown: string | null): AppliedDiff {
+  const placed = rebaseDiff(diff, markdown);
+  if (!placed.ok) return placed;
+  const read = readHunks(placed.diff);
+  if (!read) return { ok: false, why: 'It changes more than one file, and a change is to one spec.' };
+
+  const spec = markdown === null ? [] : markdown.replace(/\r/g, '').split('\n');
+  const out: string[] = [];
+  let cursor = 0;
+  for (const hunk of read.hunks) {
+    const lines = hunk.lines.filter((line) => markOf(line) !== '\\');
+    const oldCount = lines.filter((line) => markOf(line) !== '+').length;
+    // rebaseDiff found these lines in order from the cursor, so finding them
+    // again from the same cursor lands on the same place.
+    const old = lines.filter((line) => markOf(line) !== '+').map((line) => line.slice(line === '' ? 0 : 1));
+    const at = oldCount === 0 ? cursor : findRun(spec, old, cursor);
+    out.push(...spec.slice(cursor, at));
+    for (const line of lines) {
+      if (markOf(line) === '+') out.push(line.slice(1));
+      else if (markOf(line) === ' ') out.push(line === '' ? '' : line.slice(1));
+    }
+    cursor = at + oldCount;
+  }
+  out.push(...spec.slice(cursor));
+
+  const text = out.join('\n');
+  return { ok: true, markdown: markdown === null && !text.endsWith('\n') ? `${text}\n` : text, diff: placed.diff };
 }
 
 /**
