@@ -453,6 +453,24 @@ a `claude` comment on the thread, not a close.
 A raise is not a way to avoid finishing a note. A note that cannot be finished
 is still `blocked` with the question, in the queue where the user works it.
 
+## Ending the run
+
+A run fired from the queue's button has a row in `plan_runs` with job `notes`
+and no step. When the batch is over, mark it finished through the connector,
+the same write the posts skill makes, so the plan page does not report a run
+that closed notes as one that failed:
+
+```sql
+update plan_runs set status = 'finished', error = null
+where id = (select id from plan_runs
+            where job = 'notes' and status = 'started'
+            order by created_at desc limit 1);
+```
+
+Skip it when you were started by hand rather than by the button; there is no
+row to mark. The sweep in `lib/plan/runs.ts` also finishes a notes run that
+closed notes, so a missed update costs only the two hours until it looks.
+
 ## Closing report
 
 **Always end a run with a table**, one row per note touched, whatever the

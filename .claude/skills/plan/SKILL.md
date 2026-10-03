@@ -245,6 +245,20 @@ Each is one file. Read the one you were sent for; do not read the others.
 | `reference/dismissed.md` | What the person has put aside, and why you never bring it back. |
 | `reference/offline.md` | The SQL to use when `DATABASE_URL` is missing. |
 
+A shaping run and a re-shape each have a row in `plan_runs` (job `shape` or
+`reshape`) that nothing else marks finished until the sweep reads what they
+wrote. As the last write of the run, mark yours:
+
+```sql
+update plan_runs set status = 'finished', error = null
+where id = (select id from plan_runs
+            where job = '<shape or reshape>' and status = 'started'
+            order by created_at desc limit 1);
+```
+
+For a re-shape, add `and plan_item_id = '<the feature's id>'` inside the
+select. A build run needs nothing: closing or blocking its step ends it.
+
 ## Statuses
 
 | Status | Meaning |

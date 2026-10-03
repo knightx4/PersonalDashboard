@@ -25,6 +25,7 @@ import {
   OVERNIGHT_NO_PROGRESS,
   outsideRunning,
   runOvernightTick,
+  sweepQuietRuns,
   tickNote,
   type OvernightPorts,
 } from '@/inngest/dev/overnight';
@@ -856,5 +857,67 @@ describe('featureRunLiveness', () => {
       pushes: [],
     });
     expect(liveness).toBe('finished');
+  });
+});
+
+describe('sweepQuietRuns', () => {
+  it('writes back the runs of every account from the tick, with nobody on the page', async () => {
+    // Before this the sweep ran only from the plan page's render, so a night
+    // nobody watched kept every run `started` until morning.
+    const updates: Array<{ values: Record<string, unknown>; id: string }> = [];
+    const run = (id: string, userId: string, createdAt: string) => ({
+      id,
+      user_id: userId,
+      plan_item_id: `step-${id}`,
+      created_at: createdAt,
+      routine_id: null,
+      job: 'step',
+    });
+    const started = [
+      run('r1', 'u1', '2026-09-17T19:00:00.000Z'),
+      run('r2', 'u2', '2026-09-17T22:30:00.000Z'),
+    ];
+    const supabase = {
+      from(table: string) {
+        if (table === 'plan_items') {
+          return { select: () => ({ in: async () => ({ data: [], error: null }) }) };
+        }
+        let userId: string | null = null;
+        const chain = {
+          select: () => chain,
+          eq: (column: string, value: string) => {
+            if (column === 'user_id') userId = value;
+            if (column === 'status' && userId) {
+              return Promise.resolve({
+                data: started.filter((row) => row.user_id === userId),
+                error: null,
+              });
+            }
+            return chain;
+          },
+          limit: async () => ({ data: started, error: null }),
+          update: (values: Record<string, unknown>) => ({
+            eq: async (_column: string, id: string) => {
+              updates.push({ values, id });
+              return { error: null };
+            },
+            in: async (_column: string, ids: string[]) => {
+              for (const id of ids) updates.push({ values, id });
+              return { error: null };
+            },
+          }),
+        };
+        return chain;
+      },
+    };
+
+    const swept = await sweepQuietRuns({ supabase: supabase as never, now: MIDNIGHT });
+
+    // No GitHub token here, so the clock judges: r1 has been quiet four hours,
+    // r2 half an hour.
+    expect(swept).toEqual({ finished: 0, failed: 1 });
+    expect(updates).toEqual([
+      { values: { status: 'failed', error: 'Nothing was heard from this run for 4h.' }, id: 'r1' },
+    ]);
   });
 });

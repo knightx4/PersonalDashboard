@@ -25,6 +25,7 @@ import {
 } from '@/lib/plan/overnight';
 import { chooseOvernightFeature, OVERNIGHT_NOTHING_READY } from '@/lib/plan/overnight-choice';
 import { endsRun } from '@/lib/plan/run-end';
+import { endQuietRuns } from '@/lib/plan/runs';
 import { subtreeBlockedAt, subtreeClosedAt, subtreeTrail } from '@/lib/plan/subtree';
 import { buildPlanTree, flatten, type PlanNode, type PlanSection } from '@/lib/plan/tree';
 
@@ -590,8 +591,9 @@ async function lastFeatureFires(supabase: Db, userId: string): Promise<Record<st
 /**
  * How far back a feature run marked started is still read as possibly going.
  *
- * Nothing sweeps plan_runs rows while nobody has the plan page open, so rows
- * from sessions long over still say `started`. Each one read costs a few
+ * `sweepQuietRuns` writes runs back on every tick, but only on the clock and on
+ * what their jobs left behind, so a run can still say `started` for up to two
+ * hours after its session went. Each one read costs a few
  * queries, and `runLiveness` calls a run ended after two hours without a push,
  * so a run older than this is not worth the reads.
  */
@@ -843,6 +845,8 @@ export type OvernightTickSummary = {
     error: string | null;
     reason: string | null;
   };
+  /** Runs this tick wrote back as over, across every account. */
+  runs: { finished: number; failed: number };
 };
 
 /**
@@ -900,6 +904,18 @@ export async function runOvernightTick(
     main = { sha: null, conclusion: null, error: said, reason: null };
   }
 
+  // Every run still marked started is read against what it left behind, on
+  // every tick, whether or not a night is running. Stepped over if it breaks,
+  // for the same reason as the CI read: a tidying pass is not a precondition.
+  let runs: OvernightTickSummary['runs'] = { finished: 0, failed: 0 };
+  try {
+    runs = await sweepQuietRuns({ supabase, now, fetch: input.fetch });
+  } catch (err) {
+    console.error(
+      `the runs could not be swept on this tick: ${err instanceof Error ? err.message : 'failed'}`,
+    );
+  }
+
   const { data, error } = await supabase
     .from('plan_overnight_runs')
     .select('user_id')
@@ -948,7 +964,61 @@ export async function runOvernightTick(
     }
   }
 
-  return { accounts: users.length, fired, results, goals, main };
+  return { accounts: users.length, fired, results, goals, main, runs };
+}
+
+/** The most started runs one sweep reads. There are a handful at any moment. */
+const SWEEP_LIMIT = 500;
+
+/**
+ * Write back every run that has stopped, in every account, from the tick.
+ *
+ * `endQuietRuns` used to run only when somebody opened the plan page, so on a
+ * night nobody looked, every run fired stayed `started` until morning, and the
+ * morning sweep judged them all at once, hours late, on the clock. The tick
+ * runs every four minutes whoever is watching, which makes it the one place
+ * the record can be kept current.
+ *
+ * One listing of pushes for every account, from the oldest started run, as
+ * `refreshRunReadings` takes it; a listing GitHub refused is no evidence, and
+ * the runs are judged on the clock and on what their jobs left behind.
+ */
+export async function sweepQuietRuns(input: {
+  supabase: Db;
+  now: number;
+  fetch?: typeof globalThis.fetch;
+}): Promise<{ finished: number; failed: number }> {
+  const { supabase, now } = input;
+  const { data, error } = await supabase
+    .from('plan_runs')
+    .select('user_id, created_at')
+    .eq('status', 'started')
+    .limit(SWEEP_LIMIT);
+  if (error) throw new Error(error.message);
+
+  const rows = (data ?? []) as Array<{ user_id: string; created_at: string }>;
+  const tally = { finished: 0, failed: 0 };
+  if (rows.length === 0) return tally;
+
+  const oldest = Math.min(...rows.map((row) => new Date(row.created_at).getTime()));
+  const listed = await listPushes({ since: oldest, fetch: input.fetch });
+  const pushes = listed.error ? null : listed.pushes;
+
+  for (const userId of new Set(rows.map((row) => row.user_id))) {
+    const ended = await endQuietRuns({
+      supabase,
+      userId,
+      now,
+      pushes,
+      pushesSince: pushes ? oldest : undefined,
+    });
+    tally.finished += ended.finished;
+    tally.failed += ended.failed;
+  }
+  if (tally.finished + tally.failed > 0) {
+    console.log(`overnight: wrote back ${tally.finished} finished and ${tally.failed} failed run(s).`);
+  }
+  return tally;
 }
 
 /** The goals half of one account's tick, with a failure turned into a result. */

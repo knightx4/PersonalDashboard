@@ -38,6 +38,7 @@ import {
   runQuietNote,
   storedReading,
   type LastRun,
+  type RunEnd,
   type RunJob,
   type RunReadingColumns,
   type RunStatus,
@@ -46,7 +47,23 @@ import {
 import { commitSubjects, listPushes } from './ci';
 import type { RunRaise } from './work';
 import {
+  checkBackWork,
+  featureWork,
+  judgedOnClock,
+  noWorkNote,
+  readsWork,
+  reshapeWork,
+  within,
+  workedEnd,
+  workWindow,
+  type RunWork,
+  type WorkJob,
+  type WorkRow,
+} from './run-work';
+import { readAll } from '@/lib/learn/db/read-all';
+import {
   abandonedClaim,
+  FEATURE_IDLE_AFTER_MINUTES,
   lastPushSince,
   runEndedNote,
   runLiveness,
@@ -178,7 +195,13 @@ export async function startRoutineRun(input: {
  * run that is still pushing is left alone however long it has been going,
  * which is the thing the clock alone could not do.
  *
- * Run from the plan page, which is where the answer is read. A failed sweep is
+ * A run sent at no step, or at a feature, is also read against what its job
+ * left behind (`lib/plan/run-work.ts`): the notes it closed, the check-backs
+ * it was woken for, the proposal it wrote. Without that every notes, shaping
+ * and check-back run was written off as failed, whatever it had done.
+ *
+ * Run from the plan page and from the overnight tick (`sweepQuietRuns`), so
+ * the record is kept whether or not anybody is looking. A failed sweep is
  * logged and swallowed for the same reason the insert above is: a page that
  * cannot tidy the record is still a page worth reading.
  */
@@ -194,13 +217,18 @@ export async function endQuietRuns(input: {
    * it is not evidence that the run pushed nothing.
    */
   pushesSince?: number;
+  /**
+   * What each run's job left behind (`lib/plan/run-work.ts`), by run id.
+   * `readRunWork` unless a test hands one in.
+   */
+  readWork?: (runs: readonly QuietRun[], now: number) => Promise<Map<string, RunWork>>;
 }): Promise<{ finished: number; failed: number; error: string | null }> {
   const now = input.now ?? Date.now();
   const nothing = { finished: 0, failed: 0 };
 
   const { data: rows, error } = await input.supabase
     .from('plan_runs')
-    .select('id, plan_item_id, created_at, routine_id')
+    .select('id, plan_item_id, created_at, routine_id, job')
     .eq('user_id', input.userId)
     .eq('status', 'started');
   if (error) {
@@ -208,12 +236,7 @@ export async function endQuietRuns(input: {
     return { ...nothing, error: error.message };
   }
 
-  const started = (rows ?? []) as Array<{
-    id: string;
-    plan_item_id: string | null;
-    created_at: string;
-    routine_id: string | null;
-  }>;
+  const started = (rows ?? []) as QuietRun[];
   if (started.length === 0) return { ...nothing, error: null };
 
   // Only the steps these runs name, and only the two columns that say one is
@@ -235,6 +258,22 @@ export async function endQuietRuns(input: {
     }
   }
 
+  // What the jobs that build no single step left behind. Read only for those
+  // runs, and a failed read leaves them to the clock and the pushes as before.
+  const working = started.filter((row) => readsWork(row.job));
+  let work = new Map<string, RunWork>();
+  if (working.length > 0) {
+    const read =
+      input.readWork ?? ((runs, at) => readRunWork(input.supabase, input.userId, runs, at));
+    try {
+      work = await read(working, now);
+    } catch (err) {
+      console.error(
+        `what the runs left behind could not be read: ${err instanceof Error ? err.message : 'failed'}`,
+      );
+    }
+  }
+
   const pushes = input.pushes ?? null;
   // A project's run pushes to its own repository, so this one's pushes say
   // nothing about it: it is judged on the clock, as an unread listing is.
@@ -248,27 +287,46 @@ export async function endQuietRuns(input: {
     };
     const listed =
       input.pushesSince === undefined || new Date(row.created_at).getTime() >= input.pushesSince;
-    if (!pushes || !listed || (row.routine_id !== null && elsewhere.has(row.routine_id))) {
-      const end = runEnd({ status: 'started', createdAt: row.created_at }, step, now);
-      if (end === 'finished') finished.push(row.id);
-      if (end === 'failed') ended.push({ id: row.id, note: runQuietNote(row.created_at, now) });
-      continue;
+
+    let verdict: RunEnd | null;
+    let note: string;
+    if (
+      !pushes ||
+      !listed ||
+      judgedOnClock(row.job) ||
+      (row.routine_id !== null && elsewhere.has(row.routine_id))
+    ) {
+      verdict = runEnd({ status: 'started', createdAt: row.created_at }, step, now);
+      note = runQuietNote(row.created_at, now);
+    } else {
+      const evidence: RunEvidence = {
+        startedAt: row.created_at,
+        lastPush: lastPushSince(pushes, row.created_at),
+        stepClosedAt: step.completedAt,
+        stepBlockedAt: step.blockedAt,
+        read: true,
+      };
+      const liveness = runLiveness(evidence, now);
+      verdict = liveness === 'finished' ? 'finished' : liveness === 'ended' ? 'failed' : null;
+      note = runEndedNote(evidence, now);
     }
 
-    const evidence: RunEvidence = {
-      startedAt: row.created_at,
-      lastPush: lastPushSince(pushes, row.created_at),
-      stepClosedAt: step.completedAt,
-      stepBlockedAt: step.blockedAt,
-      read: true,
-    };
-    const liveness = runLiveness(evidence, now);
-    if (liveness === 'finished') finished.push(row.id);
-    if (liveness === 'ended') ended.push({ id: row.id, note: runEndedNote(evidence, now) });
+    const job = row.job;
+    const done = readsWork(job) ? (work.get(row.id) ?? null) : null;
+    const end = workedEnd(verdict, done);
+    if (end === 'finished') finished.push(row.id);
+    if (end === 'failed') {
+      ended.push({ id: row.id, note: done && readsWork(job) ? noWorkNote(job, note) : note });
+    }
   }
 
+  // `error` goes back to null with the status because the table insists on it
+  // (`plan_runs_error_matches_status_ck`): a finished run carries no reason.
   if (finished.length > 0) {
-    await input.supabase.from('plan_runs').update({ status: 'finished' }).in('id', finished);
+    await input.supabase
+      .from('plan_runs')
+      .update({ status: 'finished', error: null })
+      .in('id', finished);
   }
   // One at a time, because each reason names what was last seen of that run.
   for (const row of ended) {
@@ -279,6 +337,155 @@ export async function endQuietRuns(input: {
   }
 
   return { finished: finished.length, failed: ended.length, error: null };
+}
+
+/** A run still marked started, as the sweep reads it. */
+export type QuietRun = {
+  id: string;
+  plan_item_id: string | null;
+  created_at: string;
+  routine_id: string | null;
+  /** Missing on rows read through an older select. */
+  job?: string | null;
+};
+
+/**
+ * What each run's job left behind, by run id. `lib/plan/run-work.ts` says what
+ * each job's trail is.
+ *
+ * At most five reads whatever the number of runs, and only the ones the runs'
+ * jobs need: the closed notes, the check-backs, the plan rows (once, for every
+ * re-shape and feature batch), the top-level rows written since the oldest
+ * run, and the ideas pointing at them. A read that fails throws, and the sweep
+ * leaves those runs to the clock.
+ */
+export async function readRunWork(
+  supabase: Db,
+  userId: string,
+  runs: readonly QuietRun[],
+  now: number,
+): Promise<Map<string, RunWork>> {
+  const out = new Map<string, RunWork>();
+  if (runs.length === 0) return out;
+
+  const earliest = new Date(
+    Math.min(...runs.map((run) => new Date(run.created_at).getTime())),
+  ).toISOString();
+  const needs = (...jobs: WorkJob[]) => runs.some((run) => jobs.includes(run.job as WorkJob));
+
+  let closedNotes: string[] = [];
+  if (needs('notes')) {
+    const { data, error } = await supabase
+      .from('feedback_items')
+      .select('completed_at')
+      .eq('user_id', userId)
+      .gte('completed_at', earliest);
+    if (error) throw new Error(`feedback_items: ${error.message}`);
+    closedNotes = ((data ?? []) as Array<{ completed_at: string | null }>)
+      .map((row) => row.completed_at)
+      .filter((at): at is string => Boolean(at));
+  }
+
+  const checkBacks = new Map<string, string[]>();
+  if (needs('check_back')) {
+    const { data, error } = await supabase
+      .from('check_backs')
+      .select('woke_run_id, status')
+      .eq('user_id', userId)
+      .in(
+        'woke_run_id',
+        runs.filter((run) => run.job === 'check_back').map((run) => run.id),
+      );
+    if (error) throw new Error(`check_backs: ${error.message}`);
+    for (const row of (data ?? []) as Array<{ woke_run_id: string; status: string }>) {
+      checkBacks.set(row.woke_run_id, [...(checkBacks.get(row.woke_run_id) ?? []), row.status]);
+    }
+  }
+
+  let planRows: WorkRow[] = [];
+  if (needs('feature', 'reshape')) {
+    type Row = {
+      id: string;
+      parent_id: string | null;
+      number: number | null;
+      status: string;
+      created_at: string;
+      updated_at: string;
+      completed_at: string | null;
+      blocked_at: string | null;
+    };
+    const rows = await readAll<Row>((from, to) =>
+      supabase
+        .from('plan_items')
+        .select('id, parent_id, number, status, created_at, updated_at, completed_at, blocked_at')
+        .eq('user_id', userId)
+        .order('id', { ascending: true })
+        .range(from, to),
+    );
+    planRows = rows.map((row) => ({
+      id: row.id,
+      parentId: row.parent_id,
+      number: row.number,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      completedAt: row.completed_at,
+      blockedAt: row.blocked_at,
+    }));
+  }
+
+  // Top-level rows written since the oldest run: what a shaping run proposes,
+  // and what a re-shape of a closed feature raises in its place.
+  let topLevel: Array<{ id: string; createdAt: string; detail: string | null }> = [];
+  if (needs('shape', 'reshape')) {
+    const { data, error } = await supabase
+      .from('plan_items')
+      .select('id, created_at, detail')
+      .eq('user_id', userId)
+      .is('parent_id', null)
+      .gte('created_at', earliest);
+    if (error) throw new Error(`plan_items: ${error.message}`);
+    topLevel = ((data ?? []) as Array<{ id: string; created_at: string; detail: string | null }>).map(
+      (row) => ({ id: row.id, createdAt: row.created_at, detail: row.detail }),
+    );
+  }
+
+  // Which of those rows an idea now points at: an idea that was shaped.
+  const shaped = new Set<string>();
+  if (needs('shape') && topLevel.length > 0) {
+    const { data, error } = await supabase
+      .from('ideas')
+      .select('plan_item_id')
+      .eq('user_id', userId)
+      .in(
+        'plan_item_id',
+        topLevel.map((row) => row.id),
+      );
+    if (error) throw new Error(`ideas: ${error.message}`);
+    for (const row of (data ?? []) as Array<{ plan_item_id: string | null }>) {
+      if (row.plan_item_id) shaped.add(row.plan_item_id);
+    }
+  }
+
+  for (const run of runs) {
+    const window = workWindow(run.created_at, now);
+    if (run.job === 'notes') {
+      out.set(run.id, { done: closedNotes.filter((at) => within(at, window)).length });
+    } else if (run.job === 'check_back') {
+      out.set(run.id, checkBackWork(checkBacks.get(run.id) ?? []));
+    } else if (run.job === 'shape') {
+      const done = topLevel.filter((row) => shaped.has(row.id) && within(row.createdAt, window));
+      out.set(run.id, { done: done.length });
+    } else if (run.job === 'reshape' && run.plan_item_id) {
+      out.set(run.id, reshapeWork(planRows, run.plan_item_id, window, topLevel));
+    } else if (run.job === 'feature' && run.plan_item_id) {
+      out.set(
+        run.id,
+        featureWork(planRows, run.plan_item_id, window, now, FEATURE_IDLE_AFTER_MINUTES),
+      );
+    }
+  }
+  return out;
 }
 
 /**
