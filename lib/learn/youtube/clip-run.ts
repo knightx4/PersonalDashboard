@@ -30,6 +30,13 @@ import { loadTranscript } from './transcripts';
 
 /** Videos cut per scheduled run. */
 export const CLIPS_PER_RUN = 12;
+/**
+ * No video is cut for a person who already has this many clips waiting to be
+ * shown. Unshown means what the stream (clips/next.ts) still offers as new:
+ * shown_at and not_interested_at both null. 261 clips were cut in two days and
+ * 253 never shown, so cutting waits until the stream works through them.
+ */
+export const UNSHOWN_CAP = 40;
 const CONCURRENCY = 4;
 const BATCH = 200;
 const PAGE = 1000;
@@ -56,6 +63,8 @@ export type ClipPassResult = {
   unreadable: number;
   /** Videos with a stored transcript still waiting to be cut after this run. */
   waiting: number;
+  /** Videos held back because their person already has UNSHOWN_CAP clips unshown. */
+  held: number;
   stopped: string | null;
 };
 
@@ -221,7 +230,30 @@ async function recordCut(
   if (error) throw new Error(`Recording the cut failed: ${error.message}`);
 }
 
-/** Cut the next videos waiting, until the cap or the time runs out. */
+/**
+ * The people among `userIds` who already have `cap` or more clips not yet
+ * shown. Reads at most `cap` ids per person.
+ */
+export async function peopleWithEnoughUnshown(learn: LearnSupabaseClient, userIds: string[], cap: number): Promise<Set<string>> {
+  const full = new Set<string>();
+  for (const userId of userIds) {
+    const { data, error } = await learn
+      .from('video_clips')
+      .select('id')
+      .eq('user_id', userId)
+      .is('shown_at', null)
+      .is('not_interested_at', null)
+      .limit(cap);
+    if (error) throw new Error(`Counting the clips not yet shown failed: ${error.message}`);
+    if ((data ?? []).length >= cap) full.add(userId);
+  }
+  return full;
+}
+
+/**
+ * Cut the next videos waiting, until the cap or the time runs out. A person
+ * with UNSHOWN_CAP clips not yet shown gets no new cuts this run.
+ */
 export async function cutClips(
   learn: LearnSupabaseClient,
   options: {
@@ -239,12 +271,21 @@ export async function cutClips(
     now?: () => Date;
     /** Stands in for loadLearnerProfile, for tests. */
     profileFor?: (userId: string) => Promise<LearnerProfile>;
+    /** Clips not yet shown at which a person's cutting pauses. Defaults to UNSHOWN_CAP. */
+    unshownCap?: number;
   },
 ): Promise<ClipPassResult> {
-  const result: ClipPassResult = { cut: 0, clips: 0, failed: 0, unreadable: 0, waiting: 0, stopped: null };
+  const result: ClipPassResult = { cut: 0, clips: 0, failed: 0, unreadable: 0, waiting: 0, held: 0, stopped: null };
   const now = options.now ?? (() => new Date());
   const waiting = await videosToClip(learn, options.owner);
-  const queue = waiting.slice(0, options.limit ?? CLIPS_PER_RUN);
+  const full = await peopleWithEnoughUnshown(
+    learn,
+    [...new Set(waiting.map((video) => video.userId))],
+    options.unshownCap ?? UNSHOWN_CAP,
+  );
+  const eligible = waiting.filter((video) => !full.has(video.userId));
+  result.held = waiting.length - eligible.length;
+  const queue = eligible.slice(0, options.limit ?? CLIPS_PER_RUN);
   const profiles = new Map<string, Promise<LearnerProfile>>();
   const profileOf = (userId: string) => {
     let profile = profiles.get(userId);

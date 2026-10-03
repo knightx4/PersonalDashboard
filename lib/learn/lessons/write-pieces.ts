@@ -29,8 +29,40 @@ You are given the unit, what it covers and its outcome, and its ideas, numbered,
 
 Plain sentences. No slogans, no "not X, but Y" contrasts, no dashes used for rhythm.
 
-Report through ${TOOL_NAME}.`;
+Report through ${TOOL_NAME}, with pieces as a list of objects, never as a string.`;
 
+/** The tool, as each call sends it. */
+const TOOL: Anthropic.Tool = {
+  name: TOOL_NAME,
+  description: "Report the unit's pieces, in the order they are suggested.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      pieces: {
+        type: 'array',
+        maxItems: PIECES_MAX,
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            ideas: { type: 'array', items: { type: 'integer' } },
+          },
+          required: ['title', 'ideas'],
+        },
+      },
+    },
+    required: ['pieces'],
+  },
+};
+
+/** The refusal worth one more call: the reply's shape, not what it says. */
+const SCHEMA_FAULT = /did not match their schema/;
+
+/**
+ * Split one unit into pieces. A reply the schema refuses is sent back once
+ * with the refusal as a tool error, and the second reply is read the same way.
+ * Any other failure, and a second refusal, is reported as it is.
+ */
 export async function writePieces(input: {
   trackName: string;
   unit: { title: string; covers: string | null; outcome: string | null };
@@ -40,48 +72,44 @@ export async function writePieces(input: {
   onSpend?: SpendSink;
 }): Promise<PiecesResult> {
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
+  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: piecesPrompt(input) }];
 
-  let response;
-  try {
-    response = await client.messages.create({
-      model: PIECES_MODEL,
-      max_tokens: 1500,
-      system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Report the unit\'s pieces, in the order they are suggested.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              pieces: {
-                type: 'array',
-                maxItems: PIECES_MAX,
-                items: {
-                  type: 'object',
-                  properties: {
-                    title: { type: 'string' },
-                    ideas: { type: 'array', items: { type: 'integer' } },
-                  },
-                  required: ['title', 'ideas'],
-                },
-              },
-            },
-            required: ['pieces'],
+  for (let attempt = 1; ; attempt += 1) {
+    let response;
+    try {
+      response = await client.messages.create({
+        model: PIECES_MODEL,
+        max_tokens: 1500,
+        system: SYSTEM,
+        tools: [TOOL],
+        tool_choice: forceTool(TOOL_NAME),
+        messages,
+      });
+    } catch (error) {
+      return { ok: false, detail: error instanceof Error ? error.message : 'The pieces call failed.' };
+    }
+
+    // Before the reply is read: a malformed report still cost what it cost.
+    input.onSpend?.({ model: PIECES_MODEL, usage: usageFrom(response.usage) });
+
+    const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
+    if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
+    const result = readPieces(block.input, input.ideas.length);
+    if (result.ok || attempt >= 2 || !SCHEMA_FAULT.test(result.detail)) return result;
+
+    messages.push(
+      { role: 'assistant', content: response.content },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: block.id,
+            is_error: true,
+            content: `${result.detail} Call ${TOOL_NAME} again with pieces as a list of objects, each with a title and ideas as a list of idea numbers.`,
           },
-        },
-      ],
-      tool_choice: forceTool(TOOL_NAME),
-      messages: [{ role: 'user', content: piecesPrompt(input) }],
-    });
-  } catch (error) {
-    return { ok: false, detail: error instanceof Error ? error.message : 'The pieces call failed.' };
+        ],
+      },
+    );
   }
-
-  // Before the reply is read: a malformed report still cost what it cost.
-  input.onSpend?.({ model: PIECES_MODEL, usage: usageFrom(response.usage) });
-
-  const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-  return readPieces(block.input, input.ideas.length);
 }

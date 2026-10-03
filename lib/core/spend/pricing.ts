@@ -66,12 +66,23 @@ export const MODEL_PRICES: Record<string, ModelPrice> = {
   'jev-1.13.0': { input: 0.042, cachedInput: 0, cacheWrite: 0, output: 0 },
 };
 
-/** Tokens as the API reports them. */
+/**
+ * The web search tool's fee: $10 per thousand searches, so ten thousand
+ * micro-dollars a search, billed on top of the tokens the results add.
+ */
+export const WEB_SEARCH_MICROS = 10_000;
+
+/** Tokens as the API reports them, and the web searches the call ran. */
 export type TokenUsage = {
   inputTokens: number;
   cachedInputTokens: number;
   cacheWriteTokens: number;
   outputTokens: number;
+  /**
+   * Searches run by the web search tool (`usage.server_tool_use`). Absent
+   * on a call that offered no search, which is read as none.
+   */
+  webSearchRequests?: number;
 };
 
 export const EMPTY_USAGE: TokenUsage = {
@@ -95,7 +106,8 @@ export function costMicrosFor(model: string, usage: TokenUsage): number | null {
     usage.inputTokens * price.input +
     usage.cachedInputTokens * price.cachedInput +
     usage.cacheWriteTokens * price.cacheWrite +
-    usage.outputTokens * price.output;
+    usage.outputTokens * price.output +
+    (usage.webSearchRequests ?? 0) * WEB_SEARCH_MICROS;
 
   return Math.round(micros);
 }
@@ -115,11 +127,18 @@ export function usageFrom(raw: unknown): TokenUsage {
   const count = (value: unknown): number =>
     typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
 
+  const serverTools = usage.server_tool_use;
+  const searches =
+    serverTools && typeof serverTools === 'object'
+      ? count((serverTools as Record<string, unknown>).web_search_requests)
+      : 0;
+
   return {
     inputTokens: count(usage.input_tokens),
     cachedInputTokens: count(usage.cache_read_input_tokens),
     cacheWriteTokens: count(usage.cache_creation_input_tokens),
     outputTokens: count(usage.output_tokens),
+    ...(searches > 0 ? { webSearchRequests: searches } : {}),
   };
 }
 
@@ -167,6 +186,8 @@ export function sumByModel(reports: SpendReport[]): SpendReport[] {
     seen.usage.cachedInputTokens += report.usage.cachedInputTokens;
     seen.usage.cacheWriteTokens += report.usage.cacheWriteTokens;
     seen.usage.outputTokens += report.usage.outputTokens;
+    const searches = (seen.usage.webSearchRequests ?? 0) + (report.usage.webSearchRequests ?? 0);
+    if (searches > 0) seen.usage.webSearchRequests = searches;
   }
   return [...byModel.values()];
 }

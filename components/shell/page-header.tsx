@@ -55,8 +55,8 @@ export function PageHeader({
       <div className="col-start-1 row-start-1 flex flex-wrap items-start gap-3 group-has-[[data-selection-bar]]/header:invisible">
         {leading}
         <div className="min-w-0">
-          <h1 className="font-display text-title tracking-tight text-ink">{title}</h1>
-          {description && <p className="mt-0.5 text-body text-ink-muted">{description}</p>}
+          <h1 className="font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">{title}</h1>
+          {description && <p className="mt-0.5 text-body text-ink-muted [overflow-wrap:anywhere]">{description}</p>}
         </div>
         {actions && (
           <div className="ml-auto flex flex-wrap items-center justify-end gap-2">{actions}</div>

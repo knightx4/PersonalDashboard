@@ -3,8 +3,10 @@ import {
   costMicrosFor,
   EMPTY_USAGE,
   MODEL_PRICES,
+  sumByModel,
   totalMicros,
   usageFrom,
+  WEB_SEARCH_MICROS,
   type TokenUsage,
 } from './pricing';
 
@@ -74,6 +76,15 @@ describe('what a call cost', () => {
     expect(costMicrosFor('claude-haiku-4-5', usage({ cachedInputTokens: 5 }))).toBe(1);
   });
 
+  it('adds the web search fee, a cent a search, on top of the tokens', () => {
+    // $10 per thousand searches is $0.01, ten thousand micro-dollars, each.
+    expect(WEB_SEARCH_MICROS).toBe(10_000);
+    const tokens = costMicrosFor('claude-sonnet-5', usage({ inputTokens: 1000, outputTokens: 100 }))!;
+    expect(costMicrosFor('claude-sonnet-5', usage({ inputTokens: 1000, outputTokens: 100, webSearchRequests: 3 }))).toBe(
+      tokens + 30_000,
+    );
+  });
+
   it('has a rate for every model this app calls', () => {
     for (const model of ['claude-opus-5', 'claude-haiku-4-5', 'claude-haiku-4-5-20251001']) {
       expect(MODEL_PRICES[model]).toBeDefined();
@@ -109,6 +120,16 @@ describe('reading usage off a response', () => {
     });
   });
 
+  it('takes the web searches the call ran, and leaves them off when there were none', () => {
+    expect(
+      usageFrom({ input_tokens: 10, output_tokens: 5, server_tool_use: { web_search_requests: 4 } }),
+    ).toEqual({ inputTokens: 10, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 5, webSearchRequests: 4 });
+    expect(usageFrom({ input_tokens: 10, output_tokens: 5, server_tool_use: { web_search_requests: 0 } })).not.toHaveProperty(
+      'webSearchRequests',
+    );
+    expect(usageFrom({ input_tokens: 10, server_tool_use: 'nonsense' })).not.toHaveProperty('webSearchRequests');
+  });
+
   it('survives a response with no usage at all', () => {
     expect(usageFrom(undefined)).toEqual(EMPTY_USAGE);
     expect(usageFrom(null)).toEqual(EMPTY_USAGE);
@@ -127,5 +148,16 @@ describe('adding a column of costs', () => {
 
   it('is zero and empty over nothing', () => {
     expect(totalMicros([])).toEqual({ micros: 0, unpriced: 0 });
+  });
+});
+
+describe('one report per model', () => {
+  it('adds the web searches along with the tokens', () => {
+    const [sonnet] = sumByModel([
+      { model: 'claude-sonnet-5', usage: usage({ inputTokens: 100, webSearchRequests: 2 }) },
+      { model: 'claude-sonnet-5', usage: usage({ inputTokens: 50 }) },
+      { model: 'claude-sonnet-5', usage: usage({ inputTokens: 10, webSearchRequests: 1 }) },
+    ]);
+    expect(sonnet.usage).toMatchObject({ inputTokens: 160, webSearchRequests: 3 });
   });
 });

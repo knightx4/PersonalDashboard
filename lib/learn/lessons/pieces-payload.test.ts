@@ -147,4 +147,24 @@ describe('reading the pieces', () => {
     expect(readPieces({ pieces: [] }, 3).ok).toBe(false);
     expect(readPieces({ nope: true }, 3).ok).toBe(false);
   });
+
+  it('reads the list sent as a JSON string or as the one object, and idea numbers sent as strings', () => {
+    const asString = readPieces({ pieces: JSON.stringify([{ title: 'One', ideas: [1, 2] }, { title: 'Two', ideas: [3] }, { title: 'Three', ideas: [4] }]) }, 4);
+    expect(asString).toEqual({ ok: true, pieces: [{ title: 'One', ideas: [1, 2] }, { title: 'Two', ideas: [3] }, { title: 'Three', ideas: [4] }] });
+
+    expect(readPieces({ pieces: { title: 'Only', ideas: [1] } }, 1)).toEqual({ ok: true, pieces: [{ title: 'Only', ideas: [1] }] });
+    expect(readPieces({ pieces: [{ title: 'Only', ideas: '1' }] }, 1)).toEqual({ ok: true, pieces: [{ title: 'Only', ideas: [1] }] });
+    expect(readPieces({ pieces: [{ title: 'Both', ideas: ['1', '2'] }] }, 2)).toEqual({ ok: false, detail: 'The unit came back in 1 piece.' });
+    expect(readPieces({ pieces: [{ title: 'A', ideas: '1, 2' }, { title: 'B', ideas: 3 }, { title: 'C', ideas: '[4]' }] }, 4)).toEqual({
+      ok: true,
+      pieces: [{ title: 'A', ideas: [1, 2] }, { title: 'B', ideas: [3] }, { title: 'C', ideas: [4] }],
+    });
+  });
+
+  it('names the field a refused report got wrong', () => {
+    expect(readPieces({ pieces: [{ title: 'One', ideas: ['first'] }] }, 1)).toEqual({
+      ok: false,
+      detail: 'The pieces did not match their schema (pieces.0.ideas.0).',
+    });
+  });
 });

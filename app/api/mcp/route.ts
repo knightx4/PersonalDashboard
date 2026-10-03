@@ -14,6 +14,12 @@ import { serveMcp } from '@/lib/connector/mcp';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+/**
+ * A lookup answers in seconds. A listen stream is now closed as soon as it
+ * is acknowledged (lib/connector/mcp.ts); this cap keeps any other stream
+ * left open from running to the 300 s default.
+ */
+export const maxDuration = 60;
 
 function handle(request: Request): Promise<Response> {
   return serveMcp(request, connectorAccess, () => createServiceSchemaSupabase('core'));

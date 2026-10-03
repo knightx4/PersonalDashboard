@@ -100,7 +100,7 @@ export default async function ShareDetailPage({ params }: { params: Promise<{ id
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div>
+        <div className="min-w-0">
           {groups.length === 0 ? (
             <EmptyState
               icon={Package}
@@ -178,7 +178,7 @@ export default async function ShareDetailPage({ params }: { params: Promise<{ id
           )}
         </div>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <CardSection title="Links">
             {/* Divided rows rather than a box each: the Links card is the
                 frame. Law 11. */}

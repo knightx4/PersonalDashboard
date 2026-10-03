@@ -2807,6 +2807,9 @@ form[data-auto-submit] [data-fallback-submit] {
   line-height: 1.7;
   /* Around 70 characters, which is where long lines stop being readable. */
   max-width: 68ch;
+  /* A pasted address has no spaces to wrap at, and on a phone it pushed the
+   * whole page sideways. Code blocks keep their own scroll. */
+  overflow-wrap: break-word;
 }
 
 .vault-prose > * + * {
