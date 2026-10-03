@@ -6,6 +6,10 @@ Every table in the app that can tell you something about a goal, grouped by how 
 says about what the person wants. Each is scoped to the person by `user_id` unless it says
 otherwise. The goals skill, "Pulling in from the other modules", says how to use it.
 
+The columns listed under Search find rows by their words. To find rows that say the same
+thing in other words, give a row you have already found to `core.search_memory_from`; the
+goals skill, "Search by meaning from a row you found", shows the call.
+
 ## What they said they want (read first, quote rather than paraphrase)
 
 ### `job_search.thoughts` (Job search)
