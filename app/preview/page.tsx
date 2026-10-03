@@ -3,6 +3,11 @@ import { isOwner } from '@/lib/dev/owner';
 import Link from 'next/link';
 import { SURFACES } from './surfaces';
 import { MAIN_BOX } from '@/components/shell/main-box';
+import {
+  INTERACTIONS_SCRIPT_ID,
+  writeInteractions,
+  type Interaction,
+} from '@/lib/preview/interaction';
 
 /**
  * The surface gallery: the app's own components, on the app's own ground.
@@ -74,8 +79,19 @@ export default async function PreviewPage({
     );
   }
 
+  // The declared interactions, for scripts/shoot.ts --record, which cannot
+  // import this module (it pulls in client components) and so reads them off
+  // the index the same way it reads the list of surfaces.
+  const interactions: Record<string, Interaction> = {};
+  for (const entry of SURFACES) if (entry.interaction) interactions[entry.id] = entry.interaction;
+
   return (
     <div className="bg-page min-h-screen px-6 py-10">
+      <script
+        type="application/json"
+        id={INTERACTIONS_SCRIPT_ID}
+        dangerouslySetInnerHTML={{ __html: writeInteractions(interactions) }}
+      />
       <div className="mx-auto max-w-2xl space-y-4">
         <div>
           <h1 className="text-title text-page-ink">Surfaces</h1>

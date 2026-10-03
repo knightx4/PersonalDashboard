@@ -31,6 +31,7 @@ import { RoundsTable, type RoundView } from '@/app/jobs/(app)/interviews/rounds-
 import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
 import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
+import type { Interaction } from '@/lib/preview/interaction';
 import { CalendarMonthGrid } from '@/components/todo/calendar-month';
 import { FeedEventCard } from '@/components/todo/feed-event-card';
 import {
@@ -150,6 +151,12 @@ export type Surface = {
    */
   width: 'narrow' | 'wide' | 'page';
   render: () => React.ReactNode;
+  /**
+   * The press, swipe or completion `npm run record` plays on this surface and
+   * keeps as a strip of frames (lib/preview/interaction.ts). Left out, the
+   * surface is not recorded.
+   */
+  interaction?: Interaction;
 };
 
 /**
@@ -3337,6 +3344,12 @@ export const SURFACES: readonly Surface[] = [
     label: 'News · Quick read story card',
     module: 'news',
     width: 'page',
+    interaction: {
+      kind: 'swipe',
+      target: '[data-quick-swipe]',
+      direction: 'left',
+      shows: 'The card follows the finger left, then slides off as the essay behind it comes in.',
+    },
     // The essay drawn behind it, so Next shows it at once (note 452a90d9).
     render: () => (
       <QuickReadView
