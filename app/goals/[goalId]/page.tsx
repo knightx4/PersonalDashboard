@@ -17,6 +17,7 @@ import { loadProgressEntries } from '@/lib/goals/progress-store';
 import { loadNumberFrom, loadReadings } from '@/lib/goals/readings-store';
 import { goalRunRows, type RunListing } from '@/lib/goals/runs';
 import { loadGoalRuns } from '@/lib/goals/runs-store';
+import { loadDashArrivals } from '@/lib/goals/dash-arrivals-store';
 import {
   approvalLine,
   countOpenQuestions,
@@ -123,6 +124,20 @@ function shapingLines(
 }
 
 /** Every step on the page, its own and those linked in, at any depth. */
+/** The finished steps on the page, the only ones that can arrive. */
+function doneStepIdsOn(map: GoalMap): string[] {
+  const done = new Set<string>();
+  const walk = (nodes: StepNode[]) => {
+    for (const node of nodes) {
+      if (node.status === 'done') done.add(node.id);
+      walk(node.children);
+    }
+  };
+  walk(map.steps);
+  walk(map.linked.map((entry) => entry.step));
+  return [...done];
+}
+
 function stepIdsOn(map: GoalMap): string[] {
   const ids: string[] = [];
   const walk = (nodes: StepNode[]) => {
@@ -268,7 +283,7 @@ export default async function GoalMapPage({
     goalMatchText({ title: map.goal.title, acceptance: map.goal.acceptance }),
     { core },
   ).then((found) => found.map(toLink));
-  const [stepRuns, filesOf, brief, review, places, progressEntries] = await Promise.all([
+  const [stepRuns, filesOf, brief, review, places, progressEntries, arrivals] = await Promise.all([
     loadStepRuns(client, stepIdsOn(map)).catch((): Record<string, GoalRun> => ({})),
     // The files the goal and its steps link to. A failed read leaves them
     // out rather than the page, as do the note and the verdict below.
@@ -289,6 +304,9 @@ export default async function GoalMapPage({
     loadProgressEntries(client, [map.goal.id, ...stepIdsOn(map)]).catch(
       (): ProgressEntry[] => [],
     ),
+    // The finished steps Dash closed lately, which arrive with its mark
+    // (plan #1561). A failed read leaves the moment out.
+    loadDashArrivals(client, doneStepIdsOn(map)).catch((): string[] => []),
   ]);
   const status = goalStatus(
     map.goal,
@@ -437,6 +455,7 @@ export default async function GoalMapPage({
             runs={stepRunLines(stepRuns)}
             files={filesOf}
             progress={summariseProgress(progressEntries)}
+            arrivals={arrivals}
           />
         </GoalStepsFold>
         <GoalRhythms steps={rhythmSteps(map.steps)} records={map.rhythms} />

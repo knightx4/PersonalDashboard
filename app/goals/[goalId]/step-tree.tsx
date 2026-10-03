@@ -43,6 +43,7 @@ const RUN_POLL_MS = 15_000;
 const NO_RUNS: Record<string, StepRunView> = {};
 const NO_FILES: Record<string, LinkedFile[]> = {};
 const NO_PROGRESS: Record<string, ItemProgress> = {};
+const NO_ARRIVALS: readonly string[] = [];
 
 /** A step that is finished or dropped, which folds away under the open ones. */
 function isClosed(row: GoalRowNode): boolean {
@@ -95,6 +96,7 @@ export function StepTree({
   runs = NO_RUNS,
   files = NO_FILES,
   progress = NO_PROGRESS,
+  arrivals = NO_ARRIVALS,
   view = DEFAULT_GOAL_VIEW,
 }: {
   map: GoalMap;
@@ -113,6 +115,8 @@ export function StepTree({
    * A step with none is not in it and reads as it always has.
    */
   progress?: Record<string, ItemProgress>;
+  /** The finished steps Dash closed lately, by id (plan #1561). */
+  arrivals?: readonly string[];
   /** Start with every step's sub-steps showing. */
   unfolded?: boolean;
   /** Start with every step opened. A seam for the gallery; nothing in the app passes it. */
@@ -154,6 +158,7 @@ export function StepTree({
       files,
       progress,
       progressBeneath: latestBeneath(trees.flat(), progress),
+      arrivals: new Set(arrivals),
       ...stepPreps(trees),
     };
     return {
@@ -164,7 +169,7 @@ export function StepTree({
       })),
       context,
     };
-  }, [map, todoOn, showAside, unfolded, opened, informationSeam, runs, files, progress]);
+  }, [map, todoOn, showAside, unfolded, opened, informationSeam, runs, files, progress, arrivals]);
   // When anything on the goal last moved, its own entries included.
   const lastOn = lastProgressOn(progress);
 

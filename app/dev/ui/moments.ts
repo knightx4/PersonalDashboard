@@ -166,7 +166,11 @@ export const MOMENTS: readonly Moment[] = [
     trigger: 'A goal step closed by a Dash run appearing on the page.',
     sees: 'The step settles in, and Dash’s mark beside it flashes once.',
     reducedMotion: 'The step and the mark are simply there.',
-    state: { built: 'no', step: 1561 },
+    state: {
+      built: 'yes',
+      where:
+        'useDashArrival in app/goals/[goalId]/dash-arrival.ts on the step’s row, for the steps loadDashArrivals in lib/goals/dash-arrivals-store.ts finds Dash closed.',
+    },
   },
   {
     workspace: 'learn',

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { FieldError, InlineInput } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { awaitsSeenIt } from '@/lib/goals/answer-change';
+import { useDashArrival } from './dash-arrival';
 import type { LinkedFile } from '@/lib/files/files';
 import { awaitsReview } from '@/lib/goals/daily';
 import type { PrepTarget, StepPrep } from '@/lib/goals/goal-page';
@@ -127,6 +128,8 @@ export type GoalRowContext = {
   progress?: Record<string, ItemProgress>;
   /** The newest progress beneath each step with sub-steps, by step id. */
   progressBeneath?: Record<string, LatestBeneath>;
+  /** The finished steps Dash closed lately, which arrive with its mark (plan #1561). */
+  arrivals?: ReadonlySet<string>;
 };
 
 /**
@@ -339,6 +342,10 @@ export function GoalRow({
     opened: context.opened,
   });
   const [blocking, setBlocking] = useState(false);
+  // A step Dash finished lately settles in with its mark flashing, the first
+  // time you see it (plan #1561).
+  const arrived = step.status === 'done' && (context.arrivals?.has(step.id) ?? false);
+  const markRef = useDashArrival(step.id, arrived);
   // Send to Claude (plan #1000). Held by the row rather than by a button,
   // because there are three ways to press it -- the quick icon, the button in
   // the opened row and the menu -- and what came back is said once, on the
@@ -566,7 +573,8 @@ export function GoalRow({
   // hidden below sm. A stage over both kinds carries both. A rhythm keeps its
   // own mark beside the Yours one.
   const yours = node.who.word !== 'Dash';
-  const dashes = node.who.word !== 'You';
+  // A step of yours that Dash closed from evidence carries the mark too.
+  const dashes = node.who.word !== 'You' || arrived;
   const onTodo = context.todoOn && step.onTodo && canShowOnTodo(step);
   const substeps = node.children.filter((child) => child.kind !== 'decision');
 
@@ -605,7 +613,14 @@ export function GoalRow({
           )}
           {dashes && (
             <span
-              title={step.kind === 'claude' ? STEP_KIND_LABELS.claude : node.who.title}
+              ref={markRef}
+              title={
+                step.kind === 'claude'
+                  ? STEP_KIND_LABELS.claude
+                  : arrived
+                    ? 'Finished by Dash'
+                    : node.who.title
+              }
               className="inline-flex shrink-0 text-ink-muted"
             >
               <DashMark size="2xs" label="Dash's" />
