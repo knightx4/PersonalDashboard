@@ -74,6 +74,12 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    the repo's rules (`README.md` "Rules", the module's spec in `docs/`). Do not
    fold unrelated cleanup into a step's commit.
 
+   **A step that changes a screen starts in the gallery.** When the brief has a
+   `## Gallery surfaces` section, or the change touches a `.tsx` file under
+   `app/` or `components/` that a person sees, follow **Building a screen**
+   below: draw it with fixtures, photograph it, have the critic pass it, and
+   only then wire it to real data.
+
    **Read the part you need, not the whole file.** Twenty-four files here are
    over forty thousand characters, and the largest are over a hundred and
    twenty thousand: `app/jobs/(app)/roles/[id]/panels.tsx` is about
@@ -108,7 +114,9 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
      the code you touched, not the whole suite.
 
    Then check the done-when line by line. If a line is not met, it is not
-   done.
+   done. A step that changes a screen is not done until the critic has passed
+   each of its surfaces, or the third round has failed (see **Building a
+   screen**).
 
    **Do not run the full suite and do not run `next build`.** The session that
    sent you runs both when it merges your step to main, which is as soon as you
@@ -117,7 +125,9 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    about a test that the narrow run cannot reach: run what the done-when needs
    and say so in your report.
 7. **Commit the step on its own.** One step per commit. End the subject with
-   the step: `Add the anonymous share page (plan #14)`. **Do not push and do
+   the step: `Add the anonymous share page (plan #14)`. A step that changed a
+   screen carries one `UI-check:` line per critic round in the commit body
+   (see **Building a screen**). **Do not push and do
    not merge.** The session that sent you puts your commit on main and closes
    your step from there, so stop at the commit and say in your report that you
    made it. If nobody sent you and this step is the whole job, the merge is
@@ -166,12 +176,114 @@ session building the next step:
   out to have, a test that has to be updated whenever this changes, a rule in
   the code that was not obvious. This is the part that stops the next step
   re-deriving what you just learned.
+- **The critic rounds**, for a step that changed a screen: each surface, how
+  many rounds it took, and the last verdict. After a third failed round, the
+  last verdict's fixes in full and where the shots are.
 - **Anything you wrote outside your own step**: a decision and its dependency
   edge, fog graduated or cleared, an idea filed, a raise. By number and title.
 - **Any step that became ready** when you closed yours.
 
 Keep it to what the next session needs. A page is too long; three lines is too
 short.
+
+## Building a screen
+
+A step that adds or changes a screen draws it in the gallery, photographs it
+and has a separate critic pass the pictures before the screen is wired to real
+data (`docs/UI-QUALITY-SPEC.md`, Parts 1 to 3). The first version of a screen
+used to be designed by reading code, and most of the person's notes were about
+what that missed on a phone.
+
+**Which surfaces.** The brief's `## Gallery surfaces` section lists them, as
+`- <id>: /preview?s=<id>, for <routes>`. Working offline there is no brief
+from the CLI, so read them yourself: `surfacesInText` and `surfacesForFiles`
+in `lib/preview/routes.ts` give the surfaces a step's words and changed files
+name. A step that changes a page with no surface adds one, and adds its routes
+to `SURFACE_ROUTES` in the same file; `tests/preview-routes.test.ts` fails on
+a surface with no routes. A step that changes no surface skips this section.
+
+**The loop, for each surface:**
+
+1. **Shoot main first.** Before changing anything, photograph the surface as
+   main has it, for the critic to compare against. Take it from a worktree of
+   `origin/main` (`git worktree add <dir> origin/main`, with a link to this
+   checkout's `node_modules`), shooting it as in 3 below, so the shots land
+   in that worktree's `.preview-shots/`. Stop its preview server before
+   starting your own, since both use port 3400. A new surface has no before
+   shots; the critic is told "none".
+2. **Draw it in the gallery.** Add or update the surface's entry in
+   `app/preview/surfaces.tsx` with typed fixtures and the real components.
+   Fixtures as long and as empty as real data gets: the longest name, the
+   empty list.
+3. **Photograph it.** Build and serve the preview, then shoot the one
+   surface:
+
+   ```
+   export NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
+   export NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-anon-key
+   npm run preview &          # UI_PREVIEW build and start on port 3400
+   npm run shoot -- <id>      # one surface per run
+   ```
+
+   Without the two placeholders the preview pages answer 500. The shots are
+   `.preview-shots/<id>--{phone,laptop}-{light,dark}.png`: 390 and 1280
+   pixels, light and dark. Open them yourself before sending them on.
+4. **Hand them to the critic.** The `ui-critic` agent
+   (`.claude/agents/ui-critic.md`) judges the pictures and nothing else. Run
+   it as the subagent `ui-critic`, or, where you cannot start a subagent,
+   headless with the prompt on stdin:
+
+   ```
+   echo "<prompt>" | claude -p --agent ui-critic --allowedTools "Read,Glob,Grep"
+   ```
+
+   The prompt names the surface id, the round (1, 2 or 3), the four after
+   shots, the before shots or "none", the step's done-when, the page pattern
+   when the brief names one, and on rounds 2 and 3 the fixes from the round
+   before. It answers with a paragraph and a fenced `json` verdict:
+   `verdict` is `pass` or `fix`, and each fix names the shot, where, the
+   problem, what it breaks (`law <n>`, `taste:<id>`, `done-when` or
+   `regression`) and the change.
+5. **Record the round** (below), whatever the verdict.
+6. **On `fix`, make every change it asks for**, shoot again and start the next
+   round. Most surfaces fail round 1. A fix you think is wrong is still the
+   critic's call: make it, or say in the next prompt why it cannot be made,
+   and let the critic rule on that.
+7. **On `pass`, wire it.** Connect the screen to real data. If wiring it
+   changes the components the gallery draws, shoot again and send the new
+   shots to the critic as the next round.
+
+**The builder never writes the verdict.** You copy the critic's `json` block
+as it came back. You do not edit it, summarise it into a pass, or judge the
+pictures yourself in its place.
+
+**Three rounds at most.** If round 3 comes back `fix`, stop the loop. What
+happens after a third failed round is decision #1535 on the plan, and it is
+unanswered: do not run a fourth round and do not choose what follows. Report
+the step with the last verdict's fixes and where the shots are, and leave the
+next move to the session that sent you or, with nobody, to the person. Once
+#1535 is answered, its answer replaces this paragraph.
+
+**Recording a round.** Every round goes on record, passed or failed, in two
+places:
+
+- Save the critic's `json` block, unchanged, as
+  `.preview-shots/checks/<step>--<surface>--r<round>.json`, beside the shots
+  it judged. That folder is gitignored; the file is what the recorder reads.
+- Add one line per round to the step's commit body:
+
+  ```
+  UI-check: <surface> round <n> <pass|fix> (<k> fixes)
+  ```
+
+  The commit is the record that lasts until the table below exists.
+
+Plan #1533 adds the table for this, `public.ui_checks` (step, surface, round,
+verdict, fixes), and a bucket for the shots that only the account can read.
+When it lands, the command it adds takes the place of the commit line: it
+reads the saved verdict file, uploads the shots and writes the row. Plan #1534
+then makes `done` refuse a step whose commit changes a `.tsx` file under
+`app/` or `components/` while one of its surfaces has no passing round.
 
 ## When you reach something you should not decide
 
