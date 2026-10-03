@@ -74,9 +74,9 @@ function line(id: string, areaId: string, extra: Partial<HomeGoal> = {}): HomeGo
     progress: {
       live: 0,
       done: 0,
-      bands: { on_you: 0, waiting: 0, with_claude: 0, done: 0 },
+      bands: { on_you: 0, waiting: 0, with_dash: 0, done: 0 },
       move: 'settled',
-      moves: { on_you: 0, with_claude: 0, waiting: 0, settled: 0 },
+      moves: { on_you: 0, with_dash: 0, waiting: 0, settled: 0 },
       questions: 0,
     },
     review: null,

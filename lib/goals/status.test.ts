@@ -131,7 +131,7 @@ describe('goalProgress', () => {
     const progress = goalProgress(steps);
     expect(progress.live).toBe(5);
     expect(progress.done).toBe(2);
-    expect(progress.bands).toEqual({ on_you: 2, waiting: 0, with_claude: 1, done: 2 });
+    expect(progress.bands).toEqual({ on_you: 2, waiting: 0, with_dash: 1, done: 2 });
     expect(progress.move).toBe('on_you');
     expect(progress.questions).toBe(1);
   });

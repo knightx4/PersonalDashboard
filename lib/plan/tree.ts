@@ -10,6 +10,7 @@ import {
 } from './load';
 import { claimLiveness, type ClaimLiveness, type ClaimRun, type ClaimStep } from './liveness';
 import { PLAN_SCOPES, planScopeLabel, type PlanScope } from '@/lib/plan/projects';
+import { MOVE_WORD } from '@/lib/core/move';
 
 /**
  * The plan, read.
@@ -150,7 +151,7 @@ export const PLAN_VIEW_MENU: readonly PlanView[] = PLAN_VIEWS.filter(
 export const PLAN_VIEW_LABEL: Record<PlanView, string> = {
   all: 'Everything',
   open: 'Open',
-  you: 'On you',
+  you: MOVE_WORD.on_you,
   ready: 'Ready',
   proposed: 'Proposed',
   claude: "Dash's",

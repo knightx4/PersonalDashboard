@@ -34,9 +34,9 @@ function step(id: string, parentId: string, extra: Partial<Step> = {}): Step {
 const progress: GoalProgress = {
   live: 4,
   done: 1,
-  bands: { on_you: 2, waiting: 0, with_claude: 1, done: 1 },
+  bands: { on_you: 2, waiting: 0, with_dash: 1, done: 1 },
   move: 'on_you',
-  moves: { on_you: 2, with_claude: 1, waiting: 0, settled: 0 },
+  moves: { on_you: 2, with_dash: 1, waiting: 0, settled: 0 },
   questions: 0,
 };
 

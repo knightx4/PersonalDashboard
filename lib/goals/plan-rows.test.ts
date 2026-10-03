@@ -85,7 +85,7 @@ describe('goalRows', () => {
     expect(row.health.word).toBe(HEALTH.blocked.word);
     expect(row.health.title).toBe('The bank letter');
     expect(row.blockAsk).toBe('The bank letter');
-    expect(row.move.word).toBe('Needs you');
+    expect(row.move.word).toBe('On you');
   });
 
   it('reads a step waiting on an open step as Waiting, naming it by number', () => {
@@ -95,7 +95,7 @@ describe('goalRows', () => {
     const row = find(rows, 'b');
     expect(row.health.name).toBe('waiting');
     expect(row.health.title).toBe('Waits on #1 List balances');
-    expect(row.move.word).toBe('Held up');
+    expect(row.move.word).toBe('Waiting');
     expect(row.dependsOn).toEqual([
       {
         dependencyId: 'd1',
@@ -135,7 +135,7 @@ describe('goalRows', () => {
     expect(row.health.name).toBe('blocked');
     expect(row.health.title).toBe(REVIEW_ASK);
     expect(row.health.word).toBe(REVIEW_WORD);
-    expect(row.move.word).toBe('Needs you');
+    expect(row.move.word).toBe('On you');
     expect(row.blockAsk).toBeNull();
   });
 
@@ -146,7 +146,7 @@ describe('goalRows', () => {
     expect(a.health.name).toBe('blocked');
     expect(a.health.word).toBe(YOURS_WORD);
     expect(a.health.title).toBe(YOURS_ASK);
-    expect(a.move.word).toBe('Needs you');
+    expect(a.move.word).toBe('On you');
     expect(a.need).toBe(YOURS_ASK);
     expect(find(rows, 'b').move.word).toBe('');
     expect(find(rows, 'b').health.name).toBe('ready');

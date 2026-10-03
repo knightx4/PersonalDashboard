@@ -13,9 +13,9 @@ function progressAt(done: number): Progress {
   return {
     live: LIVE,
     done,
-    bands: { on_you: onYou, waiting: 0, with_claude: open - onYou, done },
+    bands: { on_you: onYou, waiting: 0, with_dash: open - onYou, done },
     move: open === 0 ? 'settled' : 'on_you',
-    moves: { on_you: onYou, waiting: 0, with_claude: open - onYou, settled: 0 },
+    moves: { on_you: onYou, waiting: 0, with_dash: open - onYou, settled: 0 },
     questions: 0,
   };
 }
