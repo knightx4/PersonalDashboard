@@ -9,6 +9,7 @@ import {
 } from '@/lib/jobs/jd/lookup';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import { recordScheduled, scheduledBefore } from '@/lib/core/scheduled-actions';
 
 /**
  * Filling in job descriptions from the employer's own board, nightly.
@@ -109,7 +110,7 @@ export async function runJdBackfill(
   return summary;
 }
 
-async function backfillCompany(
+export async function backfillCompany(
   supabase: AppSupabaseClient,
   core: CoreSupabaseClient,
   roles: RoleRow[],
@@ -135,9 +136,28 @@ async function backfillCompany(
   }
 
   for (const role of roles) {
+    const ref = `job_search.roles:${role.id}`;
+    const before = await scheduledBefore(supabase, role.user_id, ref);
     const outcome = await applyBoardToRole(supabase, role, resolved.board, now);
     if (outcome.kind === 'filled') summary.filled += 1;
     else if (outcome.kind === 'ambiguous') summary.ambiguous += 1;
     else if (outcome.kind === 'closed') summary.closed += 1;
+
+    // A filled description and a closed posting change what the role says,
+    // so they are recorded as Dash's (plan #1570). The lookup note on the
+    // other outcomes is the run's own bookkeeping.
+    if (outcome.kind === 'filled' || outcome.kind === 'closed') {
+      const name = `${role.title} at ${company.name}`;
+      await recordScheduled(supabase, role.user_id, {
+        kind: outcome.kind === 'filled' ? 'fill_job_description' : 'close_posting',
+        subjectRef: ref,
+        op: 'update',
+        summary:
+          outcome.kind === 'filled'
+            ? `Dash filled in the job description for ${name} from the ${outcome.vendor} board.`
+            : `Dash marked the posting for ${name} closed, because it is no longer on the ${outcome.vendor} board.`,
+        beforeValues: before,
+      });
+    }
   }
 }

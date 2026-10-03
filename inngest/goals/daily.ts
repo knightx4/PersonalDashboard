@@ -90,7 +90,7 @@ export type GoalsDailyDeps = {
   /** Stands in for readEvidence, so a test need not answer every schema's reads. */
   evidence?: (input: EvidenceInput) => Promise<EvidenceBrief | null>;
   /** Stands in for holdActingSteps (plan #1183). */
-  holdActs?: (input: { client: GoalsSupabaseClient; userId: string }) => Promise<unknown>;
+  holdActs?: (input: { client: GoalsSupabaseClient; userId: string; scheduled?: boolean }) => Promise<unknown>;
   /** Stands in for loadStatementSources, for the same reason. */
   statements?: (
     client: GoalsSupabaseClient,
@@ -169,7 +169,7 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
 
   // A Claude step that acts outside the plan becomes a proposal before the
   // tree is read, so it is not in the brief's ready steps (plan #1183).
-  await (deps?.holdActs ?? holdActingSteps)({ client, userId });
+  await (deps?.holdActs ?? holdActingSteps)({ client, userId, scheduled: true });
 
   // A step whose start date has not come is left for a later morning.
   const today = await accountToday(client, userId, now);

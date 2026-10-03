@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { SpendReport } from '@/lib/core/spend/pricing';
+import { recordScheduled, scheduledBefore } from '@/lib/core/scheduled-actions';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
@@ -71,6 +72,11 @@ export type HoldActsInput = {
   ask?: (step: ActsCandidate) => Promise<number | null>;
   write?: (step: ActsCandidate) => Promise<string | null>;
   enabled?: boolean;
+  /**
+   * The scheduled morning run: each step held is recorded as Dash's change,
+   * with Undo on Home (plan #1570). The pressed paths leave it off.
+   */
+  scheduled?: boolean;
 };
 
 /** Open Claude steps with no sentence, and those blocked only on other steps. */
@@ -143,12 +149,25 @@ export async function holdActingSteps(input: HoldActsInput): Promise<HoldActsRes
         continue;
       }
       const acts = (await write(check.step)) ?? fallbackActsSentence(check.step);
+      const ref = `goals.items:${check.step.id}`;
+      const before = input.scheduled ? await scheduledBefore(client, userId, ref) : null;
       const { data, error } = await client.rpc('hold_acting_step', { step: check.step.id, sentence: acts });
       if (error) {
         console.warn(`[goals] step ${check.step.id} not held: ${error.message}`);
         continue;
       }
-      if (data === true) held.push({ ...found, acts });
+      if (data === true) {
+        held.push({ ...found, acts });
+        if (input.scheduled) {
+          await recordScheduled(client, userId, {
+            kind: 'hold_acting_step',
+            subjectRef: ref,
+            op: 'update',
+            summary: `Dash turned the step "${check.step.title}" into a proposal for you to approve, because it acts outside the plan: ${acts}`,
+            beforeValues: before,
+          });
+        }
+      }
     }
 
     await Promise.all([

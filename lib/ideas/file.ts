@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { recordScheduled } from '@/lib/core/scheduled-actions';
 import { findDuplicateIdea, type FiledIdea } from '@/lib/ideas/duplicate';
 import { loadFiledIdeas } from '@/lib/ideas/load';
 
@@ -35,6 +36,12 @@ export function nightIdeaBody(suggestion: NightSuggestion): string {
   const title = suggestion.title.trim();
   const detail = suggestion.detail?.trim();
   return detail ? `${title}\n\n${detail}` : title;
+}
+
+/** The idea's first line, short enough to quote in a sentence. */
+function firstLine(body: string): string {
+  const line = body.split('\n')[0].trim();
+  return line.length > 200 ? `${line.slice(0, 199).trimEnd()}…` : line;
 }
 
 /**
@@ -79,8 +86,17 @@ export async function fileNightIdeas(
       continue;
     }
 
-    filed.unshift({ id: String((data as { id: string }).id), body });
+    const id = String((data as { id: string }).id);
+    filed.unshift({ id, body });
     written += 1;
+    // The nightly run is scheduled, so each idea it files is recorded as
+    // Dash's, with Undo on Home (plan #1570).
+    await recordScheduled(supabase, userId, {
+      kind: 'file_idea',
+      subjectRef: `public.ideas:${id}`,
+      op: 'insert',
+      summary: `Dash filed an idea overnight: "${firstLine(body)}".`,
+    });
   }
 
   return written;
