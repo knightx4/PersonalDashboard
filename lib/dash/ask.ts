@@ -2,7 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import type { AskToolResult } from '@/lib/ask/db';
 import type { PageContext } from '@/lib/ask/page';
-import type { DashChange, NewDashChange } from '@/lib/talk/changes';
+import type { DashChange, MadeDashChange, NewDashChange } from '@/lib/talk/changes';
 import { HANDED_OFF, handoffRequest, type DashHandoff } from '@/lib/talk/handoff';
 import { DASH_MODELS } from './models';
 import { askTitle, MAX_TURN, type NewTalkTurn, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
@@ -16,20 +16,24 @@ import {
   type DashSeen,
   type DashStop,
   type DashVoice,
+  type DashWriter,
 } from './loop';
-import { DASH_TOOLS } from './registry';
+import { DASH_TOOLS, type DashWriteResult, type DashWriteTool } from './registry';
 
 /**
  * Ask Dash: Dash answering a question about anything in the app (plan
  * #1089), on the shared loop in lib/dash/loop.ts since plan #1463.
  *
  * Ask's voice offers every tool in the registry (lib/dash/registry.ts): the
- * lookups, the four proposals (lib/ask/propose.ts, plans #1188 and #1296:
- * add a todo, add a goal step, mark an item returned, start a watch), and
- * `hand_off` (lib/talk/handoff.ts, plan #1402). A proposal is kept as a
- * proposed row in core.dash_actions and nothing else is written; the person
- * confirms each on its own. A hand-off keeps the request, the answer says it
- * was passed on, and the backup routine is started once the answer is kept.
+ * lookups, the writes (lib/dash/writes.ts, plan #1440: a todo added,
+ * renamed, moved or ticked off, a goal or a step added, a step closed, an
+ * item marked returned, a note on a role), the one proposal left (a watch
+ * on a price, plan #1296), and `hand_off` (lib/talk/handoff.ts, plan #1402).
+ * A write happens when Dash makes it and is kept as a done row in
+ * core.dash_actions, which the answer's card offers to Undo. A proposal is
+ * kept as a proposed row and nothing else is written until the person
+ * confirms it. A hand-off keeps the request, the answer says it was passed
+ * on, and the backup routine is started once the answer is kept.
  *
  * `answerQuestion` is the loop with Ask's voice. `askDash` below it keeps the
  * turns and the spend through the stores it is handed;
@@ -66,19 +70,26 @@ email says, find it with search_mail, then open it with read_mail and answer
 from its text. Open only the messages the question is about, and quote no
 more of the text than the answer needs.
 
-YOU CAN PROPOSE FOUR CHANGES, AND ONLY WHEN ASKED. When they ask you to add
-a todo, add a step under one of their goals, or say they sent an item back,
-call propose_todo, propose_goal_step or propose_returned. When they ask you to
-watch a price on a page outside the app, or to tell them when it drops, call
-propose_watch. A goal, a step or an item is named by the ref a lookup returned
-for it, so look it up first. Nothing is written when you propose: each
-proposal shows as a card under your answer and they confirm or decline it.
-Say in your answer what you proposed, and for a watch, what it will do and
-when it stops. You may propose several in one answer.
+YOU MAKE THE CHANGES THEY ASK FOR, AND ONLY WHEN ASKED. When they ask you to
+add, rename, move or tick off a todo, add a goal under one of their areas,
+add a step under a goal or mark one done, say they sent an item back, or note
+something on a role, call the tool for it: add_todo, change_todo, close_todo,
+add_goal, add_goal_step, close_goal_step, mark_returned or add_role_note. The
+change is made when you call it, and shows as a card under your answer with
+an Undo. A todo, a goal, a step, an item or a role is named by the ref a
+lookup returned for it, so look it up first; an area is named by its name.
+When you cannot tell which row they mean, ask rather than guess. Say in your
+answer what you did, and cite the row the tool returned so they can open it.
+Never change something they only asked about.
+
+A WATCH IS PROPOSED, NOT STARTED. When they ask you to watch a price on a page
+outside the app, or to tell them when it drops, call propose_watch. Nothing is
+written: it shows as a card under your answer and they confirm or decline it.
+Say what it will do and when it stops.
 
 ANYTHING ELSE THEY ASK YOU TO DO, HAND ON. When they ask you to create or
-change something none of your tools can (a new goal, editing or completing a
-todo, a job application, a note), call hand_off with the request written out
+change something none of your tools can (a job application, a vault note, a
+goal's done-when), call hand_off with the request written out
 in full, including every detail they gave and the refs of rows you looked up
 for it. A routine does it within a few minutes and its reply appears in this
 conversation. Then say in a sentence that you have passed it on; do not say
@@ -115,6 +126,8 @@ export async function answerQuestion(input: {
   execute: AskExecutor;
   /** Absent: every proposal is refused. */
   propose?: AskProposer;
+  /** Absent: every write is refused. */
+  write?: DashWriter;
   /**
    * Keeps a hand-off and returns what to tell the model. Absent: every
    * hand-off is refused. `seen` says whether Dash has seen the row it names.
@@ -145,6 +158,8 @@ export type AskStores = {
   recordSpend: (reports: Parameters<SpendSink>[0][]) => Promise<void>;
   /** Keeps a proposal in the conversation (changes.ts insertProposal). */
   saveProposal: (conversationId: string, change: NewDashChange) => Promise<DashChange>;
+  /** Keeps a change Dash made as done (changes.ts insertMadeChange). Absent: every write is refused. */
+  saveChange?: (conversationId: string, made: MadeDashChange) => Promise<DashChange>;
   /** Ties the answer's proposals to its turn once that is written. */
   attachProposals: (ids: readonly string[], turnId: string) => Promise<void>;
   /** Removes the proposals of an answer that was not kept. */
@@ -167,6 +182,14 @@ export type AskProposalRunner = (
   save: (change: NewDashChange) => Promise<DashChange>,
 ) => Promise<AskToolResult>;
 
+/** A write tool run as the person: the tool's apply with their context bound. */
+export type AskWriteRunner = (tool: DashWriteTool, input: unknown, seen: DashSeen) => Promise<DashWriteResult>;
+
+/** What the model is told once a change is made and kept. */
+function madeNote(summary: string): string {
+  return `Done: ${summary} It shows under your answer with an Undo. Say what you did, and cite the row this returned.`;
+}
+
 export type AskDashResult = {
   /** The conversation, to reopen or continue; absent only when nothing was kept. */
   conversation?: { ref: string; title: string | null };
@@ -176,7 +199,7 @@ export type AskDashResult = {
   error?: string;
   /** Why the answer stopped: 'answered', or the limit it was written under. */
   stop?: AskStop;
-  /** The changes the answer proposed, each tied to its turn, in the order proposed. */
+  /** The changes the answer made or proposed, each tied to its turn, in the order made. */
   changes?: DashChange[];
   /** The requests the answer handed to the backup routine, with what starting it did. */
   handoffs?: DashHandoff[];
@@ -202,6 +225,12 @@ export async function askDash(
     execute: AskExecutor;
     /** Absent: every proposal is refused. */
     propose?: AskProposalRunner;
+    /**
+     * Runs a write tool's `apply` with the person's context bound (the
+     * request's clients and the rows Dash has seen). Absent, or with no
+     * `saveChange` store: every write is refused.
+     */
+    write?: AskWriteRunner;
     anthropicApiKey: string | null | undefined;
     client?: Anthropic;
     now?: () => number;
@@ -246,6 +275,40 @@ export async function askDash(
     proposed.push(kept);
     return kept;
   };
+  // A write is made at once and kept as done; it joins the proposals so its
+  // card hangs from the answer the same way. A write is not taken back when
+  // the answer fails: the person asked for it, and it shows in Ask's list.
+  const apply = input.write;
+  const saveChange = stores.saveChange;
+  const write: DashWriter | undefined =
+    apply && saveChange
+      ? async (tool, args, seen) => {
+          const result = await apply(tool, args, seen);
+          if (!result.ok) return { ok: false, error: result.error };
+          const { row } = result;
+          const made = {
+            kind: result.kind,
+            input: result.input,
+            subjectRef: result.subjectRef,
+            op: result.op,
+            before: result.before,
+            after: result.after,
+            summary: result.summary,
+            undo: result.undo ?? null,
+          } as MadeDashChange;
+          try {
+            proposed.push(await saveChange(subject.ref, made));
+          } catch (error) {
+            console.error(`ask write ${tool.name} was made but not kept`, error);
+            return {
+              ok: true,
+              rows: [row],
+              note: `Done: ${result.summary} Its Undo could not be kept, so tell them it is done and can be changed back on its page.`,
+            };
+          }
+          return { ok: true, rows: [row], note: madeNote(result.summary) };
+        }
+      : undefined;
   const handed: DashHandoff[] = [];
   const saveHandoff = stores.saveHandoff;
   const handOff =
@@ -279,6 +342,7 @@ export async function askDash(
     page: input.page,
     execute: input.execute,
     propose: propose ? (name, args, seen) => propose(name, args, seen, save) : undefined,
+    write,
     handOff,
     anthropicApiKey: input.anthropicApiKey,
     client: input.client,

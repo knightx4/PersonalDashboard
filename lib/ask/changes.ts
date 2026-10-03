@@ -3,11 +3,13 @@ import { insertStep, setStepArchived } from '@/lib/goals/steps-store';
 import type { ModuleId } from '@/lib/modules';
 import { markReturned, unmarkReturned } from '@/lib/returns/mark';
 import type { TaskInput } from '@/lib/todo/tasks/input';
-import { readSubject } from '@/lib/core/dash-actions';
+import { readSubject, undoDashAction } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
 import {
   DASH_ACTIONS,
+  type NewDashChange,
   DASH_CHANGE_SELECT,
+  PROPOSAL_KINDS,
   toDashChange,
   type DashChange,
   type DashChangeKind,
@@ -44,6 +46,14 @@ import type { AskDb, SchemaClient } from './db';
  *   start_watch    the watch deleted, with its readings, while it is still
  *                  running and has sent no push. One that has is stopped
  *                  from its home row instead (plan #1296).
+ *
+ * Since plan #1440 Dash makes these four straight away when asked (lib/dash/
+ * writes.ts runs writeChange below and keeps the change as done), and adds
+ * five more kinds of its own: a goal, a renamed or moved todo, a ticked-off
+ * todo, a closed goal step and a note on a role. Those five are undone by
+ * the one rule in lib/core/dash-actions.ts, from the values the record
+ * kept; a ticked-off todo also reopens the items on its list that went with
+ * it.
  *
  * Every refusal is a sentence the person reads in place of the button, and
  * names Dash, not Claude.
@@ -96,6 +106,15 @@ export function changePaths(change: DashChange): string[] {
       ];
     case 'start_watch':
       return ['/home'];
+    case 'add_goal':
+      return ['/goals', ...(change.writtenRef ? [`/goals/${change.writtenRef}`] : [])];
+    case 'change_todo':
+    case 'close_todo':
+      return ['/todo', '/todo/all', '/home'];
+    case 'close_goal_step':
+      return ['/goals', `/goals/${change.input.goalId}`];
+    case 'add_role_note':
+      return [`/jobs/roles/${change.input.roleId}`];
   }
 }
 
@@ -105,6 +124,11 @@ const WORKSPACE: Record<DashChangeKind, { module: ModuleId; label: string } | nu
   add_goal_step: { module: 'goals', label: 'Goals' },
   mark_returned: { module: 'shopping', label: 'Shopping' },
   start_watch: null,
+  add_goal: { module: 'goals', label: 'Goals' },
+  change_todo: { module: 'todo', label: 'Todo' },
+  close_todo: { module: 'todo', label: 'Todo' },
+  close_goal_step: { module: 'goals', label: 'Goals' },
+  add_role_note: { module: 'jobs', label: 'Jobs' },
 };
 
 const WRITTEN_TABLE: Record<DashChangeKind, string> = {
@@ -112,6 +136,11 @@ const WRITTEN_TABLE: Record<DashChangeKind, string> = {
   add_goal_step: 'goals.items',
   mark_returned: 'public.inventory_items',
   start_watch: 'core.watches',
+  add_goal: 'goals.items',
+  change_todo: 'todo.tasks',
+  close_todo: 'todo.tasks',
+  close_goal_step: 'goals.items',
+  add_role_note: 'job_search.notes',
 };
 
 /** What each kind does to that row: a return changes the item, the rest add one. */
@@ -120,6 +149,11 @@ const WRITTEN_OP: Record<DashChangeKind, 'insert' | 'update'> = {
   add_goal_step: 'insert',
   mark_returned: 'update',
   start_watch: 'insert',
+  add_goal: 'insert',
+  change_todo: 'update',
+  close_todo: 'update',
+  close_goal_step: 'update',
+  add_role_note: 'insert',
 };
 
 /** A refusal the person reads: the sentence is theirs, the class only marks it as one. */
@@ -175,6 +209,13 @@ function notConfirmed(status: DashChangeStatus): string {
 // Writers: one per kind. Each re-reads what the proposal checked, since that
 // check may be hours old, and returns the row it wrote.
 // ---------------------------------------------------------------------------
+
+/** The four kinds that were proposals first, which write and undo by their own code here. */
+type ProposalChange = Extract<DashChange, { kind: 'add_todo' | 'add_goal_step' | 'mark_returned' | 'start_watch' }>;
+
+function isProposalKind(change: DashChange): change is ProposalChange {
+  return PROPOSAL_KINDS.includes(change.kind);
+}
 
 type Written = { ref: string; undo: Record<string, unknown> | null };
 
@@ -264,7 +305,7 @@ async function writeWatch(deps: ChangeDeps, change: Extract<DashChange, { kind: 
   return { ref: data.id as string, undo: null };
 }
 
-async function write(deps: ChangeDeps, change: DashChange): Promise<Written> {
+async function write(deps: ChangeDeps, change: ProposalChange): Promise<Written> {
   switch (change.kind) {
     case 'add_todo':
       return writeTodo(deps, change);
@@ -442,7 +483,7 @@ async function undoWatch(deps: ChangeDeps, ref: string, force = false) {
   if (!force && (data ?? []).length === 0) throw new Refused('That watch has changed since, so Dash will not remove it.');
 }
 
-async function takeBack(deps: ChangeDeps, change: DashChange, ref: string, force = false): Promise<void> {
+async function takeBack(deps: ChangeDeps, change: ProposalChange, ref: string, force = false): Promise<void> {
   switch (change.kind) {
     case 'add_todo':
       return undoTodo(deps, change, ref, force);
@@ -456,9 +497,9 @@ async function takeBack(deps: ChangeDeps, change: DashChange, ref: string, force
 }
 
 /** Take back a write whose confirm did not stick. Best effort: the error that stopped the confirm is the one that matters. */
-async function rollBack(deps: ChangeDeps, change: DashChange, written: Written): Promise<void> {
+async function rollBack(deps: ChangeDeps, change: ProposalChange, written: Written): Promise<void> {
   try {
-    await takeBack(deps, { ...change, undo: written.undo } as DashChange, written.ref, true);
+    await takeBack(deps, { ...change, undo: written.undo } as ProposalChange, written.ref, true);
   } catch (error) {
     console.error(`ask change ${change.id}: taking back ${written.ref} failed`, error);
   }
@@ -505,6 +546,7 @@ export async function confirmChange(deps: ChangeDeps, id: string): Promise<Chang
   if (!change.turnId) {
     return { ok: false, error: 'Dash is still writing this answer. Try again once it has finished.', change };
   }
+  if (!isProposalKind(change)) return { ok: false, error: 'This change cannot be confirmed.', change };
   const workspace = WORKSPACE[change.kind];
   if (workspace && !deps.enabledModules.includes(workspace.module)) {
     return { ok: false, error: `The ${workspace.label} workspace is switched off, so this cannot be written.`, change };
@@ -586,6 +628,8 @@ export async function undoChange(deps: ChangeDeps, id: string): Promise<ChangeOu
     return { ok: false, error: notConfirmed(change.status), change };
   }
 
+  if (!isProposalKind(change)) return undoWrite(deps, change);
+
   try {
     await takeBack(deps, change, change.writtenRef);
   } catch (error) {
@@ -606,4 +650,66 @@ export async function undoChange(deps: ChangeDeps, id: string): Promise<ChangeOu
     return { ok: false, error: current ? notConfirmed(current.status) : GONE, change: current };
   }
   return { ok: true, change: toDashChange(rows[0]) };
+}
+
+/**
+ * Write one of the four proposal kinds straight away, for Dash acting when
+ * asked (plan #1440): the same writer Confirm uses, then the row as it was
+ * before and is after, for the record. Refused with a sentence when what it
+ * points at can no longer take it; throws only on a failed read or write.
+ */
+export async function writeChange(
+  deps: ChangeDeps,
+  change: Extract<NewDashChange, { kind: ProposalChange['kind'] }>,
+): Promise<
+  | {
+      ok: true;
+      subjectRef: string;
+      op: 'insert' | 'update';
+      before: Record<string, unknown> | null;
+      after: Record<string, unknown> | null;
+      undo: Record<string, unknown> | null;
+    }
+  | { ok: false; error: string }
+> {
+  const op = WRITTEN_OP[change.kind];
+  const pending = change as unknown as ProposalChange;
+  const before = op === 'update' ? await valuesOf(deps, toRef(WRITTEN_TABLE[change.kind], updatedId(pending))) : null;
+  let written: Written;
+  try {
+    written = await write(deps, pending);
+  } catch (error) {
+    if (error instanceof Refused) return { ok: false, error: error.message };
+    throw error;
+  }
+  const subjectRef = toRef(WRITTEN_TABLE[change.kind], written.ref);
+  return { ok: true, subjectRef, op, before, after: await valuesOf(deps, subjectRef), undo: written.undo };
+}
+
+/**
+ * Undo one of the kinds Dash writes straight away by the one rule
+ * (undoDashAction), then reopen the items a ticked-off todo closed with it,
+ * where they are still ticked. The record is marked undone by the rule.
+ */
+async function undoWrite(deps: ChangeDeps, change: DashChange): Promise<ChangeOutcome> {
+  const result = await undoDashAction(
+    { userId: deps.userId, core: deps.core, db: deps.db, now: deps.now },
+    change.id,
+    { fromAsk: true },
+  );
+  if (!result.ok) return { ok: false, error: result.error, change: result.action ? await loadOne(deps, change.id) : null };
+
+  const items = change.undo?.items;
+  if (change.kind === 'close_todo' && Array.isArray(items) && items.length > 0) {
+    const todo = await deps.db('todo');
+    const { error } = await todo
+      .from('tasks')
+      .update({ status: 'open' })
+      .in('id', items.filter((id): id is string => typeof id === 'string'))
+      .eq('user_id', deps.userId)
+      .eq('status', 'done');
+    if (error) console.error(`ask change ${change.id}: reopening the todo's items failed`, error);
+  }
+  const now = await loadOne(deps, change.id);
+  return now ? { ok: true, change: now } : { ok: false, error: GONE, change: null };
 }

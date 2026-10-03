@@ -139,7 +139,7 @@ export function pageLine(page: PageContext | null | undefined): string | null {
   const { table, ref, title } = page.row;
   const shown = title.replace(/\s+/g, ' ').trim();
   // open_row does not take the goals tables; goal_status is how Dash reads
-  // a goal, and a goal's ref is what propose_goal_step names.
+  // a goal, and a goal's ref is what add_goal_step names.
   const reach = table.startsWith('goals.')
     ? 'open_row does not take goals, so read it through goal_status'
     : `open_row with table ${table} and ref ${ref} reads it`;
