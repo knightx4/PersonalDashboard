@@ -19,14 +19,14 @@ const { writeYearReviewFor } = await import('./year-review-run');
 const { showYearReview } = await import('./year-review-view');
 import type { YearReviewPorts, YearReviewRow } from './year-review-run';
 import type { RawParagraph, YearReviewRecord } from './year-review';
-import { eventRef, type TimelineEvent } from './timeline';
+import { eventRef, withRefs, type TimelineEvent } from './timeline';
 
 const TZ = 'America/New_York';
 
 let n = 0;
 function event(partial: Partial<TimelineEvent> & Pick<TimelineEvent, 'occurred_at' | 'module' | 'kind'>): TimelineEvent {
   n += 1;
-  return {
+  return withRefs([{
     title: 'Something',
     detail: null,
     amount_cents: null,
@@ -35,7 +35,7 @@ function event(partial: Partial<TimelineEvent> & Pick<TimelineEvent, 'occurred_a
     source_id: `row-${String(n).padStart(4, '0')}`,
     link_ref: null,
     ...partial,
-  };
+  }])[0];
 }
 
 const orderMarch = event({

@@ -27,6 +27,7 @@ const hit = (module: SearchHit['module'], title: string): SearchHit => ({
   module,
   kind: 'company',
   id: `${module}:${title}`,
+  ref: `job_search.companies:${title}`,
   title,
   subtitle: null,
   href: `/${module}/${title}`,

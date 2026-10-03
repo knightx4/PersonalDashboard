@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parseRef } from '@/lib/core/refs';
 import { storyHits } from './news-map';
 
 const story = (headline: string, summary = 'A summary.') => ({ headline, summary });
@@ -16,11 +17,13 @@ describe('news search hits', () => {
         module: 'news',
         kind: 'story',
         id: 'i2:1',
+        ref: 'news.issues:i2',
         title: 'Some Chickens',
         subtitle: 'Story · Morning Brief',
         href: '/news/i/i2',
       },
     ]);
+    expect(parseRef(hits[0].ref!)).toMatchObject({ table: 'news.issues', id: 'i2' });
   });
 
   it('keeps a repeated headline once, from the newest issue', () => {

@@ -69,6 +69,11 @@ export interface AgendaItem {
   /** Unique within the source. Also the key its deferral is stored against. */
   key: string;
   source: SourceId;
+  /**
+   * The row it is about, as `schema.table:id` (lib/core/refs.ts), so an item
+   * can be linked, commented on or handed to Dash like any other row.
+   */
+  ref: string;
   title: string;
   /**
    * A calendar day, YYYY-MM-DD. What the item sorts by. Null for something
@@ -150,6 +155,8 @@ export function isInterviewContext(key: string): boolean {
 
 export interface DayContext {
   key: string;
+  /** The row it is about, as `schema.table:id`, as on AgendaItem. */
+  ref: string;
   /** A calendar day, YYYY-MM-DD, in the reader's zone. */
   day: string;
   at: string | null;

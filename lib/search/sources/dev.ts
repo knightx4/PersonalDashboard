@@ -80,7 +80,7 @@ async function read(ctx: Read): Promise<SearchHit[]> {
     .limit(WAITING_READ);
   const visions = supabase
     .from('module_visions')
-    .select('module, body')
+    .select('id, module, body')
     .eq('user_id', ctx.userId)
     .limit(WAITING_READ);
   if (number) plan = plan.eq('number', Number(number));

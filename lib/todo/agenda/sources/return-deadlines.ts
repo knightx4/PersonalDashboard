@@ -63,6 +63,7 @@ export const returnDeadlinesSource: AgendaSource = {
       return {
         key: `return_deadlines:${row.id as string}`,
         source: 'return_deadlines',
+        ref: `public.orders:${row.id as string}`,
         title: `Return window closes — ${name}`,
         day: row.return_deadline as string,
         at: null,

@@ -27,6 +27,7 @@ function item(over: Partial<AgendaItem> = {}): AgendaItem {
   return {
     key: 'job_reminders:r1',
     source: 'job_reminders',
+    ref: 'job_search.reminders:r1',
     title: 'Follow up with Acme',
     day: '2026-03-10',
     at: null,
@@ -169,6 +170,7 @@ describe('mergeAgenda', () => {
       context: [
         {
           key: 'interview:1',
+          ref: 'job_search.interviews:1',
           day: '2026-03-12',
           at: '2026-03-12T14:00:00.000Z',
           label: 'Acme · Staff Engineer',
@@ -190,6 +192,7 @@ describe('mergeAgenda', () => {
       context: [
         {
           key: 'interview:1',
+          ref: 'job_search.interviews:1',
           day: '2026-03-10',
           at: '2026-03-10T14:00:00.000Z',
           label: 'Acme',
@@ -207,7 +210,7 @@ describe('mergeAgenda', () => {
   it('never gives an appointment a checkbox by turning it into an entry', () => {
     const piles = merge({
       context: [
-        { key: 'i', day: '2026-03-10', at: null, label: 'Acme', detail: null, link: null },
+        { key: 'i', ref: 'job_search.interviews:i', day: '2026-03-10', at: null, label: 'Acme', detail: null, link: null },
       ],
     });
 
@@ -222,6 +225,7 @@ describe('mergeAgenda', () => {
       context: [
         {
           key: 'interview:old',
+          ref: 'job_search.interviews:old',
           day: '2026-01-14',
           at: '2026-01-14T14:00:00.000Z',
           label: 'Acme · Staff Engineer',
@@ -237,7 +241,7 @@ describe('mergeAgenda', () => {
   it('still shows today’s appointment, which is not in the past', () => {
     const piles = merge({
       context: [
-        { key: 'i', day: '2026-03-10', at: null, label: 'Acme', detail: null, link: null },
+        { key: 'i', ref: 'job_search.interviews:i', day: '2026-03-10', at: null, label: 'Acme', detail: null, link: null },
       ],
     });
 

@@ -34,7 +34,7 @@ export type DevRows = {
     status: string;
   }[];
   /** The visions a query found: one per workspace, the app's under `app`. */
-  visions?: { module: string; body: string }[];
+  visions?: { id: string; module: string; body: string }[];
 };
 
 /**
@@ -116,6 +116,7 @@ export function devHits(rows: DevRows): SearchHit[] {
       module: 'dev',
       kind: 'plan',
       id: row.id,
+      ref: `public.plan_items:${row.id}`,
       title: row.title,
       subtitle: `${row.parent_id ? 'Step' : 'Feature'} #${row.number} · ${row.status.replace('_', ' ')}`,
       match: `#${row.number}`,
@@ -128,6 +129,7 @@ export function devHits(rows: DevRows): SearchHit[] {
       module: 'dev',
       kind: 'plan',
       id: row.id,
+      ref: `public.plan_items:${row.id}`,
       title: row.title,
       subtitle: `Question #${row.number} · waiting on you`,
       // The number, as a step is quoted, and the options beneath the title:
@@ -142,6 +144,7 @@ export function devHits(rows: DevRows): SearchHit[] {
       module: 'dev',
       kind: 'raise',
       id: row.id,
+      ref: `public.raised_items:${row.id}`,
       title: row.title,
       subtitle: `Raised · ${row.status}`,
       match: `${row.ask ?? ''} ${row.detail ?? ''}`.trim() || undefined,
@@ -154,6 +157,8 @@ export function devHits(rows: DevRows): SearchHit[] {
       module: 'dev',
       kind: 'spec',
       id: spec.slug,
+      // A spec is a file in docs/, not a row, so there is nothing to point at.
+      ref: null,
       title: spec.title,
       subtitle: 'Spec',
       match: spec.blurb,
@@ -166,6 +171,7 @@ export function devHits(rows: DevRows): SearchHit[] {
       module: 'dev',
       kind: 'vision',
       id: row.module,
+      ref: `public.module_visions:${row.id}`,
       title: `Vision for ${visionLabel(row.module)}`,
       subtitle: 'Vision · Specs',
       match: row.body,
@@ -178,6 +184,7 @@ export function devHits(rows: DevRows): SearchHit[] {
       module: 'dev',
       kind: 'idea',
       id: row.id,
+      ref: `public.ideas:${row.id}`,
       title: firstLine(row.body),
       subtitle: 'Idea',
       match: row.body,
@@ -190,6 +197,7 @@ export function devHits(rows: DevRows): SearchHit[] {
       module: 'dev',
       kind: 'feedback',
       id: row.id,
+      ref: `public.feedback_items:${row.id}`,
       title: firstLine(row.body),
       subtitle: `${NOTE_KIND_LABEL[row.kind] ?? 'Request'} · ${row.status.replace('_', ' ')}`,
       match: row.body,

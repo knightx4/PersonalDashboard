@@ -61,6 +61,7 @@ export const billsSource: AgendaSource = {
     return ((data ?? []) as Row[]).map((row) => ({
       key: `bills:${row.id}:${row.next_date}`,
       source: 'bills',
+      ref: `public.recurring_payments:${row.id}`,
       title: billTitle(row),
       day: row.next_date,
       at: null,
