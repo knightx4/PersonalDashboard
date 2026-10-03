@@ -957,15 +957,16 @@
   --c-page-danger: #ff9d9d;
 
   /* Borealis: the ramp across the app icon's dash, and a deep indigo floor.
-   * Brighter than the glass rooms' pools, and lifted a little further, because
-   * this bench is darker and the sky is the point of the theme. Measured: the
-   * brightest point of the field stays under the light the free-hue wash
-   * already spends, so the glass over it keeps its contrast. */
+   * Brighter than the glass rooms' pools, and lifted half as far again,
+   * because this bench is darker and the sky is the point of the theme. The
+   * glass stays smoked rather than white for the same reason: a white pane
+   * over a lifted gold pool (News) came out at 2:1, and smoked it holds 5:1.
+   * lib/theme/sky.test.ts measures every sky and every workspace pool. */
   --c-wash-near: #5b7cff;
   --c-wash-mid: #8b5cf6;
   --c-wash-far: #ff6b9d;
   --c-wash-floor: #2a2fd0;
-  --wash-lift: 1.15;
+  --wash-lift: 1.4;
 
   --c-accent-base-lit: #aab6ff;
   --c-accent-hover-lit: #c3ccff;
@@ -1103,7 +1104,7 @@
   --c-wash-mid: #b48cff;
   --c-wash-far: #ff8fb8;
   --c-wash-floor: #8fb0ff;
-  --wash-lift: 1;
+  --wash-lift: 1.3;
 
   --c-accent-base-lit: #3346b8;
   --c-accent-hover-lit: #26348f;
@@ -2917,10 +2918,6 @@ form[data-auto-submit] [data-fallback-submit] {
 [data-theme='darkroom'] body,
 [data-theme='lightbox'] .bg-page,
 [data-theme='darkroom'] .bg-page,
-[data-theme='aurora'] .bg-page,
-[data-theme='dawn'] .bg-page,
-[data-theme='aurora'] body::after,
-[data-theme='dawn'] body::after,
 .wash-chip {
   background-image:
     radial-gradient(
@@ -3095,8 +3092,8 @@ form[data-auto-submit] [data-fallback-submit] {
  * The sky -- Aurora and Dawn only.
  *
  * The glass rooms paint their wash on <body>, which holds still. Aurora's
- * moves: the same five-layer wash, on a fixed layer a little larger than the
- * viewport, drifting and breathing once a minute. It is the one thing in the
+ * sky is curtains of light rather than pools, on a fixed layer much larger
+ * than the viewport, drifting and turning a few degrees over about a minute. It is the one thing in the
  * app that moves without being asked, so it is slow enough that nobody sees
  * it happen -- the screen just never looks quite the same twice.
  *
@@ -3112,34 +3109,265 @@ form[data-auto-submit] [data-fallback-submit] {
   background-image: none;
 }
 
+/* A layout that paints the page ground itself stands in for <body>, and here
+ * the body's ground is the sky behind it, so it lets the sky through. */
+[data-theme='aurora'] .bg-page,
+[data-theme='dawn'] .bg-page {
+  background-color: transparent;
+}
+
+/* Curtains, not pools. The glass rooms light their bench with round pools;
+ * an aurora is ribbons -- long, thin, slanted bands of light, brightest along
+ * one edge and fading off the other. Each ribbon here is a radial gradient
+ * stretched seven times wider than it is tall, and the whole layer leans
+ * twelve degrees, so they read as curtains hanging across the sky.
+ *
+ * The strongest share any ribbon gets is the same 34% (times the lift) the
+ * glass rooms give their largest pool, which is what lib/theme/sky.test.ts
+ * measures the glass against. Between the ribbons the sky drops to the bench,
+ * and a dark band along the foot keeps the lower half of the screen night. */
 [data-theme='aurora'] body::after,
-[data-theme='dawn'] body::after {
+[data-theme='dawn'] body::after,
+[data-theme='aurora'] .shell-ground::before,
+[data-theme='dawn'] .shell-ground::before {
   position: fixed;
-  z-index: -2;
-  inset: -12%;
+  z-index: -3;
+  inset: -25%;
   content: "";
   pointer-events: none;
   will-change: transform;
-  animation: sky-drift 64s ease-in-out infinite alternate;
+  background-image:
+    radial-gradient(
+      58% 9% at 34% 30%,
+      color-mix(in oklab, var(--c-wash-near) calc(var(--wash-lift) * 34%), transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      44% 7% at 40% 36%,
+      color-mix(in oklab, var(--c-wash-near) calc(var(--wash-lift) * 22%), transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      52% 8% at 64% 42%,
+      color-mix(in oklab, var(--c-wash-mid) calc(var(--wash-lift) * 30%), transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      36% 6% at 74% 27%,
+      color-mix(in oklab, var(--c-wash-far) calc(var(--wash-lift) * 30%), transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      70% 30% at 42% 30%,
+      color-mix(in oklab, var(--c-wash-near) calc(var(--wash-lift) * 12%), transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      90% 22% at 50% 78%,
+      color-mix(in oklab, var(--c-wash-floor) calc(var(--wash-lift) * 26%), transparent),
+      transparent 70%
+    );
+  animation: sky-drift 70s ease-in-out infinite alternate;
+}
+
+/* The rays: fine vertical streaks inside the brightest band, which is what
+ * makes a curtain of light read as an aurora rather than a smear. Masked to
+ * the band and very faint -- a texture in the light, never a pattern on the
+ * page. Its own layer, so it can drift sideways against the curtains. */
+[data-theme='aurora'] .shell-ground::after,
+[data-theme='dawn'] .shell-ground::after {
+  position: fixed;
+  z-index: -2;
+  inset: -10%;
+  content: "";
+  pointer-events: none;
+  will-change: transform;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgb(255 255 255 / var(--ray-alpha)) 0 1px,
+    transparent 1px 7px,
+    rgb(255 255 255 / calc(var(--ray-alpha) * 0.6)) 7px 9px,
+    transparent 9px 17px
+  );
+  -webkit-mask-image: radial-gradient(48% 20% at 46% 32%, black, transparent 72%);
+  mask-image: radial-gradient(48% 20% at 46% 32%, black, transparent 72%);
+  transform: rotate(-12deg);
+  animation: sky-rays 40s ease-in-out infinite alternate;
+}
+
+[data-theme='aurora'] {
+  --ray-alpha: 0.05;
+}
+
+[data-theme='dawn'] {
+  --ray-alpha: 0.12;
 }
 
 @keyframes sky-drift {
   0% {
-    transform: translate3d(-4%, -3%, 0) scale(1) rotate(0deg);
+    transform: rotate(-12deg) translate3d(-5%, -2%, 0) scale(1);
   }
   50% {
-    transform: translate3d(2%, 1%, 0) scale(1.08) rotate(1.5deg);
+    transform: rotate(-9deg) translate3d(1%, 1%, 0) scale(1.06);
   }
   100% {
-    transform: translate3d(5%, 3%, 0) scale(1.03) rotate(-1deg);
+    transform: rotate(-14deg) translate3d(5%, -1%, 0) scale(1.02);
+  }
+}
+
+@keyframes sky-rays {
+  from {
+    transform: rotate(-12deg) translate3d(-3%, 0, 0);
+  }
+  to {
+    transform: rotate(-10deg) translate3d(3%, 1%, 0);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   [data-theme='aurora'] body::after,
-  [data-theme='dawn'] body::after {
+  [data-theme='dawn'] body::after,
+  [data-theme='aurora'] .shell-ground::before,
+  [data-theme='dawn'] .shell-ground::before {
+    animation: none;
+    transform: rotate(-12deg);
+  }
+
+  [data-theme='aurora'] .shell-ground::after,
+  [data-theme='dawn'] .shell-ground::after {
     animation: none;
   }
+}
+
+/* Inside the app the sky is painted by the shell's ground rather than by
+ * <body>, because the ground sits inside `[data-workspace]` and so can see
+ * which workspace this is. The body's copy stays for the pages with no shell
+ * (sign-in, onboarding) and stands down wherever the shell is drawn, so there
+ * is only ever one moving layer. */
+[data-theme='aurora'] body:has(.shell-ground)::after,
+[data-theme='dawn'] body:has(.shell-ground)::after {
+  display: none;
+}
+
+/* The workspace takes the sky's largest pool, top left, in the vivid end of
+ * its own mark (lib/modules.ts). The sky keeps the other three, so Jobs in
+ * Polar is still Polar, with violet coming up behind it. This replaces the
+ * glass rooms' corner pool, which in Aurora would be a fifth pool on top. */
+[data-theme='aurora'] [data-workspace='shopping'],
+[data-theme='dawn'] [data-workspace='shopping'] { --c-wash-near: #fb7185; }
+[data-theme='aurora'] [data-workspace='jobs'],
+[data-theme='dawn'] [data-workspace='jobs'] { --c-wash-near: #a78bfa; }
+[data-theme='aurora'] [data-workspace='todo'],
+[data-theme='dawn'] [data-workspace='todo'] { --c-wash-near: #38bdf8; }
+[data-theme='aurora'] [data-workspace='vault'],
+[data-theme='dawn'] [data-workspace='vault'] { --c-wash-near: #e879f9; }
+[data-theme='aurora'] [data-workspace='learn'],
+[data-theme='dawn'] [data-workspace='learn'] { --c-wash-near: #34d399; }
+[data-theme='aurora'] [data-workspace='news'],
+[data-theme='dawn'] [data-workspace='news'] { --c-wash-near: #e8c760; }
+[data-theme='aurora'] [data-workspace='goals'],
+[data-theme='dawn'] [data-workspace='goals'] { --c-wash-near: #a3e635; }
+[data-theme='aurora'] [data-workspace='dev'],
+[data-theme='dawn'] [data-workspace='dev'] { --c-wash-near: #94a3b8; }
+
+[data-theme='aurora'] .shell-ground,
+[data-theme='dawn'] .shell-ground {
+  background-image: none;
+}
+
+/* ---------------------------------------------------------------------------
+ * Aurora's shape -- what makes it more than a palette.
+ *
+ * Every other theme is colours on one set of shapes. Aurora changes the
+ * shapes as well, because glass reads as glass through its blur, its rounded
+ * edge and the light it gives off, not through its colour:
+ *
+ *   Frosted sheets. Every `.sheet` blurs what is behind it, so the sky reads
+ *   through a card as soft colour rather than as a sharp ghost. The blur is
+ *   also what keeps the text legible over the brightest pool.
+ *   Rounder. Cards, controls and the pane all step up a size.
+ *   The sidebar and the top bar are glass panes of their own.
+ *   Two things glow: the primary button and the current place in the
+ *   sidebar. Nothing else gives off light.
+ * ------------------------------------------------------------------------- */
+[data-theme='aurora'],
+[data-theme='dawn'] {
+  --radius-pane: 1.75rem;
+  --radius-card: 1.25rem;
+  --radius-control: 0.75rem;
+}
+
+[data-theme='aurora'] .sheet,
+[data-theme='dawn'] .sheet {
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  backdrop-filter: blur(18px) saturate(1.6);
+}
+
+/* A sheet inside a sheet is already behind one blur; a second only greys it. */
+[data-theme='aurora'] .sheet .sheet,
+[data-theme='dawn'] .sheet .sheet {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* The pane is the room the sheets stand in, so it carries no fill of its own
+ * here: the sky runs straight through it to the edges of every card. */
+[data-theme='aurora'] .page-pane,
+[data-theme='dawn'] .page-pane {
+  background-color: transparent;
+  background-image: none;
+}
+
+@media (min-width: 1024px) {
+  [data-theme='aurora'] .page-pane,
+  [data-theme='dawn'] .page-pane {
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.07);
+  }
+
+  [data-theme='aurora'] .shell-ground > aside {
+    border-radius: var(--radius-pane);
+    background-color: rgb(8 10 24 / 0.38);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.1),
+      inset 0 0 0 1px rgb(255 255 255 / 0.06);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    backdrop-filter: blur(24px) saturate(1.4);
+  }
+
+  [data-theme='dawn'] .shell-ground > aside {
+    border-radius: var(--radius-pane);
+    background-color: rgb(255 255 255 / 0.4);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.9),
+      inset 0 0 0 1px rgb(255 255 255 / 0.5);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    backdrop-filter: blur(24px) saturate(1.4);
+  }
+}
+
+/* The top bar is glass too, over the same sky, rather than a slab of page. */
+[data-theme='aurora'] .page-pane > header {
+  background-color: rgb(8 10 24 / 0.3);
+}
+
+[data-theme='dawn'] .page-pane > header {
+  background-color: rgb(255 255 255 / 0.35);
+}
+
+/* Where you are: the current row in the sidebar takes the accent's tint and
+ * a soft glow of the accent around it. */
+[data-theme='aurora'] .shell-ground aside a[aria-current='page'],
+[data-theme='dawn'] .shell-ground aside a[aria-current='page'] {
+  background-color: color-mix(in oklab, var(--c-accent-base) 18%, transparent);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--c-accent-base) 30%, transparent),
+    0 0 22px -6px color-mix(in oklab, var(--c-accent-base) 60%, transparent);
+}
+
+/* The primary action is the one thing on the page that gives off light. */
+[data-theme='aurora'] .bg-accent,
+[data-theme='dawn'] .bg-accent {
+  box-shadow: 0 0 20px -4px color-mix(in oklab, var(--c-accent-base) 75%, transparent);
 }
 
 /* ---------------------------------------------------------------------------

@@ -53,6 +53,11 @@ function ratio(a: Rgb, b: Rgb): number {
  */
 const STRONGEST = 0.34;
 
+/** The near pool each workspace paints in Aurora, read out of globals.css. */
+const WORKSPACE_POOLS = [
+  ...CSS.matchAll(/\[data-theme='aurora'\] \[data-workspace='[a-z]+'\],\n\[data-theme='dawn'\] \[data-workspace='[a-z]+'\] \{ --c-wash-near: (#[0-9a-f]{6}); \}/g),
+].map((match) => match[1]!);
+
 const GLASS = ['--c-surface', '--c-raised', '--c-canvas', '--c-sunken'] as const;
 
 function theme(polarity: SkyPolarity, id: (typeof SKY_IDS)[number]): Record<string, string> {
@@ -83,6 +88,10 @@ describe('the default sky', () => {
 });
 
 describe('every sky', () => {
+  it('reads all eight workspace pools out of globals.css', () => {
+    expect(WORKSPACE_POOLS).toHaveLength(8);
+  });
+
   it('has a night side and a dawn side, in flat colours', () => {
     expect(SKIES.map((sky) => sky.id)).toEqual([...SKY_IDS]);
     for (const sky of SKIES) {
@@ -108,7 +117,10 @@ describe('every sky', () => {
         const bench = parse(vars['--c-page']!).rgb;
         const lift = Number(vars['--wash-lift'] ?? 1);
         const pools = ['--c-wash-near', '--c-wash-mid', '--c-wash-far', '--c-wash-floor'];
-        const lit = [bench, ...pools.map((pool) => over(vars[pool]!, Math.min(1, STRONGEST * lift), bench))];
+        // The sky's own pools, and every workspace colour, which takes the
+        // largest pool inside its workspace.
+        const colours = [...pools.map((pool) => vars[pool]!), ...WORKSPACE_POOLS];
+        const lit = [bench, ...colours.map((colour) => over(colour, Math.min(1, STRONGEST * lift), bench))];
 
         for (const ground of lit) {
           for (const glass of GLASS) {
