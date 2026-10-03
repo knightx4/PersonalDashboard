@@ -9,7 +9,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
           <Link href="/" className="flex items-center gap-2">
             <ModuleMark module={null} size="sm" />
             <span className="text-body font-semibold tracking-tight">
-              Personal Dashboard
+              Dash
             </span>
           </Link>
         </div>

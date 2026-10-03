@@ -15,7 +15,7 @@ import Link from 'next/link';
  */
 export const metadata = {
   title: 'Privacy',
-  description: 'What Personal Dashboard reads, what it stores, and what it never keeps.',
+  description: 'What Dash reads, what it stores, and what it never keeps.',
 };
 
 const LAST_UPDATED = '1 October 2026';
@@ -27,7 +27,7 @@ export default function PrivacyPage() {
       <p className="!text-ink-muted">Last updated {LAST_UPDATED}</p>
 
       <p>
-        Personal Dashboard helps you see what you already own and what you spend. To do that it
+        Dash helps you see what you already own and what you spend. To do that it
         can, with your permission, read purchase-related messages in your email. This page
         explains exactly what it reads, what it keeps, and what it never keeps.
       </p>
@@ -44,7 +44,7 @@ export default function PrivacyPage() {
       <h2>Who we are</h2>
       <p>
         {/* TODO: replace with the real legal entity and address before verification. */}
-        Personal Dashboard is operated by <strong>[TODO: legal entity name]</strong>. You can
+        Dash is operated by <strong>[TODO: legal entity name]</strong>. You can
         reach us at <strong>[TODO: contact email]</strong>.
       </p>
 
