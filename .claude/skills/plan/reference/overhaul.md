@@ -184,9 +184,9 @@ A removal step closes only when its count has reached its target. Before
 closing it, run `npm run check:specs` and read the counter's value with
 `npm run check:specs -- --list`. When the value is at the target, commit the
 lowered `scripts/spec-baseline.json` with the step. When it is still above,
-the step stays open: block it with what is left in the ask, such as `3
-thread tables remain: learn.discussions, vault.note_threads,
-obsidian.maya_messages.`
+the step stays open: block it with what is left in the ask, such as `4
+tables still link through one column per target: job_search.attachments,
+job_search.notes, public.dev_comments, todo.task_links.`
 
 The overhaul itself closes only when every phase is done and every rule on
 its `Rules:` line is at its target. Never close an overhaul whose counts

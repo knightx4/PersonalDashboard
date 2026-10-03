@@ -2,10 +2,13 @@
 
 The standing prompt for the Claude Code routine that works one overhaul: a
 feature on the plan with `track = 'overhaul'` (docs/SPEC-LAYER-SPEC.md,
-Part 4). The **Work this overhaul** button on an overhaul's row fires it
-(plan #1514), through `fireFeatureRoutine` in `lib/feedback/routine.ts`, and
-records the fire in `plan_runs` with job `overhaul`. The overnight runner
-never fires it and never takes an overhaul's steps.
+Part 4). The **Work this overhaul** button on an overhaul's row is to fire
+it (plan #1514), through `fireFeatureRoutine` in `lib/feedback/routine.ts`,
+and record the fire in `plan_runs` with job `overhaul`. #1514 is not built
+yet: no button fires this routine, neither environment variable below is
+read by the code, and `plan_runs` does not accept the job `overhaul`. Until
+it is built, the routine is started by hand with the turn described below.
+The overnight runner never fires it and never takes an overhaul's steps.
 
 The app appends a turn naming the overhaul by number and title, the
 account's `user_id`, and the overhaul's brief as the plan holds it. The
@@ -26,7 +29,8 @@ either takes effect only once it is made on the routine itself.
    to the token, then redeploy. The token is scoped to this routine; another
    routine's token answers 401.
 
-Until both are set, the button says so and starts nothing.
+Steps 3 and 4 wait on #1514, which adds the button and reads these two
+variables.
 
 ## The prompt
 
