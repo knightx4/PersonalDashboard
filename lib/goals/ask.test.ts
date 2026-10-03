@@ -53,6 +53,7 @@ vi.mock('@/lib/goals/steps-store', () => ({
 
 import { askDashOnGoal, type GoalAskInput } from './ask';
 import type { GoalsSupabaseClient } from './db/schema-name';
+import { fakeDashDeps } from '../../tests/stubs/fake-schema-db';
 
 function step(id: string, kind: string, title: string, children: unknown[] = []) {
   return {
@@ -94,6 +95,7 @@ function input(extra: Partial<GoalAskInput> = {}): GoalAskInput {
     apiKey: 'key',
     canRun: true,
     routine: { id: 'routine', token: 'token' },
+    dash: fakeDashDeps({}, 'u'),
     ...extra,
   };
 }

@@ -17,10 +17,16 @@
  * every outcome the person can see is written into the thread, including the
  * ones where nothing could be done, because a question that went nowhere
  * silently looks the same as one being worked on.
+ *
+ * Each draft filed and each change to a step's date or Todo is recorded in
+ * core.dash_actions alongside the write (plan #1459), so it can be undone
+ * while nobody has changed the row since.
  */
 import 'server-only';
 
 import type { Schedule } from '@/lib/goals/comments';
+import { readSubjectOrNull, recordDashAction, type DashActionDeps } from '@/lib/core/dash-actions';
+import { toRef } from '@/lib/core/refs';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { resolveRoutineId, type RoutineTarget } from '@/lib/feedback/routine';
@@ -62,6 +68,8 @@ export type GoalAskInput = {
   /** Whether this account may spend the owner's routine allowance. */
   canRun: boolean;
   routine: RoutineTarget;
+  /** The person's clients, for recording what the reply files in core.dash_actions. */
+  dash: DashActionDeps;
 };
 
 export type GoalAskOutcome = { ok: true; message: string } | { ok: false; error: string };
@@ -197,6 +205,13 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
       collection.records.length,
     );
     if (written.ok) {
+      await recordDashAction(input.dash, {
+        surface: 'thread',
+        kind: 'file_goal_record',
+        subjectRef: toRef('goals.records', written.value),
+        op: 'insert',
+        summary: `Filed a draft in ${collection.name}, from a comment on "${input.itemTitle}".`,
+      });
       // The values in the stored form addRecord kept them in, so the reply
       // shows $12,450.37 rather than whatever the model wrote.
       const stored = checkRecord(collection.fields, filing.values, null);
@@ -237,6 +252,8 @@ async function applySchedule(
   }
   let dated: boolean | null = null;
   let todo: boolean | null = null;
+  const ref = toRef('goals.items', input.itemId);
+  const before = await readSubjectOrNull(input.dash, ref);
   try {
     if (schedule.dueOn !== undefined) {
       dated = await updateStep(input.client, input.itemId, { due_on: schedule.dueOn });
@@ -249,6 +266,25 @@ async function applySchedule(
       said: `I could not change it: ${error instanceof Error ? error.message : 'no reason given'}.`,
       changed: false,
     };
+  } finally {
+    // Whatever landed, even when the second write failed after the first.
+    if (dated || todo) {
+      const did = [
+        dated ? `set the due date on "${input.itemTitle}"` : null,
+        todo
+          ? `${schedule.onTodo ? 'put' : 'took'} ${dated ? 'it' : `"${input.itemTitle}"`} ${schedule.onTodo ? 'on' : 'off'} Todo`
+          : null,
+      ].filter(Boolean);
+      const sentence = did.join(' and ');
+      await recordDashAction(input.dash, {
+        surface: 'thread',
+        kind: 'schedule_goal_step',
+        subjectRef: ref,
+        op: 'update',
+        beforeValues: before,
+        summary: `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}.`,
+      });
+    }
   }
   return { said: scheduleSaid(schedule, { dated, todo }), changed: dated === true || todo === true };
 }

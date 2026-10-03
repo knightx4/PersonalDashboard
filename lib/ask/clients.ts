@@ -8,6 +8,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { createTodoClient } from '@/lib/todo/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import type { DashActionDeps } from '@/lib/core/dash-actions';
 import type { AskDb, AskSchema, SchemaClient } from './db';
 
 /**
@@ -39,4 +40,13 @@ export function requestAskDb(): AskDb {
     }
     return client;
   };
+}
+
+/**
+ * What recording one of Dash's changes in core.dash_actions takes, on the
+ * signed-in person's session (plan #1459). Only inside a request.
+ */
+export async function requestDashDeps(userId: string): Promise<DashActionDeps> {
+  const db = requestAskDb();
+  return { userId, core: await db('core'), db };
 }

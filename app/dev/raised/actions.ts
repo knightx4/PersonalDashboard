@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
+import { requestDashDeps } from '@/lib/ask/clients';
 import { carryOut } from '@/lib/comments/act';
 import { askDash } from '@/lib/comments/ask';
 import { isCommentTarget, type CommentTarget } from '@/lib/comments/load';
@@ -130,6 +131,7 @@ export async function decideRaise(
     target: 'raise',
     id: id.data,
     action: consequence.action,
+    dash: await requestDashDeps(user.id),
   });
   await say(supabase, user.id, id.data, 'claude', outcome.ok ? outcome.said : outcome.why);
 
@@ -150,6 +152,7 @@ export async function decideRaise(
         id: id.data,
         commentId: said,
         question: extra,
+        dash: await requestDashDeps(user.id),
       })
     : null;
   if (asked?.ok && asked.redraw) revalidatePath(asked.redraw);

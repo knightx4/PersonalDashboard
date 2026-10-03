@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { AskSchema, SchemaClient } from '@/lib/ask/db';
-import { planUndo, sameValue, undoDashAction, type DashAction, type DashActionDeps } from './dash-actions';
+import { fakeSchemaDb, type FakeTables } from '../../tests/stubs/fake-schema-db';
+import { planUndo, recordDashAction, sameValue, undoDashAction, type DashAction, type DashActionDeps } from './dash-actions';
 
 /**
  * Undoing any of Dash's changes by one rule (plan #1458), against an
@@ -13,52 +14,7 @@ const TASK = id(1);
 const ACTION = id(600);
 
 type Row = Record<string, unknown>;
-type Tables = Record<string, Row[]>;
-
-function fakeDb(tables: Tables) {
-  return function client(schema: string): SchemaClient {
-    return {
-      from(table: string) {
-        const rows = (tables[`${schema}.${table}`] ??= []);
-        const filters: ((row: Row) => boolean)[] = [];
-        let op: 'select' | 'insert' | 'update' | 'delete' = 'select';
-        let payload: Row = {};
-        let limit = Infinity;
-        let single = false;
-
-        function run() {
-          let out: Row[];
-          if (op === 'insert') {
-            if (rows.some((r) => r.id === payload.id)) return { data: null, error: { message: 'duplicate key' } };
-            rows.push({ ...payload });
-            out = [payload];
-          } else {
-            out = rows.filter((row) => filters.every((f) => f(row)));
-            if (op === 'update') for (const row of out) Object.assign(row, payload);
-            if (op === 'delete') for (const row of out) rows.splice(rows.indexOf(row), 1);
-          }
-          out = out.slice(0, limit).map((row) => ({ ...row }));
-          if (single) return { data: out[0] ?? null, error: null };
-          return { data: out, error: null };
-        }
-
-        const query = {
-          select: () => query,
-          insert: (value: Row) => ((op = 'insert'), (payload = value), query),
-          update: (value: Row) => ((op = 'update'), (payload = value), query),
-          delete: () => ((op = 'delete'), query),
-          eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), query),
-          neq: (c: string, v: unknown) => (filters.push((r) => r[c] !== v), query),
-          gt: (c: string, v: string) => (filters.push((r) => String(r[c]) > v), query),
-          limit: (n: number) => ((limit = n), query),
-          maybeSingle: () => ((single = true), query),
-          then: (resolve: (value: unknown) => void) => resolve(run()),
-        };
-        return query;
-      },
-    } as unknown as SchemaClient;
-  };
-}
+type Tables = FakeTables;
 
 const TASK_BEFORE: Row = { id: TASK, user_id: ME, title: 'Call the bank', due_on: '2026-10-02', status: 'open', updated_at: '2026-10-01T09:00:00Z' };
 const TASK_AFTER: Row = { ...TASK_BEFORE, due_on: '2026-10-09', updated_at: '2026-10-03T08:00:00Z' };
@@ -87,7 +43,7 @@ function setup(opts: { task?: Row | null; action?: Row; more?: Row[] } = {}) {
     'core.dash_actions': [action(opts.action), ...(opts.more ?? [])],
     'todo.tasks': opts.task === null ? [] : [{ ...(opts.task ?? TASK_AFTER) }],
   };
-  const client = fakeDb(tables);
+  const client = fakeSchemaDb(tables);
   const deps: DashActionDeps = {
     userId: ME,
     core: client('core'),
@@ -209,5 +165,46 @@ describe('sameValue', () => {
     expect(sameValue({ a: [1, { b: null }] }, { a: [1, { b: null }] })).toBe(true);
     expect(sameValue({ a: [1] }, { a: [2] })).toBe(false);
     expect(sameValue(null, undefined)).toBe(true);
+  });
+});
+
+describe('recordDashAction', () => {
+  it('records an update as done, with the row before and after', async () => {
+    const { tables, deps } = setup({ task: TASK_AFTER });
+    const id = await recordDashAction(deps, {
+      surface: 'thread',
+      kind: 'reschedule_todo',
+      subjectRef: `todo.tasks:${TASK}`,
+      op: 'update',
+      summary: 'Moved Call the bank to 9 October.',
+      beforeValues: TASK_BEFORE,
+    });
+    expect(id).not.toBeNull();
+    expect(tables['core.dash_actions'].find((r) => r.id === id)).toMatchObject({
+      status: 'done',
+      done_at: '2026-10-03T12:00:00Z',
+      before_values: TASK_BEFORE,
+      after_values: TASK_AFTER,
+    });
+  });
+
+  it('never throws: a record that cannot be written leaves the write standing', async () => {
+    const { deps } = setup();
+    const failing = {
+      from: () => ({
+        insert: () => ({ select: () => ({ single: async () => ({ data: null, error: { message: 'denied' } }) }) }),
+      }),
+    } as unknown as SchemaClient;
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const id = await recordDashAction({ ...deps, core: failing }, {
+      surface: 'thread',
+      kind: 'file_idea',
+      subjectRef: `todo.tasks:${TASK}`,
+      op: 'insert',
+      summary: 'Filed an idea.',
+    });
+    expect(id).toBeNull();
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
   });
 });

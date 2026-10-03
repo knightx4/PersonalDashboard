@@ -33,6 +33,12 @@
  * step is written ready to be worked and handed to a session in the same
  * press. It is still not approved on this file's own judgement -- nothing
  * here decides that a raise deserves a session; the instruction did.
+ *
+ * Every row an action writes is recorded in core.dash_actions alongside the
+ * write (plan #1459), with its values before and after, so it can be undone
+ * from the record while nothing has changed it since. `send_step` writes no
+ * row of its own: it starts a session, which putting a status back would
+ * not stop, so it has nothing to record.
  */
 import 'server-only';
 
@@ -42,6 +48,8 @@ import { handStepToClaude } from '@/lib/plan/handover';
 import { countChangedLines, diffFits, MAX_CHANGED_LINES, rebaseDiff } from '@/lib/specs/changes';
 import { readSpec, specBySlug } from '@/lib/specs/registry';
 import { nextPlanPosition } from '@/lib/plan/position';
+import { readSubjectOrNull, recordDashAction, type DashActionDeps } from '@/lib/core/dash-actions';
+import { toRef } from '@/lib/core/refs';
 import { TARGET_PATH, type CommentTarget } from './load';
 import type { DashAction } from './reply-payload';
 
@@ -74,7 +82,57 @@ export type ActInput = {
   /** The row itself, not the comment. */
   id: string;
   action: DashAction;
+  /** The person's clients, for recording each write in core.dash_actions. */
+  dash: DashActionDeps;
 };
+
+/**
+ * Record a row an action added, as a thread change. Best-effort: a record
+ * that cannot be written is logged by recordDashAction and the row stands.
+ */
+async function recordAdded(
+  input: ActInput,
+  kind: 'file_idea' | 'file_note' | 'add_step' | 'build_step',
+  table: string,
+  id: string | undefined,
+  summary: string,
+): Promise<void> {
+  if (!id) return;
+  await recordDashAction(input.dash, {
+    surface: 'thread',
+    kind,
+    subjectRef: toRef(`public.${table}`, id),
+    op: 'insert',
+    summary,
+  });
+}
+
+/**
+ * Rewrite one row's wording and record it: the row is read before the write
+ * for what it said, and recorded after it with what it says now. The write
+ * itself is the caller's, so each target keeps its own narrowing.
+ */
+async function recordedUpdate(
+  input: ActInput,
+  table: string,
+  summary: string,
+  write: () => PromiseLike<{ error: { message: string } | null }>,
+): Promise<{ error: { message: string } | null }> {
+  const ref = toRef(`public.${table}`, input.id);
+  const before = await readSubjectOrNull(input.dash, ref);
+  const result = await write();
+  if (!result.error) {
+    await recordDashAction(input.dash, {
+      surface: 'thread',
+      kind: 'reword',
+      subjectRef: ref,
+      op: 'update',
+      summary,
+      beforeValues: before,
+    });
+  }
+  return result;
+}
 
 /** The ideas column takes 4000 characters. */
 const MAX_IDEA = 4000;
@@ -209,15 +267,20 @@ async function fileIdea(input: ActInput): Promise<ActOutcome> {
 
   // Named `scope` rather than `module`, which Next reserves.
   const scope = scopeOf(input.action);
-  const { error } = await input.supabase.from('ideas').insert({
-    user_id: input.userId,
-    body,
-    module: scope,
-    source: 'claude',
-    // Only a plan step is a row `ideas.from_plan_item_id` can point at.
-    from_plan_item_id: input.target === 'step' ? input.id : null,
-  });
+  const { data, error } = await input.supabase
+    .from('ideas')
+    .insert({
+      user_id: input.userId,
+      body,
+      module: scope,
+      source: 'claude',
+      // Only a plan step is a row `ideas.from_plan_item_id` can point at.
+      from_plan_item_id: input.target === 'step' ? input.id : null,
+    })
+    .select('id')
+    .maybeSingle();
   if (error) return { ok: false, why: `I could not file that idea: ${error.message}` };
+  await recordAdded(input, 'file_idea', 'ideas', (data as { id: string } | null)?.id, `Filed an idea: ${body}`);
 
   return {
     ok: true,
@@ -260,15 +323,20 @@ async function fileNote(input: ActInput): Promise<ActOutcome> {
   }
 
   const kind = input.action.kind?.trim().toLowerCase() === 'feature' ? 'feature' : 'bug';
-  const { error } = await input.supabase.from('feedback_items').insert({
-    user_id: input.userId,
-    kind,
-    body,
-    page_path: TARGET_PATH[input.target],
-  });
+  const { data, error } = await input.supabase
+    .from('feedback_items')
+    .insert({
+      user_id: input.userId,
+      kind,
+      body,
+      page_path: TARGET_PATH[input.target],
+    })
+    .select('id')
+    .maybeSingle();
   if (error) return { ok: false, why: `I could not file that note: ${error.message}` };
 
   const what = kind === 'bug' ? 'a bug' : 'a feature request';
+  await recordAdded(input, 'file_note', 'feedback_items', (data as { id: string } | null)?.id, `Filed ${what}: ${body}`);
   return {
     ok: true,
     said: `Filed on the notes queue as ${what}, open:\n\n${body}`,
@@ -375,17 +443,22 @@ async function addStep(input: ActInput): Promise<ActOutcome> {
   if (!planned.ok) return planned;
   const row = planned.row;
 
-  const { error } = await input.supabase.from('plan_items').insert({
-    user_id: input.userId,
-    module: row.scope,
-    parent_id: row.parentId,
-    title: row.title,
-    detail: row.detail,
-    status: 'proposed',
-    kind: 'build',
-    position: row.position,
-  });
+  const { data, error } = await input.supabase
+    .from('plan_items')
+    .insert({
+      user_id: input.userId,
+      module: row.scope,
+      parent_id: row.parentId,
+      title: row.title,
+      detail: row.detail,
+      status: 'proposed',
+      kind: 'build',
+      position: row.position,
+    })
+    .select('id')
+    .maybeSingle();
   if (error) return { ok: false, why: `I could not add that step: ${error.message}` };
+  await recordAdded(input, 'add_step', 'plan_items', (data as { id: string } | null)?.id, `Proposed a step: ${row.title}`);
 
   return {
     ok: true,
@@ -424,7 +497,9 @@ async function reword(input: ActInput): Promise<ActOutcome> {
     const was = (data as { body: string } | null)?.body ?? null;
     if (was === null) return { ok: false, why: 'That idea is not there any more, so nothing was changed.' };
 
-    const { error } = await input.supabase.from('ideas').update({ body: text }).eq('id', input.id);
+    const { error } = await recordedUpdate(input, 'ideas', `Rewrote an idea: ${text}`, () =>
+      input.supabase.from('ideas').update({ body: text }).eq('id', input.id),
+    );
     if (error) return { ok: false, why: `I could not change it: ${error.message}` };
     return { ok: true, said: rewritten('the idea', text, was) };
   }
@@ -453,10 +528,12 @@ async function reword(input: ActInput): Promise<ActOutcome> {
     if (!data) return { ok: false, why: 'That step is not there any more, so nothing was changed.' };
     const was = (data as Record<string, string | null>)[field.column];
 
-    const { error } = await input.supabase
-      .from('plan_items')
-      .update({ [field.column]: text })
-      .eq('id', input.id);
+    const { error } = await recordedUpdate(input, 'plan_items', `Rewrote ${field.word} of a step: ${text}`, () =>
+      input.supabase
+        .from('plan_items')
+        .update({ [field.column]: text })
+        .eq('id', input.id),
+    );
     if (error) return { ok: false, why: `I could not change it: ${error.message}` };
     return { ok: true, said: rewritten(field.word, text, was) };
   }
@@ -477,10 +554,12 @@ async function reword(input: ActInput): Promise<ActOutcome> {
     // resolution are worked in the queue, and the run that closes one writes
     // what closed it -- a reword reaching those would rewrite the record of
     // work rather than the report of the problem.
-    const { error } = await input.supabase
-      .from('feedback_items')
-      .update({ body: text })
-      .eq('id', input.id);
+    const { error } = await recordedUpdate(input, 'feedback_items', `Rewrote a note: ${text}`, () =>
+      input.supabase
+        .from('feedback_items')
+        .update({ body: text })
+        .eq('id', input.id),
+    );
     if (error) return { ok: false, why: `I could not change it: ${error.message}` };
     return { ok: true, said: rewritten('the note', text, was) };
   }
@@ -559,11 +638,13 @@ async function rewordSpecChange(input: ActInput, text: string): Promise<ActOutco
     if (text.length > limit) {
       return { ok: false, why: `That is longer than the ${field} can be (${limit} characters), so nothing was changed.` };
     }
-    const { error } = await input.supabase
-      .from('spec_changes')
-      .update({ [field]: text })
-      .eq('id', input.id)
-      .eq('status', 'proposed');
+    const { error } = await recordedUpdate(input, 'spec_changes', `Rewrote the ${field} of a spec change: ${text}`, () =>
+      input.supabase
+        .from('spec_changes')
+        .update({ [field]: text })
+        .eq('id', input.id)
+        .eq('status', 'proposed'),
+    );
     if (error) return { ok: false, why: `I could not change it: ${error.message}` };
     return { ok: true, said: rewritten(`the ${field}`, text, change[field]) };
   }
@@ -583,11 +664,13 @@ async function rewordSpecChange(input: ActInput, text: string): Promise<ActOutco
     };
   }
 
-  const { error } = await input.supabase
-    .from('spec_changes')
-    .update({ diff: placed.diff })
-    .eq('id', input.id)
-    .eq('status', 'proposed');
+  const { error } = await recordedUpdate(input, 'spec_changes', `Rewrote the diff of a spec change: ${change.title}`, () =>
+    input.supabase
+      .from('spec_changes')
+      .update({ diff: placed.diff })
+      .eq('id', input.id)
+      .eq('status', 'proposed'),
+  );
   if (error) return { ok: false, why: `I could not change it: ${error.message}` };
 
   const was = countChangedLines(change.diff);
@@ -707,6 +790,9 @@ async function buildStep(input: ActInput): Promise<ActOutcome> {
 
   const written = data as { id: string; number: number } | null;
   if (!written) return { ok: false, why: 'I could not add that step, so nothing was started.' };
+  // Recorded before the hand-over, as written: once a session takes it the
+  // row has moved on, and the record rightly will not take it back.
+  await recordAdded(input, 'build_step', 'plan_items', written.id, `Added #${written.number}: ${row.title}`);
 
   const opening = `Added #${written.number} ${placeOf(row)}`;
   const sent = await handStepToClaude({
