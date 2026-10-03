@@ -156,6 +156,7 @@ function fakeLearn(tables: Record<string, Row[]>, stored: Record<string, Buffer>
     const builder = {
       select: () => builder,
       order: () => builder,
+      limit: (count: number) => ((range = [0, count - 1]), builder),
       range: (start: number, end: number) => ((range = [start, end]), builder),
       is: (column: string, value: null) => (filters.push((row) => (row[column] ?? null) === value), builder),
       not: (column: string) => (filters.push((row) => (row[column] ?? null) !== null), builder),
@@ -246,7 +247,7 @@ describe('cutClips', () => {
       profileFor: async () => PROFILE,
     });
 
-    expect(result).toEqual({ cut: 3, clips: 6, failed: 0, unreadable: 0, waiting: 1, stopped: null });
+    expect(result).toEqual({ cut: 3, clips: 6, failed: 0, unreadable: 0, waiting: 1, held: 0, stopped: null });
     expect(create).toHaveBeenCalledTimes(3);
     expect(spend).toHaveBeenCalledTimes(3);
     expect(spend.mock.calls.every(([userId]) => userId === OWNER)).toBe(true);
@@ -271,6 +272,26 @@ describe('cutClips', () => {
     const result = await cutClips(learn, { anthropicApiKey: 'k', owner: OWNER, deadline: Date.now() + 60_000, limit: 1, client: failing, now: () => NOW, profileFor: async () => PROFILE });
     expect(result.failed).toBe(1);
     expect(tables.video_clip_cuts.some((row) => row.video_id === LISTED_OLDER)).toBe(false);
+  });
+
+  it('cuts nothing for a person who already has forty clips not yet shown', async () => {
+    const { tables, learn } = world();
+    const clip = (n: number, extra: Row = {}) => ({ user_id: OWNER, video_id: DONE, start_seconds: n, shown_at: null, not_interested_at: null, ...extra });
+    // 39 unshown, plus clips that do not count: one shown, one marked not interested.
+    tables.video_clips = [
+      ...Array.from({ length: 39 }, (_, n) => clip(n)),
+      clip(100, { shown_at: NOW.toISOString() }),
+      clip(101, { not_interested_at: NOW.toISOString() }),
+    ];
+    const { client, create } = stubClient();
+    const under = await cutClips(learn, { anthropicApiKey: 'k', owner: OWNER, deadline: Date.now() + 60_000, limit: 1, client, now: () => NOW, profileFor: async () => PROFILE });
+    expect(under).toMatchObject({ cut: 1, held: 0 });
+    expect(create).toHaveBeenCalledTimes(1);
+
+    // The cut above added two unshown clips, which takes the person past forty.
+    const at = await cutClips(learn, { anthropicApiKey: 'k', owner: OWNER, deadline: Date.now() + 60_000, limit: 1, client, now: () => NOW, profileFor: async () => PROFILE });
+    expect(at).toMatchObject({ cut: 0, held: 3, waiting: 3 });
+    expect(create).toHaveBeenCalledTimes(1);
   });
 
   it('starts nothing once the deadline has passed', async () => {

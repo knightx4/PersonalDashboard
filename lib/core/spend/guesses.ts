@@ -19,13 +19,11 @@ import { HAIKU, OPUS, SONNET } from '@/lib/core/models';
  * the guesses with it. Where the ledger already had a few runs by September
  * 2026, the tokens were set so the guess lands near them.
  *
- * **Web search fees are not in these figures.** `enrich-company`, `find-openings`, `suggest-outreach`,
- * `resolve-reference`, `estimate-resale-price`, `recommend-newsletters` and `write-maya-thought` call
- * the web search tool, which bills $10 per thousand searches on top of tokens. The ledger records
- * tokens only (lib/core/spend/pricing.ts), so a guess that added the fee would
- * disagree with the measured figure that later replaces it, and with the spend
- * page's comparison of estimates against the ledger. Both read about one cent
- * per search low.
+ * **Web search fees are in these figures.** The operations that offer the web
+ * search tool give a typical number of searches, about half the call's cap,
+ * priced at $10 per thousand as the ledger prices them (lib/core/spend/pricing.ts),
+ * so a guess and the measured figure that later replaces it count the same
+ * things.
  *
  * Keyed by every name in `SPEND_OPERATIONS` and `LEARN_OPERATIONS`; the type
  * makes a missing name a compile error and estimate.test.ts checks it again.
@@ -45,6 +43,8 @@ export type OperationGuess = {
   inputTokens: number;
   /** Output tokens it typically gets back. */
   outputTokens: number;
+  /** Web searches it typically runs. Absent for a call that offers no search. */
+  searches?: number;
   /**
    * `unit` when the cost grows with a count the button knows, such as items
    * to price or references to resolve: the figure is for one, and each unit
@@ -73,14 +73,19 @@ function background(guess: OperationGuess): OperationGuess {
   return { ...guess, background: true };
 }
 
+/** A guess for a call that also runs about `count` web searches. */
+function searching(guess: OperationGuess, count: number): OperationGuess {
+  return { ...guess, searches: count };
+}
+
 export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // Learn: importing a reading list. A paste is parsed once, then each
   // reference is resolved on its own with a web search, then the topic is
   // planned. The import button's estimate is the sum.
   'parse-references': run(HAIKU, 3_000, 1_500),
-  'resolve-reference': unit(OPUS, 8_000, 800),
-  'suggest-sources': run(OPUS, 30_000, 6_000),
-  'plan-topic': run(OPUS, 40_000, 8_000),
+  'resolve-reference': searching(unit(OPUS, 8_000, 800), 2),
+  'suggest-sources': searching(run(OPUS, 30_000, 6_000), 4),
+  'plan-topic': searching(run(OPUS, 40_000, 8_000), 6),
   'name-areas': run(SONNET, 3_000, 1_000),
   'locate-passage': run(HAIKU, 3_000, 150),
 
@@ -107,8 +112,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // A goal's whole outline (plan #1139) runs to sixteen units, where a new
   // track's opening three or four came to about 900 tokens.
   'write-curriculum': run(SONNET, 3_000, 1_500),
-  'place-track': run(OPUS, 3_000, 400),
-  'place-aim': run(OPUS, 2_500, 300),
+  'place-track': run(SONNET, 3_000, 400),
+  'place-aim': run(SONNET, 2_500, 300),
 
   // Learn: the catalogue. One search press embeds the claim and judges the
   // nearest segments, up to forty of them, so the judging is priced per press.
@@ -129,7 +134,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // A note, its eight nearest notes cut to 1,500 characters, and up to
   // sixteen positions with quotes, plus up to two searches read back. The
   // material is cached, so the rounds after the first read it at a tenth.
-  'write-maya-thought': run(OPUS, 25_000, 2_500),
+  'write-maya-thought': searching(run(OPUS, 25_000, 2_500), 1),
   // The title and up to 4,000 characters of one note, from the hourly job.
   'gate-maya-note': background(unit(JEV, 1_200, 0)),
   // The note, Maya's thought, the thread so far and the summary, answered
@@ -142,13 +147,13 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'propose-theme-merges': background(unit(HAIKU, 8_000, 300)),
   'propose-position-merges': background(unit(HAIKU, 9_000, 300)),
   'link-positions': background(unit(HAIKU, 10_000, 400)),
-  'check-areas': background(run(OPUS, 40_000, 5_000)),
-  'place-themes': background(run(OPUS, 60_000, 6_000)),
+  'check-areas': background(run(SONNET, 40_000, 5_000)),
+  'place-themes': background(run(SONNET, 60_000, 6_000)),
   'write-survey-idea': background(unit(HAIKU, 6_000, 250)),
   'write-survey-question': background(unit(HAIKU, 2_500, 100)),
 
   // Learn now cards, written by the hourly top-up.
-  'name-feed-material': background(unit(SONNET, 2_500, 100)),
+  'name-feed-material': background(unit(HAIKU, 2_500, 230)),
   // One call per section, writing a card for each of up to three ideas.
   'write-feed-card': background(unit(SONNET, 4_000, 2_000)),
   'embed-feed-ideas': background(unit(VOYAGE_LITE, 1_500, 0)),
@@ -209,7 +214,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'screen-video': background(unit(HAIKU, 5_000, 700)),
   'judge-video': background(unit(HAIKU, 12_000, 400)),
   // Web search results come back as input, so the input side is the large one.
-  'find-channels': run(SONNET, 30_000, 1_500),
+  'find-channels': searching(run(SONNET, 30_000, 1_500), 3),
   // Per channel: up to 200 titles in and three numbers out, then the profile,
   // three verdicts and three 5,000-character excerpts in and a reason out.
   'judge-channel': unit(HAIKU, 9_000, 200),
@@ -221,7 +226,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'score-clips': background(unit(JEV, 1_500, 0)),
 
   // Jobs.
-  'enrich-company': run(HAIKU, 10_000, 500),
+  'enrich-company': searching(run(HAIKU, 10_000, 500), 2),
   'write-interview-prep': run(OPUS, 8_000, 3_000),
   'classify-job-email': background(unit(HAIKU, 1_500, 100)),
   'match-evidence': run(OPUS, 10_000, 3_000),
@@ -232,12 +237,12 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'propose-evidence': run(OPUS, 8_000, 3_000),
   'suggest-learning-tracks': run(OPUS, 4_000, 900),
   // The career goals, a CV excerpt and the names already known in, then up
-  // to six searches whose results come back as input; three people with a
+  // to five searches whose results come back as input; three people with a
   // message each out.
-  'suggest-outreach': run(SONNET, 50_000, 2_500),
-  // The career goals and the companies already applied to, then up to six
+  'suggest-outreach': searching(run(SONNET, 50_000, 2_500), 3),
+  // The career goals and the companies already applied to, then up to five
   // searches whose results come back as input; five postings out.
-  'find-openings': run(SONNET, 50_000, 2_500),
+  'find-openings': searching(run(SONNET, 50_000, 2_500), 3),
   // One opening's text, the evidence titles, thirty applied roles, the
   // similar-application history and ten questions in; ten answers out.
   // 1,805 tokens a request on the trial with eight questions.
@@ -250,7 +255,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // background, and the reparse and review buttons know how many they send.
   'extract-email-order': unit(HAIKU, 3_000, 500),
   'read-bill-email': background(unit(HAIKU, 2_500, 150)),
-  'estimate-resale-price': unit(HAIKU, 6_000, 300),
+  'estimate-resale-price': searching(unit(HAIKU, 6_000, 300), 1),
   'read-shelf-photo': run(OPUS, 2_100, 1_500),
   'read-receipt-photo': run(HAIKU, 2_000, 600),
   'parse-paste-list': run(HAIKU, 1_500, 1_000),
@@ -318,7 +323,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'score-importance': background(unit(JEV, 12_000, 0)),
   'measure-repeats': background(run(VOYAGE_LITE, 100_000, 0)),
   // Up to 24 searches, whose results are read back in on each round.
-  'recommend-newsletters': run(OPUS, 60_000, 5_000),
+  'recommend-newsletters': searching(run(OPUS, 60_000, 5_000), 12),
   // The story's summary and text, the discussion so far and the view in; a
   // counterpoint or a question out.
   'discuss-story': run(SONNET, 3_000, 300),

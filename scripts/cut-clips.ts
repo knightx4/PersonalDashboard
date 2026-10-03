@@ -52,7 +52,8 @@ async function main(): Promise<void> {
   await Promise.all(rows);
   console.log(
     `Cut ${result.cut} videos into ${result.clips} clips. ${result.failed} failed and will be tried again, ` +
-      `${result.unreadable} could not be read, ${result.waiting} still waiting.`,
+      `${result.unreadable} could not be read, ${result.waiting} still waiting` +
+      (result.held > 0 ? `, ${result.held} held until the clips already cut have been shown.` : '.'),
   );
 }
 

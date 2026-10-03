@@ -18,8 +18,8 @@ import { MODELS } from '@/lib/core/models';
  * every title and drops the ones Wikipedia does not have, and a section it
  * cannot find in the fetched article falls back to the article's lead.
  *
- * Sonnet, because the spec prices the feed at two Sonnet calls per card, and
- * naming well-known articles does not need more.
+ * Haiku: the reply is two or three titles and a sentence each, about 230
+ * output tokens, and every title is checked against Wikipedia afterwards.
  */
 
 export const NAME_MATERIAL_MODEL = MODELS.learnNameMaterial;

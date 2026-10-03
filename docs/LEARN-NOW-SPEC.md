@@ -566,8 +566,9 @@ conversation is the answer being marked and its claim is the answer.
 
 ## Cost
 
-Two model calls per card, one to name the material and one to write the card.
-At a few hundred tokens out each on Sonnet, twenty cards is roughly ten cents.
+Two model calls per card, one to name the material (Haiku, about 230 tokens
+out) and one to write the card (Sonnet, a few hundred tokens out). Twenty cards
+is a few cents.
 Recorded in the spend ledger under their own operations.
 
 ## Build order

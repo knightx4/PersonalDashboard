@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LaidOutUnit } from './lay-out-unit';
-import { MAX_PLAN_LAYOUTS_PER_RUN, layOutPlans, type PlanLayoutDue, type PlanLayoutPorts } from './plan-layout';
+import { MAX_PLAN_LAYOUTS_PER_RUN, layOutPlans, unitStarted, type PlanLayoutDue, type PlanLayoutPorts } from './plan-layout';
 import { LAYOUT_RESERVE_MS, LESSON_HOLD_MS } from './top-up';
 
 /**
@@ -68,5 +68,27 @@ describe('layOutPlans', () => {
     const summary = await layOutPlans(p, { userId: 'me', deadline: NOW + LAYOUT_RESERVE_MS - 1 });
     expect(calls.layOut).toEqual([]);
     expect(summary.stopped).toBe('deadline');
+  });
+});
+
+describe('unitStarted', () => {
+  const pieces = [
+    { id: 'p1', conceptIds: ['c1', 'c2'], passed: false },
+    { id: 'p2', conceptIds: ['c3'], passed: false },
+  ];
+  const none = new Set<string>();
+
+  it('reads a unit nobody has opened as not started', () => {
+    expect(unitStarted({ pieces, checkedPieceIds: none, lessonConceptIds: new Set(['elsewhere']) })).toBe(false);
+  });
+
+  it('reads a unit as started once a piece is passed, checked, or has a lesson for one of its ideas', () => {
+    expect(unitStarted({ pieces: [{ ...pieces[0], passed: true }], checkedPieceIds: none, lessonConceptIds: none })).toBe(true);
+    expect(unitStarted({ pieces, checkedPieceIds: new Set(['p2']), lessonConceptIds: none })).toBe(true);
+    expect(unitStarted({ pieces, checkedPieceIds: none, lessonConceptIds: new Set(['c3']) })).toBe(true);
+  });
+
+  it('reads a unit with no pieces as not started, so nothing more is laid out behind it', () => {
+    expect(unitStarted({ pieces: [], checkedPieceIds: none, lessonConceptIds: new Set(['c1']) })).toBe(false);
   });
 });
