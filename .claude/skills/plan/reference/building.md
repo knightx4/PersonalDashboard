@@ -74,11 +74,12 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    the repo's rules (`README.md` "Rules", the module's spec in `docs/`). Do not
    fold unrelated cleanup into a step's commit.
 
-   **Read the part you need, not the whole file.** Eleven files here are over
-   forty thousand characters and two are over a hundred and forty thousand:
-   `app/dev/plan/plan-view.tsx` is about thirty-six thousand tokens, and
-   `lib/plan/tree.ts`, `app/dev/plan/actions.ts` and `lib/plan/tree.test.ts`
-   are fourteen to nineteen thousand each. Opening one whole to change three
+   **Read the part you need, not the whole file.** Twenty-four files here are
+   over forty thousand characters, and the largest are over a hundred and
+   twenty thousand: `app/jobs/(app)/roles/[id]/panels.tsx` is about
+   thirty-four thousand tokens, and `lib/plan/tree.ts`,
+   `app/dev/plan/actions.ts` and `lib/plan/tree.test.ts` are fifteen to
+   nineteen thousand each. Opening one whole to change three
    hundred lines costs that once to read and again on every turn afterwards,
    because the session carries it to the end.
 

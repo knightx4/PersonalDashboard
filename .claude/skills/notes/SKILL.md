@@ -52,8 +52,10 @@ fault — fall back to the Supabase MCP tools against `feedback_items` and do
 not spend the session diagnosing it.
 
 Use the **`Supabase`** connector, `mcp__Supabase__*`. Project ref:
-`asjztutnqxbecruvyrbj`. `feedback_items` is in `public` — the app's own tables
-are not, they are under `todo.`, `job_search.`, `vault.` and so on.
+`asjztutnqxbecruvyrbj`. `feedback_items` is in `public`. Most of the app's own
+tables are not: they are in a schema per workspace, such as `todo.`,
+`job_search.`, `goals.`, `learn.`, `news.` and `core.`, and the vault's are in
+`obsidian.`.
 
 The procedure is identical, and these are the writes each command makes, so
 the queue records the same thing either way:
@@ -154,11 +156,12 @@ one is closed.
 4. **Make the change.** Smallest change that genuinely fixes it. Do not fold
    unrelated cleanup into a note's commit.
 
-   **Read the part you need, not the whole file.** Eleven files here are over
-   forty thousand characters and two are over a hundred and forty thousand:
-   `app/dev/plan/plan-view.tsx` is roughly thirty-six thousand tokens, and
-   `lib/plan/tree.ts`, `app/dev/plan/actions.ts` and `lib/plan/tree.test.ts`
-   are fourteen to nineteen thousand each. Opening one whole to change twenty
+   **Read the part you need, not the whole file.** Twenty-four files here are
+   over forty thousand characters, and the largest are over a hundred and
+   twenty thousand: `app/jobs/(app)/roles/[id]/panels.tsx` is roughly
+   thirty-four thousand tokens, and `lib/plan/tree.ts`,
+   `app/dev/plan/actions.ts` and `lib/plan/tree.test.ts` are fifteen to
+   nineteen thousand each. Opening one whole to change twenty
    lines costs that once to read and again on every turn for the rest of the
    batch, because the session carries it to the end. `grep -n` for the symbol,
    then read around the line. Read a whole file only when you are changing most
@@ -481,8 +484,9 @@ Then, below the table:
   its title, its spec, and the notes now waiting on it.
 - **Still open** — anything not reached, and why the batch stopped there.
 - The queue count after the run.
-- Anything the user has to do themselves — a migration to apply, a setting to
-  change, a credential to add.
+- Anything the user has to do themselves, such as a setting to change or a
+  credential to add. A migration is not one of these: apply it yourself, as
+  `CLAUDE.md` says.
 
 Detail beyond the table is worth writing only where it changes what the user
 would do next: a cause worth knowing, an assumption they may want to

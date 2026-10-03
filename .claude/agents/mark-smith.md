@@ -19,28 +19,31 @@ judged by a script.
   comments explaining why it is the way it is. Several of those comments are
   the record of choices already tried and rejected. Read them before proposing
   something that was already thrown out.
-- `lib/modules.ts` — `MarkShape`, `MarkKey`, the per-module hues, `HOME_MARK`.
+- `lib/modules.ts` — `MarkShape`, `MarkKey`, each module's ramp, `HOME_MARK`.
 - `app/globals.css` — the token system, if you need a colour.
 
 ## What is true about the current mark
 
-Four nodes in a square. Three never change and carry no colour; the top-right
-one is the "key" — a filled silhouette in the module's hue, the only colour in
-the mark. The tile is a fixed near-black `#101216` with a hairline inset ring.
-Geometry lives in a 24-unit box so one set of paths serves 20px and 44px.
+Each mark is one object on a tinted ground, built from three values and no
+more. The ground is a superellipse in the module's hue at 16%, over whatever
+is behind it, so it follows the theme. The object is drawn solid in a
+light-to-deep ramp of that hue, ending on the workspace's own accent. One
+detail is cut out of the object in white, showing the ground through. The
+objects are the `MarkShape` values: `dash` for the app itself and one per
+workspace. Only the home mark (`HOME_MARK`) uses more than one hue. Geometry
+lives in a 24-unit box so one set of paths serves every size.
 
-The split is load-bearing: the constant three say "same app" without being
-looked at, the key says which room you are in without being read. An earlier
-version encoded the module in *which* node was promoted; that ran out at four
-modules. Do not go back to it.
+An earlier version was four nodes in a square, three constant and one
+coloured "key" for the module. `module-mark.tsx` says why it was replaced. Do
+not go back to it.
 
-## Known drift you should check
+## The icon files
 
-`app/icon.svg` is a gradient-filled rounded square — the exact shape
-`module-mark.tsx` calls "the most dated shape in software". `app/favicon.ico`
-and `app/apple-icon.png` are binaries of that same old mark. The favicon and
-the in-app mark have been out of sync. Whatever you draw, they must end up
-agreeing.
+`app/icon.svg` is the home mark drawn out by hand, with two deliberate
+differences from the component that its comments list. `app/favicon.ico` and
+`app/apple-icon.png` are binaries, so a change to the component does not
+reach them: open them and check they show the same mark. Whatever you draw,
+all of them must end up agreeing.
 
 ## How to judge your own work
 
@@ -69,17 +72,16 @@ serve you an old build and you will screenshot the wrong thing.
 
 ## Drawing rules that come from this codebase's own experience
 
-- **Single filled silhouettes.** No strokes, no counters, no gap narrower than
-  about a sixth of the shape. At 24px the key is roughly 5px; anything finer
-  closes into a blob. This is why the shopping bag has two ears rather than a
-  drawn handle.
+- **One filled object, with exactly one detail cut out of it** (the home
+  mark has none). No strokes, and no gap narrower than about a sixth of the
+  shape: a second detail, or a finer one, closes into a blob at 18px and
+  takes the first one with it.
 - **Fixed hexes in the mark are correct.** A mark is an object; an app icon
   does not invert when the OS goes dark. `lib/modules.ts` and the mark
   component are the sanctioned homes for literal colours. If you add one
   elsewhere, `npm run check:ui` will stop you, and it is right to.
 - **Test the shapes against each other, not one at a time.** Two silhouettes
-  chosen separately end up confusable. Briefcase against bag is the standing
-  example.
+  chosen separately end up confusable.
 
 ## Verify before you finish
 
@@ -94,10 +96,11 @@ npm run build
 npm test
 ```
 
-`npm test` has a standing baseline of failures — the RLS suites need a live
-database on port 5433 and the FX suite needs network. Establish the baseline
-before you change anything (`npm test` on a clean tree) so you can prove you
-did not add to it. Report the numbers honestly; never describe a suite as
+The RLS suites in `npm test` need the test database on port 5433:
+`npm run gate` starts it (`scripts/test-db-up.sh`), applies the migrations and
+runs every check above. The FX suite needs network. Run the tests on a clean
+tree before you change anything so you can prove you did not add to what
+fails. Report the numbers honestly; never describe a suite as
 passing when it did not run.
 
 ## Committing

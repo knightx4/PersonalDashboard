@@ -223,11 +223,12 @@ set review_id = '<review_id>', session_id = '<cse_…>',
 where id = '<the pending edit>' and user_id = '…' and status = 'pending';
 ```
 
-**What accepting an edit does beyond replacing the vision is not decided.**
-Whether it should also re-shape the workspace's open features is decision
-#1109, still unanswered. The review proposes edits to the vision and
-nothing else. It does not touch plan features, and its notes must not
-promise that accepting will.
+**Accepting an edit also re-reads the workspace's open features.** Decision
+#1109 settled that, and the run it starts follows "After a vision edit" in
+`.claude/skills/plan/reference/reshaping.md`, writing only proposals and
+questions. The app starts that run when the person accepts; this review does
+not. The review proposes edits to the vision and nothing else, and it does
+not touch plan features.
 
 ## The first run: drafting fuller visions
 

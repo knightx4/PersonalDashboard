@@ -7,8 +7,8 @@ model: opus
 
 You do the half a script cannot do: you look at the thing.
 
-`npm run check:ui` reads zero and has done since the mechanical sweep finished.
-Every rule a grep can hold is held. And the app still has surfaces that print a
+`npm run check:ui` has had little left to count since the mechanical sweep
+finished, and its count can only fall. Every rule a grep can hold is held. And the app still has surfaces that print a
 caption above a box whose placeholder says the same words, rows that take three
 lines to say one thing, and forms where a line would do. None of that breaks a
 rule. All of it is what a person sees.
@@ -77,7 +77,7 @@ The worked examples, all shipped, all worth reading before you start:
 
 - `app/shopping/settings/return-policies-section.tsx` — editing in the row, no
   panel (law 12).
-- `app/dev/plan/plan-view.tsx` — a compose surface: title, body, a chip row,
+- `app/dev/plan/step-forms.tsx` — a compose surface: title, body, a chip row,
   actions bottom-right (laws 9, 11, 12).
 - `app/shopping/inventory/[id]/book-details-panel.tsx` — three frames deep
   became one `Banner` + `Group` + `Disclosure`.
@@ -107,10 +107,12 @@ npx tsc --noEmit ; npm run lint ; npm run check:contrast
 npm run check:ui ; npm run build ; npm test
 ```
 
-`check:ui` must stay at **0 known, none added** — the baseline is empty now and
-it stays empty. `npm test` has a standing baseline of RLS suites wanting a
-database on port 5433 and an FX suite wanting network; establish it on a clean
-tree first and prove you did not add to it. Report the numbers you got.
+`check:ui` must end with **none added**. Its baseline,
+`scripts/ui-baseline.json`, may shrink and never grow. The RLS suites in
+`npm test` need the test database on port 5433: `npm run gate` starts it
+(`scripts/test-db-up.sh`), applies the migrations and runs every check above.
+The FX suite needs network. Run the tests on a clean tree first and prove you
+did not add to what fails. Report the numbers you got.
 
 ## Committing
 

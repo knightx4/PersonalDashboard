@@ -5,11 +5,14 @@ description: Carry out a request Ask Dash handed on because none of its own tool
 
 # Doing what Ask Dash handed on
 
-Ask Dash answers questions and can propose four changes: a todo, a goal step,
-marking an item returned and a price watch. When the person asks for anything
-else ("add a goal to publish a song on Spotify"), Dash calls `hand_off`. That
-keeps the request in `core.dash_handoffs`, tells the person it has been passed
-on, and starts this routine. Code: `lib/talk/handoff.ts`, `lib/dash/ask.ts`.
+Ask Dash answers questions and makes eight kinds of change itself, with an
+Undo: adding a todo, a goal or a goal step, renaming, moving or ticking off a
+todo, closing a goal step, marking an item returned, and adding a note on a
+role (`lib/dash/writes.ts`). It can also propose a price watch for the person
+to confirm. When the person asks for anything else ("add a course to Learn"),
+Dash calls `hand_off`. That keeps the request in
+`core.dash_handoffs`, tells the person it has been passed on, and starts this
+routine. Code: `lib/talk/handoff.ts`, `lib/dash/ask.ts`.
 
 The person is watching the thread. It checks for your reply every twenty
 seconds for half an hour, so be quick: do the one thing they asked, reply, and
@@ -135,7 +138,7 @@ next request like this one does not need you:
 ```sql
 insert into public.feedback_items (user_id, kind, body, page_path)
 values ('<user_id>', 'feature',
-  $n$Ask Dash could not <what it was asked, in general terms: create a goal>, so it handed the request to the backup routine (hand-off <id>). Give Dash a proposal for it in lib/ask/propose.ts.$n$,
+  $n$Ask Dash could not <what it was asked, in general terms: create a goal>, so it handed the request to the backup routine (hand-off <id>). Give Dash a write tool for it in lib/dash/writes.ts.$n$,
   '/ask/<conversation>')
 returning id;
 ```

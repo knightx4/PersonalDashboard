@@ -72,7 +72,7 @@ export const coreSources: ModuleSources = {
         reads: ['week'],
         href: (row) => `/home/week/${row.week}`,
       },
-      note: "The observations and the change are Dash's, not theirs: each observation is {text, goal_id, evidence}, with goal_id a goals.goals id or null and evidence as `schema.table:id` refs. facts holds the numbers counted for the week. week is the Sunday it starts on. change_kept says whether the previous week's change happened (null when unknown). source 'plain' means no model wrote it.",
+      note: "The observations and the change are Dash's, not theirs: each observation is {text, goal_id, evidence}, with goal_id the goals.items id of a goal, or null and evidence as `schema.table:id` refs. facts holds the numbers counted for the week. week is the Sunday it starts on. change_kept says whether the previous week's change happened (null when unknown). source 'plain' means no model wrote it.",
     },
     {
       table: 'core.watches',
