@@ -94,6 +94,7 @@ export function namePosition(
 }
 
 const NAME_CLASS =
+  /* ui-ok: a floating pill appended to <body>, not a grouping box; it was exempt as a components/ui primitive before moving here */
   'toast-in pointer-events-none fixed z-toast max-w-xs truncate rounded-full border border-border bg-raised px-2.5 py-1 text-small font-medium text-ink shadow-lg';
 
 /** The name on screen now, so a second filing replaces it rather than stacking. */

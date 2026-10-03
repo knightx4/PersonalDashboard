@@ -87,6 +87,7 @@ function boxOf(point: TravelPoint): Box {
 }
 
 const CHIP_CLASS =
+  /* ui-ok: a floating pill appended to <body>, not a grouping box; it was exempt as a components/ui primitive before moving here */
   'pointer-events-none fixed left-0 top-0 z-toast max-w-xs truncate rounded-full border border-border bg-raised px-2.5 py-1 font-mono text-micro text-ink shadow-lg';
 
 /**
