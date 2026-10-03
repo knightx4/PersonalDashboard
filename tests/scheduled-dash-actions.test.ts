@@ -12,6 +12,7 @@
  *   /api/cron/jd-backfill and the daily cron's jd-backfill stage
  *   /api/cron/daily: the claim sweep, the night digest's ideas and the
  *   morning goals run's held steps
+ *   /api/cron/youtube-library: the skip verdicts on the watch list (plan #1572)
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { SchemaClient } from '@/lib/ask/db';
@@ -31,6 +32,7 @@ const { applyBoardToRole } = await import('@/lib/jobs/jd/lookup');
 const { releaseStaleClaims } = await import('@/inngest/dev/claims');
 const { fileNightIdeas } = await import('@/lib/ideas/file');
 const { holdActingSteps } = await import('@/lib/goals/hold-acts-store');
+const { judgeWatchLists } = await import('@/lib/learn/youtube/judging');
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const DAY = 24 * 60 * 60 * 1000;
@@ -349,6 +351,106 @@ describe('the daily cron (/api/cron/daily)', () => {
       write: async () => 'Books a table.',
     });
     expect(tables['goals.items'][0].status).toBe('proposed');
+    expect(records(tables)).toHaveLength(0);
+  });
+});
+
+describe('the YouTube library (/api/cron/youtube-library)', () => {
+  const listRow = (id: string, videoId: string, title: string): Row => ({
+    id,
+    user_id: USER,
+    video_id: videoId,
+    left_playlist_at: null,
+    verdict: null,
+    judge_verdict: null,
+    verdict_by: null,
+    why: null,
+    screened_at: null,
+    judged_at: null,
+    summary: null,
+    key_points: null,
+    added_at: '2026-10-01T00:00:00Z',
+    item: { title, author: 'A channel', description: 'About it.', duration_seconds: 600, provider: null },
+  });
+
+  /** One screening call: the first video looked at, the second skipped. */
+  const anthropic = {
+    messages: {
+      create: vi.fn(async () => ({
+        content: [
+          {
+            type: 'tool_use',
+            name: 'report_screen',
+            input: {
+              videos: [
+                { number: 1, decision: 'look', why: 'Serves your finance track.' },
+                { number: 2, decision: 'skip', why: 'Touches none of your tracks.' },
+              ],
+            },
+          },
+        ],
+        stop_reason: 'tool_use',
+        usage: { input_tokens: 500, output_tokens: 80 },
+      })),
+    },
+  };
+
+  it('records each skip verdict it writes, and Home can undo it', async () => {
+    const tables: FakeTables = {
+      'learn.watch_list': [
+        listRow('wl-1', 'aaaaaaaaaaa', 'Cash flow in ten minutes'),
+        listRow('wl-2', 'bbbbbbbbbbb', 'Minecraft speedrun'),
+      ],
+      'learn.video_transcripts': [],
+    };
+
+    const result = await judgeWatchLists(serviceClient(tables, 'learn') as never, {
+      anthropicApiKey: 'k',
+      deadline: Date.now() + 60_000,
+      client: anthropic as never,
+      profileFor: async () => ({ tracks: [], goals: [], ideas: [] }) as never,
+      now: () => new Date('2026-10-03T06:00:00Z'),
+    });
+
+    expect(result).toMatchObject({ skipped: 1, passed: 1 });
+    const rows = records(tables);
+    expect(rows).toHaveLength(1);
+    expectScheduled(rows);
+    expect(rows[0]).toMatchObject({
+      kind: 'skip_video',
+      subject_ref: 'learn.watch_list:wl-2',
+      op: 'update',
+      summary: 'Dash marked "Minecraft speedrun" as a skip on your watch list.',
+      before_values: expect.objectContaining({ verdict: null, screened_at: null }),
+      after_values: expect.objectContaining({ verdict: 'skip', verdict_by: 'judge' }),
+    });
+
+    const undone = await undoDashAction(fakeDashDeps(tables, USER), String(rows[0].id));
+    expect(undone.ok).toBe(true);
+    expect(tables['learn.watch_list'][1]).toMatchObject({ verdict: null, judge_verdict: null, verdict_by: null, screened_at: null });
+  });
+
+  it('records nothing when you set the verdict while the run was working', async () => {
+    const tables: FakeTables = {
+      'learn.watch_list': [
+        listRow('wl-1', 'aaaaaaaaaaa', 'Cash flow in ten minutes'),
+        listRow('wl-2', 'bbbbbbbbbbb', 'Minecraft speedrun'),
+      ],
+      'learn.video_transcripts': [],
+    };
+    const moved = vi.fn(async () => {
+      Object.assign(tables['learn.watch_list'][1], { verdict: 'watch', verdict_by: 'you' });
+      return anthropic.messages.create();
+    });
+
+    await judgeWatchLists(serviceClient(tables, 'learn') as never, {
+      anthropicApiKey: 'k',
+      deadline: Date.now() + 60_000,
+      client: { messages: { create: moved } } as never,
+      profileFor: async () => ({ tracks: [], goals: [], ideas: [] }) as never,
+    });
+
+    expect(tables['learn.watch_list'][1]).toMatchObject({ verdict: 'watch', verdict_by: 'you' });
     expect(records(tables)).toHaveLength(0);
   });
 });

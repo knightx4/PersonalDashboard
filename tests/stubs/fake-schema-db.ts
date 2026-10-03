@@ -6,7 +6,8 @@ import type { AskSchema, SchemaClient } from '@/lib/ask/db';
  *
  * Enough of the query builder for code that reads a row, writes one and
  * reads it back: select, insert, update and delete, the filters eq, neq, gt,
- * gte, lt, is and in, order, limit, single and maybeSingle. Every query returns whole
+ * gte, lt, is, in, not (is null) and or (of eq, neq and is null), order,
+ * limit, single and maybeSingle. Every query returns whole
  * rows whatever columns it selected. An insert without an id gets one, and a
  * created_at, so a writer that asks for its new row's id gets one back; an
  * insert with one is kept exactly as given.
@@ -86,6 +87,16 @@ export function fakeSchemaDb(tables: FakeTables, now = '2026-10-03T08:00:00Z') {
           lt: (c: string, v: string) => (filters.push((r) => r[c] != null && String(r[c]) < v), query),
           is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), query),
           in: (c: string, vs: unknown[]) => (filters.push((r) => vs.includes(r[c])), query),
+          not: (c: string) => (filters.push((r) => (r[c] ?? null) !== null), query),
+          or: (spec: string) => {
+            const parts = spec.split(',').map((part) => part.split('.'));
+            filters.push((r) =>
+              parts.some(([c, operator, v]) =>
+                operator === 'is' ? (r[c] ?? null) === null : operator === 'neq' ? r[c] !== v : r[c] === v,
+              ),
+            );
+            return query;
+          },
           order: (column: string, opts: { ascending?: boolean } = {}) => (
             (order = { column, ascending: opts.ascending ?? true }), query
           ),
