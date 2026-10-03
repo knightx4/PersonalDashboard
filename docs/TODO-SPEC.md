@@ -167,6 +167,10 @@ Listing these because they will otherwise get invented.
 | A note checkbox | your vault | **nothing, ever** | not possible | deferred entirely; see below |
 | A goal's next step, or a step flagged Show on Todo | `goals.items` | nothing new | `status` on the step, set to done | a row in `todo.dismissals` |
 | An open question on a goal | `goals.items` | nothing new | answered, not finished: the option pressed goes in `resolution` | a row in `todo.dismissals` |
+| A plan question, proposal, block or setup job on you | `public.plan_items` | nothing | answered or approved on the plan | a row in `todo.dismissals` |
+| A goal or goal steps Dash proposed, or a goal step blocked on you | `goals.items` | nothing | approved or unblocked on the goal | a row in `todo.dismissals` |
+| A question Dash raised | `public.raised_items` | nothing | answered on the Dash tab or its goal | a row in `todo.dismissals` |
+| A thread where Dash spoke last and asked something | `core.conversations` | nothing | your reply in the thread | a row in `todo.dismissals` |
 
 The second row is the one exception to "never write to another schema", and it
 is not really an exception: `/jobs/today` and `/todo` are two views of one row,
