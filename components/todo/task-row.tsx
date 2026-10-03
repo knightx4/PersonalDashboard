@@ -47,6 +47,8 @@ import { TaskAbout } from './task-about';
 import { EditTask } from './task-form';
 import { formatClock } from '@/lib/clock';
 import { LinkedText } from '@/components/ui/linked-text';
+import { MoveLabel } from '@/components/ui/move-label';
+import { taskMove } from '@/lib/todo/tasks/move';
 
 /**
  * One task, and what you can do to it without leaving the list.
@@ -196,6 +198,7 @@ export function TaskRow({
 
   const done = task.status === 'done';
   const dropped = task.status === 'dropped';
+  const whoseMove = taskMove(task);
 
   /**
    * Run one of the writes the row does not draw ahead of: a move, a place, a
@@ -452,6 +455,10 @@ export function TaskRow({
                 })
               }
             />
+
+            {/* Whose move (plan #1454): an open todo is on you, in the same
+                word and colour as a plan step or an application. */}
+            {whoseMove && <MoveLabel move={whoseMove.move} title={whoseMove.title} />}
 
             {anchor && (
               <a

@@ -40,7 +40,16 @@ type OrderJoin = {
     name: string;
     default_return_window_days: number | null;
   } | null;
+  shipments?: { carrier: string | null; created_at: string }[] | null;
 };
+
+/** The carrier named on the order's newest shipment that names one. */
+function carrierOf(order: OrderJoin): string | null {
+  const named = (order.shipments ?? [])
+    .filter((shipment) => shipment.carrier?.trim())
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  return named[0]?.carrier?.trim() ?? null;
+}
 
 type InventoryQueryRow = {
   id: string;
@@ -93,6 +102,7 @@ function buildOwnedRow(item: InventoryQueryRow, today: string): ReturnsTrackerRo
     returnPlanned: item.return_planned,
     returnWindowDays: merchant?.default_return_window_days ?? null,
     delivered: deadline != null || order.status === 'delivered',
+    carrier: carrierOf(order),
     status: 'owned',
     returnId: null,
     refundedAt: null,
@@ -126,6 +136,7 @@ function buildReturnedRow(
     returnPlanned: false,
     returnWindowDays: merchant?.default_return_window_days ?? null,
     delivered: true,
+    carrier: null,
     status: 'returned',
     returnId: refund.id,
     refundedAt: refund.refunded_at,
@@ -152,7 +163,8 @@ const ITEM_SELECT = `
     order_id,
     orders!inner (
       id, status, order_date, external_order_number, return_deadline, merchant_id, deleted_at,
-      merchants ( id, name, default_return_window_days )
+      merchants ( id, name, default_return_window_days ),
+      shipments ( carrier, created_at )
     )
   )
 `;

@@ -8,6 +8,8 @@ import { DetailLayout, Property, PropertyList } from '@/components/shell/detail-
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
+import { MoveLabel } from '@/components/ui/move-label';
+import { applicationMove, lastTurnEvent } from '@/lib/jobs/move';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { formatCompBand, formatDate } from '@/lib/jobs/applications/load';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
@@ -331,6 +333,14 @@ export default async function RoleDetailPage({
     ]),
   );
 
+  // Whose move the pursuit is (plan #1454), from its stage and the newest
+  // event that says whose turn it is. Null once it has closed.
+  const move = applicationMove({
+    status: current.status as ApplicationStatus,
+    lastEvent: lastTurnEvent((events ?? []).map((event) => event.kind as string)),
+    companyName: company.name,
+  });
+
   return (
     <DetailLayout
       header={
@@ -387,6 +397,7 @@ export default async function RoleDetailPage({
                     {coverageLabel}
                   </Link>
                 )}
+                {move && <MoveLabel move={move.move} title={move.title} />}
                 <StatusPicker
                   applicationId={current.id as string}
                   status={current.status as ApplicationStatus}
