@@ -19,6 +19,7 @@ import { loadMainCheck } from '@/lib/shell/main-check';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
 import { loadAgenda, type Agenda } from '@/lib/todo/agenda/load';
+import { todaySlice } from '@/lib/todo/agenda/today';
 import { BUCKET_LABELS, dueDay } from '@/lib/todo/tasks/model';
 import { countReviewItems as countShoppingReview } from '@/lib/review/load';
 import { countReviewItems as countJobsReview } from '@/lib/jobs/review/load';
@@ -510,21 +511,12 @@ async function TodaySection({
   agenda: Promise<Agenda | null>;
   timezone: string;
 }) {
-  const piles = (await agenda)?.piles ?? [];
-  const dueAll = piles
-    .filter((pile) => pile.bucket === 'overdue' || pile.bucket === 'today')
-    .flatMap((pile) => pile.entries.map((entry) => ({ bucket: pile.bucket, entry })));
-  const due = dueAll.slice(0, 5);
-  const dueMore = dueAll.length - due.length;
-
-  // What today already holds -- an event you typed, an interview -- above the
-  // things to do, and without a checkbox for the same reason the agenda gives
-  // it none. Today only: the merge already drops anything earlier, because an
-  // appointment in the past is over rather than late.
-  const happening = piles
-    .filter((pile) => pile.bucket === 'today')
-    .flatMap((pile) => pile.context)
-    .slice(0, 5);
+  // The Todo list's Overdue and Today piles, cut to five (plan #1476): the
+  // rule for what counts as today is todaySlice's, so the two cannot drift.
+  // What today already holds -- an event you typed, an interview -- goes above
+  // the things to do, without a checkbox for the same reason the agenda gives
+  // it none.
+  const { due, more: dueMore, happening } = todaySlice((await agenda)?.piles ?? []);
 
   if (due.length === 0 && happening.length === 0) return null;
   return (
