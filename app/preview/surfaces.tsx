@@ -10,6 +10,8 @@ import { SettleDemo } from '@/app/dev/ui/settle-demo';
 import { ClearDemo } from '@/app/dev/ui/clear-demo';
 import { DayCloseDemo } from '@/app/dev/ui/day-close-demo';
 import { DayClosed } from '@/components/todo/day-closed';
+import { GotThroughDemo } from '@/app/dev/ui/got-through-demo';
+import { GotThrough } from '@/app/news/quick/got-through';
 import { ItemDetailsPanel } from '@/app/shopping/inventory/[id]/item-details-panel';
 import { EstimatesTable } from '@/app/account/spend/estimates-table';
 import { compareEstimate } from '@/lib/core/spend/comparison';
@@ -3584,6 +3586,43 @@ export const SURFACES: readonly Surface[] = [
           { id: 'c', title: 'Return the kettle' },
           { id: 'd', title: 'Pay the window cleaner' },
         ]}
+      />
+    ),
+  },
+
+  /* The end of Quick read (plan #1557): played by passing the last story,
+   * and as a page that loads already caught up. */
+  {
+    id: 'news-quick-got-through',
+    label: 'News · The end of Quick read',
+    module: 'news',
+    width: 'narrow',
+    interaction: {
+      kind: 'completion',
+      target: '[data-motion-demo="got-through"]',
+      shows:
+        'The last story goes, the day\'s sigil draws in, and the card below lifts in with Read counting up to 9 and Skipped to 4, the longest-read story and the two newsletters due next.',
+    },
+    render: () => (
+      <div className={cardVariants({ padding: 'standard' })}>
+        <GotThroughDemo stories={['Rail strike called off']} />
+      </div>
+    ),
+  },
+  {
+    id: 'news-quick-got-through-loaded',
+    label: 'News · Quick read already finished',
+    module: 'news',
+    width: 'narrow',
+    render: () => (
+      <GotThrough
+        done
+        summary={{
+          read: 14,
+          skipped: 6,
+          longest: { headline: 'Why the rail strike was called off at midnight', held: '4 minutes' },
+          due: [{ from: 'The Morning Letter', when: 'tomorrow around 6:00\u00a0AM' }],
+        }}
       />
     ),
   },
