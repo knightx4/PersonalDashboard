@@ -10,6 +10,7 @@ import { forceTool } from '@/lib/learn/graph/tool-call';
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
 import { readStories, type NewsStory } from '@/lib/news/issues/stories';
 import { FALLBACK_TOPIC, NEWS_TOPICS, readTopic } from '@/lib/news/issues/topics';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * A newsletter's summary and stories, written by Haiku from the body already
@@ -67,7 +68,7 @@ import { FALLBACK_TOPIC, NEWS_TOPICS, readTopic } from '@/lib/news/issues/topics
  * left null, which Quick read shows as it did before.
  */
 
-export const DIGEST_MODEL = 'claude-haiku-4-5';
+export const DIGEST_MODEL = MODELS.newsDigest;
 
 /** The name this call has in core.model_spend. Stable: renaming it splits the history. */
 export const DIGEST_OPERATION: NewsOperation = 'digest-issue';

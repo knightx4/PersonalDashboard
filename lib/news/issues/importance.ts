@@ -18,6 +18,7 @@ import {
   storyState,
 } from './importance-jev';
 import { applyRatings, unrated, type Unrated } from './importance-rows';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Rating how much each story matters, out of 100 (plan #1170).
@@ -38,7 +39,7 @@ import { applyRatings, unrated, type Unrated } from './importance-rows';
  * newsletter whose first story is rated is taken as done.
  */
 
-export const IMPORTANCE_MODEL = 'claude-haiku-4-5';
+export const IMPORTANCE_MODEL = MODELS.newsImportance;
 
 /** The name this call has in core.model_spend. Stable: renaming it splits the history. */
 export const IMPORTANCE_OPERATION: NewsOperation = 'score-importance';

@@ -21,6 +21,7 @@ import {
   type CategoryOption,
   type ExtractedOrder,
 } from './schema';
+import { MODELS } from '@/lib/core/models';
 
 function defaultCategoryOptions(): CategoryOption[] {
   return CATEGORY_SLUGS.map((slug) => ({
@@ -153,7 +154,7 @@ function enrichExtractedOrder(
   };
 }
 
-const EXTRACT_MODEL = 'claude-haiku-4-5-20251001';
+const EXTRACT_MODEL = MODELS.emailOrderExtract;
 
 export async function extractOrderFromEmail(input: {
   subject: string;

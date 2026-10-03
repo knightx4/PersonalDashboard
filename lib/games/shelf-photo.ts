@@ -12,9 +12,10 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { z } from 'zod';
+import { MODELS } from '@/lib/core/models';
 
 /** Vision over a crowded shelf is the hard part; do not skimp on the model. */
-const SHELF_MODEL = 'claude-opus-5';
+const SHELF_MODEL = MODELS.gamesShelfPhoto;
 
 export const shelfSightingSchema = z.object({
   title: z.string().trim().min(1),

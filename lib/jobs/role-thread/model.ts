@@ -11,8 +11,9 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
+import { MODELS } from '@/lib/core/models';
 
-export const ROLE_REPLY_MODEL = 'claude-sonnet-5';
+export const ROLE_REPLY_MODEL = MODELS.roleCommentReply;
 const TOOL_NAME = 'reply';
 
 const SYSTEM = `You are Dash, replying to a comment the owner of a job-search

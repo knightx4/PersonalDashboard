@@ -16,8 +16,9 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { ExtractResult, ExtractSource } from '@/lib/goals/extract-model';
 import type { LearnOperation } from '@/lib/learn/spend';
 import { TRANSCRIPT_TOOL, transcriptPrompt, transcriptTool } from '@/lib/vault/transcript-read';
+import { MODELS } from '@/lib/core/models';
 
-export const TRANSCRIPT_MODEL = 'claude-haiku-4-5';
+export const TRANSCRIPT_MODEL = MODELS.vaultTranscript;
 
 /** The spend ledger's name for one read (lib/learn/spend.ts, where the vault's operations live). */
 export const TRANSCRIPT_OPERATION: LearnOperation = 'read-transcript';

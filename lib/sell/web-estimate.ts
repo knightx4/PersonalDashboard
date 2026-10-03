@@ -21,13 +21,14 @@ import {
 } from '@/lib/sell/price-estimate';
 import type { ExpectedPriceSource, PriceSubject } from '@/lib/sell/expected-price';
 import type { PriceEvidence } from '@/lib/sell/price-evidence';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Reading a few search results and reporting a number is not a reasoning
  * problem — Haiku does it for a fifth of Opus's token price, and the search
  * fee dominates the bill anyway.
  */
-const MODEL = 'claude-haiku-4-5';
+const MODEL = MODELS.sellWebEstimate;
 const TOOL_NAME = 'report_price';
 
 /** Each search is billed. Two is enough to cross-check a price. */

@@ -11,6 +11,7 @@ import {
   type PreviousReview,
   type RawReview,
 } from './review';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * The model call behind the weekly review (plan #1232). Sonnet is given the
@@ -20,7 +21,7 @@ import {
  * a forced tool. checkReview reads what comes back before anything is stored.
  */
 
-export const WEEK_REVIEW_MODEL = 'claude-sonnet-5';
+export const WEEK_REVIEW_MODEL = MODELS.weekReview;
 const TOOL_NAME = 'write_week_review';
 
 const SYSTEM = `You are Dash, the assistant in a personal app. Every Sunday

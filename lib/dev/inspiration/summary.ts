@@ -7,6 +7,7 @@ import type { TranscriptCue } from '@/lib/learn/catalogue/segment';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { forceTool } from '@/lib/learn/graph/tool-call';
 import { timestampedTranscript } from './takeaways';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * A short summary of each inspiration video (note b0594be6): three to five
@@ -18,7 +19,7 @@ import { timestampedTranscript } from './takeaways';
  * because this is summarising, not judging what fits the app.
  */
 
-export const SUMMARY_MODEL = 'claude-haiku-4-5';
+export const SUMMARY_MODEL = MODELS.inspirationSummary;
 const TOOL = 'report_summary';
 
 /** The most points one summary keeps. */

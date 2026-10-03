@@ -6,6 +6,7 @@ import type {
   ShoppingOperation,
 } from '@/lib/core/spend/operations';
 import type { LearnOperation } from '@/lib/learn/spend';
+import { HAIKU, OPUS, SONNET } from '@/lib/core/models';
 
 /**
  * A written best guess at what each paid operation costs, for when the ledger
@@ -57,9 +58,6 @@ export type OperationGuess = {
   background: boolean;
 };
 
-const HAIKU = 'claude-haiku-4-5';
-const SONNET = 'claude-sonnet-5';
-const OPUS = 'claude-opus-5';
 const VOYAGE_LITE = 'voyage-4-lite';
 const JEV = 'jev-1.13.0';
 

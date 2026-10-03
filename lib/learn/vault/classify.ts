@@ -8,6 +8,7 @@ import {
   tooShortToRead,
   type NoteClass,
 } from '@/lib/learn/vault/classify-payload';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * What kind of note this is, in one cheap call.
@@ -17,7 +18,7 @@ import {
  * actually matters: everything downstream only sees what this lets through.
  */
 
-const MODEL = 'claude-haiku-4-5';
+const MODEL = MODELS.learnVaultClassify;
 const TOOL_NAME = 'classify_note';
 
 const SYSTEM = `You sort personal notes into four kinds, so that only the ones

@@ -12,6 +12,7 @@ import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import type { ConceptKind } from '@/lib/learn/graph/model';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { surveySubjectForTheme } from './subject';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * The idea a survey question tests (plan #853).
@@ -36,7 +37,7 @@ import { surveySubjectForTheme } from './subject';
  * wrote, not judging whether it is true.
  */
 
-const MODEL = 'claude-haiku-4-5';
+const MODEL = MODELS.learnSurveyIdea;
 const TOOL_NAME = 'report_idea';
 
 /** How many of a theme's notes are read. The median theme has one. */

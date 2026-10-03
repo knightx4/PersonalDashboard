@@ -14,6 +14,7 @@ import {
 import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * What you already know, told directly.
@@ -37,7 +38,7 @@ import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
  * you again, so a wrong one is invisible from the moment it is wrong.
  */
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = MODELS.learnGraphFromPrior;
 const TOOL_NAME = 'report_chain';
 
 const SYSTEM = `Somebody is telling you what they already know, so it can be added to a

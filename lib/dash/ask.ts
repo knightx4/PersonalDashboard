@@ -4,7 +4,7 @@ import type { AskToolResult } from '@/lib/ask/db';
 import type { PageContext } from '@/lib/ask/page';
 import type { DashChange, NewDashChange } from '@/lib/talk/changes';
 import { HANDED_OFF, handoffRequest, type DashHandoff } from '@/lib/talk/handoff';
-import { TALK_MODEL } from '@/lib/talk/reply';
+import { DASH_MODELS } from './models';
 import { askTitle, MAX_TURN, type NewTalkTurn, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import {
   MAX_LOOKUPS,
@@ -36,7 +36,7 @@ import { DASH_TOOLS } from './registry';
  * lib/talk/ask-request.ts hands it the real ones inside a request.
  */
 
-export const ASK_MODEL = TALK_MODEL;
+export const ASK_MODEL = DASH_MODELS.ask;
 
 const SYSTEM = `You are Dash, the assistant inside somebody's personal dashboard. It holds their
 shopping orders, job applications, notes, todos, reading, newsletters, goals

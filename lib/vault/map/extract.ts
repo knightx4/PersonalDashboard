@@ -26,6 +26,7 @@ import {
   type NotRead,
 } from '@/lib/vault/map/rules';
 import { MAX_EXISTING_THEMES } from '@/lib/vault/map/themes';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Stages 0 to 2 of LEARN-MAP-SPEC.md for one note: classify it, cut it into
@@ -43,7 +44,7 @@ import { MAX_EXISTING_THEMES } from '@/lib/vault/map/themes';
  * resume point and a run record.
  */
 
-const MODEL = 'claude-haiku-4-5';
+const MODEL = MODELS.vaultMapExtract;
 const TOOL_NAME = 'report_note_map';
 
 /** Chunks read at once. Enough to keep a long note under a minute. */

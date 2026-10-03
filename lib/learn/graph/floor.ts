@@ -13,6 +13,7 @@ import {
 import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * What a node rests on, when getting it wrong says the graph is missing a
@@ -36,7 +37,7 @@ import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
  * telling them what they are missing.
  */
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = MODELS.learnFloor;
 const TOOL_NAME = 'report_chain';
 
 const SYSTEM = `Somebody got a question wrong about one specific claim, and their

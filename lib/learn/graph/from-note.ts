@@ -13,6 +13,7 @@ import {
 import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * What a reading actually taught, read out of the note you already wrote.
@@ -33,7 +34,7 @@ import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
  * paraphrases of your own shorthand.
  */
 
-const MODEL = 'claude-haiku-4-5';
+const MODEL = MODELS.learnGraphFromNote;
 const TOOL_NAME = 'report_chain';
 
 const SYSTEM = `Somebody finished a reading and wrote a note about it. Pull out the

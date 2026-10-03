@@ -6,6 +6,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import type { NearbySegment } from '@/lib/learn/catalogue/nearest';
 import type { LearnOperation } from '@/lib/learn/spend';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Deciding whether a segment actually teaches a claim.
@@ -40,7 +41,7 @@ import type { LearnOperation } from '@/lib/learn/spend';
  */
 
 /** The cheap call, as the rest of the module spells it. */
-export const JUDGE_MODEL = 'claude-haiku-4-5';
+export const JUDGE_MODEL = MODELS.learnCatalogueJudge;
 
 /** Where the spend lands, for the screen that groups by operation. */
 export const JUDGE_OPERATION: LearnOperation = 'judge-segment';
