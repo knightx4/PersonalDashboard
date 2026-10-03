@@ -181,7 +181,9 @@ export function healthOf(
  *
  * The plan reads seven moves off a step because its rules need them, and
  * says them with the five words every workspace shares. A re-shape running
- * against a feature is a Dash run in progress, so it says "Dash is on it". A
+ * against a feature and a session building a step are Dash runs in progress,
+ * so both say "Dash is on it"; a claim with no run reporting from it is still
+ * Dash's, and says "With Dash" (plan #1455). A
  * step you kept is on you, the same as one stopped on you; the tooltip tells
  * the two apart. A step held up by another step is waiting.
  *
@@ -193,6 +195,7 @@ export function healthOf(
 export const PLAN_MOVE_STATE: Record<PlanMove, MoveState | null> = {
   resolving: 'dash_working',
   on_you: 'on_you',
+  working: 'dash_working',
   with_dash: 'with_dash',
   waiting: 'waiting',
   yours: 'on_you',
@@ -210,7 +213,8 @@ export const PLAN_MOVE_TITLE: Record<PlanMove, string> = {
     'Re-reading this feature against the answers you just gave. What it proposes will be here when it is done; sending it anywhere until then would send a plan that is mid-edit.',
   on_you:
     'Stopped on you: a question to answer, a proposal to approve, or something only you can supply.',
-  with_dash: 'A session is working on this now.',
+  working: 'A session is working on this now.',
+  with_dash: 'A session took this and has not reported back lately.',
   waiting: 'Waiting on another step that has not closed.',
   yours: 'You kept this one, so the runner will not take it.',
   none: 'Approved and waiting its turn. Nothing is on it and nothing is needed from you.',

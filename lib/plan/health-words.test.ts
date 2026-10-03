@@ -39,8 +39,17 @@ describe('healthOf', () => {
 
 describe('moveFor', () => {
   it('says when the word came from a step beneath', () => {
-    expect(moveFor('with_dash', 'with_dash').title).toBe('A session is working on this now.');
+    expect(moveFor('working', 'working').title).toBe('A session is working on this now.');
+    expect(moveFor('working', 'none').title).toMatch(/\(from a step beneath this one\.\)$/);
     expect(moveFor('with_dash', 'none').title).toMatch(/\(from a step beneath this one\.\)$/);
     expect(moveFor('on_you', 'on_you').tone).toBe('caution');
+  });
+
+  // plan #1455: a claim a session is working now is Dash at work; one with no
+  // run reporting from it is still Dash's.
+  it('says Dash is on it for a claim being worked, and With Dash otherwise', () => {
+    expect(moveFor('working', 'working').word).toBe('Dash is on it');
+    expect(moveFor('working', 'working').move).toEqual({ state: 'dash_working' });
+    expect(moveFor('with_dash', 'with_dash').word).toBe('With Dash');
   });
 });

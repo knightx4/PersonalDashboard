@@ -69,6 +69,7 @@ import {
 } from './step-parts';
 import { answerGoalQuestion, askGoalQuestion, dismissGoalQuestion } from './tree-actions';
 import { DashMark } from '@/components/ui/dash-mark';
+import { MoveLabel } from '@/components/ui/move-label';
 
 /**
  * One goal step, drawn through the dev plan's shared row (plan #982).
@@ -213,8 +214,8 @@ function ProgressList({ progress }: { progress: ItemProgress }) {
 }
 
 /**
- * A sent or prepared step's latest run on its row (plan #1044): what it is on
- * now while it goes, then why it failed or what it said it did, with the run's
+ * A sent or prepared step's latest run on its row (plan #1044): "Dash is on
+ * it" and what it is on now while it goes, then why it failed or what it said it did, with the run's
  * own page one press away. The wording follows an area's Plan this area line.
  */
 function StepRunLine({ run, inset }: { run: StepRunView; inset: React.CSSProperties }) {
@@ -228,11 +229,14 @@ function StepRunLine({ run, inset }: { run: StepRunView; inset: React.CSSPropert
       <li
         style={inset}
         role="status"
-        className="flex items-center gap-1.5 pb-1.5 pr-3 text-small text-accent"
+        className="flex flex-wrap items-center gap-x-1.5 pb-1.5 pr-3 text-small text-ink-muted"
       >
-        <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden />
+        {/* The move every row says while a Dash run on it is going (plan
+            #1455), beside the Who column rather than in place of it: who the
+            step is on is a different fact from what is happening to it now. */}
+        <MoveLabel move={{ state: 'dash_working' }} title="A Dash run on this step is going now." />
         <span>
-          Dash is on this · {run.running} · {details}
+          · {run.running} · {details}
         </span>
       </li>
     );
