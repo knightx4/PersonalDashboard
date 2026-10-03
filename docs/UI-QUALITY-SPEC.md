@@ -60,7 +60,13 @@ real data.
 The surfaces a step touches are named in its brief. Nothing maps a page to its
 gallery surfaces yet (`lib/feedback/surfaces.ts` only reads notes filed from
 the gallery), so each gallery entry gains the routes it stands for, and the
-brief lists the surfaces whose routes the step's files serve. A step that
+brief lists the surfaces whose routes the step's files serve. The routes are
+kept by surface id in `lib/preview/routes.ts` rather than on the entries,
+because the brief is written where the gallery's components cannot be
+loaded; a test holds the two lists together. The brief lists the surfaces the
+step's words name (a page address, a gallery link or a screen file) and, from
+the plan CLI, those its changed files serve, following a component's imports
+to the pages that use it. A step that
 changes a page with no surface adds one. A step that changes no surface
 skips this part and Part 2.
 

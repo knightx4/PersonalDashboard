@@ -77,6 +77,8 @@ import { IDEA_WINDOW_MINUTES, ideaAllowance, ideaCapRefusal } from '../lib/ideas
 import { isModuleId } from '../lib/modules';
 import { isAppScope, isPlanScope, planScopeLabel, planScopeOf } from '../lib/plan/projects';
 import { planBrief, STATUS_WORD } from '../lib/plan/brief';
+import { importedBy, pagesUsing } from '../lib/preview/importers';
+import { surfacesForFiles } from '../lib/preview/routes';
 import type { VisionBodies } from '../lib/specs/vision';
 import { closeRefusal, commitOnMain } from '../lib/plan/github';
 import { branchesContaining } from '../lib/plan/branches';
@@ -229,6 +231,27 @@ function currentCommit(): string | null {
     return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
   } catch {
     return null;
+  }
+}
+
+/**
+ * The gallery surfaces a step's files serve, for its brief: the files of its
+ * commit once it has one, and otherwise what this branch has changed since it
+ * left main, committed or not. Empty where git cannot answer.
+ */
+function changedSurfaces(commitSha: string | null): string[] {
+  try {
+    const command = commitSha
+      ? `git show --name-only --format= ${commitSha}`
+      : 'git diff --name-only $(git merge-base origin/main HEAD)';
+    const files = execSync(command, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+      .split('\n')
+      .filter(Boolean);
+    if (files.length === 0) return [];
+    const graph = importedBy(process.cwd());
+    return surfacesForFiles(files, (file) => pagesUsing(file, graph));
+  } catch {
+    return [];
   }
 }
 
@@ -913,7 +936,11 @@ async function main(): Promise<void> {
       const node = findNode(sections, item.id);
       if (!node) fail(`#${item.number} is not in the tree.`);
       process.stdout.write(
-        planBrief(sections, node, { liveness, visions: await loadVisions(sql, userId) }),
+        planBrief(sections, node, {
+          liveness,
+          visions: await loadVisions(sql, userId),
+          surfaces: changedSurfaces(item.commitSha),
+        }),
       );
       return;
     }

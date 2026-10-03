@@ -460,3 +460,41 @@ describe('the vision at the top of a brief', () => {
     expect(brief).not.toContain('One place for the whole of a life.');
   });
 });
+
+describe('the gallery surfaces in a brief', () => {
+  const sections = buildPlanTree({
+    items: [
+      item({
+        id: 'saved',
+        title: 'Say when a story was saved',
+        module: 'news',
+        detail: 'On /news/saved, each story shows the day it was saved.',
+      }),
+      item({ id: 'plain', title: 'Store the saved day', module: 'news' }),
+      item({
+        id: 'ask',
+        title: 'Should /news/saved sort by day?',
+        module: 'news',
+        kind: 'decision',
+      }),
+    ],
+    dependencies: [],
+  });
+
+  it('lists the surfaces the step names, with their gallery links', () => {
+    const brief = planBrief(sections, findNode(sections, 'saved')!);
+    expect(brief).toContain('## Gallery surfaces');
+    expect(brief).toContain('- news-saved: /preview?s=news-saved, for /news/saved');
+    expect(brief).toContain('- news-saved-empty: /preview?s=news-saved-empty');
+  });
+
+  it('adds the surfaces its changed files serve', () => {
+    const brief = planBrief(sections, findNode(sections, 'plain')!, { surfaces: ['news-quick-story'] });
+    expect(brief).toContain('- news-quick-story: /preview?s=news-quick-story, for /news');
+  });
+
+  it('says nothing for a step with no surface, or for a decision', () => {
+    expect(planBrief(sections, findNode(sections, 'plain')!)).not.toContain('Gallery surfaces');
+    expect(planBrief(sections, findNode(sections, 'ask')!)).not.toContain('Gallery surfaces');
+  });
+});
