@@ -19,5 +19,14 @@ alter function job_search.is_terminal_application_status(job_search.application_
   set search_path = '';
 alter function job_search.unapplied_event_needs_review(job_search.application_event_kind)
   set search_path = '';
-alter function job_search.clear_review_flag_when_closed()
-  set search_path = '';
+
+-- clear_review_flag_when_closed was created on the live project by a
+-- migration that is not in this folder, so the local test database does not
+-- have it. Pin it only where it exists.
+do $$
+begin
+  if to_regprocedure('job_search.clear_review_flag_when_closed()') is not null then
+    alter function job_search.clear_review_flag_when_closed() set search_path = '';
+  end if;
+end
+$$;
