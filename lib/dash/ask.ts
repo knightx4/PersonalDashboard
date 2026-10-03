@@ -1,0 +1,360 @@
+import type Anthropic from '@anthropic-ai/sdk';
+import type { SpendSink } from '@/lib/core/spend/pricing';
+import type { AskToolResult } from '@/lib/ask/db';
+import type { PageContext } from '@/lib/ask/page';
+import type { DashChange, NewDashChange } from '@/lib/talk/changes';
+import { HANDED_OFF, handoffRequest, type DashHandoff } from '@/lib/talk/handoff';
+import { TALK_MODEL } from '@/lib/talk/reply';
+import { askTitle, MAX_TURN, type NewTalkTurn, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
+import {
+  MAX_LOOKUPS,
+  runDash,
+  type DashAnswer,
+  type DashExecutor,
+  type DashLookupEvent,
+  type DashProposer,
+  type DashSeen,
+  type DashStop,
+  type DashVoice,
+} from './loop';
+import { DASH_TOOLS } from './registry';
+
+/**
+ * Ask Dash: Dash answering a question about anything in the app (plan
+ * #1089), on the shared loop in lib/dash/loop.ts since plan #1463.
+ *
+ * Ask's voice offers every tool in the registry (lib/dash/registry.ts): the
+ * lookups, the four proposals (lib/ask/propose.ts, plans #1188 and #1296:
+ * add a todo, add a goal step, mark an item returned, start a watch), and
+ * `hand_off` (lib/talk/handoff.ts, plan #1402). A proposal is kept as a
+ * proposed row in core.dash_actions and nothing else is written; the person
+ * confirms each on its own. A hand-off keeps the request, the answer says it
+ * was passed on, and the backup routine is started once the answer is kept.
+ *
+ * `answerQuestion` is the loop with Ask's voice. `askDash` below it keeps the
+ * turns and the spend through the stores it is handed;
+ * lib/talk/ask-request.ts hands it the real ones inside a request.
+ */
+
+export const ASK_MODEL = TALK_MODEL;
+
+const SYSTEM = `You are Dash, the assistant inside somebody's personal dashboard. It holds their
+shopping orders, job applications, notes, todos, reading, newsletters, goals
+and build plan, and can search the email in the Gmail they connected. They are
+asking you a question about their own things.
+
+LOOK IT UP. Answer from what the lookup tools return, never from memory or a
+guess about what they probably have. Work out which lookups the question needs
+and make them; where two are independent, make them in the same turn. You
+have at most ${MAX_LOOKUPS} lookups for one answer, so choose them well.
+When they ask what they said, wrote or think about something, start with
+recall, and keep their own words apart from anything Dash wrote for them.
+
+WHEN THE DATA CANNOT ANSWER IT, SAY SO. If the lookups do not hold what the
+question needs, or a workspace is switched off, answer "I cannot see that"
+and say in a sentence what you could see instead. Do not fill the gap with a
+likely answer.
+
+ANSWER THROUGH THE answer TOOL. Keep it short: a few sentences, or a short
+list when they asked for a list. Give figures exactly as the lookups gave
+them, with their currency. Name each order, application, note, step or other
+row you used by its title, and list each in cited by the table and ref the
+lookup returned for it. Cite only rows a lookup returned. For an email, say
+who sent it, the day it arrived and its subject, and cite it the same way:
+the person opens it in Gmail from there. When the question is about what an
+email says, find it with search_mail, then open it with read_mail and answer
+from its text. Open only the messages the question is about, and quote no
+more of the text than the answer needs.
+
+YOU CAN PROPOSE FOUR CHANGES, AND ONLY WHEN ASKED. When they ask you to add
+a todo, add a step under one of their goals, or say they sent an item back,
+call propose_todo, propose_goal_step or propose_returned. When they ask you to
+watch a price on a page outside the app, or to tell them when it drops, call
+propose_watch. A goal, a step or an item is named by the ref a lookup returned
+for it, so look it up first. Nothing is written when you propose: each
+proposal shows as a card under your answer and they confirm or decline it.
+Say in your answer what you proposed, and for a watch, what it will do and
+when it stops. You may propose several in one answer.
+
+ANYTHING ELSE THEY ASK YOU TO DO, HAND ON. When they ask you to create or
+change something none of your tools can (a new goal, editing or completing a
+todo, a job application, a note), call hand_off with the request written out
+in full, including every detail they gave and the refs of rows you looked up
+for it. A routine does it within a few minutes and its reply appears in this
+conversation. Then say in a sentence that you have passed it on; do not say
+it is done, and do not propose something near it instead. Never hand on a
+question you can answer by looking things up, and never a request to delete
+something, send an email or spend money: for those, say you cannot.
+
+THE PAGE THEY ASKED FROM IS CONTEXT FOR "THIS". A line after these rules may say
+which page of the app they asked from, and the row it shows. When the question
+points at that row, by "this", "here", "it" or by its subject, look the row up
+first with the tool the line names, and answer about it. When the question is
+about anything else, ignore the page and answer as if it had not been said.`;
+
+/** How Dash speaks on Ask: Sonnet, the rules above, and every registered tool. */
+export const ASK_VOICE: DashVoice = { model: ASK_MODEL, system: SYSTEM, tools: DASH_TOOLS };
+
+export type AskStop = DashStop;
+export type AskAnswer = DashAnswer;
+export type AskLookupEvent = DashLookupEvent;
+export type AskExecutor = DashExecutor;
+export type AskProposer = DashProposer;
+
+/**
+ * Dash's answer to the last of the turns, which is the person's question:
+ * the shared loop with Ask's voice and no subject row. Never throws.
+ */
+export async function answerQuestion(input: {
+  /** The conversation so far, oldest first, ending with the question. */
+  turns: readonly Pick<TalkTurn, 'role' | 'body' | 'citations'>[];
+  /** YYYY-MM-DD in the person's timezone. */
+  today: string;
+  /** The page the question was asked from; null or absent when none is told. */
+  page?: PageContext | null;
+  execute: AskExecutor;
+  /** Absent: every proposal is refused. */
+  propose?: AskProposer;
+  /**
+   * Keeps a hand-off and returns what to tell the model. Absent: every
+   * hand-off is refused. `seen` says whether Dash has seen the row it names.
+   */
+  handOff?: (input: unknown, seen: DashSeen) => Promise<AskToolResult>;
+  anthropicApiKey: string;
+  client?: Anthropic;
+  onSpend?: SpendSink;
+  /** For tests: the clock the time budget reads. */
+  now?: () => number;
+  /** Hears each lookup start and finish. Whatever it throws is ignored. */
+  onLookup?: (event: AskLookupEvent) => void;
+}): Promise<AskAnswer> {
+  const { page, ...rest } = input;
+  return runDash({ ...rest, voice: ASK_VOICE, context: { surface: 'ask', subject: null, page: page ?? null } });
+}
+
+// ---------------------------------------------------------------------------
+// Keeping the question, the answer and the spend
+// ---------------------------------------------------------------------------
+
+/** Where askDash reads and writes the conversation; store.ts bound to a client and a user. */
+export type AskStores = {
+  start: (question: string) => Promise<TalkSubject & { kind: 'ask' }>;
+  load: (ref: string) => Promise<TalkTurn[]>;
+  append: (subject: TalkSubject, turns: readonly NewTalkTurn[]) => Promise<TalkTurn[]>;
+  /** Writes what the calls cost, under the operation 'ask-dash'. Never throws. */
+  recordSpend: (reports: Parameters<SpendSink>[0][]) => Promise<void>;
+  /** Keeps a proposal in the conversation (changes.ts insertProposal). */
+  saveProposal: (conversationId: string, change: NewDashChange) => Promise<DashChange>;
+  /** Ties the answer's proposals to its turn once that is written. */
+  attachProposals: (ids: readonly string[], turnId: string) => Promise<void>;
+  /** Removes the proposals of an answer that was not kept. */
+  discardProposals: (ids: readonly string[]) => Promise<void>;
+  /** Keeps a hand-off as pending (handoffs.ts insertHandoff). Absent with no fireHandoff. */
+  saveHandoff?: (conversationId: string, request: string, subjectRef: string | null) => Promise<DashHandoff>;
+  /** Ties the answer's hand-offs to its turn once that is written. */
+  attachHandoffs?: (ids: readonly string[], turnId: string) => Promise<void>;
+  /** Removes the hand-offs of an answer that was not kept. */
+  discardHandoffs?: (ids: readonly string[]) => Promise<void>;
+  /** Starts the backup routine on one hand-off and records the outcome; returns its new status. */
+  fireHandoff?: (handoff: DashHandoff) => Promise<{ status: DashHandoff['status']; error?: string }>;
+};
+
+/** Checks a proposal against the person's rows and keeps it; lib/ask/propose.ts bound to a request. */
+export type AskProposalRunner = (
+  name: string,
+  input: unknown,
+  seen: (table: string, ref: string) => boolean,
+  save: (change: NewDashChange) => Promise<DashChange>,
+) => Promise<AskToolResult>;
+
+export type AskDashResult = {
+  /** The conversation, to reopen or continue; absent only when nothing was kept. */
+  conversation?: { ref: string; title: string | null };
+  /** The turns written by this call, oldest first: the question, then the answer when there is one. */
+  turns: TalkTurn[];
+  /** Why there is no answer, in a sentence for the person. */
+  error?: string;
+  /** Why the answer stopped: 'answered', or the limit it was written under. */
+  stop?: AskStop;
+  /** The changes the answer proposed, each tied to its turn, in the order proposed. */
+  changes?: DashChange[];
+  /** The requests the answer handed to the backup routine, with what starting it did. */
+  handoffs?: DashHandoff[];
+};
+
+/**
+ * Ask Dash a question, starting a conversation or continuing one. The
+ * question is kept before the model is called, so a failed answer still
+ * leaves it in the list of past questions. What the calls cost is recorded
+ * whether or not an answer came of them.
+ */
+export async function askDash(
+  input: {
+    question: string;
+    /** An `ask` conversation's ref, to continue it; absent to start a new one. */
+    conversationRef?: string | null;
+    today: string;
+    /**
+     * The page it was asked from, resolved (lib/ask/page.ts). Not kept with
+     * the conversation: each question carries the page it was asked on.
+     */
+    page?: PageContext | null;
+    execute: AskExecutor;
+    /** Absent: every proposal is refused. */
+    propose?: AskProposalRunner;
+    anthropicApiKey: string | null | undefined;
+    client?: Anthropic;
+    now?: () => number;
+    /** Hears each lookup start and finish (AskLookupEvent). */
+    onLookup?: (event: AskLookupEvent) => void;
+  },
+  stores: AskStores,
+): Promise<AskDashResult> {
+  const question = input.question.trim();
+  if (!question) return { turns: [], error: 'Write a question first.' };
+  if (question.length > MAX_TURN) {
+    return { turns: [], error: `That is ${question.length} characters; the most is ${MAX_TURN}.` };
+  }
+
+  let subject: TalkSubject & { kind: 'ask' };
+  let earlier: TalkTurn[] = [];
+  let asked: TalkTurn[];
+  try {
+    if (input.conversationRef) {
+      earlier = await stores.load(input.conversationRef);
+      if (earlier.length === 0) return { turns: [], error: 'That conversation is not there any more.' };
+      subject = { kind: 'ask', ref: input.conversationRef, title: askTitle(earlier[0].body) || null };
+    } else {
+      subject = await stores.start(question);
+    }
+    asked = await stores.append(subject, [{ role: 'user', body: question }]);
+  } catch {
+    return { turns: [], error: 'Your question was not kept. Try again.' };
+  }
+  const conversation = { ref: subject.ref, title: subject.title ?? null };
+
+  if (!input.anthropicApiKey) {
+    return { conversation, turns: asked, error: 'This deployment has no ANTHROPIC_API_KEY, so Dash cannot answer.' };
+  }
+
+  const spent: Parameters<SpendSink>[0][] = [];
+  // An ask conversation's id is its ref (conversations_ask_ref_ck).
+  const proposed: DashChange[] = [];
+  const propose = input.propose;
+  const save = async (change: NewDashChange) => {
+    const kept = await stores.saveProposal(subject.ref, change);
+    proposed.push(kept);
+    return kept;
+  };
+  const handed: DashHandoff[] = [];
+  const saveHandoff = stores.saveHandoff;
+  const handOff =
+    saveHandoff && stores.fireHandoff
+      ? async (args: unknown, seen: (table: string, ref: string) => boolean) => {
+          const parsed = handoffRequest(args, seen);
+          if (!parsed.ok) return { ok: false as const, error: parsed.error };
+          try {
+            handed.push(await saveHandoff(subject.ref, parsed.request, parsed.subjectRef));
+          } catch {
+            return { ok: false as const, error: 'The request could not be kept. Tell them it was not passed on.' };
+          }
+          return { ok: true as const, rows: [], note: HANDED_OFF };
+        }
+      : undefined;
+  const discard = async () => {
+    try {
+      await stores.discardProposals(proposed.map((c) => c.id));
+    } catch (error) {
+      console.error('ask proposals were not removed', error);
+    }
+    try {
+      if (handed.length > 0) await stores.discardHandoffs?.(handed.map((h) => h.id));
+    } catch (error) {
+      console.error('ask hand-offs were not removed', error);
+    }
+  };
+  const answer = await answerQuestion({
+    turns: [...earlier, ...asked],
+    today: input.today,
+    page: input.page,
+    execute: input.execute,
+    propose: propose ? (name, args, seen) => propose(name, args, seen, save) : undefined,
+    handOff,
+    anthropicApiKey: input.anthropicApiKey,
+    client: input.client,
+    now: input.now,
+    onLookup: input.onLookup,
+    onSpend: (report) => spent.push(report),
+  });
+  await stores.recordSpend(spent);
+  if (!answer.ok) {
+    await discard();
+    return { conversation, turns: asked, error: `Dash could not answer: ${answer.detail}` };
+  }
+
+  let answered: TalkTurn[];
+  try {
+    answered = await stores.append(subject, [
+      { role: 'assistant', body: answer.body, toolCalls: answer.toolCalls, citations: answer.citations },
+    ]);
+  } catch {
+    await discard();
+    return { conversation, turns: asked, error: 'Dash answered, but the answer was not kept. Try again.' };
+  }
+  const turnId = answered[answered.length - 1].id;
+  const handoffs = handed.length > 0 ? await startHandoffs(handed, turnId, subject, stores) : undefined;
+  const turns = [...asked, ...answered, ...(handoffs?.failedTurns ?? [])];
+  if (proposed.length === 0) return { conversation, turns, stop: answer.stop, handoffs: handoffs?.handoffs };
+
+  // The answer is kept; its proposals now hang from it. Should tying them
+  // fail, they stay in the conversation with no turn, and the answer's
+  // tool calls still name each by id.
+  let changes = proposed;
+  try {
+    await stores.attachProposals(proposed.map((c) => c.id), turnId);
+    changes = proposed.map((c) => ({ ...c, turnId }));
+  } catch (error) {
+    console.error('ask proposals were not tied to the answer', error);
+  }
+  return { conversation, turns, stop: answer.stop, changes, handoffs: handoffs?.handoffs };
+}
+
+/**
+ * Ties the answer's hand-offs to it and starts the routine on each, now that
+ * the answer saying so is kept. A hand-off that could not be started gets a
+ * turn of its own saying so, so the thread does not wait on a reply that
+ * will not come.
+ */
+async function startHandoffs(
+  handed: readonly DashHandoff[],
+  turnId: string,
+  subject: TalkSubject,
+  stores: AskStores,
+): Promise<{ handoffs: DashHandoff[]; failedTurns: TalkTurn[] }> {
+  try {
+    await stores.attachHandoffs?.(handed.map((h) => h.id), turnId);
+  } catch (error) {
+    console.error('ask hand-offs were not tied to the answer', error);
+  }
+  const handoffs: DashHandoff[] = [];
+  const failures: string[] = [];
+  for (const handoff of handed) {
+    const fired = stores.fireHandoff
+      ? await stores.fireHandoff(handoff)
+      : { status: 'failed' as const, error: 'nothing is set up to take it' };
+    handoffs.push({ ...handoff, turnId, status: fired.status, error: fired.error ?? null });
+    if (fired.status === 'failed') failures.push(fired.error ?? 'it could not be started');
+  }
+  if (failures.length === 0) return { handoffs, failedTurns: [] };
+  try {
+    const failedTurns = await stores.append(subject, [
+      {
+        role: 'assistant',
+        body: `That did not get passed on after all: ${failures[0]} Ask again later, or do it on the page.`,
+      },
+    ]);
+    return { handoffs, failedTurns };
+  } catch {
+    return { handoffs, failedTurns: [] };
+  }
+}

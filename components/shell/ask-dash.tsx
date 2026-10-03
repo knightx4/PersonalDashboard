@@ -22,7 +22,7 @@ import { scrim } from '@/components/ui/popover';
 import { commentWhen } from '@/lib/comments/when';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
 import { isAskPath, roughPageName } from '@/lib/ask/page-name';
-import type { AskDashResult } from '@/lib/talk/ask';
+import type { AskDashResult } from '@/lib/dash/ask';
 import type { DashChange } from '@/lib/talk/changes';
 import { heardLookup, readAskStream, STREAM_CUT, type LookupLine, type LookupWire } from '@/lib/talk/lookups';
 import type { ConversationSummary } from '@/lib/talk/store';

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { MailSearchHit, MailSearchInput, MailSearchResult } from '@/lib/inbox/search-mail';
 import type { MailReadInput, MailReadResult } from '@/lib/inbox/read-mail';
-import { askDash, type AskStores } from '@/lib/talk/ask';
+import { askDash, type AskStores } from '@/lib/dash/ask';
 import type { NewTalkTurn } from '@/lib/talk/talk';
 import { isOpenableHref, toolResultText, type AskContext, type AskDb } from './db';
 import { parseMailRef, senderName } from './mail';

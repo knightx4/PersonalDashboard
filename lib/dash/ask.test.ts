@@ -3,23 +3,19 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { AskContext, AskToolResult, SchemaClient } from '@/lib/ask/db';
 import { executeProposal } from '@/lib/ask/propose';
 import type { SpendReport } from '@/lib/core/spend/pricing';
+import { answerQuestion, askDash, ASK_MODEL, type AskLookupEvent, type AskStores } from './ask';
 import {
   ANSWER_MAX_TOKENS,
   answerFromLookups,
-  answerQuestion,
-  askDash,
-  ASK_MODEL,
   FALLBACK_ROWS,
-  type AskLookupEvent,
   limitNote,
   MAX_LOOKUPS,
   pageLine,
   TIME_BUDGET_MS,
-  type AskStores,
-} from './ask';
-import type { DashChange, NewDashChange } from './changes';
-import type { DashHandoff } from './handoff';
-import type { NewTalkTurn, TalkSubject, TalkTurn } from './talk';
+} from './loop';
+import type { DashChange, NewDashChange } from '@/lib/talk/changes';
+import type { DashHandoff } from '@/lib/talk/handoff';
+import type { NewTalkTurn, TalkSubject, TalkTurn } from '@/lib/talk/talk';
 
 /**
  * Dash's question loop, with the model stubbed as a client that plays back a

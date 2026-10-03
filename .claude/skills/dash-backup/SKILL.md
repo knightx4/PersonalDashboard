@@ -9,7 +9,7 @@ Ask Dash answers questions and can propose four changes: a todo, a goal step,
 marking an item returned and a price watch. When the person asks for anything
 else ("add a goal to publish a song on Spotify"), Dash calls `hand_off`. That
 keeps the request in `core.dash_handoffs`, tells the person it has been passed
-on, and starts this routine. Code: `lib/talk/handoff.ts`, `lib/talk/ask.ts`.
+on, and starts this routine. Code: `lib/talk/handoff.ts`, `lib/dash/ask.ts`.
 
 The person is watching the thread. It checks for your reply every twenty
 seconds for half an hour, so be quick: do the one thing they asked, reply, and
