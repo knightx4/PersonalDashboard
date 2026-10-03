@@ -1,4 +1,4 @@
-import type { ModuleSources } from '@/lib/sources/types';
+import type { ModuleSources, Page } from '@/lib/sources/types';
 
 /**
  * Goals' own tables (lib/sources/types.ts). The goals skill reads them
@@ -7,6 +7,25 @@ import type { ModuleSources } from '@/lib/sources/types';
  * the gate says so.
  */
 const OWN = 'Goals’ own table; the goals skill reads it directly.';
+
+/**
+ * The goals rows a ref can open (lib/core/refs.ts). A goal has its own page
+ * and a step is a row on its parent's, which is its goal for every step that
+ * is not a sub-step (the same fallback as lib/search/sources/goals-map.ts).
+ */
+const PAGES: Record<string, Page> = {
+  'goals.items': {
+    title: 'title',
+    reads: ['level', 'parent_id'],
+    href: (row) =>
+      row.level === 'goal' || !row.parent_id ? `/goals/${row.id}` : `/goals/${row.parent_id}#step-${row.id}`,
+  },
+  'goals.areas': { title: 'name', href: (row) => `/goals/area/${row.id}` },
+  'goals.runs': {
+    title: { reads: ['summary', 'job'], of: (row) => (row.summary as string | null) || (row.job as string | null) },
+    href: (row) => `/goals/runs/${row.id}`,
+  },
+};
 
 export const goalsSources: ModuleSources = {
   sources: [],
@@ -33,5 +52,5 @@ export const goalsSources: ModuleSources = {
     'goals.answers',
     'goals.document_kinds',
     'goals.progress_entries',
-  ].map((table) => ({ table, reason: OWN })),
+  ].map((table) => ({ table, reason: OWN, page: PAGES[table] })),
 };

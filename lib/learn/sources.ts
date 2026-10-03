@@ -195,7 +195,11 @@ export const learnSources: ModuleSources = {
     { table: 'learn.concept_subjects', reason: 'Join rows; read through subjects.' },
     { table: 'learn.next_outcomes', reason: 'Scheduling state for the feed.' },
     { table: 'learn.opening_questions', reason: 'Placement questions for a new subject.' },
-    { table: 'learn.opening_sweeps', reason: 'Placement bookkeeping.' },
+    {
+      table: 'learn.opening_sweeps',
+      reason: 'Placement bookkeeping.',
+      page: { title: 'asked', href: (row) => `/learn/opening/${row.id}` },
+    },
     { table: 'learn.piece_practice', reason: 'Practice tasks Dash wrote; read through what was handed in for them.' },
     { table: 'learn.plan_projects', reason: 'Final projects Dash wrote; read through what was handed in for them.' },
     { table: 'learn.probes', reason: 'Mastery-check questions and grades.' },
