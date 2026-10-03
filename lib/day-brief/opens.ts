@@ -10,9 +10,12 @@ import { BRIEF_ANCHOR } from './shown';
  * that pick through core.open_day_brief_pick (app/home/actions.ts). Both
  * functions stamp once; supabase/migrations/0130_day_brief_opens.sql.
  *
- * Opening the home page any other way records nothing. Nothing reads the
- * record yet: it is kept so the order of kinds can be checked later against
- * what is actually opened.
+ * Since plan #1494 the brief also counts as opened when Home shows it, however
+ * the page was reached: most mornings it is read there without the
+ * notification being pressed. "Shown" means the server rendered today's brief
+ * into the page; the brief sits under the date at the top, so a render is a
+ * read. Nothing reads the record yet: it is kept so the order of kinds can be
+ * checked later against what is actually opened.
  */
 
 /** The query parameter carrying the day the notification was for. */
@@ -52,6 +55,19 @@ export function openedFromPush(params: SearchParams, today: string): string | nu
   const day = first(params[BRIEF_DAY_PARAM]);
   if (day === undefined) return today;
   return isDay(day) ? day : null;
+}
+
+/**
+ * The days whose brief this visit to Home opened (plan #1494): the day the
+ * notification was for, when it was pressed, and today whenever today's brief
+ * is shown on the page. The database stamps each day once, so a second visit
+ * changes nothing.
+ */
+export function briefDaysOpened(pushDay: string | null, today: string, shownToday: boolean): string[] {
+  const days = new Set<string>();
+  if (pushDay) days.add(pushDay);
+  if (shownToday) days.add(today);
+  return [...days];
 }
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { briefUrl, isDay, isPickKey, openedFromPush } from './opens';
+import { briefDaysOpened, briefUrl, isDay, isPickKey, openedFromPush } from './opens';
 
 const TODAY = '2026-09-30';
 
@@ -29,6 +29,20 @@ describe('recording an opened brief', () => {
     expect(openedFromPush({ from: 'push', brief: '2026-02-30' }, TODAY)).toBeNull();
     expect(openedFromPush({ from: 'push', brief: 'yesterday' }, TODAY)).toBeNull();
     expect(openedFromPush({ from: ['push', 'x'], brief: ['2026-09-28'] }, TODAY)).toBe('2026-09-28');
+  });
+
+  it("counts today's brief as opened whenever Home shows it", () => {
+    expect(briefDaysOpened(null, TODAY, true)).toEqual([TODAY]);
+    expect(briefDaysOpened(TODAY, TODAY, true)).toEqual([TODAY]);
+  });
+
+  it('records nothing from a plain visit when there is no brief to show', () => {
+    expect(briefDaysOpened(null, TODAY, false)).toEqual([]);
+  });
+
+  it("keeps an older notification's day alongside today's", () => {
+    expect(briefDaysOpened('2026-09-29', TODAY, true)).toEqual(['2026-09-29', TODAY]);
+    expect(briefDaysOpened('2026-09-29', TODAY, false)).toEqual(['2026-09-29']);
   });
 
   it('checks the shape of what the pick link sends', () => {
