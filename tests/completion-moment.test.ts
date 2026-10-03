@@ -5,7 +5,9 @@
  * inside a move.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { HAPTIC_MS, MOTION_MS } from '@/lib/motion';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { CLICK_MS, HAPTIC_MS, MOTION_MS } from '@/lib/motion';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -98,5 +100,92 @@ describe('completionMoment', () => {
     });
     const { completionMoment } = await import('@/components/motion/complete');
     expect(() => completionMoment(1000)).not.toThrow();
+  });
+});
+
+/**
+ * The click (plan #1553): an AudioContext that records what it plays, and a
+ * fetch that hands back the file's bytes.
+ */
+function stubAudio() {
+  const started = vi.fn();
+  class FakeContext {
+    state: 'suspended' | 'running' = 'suspended';
+    destination = {};
+    resume() {
+      this.state = 'running';
+      return Promise.resolve();
+    }
+    decodeAudioData() {
+      return Promise.resolve({ duration: CLICK_MS / 1000 });
+    }
+    createBufferSource() {
+      return { buffer: null, connect: () => {}, start: started };
+    }
+  }
+  vi.stubGlobal('AudioContext', FakeContext);
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) })),
+  );
+  return started;
+}
+
+describe('the completion click', () => {
+  it('is off by default, and nothing plays', async () => {
+    stubStorage();
+    const started = stubAudio();
+    const { completionMoment, clickOn, primeClick } = await import('@/components/motion/complete');
+    expect(clickOn()).toBe(false);
+    primeClick();
+    await new Promise((r) => setTimeout(r, 0));
+    completionMoment(1000);
+    expect(started).not.toHaveBeenCalled();
+  });
+
+  it('plays once for a completion with the switch on, and not at all once off', async () => {
+    const store = stubStorage();
+    const started = stubAudio();
+    const { completionMoment, setClickOn, primeClick, CLICK_KEY } = await import(
+      '@/components/motion/complete'
+    );
+    setClickOn(true);
+    expect(store.get(CLICK_KEY)).toBe('on');
+    await new Promise((r) => setTimeout(r, 0));
+    // Switching it on plays it once, so the person hears what they chose.
+    expect(started).toHaveBeenCalledTimes(1);
+
+    primeClick();
+    completionMoment(1000);
+    expect(started).toHaveBeenCalledTimes(2);
+
+    setClickOn(false);
+    completionMoment(5000);
+    expect(started).toHaveBeenCalledTimes(2);
+  });
+
+  it('is skipped rather than played late when the sound is not ready', async () => {
+    stubStorage({ pt_click: 'on' });
+    const started = stubAudio();
+    const { completionMoment } = await import('@/components/motion/complete');
+    completionMoment(1000);
+    expect(started).not.toHaveBeenCalled();
+  });
+
+  it('does nothing outside a browser that can play sound', async () => {
+    stubStorage({ pt_click: 'on' });
+    const { clickOnce, canClick } = await import('@/components/motion/complete');
+    expect(canClick()).toBe(false);
+    expect(clickOnce()).toBe(false);
+  });
+
+  it('is a file shorter than 80ms, CLICK_MS long', () => {
+    const wav = readFileSync(join(process.cwd(), 'public/sounds/click.wav'));
+    expect(wav.toString('ascii', 0, 4)).toBe('RIFF');
+    const byteRate = wav.readUInt32LE(28);
+    const dataBytes = wav.readUInt32LE(40);
+    const ms = (dataBytes / byteRate) * 1000;
+    expect(ms).toBeLessThan(80);
+    expect(Math.round(ms)).toBe(CLICK_MS);
   });
 });

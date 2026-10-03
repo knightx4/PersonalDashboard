@@ -491,7 +491,7 @@ export const ALIVE: readonly Row[] = [
   ],
   [
     'Sound',
-    'Not yet. One short, soft click when something completes. Under 80ms, never on load, never for errors, off unless explicitly enabled.',
+    'One short, soft click when something completes: 40ms, never on load, never for errors, off unless switched on in the account page (clickOnce in components/motion/complete.ts).',
   ],
 ];
 

@@ -78,3 +78,12 @@ export const FLIGHT_MS = MOTION_MS.move + MOTION_MS.quick;
  * components/motion/complete.ts and nowhere else.
  */
 export const HAPTIC_MS = 10;
+
+/**
+ * The completion click, in milliseconds (plan #1553): the length of
+ * public/sounds/click.wav, one soft tick that is over before the eye has
+ * finished the motion. The design language caps it at 80ms;
+ * tests/completion-moment.test.ts reads the file and fails if it grows past
+ * that or stops matching this value.
+ */
+export const CLICK_MS = 40;
