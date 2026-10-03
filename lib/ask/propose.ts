@@ -114,6 +114,9 @@ export type ProposeContext = AskContext & {
   timezone?: string;
 };
 
+/** What checking a change needs: a proposal's context without the place it is kept. */
+export type CheckContext = Omit<ProposeContext, 'save'>;
+
 const MODULES: Record<ProposalToolName, ModuleId | null> = {
   propose_todo: 'todo',
   propose_goal_step: 'goals',
@@ -132,7 +135,7 @@ function text(args: Record<string, unknown>, key: string): string {
 }
 
 /** A ref a lookup returned, in the table it has to be from. */
-function seenRef(ctx: ProposeContext, args: Record<string, unknown>, key: string, table: string): string {
+function seenRef(ctx: CheckContext, args: Record<string, unknown>, key: string, table: string): string {
   const ref = text(args, key);
   if (!ref) throw new Refused(`${key} is missing.`);
   if (!ctx.seen(table, ref) || !isUuid(ref)) {
@@ -148,7 +151,7 @@ async function firstRow<T>(query: PromiseLike<{ data: unknown; error: { message:
   return ((data as T[] | null) ?? [])[0] ?? null;
 }
 
-async function checkTodo(ctx: ProposeContext, args: Record<string, unknown>): Promise<NewDashChange> {
+async function checkTodo(ctx: CheckContext, args: Record<string, unknown>): Promise<NewDashChange> {
   const dueOn = text(args, 'due_on');
   const parsed = taskInput.safeParse({ title: text(args, 'title'), body: '', dueOn, dueTime: '', pinned: false });
   if (!parsed.success) throw new Refused(parsed.error.issues[0].message);
@@ -159,7 +162,7 @@ async function checkTodo(ctx: ProposeContext, args: Record<string, unknown>): Pr
   };
 }
 
-async function checkGoalStep(ctx: ProposeContext, args: Record<string, unknown>): Promise<NewDashChange> {
+async function checkGoalStep(ctx: CheckContext, args: Record<string, unknown>): Promise<NewDashChange> {
   const parentId = seenRef(ctx, args, 'goal_ref', 'goals.items');
   const parsed = parseStepFields((key) => (key === 'title' ? text(args, 'title') : undefined), { requireTitle: true });
   if (!parsed.ok) throw new Refused(parsed.error);
@@ -183,7 +186,7 @@ async function checkGoalStep(ctx: ProposeContext, args: Record<string, unknown>)
   return { kind: 'add_goal_step', input: { parentId, goalTitle: goal.title, title, kind: 'mine' } };
 }
 
-async function checkReturned(ctx: ProposeContext, args: Record<string, unknown>): Promise<NewDashChange> {
+async function checkReturned(ctx: CheckContext, args: Record<string, unknown>): Promise<NewDashChange> {
   const id = seenRef(ctx, args, 'item_ref', 'public.inventory_items');
   const client = await ctx.db('public');
   const item = await firstRow<{ id: string; name: string | null; status: string; order_item_id: string | null }>(
@@ -201,7 +204,7 @@ async function checkReturned(ctx: ProposeContext, args: Record<string, unknown>)
   return { kind: 'mark_returned', input: { id, itemTitle: item.name?.trim() || 'Item' } };
 }
 
-async function checkWatch(ctx: ProposeContext, args: Record<string, unknown>): Promise<NewDashChange> {
+async function checkWatch(ctx: CheckContext, args: Record<string, unknown>): Promise<NewDashChange> {
   const parsed = parseWatchRequest(args, {
     now: new Date(ctx.now ?? Date.now()),
     timezone: ctx.timezone ?? 'UTC',
@@ -250,7 +253,7 @@ async function checkWatch(ctx: ProposeContext, args: Record<string, unknown>): P
   return { kind: 'start_watch', input: { ...parsed.value, goalItemId, goalTitle, pushOn: push !== null } };
 }
 
-const CHECKS: Record<ProposalToolName, (ctx: ProposeContext, args: Record<string, unknown>) => Promise<NewDashChange>> = {
+const CHECKS: Record<ProposalToolName, (ctx: CheckContext, args: Record<string, unknown>) => Promise<NewDashChange>> = {
   propose_todo: checkTodo,
   propose_goal_step: checkGoalStep,
   propose_returned: checkReturned,
@@ -276,6 +279,32 @@ function described(change: NewDashChange): string {
         : ` Tell them, in these words or close to them: "${NO_PUSH_LINE}"`;
       return `Watch "${watch.title}"${plan}, reading the lowest price on ${watch.url} each hour.${goal}${push}`;
     }
+    default:
+      return 'Make the change.';
+  }
+}
+
+/**
+ * Check one of the proposal kinds the way a proposal is checked, without
+ * keeping anything: for a tool that writes the change straight away
+ * (lib/dash/writes.ts, plan #1440). Never throws.
+ */
+export async function checkChange(
+  name: ProposalToolName,
+  input: unknown,
+  ctx: CheckContext,
+): Promise<{ ok: true; change: NewDashChange } | { ok: false; error: string }> {
+  const workspace = MODULES[name];
+  if (workspace && !ctx.enabledModules.includes(workspace)) {
+    return { ok: false, error: `The ${MODULE_LABELS[workspace]} workspace is switched off, so nothing can be changed there.` };
+  }
+  const args = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+  try {
+    return { ok: true, change: await CHECKS[name](ctx, args) };
+  } catch (error) {
+    if (error instanceof Refused) return { ok: false, error: error.message };
+    console.error(`dash write ${name}: the check failed`, error);
+    return { ok: false, error: 'That change could not be checked against the database.' };
   }
 }
 

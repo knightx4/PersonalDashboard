@@ -16,10 +16,11 @@ import type { DashChange } from '@/lib/talk/changes';
 import { NO_PUSH, PUSH_SETTINGS_HREF } from '@/lib/watch/start';
 
 /**
- * The changes Dash proposed in one answer, drawn under it (plan #1190,
- * feature #1186). Each is a row saying what would be written and where, with
- * Confirm and Decline; after a press the row says what happened, links to the
- * row it wrote, and offers Undo. Nothing is written until Confirm.
+ * The changes Dash made or proposed in one answer, drawn under it (plan
+ * #1190, feature #1186). Since plan #1440 Dash makes most changes when asked,
+ * so a row usually arrives done: it says what was written, links to the row,
+ * and offers Undo. A proposal (a watch on a price) says what would be
+ * written, with Confirm and Decline, and nothing is written until Confirm.
  *
  * The presses are handed in, so the sheet, the /ask page and the surface
  * gallery each bring their own: the server actions in app/ask/actions.ts, or
@@ -48,9 +49,10 @@ export function DashChanges({
   today?: string;
 }) {
   if (changes.length === 0) return null;
+  const verb = changes.some((change) => change.status === 'proposed') ? 'proposed' : 'made';
   return (
     <ul
-      aria-label={changes.length === 1 ? 'The change Dash proposed' : 'The changes Dash proposed'}
+      aria-label={changes.length === 1 ? `The change Dash ${verb}` : `The changes Dash ${verb}`}
       className="mt-2 divide-y divide-border rounded-card bg-sunken px-3"
     >
       {changes.map((change) => (

@@ -13,7 +13,7 @@ import {
   pageLine,
   TIME_BUDGET_MS,
 } from './loop';
-import type { DashChange, NewDashChange } from '@/lib/talk/changes';
+import type { DashChange, MadeDashChange, NewDashChange } from '@/lib/talk/changes';
 import type { DashHandoff } from '@/lib/talk/handoff';
 import type { NewTalkTurn, TalkSubject, TalkTurn } from '@/lib/talk/talk';
 
@@ -436,54 +436,101 @@ describe('askDash proposals', () => {
       name === 'goal_status' ? { ok: true, rows: [GOAL] } : { ok: false, error: `There is no tool called ${name}.` };
   }
 
-  it('looks up a goal, proposes a step under it, keeps one proposed change tied to the answer, and writes nothing to goals.items', async () => {
+  it('looks up a goal, adds a step under it straight away, keeps it done and tied to the answer, and the answer links the step', async () => {
+    const STEP_ID = '00000000-0000-4000-8000-0000000000c3';
     const { client, sent } = stubClient([
       reply([use('u1', 'goal_status', {})]),
-      reply([use('u2', 'propose_goal_step', { goal_ref: GOAL_ID, title: 'Update my CV' })]),
-      reply([use('u3', 'answer', { answer: 'I have proposed the step "Update my CV" under Find a new job.', cited: [GOAL] })]),
+      reply([use('u2', 'add_goal_step', { goal_ref: GOAL_ID, title: 'Update my CV' })]),
+      reply([
+        use('u3', 'answer', {
+          answer: 'I added the step "Update my CV" under Find a new job.',
+          cited: [{ table: 'goals.items', ref: STEP_ID }],
+        }),
+      ]),
     ]);
-    const { ctx, writes } = goalsDb(GOAL_ROWS);
     const { stores, written, changes } = memoryStores();
+    const made: MadeDashChange[] = [];
+    stores.saveChange = async (conversationId, change) => {
+      made.push(change);
+      const kept = {
+        ...change,
+        id: `c${changes.length + 1}`,
+        conversationId,
+        turnId: null,
+        status: 'done',
+        writtenTable: 'goals.items',
+        writtenRef: STEP_ID,
+        createdAt: '2026-09-27T10:00:00Z',
+        doneAt: '2026-09-27T10:00:00Z',
+        declinedAt: null,
+        undoneAt: null,
+      } as unknown as DashChange;
+      changes.push(kept);
+      return kept;
+    };
+    const applied: { name: string; input: unknown; seenGoal: boolean }[] = [];
 
     const result = await askDash(
       {
         question: 'Add a step to my job goal to update my CV',
         today: '2026-09-27',
         execute: goalExecute(),
-        propose: (name, args, seen, save) => executeProposal(name, args, { ...ctx, seen, save }),
+        // The tool's apply is stubbed: lib/dash/writes.test.ts covers what it writes.
+        write: async (tool, input, seen) => {
+          applied.push({ name: tool.name, input, seenGoal: seen('goals.items', GOAL_ID) });
+          return {
+            ok: true,
+            kind: 'add_goal_step',
+            input: { parentId: GOAL_ID, goalTitle: 'Find a new job', title: 'Update my CV', kind: 'mine' },
+            subjectRef: `goals.items:${STEP_ID}`,
+            op: 'insert',
+            before: null,
+            after: { id: STEP_ID, title: 'Update my CV' },
+            summary: 'Dash added the step "Update my CV" under the goal "Find a new job".',
+            row: { table: 'goals.items', ref: STEP_ID, title: 'Update my CV', href: `/goals/${GOAL_ID}#step-${STEP_ID}` },
+          };
+        },
         anthropicApiKey: 'k',
         client,
       },
       stores,
     );
 
-    // The proposal tools are offered, and the prompt no longer says Dash only reads.
-    expect(sent[0].tools.map((t) => t.name)).toEqual(
-      expect.arrayContaining(['propose_todo', 'propose_goal_step', 'propose_returned', 'answer']),
-    );
-    expect(sent[0].system[0].text).toContain('YOU CAN PROPOSE FOUR CHANGES');
-    expect(sent[0].system[0].text).not.toContain('You only read');
+    // The writes are offered and the old proposals for them are not.
+    const offered = sent[0].tools.map((t) => t.name);
+    expect(offered).toEqual(expect.arrayContaining(['add_todo', 'change_todo', 'close_todo', 'add_goal', 'add_goal_step', 'close_goal_step', 'mark_returned', 'add_role_note', 'propose_watch']));
+    expect(offered).not.toContain('propose_goal_step');
+    expect(sent[0].system[0].text).toContain('YOU MAKE THE CHANGES THEY ASK FOR');
 
-    // One proposed change, in this conversation, in the shape insertStep takes.
-    expect(changes).toHaveLength(1);
-    expect(changes[0]).toMatchObject({
-      kind: 'add_goal_step',
-      conversationId: 'conv-new',
-      status: 'proposed',
-      input: { parentId: GOAL_ID, goalTitle: 'Find a new job', title: 'Update my CV', kind: 'mine' },
-    });
+    // The write ran once, on the goal the lookup returned.
+    expect(applied).toEqual([{ name: 'add_goal_step', input: { goal_ref: GOAL_ID, title: 'Update my CV' }, seenGoal: true }]);
+    expect(made).toEqual([expect.objectContaining({ kind: 'add_goal_step', subjectRef: `goals.items:${STEP_ID}`, op: 'insert', undo: null })]);
 
-    // The answer turn names it: its tool calls carry the proposal's id, and the
-    // change hangs from that turn.
-    const answerTurn = written[1].turns[0];
-    const call = answerTurn.toolCalls?.find((c) => c.name === 'propose_goal_step');
-    expect(call?.result).toMatchObject({ ok: true, totals: { proposal: { id: 'c1', kind: 'add_goal_step' } } });
+    // The model was told it is done, and the step it returned is cited by the answer.
+    const back = sent[2].messages[sent[2].messages.length - 1].content as Anthropic.ToolResultBlockParam[];
+    expect(back[0].content).toContain('Done: Dash added the step');
+    expect(result.turns[1].citations).toEqual([
+      { table: 'goals.items', ref: STEP_ID, title: 'Update my CV', href: `/goals/${GOAL_ID}#step-${STEP_ID}` },
+    ]);
+
+    // The change is done and hangs from the answer.
     const turnId = result.turns[1].id;
-    expect(changes[0].turnId).toBe(turnId);
-    expect(result.changes).toEqual([{ ...changes[0], turnId }]);
+    expect(result.changes).toEqual([expect.objectContaining({ status: 'done', kind: 'add_goal_step', turnId })]);
+    expect(written[1].turns[0].toolCalls?.map((c) => c.name)).toEqual(['goal_status', 'add_goal_step']);
+  });
 
-    // Nothing was written anywhere but the proposal.
-    expect(writes).toEqual([]);
+  it('refuses every write when the surface keeps none', async () => {
+    const { client, sent } = stubClient([
+      reply([use('u1', 'close_todo', { todo_ref: 'x' })]),
+      reply([use('u2', 'answer', { answer: 'I could not tick it off here.', cited: [] })]),
+    ]);
+    const { stores } = memoryStores();
+    await askDash(
+      { question: 'Tick off the dentist', today: '2026-09-27', execute: goalExecute(), anthropicApiKey: 'k', client },
+      stores,
+    );
+    const back = sent[1].messages[sent[1].messages.length - 1].content as Anthropic.ToolResultBlockParam[];
+    expect(back[0]).toMatchObject({ is_error: true, content: 'Changes cannot be made here. Answer in words.' });
   });
 
   it('refuses a goal ref no lookup returned, and keeps nothing', async () => {

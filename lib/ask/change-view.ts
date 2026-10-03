@@ -20,7 +20,25 @@ export function changeHref(change: DashChange): string {
       return `/shopping/inventory/${change.input.id}`;
     case 'start_watch':
       return change.writtenRef ? `/home#watch-${change.writtenRef}` : '/home#watching';
+    case 'add_goal':
+      return change.writtenRef ? `/goals/${change.writtenRef}` : '/goals';
+    case 'change_todo':
+    case 'close_todo':
+      return `/todo/all?status=all&focus=${change.input.id}`;
+    case 'close_goal_step':
+      return `/goals/${change.input.goalId}#step-${change.input.id}`;
+    case 'add_role_note':
+      return `/jobs/roles/${change.input.roleId}`;
   }
+}
+
+/** A note as the card quotes it: its first line, cut at a word. */
+function quoted(body: string, max = 80): string {
+  const line = body.split('\n')[0].trim();
+  if (line.length <= max) return line;
+  const cut = line.slice(0, max - 1);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > max / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }
 
 /**
@@ -77,6 +95,48 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
         what: change.input.title,
         rest: watchPlan(change.input, dueDay(change.input.endsOn, today)),
       };
+    case 'add_goal':
+      return {
+        verb: done ? 'Added the goal' : 'Add the goal',
+        what: change.input.title,
+        rest: ` under ${change.input.areaName}${change.input.dueOn ? `, due ${dueDay(change.input.dueOn, today)}` : ''}`,
+      };
+    case 'change_todo': {
+      const { renamedFrom, moved, dueOn, dueTime } = change.input;
+      const day = dueOn ? `${dueDay(dueOn, today)}${dueTime ? ` at ${dueTime}` : ''}` : null;
+      const move = moved ? (day ? `moved to ${day}` : 'with no due date now') : '';
+      if (renamedFrom) {
+        return {
+          verb: done ? 'Renamed the todo' : 'Rename the todo',
+          what: change.input.title,
+          rest: ` (it was ${renamedFrom})${move ? `, ${move}` : ''}`,
+        };
+      }
+      if (!day) {
+        return { verb: done ? 'Took the due date off' : 'Take the due date off', what: change.input.title, rest: '' };
+      }
+      return { verb: done ? 'Moved the todo' : 'Move the todo', what: change.input.title, rest: ` to ${day}` };
+    }
+    case 'close_todo': {
+      const items = change.input.items;
+      return {
+        verb: done ? 'Ticked off' : 'Tick off',
+        what: change.input.title,
+        rest: items > 0 ? `, with the ${items === 1 ? 'item' : `${items} items`} on its list` : '',
+      };
+    }
+    case 'close_goal_step':
+      return {
+        verb: done ? 'Closed the step' : 'Close the step',
+        what: change.input.title,
+        rest: ` under ${change.input.goalTitle}`,
+      };
+    case 'add_role_note':
+      return {
+        verb: done ? 'Added a note to' : 'Add a note to',
+        what: change.input.roleTitle,
+        rest: `: ${quoted(change.input.body)}`,
+      };
   }
 }
 
@@ -105,5 +165,14 @@ export function changeWhere(change: DashChange): string {
       return 'Open the item';
     case 'start_watch':
       return 'Open on the home page';
+    case 'add_goal':
+      return 'Open the goal';
+    case 'change_todo':
+    case 'close_todo':
+      return 'Open in Todo';
+    case 'close_goal_step':
+      return 'Open the goal';
+    case 'add_role_note':
+      return 'Open the role';
   }
 }

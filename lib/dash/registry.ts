@@ -1,9 +1,11 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { ASK_TOOLS, IN_APP_ONLY_TOOLS } from '@/lib/ask/tools';
 import { PROPOSAL_TOOLS } from '@/lib/ask/propose';
-import type { AskContext } from '@/lib/ask/db';
+import type { ChangeDeps } from '@/lib/ask/changes';
+import type { AskContext, AskRow } from '@/lib/ask/db';
 import type { DashAction, DashActionOp } from '@/lib/core/dash-actions';
 import { HAND_OFF_TOOL } from '@/lib/talk/handoff';
+import { WRITE_TOOLS } from './writes';
 
 /**
  * Every tool Dash can call, on any surface (plan #1463, feature #1462;
@@ -19,8 +21,15 @@ import { HAND_OFF_TOOL } from '@/lib/talk/handoff';
  *             core.dash_actions for the person to confirm (lib/ask/propose.ts).
  *   handoff   passes a request no tool can do to the backup routine
  *             (lib/talk/handoff.ts).
- *   write     changes a row straight away and carries an Undo. None is
- *             registered yet; #1440 adds the first.
+ *   write     changes a row straight away and carries an Undo
+ *             (lib/dash/writes.ts, plan #1440): a todo added, renamed,
+ *             moved or ticked off, a goal or a step added, a step closed,
+ *             an item marked returned, a note on a role.
+ *
+ * Only a watch on a price is still a proposal (propose_watch): it reads a
+ * page outside the app every hour, and what acts outside the app waits for
+ * the person. The other three proposals became the writes add_todo,
+ * add_goal_step and mark_returned.
  *
  * The lookup and proposal code stays where it is: this file lists the tools
  * and does not run them. A write tool is different, since what it does is
@@ -50,14 +59,29 @@ export type DashHandoffTool = DashToolBase & { kind: 'handoff' };
 export type DashWriteContext = AskContext & {
   /** Whether a lookup in this conversation returned the row, or the page shows it. */
   seen: (table: string, ref: string) => boolean;
+  /**
+   * A goals client on the person's session, recording its writes in
+   * goals.history as `actor` (createGoalsClient). `{ actor: 'claude' }`
+   * marks a write as Dash's; `{}` writes as the person, which is how a goal
+   * they asked for goes in approved.
+   */
+  goals: ChangeDeps['goals'];
+  /** createTask from lib/todo/tasks/write.ts. */
+  createTask: ChangeDeps['createTask'];
 };
 
 /** What a write tool reports about the change it made, in the shape core.dash_actions keeps. */
 export type DashWriteResult =
   | {
       ok: true;
-      /** What was done, in snake_case: `add_goal`, `close_todo`. */
+      /** What was done, in snake_case: `add_goal`, `close_todo`. The tool's name. */
       kind: string;
+      /**
+       * What the change was, in the words its card is drawn from
+       * (DashChangeInput in lib/talk/changes.ts). Ask keeps it as the
+       * record's `input`; a surface with no cards can leave it unread.
+       */
+      input: Record<string, unknown>;
       /** `schema.table:id`, the row written. */
       subjectRef: string;
       op: DashActionOp;
@@ -69,6 +93,11 @@ export type DashWriteResult =
       summary: string;
       /** What undoing needs beyond the row, kept in the `undo` column. */
       undo?: Record<string, unknown> | null;
+      /**
+       * The row to link to from the answer, returned to the model as a
+       * lookup row is, so the answer can cite it. For a note, the role it is on.
+       */
+      row: AskRow;
     }
   | { ok: false; error: string };
 
@@ -88,6 +117,9 @@ export type DashTool = DashLookupTool | DashProposalTool | DashHandoffTool | Das
 
 const IN_APP = new Set<string>(IN_APP_ONLY_TOOLS);
 
+/** The proposals still offered: the rest became writes (plan #1440). */
+const REGISTERED_PROPOSALS = new Set<string>(['propose_watch']);
+
 /** The tools in the order the model is sent them, which keeps the cached prefix stable. */
 export const DASH_TOOLS: readonly DashTool[] = [
   ...ASK_TOOLS.map(
@@ -98,7 +130,10 @@ export const DASH_TOOLS: readonly DashTool[] = [
       ...(IN_APP.has(definition.name) ? { inAppOnly: true } : {}),
     }),
   ),
-  ...PROPOSAL_TOOLS.map((definition): DashProposalTool => ({ name: definition.name, kind: 'proposal', definition })),
+  ...WRITE_TOOLS,
+  ...PROPOSAL_TOOLS.filter((definition) => REGISTERED_PROPOSALS.has(definition.name)).map(
+    (definition): DashProposalTool => ({ name: definition.name, kind: 'proposal', definition }),
+  ),
   { name: HAND_OFF_TOOL.name, kind: 'handoff', definition: HAND_OFF_TOOL },
 ];
 

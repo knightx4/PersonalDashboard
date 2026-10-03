@@ -326,11 +326,17 @@ export function planUndo(
    * that later change is one with no Undo of its own.
    */
   laterAction: boolean | 'fixed',
+  /**
+   * True when Ask's own undo (lib/ask/changes.ts) asks for the rule, for a
+   * kind Dash wrote straight away from Ask (plan #1440). Anything else
+   * pressing Undo on an Ask change is sent there.
+   */
+  fromAsk = false,
 ): { ok: true; plan: UndoPlan } | { ok: false; reason: string } {
   if (action.status !== 'done') return { ok: false, reason: notDone(action.status) };
   const none = noUndoReason(action);
   if (none) return { ok: false, reason: none };
-  if (action.surface === 'ask') {
+  if (action.surface === 'ask' && !fromAsk) {
     return { ok: false, reason: 'This change was made in Ask Dash, and is undone from there.' };
   }
   // A capture line can touch more than its one row (an added step and the
@@ -488,16 +494,22 @@ export async function loadDashAction(deps: DashActionDeps, id: string): Promise<
  * the action undone. Refused, with the sentence the person reads, when the
  * row has moved on since Dash wrote it.
  */
-export async function undoDashAction(deps: DashActionDeps, id: string): Promise<DashActionUndo> {
+export async function undoDashAction(
+  deps: DashActionDeps,
+  id: string,
+  /** `fromAsk`: Ask's own undo asking for the rule (planUndo). */
+  options: { fromAsk?: boolean } = {},
+): Promise<DashActionUndo> {
   const action = await loadDashAction(deps, id);
   if (!action) return { ok: false, error: GONE, action: null };
 
+  const fromAsk = options.fromAsk === true;
   const ref = action.subjectRef;
   const [current, later] =
-    action.status === 'done' && ref && action.surface !== 'ask' && action.surface !== 'capture'
+    action.status === 'done' && ref && (action.surface !== 'ask' || fromAsk) && action.surface !== 'capture'
       ? await Promise.all([readSubject(deps.db, ref), laterActionOn(deps, action)])
       : [null, false];
-  const decided = planUndo(action, current, later);
+  const decided = planUndo(action, current, later, fromAsk);
   if (!decided.ok) return { ok: false, error: decided.reason, action };
 
   if (decided.plan.op === 'delete' && (await hasDependents(deps.db, ref!))) {
