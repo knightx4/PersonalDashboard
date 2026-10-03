@@ -12,11 +12,11 @@ import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
+import { VIEW_LABEL } from '@/lib/core/move';
 import {
   DEFAULT_GOAL_VIEW,
   GOAL_VIEWS,
   GOAL_VIEW_CHIPS,
-  GOAL_VIEW_LABEL,
   GOAL_VIEW_MENU,
   countGoalView,
   goalCatalog,
@@ -227,7 +227,7 @@ export function StepTree({
                 view={view}
                 chips={GOAL_VIEW_CHIPS}
                 menu={GOAL_VIEW_MENU}
-                labels={GOAL_VIEW_LABEL}
+                labels={VIEW_LABEL}
                 hrefOf={(candidate) => goalViewHref(path, candidate)}
                 counts={Object.fromEntries(
                   GOAL_VIEWS.filter((candidate) => candidate !== 'all').map((candidate) => [

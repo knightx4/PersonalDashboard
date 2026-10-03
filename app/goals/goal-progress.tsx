@@ -1,5 +1,5 @@
 import { HelpCircle } from 'lucide-react';
-import { StateLabel } from '@/components/dev/state-label';
+import { MoveLabel } from '@/components/ui/move-label';
 import { Bands } from '@/components/ui/meter';
 import { cn } from '@/lib/cn';
 import { ProgressCount } from './progress-count';
@@ -38,7 +38,7 @@ export function GoalProgress({
 
   return (
     <span className={cn('flex flex-wrap items-center gap-x-3 gap-y-1', className)}>
-      {move.word && <StateLabel glyph={null} word={move.word} tone={move.tone} title={move.title} />}
+      {move.move && <MoveLabel move={move.move} title={move.title} />}
       {progress.live > 0 && (
         <span className="flex items-center gap-2">
           <Bands

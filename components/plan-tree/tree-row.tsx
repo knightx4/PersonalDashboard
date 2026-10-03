@@ -81,8 +81,6 @@ export type TreeHealth = {
   name: string;
 };
 
-/** Whose move it is: see `moveFor` in lib/plan/health-words.ts. */
-export type TreeMove = { word: string; tone: DevTone; title?: string };
 
 /**
  * The row's own state, held by the page's row so its menus can open the panel,
@@ -209,7 +207,11 @@ export function TreeRow<E extends TreeCatalogEntry>({
   trail: readonly boolean[];
   row: TreeRowState;
   health: TreeHealth;
-  move: TreeMove;
+  /**
+   * The cell beside health: on the plan, whose move it is, drawn with
+   * `MoveLabel` (components/ui/move-label.tsx); on a goal, who the step is on.
+   */
+  move: React.ReactNode;
   /** What pressing the health word offers. */
   statusMenu: ActionMenuItem[];
   /** The row's own menu, at the end of the line. */
@@ -573,24 +575,18 @@ export function TreeRow<E extends TreeCatalogEntry>({
 
         {/* Whose move it is, beside how far along it is.
 
-            A word and a tone, and deliberately no glyph: the hexagons belong to
-            health, they are a scale from empty to full, and a second column of
-            shapes beside them would read as a second position on the same scale
-            rather than as an answer to a different question. Law 4 -- if none
-            of the meanings is true, use ink and a shape, and here the shape is
-            the column itself.
+            A word and a tone, and deliberately no hexagon: the hexagons belong
+            to health, they are a scale from empty to full, and a second column
+            of them beside it would read as a second position on the same scale
+            rather than as an answer to a different question. The one shape is
+            Dash's working mark, which MoveLabel puts beside "Dash is on it".
 
             Not a menu, where health is one. Health is set by hand; this is
             derived from what is already true of the row -- who it is assigned
             to, what it waits on, whether it is a question -- so there is
             nothing here to pick. Changing it means handing the step over or
             answering what it asks, which are the buttons already on the row. */}
-        <span
-          className={cn('hidden truncate text-small sm:block', TONE_TEXT[move.tone])}
-          title={move.title}
-        >
-          {move.word}
-        </span>
+        <span className="hidden min-w-0 truncate text-small sm:block">{move}</span>
 
         <span className="hidden truncate text-small sm:block">{priority}</span>
 
