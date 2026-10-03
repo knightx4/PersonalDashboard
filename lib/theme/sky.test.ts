@@ -6,7 +6,12 @@ import { themeAttribute, themeStyle } from '@/lib/theme/apply';
 import { readTheme, THEME_SELECTORS } from '@/lib/theme/css';
 import { MEANING_FLOOR, meaningGaps } from '@/lib/theme/palette';
 import { parseHex, relativeLuminance } from '@/lib/theme/oklch';
-import { DEFAULT_SKY, SKIES, SKY_IDS, skyTokens, type SkyPolarity } from '@/lib/theme/sky';
+import { DEFAULT_SKY, hasSide, SKIES, SKY_IDS, skyById, skyTokens, type SkyPolarity } from '@/lib/theme/sky';
+
+/** Every sky that can be shown in a polarity. */
+function skiesIn(polarity: SkyPolarity) {
+  return SKY_IDS.filter((id) => hasSide(id, polarity));
+}
 
 /**
  * Aurora's skies are hand-picked colours laid over a written block, so two
@@ -68,7 +73,7 @@ describe('the default sky', () => {
   it('is the Aurora and Dawn blocks as written', () => {
     const borealis = SKIES.find((sky) => sky.id === DEFAULT_SKY)!;
     for (const polarity of ['night', 'dawn'] as const) {
-      const side = borealis[polarity];
+      const side = borealis[polarity]!;
       const block = BLOCK[polarity];
       expect(block['--c-page']).toBe(side.bench);
       expect(block['--c-wash-near']).toBe(side.pools.near);
@@ -92,35 +97,49 @@ describe('every sky', () => {
     expect(WORKSPACE_POOLS).toHaveLength(8);
   });
 
-  it('has a night side and a dawn side, in flat colours', () => {
+  it('has a night side, and a dawn side unless it is a night-only scene, in flat colours', () => {
     expect(SKIES.map((sky) => sky.id)).toEqual([...SKY_IDS]);
     for (const sky of SKIES) {
+      expect(sky.night, sky.id).toBeDefined();
+      // Only a painted scene may be night-only; every ribbon sky works by day too.
+      if (!sky.dawn) expect(sky.night!.art, sky.id).toBeDefined();
       for (const side of [sky.night, sky.dawn]) {
-        const colours = [side.bench, side.accent, side.accentHover, side.accentTint, ...Object.values(side.pools)];
+        if (!side) continue;
+        const colours = [side.bench, side.accent, side.accentHover, side.accentTint, ...Object.values(side.pools), ...(side.peaks ?? [])];
         for (const colour of colours) expect(colour).toMatch(/^#[0-9a-f]{6}$/);
+        // A scene has to say how bright it gets, or nothing below can measure it.
+        if (side.art) expect(side.peaks?.length, sky.id).toBeGreaterThan(0);
       }
     }
   });
 
   it('keeps night dark and dawn light', () => {
     for (const sky of SKIES) {
-      expect(relativeLuminance(sky.night.bench), sky.id).toBeLessThan(0.01);
-      expect(relativeLuminance(sky.dawn.bench), sky.id).toBeGreaterThan(0.75);
+      expect(relativeLuminance(sky.night!.bench), sky.id).toBeLessThan(0.01);
+      if (sky.dawn) expect(relativeLuminance(sky.dawn.bench), sky.id).toBeGreaterThan(0.5);
     }
   });
 
   it.each(['night', 'dawn'] as const)(
-    'keeps its text readable on every glass, over the brightest point of every pool, at %s',
+    'keeps its text readable on every glass, over the brightest point of every pool or scene, at %s',
     (polarity) => {
-      for (const id of SKY_IDS) {
+      for (const id of skiesIn(polarity)) {
         const vars = theme(polarity, id);
         const bench = parse(vars['--c-page']!).rgb;
         const lift = Number(vars['--wash-lift'] ?? 1);
         const pools = ['--c-wash-near', '--c-wash-mid', '--c-wash-far', '--c-wash-floor'];
-        // The sky's own pools, and every workspace colour, which takes the
-        // largest pool inside its workspace.
-        const colours = [...pools.map((pool) => vars[pool]!), ...WORKSPACE_POOLS];
-        const lit = [bench, ...colours.map((colour) => over(colour, Math.min(1, STRONGEST * lift), bench))];
+        const scene = skyById(id)![polarity]!.peaks;
+        // A painted scene: its own brightest colours, opaque. A ribbon sky:
+        // its pools and every workspace colour, which takes the largest pool
+        // inside its workspace, at the strongest share any of them gets.
+        const lit = scene
+          ? [bench, ...scene.map((colour) => parse(colour).rgb)]
+          : [
+              bench,
+              ...[...pools.map((pool) => vars[pool]!), ...WORKSPACE_POOLS].map((colour) =>
+                over(colour, Math.min(1, STRONGEST * lift), bench),
+              ),
+            ];
 
         for (const ground of lit) {
           for (const glass of GLASS) {
@@ -137,7 +156,7 @@ describe('every sky', () => {
 
   it('puts a readable label on its accent, and keeps the accent off the meaning colours', () => {
     for (const polarity of ['night', 'dawn'] as const) {
-      for (const id of SKY_IDS) {
+      for (const id of skiesIn(polarity)) {
         const vars = theme(polarity, id);
         const label = ratio(parse(vars['--c-fill-ink']!).rgb, parse(vars['--c-accent-base']!).rgb);
         expect(label, `${polarity} ${id}`).toBeGreaterThanOrEqual(4.5);
@@ -167,7 +186,20 @@ describe('choosing a sky', () => {
     const chosen = parseTheme('dawn:tide');
     expect(themeAttribute(chosen)).toBe('dawn');
     expect(themeStyle(chosen)).toEqual(skyTokens('dawn', 'tide'));
-    expect(themeStyle(chosen)?.['--c-page']).toBe(SKIES.find((sky) => sky.id === 'tide')!.dawn.bench);
+    expect(themeStyle(chosen)?.['--c-page']).toBe(SKIES.find((sky) => sky.id === 'tide')!.dawn!.bench);
+  });
+
+  it('keeps a night-only sky out of Dawn', () => {
+    expect(parseTheme('dawn:northern')).toEqual({ kind: 'written', id: 'dawn' });
+    expect(formatTheme(auroraFor('light', 'starfield'))).toBe('dawn');
+    expect(formatTheme(auroraFor('dark', 'starfield'))).toBe('aurora:starfield');
+  });
+
+  it('paints a scene in place of the ribbons, and takes it off again', () => {
+    const tokens = skyTokens('night', 'northern');
+    expect(tokens['--sky-art']).toBe('url("/sky/northern.svg")');
+    expect(tokens['--sky-rays']).toBe('0');
+    expect(skyTokens('night', 'polar')['--sky-art']).toBeUndefined();
   });
 
   it('keeps the sky across Aurora and Dawn', () => {

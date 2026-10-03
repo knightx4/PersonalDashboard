@@ -34,6 +34,24 @@ export type SkySide = {
   accentHover: string;
   /** The ground behind accent text: a selected row, an accent chip. */
   accentTint: string;
+  /**
+   * A painted scene in place of the curtains: a file in public/sky/, drawn by
+   * scripts/sky-art.ts. A sky with a scene shows the scene and none of the
+   * ribbons or rays.
+   */
+  art?: string;
+  /**
+   * The brightest colours the scene paints over any area a card could sit on,
+   * opaque. lib/theme/sky.test.ts measures the glass over every one of them,
+   * the way it measures the ribbons' pools for the skies without a scene.
+   */
+  peaks?: readonly string[];
+  /**
+   * The glass, where a scene is bright enough to need a heavier pane than the
+   * block's: a dusk horizon or the lower edge of an aurora is far brighter
+   * than any pool. Flat `rgb(r g b / a)` values, like the block's own.
+   */
+  glass?: { surface: string; raised: string; canvas: string; sunken: string };
 };
 
 export type Sky = {
@@ -41,8 +59,13 @@ export type Sky = {
   label: string;
   /** One line for the swatch's title, so it says what it is. */
   mood: string;
-  night: SkySide;
-  dawn: SkySide;
+  /**
+   * A sky has a night side, a dawn side, or both. The scenes that only make
+   * sense in the dark -- a starfield, the northern lights -- have no dawn,
+   * and the picker offers them only at night.
+   */
+  night?: SkySide;
+  dawn?: SkySide;
 };
 
 export const SKY_IDS = [
@@ -53,6 +76,10 @@ export const SKY_IDS = [
   'nebula',
   'ember',
   'rose',
+  'dunes',
+  'silver',
+  'starfield',
+  'northern',
 ] as const;
 
 export type SkyId = (typeof SKY_IDS)[number];
@@ -194,6 +221,143 @@ export const SKIES: readonly Sky[] = [
       accentTint: '#f6e3f4',
     },
   },
+  {
+    id: 'dunes',
+    label: 'Dunes',
+    mood: 'Sand under a low sun; a desert at dusk at night',
+    night: {
+      bench: '#1a1030',
+      pools: { near: '#d8794f', mid: '#7a3a58', far: '#2a1640', floor: '#3a1d36' },
+      accent: '#c9b2ff',
+      accentHover: '#ddcbff',
+      accentTint: '#2c1f45',
+      art: '/sky/dunes-night.svg',
+      peaks: ['#d8794f', '#e88a52', '#8a4a52', '#7a3a58'],
+      glass: {
+        surface: 'rgb(16 12 30 / 0.72)',
+        raised: 'rgb(22 16 40 / 0.92)',
+        canvas: 'rgb(8 6 18 / 0.62)',
+        sunken: 'rgb(6 4 14 / 0.66)',
+      },
+    },
+    dawn: {
+      bench: '#f2c9b8',
+      pools: { near: '#ffb38a', mid: '#e8956a', far: '#c9b7f0', floor: '#f6c99a' },
+      accent: '#6a3d7a',
+      accentHover: '#552f63',
+      accentTint: '#f2e4f0',
+      art: '/sky/dunes-dawn.svg',
+      peaks: ['#b9a7f0', '#f0b8c8', '#ffd2a3', '#fff6d6', '#f9cf9c', '#eeb07c', '#d47a4d', '#a2583a'],
+    },
+  },
+  {
+    id: 'silver',
+    label: 'Silver Dunes',
+    mood: 'Pale sand and a cool sky; moonlit at night',
+    night: {
+      bench: '#0b1426',
+      pools: { near: '#4a5f82', mid: '#2b4670', far: '#5a74a0', floor: '#1a2438' },
+      accent: '#a9c8ff',
+      accentHover: '#c4d9ff',
+      accentTint: '#18263a',
+      art: '/sky/silver-night.svg',
+      peaks: ['#b8c6dc', '#5a74a0', '#4a5f82', '#2b4670'],
+      glass: {
+        surface: 'rgb(12 18 34 / 0.72)',
+        raised: 'rgb(18 26 46 / 0.92)',
+        canvas: 'rgb(6 10 22 / 0.72)',
+        sunken: 'rgb(4 8 18 / 0.74)',
+      },
+    },
+    dawn: {
+      bench: '#e6ecf3',
+      pools: { near: '#b9cbe0', mid: '#ddd5c6', far: '#a9c4e6', floor: '#efe9de' },
+      accent: '#2c5592',
+      accentHover: '#21447a',
+      accentTint: '#e1e9f6',
+      art: '/sky/silver-dawn.svg',
+      peaks: ['#ffffff', '#a9c4e6', '#efe9de', '#c0b6a5', '#958e84'],
+    },
+  },
+  {
+    id: 'starfield',
+    label: 'Starfield',
+    mood: 'The Milky Way over a mountain ridge',
+    night: {
+      bench: '#03040a',
+      pools: { near: '#9a98b4', mid: '#7d86ad', far: '#b8a48c', floor: '#16243a' },
+      accent: '#b8c7ff',
+      accentHover: '#d0daff',
+      accentTint: '#1a2040',
+      art: '/sky/starfield.svg',
+      // The galaxy's glow at its warm core, which is the brightest area; a
+      // star is a point and never sits under a whole line of text.
+      peaks: ['#3a3640', '#2a2a35', '#16243a'],
+    },
+  },
+  {
+    id: 'northern',
+    label: 'Northern Lights',
+    mood: 'Green curtains of light over a line of pines',
+    night: {
+      bench: '#03070e',
+      pools: { near: '#4dffa6', mid: '#1fc98a', far: '#b04fe0', floor: '#082430' },
+      // Not green: green means saved here, and the sky is already green.
+      accent: '#c9b5ff',
+      accentHover: '#ddd0ff',
+      accentTint: '#241d40',
+      art: '/sky/northern.svg',
+      peaks: ['#9ff0c4', '#4ce69a', '#1fc98a', '#3b6fd0'],
+      glass: {
+        surface: 'rgb(6 12 22 / 0.8)',
+        raised: 'rgb(12 20 34 / 0.94)',
+        canvas: 'rgb(4 8 16 / 0.7)',
+        sunken: 'rgb(2 6 12 / 0.72)',
+      },
+    },
+  },
+];
+
+/** Whether a sky can be shown in a polarity. */
+export function hasSide(id: SkyId, polarity: SkyPolarity): boolean {
+  return Boolean(skyById(id)?.[polarity]);
+}
+
+/**
+ * The tokens a painted scene adds: the picture, and how the sky layer holds
+ * it -- cover the screen from a little outside it, float rather than turn, no
+ * rays -- plus a heavier pane where the scene needs one. None for the skies
+ * that are ribbons, which the layer's own defaults already draw.
+ */
+function sceneTokens(side: SkySide): Record<string, string> {
+  if (!side.art) return {};
+  const glass: Record<string, string> = side.glass
+    ? {
+        '--c-surface': side.glass.surface,
+        '--c-raised': side.glass.raised,
+        '--c-canvas': side.glass.canvas,
+        '--c-sunken': side.glass.sunken,
+      }
+    : {};
+  return {
+    '--sky-art': `url("${side.art}")`,
+    '--sky-size': 'cover',
+    '--sky-inset': '-3%',
+    '--sky-anim': 'sky-float',
+    '--sky-rest': 'none',
+    '--sky-rays': '0',
+    ...glass,
+  };
+}
+
+/** The scene's own tokens, none of them `--c-*`, so applyTheme can clear them. */
+export const SCENE_TOKENS: readonly string[] = [
+  '--sky-art',
+  '--sky-size',
+  '--sky-inset',
+  '--sky-anim',
+  '--sky-rest',
+  '--sky-rays',
 ];
 
 export function isSkyId(value: string | null | undefined): value is SkyId {
@@ -214,9 +378,10 @@ export function skyById(id: string | null | undefined): Sky | undefined {
 export function skyTokens(polarity: SkyPolarity, id: SkyId): Record<string, string> {
   if (id === DEFAULT_SKY) return {};
   const sky = skyById(id);
-  if (!sky) return {};
-  const side = sky[polarity];
+  const side = sky?.[polarity];
+  if (!side) return {};
   return {
+    ...sceneTokens(side),
     '--c-page-ground': side.bench,
     '--c-page': side.bench,
     '--c-shell': side.bench,

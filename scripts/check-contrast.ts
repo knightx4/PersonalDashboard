@@ -69,8 +69,8 @@ const GENERATED: Record<string, Vars> = Object.fromEntries(
  */
 const SKIED: Record<string, Vars> = Object.fromEntries(
   SKIES.filter((sky) => sky.id !== DEFAULT_SKY).flatMap((sky) => [
-    [`aurora ${sky.id}`, { ...WRITTEN.aurora, ...skyTokens('night', sky.id) }],
-    [`dawn ${sky.id}`, { ...WRITTEN.dawn, ...skyTokens('dawn', sky.id) }],
+    ...(sky.night ? [[`aurora ${sky.id}`, { ...WRITTEN.aurora, ...skyTokens('night', sky.id) }]] : []),
+    ...(sky.dawn ? [[`dawn ${sky.id}`, { ...WRITTEN.dawn, ...skyTokens('dawn', sky.id) }]] : []),
   ]),
 );
 

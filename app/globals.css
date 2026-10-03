@@ -3348,11 +3348,16 @@ form[data-auto-submit] [data-fallback-submit] {
 [data-theme='dawn'] .shell-ground::before {
   position: fixed;
   z-index: -3;
-  inset: -25%;
+  /* A painted scene (lib/theme/sky.ts) sets these and the picture; the
+   * ribbons below are what every other sky draws. */
+  inset: var(--sky-inset, -25%);
+  background-size: var(--sky-size, auto);
+  background-position: center bottom;
+  background-repeat: no-repeat;
   content: "";
   pointer-events: none;
   will-change: transform;
-  background-image:
+  background-image: var(--sky-art,
     radial-gradient(
       58% 9% at 34% 30%,
       color-mix(in oklab, var(--c-wash-near) calc(var(--wash-lift) * 34%), transparent),
@@ -3382,8 +3387,8 @@ form[data-auto-submit] [data-fallback-submit] {
       90% 22% at 50% 78%,
       color-mix(in oklab, var(--c-wash-floor) calc(var(--wash-lift) * 26%), transparent),
       transparent 70%
-    );
-  animation: sky-drift calc(var(--motion-moment) * 120) var(--ease-sway) infinite alternate;
+    ));
+  animation: var(--sky-anim, sky-drift) calc(var(--motion-moment) * 120) var(--ease-sway) infinite alternate;
 }
 
 /* The rays: fine vertical streaks inside the brightest band, which is what
@@ -3405,6 +3410,7 @@ form[data-auto-submit] [data-fallback-submit] {
     rgb(255 255 255 / calc(var(--ray-alpha) * 0.6)) 7px 9px,
     transparent 9px 17px
   );
+  opacity: var(--sky-rays, 1);
   -webkit-mask-image: radial-gradient(48% 20% at 46% 32%, black, transparent 72%);
   mask-image: radial-gradient(48% 20% at 46% 32%, black, transparent 72%);
   transform: rotate(-12deg);
@@ -3431,6 +3437,17 @@ form[data-auto-submit] [data-fallback-submit] {
   }
 }
 
+/* A painted scene does not turn: a horizon that tilts reads as the screen
+ * being crooked. It floats, a percent or two either way. */
+@keyframes sky-float {
+  from {
+    transform: translate3d(-1%, 0.5%, 0) scale(1.02);
+  }
+  to {
+    transform: translate3d(1%, -0.5%, 0) scale(1.04);
+  }
+}
+
 @keyframes sky-rays {
   from {
     transform: rotate(-12deg) translate3d(-3%, 0, 0);
@@ -3446,7 +3463,7 @@ form[data-auto-submit] [data-fallback-submit] {
   [data-theme='aurora'] .shell-ground::before,
   [data-theme='dawn'] .shell-ground::before {
     animation: none;
-    transform: rotate(-12deg);
+    transform: var(--sky-rest, rotate(-12deg));
   }
 
   [data-theme='aurora'] .shell-ground::after,
