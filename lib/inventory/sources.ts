@@ -56,7 +56,22 @@ export const shoppingSources: ModuleSources = {
     },
   ],
   notSources: [
-    { table: 'public.orders', reason: 'Order headers; read through order_items.' },
+    {
+      table: 'public.orders',
+      reason: 'Order headers; read through order_items.',
+      page: {
+        title: {
+          reads: ['external_order_number', 'order_date'],
+          of: (row) =>
+            row.external_order_number
+              ? `Order ${row.external_order_number}`
+              : row.order_date
+                ? `Order of ${row.order_date}`
+                : null,
+        },
+        href: (row) => `/shopping/orders/${row.id}`,
+      },
+    },
     { table: 'public.shipments', reason: 'Parcel tracking.' },
     { table: 'public.returns', reason: 'Return deadlines.' },
     { table: 'public.merchants', reason: 'The shared list of shops.' },
@@ -86,7 +101,11 @@ export const shoppingSources: ModuleSources = {
     { table: 'public.game_details', reason: 'Game metadata for resale.' },
     { table: 'public.game_price_quotes', reason: 'Resale price lookups.' },
     { table: 'public.fx_rates', reason: 'Exchange rates.' },
-    { table: 'public.share_links', reason: 'Lists shared with other people.' },
+    {
+      table: 'public.share_links',
+      reason: 'Lists shared with other people.',
+      page: { title: 'title', href: (row) => `/shopping/share/${row.id}` },
+    },
     { table: 'public.share_link_items', reason: 'Lists shared with other people.' },
     { table: 'public.share_link_events', reason: 'Lists shared with other people.' },
     { table: 'public.share_link_responses', reason: 'Lists shared with other people.' },

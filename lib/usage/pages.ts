@@ -92,6 +92,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/news/settings',
   '/oauth/consent',
   '/onboarding',
+  '/open/[ref]',
   '/preview',
   '/privacy',
   '/reset-password',

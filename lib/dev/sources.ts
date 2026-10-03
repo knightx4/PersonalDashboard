@@ -1,4 +1,5 @@
-import type { ModuleSources } from '@/lib/sources/types';
+import { planRefHref } from '@/lib/comments/refs';
+import type { ModuleSources, Page } from '@/lib/sources/types';
 
 /**
  * The dev workspace's tables, as Goals reads them (lib/sources/types.ts).
@@ -8,6 +9,22 @@ import type { ModuleSources } from '@/lib/sources/types';
  * goes in one of these two lists, or the gate says so.
  */
 const ABOUT_THE_APP = 'About building this app, not the person’s life.';
+
+/**
+ * The dev rows a ref can open (lib/core/refs.ts). A plan step opens on the
+ * plan filtered to its number; the rest open on their list with the row's
+ * anchor, the same addresses Dash's lookups link to (lib/ask/dev.ts).
+ */
+const PAGES: Record<string, Page> = {
+  'public.plan_items': {
+    title: 'title',
+    reads: ['number'],
+    href: (row) => (typeof row.number === 'number' ? planRefHref(row.number) : null),
+  },
+  'public.ideas': { title: 'body', href: (row) => `/dev/ideas#idea-${row.id}` },
+  'public.feedback_items': { title: 'body', href: (row) => `/dev/bugs#note-${row.id}` },
+  'public.raised_items': { title: 'title', href: (row) => `/dev/raised#raise-${row.id}` },
+};
 
 export const devSources: ModuleSources = {
   sources: [
@@ -48,5 +65,5 @@ export const devSources: ModuleSources = {
     'public.ui_findings',
     'public.ui_reviews',
     'public.vision_reviews',
-  ].map((table) => ({ table, reason: ABOUT_THE_APP })),
+  ].map((table) => ({ table, reason: ABOUT_THE_APP, page: PAGES[table] })),
 };

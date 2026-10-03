@@ -8,7 +8,7 @@ import { learnSources } from '@/lib/learn/sources';
 import { newsSources } from '@/lib/news/sources';
 import { todoSources } from '@/lib/todo/sources';
 import { vaultSources } from '@/lib/vault/sources';
-import { SOURCE_WEIGHTS, type ModuleSources, type NotASource, type Source } from './types';
+import { SOURCE_WEIGHTS, type ModuleSources, type NotASource, type Page, type Source } from './types';
 
 /**
  * Every module's sources, gathered (lib/sources/types.ts). Goals reads this
@@ -75,6 +75,49 @@ export function sourceHref(table: string, ref: string): string | null {
 /** The module a source belongs to, as the page names it; the schema for one not listed. */
 export function sourceModule(table: string): string {
   return byTable.get(table)?.module ?? table.split('.')[0];
+}
+
+/** A table whose rows can be named by a ref, and how one opens (lib/core/refs.ts). */
+export type PageEntry = { table: string; page: Page };
+
+/**
+ * The page a source's own href and title give, for one that sets no `page`.
+ * Its href is keyed by `ref` when that column is not the id, so the row is
+ * read for it.
+ */
+function sourcePage(source: Source): Page | null {
+  if (source.page !== undefined) return source.page;
+  const href = source.href;
+  if (!href) return null;
+  const key = source.ref ?? 'id';
+  return {
+    title: source.title,
+    href: (row) => {
+      const value = row[key];
+      return value === null || value === undefined ? null : href(String(value));
+    },
+    reads: key === 'id' ? [] : [key],
+  };
+}
+
+/**
+ * Every table with a page, as refs resolve them: each source with an href
+ * and each table that is not a source but declares a page. The registry
+ * behind lib/core/refs.ts; tests/refs.test.ts resolves a row of each.
+ */
+export const PAGES: readonly PageEntry[] = [
+  ...SOURCES.flatMap((source) => {
+    const page = sourcePage(source);
+    return page ? [{ table: source.table, page }] : [];
+  }),
+  ...NOT_SOURCES.flatMap((not) => (not.page ? [{ table: not.table, page: not.page }] : [])),
+];
+
+const pages = new Map(PAGES.map((entry) => [entry.table, entry]));
+
+/** The page entry for `schema.table`, or null when its rows have no page. */
+export function pageFor(table: string): PageEntry | null {
+  return pages.get(table) ?? null;
 }
 
 /** Stands in for a row's ref when an href is written into the catalogue; survives URL encoding. */

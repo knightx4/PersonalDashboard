@@ -16,6 +16,12 @@ export const coreSources: ModuleSources = {
       weight: 'record',
       search: ['title'],
       title: 'title',
+      // Only a question asked from anywhere has a page of its own.
+      page: {
+        title: 'title',
+        reads: ['subject_kind', 'subject_ref'],
+        href: (row) => (row.subject_kind === 'ask' && row.subject_ref ? `/ask/${row.subject_ref}` : null),
+      },
       note: "subject_kind says what it is about: 'feed_card' with subject_ref the learn.feed_cards id, 'news_story', or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id.",
     },
     {
@@ -45,6 +51,11 @@ export const coreSources: ModuleSources = {
       title: 'year',
       ref: 'year',
       href: (year) => `/timeline/year/${year}`,
+      page: {
+        title: { reads: ['year'], of: (row) => `${row.year} in review` },
+        reads: ['year'],
+        href: (row) => `/timeline/year/${row.year}`,
+      },
       note: "The paragraphs are Dash's, not theirs: each is {topic, text, evidence}, with evidence as core.timeline refs (`schema.table:id`). totals holds the counts per kind, spend per currency, each month, the top shops and the goals with steps done. complete is false while the year was still going when it was written; through is how far it read.",
     },
     {
@@ -56,6 +67,11 @@ export const coreSources: ModuleSources = {
       title: 'week',
       ref: 'week',
       href: (week) => `/home/week/${week}`,
+      page: {
+        title: { reads: ['week'], of: (row) => `The week of ${row.week}` },
+        reads: ['week'],
+        href: (row) => `/home/week/${row.week}`,
+      },
       note: "The observations and the change are Dash's, not theirs: each observation is {text, goal_id, evidence}, with goal_id a goals.goals id or null and evidence as `schema.table:id` refs. facts holds the numbers counted for the week. week is the Sunday it starts on. change_kept says whether the previous week's change happened (null when unknown). source 'plain' means no model wrote it.",
     },
     {
