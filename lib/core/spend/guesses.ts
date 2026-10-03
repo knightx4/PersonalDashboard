@@ -107,8 +107,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // A goal's whole outline (plan #1139) runs to sixteen units, where a new
   // track's opening three or four came to about 900 tokens.
   'write-curriculum': run(SONNET, 3_000, 1_500),
-  'place-track': run(OPUS, 3_000, 400),
-  'place-aim': run(OPUS, 2_500, 300),
+  'place-track': run(SONNET, 3_000, 400),
+  'place-aim': run(SONNET, 2_500, 300),
 
   // Learn: the catalogue. One search press embeds the claim and judges the
   // nearest segments, up to forty of them, so the judging is priced per press.
@@ -142,13 +142,13 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'propose-theme-merges': background(unit(HAIKU, 8_000, 300)),
   'propose-position-merges': background(unit(HAIKU, 9_000, 300)),
   'link-positions': background(unit(HAIKU, 10_000, 400)),
-  'check-areas': background(run(OPUS, 40_000, 5_000)),
-  'place-themes': background(run(OPUS, 60_000, 6_000)),
+  'check-areas': background(run(SONNET, 40_000, 5_000)),
+  'place-themes': background(run(SONNET, 60_000, 6_000)),
   'write-survey-idea': background(unit(HAIKU, 6_000, 250)),
   'write-survey-question': background(unit(HAIKU, 2_500, 100)),
 
   // Learn now cards, written by the hourly top-up.
-  'name-feed-material': background(unit(SONNET, 2_500, 100)),
+  'name-feed-material': background(unit(HAIKU, 2_500, 230)),
   // One call per section, writing a card for each of up to three ideas.
   'write-feed-card': background(unit(SONNET, 4_000, 2_000)),
   'embed-feed-ideas': background(unit(VOYAGE_LITE, 1_500, 0)),

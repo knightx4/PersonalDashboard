@@ -23,7 +23,9 @@ import { MODELS } from '@/lib/core/models';
  * a trip being planned or the plot of a story being written, and a track can
  * span two domains, so theme and track placement may answer "unplaced".
  *
- * Opus, because the value is in the close calls. Forty items is one call.
+ * Sonnet. It was Opus for the close calls, but theme placement runs from an
+ * hourly tick, and the reply is a short pick per item from a given list.
+ * Forty items is one call.
  */
 
 export const PLACE_MODEL = MODELS.learnAreaPlace;

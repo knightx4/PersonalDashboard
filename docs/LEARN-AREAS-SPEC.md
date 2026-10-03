@@ -317,7 +317,7 @@ on its first call and places unplaced articles until its time is up on every
 call, so it is called until it reports nothing remaining. It has no schedule:
 it is fired by hand through `pg_net` with the vault's `app_origin` and
 `cron_secret`, the pair the map sweep's tick already uses. Placement is one
-Opus call per forty articles, about twenty-five calls for the whole page,
+Sonnet call per forty articles, about twenty-five calls for the whole page,
 recorded as `check-areas` in the spend ledger.
 
 Each finding is a query over that table: `confidence = 'none'` for a missing

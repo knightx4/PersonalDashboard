@@ -72,12 +72,12 @@ export const MODELS = {
   rowCommentReply: SONNET,
   /** lib/jobs/suggest/model.ts */
   jobsSuggest: SONNET,
-  /** lib/learn/areas/place.ts */
-  learnAreaPlace: OPUS,
+  /** lib/learn/areas/place.ts; Sonnet since theme placement runs hourly */
+  learnAreaPlace: SONNET,
   /** lib/learn/catalogue/judge.ts */
   learnCatalogueJudge: HAIKU,
-  /** lib/learn/feed/name-material.ts */
-  learnNameMaterial: SONNET,
+  /** lib/learn/feed/name-material.ts; a reply of about 230 tokens */
+  learnNameMaterial: HAIKU,
   /** lib/learn/feed/write-card.ts */
   learnWriteCard: SONNET,
   /** lib/learn/graph/applied.ts */
