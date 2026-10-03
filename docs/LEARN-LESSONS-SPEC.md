@@ -305,9 +305,13 @@ ordinary one.
 Nothing waits on Learn now to lay out a goal's next unit any more. On every
 hourly run, whether or not the deck is short, the top-up lays out the first
 unit with no ideas of up to two goal tracks and splits each into pieces
-straight after (`layOutPlans` in `lib/learn/lessons/plan-layout.ts`). A plan's
-units are all laid out a few hours after its outline is written. A track whose
-layout failed is held for a day, as the lesson top-up holds one.
+straight after (`layOutPlans` in `lib/learn/lessons/plan-layout.ts`). It
+stays one unit ahead of the person: a track's next unit is laid out only once
+the latest unit laid out on it has been started, meaning one of its pieces has
+been passed, asked a check, or opened so that an idea has a lesson
+(`unitStarted`). Laying out every unit as soon as the outline was written
+produced 80 pieces before one was passed. A track whose layout failed is held
+for a day, as the lesson top-up holds one.
 
 ### Changing a plan
 

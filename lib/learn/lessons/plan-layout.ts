@@ -7,10 +7,14 @@ import { LAYOUT_RESERVE_MS, LESSON_HOLD_MS } from './top-up';
  *
  * A goal's lessons left Learn now for its plan, so nothing waits for its
  * ready ideas to run out before laying out its next unit. Instead the top-up
- * lays out each goal track's first unit that has no ideas yet, every hour,
- * whether or not the deck is short, until every unit of the plan is laid out.
- * The lay-out port splits each unit into pieces straight after (plan #1140),
- * so the plan page fills in unit by unit.
+ * lays out each goal track's first unit that has no ideas yet, whether or not
+ * the deck is short. The lay-out port splits each unit into pieces straight
+ * after (plan #1140), so the plan page fills in unit by unit.
+ *
+ * It stays one unit ahead of the person and no further: the next unit is laid
+ * out only once the latest one laid out has been started (`unitStarted`). Run
+ * every hour without that, the pass laid out 80 pieces across four plans
+ * before one was passed.
  *
  * At most `MAX_PLAN_LAYOUTS_PER_RUN` units a run, each on a different track so
  * the calls can run side by side. A track whose layout failed is held for a
@@ -22,6 +26,31 @@ import { LAYOUT_RESERVE_MS, LESSON_HOLD_MS } from './top-up';
 
 /** Units laid out ahead in one run, at most. Each is a chain call of about a minute. */
 export const MAX_PLAN_LAYOUTS_PER_RUN = 2;
+
+/** The latest unit laid out on a track, as `unitStarted` reads it. */
+export type LaidOutUnitUse = {
+  /** The unit's pieces. */
+  pieces: readonly { id: string; conceptIds: readonly string[]; passed: boolean }[];
+  /** Pieces that have had a check question asked. */
+  checkedPieceIds: ReadonlySet<string>;
+  /** Concepts with a lesson card, which a piece's page writes when it is opened. */
+  lessonConceptIds: ReadonlySet<string>;
+};
+
+/**
+ * Whether the person has started a laid-out unit: a piece of it passed, asked
+ * a check, or opened so that one of its ideas has a lesson. A unit with no
+ * pieces has not been started, so the pass waits rather than laying out more
+ * behind it.
+ */
+export function unitStarted(unit: LaidOutUnitUse): boolean {
+  return unit.pieces.some(
+    (piece) =>
+      piece.passed ||
+      unit.checkedPieceIds.has(piece.id) ||
+      piece.conceptIds.some((conceptId) => unit.lessonConceptIds.has(conceptId)),
+  );
+}
 
 /** A goal track with a unit still to lay out. */
 export type PlanLayoutDue = { subjectId: string; subjectName: string };

@@ -3,7 +3,7 @@ import 'server-only';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadCurriculum } from '@/lib/learn/graph/curriculum-store';
 import { nextUnitToOpen } from './lay-out-unit';
-import type { PlanLayoutDue } from './plan-layout';
+import { unitStarted, type PlanLayoutDue } from './plan-layout';
 import { pieceState, planFinished, planProgress, type PlanProgress, type PlanUnit } from './plan-view';
 import { loadProjectsPassed } from './project-store';
 
@@ -203,9 +203,66 @@ export async function loadPlans(learn: LearnSupabaseClient, userId: string): Pro
 }
 
 /**
+ * Whether the person has started each of `unitIds`, read as `unitStarted`
+ * reads it: its pieces, the checks asked on them, and the lesson cards for
+ * their ideas.
+ */
+async function loadUnitsStarted(
+  learn: LearnSupabaseClient,
+  userId: string,
+  unitIds: readonly string[],
+): Promise<Set<string>> {
+  const started = new Set<string>();
+  if (unitIds.length === 0) return started;
+  const pieces = await learn
+    .from('plan_pieces')
+    .select('id, unit_id, concept_ids, passed_at')
+    .eq('user_id', userId)
+    .in('unit_id', [...unitIds]);
+  if (pieces.error) throw new Error(`Reading the laid-out pieces failed: ${pieces.error.message}`);
+  const pieceRows = (pieces.data ?? []) as { id: string; unit_id: string; concept_ids: string[] | null; passed_at: string | null }[];
+  if (pieceRows.length === 0) return started;
+
+  const conceptIds = [...new Set(pieceRows.flatMap((piece) => piece.concept_ids ?? []))];
+  const [checks, lessons] = await Promise.all([
+    learn
+      .from('piece_checks')
+      .select('piece_id')
+      .eq('user_id', userId)
+      .in('piece_id', pieceRows.map((piece) => piece.id)),
+    conceptIds.length === 0
+      ? Promise.resolve({ data: [], error: null })
+      : learn
+          .from('feed_cards')
+          .select('concept_id')
+          .eq('user_id', userId)
+          .eq('reason', 'lesson')
+          .in('concept_id', conceptIds),
+  ]);
+  if (checks.error) throw new Error(`Reading the pieces' checks failed: ${checks.error.message}`);
+  if (lessons.error) throw new Error(`Reading the pieces' lessons failed: ${lessons.error.message}`);
+  const checkedPieceIds = new Set(((checks.data ?? []) as { piece_id: string }[]).map((row) => row.piece_id));
+  const lessonConceptIds = new Set(((lessons.data ?? []) as { concept_id: string }[]).map((row) => row.concept_id));
+
+  for (const unitId of unitIds) {
+    const use = {
+      pieces: pieceRows
+        .filter((piece) => piece.unit_id === unitId)
+        .map((piece) => ({ id: piece.id, conceptIds: piece.concept_ids ?? [], passed: piece.passed_at !== null })),
+      checkedPieceIds,
+      lessonConceptIds,
+    };
+    if (unitStarted(use)) started.add(unitId);
+  }
+  return started;
+}
+
+/**
  * Goal tracks with a unit that has no ideas laid out yet, oldest goal first,
- * leaving out tracks held after a failed layout. For the top-up's plan pass
- * (`plan-layout.ts`); it names the person on every read.
+ * leaving out tracks held after a failed layout and tracks whose latest
+ * laid-out unit the person has not started (`unitStarted`), so a plan is laid
+ * out one unit ahead of use. For the top-up's plan pass (`plan-layout.ts`); it
+ * names the person on every read.
  */
 export async function loadPlanLayoutsDue(
   learn: LearnSupabaseClient,
@@ -239,21 +296,36 @@ export async function loadPlanLayoutsDue(
   const unitRows = (units.data ?? []) as { id: string; subject_id: string; ordinal: number }[];
   const goalRows = (goals.data ?? []) as { subject_id: string; unit_id: string | null; status: string }[];
 
-  const due: PlanLayoutDue[] = [];
+  // Each track with a unit to lay out, and the unit laid out just before it,
+  // which must have been started first. A track with none laid out is due.
+  const candidates: { subjectId: string; subjectName: string; before: string | null }[] = [];
   for (const subjectId of subjectIds) {
-    if (due.length >= limit) break;
     const subject = subjectRows.find((row) => row.id === subjectId);
     if (!subject) continue;
     if (subject.lessons_held_until && new Date(subject.lessons_held_until) > now) continue;
+    const trackUnits = unitRows.filter((unit) => unit.subject_id === subjectId);
     const next = nextUnitToOpen(
-      unitRows.filter((unit) => unit.subject_id === subjectId),
+      trackUnits,
       goalRows
         .filter((goal) => goal.subject_id === subjectId)
         .map((goal) => ({ unitId: goal.unit_id, status: goal.status })),
     );
-    if (next) due.push({ subjectId, subjectName: subject.name });
+    if (!next) continue;
+    const before = trackUnits
+      .filter((unit) => unit.ordinal < next.ordinal)
+      .sort((a, b) => b.ordinal - a.ordinal)[0];
+    candidates.push({ subjectId, subjectName: subject.name, before: before?.id ?? null });
   }
-  return due;
+
+  const started = await loadUnitsStarted(
+    learn,
+    userId,
+    candidates.flatMap((one) => (one.before ? [one.before] : [])),
+  );
+  return candidates
+    .filter((one) => one.before === null || started.has(one.before))
+    .slice(0, limit)
+    .map(({ subjectId, subjectName }) => ({ subjectId, subjectName }));
 }
 
 /**
