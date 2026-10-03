@@ -2,7 +2,7 @@ import 'server-only';
 
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { fetchPlaylistVideoIds, fetchVideosByIds, type YouTubeVideo } from '@/lib/learn/providers/youtube';
-import { videoRow } from './library';
+import { catalogueItems, videoRow } from './library';
 
 /**
  * Your list: the videos you chose to watch, read from a playlist you keep
@@ -88,23 +88,7 @@ async function playlistsToRead(learn: LearnSupabaseClient): Promise<SettingsRow[
   return (data ?? []) as SettingsRow[];
 }
 
-/** The catalogue rows of kind video these ids already have, one per id. */
-export async function catalogueItems(learn: LearnSupabaseClient, videoIds: string[]): Promise<Map<string, string>> {
-  const found = new Map<string, string>();
-  for (let from = 0; from < videoIds.length; from += BATCH) {
-    const { data, error } = await learn
-      .from('catalogue_items')
-      .select('id, external_id')
-      .eq('kind', 'video')
-      .in('external_id', videoIds.slice(from, from + BATCH))
-      .order('created_at');
-    if (error) throw new Error(`Looking for videos in the catalogue failed: ${error.message}`);
-    for (const row of (data ?? []) as { id: string; external_id: string }[]) {
-      if (!found.has(row.external_id)) found.set(row.external_id, row.id);
-    }
-  }
-  return found;
-}
+export { catalogueItems };
 
 /** Providers by YouTube channel id, and the list's own provider. */
 async function providers(learn: LearnSupabaseClient): Promise<{ byChannel: Map<string, string>; list: string }> {
@@ -121,12 +105,23 @@ async function providers(learn: LearnSupabaseClient): Promise<{ byChannel: Map<s
   return { byChannel, list };
 }
 
-/** Store videos the catalogue does not have, and return their item ids. */
+/**
+ * Store videos the catalogue does not have, and return their item ids.
+ *
+ * A video the catalogue already holds under any provider keeps that row and
+ * its id is returned, so the same video is never stored twice under two
+ * providers.
+ */
 export async function storeNewVideos(learn: LearnSupabaseClient, videos: YouTubeVideo[]): Promise<Map<string, string>> {
-  const ids = new Map<string, string>();
-  if (videos.length === 0) return ids;
+  if (videos.length === 0) return new Map();
+  const ids = await catalogueItems(
+    learn,
+    videos.map((video) => video.videoId),
+  );
+  const fresh = videos.filter((video) => !ids.has(video.videoId));
+  if (fresh.length === 0) return ids;
   const { byChannel, list } = await providers(learn);
-  const rows = videos.map((video) => {
+  const rows = fresh.map((video) => {
     const followed = video.channelId ? byChannel.get(video.channelId) : undefined;
     // A followed channel is the provider, so its name is not repeated as the author.
     return { ...videoRow(followed ?? list, video), author: followed ? null : video.channelTitle?.slice(0, 200) || null };
