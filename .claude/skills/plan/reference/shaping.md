@@ -131,6 +131,51 @@ not held.
    replaces the first rather than joining it. A feature that seems to need two
    has at most one: the other is a decision, or it is a follow-on and belongs
    on the ideas page.
+
+   **A feature whose screens have a moment ends with a moments step.** The
+   moments are the catalogue in `app/dev/ui/moments.ts`, listed on `/dev/ui`
+   (Part 8 of `docs/UI-QUALITY-SPEC.md`). When the feature builds or changes
+   a screen that a catalogue moment plays on, or adds a moment of its own,
+   its last step is:
+
+   ```
+   npx tsx scripts/plan.ts add "Build its moments and pass the craft check" --parent <n> \
+     --size s --detail "<each moment by its catalogue name, and the screen it plays on>" \
+     --done-when "<the moments, by name> play as the catalogue describes, with their reduced-motion versions, and the craft check passes on each one's frame strip."
+   ```
+
+   Make it `depends` on the steps that build those screens. A feature is not
+   done while a step under it is open (the plan's health check flags one
+   closed over open steps), so the feature waits on its moments too. When the catalogue already gives a moment to an open step
+   (its `state.step`), that step builds it: name it in the detail and
+   `depends` on that step rather than building the moment twice. Leave the
+   moments step out when no screen the feature touches has a moment.
+
+   The craft check is the critic's second checklist (#1566), read against the
+   strip `npm run record` writes to `.preview-shots/strips/`: a press shows a
+   response in the first frame after it, motion follows the finger and ends
+   settled with no jump, the catalogue moment is there, and the wording names
+   real counts and things. Until that critic is on main, the session building
+   the step records the strip, checks the four points against it itself, and
+   says so in the note it closes with.
+
+   **A fourth moment in a workspace is a decision for the person.** Each
+   workspace has at most three, so they stay noticeable (R8, held by
+   `tests/dev-ui-moments.test.ts`). Count the workspace's moments in the
+   catalogue first. If the feature would add a fourth, do not put it in the
+   catalogue or in a step's detail. Write a decision under the feature and
+   make the moments step `depends` on it:
+
+   ```
+   npx tsx scripts/plan.ts add "Should Jobs trade a moment for <the new one>?" --parent <n> \
+     --kind decision --detail "A — Keep the three Jobs has. <the new one> becomes a plain response with no moment.
+   B — Replace <one of the three, by name> with <the new one>. <what the person stops seeing>.
+   Recommend <A or B>: <why>."
+   ```
+
+   The same holds outside shaping: a session building or re-shaping that
+   finds it wants a fourth moment writes this decision and blocks on it
+   (`building.md`, **When you reach something you should not decide**).
 5. **Say what you are unsure of** in the feature's `--detail` as well: the
    costs, the trade-offs, the thing the idea did not say. A proposal that
    hides its open questions gets approved with them still open. A decision
