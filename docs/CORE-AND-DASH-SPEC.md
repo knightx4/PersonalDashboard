@@ -175,6 +175,17 @@ database takes the rest with it. The undo is refused once later mail has
 added a shipment or return, or the person has given one of its things a use,
 a list, a family or a task.
 
+What the mail sync files in the job search is recorded the same way. A
+company or role it adds is one record, with the application, events and
+interviews the same email made under it, and its Undo removes them together.
+An event it files on a pursuit that was already there is a record of its own,
+and so is a round it books, an invite that moves or cancels an interview, a
+contact it adds or gives an address, and a domain, job board or title it
+teaches a company or role. An application's status is worked out from its
+events, so undoing an event puts the status back too. An add is refused once
+anything has been written under it since, whether by the person or by later
+mail.
+
 A **Dash today** panel lists what Dash did today, grouped by workspace, each
 with its Undo, and what is running now. Home shows its count. The runs in
 progress (`goals.runs`, `plan_runs` and hand-offs in flight) are what set

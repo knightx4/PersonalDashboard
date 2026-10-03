@@ -5,9 +5,11 @@ import type { AskSchema, SchemaClient } from '@/lib/ask/db';
  * all sharing one set of tables keyed `schema.table`.
  *
  * Enough of the query builder for code that reads a row, writes one and
- * reads it back: select, insert, update and delete, the filters eq, neq, gt,
- * gte, lt, is, in, not (is null) and or (of eq, neq and is null), order,
- * limit, single and maybeSingle. Every query returns whole
+ * reads it back: select, insert, upsert (on its conflict columns, `id` by
+ * default, merging or with ignoreDuplicates leaving the row alone and
+ * returning nothing for it), update and delete, the filters eq, neq, gt,
+ * gte, lt, is, ilike (without wildcards), in, not (is null) and or (of eq,
+ * neq and is null), order, limit, single and maybeSingle. Every query returns whole
  * rows whatever columns it selected. An insert without an id gets one, and a
  * created_at, so a writer that asks for its new row's id gets one back; an
  * insert with one is kept exactly as given.
@@ -30,7 +32,8 @@ export function fakeSchemaDb(tables: FakeTables, now = '2026-10-03T08:00:00Z') {
       from(table: string) {
         const rows = (tables[`${schema}.${table}`] ??= []);
         const filters: ((row: Row) => boolean)[] = [];
-        let op: 'select' | 'insert' | 'update' | 'delete' = 'select';
+        let op: 'select' | 'insert' | 'upsert' | 'update' | 'delete' = 'select';
+        let conflict = { columns: ['id'], ignore: false };
         let payload: Row[] = [];
         let patch: Row = {};
         let limit = Infinity;
@@ -39,7 +42,21 @@ export function fakeSchemaDb(tables: FakeTables, now = '2026-10-03T08:00:00Z') {
 
         function run() {
           let out: Row[];
-          if (op === 'insert') {
+          if (op === 'upsert') {
+            out = [];
+            for (const value of payload) {
+              const found = rows.find((r) => conflict.columns.every((c) => c in value && r[c] === value[c]));
+              if (found) {
+                if (conflict.ignore) continue;
+                Object.assign(found, value);
+                out.push(found);
+              } else {
+                const row = { id: fakeId(), created_at: now, ...value };
+                rows.push(row);
+                out.push(row);
+              }
+            }
+          } else if (op === 'insert') {
             out = [];
             for (const value of payload) {
               // A row given its own id is one being put back as it was.
@@ -78,6 +95,15 @@ export function fakeSchemaDb(tables: FakeTables, now = '2026-10-03T08:00:00Z') {
           insert: (value: Row | Row[]) => (
             (op = 'insert'), (payload = Array.isArray(value) ? value : [value]), query
           ),
+          upsert: (value: Row | Row[], opts: { onConflict?: string; ignoreDuplicates?: boolean } = {}) => (
+            (op = 'upsert'),
+            (payload = Array.isArray(value) ? value : [value]),
+            (conflict = {
+              columns: (opts.onConflict ?? 'id').split(',').map((c) => c.trim()),
+              ignore: opts.ignoreDuplicates ?? false,
+            }),
+            query
+          ),
           update: (value: Row) => ((op = 'update'), (patch = value), query),
           delete: () => ((op = 'delete'), query),
           eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), query),
@@ -86,6 +112,9 @@ export function fakeSchemaDb(tables: FakeTables, now = '2026-10-03T08:00:00Z') {
           gte: (c: string, v: string) => (filters.push((r) => r[c] != null && String(r[c]) >= v), query),
           lt: (c: string, v: string) => (filters.push((r) => r[c] != null && String(r[c]) < v), query),
           is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), query),
+          ilike: (c: string, v: string) => (
+            filters.push((r) => typeof r[c] === 'string' && (r[c] as string).toLowerCase() === v.toLowerCase()), query
+          ),
           in: (c: string, vs: unknown[]) => (filters.push((r) => vs.includes(r[c])), query),
           not: (c: string) => (filters.push((r) => (r[c] ?? null) !== null), query),
           or: (spec: string) => {
