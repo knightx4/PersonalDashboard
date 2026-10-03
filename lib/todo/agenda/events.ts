@@ -76,6 +76,7 @@ function contextFor(
 
     context.push({
       key: `${kind === 'own' ? 'event' : 'feed'}:${event.id}`,
+      ref: `${kind === 'own' ? 'todo.events' : 'todo.feed_events'}:${event.id}`,
       day,
       at: timed && day === first ? event.startsAt : null,
       label: event.title,

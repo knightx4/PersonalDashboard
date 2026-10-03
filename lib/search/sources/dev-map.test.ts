@@ -1,8 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import { rankHits } from '@/lib/search/rank';
 import { devHits, firstLine, matchVisions, matchWaiting, planHref } from './dev-map';
+import { parseRef } from '@/lib/core/refs';
 
 describe('dev search hits', () => {
+  it('names the row behind every kind but a spec by a ref', () => {
+    const hits = devHits({
+      plan: [{ id: 'p1', number: 1, title: 'Step', parent_id: 'f', status: 'not_started' }],
+      questions: [{ id: 'q1', number: 2, title: 'Which?', detail: null }],
+      raises: [{ id: 'r1', title: 'Raise', detail: null, ask: null, status: 'open' }],
+      specs: [{ slug: 'writing', title: 'Writing guide', blurb: 'How to write' }],
+      visions: [{ id: 'v1', module: 'jobs', body: 'A calm place.' }],
+      ideas: [{ id: 'i1', body: 'An idea', module: null }],
+      notes: [{ id: 'n1', body: 'It broke', kind: 'bug', status: 'open' }],
+    });
+    expect(hits.map((hit) => [hit.kind, hit.ref])).toEqual([
+      ['plan', 'public.plan_items:p1'],
+      ['plan', 'public.plan_items:q1'],
+      ['raise', 'public.raised_items:r1'],
+      // A spec is a file in docs/, not a row.
+      ['spec', null],
+      ['vision', 'public.module_visions:v1'],
+      ['idea', 'public.ideas:i1'],
+      ['feedback', 'public.feedback_items:n1'],
+    ]);
+    for (const hit of hits) if (hit.ref) expect(parseRef(hit.ref)).not.toBeNull();
+  });
+
   it('lands a step on the plan with its number in the search box', () => {
     expect(planHref(612)).toBe('/dev/plan?view=all&q=%23612');
     const [hit] = devHits({
@@ -104,9 +128,9 @@ describe('dev search hits', () => {
 
   it('finds a vision by a word only in its text and opens the specs page at it', () => {
     const visions = [
-      { module: 'jobs', body: 'A calm place to track the search.' },
-      { module: 'app', body: 'One dashboard for a whole life.' },
-      { module: 'news', body: '   ' },
+      { id: 'v-jobs', module: 'jobs', body: 'A calm place to track the search.' },
+      { id: 'v-app', module: 'app', body: 'One dashboard for a whole life.' },
+      { id: 'v-news', module: 'news', body: '   ' },
     ];
     expect(matchVisions(visions, 'CALM', 10).map((row) => row.module)).toEqual(['jobs']);
     expect(matchVisions(visions, undefined, 10).map((row) => row.module)).toEqual(['jobs', 'app']);

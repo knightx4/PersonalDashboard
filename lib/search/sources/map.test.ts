@@ -9,6 +9,7 @@ import {
   roleHit,
   savedHit,
 } from './map';
+import { parseRef } from '@/lib/core/refs';
 
 /**
  * Rows into hits, for all six kinds.
@@ -152,5 +153,27 @@ describe('escaping what somebody typed', () => {
     expect(escapeLike('50%')).toBe('50\\%');
     expect(escapeLike('a_b')).toBe('a\\_b');
     expect(escapeLike('back\\slash')).toBe('back\\\\slash');
+  });
+});
+
+describe('refs', () => {
+  it('names the row behind each of the six kinds', () => {
+    const hits = [
+      companyHit({ id: 'c1', name: 'Acme', slug: 'acme', industry: null }),
+      roleHit({ id: 'r1', title: 'Analyst', company: null }),
+      contactHit({ id: 'p1', full_name: 'Ann', title: null, company: null }),
+      orderHit({ id: 'o1', external_order_number: null, order_date: null, merchant: null }),
+      inventoryHit({ id: 'v1', name: 'Kettle', variant: null, status: 'owned' }),
+      savedHit({ id: 's1', title: 'Lamp', merchant: null }),
+    ];
+    expect(hits.map((hit) => hit.ref)).toEqual([
+      'job_search.companies:c1',
+      'job_search.roles:r1',
+      'job_search.contacts:p1',
+      'public.orders:o1',
+      'public.inventory_items:v1',
+      'public.saved_items:s1',
+    ]);
+    for (const hit of hits) expect(parseRef(hit.ref!)).toMatchObject({ id: hit.id });
   });
 });

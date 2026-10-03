@@ -8,7 +8,7 @@ import {
   type ObservationRecord,
   type ShownObservation,
 } from './observations-view';
-import { TIMELINE_COLUMNS, type TimelineEvent } from './timeline';
+import { TIMELINE_COLUMNS, withRefs, type TimelineEvent, type TimelineRow } from './timeline';
 
 /** How many ids go in one `in (…)` read, so the request line stays short. */
 const IDS_PER_READ = 100;
@@ -48,7 +48,7 @@ export async function readObservations(
             .eq('source_table', table)
             .in('source_id', ids.slice(at, at + IDS_PER_READ));
           if (readError) throw new Error(`Could not read the timeline: ${readError.message}`);
-          return (rows ?? []) as unknown as TimelineEvent[];
+          return withRefs((rows ?? []) as unknown as TimelineRow[]);
         })(),
       );
     }

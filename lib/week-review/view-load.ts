@@ -1,7 +1,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { TIMELINE_COLUMNS, type TimelineEvent } from '@/lib/timeline/timeline';
+import { TIMELINE_COLUMNS, withRefs, type TimelineEvent, type TimelineRow } from '@/lib/timeline/timeline';
 import { addDays } from '@/lib/todo/tasks/model';
 import {
   reviewEvidenceByTable,
@@ -58,7 +58,7 @@ export async function readWeekPage(client: SupabaseClient, week: string | null):
             .eq('source_table', table)
             .in('source_id', ids.slice(at, at + IDS_PER_READ));
           if (error) throw new Error(`Could not read the timeline: ${error.message}`);
-          return (rows ?? []) as unknown as TimelineEvent[];
+          return withRefs((rows ?? []) as unknown as TimelineRow[]);
         })(),
       );
     }

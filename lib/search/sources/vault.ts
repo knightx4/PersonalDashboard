@@ -100,6 +100,7 @@ async function read(ctx: Read): Promise<SearchHit[]> {
       module: 'vault' as const,
       kind: 'note' as const,
       id: row.id,
+      ref: `obsidian.notes:${row.id}`,
       title: name,
       subtitle: folder ? `Note · ${folder}` : 'Note',
       // The path is half of how a note is remembered, so it is matched on

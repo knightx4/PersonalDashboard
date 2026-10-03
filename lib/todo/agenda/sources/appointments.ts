@@ -59,6 +59,7 @@ export const appointmentsSource: AgendaSource = {
 
       return {
         key: `appointment:${row.id as string}`,
+        ref: `todo.appointments:${row.id as string}`,
         day: row.starts_on as string,
         at: (row.starts_at as string | null) ?? null,
         label: title,

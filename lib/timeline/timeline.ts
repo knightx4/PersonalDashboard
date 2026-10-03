@@ -69,7 +69,16 @@ export type TimelineEvent = {
   source_id: string;
   /** What the link is built from; see timelineHref. */
   link_ref: string | null;
+  /**
+   * The row that records it, as `schema.table:id` (lib/core/refs.ts): the
+   * same string as eventRef, carried on the event so it can be linked,
+   * commented on or handed to Dash like any other row.
+   */
+  ref: string;
 };
+
+/** One row as core.timeline returns it, before withRefs adds the ref. */
+export type TimelineRow = Omit<TimelineEvent, 'ref'>;
 
 /** The columns read from core.timeline, in the view's order. */
 export const TIMELINE_COLUMNS =
@@ -78,6 +87,15 @@ export const TIMELINE_COLUMNS =
 /** A stable key for one event, and the form an observation cites it in. */
 export function eventRef(event: Pick<TimelineEvent, 'source_table' | 'source_id'>): string {
   return `${event.source_table}:${event.source_id}`;
+}
+
+/**
+ * The rows of a core.timeline read as events, each with its ref. Computed
+ * here from source_table and source_id rather than in the view, which every
+ * reader already selects those two from.
+ */
+export function withRefs(rows: readonly TimelineRow[]): TimelineEvent[] {
+  return rows.map((row) => ({ ...row, ref: eventRef(row) }));
 }
 
 /**

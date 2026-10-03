@@ -59,6 +59,7 @@ async function read(ctx: Read): Promise<SearchHit[]> {
     module: 'todo' as const,
     kind: 'task' as const,
     id: row.id,
+    ref: `todo.tasks:${row.id}`,
     title: row.title,
     subtitle:
       row.status === 'open'

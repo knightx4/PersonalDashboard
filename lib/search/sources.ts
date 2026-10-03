@@ -51,6 +51,12 @@ export interface SearchHit {
   module: ModuleId;
   kind: HitKind;
   id: string;
+  /**
+   * The row it is, as `schema.table:id` (lib/core/refs.ts), so a hit can be
+   * linked, commented on or handed to Dash like any other row. Null only for
+   * a spec, which is a file in docs/ rather than a row.
+   */
+  ref: string | null;
   title: string;
   subtitle: string | null;
   /**

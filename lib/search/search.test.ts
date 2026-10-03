@@ -16,6 +16,7 @@ const hit = (title: string, overrides: Partial<SearchHit> = {}): SearchHit => ({
   module: 'jobs',
   kind: 'company',
   id: title,
+  ref: `job_search.companies:${title}`,
   title,
   subtitle: 'Company · Job search',
   href: `/jobs/companies/${title}`,

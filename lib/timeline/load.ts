@@ -1,7 +1,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { TIMELINE_COLUMNS, type TimelineEvent, type TimelineModule } from './timeline';
+import { TIMELINE_COLUMNS, withRefs, type TimelineEvent, type TimelineRow, type TimelineModule } from './timeline';
 
 export type TimelineQuery = {
   /** Inclusive lower bound on occurred_at, as an ISO timestamp. */
@@ -38,7 +38,7 @@ export async function readTimeline(
       .order('source_id', { ascending: true })
       .range(offset, offset + pageSize - 1);
     if (error) throw new Error(`Could not read the timeline: ${error.message}`);
-    const page = (data ?? []) as unknown as TimelineEvent[];
+    const page = withRefs((data ?? []) as unknown as TimelineRow[]);
     events.push(...page);
     if (page.length < pageSize) return events;
   }
