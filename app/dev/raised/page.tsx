@@ -18,6 +18,8 @@ import { runnerCard } from '@/lib/plan/runner-card';
 import { planRoutine } from '@/lib/feedback/routine';
 import { loadNotesLastRun } from '@/lib/feedback/last-worked';
 import { loadVisionReviewStatus } from '@/lib/specs/vision-review-run';
+import { loadOpenSpecChanges } from '@/lib/specs/changes';
+import { specBySlug } from '@/lib/specs/registry';
 import { NOTES_WORK_KINDS } from '@/lib/feedback/load';
 import { CHECK_BACK_COLUMNS, checkBackFrom } from '@/lib/plan/check-backs';
 import { CheckBacksPanel } from './check-backs-panel';
@@ -116,6 +118,7 @@ export default async function DevRaisedPage() {
     notesLastRun,
     checkBacks,
     vision,
+    specChanges,
   ] = await Promise.all([
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
@@ -146,6 +149,8 @@ export default async function DevRaisedPage() {
       .eq('status', 'waiting')
       .order('due_at'),
     loadVisionReviewStatus(supabase, user.id),
+    // Changes Dash proposed to a spec, which wait under To approve (plan #1506).
+    loadOpenSpecChanges(supabase, user.id),
   ]);
   const comingBack = (checkBacks.data ?? []).map((row) => checkBackFrom(row as Record<string, unknown>));
   const now = readClock();
@@ -160,7 +165,12 @@ export default async function DevRaisedPage() {
   // The tree once, for the two things below that read it: what is waiting, and
   // how many features the runner could pick up.
   const sections = buildPlanTree(plan);
-  const groups = waitingGroups(sections, queue, await readWaitingRows(sections, user.id));
+  const groups = waitingGroups(
+    sections,
+    queue,
+    await readWaitingRows(sections, user.id),
+    specChanges.map((change) => ({ change, specTitle: specBySlug(change.spec)?.title ?? null })),
+  );
 
   // The runner's card, read by the same function the plan page reads it with.
   const card = runnerCard({
