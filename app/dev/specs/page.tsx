@@ -6,12 +6,15 @@ import { cardVariants } from '@/components/ui/card';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { SPECS, groupSpecs, specBySlug, type SpecDoc } from '@/lib/specs/registry';
 import { loadOpenSpecChanges } from '@/lib/specs/changes';
+import { loadLatestFindings } from '@/lib/specs/findings';
+import { MODULE_IDS } from '@/lib/modules';
 import { specCommentCounts } from '@/lib/specs/load';
 import { APP_VISION, loadModuleVisions, visionAnchor } from '@/lib/specs/vision';
 import { loadPendingVisionEdits } from '@/lib/specs/vision-review';
 import { ModuleVisionPanel } from './vision-view';
 import { VisionEditPanel } from './vision-edit';
 import { SpecChangeCard } from './spec-change-card';
+import { SpecFindings } from './spec-findings';
 import { cn } from '@/lib/cn';
 
 export const metadata = { title: 'Specs' };
@@ -63,14 +66,24 @@ function SpecRow({ spec, comments }: { spec: SpecDoc; comments: number }) {
   );
 }
 
+/**
+ * Workspaces the audit files findings under by their own id: those with no
+ * spec in the registry. A workspace id that is also a spec's slug ('learn')
+ * belongs to that spec's page.
+ */
+const UNSPECCED = MODULE_IDS.filter(
+  (id) => !SPECS.some((spec) => spec.module === id || spec.slug === id),
+);
+
 export default async function SpecsPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const [counts, visions, edits, changes] = await Promise.all([
+  const [counts, visions, edits, changes, audit] = await Promise.all([
     specCommentCounts(supabase, user.id),
     loadModuleVisions(supabase, user.id),
     loadPendingVisionEdits(supabase, user.id),
     loadOpenSpecChanges(supabase, user.id),
+    loadLatestFindings(supabase, user.id, UNSPECCED),
   ]);
   const groups = groupSpecs(SPECS, counts);
 
@@ -161,6 +174,19 @@ export default async function SpecsPage() {
                   />
                 )}
               </div>
+
+              {/* A workspace with no spec has no page of its own, so what the
+                  audit found about it (usually that nothing describes it) is
+                  drawn here, under its vision (plan #1525). */}
+              {group.module && audit.findings.some((f) => f.spec === group.module) && (
+                <div className="mb-2">
+                  <SpecFindings
+                    auditAt={audit.auditAt}
+                    findings={audit.findings.filter((f) => f.spec === group.module)}
+                    headingId={`spec-findings-${group.module}`}
+                  />
+                </div>
+              )}
 
               {group.specs.length > 0 && (
                 <ul className="space-y-2">

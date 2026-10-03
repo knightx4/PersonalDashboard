@@ -7,11 +7,13 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { loadSpec } from '@/lib/specs/load';
 import { specBySlug } from '@/lib/specs/registry';
 import { ruleStates } from '@/lib/specs/rule-states';
+import { loadLatestFindings } from '@/lib/specs/findings';
 import { SPEC_COUNTERS } from '@/scripts/spec-counts';
 import specBaseline from '@/scripts/spec-baseline.json';
 import { cn } from '@/lib/cn';
 import { SpecSectionCard, SpecOrphan } from './spec-view';
 import { SpecRules } from './spec-rules';
+import { SpecFindings } from '../spec-findings';
 
 /**
  * Names and targets only: the counters' `measure` is never called here, since
@@ -46,7 +48,10 @@ export default async function SpecPage({ params }: { params: Promise<{ slug: str
 
   const user = await requireUser();
   const supabase = await createClient();
-  const { sections, orphans, rules } = await loadSpec(supabase, user.id, doc);
+  const [{ sections, orphans, rules }, audit] = await Promise.all([
+    loadSpec(supabase, user.id, doc),
+    loadLatestFindings(supabase, user.id, [doc.slug]),
+  ]);
   const states = rules
     ? ruleStates(rules, { baseline: specBaseline as Record<string, number>, counters: COUNTERS })
     : [];
@@ -66,6 +71,11 @@ export default async function SpecPage({ params }: { params: Promise<{ slug: str
       <PageHeader title={doc.title} description={`docs/${doc.file}`} />
 
       <SpecRules states={states} />
+
+      {/* What the weekly audit found when it compared the code with this
+          spec (plan #1525), under the rules and above the text it was
+          compared with. */}
+      <SpecFindings auditAt={audit.auditAt} findings={audit.findings} />
 
       {sections === null ? (
         // The file is gone from the repository. Said plainly, with whatever was
