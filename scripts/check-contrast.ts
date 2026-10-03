@@ -27,6 +27,7 @@ import { join } from 'node:path';
 import { PAPER_SELECTOR, readTheme, THEME_SELECTORS, type Vars } from '../lib/theme/css';
 import { generatePalette, MEANING_FLOOR, meaningGaps } from '../lib/theme/palette';
 import { DEFAULT_SKY, SKIES, skyTokens } from '../lib/theme/sky';
+import { DEFAULT_PALETTE, PALETTES, posterTokens } from '../lib/theme/poster';
 
 const CSS = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
 
@@ -73,7 +74,15 @@ const SKIED: Record<string, Vars> = Object.fromEntries(
   ]),
 );
 
-const THEMES: Record<string, Vars> = { ...WRITTEN, ...GENERATED, ...SKIED };
+/** Lightbox's poster palettes, each as the whole theme it makes. Primary is the block itself. */
+const PRINTED: Record<string, Vars> = Object.fromEntries(
+  PALETTES.filter((palette) => palette.id !== DEFAULT_PALETTE).map((palette) => [
+    `poster ${palette.id}`,
+    { ...WRITTEN.poster, ...posterTokens(palette.id) },
+  ]),
+);
+
+const THEMES: Record<string, Vars> = { ...WRITTEN, ...GENERATED, ...SKIED, ...PRINTED };
 
 type Rgb = [number, number, number];
 type Rgba = { rgb: Rgb; alpha: number };
@@ -364,7 +373,8 @@ if (failures > 0) {
 
 console.log(
   `✓ ${checked} text and non-text pairs clear WCAG AA across ` +
-    `${Object.keys(WRITTEN).length} written themes, ${Object.keys(SKIED).length} Aurora skies and ` +
+    `${Object.keys(WRITTEN).length} written themes, ${Object.keys(SKIED).length} Aurora skies, ` +
+    `${Object.keys(PRINTED).length} Lightbox palettes and ` +
     `${Object.keys(GENERATED).length} generated ones, every ${HUE_STEP}° of the circle.`,
 );
 console.log(

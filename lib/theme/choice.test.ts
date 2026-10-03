@@ -18,8 +18,8 @@ describe('parseTheme', () => {
     }
   });
 
-  it('still reads the four written themes', () => {
-    for (const id of ['paper', 'ink', 'lightbox', 'dusk'] as const) {
+  it('still reads the written themes', () => {
+    for (const id of ['paper', 'ink', 'darkroom', 'dusk', 'aurora', 'dawn', 'poster'] as const) {
       expect(parseTheme(id)).toEqual({ kind: 'written', id });
     }
   });
@@ -27,14 +27,17 @@ describe('parseTheme', () => {
   it('reads a mode on its own', () => {
     expect(parseTheme('light')).toEqual({ kind: 'generated', mode: 'light', hue: null });
     expect(parseTheme('dark')).toEqual({ kind: 'generated', mode: 'dark', hue: null });
-    // Lightbox with no colour is the written Lightbox, which is the same
-    // palette under a name that already existed.
-    expect(parseTheme('lightbox')).toEqual({ kind: 'written', id: 'lightbox' });
+  });
+
+  it('reads every stored Lightbox as the poster, which is what Lightbox is now', () => {
+    for (const value of ['lightbox', 'lightbox:155', 'lightbox:midnight', 'lightbox:pink']) {
+      expect(parseTheme(value)).toEqual({ kind: 'written', id: 'poster' });
+    }
   });
 
   it('reads a mode and a colour', () => {
     expect(parseTheme('dark:284')).toEqual({ kind: 'generated', mode: 'dark', hue: 284 });
-    expect(parseTheme('lightbox:155')).toEqual({ kind: 'generated', mode: 'lightbox', hue: 155 });
+    expect(parseTheme('darkroom:155')).toEqual({ kind: 'generated', mode: 'darkroom', hue: 155 });
   });
 
   it('brings a hue back onto the circle', () => {
@@ -46,7 +49,7 @@ describe('parseTheme', () => {
   it('reads anything it does not understand as no choice at all', () => {
     // Better than guessing light: a value this app cannot read is not evidence
     // of what somebody wanted.
-    for (const value of ['riso', 'sideways', 'dark:pink', 'dark:NaN', ':90', 'lightbox:pink']) {
+    for (const value of ['riso', 'sideways', 'dark:pink', 'dark:NaN', ':90', 'darkroom:pink']) {
       expect(parseTheme(value)).toEqual(SYSTEM_THEME);
     }
   });
@@ -57,12 +60,14 @@ describe('formatTheme', () => {
     for (const value of [
       'paper',
       'ink',
-      'lightbox',
+      'darkroom',
       'dusk',
+      'poster',
+      'poster:slate',
       'light',
       'dark',
       'dark:284',
-      'lightbox:155',
+      'darkroom:155',
     ]) {
       expect(formatTheme(parseTheme(value))).toBe(value);
     }
@@ -80,7 +85,7 @@ describe('putting a theme on the document', () => {
   });
 
   it('renders a written theme exactly as it did before, with no tokens of its own', () => {
-    for (const id of ['paper', 'ink', 'lightbox', 'dusk'] as const) {
+    for (const id of ['paper', 'ink', 'darkroom', 'dusk', 'poster'] as const) {
       const theme = parseTheme(id);
       expect(themeAttribute(theme)).toBe(id);
       expect(themeStyle(theme)).toBeUndefined();
@@ -94,12 +99,12 @@ describe('putting a theme on the document', () => {
     expect(themeStyle(parseTheme('dark'))).toBeUndefined();
   });
 
-  it('renders a coloured Lightbox on Lightbox\'s own block', () => {
+  it('renders a coloured glass room on its own block', () => {
     // The block carries what no token can: the glow round a sheet, the wash
-    // across the bench, and the two colour-schemes a two-polarity theme needs.
-    const theme = parseTheme('lightbox:155');
-    expect(themeAttribute(theme)).toBe('lightbox');
-    expect(themeStyle(theme)).toEqual(generatePalette('lightbox', 155));
+    // across the bench, and the colour-scheme.
+    const theme = parseTheme('darkroom:155');
+    expect(themeAttribute(theme)).toBe('darkroom');
+    expect(themeStyle(theme)).toEqual(generatePalette('darkroom', 155));
   });
 
   it('writes the generated tokens for a mode with a colour', () => {

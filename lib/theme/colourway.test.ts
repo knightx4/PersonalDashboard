@@ -85,7 +85,8 @@ describe('colourways', () => {
 
   it('stores a colourway by name and reads it back whole', () => {
     for (const way of COLOURWAYS) {
-      for (const mode of ['lightbox', 'darkroom', 'light', 'dark'] as const) {
+      // Not Lightbox: a stored Lightbox reads as the poster now.
+      for (const mode of ['darkroom', 'light', 'dark'] as const) {
         const theme: Theme = { kind: 'generated', mode, hue: way.hue, way: way.id };
         const stored = formatTheme(theme);
         expect(stored).toBe(`${mode}:${way.id}`);
@@ -96,11 +97,11 @@ describe('colourways', () => {
 
   it('still reads back every theme string that was stored as a number', () => {
     // The colourways took a slot that used to hold only degrees, so an account
-    // holding `lightbox:260` has to keep meaning 260 degrees.
+    // holding `darkroom:260` has to keep meaning 260 degrees.
     for (const hue of [0, 25, 155, 260, 359]) {
-      expect(parseTheme(`lightbox:${hue}`)).toEqual({
+      expect(parseTheme(`darkroom:${hue}`)).toEqual({
         kind: 'generated',
-        mode: 'lightbox',
+        mode: 'darkroom',
         hue,
       });
     }
@@ -114,7 +115,7 @@ describe('colourways', () => {
     // A renamed or dropped colourway should not log somebody out of their
     // theme. `generatePalette` ignores the name and the room stays the colour
     // it was pointed at.
-    expect(parseTheme('lightbox:sunset')).toEqual({ kind: 'system' });
+    expect(parseTheme('darkroom:sunset')).toEqual({ kind: 'system' });
     const palette = generatePalette('lightbox', REFERENCE_HUE.lightbox, 'sunset');
     for (const token of WASH_TOKENS) {
       expect(`${token} ${palette[token]}`).toBe(

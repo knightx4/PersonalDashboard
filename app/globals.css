@@ -1196,6 +1196,72 @@
   --grain-blend: multiply;
 }
 
+/* ---------------------------------------------------------------------------
+ * POSTER — what the picker calls Lightbox: a printed poster.
+ *
+ * Paper, one ink, a dark sidebar, and nothing translucent. Every card is drawn
+ * with a 2px outline in the ink and a hard offset shadow, and every titled card
+ * wears a solid band of colour across its header, cycling through three. The
+ * colour lives in the bands and the sidebar's highlight; the cards stay white.
+ *
+ * This block is the Primary palette. The others in lib/theme/poster.ts write
+ * the same tokens over it inline, the way Aurora's skies do, and
+ * lib/theme/poster.test.ts holds this block to Primary token for token. The
+ * shapes -- outline, shadow, bands, square corners -- are the rules under
+ * "The poster" near the foot of this file.
+ *
+ * Anything not set here is Paper's: the workspace colours, the meanings and
+ * the pipeline were all measured on white and on oat already.
+ * ------------------------------------------------------------------------- */
+[data-theme='poster'] {
+  color-scheme: light;
+  --c-sheet-scheme: light;
+
+  --c-page-ground: #f3efe6;
+  --c-page: #f3efe6;
+  --c-surface: #ffffff;
+  --c-raised: #ffffff;
+  --c-canvas: #f7f4ec;
+  --c-sunken: #f7f4ec;
+  --c-border: #e7e1d5;
+  --c-page-border: #e7e1d5;
+  --c-border-strong: #111111;
+  --c-page-border-strong: #111111;
+  --c-border-control: #111111;
+  --c-page-border-control: #111111;
+  --c-sheet-outline: #111111;
+  --c-ink: #111111;
+  --c-page-ink: #111111;
+  --c-ink-muted: #4f4b45;
+  --c-page-ink-muted: #4f4b45;
+  --c-ink-ghost: #77726a;
+  --c-page-ink-ghost: #77726a;
+  --c-accent-base: #1f4bd8;
+  --c-accent-hover: #1739a8;
+  --c-accent-tint-base: #e3e9fb;
+  --c-accent-base-lit: #1f4bd8;
+  --c-accent-hover-lit: #1739a8;
+  --c-fill-ink: #ffffff;
+  --c-shell: #111111;
+  --c-shell-ink: #f7f3ea;
+  --c-shell-muted: #b3ada2;
+  --c-shell-border: #262626;
+  --c-shell-hover: #262626;
+  --c-poster-band-1: #1f4bd8;
+  --c-poster-band-1-ink: #ffffff;
+  --c-poster-band-2: #f4c430;
+  --c-poster-band-2-ink: #111111;
+  --c-poster-band-3: #db2e1f;
+  --c-poster-band-3-ink: #ffffff;
+  --c-poster-hi: #f4c430;
+  --c-poster-hi-ink: #111111;
+
+
+  --sheet-edge: 5px 5px 0 var(--c-sheet-outline);
+  --lift-shadow: 7px 7px 0 var(--c-sheet-outline);
+  --grain-opacity: 0;
+}
+
 /* An unset choice follows the system, and the system dark is Ink. Kept in sync
  * with the [data-theme='ink'] block above by scripts/check-contrast.ts. */
 @media (prefers-color-scheme: dark) {
@@ -3368,6 +3434,106 @@ form[data-auto-submit] [data-fallback-submit] {
 [data-theme='aurora'] .bg-accent,
 [data-theme='dawn'] .bg-accent {
   box-shadow: 0 0 20px -4px color-mix(in oklab, var(--c-accent-base) 75%, transparent);
+}
+
+/* ---------------------------------------------------------------------------
+ * The poster -- Lightbox's shapes.
+ *
+ * The block above sets the colours; these set what makes it a poster. Square
+ * corners everywhere, a 2px ink outline round every sheet and menu, a hard
+ * shadow under each, and a band of solid colour across the header of every
+ * titled card.
+ *
+ * The bands cycle through three colours by a card's position among its sibling
+ * cards, so three cards in a column come out blue, yellow and red, and a
+ * fourth starts again. A card is titled when its first child is a <header> or
+ * a CardHeader (`data-card-header`); untitled cards keep the outline and the
+ * shadow and take no band, so a grid of small cards does not turn into stripes.
+ *
+ * Inside a band the ink, the muted ink and the accent are all the band's own
+ * label colour, so a heading, its hint and its icon read on yellow and on red
+ * alike without any of them knowing which they are on.
+ * ------------------------------------------------------------------------- */
+[data-theme='poster'] {
+  --radius-pane: 0;
+  --radius-card: 0;
+  --radius-control: 0;
+}
+
+[data-theme='poster'] .sheet {
+  border: 2px solid var(--c-sheet-outline);
+}
+
+[data-theme='poster'] .popover-panel {
+  border: 2px solid var(--c-sheet-outline);
+  box-shadow: 6px 6px 0 var(--c-sheet-outline);
+}
+
+[data-theme='poster'] .sheet:nth-child(3n + 1 of .sheet) {
+  --band: var(--c-poster-band-1);
+  --band-ink: var(--c-poster-band-1-ink);
+}
+
+[data-theme='poster'] .sheet:nth-child(3n + 2 of .sheet) {
+  --band: var(--c-poster-band-2);
+  --band-ink: var(--c-poster-band-2-ink);
+}
+
+[data-theme='poster'] .sheet:nth-child(3n of .sheet) {
+  --band: var(--c-poster-band-3);
+  --band-ink: var(--c-poster-band-3-ink);
+}
+
+[data-theme='poster'] .sheet > header:first-child,
+[data-theme='poster'] .sheet > [data-card-header]:first-child {
+  --c-ink: var(--band-ink);
+  --c-ink-muted: var(--band-ink);
+  --c-accent: var(--band-ink);
+  color: var(--band-ink);
+  background-color: var(--band);
+  border-bottom: 2px solid var(--c-sheet-outline);
+}
+
+/* A band runs edge to edge, so in a padded card it reaches out through the
+ * card's padding and takes the same padding back inside itself. */
+[data-theme='poster'] .card-pad-dense > header:first-child {
+  margin: calc(-1 * var(--card-p-dense)) calc(-1 * var(--card-p-dense)) 0.5rem;
+  padding: 0.5rem var(--card-p-dense);
+}
+
+[data-theme='poster'] .card-pad > header:first-child {
+  margin: calc(-1 * var(--card-p)) calc(-1 * var(--card-p)) 0.75rem;
+  padding: 0.625rem var(--card-p);
+}
+
+[data-theme='poster'] .card-pad-dense > header:first-child,
+[data-theme='poster'] .card-pad > header:first-child,
+[data-theme='poster'] .sheet > [data-card-header]:first-child {
+  padding-bottom: 0.5rem;
+}
+
+/* Where you are: the current row in the sidebar takes the highlight. */
+[data-theme='poster'] .shell-ground a[aria-current='page'] {
+  --c-shell-hover: var(--c-poster-hi);
+  --c-shell-ink: var(--c-poster-hi-ink);
+}
+
+/* The top bar is printed on the same paper, ruled off in the ink. */
+[data-theme='poster'] .page-pane > header {
+  /* The bar normally wears the sidebar's ground and ink; here it is paper,
+   * so it takes the page's ink instead. */
+  --c-shell-ink: var(--c-ink);
+  --c-shell-muted: var(--c-ink-muted);
+  --c-shell-hover: var(--c-sunken);
+  --c-shell-border: var(--c-sheet-outline);
+  background-color: var(--c-page);
+  backdrop-filter: none;
+  border-bottom: 2px solid var(--c-sheet-outline);
+}
+
+/* The primary button sits on its own small shadow, like the cards. */
+[data-theme='poster'] .bg-accent {
+  box-shadow: 2px 2px 0 var(--c-sheet-outline);
 }
 
 /* ---------------------------------------------------------------------------
