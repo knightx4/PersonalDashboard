@@ -3,10 +3,10 @@
  * session, the question checked as the action checks it, and each lookup
  * written to the stream the moment it starts, before the answer is done. The
  * answer itself is askDashInRequest, covered through askDash in
- * lib/talk/ask.test.ts.
+ * lib/dash/ask.test.ts.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AskLookupEvent } from '@/lib/talk/ask';
+import type { AskLookupEvent } from '@/lib/dash/ask';
 import { readAskStream, type LookupWire } from '@/lib/talk/lookups';
 
 const session = vi.fn<() => Promise<{ id: string } | null>>();

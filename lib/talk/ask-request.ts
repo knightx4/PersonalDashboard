@@ -19,7 +19,7 @@ import { readMail } from '@/lib/inbox/read-mail';
 import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
 import { handoffBrief } from './handoff';
 import { attachHandoffs, discardHandoffs, insertHandoff, loadOpenHandoffs, markHandoffFired } from './handoffs';
-import { askDash, type AskDashResult, type AskLookupEvent } from './ask';
+import { askDash, type AskDashResult, type AskLookupEvent } from '@/lib/dash/ask';
 import {
   attachProposals,
   discardProposals,
