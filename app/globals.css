@@ -2341,6 +2341,24 @@ tr:has([data-link-pending]) {
   }
 }
 
+/* The end of Quick read (plan #1557): as the day's sigil draws in above it,
+ * the card saying what you got through lifts in, and its figures count up
+ * from nothing (useCountUp, in JS). GotThrough in app/news/quick/got-through.tsx
+ * puts the class on only when the last story is passed while you watch, so a
+ * reload shows the card at once, and takes it off when the lift ends. */
+@keyframes got-through-rise {
+  from {
+    transform: translateY(0.5rem);
+    opacity: 0;
+  }
+}
+
+@utility got-through-in {
+  & [data-got-through] {
+    animation: got-through-rise var(--motion-move) var(--ease-out-soft) var(--motion-move) both;
+  }
+}
+
 /* The Dash mark (components/ui/dash-mark.tsx). Every state and every kind of
  * work has its own still shape as well as its motion, so all of these stop
  * under reduced motion without the state being lost. Distances are in the
@@ -2708,6 +2726,10 @@ tr:has([data-link-pending]) {
   .day-close-in [data-pile-card],
   .day-close-in [data-sigil-cell],
   .day-close-in [data-day-close-line] {
+    animation: none;
+  }
+
+  .got-through-in [data-got-through] {
     animation: none;
   }
 }
