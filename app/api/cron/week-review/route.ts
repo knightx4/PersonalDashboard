@@ -8,11 +8,11 @@ export const maxDuration = 180;
 /**
  * The weekly review (plan #1232).
  *
- * Called every hour on Sundays by a pg_cron job through pg_net
- * (supabase/migrations/0127_week_review_cron.sql), because Vercel's free plan
- * allows one cron a day and 9am in New York is 13:00 or 14:00 UTC depending
- * on daylight saving. A call writes the review of the week just gone for
- * everyone who has none yet, from 9am New York time, and does nothing
+ * Called once on Sunday at 14:11 UTC by a pg_cron job through pg_net
+ * (supabase/migrations/0127_week_review_cron.sql, rescheduled in 0154),
+ * because Vercel's free plan allows one cron a day. 14:11 UTC is past 9am in
+ * New York in either season. A call writes the review of the week just gone
+ * for everyone who has none yet, from 9am New York time, and does nothing
  * before then. GET and POST both; the body is ignored.
  *
  * Authorised like the other cron routes, with `Authorization: Bearer

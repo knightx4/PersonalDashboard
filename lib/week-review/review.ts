@@ -31,9 +31,9 @@ const MAX_EVIDENCE = 200;
 
 /**
  * The week a run at `now` writes, or null when it is not yet time: only on
- * Sunday from 9am in the review's zone. The hourly tick calls through the
- * day, so the hour holds on both sides of a clock change, and a failed call
- * is tried again the next hour.
+ * Sunday from 9am in the review's zone. The Sunday call comes at 14:11 UTC
+ * (supabase/migrations/0154_week_review_once.sql), which is past 9am in New
+ * York on both sides of a clock change.
  */
 export function reviewWeekDue(now: Date, timezone: string = WEEK_REVIEW_ZONE): string | null {
   const today = localDay(now, timezone);
