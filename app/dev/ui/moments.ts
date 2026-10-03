@@ -119,15 +119,22 @@ export const MOMENTS: readonly Moment[] = [
     trigger: 'An application moving to a later stage.',
     sees: 'The role travels across the board to its new column and settles there.',
     reducedMotion: 'The role is in its new column, with the column’s name shown beside it.',
-    state: { built: 'no', step: 1560 },
+    state: {
+      built: 'yes',
+      where:
+        'playForward in components/jobs/pipeline/moments.ts, on a drag across the board in components/jobs/pipeline/board.tsx, travelling with travelElement in components/motion/travel.ts; lib/jobs/board-moment.ts says which moves count.',
+    },
   },
   {
     workspace: 'jobs',
     name: 'An offer',
     trigger: 'An application reaching the offer stage.',
-    sees: 'The one larger moment in Jobs, kept for the stage the rest of the board leads to. Its shape is for the step that builds it.',
-    reducedMotion: 'The role is in Offer at once, marked as the offer.',
-    state: { built: 'no', step: 1560 },
+    sees: 'The role travels to Offer, one ring in the accent leaves its card, the name beside it reads “Offer · ” and the company, and a phone that can buzz buzzes once.',
+    reducedMotion: 'The role is in Offer at once, with “Offer · ” and the company beside it.',
+    state: {
+      built: 'yes',
+      where: 'playOffer in components/jobs/pipeline/moments.ts, played by the board in components/jobs/pipeline/board.tsx.',
+    },
   },
   {
     workspace: 'jobs',
@@ -135,7 +142,11 @@ export const MOMENTS: readonly Moment[] = [
     trigger: 'An application marked rejected.',
     sees: 'The role fades where it is, with no movement, and a line says how many applications are still open.',
     reducedMotion: 'The role goes at once, and the line is the same.',
-    state: { built: 'no', step: 1560 },
+    state: {
+      built: 'yes',
+      where:
+        'fadeInPlace in components/jobs/pipeline/moments.ts on the card’s reject button, with the line from stillOpenLine in lib/jobs/board-moment.ts above the board.',
+    },
   },
   {
     workspace: 'goals',

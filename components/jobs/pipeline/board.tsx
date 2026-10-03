@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useTransition } from 'react';
+import { useLayoutEffect, useRef, useState, useTransition } from 'react';
 import { AlertTriangle, Ban, GripVertical, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,9 @@ import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { shortAge } from '@/lib/jobs/applications/load';
 import { formatCoverage, type ApplicationStatus } from '@/lib/jobs/pipeline';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
+import { boardMoment, openApplications, stillOpenLine, type BoardMoment } from '@/lib/jobs/board-moment';
+import { completionMoment } from '@/components/motion/complete';
+import { CARD_ATTR, fadeInPlace, playForward, playOffer, visibleCard } from './moments';
 import { dismissPursuit, moveApplication } from '@/app/jobs/(app)/pipeline/actions';
 
 /**
@@ -107,6 +110,21 @@ export function PipelineBoard({
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<ApplicationStatus | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  /**
+   * The move waiting to play its moment (plan #1560): which card, which
+   * moment, and where the card stood before the board redrew it.
+   */
+  const moving = useRef<{
+    applicationId: string;
+    moment: Exclude<BoardMoment, 'rejection'>;
+    status: ApplicationStatus;
+    from: DOMRectReadOnly | null;
+    column: string;
+    company: string;
+  } | null>(null);
+  /** The line a rejection leaves: where the role went, and how many are still open. */
+  const [closedLine, setClosedLine] = useState<string | null>(null);
 
   /**
    * The moved card, drawn in its new column before the server agrees.
@@ -119,7 +137,7 @@ export function PipelineBoard({
    * sentence on the board itself, because the card that moved back is what the
    * person is looking at.
    */
-  const { shown, run } = useOptimisticWrite<
+  const { shown, run, failed } = useOptimisticWrite<
     PipelineRow[],
     { applicationId: string; status: ApplicationStatus }
   >({
@@ -129,7 +147,57 @@ export function PipelineBoard({
         row.applicationId === change.applicationId ? { ...row, status: change.status } : row,
       ),
     write: (change) => moveApplication(change.applicationId, change.status),
+    // An offer is a completion: the buzz once the write is through.
+    onDone: (change) => {
+      if (change.status === 'offer') completionMoment();
+    },
   });
+
+  /**
+   * Play the waiting move's moment once the card has been drawn in its new
+   * column: before paint, so the card is never seen there first and then
+   * jumping back to travel.
+   */
+  useLayoutEffect(() => {
+    const pending = moving.current;
+    if (!pending) return;
+    const row = shown.find((r) => r.applicationId === pending.applicationId);
+    if (!row || row.status !== pending.status) return;
+    moving.current = null;
+    const card = visibleCard(boardRef.current, pending.applicationId);
+    if (!card) return;
+    if (pending.moment === 'offer') void playOffer(card, pending.from, pending.company);
+    else void playForward(card, pending.from, pending.column);
+  }, [shown]);
+
+  /**
+   * Move a card, with the moment the move calls for. A rejection fades the
+   * card where it stands before the write draws it into Closed, and leaves
+   * the line saying how many applications are still open.
+   */
+  async function move(row: PipelineRow, status: ApplicationStatus) {
+    const moment = boardMoment(row.status, status);
+    setClosedLine(null);
+    if (moment === 'rejection') {
+      await fadeInPlace(visibleCard(boardRef.current, row.applicationId));
+      const after = shown.map((r) => (r.applicationId === row.applicationId ? { ...r, status } : r));
+      setClosedLine(stillOpenLine(row.companyName, openApplications(after)));
+    } else if (moment) {
+      const target = COLUMNS.find((column) => column.statuses.includes(status));
+      const source = COLUMNS.find((column) => column.statuses.includes(row.status));
+      if (target && target !== source) {
+        moving.current = {
+          applicationId: row.applicationId,
+          moment,
+          status,
+          from: visibleCard(boardRef.current, row.applicationId)?.getBoundingClientRect() ?? null,
+          column: target.label,
+          company: row.companyName,
+        };
+      }
+    }
+    run({ applicationId: row.applicationId, status });
+  }
 
   function drop(status: ApplicationStatus) {
     const applicationId = dragging;
@@ -140,7 +208,7 @@ export function PipelineBoard({
     const row = shown.find((r) => r.applicationId === applicationId);
     if (!row || row.status === status) return;
 
-    run({ applicationId, status });
+    void move(row, status);
   }
 
   const closedRows = shown.filter((row) => CLOSED.includes(row.status));
@@ -193,6 +261,7 @@ export function PipelineBoard({
                   dragging={dragging === row.applicationId}
                   onDragStart={() => setDragging(row.applicationId)}
                   onDragEnd={() => setDragging(null)}
+                  onReject={() => move(row, 'rejected')}
                 />
               ))}
               {columnRows.length === 0 && (
@@ -235,6 +304,7 @@ export function PipelineBoard({
                 dragging={dragging === row.applicationId}
                 onDragStart={() => setDragging(row.applicationId)}
                 onDragEnd={() => setDragging(null)}
+                onReject={() => move(row, 'rejected')}
               />
             ))}
             {columnRows.length === 0 && (
@@ -246,7 +316,13 @@ export function PipelineBoard({
     });
 
   return (
-    <div className="space-y-4">
+    <div ref={boardRef} className="space-y-4">
+      {/* Kept under reduced motion: the fade is the motion, this is the news. */}
+      {closedLine && !failed && (
+        <p role="status" className="text-small text-ink-muted">
+          {closedLine}
+        </p>
+      )}
       <div className="flex flex-col gap-2 sm:hidden">{renderColumns('list')}</div>
       <div
         className={cn(
@@ -283,6 +359,7 @@ function PipelineCard({
   muted = false,
   onDragStart,
   onDragEnd,
+  onReject,
   working,
 }: {
   row: PipelineRow;
@@ -290,6 +367,8 @@ function PipelineCard({
   muted?: boolean;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  /** Send it straight to rejected, through the board so the rejection plays. */
+  onReject?: () => Promise<void>;
   working?: readonly string[];
 }) {
   const age = shortAge(row.lastActivityAt);
@@ -311,6 +390,7 @@ function PipelineCard({
 
   return (
     <article
+      {...{ [CARD_ATTR]: row.applicationId }}
       draggable={!muted}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
@@ -414,7 +494,7 @@ function PipelineCard({
           */}
         {!muted && (
           <span className="hidden shrink-0 items-center gap-0.5 sm:flex">
-            <QuickReject row={row} />
+            {onReject && <QuickReject row={row} onReject={onReject} />}
             <Dismiss row={row} />
           </span>
         )}
@@ -444,9 +524,11 @@ function PipelineCard({
  * A rejection you already know about — a form-letter no, a posting that
  * vanished — otherwise costs a drag across every column in between, or a trip
  * to the status picker on the role page. This writes the same status_override
- * event `moveApplication` always has; it just skips the trip.
+ * event `moveApplication` always has; it just skips the trip. It goes through
+ * the board's move, so the card fades where it is and the board says how many
+ * applications are still open (plan #1560).
  */
-function QuickReject({ row }: { row: PipelineRow }) {
+function QuickReject({ row, onReject }: { row: PipelineRow; onReject: () => Promise<void> }) {
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
 
@@ -462,7 +544,7 @@ function QuickReject({ row }: { row: PipelineRow }) {
           pending={pending}
           onClick={() =>
             startTransition(async () => {
-              await moveApplication(row.applicationId, 'rejected');
+              await onReject();
               setConfirming(false);
             })
           }
