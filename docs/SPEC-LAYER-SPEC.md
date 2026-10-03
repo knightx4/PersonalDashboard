@@ -92,6 +92,24 @@ its rules, and fails when a rule names a test file that does not exist or a
 counter that `scripts/spec-counts.ts` does not define. So a rule always has a
 real check behind it, or says plainly that only the audit reads it.
 
+A spec can state a rule before its check is built. The check line then ends
+with `pending` and the plan step that builds the check:
+
+```markdown
+**R2.** No surface scrolls sideways at 390 pixels.
+Checked by: test `tests/interaction/no-sideways-scroll.test.ts`, pending #1537.
+
+**R1.** Every page under `app/` has at least one surface in the gallery.
+Checked by: count `routes-without-surface`, target 0, pending #1539.
+```
+
+A pending count may leave out its baseline, since nothing measures it yet. The
+test passes a pending rule while its check is missing and fails it in three
+cases: it names no step, its test file or counter now exists, or its test path
+is one vitest does not run. So the step that builds the check also takes the
+mark off and, for a count, writes the baseline it measured. The audit is never
+pending.
+
 `/dev/specs` shows each spec's rules with their state: holding, failing, or
 for a count, its value against its target.
 

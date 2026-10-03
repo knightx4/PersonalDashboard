@@ -13,6 +13,13 @@
  *     **R3.** A Dash reply says what it could not do instead of guessing.
  *     Checked by: audit.
  *
+ *     **R4.** No surface scrolls sideways at 390 pixels.
+ *     Checked by: test `tests/interaction/no-sideways-scroll.test.ts`, pending #1537.
+ *
+ * A test or count whose check is still to be built ends with `pending #N`, N
+ * being the plan step that builds it. A pending count may leave out its
+ * baseline, since nothing measures it yet.
+ *
  * Pure, with no server-only import, so tests/spec-rules.test.ts can hold every
  * spec to it and /dev/specs can list the same rules it checked. Whether a named
  * test or counter exists is a question about the repository, so `ruleProblems`
@@ -20,20 +27,32 @@
  */
 import { splitSections } from './sections';
 
+/**
+ * Set when the check is still to be built: the plan step that builds it, or
+ * true when the rule says `pending` without naming one, which `ruleProblems`
+ * fails.
+ */
+export type Pending = number | true;
+
 export type RuleCheck =
   | {
       kind: 'count';
       /** The counter's name in scripts/spec-counts.ts. */
       counter: string;
-      /** The count when the rule was written. Not compared with the baseline file. */
-      baseline: number;
+      /**
+       * The count when the rule was written. Not compared with the baseline
+       * file. Absent only on a pending count, which nothing measures yet.
+       */
+      baseline?: number;
       /** Where the rule wants the count to end up; absent when it is only held. */
       target?: number;
+      pending?: Pending;
     }
   | {
       kind: 'test';
       /** Repository-relative: `tests/…` or `lib/…`. */
       path: string;
+      pending?: Pending;
     }
   | { kind: 'audit' };
 
@@ -56,25 +75,37 @@ export type ParsedRules = {
 
 const RULE_START = /^\*\*R(\d+)\.\*\*\s*(.*)$/;
 const CHECKED_BY = /^Checked by:\s*(.*?)\s*$/i;
-const COUNT = /^count\s+`([^`]+)`\s*,\s*baseline\s+(\d+)(?:\s*,\s*target\s+(\d+))?\s*\.?$/i;
-const TEST = /^test\s+`([^`]+)`\s*\.?$/i;
-const AUDIT = /^audit\s*\.?$/i;
+const COUNT = /^count\s+`([^`]+)`(?:\s*,\s*baseline\s+(\d+))?(?:\s*,\s*target\s+(\d+))?$/i;
+const TEST = /^test\s+`([^`]+)`$/i;
+const AUDIT = /^audit$/i;
+/** The trailing `, pending #N` of a check still to be built. */
+const PENDING = /\s*,\s*pending(?:\s+#(\d+))?$/i;
 
 /** Reads what follows `Checked by:`; null when it is none of the three kinds. */
 export function parseCheck(text: string): RuleCheck | null {
-  const t = text.trim();
+  let t = text.trim().replace(/\s*\.$/, '');
+  let pending: Pending | undefined;
+  const mark = PENDING.exec(t);
+  if (mark) {
+    pending = mark[1] !== undefined ? Number(mark[1]) : true;
+    t = t.slice(0, mark.index);
+  }
+  const withPending = pending !== undefined ? { pending } : {};
+
   const count = COUNT.exec(t);
   if (count) {
     return {
       kind: 'count',
       counter: count[1].trim(),
-      baseline: Number(count[2]),
+      ...(count[2] !== undefined ? { baseline: Number(count[2]) } : {}),
       ...(count[3] !== undefined ? { target: Number(count[3]) } : {}),
+      ...withPending,
     };
   }
   const test = TEST.exec(t);
-  if (test) return { kind: 'test', path: test[1].trim() };
-  if (AUDIT.test(t)) return { kind: 'audit' };
+  if (test) return { kind: 'test', path: test[1].trim(), ...withPending };
+  // The audit is never pending: it reads whatever the spec says.
+  if (AUDIT.test(t) && pending === undefined) return { kind: 'audit' };
   return null;
 }
 
@@ -143,7 +174,9 @@ export type RuleContext = {
  *
  * Empty when every rule names a check that exists: a test file under `tests/`
  * or `lib/` that vitest runs, a counter scripts/spec-counts.ts defines with the
- * same target, or the audit.
+ * same target, or the audit. A pending check passes while it is missing, as
+ * long as it names the plan step that builds it, and fails once it exists, so
+ * the step that builds it also takes the mark off.
  */
 export function ruleProblems(parsed: ParsedRules, ctx: RuleContext): string[] {
   const problems: string[] = [];
@@ -168,17 +201,41 @@ export function ruleProblems(parsed: ParsedRules, ctx: RuleContext): string[] {
       continue;
     }
 
+    if (check.kind === 'audit') continue;
+
+    const pending = check.pending;
+    if (pending === true) {
+      problems.push(`${label} is pending without the plan step that builds its check.`);
+      continue;
+    }
+
     if (check.kind === 'test') {
       if (!/^(tests|lib)\/.+\.test\.tsx?$/.test(check.path)) {
         problems.push(
           `${label} names ${check.path}, which is not a .test.ts or .test.tsx file under tests/ or lib/, so vitest does not run it.`,
         );
+      } else if (pending !== undefined) {
+        if (ctx.fileExists(check.path)) {
+          problems.push(
+            `${label} is pending on #${pending}, and ${check.path} exists; take the pending mark off.`,
+          );
+        }
       } else if (!ctx.fileExists(check.path)) {
         problems.push(`${label} names the test ${check.path}, which does not exist.`);
       }
-    } else if (check.kind === 'count') {
+    } else {
       const counter = ctx.counters.get(check.counter);
-      if (!counter) {
+      if (pending !== undefined) {
+        if (counter) {
+          problems.push(
+            `${label} is pending on #${pending}, and scripts/spec-counts.ts defines ${check.counter}; take the pending mark off and give its baseline.`,
+          );
+        }
+      } else if (check.baseline === undefined) {
+        problems.push(
+          `${label} gives ${check.counter} no baseline, which only a pending count may leave out.`,
+        );
+      } else if (!counter) {
         problems.push(
           `${label} names the counter ${check.counter}, which scripts/spec-counts.ts does not define.`,
         );

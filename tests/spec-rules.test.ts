@@ -4,7 +4,9 @@
  * A rule is held by a test file, by a counter in scripts/spec-counts.ts, or by
  * the weekly audit (docs/SPEC-LAYER-SPEC.md, Part 1). A rule naming a test that
  * was renamed away, or a counter nobody registered, reads as enforced and is
- * not, so this fails on either.
+ * not, so this fails on either. A rule whose check is still to be built says
+ * so with `pending #N`, and passes only while it names the step and the check
+ * is still missing.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -123,6 +125,69 @@ describe('ruleProblems', () => {
     expect(
       problems('**R1.** One.\nChecked by: count `thread-tables`, baseline 6, target 2.'),
     ).toEqual(["R1 gives thread-tables a target of 2, and the counter's is 1."]);
+  });
+
+  it('reads a pending check with the step that builds it', () => {
+    expect(
+      parseRules(
+        [
+          '## Rules',
+          '**R1.** One.',
+          'Checked by: count `routes-without-surface`, target 0, pending #1539.',
+          '**R2.** Two.',
+          'Checked by: test `tests/interaction/press-targets.test.ts`, pending #1537.',
+        ].join('\n'),
+      ).rules.map((r) => r.check),
+    ).toEqual([
+      { kind: 'count', counter: 'routes-without-surface', target: 0, pending: 1539 },
+      { kind: 'test', path: 'tests/interaction/press-targets.test.ts', pending: 1537 },
+    ]);
+  });
+
+  it('passes a pending rule whose check is missing', () => {
+    expect(
+      problems(
+        [
+          '**R1.** One.',
+          'Checked by: count `nobody-wrote-me`, target 0, pending #1539.',
+          '**R2.** Two.',
+          'Checked by: test `tests/gone.test.ts`, pending #1537.',
+          '**R3.** Three.',
+          'Checked by: count `nobody-wrote-me-either`, baseline 4, target 0, pending #1539.',
+        ].join('\n'),
+      ),
+    ).toEqual([]);
+  });
+
+  it('fails a pending rule with no step, or whose check now exists', () => {
+    expect(
+      problems(
+        [
+          '**R1.** One.',
+          'Checked by: test `tests/gone.test.ts`, pending.',
+          '**R2.** Two.',
+          'Checked by: test `tests/real.test.ts`, pending #1537.',
+          '**R3.** Three.',
+          'Checked by: count `thread-tables`, target 1, pending #1539.',
+          '**R4.** Four.',
+          'Checked by: test `app/dev/ui/taste.test.ts`, pending #1529.',
+          '**R5.** Five.',
+          'Checked by: audit, pending #1522.',
+        ].join('\n'),
+      ),
+    ).toEqual([
+      'R1 is pending without the plan step that builds its check.',
+      'R2 is pending on #1537, and tests/real.test.ts exists; take the pending mark off.',
+      'R3 is pending on #1539, and scripts/spec-counts.ts defines thread-tables; take the pending mark off and give its baseline.',
+      'R4 names app/dev/ui/taste.test.ts, which is not a .test.ts or .test.tsx file under tests/ or lib/, so vitest does not run it.',
+      'R5 has a check that is not a count, a test or the audit: "Checked by: audit, pending #1522.".',
+    ]);
+  });
+
+  it('fails a count with no baseline that is not pending', () => {
+    expect(problems('**R1.** One.\nChecked by: count `thread-tables`, target 1.')).toEqual([
+      'R1 gives thread-tables no baseline, which only a pending count may leave out.',
+    ]);
   });
 
   it('fails a rule with no check, a check of no kind, or a repeated number', () => {
