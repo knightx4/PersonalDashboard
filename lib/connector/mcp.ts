@@ -175,6 +175,12 @@ export function registerAskTools(server: McpServer): void {
 
 const handler = createMcpHandler(registerAskTools, {
   serverInfo: { name: 'Dash', version: '1.0.0' },
+  // The tool list is fixed for a deployment, so the server says it never
+  // changes. registerTool would otherwise advertise listChanged, and the SDK
+  // then holds each client's subscriptions/listen POST open as an SSE stream
+  // with nothing ever sent on it: 502 production calls ran to Vercel's 300 s
+  // limit that way. Without it, a listen is acknowledged and closed at once.
+  capabilities: { tools: { listChanged: false } },
   instructions:
     "Read-only lookups over the person's own dashboard: their orders and spending, job applications, todos, goals, Obsidian vault notes, and what they have written about a topic anywhere in it. Every row comes back with a link to its page in the dashboard.",
 });

@@ -132,6 +132,68 @@ describe('the tool list', () => {
   });
 });
 
+describe('a subscription request', () => {
+  /** A 2026-07-28 request, which carries its protocol version in the body as well as the header. */
+  function modernRequest(method: string, params: Record<string, unknown>): Request {
+    return new Request('http://localhost:3000/api/mcp', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+        'mcp-protocol-version': '2026-07-28',
+        'mcp-method': method,
+        authorization: 'Bearer good',
+        'x-forwarded-host': 'dash.example.com',
+        'x-forwarded-proto': 'https',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: ++rpcId,
+        method,
+        params: {
+          ...params,
+          _meta: {
+            'io.modelcontextprotocol/protocolVersion': '2026-07-28',
+            'io.modelcontextprotocol/clientInfo': { name: 'test', version: '1' },
+            'io.modelcontextprotocol/clientCapabilities': {},
+          },
+        },
+      }),
+    });
+  }
+
+  it('acknowledges a listen for tool list changes and closes, since the list never changes', async () => {
+    const response = await serveMcp(
+      modernRequest('subscriptions/listen', { notifications: { toolsListChanged: true } }),
+      async () => session,
+      makeLog,
+    );
+    expect(response.status).toBe(200);
+
+    // The whole body arrives and ends: a stream left open runs the function to its time limit.
+    const ended = await Promise.race([
+      response.text().then((text) => ({ text })),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1_000)),
+    ]);
+    expect(ended).not.toBeNull();
+    const frames = ended!.text
+      .split('\n')
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => JSON.parse(line.slice(5)));
+    expect(frames[0]).toMatchObject({ method: 'notifications/subscriptions/acknowledged', params: { notifications: {} } });
+    expect(frames.at(-1)).toMatchObject({ result: { resultType: 'complete' } });
+  });
+
+  it('still answers a modern tools/list with every lookup', async () => {
+    const response = await serveMcp(modernRequest('tools/list', {}), async () => session, makeLog);
+    expect(response.status).toBe(200);
+    const { tools } = (await rpcResult(response)) as { tools: { name: string }[] };
+    expect(tools.map((tool) => tool.name)).toEqual(
+      ASK_TOOL_NAMES.filter((name) => name !== 'search_mail' && name !== 'read_mail'),
+    );
+  });
+});
+
 describe('a tool call', () => {
   it('checks the cap and runs the lookup as the token holder, and logs the call once through the service-role client', async () => {
     const result: AskToolResult = {
