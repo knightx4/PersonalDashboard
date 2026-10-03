@@ -13,7 +13,7 @@ import { askDashOnRole } from '@/lib/jobs/role-thread/ask';
  * Writing and removing a comment on a role (note 89ad8bef). The thread is the
  * role's notes in job_search.notes, oldest first, with `author` telling your
  * comments from Dash's (migration 0033). The same form the other threads post
- * (components/dev/comment-thread.tsx): `id` is the role, `body` the words. A
+ * (components/thread/thread.tsx): `id` is the role, `body` the words. A
  * comment tagged @dash gets its reply in the thread before this returns.
  */
 

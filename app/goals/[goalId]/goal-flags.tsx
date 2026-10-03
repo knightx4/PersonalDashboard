@@ -1,7 +1,8 @@
 'use client';
 
 import { useActionState } from 'react';
-import { CommentThread, type CommentStore } from '@/components/dev/comment-thread';
+import { Thread, type CommentStore } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { FieldError } from '@/components/ui/field';
@@ -60,10 +61,9 @@ function FlagCard({ flag }: { flag: GoalFlag }) {
           <p className="text-small text-ink-muted">Answered. Dash closes it once it has acted on your answer.</p>
         )}
       </div>
-      <CommentThread
-        target="raise"
-        id={flag.id}
-        thread={flag.thread}
+      <Thread
+        subject={threadRef('raise', flag.id)}
+        turns={flag.thread}
         store={FLAG_STORE}
         submit={{ action: answerFlagAction, label: open ? 'Answer' : 'Say more' }}
         placeholder="Your answer. Dash acts on it and replies here."

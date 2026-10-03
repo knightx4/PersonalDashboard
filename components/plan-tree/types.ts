@@ -5,7 +5,7 @@
  * its own -- a goal's -- builds the same fields and hands over its own server
  * actions, and the rows read the same on both.
  */
-import type { CommentStore, ThreadTarget } from '@/components/dev/comment-thread';
+import type { ThreadTarget } from '@/lib/thread/subjects';
 import type { DevComment } from '@/lib/comments/load';
 import type { PlanKind, PlanStatus } from '@/lib/plan/load';
 
@@ -37,8 +37,8 @@ export type TreeActions = {
   dismissFog: TreeAction;
 };
 
-/** Where a row's comments are written. The dev plan's are steps in `dev_comments`. */
-export type TreeComments = { target: ThreadTarget; store?: CommentStore };
+/** What a row's thread is under. The dev plan's are steps; a goal page's are goals. */
+export type TreeComments = { target: ThreadTarget };
 
 export const PLAN_COMMENTS: TreeComments = { target: 'step' };
 

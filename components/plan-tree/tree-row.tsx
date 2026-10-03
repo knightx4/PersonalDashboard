@@ -13,7 +13,8 @@ import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
 import { LinkedText } from '@/components/ui/linked-text';
 import { CommentCount } from '@/components/dev/comment-count';
-import { CommentThread } from '@/components/dev/comment-thread';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 import { FogNote } from '@/components/dev/fog-note';
 import { StateLabel, TONE_TEXT, type DevTone } from '@/components/dev/state-label';
 import { StatusGlyph } from '@/components/ui/status-glyph';
@@ -728,11 +729,9 @@ export function TreeRow<E extends TreeCatalogEntry>({
                     />
                   )}
 
-                  <CommentThread
-                    target={comments.target}
-                    store={comments.store}
-                    id={node.id}
-                    thread={node.thread}
+                  <Thread
+                    subject={threadRef(comments.target, node.id)}
+                    turns={node.thread}
                     titles={titles}
                     placeholder={threadPlaceholder}
                   />

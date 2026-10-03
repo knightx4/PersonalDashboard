@@ -18,7 +18,7 @@ import { todayIn } from '@/lib/todo/tasks/model';
 
 /**
  * Writing and removing a comment on a goal or a step (plan #957). The same
- * form the dev pages' thread posts (components/dev/comment-thread.tsx), so the
+ * form the dev pages' thread posts (components/thread/thread.tsx), so the
  * fields are its: `id` is the goal or step, `body` the words. A comment
  * tagged @dash gets a reply in the thread before this returns, or a note that
  * the goals routine is on it.

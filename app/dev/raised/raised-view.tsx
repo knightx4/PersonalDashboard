@@ -19,7 +19,8 @@ import { ApproveAll, WaitingCard } from './waiting-view';
 import { SpecChangeCard } from '@/app/dev/specs/spec-change-card';
 import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
-import { CommentThread } from '@/components/dev/comment-thread';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 import { RefText } from '@/components/dev/ref-text';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
@@ -282,10 +283,9 @@ function RaiseCard({ row, titles }: { row: RaisedRow; titles?: PlanRefTitles }) 
       {/* One thread, two ways into it. The buttons answer the ask it named;
           what you write here is an answer in your own words, and it starts a
           session that acts on it and replies under you. */}
-      <CommentThread
-        target="raise"
-        id={row.id}
-        thread={row.thread}
+      <Thread
+        subject={threadRef('raise', row.id)}
+        turns={row.thread}
         label="Answer in your own words"
         placeholder="What you want done about this. A session reads it, does it, and replies here."
         titles={titles}

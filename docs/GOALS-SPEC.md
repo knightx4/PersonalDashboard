@@ -1021,7 +1021,7 @@ than rebuilding them:
    recommended one marked, a written answer still possible, and Not now and
    Change answer beside them.
 2. **Comments and @dash** on every goal and step, from
-   `components/dev/comment-thread.tsx`. The reply path needs a goals version
+   `components/thread/thread.tsx`. The reply path needs a goals version
    that writes out the goal, its collections and its steps for the model, and
    hands anything bigger to the goals routine.
 3. **Status words and colours**: On you, With Claude, Waiting, the health

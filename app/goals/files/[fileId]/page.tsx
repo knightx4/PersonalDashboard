@@ -15,7 +15,8 @@ import { createGoalsClient } from '@/lib/goals/auth/server';
 import { formatInstant } from '@/lib/goals/dates';
 import { loadFileUses, type FileUse } from '@/lib/goals/files-store';
 import type { DevComment } from '@/lib/comments/load';
-import { FileThread } from './file-comments';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 import { MarkFileRead } from './mark-read';
 import { DashCredit } from '@/components/ui/dash-mark';
 
@@ -102,7 +103,11 @@ export default async function FilePage({
 
         {/* Notes on the file (note 7a6a37aa), read by the goals run before it revises it. */}
         <section aria-label="Comments" className="px-1">
-          <FileThread fileId={file.id} thread={thread} />
+          <Thread
+            subject={threadRef('file', file.id)}
+            turns={thread}
+            placeholder="What you think of this file, or what it should change."
+          />
         </section>
 
         {uses.length > 0 && (

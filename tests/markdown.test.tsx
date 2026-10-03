@@ -10,7 +10,7 @@ import { Markdown } from '@/components/ui/markdown';
 import { FoldingMarkdown } from '@/components/ui/folding-markdown';
 import { FileBody } from '@/components/files/file-body';
 
-vi.mock('@/components/dev/comment-thread', () => ({ CommentThread: () => null }));
+vi.mock('@/components/thread/thread', () => ({ Thread: () => null }));
 
 const { SpecSectionCard } = await import('@/app/dev/specs/[slug]/spec-view');
 

@@ -11,7 +11,8 @@ import {
   type PlanActionState,
 } from '@/app/dev/plan/actions';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { CommentThread } from '@/components/dev/comment-thread';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { FieldError } from '@/components/ui/field';
@@ -136,10 +137,9 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
           the other half of #612" meant going to the plan and finding the
           number. The write is against the step either way, so what is said
           here is on the row when you next open it there. */}
-      <CommentThread
-        target="step"
-        id={row.id}
-        thread={row.thread}
+      <Thread
+        subject={threadRef('step', row.id)}
+        turns={row.thread}
         label="Comment"
         placeholder={PLACEHOLDER[row.health]}
         titles={titles}

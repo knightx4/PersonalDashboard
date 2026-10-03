@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useActionState } from 'react';
 import { approveSpecChange, declineSpecChange, type SpecChangeActionState } from './actions';
-import { CommentThread } from '@/components/dev/comment-thread';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError } from '@/components/ui/field';
@@ -162,10 +163,9 @@ export function SpecChangeCard({
         <p className="text-small text-ink-muted">Approved. Waiting to be written into the spec.</p>
       )}
 
-      <CommentThread
-        target="change"
-        id={change.id}
-        thread={change.thread}
+      <Thread
+        subject={threadRef('change', change.id)}
+        turns={change.thread}
         placeholder="A note on this change, a question for Dash, or @dash reword it."
       />
     </li>

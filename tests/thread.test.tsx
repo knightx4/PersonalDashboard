@@ -11,6 +11,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { CommentActionState } from '@/app/dev/comment-actions';
+import { threadRef } from '@/lib/thread/subjects';
 
 // The comment actions reach for the session client, which has no business in a
 // render test. The thread only needs them to exist to hand to its forms.
@@ -18,16 +19,28 @@ vi.mock('@/app/dev/comment-actions', () => {
   const noop = async () => ({});
   return { addComment: noop, deleteComment: noop };
 });
+vi.mock('@/app/goals/[goalId]/comment-actions', () => {
+  const noop = async () => ({});
+  return { addGoalComment: noop, deleteGoalComment: noop };
+});
+vi.mock('@/app/goals/files/[fileId]/comment-actions', () => {
+  const noop = async () => ({});
+  return { addFileComment: noop, deleteFileCommentAction: noop };
+});
+vi.mock('@/app/jobs/(app)/roles/[id]/comment-actions', () => {
+  const noop = async () => ({});
+  return { addRoleComment: noop, deleteRoleComment: noop };
+});
 
-const { CommentThread } = await import('@/components/dev/comment-thread');
+const { Thread } = await import('@/components/thread/thread');
 
 const ROW = '00000000-0000-4000-8000-000000000001';
 
 const respond = async (): Promise<CommentActionState> => ({});
 
-function open(props: Partial<React.ComponentProps<typeof CommentThread>> = {}): string {
+function open(props: Partial<React.ComponentProps<typeof Thread>> = {}): string {
   return renderToStaticMarkup(
-    <CommentThread target="step" id={ROW} thread={[]} composerOpen {...props} />,
+    <Thread subject={threadRef('step', ROW)} turns={[]} composerOpen {...props} />,
   );
 }
 
@@ -83,7 +96,7 @@ describe('the open box', () => {
   });
 
   it('lights the tag button once the comment reaches Dash', () => {
-    const html = open({ target: 'raise' });
+    const html = open({ subject: threadRef('raise', ROW) });
 
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain('Dash will read this');
@@ -92,7 +105,7 @@ describe('the open box', () => {
 
 describe('the closed box', () => {
   it('is a trigger until it is pressed', () => {
-    const html = renderToStaticMarkup(<CommentThread target="step" id={ROW} thread={[]} />);
+    const html = renderToStaticMarkup(<Thread subject={threadRef('step', ROW)} turns={[]} />);
 
     expect(html).not.toContain('<textarea');
     expect(html).not.toContain('Send</span>');
@@ -107,7 +120,7 @@ describe('a grouped message', () => {
   ];
 
   it('carries a short time in the strip, with the whole one on the title', () => {
-    const html = renderToStaticMarkup(<CommentThread target="step" id={ROW} thread={run} />);
+    const html = renderToStaticMarkup(<Thread subject={threadRef('step', ROW)} turns={run} />);
 
     // The clock reads zero on a server render, so both times are the date.
     expect(html).toContain('title="2026-09-10 09:05"');
@@ -122,9 +135,37 @@ describe('a grouped message', () => {
 
   it('leaves the strip to the author mark when nothing is grouped', () => {
     const html = renderToStaticMarkup(
-      <CommentThread target="step" id={ROW} thread={[run[0]!]} />,
+      <Thread subject={threadRef('step', ROW)} turns={[run[0]!]} />,
     );
 
     expect(html).not.toContain('>10 Sep</time>');
+  });
+});
+
+describe('one thread for any row', () => {
+  it('posts the row its ref names, with the ref beside it', () => {
+    const html = open({ subject: threadRef('role', ROW) });
+
+    expect(html).toContain('name="target" value="role"');
+    expect(html).toContain(`name="id" value="${ROW}"`);
+    expect(html).toContain(`name="subject" value="job_search.roles:${ROW}"`);
+  });
+
+  it('offers the tag wherever Dash answers, and not on a file', () => {
+    for (const target of ['step', 'idea', 'goal', 'role'] as const) {
+      expect(open({ subject: threadRef(target, ROW) })).toContain('Tag @dash');
+    }
+
+    const file = open({ subject: threadRef('file', ROW) });
+    expect(file).not.toContain('Tag @dash');
+    expect(file).toContain('Dash reads it before revising the file.');
+  });
+
+  it('says a raise is an answer, tagged or not', () => {
+    expect(open({ subject: threadRef('raise', ROW) })).toContain('This is your answer.');
+  });
+
+  it('will not draw a thread under a table that has none', () => {
+    expect(() => open({ subject: `public.orders:${ROW}` })).toThrow(/not a row that has a thread/);
   });
 });

@@ -76,7 +76,8 @@ import {
   type ListDisplaySpec,
 } from '@/lib/list-display';
 import { formatMoney } from '@/lib/money';
-import { CommentThread } from '@/components/dev/comment-thread';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 import type { DevComment } from '@/lib/comments/load';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -2449,10 +2450,9 @@ export const SURFACES: readonly Surface[] = [
         <p className="text-body text-ink">
           The filter and the count disagree on who a step is handed to.
         </p>
-        <CommentThread
-          target="step"
-          id="00000000-0000-4000-8000-000000000412"
-          thread={commentThread}
+        <Thread
+          subject={threadRef('step', '00000000-0000-4000-8000-000000000412')}
+          turns={commentThread}
           awaitingReply
         />
       </div>
@@ -2472,7 +2472,7 @@ export const SURFACES: readonly Surface[] = [
         <p className="text-body text-ink">
           The filter and the count disagree on who a step is handed to.
         </p>
-        <CommentThread target="step" id="00000000-0000-4000-8000-000000000413" thread={[]} />
+        <Thread subject={threadRef('step', '00000000-0000-4000-8000-000000000413')} turns={[]} />
       </div>
     ),
   },
@@ -2491,10 +2491,9 @@ export const SURFACES: readonly Surface[] = [
         <p className="text-body text-ink">
           The filter and the count disagree on who a step is handed to.
         </p>
-        <CommentThread
-          target="step"
-          id="00000000-0000-4000-8000-000000000414"
-          thread={commentThread}
+        <Thread
+          subject={threadRef('step', '00000000-0000-4000-8000-000000000414')}
+          turns={commentThread}
           composerOpen
         />
       </div>

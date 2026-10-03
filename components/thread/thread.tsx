@@ -4,6 +4,10 @@ import { useActionState, useOptimistic, useRef, useState } from 'react';
 import { ArrowUp, CircleUser, X } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
 import { addComment, deleteComment, type CommentActionState } from '@/app/dev/comment-actions';
+import { addGoalComment, deleteGoalComment } from '@/app/goals/[goalId]/comment-actions';
+import { addFileComment, deleteFileCommentAction } from '@/app/goals/files/[fileId]/comment-actions';
+import { addRoleComment, deleteRoleComment } from '@/app/jobs/(app)/roles/[id]/comment-actions';
+import type { PaidAction } from '@/lib/core/spend/paid-actions';
 import { CommentBody } from '@/components/dev/comment-body';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
@@ -14,34 +18,44 @@ import { MENTION, mentionsDash, withoutMention } from '@/lib/comments/mention';
 import { commentWhen, exactTime, shortWhen } from '@/lib/comments/when';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { useClockNow } from '@/lib/use-clock-now';
-import type { CommentAuthor, CommentTarget, DevComment } from '@/lib/comments/load';
-import type { PaidAction } from '@/lib/core/spend/paid-actions';
+import type { CommentAuthor, DevComment } from '@/lib/comments/load';
+import { threadSubject, type ThreadTarget } from '@/lib/thread/subjects';
 import { PaidHint } from '@/components/ui/paid-hint';
 
 /**
- * The thread on one row of the dev pages, and the box for adding to it.
+ * The thread under one row, and the box for adding to it
+ * (docs/CORE-AND-DASH-SPEC.md, Part 2).
  *
- * The same component on an idea, a plan step and a raise, because the thing
- * being written is the same thing in all three places: something you want
- * attached to that row rather than to a transcript. It is a note until `@dash`
- * appears in it, which is what makes it worth having on rows nobody is waiting
- * on.
+ * One component wherever a thread is: plan steps and questions, ideas, raises,
+ * goals and their steps, files, roles, bug notes, spec sections, takeaways and
+ * spec changes. The thing being written is the same in all of them: something
+ * you want attached to that row rather than to a transcript. It is a note
+ * until `@dash` appears in it, which is what makes it worth having on rows
+ * nobody is waiting on.
  *
- * The list is the whole thread including a session's replies, told apart by who
+ * The row is named by its ref, `schema.table:id` (lib/thread/subjects.ts), and
+ * the table in it says where the turns are written (./stores.ts) and how Dash
+ * takes them: a raise always reaches Dash, a file never answers, everything
+ * else answers when tagged.
+ *
+ * The list is the whole thread including Dash's replies, told apart by who
  * wrote each one rather than by where it sits.
  */
 
 /** A server action the thread's forms post to. */
-type ThreadAction = (prev: CommentActionState, formData: FormData) => Promise<CommentActionState>;
+type ThreadAction = (
+  prev: CommentActionState,
+  formData: FormData,
+) => Promise<CommentActionState>;
 
 /**
- * Where a thread's comments are kept, when it is not `dev_comments`.
+ * Where a thread's turns are written, and what a reply there costs.
  *
- * Goals keeps its threads in its own schema (plan #957), for every signed-in
- * account rather than the owner alone, so its thread posts to its own
- * actions. Everything else about the thread -- the tag, the waiting line, the
- * optimistic comment -- is the same, which is why this is a prop and not a
- * second component.
+ * Each of the six surfaces still writes to its own table until plan #1470
+ * copies them into core.conversations; this is the one place that says which.
+ * When that lands, every target here points at the same pair of actions and
+ * the map goes. The cost keys are named here, beside the PaidHint that shows
+ * them, which is where lib/core/spend/paid-actions.test.ts looks for them.
  */
 export type CommentStore = {
   add: ThreadAction;
@@ -50,13 +64,46 @@ export type CommentStore = {
   paid: PaidAction;
 };
 
-/**
- * What a thread is on: a dev row, a goal or step, a role in Jobs (note
- * 89ad8bef), or a file. Dash does not answer in a file's thread; the goals
- * run reads it before revising the file (note 7a6a37aa), so there is no tag
- * and nothing waits on a reply.
- */
-export type ThreadTarget = CommentTarget | 'goal' | 'role' | 'file';
+/** dev_comments: ideas, plan steps, raises, bug notes, spec sections, takeaways, spec changes. */
+const DEV_STORE: CommentStore = {
+  add: addComment,
+  remove: deleteComment,
+  paid: 'app/dev/comment-actions.ts#addComment',
+};
+
+/** goals.comments, for every signed-in account rather than the owner alone (plan #957). */
+const GOALS_STORE: CommentStore = {
+  add: addGoalComment,
+  remove: deleteGoalComment,
+  paid: 'app/goals/[goalId]/comment-actions.ts#addGoalComment',
+};
+
+/** A role's notes, with Dash's replies among them (note 89ad8bef). */
+const ROLE_STORE: CommentStore = {
+  add: addRoleComment,
+  remove: deleteRoleComment,
+  paid: 'app/jobs/(app)/roles/[id]/comment-actions.ts#addRoleComment',
+};
+
+/** core.file_comments. No reply is paid for here, since Dash does not answer in it. */
+const FILES_STORE: CommentStore = {
+  add: addFileComment,
+  remove: deleteFileCommentAction,
+  paid: 'app/goals/[goalId]/comment-actions.ts#addGoalComment',
+};
+
+const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
+  idea: DEV_STORE,
+  step: DEV_STORE,
+  raise: DEV_STORE,
+  note: DEV_STORE,
+  spec: DEV_STORE,
+  takeaway: DEV_STORE,
+  change: DEV_STORE,
+  goal: GOALS_STORE,
+  role: ROLE_STORE,
+  file: FILES_STORE,
+};
 
 function DeleteComment({
   id,
@@ -223,10 +270,9 @@ export type CommentSubmit = {
  * optimistic row goes away again and the draft comes back in the box, which is
  * the part that makes posting first honest rather than merely quick.
  */
-export function CommentThread({
-  target,
-  id,
-  thread,
+export function Thread({
+  subject,
+  turns: thread,
   label,
   submit,
   placeholder = 'A note on this row, or a question for Dash.',
@@ -235,10 +281,10 @@ export function CommentThread({
   titles,
   store,
 }: {
-  target: ThreadTarget;
-  /** The row being commented on, not the comment. */
-  id: string;
-  thread: readonly DevComment[];
+  /** The row the thread is under, as `schema.table:id`: `threadRef(target, id)` builds one. */
+  subject: string;
+  /** What has been said so far, oldest first. */
+  turns: readonly DevComment[];
   /** What the trigger says when the thread is empty. */
   label?: string;
   /** Where the box writes, when it is not a plain comment. */
@@ -263,14 +309,21 @@ export function CommentThread({
    * in the app.
    */
   composerOpen?: boolean;
-  /** Where the comments are kept, when not in `dev_comments`. */
+  /**
+   * Where the comments are written, when not where the subject's table keeps
+   * them. Only a goal's flag needs it: a raise whose answer starts a goals run.
+   */
   store?: CommentStore;
 }) {
+  const parsed = threadSubject(subject);
+  if (!parsed) throw new Error(`Thread: ${subject} is not a row that has a thread`);
+  const { target, id } = parsed;
+  const writes = store ?? THREAD_STORES[target];
   // The write is not waited on: the comment is in the thread the moment it is
   // written, and a failure puts the words back in the box. Nothing on screen
   // is keyed to the request being in flight any more.
   const [state, action, sending] = useActionState(
-    submit?.action ?? store?.add ?? addComment,
+    submit?.action ?? writes.add,
     {} as CommentActionState,
   );
   const [writing, setWriting] = useState(composerOpen);
@@ -349,7 +402,7 @@ export function CommentThread({
               key={comment.id}
               comment={comment}
               target={target}
-              remove={store?.remove ?? deleteComment}
+              remove={writes.remove}
               // Grouped on the same rule as any other turn. It used to be
               // forced apart so it could say "Sending…"; a comment that posts
               // straight into the thread has nothing to say that the one above
@@ -430,6 +483,7 @@ export function CommentThread({
         >
           <input type="hidden" name="target" value={target} />
           <input type="hidden" name="id" value={id} />
+          <input type="hidden" name="subject" value={subject} />
 
           {/* One box: the words, what they will reach, and the control that
               sends them. A Send and a Cancel standing underneath were two
@@ -544,7 +598,7 @@ export function CommentThread({
               {/* Only a tagged comment is answered by Dash; the rest are free. */}
               {!submit && tagged && (
                 <PaidHint
-                  action={store?.paid ?? 'app/dev/comment-actions.ts#addComment'}
+                  action={writes.paid}
                   what="Cost of Dash's reply"
                   align="end"
                   className="self-center"
