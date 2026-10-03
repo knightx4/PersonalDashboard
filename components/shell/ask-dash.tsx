@@ -15,13 +15,16 @@ import { usePathname } from 'next/navigation';
 import { SquarePen, X } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
 import { DashChanges, type ChangePresses } from '@/components/talk/dash-changes';
+import { LookupFold, LookupList } from '@/components/talk/lookup-lines';
 import { TalkThread, type TalkSend } from '@/components/talk/talk-thread';
 import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
 import { scrim } from '@/components/ui/popover';
 import { commentWhen } from '@/lib/comments/when';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
 import { isAskPath, roughPageName } from '@/lib/ask/page-name';
+import type { AskDashResult } from '@/lib/talk/ask';
 import type { DashChange } from '@/lib/talk/changes';
+import { heardLookup, readAskStream, STREAM_CUT, type LookupLine, type LookupWire } from '@/lib/talk/lookups';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { useClockNow } from '@/lib/use-clock-now';
@@ -29,7 +32,6 @@ import {
   type OpenedAsk,
   askDashCosts,
   askDashPageLabel,
-  askDashQuestion,
   confirmDashChange,
   declineDashChange,
   openAskQuestion,
@@ -63,7 +65,17 @@ import {
  * or typed fixtures in the surface gallery, which cannot sign in.
  */
 export type AskSource = ChangePresses & {
-  ask: typeof askDashQuestion;
+  /**
+   * Ask, and hear each lookup as it starts and finishes (plan #1438). A
+   * source that cannot say what it looks up, such as the gallery's, ignores
+   * `onLookup` and the thread shows the waiting line alone.
+   */
+  ask: (
+    question: string,
+    conversationRef: string | null,
+    page?: string | null,
+    onLookup?: (lookup: LookupWire) => void,
+  ) => Promise<AskDashResult>;
   recent: typeof recentAskQuestions;
   open: typeof openAskQuestion;
   poll: typeof pollAskQuestion;
@@ -71,8 +83,40 @@ export type AskSource = ChangePresses & {
   label: typeof askDashPageLabel;
 };
 
+/**
+ * Asks through app/api/ask/route.ts, which streams the lookups as they run.
+ * The route answers 401 when the session has gone; anything that is not a
+ * stream comes back as an error for the thread, never a throw.
+ */
+async function askLive(
+  question: string,
+  conversationRef: string | null,
+  page: string | null = null,
+  onLookup?: (lookup: LookupWire) => void,
+): Promise<AskDashResult> {
+  let response: Response;
+  try {
+    response = await fetch('/api/ask', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ question, conversationRef, page }),
+    });
+  } catch {
+    return { turns: [], error: 'Dash could not be asked. Check your connection and try again.' };
+  }
+  if (response.status === 401) return { turns: [], error: 'You are signed out. Sign in again to ask Dash.' };
+  if (!response.ok || !response.body) {
+    return { turns: [], error: 'Dash could not be asked. Check your connection and try again.' };
+  }
+  try {
+    return await readAskStream(response.body, (lookup) => onLookup?.(lookup));
+  } catch {
+    return { turns: [], error: STREAM_CUT };
+  }
+}
+
 const ACTIONS: AskSource = {
-  ask: askDashQuestion,
+  ask: askLive,
   recent: recentAskQuestions,
   open: openAskQuestion,
   poll: pollAskQuestion,
@@ -99,7 +143,7 @@ export function useAskDash(): AskDashHandle | null {
   return useContext(AskDashContext);
 }
 
-const ACTION = 'app/ask/actions.ts#askDashQuestion';
+const ACTION = 'app/api/ask/route.ts#POST';
 
 /** One opening of the sheet; the key makes a fresh one on every open. */
 type Session = { key: number; ask?: string };
@@ -202,15 +246,18 @@ export function useAskSend(
   onConversation?: (ref: string) => void,
   onChanges?: (changes: DashChange[]) => void,
   onHandedOff?: (count: number) => void,
+  onLookup?: (lookup: LookupWire) => void,
 ): TalkSend {
   const source = useAskDash()?.source ?? ACTIONS;
   const ref = useRef(initialRef);
-  const heard = useRef({ onConversation, onChanges, onHandedOff, page });
+  const heard = useRef({ onConversation, onChanges, onHandedOff, onLookup, page });
   useEffect(() => {
-    heard.current = { onConversation, onChanges, onHandedOff, page };
+    heard.current = { onConversation, onChanges, onHandedOff, onLookup, page };
   });
   return useCallback<TalkSend>(async (body) => {
-    const result = await source.ask(body, ref.current, heard.current.page);
+    const result = await source.ask(body, ref.current, heard.current.page, (lookup) =>
+      heard.current.onLookup?.(lookup),
+    );
     if (result.conversation && result.conversation.ref !== ref.current) {
       ref.current = result.conversation.ref;
       heard.current.onConversation?.(result.conversation.ref);
@@ -270,6 +317,9 @@ export function AskThread({
   const [ref, setRef] = useState(conversationRef);
   const [open, setOpen] = useState(openHandoffs);
   const incoming = useHandoffReplies(source, ref, open > 0, setOpen);
+  // What Dash is looking up for the answer on its way (plan #1438), emptied
+  // on each question; the answer once landed shows its own, folded.
+  const [live, setLive] = useState<LookupLine[]>([]);
   const send = useAskSend(
     conversationRef,
     page,
@@ -279,6 +329,7 @@ export function AskThread({
     },
     (added) => setChanges((current) => [...current.filter((c) => !added.some((a) => a.id === c.id)), ...added]),
     (count) => setOpen((current) => current + count),
+    (lookup) => setLive((current) => heardLookup(current, lookup)),
   );
   const onChanged = useCallback(
     (next: DashChange) => setChanges((current) => current.map((c) => (c.id === next.id ? next : c))),
@@ -301,16 +352,22 @@ export function AskThread({
       turns={turns}
       send={(body) => {
         onSend?.();
+        setLive([]);
         return send(body);
       }}
       waiting={ASK_WAITING}
+      working={<LookupList lines={live} label="What Dash is looking up" />}
       activity="searching"
       incoming={incoming}
       below={(turn) => {
-        const mine = turn.role === 'assistant' ? byTurn.get(turn.id) : undefined;
-        return mine ? (
-          <DashChanges changes={mine} presses={source} onChanged={onChanged} today={today} />
-        ) : null;
+        if (turn.role !== 'assistant') return null;
+        const mine = byTurn.get(turn.id);
+        return (
+          <>
+            {mine ? <DashChanges changes={mine} presses={source} onChanged={onChanged} today={today} /> : null}
+            <LookupFold calls={turn.toolCalls} />
+          </>
+        );
       }}
       {...thread}
     />
