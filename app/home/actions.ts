@@ -4,6 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { getUser, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { isDay, isPickKey } from '@/lib/day-brief/opens';
+import { requestDashDeps } from '@/lib/ask/clients';
+import { changePaths } from '@/lib/ask/changes';
+import { undoDashTodayWith } from '@/lib/shell/dash-today';
+import { undoAskChange } from '@/lib/talk/ask-request';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -60,4 +64,30 @@ export async function stopWatch(formData: FormData): Promise<StopWatchResult> {
   revalidatePath('/home');
   if ((data ?? []).length === 0) return { ok: false, error: 'That watch is not running any more.' };
   return { ok: true };
+}
+
+export type UndoDashTodayResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Undo one of today's Dash changes from its row on Home (plan #1461), by
+ * lib/shell/dash-today.ts: the generic undo for every surface, and Ask
+ * Dash's own for its changes. A refusal comes back as the sentence the
+ * person reads.
+ */
+// latency: pending
+export async function undoDashToday(id: string): Promise<UndoDashTodayResult> {
+  if (typeof id !== 'string' || !UUID.test(id)) return { ok: false, error: 'That change is not there any more.' };
+  const user = await requireUser();
+  try {
+    const result = await undoDashTodayWith(await requestDashDeps(user.id), id, undoAskChange, (outcome) =>
+      changePaths(outcome.change),
+    );
+    if (!result.ok) return result;
+    for (const path of result.paths) revalidatePath(path);
+    revalidatePath('/home');
+    return { ok: true };
+  } catch (error) {
+    console.error('undoing a Dash change from Home failed', error);
+    return { ok: false, error: 'The change could not be undone. Check your connection and try again.' };
+  }
 }

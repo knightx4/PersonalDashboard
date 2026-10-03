@@ -45,6 +45,9 @@ import { BRIEF_ANCHOR, shownBrief, type ShownBrief } from '@/lib/day-brief/shown
 import { briefDaysOpened, openedFromPush } from '@/lib/day-brief/opens';
 import { DayBrief } from './day-brief';
 import { WatchingSection, WatchMark } from './watching';
+import { loadDashToday, type DashTodayGroup } from '@/lib/shell/dash-today';
+import { DashTodaySection } from './dash-today';
+import { undoDashToday } from './actions';
 
 export const metadata = { title: 'Home' };
 
@@ -87,7 +90,8 @@ function greeting(timezone: string, now: Date): string {
  * is the day's sigil and one line, not five rows of "nothing". The agenda's
  * overdue and due-today entries follow, capped, with a count of the rest.
  * Then the next seven days from the same agenda (interviews, events, return
- * deadlines, tasks), and then what changed in the last three days: replies
+ * deadlines, tasks), what Dash changed today with Undo on each, and then
+ * what changed in the last three days: replies
  * from companies, new orders, newsletters that arrived. Each of those cards
  * is left out when it has nothing in it. The tiles come last and are small,
  * because they are only there to get you into a workspace.
@@ -179,6 +183,12 @@ export default async function HomePage({
   // What Dash is watching (plan #1295): the running watches for their
   // section, and any that finished lately as lines for Updates.
   const watching = safe(loadWatching(now), { running: [], ended: [] });
+  // What Dash changed today (plan #1461), from core.dash_actions in the
+  // person's zone, by workspace. A workspace switched off is left out.
+  const dashToday = safe(
+    loadDashToday(core, { userId: user.id, today, timezone: settings.timezone, shown: on }),
+    [],
+  );
 
   // This morning's brief (plan #1123), written by the hourly day-brief cron
   // from six in the person's zone. Before then there is none, and the page
@@ -315,6 +325,10 @@ export default async function HomePage({
           {/* The fallback carries #watching, where every watch push opens. */}
           <Suspense fallback={<SectionSkeleton rows={1} id="watching" />}>
             <WatchingBlock watching={watching} now={now} timezone={settings.timezone} />
+          </Suspense>
+
+          <Suspense fallback={null}>
+            <DashTodayBlock groups={dashToday} timezone={settings.timezone} />
           </Suspense>
 
           <Suspense fallback={<SectionSkeleton rows={4} />}>
@@ -667,6 +681,20 @@ async function WatchingBlock({
   const { running } = await watching;
   if (running.length === 0) return null;
   return <WatchingSection rows={running} now={now} timezone={timezone} />;
+}
+
+/**
+ * What Dash changed today, with Undo on each (plan #1461). Absent on a day
+ * Dash changed nothing, so it takes no placeholder either.
+ */
+async function DashTodayBlock({
+  groups,
+  timezone,
+}: {
+  groups: Promise<DashTodayGroup[]>;
+  timezone: string;
+}) {
+  return <DashTodaySection groups={await groups} timezone={timezone} undo={undoDashToday} />;
 }
 
 /**
