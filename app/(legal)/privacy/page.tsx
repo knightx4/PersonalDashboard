@@ -149,7 +149,7 @@ export default function PrivacyPage() {
         format=metadata), lib/inbox/read-mail.ts (readMail, MAIL_TEXT_LIMIT,
         format=full), lib/ask/mail.ts (the rows the model reads, the citation
         kept, and `kept` replacing each result on the saved tool call) and
-        keptResult in lib/talk/ask.ts, plans #1315 to #1317. IN_APP_ONLY_TOOLS in
+        keptResult in lib/dash/loop.ts, plans #1315 to #1317. IN_APP_ONLY_TOOLS in
         lib/ask/tools.ts keeps both tools off the connector (lib/connector/mcp.ts).
         A change to what either tool sends or keeps has to be made here too.
       */}

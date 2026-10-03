@@ -1,4 +1,4 @@
-import type { AskDashResult, AskLookupEvent } from './ask';
+import type { AskDashResult, AskLookupEvent } from '@/lib/dash/ask';
 import type { TalkToolCall } from './talk';
 
 /**
