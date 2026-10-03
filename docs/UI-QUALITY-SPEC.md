@@ -14,6 +14,8 @@ the building follow it the first time.
 
 > **Status:** shaped 3 October 2026 into proposed features #1528 (the critic),
 > #1536 (phone checks), #1540 (before and after pictures) and #1544 (patterns).
+> Part 8, added the same day, is #1548 (motion), #1555 and #1559 (moments)
+> and #1564 (judging craft).
 
 ## What happens today
 
@@ -177,6 +179,84 @@ by week. It should fall once Parts 1 to 3 are running. If it does not, the
 critic's instructions or the preferences are wrong, and they are what to look
 at.
 
+## Part 8: Delight
+
+Parts 1 to 7 stop a screen shipping with something wrong with it. They do not
+make it a pleasure to use, and the person wants that, with an opinionated
+direction. This part gives the app one.
+
+### The direction
+
+Calm and fast, with things that behave like objects. Everything has a place,
+and you see it go there: a capture flies into its workspace, a finished todo
+settles into the day's pile, a passed story slides off the deck, a closed goal
+step settles into the step above it. Done consistently, that makes the app
+feel like a place rather than a set of pages.
+
+The numbers and the person's data stay plain, as law 7 already says, and the
+voice stays as `/dev/ui` describes it. The expression goes into motion, the
+marks, the themes and a few designed moments. The person chose this balance
+on 3 October 2026: restrained in the data and the voice, expressive in motion.
+
+The start of this is already in the app. Capture plays a puff and flies a chip
+to where the item went (`components/ui/puff.ts`, `fly-chip.ts`, `landed.ts`).
+Clearing a worked list draws the day's sigil, a mark made from the account and
+the date (`components/ui/sigil.tsx`, `queue-cleared.tsx`), on Todo, Quick read
+and the shopping review. A goal closing plays a ring and a fold. What is
+missing is a system: each animation has its own duration, they share one
+easing curve, nothing springs, nothing responds to touch beyond the swipe, and
+sound is listed on `/dev/ui` as "not yet".
+
+### Motion
+
+Shared tokens in `app/globals.css`, mirrored in `lib/motion.ts` for code that
+times animations: four durations (instant 90ms, quick 160ms, move 260ms,
+moment 600ms), the existing soft ease-out, and a spring written with CSS
+`linear()`. Three shared pieces in `components/motion/`, grown from the
+capture code: travel (an item moving from one place to another), settle (a
+short spring into place, with its name beside it), and clear (a list's last
+item leaving and the sigil drawing in).
+
+A swipe follows the finger exactly and springs away or back on release. A
+completion buzzes once for 10ms on Android; iPhones give web apps no vibration,
+so there it is motion only. A soft completion click, under 80ms, can be
+switched on in account settings and is off by default. Every animation has a
+reduced-motion version that keeps what it tells the person, as the landing
+name already does.
+
+### Moments
+
+A moment is a designed response to something that matters. Each workspace has
+at most three, so they stay noticeable. They are listed on `/dev/ui` with
+their trigger, what the person sees and their reduced-motion version.
+
+| Workspace | Moment |
+|---|---|
+| Todo | Ticking the last item due today settles the done items into a pile that folds shut, draws the sigil, and says how many were finished. |
+| News | The end of Quick read says how many stories were read and skipped and which one held attention longest. |
+| Home | The first visit of the day brings the greeting, brief and Today in in sequence; once nothing due today is left, the sigil sits beside the date. |
+| Jobs | A role moving forward travels to its new column; an offer has the one larger moment. A rejection fades with no movement and shows how many applications are still open. |
+| Goals | A goal closing keeps its ring and fold. A step Dash finished settles in with Dash's mark flashing once. |
+| Learn | A concept you now know lights on the map and traces what it unlocks. |
+| Shopping | A refund that arrived inside its window counts up into the year's "saved by returning on time" figure. |
+| Dash | Its mark comes alive while it works, and its lookups appear as it makes them. |
+
+A fourth moment in a workspace is a decision for the person.
+
+### Judging craft
+
+The critic in Part 2 also judges craft. `scripts/shoot.ts` records each
+gallery surface's declared interaction (a press, a swipe, a completion) as a
+strip of frames, 50ms apart for up to a second, because the critic reads
+images and cannot watch a video. Against the strip it checks that a press
+shows a response in the first frame after it, that motion follows the finger
+and ends settled without a jump, that the moment the catalogue lists for the
+screen is there, and that the wording names real counts and things.
+
+A feature whose screens have a catalogue moment gets a last step from
+shaping, "Build its moments and pass the craft check", and is not done until
+that step is.
+
 ## Rules
 
 Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. None
@@ -199,6 +279,15 @@ Checked by: test `lib/plan/ui-check-guard.test.ts`, pending #1534.
 
 **R5.** Every preference names the note it came from.
 Checked by: test `tests/dev-ui-taste.test.ts`, pending #1529.
+
+**R6.** Every animation has a reduced-motion version.
+Checked by: test `tests/dev-ui-moments.test.ts`, pending #1554.
+
+**R7.** Animation timings and easings come from the motion tokens.
+Checked by: count `raw-motion-values`, target 0, pending #1549.
+
+**R8.** No workspace has more than three moments.
+Checked by: test `tests/dev-ui-moments.test.ts`, pending #1554.
 
 ## Decisions
 
@@ -224,12 +313,18 @@ person's to make.
 4. Before and after on the plan row, the thumbs-down, and the measure.
 5. The three patterns, then the rule that steps name one.
 6. The notes routine adding preferences.
+7. The motion tokens and shared pieces, then the moments on Todo, News and
+   Home, which are the screens used most.
+8. The frame strips and the critic's craft checklist, then the moments in the
+   other workspaces.
 
 ## Limits
 
 The critic is good at crowding, alignment, overflow and hierarchy, and weaker
 on motion, timing and how a screen feels to use. Part 5 covers the parts of
-that a script can measure. The person stays the final check. What this aims
+that a script can measure, and the frame strips in Part 8 let the critic see
+motion at all, though a strip of still frames is not the same as feeling a
+spring under a finger. The person stays the final check. What this aims
 for is screens that need one round of the person's notes, not five.
 
 ## What this does not do
