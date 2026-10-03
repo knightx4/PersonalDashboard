@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useActionState } from 'react';
 import { approveSpecChange, declineSpecChange, type SpecChangeActionState } from './actions';
+import { CommentThread } from '@/components/dev/comment-thread';
 import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError } from '@/components/ui/field';
@@ -71,6 +72,9 @@ function DiffView({ diff }: { diff: string }) {
  *
  * An approved change stays on Specs, without the buttons, until #1509's run
  * has written it into the spec and marked it applied.
+ *
+ * The thread under it (plan #1507) is where you ask Dash about the change or
+ * tell it to reword it; a reword writes a new diff onto this same change.
  */
 export function SpecChangeCard({
   change,
@@ -157,6 +161,13 @@ export function SpecChangeCard({
       ) : (
         <p className="text-small text-ink-muted">Approved. Waiting to be written into the spec.</p>
       )}
+
+      <CommentThread
+        target="change"
+        id={change.id}
+        thread={change.thread}
+        placeholder="A note on this change, a question for Dash, or @dash reword it."
+      />
     </li>
   );
 }

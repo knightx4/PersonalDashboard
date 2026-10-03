@@ -16,6 +16,13 @@ vi.mock('@/lib/plan/handover', () => ({
   })),
 }));
 
+// The spec a change's diff is placed against, in place of reading docs/.
+vi.mock('@/lib/specs/registry', () => ({
+  specBySlug: (slug: string) =>
+    slug === 'spec-layer' ? { slug, title: 'Spec layer', file: 'SPEC-LAYER-SPEC.md', blurb: '', module: null } : null,
+  readSpec: async () => ['# Spec layer', '', '## Part 3', '', 'A change is a row.', 'It has a diff.', ''].join('\n'),
+}));
+
 type Write = { table: string; op: 'insert' | 'update'; row: Record<string, unknown> };
 
 /**
@@ -69,7 +76,10 @@ function db(
         },
         update(row: Record<string, unknown>) {
           writes.push({ table, op: 'update', row });
-          return { eq: () => Promise.resolve({ error }) };
+          // Awaited after one `eq`, or after a second that only touches a
+          // row still in the state it was read in.
+          const narrowed = (): unknown => Object.assign(Promise.resolve({ error }), { eq: narrowed });
+          return { eq: narrowed };
         },
       };
     },
@@ -640,5 +650,91 @@ describe('an instruction outside the list', () => {
       expect(outcome.ok === false && outcome.route).toBe(true);
       expect(outcome.ok === false && outcome.why).toContain(name);
     }
+  });
+});
+
+describe('rewording a spec change', () => {
+  const proposed = {
+    spec: 'spec-layer',
+    title: 'Say what a change is',
+    why: 'Because.',
+    diff: '@@ -5 +5 @@\n-A change is a row.\n+A change is a row in spec_changes.\n',
+    status: 'proposed',
+  };
+
+  it('writes a new diff on the same change, placed against the spec', async () => {
+    const { writes, supabase } = db({ row: proposed });
+    const outcome = await carryOut(
+      input({
+        supabase,
+        target: 'change',
+        action: action({
+          name: 'reword',
+          field: 'diff',
+          text: '```diff\n@@ @@\n A change is a row.\n-It has a diff.\n+It has a diff of at most sixty lines.\n```',
+        }),
+      }),
+    );
+
+    expect(writes).toEqual([
+      {
+        table: 'spec_changes',
+        op: 'update',
+        row: { diff: '@@ -5,2 +5,2 @@\n A change is a row.\n-It has a diff.\n+It has a diff of at most sixty lines.\n' },
+      },
+    ]);
+    expect(outcome.ok && outcome.said).toContain('Rewrote the diff');
+    expect(outcome.ok && outcome.said).toContain('+A change is a row in spec_changes.');
+  });
+
+  it('reads no field as the diff', async () => {
+    const { writes, supabase } = db({ row: proposed });
+    await carryOut(
+      input({ supabase, target: 'change', action: action({ name: 'reword', text: '@@ @@\n-It has a diff.\n+It has two.' }) }),
+    );
+    expect(writes.map((write) => Object.keys(write.row))).toEqual([['diff']]);
+  });
+
+  it('refuses a diff whose lines are not in the spec, and writes nothing', async () => {
+    const { writes, supabase } = db({ row: proposed });
+    const outcome = await carryOut(
+      input({ supabase, target: 'change', action: action({ name: 'reword', text: '@@ @@\n-Not in it.\n+Anything.' }) }),
+    );
+    expect(writes).toEqual([]);
+    expect(outcome.ok === false && outcome.why).toContain('Not in it.');
+  });
+
+  it('refuses a diff over the sixty-line cap, and writes nothing', async () => {
+    const added = Array.from({ length: 60 }, (_, i) => `+Line ${i}.`);
+    const { writes, supabase } = db({ row: proposed });
+    const outcome = await carryOut(
+      input({
+        supabase,
+        target: 'change',
+        action: action({ name: 'reword', text: ['@@ @@', '-It has a diff.', ...added].join('\n') }),
+      }),
+    );
+    expect(writes).toEqual([]);
+    expect(outcome.ok === false && outcome.why).toContain('61 lines');
+  });
+
+  it('rewrites the title and the why', async () => {
+    for (const field of ['title', 'why'] as const) {
+      const { writes, supabase } = db({ row: proposed });
+      const outcome = await carryOut(
+        input({ supabase, target: 'change', action: action({ name: 'reword', field, text: 'Said better.' }) }),
+      );
+      expect(writes).toEqual([{ table: 'spec_changes', op: 'update', row: { [field]: 'Said better.' } }]);
+      expect(outcome.ok && outcome.said).toContain(proposed[field]);
+    }
+  });
+
+  it('leaves a change that is no longer proposed alone', async () => {
+    const { writes, supabase } = db({ row: { ...proposed, status: 'approved' } });
+    const outcome = await carryOut(
+      input({ supabase, target: 'change', action: action({ name: 'reword', text: '@@ @@\n-It has a diff.\n+It has two.' }) }),
+    );
+    expect(writes).toEqual([]);
+    expect(outcome.ok === false && outcome.why).toContain('approved already');
   });
 });

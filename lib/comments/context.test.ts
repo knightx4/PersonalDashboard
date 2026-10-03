@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { askMessage, ideaContext, noteContext, raiseContext, threadText } from './context';
+import { askMessage, ideaContext, noteContext, raiseContext, specChangeContext, threadText } from './context';
 import type { DevComment } from './load';
 import type { FeedbackRow } from '@/lib/feedback/load';
 import type { IdeaRow } from '@/lib/ideas/load';
@@ -149,5 +149,32 @@ describe('noteContext', () => {
 
   it('calls a like a like', () => {
     expect(noteContext(note({ kind: 'like' }))).toContain('# A like');
+  });
+});
+
+describe('specChangeContext', () => {
+  const change = {
+    title: 'Say what a change is',
+    why: 'The notes keep asking.',
+    diff: '@@ -5 +5 @@\n-A change is a row.\n+A change is a row in spec_changes.\n',
+    status: 'proposed',
+    madeBy: 'claude' as const,
+    spec: { title: 'Spec layer', file: 'SPEC-LAYER-SPEC.md' },
+    slug: 'spec-layer',
+  };
+
+  it('carries the diff, the why and the section it changes', () => {
+    const text = specChangeContext({ ...change, sections: [{ heading: 'Part 3', body: 'A change is a row.' }] });
+    expect(text).toContain('+A change is a row in spec_changes.');
+    expect(text).toContain('The notes keep asking.');
+    expect(text).toContain('## Part 3\n\nA change is a row.');
+    expect(text).toContain('docs/SPEC-LAYER-SPEC.md');
+  });
+
+  it('cuts a spec too long for the call', () => {
+    const body = 'x'.repeat(20000);
+    const text = specChangeContext({ ...change, sections: [{ heading: 'Long', body }] });
+    expect(text.length).toBeLessThan(14000);
+    expect(text).toContain('left out for length');
   });
 });

@@ -287,6 +287,7 @@ describe('waitingGroups', () => {
       planItemId: null,
       decidedAt: status === 'proposed' ? null : '2026-10-01T00:00:00Z',
       createdAt: '2026-10-01T00:00:00Z',
+      thread: [],
     });
     const laid = waitingGroups(
       buildPlanTree({ items: [item({ id: 'a', number: 1, status: 'proposed' })], dependencies: [] }),

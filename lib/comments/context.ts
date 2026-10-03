@@ -161,3 +161,62 @@ export function specContext(spec: {
     ].join('\n') + '\n'
   );
 }
+
+/** The spec the change's diff reads against, when it is more than a few sections. */
+const MAX_SPEC_CONTEXT = 12000;
+
+/**
+ * A proposed change to a spec (plan #1507): its title, its why and its diff,
+ * with the sections of the spec the diff touches.
+ *
+ * The sections are there for two things a diff alone cannot answer: what the
+ * rule around the change says, and the exact wording a reworded diff has to
+ * keep on its context lines. Only the touched sections, for the reason
+ * `specContext` gives; the whole document when none can be told apart, cut to
+ * a length a cheap call can carry.
+ */
+export function specChangeContext(change: {
+  title: string;
+  why: string;
+  diff: string;
+  status: string;
+  madeBy: 'me' | 'claude';
+  /** The spec's title and file, or null for a spec the change creates. */
+  spec: { title: string; file: string } | null;
+  slug: string;
+  /** The touched sections, as `## heading` and body, or the document when none matched. */
+  sections: readonly { heading: string; body: string }[];
+}): string {
+  const out = [
+    `# A proposed change to a spec — ${change.title}`,
+    '',
+    change.spec
+      ? `To ${change.spec.title}, which is \`docs/${change.spec.file}\` in the repository.`
+      : `To a new spec, ${change.slug}, which does not exist yet.`,
+    `Status: ${change.status}`,
+    `Drafted by: ${change.madeBy === 'claude' ? 'a session' : 'the person'}`,
+    '',
+    '## Why',
+    '',
+    change.why,
+    '',
+    '## The diff',
+    '',
+    change.diff.trimEnd(),
+  ];
+  if (change.sections.length > 0) {
+    out.push('', '## The spec where it changes, as it stands');
+    let used = 0;
+    for (const section of change.sections) {
+      const text = `## ${section.heading}\n\n${section.body}`;
+      if (used + text.length > MAX_SPEC_CONTEXT) {
+        if (used === 0) out.push('', text.slice(0, MAX_SPEC_CONTEXT));
+        out.push('', '(The rest of the spec is left out for length.)');
+        break;
+      }
+      out.push('', text);
+      used += text.length;
+    }
+  }
+  return out.join('\n') + '\n';
+}
