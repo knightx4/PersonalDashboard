@@ -436,6 +436,29 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     const uses = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');
     const answered = uses.find((c) => c.name === ANSWER_TOOL);
     if (answered) {
+      // Writes made in the same round as the answer are made first (plan
+      // #1478): the answer says they are done, and capture files every move
+      // and its answer in one round. Lookups beside an answer are not run,
+      // since nothing would read what they return.
+      const writes = uses.filter((use) => use !== answered && dashTool(use.name, voice.tools)?.kind === 'write');
+      const made = await Promise.all(
+        writes.map(async (use, i): Promise<AskToolResult> => {
+          if (lookups + i >= MAX_LOOKUPS) return { ok: false, error: LIMIT_REACHED };
+          hear({ phase: 'started', id: use.id, index: lookups + i, name: use.name, input: use.input });
+          return run(use.name, use.input);
+        }),
+      );
+      writes.forEach((use, i) => {
+        const result = made[i];
+        const kept = keptResult(result);
+        toolCalls.push({ name: use.name, input: use.input, result: kept });
+        hear({ phase: 'finished', id: use.id, index: lookups + i, name: use.name, input: use.input, ok: result.ok, result: kept });
+        for (const c of citationsOf(result)) {
+          known.set(citationKey(c), c);
+          found.push(c);
+        }
+      });
+      lookups += writes.length;
       const { answer, cited } = answerInput(answered.input);
       if (!answer) return fail('The answer came back empty.');
       const citations: TalkCitation[] = [];

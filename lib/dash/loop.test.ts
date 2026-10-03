@@ -86,4 +86,35 @@ describe('runDash', () => {
       result: { ok: false, error: 'Changes cannot be made here. Answer in words.' },
     });
   });
+
+  it('makes the writes that come with the answer before answering, and skips lookups beside it', async () => {
+    const { client: stub, sent } = client([
+      {
+        content: [
+          { type: 'tool_use', id: 'w1', name: 'add_goal', input: { title: 'Run a marathon' } },
+          { type: 'tool_use', id: 'l1', name: 'todos', input: {} },
+          { type: 'tool_use', id: 'a1', name: 'answer', input: { answer: 'Added it.', cited: [] } },
+        ],
+        stop_reason: 'tool_use',
+        usage: USAGE,
+      },
+    ]);
+    const write = vi.fn(async () => ({ ok: true as const, rows: [], note: 'Added.' }));
+    const execute = vi.fn();
+    const answer = await runDash({
+      voice,
+      context,
+      turns,
+      today: '2026-10-03',
+      execute,
+      write,
+      anthropicApiKey: 'k',
+      client: stub,
+    });
+    expect(sent).toHaveLength(1);
+    expect(write).toHaveBeenCalledWith(ADD_GOAL, { title: 'Run a marathon' }, expect.any(Function));
+    expect(execute).not.toHaveBeenCalled();
+    expect(answer).toMatchObject({ ok: true, body: 'Added it.', stop: 'answered' });
+    expect(answer.ok && answer.toolCalls.map((c) => c.name)).toEqual(['add_goal']);
+  });
 });

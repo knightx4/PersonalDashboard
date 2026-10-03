@@ -5,6 +5,7 @@ import type { ChangeDeps } from '@/lib/ask/changes';
 import type { AskContext, AskRow } from '@/lib/ask/db';
 import type { DashAction, DashActionOp } from '@/lib/core/dash-actions';
 import { HAND_OFF_TOOL } from '@/lib/talk/handoff';
+import { CAPTURE_TABLE, CAPTURE_TOOLS } from './capture-tools';
 import { THREAD_TOOLS } from './thread-tools';
 import { WRITE_TOOLS } from './writes';
 
@@ -44,6 +45,10 @@ import { WRITE_TOOLS } from './writes';
  * into a goal's collection, or writing a role's cover letter. It is offered
  * only in a thread on a row of one of those tables, never in Ask, and the
  * thread binds what it does (`DashWriteContext.thread`).
+ *
+ * The five capture moves (lib/dash/capture-tools.ts, plan #1478) are such
+ * tools on `goals.captures`: offered only to the capture box, which files
+ * each one as the model makes it.
  *
  * `answer` is not here. It is how the loop ends a turn, not something Dash
  * can do, and the loop adds it after a surface's tools.
@@ -172,6 +177,7 @@ export const DASH_TOOLS: readonly DashTool[] = [
   ),
   ...WRITE_TOOLS,
   ...THREAD_TOOLS,
+  ...CAPTURE_TOOLS,
   ...PROPOSAL_TOOLS.filter((definition) => REGISTERED_PROPOSALS.has(definition.name)).map(
     (definition): DashProposalTool => ({ name: definition.name, kind: 'proposal', definition }),
   ),
@@ -214,4 +220,13 @@ export function threadDashTools(table: string): DashTool[] {
       (tool.kind === 'lookup' || tool.kind === 'write' || (tool.kind === 'handoff' && tool.subjects)) &&
       offeredOn(tool, table),
   );
+}
+
+/**
+ * The tools the capture box offers (plan #1478): its five moves and nothing
+ * else. The sentence comes with the goals and steps it can be filed against,
+ * so there is nothing to look up, and Haiku answers faster with less to read.
+ */
+export function captureDashTools(): DashTool[] {
+  return DASH_TOOLS.filter((tool) => tool.kind === 'write' && offeredOn(tool, CAPTURE_TABLE) && !!tool.subjects);
 }

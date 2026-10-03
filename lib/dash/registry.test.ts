@@ -2,18 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { ASK_TOOLS, ASK_TOOL_NAMES, IN_APP_ONLY_TOOLS } from '@/lib/ask/tools';
 import { HAND_OFF_TOOL_NAME } from '@/lib/talk/handoff';
 import { WRITE_TOOL_KINDS } from '@/lib/core/dash-actions';
-import { ASK_DASH_TOOLS, DASH_TOOLS, dashTool, dashToolsOf, threadDashTools } from './registry';
+import { ASK_DASH_TOOLS, DASH_TOOLS, captureDashTools, dashTool, dashToolsOf, threadDashTools } from './registry';
+import { CAPTURE_TOOL_NAMES } from './capture-tools';
 import { DEV_THREAD_TABLES, GOAL_THREAD_TABLE, ROLE_THREAD_TABLE, THREAD_TOOL_NAMES } from './thread-tools';
 import { WRITE_TOOL_NAMES } from './writes';
 import { isShownLookup, WRITE_TOOL_NAMES_SHOWN_AS_CARDS } from '@/lib/talk/lookups';
 
 /** Dash's one tool registry (plan #1463): every tool Ask had, each declared once. */
 describe('DASH_TOOLS', () => {
-  it('lists every lookup, the writes, the thread tools, the watch proposal and the hand-off, in the order sent', () => {
+  it('lists every lookup, the writes, the thread tools, the capture moves, the watch proposal and the hand-off, in the order sent', () => {
     expect(DASH_TOOLS.map((t) => t.name)).toEqual([
       ...ASK_TOOL_NAMES,
       ...WRITE_TOOL_NAMES,
       ...THREAD_TOOL_NAMES,
+      ...CAPTURE_TOOL_NAMES,
       'propose_watch',
       HAND_OFF_TOOL_NAME,
     ]);
@@ -47,6 +49,11 @@ describe('DASH_TOOLS', () => {
       'file_goal_record',
       'schedule_goal_step',
       'write_cover_letter',
+      'file_close',
+      'file_count',
+      'file_progress',
+      'file_reading',
+      'file_add',
     ]);
     // Ask's undo puts back exactly the kinds the write tools record.
     expect([...WRITE_TOOL_KINDS]).toEqual(WRITE_TOOL_NAMES);
@@ -77,6 +84,20 @@ describe('DASH_TOOLS', () => {
     expect(own(DEV_THREAD_TABLES.change)).toEqual(['file_idea', 'file_note', 'reword', 'pass_to_session']);
     expect(own(GOAL_THREAD_TABLE)).toEqual(['file_goal_record', 'schedule_goal_step', 'take_step', 'pass_to_routine']);
     expect(own(ROLE_THREAD_TABLE)).toEqual(['write_cover_letter']);
+  });
+
+  it('offers the capture box its five moves and nothing else, and no other surface those moves', () => {
+    expect(captureDashTools().map((t) => t.name)).toEqual([
+      'file_close',
+      'file_count',
+      'file_progress',
+      'file_reading',
+      'file_add',
+    ]);
+    for (const table of [...Object.values(DEV_THREAD_TABLES), GOAL_THREAD_TABLE, ROLE_THREAD_TABLE]) {
+      for (const name of CAPTURE_TOOL_NAMES) expect(threadDashTools(table).map((t) => t.name)).not.toContain(name);
+    }
+    for (const name of CAPTURE_TOOL_NAMES) expect(ASK_DASH_TOOLS.map((t) => t.name)).not.toContain(name);
   });
 
   it('names each tool once, by the name its definition sends', () => {

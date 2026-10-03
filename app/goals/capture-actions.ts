@@ -48,8 +48,9 @@ import { todayIn } from '@/lib/todo/tasks/model';
  * undo one line of what it filed. Called from the shell's capture panel
  * (components/shell/capture.tsx), so it is reachable from every page.
  *
- * Both write through a client made as the capture actor with the capture's
- * id, so goals.history records each change as capture's and names the
+ * Filing runs on Dash's shared loop with surface capture and Haiku (plan
+ * #1478), its five moves made as write tools. Both write through a client
+ * made as the capture actor with the capture's id, so goals.history records each change as capture's and names the
  * sentence it came from. Each line filed is recorded as Dash's in
  * core.dash_actions too (plan #1569), and undoing a line marks its record
  * undone, so Home's list of what Dash did today agrees with the panel.
@@ -109,8 +110,12 @@ export async function fileGoalCapture(
     const result = await fileCapture(body, today, {
       keep: (text) => keepCapture(client, user.id, captureId, text),
       context: () => loadCaptureContext(reader, { userId: user.id, today }),
-      ask: (message) =>
-        askCaptureModel({ apiKey: key, onSpend: (report) => spend.push(report) }, message),
+      ask: (message, file) =>
+        askCaptureModel(
+          { apiKey: key, captureId, today, onSpend: (report) => spend.push(report) },
+          message,
+          file,
+        ),
       apply: (id, action) =>
         applyCaptureAction(client, { userId: user.id, today, captureId: id, dash }, action),
       save: (id, filed) => saveFiled(client, id, filed),

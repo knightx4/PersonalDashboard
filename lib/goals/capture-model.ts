@@ -1,20 +1,26 @@
 /**
- * The model call behind the capture box (plan #929): one sentence read
- * against your open goals and steps, answered through a single tool.
+ * The model call behind the capture box (plan #929), on Dash's shared loop
+ * (plan #1478; docs/CORE-AND-DASH-SPEC.md, Part 6): one sentence read
+ * against your open goals and steps, filed through the five capture moves.
  *
- * Haiku, with a forced tool call and nothing else, because the box has to
- * answer in seconds. The rules for what the answer may do are in
- * lib/goals/capture.ts, which checks every ref before anything is written.
+ * Haiku, with the five moves and nothing to look up, because the box has to
+ * answer in seconds. Each move is a write tool in lib/dash's registry
+ * (lib/dash/capture-tools.ts); the loop hands each call here, and here it is
+ * handed to fileCapture, which checks every ref against what was shown
+ * before anything is written (lib/goals/capture.ts) and says back what it
+ * filed or why not.
  */
 import 'server-only';
 
-import Anthropic from '@anthropic-ai/sdk';
-import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import type { AskResult } from '@/lib/goals/capture';
-import { MODELS } from '@/lib/core/models';
+import type Anthropic from '@anthropic-ai/sdk';
+import type { SpendSink } from '@/lib/core/spend/pricing';
+import type { AskToolResult } from '@/lib/ask/db';
+import { runDash, type DashVoice, type DashWriter } from '@/lib/dash/loop';
+import { DASH_MODELS } from '@/lib/dash/models';
+import { captureDashTools } from '@/lib/dash/registry';
+import { describeFiled, moveOfTool, type AskResult, type FiledMove } from '@/lib/goals/capture';
 
-export const CAPTURE_MODEL = MODELS.goalCapture;
-const TOOL_NAME = 'file';
+export const CAPTURE_MODEL = DASH_MODELS.capture;
 
 const SYSTEM = `You file a sentence the owner of a personal goals tracker wrote
 about something that happened. You are given their open goals, each with a ref
@@ -22,46 +28,15 @@ like g1, and the open steps under each goal, each with a ref like s4, then the
 sentence. A step may have a line in brackets under it with its done-when, its
 total and how much is logged so far, and what Dash prepared for it.
 
-Decide what the sentence means for those goals, using only these five moves:
-
-- close: the whole of a step is finished. "step" is its ref. Only for steps
-  marked mine or claude, never a rhythm.
-- count: the sentence reports occurrences of a rhythm step (for example "went
-  to an event" against a rhythm of one event a week). "step" is its ref. Only
-  for steps marked rhythm with a period open. "quantity" is how many, as a
-  whole number, when the sentence says more than one ("sent three
-  applications" is quantity 3); leave it out for one. "day" is the date as
-  YYYY-MM-DD, only when the sentence names another day than today, such as
-  yesterday; work it out from today's date.
-- progress: part of the work, done without finishing it. "step" is the ref of
-  the deepest step the sentence fits; when no step fits, leave "step" out and
-  give "goal" instead, but only when the work belongs to the goal as a whole;
-  a distinct piece of work the tree has no step for is an add carrying the
-  progress, below. "text" says what was done in a short phrase in the
-  person's own terms. When the sentence gives an amount, "quantity" is the
-  number alone and "unit" is what was counted, such as bags, pages or rooms
-  ("moved two bags" is quantity 2, unit bags). "day" is the date it happened
-  as YYYY-MM-DD, only when the sentence names another day than today, such as
-  yesterday; work it out from today's date.
-  "total" is how many there are in all, in the same unit, and only for a
-  step shown with "no total" whose done-when or what Dash prepared for it
-  says the number ("all 100 bags", "about 100 bags"). Never guess one.
-- reading: the sentence gives the current value of a goal's number, such as a
-  balance or a weight. "goal" is its ref and "value" is the number alone, in
-  the goal's unit. Only for goals marked "measured in".
-- add: a follow-up step the sentence implies. "parent" is the ref of the goal
-  or step it goes under, "title" says what will be done in a few plain words,
-  and "kind" is mine when the person does it or claude when it is research or
-  drafting Claude can do later, such as finding a sign-up page, a contact or
-  an application form.
-  When the sentence reports work already done on something no step covers,
-  add that step under the nearest step it fits (or the goal) and log the work
-  on it in the same move: "text", "quantity", "unit" and "day" as for
-  progress, so the step starts under way. "moved two bags to the office" with
-  only a "Living room" step is an add under it titled "Move the bags to the
-  office", text "moved two bags", quantity 2, unit bags. "total" only when the
-  sentence says how many there are in all. Never also log the same work as a
-  separate progress move.
+Decide what the sentence means for those goals, and file it with the five
+move tools: file_close (the whole of a step is finished), file_count
+(occurrences of a rhythm), file_progress (part of the work, done without
+finishing it), file_reading (the current value of a goal's number) and
+file_add (a follow-up step, or work done that no step covers). Each tool says
+when it applies. Make every move in one go, together with the answer tool,
+whose answer is one short sentence saying what you filed; the person sees the
+moves, not the answer. If a move comes back refused, correct it once or leave
+it out.
 
 Rules:
 
@@ -72,84 +47,71 @@ Rules:
   several rooms, two chapters of a book) is progress on that step, never a
   close. Close a step only when the sentence says the whole step is finished.
   When unsure, log progress: the step stays open and nothing is lost.
-- Never invent refs. If nothing fits, return an empty list: the sentence is
-  kept either way.
+- Work already done on something no step covers is one file_add carrying the
+  progress: "moved two bags to the office" with only a "Living room" step is
+  an add under it titled Move the bags to the office, text moved two bags,
+  quantity 2, unit bags.
+- Never invent refs. If nothing fits, make no move and only answer: the
+  sentence is kept either way.
 - Titles and progress text are short and plain, with no quotation marks around them.`;
+
+/** How Dash speaks in the capture box: Haiku, the filing rules, the five moves. */
+export const CAPTURE_VOICE: DashVoice = {
+  model: CAPTURE_MODEL,
+  system: SYSTEM,
+  tools: captureDashTools(),
+};
+
+const NOTHING_TO_LOOK_UP = 'There is nothing to look up here. File the sentence with the move tools, then answer.';
 
 export type CaptureModelOptions = {
   apiKey: string;
+  /** The capture the sentence was kept as: what the conversation hangs from. */
+  captureId: string;
+  /** YYYY-MM-DD in the person's timezone. */
+  today: string;
   /** Overridable for tests. */
   client?: Anthropic;
-  /** What the call cost; recorded as 'file-capture'. */
+  /** What the calls cost; recorded as 'file-capture'. */
   onSpend?: SpendSink;
 };
 
-/** Ask; get back the tool input, or why there is none. */
+/** What the model is told about a move once fileCapture has filed it or refused it. */
+function told(outcome: FiledMove): AskToolResult {
+  if (!outcome.ok) return { ok: false, error: outcome.error };
+  return { ok: true, rows: [], note: `Filed: ${describeFiled(outcome.entry)}. It is listed under the sentence with an Undo.` };
+}
+
+/**
+ * Run the sentence through the shared loop with surface capture. Each move
+ * the model makes goes to `file`; what comes back is whether the loop
+ * finished, since what was filed is already in hand.
+ */
 export async function askCaptureModel(
   options: CaptureModelOptions,
   message: string,
+  file: (move: unknown) => Promise<FiledMove>,
 ): Promise<AskResult> {
-  const client = options.client ?? new Anthropic({ apiKey: options.apiKey });
-
-  let response;
-  try {
-    response = await client.messages.create({
-      model: CAPTURE_MODEL,
-      max_tokens: 1024,
-      system: SYSTEM,
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'File the sentence against the goals and steps as a list of moves.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              actions: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    type: {
-                      type: 'string',
-                      enum: ['close', 'count', 'progress', 'reading', 'add'],
-                    },
-                    step: { type: ['string', 'null'] },
-                    goal: { type: ['string', 'null'] },
-                    parent: { type: ['string', 'null'] },
-                    title: { type: ['string', 'null'] },
-                    kind: { type: ['string', 'null'], enum: ['mine', 'claude', null] },
-                    text: { type: ['string', 'null'] },
-                    value: { type: ['number', 'null'] },
-                    quantity: { type: ['number', 'null'] },
-                    unit: { type: ['string', 'null'] },
-                    day: { type: ['string', 'null'] },
-                    total: { type: ['number', 'null'] },
-                  },
-                  required: ['type'],
-                },
-              },
-            },
-            required: ['actions'],
-          },
-        },
-      ],
-      tool_choice: { type: 'tool', name: TOOL_NAME },
-      messages: [{ role: 'user', content: message }],
-    });
-  } catch (error) {
-    if (error instanceof Anthropic.RateLimitError) {
-      return { ok: false, error: 'Filing is rate-limited right now.' };
-    }
-    if (error instanceof Anthropic.APIError) {
-      return { ok: false, error: `Filing failed (${error.status}).` };
-    }
+  const write: DashWriter = async (tool, args) => {
+    const type = moveOfTool(tool.name);
+    if (!type) return { ok: false, error: 'That is not one of the five moves.' };
+    const fields = args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
+    return told(await file({ ...fields, type }));
+  };
+  const answer = await runDash({
+    voice: CAPTURE_VOICE,
+    context: { surface: 'capture', subject: { ref: `goals.captures:${options.captureId}` }, page: null },
+    turns: [{ role: 'user', body: message }],
+    today: options.today,
+    execute: async () => ({ ok: false, error: NOTHING_TO_LOOK_UP }),
+    write,
+    anthropicApiKey: options.apiKey,
+    client: options.client,
+    onSpend: options.onSpend,
+  });
+  if (!answer.ok) {
+    console.error('capture filing failed', answer.detail);
     return { ok: false, error: 'Filing failed.' };
   }
-  options.onSpend?.({ model: CAPTURE_MODEL, usage: usageFrom(response.usage) });
-
-  const reported = response.content.find(
-    (block) => block.type === 'tool_use' && block.name === TOOL_NAME,
-  );
-  if (!reported || reported.type !== 'tool_use') return { ok: false, error: 'Nothing came back.' };
-  return { ok: true, input: reported.input };
+  return { ok: true };
 }

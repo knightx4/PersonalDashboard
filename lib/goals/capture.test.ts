@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import type Anthropic from '@anthropic-ai/sdk';
+import { askCaptureModel } from './capture-model';
 import {
   addedProgress,
   asksEstimate,
+  CAPTURE_MOVE_TOOLS,
   captureContext,
   captureMessage,
   describeFiled,
@@ -241,21 +244,55 @@ describe('parseFiling', () => {
   });
 });
 
-/** Stubbed model and database, recording what was written. */
+const USAGE = { input_tokens: 10, output_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+
+/**
+ * A model that makes the moves in `input.actions` as the capture tools, all
+ * in its first round with its answer, as the capture rules ask it to. What it
+ * was sent is kept in `sent`.
+ */
+function modelMaking(input: unknown, sent: { messages: { content: unknown }[]; tools: { name: string }[] }[]) {
+  const actions =
+    input && typeof input === 'object' && Array.isArray((input as { actions?: unknown }).actions)
+      ? ((input as { actions: Record<string, unknown>[] }).actions)
+      : [];
+  return {
+    messages: {
+      create: async (params: (typeof sent)[number]) => {
+        sent.push(structuredClone(params));
+        const moves = actions.map(({ type, ...fields }, i) => ({
+          type: 'tool_use',
+          id: `m${i}`,
+          name: CAPTURE_MOVE_TOOLS[type as keyof typeof CAPTURE_MOVE_TOOLS] ?? `file_${String(type)}`,
+          input: fields,
+        }));
+        const answer = { type: 'tool_use', id: 'a', name: 'answer', input: { answer: 'Filed it.', cited: [] } };
+        return { content: [...moves, answer], stop_reason: 'tool_use', usage: USAGE };
+      },
+    },
+  } as unknown as Anthropic;
+}
+
+/** Stubbed model and database, recording what was written. The model call runs on the shared loop. */
 function stubs(input: unknown, overrides: Partial<FilingDeps> = {}) {
   const kept: string[] = [];
   const applied: PlannedAction[] = [];
   const saved: FiledEntry[][] = [];
   const asked: string[] = [];
+  const sent: Parameters<typeof modelMaking>[1] = [];
   const deps: FilingDeps = {
     keep: async (body) => {
       kept.push(body);
       return 'capture-1';
     },
     context: async () => city,
-    ask: async (message) => {
+    ask: async (message, file) => {
       asked.push(message);
-      return { ok: true, input };
+      return askCaptureModel(
+        { apiKey: 'test', captureId: 'capture-1', today: '2026-09-30', client: modelMaking(input, sent) },
+        message,
+        file,
+      );
     },
     apply: async (_id, action) => {
       applied.push(action);
@@ -315,7 +352,7 @@ function stubs(input: unknown, overrides: Partial<FilingDeps> = {}) {
     },
     ...overrides,
   };
-  return { deps, kept, applied, saved, asked };
+  return { deps, kept, applied, saved, asked, sent };
 }
 
 describe('fileCapture', () => {
@@ -380,6 +417,54 @@ describe('fileCapture', () => {
     expect(kept).toEqual(['nice weather today']);
     expect(saved).toEqual([]);
     expect(result).toEqual({ ok: true, captureId: 'capture-1', filed: [] });
+  });
+
+  it('files through the shared loop: Haiku, the five moves as tools, the sentence as the turn', async () => {
+    const { deps, sent } = stubs(reply);
+    await fileCapture(sentence, '2026-09-24', deps);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.tools.map((t) => t.name)).toEqual([
+      'file_close',
+      'file_count',
+      'file_progress',
+      'file_reading',
+      'file_add',
+      'answer',
+    ]);
+    expect(String(sent[0]!.messages[0]!.content)).toContain(sentence);
+  });
+
+  it('refuses a ref it was not shown and a repeat, and files the rest in order', async () => {
+    const { deps, applied } = stubs({
+      actions: [
+        { type: 'close', step: 's9' },
+        { type: 'close', step: 's2' },
+        { type: 'close', step: 's2' },
+        { type: 'note', goal: 'g1', text: 'not a tool' },
+        { type: 'count', step: 's1' },
+      ],
+    });
+    const result = await fileCapture(sentence, '2026-09-24', deps);
+    expect(applied.map((a) => a.kind)).toEqual(['close', 'count']);
+    expect(result.ok && result.filed.map((e) => e.kind)).toEqual(['close', 'count']);
+  });
+
+  it('says filing failed and keeps the sentence when the model call throws', async () => {
+    const failing = {
+      messages: {
+        create: async () => {
+          throw new Error('overloaded');
+        },
+      },
+    } as unknown as Anthropic;
+    const { deps, kept, saved } = stubs(reply, {
+      ask: (message, file) =>
+        askCaptureModel({ apiKey: 'test', captureId: 'capture-1', today: '2026-09-24', client: failing }, message, file),
+    });
+    const result = await fileCapture(sentence, '2026-09-24', deps);
+    expect(kept).toEqual([sentence]);
+    expect(saved).toEqual([]);
+    expect(result).toEqual({ ok: false, error: 'Filing failed. What you wrote is kept.', captureId: 'capture-1' });
   });
 
   it('refuses an empty or overlong sentence before anything is kept', async () => {
