@@ -118,6 +118,30 @@ describe('tablesCreated', () => {
     ]);
     expect(tables.find((t) => t.name === 'core.files')?.definition).toContain('body text');
   });
+
+  it('keeps each later alter table beside the definition, through a rename', () => {
+    put(
+      'supabase/migrations/0001_a.sql',
+      `create table raised_comments (id int);
+       alter table raised_comments add column author text;
+       alter table raised_comments rename to dev_comments;`,
+    );
+    put(
+      'supabase/migrations-x/0001_b.sql',
+      `set search_path = job_search, extensions;
+       create table notes (id int);
+       alter table notes add constraint notes_author_ck check (author in ('me', 'claude'));
+       alter table if exists public.dev_comments add column body text;`,
+    );
+    const tables = new Map(tablesCreated(root).map((t) => [t.name, t]));
+    expect(tables.get('job_search.notes')?.alterations).toEqual([
+      "alter table notes add constraint notes_author_ck check (author in ('me', 'claude'))",
+    ]);
+    expect(tables.get('public.dev_comments')?.alterations).toEqual([
+      'alter table raised_comments add column author text',
+      'alter table if exists public.dev_comments add column body text',
+    ]);
+  });
 });
 
 describe('the repository', () => {

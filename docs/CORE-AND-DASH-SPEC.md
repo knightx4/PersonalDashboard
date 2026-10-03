@@ -211,6 +211,54 @@ and reads them from the new one. Scheduled writers that are not conversations,
 such as the morning brief, the week review and Learn's card writer, stay as
 they are; any change they make to the person's rows goes through Part 5.
 
+## Rules
+
+Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. Each
+count is measured by a counter in `scripts/spec-counts.ts`, and
+`npm run check:specs -- --list` prints what it counted. The baselines were
+measured on main on 3 October 2026, and three differ from the estimates under
+**What there is today**: `job_search.attachments` is a fourth link table with
+a column per target, the Learn now card and Quick read discussions are two
+more conversational paths, and 74 files hold a model id.
+
+**R1.** Every comment thread is stored in `core.conversations`, with its
+turns in `core.conversation_turns`.
+Checked by: count `thread-tables`, baseline 6, target 1.
+
+**R2.** Every place the person talks to Dash runs on the one loop in
+`lib/dash/`.
+Checked by: count `conversational-model-paths`, baseline 8, target 1.
+
+**R3.** A model id is written in one file, `lib/core/models.ts`.
+Checked by: count `model-id-files`, baseline 74, target 1.
+
+**R4.** A row points at another row by a ref, not by a column for each kind
+of row it could point at.
+Checked by: count `link-tables-per-target-column`, baseline 4, target 0.
+
+**R5.** Every write Dash makes to the person's rows has a `core.dash_actions`
+row that can undo it.
+Checked by: test `tests/dash-actions-recorded.test.ts`, pending #1459.
+
+**R6.** Every skill that writes the person's rows records each write with
+`core.record_dash_action`.
+Checked by: test `tests/skills-record-dash-actions.test.ts`, pending #1460.
+
+The counters count these things:
+
+- `thread-tables`: tables whose rows are turns between the person and Dash or
+  Maya, told apart by an author or role column checked to one of each, such
+  as `author in ('me', 'claude')`. `core.memory_chunks` marks its rows the
+  same way and is left out, because it copies turns out of the threads to
+  search them.
+- `conversational-model-paths`: spend operations under which a model answers
+  what the person typed, which are the ones named `ask-`, `reply-` or
+  `discuss-`, and capture's `file-capture`.
+- `model-id-files`: files under `app`, `components`, `inngest`, `lib` and
+  `scripts`, tests aside, that contain a model id such as `'claude-sonnet-5'`.
+- `link-tables-per-target-column`: tables with a check that exactly one of
+  three or more `_id` columns is set.
+
 ## Decisions
 
 **1. What happens to the threads already written?**
