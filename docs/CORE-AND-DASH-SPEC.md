@@ -16,6 +16,11 @@ meant to remove.
 > **Status:** decisions answered 2 October 2026, and shaped into proposed
 > features on `/dev/plan`. Three features already proposed there became parts
 > of this one; they are named under **Order of work**.
+>
+> **Held 3 October 2026.** Its seven features are blocked until
+> [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) is in place. This becomes the first
+> overhaul built that way: rules first, a design session in code, then steps
+> rewritten from it. #1436, Ask Dash reliability, is not held.
 
 ## What there is today
 
