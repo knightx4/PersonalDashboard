@@ -179,24 +179,26 @@ at.
 
 ## Rules
 
-Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes, and
-enforced once its counters exist (#1500).
+Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. None
+of these checks exists yet, so each rule is marked pending on the plan step
+that builds its check. That step takes the mark off, and gives R1 its baseline
+measured on main.
 
 **R1.** Every page under `app/` has at least one surface in the gallery.
-Checked by: count `routes-without-surface`, baseline measured on main, target 0.
+Checked by: count `routes-without-surface`, target 0, pending #1539.
 
 **R2.** No surface scrolls sideways at 390 pixels.
-Checked by: test `tests/interaction/no-sideways-scroll.test.ts`.
+Checked by: test `tests/interaction/no-sideways-scroll.test.ts`, pending #1537.
 
 **R3.** Every press target is at least 44 by 44 pixels at 390 pixels wide.
-Checked by: test `tests/interaction/press-targets.test.ts`.
+Checked by: test `tests/interaction/press-targets.test.ts`, pending #1537.
 
 **R4.** A step that changes a surface has a passing design check before it
 closes.
-Checked by: test `lib/plan/ui-check-guard.test.ts`.
+Checked by: test `lib/plan/ui-check-guard.test.ts`, pending #1534.
 
 **R5.** Every preference names the note it came from.
-Checked by: test `app/dev/ui/taste.test.ts`.
+Checked by: test `tests/dev-ui-taste.test.ts`, pending #1529.
 
 ## Decisions
 
