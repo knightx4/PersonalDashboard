@@ -203,3 +203,32 @@ values ('…', '<the step>', 'claude', '…');
 `started_at` and `completed_at` are kept by a trigger from the status; do not
 write them. A step is never closed without a note.
 
+## Recording what you wrote
+
+Every write above except `start` is recorded with `core.record_dash_action`,
+so Home lists it under what Dash did today with an Undo. The arguments are
+the account, the row as `schema.table:id`, the op, what was done in
+snake_case, and one finished sentence the person reads as it is: it names
+Dash, says what happened to which row, and stays under 300 characters.
+
+```sql
+-- an insert (add, a decision, needs, an idea): once it has returned the id,
+-- in the next call. The function reads the new row itself.
+select core.record_dash_action('…', 'public.plan_items:<id>', 'insert', 'add_step',
+  $s$Dash added step #1463, "Show the count on Home", under #1456.$s$);
+
+-- an update (done, block, drop, fog, linking an idea): keep the row as it
+-- is, write, then record, in one call. dash_before is what makes it undoable.
+select core.dash_before('public.plan_items:<id>');
+update plan_items set status = 'done', commit_sha = '…' where id = '<id>';
+select core.record_dash_action('…', 'public.plan_items:<id>', 'update', 'close_step',
+  $s$Dash closed step #1460, "Give routines one call to record their changes".$s$);
+```
+
+Kinds: `add_step`, `add_decision`, `close_step`, `block_step`, `drop_step`,
+`write_fog`, `file_idea`, `link_idea`. The note that goes in its own
+statement after the status goes in the same call, between the status update
+and the record call, so the record holds both. A note written after the
+record reads as a later change, and the Undo then refuses. If the call fails,
+everything in it is rolled back, so fix it and send it again.
+

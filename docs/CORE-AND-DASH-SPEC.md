@@ -249,7 +249,7 @@ Checked by: test `tests/dash-actions-recorded.test.ts`, pending #1459.
 
 **R6.** Every skill that writes the person's rows records each write with
 `core.record_dash_action`.
-Checked by: test `tests/skills-record-dash-actions.test.ts`, pending #1460.
+Checked by: test `tests/skills-record-dash-actions.test.ts`.
 
 The counters count these things:
 

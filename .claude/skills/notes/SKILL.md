@@ -97,6 +97,25 @@ update feedback_items set status = 'declined', resolution_note = '…',
 A note is never closed without a `resolution_note`. That rule is the CLI's,
 and it does not stop applying because the writes are being made by hand.
 
+**Record each close** (done, blocked or declined) with
+`core.record_dash_action`, in the same call as the update, so Home lists it
+under what Dash did today with an Undo. The claim to `in_progress` is not
+recorded; the close that follows it is.
+
+```sql
+select core.dash_before('public.feedback_items:<id>');
+update feedback_items set status = 'done', resolution_note = '…',
+  commit_sha = '…', completed_at = now() where id = '<id>';
+select core.record_dash_action('<user_id>', 'public.feedback_items:<id>', 'update',
+  'close_note', $s$Dash fixed your note about the stuck save button and closed it.$s$);
+```
+
+`dash_before` keeps the row as it was, for the Undo. The kind is
+`close_note`, `block_note` or `decline_note`. The sentence is read on Home as
+it is: it names Dash, says what happened to which note, and stays under 300
+characters. If the call fails, the update in it is rolled back too, so fix
+it and send both again. The `user_id` is the note's own.
+
 ## Statuses
 
 | Status | Meaning |
