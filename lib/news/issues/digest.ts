@@ -263,7 +263,11 @@ export type Digest = {
 /** What became of one issue. */
 export type DigestOutcome =
   | ({ status: 'digested' } & Digest)
-  | { status: 'failed'; error: string }
+  /**
+   * `retrying` when the failure was the API's rather than the issue's and the
+   * issue was left untouched, so the next catch-up tries it again.
+   */
+  | { status: 'failed'; error: string; retrying?: true }
   | { status: 'missing' };
 
 /** Characters a newsletter pads its preview text with, which carry nothing. */
@@ -562,6 +566,39 @@ export async function writeDigest(
   return digest;
 }
 
+/**
+ * How long after an issue arrives a failure the API caused is retried.
+ *
+ * The bound that keeps a retry from looping: nothing counts attempts, so the
+ * issue's age does. A week covers an outage the length of the one from 23 to
+ * 28 September with room to spare, and an issue still failing after that is
+ * written off with its error like any other.
+ */
+export const DIGEST_RETRY_DAYS = 7;
+
+/**
+ * Whether a failed call is the API's problem rather than the issue's: no
+ * credit, a rate limit, an overloaded or failing server, or no connection.
+ *
+ * The credit error is a 400, which reads as permanent by status alone, so it
+ * is matched on its words. Every one of the 32 issues lost between 23 and 28
+ * September failed with it.
+ */
+export function isTransientDigestError(error: unknown): boolean {
+  const status = (error as { status?: unknown } | null)?.status;
+  if (typeof status === 'number' && (status === 429 || status >= 500)) return true;
+  if (error instanceof Anthropic.APIConnectionError) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /credit balance|rate.?limit|overloaded|^(429|5\d\d)\b/i.test(message);
+}
+
+/** Whether an issue is still young enough for an API failure to be retried. */
+function retryable(receivedAt: unknown, now: number): boolean {
+  if (typeof receivedAt !== 'string') return false;
+  const at = Date.parse(receivedAt);
+  return Number.isFinite(at) && now - at < DIGEST_RETRY_DAYS * 86_400_000;
+}
+
 function errorText(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   return message.trim().slice(0, MAX_ERROR_CHARS) || 'The digest failed for an unknown reason.';
@@ -577,6 +614,13 @@ function errorText(error: unknown): string {
  * written; a failed model call is saved as `digest_error` and returned, unless
  * the issue already had a summary, which is then kept. A new summary over an
  * old one also clears the issue's story passes.
+ *
+ * A failure the API caused (`isTransientDigestError`) on an issue younger
+ * than `DIGEST_RETRY_DAYS` writes nothing at all, so `digested_at` stays as it
+ * was and the catch-up tries the issue again. `digest_error` is not written
+ * either: `issues_digest_ck` refuses an error without a `digested_at`. Before
+ * this, the credit running out on 28 September marked every issue that day
+ * as digested with the error, and nothing tried them again.
  */
 export async function digestIssue(input: {
   news: NewsSupabaseClient;
@@ -588,7 +632,7 @@ export async function digestIssue(input: {
 }): Promise<DigestOutcome> {
   const { data, error } = await input.news
     .from('issues')
-    .select('subject, text_body, html_body, summary')
+    .select('subject, text_body, html_body, summary, received_at')
     .eq('id', input.issueId)
     .eq('user_id', input.userId)
     .maybeSingle();
@@ -618,7 +662,23 @@ export async function digestIssue(input: {
     );
     outcome = { status: 'digested', ...digest };
   } catch (failure) {
-    outcome = { status: 'failed', error: errorText(failure) };
+    outcome =
+      isTransientDigestError(failure) && retryable(data.received_at, Date.now())
+        ? { status: 'failed', error: errorText(failure), retrying: true }
+        : { status: 'failed', error: errorText(failure) };
+  }
+
+  if (outcome.status === 'failed' && outcome.retrying) {
+    // A failed call is usually not billed, but whatever was is still recorded.
+    for (const report of reports) {
+      await recordSpend(input.spend, input.userId, {
+        module: 'news',
+        operation: DIGEST_OPERATION,
+        model: report.model,
+        usage: report.usage,
+      });
+    }
+    return outcome;
   }
 
   const row =
