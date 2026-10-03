@@ -39,8 +39,12 @@ import { MODELS } from '@/lib/core/models';
  */
 
 /**
- * The thresholds. The feature's fog says these are first guesses, to be tuned
- * against what the first real run makes of the playlist.
+ * The thresholds. The first real run (3 October 2026, 12 videos, 61
+ * takeaways) put every takeaway's nearest neighbour between 0.64 and 0.82,
+ * with distinct ideas as close as true repeats, so the floors only keep
+ * unrelated rows out of the prompt and the pass decides. That run marked 36
+ * of the 61 covered, most of them by features that only touch the same
+ * area, which is why a cover now has to quote the row (`coverQuote`).
  */
 /** The short pass that says whether two takeaways are one idea. */
 export const MERGE_MODEL = MODELS.inspirationMerge;
@@ -135,14 +139,19 @@ builder. A new idea has come in. Say two things.
 
 1. Whether it is the same idea as one of the earlier ideas listed as T1, T2...
    The same idea means building one would build the other, even when the
-   words differ. A related idea, a narrower or broader one, or one about the
-   same part of the app that would change something different, is not the
-   same. When it is the same, say which wording is clearer: the new one or
-   the earlier one.
+   words differ. A related idea, a narrower or broader one, one sharing a
+   theme (both about checking work, both about planning first), or one about
+   the same part of the app that would change something different, is not
+   the same. When it is the same, say which wording is clearer: the new one
+   or the earlier one.
 
 2. Whether something already filed, listed as C1, C2..., covers it: a plan
    feature or an idea that, once built, would do what the new idea asks.
-   Touching the same area is not covering it.
+   Touching the same area, the same workspace or the same kind of data is
+   not covering it, and neither is making the idea easier to build. Most new
+   ideas are not covered. When one is, copy into cover_quote the sentence of
+   that row that says it does what the new idea asks, word for word. If no
+   sentence says so, it is not covered.
 
 When unsure, answer none.`;
 
@@ -150,6 +159,7 @@ const replySchema = z.object({
   same_as: z.string().default('none'),
   clearer: z.enum(['new', 'earlier']).catch('earlier').default('earlier'),
   covered_by: z.string().default('none'),
+  cover_quote: z.string().catch('').default(''),
 });
 
 export type Judgement = { sameAs: number | null; newIsClearer: boolean; coveredBy: number | null };
@@ -171,8 +181,33 @@ export function matchPrompt(fresh: FreshTakeaway, earlier: FreshTakeaway[], cove
   return lines.join('\n');
 }
 
-/** The pass's reply as indexes into the lists it was shown. Anything unreadable is none. */
-export function readJudgement(input: unknown, earlier: number, cover: number): Judgement {
+/** Lower case, one space, plain quotes: a quote copied from a row survives the round trip. */
+const squash = (text: string) =>
+  text
+    .toLowerCase()
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/** Shortest quote that counts as the row saying it does what the idea asks. */
+export const COVER_QUOTE_MIN = 20;
+
+/**
+ * Whether `quote` is in `text`. A cover the pass cannot back with the row's
+ * own words is a guess, and a covered takeaway has nothing to press, so a
+ * wrong guess hides the takeaway.
+ */
+export function coverQuote(quote: string, text: string): boolean {
+  const wanted = squash(quote).replace(/^["']|["']$/g, '').replace(/[.…]+$/, '');
+  return wanted.length >= COVER_QUOTE_MIN && squash(text).includes(wanted);
+}
+
+/**
+ * The pass's reply as indexes into the lists it was shown. Anything
+ * unreadable is none, and so is a cover whose quote is not in that row.
+ */
+export function readJudgement(input: unknown, earlier: number, cover: string[]): Judgement {
   const parsed = replySchema.safeParse(input);
   if (!parsed.success) return { sameAs: null, newIsClearer: false, coveredBy: null };
   const pick = (value: string, prefix: string, count: number) => {
@@ -184,7 +219,10 @@ export function readJudgement(input: unknown, earlier: number, cover: number): J
   return {
     sameAs: pick(parsed.data.same_as, 'T', earlier),
     newIsClearer: parsed.data.clearer === 'new',
-    coveredBy: pick(parsed.data.covered_by, 'C', cover),
+    coveredBy: (() => {
+      const index = pick(parsed.data.covered_by, 'C', cover.length);
+      return index !== null && coverQuote(parsed.data.cover_quote, cover[index]) ? index : null;
+    })(),
   };
 }
 
@@ -199,7 +237,7 @@ async function judge(
   const labels = (prefix: string, count: number) => ['none', ...Array.from({ length: count }, (_, i) => `${prefix}${i + 1}`)];
   const response = await client.messages.create({
     model: MERGE_MODEL,
-    max_tokens: 200,
+    max_tokens: 400,
     system: SYSTEM,
     tools: [
       {
@@ -211,8 +249,12 @@ async function judge(
             same_as: { type: 'string', enum: labels('T', earlier.length) },
             clearer: { type: 'string', enum: ['new', 'earlier'] },
             covered_by: { type: 'string', enum: labels('C', cover.length) },
+            cover_quote: {
+              type: 'string',
+              description: 'The covering row’s sentence, word for word. Empty when covered_by is none.',
+            },
           },
-          required: ['same_as', 'clearer', 'covered_by'],
+          required: ['same_as', 'clearer', 'covered_by', 'cover_quote'],
         },
       },
     ],
@@ -222,7 +264,11 @@ async function judge(
   onSpend({ model: MERGE_MODEL, usage: usageFrom(response.usage) });
   const block = response.content.find((part) => part.type === 'tool_use' && part.name === TOOL);
   if (!block || block.type !== 'tool_use') return { sameAs: null, newIsClearer: false, coveredBy: null };
-  return readJudgement(block.input, earlier.length, cover.length);
+  return readJudgement(
+    block.input,
+    earlier.length,
+    cover.map((row) => row.text),
+  );
 }
 
 /** Merge and check every takeaway one person has with no vector yet. */
@@ -276,7 +322,10 @@ export async function mergeNewTakeaways(store: MergeStore, userId: string, optio
 
     if (judgement.sameAs !== null) {
       const into = earlier[judgement.sameAs];
-      const wording = judgement.newIsClearer
+      // A takeaway two videos already share keeps its wording: rewording it
+      // to each newcomer let it drift until a third video matched words the
+      // first two never said.
+      const wording = judgement.newIsClearer && into.videoIds.length < 2
         ? { title: takeaway.title, body: takeaway.body, module: takeaway.module, vector, model: embedded.model }
         : null;
       await store.mergeInto(userId, takeaway.id, into.id, wording);
