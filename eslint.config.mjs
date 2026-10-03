@@ -268,7 +268,8 @@ const eslintConfig = defineConfig([
   // and repeats its groups so nothing is lost in the replacement.
   shareReadBoundaries,
   // Override default ignores of eslint-config-next.
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts"]),
+  // Agent worktrees are whole checkouts of this repository.
+  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", ".claude/worktrees/**"]),
 ]);
 
 export default eslintConfig;
