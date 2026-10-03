@@ -87,6 +87,7 @@ export async function workOnGoalAction(
       errandDueOn: goal.errand ? (goal.due_on as string | null) : null,
     },
     routine,
+    surface: 'thread',
   });
   if (!result.ok) {
     revalidatePath(`/goals/${goalId.data}`);
@@ -147,6 +148,7 @@ async function handOver(form: FormData, mode: SendMode): Promise<ShapingActionSt
       userId: user.id,
       stepId: id.data,
       routine,
+      surface: 'thread',
       mode,
     });
   } catch {

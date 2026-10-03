@@ -13,7 +13,7 @@ import {
   type SendMode,
   type SendTarget,
 } from '@/lib/goals/handover';
-import { holdActingSteps } from '@/lib/goals/hold-acts-store';
+import { holdActingSteps, type HoldSurface } from '@/lib/goals/hold-acts-store';
 import { recordAndFire } from '@/lib/goals/shaping-store';
 import { loadLiveTree } from '@/lib/goals/steps-store';
 
@@ -97,6 +97,8 @@ export async function sendGoalStep(input: {
   asked?: string;
   /** What was said on the row before that comment, passed in with it. */
   thread?: readonly { author: string; body: string }[];
+  /** Where the run was started, for the record of each step it holds (plan #1573). */
+  surface: HoldSurface;
   now?: number;
   fetch?: typeof globalThis.fetch;
 }): Promise<SendResult> {
@@ -105,7 +107,7 @@ export async function sendGoalStep(input: {
 
   // A Claude step that acts outside the plan becomes a proposal first
   // (plan #1183), so sendRefusal below turns it away if it is this one.
-  await holdActingSteps({ client, userId });
+  await holdActingSteps({ client, userId, surface: input.surface });
 
   const target = await loadTarget(client, userId, stepId);
   if (!target) return { ok: false, error: 'That step is no longer on the page.', refused: true };

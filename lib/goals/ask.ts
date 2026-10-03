@@ -326,6 +326,7 @@ async function sendFromComment(
     userId: input.userId,
     stepId: input.itemId,
     routine: input.routine,
+    surface: 'thread',
     mode,
     asked: input.question,
     thread: history.map(({ author, body }) => ({ author, body })),

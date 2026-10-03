@@ -2,7 +2,8 @@ import 'server-only';
 
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { SpendReport } from '@/lib/core/spend/pricing';
-import { recordScheduled, scheduledBefore } from '@/lib/core/scheduled-actions';
+import { recordDashAction, type DashActionSurface } from '@/lib/core/dash-actions';
+import { scheduledBefore, scheduledDashDeps } from '@/lib/core/scheduled-actions';
 import { recordSpendReports } from '@/lib/core/spend/record';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
@@ -62,6 +63,14 @@ export type HoldActsResult =
       held: HeldStep[];
     };
 
+/**
+ * Where the run that held the step was started, for the record of each hold
+ * (feature #1456): `scheduled` for the morning run and the night tick,
+ * `thread` for a run the person started themselves, from a button on the
+ * goals page, a new errand or an @dash reply.
+ */
+export type HoldSurface = Extract<DashActionSurface, 'thread' | 'scheduled'>;
+
 export type HoldActsInput = {
   client: GoalsSupabaseClient;
   userId: string;
@@ -73,10 +82,11 @@ export type HoldActsInput = {
   write?: (step: ActsCandidate) => Promise<string | null>;
   enabled?: boolean;
   /**
-   * The scheduled morning run: each step held is recorded as Dash's change,
-   * with Undo on Home (plan #1570). The pressed paths leave it off.
+   * Each step held is recorded as Dash's change under this surface, with Undo
+   * on Home: the morning run since plan #1570, the pressed paths since #1573.
+   * Left out, nothing is recorded.
    */
-  scheduled?: boolean;
+  surface?: HoldSurface;
 };
 
 /** Open Claude steps with no sentence, and those blocked only on other steps. */
@@ -150,7 +160,7 @@ export async function holdActingSteps(input: HoldActsInput): Promise<HoldActsRes
       }
       const acts = (await write(check.step)) ?? fallbackActsSentence(check.step);
       const ref = `goals.items:${check.step.id}`;
-      const before = input.scheduled ? await scheduledBefore(client, userId, ref) : null;
+      const before = input.surface ? await scheduledBefore(client, userId, ref) : null;
       const { data, error } = await client.rpc('hold_acting_step', { step: check.step.id, sentence: acts });
       if (error) {
         console.warn(`[goals] step ${check.step.id} not held: ${error.message}`);
@@ -158,8 +168,12 @@ export async function holdActingSteps(input: HoldActsInput): Promise<HoldActsRes
       }
       if (data === true) {
         held.push({ ...found, acts });
-        if (input.scheduled) {
-          await recordScheduled(client, userId, {
+        if (input.surface) {
+          // Over whichever client the caller holds: the service client on a
+          // timer, the person's own on a press, where row level security
+          // keeps the record and the read to their rows.
+          await recordDashAction(scheduledDashDeps(client, userId), {
+            surface: input.surface,
             kind: 'hold_acting_step',
             subjectRef: ref,
             op: 'update',

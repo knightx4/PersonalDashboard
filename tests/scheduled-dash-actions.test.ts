@@ -320,7 +320,7 @@ describe('the daily cron (/api/cron/daily)', () => {
       enabled: true,
       ask: async () => 0.95,
       write: async () => 'Sends an email to the landlord.',
-      scheduled: true,
+      surface: 'scheduled',
     });
 
     expect(result).toMatchObject({ held: [expect.objectContaining({ id: 'step-landlord' })] });
@@ -336,7 +336,7 @@ describe('the daily cron (/api/cron/daily)', () => {
     });
   });
 
-  it('records nothing when a pressed path holds a step', async () => {
+  it('records nothing when the caller names no surface', async () => {
     const tables: FakeTables = {
       'goals.items': [
         { id: 's', user_id: USER, level: 'step', kind: 'claude', status: 'open', title: 'Book it', acts: null, archived_at: null },

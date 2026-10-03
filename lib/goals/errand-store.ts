@@ -59,6 +59,7 @@ export async function saveErrandAndStart(input: {
       userId: user.id,
       goal: { id: goalId, title, errandDueOn: dueOn },
       routine,
+      surface: 'thread',
     });
     if (!started.ok) {
       return kept(
