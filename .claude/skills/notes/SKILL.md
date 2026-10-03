@@ -123,7 +123,7 @@ it and send both again. The `user_id` is the note's own.
 | `open` | Filed, not started. |
 | `in_progress` | Claimed right now, or committed and waiting for the batch to reach main. At most one being worked at a time. |
 | `blocked` | Needs an answer or an external dependency. Reason required. |
-| `planned` | Accepted, deliberately deferred to a later batch. |
+| `planned` | Accepted, deliberately deferred to a later batch, or waiting on a proposed rule (`spec_change_id` set). |
 | `done` | On main and verified. Carries a commit that main contains. |
 | `declined` | Will not be done. Reason required. |
 
@@ -138,6 +138,11 @@ one is closed.
 1. **Read the queue.** `list` orders it correctly: bugs before features, then
    priority, then oldest. Work it top to bottom. State the plan for the batch
    before starting — how many notes, and in what order.
+
+   Before claiming anything, do the two checks in *Requests that point at a
+   missing rule* below: settle the notes waiting on a spec change that has
+   since been decided, and look for a request filed on three pages. A note
+   that goes into a proposed rule leaves the batch.
 2. **Claim one.** `start <id>`. Read it with `show <id>`, which prints the
    thread under the note as well as its text, and re-read the page path — it
    says where the user was standing. Read the thread before starting: an
@@ -191,6 +196,99 @@ one is closed.
 the dependencies are installed. The SessionStart hook in `.claude/hooks/`
 does that before the session starts; if it has not run for some reason,
 `npm install` first rather than reading the failure as a broken repo.
+
+## Requests that point at a missing rule
+
+When the person asks for the same thing on three different pages, the app is
+missing a rule, and fixing each page leaves the fourth page to be asked about
+next month. This is Part 5 of `docs/SPEC-LAYER-SPEC.md` (plan #1526). One note
+on one page is still fixed on that page, as above.
+
+**First, settle the notes already waiting on a rule.** A note linked to a
+spec change (`feedback_items.spec_change_id`) sits in `planned` until the
+person decides the change on `/dev/specs`:
+
+```sql
+select f.id, f.status, f.page_path, c.id as change_id, c.title, c.status as change_status,
+       c.commit_sha, c.spec
+from feedback_items f join spec_changes c on c.id = f.spec_change_id
+where f.user_id = '…' and f.status = 'planned';
+```
+
+- **Applied:** the rule is in the spec on main. Close the note as done
+  against the change's `commit_sha` (check it with `git merge-base
+  --is-ancestor` as for any close), with a resolution naming the rule:
+  `Covered by R9 in the core-and-dash spec, "Every delete asks first". The
+  work to build it is on the plan.` Read the rule's number from the change's
+  diff.
+- **Declined:** the person wants it handled page by page. Put the note back
+  to `open` with `resolution_note = null` and leave the link, so it is not
+  grouped into the same rule again. It is then worked like any other note in
+  this batch.
+- **Proposed or approved:** leave it.
+
+**Then look for a request filed on three pages.** Read every note of the
+last 30 days, closed ones included, since a request fixed on one page last
+week and asked again on two more is the pattern this is for:
+
+```sql
+select id, kind, status, page_path, created_at, spec_change_id, body
+from feedback_items
+where user_id = '…' and kind <> 'like' and created_at >= now() - interval '30 days'
+order by created_at;
+```
+
+For each open note, decide which of the others ask for the same thing. Same
+thing means the same behaviour wanted from the app, such as "ask before
+deleting" on the todo, jobs and vault pages, not the same workspace or the
+same words. Group them. A group whose notes are all on one page is just a
+note with duplicates, and the check below says so.
+
+For a group on three or more pages:
+
+1. **Choose the spec.** The rule goes in the spec that governs every page in
+   the group: the core spec for behaviour across workspaces, a workspace's
+   own spec when all the pages are in it (`lib/specs/registry.ts`). Before
+   drafting, check its `## Rules` and the open changes
+   (`select id, title from spec_changes where user_id = '…' and status in
+   ('proposed', 'approved') and spec = '…'`). If a rule already covers the
+   request, the rule is failing and the notes are bugs against it: fix them
+   on their pages and name the rule in each close. If an open change already
+   proposes it, link the notes to that change (`update feedback_items set
+   spec_change_id = '<change>', status = 'planned' where id in (…) and
+   user_id = '…'`) and draft nothing.
+2. **Draft the change** as `.claude/skills/spec-audit/SKILL.md` says under
+   *Writing the diff*: copy the spec to the scratchpad, add a `**Rn.**`
+   sentence to `## Rules` with a `Checked by:` line (a count or a test where
+   one can be written, `audit` otherwise), diff it, and check it with
+   `scripts/apply-spec-diff.ts`. Title and why follow the same section, and
+   the why cites the notes.
+3. **Write the draft file** for `scripts/note-rule.ts`: the user, the spec
+   slug, the section (`Rules`), the finding (what the notes keep asking for,
+   in one or two sentences), the title, the why, the path to the diff, and
+   the group's rows exactly as the query above returned them. Then:
+
+   ```
+   npx tsx scripts/note-rule.ts "$SCRATCH/rule.json" > "$SCRATCH/rule.sql"
+   ```
+
+   It counts only the notes from the last 30 days that are not likes,
+   surface notes or already linked, and refuses unless they span three
+   pages and at least one is open. A refusal means the group is not a rule:
+   fix the notes on their pages.
+4. **Run the statement** it printed through the connector. It drafts the
+   change only while fewer than five are waiting, files the `missing_rule`
+   finding that the spec's page in Dev shows, and links the notes, moving
+   the open ones to `planned` with a line saying which rule they wait on.
+   Closed notes are linked as evidence and keep their status.
+5. **Read what came back.** A `change_id` means the rule is drafted and its
+   notes leave this batch. A null `change_id` means five changes are already
+   waiting: the finding is filed for the next spec audit, and the notes stay
+   open. Leave them for a later run rather than fixing them one page at a
+   time, and say so in the report.
+
+Report each proposed rule under the closing table (*Proposed rules*). Never
+approve the change; that is the person's press.
 
 ## Surface notes: work the law, not the note
 
@@ -379,6 +477,8 @@ Then, below the table:
   unblocks it.
 - **Raised** — anything written to `/dev/raised` during the run, by title, so
   the user knows a question is waiting there.
+- **Proposed rules** — each spec change drafted from notes on three pages:
+  its title, its spec, and the notes now waiting on it.
 - **Still open** — anything not reached, and why the batch stopped there.
 - The queue count after the run.
 - Anything the user has to do themselves — a migration to apply, a setting to
