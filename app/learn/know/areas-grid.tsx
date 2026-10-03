@@ -212,8 +212,8 @@ export function AreasGrid({
   if (grid.unplacedTracks > 0) {
     unplaced.push(
       grid.unplacedTracks === 1
-        ? '1 track is not placed yet or spans more than one domain'
-        : `${grid.unplacedTracks} tracks are not placed yet or span more than one domain`,
+        ? '1 subject is not placed yet or spans more than one domain'
+        : `${grid.unplacedTracks} subjects are not placed yet or span more than one domain`,
     );
   }
 

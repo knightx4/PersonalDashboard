@@ -7,6 +7,7 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadQuiz } from '@/lib/learn/quiz/load';
+import { QUIZZES_HREF } from '@/app/learn/know/quizzes';
 import { outstandingCount, rightCount } from '@/lib/learn/quiz/model';
 import { readQuizMaterial } from '@/lib/learn/quiz/material';
 import { QUIZ_QUESTIONS } from '@/lib/learn/quiz/payload';
@@ -47,7 +48,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
     <>
       <p className="mb-3">
         <Link
-          href="/learn/quiz"
+          href={QUIZZES_HREF}
           className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
           <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />

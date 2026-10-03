@@ -257,7 +257,7 @@ export async function loadOfferRecord(supabase: LearnSupabaseClient): Promise<Of
     .order('happened_at', { ascending: false });
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Reading what you did with offered tracks', error);
+  if (error) throw fail('Reading what you did with offered subjects', error);
 
   return (
     (data ?? []) as {
@@ -403,7 +403,7 @@ async function loadUntestedField(
   ]);
   assertSchemaExposed(fieldRead.error ?? trackRead.error, LEARN_SCHEMA);
   if (fieldRead.error) throw fail('Reading the fields', fieldRead.error);
-  if (trackRead.error) throw fail('Reading where your tracks are placed', trackRead.error);
+  if (trackRead.error) throw fail('Reading where your subjects are placed', trackRead.error);
 
   const answeredTracks = new Set(
     answered.flatMap((row) => (row.concepts ? [row.concepts.subject_id] : [])),
@@ -471,7 +471,7 @@ async function loadAnchors(
         'name',
         weighted.map((subject) => subject.name),
       );
-    if (error) throw fail('Reading the themes behind your tracks', error);
+    if (error) throw fail('Reading the themes behind your subjects', error);
     const weightByName = new Map(
       weighted.map((subject) => [subject.name, weights.get(subject.id)!.weight]),
     );
@@ -487,7 +487,7 @@ async function loadAnchors(
     .from('theme_notes')
     .select('theme_id, note_id')
     .in('theme_id', ids);
-  if (error) throw fail('Reading the notes behind your tracks', error);
+  if (error) throw fail('Reading the notes behind your subjects', error);
 
   const notesOf = new Map<string, Set<string>>();
   for (const link of (data ?? []) as { theme_id: string; note_id: string }[]) {
@@ -524,7 +524,7 @@ export async function recordTrackOffer(
   });
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Keeping what you did with that track', error);
+  if (error) throw fail('Keeping what you did with that subject', error);
 }
 
 export type StartedTrack =
@@ -560,7 +560,7 @@ export async function startTrackFromTheme(
   themeId: string,
 ): Promise<StartedTrack> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return { ok: false, detail: 'Starting a track needs ANTHROPIC_API_KEY to be set.' };
+  if (!apiKey) return { ok: false, detail: 'Starting a subject needs ANTHROPIC_API_KEY to be set.' };
 
   const map = await loadThemeMap(vault, themeId);
   if (!map) return { ok: false, detail: 'That theme is no longer in your notes.' };
@@ -601,7 +601,7 @@ export async function startTrackFromTheme(
   } catch (error) {
     return {
       ok: false,
-      detail: error instanceof Error ? error.message : 'Could not save that track.',
+      detail: error instanceof Error ? error.message : 'Could not save that subject.',
     };
   }
 

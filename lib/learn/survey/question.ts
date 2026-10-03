@@ -87,7 +87,7 @@ export async function writeSurveyQuestion(input: {
     return {
       ok: false,
       reason: 'nothing',
-      detail: 'Every subject you write about is a track already, or has no notes linked to it.',
+      detail: 'Every theme you write about is a subject already, or has no notes linked to it.',
     };
   }
 

@@ -26,7 +26,7 @@ export async function goalTrackIds(supabase: LearnSupabaseClient, userId?: strin
     .not('subject_id', 'is', null);
   if (userId) query = query.eq('user_id', userId);
   const { data, error } = await query;
-  if (error) throw new Error(`Reading your goals' tracks failed: ${error.message}`);
+  if (error) throw new Error(`Reading your goals' subjects failed: ${error.message}`);
   return [...new Set(((data ?? []) as { subject_id: string }[]).map((row) => row.subject_id))];
 }
 

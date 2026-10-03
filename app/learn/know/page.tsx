@@ -34,6 +34,8 @@ import { FromCoursesForm } from './from-courses-form';
 import { readsByCourse, type CourseRead, type CourseReadRow } from '@/lib/learn/graph/course-reads';
 import { groupCourses, type SchoolGroup } from '@/lib/vault/education';
 import type { Course, Transcript } from '@/lib/vault/transcripts';
+import { loadQuizzes, type QuizListItem } from '@/lib/learn/quiz/load';
+import { QuizzesSection } from './quizzes';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,7 +68,13 @@ function settledLine(counts: ReturnType<typeof countStates>): string {
 export default async function KnowPage({
   searchParams,
 }: {
-  searchParams: Promise<{ field?: string; domain?: string; unplaced?: string; make?: string }>;
+  searchParams: Promise<{
+    field?: string;
+    domain?: string;
+    unplaced?: string;
+    make?: string;
+    open?: string;
+  }>;
 }) {
   const params = await searchParams;
   const user = await requireUser();
@@ -154,6 +162,17 @@ export default async function KnowPage({
   } catch {
     coursesFailed = true;
   }
+  // The quizzes, a section here since plan #1487 moved them out of their own
+  // tab. A failed read is said in the section rather than taking the page.
+  let quizzes: QuizListItem[] = [];
+  let quizzesFailed = false;
+  try {
+    quizzes = await loadQuizzes(supabase);
+  } catch (error) {
+    console.error('[learn subjects] quizzes', error instanceof Error ? error.message : error);
+    quizzesFailed = true;
+  }
+
   const courseCount = courseGroups.reduce(
     (sum, group) => sum + group.terms.reduce((n, term) => n + term.courses.length, 0),
     0,
@@ -167,13 +186,13 @@ export default async function KnowPage({
   return (
     <>
       <PageHeader
-        title="Tracks"
-        description="One graph per track, and it grows every time you use it."
+        title="Subjects"
+        description="One graph per subject, and it grows every time you use it."
         actions={
           making ? undefined : (
             <Link href="/learn/know?make=track" className={buttonVariants({ variant: 'primary' })}>
               <Plus className="size-4" strokeWidth={2} aria-hidden />
-              Make a track
+              Make a subject
             </Link>
           )
         }
@@ -186,8 +205,8 @@ export default async function KnowPage({
       {rows.length === 0 ? (
         <EmptyState
           icon={Network}
-          title="No tracks yet"
-          description="A track is the container: Economics, not the Phillips curve. Make one from the button above and it gets its first units, with more added as you finish them, or ask one question and the track forms around it."
+          title="No subjects yet"
+          description="A subject is the container: Economics, not the Phillips curve. Make one from the button above and it gets its first units, with more added as you finish them, or ask one question and the subject forms around it."
         />
       ) : (
         <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
@@ -240,6 +259,10 @@ export default async function KnowPage({
           </span>
         </Link>
       )}
+
+      {/* Quizzes are over notes you chose rather than over one subject, so
+          they sit after the subjects and before the ways of making one. */}
+      <QuizzesSection quizzes={quizzes} failed={quizzesFailed} open={params.open === 'quizzes'} />
 
       {/* Naming a goal is the other way a track comes into being: the chain
           for one question first, and the curriculum around it. */}

@@ -79,7 +79,7 @@ export async function findOrCreateSubject(
     .maybeSingle();
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Looking up the track', error);
+  if (error) throw fail('Looking up the subject', error);
   if (data) {
     const found = data as { id: string; placed_at?: string | null; survey?: boolean };
     // A hidden subject holding survey questions about this theme (plan #838)
@@ -89,7 +89,7 @@ export async function findOrCreateSubject(
         .from('subjects')
         .update({ survey: false })
         .eq('id', found.id);
-      if (takeError) throw fail('Turning the survey subject into a track', takeError);
+      if (takeError) throw fail('Turning the survey topic into a subject', takeError);
     }
     return { id: found.id, created: false, placed: Boolean(found.placed_at) };
   }
@@ -102,7 +102,7 @@ export async function findOrCreateSubject(
 
   assertSchemaExposed(createError, LEARN_SCHEMA);
   if (createError || !created) {
-    throw fail('Creating the track', createError ?? { message: 'no row' });
+    throw fail('Creating the subject', createError ?? { message: 'no row' });
   }
   return { id: (created as { id: string }).id, created: true, placed: false };
 }
@@ -394,6 +394,6 @@ export async function existingConcepts(
     .order('name');
 
   assertSchemaExposed(error, LEARN_SCHEMA);
-  if (error) throw fail('Reading the track', error);
+  if (error) throw fail('Reading the subject', error);
   return (data ?? []) as { id: string; name: string }[];
 }

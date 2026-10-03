@@ -83,7 +83,7 @@ async function loadFiledGoals(
     .eq('user_id', userId)
     .eq('subject_id', subjectId)
     .not('unit_id', 'is', null);
-  if (error) throw new Error(`Reading the track's goals failed: ${error.message}`);
+  if (error) throw new Error(`Reading the subject's goals failed: ${error.message}`);
   return ((data ?? []) as { unit_id: string | null; status: string }[]).map((row) => ({
     unitId: row.unit_id,
     status: row.status,
@@ -124,8 +124,8 @@ export async function layOutNextUnit(
       .eq('id', subjectId)
       .eq('user_id', userId)
       .maybeSingle();
-    if (subjectError) throw new Error(`Reading the track failed: ${subjectError.message}`);
-    if (!subject) return { outcome: 'failed', detail: 'No track of this person has that id.' };
+    if (subjectError) throw new Error(`Reading the subject failed: ${subjectError.message}`);
+    if (!subject) return { outcome: 'failed', detail: 'No subject of this person has that id.' };
     const name = (subject as { name: string }).name;
 
     const unit = await findNextUnit(learn, userId, subjectId);

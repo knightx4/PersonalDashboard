@@ -15,7 +15,7 @@ function MakeButton() {
   return (
     <Button type="submit" size="sm" variant="primary" pending={pending}>
       <Plus className="size-4" strokeWidth={2} aria-hidden />
-      {pending ? 'Writing the curriculum…' : 'Make the track'}
+      {pending ? 'Writing the curriculum…' : 'Make the subject'}
     </Button>
   );
 }
@@ -39,11 +39,11 @@ export function CustomTrackForm() {
       <ComposeBox className="space-y-1.5 py-2.5">
         <ComposeTitle
           name="name"
-          aria-label="Track"
+          aria-label="Subject"
           required
           autoFocus
           maxLength={80}
-          placeholder="The track, like Options pricing"
+          placeholder="The subject, like Options pricing"
         />
         {/* ui-ok: composer-always-open -- the create. This box only renders
          * once Make a track is pressed, and naming the track is its job. */}
@@ -73,7 +73,7 @@ export function CustomTrackForm() {
           <MakeButton />
           <PaidHint
             action="app/learn/know/actions.ts#createCustomTrack"
-            what="Cost of making the track"
+            what="Cost of making the subject"
           />
           <Link href="/learn/know" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
             Cancel

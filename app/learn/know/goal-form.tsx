@@ -53,7 +53,7 @@ function NodeRow({ node, isGoal }: { node: ChainNode; isGoal: boolean }) {
         <span className="text-body font-medium text-ink">{node.name}</span>
         {node.existingId ? (
           <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-            Already in this track
+            Already in this subject
           </span>
         ) : (
           <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
@@ -131,7 +131,7 @@ function Proposal({
 
       <div className="mt-4 flex items-center gap-3">
         <ApproveButton />
-        <PaidHint action="app/learn/know/actions.ts#approveChain" what="Cost of saving the track" />
+        <PaidHint action="app/learn/know/actions.ts#approveChain" what="Cost of saving the subject" />
         {state.error && <span className="text-ui text-danger">{state.error}</span>}
       </div>
     </form>
@@ -194,8 +194,8 @@ export function GoalForm({
             <ChipSelect
               name="subjectId"
               defaultValue={subjects[0].id}
-              aria-label="Which track"
-              title="What it lays out is joined onto what that track already holds"
+              aria-label="Which subject"
+              title="What it lays out is joined onto what that subject already holds"
               icon={<Network className="size-3.5" strokeWidth={1.75} />}
             >
               {subjects.map((subject) => (
@@ -203,7 +203,7 @@ export function GoalForm({
                   {subject.name}
                 </option>
               ))}
-              <option value="">A new track</option>
+              <option value="">A new subject</option>
             </ChipSelect>
           )}
           <span className="ml-auto flex items-center gap-1">

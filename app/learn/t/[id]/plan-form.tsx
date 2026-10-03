@@ -248,7 +248,7 @@ export function PlanForm({ trackId }: { trackId: string }) {
         <PlanButton />
         <PaidHint
           action="app/learn/t/[id]/actions.ts#planTrack"
-          what="Cost of planning the track"
+          what="Cost of planning the reading list"
         />
         {planState.error && <span className="text-ui text-danger">{planState.error}</span>}
       </div>

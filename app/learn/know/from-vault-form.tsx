@@ -86,10 +86,10 @@ export function FromVaultForm({
             name="subjectId"
             defaultValue=""
             placeholderValue=""
-            aria-label="Into which track"
+            aria-label="Into which subject"
             icon={<Network className="size-3.5" strokeWidth={1.75} />}
           >
-            <option value="">Let it name its track</option>
+            <option value="">Let it name its subject</option>
             {subjects.map((subject) => (
               <option key={subject.id} value={subject.id}>
                 {subject.name}

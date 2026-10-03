@@ -80,5 +80,5 @@ export const CHECK_CONCEPTS_NAMED = 12;
  * if you want it."
  */
 export function unitCheckWhy(trackName: string): string {
-  return `You finished this unit of your ${trackName.trim()} track. One question on it, if you want it.`;
+  return `You finished this unit of your ${trackName.trim()} subject. One question on it, if you want it.`;
 }

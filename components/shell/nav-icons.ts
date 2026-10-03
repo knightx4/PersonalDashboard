@@ -33,7 +33,6 @@ import {
   Megaphone,
   Map,
   Network,
-  PencilLine,
   MessageCircleQuestion,
   MessageSquareText,
   MonitorPlay,
@@ -138,9 +137,6 @@ export const NAV_ICONS = {
   know: Network,
   // Goals: the things you want to learn and how well (plan #897).
   goals: Target,
-  // A quiz is answered in writing, which is the whole of what separates it
-  // from being asked to recognise something, so it gets the pencil.
-  quiz: PencilLine,
   // The YouTube library: channels, playlists and the transcripts fetched for
   // them. A screen with a play mark, not the YouTube logo, because a brand
   // mark in the nav would be the only one.

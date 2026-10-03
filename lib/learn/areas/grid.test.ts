@@ -236,7 +236,7 @@ describe('the lines a cell says', () => {
         { tracks: [], known: 0, total: 0, answered: 0, surveyed: 0, lastAnswered: null },
         day,
       ),
-    ).toBe('No track here');
+    ).toBe('No subject here');
     expect(
       testedLine(
         { tracks: [], known: 0, total: 0, answered: 0, surveyed: 1, lastAnswered: 'x' },

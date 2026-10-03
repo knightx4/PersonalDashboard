@@ -148,7 +148,7 @@ export async function PracticeFlow({
 
       {goal && <FlowFocus name={goal.name} back="Everything" />}
 
-      {track && <FlowFocus name={track.name} back="All tracks" />}
+      {track && <FlowFocus name={track.name} back="All subjects" />}
 
       {/* When the last one was, and nothing about how many days in a row: a
           run is something you can lose, and missing a day here costs nothing. */}
@@ -173,7 +173,7 @@ export async function PracticeFlow({
             description={
               goal
                 ? 'No question about this goal could be written just now. Try again later, or ask about everything.'
-                : 'Goals only asks about the goals on your Goals page that have no track of their own. Name one there, such as startup finance, and Dash will ask about it here.'
+                : 'Goals only asks about the goals on your Goals page that have no subject of their own. Name one there, such as startup finance, and Dash will ask about it here.'
             }
             action={
               goal
@@ -191,22 +191,22 @@ export async function PracticeFlow({
         ) : track ? (
           <EmptyState
             title={`Nothing left to ask about ${track.name}`}
-            description="You have answered everything in this track for now. The other tracks may still have questions."
+            description="You have answered everything in this subject for now. The other subjects may still have questions."
             tone="finished"
             seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:learn-track`}
-            action={{ label: 'All tracks', href: practiceHref() }}
+            action={{ label: 'All subjects', href: practiceHref() }}
           />
         ) : picked.because === 'no-subjects' ? (
           <EmptyState
             icon={Target}
             title="Nothing to ask about yet"
-            description="You have no tracks. Name one, or paste something you have read, and the ideas underneath it are what these questions get written against."
-            action={{ label: 'Tracks', href: '/learn/know' }}
+            description="You have no subjects. Name one, or paste something you have read, and the ideas underneath it are what these questions get written against."
+            action={{ label: 'Subjects', href: '/learn/know' }}
           />
         ) : (
           <EmptyState
             title="Nothing left to ask"
-            description="Every idea in every track is known. Name a goal or add a reading, and whatever is missing underneath it will be what gets asked about."
+            description="Every idea in every subject is known. Name a goal or add a reading, and whatever is missing underneath it will be what gets asked about."
             tone="finished"
             seed={`${user.id}:${new Date().toISOString().slice(0, 10)}:learn-five`}
           />

@@ -85,7 +85,7 @@ export default async function PiecePage({ params }: { params: Promise<{ id: stri
       />
 
       {page.ideas.length === 0 ? (
-        <p className="mb-6 text-body text-ink-muted">The ideas this piece covered are no longer in the track.</p>
+        <p className="mb-6 text-body text-ink-muted">The ideas this piece covered are no longer in the subject.</p>
       ) : (
         <>
           <PieceLessons subjectId={subject.id} pieceId={piece.id} ideas={page.ideas} />

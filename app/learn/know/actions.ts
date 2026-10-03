@@ -827,7 +827,7 @@ const CustomTrackInput = z.object({
   name: z
     .string()
     .trim()
-    .min(2, 'Name the track.')
+    .min(2, 'Name the subject.')
     .max(80, 'Keep the name short; say the rest in what you want from it.'),
   want: z.string().trim().max(500, 'Shorter, please: a sentence or two.'),
   units: z.string().max(4000),
@@ -870,7 +870,7 @@ export async function createCustomTrack(
   try {
     subject = await findOrCreateSubject(supabase, user.id, name);
   } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Could not make that track.' };
+    return { error: error instanceof Error ? error.message : 'Could not make that subject.' };
   }
 
   if (subject.created) {
@@ -900,7 +900,7 @@ export async function createCustomTrack(
   // quietly dropping the units that were typed.
   if (!subject.created && curriculum.ok && !curriculum.written && own.titles.length > 0) {
     return {
-      error: `You already have a track called ${name}, and its curriculum is fixed.`,
+      error: `You already have a subject called ${name}, and its curriculum is fixed.`,
       existing: { id: subject.id, name },
     };
   }

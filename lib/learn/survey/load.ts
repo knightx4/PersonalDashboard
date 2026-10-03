@@ -148,7 +148,7 @@ export async function loadSurveyPool(
   ]);
   assertSchemaExposed(fieldRead.error ?? trackRead.error, LEARN_SCHEMA);
   if (fieldRead.error) throw fail('Reading the fields', fieldRead.error);
-  if (trackRead.error) throw fail('Reading your tracks', trackRead.error);
+  if (trackRead.error) throw fail('Reading your subjects', trackRead.error);
 
   const counts = await loadSurveyCounts(supabase, placements);
 

@@ -70,7 +70,7 @@ export async function writePlanProject(subjectId: string): Promise<ProjectResult
     if (existing) return { project: await projectViewOf(learn, user.id, existing) };
 
     const plan = await loadPlanForProject(learn, user.id, id.data);
-    if (!plan) return { error: 'This track is not a learning goal’s plan.' };
+    if (!plan) return { error: 'This subject is not a learning goal’s plan.' };
     if (plan.units.length === 0) return { error: 'This plan has no units to set a project from yet.' };
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -149,7 +149,7 @@ export async function handInPlanProject(
     if (!handedInSomething(working, lined)) return { error: 'Type in the figures or your working first.' };
 
     const plan = await loadPlanForProject(learn, user.id, subject);
-    if (!plan) return { error: 'This track is not a learning goal’s plan.' };
+    if (!plan) return { error: 'This subject is not a learning goal’s plan.' };
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) return { error: 'Marking a hand-in needs ANTHROPIC_API_KEY to be set.' };

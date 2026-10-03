@@ -90,8 +90,8 @@ export async function loadPiecesDue(
       .order('ordinal'),
     unitsWithPieces(learn, userId, tracks),
   ]);
-  if (goals.error) throw new Error(`Reading the goal tracks' goals failed: ${goals.error.message}`);
-  if (units.error) throw new Error(`Reading the goal tracks' units failed: ${units.error.message}`);
+  if (goals.error) throw new Error(`Reading the goal subjects' goals failed: ${goals.error.message}`);
+  if (units.error) throw new Error(`Reading the goal subjects' units failed: ${units.error.message}`);
 
   const laidOut = new Set(((goals.data ?? []) as { unit_id: string }[]).map((row) => row.unit_id));
   const order = new Map(tracks.map((id, index) => [id, index]));
@@ -120,8 +120,8 @@ export async function writeUnitPieces(
       .eq('id', due.subjectId)
       .eq('user_id', userId)
       .maybeSingle();
-    if (subjectError) throw new Error(`Reading the track failed: ${subjectError.message}`);
-    if (!subject) return { outcome: 'failed', detail: 'No track of this person has that id.' };
+    if (subjectError) throw new Error(`Reading the subject failed: ${subjectError.message}`);
+    if (!subject) return { outcome: 'failed', detail: 'No subject of this person has that id.' };
     const trackName = (subject as { name: string }).name;
 
     if ((await unitsWithPieces(learn, userId, [due.subjectId])).has(due.unitId)) return { outcome: 'already' };
@@ -132,7 +132,7 @@ export async function writeUnitPieces(
       loadCurriculum(learn, due.subjectId, userId),
     ]);
     const unit = units.find((one) => one.id === due.unitId);
-    if (!unit) return { outcome: 'failed', detail: 'The unit is no longer on its track.' };
+    if (!unit) return { outcome: 'failed', detail: 'The unit is no longer in its subject.' };
     const ideas = unitIdeas({ units, goals, graph }, due.unitId);
     if (ideas.length === 0) return { outcome: 'nothing' };
     if (!apiKey) return { outcome: 'failed', detail: 'Writing pieces needs ANTHROPIC_API_KEY to be set.' };

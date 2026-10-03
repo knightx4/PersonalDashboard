@@ -135,10 +135,10 @@ export function weightReason(
 ): string {
   const row = activity ?? NO_ACTIVITY;
   const { weight: value, stopped } = weight ?? { weight: 1, stopped: false };
-  const lead = `Practice Flow asks about this track ${howOften(value)}`;
+  const lead = `Practice asks about this subject ${howOften(value)}`;
 
   if (stopped) {
-    return `${lead}, because in the last four weeks you answered questions from other tracks and none from this one.`;
+    return `${lead}, because in the last four weeks you answered questions from other subjects and none from this one.`;
   }
 
   const taken = row.lessonsTaken ?? 0;

@@ -85,7 +85,7 @@ describe('lessons in Learn now', () => {
   it('are named on the track’s page', () => {
     const row = activity({ answered: 1, lessonsTaken: 2, lessonsPassed: 1 });
     expect(weightReason(row, trackWeight(row, false))).toBe(
-      'Practice Flow asks about this track about 2 times as often as a new one, because in the last four weeks you answered 1 of its questions, skipped none, took 2 lessons in Learn now and passed on 1 lesson.',
+      'Practice asks about this subject about 2 times as often as a new one, because in the last four weeks you answered 1 of its questions, skipped none, took 2 lessons in Learn now and passed on 1 lesson.',
     );
   });
 });
@@ -94,27 +94,27 @@ describe('the line on the track’s page', () => {
   it('names the counts behind a heavy track', () => {
     const row = activity({ answered: 12, skipped: 1 });
     expect(weightReason(row, trackWeight(row, false))).toBe(
-      'Practice Flow asks about this track about 4 times as often as a new one, because in the last four weeks you answered 12 of its questions and skipped 1.',
+      'Practice asks about this subject about 4 times as often as a new one, because in the last four weeks you answered 12 of its questions and skipped 1.',
     );
   });
 
   it('names skips and Not now behind a light one', () => {
     const row = activity({ skipped: 2, pushedAside: 1 });
     expect(weightReason(row, trackWeight(row, false))).toBe(
-      'Practice Flow asks about this track about 25% as often as a new one, because in the last four weeks you answered none of its questions, skipped 2 and pushed 1 idea aside with Not now.',
+      'Practice asks about this subject about 25% as often as a new one, because in the last four weeks you answered none of its questions, skipped 2 and pushed 1 idea aside with Not now.',
     );
   });
 
   it('says when nothing has happened', () => {
     expect(weightReason(undefined, undefined)).toBe(
-      'Practice Flow asks about this track as often as a new one, because you have not answered or skipped any of its questions in the last four weeks.',
+      'Practice asks about this subject as often as a new one, because you have not answered or skipped any of its questions in the last four weeks.',
     );
   });
 
   it('says when you stopped', () => {
     const row = activity({ answeredBefore: 4 });
     expect(weightReason(row, trackWeight(row, true))).toBe(
-      'Practice Flow asks about this track about 50% as often as a new one, because in the last four weeks you answered questions from other tracks and none from this one.',
+      'Practice asks about this subject about 50% as often as a new one, because in the last four weeks you answered questions from other subjects and none from this one.',
     );
   });
 });

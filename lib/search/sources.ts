@@ -25,7 +25,7 @@ export const HIT_KINDS = {
   note: 'Note',
   course: 'Course',
   reading: 'Reading',
-  track: 'Track',
+  track: 'Reading list',
   subject: 'Subject',
   plan: 'Plan',
   spec: 'Spec',

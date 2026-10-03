@@ -91,7 +91,7 @@ export async function loadGoalTracks(supabase: LearnSupabaseClient, userId: stri
     .is('archived_at', null)
     .is('list_source', null)
     .not('subject_id', 'is', null);
-  if (error) throw new Error(`Reading your goals' tracks failed: ${error.message}`);
+  if (error) throw new Error(`Reading your goals' subjects failed: ${error.message}`);
   return new Set(((data ?? []) as { subject_id: string }[]).map((row) => row.subject_id));
 }
 

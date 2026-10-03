@@ -231,9 +231,9 @@ export async function loadPlanLayoutsDue(
       .in('subject_id', subjectIds)
       .not('unit_id', 'is', null),
   ]);
-  if (subjects.error) throw new Error(`Reading the goal tracks failed: ${subjects.error.message}`);
-  if (units.error) throw new Error(`Reading the goal tracks' units failed: ${units.error.message}`);
-  if (goals.error) throw new Error(`Reading the goal tracks' goals failed: ${goals.error.message}`);
+  if (subjects.error) throw new Error(`Reading the goal subjects failed: ${subjects.error.message}`);
+  if (units.error) throw new Error(`Reading the goal subjects' units failed: ${units.error.message}`);
+  if (goals.error) throw new Error(`Reading the goal subjects' goals failed: ${goals.error.message}`);
 
   const subjectRows = (subjects.data ?? []) as { id: string; name: string; lessons_held_until: string | null }[];
   const unitRows = (units.data ?? []) as { id: string; subject_id: string; ordinal: number }[];
@@ -277,7 +277,7 @@ export async function loadOutlinesDue(
     .eq('user_id', userId)
     .in('id', subjectIds)
     .is('outlined_at', null);
-  if (error) throw new Error(`Reading which goal tracks are outlined failed: ${error.message}`);
+  if (error) throw new Error(`Reading which goal subjects are outlined failed: ${error.message}`);
   const rows = (data ?? []) as { id: string; name: string; lessons_held_until: string | null }[];
 
   const due: PlanLayoutDue[] = [];

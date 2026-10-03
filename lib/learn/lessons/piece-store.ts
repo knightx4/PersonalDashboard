@@ -207,7 +207,7 @@ export async function loadPiecePage(
     loadLessons(learn, userId, piece.concept_ids),
     loadLatestCheck(learn, userId, piece.id),
   ]);
-  if (subject.error) throw new Error(`Reading the track failed: ${subject.error.message}`);
+  if (subject.error) throw new Error(`Reading the subject failed: ${subject.error.message}`);
   if (unit.error) throw new Error(`Reading the unit failed: ${unit.error.message}`);
   if (siblings.error) throw new Error(`Reading the unit's pieces failed: ${siblings.error.message}`);
   if (!subject.data || !unit.data) return null;
@@ -247,7 +247,7 @@ export async function loadPieceForCheck(
     learn.from('curriculum_units').select('title, outcome').eq('id', row.unit_id).eq('user_id', userId).maybeSingle(),
     loadIdeas(learn, userId, row.concept_ids),
   ]);
-  if (subject.error) throw new Error(`Reading the track failed: ${subject.error.message}`);
+  if (subject.error) throw new Error(`Reading the subject failed: ${subject.error.message}`);
   if (unit.error) throw new Error(`Reading the unit failed: ${unit.error.message}`);
   if (!subject.data || !unit.data || ideas.length === 0) return null;
   const unitRow = unit.data as { title: string; outcome: string | null };
@@ -351,7 +351,7 @@ export async function loadTrackPieces(
     .eq('user_id', userId)
     .eq('subject_id', subjectId)
     .order('ordinal');
-  if (error) throw new Error(`Reading the track's pieces failed: ${error.message}`);
+  if (error) throw new Error(`Reading the subject's pieces failed: ${error.message}`);
   const byUnit = new Map<string, PieceSibling[]>();
   for (const row of (data ?? []) as { id: string; unit_id: string; ordinal: number; title: string; passed_at: string | null }[]) {
     const list = byUnit.get(row.unit_id) ?? [];

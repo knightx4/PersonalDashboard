@@ -48,8 +48,8 @@ function nothingAboutGoals(goal: FlowGoal): string {
 }
 
 const NOTHING_TO_ASK: Record<NonNullable<FlowState['nothing']>, string> = {
-  'no-subjects': 'No tracks yet, so there is nothing to ask about. Name one first.',
-  'all-settled': 'Every idea in every track is known. Nothing left to ask.',
+  'no-subjects': 'No subjects yet, so there is nothing to ask about. Name one first.',
+  'all-settled': 'Every idea in every subject is known. Nothing left to ask.',
 };
 
 function AskButton({ label }: { label: string }) {
@@ -94,7 +94,7 @@ function TrackBar({ name, move }: { name?: string; move: TrackMove }) {
         aria-valuenow={move.settled}
         aria-valuemin={0}
         aria-valuemax={move.total}
-        aria-label={name ? `Ideas known in ${name}` : 'Ideas known in this track'}
+        aria-label={name ? `Ideas known in ${name}` : 'Ideas known in this subject'}
       >
         <div
           className={cn(
@@ -155,7 +155,7 @@ function StartButton() {
   // so this is the slowest press in the flow and says so.
   return (
     <Button type="submit" variant="secondary" size="sm" disabled={pending}>
-      {pending ? 'Writing the track…' : 'Start'}
+      {pending ? 'Writing the subject…' : 'Start'}
     </Button>
   );
 }
@@ -192,7 +192,7 @@ function TrackOfferCard({
     <div className="mt-4 flex gap-3 text-left">
       <Sprout className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-hidden />
       <div className="min-w-0 flex-1">
-        <p className="text-ui font-medium text-ink">New track: {offer.name}</p>
+        <p className="text-ui font-medium text-ink">New subject: {offer.name}</p>
         <p className="mt-0.5 text-small text-ink-muted">
           From {offer.notes} of your {offer.notes === 1 ? 'note' : 'notes'}. {offer.about}
         </p>
@@ -210,7 +210,7 @@ function TrackOfferCard({
               <StartButton />
               <PaidHint
                 action="app/learn/flow/actions.ts#flowStep:start-track"
-                what="Cost of starting the track"
+                what="Cost of starting the subject"
               />
             </span>
           </form>
@@ -309,7 +309,7 @@ export function FlowSession({
           )}
           {live.nothing && track && (
             <Link href={practiceHref()} className="text-ui text-accent hover:underline">
-              Ask across all tracks
+              Ask across all subjects
             </Link>
           )}
           {live.nothing && aboutGoals && (
@@ -340,7 +340,7 @@ export function FlowSession({
           not in your list of tracks and would otherwise look like a mistake. */}
       {live.survey && (
         <p className="mt-0.5 text-small text-ink-muted">
-          From a subject in your notes that is not one of your tracks.
+          From a theme in your notes that is not one of your subjects.
         </p>
       )}
       {/* A goal question (plan #1385) is named after the goal above, which is

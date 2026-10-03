@@ -58,5 +58,5 @@ export function readLine(read: CourseRead): string {
   const ideas = `${read.conceptsAdded} ${read.conceptsAdded === 1 ? 'idea' : 'ideas'} known`;
   return read.subject
     ? `Read into ${read.subject.name}, ${ideas}`
-    : `Read, ${ideas}; that track has since been removed`;
+    : `Read, ${ideas}; that subject has since been removed`;
 }

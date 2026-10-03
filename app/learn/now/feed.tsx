@@ -476,11 +476,11 @@ function DeckCard({
     startMake(async () => {
       setError(null);
       const result = await makeTrackOfCard(card.id).catch(() => ({
-        error: 'Could not make that track. Check your connection.',
+        error: 'Could not make that subject. Check your connection.',
         track: undefined,
       }));
       if (result.track) setMade(result.track);
-      else setError(result.error ?? 'Could not make that track.');
+      else setError(result.error ?? 'Could not make that subject.');
     });
 
   // Too hard and Too easy (plan #893). The card stays on screen (#891), so
@@ -739,14 +739,14 @@ function DeckCard({
               {testing
                 ? card.kind === 'lesson'
                   ? 'Opening the questions…'
-                  : 'Starting a track…'
+                  : 'Starting a subject…'
                 : 'Test me on this'}
             </Button>
             {/* A lesson's track already exists, so testing on it costs nothing. */}
             {card.kind === 'section' && (
               <PaidHint
                 action="app/learn/now/actions.ts#testMeOnCard"
-                what="Cost of starting a track from this card"
+                what="Cost of starting a subject from this card"
               />
             )}
             {canMakeTrack(card) && (
@@ -764,12 +764,12 @@ function DeckCard({
                   ) : (
                     <Sprout className="size-3.5" strokeWidth={2} aria-hidden />
                   )}
-                  {made ? 'Track made' : making ? 'Making a track…' : 'Make this a track'}
+                  {made ? 'Subject made' : making ? 'Making a subject…' : 'Make this a subject'}
                 </Button>
                 {!made && (
                   <PaidHint
                     action="app/learn/now/actions.ts#makeTrackOfCard"
-                    what="Cost of making a track from this card"
+                    what="Cost of making a subject from this card"
                   />
                 )}
               </span>
@@ -839,7 +839,7 @@ function DeckCard({
           )}
           {making && (
             <p className="mt-2 text-small text-ink-muted" aria-live="polite">
-              Writing the track&apos;s units. This takes about half a minute.
+              Writing the subject&apos;s units. This takes about half a minute.
             </p>
           )}
           {made && <MadeTrackLine track={made} className="mt-2" />}
