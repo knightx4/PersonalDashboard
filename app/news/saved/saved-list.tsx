@@ -72,7 +72,7 @@ export function SavedList({ stories }: { stories: SavedListStory[] }) {
           <li
             key={story.id}
             id={savedStoryAnchor(story.id)}
-            className="scroll-mt-20 py-3 first:pt-0 last:pb-0"
+            className="scroll-mt-bar py-3 first:pt-0 last:pb-0"
           >
             <article>
               <div className="flex items-start gap-3">

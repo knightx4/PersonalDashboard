@@ -116,7 +116,7 @@ export default async function SpecsPage() {
             <div className="pt-2">
               {/* The anchor a search hit on this vision lands at (plan #1155),
                   around the vision and any edit proposed to it. */}
-              <div id={visionAnchor(group.module ?? APP_VISION)} className="scroll-mt-20">
+              <div id={visionAnchor(group.module ?? APP_VISION)} className="scroll-mt-bar">
                 {/* Above the documents rather than among them, because it is the
                   layer above them. The app-wide group has one too: what the
                   app as a whole is for, which a step with no workspace is

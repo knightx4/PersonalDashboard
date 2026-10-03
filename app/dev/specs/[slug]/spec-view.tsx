@@ -29,7 +29,7 @@ function Prose({ markdown }: { markdown: string }) {
 
 export function SpecSectionCard({ section }: { section: SpecSectionWithThread }) {
   return (
-    <section id={section.anchor} className={cn(cardVariants(), 'scroll-mt-20 px-4 py-4')}>
+    <section id={section.anchor} className={cn(cardVariants(), 'scroll-mt-bar px-4 py-4')}>
       <h2 className="mb-3 text-body font-semibold text-ink">{section.heading}</h2>
 
       {section.body ? (

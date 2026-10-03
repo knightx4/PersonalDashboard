@@ -116,7 +116,7 @@ export function TakeawayRow({ takeaway, inVideo = false }: { takeaway: Takeaway;
   const body = own?.said?.trim() || takeaway.body;
 
   return (
-    <li id={`takeaway-${takeaway.id}`} className="flex scroll-mt-20 flex-col gap-1.5 px-4 py-3">
+    <li id={`takeaway-${takeaway.id}`} className="flex scroll-mt-bar flex-col gap-1.5 px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <WorkspaceChip module={takeaway.module} />
         <TakeawayState takeaway={takeaway} />

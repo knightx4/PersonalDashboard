@@ -456,9 +456,11 @@ export function AppShell({
   const dockKey = (moduleById(module) ?? HOME_MARK).key.from;
   // Taller than the icons need: a thumb target, and on a phone a bar you can
   // hit without looking. The icons stay at the dock's 20px (the icon law);
-  // the room is in the padding.
+  // the room is around them. The height is --dock-h in app/globals.css, less
+  // the bar's 1px top border, so everything that clears the dock reads the
+  // same figure.
   const dockItem =
-    'press flex w-full flex-col items-center gap-1 px-1 pb-3.5 pt-4 text-micro font-medium';
+    'press flex h-[calc(var(--dock-h)-1px)] w-full flex-col items-center justify-center gap-1 px-1 text-micro font-medium';
 
   const dockTabs = tabs.map((section) => {
     const Icon = section.icon ? NAV_ICONS[section.icon] : null;
@@ -657,7 +659,7 @@ export function AppShell({
             Lightbox it is the difference between a white strip across the top
             of a black bench and one continuous bench. */}
             <header className="sticky top-0 z-chrome bg-page/85 pt-[env(safe-area-inset-top)] backdrop-blur">
-              <div className="flex h-[4.5rem] items-center gap-1 px-3 sm:gap-2 sm:px-5 lg:h-14">
+              <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5">
                 <button
                   type="button"
                   onClick={() => setDrawer(true)}
@@ -839,7 +841,7 @@ export function AppShell({
                 'flex-1',
                 // Room for the tab bar, which is fixed over the foot of the page,
                 // and for the home indicator it is lifted clear of.
-                'pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-6',
+                'pb-[calc(var(--dock-h)+2.125rem+env(safe-area-inset-bottom))] lg:pb-6',
               )}
             >
               {children}

@@ -240,7 +240,7 @@ export default async function HomePage({
                 itself does. */}
             <Suspense
               fallback={
-                <div id={BRIEF_ANCHOR} className="mt-4 scroll-mt-20 space-y-2.5" aria-hidden>
+                <div id={BRIEF_ANCHOR} className="mt-4 scroll-mt-bar space-y-2.5" aria-hidden>
                   <Skeleton className="h-4 w-72 max-w-full" />
                   <Skeleton className="h-3 w-56 max-w-full" />
                 </div>
@@ -421,7 +421,7 @@ async function QuietDay({
  */
 function SectionSkeleton({ rows, id }: { rows: number; id?: string }) {
   return (
-    <Card id={id} padding="standard" className="mt-4 scroll-mt-20" aria-hidden>
+    <Card id={id} padding="standard" className="mt-4 scroll-mt-bar" aria-hidden>
       <Skeleton className="h-4 w-32" />
       <div className="mt-2 divide-y divide-border">
         {Array.from({ length: rows }).map((_, index) => (

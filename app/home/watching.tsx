@@ -29,7 +29,7 @@ export function WatchingSection({
   timezone: string;
 }) {
   return (
-    <Card id="watching" padding="standard" className="mt-4 scroll-mt-20">
+    <Card id="watching" padding="standard" className="mt-4 scroll-mt-bar">
       <h2 className="flex items-center gap-2 text-ui font-semibold text-ink">
         <Eye className="size-4 text-accent" strokeWidth={1.75} aria-hidden />
         Watching

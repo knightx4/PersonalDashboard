@@ -244,7 +244,7 @@ export function PostItem({ card }: { card: PostCard }) {
   };
 
   return (
-    <li id={`post-${post.id}`} className="flex scroll-mt-20 flex-col gap-2 px-4 py-3">
+    <li id={`post-${post.id}`} className="flex scroll-mt-bar flex-col gap-2 px-4 py-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h3 className="min-w-0 flex-1 text-ui font-semibold text-ink">{post.angle}</h3>
         <StatusLine card={card} />

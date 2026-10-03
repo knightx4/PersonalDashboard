@@ -92,7 +92,7 @@ describe('the bottom bar', () => {
   });
 
   it('leaves room under the page for it, whether or not there are sections', () => {
-    const room = 'pb-[calc(6.5rem+env(safe-area-inset-bottom))]';
+    const room = 'pb-[calc(var(--dock-h)+2.125rem+env(safe-area-inset-bottom))]';
     expect(render([])).toContain(room);
     expect(render([{ href: '/todo', label: 'Agenda' }])).toContain(room);
   });

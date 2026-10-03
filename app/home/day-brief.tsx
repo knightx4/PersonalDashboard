@@ -18,7 +18,7 @@ import { PickLink } from './pick-link';
  */
 export function DayBrief({ brief, day }: { brief: ShownBrief; day: string }) {
   return (
-    <section id={BRIEF_ANCHOR} aria-label="This morning's brief" className="mt-4 scroll-mt-20">
+    <section id={BRIEF_ANCHOR} aria-label="This morning's brief" className="mt-4 scroll-mt-bar">
       {brief.kind === 'body' && <p className="max-w-prose text-body text-ink">{brief.body}</p>}
 
       {brief.kind === 'picks' && (
