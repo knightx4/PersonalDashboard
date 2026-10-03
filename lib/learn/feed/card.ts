@@ -549,6 +549,18 @@ export function appendCards(current: FeedCard[], incoming: FeedCard[]): FeedCard
   return [...current, ...incoming.filter((card) => !seen.has(card.id))];
 }
 
+/**
+ * Put a card from further down the deck on top (note e555b339), from the
+ * Up next list under the card on screen. The card it replaces goes second, so
+ * picking ahead skips nothing. An id that is not in the deck, or is already on
+ * top, leaves the deck as it was.
+ */
+export function bringForward(deck: FeedCard[], id: string): FeedCard[] {
+  const index = deck.findIndex((card) => card.id === id);
+  if (index <= 0) return deck;
+  return [deck[index], ...deck.slice(0, index), ...deck.slice(index + 1)];
+}
+
 /** Cards loaded at a time: the first deck, and each time it runs low. */
 export const FEED_PAGE = 6;
 

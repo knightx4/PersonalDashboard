@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Feather,
   GraduationCap,
+  Play,
   Sprout,
   Weight,
   X,
@@ -21,12 +22,13 @@ import { ClipPlayer } from '@/components/learn/clip-player';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
-import { Disclosure } from '@/components/ui/disclosure';
+import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { RelatedNotes } from '@/components/vault/related-notes';
 import { Field, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import {
   appendCards,
+  bringForward,
   canMakeTrack,
   feedEnd,
   type CardDifficulty,
@@ -161,6 +163,14 @@ export function LearnNowFeed({
     });
   }, []);
 
+  /** A card picked from Up next goes on top, with the one it replaces next. */
+  const pick = useCallback((id: string) => {
+    setError(null);
+    setDeck((cards) => bringForward(cards, id));
+    const box = top.current;
+    if (box && box.getBoundingClientRect().top < 0) box.scrollIntoView({ block: 'start' });
+  }, []);
+
   /** Take the card off the top of the deck, and bring the next into view. */
   const advance = useCallback((id: string) => {
     setLeaving(null);
@@ -290,6 +300,9 @@ export function LearnNowFeed({
               onMadeCard={putNext}
             />
           )}
+          {deck.length > 1 && (
+            <UpNext cards={deck.slice(1)} disabled={leaving !== null} onPick={pick} />
+          )}
         </>
       ) : (
         <Card padding="standard" className="text-center">
@@ -322,6 +335,58 @@ export function LearnNowFeed({
         </Card>
       )}
     </div>
+  );
+}
+
+/**
+ * The cards loaded behind the one on screen, in the order they will come
+ * (note e555b339). Folded by default so the card stays the page; a press on
+ * one puts it on top. A card with a lecture clip says so, since a clip is
+ * the thing most worth choosing ahead for.
+ */
+function UpNext({
+  cards,
+  disabled,
+  onPick,
+}: {
+  cards: FeedCard[];
+  disabled: boolean;
+  onPick: (id: string) => void;
+}) {
+  return (
+    <SectionFold
+      title="Up next"
+      count={cards.length}
+      defaultOpen={false}
+      remember="learn-now-up-next"
+      className="mt-4"
+    >
+      <ul className="divide-y divide-border">
+        {cards.map((card) => (
+          <li key={card.id}>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => onPick(card.id)}
+              className="press flex w-full items-baseline gap-2 rounded-control px-1.5 py-2 text-left hover:bg-sunken disabled:opacity-50"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-ui text-ink">{card.title}</span>
+                {card.source && (
+                  <span className="block text-small text-ink-muted">{card.source}</span>
+                )}
+              </span>
+              {card.video && (
+                <span className="inline-flex shrink-0 items-center gap-1 text-small text-ink-muted">
+                  <Play className="size-3" strokeWidth={2} aria-hidden />
+                  Clip
+                </span>
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </SectionFold>
   );
 }
 
