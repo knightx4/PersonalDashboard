@@ -65,10 +65,8 @@ export const MAX_LOOKUPS = 8;
 /** Input tokens across the calls of one answer, cached and not, before it must answer. */
 export const INPUT_BUDGET = 150_000;
 /**
- * Time spent looking before it must answer. Ask is a server action, so it runs
- * under the maxDuration of whichever page the sheet is open over: none sets
- * one below 300 seconds, and a page that sets none gets Vercel's default of
- * 300 under fluid compute. Forty seconds fits five rounds of lookups (the
+ * Time spent looking before it must answer. Ask runs in app/api/ask/route.ts,
+ * whose maxDuration is 300 seconds (plan #1438). Forty seconds fits five rounds of lookups (the
  * jobs question that failed at fourteen took five), and leaves the answer
  * call and the writes well inside even a sixty-second limit.
  */

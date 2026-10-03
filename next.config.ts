@@ -39,6 +39,8 @@ const nextConfig: NextConfig = {
     '/ask': ['./docs/**/*.md'],
     '/ask/*': ['./docs/**/*.md'],
     '/api/mcp': ['./docs/**/*.md'],
+    // The sheet asks through this route, which streams the lookups (plan #1438).
+    '/api/ask': ['./docs/**/*.md'],
   },
 
   async redirects() {

@@ -19,7 +19,7 @@ import { readMail } from '@/lib/inbox/read-mail';
 import { dashBackupRoutine, fireFeatureRoutine } from '@/lib/feedback/routine';
 import { handoffBrief } from './handoff';
 import { attachHandoffs, discardHandoffs, insertHandoff, loadOpenHandoffs, markHandoffFired } from './handoffs';
-import { askDash, type AskDashResult } from './ask';
+import { askDash, type AskDashResult, type AskLookupEvent } from './ask';
 import {
   attachProposals,
   discardProposals,
@@ -51,6 +51,8 @@ export async function askDashInRequest(input: {
   conversationRef?: string | null;
   /** The app address it was asked from, already checked; null when dropped. */
   page?: string | null;
+  /** Hears each lookup as it starts and finishes (plan #1438): the streaming route listens. */
+  onLookup?: (event: AskLookupEvent) => void;
 }): Promise<AskDashResult> {
   const user = await requireUser();
   const [settings, core] = await Promise.all([loadAccountSettings(user.id), createCoreClient()]);
@@ -72,6 +74,7 @@ export async function askDashInRequest(input: {
       propose: (name, args, seen, save) =>
         executeProposal(name, args, { ...ctx, seen, save, timezone: settings.timezone }),
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+      onLookup: input.onLookup,
     },
     {
       start: (question) => startAsk(core, user.id, question),
