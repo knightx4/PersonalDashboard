@@ -37,6 +37,7 @@ import {
 } from '@/lib/plan/run-end';
 import { type RunRaise } from '@/lib/plan/work';
 import { type CommitCheck } from '@/lib/plan/checks';
+import type { OverhaulProgress } from '@/lib/plan/overhaul-progress';
 import { type PlanCatalogEntry } from './plan-catalog';
 import { cn } from '@/lib/cn';
 import { PlanRow } from './plan-row';
@@ -381,6 +382,7 @@ export function PlanView({
   keyRefusal = null,
   liveness,
   commitChecks,
+  overhaulProgress = {},
   empty,
   canSend,
   unfolded = false,
@@ -414,6 +416,8 @@ export function PlanView({
   liveness?: PlanLiveness;
   /** What CI said about each commit a step shipped in, by the commit's sha. */
   commitChecks: Record<string, CommitCheck>;
+  /** Each overhaul's rule counts, by its plan item id. Absent: none to show. */
+  overhaulProgress?: Readonly<Record<string, OverhaulProgress>>;
   empty: boolean;
   canSend: boolean;
   /**
@@ -593,6 +597,7 @@ export function PlanView({
                       runRaises={runRaises}
                       liveness={liveness}
                       commitChecks={ci.checks}
+                      overhaulProgress={overhaulProgress}
                       view={view}
                       searching={searching}
                       unfolded={unfolded}
@@ -675,6 +680,7 @@ export function PlanView({
                 runRaises={runRaises}
                 liveness={liveness}
                 commitChecks={ci.checks}
+                overhaulProgress={overhaulProgress}
                 view={view}
                 searching={searching}
                 unfolded={unfolded}
