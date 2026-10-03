@@ -353,8 +353,11 @@ export async function answerQuestion(input: {
   execute: AskExecutor;
   /** Absent: every proposal is refused. */
   propose?: AskProposer;
-  /** Keeps a hand-off and returns what to tell the model. Absent: every hand-off is refused. */
-  handOff?: (input: unknown) => Promise<AskToolResult>;
+  /**
+   * Keeps a hand-off and returns what to tell the model. Absent: every
+   * hand-off is refused. `seen` says whether Dash has seen the row it names.
+   */
+  handOff?: (input: unknown, seen: (table: string, ref: string) => boolean) => Promise<AskToolResult>;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
@@ -516,7 +519,12 @@ export async function answerQuestion(input: {
         hear({ phase: 'started', id: use.id, index: lookups + i, name: use.name, input: use.input });
         if (use.name === HAND_OFF_TOOL_NAME) {
           if (!input.handOff) return { ok: false, error: NO_HANDOFF };
-          return input.handOff(use.input);
+          // The row it is about counts when a lookup returned it or the page shows it.
+          const row = input.page?.row;
+          return input.handOff(
+            use.input,
+            (table, ref) => known.has(citationKey({ table, ref })) || (row?.table === table && row.ref === ref),
+          );
         }
         if (isProposal(use.name)) {
           if (!input.propose) return { ok: false, error: NO_PROPOSALS };
@@ -566,7 +574,7 @@ export type AskStores = {
   /** Removes the proposals of an answer that was not kept. */
   discardProposals: (ids: readonly string[]) => Promise<void>;
   /** Keeps a hand-off as pending (handoffs.ts insertHandoff). Absent with no fireHandoff. */
-  saveHandoff?: (conversationId: string, request: string) => Promise<DashHandoff>;
+  saveHandoff?: (conversationId: string, request: string, subjectRef: string | null) => Promise<DashHandoff>;
   /** Ties the answer's hand-offs to its turn once that is written. */
   attachHandoffs?: (ids: readonly string[], turnId: string) => Promise<void>;
   /** Removes the hand-offs of an answer that was not kept. */
@@ -666,11 +674,11 @@ export async function askDash(
   const saveHandoff = stores.saveHandoff;
   const handOff =
     saveHandoff && stores.fireHandoff
-      ? async (args: unknown) => {
-          const parsed = handoffRequest(args);
+      ? async (args: unknown, seen: (table: string, ref: string) => boolean) => {
+          const parsed = handoffRequest(args, seen);
           if (!parsed.ok) return { ok: false as const, error: parsed.error };
           try {
-            handed.push(await saveHandoff(subject.ref, parsed.request));
+            handed.push(await saveHandoff(subject.ref, parsed.request, parsed.subjectRef));
           } catch {
             return { ok: false as const, error: 'The request could not be kept. Tell them it was not passed on.' };
           }

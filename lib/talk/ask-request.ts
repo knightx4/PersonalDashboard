@@ -87,8 +87,8 @@ export async function askDashInRequest(input: {
       discardProposals: (ids) => discardProposals(core, ids),
       ...(canHandOff
         ? {
-            saveHandoff: (conversationId: string, request: string) =>
-              insertHandoff(core, user.id, conversationId, request),
+            saveHandoff: (conversationId: string, request: string, subjectRef: string | null) =>
+              insertHandoff(core, user.id, conversationId, request, subjectRef),
             attachHandoffs: (ids: readonly string[], turnId: string) => attachHandoffs(core, ids, turnId),
             discardHandoffs: (ids: readonly string[]) => discardHandoffs(core, ids),
             fireHandoff: async (handoff) => {

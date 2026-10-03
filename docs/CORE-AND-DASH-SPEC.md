@@ -128,6 +128,13 @@ that has been sent is waiting on the company, a return inside its window is on
 you, a todo is on you. Moves are worked out when read, not stored, except
 `dash_working`, which comes from the runs in progress (Part 5).
 
+An Ask Dash hand-off counts as one of those runs. When Dash hands a request
+on, it names the row the request is about in `core.dash_handoffs.subject_ref`,
+as a ref, and only a row a lookup returned or the page showed. While the
+hand-off is pending or fired, the Jobs, Todo and Shopping pages read those
+refs and `withRun` in `lib/core/move.ts` shows that row as `dash_working`. A
+row with no move of its own stays without one.
+
 ## Part 4: One "on you" list
 
 The Todo agenda already merges eight workspaces' obligations without copying

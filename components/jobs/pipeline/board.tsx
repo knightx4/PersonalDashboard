@@ -12,6 +12,7 @@ import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { ScoreLine } from '@/components/jobs/ui/score-figures';
 import { MoveLabel } from '@/components/ui/move-label';
 import { applicationMove } from '@/lib/jobs/move';
+import { rowRef, withRun } from '@/lib/core/move';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { shortAge } from '@/lib/jobs/applications/load';
 import { formatCoverage, type ApplicationStatus } from '@/lib/jobs/pipeline';
@@ -97,9 +98,12 @@ export type PipelineView = 'board' | 'list';
 export function PipelineBoard({
   rows,
   view = 'board',
+  working = [],
 }: {
   rows: PipelineRow[];
   view?: PipelineView;
+  /** Refs an open Ask Dash hand-off is about (plan #1568); those cards read "Dash is on it". */
+  working?: readonly string[];
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<ApplicationStatus | null>(null);
@@ -184,6 +188,7 @@ export function PipelineBoard({
               {columnRows.map((row) => (
                 <PipelineCard
                   key={row.applicationId}
+                  working={working}
                   row={row}
                   dragging={dragging === row.applicationId}
                   onDragStart={() => setDragging(row.applicationId)}
@@ -225,6 +230,7 @@ export function PipelineBoard({
             {columnRows.map((row) => (
               <PipelineCard
                 key={row.applicationId}
+                working={working}
                 row={row}
                 dragging={dragging === row.applicationId}
                 onDragStart={() => setDragging(row.applicationId)}
@@ -260,7 +266,7 @@ export function PipelineBoard({
           <Disclosure remember="jobs.fold.pipeline.closed" title="Closed" meta={`${closedRows.length} pursuit${closedRows.length === 1 ? '' : 's'}`}>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {closedRows.map((row) => (
-                <PipelineCard key={row.applicationId} row={row} dragging={false} muted />
+                <PipelineCard key={row.applicationId} row={row} dragging={false} muted working={working} />
               ))}
             </div>
           </Disclosure>
@@ -277,12 +283,14 @@ function PipelineCard({
   muted = false,
   onDragStart,
   onDragEnd,
+  working,
 }: {
   row: PipelineRow;
   dragging: boolean;
   muted?: boolean;
   onDragStart?: () => void;
   onDragEnd?: () => void;
+  working?: readonly string[];
 }) {
   const age = shortAge(row.lastActivityAt);
   const stale = (row.daysSinceActivity ?? 0) > STALE_DAYS;
@@ -290,11 +298,16 @@ function PipelineCard({
   // card says nothing rather than showing 0/0 and reading as a hopeless fit.
   const coverage = formatCoverage(row.coverage);
   // Whose move it is (plan #1454). Null on a closed card, whose badge says it.
-  const move = applicationMove({
-    status: row.status,
-    lastEvent: row.lastTurnEvent,
-    companyName: row.companyName,
-  });
+  // "Dash is on it" while an Ask Dash hand-off about it is open (plan #1568).
+  const move = withRun(
+    applicationMove({
+      status: row.status,
+      lastEvent: row.lastTurnEvent,
+      companyName: row.companyName,
+    }),
+    working,
+    [rowRef('job_search.applications', row.applicationId), rowRef('job_search.roles', row.roleId)],
+  );
 
   return (
     <article

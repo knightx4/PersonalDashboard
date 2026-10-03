@@ -6,22 +6,33 @@ import { displayVariant } from '@/lib/inventory/display';
 import type { ReturnsTrackerRow } from '@/lib/returns/types';
 import { returnMove } from '@/lib/returns/move';
 import { MoveLabel } from '@/components/ui/move-label';
+import { rowRef, withRun } from '@/lib/core/move';
 import { MarkReturnedButton, PlanReturnButton, UndoReturnedButton } from './plan-return-button';
 
 export function ReturnItemRow({
   row,
   nested = false,
+  working,
 }: {
   row: ReturnsTrackerRow;
   /** When nested under an order accordion, hide the redundant “View order” link. */
   nested?: boolean;
+  /**
+   * Refs an open Ask Dash hand-off is about (plan #1568). The row reads "Dash
+   * is on it" when one names its item, its return or its order.
+   */
+  working?: readonly string[];
 }) {
   const urgency =
     row.daysLeft != null && row.daysLeft <= 7 ? 'text-caution font-medium' : 'text-ink-muted';
   const returned = row.status === 'returned';
   // Whose move it is (plan #1454): on you inside the window, waiting on the
   // carrier before it arrives, nothing once it is back.
-  const move = returnMove(row);
+  const move = withRun(returnMove(row), working, [
+    rowRef('public.inventory_items', row.inventoryItemId),
+    rowRef('public.returns', row.returnId),
+    rowRef('public.orders', row.orderId),
+  ]);
 
   return (
     <li className="row-pad flex flex-col gap-3 px-4 sm:flex-row sm:items-center">

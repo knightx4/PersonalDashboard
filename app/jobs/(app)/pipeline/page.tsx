@@ -2,6 +2,7 @@ import { KanbanSquare } from 'lucide-react';
 import { countConnectedInboxes } from '@/lib/core/inbox/accounts';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
+import { loadWorkingRefs } from '@/lib/talk/handoffs';
 import Link from 'next/link';
 import { PipelineBoard, type PipelineView } from '@/components/jobs/pipeline/board';
 import { PipelineViewToggle } from '@/components/jobs/pipeline/view-toggle';
@@ -55,10 +56,12 @@ export default async function PipelinePage({
   const core = await createCoreClient();
   const params = await searchParams;
 
-  const [pipeline, inboxCount, { data: profile }] = await Promise.all([
+  const [pipeline, inboxCount, { data: profile }, working] = await Promise.all([
     loadPipeline(supabase, user.id),
     countConnectedInboxes(core, user.id),
     supabase.from('profiles').select('pipeline_view').eq('id', user.id).maybeSingle(),
+    // What an Ask Dash hand-off is working on (plan #1568).
+    loadWorkingRefs(core, user.id),
   ]);
 
   // Fit and chance on each card (plan #1206).
@@ -251,7 +254,7 @@ export default async function PipelinePage({
                  coverage rails where they were. */
               <SearchEmpty query={params.q ?? ''} />
             ) : (
-              <PipelineBoard rows={filtered} view={view} />
+              <PipelineBoard rows={filtered} view={view} working={working} />
             )}
           </div>
         </div>

@@ -51,8 +51,11 @@ function orderDeadlineLine(group: ReturnsOrderGroup<ReturnsTrackerRow>): {
  */
 export function ReturnsOrderList({
   groups,
+  working,
 }: {
   groups: ReturnsOrderGroup<ReturnsTrackerRow>[];
+  /** Refs an open Ask Dash hand-off is about (plan #1568). */
+  working?: readonly string[];
 }) {
   return (
     <ul className="space-y-2">
@@ -91,7 +94,7 @@ export function ReturnsOrderList({
               </div>
               <ul className="divide-y divide-border border-t border-border">
                 {group.items.map((row) => (
-                  <ReturnItemRow key={row.inventoryItemId} row={row} nested />
+                  <ReturnItemRow key={row.inventoryItemId} row={row} nested working={working} />
                 ))}
               </ul>
             </Disclosure>

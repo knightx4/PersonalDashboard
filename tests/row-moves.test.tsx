@@ -2,7 +2,9 @@
  * Jobs, Todo and Shopping rows say whose move they are with the shared label
  * (plan #1454): the role page, a pipeline card, a todo row and a row on the
  * returns list. The rules themselves are tested beside each moveOf; this
- * checks the surfaces draw them with MoveLabel's words and colours.
+ * checks the surfaces draw them with MoveLabel's words and colours, and that
+ * each reads "Dash is on it" while an Ask Dash hand-off about it is open
+ * (plan #1568).
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -46,6 +48,7 @@ import { ReturnItemRow } from '@/app/shopping/returns/return-item-row';
 import { TaskRow } from '@/components/todo/task-row';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import type { ReturnsTrackerRow } from '@/lib/returns/types';
+import type { Task } from '@/lib/todo/tasks/model';
 
 const pursuit = (over: Partial<PipelineRow>): PipelineRow => ({
   applicationId: 'a1',
@@ -105,6 +108,21 @@ const item = (over: Partial<ReturnsTrackerRow>): ReturnsTrackerRow => ({
   ...over,
 });
 
+const task: Task = {
+  id: 't1',
+  title: 'Ring the dentist',
+  body: null,
+  status: 'open',
+  dueOn: null,
+  dueAt: null,
+  pinned: false,
+  snoozedUntil: null,
+  completedAt: null,
+  createdAt: '2026-10-01T00:00:00Z',
+  position: null,
+  parentId: null,
+};
+
 describe('moves on Jobs, Todo and Shopping rows', () => {
   it('says a sent application waits on the company, on its pipeline card', () => {
     const html = renderToStaticMarkup(<PipelineBoard rows={[pursuit({})]} view="board" />);
@@ -114,23 +132,7 @@ describe('moves on Jobs, Todo and Shopping rows', () => {
 
   it('puts an open todo on you', () => {
     const html = renderToStaticMarkup(
-      <TaskRow
-        task={{
-          id: 't1',
-          title: 'Ring the dentist',
-          body: null,
-          status: 'open',
-          dueOn: null,
-          dueAt: null,
-          pinned: false,
-          snoozedUntil: null,
-          completedAt: null,
-          createdAt: '2026-10-01T00:00:00Z',
-          position: null,
-          parentId: null,
-        }}
-        timezone="UTC"
-      />,
+      <TaskRow task={task} timezone="UTC" />,
     );
     expect(html).toContain('On you');
   });
@@ -150,6 +152,46 @@ describe('moves on Jobs, Todo and Shopping rows', () => {
         />,
       ),
     ).toContain('Waiting on UPS');
+  });
+
+  // An open Ask Dash hand-off about the row (plan #1568), stubbed as the refs
+  // the page would read from core.dash_handoffs.
+  describe('while an Ask Dash hand-off about the row is open', () => {
+    it('says Dash is on it on the pipeline card, by its application or its role', () => {
+      for (const working of [['job_search.applications:a1'], ['job_search.roles:r1']]) {
+        const html = renderToStaticMarkup(<PipelineBoard rows={[pursuit({})]} view="board" working={working} />);
+        expect(html).toContain('Dash is on it');
+        expect(html).not.toContain('Waiting on EliseAI');
+      }
+      const other = renderToStaticMarkup(
+        <PipelineBoard rows={[pursuit({})]} view="board" working={['job_search.applications:a2']} />,
+      );
+      expect(other).toContain('Waiting on EliseAI');
+    });
+
+    it('says Dash is on it on the todo row', () => {
+      const html = renderToStaticMarkup(<TaskRow task={task} timezone="UTC" working={['todo.tasks:t1']} />);
+      expect(html).toContain('Dash is on it');
+      expect(html).not.toContain('On you');
+    });
+
+    it('says Dash is on it on a return, by its item or its order', () => {
+      for (const working of [['public.inventory_items:i1'], ['public.orders:o1']]) {
+        const html = renderToStaticMarkup(<ReturnItemRow row={item({})} working={working} />);
+        expect(html).toContain('Dash is on it');
+        expect(html).not.toContain('On you');
+      }
+    });
+
+    it('leaves a row with no move without one', () => {
+      const html = renderToStaticMarkup(
+        <ReturnItemRow
+          row={item({ status: 'returned', returnId: 'x', daysLeft: null })}
+          working={['public.inventory_items:i1']}
+        />,
+      );
+      expect(html).not.toContain('Dash is on it');
+    });
   });
 
   it('shows no move on a returned item', () => {

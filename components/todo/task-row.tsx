@@ -49,6 +49,7 @@ import { formatClock } from '@/lib/clock';
 import { LinkedText } from '@/components/ui/linked-text';
 import { MoveLabel } from '@/components/ui/move-label';
 import { taskMove } from '@/lib/todo/tasks/move';
+import { rowRef, withRun } from '@/lib/core/move';
 
 /**
  * One task, and what you can do to it without leaving the list.
@@ -123,6 +124,7 @@ export function TaskRow({
   pile,
   items = [],
   under,
+  working,
 }: {
   task: Task;
   timezone: string;
@@ -152,6 +154,8 @@ export function TaskRow({
    * it happened.
    */
   pile?: readonly string[];
+  /** Refs an open Ask Dash hand-off is about (plan #1568); this row reads "Dash is on it" when it is one. */
+  working?: readonly string[];
 }) {
   const [editing, setEditing] = useState(false);
   /** Whether the box for writing the next item is open under this task. */
@@ -198,7 +202,7 @@ export function TaskRow({
 
   const done = task.status === 'done';
   const dropped = task.status === 'dropped';
-  const whoseMove = taskMove(task);
+  const whoseMove = withRun(taskMove(task), working, [rowRef('todo.tasks', task.id)]);
 
   /**
    * Run one of the writes the row does not draw ahead of: a move, a place, a

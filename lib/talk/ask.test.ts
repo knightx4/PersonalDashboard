@@ -659,12 +659,13 @@ describe('handing a request on to the backup routine (plan #1402)', () => {
     const fired: string[] = [];
     const stores: AskStores = {
       ...memory.stores,
-      saveHandoff: async (conversationId, request) => {
+      saveHandoff: async (conversationId, request, subjectRef) => {
         const kept: DashHandoff = {
           id: `h${handoffs.length + 1}`,
           conversationId,
           turnId: null,
           request,
+          subjectRef,
           status: 'pending',
           runId: null,
           error: null,
@@ -705,6 +706,36 @@ describe('handing a request on to the backup routine (plan #1402)', () => {
     expect(result.handoffs?.map((h) => h.status)).toEqual(['fired']);
     // The question and the answer, and no turn saying it failed.
     expect(written.flatMap((w) => w.turns.map((t) => t.role))).toEqual(['user', 'assistant']);
+  });
+
+  it('records the row the request is about when the page shows it (plan #1568)', async () => {
+    const about = { table: 'job_search.applications', ref: 'a1' };
+    const { client } = stubClient([
+      reply([
+        use('u1', 'hand_off', { request: 'Add a follow-up note to this application', about }),
+        use('u2', 'hand_off', { request: 'And to this one', about: { table: 'job_search.applications', ref: 'a9' } }),
+      ]),
+      reply([use('a', 'answer', { answer: 'Passed on.', cited: [] })]),
+    ]);
+    const { stores, handoffs } = handoffStores(() => ({ status: 'fired' }));
+    await askDash(
+      {
+        question: 'Note that I followed up on this one',
+        today: '2026-10-02',
+        page: {
+          path: '/jobs/roles/r1',
+          module: 'jobs',
+          page: 'Role',
+          row: { ...about, title: 'Backend Engineer at EliseAI', href: '/jobs/roles/r1' },
+        },
+        execute: stubExecute().execute,
+        anthropicApiKey: 'k',
+        client,
+      },
+      stores,
+    );
+    // The page's row is kept; a row Dash never saw is not.
+    expect(handoffs.map((h) => h.subjectRef)).toEqual(['job_search.applications:a1', null]);
   });
 
   it('refuses a hand-off where nothing can take it, so Dash says it cannot', async () => {

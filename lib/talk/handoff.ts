@@ -1,4 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk';
+import { toRef } from '@/lib/core/refs';
 
 /**
  * Handing a request Ask Dash cannot do to the backup routine (plan #1402).
@@ -26,6 +27,12 @@ export type DashHandoff = {
   /** Dash's turn that announced it; null until that turn is written. */
   turnId: string | null;
   request: string;
+  /**
+   * The row the request is about, as a ref (`schema.table:id`), when Dash
+   * named one it had seen (plan #1568). That row reads "Dash is on it" while
+   * the hand-off is open. Null when the request is not about one row.
+   */
+  subjectRef: string | null;
   status: DashHandoffStatus;
   runId: string | null;
   error: string | null;
@@ -47,21 +54,55 @@ export const HAND_OFF_TOOL: Anthropic.Tool = {
         description:
           'What to do, complete on its own: "Create a goal \\"Make a new song and publish it on Spotify\\" in their Music area".',
       },
+      about: {
+        type: 'object',
+        description:
+          'The one row the request is about, when it is about one: a job application, role, todo, order or item a lookup returned, or the row the page shows. Its page then says Dash is on it until the reply comes. Leave it out when the request is about no single row, such as creating something new.',
+        properties: {
+          table: { type: 'string', description: 'The table the lookup returned, such as job_search.applications.' },
+          ref: { type: 'string', description: 'The ref the lookup returned for the row.' },
+        },
+        required: ['table', 'ref'],
+        additionalProperties: false,
+      },
     },
     required: ['request'],
     additionalProperties: false,
   },
 };
 
-/** The request out of the tool's input, or why it cannot be used. */
-export function handoffRequest(input: unknown): { ok: true; request: string } | { ok: false; error: string } {
-  const raw = input && typeof input === 'object' ? (input as Record<string, unknown>).request : undefined;
-  const request = typeof raw === 'string' ? raw.trim() : '';
+/** The longest subject ref kept (dash_handoffs_subject_ref_ck). */
+const MAX_SUBJECT_REF = 200;
+
+/**
+ * The request out of the tool's input, or why it cannot be used, with the
+ * row it is about as a ref. `seen` says whether a lookup in this
+ * conversation returned the row, or the page showed it: a row Dash has not
+ * seen is left out rather than refusing the request, so a made-up ref never
+ * marks a row and the request is still passed on.
+ */
+export function handoffRequest(
+  input: unknown,
+  seen: (table: string, ref: string) => boolean = () => false,
+): { ok: true; request: string; subjectRef: string | null } | { ok: false; error: string } {
+  const args = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+  const request = typeof args.request === 'string' ? args.request.trim() : '';
   if (!request) return { ok: false, error: 'request is missing. Say what to do.' };
   if (request.length > MAX_HANDOFF_REQUEST) {
     return { ok: false, error: `request is ${request.length} characters; the most is ${MAX_HANDOFF_REQUEST}.` };
   }
-  return { ok: true, request };
+  return { ok: true, request, subjectRef: subjectRefOf(args.about, seen) };
+}
+
+function subjectRefOf(about: unknown, seen: (table: string, ref: string) => boolean): string | null {
+  if (!about || typeof about !== 'object') return null;
+  const { table, ref } = about as Record<string, unknown>;
+  if (typeof table !== 'string' || typeof ref !== 'string') return null;
+  const t = table.trim();
+  const r = ref.trim();
+  if (!/^[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*$/.test(t) || !r || !seen(t, r)) return null;
+  const subject = toRef(t, r);
+  return subject.length <= MAX_SUBJECT_REF ? subject : null;
 }
 
 /** Said to the model when it hands off where there is nothing to hand to. */

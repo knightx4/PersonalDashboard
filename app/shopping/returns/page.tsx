@@ -1,6 +1,7 @@
 import { RotateCcw } from 'lucide-react';
 import Link from 'next/link';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { workingRefsForPage } from '@/lib/talk/handoffs';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
 import { cardVariants } from '@/components/ui/card';
@@ -45,7 +46,11 @@ export default async function ReturnsPage({
   const group = parseReturnsGroup(params.group);
   const merchantFilter = params.merchant?.trim() || undefined;
 
-  const data = await loadReturnsTracker(supabase, user.id, view);
+  const [data, working] = await Promise.all([
+    loadReturnsTracker(supabase, user.id, view),
+    // What an Ask Dash hand-off is working on (plan #1568).
+    workingRefsForPage(user.id),
+  ]);
   const merchantOptions = [
     ...new Map(
       data.rows
@@ -156,11 +161,11 @@ export default async function ReturnsPage({
             }
           />
         ) : group === 'orders' ? (
-          <ReturnsOrderList groups={orderGroups} />
+          <ReturnsOrderList groups={orderGroups} working={working} />
         ) : (
           <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
             {rows.map((row) => (
-              <ReturnItemRow key={row.inventoryItemId} row={row} />
+              <ReturnItemRow key={row.inventoryItemId} row={row} working={working} />
             ))}
           </ul>
         )}
