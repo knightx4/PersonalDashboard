@@ -1,5 +1,6 @@
 import { createServiceSupabase } from '@/inngest/jobs/supabase-admin';
 import { DEBRIEF_NUDGE_WINDOW_DAYS } from '@/lib/jobs/pipeline';
+import { recordScheduled } from '@/lib/core/scheduled-actions';
 
 /**
  * The nightly sweep: ghosting and rule-generated reminders.
@@ -61,12 +62,12 @@ export function coldLeadCutoffDays(ghostThresholdDays: number): number {
  * still one definition of what `withdrawn` means, and the timeline says who
  * closed it and why.
  */
-async function closeColdLeads(
+export async function closeColdLeads(
   supabase: ReturnType<typeof createServiceSupabase>,
 ): Promise<number> {
   const { data: candidates } = await supabase
     .from('applications')
-    .select('id, user_id, created_at, profiles!inner ( ghost_threshold_days )')
+    .select('id, user_id, created_at, profiles!inner ( ghost_threshold_days ), roles ( title, companies ( name ) )')
     .in('status', ['lead', 'drafting'])
     .limit(500);
 
@@ -75,6 +76,7 @@ async function closeColdLeads(
     user_id: string;
     created_at: string;
     profiles: { ghost_threshold_days: number | null };
+    roles?: { title: string | null; companies: { name: string | null } | null } | null;
   };
 
   const rows = (candidates ?? []) as unknown as Row[];
@@ -108,18 +110,58 @@ async function closeColdLeads(
     const last = new Date(lastAt.get(row.id) ?? row.created_at).getTime();
     if (now - last <= cutoff * DAY_MS) continue;
 
-    const { error } = await supabase.from('application_events').insert({
-      user_id: row.user_id,
-      application_id: row.id,
-      kind: 'withdrawal',
-      occurred_at: new Date().toISOString(),
-      source: 'system',
-      summary: `Closed after ${cutoff} days with nothing sent and no further contact. Move it back if it is still live.`,
+    const { data: event, error } = await supabase
+      .from('application_events')
+      .insert({
+        user_id: row.user_id,
+        application_id: row.id,
+        kind: 'withdrawal',
+        occurred_at: new Date().toISOString(),
+        source: 'system',
+        summary: `Closed after ${cutoff} days with nothing sent and no further contact. Move it back if it is still live.`,
+      })
+      .select('id')
+      .single();
+    if (error) continue;
+    closed += 1;
+    // The withdrawal is what moves the lead's status, so undoing it (deleting
+    // the event) puts the lead back where it was (plan #1570).
+    await recordScheduled(supabase, row.user_id, {
+      kind: 'close_cold_lead',
+      subjectRef: `job_search.application_events:${(event as { id: string }).id}`,
+      op: 'insert',
+      summary: `Dash closed the lead ${leadName(row.roles)} after ${cutoff} days with nothing sent and no further contact.`,
     });
-    if (!error) closed += 1;
   }
 
   return closed;
+}
+
+/** "for Designer at Acme", or "with no role on it" when the join came back empty. */
+function leadName(role: { title: string | null; companies: { name: string | null } | null } | null | undefined) {
+  const title = role?.title?.trim();
+  const company = role?.companies?.name?.trim();
+  if (title && company) return `for ${title} at ${company}`;
+  if (title || company) return `for ${title || company}`;
+  return 'with no role on it';
+}
+
+/** Insert one rule's reminder and record it; true when it was new. */
+async function addReminder(
+  supabase: ReturnType<typeof createServiceSupabase>,
+  row: Record<string, unknown> & { user_id: string },
+  summary: string,
+): Promise<boolean> {
+  const { data, error } = await supabase.from('reminders').insert(row).select('id').single();
+  // A rule_key already there is the same reminder from an earlier night.
+  if (error) return false;
+  await recordScheduled(supabase, row.user_id, {
+    kind: 'add_reminder',
+    subjectRef: `job_search.reminders:${(data as { id: string }).id}`,
+    op: 'insert',
+    summary,
+  });
+  return true;
 }
 
 /**
@@ -141,7 +183,7 @@ async function closeColdLeads(
  * are still read, and the follow-up composer on /todo and This week is what
  * makes one actionable.
  */
-async function generateReminders(
+export async function generateReminders(
   supabase: ReturnType<typeof createServiceSupabase>,
 ): Promise<number> {
   let created = 0;
@@ -159,15 +201,19 @@ async function generateReminders(
     .limit(500);
 
   for (const interview of interviews ?? []) {
-    const { error } = await supabase.from('reminders').insert({
-      user_id: interview.user_id as string,
-      application_id: interview.application_id as string,
-      kind: 'thank_you',
-      due_at: new Date().toISOString(),
-      body: 'Write the debrief while it is fresh, and send the thank-you note.',
-      rule_key: `debrief:${interview.id}`,
-    });
-    if (!error) created += 1;
+    const added = await addReminder(
+      supabase,
+      {
+        user_id: interview.user_id as string,
+        application_id: interview.application_id as string,
+        kind: 'thank_you',
+        due_at: new Date().toISOString(),
+        body: 'Write the debrief while it is fresh, and send the thank-you note.',
+        rule_key: `debrief:${interview.id}`,
+      },
+      'Dash added a reminder to write up the interview you just had and send the thank-you note.',
+    );
+    if (added) created += 1;
   }
 
   // 2. An interview tomorrow, with nothing written down for it.
@@ -193,15 +239,21 @@ async function generateReminders(
   };
 
   for (const interview of (soon ?? []) as unknown as Upcoming[]) {
-    const { error } = await supabase.from('reminders').insert({
-      user_id: interview.user_id,
-      application_id: interview.application_id,
-      kind: 'prep',
-      due_at: new Date().toISOString(),
-      body: `Interview at ${interview.applications.roles.companies.name} for ${interview.applications.roles.title} within two days, and nothing written down for it.`,
-      rule_key: `prep:${interview.id}`,
-    });
-    if (!error) created += 1;
+    const { name } = interview.applications.roles.companies;
+    const { title } = interview.applications.roles;
+    const added = await addReminder(
+      supabase,
+      {
+        user_id: interview.user_id,
+        application_id: interview.application_id,
+        kind: 'prep',
+        due_at: new Date().toISOString(),
+        body: `Interview at ${name} for ${title} within two days, and nothing written down for it.`,
+        rule_key: `prep:${interview.id}`,
+      },
+      `Dash added a reminder to prepare for your interview at ${name} for ${title}, which is within two days.`,
+    );
+    if (added) created += 1;
   }
 
   return created;

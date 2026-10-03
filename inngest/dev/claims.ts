@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
+import { recordScheduled, scheduledBefore } from '@/lib/core/scheduled-actions';
 import { claimExpiredNote, expiredClaim } from '@/lib/plan/claims';
 import { listPushes } from '@/lib/plan/ci';
 import { claimIsLive, claimLiveness, lastPushSince } from '@/lib/plan/liveness';
@@ -83,6 +84,8 @@ export type ClaimSweepSummary = {
 
 type ClaimRow = {
   id: string;
+  user_id?: string;
+  title?: string | null;
   number: number | null;
   status: string;
   started_at: string | null;
@@ -240,7 +243,7 @@ export async function releaseStaleClaims(
 ): Promise<ClaimSweepSummary> {
   const { data, error } = await supabase
     .from('plan_items')
-    .select('id, number, status, started_at, comment')
+    .select('id, user_id, number, title, status, started_at, comment')
     .eq('status', 'in_progress')
     .limit(500);
   if (error) throw new Error(error.message);
@@ -270,7 +273,9 @@ export async function releaseStaleClaims(
     }
 
     const line = claimExpiredNote(startedAt, now.getTime(), unheard.get(row.id) ?? null);
-    const { error: writeError } = await supabase
+    const ref = `public.plan_items:${row.id}`;
+    const before = row.user_id ? await scheduledBefore(supabase, row.user_id, ref) : null;
+    const { data: written, error: writeError } = await supabase
       .from('plan_items')
       .update({
         status: 'not_started',
@@ -279,8 +284,23 @@ export async function releaseStaleClaims(
       .eq('id', row.id)
       // Only if nothing has moved it since it was read. A session that closed
       // its step between the select and the update must not have it reopened.
-      .eq('status', 'in_progress');
+      .eq('status', 'in_progress')
+      .select('id');
     if (writeError) throw new Error(writeError.message);
+
+    // Recorded as Dash's change to the step (plan #1570). The claim that
+    // started it is not, any more than a session's own start is.
+    if (row.user_id && (written ?? []).length > 0) {
+      const named = row.number !== null ? `step #${row.number}` : 'a step';
+      const title = row.title?.trim() ? `, "${row.title.trim()}",` : '';
+      await recordScheduled(supabase, row.user_id, {
+        kind: 'release_claim',
+        subjectRef: ref,
+        op: 'update',
+        summary: `Dash put ${named}${title} back to not started, because the session working it had stopped.`,
+        beforeValues: before,
+      });
+    }
 
     released += 1;
     if (row.number !== null) steps.push(row.number);

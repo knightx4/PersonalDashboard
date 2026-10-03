@@ -183,6 +183,10 @@ const DEPENDENTS: Record<string, { schema: AskSchema; table: string; column: str
   ],
   'goals.records': [{ schema: 'goals', table: 'answers', column: 'changed_record_id' }],
   'core.files': [{ schema: 'core', table: 'file_comments', column: 'file_id' }],
+  // What scheduled runs add (plan #1570): the job sweep's withdrawal events.
+  'job_search.application_events': [
+    { schema: 'job_search', table: 'waiting_dismissals', column: 'application_event_id' },
+  ],
   'todo.tasks': [
     { schema: 'todo', table: 'tasks', column: 'parent_id' },
     { schema: 'todo', table: 'task_links', column: 'task_id' },

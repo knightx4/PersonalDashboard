@@ -3,6 +3,7 @@ import 'server-only';
 import { createCoreServiceSupabase } from '@/inngest/core/supabase-admin';
 import { pushPorts } from '@/inngest/core/day-brief';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
+import { recordScheduled, scheduledBefore } from '@/lib/core/scheduled-actions';
 import { safeTimeZone } from '@/lib/core/timezone';
 import { sendToPerson } from '@/lib/push/send';
 import { readLowestPrice } from '@/lib/watch/read-price';
@@ -127,14 +128,28 @@ export function watchPorts(core: CoreSupabaseClient, now: Date): WatchPorts {
       if (error) throw new Error(`Recording the report failed: ${error.message}`);
     },
 
+    // Ending is the one change to the watch the person would see as Dash's:
+    // it stops being read. fired_value and reported_at are the run's own
+    // memory of what it already sent, so they are not recorded (plan #1570).
     async end(watch) {
-      const { error } = await core
+      const ref = `core.watches:${watch.id}`;
+      const before = await scheduledBefore(core, watch.user_id, ref);
+      const { data, error } = await core
         .from('watches')
         .update({ status: 'ended' })
         .eq('id', watch.id)
         .eq('user_id', watch.user_id)
-        .eq('status', 'running');
+        .eq('status', 'running')
+        .select('id');
       if (error) throw new Error(`Ending the watch failed: ${error.message}`);
+      if ((data ?? []).length === 0) return;
+      await recordScheduled(core, watch.user_id, {
+        kind: 'end_watch',
+        subjectRef: ref,
+        op: 'update',
+        summary: `Dash ended the watch on ${watch.title}, because its end date had passed.`,
+        beforeValues: before,
+      });
     },
 
     async push(userId, payload) {
