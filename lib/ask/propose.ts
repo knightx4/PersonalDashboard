@@ -11,7 +11,7 @@ import { isUuid, type AskContext, type AskToolResult } from './db';
  * add a todo, add a step under a goal, mark an owned item returned, and start
  * a watch on a price (plan #1296). A
  * proposal is checked the way the page's own action checks it and kept as a
- * proposed row in core.dash_changes; nothing else is written until the person
+ * proposed row in core.dash_actions; nothing else is written until the person
  * presses Confirm (#1189).
  *
  * These four and nothing else, as lib/comments/act.ts keeps to its named
