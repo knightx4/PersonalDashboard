@@ -500,6 +500,9 @@ export function AppShell({
         <button
           type="button"
           onClick={() => setDrawer(true)}
+          // Where an item lands when its section is one the dock folded away
+          // (landingTarget in components/motion/settle.ts).
+          data-capture-more=""
           className={cn(dockItem, 'text-shell-muted')}
         >
           <MoreHorizontal className="size-5" strokeWidth={1.75} aria-hidden />

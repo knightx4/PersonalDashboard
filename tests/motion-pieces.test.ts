@@ -86,6 +86,83 @@ describe('sendToPlace', () => {
   });
 });
 
+describe('putAway', () => {
+  it('knows when the page is already the place', async () => {
+    const { alreadyIn } = await import('@/components/motion/place');
+    expect(alreadyIn('/todo/all', '/todo/all')).toBe(true);
+    expect(alreadyIn('/todo/all?status=done', '/todo/all')).toBe(true);
+    expect(alreadyIn('/learn/lists', '/learn/lists/x')).toBe(true);
+    expect(alreadyIn('/todo/all', '/todo')).toBe(false);
+    expect(alreadyIn('/goals', '/goals-old')).toBe(false);
+  });
+
+  async function load(path: string, target: Element | null) {
+    const calls: string[] = [];
+    vi.stubGlobal('window', { location: { pathname: path } });
+    vi.stubGlobal('document', {});
+    vi.doMock('@/components/motion/clear', () => ({
+      puffAt: () => {
+        calls.push('puff');
+        return Promise.resolve();
+      },
+    }));
+    vi.doMock('@/components/motion/travel', () => ({
+      travel: async () => {
+        calls.push('travel');
+      },
+    }));
+    vi.doMock('@/components/motion/settle', () => ({
+      landingTarget: (href: string) => {
+        calls.push(`target ${href}`);
+        return target;
+      },
+      settle: (_: Element, name: string) => calls.push(`settle ${name}`),
+    }));
+    const { putAway } = await import('@/components/motion/place');
+    return { calls, putAway };
+  }
+
+  const from = { left: 0, top: 0, width: 10, height: 10 } as DOMRectReadOnly;
+
+  it('sends a finished item to its section from elsewhere', async () => {
+    const { calls, putAway } = await load('/todo', {} as Element);
+    await putAway({ from, href: '/todo/all', label: 'Buy milk', name: 'All · Done' });
+    expect(calls).toEqual(['target /todo/all', 'puff', 'travel', 'settle All · Done']);
+  });
+
+  it('plays nothing on the page that is already its place', async () => {
+    const { calls, putAway } = await load('/todo/all', {} as Element);
+    await putAway({ from, href: '/todo/all', label: 'Buy milk', name: 'All · Done' });
+    expect(calls).toEqual([]);
+  });
+});
+
+describe('landingTarget', () => {
+  function stubPage(path: string, present: string[]) {
+    const box = { left: 0, top: 0, right: 10, bottom: 10, width: 10, height: 10 };
+    vi.stubGlobal('window', { location: { pathname: path }, innerWidth: 400, innerHeight: 800 });
+    vi.stubGlobal('CSS', { escape: (value: string) => value });
+    vi.stubGlobal('document', {
+      querySelectorAll: (selector: string) =>
+        present
+          .filter((name) => selector.includes(name))
+          .map((name) => ({ name, getBoundingClientRect: () => box })),
+    });
+  }
+
+  it('falls back to More for a folded section of the workspace on screen', async () => {
+    stubPage('/todo', ['data-capture-more', 'data-capture-switcher']);
+    const { landingTarget } = await import('@/components/motion/settle');
+    expect((landingTarget('/todo/all') as unknown as { name: string }).name).toBe('data-capture-more');
+  });
+
+  it('goes to the switcher for another workspace', async () => {
+    stubPage('/todo', ['data-capture-more', 'data-capture-switcher']);
+    const { landingTarget } = await import('@/components/motion/settle');
+    expect((landingTarget('/goals') as unknown as { name: string }).name).toBe('data-capture-switcher');
+  });
+});
+
 describe('swipe', () => {
   function card() {
     const animation = { finished: Promise.resolve(), cancel: vi.fn() };

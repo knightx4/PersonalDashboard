@@ -12,7 +12,7 @@
  */
 
 import { puffAt } from './clear';
-import { settle } from './settle';
+import { landingTarget, settle } from './settle';
 import { travel, type TravelPoint } from './travel';
 
 export type SendToPlaceInput = {
@@ -39,4 +39,41 @@ export async function sendToPlace({ from, to, label, name }: SendToPlaceInput): 
   if (!to) return;
   if (from) await travel({ from, to, label });
   settle(to, name);
+}
+
+export type PutAwayInput = {
+  /** The control the item was finished or set aside from, or its rect taken before the write. */
+  from?: TravelPoint;
+  /** The section the item now lives in, as its nav href: "/todo/all". */
+  href: string;
+  /** The item's text. The chip carries its first few words. */
+  label: string;
+  /** Where it went, shown beside the place: "All · Done". */
+  name: string;
+};
+
+/**
+ * Whether the page at `path` is already the place `href` names, or a page
+ * inside it. An item finished there stays where it is, so nothing travels.
+ */
+export function alreadyIn(href: string, path: string): boolean {
+  const place = href.split(/[?#]/)[0].replace(/\/$/, '');
+  return path === place || path.startsWith(`${place}/`);
+}
+
+/**
+ * Something finished or set aside going to where it now lives (plan #1578):
+ * a finished todo to All, a reading marked read to its reading list, an
+ * agenda item back to the workspace that owns it. The same puff, chip and
+ * settle as capture, landing on `href`'s nav row, the dock's More button
+ * when the dock folded that section away, or the switcher for another
+ * workspace (landingTarget).
+ *
+ * Call it once the write has succeeded. Nothing plays when the page on
+ * screen is already that place, since the row there shows the change itself.
+ */
+export function putAway({ from, href, label, name }: PutAwayInput): Promise<void> {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return Promise.resolve();
+  if (alreadyIn(href, window.location?.pathname ?? '')) return Promise.resolve();
+  return sendToPlace({ from, to: landingTarget(href), label, name });
 }

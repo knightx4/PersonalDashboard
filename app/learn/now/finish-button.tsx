@@ -1,10 +1,11 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useRef } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { completionMoment } from '@/components/motion/complete';
+import { putAway } from '@/components/motion/place';
 import { updateStatus, type ReadingActionState } from '../r/[id]/actions';
 
 /**
@@ -15,25 +16,45 @@ import { updateStatus, type ReadingActionState } from '../r/[id]/actions';
  * hand. "Gave up" is not offered here: it is a real and useful answer, and it
  * is a decision, which is exactly what this tab exists not to ask for. It is
  * one click away on the reading's own page.
+ *
+ * Once it is marked, the reading is shown going to its reading list (plan
+ * #1578), which is where it now lives: Reading lists, named with the list.
  */
-export function FinishButton({ readingId }: { readingId: string }) {
+export function FinishButton({
+  readingId,
+  subject,
+  list,
+}: {
+  readingId: string;
+  /** The reading's subject, which the chip carries. */
+  subject: string;
+  /** The reading list it belongs to, named where it lands. */
+  list: string;
+}) {
+  const form = useRef<HTMLFormElement>(null);
+
+  /** Mark it read, then play the completion moment and the trip to its list. */
+  async function finish(previous: ReadingActionState, data: FormData): Promise<ReadingActionState> {
+    // Taken before the write: the row leaves the shelf when the page comes back.
+    const from = form.current?.getBoundingClientRect();
+    const state = await updateStatus(previous, data);
+    if (!state.error) {
+      completionMoment();
+      void putAway({ from, href: '/learn/lists', label: subject, name: `Reading lists · ${list}` });
+    }
+    return state;
+  }
+
   const [state, formAction] = useActionState<ReadingActionState, FormData>(finish, {});
 
   return (
-    <form action={formAction} className="inline-flex items-center gap-2">
+    <form ref={form} action={formAction} className="inline-flex items-center gap-2">
       <input type="hidden" name="readingId" value={readingId} />
       <input type="hidden" name="status" value="read" />
       <Submit />
       {state.error && <span className="text-small text-danger">{state.error}</span>}
     </form>
   );
-}
-
-/** Mark it read, and play the completion moment when that went through. */
-async function finish(previous: ReadingActionState, form: FormData): Promise<ReadingActionState> {
-  const state = await updateStatus(previous, form);
-  if (!state.error) completionMoment();
-  return state;
 }
 
 function Submit() {

@@ -200,7 +200,11 @@ export default async function NowPage({
 
                     {/* Finishing is the one write this shelf needs, and it is
                         also what takes the row off it. */}
-                    <FinishButton readingId={reading.id} />
+                    <FinishButton
+                      readingId={reading.id}
+                      subject={reading.subject}
+                      list={reading.trackTitle}
+                    />
 
                     <Link
                       href={`/learn/r/${reading.id}`}
