@@ -49,6 +49,12 @@ export type Source = {
   href?: (ref: string) => string;
   /** Anything else Claude should know to read it well. */
   note?: string;
+  /**
+   * Where one row opens when it is named by a ref (lib/core/refs.ts). Left
+   * out, it is worked out from `href`, `title` and `ref` above; null when
+   * the table has an href for Goals but its rows cannot be named by id.
+   */
+  page?: Page | null;
 };
 
 export type NotASource = {
@@ -56,6 +62,32 @@ export type NotASource = {
   table: string;
   /** Why Goals never reads it, in a few words. */
   reason: string;
+  /**
+   * Where one row opens when it is named by a ref (lib/core/refs.ts), for a
+   * table Goals does not read that still has a page.
+   */
+  page?: Page;
+};
+
+/** One row as a page entry reads it: `id`, the title's columns and `reads`. */
+export type PageRow = Readonly<Record<string, unknown>>;
+
+/**
+ * How a row named by a ref (`schema.table:id`, docs/CORE-AND-DASH-SPEC.md
+ * Part 1) is opened and named. Every table a person can open a page for has
+ * one, whether or not Goals may read it; being a source still means only
+ * that. A ref always names a row by its `id` column.
+ */
+export type Page = {
+  /** The column that names a row, or how to name it from the columns it reads. */
+  title: string | { reads: readonly string[]; of: (row: PageRow) => string | null };
+  /** The page one row opens on; null for a row of this table with no page. */
+  href: (row: PageRow) => string | null;
+  /**
+   * The columns `href` reads besides `id`. Empty or absent means the id
+   * alone gives the page, so refHref needs no query.
+   */
+  reads?: readonly string[];
 };
 
 export type ModuleSources = {

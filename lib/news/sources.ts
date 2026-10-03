@@ -25,6 +25,8 @@ export const newsSources: ModuleSources = {
       title: 'local_area',
       ref: 'user_id',
       href: () => '/news/settings',
+      // One row per person, with no id to name it by.
+      page: null,
     },
     {
       table: 'news.issues',

@@ -14,6 +14,8 @@ export const todoSources: ModuleSources = {
       search: ['title', 'body'],
       title: 'title',
       href: () => '/todo/all',
+      // Named by a ref, a task opens on the list scrolled to it.
+      page: { title: 'title', href: (row) => `/todo/all?status=all&focus=${row.id}` },
       note: 'A task that repeats a goal step is theirs to keep; do not propose it again as a step.',
     },
     {
