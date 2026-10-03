@@ -12,8 +12,9 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { AskResult } from '@/lib/goals/capture';
+import { MODELS } from '@/lib/core/models';
 
-export const CAPTURE_MODEL = 'claude-haiku-4-5';
+export const CAPTURE_MODEL = MODELS.goalCapture;
 const TOOL_NAME = 'file';
 
 const SYSTEM = `You file a sentence the owner of a personal goals tracker wrote

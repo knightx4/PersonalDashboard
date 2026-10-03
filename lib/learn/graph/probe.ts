@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { probePayloadSchema, toProbe, type Probe } from '@/lib/learn/graph/probe-payload';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * One question, written against one claim.
@@ -22,7 +23,7 @@ import { probePayloadSchema, toProbe, type Probe } from '@/lib/learn/graph/probe
  */
 
 /** Stored on every probe row, so the two routes that ask record the same thing. */
-export const PROBE_MODEL = 'claude-haiku-4-5';
+export const PROBE_MODEL = MODELS.learnProbe;
 const MODEL = PROBE_MODEL;
 const TOOL_NAME = 'report_question';
 

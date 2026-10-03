@@ -12,8 +12,9 @@ import { parseImageDataUrl } from '@/lib/images/data-url';
 import type { BookActionState } from './actions';
 import { usageFrom } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
+import { MODELS } from '@/lib/core/models';
 
-const PHOTO_MODEL = 'claude-haiku-4-5-20251001';
+const PHOTO_MODEL = MODELS.shoppingBookPhoto;
 
 const spineSchema = z.object({
   spines: z

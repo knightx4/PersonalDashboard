@@ -19,6 +19,7 @@ import {
   type MergeLabel,
   type MergeRead,
 } from '@/lib/vault/map/pair-jev-question';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * What the theme merge pass (#811) and the position merge pass (#812) share.
@@ -35,7 +36,7 @@ import {
  * cannot answer go to Haiku, in one call as before.
  */
 
-export const MERGE_MODEL = 'claude-haiku-4-5';
+export const MERGE_MODEL = MODELS.vaultMapMerge;
 
 /** Pairs per model call. The spec's cost model assumes twenty. */
 export const PAIRS_PER_CALL = 20;

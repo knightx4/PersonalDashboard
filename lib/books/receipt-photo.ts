@@ -11,8 +11,9 @@ import {
 } from '@/lib/email/extract/schema';
 import { parseImageDataUrl } from '@/lib/images/data-url';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
+import { MODELS } from '@/lib/core/models';
 
-const RECEIPT_MODEL = 'claude-haiku-4-5-20251001';
+const RECEIPT_MODEL = MODELS.booksReceiptPhoto;
 
 export async function extractOrderFromReceiptPhoto(input: {
   imageDataUrl: string;

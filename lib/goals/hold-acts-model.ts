@@ -8,6 +8,7 @@ import {
   cleanActsSentence,
   type ActsCandidate,
 } from '@/lib/goals/hold-acts';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Haiku writes the `acts` sentence for a step Jev held (plan #1183): what
@@ -15,7 +16,7 @@ import {
  * yes or no and cannot write it.
  */
 
-export const ACTS_SENTENCE_MODEL = 'claude-haiku-4-5';
+export const ACTS_SENTENCE_MODEL = MODELS.goalHoldActs;
 
 /** The sentence, or null when there is no key, the call failed or nothing usable came back. */
 export async function writeActsSentence(

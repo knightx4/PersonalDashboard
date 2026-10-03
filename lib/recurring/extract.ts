@@ -14,6 +14,7 @@ import {
 } from './extraction';
 import { RECURRING_QUESTION, recurringState } from './jev-question';
 import type { RecurringHint } from './rules';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Reading a claimed email's body into a recurring payment.
@@ -29,7 +30,7 @@ import type { RecurringHint } from './rules';
  * extractRecurringFromEmail.
  */
 
-const EXTRACT_MODEL = 'claude-haiku-4-5-20251001';
+const EXTRACT_MODEL = MODELS.recurringExtract;
 
 const SYSTEM = `You read one email about something a person pays for regularly: a subscription, a membership, or a bill (phone, broadband, power, water, insurance, rent, a loan).
 Return ONLY a JSON object with these fields:

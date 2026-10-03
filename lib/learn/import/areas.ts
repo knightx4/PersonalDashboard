@@ -3,6 +3,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * What is inside "economics".
@@ -20,7 +21,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
  * Each area is planned separately, later, when you open it.
  */
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = MODELS.learnImportAreas;
 const TOOL_NAME = 'report_areas';
 
 /** Fewer than this and the topic was not broad enough to need branching. */

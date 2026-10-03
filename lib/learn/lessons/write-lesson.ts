@@ -6,6 +6,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { IdeaCard } from '@/lib/learn/feed/write-card';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import type { LessonSource } from './closest-source';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Writing the lesson for one concept in a track (LEARN-LESSONS-SPEC, "A
@@ -28,7 +29,7 @@ import type { LessonSource } from './closest-source';
  * again.
  */
 
-export const WRITE_LESSON_MODEL = 'claude-sonnet-5';
+export const WRITE_LESSON_MODEL = MODELS.learnWriteLesson;
 
 /**
  * The most source text sent in one call. Catalogue segments run to 7,300

@@ -16,6 +16,7 @@ import {
   type YouTubeFailure,
 } from '@/lib/learn/providers/youtube';
 import { loadChannels } from './library';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Finding the YouTube channels people recommend for a subject (plan #1195,
@@ -40,7 +41,7 @@ import { loadChannels } from './library';
  * channels written before it happened, so the page can say how far it got.
  */
 
-export const FIND_CHANNELS_MODEL = 'claude-sonnet-5';
+export const FIND_CHANNELS_MODEL = MODELS.learnFindChannels;
 
 /** Channels asked for and written per search. */
 export const MAX_CHANNELS = 5;

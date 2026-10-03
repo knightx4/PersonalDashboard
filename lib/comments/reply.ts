@@ -19,8 +19,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODULE_IDS } from '@/lib/modules';
 import { ACTIONS, parseReplyPayload, type DashReply } from './reply-payload';
+import { MODELS } from '@/lib/core/models';
 
-const MODEL = 'claude-haiku-4-5';
+const MODEL = MODELS.devCommentReply;
 const TOOL_NAME = 'reply';
 
 const SYSTEM = `You are reading a comment the owner of a personal dashboard

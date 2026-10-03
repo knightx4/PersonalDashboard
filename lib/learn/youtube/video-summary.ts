@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { TranscriptCue } from '@/lib/learn/catalogue/segment';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * The short summary and key points shown for a video on your list (plan
@@ -17,7 +18,7 @@ import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
  * out, run in the background for every video on the list.
  */
 
-export const VIDEO_SUMMARY_MODEL = 'claude-haiku-4-5';
+export const VIDEO_SUMMARY_MODEL = MODELS.learnVideoSummary;
 const TOOL = 'report_summary';
 
 /**

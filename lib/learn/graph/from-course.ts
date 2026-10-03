@@ -14,6 +14,7 @@ import {
 import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * The ideas a course on your transcript probably covered (plan #1390, under
@@ -31,7 +32,7 @@ import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
  * declareKnown as approvePrior does.
  */
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = MODELS.learnGraphFromCourse;
 const TOOL_NAME = 'report_chain';
 
 /** The course as the vault keeps it, only the parts the call reads. */

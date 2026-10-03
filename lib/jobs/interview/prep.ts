@@ -27,9 +27,10 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 
 import { PREP_MISSING_LABEL, type PrepContext } from './prep-context';
 import { parsePrepPayload, type PrepResult } from './prep-payload';
+import { MODELS } from '@/lib/core/models';
 
 /** Reading a room off a handful of rows is judgment, not retrieval. */
-const MODEL = 'claude-opus-5';
+const MODEL = MODELS.jobsInterviewPrep;
 const TOOL_NAME = 'report_prep';
 
 const SYSTEM = `You write an interview prep note for someone, out of their own
