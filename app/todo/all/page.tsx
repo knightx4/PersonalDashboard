@@ -12,7 +12,7 @@ import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { QueueCleared } from '@/components/ui/queue-cleared';
+import { QueueCleared } from '@/components/motion/clear';
 import { TaskRow } from '@/components/todo/task-row';
 import type { DevComment } from '@/lib/comments/load';
 import { loadRowThreads } from '@/lib/thread/store';

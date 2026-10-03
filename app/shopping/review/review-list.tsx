@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { QueueCleared } from '@/components/ui/queue-cleared';
+import { QueueCleared } from '@/components/motion/clear';
 import {
   SelectionActionBar,
   SelectionCheckbox,

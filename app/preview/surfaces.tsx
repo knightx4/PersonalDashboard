@@ -5,6 +5,9 @@ import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
 import DevUiPage from '@/app/dev/ui/page';
 import { ANATOMIES } from '@/app/dev/ui/anatomy';
+import { TravelDemo } from '@/app/dev/ui/travel-demo';
+import { SettleDemo } from '@/app/dev/ui/settle-demo';
+import { ClearDemo } from '@/app/dev/ui/clear-demo';
 import { ItemDetailsPanel } from '@/app/shopping/inventory/[id]/item-details-panel';
 import { EstimatesTable } from '@/app/account/spend/estimates-table';
 import { compareEstimate } from '@/lib/core/spend/comparison';
@@ -3489,6 +3492,57 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <SpendEstimates />,
+  },
+
+  /* The three shared motion pieces (plan #1550), each on the /dev/ui demo
+   * that shows it, so a recording keeps the strip of it playing. */
+  {
+    id: 'dev-motion-travel',
+    label: 'Motion · Travel, a chip flying to its place',
+    module: 'dev',
+    width: 'narrow',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="travel"]',
+      shows: 'A chip carrying the first words leaves "capture", crosses, and fades as it lands on "todo".',
+    },
+    render: () => (
+      <div className={cardVariants({ padding: 'standard' })}>
+        <TravelDemo />
+      </div>
+    ),
+  },
+  {
+    id: 'dev-motion-settle',
+    label: 'Motion · Settle, a row springing into place',
+    module: 'dev',
+    width: 'narrow',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="settle"]',
+      shows: 'A second row rises into the list with a little give, and "todo" swells once with "Todo · Today" beside it.',
+    },
+    render: () => (
+      <div className={cardVariants({ padding: 'standard' })}>
+        <SettleDemo />
+      </div>
+    ),
+  },
+  {
+    id: 'dev-motion-clear',
+    label: 'Motion · Clear, the last item leaving',
+    module: 'dev',
+    width: 'narrow',
+    interaction: {
+      kind: 'completion',
+      target: '[data-motion-demo="clear"]',
+      shows: 'The last item leaves with a puff and the day\'s sigil draws in cell by cell in its place.',
+    },
+    render: () => (
+      <div className={cardVariants({ padding: 'standard' })}>
+        <ClearDemo items={['Return the kettle']} />
+      </div>
+    ),
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on

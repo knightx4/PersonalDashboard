@@ -2193,7 +2193,7 @@ tr:has([data-link-pending]) {
 }
 
 /* A puff: a few soft circles leave a point and fade, marking where something
- * just left. puffAt in components/ui/puff.ts places the circles and sets each
+ * just left. puffAt in components/motion/clear.tsx places the circles and sets each
  * one's drift in --puff-dx and --puff-dy. One move, so it is over before
  * anything that follows it has moved far. */
 @keyframes puff {
@@ -2219,8 +2219,8 @@ tr:has([data-link-pending]) {
   animation: puff var(--motion-move) var(--ease-out-soft) both;
 }
 
-/* The place a captured item landed: one small swell and back. markLanded in
- * components/ui/landed.ts adds it to the nav row or the workspace switcher
+/* The place a captured item landed: one small swell and back. settle in
+ * components/motion/settle.ts adds it to the nav row or the workspace switcher
  * and takes it off again after LANDED_PULSE_MS. */
 @keyframes landed-pulse {
   0%,
@@ -2285,7 +2285,7 @@ tr:has([data-link-pending]) {
 
 /* A queue cleared on screen (plan #1340): the quiet-day sigil draws in cell by
  * cell, in reading order, each cell growing from 40% and fading up to its own
- * opacity. QueueCleared in components/ui/queue-cleared.tsx puts the class on
+ * opacity. QueueCleared in components/motion/clear.tsx puts the class on
  * the wrapper round the list only for a clear made while you watch, so a page
  * loaded already empty shows the sigil at once. A move a cell, half an instant
  * apart, so the fourteen cells of the busiest sigil are all in by 845ms. */

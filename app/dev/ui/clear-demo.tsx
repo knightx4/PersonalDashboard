@@ -3,22 +3,23 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { QueueCleared } from '@/components/ui/queue-cleared';
+import { puffAt, QueueCleared } from '@/components/motion/clear';
 
 const ITEMS = ['Return the kettle', 'Book the dentist', 'Renew the parking permit'];
 
 /**
- * A worked list cleared on screen (plan #1340), on demand: tick the last item
- * off and the day's sigil draws in cell by cell. Putting the items back and
- * clearing them again draws it again. Under reduced motion the sigil is simply
- * there.
+ * Clear (components/motion/clear.tsx), on demand: each item ticked off leaves
+ * with a puff, and ticking off the last draws the day's sigil in cell by
+ * cell. Putting the items back and clearing them again draws it again. Under
+ * reduced motion there is no puff and the sigil is simply there. The gallery
+ * entry starts it with one item, so one press clears the list.
  */
-export function QueueClearedDemo() {
-  const [left, setLeft] = useState<readonly string[]>(ITEMS);
+export function ClearDemo({ items = ITEMS }: { items?: readonly string[] }) {
+  const [left, setLeft] = useState<readonly string[]>(items);
   const cleared = left.length === 0;
   return (
     <div className="space-y-3">
-      <Button variant="secondary" onClick={() => setLeft(ITEMS)} disabled={left.length === ITEMS.length}>
+      <Button variant="secondary" onClick={() => setLeft(items)} disabled={left.length === items.length}>
         Put them back
       </Button>
       <QueueCleared cleared={cleared}>
@@ -37,7 +38,11 @@ export function QueueClearedDemo() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setLeft((now) => now.filter((entry) => entry !== item))}
+                  data-motion-demo="clear"
+                  onClick={(event) => {
+                    void puffAt(event.currentTarget.closest('li') ?? event.currentTarget);
+                    setLeft((now) => now.filter((entry) => entry !== item));
+                  }}
                 >
                   Done
                 </Button>

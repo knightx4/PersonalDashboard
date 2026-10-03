@@ -42,11 +42,11 @@ import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 import type { PlanHealth } from '@/lib/plan/tree';
 import type { TaskStatus } from '@/lib/todo/tasks/model';
 import { ActivePalette } from './palette';
-import { FlyChipDemo } from './fly-chip-demo';
-import { PuffDemo } from './puff-demo';
+import { TravelDemo } from './travel-demo';
+import { SettleDemo } from './settle-demo';
 import { ProgressMoveDemo } from './progress-move-demo';
 import { GoalCloseDemo } from './goal-close-demo';
-import { QueueClearedDemo } from './queue-cleared-demo';
+import { ClearDemo } from './clear-demo';
 import { LAW_GROUPS } from './laws';
 import { ANATOMIES } from './anatomy';
 import * as C from './content';
@@ -1534,19 +1534,19 @@ export default function DevUiPage() {
           </span>
         </Card>
         <Card padding="standard">
-          <FlyChipDemo />
+          <TravelDemo />
         </Card>
         <Card padding="standard">
-          <PuffDemo />
+          <SettleDemo />
+        </Card>
+        <Card padding="standard">
+          <ClearDemo />
         </Card>
         <Card padding="standard">
           <ProgressMoveDemo />
         </Card>
         <Card padding="standard">
           <GoalCloseDemo />
-        </Card>
-        <Card padding="standard">
-          <QueueClearedDemo />
         </Card>
         <Rows rows={M.MOTION} labelWidth="sm:grid-cols-[7rem_1fr]" />
         <Rules items={M.MOTION_RULES} />

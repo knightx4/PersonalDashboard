@@ -27,9 +27,8 @@ import {
 } from '@/lib/capture/actions';
 import { isCalendarDay, todoCaptureForm, type CaptureDay } from '@/lib/capture/todo';
 import { captureDestination, type CaptureDestination } from '@/lib/capture/destination';
-import { flyChip } from '@/components/ui/fly-chip';
-import { landingTarget, markLanded } from '@/components/ui/landed';
-import { puffAt } from '@/components/ui/puff';
+import { sendToPlace } from '@/components/motion/place';
+import { landingTarget } from '@/components/motion/settle';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
 import { describeFiled, estimateAsked, type FiledEntry } from '@/lib/goals/capture';
 import {
@@ -245,8 +244,10 @@ async function file(
  * named beside it, "Todo · Today".
  *
  * The destination is the workspace's own nav row when it is on screen and the
- * workspace switcher when it is not (landingTarget). All of it is chrome: it
- * runs after the save has been confirmed and nothing waits on it. Under
+ * workspace switcher when it is not (landingTarget). The pieces are the
+ * shared ones in components/motion/, played in order by sendToPlace. All of
+ * it is chrome: it runs after the save has been confirmed and nothing waits
+ * on it. Under
  * reduced motion the puff and the flight resolve at once without drawing, so
  * the name appears straight away and is the only thing that does.
  *
@@ -254,11 +255,7 @@ async function file(
  * element that has gone has no size and the helpers skip it silently.
  */
 function showLanding(from: DOMRectReadOnly | undefined, where: CaptureDestination, text: string) {
-  if (from) void puffAt(from);
-  const to = landingTarget(where.href);
-  if (!to) return;
-  const flight = from ? flyChip({ from, to, label: text }) : Promise.resolve();
-  void flight.then(() => markLanded(to, where.name));
+  void sendToPlace({ from, to: landingTarget(where.href), label: text, name: where.name });
 }
 
 /** The paid press the panel's File it button makes, where there is one. */
