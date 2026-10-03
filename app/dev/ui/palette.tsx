@@ -8,6 +8,7 @@ import {
   parseTheme,
   THEME_CHOICE_ATTRIBUTE,
   COLOURWAYS,
+  SKIES,
   THEME_ROOMS,
   type Theme,
 } from '@/lib/theme';
@@ -31,7 +32,11 @@ import { FIXED_STRIP, HUE_SWEEP, PALETTE_STRIP } from './palette-tokens';
 /** What a choice is called, in a sentence. */
 function describe(theme: Theme): string {
   if (theme.kind === 'system') return 'Following the system';
-  if (theme.kind === 'written') return `${theme.id[0]!.toUpperCase()}${theme.id.slice(1)}`;
+  if (theme.kind === 'written') {
+    const name = `${theme.id[0]!.toUpperCase()}${theme.id.slice(1)}`;
+    const sky = SKIES.find((option) => option.id === theme.sky);
+    return sky ? `${name}, ${sky.label.toLowerCase()} sky` : name;
+  }
   const mode = THEME_ROOMS.find((option) => option.id === theme.mode)?.label ?? theme.mode;
   if (theme.hue === null) return `${mode}, no colour`;
   const way = COLOURWAYS.find((colour) => colour.id === theme.way);
