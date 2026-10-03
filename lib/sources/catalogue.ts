@@ -8,6 +8,7 @@ import { learnSources } from '@/lib/learn/sources';
 import { newsSources } from '@/lib/news/sources';
 import { todoSources } from '@/lib/todo/sources';
 import { vaultSources } from '@/lib/vault/sources';
+import type { ModuleId } from '@/lib/modules';
 import { SOURCE_WEIGHTS, type ModuleSources, type NotASource, type Page, type Source } from './types';
 
 /**
@@ -18,18 +19,37 @@ import { SOURCE_WEIGHTS, type ModuleSources, type NotASource, type Page, type So
  * A module with tables adds its `sources.ts` to MODULES below. That is the
  * only edit outside the module.
  */
-const MODULES: readonly ModuleSources[] = [
-  jobsSources,
-  vaultSources,
-  learnSources,
-  todoSources,
-  newsSources,
-  shoppingSources,
-  goalsSources,
-  filesSources,
-  coreSources,
-  devSources,
+const WORKSPACE_SOURCES: readonly (readonly [ModuleId | null, ModuleSources])[] = [
+  ['jobs', jobsSources],
+  ['vault', vaultSources],
+  ['learn', learnSources],
+  ['todo', todoSources],
+  ['news', newsSources],
+  ['shopping', shoppingSources],
+  ['goals', goalsSources],
+  // Files and core belong to no one workspace.
+  [null, filesSources],
+  [null, coreSources],
+  ['dev', devSources],
 ];
+
+const MODULES: readonly ModuleSources[] = WORKSPACE_SOURCES.map(([, sources]) => sources);
+
+const workspaceByTable = new Map<string, ModuleId | null>(
+  WORKSPACE_SOURCES.flatMap(([workspace, sources]) => [
+    ...sources.sources.map((source) => [source.table, workspace] as const),
+    ...sources.notSources.map((entry) => [entry.table, workspace] as const),
+  ]),
+);
+
+/**
+ * The workspace a table belongs to, by the `sources.ts` that lists it: null
+ * for files, core and a table no list names. Home groups what Dash changed
+ * today by it (plan #1461).
+ */
+export function tableWorkspace(table: string): ModuleId | null {
+  return workspaceByTable.get(table) ?? null;
+}
 
 /**
  * The schemas the catalogue covers: every one the migrations in this
