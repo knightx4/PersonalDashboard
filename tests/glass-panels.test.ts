@@ -19,7 +19,7 @@ function panelAlpha(theme: string): number | null {
 }
 
 describe('floating panels in the glass themes', () => {
-  it.each(['lightbox', 'darkroom'])('are nearly opaque in %s', (theme) => {
+  it.each(['lightbox', 'darkroom', 'aurora', 'dawn'])('are nearly opaque in %s', (theme) => {
     expect(panelAlpha(theme)).toBeGreaterThanOrEqual(0.95);
   });
 

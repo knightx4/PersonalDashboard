@@ -24,6 +24,9 @@ import {
   hueOf,
   modeOf,
   THEME_ROOMS,
+  SKIES,
+  auroraFor,
+  skyOf,
   type Theme,
 } from '@/lib/theme';
 import { applyTheme } from '@/lib/theme/apply';
@@ -181,6 +184,10 @@ function themeCommands(theme: Theme): SearchCommand[] {
   const mode = modeOf(theme);
   const hue = hueOf(theme);
   const way = colourwayOf(theme) ?? undefined;
+  // Dawn is Aurora's light side, and Lightbox's sheets are light, so both
+  // light rooms land on Dawn. modeOf already reads Aurora as dark and Dawn as
+  // light.
+  const polarity = mode === 'light' || mode === 'lightbox' ? 'light' : 'dark';
 
 
   return [
@@ -197,6 +204,22 @@ function themeCommands(theme: Theme): SearchCommand[] {
       hint: colour.mood,
       icon: 'theme' as const,
       run: applying({ kind: 'generated', mode, hue: colour.hue, way: colour.id }),
+    })),
+    // Aurora takes a sky rather than a colour. "Theme: Aurora" keeps the sky
+    // and the polarity you are in; a sky moves you into Aurora if you are not.
+    {
+      id: 'theme:aurora',
+      label: 'Theme: Aurora',
+      hint: 'Glass under a moving sky',
+      icon: 'theme' as const,
+      run: applying(auroraFor(polarity, skyOf(theme))),
+    },
+    ...SKIES.map((sky) => ({
+      id: `theme:sky:${sky.id}`,
+      label: `Sky: ${sky.label}`,
+      hint: sky.mood,
+      icon: 'theme' as const,
+      run: applying(auroraFor(polarity, sky.id)),
     })),
     {
       id: 'theme:none',

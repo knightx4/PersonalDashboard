@@ -16,8 +16,12 @@ import {
   colourwayOf,
   THEME_POLARITIES,
   THEME_SURFACES,
+  SKIES,
+  auroraFor,
+  isAurora,
   modeFor,
   partsOf,
+  skyOf,
   type Polarity,
   type Surface,
   type ColourwayId,
@@ -26,6 +30,7 @@ import {
   type ThemeMode,
 } from '@/lib/theme';
 import { colourwayById, POOL_TOKENS, WASH_LIFT, type Colourway } from '@/lib/theme/colourway';
+import type { Sky } from '@/lib/theme/sky';
 import { applyTheme, shouldRepairTheme } from '@/lib/theme/apply';
 import { generatePalette } from '@/lib/theme/palette';
 import { DENSITIES, parseDensity, type Density } from '@/lib/density';
@@ -213,24 +218,29 @@ export function ThemePicker({ value }: { value: Theme }) {
    * one of them has to keep the other, which is what `partsOf` is for: read
    * the current room apart, replace one half, put it back together.
    */
-  const here = partsOf(mode);
+  // Aurora is the third surface, and it is a written theme rather than a mode,
+  // so it is read apart here instead of through `partsOf`.
+  const aurora = isAurora(showing);
+  const here: { polarity: Polarity; surface: Surface } = aurora
+    ? { polarity: showing.id === 'dawn' ? 'light' : 'dark', surface: 'aurora' }
+    : partsOf(mode);
+  const sky = skyOf(showing);
   // The colour survives a change of room, which means carrying the colourway
   // and not just its hue: dropping it here would turn Ember into "330 degrees"
   // the first time somebody switched to dark, and the pools would go back to
   // the turned sweep without anything having been said about colour.
   const way = colourwayOf(showing) ?? undefined;
-  const inPolarity = (next: Polarity): GeneratedTheme => ({
-    kind: 'generated',
-    mode: modeFor(next, here.surface),
-    hue,
-    way,
-  });
-  const inSurface = (next: Surface): GeneratedTheme => ({
-    kind: 'generated',
-    mode: modeFor(here.polarity, next),
-    hue,
-    way,
-  });
+  // In Aurora the switch moves between Aurora and Dawn and keeps the sky.
+  const inPolarity = (next: Polarity): Theme =>
+    here.surface === 'aurora'
+      ? auroraFor(next, sky)
+      : { kind: 'generated', mode: modeFor(next, here.surface), hue, way };
+  // Into Aurora keeps the polarity and starts from the default sky, since a
+  // colourway is not a sky. Out of it keeps the polarity and drops the sky.
+  const inSurface = (next: Surface): Theme =>
+    next === 'aurora'
+      ? auroraFor(here.polarity, sky)
+      : { kind: 'generated', mode: modeFor(here.polarity, next), hue, way };
   /** The strip and "no colour": a hue with no name for its pools. */
   const inHue = (next: number | null): GeneratedTheme => ({ kind: 'generated', mode, hue: next });
   const inWay = (next: Colourway): GeneratedTheme => ({
@@ -328,6 +338,24 @@ export function ThemePicker({ value }: { value: Theme }) {
             Colour
           </p>
 
+          {aurora ? (
+            <div className="flex flex-wrap gap-1.5 px-2 pb-2">
+              {SKIES.map((option) => {
+                const next = auroraFor(here.polarity, option.id);
+                return (
+                  <SkySwatch
+                    key={option.id}
+                    sky={option}
+                    side={here.polarity === 'light' ? 'dawn' : 'night'}
+                    label={`${option.label} - ${option.mood}`}
+                    chosen={same(showing, next)}
+                    onChoose={() => save(next)}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+          <>
           <div className="flex flex-wrap gap-1.5 px-2 pb-1">
             <Swatch
               theme={inHue(null)}
@@ -352,6 +380,8 @@ export function ThemePicker({ value }: { value: Theme }) {
             onMove={(next) => setPreview(inHue(next))}
             onRelease={(next) => save(inHue(next))}
           />
+          </>
+          )}
 
           <button
             type="button"
@@ -477,6 +507,59 @@ function Swatch({
       )}
       // ui-ok: raw-hex -- this is the generated colour itself, which is the
       // one thing on the screen that cannot be a token.
+      style={style}
+    >
+      {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={3} aria-hidden />}
+      <span className="sr-only">{label}</span>
+    </button>
+  );
+}
+
+/**
+ * A sky, drawn as the sky it paints: its own bench with its four pools on it.
+ *
+ * The same `.wash-chip` the colourways use, with the side for the polarity
+ * the person is in, so a Dawn swatch is the pale version they will get.
+ */
+function SkySwatch({
+  sky,
+  side,
+  label,
+  chosen,
+  onChoose,
+}: {
+  sky: Sky;
+  side: 'night' | 'dawn';
+  label: string;
+  chosen: boolean;
+  onChoose: () => void;
+}) {
+  const style = useMemo(() => {
+    const colours = sky[side];
+    return {
+      backgroundColor: colours.bench,
+      [WASH_LIFT]: String(CHIP_LIFT),
+      ...Object.fromEntries(
+        Object.entries(POOL_TOKENS).map(([slot, token]) => [
+          token,
+          colours.pools[slot as keyof typeof colours.pools],
+        ]),
+      ),
+    } as React.CSSProperties;
+  }, [sky, side]);
+
+  return (
+    <button
+      type="button"
+      onClick={onChoose}
+      aria-pressed={chosen}
+      title={label}
+      className={cn(
+        // ui-ok: hand-rolled-box -- a user's colour against a like ground needs an edge, which is the case law 11 keeps the border for.
+        'press wash-chip flex size-8 items-center justify-center rounded-md border border-border-strong transition-transform hover:scale-105',
+      )}
+      // ui-ok: raw-hex -- this is the sky itself, which is the one thing on the
+      // screen that cannot be a token.
       style={style}
     >
       {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={3} aria-hidden />}

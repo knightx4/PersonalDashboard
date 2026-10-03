@@ -24,6 +24,8 @@ export const THEME_SELECTORS: Record<string, string> = {
   lightbox: "[data-theme='lightbox']",
   darkroom: "[data-theme='darkroom']",
   dusk: "[data-theme='dusk']",
+  aurora: "[data-theme='aurora']",
+  dawn: "[data-theme='dawn']",
 };
 
 /** The declarations inside one selector block. */

@@ -26,6 +26,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PAPER_SELECTOR, readTheme, THEME_SELECTORS, type Vars } from '../lib/theme/css';
 import { generatePalette, MEANING_FLOOR, meaningGaps } from '../lib/theme/palette';
+import { DEFAULT_SKY, SKIES, skyTokens } from '../lib/theme/sky';
 
 const CSS = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
 
@@ -60,7 +61,19 @@ const GENERATED: Record<string, Vars> = Object.fromEntries(
   ),
 );
 
-const THEMES: Record<string, Vars> = { ...WRITTEN, ...GENERATED };
+/**
+ * Aurora's skies, each as the whole theme it makes: the written block with the
+ * sky's bench, pools and accent laid over it, at night and at dawn. The
+ * default sky is the block itself and is already measured above.
+ */
+const SKIED: Record<string, Vars> = Object.fromEntries(
+  SKIES.filter((sky) => sky.id !== DEFAULT_SKY).flatMap((sky) => [
+    [`aurora ${sky.id}`, { ...WRITTEN.aurora, ...skyTokens('night', sky.id) }],
+    [`dawn ${sky.id}`, { ...WRITTEN.dawn, ...skyTokens('dawn', sky.id) }],
+  ]),
+);
+
+const THEMES: Record<string, Vars> = { ...WRITTEN, ...GENERATED, ...SKIED };
 
 type Rgb = [number, number, number];
 type Rgba = { rgb: Rgb; alpha: number };
@@ -328,6 +341,19 @@ for (const mode of MODES) {
   }
 }
 
+// The skies' accents, kept off the meaning colours like every other accent.
+for (const [name, vars] of Object.entries({ aurora: WRITTEN.aurora, dawn: WRITTEN.dawn, ...SKIED })) {
+  for (const { accent, meaning, gap } of meaningGaps(vars)) {
+    separations += 1;
+    if (gap < MEANING_FLOOR) {
+      failures += 1;
+      console.error(
+        `✗ ${name}: ${accent} is ${gap.toFixed(3)} from ${meaning} in OKLab, needs ${MEANING_FLOOR}`,
+      );
+    }
+  }
+}
+
 if (failures > 0) {
   console.error(
     `\n${failures} failure${failures === 1 ? '' : 's'} across ${checked} contrast pairs ` +
@@ -338,7 +364,7 @@ if (failures > 0) {
 
 console.log(
   `✓ ${checked} text and non-text pairs clear WCAG AA across ` +
-    `${Object.keys(WRITTEN).length} written themes and ` +
+    `${Object.keys(WRITTEN).length} written themes, ${Object.keys(SKIED).length} Aurora skies and ` +
     `${Object.keys(GENERATED).length} generated ones, every ${HUE_STEP}° of the circle.`,
 );
 console.log(
