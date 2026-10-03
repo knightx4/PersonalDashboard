@@ -18,6 +18,9 @@
  *   stage) and the receipt re-read (/api/cron/recurring-reread and its daily
  *   stage), on the person's recurring payments (plan #1571)
  *   the mail sync's orders, with the inventory items they make (plan #1576)
+ *   the mail sync's later mail on an order (shipments, returns, a
+ *   cancellation), the appointments it files into Todo, and its reply tasks
+ *   (plan #1577)
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { SchemaClient } from '@/lib/ask/db';
@@ -25,7 +28,10 @@ import { undoDashAction } from '@/lib/core/dash-actions';
 import type { RecurringExtraction } from '@/lib/recurring/extraction';
 import type { RecurringReading } from '@/lib/recurring/extract';
 import { memoryClient } from '@/lib/recurring/memory-client';
-import { orderImportedSummary, recordOrderImport } from '@/lib/orders/record';
+import { orderImportedSummary, recordLifecycleChange, recordOrderImport, RETURNS_NO_UNDO } from '@/lib/orders/record';
+import type { LifecycleExtraction } from '@/lib/email/extract/lifecycle';
+import type { AppointmentExtraction } from '@/lib/todo/appointments/extraction';
+import type { ReplyCandidate } from '@/lib/todo/replies/task';
 import { MOVED_NO_UNDO, UPDATED_NO_UNDO } from '@/lib/recurring/record';
 import { dashTodayEntry } from '@/lib/shell/dash-today';
 import { fakeDashDeps, fakeSchemaDb, type FakeTables } from '@/tests/stubs/fake-schema-db';
@@ -46,6 +52,9 @@ const { holdActingSteps } = await import('@/lib/goals/hold-acts-store');
 const { judgeWatchLists } = await import('@/lib/learn/youtube/judging');
 const { fileRecurringReading } = await import('@/lib/recurring/store');
 const { rereadStoreReceipts } = await import('@/lib/recurring/reread');
+const { applyLifecycleToOrder } = await import('@/lib/orders/apply-lifecycle');
+const { fileAppointmentReading } = await import('@/lib/todo/appointments/store');
+const { fileReplyTasks } = await import('@/lib/todo/replies/linker');
 
 const USER = '11111111-1111-4111-8111-111111111111';
 const DAY = 24 * 60 * 60 * 1000;
@@ -771,5 +780,277 @@ describe('the mail sync, on the orders it imports (plan #1576)', () => {
     expect(orderImportedSummary({ merchant: 'Shop', orderDate: '2026-09-28', lines: [], units: 0 })).toBe(
       'Dash added your order from Shop of 28 Sept. Nothing in it went into your inventory.',
     );
+  });
+});
+
+describe('the mail sync, on later mail about an order (plan #1577)', () => {
+  function orderWorld(): FakeTables {
+    return {
+      'public.merchants': [{ id: 'm-1', name: 'Bookshop' }],
+      'public.orders': [
+        { id: 'order-1', user_id: USER, merchant_id: 'm-1', order_date: '2026-09-28', cancelled_at: null, status: 'ordered' },
+      ],
+      'public.order_items': [{ id: 'oi-1', order_id: 'order-1', name: 'Dune', quantity: 2 }],
+      'public.inventory_items': [
+        { id: 'inv-1', user_id: USER, order_item_id: 'oi-1', name: 'Dune', status: 'owned', cost_cents: 1200 },
+        { id: 'inv-2', user_id: USER, order_item_id: 'oi-1', name: 'Dune', status: 'owned', cost_cents: 1200 },
+      ],
+    };
+  }
+
+  const ORDER: { id: string; merchantId: string; externalOrderNumber: string; cancelledAt: string | null } = {
+    id: 'order-1',
+    merchantId: 'm-1',
+    externalOrderNumber: '42',
+    cancelledAt: null,
+  };
+
+  function reading(overrides: Partial<LifecycleExtraction> = {}): LifecycleExtraction {
+    return {
+      externalOrderNumber: '42',
+      trackingNumber: '1Z999',
+      trackingUrl: null,
+      carrier: 'UPS',
+      shipmentStatus: 'in_transit',
+      shippedAt: '2026-09-29T10:00:00Z',
+      deliveredAt: null,
+      expectedOn: '2026-10-01',
+      refundAmountCents: null,
+      itemNameHints: [],
+      confidence: 0.9,
+      ...overrides,
+    };
+  }
+
+  /** What the sync does with one email: apply it, then record what it changed. */
+  async function sync(
+    fake: FakeTables,
+    classification: 'shipping' | 'delivery' | 'return' | 'cancellation',
+    extraction: LifecycleExtraction,
+    order: typeof ORDER = ORDER,
+  ) {
+    const client = serviceClient(fake, 'public');
+    const applied = await applyLifecycleToOrder(client as never, {
+      userId: USER,
+      order,
+      classification,
+      extraction,
+      sourceMessageId: `msg-${classification}`,
+      receivedAt: new Date('2026-09-30T09:00:00Z'),
+    });
+    expect(applied.ok).toBe(true);
+    if (applied.ok && applied.change) await recordLifecycleChange(client, USER, order.id, applied.change);
+  }
+
+  it('records a shipment it adds, and Home can undo it, which frees the order import\'s own Undo', async () => {
+    const fake = orderWorld();
+    await recordOrderImport(serviceClient(fake, 'public'), USER, {
+      orderId: 'order-1',
+      merchant: 'Bookshop',
+      orderDate: '2026-09-28',
+      lines: [{ name: 'Dune', quantity: 2 }],
+      units: 2,
+    });
+    await sync(fake, 'shipping', reading());
+
+    const rows = records(fake);
+    expect(rows).toHaveLength(2);
+    expectScheduled(rows);
+    const shipment = rows[1];
+    expect(shipment).toMatchObject({ kind: 'add_shipment', op: 'insert', undo: null });
+    expect(shipment.subject_ref).toBe(`public.shipments:${fake['public.shipments'][0].id}`);
+    expect(shipment.summary).toBe('Dash added a shipment to your order from Bookshop of 28 Sept: on its way, due 1 Oct.');
+
+    const deps = fakeDashDeps(fake, USER);
+    expect((await undoDashAction(deps, String(rows[0].id))).ok).toBe(false);
+    expect((await undoDashAction(deps, String(shipment.id))).ok).toBe(true);
+    expect(fake['public.shipments']).toHaveLength(0);
+    expect((await undoDashAction(deps, String(rows[0].id))).ok).toBe(true);
+  });
+
+  it('records a later email moving the shipment on, and nothing for one that changes nothing', async () => {
+    const fake = orderWorld();
+    await sync(fake, 'shipping', reading());
+    await sync(fake, 'delivery', reading({ shipmentStatus: 'delivered', deliveredAt: '2026-10-01T15:00:00Z' }));
+    await sync(fake, 'delivery', reading({ shipmentStatus: 'delivered', deliveredAt: '2026-10-01T15:00:00Z' }));
+
+    const rows = records(fake);
+    expect(rows.map((row) => row.kind)).toEqual(['add_shipment', 'update_shipment']);
+    expect(rows[1]).toMatchObject({ op: 'update', summary: 'Dash marked your order from Bookshop of 28 Sept delivered.' });
+
+    const deps = fakeDashDeps(fake, USER);
+    // The add waits on the later change, which goes back first.
+    expect((await undoDashAction(deps, String(rows[0].id))).ok).toBe(false);
+    expect((await undoDashAction(deps, String(rows[1].id))).ok).toBe(true);
+    expect(fake['public.shipments'][0]).toMatchObject({ status: 'in_transit', delivered_at: null });
+  });
+
+  it('records a cancellation, and Home can undo it; an order already cancelled records nothing', async () => {
+    const fake = orderWorld();
+    await sync(fake, 'cancellation', reading());
+    await sync(fake, 'cancellation', reading(), { ...ORDER, cancelledAt: '2026-09-30T09:00:00Z' });
+
+    const rows = records(fake);
+    expect(rows).toHaveLength(1);
+    expectScheduled(rows);
+    expect(rows[0]).toMatchObject({
+      kind: 'cancel_order',
+      op: 'update',
+      subject_ref: 'public.orders:order-1',
+      summary: 'Dash marked your order from Bookshop of 28 Sept cancelled.',
+    });
+    expect((await undoDashAction(fakeDashDeps(fake, USER), String(rows[0].id))).ok).toBe(true);
+    expect(fake['public.orders'][0].cancelled_at).toBeNull();
+  });
+
+  it('records one thing returned with an Undo, and several from one email with the sentence saying why there is none', async () => {
+    const one = orderWorld();
+    await sync(one, 'return', reading({ refundAmountCents: 1200 }));
+    // Both units are owned and the email names neither, so it returns both.
+    expect(one['public.returns']).toHaveLength(2);
+
+    const single = orderWorld();
+    single['public.inventory_items'] = [single['public.inventory_items'][0]];
+    await sync(single, 'return', reading({ refundAmountCents: 1200 }));
+    const [record] = records(single);
+    expect(record).toMatchObject({ kind: 'mark_returned', op: 'insert', undo: null });
+    expect(record.summary).toBe('Dash marked Dune from your order from Bookshop of 28 Sept returned and refunded.');
+    expect((await undoDashAction(fakeDashDeps(single, USER), String(record.id))).ok).toBe(true);
+    expect(single['public.returns']).toHaveLength(0);
+
+    const [both] = records(one);
+    expect(both).toMatchObject({ kind: 'mark_returned', undo: { none: RETURNS_NO_UNDO } });
+    expect(both.summary).toBe('Dash marked 2 things from your order from Bookshop of 28 Sept returned and refunded.');
+    const entry = dashTodayEntry(
+      { ...(both as Parameters<typeof dashTodayEntry>[0]), conversation_id: null, turn_id: null, input: null, declined_at: null },
+      '2026-10-03',
+    );
+    expect(entry).toMatchObject({ workspace: 'shopping', noUndo: RETURNS_NO_UNDO });
+    const refused = await undoDashAction(fakeDashDeps(one, USER), String(both.id));
+    expect(refused).toMatchObject({ ok: false, error: RETURNS_NO_UNDO });
+    expect(one['public.returns']).toHaveLength(2);
+  });
+});
+
+describe('the mail sync, on the appointments it files into Todo (plan #1577)', () => {
+  function booking(overrides: Partial<AppointmentExtraction> = {}): AppointmentExtraction {
+    return {
+      event: 'booked',
+      title: 'Dental cleaning',
+      provider: 'Smile Dental',
+      reference: 'ABC123',
+      date: '2026-10-08',
+      time: '09:30',
+      endTime: null,
+      location: null,
+      previousDate: null,
+      previousTime: null,
+      ...overrides,
+    };
+  }
+
+  async function file(fake: FakeTables, reading: AppointmentExtraction, receivedAt: string) {
+    return fileAppointmentReading(serviceClient(fake, 'todo') as never, {
+      userId: USER,
+      messageId: `msg-${receivedAt}`,
+      receivedAt,
+      timezone: 'UTC',
+      senderName: null,
+      reading,
+    });
+  }
+
+  it('records an appointment it adds, and Home can undo it', async () => {
+    const fake: FakeTables = {};
+    const filed = await file(fake, booking(), '2026-10-01T08:00:00Z');
+
+    const rows = records(fake);
+    expect(rows).toHaveLength(1);
+    expectScheduled(rows);
+    expect(rows[0]).toMatchObject({
+      kind: 'add_appointment',
+      op: 'insert',
+      subject_ref: `todo.appointments:${filed.appointmentId}`,
+      summary: 'Dash added your appointment with Smile Dental on Thu 8 Oct to Todo.',
+    });
+    const entry = dashTodayEntry(
+      { ...(rows[0] as Parameters<typeof dashTodayEntry>[0]), conversation_id: null, turn_id: null, input: null, declined_at: null },
+      '2026-10-03',
+    );
+    expect(entry).toMatchObject({ workspace: 'todo', noUndo: null });
+    expect((await undoDashAction(fakeDashDeps(fake, USER), String(rows[0].id))).ok).toBe(true);
+    expect(fake['todo.appointments']).toHaveLength(0);
+  });
+
+  it('records a later move and a cancellation, each with an Undo, and nothing for a repeat', async () => {
+    const fake: FakeTables = {};
+    await file(fake, booking(), '2026-10-01T08:00:00Z');
+    await file(fake, booking({ event: 'reminder' }), '2026-10-02T08:00:00Z');
+    await file(fake, booking({ event: 'rescheduled', date: '2026-10-09' }), '2026-10-03T08:00:00Z');
+    await file(fake, booking({ event: 'cancelled', date: null, time: null }), '2026-10-04T08:00:00Z');
+
+    const rows = records(fake);
+    expect(rows.map((row) => row.summary)).toEqual([
+      'Dash added your appointment with Smile Dental on Thu 8 Oct to Todo.',
+      'Dash moved your appointment with Smile Dental to Fri 9 Oct.',
+      'Dash marked your appointment with Smile Dental on Fri 9 Oct cancelled.',
+    ]);
+    expect(rows.slice(1).map((row) => row.op)).toEqual(['update', 'update']);
+
+    const deps = fakeDashDeps(fake, USER);
+    expect((await undoDashAction(deps, String(rows[2].id))).ok).toBe(true);
+    expect(fake['todo.appointments'][0]).toMatchObject({ status: 'booked', starts_on: '2026-10-09' });
+  });
+});
+
+describe('the mail sync, on the reply tasks it files (plan #1577)', () => {
+  const waiting: ReplyCandidate = {
+    message_id: 'msg-1',
+    account_email: 'me@example.com',
+    thread_id: 'thread-1',
+    received_at: '2026-10-02T10:00:00Z',
+    from_address: 'Jane Doe <jane@example.com>',
+    reply_to_address: null,
+    subject: 'Lunch next week?',
+  };
+
+  /** The two functions over the fake tables, one task per thread as the migration has it. */
+  function replyClient(fake: FakeTables, candidates: ReplyCandidate[]) {
+    const judged = new Set<string>();
+    return {
+      ...(serviceClient(fake, 'todo') as unknown as Record<string, unknown>),
+      async rpc(name: string, args: Row) {
+        if (name === 'reply_candidates') return { data: candidates.filter((c) => !judged.has(c.thread_id)), error: null };
+        const found = candidates.find((c) => c.message_id === args.p_message_id)!;
+        if (judged.has(found.thread_id)) return { data: null, error: null };
+        judged.add(found.thread_id);
+        if (args.p_title === null) return { data: null, error: null };
+        const id = `task-${found.thread_id}`;
+        (fake['todo.tasks'] ??= []).push({ id, user_id: USER, title: args.p_title, body: args.p_body, parent_id: null });
+        return { data: id, error: null };
+      },
+    };
+  }
+
+  it('records each task it files, and Home can undo it; a skipped thread records nothing', async () => {
+    const fake: FakeTables = {};
+    const automated = { ...waiting, message_id: 'msg-2', thread_id: 'thread-2', from_address: 'no-reply@shop.com' };
+    const client = replyClient(fake, [waiting, automated]);
+    expect(await fileReplyTasks(client as never, { userId: USER })).toEqual({ filed: 1, skipped: 1 });
+
+    const rows = records(fake);
+    expect(rows).toHaveLength(1);
+    expectScheduled(rows);
+    expect(rows[0]).toMatchObject({
+      kind: 'file_reply_task',
+      op: 'insert',
+      subject_ref: 'todo.tasks:task-thread-1',
+      summary: 'Dash added "Reply to Jane Doe: Lunch next week?" to Todo, for an email waiting on your answer.',
+    });
+    expect((await undoDashAction(fakeDashDeps(fake, USER), String(rows[0].id))).ok).toBe(true);
+    expect(fake['todo.tasks']).toHaveLength(0);
+
+    // The thread stays judged, so the next pass files nothing again.
+    expect(await fileReplyTasks(client as never, { userId: USER })).toEqual({ filed: 0, skipped: 0 });
   });
 });
