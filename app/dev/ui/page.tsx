@@ -52,6 +52,7 @@ import { HomeArrivalDemo } from './home-arrival-demo';
 import { ClearDemo } from './clear-demo';
 import { MOMENT_WORKSPACES, MOMENTS, MOMENTS_PER_WORKSPACE, type Moment } from './moments';
 import { LAW_GROUPS } from './laws';
+import { describeSources, TASTE } from './taste';
 import { ANATOMIES } from './anatomy';
 import * as C from './content';
 import * as M from './measurements';
@@ -525,6 +526,7 @@ const DASH_ACTIVITY_NOTES: Record<DashActivity, string> = {
 const CONTENTS: readonly (readonly [string, string])[] = [
   ['tension', 'The tension'],
   ['laws', 'The laws'],
+  ['taste', 'Your preferences'],
   ['restraint', 'Restraint, worked'],
   ['shape', 'Shape, worked'],
   ['anatomy', 'Page anatomy'],
@@ -735,6 +737,33 @@ export default function DevUiPage() {
               </section>
             ))}
           </div>
+        </Card>
+      </Section>
+
+      <Section
+        id="taste"
+        title="Your preferences"
+        lead="Narrower than the laws: things you asked for in your notes that no law states. Each names the note it came from and a gallery surface that gets it right. The design critic reads these with the laws."
+      >
+        {/* The same single surface and hairlines as the laws above, so the
+         * two read as one list at two scales. */}
+        <Card padding="none">
+          <ul className="divide-y divide-border">
+            {TASTE.map((taste) => (
+              <li key={taste.id} id={`taste-${taste.id}`} className="card-pad-x row-pad">
+                <p className="text-body text-ink">{taste.sentence}</p>
+                <p className="mt-0.5 text-small text-ink-muted">
+                  From {describeSources(taste.sources)}.{' '}
+                  <a
+                    href={`/preview?s=${taste.example}`}
+                    className="underline hover:text-accent"
+                  >
+                    See it done right
+                  </a>
+                </p>
+              </li>
+            ))}
+          </ul>
         </Card>
       </Section>
 
