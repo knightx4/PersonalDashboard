@@ -1,8 +1,8 @@
 /**
  * Filing a sentence from the capture box against your goals (plan #929).
  *
- * The spec's "Capture" section: you write what happened, one model call reads
- * it against your open goals and steps, and what it decided is carried out
+ * The spec's "Capture" section: you write what happened, Dash reads it on
+ * Haiku against your open goals and steps, and what it decided is carried out
  * and listed back with an Undo on each line. This file holds the rules and
  * none of the I/O, so the whole of filing can be tested with the model and
  * the database stubbed:
@@ -11,11 +11,12 @@
  *   steps under them that a sentence can close, count or add beneath.
  * - `captureMessage` writes that out with short refs (g1, s4) in place of
  *   ids, so the model never has to copy a uuid.
- * - `parseFiling` turns what the model returned into actions against real
- *   rows, dropping anything that names a row it was not shown or asks for a
- *   move capture does not make.
- * - `fileCapture` runs the sequence: keep the sentence, ask, carry out each
- *   action, save the list of what was done.
+ * - `parseMove` turns one move the model made into an action against real
+ *   rows, refusing anything that names a row it was not shown or asks for a
+ *   move capture does not make. `parseFiling` reads a list of them the same way.
+ * - `fileCapture` runs the sequence: keep the sentence, ask the shared Dash
+ *   loop (lib/dash, surface capture, plan #1478), carry out each move it
+ *   makes as it makes it, save the list of what was done.
  * - `undoMove` and `markUndone` are the Undo on one line.
  *
  * Five moves, and only five. Close a step, count towards a rhythm, log
@@ -460,64 +461,81 @@ export function parseFiling(
     raw && typeof raw === 'object' && Array.isArray((raw as { actions?: unknown }).actions)
       ? ((raw as { actions: unknown[] }).actions)
       : [];
-  const goals = new Map(context.goals.map((g) => [g.ref, g]));
-  const steps = new Map(context.steps.map((s) => [s.ref, s]));
   const seen = new Set<string>();
   const out: PlannedAction[] = [];
 
   for (const item of list) {
     if (out.length >= MAX_FILED) break;
-    if (!item || typeof item !== 'object') continue;
-    const entry = item as Record<string, unknown>;
-    let planned: PlannedAction | null = null;
-    let key = '';
+    const move = parseMove(item, context, today);
+    if (!move || seen.has(move.key)) continue;
+    seen.add(move.key);
+    out.push(move.planned);
+  }
+  return out;
+}
 
-    switch (entry.type) {
-      case 'close': {
-        const step = steps.get(text(entry.step));
-        if (!step || step.kind === 'rhythm') break;
-        planned = { kind: 'close', step };
-        key = `close:${step.id}`;
-        break;
-      }
-      case 'count': {
-        const step = steps.get(text(entry.step));
-        if (!step || step.kind !== 'rhythm' || !step.rhythm) break;
-        const amount = readCount(entry);
-        if (amount === null) break;
-        // Counted in the period the day falls in (plan #1279): "yesterday"
-        // can be last week's when today is a Monday.
-        const happenedOn = progressDay(entry.day, today);
-        const startsOn = happenedOn
-          ? periodOf(step.rhythm.period, happenedOn).startsOn
-          : step.rhythm.startsOn;
-        planned = { kind: 'count', step, amount, happenedOn, startsOn };
-        key = `count:${step.id}:${startsOn}`;
-        break;
-      }
-      case 'progress':
-      case 'note': {
-        // A step when it names one; otherwise the goal. A named step that was
-        // not shown is a bad ref, not a reason to fall back on the goal.
-        const stepRef = entry.type === 'progress' ? text(entry.step) : '';
-        const step = stepRef ? steps.get(stepRef) : null;
-        if (stepRef && (!step || step.kind === 'rhythm')) break;
-        const goal = step
-          ? context.goals.find((g) => g.ref === step.goalRef)
-          : goals.get(text(entry.goal));
-        const said = text(entry.text).slice(0, NOTE_MAX);
-        if (!goal || !said) break;
+/**
+ * One move against real rows, with the key that tells a repeat of it, or
+ * null when it breaks a rule `parseFiling` lists. A move filed through the
+ * shared loop (lib/goals/capture-model.ts) arrives one tool call at a time
+ * and is read here, so both paths keep the same rules.
+ */
+export function parseMove(
+  item: unknown,
+  context: CaptureContext,
+  today?: string | null,
+): { planned: PlannedAction; key: string } | null {
+  if (!item || typeof item !== 'object') return null;
+  const entry = item as Record<string, unknown>;
+  const goals = new Map(context.goals.map((g) => [g.ref, g]));
+  const steps = new Map(context.steps.map((s) => [s.ref, s]));
 
-        const amount = readAmount(entry);
-        if (!amount) break;
-        const { quantity, unit } = amount;
+  switch (entry.type) {
+    case 'close': {
+      const step = steps.get(text(entry.step));
+      if (!step || step.kind === 'rhythm') return null;
+      return { planned: { kind: 'close', step }, key: `close:${step.id}` };
+    }
+    case 'count': {
+      const step = steps.get(text(entry.step));
+      if (!step || step.kind !== 'rhythm' || !step.rhythm) return null;
+      const amount = readCount(entry);
+      if (amount === null) return null;
+      // Counted in the period the day falls in (plan #1279): "yesterday"
+      // can be last week's when today is a Monday.
+      const happenedOn = progressDay(entry.day, today);
+      const startsOn = happenedOn
+        ? periodOf(step.rhythm.period, happenedOn).startsOn
+        : step.rhythm.startsOn;
+      return {
+        planned: { kind: 'count', step, amount, happenedOn, startsOn },
+        key: `count:${step.id}:${startsOn}`,
+      };
+    }
+    case 'progress':
+    case 'note': {
+      // A step when it names one; otherwise the goal. A named step that was
+      // not shown is a bad ref, not a reason to fall back on the goal.
+      const stepRef = entry.type === 'progress' ? text(entry.step) : '';
+      const step = stepRef ? steps.get(stepRef) : null;
+      if (stepRef && (!step || step.kind === 'rhythm')) return null;
+      const goal = step
+        ? context.goals.find((g) => g.ref === step.goalRef)
+        : goals.get(text(entry.goal));
+      const said = text(entry.text).slice(0, NOTE_MAX);
+      if (!goal || !said) return null;
 
-        // A total only for a step that has none, counted in the entry's own
-        // unit; anything else is dropped and the entry filed without it.
-        const rawTotal = readTotal(entry);
-        const setTotal = step && !step.total && unit && rawTotal !== null ? rawTotal : null;
+      const amount = readAmount(entry);
+      if (!amount) return null;
+      const { quantity, unit } = amount;
 
-        planned = {
+      // A total only for a step that has none, counted in the entry's own
+      // unit; anything else is dropped and the entry filed without it.
+      const rawTotal = readTotal(entry);
+      const setTotal = step && !step.total && unit && rawTotal !== null ? rawTotal : null;
+
+      return {
+        planned: {
           kind: 'progress',
           goal,
           step: step ?? null,
@@ -526,63 +544,57 @@ export function parseFiling(
           unit,
           happenedOn: progressDay(entry.day, today),
           setTotal,
-        };
-        key = `progress:${(step ?? goal).id}`;
-        break;
-      }
-      case 'reading': {
-        const goal = goals.get(text(entry.goal));
-        const value = parseNumber(entry.value);
-        if (!goal || !goal.unit || value === null) break;
-        planned = { kind: 'reading', goal, value };
-        key = `reading:${goal.id}`;
-        break;
-      }
-      case 'add': {
-        const ref = text(entry.parent);
-        const title = text(entry.title).slice(0, STEP_TITLE_MAX);
-        if (!title) break;
-        const parentStep = steps.get(ref) ?? null;
-        // A step goes under a goal or under an ordinary step; a rhythm is a
-        // count, not something to break down.
-        if (parentStep && parentStep.kind === 'rhythm') break;
-        const goal = parentStep
-          ? context.goals.find((g) => g.ref === parentStep.goalRef)
-          : goals.get(ref);
-        if (!goal) break;
-        // Work already done on the new step (plan #1278): text or an amount
-        // makes it progress. A bad amount drops the progress, not the step.
-        const said = text(entry.text).slice(0, NOTE_MAX);
-        const amount = readAmount(entry);
-        const carries = !!said || (amount?.quantity ?? null) !== null;
-        const progress: AddedProgress | null =
-          carries && amount
-            ? {
-                text: said || title,
-                quantity: amount.quantity,
-                unit: amount.unit,
-                happenedOn: progressDay(entry.day, today),
-                setTotal: amount.unit ? readTotal(entry) : null,
-              }
-            : null;
-        planned = {
+        },
+        key: `progress:${(step ?? goal).id}`,
+      };
+    }
+    case 'reading': {
+      const goal = goals.get(text(entry.goal));
+      const value = parseNumber(entry.value);
+      if (!goal || !goal.unit || value === null) return null;
+      return { planned: { kind: 'reading', goal, value }, key: `reading:${goal.id}` };
+    }
+    case 'add': {
+      const ref = text(entry.parent);
+      const title = text(entry.title).slice(0, STEP_TITLE_MAX);
+      if (!title) return null;
+      const parentStep = steps.get(ref) ?? null;
+      // A step goes under a goal or under an ordinary step; a rhythm is a
+      // count, not something to break down.
+      if (parentStep && parentStep.kind === 'rhythm') return null;
+      const goal = parentStep
+        ? context.goals.find((g) => g.ref === parentStep.goalRef)
+        : goals.get(ref);
+      if (!goal) return null;
+      // Work already done on the new step (plan #1278): text or an amount
+      // makes it progress. A bad amount drops the progress, not the step.
+      const said = text(entry.text).slice(0, NOTE_MAX);
+      const amount = readAmount(entry);
+      const carries = !!said || (amount?.quantity ?? null) !== null;
+      const progress: AddedProgress | null =
+        carries && amount
+          ? {
+              text: said || title,
+              quantity: amount.quantity,
+              unit: amount.unit,
+              happenedOn: progressDay(entry.day, today),
+              setTotal: amount.unit ? readTotal(entry) : null,
+            }
+          : null;
+      return {
+        planned: {
           kind: 'add',
           goal,
           parent: parentStep,
           title,
           stepKind: entry.kind === 'claude' ? 'claude' : 'mine',
           progress,
-        };
-        key = `add:${(parentStep ?? goal).id}:${title.toLowerCase()}`;
-        break;
-      }
+        },
+        key: `add:${(parentStep ?? goal).id}:${title.toLowerCase()}`,
+      };
     }
-
-    if (!planned || seen.has(key)) continue;
-    seen.add(key);
-    out.push(planned);
   }
-  return out;
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -820,16 +832,48 @@ export function readFiled(raw: unknown): FiledEntry[] {
 // The sequence
 // ---------------------------------------------------------------------------
 
-/** What the model call came back with: its tool input, or why there is none. */
-export type AskResult = { ok: true; input: unknown } | { ok: false; error: string };
+/**
+ * Each of the five moves as the write tool the shared loop offers for it
+ * (lib/dash/capture-tools.ts). The kind each move's core.dash_actions record
+ * carries is set where it is written (lib/goals/capture-store.ts), and has
+ * not changed with the move onto the loop.
+ */
+export const CAPTURE_MOVE_TOOLS = {
+  close: 'file_close',
+  count: 'file_count',
+  progress: 'file_progress',
+  reading: 'file_reading',
+  add: 'file_add',
+} as const;
+
+export type CaptureMoveType = keyof typeof CAPTURE_MOVE_TOOLS;
+export type CaptureMoveTool = (typeof CAPTURE_MOVE_TOOLS)[CaptureMoveType];
+
+/** The move a capture tool makes, by the tool's name; null for any other name. */
+export function moveOfTool(name: string): CaptureMoveType | null {
+  const found = (Object.keys(CAPTURE_MOVE_TOOLS) as CaptureMoveType[]).find(
+    (type) => CAPTURE_MOVE_TOOLS[type] === name,
+  );
+  return found ?? null;
+}
+
+/** What one move came to: the line it filed, or why nothing was, which the model is told. */
+export type FiledMove = { ok: true; entry: FiledEntry } | { ok: false; error: string };
+
+/** How the model call ended: it finished, or why it did not. */
+export type AskResult = { ok: true } | { ok: false; error: string };
 
 export type FilingDeps = {
   /** Store the sentence as typed; returns the capture's id. */
   keep: (body: string) => Promise<string>;
   /** What the model is shown. */
   context: () => Promise<CaptureContext>;
-  /** The model call. */
-  ask: (message: string) => Promise<AskResult>;
+  /**
+   * The model call, on the shared loop (lib/goals/capture-model.ts). Each
+   * move it makes is handed to `file`, one at a time, and what `file` says
+   * back is what the model is told about that move.
+   */
+  ask: (message: string, file: (move: unknown) => Promise<FiledMove>) => Promise<AskResult>;
   /** Carry out one move; null when it no longer applies (the step closed meanwhile). */
   apply: (captureId: string, action: PlannedAction) => Promise<FiledEntry | null>;
   /** Write the list of what was done onto the capture. */
@@ -840,15 +884,24 @@ export type FilingResult =
   | { ok: true; captureId: string; filed: FiledEntry[] }
   | { ok: false; error: string; captureId: string | null };
 
+/** Told to the model about a move that breaks a rule, so it can correct it or answer. */
+const MOVE_REFUSED =
+  'Nothing was filed for that: it names a ref you were not shown, or breaks one of the rules for that move.';
+
 /**
  * Keep the sentence, ask, carry out, save.
  *
  * The sentence is kept before the model is asked, so a failed call still
- * leaves what you wrote in goals.captures. Moves are carried out one at a
- * time in the order given: an add under a step and a close of that step in
- * one sentence then land in the order the model meant. A move that fails is
- * left off the list rather than stopping the others, since each line has its
- * own Undo and a partial filing is still accurate about what it did.
+ * leaves what you wrote in goals.captures. The model makes its moves as
+ * write tools on the shared loop (plan #1478), and each is checked by
+ * `parseMove` against what it was shown and carried out as it arrives. Moves
+ * are carried out one at a time in the order the model made them, also when
+ * it makes several in one round: an add under a step and a close of that
+ * step in one sentence then land in the order the model meant. A repeat of a
+ * move already filed, or a move past MAX_FILED, is refused. A move that fails
+ * is left off the list rather than stopping the others, since each line has
+ * its own Undo and a partial filing is still accurate about what it did; for
+ * the same reason a call that fails after filing some moves still saves them.
  */
 export async function fileCapture(
   body: string,
@@ -868,17 +921,40 @@ export async function fileCapture(
 
   const [captureId, context] = await Promise.all([deps.keep(body), deps.context()]);
 
-  const reply = await deps.ask(captureMessage(context, trimmed, today, hint));
-  if (!reply.ok) return { ok: false, error: `${reply.error} What you wrote is kept.`, captureId };
-
   const filed: FiledEntry[] = [];
-  for (const action of parseFiling(reply.input, context, today)) {
-    try {
-      const entry = await deps.apply(captureId, action);
-      if (entry) filed.push(entry);
-    } catch {
-      /* left off the list: it did not happen */
+  const seen = new Set<string>();
+  let tried = 0;
+  const fileOne = async (move: unknown): Promise<FiledMove> => {
+    if (tried >= MAX_FILED) {
+      return { ok: false, error: `No more than ${MAX_FILED} moves are filed from one sentence.` };
     }
+    const parsed = parseMove(move, context, today);
+    if (!parsed) return { ok: false, error: MOVE_REFUSED };
+    if (seen.has(parsed.key)) return { ok: false, error: 'That move is already filed.' };
+    seen.add(parsed.key);
+    tried += 1;
+    let entry: FiledEntry | null;
+    try {
+      entry = await deps.apply(captureId, parsed.planned);
+    } catch {
+      return { ok: false, error: 'That move could not be filed.' };
+    }
+    if (!entry) return { ok: false, error: 'That no longer applies, so nothing was filed for it.' };
+    filed.push(entry);
+    return { ok: true, entry };
+  };
+  // One at a time, in the order made: the loop runs a round's calls together.
+  let queue: Promise<unknown> = Promise.resolve();
+  const file = (move: unknown): Promise<FiledMove> => {
+    const next = queue.then(() => fileOne(move));
+    queue = next.catch(() => undefined);
+    return next;
+  };
+
+  const reply = await deps.ask(captureMessage(context, trimmed, today, hint), file);
+  await queue;
+  if (!reply.ok && filed.length === 0) {
+    return { ok: false, error: `${reply.error} What you wrote is kept.`, captureId };
   }
 
   if (filed.length > 0) await deps.save(captureId, filed);

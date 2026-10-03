@@ -104,14 +104,19 @@ describe('partial work is progress, not a close (plan #1275)', () => {
         },
       },
     } as unknown as Anthropic;
-    await askCaptureModel({ apiKey: 'test', client }, 'I just moved two bags');
-    const system = String(sent.system).replace(/\s+/g, ' ');
+    await askCaptureModel(
+      { apiKey: 'test', captureId: 'capture-1', today: '2026-09-30', client },
+      'I just moved two bags',
+      async () => ({ ok: false, error: 'not filed in this test' }),
+    );
+    const system = JSON.stringify(sent.system).replace(/(\s|\\n)+/g, ' ');
     expect(system).toContain("part of a step's work");
     expect(system).toContain('is progress on that step, never a close');
     expect(system).toContain('Close a step only when the sentence says the whole step is finished');
-    const schema = JSON.stringify(sent.tools?.[0]?.input_schema);
-    expect(schema).toContain('"progress"');
-    expect(schema).not.toContain('"note"');
+    const tools = (sent.tools ?? []) as unknown as { name: string; input_schema: unknown }[];
+    expect(tools.map((t) => t.name)).toContain('file_progress');
+    expect(tools.map((t) => t.name)).not.toContain('file_note');
+    const schema = JSON.stringify(tools.find((t) => t.name === 'file_progress')?.input_schema);
     expect(schema).toContain('"quantity"');
     expect(schema).toContain('"day"');
   });

@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import type Anthropic from '@anthropic-ai/sdk';
 import type { ChangeOutcome } from '@/lib/ask/changes';
 import type { DashAction } from '@/lib/core/dash-actions';
-import type { CaptureGoal, CaptureStep, FiledEntry } from '@/lib/goals/capture';
+import { fileCapture, type CaptureGoal, type CaptureStep, type FiledEntry } from '@/lib/goals/capture';
+import { askCaptureModel } from '@/lib/goals/capture-model';
 import { applyCaptureAction, saveFiled, undoFiled, undoFiledAction } from '@/lib/goals/capture-store';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { undoDashTodayWith } from '@/lib/shell/dash-today';
@@ -159,5 +161,48 @@ describe('undoing a filed line', () => {
     const again = await undoDashTodayWith(world.dash, record.id as string, askUndo, undefined, undoCapture);
     expect(again.ok).toBe(false);
     expect(undoCapture).toHaveBeenCalledOnce();
+  });
+});
+
+describe('a sentence filed through the shared loop (plan #1478)', () => {
+  it('lands in core.dash_actions as capture’s, and Home’s Undo puts it back', async () => {
+    const world = setup();
+    // Haiku closes the step with file_close and answers, in one round.
+    const model = {
+      messages: {
+        create: async () => ({
+          content: [
+            { type: 'tool_use', id: 'm1', name: 'file_close', input: { step: 's1' } },
+            { type: 'tool_use', id: 'a1', name: 'answer', input: { answer: 'Closed it.', cited: [] } },
+          ],
+          stop_reason: 'tool_use',
+          usage: { input_tokens: 10, output_tokens: 10 },
+        }),
+      },
+    } as unknown as Anthropic;
+
+    const result = await fileCapture('bought the shoes', TODAY, {
+      keep: async () => CAPTURE,
+      context: async () => ({ goals: [goal], steps: [step] }),
+      ask: (message, move) =>
+        askCaptureModel({ apiKey: 'test', captureId: CAPTURE, today: TODAY, client: model }, message, move),
+      apply: (captureId, action) =>
+        applyCaptureAction(world.client, { userId: ME, today: TODAY, captureId, dash: world.dash }, action),
+      save: (captureId, filed) => saveFiled(world.client, captureId, filed),
+    });
+
+    expect(result.ok && result.filed.map((e) => e.kind)).toEqual(['close']);
+    expect(world.tables['goals.items'][1]).toMatchObject({ status: 'done' });
+    const [record] = world.tables['core.dash_actions'];
+    expect(record).toMatchObject({ surface: 'capture', kind: 'close_step', status: 'done', undo: { capture_id: CAPTURE } });
+
+    const undoCapture = async (action: DashAction) => {
+      const out = await undoFiledAction(world.client, action.undo!.capture_id as string, action.id, world.dash);
+      return out.ok ? { ok: true as const, paths: [] } : { ok: false as const, error: out.error };
+    };
+    const out = await undoDashTodayWith(world.dash, record.id as string, vi.fn(), undefined, undoCapture);
+    expect(out).toEqual({ ok: true, paths: [] });
+    expect(world.tables['goals.items'][1]).toMatchObject({ status: 'open' });
+    expect(world.tables['core.dash_actions'][0]).toMatchObject({ status: 'undone' });
   });
 });
