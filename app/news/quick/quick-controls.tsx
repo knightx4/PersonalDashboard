@@ -586,7 +586,12 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
   return (
     // Clip rather than hidden, so the sticky Next row inside still sticks to
     // the window; it keeps the story coming in from widening the page.
-    <div ref={surface} className={cn((showNext || showPrevious) && 'overflow-clip')}>
+    // `data-quick-swipe` is what the gallery's recorder drags (npm run record).
+    <div
+      ref={surface}
+      data-quick-swipe
+      className={cn((showNext || showPrevious) && 'overflow-clip')}
+    >
       <div
         className={cn(
           'relative',
