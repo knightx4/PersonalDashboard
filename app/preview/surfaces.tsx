@@ -673,8 +673,9 @@ const settings = {
       isDefault: true,
       notes: 'The one that goes to platform roles.',
       hasText: true,
+      hasPdf: true,
     },
-    { id: 'cv2', label: 'Quant', isDefault: false, notes: null, hasText: false },
+    { id: 'cv2', label: 'Quant', isDefault: false, notes: null, hasText: false, hasPdf: false },
   ],
   excludedSenders: [
     { id: 'x1', domain: 'jobalerts.linkedin.com' },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
+import { useActionState, useEffect, useRef, useState, useTransition, type FormEvent } from 'react';
 import { Check, Copy, Mail, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -17,12 +17,16 @@ import {
   acceptEvidence,
   addEvidence,
   addResumeVersion,
+  attachResumePdf,
   deleteEvidence,
   proposeEvidence,
 } from './evidence-actions';
 import { addExcludedSender, removeExcludedSender } from './sender-actions';
 import { DEFAULT_BANNED_CONSTRUCTIONS } from '@/lib/jobs/evidence/draft-payload';
 import { cardVariants } from '@/components/ui/card';
+import { createClient as createBrowserJobsClient } from '@/lib/jobs/auth/client';
+import { APP_STORAGE_BUCKET } from '@/lib/jobs/db/schema-name';
+import { resumeFileProblem, resumePath } from '@/lib/jobs/resume-file';
 import { PaidHint } from '@/components/ui/paid-hint';
 import {
   COMPANY_STAGE_LABELS,
@@ -57,6 +61,7 @@ export function SettingsView(props: {
     isDefault: boolean;
     notes: string | null;
     hasText: boolean;
+    hasPdf: boolean;
   }>;
   excludedSenders: Array<{ id: string; domain: string }>;
   evidence: Array<{
@@ -771,10 +776,35 @@ function ResumeSection({
     notes: string | null;
     isDefault: boolean;
     hasText: boolean;
+    hasPdf: boolean;
   }>;
 }) {
   const [state, action] = useActionState(addResumeVersion, {});
   const [adding, setAdding] = useCloseOnSuccess(state);
+  const [uploading, startUpload] = useTransition();
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // The PDF goes to storage from the browser before the form is sent, so the
+  // file never rides in the server action's one-megabyte body. The action
+  // only receives the path.
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const file = formData.get('pdf');
+    formData.delete('pdf');
+    setUploadError(null);
+    startUpload(async () => {
+      if (file instanceof File && file.size > 0) {
+        const uploaded = await uploadResumePdf(file);
+        if ('error' in uploaded) {
+          setUploadError(uploaded.error);
+          return;
+        }
+        formData.set('storagePath', uploaded.path);
+      }
+      action(formData);
+    });
+  };
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
@@ -787,12 +817,7 @@ function ResumeSection({
       {resumes.length > 0 && (
         <ul className="mt-3 space-y-1">
           {resumes.map((resume) => (
-            <li key={resume.id} className="flex items-baseline gap-2 text-ui">
-              <span className="font-medium text-ink">{resume.label}</span>
-              {resume.isDefault && <span className="text-micro text-accent">default</span>}
-              {!resume.hasText && <span className="text-small text-ink-muted">no text pasted</span>}
-              {resume.notes && <span className="text-ink-muted">{resume.notes}</span>}
-            </li>
+            <ResumeRow key={resume.id} resume={resume} />
           ))}
         </ul>
       )}
@@ -801,7 +826,7 @@ function ResumeSection({
           stand open beneath them -- two fields, a four-row paste box and two
           captions, on a page you came to read (law 14). */}
       {adding ? (
-        <form action={action} className="mt-3 space-y-2">
+        <form onSubmit={submit} className="mt-3 space-y-2">
           <div className="flex flex-wrap items-end gap-2">
             <div className="w-32">
               <Label htmlFor="label">Label</Label>
@@ -811,6 +836,13 @@ function ResumeSection({
               <Label htmlFor="notes">What is different about it</Label>
               <Input id="notes" name="notes" placeholder="Fintech-leaning, metrics up top" />
             </div>
+          </div>
+          <div>
+            <Label htmlFor="pdf">The PDF</Label>
+            <Input id="pdf" name="pdf" type="file" accept="application/pdf,.pdf" />
+            <p className="mt-1 text-small text-ink-muted">
+              Kept as the file you send, so you can open exactly what went out.
+            </p>
           </div>
           <div>
             <Label htmlFor="textContent">Paste the text</Label>
@@ -825,8 +857,8 @@ function ResumeSection({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button type="submit" size="sm" variant="secondary">
-              Add
+            <Button type="submit" size="sm" variant="secondary" pending={uploading}>
+              {uploading ? 'Uploading…' : 'Add'}
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => setAdding(false)}>
               Cancel
@@ -836,10 +868,100 @@ function ResumeSection({
       ) : (
         <AddTrigger label="Add a version" onClick={() => setAdding(true)} className="mt-3" />
       )}
-      {state.error && <p className="mt-2 text-ui text-danger">{state.error}</p>}
+      {(uploadError ?? state.error) && (
+        <p className="mt-2 text-ui text-danger">{uploadError ?? state.error}</p>
+      )}
       {state.message && <p className="mt-2 text-ui text-ink-muted">{state.message}</p>}
     </section>
   );
+}
+
+/** One version: its label, a link to its PDF, and a way to attach or replace it. */
+function ResumeRow({
+  resume,
+}: {
+  resume: {
+    id: string;
+    label: string;
+    notes: string | null;
+    isDefault: boolean;
+    hasText: boolean;
+    hasPdf: boolean;
+  };
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, startAttach] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const attach = (file: File) => {
+    setError(null);
+    startAttach(async () => {
+      const uploaded = await uploadResumePdf(file);
+      if ('error' in uploaded) {
+        setError(uploaded.error);
+        return;
+      }
+      const result = await attachResumePdf(resume.id, uploaded.path);
+      if (result.error) setError(result.error);
+    });
+  };
+
+  return (
+    <li className="text-ui">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <span className="font-medium text-ink">{resume.label}</span>
+        {resume.isDefault && <span className="text-micro text-accent">default</span>}
+        {resume.hasPdf && (
+          <a
+            href={`/jobs/resume/${resume.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-accent underline-offset-2 hover:underline"
+          >
+            Open PDF
+          </a>
+        )}
+        {!resume.hasText && <span className="text-small text-ink-muted">no text pasted</span>}
+        {resume.notes && <span className="text-ink-muted">{resume.notes}</span>}
+        <button
+          type="button"
+          className="text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline disabled:opacity-60"
+          disabled={busy}
+          onClick={() => input.current?.click()}
+        >
+          {busy ? 'Uploading…' : resume.hasPdf ? 'Replace PDF' : 'Attach PDF'}
+        </button>
+        <input
+          ref={input}
+          type="file"
+          accept="application/pdf,.pdf"
+          className="hidden"
+          aria-label={`PDF for ${resume.label}`}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (file) attach(file);
+          }}
+        />
+      </div>
+      {error && <p className="mt-1 text-small text-danger">{error}</p>}
+    </li>
+  );
+}
+
+/** Put a resume PDF in your folder of the bucket, under a fresh name. */
+async function uploadResumePdf(file: File): Promise<{ path: string } | { error: string }> {
+  const problem = resumeFileProblem(file);
+  if (problem) return { error: problem };
+  const supabase = createBrowserJobsClient();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) return { error: 'You are signed out. Sign in again to upload.' };
+  const path = resumePath(data.user.id, crypto.randomUUID());
+  const { error } = await supabase.storage
+    .from(APP_STORAGE_BUCKET)
+    .upload(path, file, { contentType: 'application/pdf', upsert: false });
+  if (error) return { error: 'That PDF could not be uploaded. Try again.' };
+  return { path };
 }
 
 function EvidenceSection({

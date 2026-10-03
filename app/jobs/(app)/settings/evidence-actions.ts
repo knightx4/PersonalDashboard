@@ -18,6 +18,8 @@ import {
   assembleDebriefsSource,
   assembleResumeSource,
 } from '@/lib/jobs/evidence/sources';
+import { APP_STORAGE_BUCKET } from '@/lib/jobs/db/schema-name';
+import { ownsResumePath } from '@/lib/jobs/resume-file';
 
 /**
  * The evidence bank.
@@ -91,6 +93,7 @@ const resumeSchema = z.object({
   label: z.string().trim().min(1, 'Give the version a label.').max(60),
   notes: z.string().trim().max(400).optional(),
   textContent: z.string().trim().optional(),
+  storagePath: z.string().trim().optional(),
 });
 
 // latency: pending
@@ -102,6 +105,7 @@ export async function addResumeVersion(
     label: formData.get('label'),
     notes: formData.get('notes') ?? '',
     textContent: formData.get('textContent') ?? '',
+    storagePath: formData.get('storagePath') ?? '',
   });
 
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -109,11 +113,18 @@ export async function addResumeVersion(
   const user = await requireUser();
   const supabase = await createClient();
 
+  // The browser has already put the PDF in your folder; only a path there is kept.
+  const storagePath = parsed.data.storagePath || null;
+  if (storagePath && !ownsResumePath(user.id, storagePath)) {
+    return { error: 'That upload is not in your folder. Pick the file again.' };
+  }
+
   const { error } = await supabase.from('resume_versions').insert({
     user_id: user.id,
     label: parsed.data.label,
     notes: parsed.data.notes || null,
     text_content: parsed.data.textContent || null,
+    storage_path: storagePath,
   });
 
   if (error) {
@@ -126,6 +137,51 @@ export async function addResumeVersion(
 
   revalidatePath('/jobs/settings');
   return { message: 'Added. Point applications at it so you can see which version gets past resume review.' };
+}
+
+/**
+ * Keep the PDF for a version that already exists, replacing any file it had.
+ * The browser uploads first; this points the row at the new path and then
+ * removes the old file, so a failed update never leaves the row pointing at
+ * nothing.
+ */
+// latency: pending
+export async function attachResumePdf(
+  resumeVersionId: string,
+  storagePath: string,
+): Promise<{ error: string | null }> {
+  if (!z.string().uuid().safeParse(resumeVersionId).success) {
+    return { error: 'No such resume version.' };
+  }
+  const user = await requireUser();
+  if (!ownsResumePath(user.id, storagePath)) {
+    return { error: 'That upload is not in your folder. Pick the file again.' };
+  }
+  const supabase = await createClient();
+
+  const { data: existing } = await supabase
+    .from('resume_versions')
+    .select('storage_path')
+    .eq('id', resumeVersionId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!existing) return { error: 'No such resume version.' };
+
+  const { error } = await supabase
+    .from('resume_versions')
+    .update({ storage_path: storagePath })
+    .eq('id', resumeVersionId)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  const previous = existing.storage_path as string | null;
+  if (previous && previous !== storagePath && ownsResumePath(user.id, previous)) {
+    // A file left behind costs a little storage; it is not worth failing over.
+    await supabase.storage.from(APP_STORAGE_BUCKET).remove([previous]);
+  }
+
+  revalidatePath('/jobs/settings');
+  return { error: null };
 }
 
 /**
