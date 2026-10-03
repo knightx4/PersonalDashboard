@@ -2,6 +2,7 @@ import 'server-only';
 
 import { moduleEnabled, type AccountSettings } from '@/lib/core/account/settings';
 import type { AgendaSource, SourceId } from '@/lib/todo/agenda/sources';
+import { applicationsSource } from '@/lib/todo/agenda/sources/applications';
 import { appointmentsSource } from '@/lib/todo/agenda/sources/appointments';
 import { billsSource } from '@/lib/todo/agenda/sources/bills';
 import { deliveriesSource } from '@/lib/todo/agenda/sources/deliveries';
@@ -27,6 +28,7 @@ const SOURCES: AgendaSource[] = [
   appointmentsSource,
   billsSource,
   draftsSource,
+  applicationsSource,
 ];
 
 export function allSources(): AgendaSource[] {

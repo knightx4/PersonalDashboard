@@ -37,13 +37,15 @@ export default async function TodoLayout({ children }: { children: React.ReactNo
   const brief = await loadTodoBrief(user.id, settings.timezone);
 
   /**
-   * Three questions, three sections. "Agenda" is what needs you next;
+   * Four questions, four sections. "Agenda" is what needs you next;
+   * "Waiting" is what someone else has to move first (plan #1475);
    * "Calendar" is how the month is shaped; "All" is everything, including what
-   * is finished. Anything a fourth section would answer is probably a filter on
+   * is finished. Anything a fifth section would answer is probably a filter on
    * one of these.
    */
   const sections: NavSection[] = [
     { href: '/todo', label: 'Agenda', icon: 'agenda', exact: true },
+    { href: '/todo/waiting', label: 'Waiting', icon: 'waiting' },
     { href: '/todo/calendar', label: 'Calendar', icon: 'calendar' },
     { href: '/todo/all', label: 'All', icon: 'tasks' },
   ];

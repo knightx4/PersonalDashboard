@@ -21,6 +21,7 @@ import {
   Frame,
   GraduationCap,
   History,
+  Hourglass,
   House,
   KanbanSquare,
   LayoutDashboard,
@@ -115,6 +116,9 @@ export const NAV_ICONS = {
   // be claiming something about it. The two were ListChecks and ListTodo, near
   // enough that the only way to tell the rows apart was to read the labels.
   agenda: ListTodo,
+  // What someone else has to move first (plan #1475): time passing until
+  // they do.
+  waiting: Hourglass,
   calendar: CalendarDays,
   tasks: List,
   notes: StickyNote,
