@@ -12,6 +12,7 @@ import { loadFlowGoal, nextQuestion } from '@/lib/learn/flow/ahead';
 import { practiceHref } from '@/lib/learn/flow/href';
 import { loadTrackOffer } from '@/lib/learn/flow/offer';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { FlowFocus, ScopeFilter } from './scope';
 import { FlowSession, type FlowOnly } from './session';
 import { toFlowState } from './state';
@@ -173,12 +174,12 @@ export async function PracticeFlow({
             description={
               goal
                 ? 'No question about this goal could be written just now. Try again later, or ask about everything.'
-                : 'Goals only asks about the goals on your Goals page that have no subject of their own. Name one there, such as startup finance, and Dash will ask about it here.'
+                : 'Goals only asks about your learning goals that have no subject of their own. Add one to the Learn area in Goals, such as startup finance, and Dash will ask about it here.'
             }
             action={
               goal
                 ? { label: 'Ask about everything', href: practiceHref() }
-                : { label: 'Goals', href: '/learn/goals' }
+                : { label: 'Your learning goals', href: await loadLearnAreaHref() }
             }
           />
         ) : picked.kind !== 'nothing' ? null : offer ? (

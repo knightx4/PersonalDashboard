@@ -267,10 +267,14 @@ so it stays out of the runs until you answer.
 A goal's steps live in Goals. What they refer to lives in its own module, and
 Goals links to it:
 
-- **Learn.** The learning goals at `/learn/goals` (the `aims` table) stay in
-  Learn. A goal can link aims beneath it, so *get plugged into city life* can
-  hold *learn urban planning basics* without the aim moving. Goals is the
-  parent; Learn keeps what it already owns.
+- **Learn.** Each learning goal (a row in Learn's `aims` table) is a goal in
+  the Learn area here (plan #1490), and Learn has no Goals tab of its own:
+  `/learn/goals` redirects to that area, and Subjects links to it (plan
+  #1491). The goal owns the wording; how well you want to know it, its plan
+  and a way to practise it sit in a Learning section on the goal's page, and
+  the Level 3 goal is one press on Subjects. A goal elsewhere can still link
+  aims beneath it, so *get plugged into city life* can hold *learn urban
+  planning basics*.
 - **Jobs.** *Get a job* reads applications, interviews and reminders from the
   job search tables to show progress. Nothing is copied.
 - **Todo.** Covered next.

@@ -53,7 +53,6 @@ export const PAID_ACTIONS = {
   'app/learn/s/[id]/actions.ts#pullWikipediaArticles': ['embed-catalogue'],
   'app/learn/s/[id]/actions.ts#pullLectureCourse': ['embed-catalogue'],
   'app/learn/s/[id]/actions.ts#findSubjectChannels': ['find-channels', 'judge-channel'],
-  'app/learn/goals/actions.ts#addGoal': ['place-aim', 'write-curriculum'],
   // Only a goal added to the Learn area costs: it is placed and given a plan
   // (plan #1490). The hint shows in that area alone.
   'app/goals/actions.ts#addGoal': ['place-aim', 'write-curriculum'],
@@ -182,8 +181,6 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'Called by the capture box when typing pauses, to guess what the sentence will do (plan #1177). There is no button, only the field; the File it hint prices the filing.',
   'app/goals/actions.ts#editGoal':
     'Saved when a goal\'s title or done-when loses focus after a change, or when it is moved to another area. Only a goal in the Learn area costs: it is placed again and, if it has no plan yet, given one (plan #1490). There is no button, only the field.',
-  'app/learn/goals/actions.ts#editGoal':
-    'Saved when a goal\'s name or line loses focus after a change, and a reworded goal is placed again (place-aim). There is no button, only the field.',
   'app/shopping/review/actions.ts#readOrderFromEmail':
     'Nothing calls it. "Add from this email" on the review list opens the order form, whose page makes the same read as it renders, so the hint sits on that link under app/shopping/orders/new/page.tsx#NewOrderPage.',
   'app/api/inbox/sync/continue/route.ts#POST':

@@ -29,6 +29,24 @@ export async function loadActiveAims(supabase: LearnSupabaseClient): Promise<Aim
   return ((data ?? []) as AimRow[]).map(toAim);
 }
 
+/**
+ * The active aim a goal in the Learn area stands for (plan #1491), for the
+ * Learn section on the goal's page. Null for a goal with none.
+ */
+export async function loadAimForGoal(
+  supabase: LearnSupabaseClient,
+  goalId: string,
+): Promise<Aim | null> {
+  const { data, error } = await supabase
+    .from('aims')
+    .select(AIM_COLUMNS)
+    .eq('goal_id', goalId)
+    .is('archived_at', null)
+    .maybeSingle();
+  if (error) throw new Error(`Could not read the learning goal: ${error.message}`);
+  return data ? toAim(data as AimRow) : null;
+}
+
 export async function insertAim(
   supabase: LearnSupabaseClient,
   userId: string,

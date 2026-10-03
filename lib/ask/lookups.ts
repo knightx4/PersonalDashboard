@@ -782,7 +782,7 @@ const RECALL_LANDING: Record<string, string> = {
   'job_search.notes': '/jobs',
   'goals.items': '/goals',
   'goals.captures': '/goals',
-  'learn.aims': '/learn/goals',
+  'learn.aims': '/goals',
   'learn.card_notes': '/learn/now',
   'learn.feed_cards': '/learn/now',
   'public.order_items': '/shopping/orders',

@@ -45,6 +45,10 @@ function plural(count: number, one: string, many: string): string {
  */
 export const WAITING_ANCHORS = { reviews: 'due-for-review', readings: 'read-these' } as const;
 
+/**
+ * Goals without a plan open the Learn area on /goals (plan #1491), whose id
+ * differs per person, so the page passes its href; /goals when it does not.
+ */
 const LINES: Record<WaitingKey, { text: (count: number) => string; href: string }> = {
   reviews: {
     text: (n) => `${plural(n, 'idea', 'ideas')} due for review`,
@@ -54,15 +58,19 @@ const LINES: Record<WaitingKey, { text: (count: number) => string; href: string 
     text: (n) => `${plural(n, 'reading', 'readings')} you said you would read`,
     href: `/learn/now#${WAITING_ANCHORS.readings}`,
   },
-  goals: { text: (n) => `${plural(n, 'goal', 'goals')} without a plan yet`, href: '/learn/goals' },
+  goals: { text: (n) => `${plural(n, 'goal', 'goals')} without a plan yet`, href: '/goals' },
 };
 
 /** The lines to show, in a fixed order, leaving out any count that is zero or unread. */
-export function waitingLines(counts: WaitingCounts): WaitingLine[] {
+export function waitingLines(
+  counts: WaitingCounts,
+  { goalsHref }: { goalsHref?: string } = {},
+): WaitingLine[] {
   return ORDER.flatMap((key) => {
     const count = counts[key];
     if (count === null || count <= 0) return [];
-    return [{ key, text: LINES[key].text(count), href: LINES[key].href }];
+    const href = key === 'goals' && goalsHref ? goalsHref : LINES[key].href;
+    return [{ key, text: LINES[key].text(count), href }];
   });
 }
 

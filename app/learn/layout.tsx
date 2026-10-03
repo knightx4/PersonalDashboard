@@ -88,14 +88,8 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       exact: true,
       alsoMatches: ['/learn/s/', '/learn/c/', '/learn/quiz'],
     },
-    // What you want to learn and how well, which Learn now draws cards
-    // towards (plan #895). The page says Goals; the code says aims.
-    {
-      href: '/learn/goals',
-      label: 'Goals',
-      icon: 'goals',
-      exact: true,
-    },
+    // No Goals tab (plan #1491): the learning goals are goals in the Learn
+    // area on /goals, linked from Subjects, and /learn/goals redirects there.
     {
       href: '/learn/lists',
       label: 'Reading lists',

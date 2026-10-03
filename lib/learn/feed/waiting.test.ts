@@ -8,7 +8,14 @@ describe('waitingLines', () => {
     expect(waitingLines({ reviews: 3, readings: 1, goals: 2 })).toEqual([
       { key: 'reviews', text: '3 ideas due for review', href: '/learn/now#due-for-review' },
       { key: 'readings', text: '1 reading you said you would read', href: '/learn/now#read-these' },
-      { key: 'goals', text: '2 goals without a plan yet', href: '/learn/goals' },
+      { key: 'goals', text: '2 goals without a plan yet', href: '/goals' },
+    ]);
+  });
+
+  it('opens the Learn area for goals without a plan when the page knows it', () => {
+    const area = '/goals/area/00000000-0000-4000-8000-000000000001';
+    expect(waitingLines({ reviews: 0, readings: 0, goals: 1 }, { goalsHref: area })).toEqual([
+      { key: 'goals', text: '1 goal without a plan yet', href: area },
     ]);
   });
 

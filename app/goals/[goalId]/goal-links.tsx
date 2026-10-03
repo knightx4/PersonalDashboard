@@ -88,7 +88,7 @@ export function GoalLinksSection({
                 key={aim.linkId}
                 linkId={aim.linkId}
                 title={aim.name ?? 'A Learn goal'}
-                href={aim.name ? '/learn/goals' : null}
+                href={aim.name && aim.goalId ? `/goals/${aim.goalId}` : null}
                 line={aimProgressLine(aim)}
                 what="Learn goal"
               />

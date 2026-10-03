@@ -50,6 +50,11 @@ export type LinkedAim = {
   /** Null when the aim has been deleted from Learn since it was linked. */
   name: string | null;
   archived: boolean;
+  /**
+   * The goal in the Learn area the aim stands for (plan #1491), whose page
+   * is where the aim is now seen and changed. Null when it has none.
+   */
+  goalId?: string | null;
   /** The Level 3 list, whose progress is its claimed and tested articles. */
   level3: { claimed: number; tested: number; total: number } | null;
   /** Cards drawn for an open-subject aim that were read, and of those saved. */

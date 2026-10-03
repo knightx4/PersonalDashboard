@@ -19,6 +19,7 @@ import { loadPlannedGoals } from '@/lib/learn/lessons/plan-store';
 import { countGoalsWithoutPlan, WAITING_ANCHORS, waitingEmpty, waitingLines } from '@/lib/learn/feed/waiting';
 import { wantsPractice } from '@/lib/learn/flow/href';
 import { PracticeFlow } from '../flow/practice';
+import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { ReviewList } from '../review/review-list';
 import { openReading } from '../r/[id]/actions';
 import { LearnNowFeed } from './feed';
@@ -107,7 +108,12 @@ export default async function NowPage({
     ),
   ]);
   const counts = { reviews: reviews?.length ?? null, readings: readings?.length ?? null, goals };
-  const strip = <WaitingStrip lines={waitingLines(counts)} empty={waitingEmpty(counts)} />;
+  // Goals without a plan open the Learn area on /goals (plan #1491); read
+  // only when that line shows.
+  const goalsHref = goals ? await loadLearnAreaHref() : undefined;
+  const strip = (
+    <WaitingStrip lines={waitingLines(counts, { goalsHref })} empty={waitingEmpty(counts)} />
+  );
   const header = (description: string) => (
     <PageHeader title="Now" description={description} actions={<PracticeSwitch practice={practice} />} />
   );
