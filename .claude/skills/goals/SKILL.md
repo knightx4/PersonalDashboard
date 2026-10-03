@@ -2401,7 +2401,7 @@ and only when the person asked or the step it served was dropped.
 ## Leaving a note
 
 Each goal's page opens with a box headed "Where it stands", and the Goals
-home opens with one headed "From Claude". The words in both are a note you
+home opens with one headed "Dash". The words in both are a note you
 leave in `goals.briefs` as a run finishes. The pages list what is waiting on
 the person themselves, row by row; the note is your reading of it: what
 moved, what matters now, and what you will do next.
