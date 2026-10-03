@@ -47,6 +47,7 @@ import { SettleDemo } from './settle-demo';
 import { ProgressMoveDemo } from './progress-move-demo';
 import { GoalCloseDemo } from './goal-close-demo';
 import { ClearDemo } from './clear-demo';
+import { MOMENT_WORKSPACES, MOMENTS, MOMENTS_PER_WORKSPACE, type Moment } from './moments';
 import { LAW_GROUPS } from './laws';
 import { ANATOMIES } from './anatomy';
 import * as C from './content';
@@ -148,6 +149,36 @@ function Rows({
         ))}
       </ul>
     </Card>
+  );
+}
+
+/** One moment: its name and state, then what sets it off, what you see, and the reduced-motion version. */
+function MomentRow({ moment }: { moment: Moment }) {
+  const { state } = moment;
+  const status =
+    state.built === 'yes'
+      ? 'Built'
+      : state.built === 'partly'
+        ? `Partly built · rest in #${state.step}`
+        : `Not built · #${state.step}`;
+  return (
+    <li className="row-pad space-y-0.5">
+      <p className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <span className="text-ui font-medium text-ink">{moment.name}</span>
+        <span className={cn('text-small', state.built === 'yes' ? 'text-positive' : 'text-ink-muted')}>
+          {status}
+        </span>
+      </p>
+      <p className="text-body text-ink">{moment.sees}</p>
+      <p className="text-body text-ink-muted">When: {moment.trigger}</p>
+      <p className="text-body text-ink-muted">Reduced motion: {moment.reducedMotion}</p>
+      {'where' in state ? <p className="text-small text-ink-muted">{state.where}</p> : null}
+      {moment.demo ? (
+        <a href={`#${moment.demo}`} className="text-small text-ink-muted underline hover:text-ink">
+          See the demo
+        </a>
+      ) : null}
+    </li>
   );
 }
 
@@ -501,6 +532,7 @@ const CONTENTS: readonly (readonly [string, string])[] = [
   ['measurements', 'Measurements'],
   ['elevation', 'Elevation'],
   ['motion', 'Motion'],
+  ['moments', 'Moments'],
   ['marks', 'Marks'],
   ['loops', 'The four loops'],
   ['wayfinding', 'Where am I'],
@@ -1539,17 +1571,40 @@ export default function DevUiPage() {
         <Card padding="standard">
           <SettleDemo />
         </Card>
-        <Card padding="standard">
+        <Card id="motion-clear" padding="standard" className="scroll-mt-6">
           <ClearDemo />
         </Card>
         <Card padding="standard">
           <ProgressMoveDemo />
         </Card>
-        <Card padding="standard">
+        <Card id="motion-goal-close" padding="standard" className="scroll-mt-6">
           <GoalCloseDemo />
         </Card>
         <Rows rows={M.MOTION} labelWidth="sm:grid-cols-[7rem_1fr]" />
         <Rules items={M.MOTION_RULES} />
+      </Section>
+
+      <Section
+        id="moments"
+        title="Moments"
+        lead="A moment is a designed response to something that matters. Each workspace has at most three, so they stay noticeable; a fourth is a decision for the person. Each keeps what it tells you under reduced motion."
+      >
+        {MOMENT_WORKSPACES.map(([workspace, label]) => {
+          const moments = MOMENTS.filter((moment) => moment.workspace === workspace);
+          return (
+            <CardSection
+              key={workspace}
+              title={label}
+              meta={`${moments.length} of ${MOMENTS_PER_WORKSPACE}`}
+            >
+              <ul className="divide-y divide-border">
+                {moments.map((moment) => (
+                  <MomentRow key={moment.name} moment={moment} />
+                ))}
+              </ul>
+            </CardSection>
+          );
+        })}
       </Section>
 
       <Section
