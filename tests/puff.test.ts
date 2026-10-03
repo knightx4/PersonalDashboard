@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PUFF_MS, puffAt, puffOffsets, puffOrigin } from '@/components/ui/puff';
+import { MOTION_MS } from '@/lib/motion';
 
 type Stub = {
   className: string;
@@ -125,9 +126,10 @@ describe('puffAt', () => {
 describe('the puff keyframes', () => {
   const css = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
 
-  it('run for PUFF_MS', () => {
+  it('run for PUFF_MS, one move', () => {
     const utility = css.match(/@utility puff \{[^}]*\}/)?.[0] ?? '';
-    expect(utility).toContain(`animation: puff ${PUFF_MS}ms`);
+    expect(utility).toContain('animation: puff var(--motion-move)');
+    expect(PUFF_MS).toBe(MOTION_MS.move);
   });
 
   it('are entered in the reduced-motion block', () => {

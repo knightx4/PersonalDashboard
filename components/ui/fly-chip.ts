@@ -14,8 +14,13 @@
  * app/globals.css cannot reach a Web Animations call, so the check is here.
  */
 
-/** Long enough to follow across a 1280px screen; still well under a second. */
-export const FLY_CHIP_MS = 420;
+import { EASE, FLIGHT_MS } from '@/lib/motion';
+
+/**
+ * Long enough to follow across a 1280px screen; still well under a second.
+ * A move and a quick together (FLIGHT_MS in lib/motion.ts).
+ */
+export const FLY_CHIP_MS = FLIGHT_MS;
 
 /** How many words of the item the chip carries, and the most characters. */
 const LABEL_WORDS = 4;
@@ -118,7 +123,7 @@ export function flyChip({ from, to, label }: FlyChipInput): Promise<void> {
   const size = { width: chip.offsetWidth, height: chip.offsetHeight };
   const animation = chip.animate(flightKeyframes(a, b, size), {
     duration: FLY_CHIP_MS,
-    easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+    easing: EASE.outSoft,
     fill: 'forwards',
   });
 

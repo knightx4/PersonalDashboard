@@ -70,7 +70,7 @@ export default async function WaitingPage() {
                           {entry.link ? (
                             <a
                               href={entry.link.href}
-                              className="text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
+                              className="text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
                             >
                               {entry.title}
                             </a>

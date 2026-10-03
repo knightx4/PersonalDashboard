@@ -172,7 +172,7 @@ function LinkedRow({
         aria-label={done ? 'Reopen' : 'Mark done'}
         onClick={() => run(done ? 'open' : 'done')}
         className={cn(
-          'press flex size-4 shrink-0 items-center justify-center transition-colors duration-150',
+          'press flex size-4 shrink-0 items-center justify-center transition-colors duration-quick',
           done
             ? 'text-status-offer'
             : dropped
@@ -204,7 +204,7 @@ function LinkedRow({
         type="button"
         title="Detach from this"
         onClick={() => start(() => detachTask(task.id, target, targetId, returnTo))}
-        className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted opacity-100 transition-colors duration-150 hover:bg-sunken hover:text-ink sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
+        className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted opacity-100 transition-colors duration-quick hover:bg-sunken hover:text-ink sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
       >
         <Unlink className="size-3.5" strokeWidth={1.75} aria-hidden />
         <span className="sr-only">Detach from this</span>

@@ -282,7 +282,7 @@ export default async function HomePage({
                   key={module.id}
                   href={module.home}
                   title={module.label}
-                  className="press rounded-[8px] transition-opacity duration-150 hover:opacity-75"
+                  className="press rounded-[8px] transition-opacity duration-quick hover:opacity-75"
                 >
                   <ModuleMark module={module.id} size="md" />
                   <span className="sr-only">{module.label}</span>

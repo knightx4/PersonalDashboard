@@ -86,7 +86,7 @@ export function InventoryRow({
       <Link
         href={`/shopping/inventory/${item.id}`}
         className={cn(
-          'flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-3 pr-2 transition-colors duration-150',
+          'flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-3 pr-2 transition-colors duration-quick',
           'focus-visible:bg-canvas focus-visible:outline-none',
         )}
       >
@@ -103,7 +103,7 @@ export function InventoryRow({
             <img
               src={item.image_url}
               alt=""
-              className="size-full object-cover transition-transform duration-200"
+              className="size-full object-cover transition-transform duration-quick"
             />
           ) : (
             <span className="flex size-full items-center justify-center text-ink-muted">

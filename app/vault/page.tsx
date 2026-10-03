@@ -99,7 +99,7 @@ export default async function VaultPage({
                     <li key={note.id}>
                       <Link
                         href={`/vault/n/${note.path.split('/').map(encodeURIComponent).join('/')}`}
-                        className="block px-4 py-3 transition-colors duration-150 hover:bg-canvas"
+                        className="block px-4 py-3 transition-colors duration-quick hover:bg-canvas"
                       >
                         <span className="block text-body font-medium text-ink">{note.title}</span>
                         {note.excerpt && (

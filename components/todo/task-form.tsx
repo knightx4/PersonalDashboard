@@ -108,7 +108,7 @@ export function AddTask({ today }: { today: string }) {
             if (!event.target.value) setTime('');
           }}
           className={cn(
-            'tabular rounded-full bg-transparent px-2 py-1 text-small outline-none transition-colors duration-150',
+            'tabular rounded-full bg-transparent px-2 py-1 text-small outline-none transition-colors duration-quick',
             'focus:ring-1 focus:ring-accent/40',
             dueOn ? 'text-ink' : 'text-ink-muted',
           )}
@@ -121,7 +121,7 @@ export function AddTask({ today }: { today: string }) {
             aria-label="At"
             value={time}
             onChange={(event) => setTime(event.target.value)}
-            className="tabular rounded-full bg-transparent px-2 py-1 text-small text-ink-muted outline-none transition-colors duration-150 focus:ring-1 focus:ring-accent/40"
+            className="tabular rounded-full bg-transparent px-2 py-1 text-small text-ink-muted outline-none transition-colors duration-quick focus:ring-1 focus:ring-accent/40"
           />
         )}
 
@@ -136,7 +136,7 @@ export function AddTask({ today }: { today: string }) {
           onClick={() => setPinned((on) => !on)}
           title={pinned ? 'Pinned to the top' : 'Pin to the top'}
           className={cn(
-            'press flex size-7 items-center justify-center rounded-full transition-colors duration-150',
+            'press flex size-7 items-center justify-center rounded-full transition-colors duration-quick',
             pinned ? 'bg-accent text-surface' : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
           )}
         >
@@ -150,7 +150,7 @@ export function AddTask({ today }: { today: string }) {
         <button
           type="button"
           onClick={() => setNoting((open) => !open)}
-          className="ml-auto text-ui font-medium text-ink-muted transition-colors duration-150 hover:text-ink"
+          className="ml-auto text-ui font-medium text-ink-muted transition-colors duration-quick hover:text-ink"
         >
           {noting ? 'Hide note' : 'Add note'}
         </button>
@@ -263,7 +263,7 @@ function PinnedField({ id, defaultChecked = false }: { id: string; defaultChecke
       <StatusGlyph
         glyph="empty"
         size={16}
-        className="text-ink-muted transition-colors duration-150 group-hover:text-accent peer-checked:hidden peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2"
+        className="text-ink-muted transition-colors duration-quick group-hover:text-accent peer-checked:hidden peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2"
       />
       <StatusGlyph
         glyph="check"
@@ -301,7 +301,7 @@ function QuickDay({
       aria-pressed={on}
       onClick={() => onPick(on ? '' : day)}
       className={cn(
-        'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-150',
+        'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-quick',
         on ? 'bg-accent text-surface' : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
       )}
     >

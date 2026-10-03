@@ -123,7 +123,7 @@ export function CardSection({
               <ChevronRight
                 aria-hidden
                 strokeWidth={2}
-                className="size-3.5 shrink-0 translate-y-0.5 text-ink-ghost transition-transform duration-150 group-open/section:rotate-90"
+                className="size-3.5 shrink-0 translate-y-0.5 text-ink-ghost transition-transform duration-quick group-open/section:rotate-90"
               />
               {title}
               {meta !== undefined && meta !== null && (

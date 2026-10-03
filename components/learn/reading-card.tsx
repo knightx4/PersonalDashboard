@@ -115,7 +115,7 @@ export function ReadingCard({ reading, from }: { reading: ReadingRow; from?: str
     <li>
       <Link
         href={`/learn/r/${reading.id}`}
-        className="flex gap-3 px-4 py-3 transition-colors duration-150 hover:bg-canvas"
+        className="flex gap-3 px-4 py-3 transition-colors duration-quick hover:bg-canvas"
       >
         <span className="pt-0.5">
           <StatusIcon status={reading.status} />

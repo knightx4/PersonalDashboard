@@ -148,7 +148,7 @@ describe('its animations', () => {
     for (const motion of MOTIONS) {
       expect(css).toMatch(new RegExp(`@utility dash-mark-${motion} \\{[^}]*animation: dash-mark-${motion} `));
     }
-    expect(css).toMatch(/@utility dash-mark-flash \{[^}]*animation: dash-mark-flash 320ms/);
+    expect(css).toMatch(/@utility dash-mark-flash \{[^}]*animation: dash-mark-flash var\(--motion-move\)/);
   });
 
   it('are entered in the reduced-motion block', () => {

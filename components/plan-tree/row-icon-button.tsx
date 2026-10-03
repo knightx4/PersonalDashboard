@@ -25,7 +25,7 @@ export function RowIconButton({
       title={label}
       onClick={onClick}
       disabled={pending}
-      className="press flex size-7 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink disabled:opacity-50"
+      className="press flex size-7 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink disabled:opacity-50"
     >
       {children}
       <span className="sr-only">{label}</span>

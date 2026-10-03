@@ -257,7 +257,7 @@ function OrderRow({ row }: { row: ReviewOrderRow }) {
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <Link
               href={`/shopping/orders/${row.orderId}`}
-              className="font-medium text-ink transition-colors duration-150 hover:text-accent"
+              className="font-medium text-ink transition-colors duration-quick hover:text-accent"
             >
               {row.merchantName}
             </Link>

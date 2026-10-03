@@ -39,7 +39,7 @@ export function CompanyName({ companyId, name }: { companyId: string; name: stri
       >
         {name}
         <Pencil
-          className="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+          className="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity duration-quick group-hover:opacity-100"
           strokeWidth={1.75}
           aria-hidden
         />

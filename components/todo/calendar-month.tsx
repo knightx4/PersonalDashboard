@@ -71,7 +71,7 @@ export function CalendarMonthGrid({
               href={newEventHref(day.day)}
               aria-label={`New event on ${day.day}`}
               title="New event"
-              className="press absolute right-1 top-1 hidden size-5 items-center justify-center rounded-full text-ink-ghost opacity-0 transition-opacity duration-150 hover:bg-accent-tint hover:text-accent focus-visible:opacity-100 group-hover:opacity-100 sm:flex"
+              className="press absolute right-1 top-1 hidden size-5 items-center justify-center rounded-full text-ink-ghost opacity-0 transition-opacity duration-quick hover:bg-accent-tint hover:text-accent focus-visible:opacity-100 group-hover:opacity-100 sm:flex"
             >
               <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
             </Link>
@@ -82,7 +82,7 @@ export function CalendarMonthGrid({
             <Link
               href={{ pathname: '/todo/calendar', query: { view: 'day', date: day.day } }}
               className={cn(
-                'tabular inline-flex size-5 items-center justify-center rounded-full text-small transition-colors duration-150',
+                'tabular inline-flex size-5 items-center justify-center rounded-full text-small transition-colors duration-quick',
                 day.isToday
                   ? 'bg-accent font-semibold text-surface'
                   : day.inMonth
@@ -215,7 +215,7 @@ export function Pill({ entry, timezone }: { entry: CalendarEntry; timezone: stri
   return (
     <Link
       href={entry.href}
-      className="block transition-colors duration-150 hover:text-accent"
+      className="block transition-colors duration-quick hover:text-accent"
       title={entry.title}
     >
       {body}

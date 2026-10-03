@@ -131,7 +131,7 @@ export function TheOptions({
                   type="button"
                   onClick={() => onChoose(option)}
                   title={`Answer ${option.letter}: ${option.label}${isRecommended ? ' (recommended)' : ''}`}
-                  className="press flex w-full items-start gap-2 rounded-control px-1.5 py-1 transition-colors duration-150 hover:bg-accent-tint"
+                  className="press flex w-full items-start gap-2 rounded-control px-1.5 py-1 transition-colors duration-quick hover:bg-accent-tint"
                 >
                   {body}
                 </button>

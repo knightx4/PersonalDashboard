@@ -299,7 +299,7 @@ export function RoleDetailPanels(props: PanelProps & { initialTab?: Tab }) {
               onClick={() => setTab(entry.id)}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-ui font-medium transition-colors duration-150',
+                'flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-ui font-medium transition-colors duration-quick',
                 active
                   ? 'border-accent text-accent'
                   : 'border-transparent text-ink-muted hover:text-ink',
@@ -391,7 +391,7 @@ function GmailLink({ href, children }: { href: string; children: React.ReactNode
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-baseline gap-1 underline decoration-border underline-offset-2 transition-colors duration-150 hover:text-accent hover:decoration-accent"
+      className="inline-flex items-baseline gap-1 underline decoration-border underline-offset-2 transition-colors duration-quick hover:text-accent hover:decoration-accent"
     >
       <span>{children}</span>
       <ExternalLink
@@ -980,7 +980,7 @@ function Posting({
             Your evidence bank is empty, so there is nothing to match against.{' '}
             <Link
               href="/jobs/settings"
-              className="underline underline-offset-2 transition-colors duration-150 hover:text-ink"
+              className="underline underline-offset-2 transition-colors duration-quick hover:text-ink"
             >
               Fill it in Settings.
             </Link>
@@ -1150,7 +1150,7 @@ function RoleDetailsCard({
               type="button"
               onClick={() => setEditing(true)}
               title="Edit posting details"
-              className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
+              className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
             >
               <Pencil className="size-4" strokeWidth={1.75} aria-hidden />
               <span className="sr-only">Edit posting details</span>
@@ -1167,7 +1167,7 @@ function RoleDetailsCard({
                   href={jdUrl}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-accent underline underline-offset-2 transition-colors duration-150 hover:text-accent-hover"
+                  className="text-accent underline underline-offset-2 transition-colors duration-quick hover:text-accent-hover"
                 >
                   {jdUrl}
                 </a>
@@ -1207,7 +1207,7 @@ function RoleDetailsCard({
                         href={candidate.url}
                         target="_blank"
                         rel="noreferrer noopener"
-                        className="text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
+                        className="text-ink-muted underline underline-offset-2 transition-colors duration-quick hover:text-ink"
                       >
                         {candidate.title}
                       </a>
@@ -2487,7 +2487,7 @@ function InterviewGroupCard({
           className="press flex size-6 shrink-0 items-center justify-center rounded text-ink-muted hover:text-accent"
         >
           <ChevronDown
-            className={cn('size-4 transition-transform duration-150', !open && '-rotate-90')}
+            className={cn('size-4 transition-transform duration-quick', !open && '-rotate-90')}
             strokeWidth={1.75}
             aria-hidden
           />
@@ -3114,7 +3114,7 @@ function CollapsibleField({
       >
         <ChevronDown
           className={cn(
-            'size-3.5 shrink-0 transition-transform duration-150',
+            'size-3.5 shrink-0 transition-transform duration-quick',
             !open && '-rotate-90',
           )}
           strokeWidth={1.75}
@@ -3379,7 +3379,7 @@ function LinkedMail(props: PanelProps & { onAddInterview: (seed: InterviewSeed) 
                               fromSubject: message.subject,
                             })
                           }
-                          className="whitespace-nowrap text-small text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-accent"
+                          className="whitespace-nowrap text-small text-ink-muted underline underline-offset-2 transition-colors duration-quick hover:text-accent"
                         >
                           Add interview
                         </button>

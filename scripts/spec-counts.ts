@@ -95,6 +95,73 @@ const MODEL_ID = /['"`]claude-(?:opus|sonnet|haiku)-[0-9][a-z0-9.-]*['"`]/;
 
 const LEARN_LAYOUT = 'app/learn/layout.tsx';
 
+// -- docs/UI-QUALITY-SPEC.md ---------------------------------------------------
+
+/**
+ * Rule R7: animation timings and easings come from the motion tokens
+ * (lib/motion.ts and the `--motion-*` and `--ease-*` properties in
+ * app/globals.css). One item per duration or easing written out by hand,
+ * as `file:line: the value`.
+ *
+ * In CSS, it reads the animation and transition declarations (and Tailwind's
+ * `--animate-*`) for a time other than zero and for a curve: `cubic-bezier()`,
+ * `linear()` with points, or an `ease` keyword. `linear`, `steps()` and
+ * calc() over the tokens are fine. The 0.01ms the reduced-motion block uses
+ * stands for zero. In code, it reads Tailwind classes (`duration-150`,
+ * `delay-[…]`, `ease-out`), a curve in a string, a number in an inline
+ * animation or transition style, and the duration and easing given to a Web
+ * Animations `animate()` call. lib/motion.ts, where the values live, is not
+ * read, and nor are comments or tests.
+ */
+const MOTION_PROPERTY =
+  /(?:^|[;{\s])((?:animation|transition)(?:-duration|-delay|-timing-function)?|--animate-[\w-]+)\s*:\s*([^;{}]*)/g;
+const CSS_TIME = /(?<![\w.-])(\d*\.?\d+)(ms|s)\b/g;
+const CSS_CURVE = /cubic-bezier\(|(?<![\w-])linear\(|(?<![\w-])ease(?:-in-out|-in|-out)?(?![\w-])/;
+const TW_TIMING = /(?<![\w-])(?:(?:duration|delay)-(?:\d+|\[[^\]]+\])|ease-(?:in-out|in|out|linear|\[[^\]]+\]))(?![\w-])/g;
+const CODE_CURVE = /['"`][^'"`]*(?:cubic-bezier\(|(?<![\w-])linear\()/;
+const STYLE_TIMING = /\b(?:animation|transition)(?:Delay|Duration)?\s*:\s*([^,}\n]*)/g;
+const ANIMATE_OPTION = /\b(?:duration\s*:\s*\d|easing\s*:\s*['"`])/;
+
+/** The text with comments blanked, keeping every line where it was. */
+function withoutComments(text: string): string {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '))
+    .replace(/(^|\s)\/\/.*$/gm, '$1');
+}
+
+function lineAt(text: string, index: number): number {
+  return text.slice(0, index).split('\n').length;
+}
+
+function rawMotionInCss(file: string, text: string): string[] {
+  const css = withoutComments(text);
+  const out: string[] = [];
+  for (const m of css.matchAll(MOTION_PROPERTY)) {
+    const value = m[2];
+    const line = lineAt(css, m.index + m[0].indexOf(m[1]));
+    const times = [...value.matchAll(CSS_TIME)].filter((t) => Number(t[1]) !== 0 && t[0] !== '0.01ms');
+    if (times.length > 0 || CSS_CURVE.test(value)) out.push(`${file}:${line}: ${m[1]}: ${value.trim().replace(/\s+/g, ' ')}`);
+  }
+  return out;
+}
+
+function rawMotionInCode(file: string, text: string): string[] {
+  const code = withoutComments(text);
+  const out: string[] = [];
+  const animates = code.includes('.animate(');
+  code.split('\n').forEach((line, i) => {
+    const at = `${file}:${i + 1}`;
+    for (const m of line.matchAll(TW_TIMING)) out.push(`${at}: ${m[0]}`);
+    const curve = CODE_CURVE.test(line);
+    if (curve) out.push(`${at}: ${line.trim()}`);
+    for (const m of line.matchAll(STYLE_TIMING)) {
+      if (/(?<![\w.])\d+(?:\.\d+)?(?![\w.])/.test(m[1].replace(/\b0(?:ms|s)?\b/g, ''))) out.push(`${at}: ${m[0].trim()}`);
+    }
+    if (animates && !curve && ANIMATE_OPTION.test(line)) out.push(`${at}: ${line.trim()}`);
+  });
+  return out;
+}
+
 export const SPEC_COUNTERS: readonly SpecCounter[] = [
   {
     name: 'thread-tables',
@@ -145,5 +212,18 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     counts: "tabs in Learn's nav",
     measure: (root) =>
       [...read(root, LEARN_LAYOUT, 'learn-nav-tabs').matchAll(/\bhref:\s*'([^']+)'/g)].map((m) => m[1]),
+  },
+  {
+    name: 'raw-motion-values',
+    counts: 'animation durations and easings written out by hand rather than taken from the motion tokens',
+    target: 0,
+    measure: (root) => [
+      ...listFiles(root, ['app', 'components'], ['.css']).flatMap((file) =>
+        rawMotionInCss(file, readFileSync(join(root, file), 'utf8')),
+      ),
+      ...listFiles(root, ['app', 'components', 'lib'], ['.ts', '.tsx'])
+        .filter((file) => !/\.test\.tsx?$/.test(file) && file !== 'lib/motion.ts')
+        .flatMap((file) => rawMotionInCode(file, readFileSync(join(root, file), 'utf8'))),
+    ],
   },
 ];

@@ -157,7 +157,7 @@ export default async function CompanyDetailPage({
                 href={company.careers_url as string}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
+                className="text-ink-muted underline underline-offset-2 transition-colors duration-quick hover:text-ink"
               >
                 Careers
               </a>
@@ -211,7 +211,7 @@ export default async function CompanyDetailPage({
                     {todo.role && (
                       <Link
                         href={`/jobs/roles/${todo.role.id}`}
-                        className="truncate text-small text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
+                        className="truncate text-small text-ink-muted underline underline-offset-2 transition-colors duration-quick hover:text-ink"
                       >
                         {todo.role.title}
                       </Link>

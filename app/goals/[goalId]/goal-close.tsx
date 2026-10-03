@@ -6,6 +6,7 @@ import { useChangedWhileWatched, useReducedMotion } from '@/components/ui/motion
 import { StatusGlyph, StatusRing } from '@/components/ui/status-glyph';
 import { cn } from '@/lib/cn';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
+import { MOTION_MS } from '@/lib/motion';
 
 /**
  * A goal closing on its page (plan #1341): its hexagon completes with one
@@ -15,10 +16,13 @@ import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
  * line at once, and so does a close under reduced motion.
  */
 
-/** The ring's 600ms, as in app/globals.css. */
-export const GOAL_RING_MS = 600;
-/** When the fold has finished: its 450ms wait for the ring and its own 300ms. */
-export const GOAL_FOLD_DONE_MS = 750;
+/** The ring's moment, as in app/globals.css. */
+export const GOAL_RING_MS = MOTION_MS.moment;
+/**
+ * When the fold has finished: it starts as the ring enters its last quick and
+ * takes a move, as in app/globals.css.
+ */
+export const GOAL_FOLD_DONE_MS = MOTION_MS.moment - MOTION_MS.quick + MOTION_MS.move;
 
 /** The goal's hexagon beside its title. */
 export function GoalGlyph({

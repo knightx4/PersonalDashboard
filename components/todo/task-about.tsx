@@ -66,7 +66,7 @@ export function TaskAbout({
           aria-expanded={open}
           disabled={pending}
           onClick={() => setOpen(!open)}
-          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink disabled:opacity-50"
+          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink disabled:opacity-50"
         >
           <Link2 className="size-3.5" strokeWidth={1.75} aria-hidden />
           <span className="sr-only">
@@ -86,7 +86,7 @@ export function TaskAbout({
               toast({ text: error ?? 'unlinked' });
             })
           }
-          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink disabled:opacity-50"
+          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink disabled:opacity-50"
         >
           <Link2Off className="size-3.5" strokeWidth={1.75} aria-hidden />
           <span className="sr-only">Not about anything</span>

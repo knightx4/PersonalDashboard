@@ -127,7 +127,7 @@ export function Disclosure({
         <ChevronRight
           aria-hidden
           strokeWidth={2}
-          className="size-3.5 shrink-0 transition-transform duration-150 group-open/disc:rotate-90"
+          className="size-3.5 shrink-0 transition-transform duration-quick group-open/disc:rotate-90"
         />
         <span className="min-w-0 font-medium text-ink">{title}</span>
         {meta ? <span className="text-small text-ink-muted">{meta}</span> : null}
@@ -195,7 +195,7 @@ export function SectionFold({
           <ChevronRight
             aria-hidden
             strokeWidth={2}
-            className="size-4 shrink-0 translate-y-0.5 text-ink-ghost transition-transform duration-150 group-open/fold:rotate-90"
+            className="size-4 shrink-0 translate-y-0.5 text-ink-ghost transition-transform duration-quick group-open/fold:rotate-90"
           />
           {title}
           {count !== undefined && (
@@ -253,7 +253,7 @@ export function Group({
             <ChevronRight
               aria-hidden
               strokeWidth={2}
-              className="size-3.5 shrink-0 text-ink-ghost transition-transform duration-150 group-open/grp:rotate-90"
+              className="size-3.5 shrink-0 text-ink-ghost transition-transform duration-quick group-open/grp:rotate-90"
             />
             <h3 className="text-small font-semibold text-ink-muted">{title}</h3>
           </summary>

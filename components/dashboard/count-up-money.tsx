@@ -2,6 +2,7 @@
 
 import { useCountUp } from '@/components/ui/motion';
 import { formatMoney, type CurrencyCode } from '@/lib/money';
+import { MOTION_MS } from '@/lib/motion';
 
 /**
  * Count-up for dashboard headline figures. Skips animation when the user has
@@ -13,7 +14,7 @@ export function CountUpMoney({
   cents,
   currency = 'USD',
   className,
-  durationMs = 700,
+  durationMs = MOTION_MS.moment,
 }: {
   cents: number;
   currency?: CurrencyCode;

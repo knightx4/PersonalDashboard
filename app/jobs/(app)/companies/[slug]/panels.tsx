@@ -603,7 +603,7 @@ function Contacts({ contacts }: { contacts: CompanyContact[] }) {
             <li key={contact.id} className="row-pad flex flex-wrap items-baseline gap-2">
               <Link
                 href={`/jobs/contacts/${contact.id}`}
-                className="text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
+                className="text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
                 title="See details, notes and logged sends"
               >
                 {contact.fullName}

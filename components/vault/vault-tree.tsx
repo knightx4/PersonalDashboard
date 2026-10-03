@@ -97,7 +97,7 @@ export function VaultTree({
                       aria-current={open ? 'page' : undefined}
                       title={note.title}
                       className={cn(
-                        'block truncate rounded-lg px-2 py-1 text-ui transition-colors duration-150',
+                        'block truncate rounded-lg px-2 py-1 text-ui transition-colors duration-quick',
                         open
                           ? 'bg-accent-tint font-medium text-accent'
                           : 'text-ink-muted hover:bg-sunken hover:text-ink',

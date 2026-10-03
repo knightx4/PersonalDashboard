@@ -24,7 +24,7 @@ export type TopicChipsProps = {
  * bordered box).
  */
 const CHIP =
-  'press inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-small transition-colors duration-150';
+  'press inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-small transition-colors duration-quick';
 const CHIP_OFF = 'bg-sunken text-ink-muted hover:bg-accent-tint hover:text-accent';
 const CHIP_ON = 'bg-accent-tint font-medium text-accent';
 

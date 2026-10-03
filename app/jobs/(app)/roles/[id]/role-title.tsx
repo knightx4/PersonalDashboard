@@ -31,7 +31,7 @@ export function RoleTitle({ roleId, title }: { roleId: string; title: string }) 
       >
         {shown}
         <Pencil
-          className="size-4 shrink-0 text-ink-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+          className="size-4 shrink-0 text-ink-muted opacity-0 transition-opacity duration-quick group-hover:opacity-100"
           strokeWidth={1.75}
           aria-hidden
         />

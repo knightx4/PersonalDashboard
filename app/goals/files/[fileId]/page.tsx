@@ -66,7 +66,7 @@ export default async function FilePage({
     <div className="mx-auto max-w-3xl">
       <Link
         href="/goals/files"
-        className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-150 hover:text-ink"
+        className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
       >
         <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> Files
       </Link>
@@ -126,7 +126,7 @@ export default async function FilePage({
                           ? `/goals/${use.goalId}`
                           : `/goals/${use.goalId}#step-${use.itemId}`
                       }
-                      className="card-pad-x row-pad flex items-start gap-3 transition-colors duration-150 hover:bg-sunken"
+                      className="card-pad-x row-pad flex items-start gap-3 transition-colors duration-quick hover:bg-sunken"
                     >
                       {use.level === 'goal' ? (
                         <Flag
@@ -163,7 +163,7 @@ export default async function FilePage({
                   <li key={version.version}>
                     <Link
                       href={fileVersionHref(file.id, version.version)}
-                      className="card-pad-x row-pad block transition-colors duration-150 hover:bg-sunken"
+                      className="card-pad-x row-pad block transition-colors duration-quick hover:bg-sunken"
                     >
                       <span className="block text-ui text-ink">
                         Version {version.version} ·{' '}

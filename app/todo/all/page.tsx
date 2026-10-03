@@ -106,7 +106,7 @@ export default async function AllTasksPage({
                 href={href}
                 aria-current={filter.id === status ? 'page' : undefined}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-ui font-medium transition-colors duration-150',
+                  'rounded-lg px-3 py-1.5 text-ui font-medium transition-colors duration-quick',
                   filter.id === status
                     ? 'bg-accent-tint text-accent'
                     : 'text-ink-muted hover:bg-canvas hover:text-ink',

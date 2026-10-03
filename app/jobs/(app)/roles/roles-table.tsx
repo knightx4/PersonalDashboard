@@ -51,7 +51,7 @@ export function RolesTable({
                 <Link
                   href={entry.href}
                   className={cn(
-                    'transition-colors duration-150',
+                    'transition-colors duration-quick',
                     entry.chosen ? 'text-accent' : 'hover:text-ink',
                   )}
                 >
@@ -85,7 +85,7 @@ export function RolesTable({
                   lifted out from under it. */}
               <Link
                 href={`/jobs/companies/${row.companySlug}`}
-                className="relative z-over-link flex items-center gap-2 text-ink-muted transition-colors duration-150 hover:text-accent max-md:justify-end"
+                className="relative z-over-link flex items-center gap-2 text-ink-muted transition-colors duration-quick hover:text-accent max-md:justify-end"
               >
                 <CompanyAvatar
                   company={{

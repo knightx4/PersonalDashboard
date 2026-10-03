@@ -199,7 +199,7 @@ function DayHeading({
     <div className="group flex min-w-0 items-center gap-1 border-l border-border pr-1">
       <Link
         href={{ pathname: '/todo/calendar', query: { view: 'day', date: day.day } }}
-        className="flex min-w-0 flex-1 items-baseline gap-1.5 px-2 py-1.5 transition-colors duration-150 hover:bg-sunken"
+        className="flex min-w-0 flex-1 items-baseline gap-1.5 px-2 py-1.5 transition-colors duration-quick hover:bg-sunken"
       >
         <span className="truncate text-micro font-semibold uppercase tracking-wide text-ink-muted">
           {weekday}
@@ -220,7 +220,7 @@ function DayHeading({
         href={newEventHref(day.day)}
         aria-label={`New event on ${day.day}`}
         title="New event"
-        className="press flex size-5 shrink-0 items-center justify-center rounded-full text-ink-ghost transition-colors duration-150 hover:bg-accent-tint hover:text-accent"
+        className="press flex size-5 shrink-0 items-center justify-center rounded-full text-ink-ghost transition-colors duration-quick hover:bg-accent-tint hover:text-accent"
       >
         <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
       </Link>

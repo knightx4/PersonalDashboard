@@ -285,7 +285,7 @@ export function BranchFromClaim({
             <button
               type="button"
               onClick={() => setRewriting(true)}
-              className="press inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-small text-ink-ghost transition-colors duration-150 hover:bg-sunken hover:text-ink-muted"
+              className="press inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-small text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink-muted"
             >
               <Pencil className="size-3" strokeWidth={1.75} aria-hidden />
               Put this in your own words

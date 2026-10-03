@@ -14,8 +14,10 @@
  * name is how the person learns where the item went.
  */
 
-/** The `landed-pulse` utility's duration in app/globals.css. Change both together. */
-export const LANDED_PULSE_MS = 320;
+import { MOTION_MS } from '@/lib/motion';
+
+/** The `landed-pulse` utility's duration in app/globals.css: one move. */
+export const LANDED_PULSE_MS = MOTION_MS.move;
 
 /** How long the name stays beside the place. Long enough to read three words. */
 export const LANDED_NAME_MS = 2400;

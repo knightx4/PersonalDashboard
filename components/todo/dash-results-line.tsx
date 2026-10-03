@@ -15,7 +15,7 @@ export function DashResultsLine({ count, className }: { count: number; className
     <p className={className}>
       <Link
         href={DASH_RESULTS_HREF}
-        className="text-ui font-medium text-accent underline decoration-border underline-offset-2 transition-colors duration-150 hover:decoration-accent"
+        className="text-ui font-medium text-accent underline decoration-border underline-offset-2 transition-colors duration-quick hover:decoration-accent"
       >
         <DashCredit />
         Dash finished {count} {count === 1 ? 'thing' : 'things'} for you

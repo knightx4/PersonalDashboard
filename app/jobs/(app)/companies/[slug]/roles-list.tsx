@@ -126,7 +126,7 @@ export function RolesList({
             )}
             <Link
               href={`/jobs/roles/${role.id}`}
-              className="flex-1 text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
+              className="flex-1 text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
             >
               {role.title}
             </Link>

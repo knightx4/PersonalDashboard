@@ -108,7 +108,7 @@ export function TR({
     <RowContext.Provider value={{ href }}>
       <tr
         className={cn(
-          'relative transition-colors duration-150',
+          'relative transition-colors duration-quick',
           href && 'hover:bg-sunken',
           stack && 'max-md:block max-md:py-2',
           className,

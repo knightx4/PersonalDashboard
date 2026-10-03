@@ -74,7 +74,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           aria-label="Mark done"
           onClick={() => run({ state: 'done', write: () => completeItem(item.source, item.key) })}
           className={cn(
-            'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-150',
+            'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-quick',
             shown === 'done' ? 'text-status-offer' : 'text-ink-muted hover:text-accent',
           )}
         >
@@ -106,7 +106,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
             <a
               href={item.link.href}
               className={cn(
-                'text-ui font-medium text-ink transition-colors duration-150 hover:text-accent',
+                'text-ui font-medium text-ink transition-colors duration-quick hover:text-accent',
                 shown === 'done' && 'line-through',
               )}
             >
@@ -136,7 +136,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           {item.link && (
             <a
               href={item.link.href}
-              className="truncate text-small text-ink-muted underline decoration-border underline-offset-2 transition-colors duration-150 hover:text-accent"
+              className="truncate text-small text-ink-muted underline decoration-border underline-offset-2 transition-colors duration-quick hover:text-accent"
             >
               {item.link.label}
             </a>
@@ -174,7 +174,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           type="button"
           title="Later"
           onClick={() => run({ state: 'deferred', write: () => deferItem(item.source, item.key) })}
-          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
+          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
         >
           <Clock className="size-3.5" strokeWidth={1.75} aria-hidden />
           <span className="sr-only">Later</span>
@@ -185,7 +185,7 @@ export function AgendaItemRow({ item, timezone }: { item: AgendaItem; timezone: 
           onClick={() =>
             run({ state: 'dismissed', write: () => dismissItem(item.source, item.key) })
           }
-          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
+          className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
         >
           <X className="size-3.5" strokeWidth={1.75} aria-hidden />
           <span className="sr-only">Not this one</span>
@@ -221,7 +221,7 @@ function ItemOptions({
             disabled={disabled}
             onClick={() => onChoose(option)}
             title={`Answer ${option.letter}: ${option.label}${option.recommended ? ' (recommended)' : ''}`}
-            className="press flex items-start gap-1.5 rounded-control bg-sunken px-1.5 py-1 text-left transition-colors duration-150 hover:bg-accent-tint disabled:pointer-events-none"
+            className="press flex items-start gap-1.5 rounded-control bg-sunken px-1.5 py-1 text-left transition-colors duration-quick hover:bg-accent-tint disabled:pointer-events-none"
           >
             <span
               aria-hidden

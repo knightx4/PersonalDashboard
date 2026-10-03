@@ -87,7 +87,7 @@ export function ReturnsOrderList({
               <div className="row-pad flex items-center justify-end border-t border-border px-4">
                 <Link
                   href={`/shopping/orders/${group.orderId}`}
-                  className="text-small text-ink-muted transition-colors duration-150 hover:text-accent hover:underline"
+                  className="text-small text-ink-muted transition-colors duration-quick hover:text-accent hover:underline"
                 >
                   View full order
                 </Link>

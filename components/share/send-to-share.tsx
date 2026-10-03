@@ -84,7 +84,7 @@ export function SendToShare({
               <button
                 type="button"
                 onClick={() => send(share.id)}
-                className="press w-full rounded-control px-2.5 py-1.5 text-left text-ui text-ink transition-colors duration-150 hover:bg-sunken"
+                className="press w-full rounded-control px-2.5 py-1.5 text-left text-ui text-ink transition-colors duration-quick hover:bg-sunken"
               >
                 {share.title}
               </button>

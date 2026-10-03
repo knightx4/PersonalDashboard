@@ -187,7 +187,7 @@ export function RoundPrep({
           <ChevronRight
             aria-hidden
             strokeWidth={2}
-            className="size-3.5 shrink-0 text-ink-muted transition-transform duration-150 group-open/prep:rotate-90"
+            className="size-3.5 shrink-0 text-ink-muted transition-transform duration-quick group-open/prep:rotate-90"
           />
           {heading}
           {/* Law 10: the closed line says whether the note is still current. */}

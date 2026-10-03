@@ -1734,12 +1734,42 @@ body,
   --radius-card: 0.75rem;
   --radius-control: 0.5rem;
 
-  /* 150ms ease-out everywhere. Alive, never in the way. */
+  /* The easings (plan #1549), mirrored in lib/motion.ts. Soft ease-out for
+   * everything that is not a spring; the spring for things arriving in their
+   * place with a little give (about 7% over, settled by the end); sway for
+   * loops that go and come back. */
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: linear(0, 0.038, 0.133, 0.26, 0.4, 0.538, 0.665, 0.776, 0.867, 0.939, 0.993, 1.03, 1.053, 1.065, 1.068, 1.066, 1.059, 1.051, 1.041, 1.032, 1.023, 1.015, 1.009, 1.004, 1);
+  --ease-sway: cubic-bezier(0.42, 0, 0.58, 1);
+
+  /* The durations as Tailwind utilities (duration-quick, delay-instant), and
+   * the bare `transition` utilities on the quick token and the soft ease. */
+  --transition-duration-instant: var(--motion-instant);
+  --transition-duration-quick: var(--motion-quick);
+  --transition-duration-move: var(--motion-move);
+  --transition-duration-moment: var(--motion-moment);
+  --transition-delay-instant: var(--motion-instant);
+  --transition-delay-quick: var(--motion-quick);
+  --default-transition-duration: var(--motion-quick);
+  --default-transition-timing-function: var(--ease-out-soft);
+
+  /* Tailwind's own loops, on the tokens: animate-spin and animate-pulse. */
+  --animate-spin: spin calc(var(--motion-moment) * 2) linear infinite;
+  --animate-pulse: pulse calc(var(--motion-moment) * 3) var(--ease-sway) infinite;
 }
 
 :root {
   --font-mono-stack: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  /* The four durations every animation takes its timing from (plan #1549,
+   * docs/UI-QUALITY-SPEC.md Part 8), mirrored in lib/motion.ts. A longer piece
+   * is built from them in calc(): the capture flight is a move and a quick,
+   * and a loop runs a number of moments. Here rather than in @theme so they
+   * are always on :root for code that reads them. */
+  --motion-instant: 90ms;
+  --motion-quick: 160ms;
+  --motion-move: 260ms;
+  --motion-moment: 600ms;
 }
 
 /* No rubber band on the frame -- and only on the frame.
@@ -2074,7 +2104,7 @@ body::before {
 /* Shortcut hints: invisible until a modifier is held. See components/shell/key-hints.tsx. */
 .keyhint {
   opacity: 0;
-  transition: opacity 120ms var(--ease-out-soft);
+  transition: opacity var(--motion-instant) var(--ease-out-soft);
 }
 body[data-keyhints] .keyhint {
   opacity: 1;
@@ -2089,16 +2119,20 @@ body[data-keyhints] .keyhint {
 /* ---------------------------------------------------------------------------
  * Motion
  *
- * One duration, one easing, three utilities. All of it drops under
- * prefers-reduced-motion -- no exceptions, including the dashboard count-up.
- * Any new animation is added to that block in the same commit.
+ * Every duration and easing comes from the motion tokens above (plan #1549):
+ * --motion-instant, -quick, -move and -moment, and --ease-out-soft,
+ * --ease-spring and --ease-sway. The `raw-motion-values` count in
+ * scripts/spec-counts.ts finds any written out by hand and is held at 0.
+ * All of it drops under prefers-reduced-motion -- no exceptions, including
+ * the dashboard count-up. Any new animation is added to that block in the
+ * same commit.
  * ------------------------------------------------------------------------- */
 
 @utility lift {
   transition:
-    transform 150ms var(--ease-out-soft),
-    box-shadow 150ms var(--ease-out-soft),
-    border-color 150ms var(--ease-out-soft);
+    transform var(--motion-quick) var(--ease-out-soft),
+    box-shadow var(--motion-quick) var(--ease-out-soft),
+    border-color var(--motion-quick) var(--ease-out-soft);
 
   &:hover {
     transform: translateY(-2px);
@@ -2115,7 +2149,7 @@ body[data-keyhints] .keyhint {
 }
 
 @utility press {
-  transition: transform 150ms var(--ease-out-soft);
+  transition: transform var(--motion-quick) var(--ease-out-soft);
 
   &:active {
     transform: scale(0.98);
@@ -2123,7 +2157,7 @@ body[data-keyhints] .keyhint {
 }
 
 /* A link whose page is on the way (plan #1444): it holds the press by dimming,
- * and pulses while it waits. The 100ms delay means a quick navigation shows
+ * and pulses while it waits. The instant's delay means a quick navigation shows
  * nothing at all. The marker is LinkPending (components/ui/link-pending.tsx),
  * placed inside the link; a table row whose name links dims as a whole. */
 @keyframes link-pending {
@@ -2138,7 +2172,7 @@ body[data-keyhints] .keyhint {
 a:has([data-link-pending]),
 tr:has([data-link-pending]) {
   cursor: progress;
-  animation: link-pending 600ms ease-in-out 100ms infinite alternate;
+  animation: link-pending var(--motion-moment) var(--ease-sway) var(--motion-instant) infinite alternate;
 }
 
 @keyframes toast-in {
@@ -2152,14 +2186,15 @@ tr:has([data-link-pending]) {
   }
 }
 
-/* One entrance for the toast, and nothing on the way out. */
+/* One entrance for the toast, and nothing on the way out. It springs, so it
+ * arrives with a little give. */
 @utility toast-in {
-  animation: toast-in 180ms var(--ease-out-soft) both;
+  animation: toast-in var(--motion-move) var(--ease-spring) both;
 }
 
 /* A puff: a few soft circles leave a point and fade, marking where something
  * just left. puffAt in components/ui/puff.ts places the circles and sets each
- * one's drift in --puff-dx and --puff-dy. Under 400ms, so it is over before
+ * one's drift in --puff-dx and --puff-dy. One move, so it is over before
  * anything that follows it has moved far. */
 @keyframes puff {
   from {
@@ -2181,7 +2216,7 @@ tr:has([data-link-pending]) {
   height: 0.625rem;
   border-radius: 9999px;
   background-color: color-mix(in srgb, var(--c-ink-muted) 45%, transparent);
-  animation: puff 360ms var(--ease-out-soft) both;
+  animation: puff var(--motion-move) var(--ease-out-soft) both;
 }
 
 /* The place a captured item landed: one small swell and back. markLanded in
@@ -2198,24 +2233,24 @@ tr:has([data-link-pending]) {
 }
 
 @utility landed-pulse {
-  animation: landed-pulse 320ms var(--ease-out-soft) both;
+  animation: landed-pulse var(--motion-move) var(--ease-out-soft) both;
 }
 
 /* A measure sliding to its new value: a goal's progress bar as a step closes
  * (Meter and Bands with `moves`, plan #1342). A transition rather than an
  * animation, so it plays only when the value changes on screen; a page that
- * loads already there has nothing to move from. 300ms rather than 150ms, so
- * the eye can follow the length change. */
+ * loads already there has nothing to move from. A move rather than a quick,
+ * so the eye can follow the length change. */
 @utility progress-move {
-  transition: transform 300ms var(--ease-out-soft);
+  transition: transform var(--motion-move) var(--ease-out-soft);
 }
 
 /* A goal closing on screen (plan #1341): one hexagon ring leaves its status
  * glyph in the workspace accent, then its steps fold up into the line that
  * stands for them. Keyframes play on mount, so app/goals/[goalId]/goal-close.tsx
- * mounts both only for a close made while you watch. 600ms for the ring so it
- * reads as one ring rather than a blink; the fold waits 450ms for it and takes
- * 300ms, so the whole mark is over by 750ms. */
+ * mounts both only for a close made while you watch. A moment for the ring so
+ * it reads as one ring rather than a blink; the fold starts as the ring enters
+ * its last quick and takes a move, so the whole mark is over by 700ms. */
 @keyframes goal-ring {
   from {
     transform: scale(1);
@@ -2228,7 +2263,7 @@ tr:has([data-link-pending]) {
 }
 
 @utility goal-ring {
-  animation: goal-ring 600ms var(--ease-out-soft) both;
+  animation: goal-ring var(--motion-moment) var(--ease-out-soft) both;
 }
 
 @keyframes goal-fold {
@@ -2244,15 +2279,16 @@ tr:has([data-link-pending]) {
 
 @utility goal-fold {
   transform-origin: top;
-  animation: goal-fold 300ms var(--ease-out-soft) 450ms both;
+  animation: goal-fold var(--motion-move) var(--ease-out-soft)
+    calc(var(--motion-moment) - var(--motion-quick)) both;
 }
 
 /* A queue cleared on screen (plan #1340): the quiet-day sigil draws in cell by
  * cell, in reading order, each cell growing from 40% and fading up to its own
  * opacity. QueueCleared in components/ui/queue-cleared.tsx puts the class on
  * the wrapper round the list only for a clear made while you watch, so a page
- * loaded already empty shows the sigil at once. 240ms a cell, 40ms apart, so
- * the fourteen cells of the busiest sigil are all in by 760ms. */
+ * loaded already empty shows the sigil at once. A move a cell, half an instant
+ * apart, so the fourteen cells of the busiest sigil are all in by 845ms. */
 @keyframes sigil-cell {
   from {
     transform: scale(0.4);
@@ -2264,8 +2300,8 @@ tr:has([data-link-pending]) {
   & [data-sigil-cell] {
     transform-box: fill-box;
     transform-origin: center;
-    animation: sigil-cell 240ms var(--ease-out-soft) both;
-    animation-delay: calc(var(--sigil-cell, 0) * 40ms);
+    animation: sigil-cell var(--motion-move) var(--ease-out-soft) both;
+    animation-delay: calc(var(--sigil-cell, 0) * var(--motion-instant) / 2);
   }
 }
 
@@ -2292,7 +2328,7 @@ tr:has([data-link-pending]) {
 @utility dash-mark-blink {
   transform-box: fill-box;
   transform-origin: center;
-  animation: dash-mark-blink 7s infinite;
+  animation: dash-mark-blink calc(var(--motion-moment) * 12) var(--ease-sway) infinite;
 }
 
 /* Asleep: the visor breathes slowly and a z drifts up from its corner. */
@@ -2309,7 +2345,7 @@ tr:has([data-link-pending]) {
 @utility dash-mark-breathe {
   transform-box: fill-box;
   transform-origin: center bottom;
-  animation: dash-mark-breathe 3.6s ease-in-out infinite;
+  animation: dash-mark-breathe calc(var(--motion-moment) * 6) var(--ease-sway) infinite;
 }
 
 @keyframes dash-mark-snooze {
@@ -2328,7 +2364,7 @@ tr:has([data-link-pending]) {
 }
 
 @utility dash-mark-snooze {
-  animation: dash-mark-snooze 3.6s ease-in-out infinite;
+  animation: dash-mark-snooze calc(var(--motion-moment) * 6) var(--ease-sway) infinite;
 }
 
 @keyframes dash-mark-streak {
@@ -2346,7 +2382,7 @@ tr:has([data-link-pending]) {
 }
 
 @utility dash-mark-streak {
-  animation: dash-mark-streak 550ms linear infinite;
+  animation: dash-mark-streak var(--motion-moment) linear infinite;
 }
 
 @keyframes dash-mark-rattle {
@@ -2359,7 +2395,7 @@ tr:has([data-link-pending]) {
 }
 
 @utility dash-mark-rattle {
-  animation: dash-mark-rattle 180ms steps(2) infinite;
+  animation: dash-mark-rattle var(--motion-quick) steps(2) infinite;
 }
 
 /* Reading: the eyes jump along a line in short steps, then snap back. */
@@ -2387,7 +2423,7 @@ tr:has([data-link-pending]) {
 }
 
 @utility dash-mark-read {
-  animation: dash-mark-read 2.4s ease-in-out infinite;
+  animation: dash-mark-read calc(var(--motion-moment) * 4) var(--ease-sway) infinite;
 }
 
 /* Searching: the eyes sweep wide while a ring pings out from the visor. */
@@ -2401,7 +2437,7 @@ tr:has([data-link-pending]) {
 }
 
 @utility dash-mark-sweep {
-  animation: dash-mark-sweep 700ms ease-in-out infinite alternate;
+  animation: dash-mark-sweep var(--motion-moment) var(--ease-sway) infinite alternate;
 }
 
 @keyframes dash-mark-ping {
@@ -2418,7 +2454,7 @@ tr:has([data-link-pending]) {
 @utility dash-mark-ping {
   transform-box: view-box;
   transform-origin: 12px 12px;
-  animation: dash-mark-ping 1.4s var(--ease-out-soft) infinite;
+  animation: dash-mark-ping calc(var(--motion-moment) * 2.5) var(--ease-out-soft) infinite;
 }
 
 /* Writing: a line draws out under the visor towards a blinking caret. */
@@ -2435,7 +2471,7 @@ tr:has([data-link-pending]) {
 @utility dash-mark-write {
   transform-box: fill-box;
   transform-origin: left center;
-  animation: dash-mark-write 1.6s ease-out infinite;
+  animation: dash-mark-write calc(var(--motion-moment) * 2.5) var(--ease-out-soft) infinite;
 }
 
 @keyframes dash-mark-caret {
@@ -2450,7 +2486,7 @@ tr:has([data-link-pending]) {
 }
 
 @utility dash-mark-caret {
-  animation: dash-mark-caret 800ms steps(1) infinite;
+  animation: dash-mark-caret calc(var(--motion-moment) * 1.5) steps(1) infinite;
 }
 
 /* Thinking: the eyes glance up to one corner, hold, then up to the other. */
@@ -2473,7 +2509,7 @@ tr:has([data-link-pending]) {
 }
 
 @utility dash-mark-ponder {
-  animation: dash-mark-ponder 3.2s ease-in-out infinite;
+  animation: dash-mark-ponder calc(var(--motion-moment) * 5) var(--ease-sway) infinite;
 }
 
 @keyframes dash-mark-flash {
@@ -2493,7 +2529,7 @@ tr:has([data-link-pending]) {
 
 @utility dash-mark-flash {
   transform-origin: 12px 12px;
-  animation: dash-mark-flash 320ms var(--ease-out-soft) both;
+  animation: dash-mark-flash var(--motion-move) var(--ease-out-soft) both;
 }
 
 @keyframes dash-mark-wave {
@@ -2508,7 +2544,7 @@ tr:has([data-link-pending]) {
 @utility dash-mark-wave {
   transform-box: fill-box;
   transform-origin: left center;
-  animation: dash-mark-wave 500ms ease-in-out 6 alternate;
+  animation: dash-mark-wave calc(var(--motion-move) * 2) var(--ease-sway) 6 alternate;
 }
 
 @keyframes shimmer {
@@ -2534,7 +2570,7 @@ tr:has([data-link-pending]) {
       color-mix(in srgb, var(--c-surface) 65%, transparent),
       transparent
     );
-    animation: shimmer 1.6s infinite;
+    animation: shimmer calc(var(--motion-moment) * 2.5) var(--ease-sway) infinite;
     content: "";
   }
 }
@@ -2546,6 +2582,16 @@ tr:has([data-link-pending]) {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* The tokens themselves collapse too, so a delay built from them (the goal
+   * fold's, the sigil's stagger) does not hold anything back. 0.01ms rather
+   * than 0 so animationend still fires for code waiting on it. */
+  :root {
+    --motion-instant: 0.01ms;
+    --motion-quick: 0.01ms;
+    --motion-move: 0.01ms;
+    --motion-moment: 0.01ms;
+  }
+
   .dragging {
     transform: none;
   }
@@ -3337,7 +3383,7 @@ form[data-auto-submit] [data-fallback-submit] {
       color-mix(in oklab, var(--c-wash-floor) calc(var(--wash-lift) * 26%), transparent),
       transparent 70%
     );
-  animation: sky-drift 70s ease-in-out infinite alternate;
+  animation: sky-drift calc(var(--motion-moment) * 120) var(--ease-sway) infinite alternate;
 }
 
 /* The rays: fine vertical streaks inside the brightest band, which is what
@@ -3362,7 +3408,7 @@ form[data-auto-submit] [data-fallback-submit] {
   -webkit-mask-image: radial-gradient(48% 20% at 46% 32%, black, transparent 72%);
   mask-image: radial-gradient(48% 20% at 46% 32%, black, transparent 72%);
   transform: rotate(-12deg);
-  animation: sky-rays 40s ease-in-out infinite alternate;
+  animation: sky-rays calc(var(--motion-moment) * 65) var(--ease-sway) infinite alternate;
 }
 
 [data-theme='aurora'] {
@@ -3659,7 +3705,7 @@ form[data-auto-submit] [data-fallback-submit] {
 }
 
 .rise-in {
-  animation: rise-in 140ms var(--ease-out-soft) both;
+  animation: rise-in var(--motion-quick) var(--ease-out-soft) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

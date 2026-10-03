@@ -276,7 +276,7 @@ function QueueRow({
   const selection = useSelection();
   const className = useSelectionRowClass(
     key,
-    cn(cardVariants({ padding: 'dense' }), 'flex items-start gap-3 transition-colors duration-150'),
+    cn(cardVariants({ padding: 'dense' }), 'flex items-start gap-3 transition-colors duration-quick'),
   );
 
   return (
@@ -419,7 +419,7 @@ function MessageRow({
             href={row.gmailHref}
             target="_blank"
             rel="noreferrer noopener"
-            className="inline-flex items-center gap-1 text-small text-ink-muted underline underline-offset-2 transition-colors duration-150 hover:text-ink"
+            className="inline-flex items-center gap-1 text-small text-ink-muted underline underline-offset-2 transition-colors duration-quick hover:text-ink"
           >
             Open in Gmail
             <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
@@ -504,7 +504,7 @@ function OtherRolePicker({
                     onDone(result.error ?? `Linked to ${label}.`);
                   })
                 }
-                className="press flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-150 hover:bg-surface disabled:opacity-50"
+                className="press flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-quick hover:bg-surface disabled:opacity-50"
               >
                 <span className="min-w-0 flex-1 truncate text-ui text-ink">
                   {role.companyName} · {role.roleTitle}

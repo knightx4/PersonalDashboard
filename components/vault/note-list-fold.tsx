@@ -190,7 +190,7 @@ export function FoldNoteListButton() {
       title="Hide the note list"
       aria-expanded={!folded}
       aria-controls={NOTE_LIST_ID}
-      className="press hidden size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink lg:flex"
+      className="press hidden size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink lg:flex"
     >
       <PanelLeftClose className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
       <span className="sr-only">Hide the note list</span>

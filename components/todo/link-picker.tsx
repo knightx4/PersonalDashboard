@@ -82,7 +82,7 @@ export function LinkPicker({
             type="button"
             onClick={() => onChange(null)}
             title="Not about this"
-            className="press flex size-5 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors duration-150 hover:bg-accent-tint hover:text-accent"
+            className="press flex size-5 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors duration-quick hover:bg-accent-tint hover:text-accent"
           >
             <X className="size-3.5" strokeWidth={1.75} aria-hidden />
             <span className="sr-only">Not about this</span>
@@ -94,7 +94,7 @@ export function LinkPicker({
           type="button"
           onClick={() => setOpen((on) => !on)}
           aria-expanded={open}
-          className="press inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-small font-medium text-ink-muted transition-colors duration-150 hover:bg-accent-tint hover:text-accent"
+          className="press inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-small font-medium text-ink-muted transition-colors duration-quick hover:bg-accent-tint hover:text-accent"
         >
           <Link2 className="size-3.5" strokeWidth={1.75} aria-hidden />
           Link

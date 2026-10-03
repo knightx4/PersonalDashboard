@@ -287,7 +287,7 @@ Checked by: test `tests/dev-ui-taste.test.ts`, pending #1529.
 Checked by: test `tests/dev-ui-moments.test.ts`, pending #1554.
 
 **R7.** Animation timings and easings come from the motion tokens.
-Checked by: count `raw-motion-values`, target 0, pending #1549.
+Checked by: count `raw-motion-values`, baseline 234, target 0.
 
 **R8.** No workspace has more than three moments.
 Checked by: test `tests/dev-ui-moments.test.ts`, pending #1554.

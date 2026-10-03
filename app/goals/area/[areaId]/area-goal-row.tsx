@@ -35,7 +35,7 @@ export function GoalRow({ daily }: { daily: DailyGoal }) {
       {review && <ReviewLine review={review} />}
       <Link
         href={tree}
-        className="inline-flex items-center gap-1.5 text-small text-ink-muted transition-colors duration-150 hover:text-ink"
+        className="inline-flex items-center gap-1.5 text-small text-ink-muted transition-colors duration-quick hover:text-ink"
       >
         <ListTree className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
         {treeLabel}

@@ -329,7 +329,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                           href={links.shippingHref}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-ui text-ink-muted transition-colors duration-150 hover:text-accent hover:underline"
+                          className="text-ui text-ink-muted transition-colors duration-quick hover:text-accent hover:underline"
                         >
                           Open shipping email
                         </a>
@@ -339,7 +339,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                           href={links.deliveryHref}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-ui text-ink-muted transition-colors duration-150 hover:text-accent hover:underline"
+                          className="text-ui text-ink-muted transition-colors duration-quick hover:text-accent hover:underline"
                         >
                           Open delivery email
                         </a>
@@ -373,7 +373,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         href={row.emailHref}
                         target="_blank"
                         rel="noreferrer"
-                        className="ml-3 text-ui text-ink-muted transition-colors duration-150 hover:text-accent hover:underline"
+                        className="ml-3 text-ui text-ink-muted transition-colors duration-quick hover:text-accent hover:underline"
                       >
                         Open return email
                       </a>
@@ -426,7 +426,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                         href={href}
                         target="_blank"
                         rel="noreferrer"
-                        className="shrink-0 text-ui text-ink-muted transition-colors duration-150 hover:text-accent hover:underline"
+                        className="shrink-0 text-ui text-ink-muted transition-colors duration-quick hover:text-accent hover:underline"
                       >
                         Open in Gmail
                       </GmailAnchor>
