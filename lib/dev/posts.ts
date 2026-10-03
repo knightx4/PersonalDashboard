@@ -166,8 +166,36 @@ export function xRemaining(text: string): number {
  */
 export const POSTS_RUN_HOLD_MINUTES = 45;
 
-/** One step to write about, for the changelog's "Post about this" (#1420). */
-export type PostsRunFocus = { number: number };
+/**
+ * What one run writes about instead of everything since the last post: one
+ * step, for the changelog's "Post about this" (#1420), or something the person
+ * typed on the Posts tab (note 114ff495).
+ */
+export type PostsRunFocus = { number: number } | { ask: string };
+
+/** The longest ask the Posts tab sends, so a paste cannot swamp the turn. */
+export const MAX_POST_ASK = 1000;
+
+function focusLine(focus: PostsRunFocus | null | undefined): string {
+  if (!focus) {
+    return `Write ${MIN_SUGGESTIONS} to ${MAX_SUGGESTIONS} drafts about what shipped since the last posted row.`;
+  }
+  if ('number' in focus) {
+    return (
+      `Write one draft about plan step #${focus.number} only, citing that step. ` +
+      'Skip the search for what shipped, but still check the step is one a post may come from.'
+    );
+  }
+  return (
+    'Write one draft about what the person asked for, quoted below. Find the shipped steps ' +
+    'and closed notes it is about and cite them; every rule in the skill still holds, so if ' +
+    'it needs another workspace or nothing shipped bears on it, write no draft and say why.\n\n' +
+    focus.ask
+      .split('\n')
+      .map((line) => `> ${line}`)
+      .join('\n')
+  );
+}
 
 /** The turn appended to the plan routine's session. */
 export function postsRunText(input: { userId: string; focus?: PostsRunFocus | null }): string {
@@ -179,10 +207,7 @@ export function postsRunText(input: { userId: string; focus?: PostsRunFocus | nu
       'only the ones that pass, as suggested rows in social_posts carrying this run in run_id. ' +
       'Then mark this run finished in plan_runs.',
     '',
-    input.focus
-      ? `Write one draft about plan step #${input.focus.number} only, citing that step. ` +
-        'Skip the search for what shipped, but still check the step is one a post may come from.'
-      : `Write ${MIN_SUGGESTIONS} to ${MAX_SUGGESTIONS} drafts about what shipped since the last posted row.`,
+    focusLine(input.focus),
     '',
     'Dash never posts. You change rows, not code, and do not touch any plan step. The one ' +
       'commit you may push is screenshots under public/posts/, as the skill describes.',

@@ -148,6 +148,13 @@ describe('postsRunText', () => {
   it('asks for one draft when a step is named', () => {
     expect(postsRunText({ userId: 'u', focus: { number: 639 } })).toContain('#639 only');
   });
+
+  it('quotes what the person asked for, line by line', () => {
+    const text = postsRunText({ userId: 'u', focus: { ask: 'The gate\nand why it exists' } });
+    expect(text).toContain('one draft about what the person asked for');
+    expect(text).toContain('> The gate\n> and why it exists');
+    expect(text).not.toContain('3 to 5 drafts');
+  });
 });
 
 describe('socialPostFromRow and sortPosts', () => {

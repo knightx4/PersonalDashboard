@@ -19,7 +19,8 @@ types and the counter in `lib/dev/posts.ts`, and the check in
 The Suggest posts button starts one run of the plan routine with job `posts`
 in `plan_runs` and no step (`startPostsRun` in `lib/dev/posts-run.ts`). The
 turn it appends names the `user_id` and, when the press came from a changelog
-line, the one step to write about. If no turn names a `user_id`, stop and say
+line, the one step to write about, or when it came from the ask box on the
+Posts tab, what the person asked for. If no turn names a `user_id`, stop and say
 so rather than guessing the account.
 
 You change rows, not code, and no plan step is touched. The one commit a run
@@ -94,6 +95,12 @@ notes quote what the person saw, which can carry their rows.
 When the turn names one step, read only that step. It still has to be `dev`
 or null and pass the source check below; if it does not, write no draft and
 say why in your reply.
+
+When the turn quotes an ask the person typed on the Posts tab, write one draft
+about that. Search the window above for the steps and closed notes it is
+about and cite them, as for any draft. The ask chooses the subject and changes
+none of the rules: if it needs another workspace's data, or nothing shipped
+bears on it, write no draft and say why in your reply.
 
 ## 4. Gather the terms to keep out
 
