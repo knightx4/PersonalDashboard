@@ -37,6 +37,14 @@ export const SPECS: readonly SpecDoc[] = [
     module: null,
   },
   {
+    slug: 'spec-layer',
+    title: 'Specs as the layer you work at',
+    blurb:
+      'Rules in every spec that the gate checks, a weekly audit that compares the code with the specs and proposes changes, spec changes you approve in place of features, and overhauls built in their own order.',
+    file: 'SPEC-LAYER-SPEC.md',
+    module: null,
+  },
+  {
     slug: 'core-and-dash',
     title: 'One core and one Dash',
     blurb:
