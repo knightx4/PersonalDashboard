@@ -128,7 +128,7 @@ function fakeDb(tables: Tables) {
 
 function setup(opts: { status?: string; turnId?: string | null; kind?: string; input?: Row; enabled?: ChangeDeps['enabledModules'] } = {}) {
   const tables: Tables = {
-    'core.dash_changes': [],
+    'core.dash_actions': [],
     'todo.tasks': [],
     'todo.task_links': [],
     'goals.items': [
@@ -148,19 +148,20 @@ function setup(opts: { status?: string; turnId?: string | null; kind?: string; i
     id: id(600),
     user_id: ME,
     conversation_id: CONVERSATION,
+    surface: 'ask',
     turn_id: opts.turnId === undefined ? TURN : opts.turnId,
     kind: opts.kind ?? 'add_todo',
     input: opts.input ?? { title: 'Call the bank', body: null, dueOn: '2026-10-02', dueTime: null, pinned: false },
     status: opts.status ?? 'proposed',
-    written_table: null,
-    written_ref: null,
+    subject_ref: null,
+    op: null,
     undo: null,
     created_at: '2026-09-29T10:00:00Z',
-    confirmed_at: opts.status === 'confirmed' ? '2026-09-29T10:01:00Z' : null,
+    done_at: opts.status === 'done' ? '2026-09-29T10:01:00Z' : null,
     declined_at: opts.status === 'declined' ? '2026-09-29T10:01:00Z' : null,
     undone_at: null,
   };
-  tables['core.dash_changes'].push(change);
+  tables['core.dash_actions'].push(change);
 
   const created: TaskInput[] = [];
   const deps: ChangeDeps = {
@@ -205,11 +206,13 @@ describe('add_todo', () => {
     const task = tables['todo.tasks'][0];
     expect(task).toMatchObject({ title: 'Call the bank', due_on: '2026-10-02' });
     expect(confirmed.ok && confirmed.change).toMatchObject({
-      status: 'confirmed',
+      status: 'done',
+      subjectRef: `todo.tasks:${task.id}`,
       writtenTable: 'todo.tasks',
       writtenRef: task.id,
-      confirmedAt: '2026-09-29T12:00:00Z',
+      doneAt: '2026-09-29T12:00:00Z',
     });
+    expect(tables['core.dash_actions'][0]).toMatchObject({ surface: 'ask', op: 'insert' });
     expect(confirmed.ok && changeHref(confirmed.change)).toBe(`/todo/all?status=all&focus=${task.id}`);
 
     const undone = await undoChange(deps, change.id as string);
@@ -232,7 +235,7 @@ describe('add_todo', () => {
       expect(!undone.ok && undone.error).toContain('Dash');
       expect(!undone.ok && undone.error).not.toContain('Claude');
       expect(tables['todo.tasks']).toHaveLength(1);
-      expect(tables['core.dash_changes'][0].status).toBe('confirmed');
+      expect(tables['core.dash_actions'][0].status).toBe('done');
     }
   });
 
@@ -287,7 +290,7 @@ describe('add_goal_step', () => {
       const undone = await undoChange(deps, change.id as string);
       expect(undone.ok).toBe(false);
       expect(!undone.ok && undone.error).toContain(reason);
-      expect(tables['core.dash_changes'][0].status).toBe('confirmed');
+      expect(tables['core.dash_actions'][0].status).toBe('done');
     }
   });
 
@@ -297,7 +300,7 @@ describe('add_goal_step', () => {
     const confirmed = await confirmChange(deps, change.id as string);
     expect(!confirmed.ok && confirmed.error).toBe('That goal is done now, so a step cannot go under it.');
     expect(tables['goals.items']).toHaveLength(2);
-    expect(tables['core.dash_changes'][0].status).toBe('proposed');
+    expect(tables['core.dash_actions'][0].status).toBe('proposed');
   });
 });
 
@@ -315,6 +318,7 @@ describe('mark_returned', () => {
       writtenRef: ITEM,
       undo: { return_id: ret.id, refund_amount_cents: 4500 },
     });
+    expect(tables['core.dash_actions'][0]).toMatchObject({ subject_ref: `public.inventory_items:${ITEM}`, op: 'update' });
 
     const undone = await undoChange(deps, change.id as string);
     expect(undone.ok && undone.change.status).toBe('undone');
@@ -353,11 +357,11 @@ describe('what can be pressed when', () => {
     deps.createTask = async (...args) => {
       const out = await createTask(...args);
       // The other window's confirm lands between this write and its mark.
-      Object.assign(tables['core.dash_changes'][0], {
-        status: 'confirmed',
-        confirmed_at: '2026-09-29T11:59:00Z',
-        written_table: 'todo.tasks',
-        written_ref: id(900),
+      Object.assign(tables['core.dash_actions'][0], {
+        status: 'done',
+        done_at: '2026-09-29T11:59:00Z',
+        subject_ref: `todo.tasks:${id(900)}`,
+        op: 'insert',
       });
       return out;
     };

@@ -61,11 +61,12 @@ function nextFriday(): string {
 
 const CHANGE_BASE = {
   conversationId: '00000000-0000-4000-8000-000000000009',
+  subjectRef: null,
   writtenTable: null,
   writtenRef: null,
   undo: null,
   createdAt: ago(0),
-  confirmedAt: null,
+  doneAt: null,
   declinedAt: null,
   undoneAt: null,
 } as const;
@@ -126,9 +127,10 @@ function pressed(status: DashChange['status']) {
       change: {
         ...base,
         status,
+        subjectRef: status === 'declined' ? null : `${kind === 'step' ? 'goals.items' : 'todo.tasks'}:${kind}-written`,
         writtenTable: status === 'declined' ? null : kind === 'step' ? 'goals.items' : 'todo.tasks',
         writtenRef: status === 'declined' ? null : `${kind}-written`,
-        confirmedAt: status === 'declined' ? null : at,
+        doneAt: status === 'declined' ? null : at,
         declinedAt: status === 'declined' ? at : null,
         undoneAt: status === 'undone' ? at : null,
       },
@@ -196,7 +198,7 @@ const FIXTURES: AskSource = {
   },
   open: async () => ({ turns: answerTo(RECENT[0].title ?? ''), changes: [] }),
   poll: async () => ({ turns: [], open: 0 }),
-  confirm: pressed('confirmed'),
+  confirm: pressed('done'),
   decline: pressed('declined'),
   undo: pressed('undone'),
   costs: async () => ({
@@ -254,9 +256,10 @@ export function AskChangesSurface() {
     ...change,
     createdAt: at(9),
     status,
+    subjectRef: status === 'declined' ? null : `${change.kind === 'add_todo' ? 'todo.tasks' : 'goals.items'}:written`,
     writtenTable: status === 'declined' ? null : change.kind === 'add_todo' ? 'todo.tasks' : 'goals.items',
     writtenRef: status === 'declined' ? null : 'written',
-    confirmedAt: status === 'declined' ? null : at(9),
+    doneAt: status === 'declined' ? null : at(9),
     declinedAt: status === 'declined' ? at(9) : null,
     undoneAt: status === 'undone' ? at(11) : null,
   });
@@ -299,7 +302,7 @@ export function AskChangesSurface() {
           conversationRef="00000000-0000-4000-8000-000000000009"
           turns={turns}
           changes={[
-            done(todo('ra'), 'confirmed'),
+            done(todo('ra'), 'done'),
             done(step('ra'), 'declined'),
             done(todo('rb'), 'undone'),
             { ...step('rb'), createdAt: at(10) },
@@ -318,18 +321,22 @@ export function AskChangesSurface() {
  * return puts it back; Undo on the step is refused, since it was worked on
  * since, and the reason shows under its row.
  */
+function madeTable(change: DashChange): string {
+  return change.kind === 'add_todo' ? 'todo.tasks' : change.kind === 'add_goal_step' ? 'goals.items' : 'shopping.returns';
+}
+
 export function AskMadeChangesSurface() {
   // Fixed times, so the server's render and the browser's agree.
   const at = (hour: number) => `2026-09-28T${String(hour).padStart(2, '0')}:00:00Z`;
   const made = (change: DashChange, hour: number, n: number, question: string | null): MadeChange => ({
     ...change,
     conversationId: `00000000-0000-4000-8000-00000000001${n}`,
-    status: 'confirmed',
-    writtenTable:
-      change.kind === 'add_todo' ? 'todo.tasks' : change.kind === 'add_goal_step' ? 'goals.items' : 'shopping.returns',
+    status: 'done',
+    subjectRef: `${madeTable(change)}:${change.id}-row`,
+    writtenTable: madeTable(change),
     writtenRef: `${change.id}-row`,
     createdAt: at(hour),
-    confirmedAt: at(hour),
+    doneAt: at(hour),
     question,
   });
   const todo = (id: string, title: string, dueOn: string | null): DashChange => ({

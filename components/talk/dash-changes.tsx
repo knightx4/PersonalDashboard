@@ -112,7 +112,7 @@ export function DashChangeRow({
     });
   }
 
-  const written = change.status === 'confirmed' || change.status === 'undone';
+  const written = change.status === 'done' || change.status === 'undone';
   const words = changeWords(change, written, today);
   const settled = change.status === 'declined' || change.status === 'undone';
 
@@ -120,7 +120,7 @@ export function DashChangeRow({
     <div className="space-y-1.5">
       <p className={settled ? 'text-ui text-ink-muted' : 'text-ui text-ink'}>
         {words.verb}{' '}
-        {change.status === 'confirmed' ? (
+        {change.status === 'done' ? (
           <Link
             href={changeHref(change)}
             className="font-medium text-accent underline-offset-2 hover:underline"
@@ -169,7 +169,7 @@ export function DashChangeRow({
         </div>
       )}
 
-      {change.status === 'confirmed' && (
+      {change.status === 'done' && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <ChangeStatus change={change} />
           <Link
@@ -210,7 +210,7 @@ const STATUS_NOTE: Partial<Record<DashChange['status'], string>> = {
  * a done row and a declined one differ at a glance.
  */
 export function ChangeStatus({ change }: { change: DashChange }) {
-  const Glyph = change.status === 'confirmed' ? Check : change.status === 'undone' ? Undo2 : CircleSlash;
+  const Glyph = change.status === 'done' ? Check : change.status === 'undone' ? Undo2 : CircleSlash;
   if (change.status === 'proposed') {
     return <span className="text-small text-ink-muted">{CHANGE_STATUS_LABEL.proposed}</span>;
   }
@@ -218,11 +218,11 @@ export function ChangeStatus({ change }: { change: DashChange }) {
   return (
     <span className="inline-flex items-center gap-1 text-small text-ink-muted">
       <Glyph
-        className={change.status === 'confirmed' ? 'size-3.5 text-positive' : 'size-3.5'}
+        className={change.status === 'done' ? 'size-3.5 text-positive' : 'size-3.5'}
         strokeWidth={2}
         aria-hidden
       />
-      <span className={change.status === 'confirmed' ? 'font-medium text-ink' : 'font-medium'}>
+      <span className={change.status === 'done' ? 'font-medium text-ink' : 'font-medium'}>
         {CHANGE_STATUS_LABEL[change.status]}
       </span>
       {note && <span>{note}</span>}

@@ -3,7 +3,9 @@ import { insertStep, setStepArchived } from '@/lib/goals/steps-store';
 import type { ModuleId } from '@/lib/modules';
 import { markReturned, unmarkReturned } from '@/lib/returns/mark';
 import type { TaskInput } from '@/lib/todo/tasks/input';
+import { toRef } from '@/lib/core/refs';
 import {
+  DASH_ACTIONS,
   DASH_CHANGE_SELECT,
   toDashChange,
   type DashChange,
@@ -19,7 +21,7 @@ import type { AskDb, SchemaClient } from './db';
  * Confirm writes the change through the code the page itself uses: a todo
  * through createTask, a step through insertStep on a goals client that records
  * it in goals.history as Dash's, a return through markReturned (the returns
- * page's own). It then marks the change confirmed with the row it wrote, in
+ * page's own). It then marks the change done with the row it wrote, in
  * one update that only a still-proposed change takes, so a second Confirm
  * (another window, a double press) finds nothing to update and the row it
  * wrote is taken back again. A change is written once.
@@ -55,7 +57,7 @@ export type ChangeDeps = {
   /** YYYY-MM-DD in that timezone: the day a return is refunded. */
   today: string;
   enabledModules: readonly ModuleId[];
-  /** The person's core client, for core.dash_changes. */
+  /** The person's core client, for core.dash_actions. */
   core: SchemaClient;
   /** The person's client per schema: reads, the undo writes, and the return. */
   db: AskDb;
@@ -110,6 +112,14 @@ const WRITTEN_TABLE: Record<DashChangeKind, string> = {
   start_watch: 'core.watches',
 };
 
+/** What each kind does to that row: a return changes the item, the rest add one. */
+const WRITTEN_OP: Record<DashChangeKind, 'insert' | 'update'> = {
+  add_todo: 'insert',
+  add_goal_step: 'insert',
+  mark_returned: 'update',
+  start_watch: 'insert',
+};
+
 /** A refusal the person reads: the sentence is theirs, the class only marks it as one. */
 class Refused extends Error {}
 
@@ -121,10 +131,11 @@ function now(deps: ChangeDeps): string {
 
 async function loadOne(deps: ChangeDeps, id: string): Promise<DashChange | null> {
   const { data, error } = await deps.core
-    .from('dash_changes')
+    .from(DASH_ACTIONS)
     .select(DASH_CHANGE_SELECT)
     .eq('id', id)
     .eq('user_id', deps.userId)
+    .eq('surface', 'ask')
     .maybeSingle();
   if (error) throw new Error(`Reading the change failed: ${error.message}`);
   return data ? toDashChange(data) : null;
@@ -133,7 +144,7 @@ async function loadOne(deps: ChangeDeps, id: string): Promise<DashChange | null>
 /** Why a change in this status cannot be confirmed or declined. */
 function notProposed(status: DashChangeStatus): string {
   switch (status) {
-    case 'confirmed':
+    case 'done':
       return 'You have already confirmed this change.';
     case 'declined':
       return 'You declined this change, so it cannot be confirmed now. Ask Dash again if you want it.';
@@ -461,7 +472,7 @@ function refusedOrThrow(error: unknown, change: DashChange | null): ChangeOutcom
 }
 
 /**
- * Write a proposed change and mark it confirmed. Refused, with the change as
+ * Write a proposed change and mark it done. Refused, with the change as
  * it stands, when it is not a proposal any more, its answer is still being
  * written, its workspace is off, or what it points at can no longer take it.
  */
@@ -485,12 +496,12 @@ export async function confirmChange(deps: ChangeDeps, id: string): Promise<Chang
   }
 
   const { data, error } = await deps.core
-    .from('dash_changes')
+    .from(DASH_ACTIONS)
     .update({
-      status: 'confirmed',
-      confirmed_at: now(deps),
-      written_table: WRITTEN_TABLE[change.kind],
-      written_ref: written.ref,
+      status: 'done',
+      done_at: now(deps),
+      subject_ref: toRef(WRITTEN_TABLE[change.kind], written.ref),
+      op: WRITTEN_OP[change.kind],
       undo: written.undo,
     })
     .eq('id', change.id)
@@ -502,7 +513,7 @@ export async function confirmChange(deps: ChangeDeps, id: string): Promise<Chang
     // Another press got there first, or the mark failed: either way this
     // write is not the change's, so it goes.
     await rollBack(deps, change, written);
-    if (error) throw new Error(`Marking the change confirmed failed: ${error.message}`);
+    if (error) throw new Error(`Marking the change done failed: ${error.message}`);
     const current = await loadOne(deps, id);
     return { ok: false, error: current ? notProposed(current.status) : GONE, change: current };
   }
@@ -518,7 +529,7 @@ export async function declineChange(deps: ChangeDeps, id: string): Promise<Chang
     return { ok: false, error, change };
   }
   const { data, error } = await deps.core
-    .from('dash_changes')
+    .from(DASH_ACTIONS)
     .update({ status: 'declined', declined_at: now(deps) })
     .eq('id', change.id)
     .eq('user_id', deps.userId)
@@ -540,7 +551,7 @@ export async function declineChange(deps: ChangeDeps, id: string): Promise<Chang
 export async function undoChange(deps: ChangeDeps, id: string): Promise<ChangeOutcome> {
   const change = await loadOne(deps, id);
   if (!change) return { ok: false, error: GONE, change: null };
-  if (change.status !== 'confirmed' || !change.writtenRef) {
+  if (change.status !== 'done' || !change.writtenRef) {
     return { ok: false, error: notConfirmed(change.status), change };
   }
 
@@ -551,11 +562,11 @@ export async function undoChange(deps: ChangeDeps, id: string): Promise<ChangeOu
   }
 
   const { data, error } = await deps.core
-    .from('dash_changes')
+    .from(DASH_ACTIONS)
     .update({ status: 'undone', undone_at: now(deps) })
     .eq('id', change.id)
     .eq('user_id', deps.userId)
-    .eq('status', 'confirmed')
+    .eq('status', 'done')
     .select(DASH_CHANGE_SELECT);
   if (error) throw new Error(`Marking the change undone failed: ${error.message}`);
   const rows = (data ?? []) as Parameters<typeof toDashChange>[0][];
