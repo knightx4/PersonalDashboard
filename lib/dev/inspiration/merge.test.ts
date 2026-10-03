@@ -159,7 +159,9 @@ describe('mergeNewTakeaways', () => {
         { kind: 'idea', id: 'i1', text: 'Sort the ideas page by score' },
       ],
     );
-    const { client, create } = stubJudge([{ same_as: 'none', clearer: 'earlier', covered_by: 'C1' }]);
+    const { client, create } = stubJudge([
+      { same_as: 'none', clearer: 'earlier', covered_by: 'C1', cover_quote: 'Every page follows the system theme.' },
+    ]);
 
     const result = await mergeNewTakeaways(store, USER, {
       anthropicApiKey: 'k',
@@ -172,6 +174,33 @@ describe('mergeNewTakeaways', () => {
     const prompt = create.mock.calls[0][0].messages[0].content as string;
     expect(prompt).toContain('C1: Plan feature #12: Dark mode');
     expect(prompt).not.toContain('Sort the ideas page');
+  });
+
+  it('leaves a takeaway open when the pass names a cover it cannot quote', async () => {
+    const { store, rows } = memoryStore(
+      [row('a', 'Dark mode for every page', ['v1'])],
+      [{ kind: 'plan', id: 'p12', number: 12, text: 'Theme settings\n\nPick an accent colour for the app.' }],
+    );
+    const { client } = stubJudge([
+      { same_as: 'none', clearer: 'earlier', covered_by: 'C1', cover_quote: 'Every page follows the system theme.' },
+    ]);
+
+    const result = await mergeNewTakeaways(store, USER, { anthropicApiKey: 'k', client, embed: embedBy({ Dark: [0, 1, 0] }) });
+
+    expect(result.covered).toBe(0);
+    expect(rows[0]).toMatchObject({ status: 'open', coveredBy: null });
+  });
+
+  it('keeps the wording of a takeaway two videos already share', async () => {
+    const { store, rows } = memoryStore([
+      row('a', 'Log decisions', ['v1', 'v2'], [1, 0, 0]),
+      row('b', 'Keep a decision journal', ['v3']),
+    ]);
+    const { client } = stubJudge([{ same_as: 'T1', clearer: 'new', covered_by: 'none' }]);
+
+    await mergeNewTakeaways(store, USER, { anthropicApiKey: 'k', client, embed: embedBy({ Keep: [1, 0, 0] }) });
+
+    expect(rows.map((one) => [one.title, one.videoIds])).toEqual([['Log decisions', ['v1', 'v2', 'v3']]]);
   });
 
   it('leaves everything as it was when embedding fails, for the next run', async () => {
@@ -200,16 +229,26 @@ describe('mergeNewTakeaways', () => {
 
 describe('readJudgement', () => {
   it('reads labels into indexes and treats anything out of range as none', () => {
-    expect(readJudgement({ same_as: 'T2', clearer: 'new', covered_by: 'c1' }, 2, 1)).toEqual({
+    const cover = ['Dark mode\n\nEvery page follows   the system’s theme.'];
+    expect(
+      readJudgement({ same_as: 'T2', clearer: 'new', covered_by: 'c1', cover_quote: "\"every page follows the system's theme.\"" }, 2, cover),
+    ).toEqual({
       sameAs: 1,
       newIsClearer: true,
       coveredBy: 0,
     });
-    expect(readJudgement({ same_as: 'T3', clearer: 'maybe', covered_by: 'C9' }, 2, 1)).toEqual({
+    expect(readJudgement({ same_as: 'T3', clearer: 'maybe', covered_by: 'C9' }, 2, cover)).toEqual({
       sameAs: null,
       newIsClearer: false,
       coveredBy: null,
     });
-    expect(readJudgement('nonsense', 2, 1)).toEqual({ sameAs: null, newIsClearer: false, coveredBy: null });
+    expect(readJudgement('nonsense', 2, cover)).toEqual({ sameAs: null, newIsClearer: false, coveredBy: null });
+  });
+
+  it('drops a cover with no quote, a short one, or one the row does not hold', () => {
+    const cover = ['Dark mode\n\nEvery page follows the system theme.'];
+    for (const cover_quote of [undefined, '', 'Dark mode', 'Every page has a dark theme toggle.']) {
+      expect(readJudgement({ same_as: 'none', covered_by: 'C1', cover_quote }, 0, cover).coveredBy).toBeNull();
+    }
   });
 });
