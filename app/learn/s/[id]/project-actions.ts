@@ -179,10 +179,11 @@ export async function handInPlanProject(
     if (error) return { error: `Recording the hand-in failed: ${error.message}` };
 
     if (marked.passed) {
-      // The plan's header, Learn now and the Goals page read finished from this.
+      // The plan's header, Learn now and the goal's page in Goals read
+      // finished from this.
       revalidatePath(`/learn/s/${subject}`);
       revalidatePath('/learn/now');
-      revalidatePath('/learn/goals');
+      revalidatePath('/goals', 'layout');
     }
     return { project: await projectViewOf(learn, user.id, row) };
   } catch (caught) {

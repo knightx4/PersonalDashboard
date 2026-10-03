@@ -34,6 +34,10 @@ import { loadGoalMap, type GoalMap } from '@/lib/goals/steps-store';
 import { loadAreas } from '@/lib/goals/store';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
+import { loadAimForGoal, loadLevel3Counts } from '@/lib/learn/aims-store';
+import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { loadPlans } from '@/lib/learn/lessons/plan-store';
+import { progressLine } from '@/lib/learn/lessons/plan-view';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { Card } from '@/components/ui/card';
 import { FileLinks } from '@/components/files/file-links';
@@ -65,6 +69,7 @@ import { GoalFlags } from './goal-flags';
 import { GoalHeadingField } from './goal-heading';
 import { GoalThread } from './goal-comments';
 import { GoalHelp } from './goal-help';
+import { GoalLearn } from './goal-learn';
 import { GoalLinksSection } from './goal-links';
 import { GoalNumber } from './goal-number';
 import { GoalFog, GoalShaping } from './goal-shaping';
@@ -180,6 +185,32 @@ function goalFiles(goalId: string, filesOf: Record<string, LinkedFile[]>): Linke
   return out;
 }
 
+/**
+ * What Learn holds for a goal in the Learn area (plan #1491): its aim, its
+ * plan and, for the Level 3 goal, the counts. Null for any other goal, and
+ * when Learn is off or the aim cannot be read, which leaves the section out
+ * rather than the page. A plan or counts that cannot be read are left out of
+ * the section the same way.
+ */
+async function loadGoalLearn(learn: LearnSupabaseClient | null, userId: string, goalId: string) {
+  if (!learn) return null;
+  const aim = await loadAimForGoal(learn, goalId).catch(() => null);
+  if (!aim) return null;
+  const level3 = aim.listSource === 'level3';
+  const [plans, level3Counts] = await Promise.all([
+    loadPlans(learn, userId).catch(() => []),
+    level3 ? loadLevel3Counts(learn).catch(() => null) : null,
+  ]);
+  const plan = plans.find((p) => p.aimId === aim.id);
+  return {
+    aim: { id: aim.id, name: aim.name, depth: aim.depth, level3 },
+    plan: plan
+      ? { href: `/learn/s/${plan.subjectId}`, line: progressLine(plan.progress, plan.finished) }
+      : null,
+    level3Counts,
+  };
+}
+
 export default async function GoalMapPage({
   params,
   searchParams,
@@ -201,7 +232,7 @@ export default async function GoalMapPage({
   const jobsOn = moduleEnabled(account, 'jobs');
   const learn = learnOn ? await createLearnClient() : null;
   const jobs = jobsOn ? await createJobsClient() : null;
-  const [map, readings, numberFrom, sources, links, aims, shaping, history, owner, flags, context] = await Promise.all([
+  const [map, readings, numberFrom, sources, links, aims, shaping, history, owner, flags, context, learnGoal] = await Promise.all([
     loadGoalMap(client, goalId, { userId: user.id, today }),
     loadReadings(client, goalId),
     // Where the number is worked out from, and what it could be (plan #1024).
@@ -223,6 +254,7 @@ export default async function GoalMapPage({
     // What Claude found in the other modules for this goal. A failed read
     // leaves the section out rather than the page.
     loadContext(client, goalId).catch((): ContextItem[] => []),
+    loadGoalLearn(learn, user.id, goalId),
   ]);
   if (!map) notFound();
   // The latest run on each step sent, prepared or asked about from its row
@@ -395,6 +427,7 @@ export default async function GoalMapPage({
         {flags.length > 0 && <GoalFlags flags={flags} />}
         {shapingUp && shapingPanel}
         {!numberEmpty && <GoalNumber {...number} />}
+        {learnGoal && <GoalLearn {...learnGoal} />}
         <GoalStepsFold closed={closed} meta={stepsMeta}>
           <StepTree
             map={map}
