@@ -133,6 +133,28 @@ export async function addThreadTurn(
 }
 
 /**
+ * The comment a Dash reply answers, as the cause its writes are recorded
+ * under in core.dash_actions (plan #1518): the turn and the row thread it sits
+ * in. Null when the turn is not the account's or is gone, and then the writes
+ * are recorded with no comment rather than not at all.
+ */
+export async function threadCause(
+  client: AnyClient,
+  input: { userId: string; turnId: string },
+): Promise<{ conversationId: string; turnId: string } | null> {
+  const { data, error } = await client
+    .schema('core')
+    .from('conversation_turns')
+    .select('id, conversation_id')
+    .eq('id', input.turnId)
+    .eq('user_id', input.userId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const row = data as { id: string; conversation_id: string | null };
+  return row.conversation_id ? { conversationId: row.conversation_id, turnId: row.id } : null;
+}
+
+/**
  * Takes one turn out of a thread and returns the ref of the row the thread
  * sits under, so the caller can redraw its page; null when there was no such
  * turn of the account's.
