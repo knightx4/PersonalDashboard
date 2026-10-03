@@ -32,7 +32,7 @@ import {
  * Beside the lookups it has four proposal tools (lib/ask/propose.ts, plans
  * #1188 and #1296): add a todo, add a goal step, mark an item returned, start
  * a watch. A proposal is
- * kept as a proposed row in core.dash_changes and nothing else is written;
+ * kept as a proposed row in core.dash_actions and nothing else is written;
  * the person confirms each on its own. Proposals count toward the lookup cap,
  * and one naming a row can only name a row a lookup returned, as citations do.
  *

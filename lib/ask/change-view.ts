@@ -89,7 +89,7 @@ export function changeSentence(change: DashChange, done: boolean, today?: string
 /** What became of a change, in a word or two beside it. */
 export const CHANGE_STATUS_LABEL: Record<DashChangeStatus, string> = {
   proposed: 'Waiting for you',
-  confirmed: 'Done',
+  done: 'Done',
   declined: 'Declined',
   undone: 'Undone',
 };

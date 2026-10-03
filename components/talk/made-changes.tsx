@@ -31,7 +31,7 @@ export function MadeChanges({
   return (
     <ul aria-label="Changes Dash made" className="divide-y divide-border border-y border-border">
       {changes.map((change) => {
-        const at = change.confirmedAt ?? change.createdAt;
+        const at = change.doneAt ?? change.createdAt;
         return (
           <li key={change.id} className="px-1 py-2.5">
             <DashChangeRow

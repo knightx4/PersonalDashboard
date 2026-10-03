@@ -34,11 +34,12 @@ const SOURCE: AskSource = {
 const BASE = {
   conversationId: 'c',
   turnId: 'a1',
+  subjectRef: null,
   writtenTable: null,
   writtenRef: null,
   undo: null,
   createdAt: '2026-09-29T10:00:00Z',
-  confirmedAt: null,
+  doneAt: null,
   declinedAt: null,
   undoneAt: null,
 } as const;
@@ -92,7 +93,7 @@ describe('a card in each state', () => {
   });
 
   it('links to the row once confirmed, with an Undo', () => {
-    const confirmed: DashChange = { ...TODO, status: 'confirmed', writtenTable: 'todo.tasks', writtenRef: 't9' };
+    const confirmed: DashChange = { ...TODO, status: 'done', writtenTable: 'todo.tasks', writtenRef: 't9' };
     const html = draw([confirmed]);
     expect(html).toContain(`href="${changeHref(confirmed).replace(/&/g, '&amp;')}"`);
     expect(html).toContain('/todo/all?status=all&amp;focus=t9');
@@ -137,7 +138,7 @@ describe('a reopened conversation', () => {
           turns={turns}
           changes={[
             { ...TODO, status: 'declined' },
-            { ...STEP, turnId: 'a2', status: 'confirmed', writtenTable: 'goals.items', writtenRef: 's1' },
+            { ...STEP, turnId: 'a2', status: 'done', writtenTable: 'goals.items', writtenRef: 's1' },
           ]}
           label="Ask a follow-up"
         />
@@ -157,11 +158,11 @@ describe('a reopened conversation', () => {
 describe('the changes Dash made, on the Ask page', () => {
   const made = (change: DashChange, question: string | null, at: string): MadeChange => ({
     ...change,
-    status: 'confirmed',
+    status: 'done',
     writtenTable: 'x',
     writtenRef: `${change.id}-row`,
     createdAt: at,
-    confirmedAt: at,
+    doneAt: at,
     question,
   });
   const list: MadeChange[] = [

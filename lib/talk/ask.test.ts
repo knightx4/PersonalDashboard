@@ -110,11 +110,12 @@ function memoryStores(existing: TalkTurn[] = []) {
         conversationId,
         turnId: null,
         status: 'proposed',
+        subjectRef: null,
         writtenTable: null,
         writtenRef: null,
         undo: null,
         createdAt: '2026-09-27T10:00:00Z',
-        confirmedAt: null,
+        doneAt: null,
         declinedAt: null,
         undoneAt: null,
       } as DashChange;

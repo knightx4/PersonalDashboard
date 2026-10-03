@@ -89,7 +89,7 @@ export const coreSources: ModuleSources = {
     { table: 'core.connector_calls', reason: 'Each call a connected Claude app made through the connector and the rows it returned, for the account page and the rate cap; the rows it points at are sources in their own modules.' },
     { table: 'core.connector_revocations', reason: 'When a connected app\'s access was removed, so its tokens stop working.' },
     { table: 'core.dash_handoffs', reason: 'Requests Ask Dash handed to the backup routine and whether it replied; the rows the routine wrote are sources in their own modules.' },
-    { table: 'core.dash_changes', reason: 'Changes Dash proposed in Ask Dash and whether they were confirmed, declined or undone; the rows a confirm wrote are sources in their own modules.' },
+    { table: 'core.dash_actions', reason: 'Every change Dash made or proposed, from any surface, with the row it wrote, its values before and after, and whether it was done, declined or undone; the rows it wrote are sources in their own modules.' },
     { table: 'core.day_briefs', reason: 'The morning brief: up to three picks from the agenda, replies, bills, goals and Dash\'s results, derived each day.' },
     { table: 'core.drafted_messages', reason: 'Follow-ups and return requests Dash wrote from the pipeline and orders, waiting to be sent.' },
     { table: 'core.email_accounts', reason: 'Mailbox connections and their tokens.' },
