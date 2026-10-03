@@ -221,6 +221,12 @@ adding the rule, with a check where one can be written. The notes are linked
 to the change and closed when it is applied, with a reply saying which rule
 now covers them. A single note is still fixed on its page, as now.
 
+Each note waiting on the rule carries the change in
+`feedback_items.spec_change_id` and sits in `planned`. If the person declines
+the change, its notes go back to the queue and are fixed page by page. The
+procedure is in `.claude/skills/notes` and the check in
+`scripts/note-rule.ts`.
+
 ## Where the person stays in the loop
 
 The person owns the visions, approves or declines spec changes, accepts an
