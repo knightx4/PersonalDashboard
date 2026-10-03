@@ -6,7 +6,8 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 import { loadSenders } from '@/lib/news/issues/load';
 import { formatArrival, issueHref } from '@/lib/news/issues/list';
-import { loadQuickRead, loadQuickSignals } from '@/lib/news/issues/quick';
+import { loadQuickRead, loadQuickSignals, loadRecentPasses } from '@/lib/news/issues/quick';
+import { dueNext, dueWhen, gotThrough, heldFor, passesToday } from '@/lib/news/quick/got-through';
 import { readTopic } from '@/lib/news/issues/topics';
 import { loadHiddenTopics } from '@/lib/news/quick/hidden-topics';
 import { loadReactions, reactionKey, type Reaction } from '@/lib/news/quick/reactions';
@@ -70,11 +71,12 @@ export default async function QuickReadPage({
   const user = await requireUser();
   const [client, vault] = await Promise.all([createNewsClient(), createVaultClient()]);
 
-  const [settings, senders, { issues, passes }, hidden] = await Promise.all([
+  const [settings, senders, { issues, passes }, hidden, recent] = await Promise.all([
     loadAccountSettings(user.id),
     loadSenders(client),
     loadQuickRead(client),
     loadHiddenTopics(client),
+    loadRecentPasses(client),
   ]);
 
   const signals = await loadQuickSignals(client, issues);
@@ -100,6 +102,19 @@ export default async function QuickReadPage({
       )
     : [];
   const wanted = params.pictures !== '0';
+
+  // What you got through today, for the card at the end of the deck (plan #1557).
+  const now = new Date();
+  const today = gotThrough(passesToday(recent, settings.timezone, now), issues);
+  const summary = {
+    read: today.read,
+    skipped: today.skipped,
+    longest: today.longest && { headline: today.longest.headline, held: heldFor(today.longest.ms) },
+    due: dueNext(issues, senders, now).map((due) => ({
+      from: due.from,
+      when: dueWhen(due.at, settings.timezone, now),
+    })),
+  };
   const topics = quickTopics(issues, senders, passes, hidden, signals.groups);
   const progress = quickProgress(issues, senders, passes, filter, signals.groups);
 
@@ -138,6 +153,7 @@ export default async function QuickReadPage({
       nothingYet={issues.length === 0}
       hiddenCount={hidden.length}
       progress={progress}
+      gotThrough={summary}
       saved={saved}
       sent={card ? sentOf(card) : null}
       reaction={card ? reactionOf(card) : null}

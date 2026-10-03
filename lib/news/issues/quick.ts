@@ -9,6 +9,7 @@ import {
   type StoryGroupRow,
   type StoryPass,
 } from '@/lib/news/quick/next';
+import type { TimedPass } from '@/lib/news/quick/got-through';
 import type { InterestRow } from '@/lib/news/quick/rank';
 import { markRead, markUnread } from './read';
 
@@ -94,6 +95,42 @@ export async function loadQuickRead(
     throw new Error(`news: reading the stories you have passed failed (${passes.error.message})`);
   }
   return { issues, passes: toPasses(passes.data) };
+}
+
+/**
+ * The stories passed in the last day and a half, with when each was passed
+ * and opened, for the card at the end of Quick read (plan #1557). Wider than
+ * a day so that any zone's today is inside it; passesToday in
+ * lib/news/quick/got-through.ts narrows it to the account's day.
+ *
+ * The card is a summary, never a condition for the page, so a failed read
+ * gives no passes rather than throwing.
+ */
+export async function loadRecentPasses(
+  client: NewsSupabaseClient,
+  now: Date = new Date(),
+): Promise<TimedPass[]> {
+  const since = new Date(now.getTime() - 36 * 60 * 60_000).toISOString();
+  const { data, error } = await client
+    .from('story_passes')
+    .select('issue_id, story_index, passed_at, opened_at')
+    .gte('passed_at', since)
+    .order('passed_at', { ascending: true })
+    .limit(1000);
+  if (error) return [];
+  return (
+    (data ?? []) as {
+      issue_id: string;
+      story_index: number;
+      passed_at: string;
+      opened_at: string | null;
+    }[]
+  ).map((row) => ({
+    issueId: row.issue_id,
+    storyIndex: row.story_index,
+    passedAt: row.passed_at,
+    openedAt: row.opened_at,
+  }));
 }
 
 /**
