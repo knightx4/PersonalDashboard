@@ -29,6 +29,11 @@ export type Area = {
   /** What you want from the area, in your own words; the brief for Plan this area. Null when unwritten. */
   note: string | null;
   position: number;
+  /**
+   * Whether this is the Learn area, whose goals are your learning goals
+   * (goals 0066, plan #1490). Adding one there places it and writes its plan.
+   */
+  learn?: boolean;
 };
 
 export type Goal = {
