@@ -19,7 +19,7 @@ import type { TodoSupabaseClient } from '@/lib/todo/db/schema-name';
 export type Dismissals = Map<string, { until: string | null }>;
 
 /** Which foreign_source enum value a source's dismissals are stored under. */
-export type DismissalSource = 'return_deadline' | 'goal_step' | 'recurring_payment';
+export type DismissalSource = 'return_deadline' | 'goal_step' | 'recurring_payment' | 'application';
 
 export async function loadDismissals(
   userId: string,

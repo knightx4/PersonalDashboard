@@ -20,7 +20,7 @@ import type { AgendaClients } from '@/lib/todo/agenda/clients';
 
 /**
  * Every source that exists. Off unless the account says otherwise, except a
- * source marked `alwaysOn`, whose items were each put here by hand.
+ * source marked `alwaysOn`.
  */
 export const SOURCE_IDS = [
   'job_reminders',
@@ -31,6 +31,7 @@ export const SOURCE_IDS = [
   'appointments',
   'bills',
   'drafts',
+  'applications',
 ] as const;
 
 export type SourceId = (typeof SOURCE_IDS)[number];
@@ -174,7 +175,9 @@ export interface AgendaSource {
    * Runs without a switch on the Todo settings page. For a source where every
    * item was already asked for one at a time -- a goal step is on Todo because
    * you pressed "Show on Todo" on it -- so a second, source-wide switch could
-   * only ever hide what you had just asked to see.
+   * only ever hide what you had just asked to see. Also for a source of moves
+   * that are on you (applications on you, plan #1475): the list is where
+   * everything on you shows, and a switch could only hide part of it.
    */
   alwaysOn?: boolean;
   /** One line, shown beside the switch. Say what appears, not how it works. */
