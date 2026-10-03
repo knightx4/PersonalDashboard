@@ -45,6 +45,17 @@ describe('the note connections route', () => {
     expect(await response.json()).toEqual({ ok: true, people: 1, results: [], failed: [] });
     expect(runNoteConnections).toHaveBeenCalled();
   });
+
+  it('answers 207 when anyone’s week failed, so the stored reply says so', async () => {
+    vi.mocked(runNoteConnections).mockResolvedValueOnce({
+      people: 1,
+      results: [],
+      failed: ['u1: Your credit balance is too low'],
+    });
+    const response = await POST(request('secret-token'));
+    expect(response.status).toBe(207);
+    expect(await response.json()).toMatchObject({ ok: false, failed: ['u1: Your credit balance is too low'] });
+  });
 });
 
 const migration = readFileSync(

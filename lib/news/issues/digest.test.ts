@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   bodyText,
   digestIssue,
+  isTransientDigestError,
   ISSUE_PURPOSES,
   readDigest,
   readLine,
@@ -324,6 +325,34 @@ describe('digesting a newsletter', () => {
     ).rejects.toThrow('clearing story_passes failed (permission denied)');
     // The new summary was saved first; the passes are what failed.
     expect(news.updates).toHaveLength(1);
+  });
+
+  it('leaves a new issue untouched when the API has no credit, so it is tried again', async () => {
+    // The 32 issues of 23 to 28 September were marked digested with this
+    // error and never retried. `issues_digest_ck` refuses an error without a
+    // digested_at, so nothing at all is written.
+    const credit = new Error(
+      '400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}',
+    );
+    const { outcome, news } = await run(credit, {
+      ...ISSUE,
+      received_at: new Date(Date.now() - 86_400_000).toISOString(),
+    });
+
+    expect(outcome).toMatchObject({ status: 'failed', retrying: true });
+    expect(news.updates).toEqual([]);
+  });
+
+  it('writes off an API failure on an issue more than a week old, so a retry cannot loop', async () => {
+    const overloaded = Object.assign(new Error('529 overloaded'), { status: 529 });
+    const { outcome, news } = await run(overloaded, {
+      ...ISSUE,
+      received_at: new Date(Date.now() - 8 * 86_400_000).toISOString(),
+    });
+
+    expect(outcome).toEqual({ status: 'failed', error: '529 overloaded' });
+    expect(news.updates[0]).toMatchObject({ digest_error: '529 overloaded' });
+    expect(news.updates[0]!.digested_at).toEqual(expect.any(String));
   });
 
   it('saves an error, and still records the spend, when the reply is unusable', async () => {
@@ -683,5 +712,23 @@ describe('reading the purpose', () => {
     expect(appeal.news.updates[0]).toMatchObject({ purpose: 'fundraising' });
     const none = await run(reported({ line: 'Plain', summary: 'Plain.', stories: [] }));
     expect(none.news.updates[0]).toMatchObject({ purpose: null });
+  });
+});
+
+describe('which failures are the API’s', () => {
+  it('counts no credit, rate limits, overload and server errors as passing', () => {
+    expect(
+      isTransientDigestError(new Error('400 {"error":{"message":"Your credit balance is too low"}}')),
+    ).toBe(true);
+    expect(isTransientDigestError(Object.assign(new Error('rate limited'), { status: 429 }))).toBe(true);
+    expect(isTransientDigestError(Object.assign(new Error('Overloaded'), { status: 529 }))).toBe(true);
+    expect(isTransientDigestError(new Error('503 Service Unavailable'))).toBe(true);
+  });
+
+  it('counts a reply that could not be read as the issue’s', () => {
+    expect(isTransientDigestError(new Error('The reply was cut off before it finished.'))).toBe(false);
+    expect(isTransientDigestError(Object.assign(new Error('400 bad request'), { status: 400 }))).toBe(
+      false,
+    );
   });
 });

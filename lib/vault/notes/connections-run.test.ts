@@ -26,13 +26,21 @@ const kept: NeighbourPair = {
   mutualRank: 1,
 };
 
-function fakePorts(options: { pairs?: NeighbourPair[]; ran?: boolean; sentences?: (string | null)[] } = {}) {
+function fakePorts(
+  options: {
+    pairs?: NeighbourPair[];
+    ran?: boolean;
+    /** The weeks with rows, by the day each is keyed by. The week before NOW by default. */
+    weeks?: string[];
+    sentences?: (string | null)[];
+  } = {},
+) {
   const written: ConnectionRow[] = [];
   const ledger: SpendReport[] = [];
   const asked: string[] = [];
   const ports: ConnectionRunPorts = {
-    async hasWeek() {
-      return options.ran ?? false;
+    async hasWeek(_userId, weekEnding) {
+      return options.ran ?? (options.weeks ?? ['2026-09-21']).includes(weekEnding);
     },
     async neighbours(_userId, since) {
       asked.push(since);
@@ -95,6 +103,19 @@ describe('runConnectionsFor', () => {
     expect(await runConnectionsFor(ports, 'u1', NOW)).toEqual({ status: 'quiet', pairs: 1 });
     expect(written).toEqual([]);
     expect(ledger).toEqual([]);
+  });
+
+  it('reads the week before as well when it has no rows, so a failed week is made up', async () => {
+    // 28 September: the model credit ran out, the route answered 200, and the
+    // week was lost with nothing to retry it.
+    const { ports, written, asked } = fakePorts({ pairs: [kept], weeks: [] });
+    expect(await runConnectionsFor(ports, 'u1', NOW)).toMatchObject({
+      status: 'written',
+      connections: 1,
+      caughtUp: true,
+    });
+    expect(asked).toEqual(['2026-09-14T13:37:00.000Z']);
+    expect(written[0]!.week_ending).toBe('2026-09-28');
   });
 
   it('does nothing when the week has already been written', async () => {

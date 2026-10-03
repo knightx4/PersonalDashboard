@@ -202,4 +202,19 @@ describe('digestPending', () => {
     expect(called.map((input) => input.issueId)).toEqual(['a']);
     expect(tally).toEqual({ digested: 1, failed: 0, missing: 0, left: 2 });
   });
+
+  it('stops at the first failure the API caused, leaving the rest for the next run', async () => {
+    const { client } = pendingClient([
+      { id: 'a', user_id: 'user-1' },
+      { id: 'b', user_id: 'user-1' },
+      { id: 'c', user_id: 'user-1' },
+    ]);
+    reply({ status: 'digested', summary: 'S', stories: [] });
+    reply({ status: 'failed', error: 'Your credit balance is too low', retrying: true });
+
+    const tally = await digestPending({ news: client, spend, anthropicApiKey: 'key' });
+
+    expect(called.map((input) => input.issueId)).toEqual(['a', 'b']);
+    expect(tally).toEqual({ digested: 1, failed: 1, missing: 0, left: 1 });
+  });
 });

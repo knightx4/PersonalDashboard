@@ -20,7 +20,12 @@ async function run(request: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   try {
-    return NextResponse.json({ ok: true, ...(await runObservations()) });
+    const summary = await runObservations();
+    // 207 when anyone's week failed, so the reply pg_net keeps in
+    // net._http_response says so. A 200 with the failures inside it read as a
+    // good run on 28 September, when the model credit ran out.
+    const failed = summary.failed.length > 0;
+    return NextResponse.json({ ok: !failed, ...summary }, { status: failed ? 207 : 200 });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'failed' },

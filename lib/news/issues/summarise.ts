@@ -17,7 +17,10 @@ import { rateNewIssue } from './importance';
  * this existed and any arrival whose digest never finished (no key on the
  * deployment, or the function stopped mid-call). A failed digest sets
  * `digested_at` too, so the catch-up does not pay for the same failure twice;
- * clearing `digested_at` on a row queues it again.
+ * clearing `digested_at` on a row queues it again. The exception is a failure
+ * the API caused -- no credit, a rate limit, an overloaded server -- on an
+ * issue under a week old: that leaves the row alone, so the next run tries it
+ * again (`DIGEST_RETRY_DAYS` in digest.ts).
  *
  * The catch-up also redoes the issues summarised before the one-line summary
  * existed (plan #824), rewriting each in place so its summary is never cleared
@@ -185,6 +188,12 @@ export async function digestPending(
     await groupAfterDigest({ ...input, userId: row.user_id as string, issueId }, outcome);
     tally[outcome.status] += 1;
     input.onIssue?.(issueId, outcome);
+    // The API refused for a reason of its own, and the next issue would go to
+    // the same API. The rest stay pending for the next run.
+    if (outcome.status === 'failed' && outcome.retrying) {
+      tally.left = rows.length - index - 1;
+      break;
+    }
   }
   return tally;
 }

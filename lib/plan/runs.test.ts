@@ -285,7 +285,7 @@ describe('endQuietRuns', () => {
     });
 
     expect(result.finished).toBe(1);
-    expect(updates).toEqual([{ values: { status: 'finished' }, ids: ['run-1'] }]);
+    expect(updates).toEqual([{ values: { status: 'finished', error: null }, ids: ['run-1'] }]);
   });
 
   it('finishes a run whose step was blocked after it was fired', async () => {
@@ -305,7 +305,7 @@ describe('endQuietRuns', () => {
     });
 
     expect(result.finished).toBe(1);
-    expect(updates).toEqual([{ values: { status: 'finished' }, ids: ['run-1'] }]);
+    expect(updates).toEqual([{ values: { status: 'finished', error: null }, ids: ['run-1'] }]);
   });
 
   it('falls back to the clock when nobody has read what was pushed', async () => {
@@ -317,6 +317,117 @@ describe('endQuietRuns', () => {
 
     expect(result.failed).toBe(1);
     expect(updates[0].values.error).toBe('Nothing was heard from this run for 5h.');
+  });
+
+  it('finishes a notes run that closed notes, rather than writing it off', async () => {
+    // Every notes run in the thirty days to 3 October was written off this
+    // way, including ones that had closed ten notes.
+    const { supabase, updates } = db([
+      { id: 'run-1', plan_item_id: null, created_at: minutesAgo(300), job: 'notes' } as never,
+    ]);
+
+    const result = await endQuietRuns({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      readWork: async () => new Map([['run-1', { done: 10 }]]),
+    });
+
+    expect(result).toEqual({ finished: 1, failed: 0, error: null });
+    expect(updates).toEqual([{ values: { status: 'finished', error: null }, ids: ['run-1'] }]);
+  });
+
+  it('says a run with nothing to show did nothing, as well as that it went quiet', async () => {
+    const { supabase, updates } = db([
+      { id: 'run-1', plan_item_id: null, created_at: minutesAgo(300), job: 'shape' } as never,
+    ]);
+
+    const result = await endQuietRuns({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      readWork: async () => new Map([['run-1', { done: 0 }]]),
+    });
+
+    expect(result.failed).toBe(1);
+    expect(updates[0].values.error).toBe(
+      'Nothing was heard from this run for 5h. No idea was shaped into a proposal while it ran.',
+    );
+  });
+
+  it('judges a re-shape on the clock, since it pushes nothing', async () => {
+    // Read through the push listing, the no-output mark wrote re-shapes off
+    // thirty minutes in while they were still writing steps.
+    const { supabase, updates } = db([
+      { id: 'run-1', plan_item_id: 'feature-1', created_at: minutesAgo(40), job: 'reshape' } as never,
+    ]);
+
+    const result = await endQuietRuns({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      pushes: [],
+      readWork: async () => new Map([['run-1', { done: 0 }]]),
+    });
+
+    expect(result).toEqual({ finished: 0, failed: 0, error: null });
+    expect(updates).toEqual([]);
+  });
+
+  it('ends a check-back run as soon as its check-backs are closed', async () => {
+    const { supabase, updates } = db([
+      { id: 'run-1', plan_item_id: null, created_at: minutesAgo(10), job: 'check_back' } as never,
+    ]);
+
+    const result = await endQuietRuns({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      readWork: async () => new Map([['run-1', { done: 1, over: true }]]),
+    });
+
+    expect(result.finished).toBe(1);
+    expect(updates).toEqual([{ values: { status: 'finished', error: null }, ids: ['run-1'] }]);
+  });
+
+  it('leaves a feature batch alone while its rows are still moving', async () => {
+    // A batch between one step and the next pushes nothing, and writing it off
+    // there let the runner send the same feature a second session. #723 was
+    // sent sixteen times that way.
+    const { supabase, updates } = db([
+      { id: 'run-1', plan_item_id: 'feature-1', created_at: minutesAgo(300), job: 'feature' } as never,
+    ]);
+
+    const result = await endQuietRuns({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      pushes: [],
+      readWork: async () => new Map([['run-1', { done: 2, busy: true }]]),
+    });
+
+    expect(result).toEqual({ finished: 0, failed: 0, error: null });
+    expect(updates).toEqual([]);
+  });
+
+  it('falls back to the clock when what the runs left behind cannot be read', async () => {
+    const { supabase, updates } = db([
+      { id: 'run-1', plan_item_id: null, created_at: minutesAgo(300), job: 'notes' } as never,
+    ]);
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await endQuietRuns({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      readWork: async () => {
+        throw new Error('feedback_items: down');
+      },
+    });
+
+    expect(result.failed).toBe(1);
+    expect(updates[0].values.error).toBe('Nothing was heard from this run for 5h.');
+    quiet.mockRestore();
   });
 });
 
