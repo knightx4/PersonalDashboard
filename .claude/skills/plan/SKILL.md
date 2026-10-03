@@ -107,6 +107,10 @@ If `DATABASE_URL` is missing, read `reference/offline.md` rather than guessing.
   now, and it is hidden from the page, from `next`, from `list` and from every
   brief. You will not normally see one; if you do, leave it exactly as it is.
   Dismissing something and bringing it back are both their moves.
+- A step **under an overhaul** (a feature with `track = 'overhaul'`, or any
+  row beneath one) belongs to that overhaul's run, which builds it in its own
+  order. `next --claude` still lists such steps, so skip them unless you were
+  sent for that overhaul; `reference/overhaul.md` is what that run follows.
 - Anything else, ask before starting. A step nobody has handed over may be one
   the user wants to do themselves, or is still thinking about.
 
@@ -226,6 +230,8 @@ Each is one file. Read the one you were sent for; do not read the others.
 | `reference/building.md` | Building one step, start to close. What a subagent reads. |
 | `reference/shaping.md` | Turning an idea into a proposed feature, or an approved spec change into approved work. |
 | `reference/reshaping.md` | Re-reading a feature against the answers beneath it. |
+| `reference/overhaul.md` | Working an overhaul: the design session, the three phases, the review against the Contract. |
+| `reference/overhaul-routine.md` | The standing prompt for the routine that works an overhaul, and how to set it up. |
 | `reference/comments.md` | Answering a comment that tags `@dash`. |
 | `reference/writing.md` | How to write a title and a detail. Read before writing any row. |
 | `reference/raising.md` | The four places something a session has to say can go. |
