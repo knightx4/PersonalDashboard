@@ -64,12 +64,12 @@ export function runnerOrder(sections: readonly PlanSection[]): PlanNode[] {
  * The night ran out of work rather than out of budget or clock.
  *
  * A sentence, like every other `ended_reason`, because the morning report
- * prints it verbatim. It says "handed to Claude" rather than "ready" because
+ * prints it verbatim. It says "handed to Dash" rather than "ready" because
  * that is the part a person can do something about in the morning: the plan
  * may be full of work, and none of it assigned over.
  */
 export const OVERNIGHT_NOTHING_READY =
-  'Nothing handed to Claude was ready to build, so it stopped early.';
+  'Nothing handed to Dash was ready to build, so it stopped early.';
 
 /**
  * What the tick should do now.
