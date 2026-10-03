@@ -16,8 +16,8 @@ import { useFormStatus } from 'react-dom';
 import { ArrowLeft, ArrowRight, ExternalLink, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
-import { parseBack, pushBack } from '@/lib/news/quick/back';
-import { swipeAxis, swipeFarEnough } from '@/lib/news/quick/swipe';
+import { BACK_PAGES, parseBack, passKey, pushBack } from '@/lib/news/quick/back';
+import { swipeAxis, swipeBackFarEnough, swipeFarEnough } from '@/lib/news/quick/swipe';
 import type { Reaction } from '@/lib/news/quick/reactions';
 import type { StoryPass } from '@/lib/news/quick/next';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
@@ -36,6 +36,9 @@ import {
  */
 export const QUICK_NEXT_FORM = 'quick-read-next';
 
+/** The id of the form Back submits on a phone card; a right swipe submits it too (plan #1445). */
+const QUICK_BACK_FORM = 'quick-read-back';
+
 /**
  * The one button #847 settled on. It records the story whether or not you
  * read it, with the same event's stories in other newsletters (plan #865),
@@ -46,6 +49,7 @@ export function QuickNextForm({ stories }: { stories: readonly StoryPass[] }) {
   const raw = useSyncExternalStore(subscribeBack, readBackStoriesRaw, () => null);
   const back = useMemo(() => parseBack(raw), [raw]);
   const previous = back.at(-1);
+  const retreat = useContext(RetreatContext);
   return (
     <>
       {/* Previous story (note 460be33e, on a phone): takes back the last
@@ -53,6 +57,8 @@ export function QuickNextForm({ stories }: { stories: readonly StoryPass[] }) {
           there is a card in this tab to go back to. */}
       {previous && (
         <form
+          id={QUICK_BACK_FORM}
+          onSubmit={() => retreat?.(passKey(previous))}
           action={async (form) => {
             writeBack(BACK_STORIES_KEY, back.slice(0, -1));
             await unpassQuickPage(form);
@@ -106,12 +112,38 @@ function PassFields({ stories }: { stories: readonly StoryPass[] }) {
 const AdvanceContext = createContext<(() => void) | null>(null);
 
 /**
- * What QuickDeck hands the swipe: the story drawn behind this one, so a drag
- * can bring it in from the right as the current card goes out (note
- * 3164d419). Null inside that drawing, so the card it draws does not draw one
- * of its own.
+ * What QuickDeck hands Back: show the card or page kept under this key, the
+ * one Back is taking back, while the undo is recorded (plan #1445).
  */
-const PeekContext = createContext<ReactNode>(null);
+const RetreatContext = createContext<((key: string) => void) | null>(null);
+
+/**
+ * What QuickDeck hands the swipe: the story drawn behind this one, so a drag
+ * to the left can bring it in from the right as the current card goes out
+ * (note 3164d419), and the card Back would bring back, so a drag to the right
+ * brings that in from the left. Null inside either drawing, so the card it
+ * draws does not draw its own.
+ */
+const PeekContext = createContext<{ next: ReactNode; previous: ReactNode } | null>(null);
+
+/**
+ * The cards and pages passed in this tab, kept as they were drawn under
+ * their passKey, so Back can show the one it takes back at once rather than
+ * wait for the page (plan #1445). Held in memory, so a reload empties it and
+ * Back then waits for the page as it used to. Twice BACK_PAGES, as the card
+ * and the laptop page each keep their own stack.
+ */
+const passedCards = new Map<string, ReactNode>();
+
+function rememberPassed(key: string, node: ReactNode) {
+  passedCards.delete(key);
+  passedCards.set(key, node);
+  while (passedCards.size > BACK_PAGES * 2) {
+    const oldest = passedCards.keys().next().value;
+    if (oldest === undefined) break;
+    passedCards.delete(oldest);
+  }
+}
 
 function NextButton() {
   const { pending } = useFormStatus();
@@ -140,24 +172,63 @@ function NextButton() {
  * deck starts again from it with the following story behind it. The next
  * story's picture is fetched ahead as well, so it does not arrive after the
  * words. With no story behind this one, Next waits for the page as before.
+ *
+ * Back works the same way the other way round (plan #1445). Each card or
+ * page Next passes is kept as it was drawn, under its `passes`, and Back
+ * shows the kept one the moment it is pressed, while the undo is recorded.
+ * `stack` says which Back stack the deck reads, the phone card's or the
+ * laptop page's. Next on a card Back brought back returns to the one Back
+ * left, which is what the page will come back with.
  */
 export function QuickDeck({
   current,
   next,
   nextImage,
+  passes,
+  stack,
 }: {
   current: ReactNode;
   next: ReactNode | null;
   nextImage: string | null;
+  passes: readonly StoryPass[];
+  stack: 'stories' | 'pages';
 }) {
   const [advanced, setAdvanced] = useState(false);
-  const advance = next ? () => setAdvanced(true) : null;
+  const [retreated, setRetreated] = useState<ReactNode>(null);
+  const raw = useSyncExternalStore(
+    subscribeBack,
+    stack === 'stories' ? readBackStoriesRaw : readBackPagesRaw,
+    () => null,
+  );
+  const top = useMemo(() => parseBack(raw).at(-1), [raw]);
+  const previous = top ? (passedCards.get(passKey(top)) ?? null) : null;
+
+  const key = passKey(passes);
+  const advance = () => {
+    if (retreated) {
+      setRetreated(null);
+      return;
+    }
+    rememberPassed(key, current);
+    if (next) setAdvanced(true);
+  };
+  const retreat = (backKey: string) => {
+    const kept = passedCards.get(backKey);
+    if (kept) setRetreated(kept);
+  };
+
+  const shown = retreated ? 'retreated' : advanced && next ? 'advanced' : 'current';
+  const peek = shown === 'current' ? { next, previous } : null;
   return (
     <AdvanceContext.Provider value={advance}>
-      <PeekContext.Provider value={advanced ? null : next}>
-        {advanced && next ? next : current}
-      </PeekContext.Provider>
-      {!advanced && nextImage && (
+      <RetreatContext.Provider value={retreat}>
+        <PeekContext.Provider value={peek}>
+          <Fragment key={shown}>
+            {shown === 'retreated' ? retreated : shown === 'advanced' ? next : current}
+          </Fragment>
+        </PeekContext.Provider>
+      </RetreatContext.Provider>
+      {shown === 'current' && nextImage && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={nextImage} alt="" referrerPolicy="no-referrer" hidden />
       )}
@@ -174,6 +245,7 @@ export function QuickPageForm({ stories }: { stories: readonly StoryPass[] }) {
   const raw = useSyncExternalStore(subscribeBack, readBackPagesRaw, () => null);
   const back = useMemo(() => parseBack(raw), [raw]);
   const previous = back.at(-1);
+  const retreat = useContext(RetreatContext);
   return (
     <div className="flex flex-wrap items-center gap-2">
       {/* Previous page (note 460be33e): takes back the last Next page's
@@ -181,6 +253,7 @@ export function QuickPageForm({ stories }: { stories: readonly StoryPass[] }) {
           a page in this tab to go back to. */}
       {previous && (
         <form
+          onSubmit={() => retreat?.(passKey(previous))}
           action={async (form) => {
             writeBack(BACK_PAGES_KEY, back.slice(0, -1));
             await unpassQuickPage(form);
@@ -360,7 +433,9 @@ export function ArticleLink({
 /**
  * A left swipe on the card does what Next does (#855), and nothing more:
  * it submits the Next form, so the story is recorded by the same action and
- * the button shows the same pending state.
+ * the button shows the same pending state. A right swipe does what Back does
+ * (plan #1445) the same way, once there is a card to go back to; before
+ * that a drag to the right is left to the page.
  *
  * Touch only. A laptop has the button, and a mouse drag across the card is
  * how text gets selected. A drag counts once it is mostly sideways and to the
@@ -370,7 +445,8 @@ export function ArticleLink({
  * while text is selected.
  *
  * The card follows the finger, with the story QuickDeck has drawn behind it
- * coming in from the right as it goes (note 3164d419). Let go short and both
+ * coming in from the right as it goes (note 3164d419), or the card Back
+ * would bring back coming in from the left. Let go short and both
  * spring back; let go far enough and the card slides the rest of the way out
  * before the form is sent, so the deck swaps to a story already in place.
  * Under prefers-reduced-motion it stays still and the swipe still works.
@@ -380,22 +456,24 @@ export function ArticleLink({
 export function QuickSwipe({ children }: { children: ReactNode }) {
   const surface = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState<number | null>(null);
-  // Let go far enough: the card is sliding the rest of the way out, and the
-  // form is sent when it has gone.
-  const [leaving, setLeaving] = useState(false);
+  // Let go far enough: the card is sliding the rest of the way out, to the
+  // left for Next and to the right for Back, and the form is sent when it
+  // has gone.
+  const [leaving, setLeaving] = useState<'next' | 'back' | null>(null);
   const sent = useRef(false);
   const peek = useContext(PeekContext);
   // Read by the touch handlers, which are attached once.
-  const hasPeek = useRef(false);
+  const hasPeek = useRef({ next: false, previous: false });
   useEffect(() => {
-    hasPeek.current = Boolean(peek);
+    hasPeek.current = { next: Boolean(peek?.next), previous: Boolean(peek?.previous) };
   }, [peek]);
 
-  // Sends the Next form once, when the card has finished leaving.
+  // Sends the form once, when the card has finished leaving.
   const send = () => {
     if (sent.current) return;
     sent.current = true;
-    submitNext();
+    if (leaving === 'back') submitForm(QUICK_BACK_FORM);
+    else submitForm(QUICK_NEXT_FORM);
   };
 
   // A transitionend that never comes (the tab hidden mid-slide) still sends.
@@ -412,7 +490,7 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
     if (!element) return;
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     let start: { x: number; y: number } | null = null;
-    let axis: 'swipe' | 'page' | null = null;
+    let axis: 'swipe' | 'back' | 'page' | null = null;
     let dx = 0;
 
     const selecting = () => {
@@ -438,27 +516,43 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
       }
       const moveX = event.touches[0]!.clientX - start.x;
       const moveY = event.touches[0]!.clientY - start.y;
-      axis ??= swipeAxis(moveX, moveY);
-      if (axis !== 'swipe') return;
+      axis ??= swipeAxis(moveX, moveY, Boolean(form(QUICK_BACK_FORM)));
+      if (axis !== 'swipe' && axis !== 'back') return;
       event.preventDefault();
-      dx = Math.min(0, moveX);
+      dx = axis === 'swipe' ? Math.min(0, moveX) : Math.max(0, moveX);
       if (!still?.matches) setOffset(dx);
     };
     const onEnd = () => {
       if (!start) return;
-      const claimed = axis === 'swipe';
+      const claimed = axis;
       start = null;
       axis = null;
       setOffset(null);
-      if (!claimed || !swipeFarEnough(dx, element.offsetWidth) || selecting()) return;
-      // The button is disabled while Next is pending, so a second swipe
-      // before the next card arrives sends nothing.
-      if (!nextForm() || nextPending()) return;
-      // Without motion there is nothing to watch go, and with no story
-      // drawn behind this one there is nothing to bring in: send at once,
-      // and the card springs back to wait for the page as it did before.
-      if (still?.matches || !hasPeek.current) submitNext();
-      else setLeaving(true);
+      if (selecting()) return;
+      const width = element.offsetWidth;
+      const direction =
+        claimed === 'swipe' && swipeFarEnough(dx, width)
+          ? 'next'
+          : claimed === 'back' && swipeBackFarEnough(dx, width)
+            ? 'back'
+            : null;
+      if (!direction) return;
+      const id = direction === 'next' ? QUICK_NEXT_FORM : QUICK_BACK_FORM;
+      // Either button is disabled while its form is pending, so a second
+      // swipe before the page comes back sends nothing.
+      if (
+        !form(id) ||
+        formPending(id) ||
+        formPending(QUICK_NEXT_FORM) ||
+        formPending(QUICK_BACK_FORM)
+      )
+        return;
+      // Without motion there is nothing to watch go, and with no card drawn
+      // on that side there is nothing to bring in: send at once, and the
+      // card springs back to wait for the page as it did before.
+      const drawn = direction === 'next' ? hasPeek.current.next : hasPeek.current.previous;
+      if (still?.matches || !drawn) submitForm(id);
+      else setLeaving(direction);
     };
 
     element.addEventListener('touchstart', onStart, { passive: true });
@@ -474,19 +568,25 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
   }, []);
 
   // The story behind this one rides a card's width and a gap to the right,
-  // in the same track, so it comes in exactly as far as this one goes out.
-  // Only drawn while a drag or the slide out is under way.
-  const showPeek = Boolean(peek) && (offset !== null || leaving);
-  const transform = leaving
-    ? `translateX(calc(-100% - ${PEEK_GAP}))`
-    : offset === null
-      ? undefined
-      : `translateX(${offset}px)`;
+  // in the same track, so it comes in exactly as far as this one goes out;
+  // the card Back would bring back rides the same distance to the left.
+  // Each is only drawn while a drag or the slide out goes its way.
+  const showNext = Boolean(peek?.next) && (leaving === 'next' || (offset !== null && offset < 0));
+  const showPrevious =
+    Boolean(peek?.previous) && (leaving === 'back' || (offset !== null && offset > 0));
+  const transform =
+    leaving === 'next'
+      ? `translateX(calc(-100% - ${PEEK_GAP}))`
+      : leaving === 'back'
+        ? `translateX(calc(100% + ${PEEK_GAP}))`
+        : offset === null
+          ? undefined
+          : `translateX(${offset}px)`;
 
   return (
     // Clip rather than hidden, so the sticky Next row inside still sticks to
     // the window; it keeps the story coming in from widening the page.
-    <div ref={surface} className={cn(showPeek && 'overflow-clip')}>
+    <div ref={surface} className={cn((showNext || showPrevious) && 'overflow-clip')}>
       <div
         className={cn(
           'relative',
@@ -499,15 +599,19 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
         }}
       >
         {children}
-        {showPeek && (
+        {(showNext || showPrevious) && (
           <PeekContext.Provider value={null}>
             <div
               inert
               aria-hidden
               className="absolute top-0 w-full"
-              style={{ left: `calc(100% + ${PEEK_GAP})` }}
+              style={
+                showNext
+                  ? { left: `calc(100% + ${PEEK_GAP})` }
+                  : { right: `calc(100% + ${PEEK_GAP})` }
+              }
             >
-              {peek}
+              {showNext ? peek?.next : peek?.previous}
             </div>
           </PeekContext.Provider>
         )}
@@ -523,20 +627,20 @@ const PEEK_GAP = '1rem';
 const LEAVE_MS = 200;
 
 /**
- * The Next form. The story coming in carries one with the same id while a
- * drag is under way, and it comes after this card in the document, so the
- * first is always the current card's.
+ * The Next or Back form. The card coming in carries ones with the same ids
+ * while a drag is under way, and it comes after this card in the document,
+ * so the first is always the current card's.
  */
-function nextForm(): HTMLFormElement | null {
-  const form = document.getElementById(QUICK_NEXT_FORM);
-  return form instanceof HTMLFormElement ? form : null;
+function form(id: string): HTMLFormElement | null {
+  const element = document.getElementById(id);
+  return element instanceof HTMLFormElement ? element : null;
 }
 
-function nextPending(): boolean {
-  return Boolean(nextForm()?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled);
+function formPending(id: string): boolean {
+  return Boolean(form(id)?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled);
 }
 
-function submitNext() {
-  const form = nextForm();
-  if (form && !nextPending()) form.requestSubmit();
+function submitForm(id: string) {
+  const element = form(id);
+  if (element && !formPending(id)) element.requestSubmit();
 }

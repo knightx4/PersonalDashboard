@@ -262,6 +262,8 @@ export function QuickReadView({
           nextImage={
             pictures && upNext?.card.kind === 'story' ? (upNext.card.story.image ?? null) : null
           }
+          passes={cardPasses(card)}
+          stack="stories"
         />
       </div>
 
@@ -272,6 +274,8 @@ export function QuickReadView({
             current={gridPage(page, pictures)}
             next={nextPage.length > 0 ? gridPage(nextPage, pictures) : null}
             nextImage={null}
+            passes={page.flatMap(({ card: c }) => cardPasses(c))}
+            stack="pages"
           />
         </div>
       )}

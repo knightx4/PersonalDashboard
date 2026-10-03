@@ -41,3 +41,11 @@ export function pushBack(stack: readonly StoryPass[][], page: readonly StoryPass
   const pairs = page.map(({ issueId, storyIndex }) => ({ issueId, storyIndex }));
   return [...stack, pairs].slice(-BACK_PAGES);
 }
+
+/**
+ * One page of passes as a single string, so the card that page drew can be
+ * kept under it and found again when Back takes that page off the stack.
+ */
+export function passKey(page: readonly StoryPass[]): string {
+  return page.map(({ issueId, storyIndex }) => `${issueId}:${storyIndex}`).join(',');
+}
