@@ -212,9 +212,9 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
   'app/api/cron/day-brief/route.ts#POST':
     'Fired every hour by pg_cron to write the morning brief for whoever it is six to eleven in the morning for; no press starts it.',
   'app/api/cron/week-review/route.ts#GET':
-    'Fired every hour on Sundays by pg_cron to write the review of the week just gone from 9am New York time; no press starts it.',
+    'Fired once on Sunday at 14:11 UTC by pg_cron to write the review of the week just gone; no press starts it.',
   'app/api/cron/week-review/route.ts#POST':
-    'Fired every hour on Sundays by pg_cron to write the review of the week just gone from 9am New York time; no press starts it.',
+    'Fired once on Sunday at 14:11 UTC by pg_cron to write the review of the week just gone; no press starts it.',
   'app/api/cron/youtube-library/route.ts#GET':
     'Fired four times a day by pg_cron to fetch and embed the YouTube library\'s transcripts; no press starts it.',
   'app/api/cron/youtube-library/route.ts#POST':

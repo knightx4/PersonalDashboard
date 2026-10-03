@@ -20,11 +20,11 @@ import {
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * The weekly review run (plan #1232), called every hour on Sundays by
+ * The weekly review run (plan #1232), called once on Sunday at 14:11 UTC by
  * pg_cron through /api/cron/week-review
- * (supabase/migrations/0127_week_review_cron.sql). It writes only from 9am
- * New York time (lib/week-review/review.ts, reviewWeekDue), once per person
- * and week.
+ * (supabase/migrations/0127_week_review_cron.sql, rescheduled in 0154). It
+ * writes only from 9am New York time (lib/week-review/review.ts,
+ * reviewWeekDue), once per person and week.
  *
  * The service clients bypass RLS, so every read and write names the person.
  * `written` in the ports is where the stored review leaves the database: the

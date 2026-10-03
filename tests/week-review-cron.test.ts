@@ -17,6 +17,7 @@ vi.mock('@/inngest/core/week-review', () => ({
 
 const { GET, POST } = await import('@/app/api/cron/week-review/route');
 const { runWeekReviews } = await import('@/inngest/core/week-review');
+const { reviewWeekDue } = await import('@/lib/week-review/review');
 
 function request(token: string | null) {
   const headers = new Headers({ host: 'example.test', 'x-forwarded-proto': 'https' });
@@ -52,6 +53,12 @@ const migration = readFileSync(
   'utf8',
 );
 
+// 0154 moved the job to once a Sunday (plan #1493); 0127 still creates it.
+const once = readFileSync(
+  join(import.meta.dirname, '..', 'supabase/migrations/0154_week_review_once.sql'),
+  'utf8',
+);
+
 const statements = migration
   .split('\n')
   .filter((line) => !line.trim().startsWith('--'))
@@ -65,8 +72,15 @@ describe('the week review schedule', () => {
     expect(unschedule).toBeLessThan(schedule);
   });
 
-  it('fires every hour on Sundays, since 9am in New York is 13:00 or 14:00 UTC by the season', () => {
-    expect(statements).toMatch(/'\d+ \* \* \* 0'/);
+  it('fires once on Sunday, at an hour past 9am in New York in either season', () => {
+    const schedule = once.match(/schedule := '(\d+) (\d+) \* \* 0'/);
+    expect(schedule).not.toBeNull();
+    expect(once).toContain("jobname = 'week-review-sunday'");
+    const [, minute, hour] = schedule!;
+    for (const day of ['2026-07-05', '2026-01-04']) {
+      const at = new Date(`${day}T${hour.padStart(2, '0')}:${minute.padStart(2, '0')}:00Z`);
+      expect(reviewWeekDue(at)).not.toBeNull();
+    }
   });
 
   it('posts to the route, reading the origin and secret from Vault', () => {
