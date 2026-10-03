@@ -31,6 +31,9 @@ import { deleteCardNote } from '@/app/learn/now/actions';
 import { addConceptNote } from './actions';
 import { BranchFromClaim } from './branch-from-claim';
 import { MaterialForClaim, NoMaterialNote } from './material';
+import { MapBranch, UnlocksMap } from './unlocks-map';
+import { isLit, litRecently } from '@/lib/learn/graph/lit';
+import { cn } from '@/lib/cn';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,9 +60,10 @@ export const dynamic = 'force-dynamic';
  * beside it.
  */
 
-function ConceptLink({ concept }: { concept: Concept }) {
+function ConceptLink({ concept, branch = false }: { concept: Concept; branch?: boolean }) {
   return (
-    <li className="flex gap-2">
+    <li className={cn('flex gap-2', branch && 'relative')}>
+      {branch && <MapBranch />}
       <StateMark concept={concept} className="mt-1" />
       <div className="min-w-0">
         <Link href={`/learn/c/${concept.id}`} className="text-ui text-ink hover:text-accent">
@@ -331,11 +335,17 @@ export default async function ConceptPage({ params }: { params: Promise<{ id: st
 
             {dependents.length > 0 && (
               <Group title="Rests on it">
-                <ul className="space-y-2">
+                {/* Drawn as a map, lit once the concept is known (plan #1562). */}
+                <UnlocksMap
+                  conceptId={concept.id}
+                  name={concept.name}
+                  lit={isLit(concept)}
+                  play={litRecently(concept, new Date())}
+                >
                   {dependents.map((row) => (
-                    <ConceptLink key={row.id} concept={row} />
+                    <ConceptLink key={row.id} concept={row} branch />
                   ))}
-                </ul>
+                </UnlocksMap>
               </Group>
             )}
 
