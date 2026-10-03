@@ -130,7 +130,7 @@ export function SearchScopeChip({
                 show(false);
               }}
               className={cn(
-                'press flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-ui transition-colors duration-150 hover:bg-sunken',
+                'press flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-ui transition-colors duration-quick hover:bg-sunken',
                 choice === scope ? 'text-ink' : 'text-ink-muted',
               )}
             >

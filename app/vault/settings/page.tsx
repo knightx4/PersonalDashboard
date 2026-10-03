@@ -267,7 +267,7 @@ function SyncProgressBar({ progress }: { progress: SyncProgress }) {
           className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-border"
         >
           <div
-            className={`h-full rounded-full transition-[width] duration-500 ${tone}`}
+            className={`h-full rounded-full transition-[width] duration-moment ${tone}`}
             style={{ width: `${progress.percent}%` }}
           />
         </div>

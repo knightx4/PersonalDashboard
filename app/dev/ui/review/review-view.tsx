@@ -226,7 +226,7 @@ export function ReviewView({ standings, only }: { standings: Standing[]; only: U
           href="/dev/ui/review"
           aria-current={only === null ? 'page' : undefined}
           className={cn(
-            'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-150',
+            'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-quick',
             only === null
               ? 'bg-accent text-surface'
               : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
@@ -240,7 +240,7 @@ export function ReviewView({ standings, only }: { standings: Standing[]; only: U
             href={{ pathname: '/dev/ui/review', query: { module: scope } }}
             aria-current={only === scope ? 'page' : undefined}
             className={cn(
-              'press rounded-full px-2.5 py-1 text-small font-medium capitalize transition-colors duration-150',
+              'press rounded-full px-2.5 py-1 text-small font-medium capitalize transition-colors duration-quick',
               only === scope
                 ? 'bg-accent text-surface'
                 : 'text-ink-muted hover:bg-accent-tint hover:text-accent',

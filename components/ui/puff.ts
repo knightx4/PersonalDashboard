@@ -14,8 +14,10 @@
  * all rather than appended and hidden.
  */
 
-/** The `puff` utility's duration in app/globals.css. Change both together. */
-export const PUFF_MS = 360;
+import { MOTION_MS } from '@/lib/motion';
+
+/** The `puff` utility's duration in app/globals.css: one move. */
+export const PUFF_MS = MOTION_MS.move;
 
 /** How many circles, and how far each one drifts from the point. */
 const PUFF_DOTS = 5;

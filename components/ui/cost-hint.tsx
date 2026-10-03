@@ -124,7 +124,7 @@ export function CostHint({
             setMode('closed');
           }
         }}
-        className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
+        className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
       >
         <CircleDollarSign className="size-3.5" strokeWidth={1.75} aria-hidden />
       </button>

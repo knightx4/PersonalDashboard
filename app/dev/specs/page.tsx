@@ -47,7 +47,7 @@ function SpecRow({ spec, comments }: { spec: SpecDoc; comments: number }) {
         href={`/dev/specs/${spec.slug}`}
         className={cn(
           cardVariants({ padding: 'dense' }),
-          'block transition-colors duration-150 hover:border-border-strong',
+          'block transition-colors duration-quick hover:border-border-strong',
         )}
       >
         <div className="flex items-start justify-between gap-3">

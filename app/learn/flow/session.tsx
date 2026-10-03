@@ -98,7 +98,7 @@ function TrackBar({ name, move }: { name?: string; move: TrackMove }) {
       >
         <div
           className={cn(
-            'h-full rounded-pill transition-[width] duration-700 ease-out motion-reduce:transition-none',
+            'h-full rounded-pill transition-[width] duration-moment ease-out-soft motion-reduce:transition-none',
             fell ? 'bg-danger' : 'bg-accent',
           )}
           style={{ width: `${shown}%` }}

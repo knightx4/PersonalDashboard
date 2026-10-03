@@ -305,7 +305,7 @@ function IssueSummary({ group }: { group: ChangelogGroup }) {
     <details className="group">
       <summary className="row-pad -mx-2 flex cursor-pointer list-none items-baseline gap-1.5 rounded-lg px-2 hover:bg-sunken [&::-webkit-details-marker]:hidden">
         <ChevronRight
-          className="size-3.5 shrink-0 self-center text-ink-ghost transition-transform duration-150 group-open:rotate-90"
+          className="size-3.5 shrink-0 self-center text-ink-ghost transition-transform duration-quick group-open:rotate-90"
           strokeWidth={1.75}
           aria-hidden
         />
@@ -381,7 +381,7 @@ function Entry({
       <details className="group/entry">
         <summary className="row-pad flex cursor-pointer list-none items-baseline gap-3 hover:bg-sunken [&::-webkit-details-marker]:hidden">
           <ChevronRight
-            className="size-3 shrink-0 self-center text-ink-ghost transition-transform duration-150 group-open/entry:rotate-90"
+            className="size-3 shrink-0 self-center text-ink-ghost transition-transform duration-quick group-open/entry:rotate-90"
             strokeWidth={1.75}
             aria-hidden
           />
@@ -408,7 +408,7 @@ function Entry({
                 a URL, and a note has no anchor of its own either. */}
             <Link
               href={entry.source === 'plan' ? '/dev/plan?view=all' : '/dev/bugs'}
-              className="transition-colors duration-150 hover:text-accent"
+              className="transition-colors duration-quick hover:text-accent"
             >
               {entry.source === 'plan' ? `${workspace} · plan` : `${workspace} · note`}
             </Link>

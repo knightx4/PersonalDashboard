@@ -79,7 +79,7 @@ export function StatusLine({
     <div className="pointer-events-none sticky bottom-0 z-status hidden border-t border-shell-border bg-shell/85 backdrop-blur lg:block">
       <div
         className={cn(
-          'flex items-center gap-2 px-4 py-1.5 font-mono text-micro transition-opacity duration-1000 sm:px-6',
+          'flex items-center gap-2 px-4 py-1.5 font-mono text-micro transition-opacity duration-moment sm:px-6',
           settled ? 'text-shell-muted/70' : 'text-shell-muted',
         )}
       >

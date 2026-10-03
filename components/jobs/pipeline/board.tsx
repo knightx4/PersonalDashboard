@@ -168,7 +168,7 @@ export function PipelineBoard({
             }
             onDrop={() => drop(column.setStatus)}
             className={cn(
-              'rounded-card bg-sunken transition-colors duration-150',
+              'rounded-card bg-sunken transition-colors duration-quick',
               over === column.setStatus && 'bg-accent-tint',
             )}
           >
@@ -213,7 +213,7 @@ export function PipelineBoard({
           onDragLeave={() => setOver((current) => (current === column.setStatus ? null : current))}
           onDrop={() => drop(column.setStatus)}
           className={cn(
-            'w-72 shrink-0 rounded-card bg-sunken p-2 transition-colors duration-150',
+            'w-72 shrink-0 rounded-card bg-sunken p-2 transition-colors duration-quick',
             over === column.setStatus && 'bg-accent-tint',
           )}
           aria-label={column.label}
@@ -328,7 +328,7 @@ function PipelineCard({
       <div className="flex items-start gap-1.5">
         {!muted && (
           <GripVertical
-            className="absolute top-1/2 -left-1 size-3 -translate-y-1/2 text-ink-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+            className="absolute top-1/2 -left-1 size-3 -translate-y-1/2 text-ink-muted opacity-0 transition-opacity duration-quick group-hover:opacity-100"
             strokeWidth={1.75}
             aria-hidden
           />
@@ -345,7 +345,7 @@ function PipelineCard({
         <div className="min-w-0 flex-1">
           <Link
             href={`/jobs/roles/${row.roleId}`}
-            className="block truncate text-small font-medium text-ink transition-colors duration-150 hover:text-accent"
+            className="block truncate text-small font-medium text-ink transition-colors duration-quick hover:text-accent"
           >
             {row.roleTitle}
           </Link>
@@ -481,7 +481,7 @@ function QuickReject({ row }: { row: PipelineRow }) {
       type="button"
       title="Send straight to rejected"
       onClick={() => setConfirming(true)}
-      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted opacity-0 transition-colors duration-150 hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted opacity-0 transition-colors duration-quick hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
     >
       <Ban className="size-4" strokeWidth={1.75} aria-hidden />
       <span className="sr-only">Send straight to rejected</span>
@@ -532,7 +532,7 @@ function Dismiss({ row }: { row: PipelineRow }) {
       type="button"
       title="Not a real pursuit — remove it"
       onClick={() => setConfirming(true)}
-      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted opacity-0 transition-colors duration-150 hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted opacity-0 transition-colors duration-quick hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
     >
       <X className="size-4" strokeWidth={1.75} aria-hidden />
       <span className="sr-only">Not a real pursuit — remove it</span>

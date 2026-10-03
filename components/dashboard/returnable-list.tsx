@@ -26,7 +26,7 @@ export function ReturnableList({ rows }: { rows: ReturnableRow[] }) {
               <li key={row.inventoryItemId}>
                 <Link
                   href={`/shopping/inventory/${row.inventoryItemId}`}
-                  className="row-pad flex items-center gap-3 transition-colors duration-150 hover:bg-canvas"
+                  className="row-pad flex items-center gap-3 transition-colors duration-quick hover:bg-canvas"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-ui font-medium text-ink">{row.name}</p>

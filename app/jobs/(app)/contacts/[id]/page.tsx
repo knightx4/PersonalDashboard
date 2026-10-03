@@ -55,7 +55,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
     <div className="mx-auto max-w-3xl">
       <Link
         href="/jobs/contacts"
-        className="mb-2 inline-flex items-center gap-1 text-ui text-ink-muted transition-colors duration-150 hover:text-ink"
+        className="mb-2 inline-flex items-center gap-1 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
       >
         <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
         Contacts

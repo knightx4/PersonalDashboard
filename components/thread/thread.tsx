@@ -133,7 +133,7 @@ function DeleteComment({
         type="submit"
         title="Delete this comment"
         disabled={pending}
-        className="press flex size-6 items-center justify-center rounded-lg text-ink-ghost transition-colors duration-150 hover:bg-sunken hover:text-ink disabled:opacity-50"
+        className="press flex size-6 items-center justify-center rounded-lg text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink disabled:opacity-50"
       >
         <X className="size-3.5" strokeWidth={2} aria-hidden />
         <span className="sr-only">Delete this comment</span>
@@ -212,7 +212,7 @@ function Message({
           <time
             dateTime={comment.createdAt}
             title={exactTime(comment.createdAt)}
-            className="tabular absolute top-1 right-0 whitespace-nowrap text-micro text-ink-ghost transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
+            className="tabular absolute top-1 right-0 whitespace-nowrap text-micro text-ink-ghost transition-opacity duration-quick sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
           >
             {shortWhen(comment.createdAt, now)}
           </time>
@@ -240,7 +240,7 @@ function Message({
       </div>
 
       {!unsent && (
-        <div className="shrink-0 transition-opacity duration-150 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+        <div className="shrink-0 transition-opacity duration-quick sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
           <DeleteComment id={comment.id} target={target} remove={remove} />
         </div>
       )}
@@ -540,7 +540,7 @@ export function Thread({
                   }
                   className={
                     // ui-ok: hand-rolled-box -- the subtle circle is what note 66f5a513 asked for, to set Dash's head apart from the words beside it.
-                    'press -ml-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border transition-colors duration-150 ' +
+                    'press -ml-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border transition-colors duration-quick ' +
                     (tagged
                       ? 'border-accent bg-accent-tint text-accent'
                       : 'border-control text-ink-ghost hover:bg-sunken hover:text-ink')

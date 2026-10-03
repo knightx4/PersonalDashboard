@@ -28,6 +28,7 @@ import {
   recordArticleOpened,
   unpassQuickPage,
 } from './actions';
+import { MOTION_MS } from '@/lib/motion';
 
 /**
  * The id of the form Next submits. A swipe on the card (#855) submits the
@@ -596,7 +597,7 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
         className={cn(
           'relative',
           offset === null && 'transition-transform ease-out-soft',
-          leaving ? 'duration-200' : 'duration-150',
+          'duration-quick',
         )}
         style={{ transform }}
         onTransitionEnd={(event) => {
@@ -628,8 +629,8 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
 /** The space between the card going out and the one coming in. */
 const PEEK_GAP = '1rem';
 
-/** How long the card takes to finish leaving once let go; `duration-200` above. */
-const LEAVE_MS = 200;
+/** How long the card takes to finish leaving once let go; `duration-quick` above. */
+const LEAVE_MS = MOTION_MS.quick;
 
 /**
  * The Next or Back form. The card coming in carries ones with the same ids

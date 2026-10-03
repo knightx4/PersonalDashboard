@@ -33,7 +33,7 @@ export function AddTrigger({
       disabled={disabled}
       className={cn(
         'press -ml-1.5 inline-flex items-center gap-1.5 rounded-control px-1.5 py-1',
-        'text-ui text-ink-ghost transition-colors duration-150 hover:bg-sunken hover:text-ink-muted disabled:opacity-50',
+        'text-ui text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink-muted disabled:opacity-50',
         className,
       )}
     >

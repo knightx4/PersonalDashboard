@@ -167,7 +167,7 @@ export default async function NewsPage({
                   href={listHref({ from: selected === sender.id ? null : sender.id, topic })}
                   aria-current={selected === sender.id ? 'true' : undefined}
                   className={cn(
-                    'min-w-0 flex-1 truncate rounded-control px-2 py-1.5 text-ui transition-colors duration-150 hover:bg-canvas',
+                    'min-w-0 flex-1 truncate rounded-control px-2 py-1.5 text-ui transition-colors duration-quick hover:bg-canvas',
                     selected === sender.id
                       ? 'bg-accent-tint font-medium text-ink'
                       : 'text-ink-muted',
@@ -239,7 +239,7 @@ export default async function NewsPage({
                         href={
                           selected ? `/news/i/${issue.id}?from=${selected}` : `/news/i/${issue.id}`
                         }
-                        className="flex items-baseline gap-3 px-4 py-3 transition-colors duration-150 hover:bg-canvas"
+                        className="flex items-baseline gap-3 px-4 py-3 transition-colors duration-quick hover:bg-canvas"
                       >
                         <span
                           className={cn(
@@ -321,7 +321,7 @@ function NewsletterList({
         <li key={sender.id}>
           <Link
             href={listHref({ from: sender.id, topic })}
-            className="flex items-baseline gap-3 px-4 py-3 transition-colors duration-150 hover:bg-canvas"
+            className="flex items-baseline gap-3 px-4 py-3 transition-colors duration-quick hover:bg-canvas"
           >
             <span
               className={cn(
@@ -377,7 +377,7 @@ function ViewSwitch({ view, topic }: { view: ListView; topic: NewsTopic | null }
           aria-current={view === option.key ? 'true' : undefined}
           className={cn(
             'press inline-flex h-(--control-h) items-center px-2.5 text-ui font-medium',
-            'transition-colors duration-150 focus-visible:outline-2 focus-visible:-outline-offset-2',
+            'transition-colors duration-quick focus-visible:outline-2 focus-visible:-outline-offset-2',
             view === option.key
               ? 'bg-accent-tint text-accent'
               : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',

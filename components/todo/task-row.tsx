@@ -403,7 +403,7 @@ export function TaskRow({
           {sortable && (
             <GripVertical
               className={cn(
-                'size-4 cursor-grab text-ink-ghost opacity-0 transition-opacity duration-150 group-hover:opacity-100',
+                'size-4 cursor-grab text-ink-ghost opacity-0 transition-opacity duration-quick group-hover:opacity-100',
                 grabbed && 'cursor-grabbing opacity-100',
               )}
               strokeWidth={1.75}
@@ -425,7 +425,7 @@ export function TaskRow({
             done ? run({ patch: { status: 'open' }, write: () => reopenTask(task.id) }) : complete()
           }
           className={cn(
-            'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-150',
+            'press mt-0.5 flex size-[18px] shrink-0 items-center justify-center transition-colors duration-quick',
             done
               ? 'text-status-offer'
               : dropped
@@ -481,7 +481,7 @@ export function TaskRow({
             {anchor && (
               <a
                 href={anchor.href}
-                className="truncate text-small text-ink-muted underline decoration-border underline-offset-2 transition-colors duration-150 hover:text-accent"
+                className="truncate text-small text-ink-muted underline decoration-border underline-offset-2 transition-colors duration-quick hover:text-accent"
               >
                 {anchor.label}
               </a>
@@ -496,7 +496,7 @@ export function TaskRow({
                 in{' '}
                 <a
                   href={under.href}
-                  className="underline decoration-border underline-offset-2 transition-colors duration-150 hover:text-accent"
+                  className="underline decoration-border underline-offset-2 transition-colors duration-quick hover:text-accent"
                 >
                   {under.label}
                 </a>
@@ -747,7 +747,7 @@ function TaskItems({
           type="button"
           aria-expanded={expanded}
           onClick={() => setOpen(!expanded)}
-          className="press flex items-center gap-1 rounded-lg py-0.5 text-small text-ink-muted transition-colors duration-150 hover:text-ink"
+          className="press flex items-center gap-1 rounded-lg py-0.5 text-small text-ink-muted transition-colors duration-quick hover:text-ink"
         >
           {expanded ? (
             <ChevronDown className="size-3.5" strokeWidth={1.75} aria-hidden />
@@ -800,7 +800,7 @@ function ItemRow({ item, onTick, onDrop }: { item: Task; onTick: () => void; onD
         aria-label={done ? 'Reopen' : 'Mark done'}
         onClick={onTick}
         className={cn(
-          'press mt-0.5 flex size-4 shrink-0 items-center justify-center transition-colors duration-150',
+          'press mt-0.5 flex size-4 shrink-0 items-center justify-center transition-colors duration-quick',
           done ? 'text-status-offer' : 'text-ink-muted hover:text-accent',
         )}
       >
@@ -820,7 +820,7 @@ function ItemRow({ item, onTick, onDrop }: { item: Task; onTick: () => void; onD
         type="button"
         title="Remove"
         onClick={onDrop}
-        className="press flex size-6 shrink-0 items-center justify-center rounded-lg text-ink-muted opacity-100 transition-colors duration-150 hover:bg-sunken hover:text-ink sm:opacity-0 sm:group-focus-within/item:opacity-100 sm:group-hover/item:opacity-100"
+        className="press flex size-6 shrink-0 items-center justify-center rounded-lg text-ink-muted opacity-100 transition-colors duration-quick hover:bg-sunken hover:text-ink sm:opacity-0 sm:group-focus-within/item:opacity-100 sm:group-hover/item:opacity-100"
       >
         <X className="size-3" strokeWidth={1.75} aria-hidden />
         <span className="sr-only">Remove</span>
@@ -900,7 +900,7 @@ function IconButton({
       type="button"
       title={label}
       onClick={onClick}
-      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
+      className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
     >
       {children}
       <span className="sr-only">{label}</span>
@@ -1059,7 +1059,7 @@ function DueLabel({
       type="button"
       onClick={() => setEditing(true)}
       title="Change when it is due"
-      className="tabular press rounded-control px-1 py-0.5 text-small text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
+      className="tabular press rounded-control px-1 py-0.5 text-small text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
     >
       {text}
     </button>

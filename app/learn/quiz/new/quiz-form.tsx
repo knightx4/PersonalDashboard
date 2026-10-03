@@ -171,7 +171,7 @@ export function QuizForm({ maxPasteChars }: { maxPasteChars: number }) {
                     type="button"
                     onClick={() => setPicked((all) => all.filter((one) => one.id !== note.id))}
                     title={`Not ${note.title}`}
-                    className="press flex size-5 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors duration-150 hover:bg-accent-tint hover:text-accent"
+                    className="press flex size-5 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors duration-quick hover:bg-accent-tint hover:text-accent"
                   >
                     <X className="size-3.5" strokeWidth={1.75} aria-hidden />
                     <span className="sr-only">Take {note.title} out of this quiz</span>

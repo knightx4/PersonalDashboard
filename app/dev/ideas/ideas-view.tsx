@@ -400,7 +400,7 @@ function ArrangeRow<T extends string>({
             aria-current={on ? 'true' : undefined}
             className={cn(
               'press inline-flex h-(--control-h) items-center px-2.5 text-ui font-medium',
-              'transition-colors duration-150 focus-visible:outline-2 focus-visible:-outline-offset-2',
+              'transition-colors duration-quick focus-visible:outline-2 focus-visible:-outline-offset-2',
               on
                 ? 'bg-accent-tint text-accent'
                 : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
@@ -520,7 +520,7 @@ export function IdeasView({
           <details key={group.key} open className="group/section space-y-2">
             <summary className="press flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
               <ChevronRight
-                className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open/section:rotate-90"
+                className="size-4 shrink-0 text-ink-ghost transition-transform duration-quick group-open/section:rotate-90"
                 strokeWidth={1.75}
                 aria-hidden
               />
@@ -549,7 +549,7 @@ export function IdeasView({
         <details open className="group/suggested space-y-2">
           <summary className="press flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
             <ChevronRight
-              className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open/suggested:rotate-90"
+              className="size-4 shrink-0 text-ink-ghost transition-transform duration-quick group-open/suggested:rotate-90"
               strokeWidth={1.75}
               aria-hidden
             />
@@ -579,7 +579,7 @@ export function IdeasView({
                 <details key={group.key} open className="group/suggested-module space-y-2">
                   <summary className="press flex cursor-pointer list-none items-center gap-1.5 text-ui font-semibold text-ink [&::-webkit-details-marker]:hidden">
                     <ChevronRight
-                      className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open/suggested-module:rotate-90"
+                      className="size-4 shrink-0 text-ink-ghost transition-transform duration-quick group-open/suggested-module:rotate-90"
                       strokeWidth={1.75}
                       aria-hidden
                     />
@@ -605,7 +605,7 @@ export function IdeasView({
         <details className="group/low">
           <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
             <ChevronRight
-              className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open/low:rotate-90"
+              className="size-4 shrink-0 text-ink-ghost transition-transform duration-quick group-open/low:rotate-90"
               strokeWidth={1.75}
               aria-hidden
             />
@@ -624,7 +624,7 @@ export function IdeasView({
         <details className="group">
           <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
             <ChevronRight
-              className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open:rotate-90"
+              className="size-4 shrink-0 text-ink-ghost transition-transform duration-quick group-open:rotate-90"
               strokeWidth={1.75}
               aria-hidden
             />
@@ -646,7 +646,7 @@ export function IdeasView({
         <details className="group">
           <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
             <ChevronRight
-              className="size-4 shrink-0 text-ink-ghost transition-transform duration-150 group-open:rotate-90"
+              className="size-4 shrink-0 text-ink-ghost transition-transform duration-quick group-open:rotate-90"
               strokeWidth={1.75}
               aria-hidden
             />

@@ -82,7 +82,7 @@ export async function SummarySection({
             <div key={stat.label} className="flex min-w-0 flex-col-reverse">
               <dt className="text-small text-ink-muted">{stat.label}</dt>
               <dd className="tabular text-body font-semibold tracking-tight text-ink">
-                <Link href={stat.href} className="transition-colors duration-150 hover:text-accent">
+                <Link href={stat.href} className="transition-colors duration-quick hover:text-accent">
                   {stat.value}
                 </Link>
               </dd>

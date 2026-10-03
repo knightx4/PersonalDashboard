@@ -62,7 +62,7 @@ export default async function AreaPage({ params }: { params: Promise<{ areaId: s
       <div>
         <Link
           href="/goals/all"
-          className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-150 hover:text-ink"
+          className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
         >
           <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> All goals
         </Link>
@@ -99,7 +99,7 @@ export default async function AreaPage({ params }: { params: Promise<{ areaId: s
                 <li key={goal.id}>
                   <Link
                     href={`/goals/${goal.id}`}
-                    className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
+                    className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-quick hover:bg-sunken"
                   >
                     <Flag className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
                     <span className="min-w-0 flex-1 text-ui break-words text-ink">{goal.title}</span>
@@ -148,7 +148,7 @@ function PracticeRow({ practice }: { practice: Practice }) {
     <li>
       <Link
         href={`/goals/${practice.goalId}`}
-        className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-150 hover:bg-sunken"
+        className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-quick hover:bg-sunken"
       >
         <Repeat className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
         <span className="min-w-0 flex-1">

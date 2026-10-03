@@ -125,7 +125,7 @@ export async function SinceSection({
                     (entry.roleId ? (
                       <Link
                         href={`/jobs/roles/${entry.roleId}`}
-                        className="text-ui text-ink transition-colors duration-150 hover:text-accent"
+                        className="text-ui text-ink transition-colors duration-quick hover:text-accent"
                       >
                         {entry.subject}
                       </Link>
@@ -146,7 +146,7 @@ export async function SinceSection({
 
           {(more > 0 || activity.entries.length > 0) && (
             <p className="text-small">
-              <Link href="/jobs/activity" className="text-ink-muted transition-colors duration-150 hover:text-accent">
+              <Link href="/jobs/activity" className="text-ink-muted transition-colors duration-quick hover:text-accent">
                 {more > 0 ? `${more} more on the Activity tab` : 'Everything on the Activity tab'}
               </Link>
             </p>

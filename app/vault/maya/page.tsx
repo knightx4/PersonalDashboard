@@ -49,7 +49,7 @@ export default async function MayaPage() {
           <li key={thread.id}>
             <Link
               href={mayaThreadHref(thread.id)}
-              className="flex items-baseline gap-4 px-4 py-3 transition-colors duration-150 hover:bg-canvas"
+              className="flex items-baseline gap-4 px-4 py-3 transition-colors duration-quick hover:bg-canvas"
             >
               <span className="min-w-0 flex-1">
                 <span className="block text-body font-medium text-ink">{thread.question}</span>

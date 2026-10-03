@@ -109,7 +109,7 @@ export function RoundsTable({
                 {' · '}
                 <Link
                   href={`/jobs/roles/${row.roleId}`}
-                  className="relative transition-colors duration-150 hover:text-accent"
+                  className="relative transition-colors duration-quick hover:text-accent"
                 >
                   {row.roleTitle}
                 </Link>

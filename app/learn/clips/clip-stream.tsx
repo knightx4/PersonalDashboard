@@ -521,4 +521,4 @@ export function ClipStream({
 /** A button on the black stage: no frame, a light wash, white ink. */
 const stageButton =
   'press inline-flex h-(--control-h) items-center gap-1.5 rounded-control bg-white/10 px-3 text-ui font-medium text-white ' +
-  'transition-colors duration-150 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 aria-pressed:bg-white/25';
+  'transition-colors duration-quick hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 aria-pressed:bg-white/25';

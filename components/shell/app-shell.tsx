@@ -328,7 +328,7 @@ export function AppShell({
       data-capture-nav={href}
       title={narrow ? label : undefined}
       className={cn(
-        'group relative flex items-center gap-2 rounded-lg py-1.5 text-ui font-medium transition-colors duration-150',
+        'group relative flex items-center gap-2 rounded-lg py-1.5 text-ui font-medium transition-colors duration-quick',
         narrow ? 'justify-center px-2' : 'pl-3 pr-2',
         on
           ? 'bg-shell-hover text-shell-ink'
@@ -340,7 +340,7 @@ export function AppShell({
           the mark key's fixed hue is vivid on all of them. */}
       <span
         className={cn(
-          'absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full transition-opacity duration-150',
+          'absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full transition-opacity duration-quick',
           on ? 'opacity-100' : 'opacity-0',
         )}
         style={{ background: (moduleById(module) ?? HOME_MARK).key.from }}
@@ -352,7 +352,7 @@ export function AppShell({
       {Icon && (
         <Icon
           className={cn(
-            'size-4 shrink-0 transition-colors duration-150',
+            'size-4 shrink-0 transition-colors duration-quick',
             on ? 'text-shell-ink' : 'text-shell-muted group-hover:text-shell-ink',
           )}
           strokeWidth={1.75}
@@ -483,7 +483,7 @@ export function AppShell({
           )}
           <span
             className={cn(
-              'absolute inset-x-6 top-0 h-0.5 rounded-b-full transition-opacity duration-150',
+              'absolute inset-x-6 top-0 h-0.5 rounded-b-full transition-opacity duration-quick',
               on ? 'opacity-100' : 'opacity-0',
             )}
             style={{ background: dockKey }}
@@ -599,7 +599,7 @@ export function AppShell({
                 title={collapsed ? 'Expand the sidebar' : 'Collapse the sidebar'}
                 aria-pressed={collapsed}
                 className={cn(
-                  'press flex w-full items-center gap-2 rounded-lg py-1.5 text-ui font-medium text-shell-muted transition-colors duration-150 hover:bg-shell-hover/60 hover:text-shell-ink',
+                  'press flex w-full items-center gap-2 rounded-lg py-1.5 text-ui font-medium text-shell-muted transition-colors duration-quick hover:bg-shell-hover/60 hover:text-shell-ink',
                   collapsed ? 'justify-center px-2' : 'pl-3 pr-2',
                 )}
               >

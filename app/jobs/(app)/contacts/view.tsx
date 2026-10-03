@@ -162,7 +162,7 @@ export function ContactsView({
                         // cell stretches, so the company is still its own destination.
                         <Link
                           href={`/jobs/companies/${contact.companySlug}`}
-                          className="relative transition-colors duration-150 hover:text-accent hover:underline"
+                          className="relative transition-colors duration-quick hover:text-accent hover:underline"
                         >
                           {contact.companyName}
                         </Link>

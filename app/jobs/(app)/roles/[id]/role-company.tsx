@@ -37,7 +37,7 @@ export function RoleCompany({
       <span className="inline-flex items-center gap-1.5">
         <Link
           href={`/jobs/companies/${slug}`}
-          className="transition-colors duration-150 hover:text-accent"
+          className="transition-colors duration-quick hover:text-accent"
         >
           {name}
         </Link>
@@ -51,7 +51,7 @@ export function RoleCompany({
             setEditing(true);
           }}
           title="Move this role to another company"
-          className="press -my-2 flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
+          className="press -my-2 flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
         >
           <Pencil className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
           <span className="sr-only">Move this role to another company</span>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { MOTION_MS } from '@/lib/motion';
 
 /**
  * The hooks a finishing mark is built from (plan #1339): whether the person
@@ -50,7 +51,7 @@ export function useChangedWhileWatched<T>(value: T): boolean {
   return changed || !Object.is(value, first);
 }
 
-/** ease-out-soft, as near as a cubic gets to --ease-out-soft. */
+/** ease-out-soft, as near as a cubic gets to --ease-out-soft (EASE.outSoft in lib/motion.ts). */
 export function easeOutSoft(t: number): number {
   const clamped = Math.min(1, Math.max(0, t));
   return 1 - Math.pow(1 - clamped, 3);
@@ -71,7 +72,7 @@ export function countAt(from: number, to: number, elapsed: number, durationMs: n
  */
 export function useCountUp(
   target: number,
-  { durationMs = 300, from = 'previous' }: { durationMs?: number; from?: 'previous' | 'zero' } = {},
+  { durationMs = MOTION_MS.move, from = 'previous' }: { durationMs?: number; from?: 'previous' | 'zero' } = {},
 ): number {
   const reduceMotion = useReducedMotion();
   const [shown, setShown] = useState(from === 'zero' ? 0 : target);

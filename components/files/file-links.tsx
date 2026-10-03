@@ -25,7 +25,7 @@ export function FileLinks({ files, bare = false }: { files: FileLinkItem[]; bare
         <li key={file.fileId}>
           <Link
             href={fileHref(file.fileId)}
-            className="card-pad-x row-pad flex items-start gap-3 transition-colors duration-150 hover:bg-sunken"
+            className="card-pad-x row-pad flex items-start gap-3 transition-colors duration-quick hover:bg-sunken"
           >
             <FileText className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
             <span className="min-w-0 flex-1">

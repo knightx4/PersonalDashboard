@@ -55,7 +55,7 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
+            className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
             title="Edit their details"
           >
             <Pencil className="size-4" strokeWidth={1.75} aria-hidden />

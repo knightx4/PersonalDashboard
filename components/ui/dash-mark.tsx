@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { cn } from '@/lib/cn';
 import { HOME_MARK } from '@/lib/modules';
 import { GROUND } from './module-mark';
+import { MOTION_MS } from '@/lib/motion';
 
 /**
  * Dash's own mark: a visor with two eyes, cut from the fat dash of the app
@@ -266,7 +267,7 @@ function Working({ id, paint, activity }: Paint & { id: string; activity?: DashA
             <Pill
               key={line.y}
               className="dash-mark-streak"
-              style={{ animationDelay: `${index * 180}ms` }}
+              style={{ animationDelay: `${index * MOTION_MS.quick}ms` }}
               x={line.x}
               y={line.y - 0.7}
               width={line.width}

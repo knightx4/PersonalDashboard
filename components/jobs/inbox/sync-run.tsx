@@ -130,7 +130,7 @@ export function SyncProgressBar({ accountId, job }: { accountId: string; job: Sy
       >
         <div
           className={cn(
-            'h-full rounded-full transition-[width] duration-500 ease-out',
+            'h-full rounded-full transition-[width] duration-moment ease-out-soft',
             view.failed ? 'bg-status-rejected' : 'bg-accent',
           )}
           style={{ width: `${Math.round(view.fraction * 100)}%` }}

@@ -557,7 +557,7 @@ export function PlanView({
                 className={cn(
                   'press flex cursor-pointer list-none flex-wrap items-center justify-between gap-2',
                   'px-3 py-2.5 [&::-webkit-details-marker]:hidden',
-                  'transition-colors duration-150 hover:bg-sunken',
+                  'transition-colors duration-quick hover:bg-sunken',
                   'focus-visible:outline-2 focus-visible:-outline-offset-2',
                   // The hairline belongs to the fold, not to the list: it is
                   // what joins the header to what it opened, and a border round
@@ -569,7 +569,7 @@ export function PlanView({
                   <ChevronRight
                     aria-hidden
                     strokeWidth={2}
-                    className="size-4 shrink-0 text-ink-muted transition-transform duration-150 group-open/section:rotate-90"
+                    className="size-4 shrink-0 text-ink-muted transition-transform duration-quick group-open/section:rotate-90"
                   />
                   {section.label}
                 </h2>
@@ -649,7 +649,7 @@ export function PlanView({
             className={cn(
               'press flex cursor-pointer list-none flex-wrap items-center justify-between gap-2',
               'px-3 py-2.5 [&::-webkit-details-marker]:hidden',
-              'transition-colors duration-150 hover:bg-sunken',
+              'transition-colors duration-quick hover:bg-sunken',
               'focus-visible:outline-2 focus-visible:-outline-offset-2',
               'group-open/section:border-b group-open/section:border-border',
             )}
@@ -658,7 +658,7 @@ export function PlanView({
               <ChevronRight
                 aria-hidden
                 strokeWidth={2}
-                className="size-4 shrink-0 text-ink-muted transition-transform duration-150 group-open/section:rotate-90"
+                className="size-4 shrink-0 text-ink-muted transition-transform duration-quick group-open/section:rotate-90"
               />
               Finished
             </h2>

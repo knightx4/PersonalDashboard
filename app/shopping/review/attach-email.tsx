@@ -152,7 +152,7 @@ function OtherOrderPicker({
                 type="button"
                 disabled={pending}
                 onClick={() => onPick(row.messageId, order.orderId)}
-                className="press flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-150 hover:bg-surface disabled:opacity-50"
+                className="press flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-quick hover:bg-surface disabled:opacity-50"
               >
                 <span className="min-w-0 flex-1 truncate text-ui text-ink">
                   {orderLabel(order)}

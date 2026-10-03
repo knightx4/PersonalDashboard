@@ -167,7 +167,7 @@ export function ActivityFeed({
                       (entry.roleId ? (
                         <Link
                           href={`/jobs/roles/${entry.roleId}`}
-                          className="text-ui text-ink transition-colors duration-150 hover:text-accent"
+                          className="text-ui text-ink transition-colors duration-quick hover:text-accent"
                         >
                           {entry.subject}
                         </Link>

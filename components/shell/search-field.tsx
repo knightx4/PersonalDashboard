@@ -100,7 +100,7 @@ export function SearchField({
               setValue('');
             }}
             // Sized to sit inside the field, so smaller than the standard size-8 icon button.
-            className="press absolute right-1 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
+            className="press absolute right-1 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
           >
             <X className="size-3.5" strokeWidth={2} aria-hidden />
             <span className="sr-only">Clear search</span>

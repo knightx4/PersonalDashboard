@@ -34,7 +34,7 @@ export function OrderItemTags({
               {!readOnly && (
                 <button
                   type="button"
-                  className="press flex items-center rounded-sm text-ink-muted transition-colors duration-150 hover:text-danger disabled:opacity-50"
+                  className="press flex items-center rounded-sm text-ink-muted transition-colors duration-quick hover:text-danger disabled:opacity-50"
                   disabled={pending}
                   onClick={() =>
                     startTransition(async () => {

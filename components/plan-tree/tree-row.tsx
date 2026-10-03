@@ -391,7 +391,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
             >
               <ChevronDown
                 className={cn(
-                  'size-3.5 transition-transform duration-150',
+                  'size-3.5 transition-transform duration-quick',
                   !expanded && '-rotate-90',
                 )}
                 strokeWidth={1.75}
@@ -604,7 +604,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
             the menu, which is how a phone reaches them. */}
         <div className="flex items-center justify-self-end">
           {quickActions && (
-            <div className="hidden items-center opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 sm:flex">
+            <div className="hidden items-center opacity-0 transition-opacity duration-quick group-focus-within:opacity-100 group-hover:opacity-100 sm:flex">
               {quickActions}
             </div>
           )}
@@ -663,7 +663,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                 >
                   <ChevronDown
                     className={cn(
-                      'size-3.5 transition-transform duration-150',
+                      'size-3.5 transition-transform duration-quick',
                       !detailsShown && '-rotate-90',
                     )}
                     strokeWidth={1.75}

@@ -109,7 +109,7 @@ export default async function ReadingListsPage({
               <li key={track.id}>
                 <Link
                   href={`/learn/t/${track.id}`}
-                  className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3.5 pr-4 transition-colors duration-150 hover:bg-canvas"
+                  className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3.5 pr-4 transition-colors duration-quick hover:bg-canvas"
                   style={{ paddingLeft: inset }}
                 >
                   <span className="min-w-0">
@@ -142,7 +142,7 @@ export default async function ReadingListsPage({
                       <li key={reading.id}>
                         <Link
                           href={`/learn/r/${reading.id}`}
-                          className="flex items-center gap-1.5 py-1 pl-5 pr-4 text-ui text-ink-muted transition-colors duration-150 hover:text-ink"
+                          className="flex items-center gap-1.5 py-1 pl-5 pr-4 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
                         >
                           <CornerDownRight
                             className="size-3.5 shrink-0"

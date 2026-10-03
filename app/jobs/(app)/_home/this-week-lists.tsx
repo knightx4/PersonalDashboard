@@ -80,7 +80,7 @@ export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: s
                   </span>
                   <Link
                     href={`/jobs/roles/${lead.roleId}?tab=interviews&interview=${lead.id}`}
-                    className="text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
+                    className="text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
                   >
                     {/* The whole row opens the same place -- prep materials on
                         the role's Interviews tab -- so this stretches to cover
@@ -127,7 +127,7 @@ export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: s
                 </span>
                 <Link
                   href={`/jobs/roles/${row.roleId}`}
-                  className="text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
+                  className="text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
                 >
                   {row.companyName} · {row.roleTitle}
                 </Link>
@@ -151,7 +151,7 @@ export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: s
                 {reminder.roleId ? (
                   <Link
                     href={`/jobs/roles/${reminder.roleId}`}
-                    className="text-ui font-medium text-ink transition-colors duration-150 hover:text-accent"
+                    className="text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
                   >
                     {reminder.companyName} · {reminder.roleTitle}
                   </Link>

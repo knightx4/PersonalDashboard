@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { captureAction } from '@/lib/capture/actions';
 import { captureDestination, goalsPlaceName, todoDayName } from '@/lib/capture/destination';
 import { LANDED_PULSE_MS, markLanded, namePosition } from '@/components/ui/landed';
+import { MOTION_MS } from '@/lib/motion';
 import type { FiledEntry } from '@/lib/goals/capture';
 
 const todo = captureAction('todo')!;
@@ -157,7 +158,8 @@ describe('the landed-pulse keyframes', () => {
 
   it('run for LANDED_PULSE_MS, under a second', () => {
     const utility = css.match(/@utility landed-pulse \{[^}]*\}/)?.[0] ?? '';
-    expect(utility).toContain(`animation: landed-pulse ${LANDED_PULSE_MS}ms`);
+    expect(utility).toContain('animation: landed-pulse var(--motion-move)');
+    expect(LANDED_PULSE_MS).toBe(MOTION_MS.move);
     expect(LANDED_PULSE_MS).toBeLessThan(1000);
   });
 

@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { cn } from '@/lib/cn';
+import { MOTION_MS } from '@/lib/motion';
 
 /**
  * The quiet-day sigil.
@@ -42,21 +43,21 @@ const CELL = 8;
 const NODE = 6.2;
 const BOX = GRID * CELL;
 
-/** The gap between one cell starting to draw in and the next, as in app/globals.css. */
-export const SIGIL_CELL_STAGGER_MS = 40;
+/** The gap between one cell starting to draw in and the next, as in app/globals.css: half an instant. */
+export const SIGIL_CELL_STAGGER_MS = MOTION_MS.instant / 2;
 /**
  * The last place in the stagger. A sigil has fourteen cells at most when its
  * seed draws well; one that ran out of attempts can have more, and those land
  * with the fourteenth, so the draw is never longer than sigilDrawMs(14).
  */
 const SIGIL_LAST_STAGGER = 13;
-/** How long one cell takes to draw in, as in app/globals.css. */
-export const SIGIL_CELL_MS = 240;
+/** How long one cell takes to draw in, as in app/globals.css: one move. */
+export const SIGIL_CELL_MS = MOTION_MS.move;
 
 /**
  * How long drawing in a sigil of `cells` cells takes, from the first cell
  * starting to the last one landing. Fourteen cells, the most a sigil has,
- * take 760ms.
+ * take 845ms.
  */
 export function sigilDrawMs(cells: number): number {
   if (cells <= 0) return 0;

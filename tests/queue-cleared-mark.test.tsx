@@ -33,9 +33,9 @@ describe('the sigil drawing in', () => {
   });
 
   it('is in under a second for the busiest sigil', () => {
-    expect(sigilDrawMs(14)).toBe(760);
+    expect(sigilDrawMs(14)).toBe(845);
     expect(QUEUE_CLEARED_MS).toBeLessThan(1000);
-    expect(sigilDrawMs(1)).toBe(240);
+    expect(sigilDrawMs(1)).toBe(260);
     expect(sigilDrawMs(0)).toBe(0);
   });
 

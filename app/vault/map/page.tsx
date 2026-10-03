@@ -81,7 +81,7 @@ export default async function VaultMapPage({
           <li key={theme.id}>
             <Link
               href={`/vault/map/${theme.id}`}
-              className="flex items-baseline gap-4 px-4 py-3 transition-colors duration-150 hover:bg-canvas"
+              className="flex items-baseline gap-4 px-4 py-3 transition-colors duration-quick hover:bg-canvas"
             >
               <span className="min-w-0 flex-1">
                 <span className="block text-body font-medium text-ink">{theme.name}</span>

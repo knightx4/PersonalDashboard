@@ -171,7 +171,7 @@ export function EditableProse({
             type="button"
             onClick={begin}
             title={editLabel ?? `Edit ${label.toLowerCase()}`}
-            className="press absolute right-0 top-0 inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-small text-ink-ghost transition-colors duration-150 hover:bg-sunken hover:text-ink-muted"
+            className="press absolute right-0 top-0 inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-small text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink-muted"
           >
             <Pencil className="size-3" strokeWidth={1.75} aria-hidden />
             Edit
@@ -207,7 +207,7 @@ export function EditableProse({
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className="press inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-small text-ink-ghost transition-colors duration-150 hover:bg-sunken hover:text-ink-muted"
+          className="press inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-small text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink-muted"
         >
           <Maximize2 className="size-3" strokeWidth={1.75} aria-hidden />
           Full screen
@@ -275,7 +275,7 @@ function Expanded({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
+            className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
           >
             <X className="size-4" strokeWidth={1.75} aria-hidden />
           </button>
@@ -320,7 +320,7 @@ export function ProseAtRest({
           type="button"
           onClick={onEdit}
           title={title}
-          className="press absolute right-0 top-0 inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-small text-ink-ghost transition-colors duration-150 hover:bg-sunken hover:text-ink-muted"
+          className="press absolute right-0 top-0 inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-small text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink-muted"
         >
           <Pencil className="size-3" strokeWidth={1.75} aria-hidden />
           Edit
@@ -336,7 +336,7 @@ export function ProseAtRest({
       title={title}
       className={cn(
         'group/prose -mx-1.5 -my-1 block w-full rounded-card px-1.5 py-1 text-left',
-        'transition-colors duration-150 hover:bg-sunken',
+        'transition-colors duration-quick hover:bg-sunken',
         className,
       )}
     >

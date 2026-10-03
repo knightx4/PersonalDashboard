@@ -48,7 +48,7 @@ export function ReturnFuse({
     >
       <span
         className={cn(
-          'block h-full rounded-full transition-[width] duration-500',
+          'block h-full rounded-full transition-[width] duration-moment',
           HEALTH_STATES[health].fill,
         )}
         style={{ width: `${Math.round(fraction * 100)}%` }}

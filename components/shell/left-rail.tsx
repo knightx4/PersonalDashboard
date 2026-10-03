@@ -280,7 +280,7 @@ export function RailItem({
   href?: string;
 }) {
   const className = cn(
-    'flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-ui transition-colors duration-150',
+    'flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-ui transition-colors duration-quick',
     active
       ? 'bg-accent-tint font-medium text-accent'
       : 'text-ink-muted hover:bg-sunken hover:text-ink',

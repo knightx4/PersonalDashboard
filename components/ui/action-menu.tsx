@@ -109,7 +109,7 @@ export const IconActionButton = forwardRef<
       title={label}
       className={cn(
         'press inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted',
-        'transition-colors duration-150',
+        'transition-colors duration-quick',
         'hover:bg-accent-tint hover:text-accent',
         'focus-visible:outline-2 focus-visible:outline-offset-2',
         'disabled:pointer-events-none disabled:opacity-40',

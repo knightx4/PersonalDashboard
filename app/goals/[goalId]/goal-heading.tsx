@@ -50,7 +50,7 @@ export function GoalHeadingField({
         {shown || 'Add when it is done…'}
         <Pencil
           className={cn(
-            'shrink-0 text-ink-muted transition-opacity duration-150 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-visible:opacity-100',
+            'shrink-0 text-ink-muted transition-opacity duration-quick sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-visible:opacity-100',
             isTitle ? 'size-4' : 'size-3.5',
           )}
           strokeWidth={1.75}

@@ -82,7 +82,7 @@ export function AttributeFilterPicker({
                     href={href}
                     // A rail row, set exactly like the ones in every other
                     // RailGroup — these are the same thing, revealed later.
-                    className="block truncate rounded-lg px-2.5 py-1.5 text-ui text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink"
+                    className="block truncate rounded-lg px-2.5 py-1.5 text-ui text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
                   >
                     {value}
                   </Link>

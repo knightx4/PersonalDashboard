@@ -431,7 +431,7 @@ function CapturePanel({
                 key={other.id}
                 type="button"
                 onClick={() => onSwitch(other)}
-                className="press flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-small text-ink-muted transition-colors duration-150 hover:bg-accent-tint hover:text-accent"
+                className="press flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-small text-ink-muted transition-colors duration-quick hover:bg-accent-tint hover:text-accent"
               >
                 <ModuleMark module={other.module} size="sm" />
                 {other.label}
@@ -506,7 +506,7 @@ function CapturePanel({
                 value={isCalendarDay(day) ? day : ''}
                 onChange={(event) => setDay(event.target.value)}
                 className={cn(
-                  'tabular rounded-full bg-transparent px-2 py-1 text-small outline-none transition-colors duration-150',
+                  'tabular rounded-full bg-transparent px-2 py-1 text-small outline-none transition-colors duration-quick',
                   'focus:ring-1 focus:ring-accent/40',
                   isCalendarDay(day) ? 'text-ink' : 'text-ink-muted',
                 )}
@@ -629,7 +629,7 @@ function MoveGuess({
               aria-pressed={on}
               onClick={() => onPick(on ? null : move)}
               className={cn(
-                'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-150',
+                'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-quick',
                 on
                   ? 'bg-accent text-fill-ink'
                   : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
@@ -748,7 +748,7 @@ function FiledLines({
                     type="button"
                     disabled={answering !== null}
                     onClick={() => answer(index, estimate)}
-                    className="press rounded-full px-2.5 py-1 text-small font-medium text-ink-muted transition-colors duration-150 hover:bg-accent-tint hover:text-accent disabled:opacity-50"
+                    className="press rounded-full px-2.5 py-1 text-small font-medium text-ink-muted transition-colors duration-quick hover:bg-accent-tint hover:text-accent disabled:opacity-50"
                   >
                     {ESTIMATE_CHIPS[estimate]}
                   </button>
@@ -789,7 +789,7 @@ function DayChip({
       aria-pressed={on}
       onClick={() => onPick(on ? '' : day)}
       className={cn(
-        'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-150',
+        'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-quick',
         on ? 'bg-accent text-fill-ink' : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
       )}
     >

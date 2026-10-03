@@ -57,6 +57,7 @@ import { markMentions } from '@/lib/learn/feed/mentions';
 import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 import { Mentioned, PhraseExplainer, usePhraseExplainer } from './phrase-explainer';
 import { TeachBackCard } from './teach-back-card';
+import { MOTION_MS } from '@/lib/motion';
 
 /**
  * The Learn now deck (LEARN-NOW-SPEC, "Cards after the first week").
@@ -85,7 +86,7 @@ import { TeachBackCard } from './teach-back-card';
 
 const SWIPE_X = 90;
 const SWIPE_Y = 110;
-const LEAVE_MS = 180;
+const LEAVE_MS = MOTION_MS.quick;
 
 type Leaving = { id: string; swipe: SwipeAction } | null;
 
@@ -586,7 +587,7 @@ function DeckCard({
         // Text on the card can be selected to have it explained (plan #1057);
         // a drag already claimed as a swipe selects nothing.
         drag && 'select-none',
-        !drag && 'transition-[transform,opacity] duration-200 ease-out',
+        !drag && 'transition-[transform,opacity] duration-quick ease-out-soft',
         leaving && 'opacity-0',
       )}
       style={{ transform }}

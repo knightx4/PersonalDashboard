@@ -29,7 +29,7 @@ export function DoneSinceList({ done }: { done: DoneSince }) {
       {done.more > 0 && (
         <Link
           href="/goals/runs"
-          className="card-pad-x row-pad flex items-center gap-1.5 border-t border-border text-small text-ink-muted transition-colors duration-150 hover:text-ink"
+          className="card-pad-x row-pad flex items-center gap-1.5 border-t border-border text-small text-ink-muted transition-colors duration-quick hover:text-ink"
         >
           {done.more} more {done.more === 1 ? 'change' : 'changes'} on the Runs page
         </Link>

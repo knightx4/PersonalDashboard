@@ -314,7 +314,7 @@ export function SelectionCheckbox({
         }}
         className={cn(
           'size-4 rounded border-border text-accent focus:ring-accent/30',
-          'transition-opacity duration-150 focus-visible:opacity-100',
+          'transition-opacity duration-quick focus-visible:opacity-100',
           'group-hover/select:opacity-100 group-focus-within/select:opacity-100',
           'pointer-coarse:opacity-100',
           // The highlight is not DOM focus, so group-focus-within does not see

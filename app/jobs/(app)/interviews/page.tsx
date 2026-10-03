@@ -146,7 +146,7 @@ export default async function InterviewsPage() {
                     only reason this list exists. */}
                 <Link
                   href={interviewHref(row.roleId, row.leadId)}
-                  className="font-medium text-ink transition-colors duration-150 hover:text-accent"
+                  className="font-medium text-ink transition-colors duration-quick hover:text-accent"
                 >
                   {row.companyName} · {row.roleTitle}
                 </Link>

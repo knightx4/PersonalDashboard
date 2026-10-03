@@ -229,7 +229,7 @@ export function WorkspaceSwitcher({
         // workspace without opening this at all.
         title={compact ? active.label : 'Switch workspace'}
         className={cn(
-          'press flex w-full items-center gap-2 rounded-lg py-1.5 transition-colors duration-150',
+          'press flex w-full items-center gap-2 rounded-lg py-1.5 transition-colors duration-quick',
           compact ? 'justify-center px-1' : 'pl-1.5 pr-2',
           onShell
             ? open
@@ -292,7 +292,7 @@ export function WorkspaceSwitcher({
                 onClick={() => setOpen(false)}
                 onFocus={() => setActiveIndex(index)}
                 className={cn(
-                  'flex items-start gap-2.5 rounded-lg px-2 py-2 transition-colors duration-150',
+                  'flex items-start gap-2.5 rounded-lg px-2 py-2 transition-colors duration-quick',
                   isCurrent ? 'bg-accent-tint' : 'hover:bg-sunken',
                 )}
               >
