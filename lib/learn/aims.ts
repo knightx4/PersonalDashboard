@@ -4,6 +4,14 @@
  * The page says Goals. The code says aims, because `goals` already means a
  * concept typed into a track (LEARN-GRAPH-SPEC).
  *
+ * Each aim is also a goal in the Learn area on /goals (goals 0066, plan
+ * #1490), named by `goalId`. The goal owns the wording and whether it is
+ * active: its title is the aim's name, its done-when the aim's line, and
+ * parking, closing or archiving it archives the aim. Triggers keep the aim's
+ * row in step, so every read of learn.aims (the feed, the plans, the flow,
+ * the survey) steers by the goal as it now stands. What only Learn needs
+ * stays here: the depth, the placement and the track.
+ *
  * An aim with `listSource` null is an open subject, placed in a field or a
  * domain of the area grid. An aim with `listSource` 'level3' is the list of
  * Level 3 vital articles in learn.area_check_articles, and is never placed.
@@ -32,13 +40,15 @@ export type Aim = {
   /** Set once placement has answered, even when it left the aim out of every field. */
   placedAt: string | null;
   archivedAt: string | null;
+  /** The goal in the Learn area on /goals that owns this aim's wording; null only if that goal was deleted. */
+  goalId: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
 /** The columns `toAim` reads, for a `.select()`. */
 export const AIM_COLUMNS =
-  'id, name, about, depth, list_source, field_id, domain_id, placed_at, archived_at, created_at, updated_at';
+  'id, name, about, depth, list_source, field_id, domain_id, placed_at, archived_at, goal_id, created_at, updated_at';
 
 export type AimRow = {
   id: string;
@@ -50,6 +60,7 @@ export type AimRow = {
   domain_id: string | null;
   placed_at: string | null;
   archived_at: string | null;
+  goal_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -69,6 +80,7 @@ export function toAim(row: AimRow): Aim {
     domainId: row.domain_id,
     placedAt: row.placed_at,
     archivedAt: row.archived_at,
+    goalId: row.goal_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

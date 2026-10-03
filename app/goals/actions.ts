@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { isOwner } from '@/lib/dev/owner';
@@ -21,7 +22,9 @@ import {
   unarchiveArea,
   updateGoal,
 } from '@/lib/goals/store';
-import { parseAreaName, parseAreaNote, parseGoalFields } from '@/lib/goals/tree';
+import { parseAreaName, parseAreaNote, parseGoalFields, type GoalFields } from '@/lib/goals/tree';
+import { createLearnClient } from '@/lib/learn/auth/server';
+import { steerLearnAfterGoalSaved } from '@/lib/learn/goal-saved';
 
 /**
  * The Goals home's writes for areas and goals (plan #924): add, rename,
@@ -37,6 +40,23 @@ export type GoalsActionState = { error?: string; message?: string; done?: number
 
 const Id = z.string().uuid();
 const Direction = z.enum(['up', 'down']);
+
+/**
+ * A goal in the Learn area is a learning goal (plan #1490): once one is added
+ * or reworded, Learn places it and gives it its plan after the response. The
+ * database has already carried the wording into Learn; this is the part that
+ * needs a model call.
+ */
+function steerLearnLater(userId: string, goalId: string): void {
+  after(async () => {
+    await steerLearnAfterGoalSaved(await createLearnClient(), userId, goalId);
+  });
+}
+
+/** Whether an edit changes what Learn reads from a goal: its wording, or its area. */
+function rewordsForLearn(fields: GoalFields): boolean {
+  return 'title' in fields || 'acceptance' in fields || 'areaId' in fields;
+}
 
 function saved(): GoalsActionState {
   // The layout, so the daily view on the home and the All goals list both
@@ -249,6 +269,7 @@ export async function addGoal(_prev: GoalsActionState, form: FormData): Promise<
       ...rest,
     });
     if (!added) return { error: 'That area is no longer on the page.' };
+    steerLearnLater(user.id, added);
   } catch {
     return { error: 'The goal could not be saved. Try again.' };
   }
@@ -261,7 +282,7 @@ export async function addGoal(_prev: GoalsActionState, form: FormData): Promise<
  */
 // latency: pending
 export async function editGoal(_prev: GoalsActionState, form: FormData): Promise<GoalsActionState> {
-  await requireUser();
+  const user = await requireUser();
   const id = Id.safeParse(form.get('id'));
   if (!id.success) return { error: 'Could not tell which goal that was.' };
   const parsed = parseGoalFields((key) => form.get(key));
@@ -276,6 +297,7 @@ export async function editGoal(_prev: GoalsActionState, form: FormData): Promise
           : 'That goal is no longer on the page.',
       };
     }
+    if (rewordsForLearn(parsed.value)) steerLearnLater(user.id, id.data);
   } catch {
     return { error: 'The change could not be saved. Try again.' };
   }

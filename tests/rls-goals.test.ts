@@ -469,8 +469,9 @@ describe('goals links', () => {
         insert into links (user_id, item_id, kind, target_id)
         values (${userA}, ${goalA}, 'application', gen_random_uuid())`),
     ).rejects.toThrow(/no application/);
-    // And the other account cannot see A's links at all.
-    const seen = await asUser(userB, (tx) => tx`select id from links`);
+    // And the other account cannot see A's links at all. (B has links of its
+    // own now: its aim above has a goal in B's Learn area, goals 0066.)
+    const seen = await asUser(userB, (tx) => tx`select id from links where user_id = ${userA}`);
     expect(seen).toHaveLength(0);
   });
 });
