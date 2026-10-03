@@ -12,6 +12,7 @@
     "db:reset": "./scripts/db-reset.sh",
     "check:contrast": "tsx scripts/check-contrast.ts",
     "check:ui": "tsx scripts/check-ui.ts",
+    "check:specs": "tsx scripts/check-specs.ts",
     "sources:write": "tsx scripts/sources-write.ts",
     "pages:write": "tsx scripts/pages-write.ts",
     "preview": "UI_PREVIEW=1 next build && UI_PREVIEW=1 next start -p ${PREVIEW_PORT:-3400}",

@@ -18,7 +18,7 @@
 #
 #   types   typecheck, then build. The build rewrites .next/types, which tsc
 #           reads, so the two cannot overlap.
-#   lint    lint, contrast, UI laws
+#   lint    lint, contrast, UI laws, spec counts
 #   test    the whole vitest suite, tests/ included
 #
 # Every lane runs to the end. Each failing step is named, with the tail of its
@@ -79,7 +79,7 @@ rm -rf .next/types
 start=$SECONDS
 lane types "Typecheck" npm run -s typecheck -- "Build" npm run -s build &
 types=$!
-lane lint "Lint" npm run -s lint -- "Contrast" npm run -s check:contrast -- "UI laws" npm run -s check:ui &
+lane lint "Lint" npm run -s lint -- "Contrast" npm run -s check:contrast -- "UI laws" npm run -s check:ui -- "Spec counts" npm run -s check:specs &
 lint=$!
 lane test "Test" npx vitest run &
 test=$!
