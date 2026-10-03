@@ -28,6 +28,7 @@ import type { DevComment } from '@/lib/comments/load';
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import { decideWithJev } from '@/lib/jev/decide';
 import type { RaisedQueue, RaisedRow } from '@/lib/raised/load';
+import type { SpecChange } from '@/lib/specs/changes';
 
 /** One row of the section, flattened out of the tree it came from. */
 export type WaitingRow = {
@@ -205,7 +206,14 @@ export type WaitingGroupKey = 'actions' | 'questions' | 'approve';
  */
 export type WaitingEntry =
   | { kind: 'plan'; id: string; row: WaitingRow }
-  | { kind: 'raise'; id: string; raise: RaisedRow };
+  | { kind: 'raise'; id: string; raise: RaisedRow }
+  | { kind: 'spec'; id: string; spec: WaitingSpecChange };
+
+/**
+ * A change to a spec waiting on your yes (plan #1506), with the spec's title
+ * looked up where the registry can be read, on the server.
+ */
+export type WaitingSpecChange = { change: SpecChange; specTitle: string | null };
 
 export type WaitingGroup = {
   key: WaitingGroupKey;
@@ -358,6 +366,8 @@ export function waitingGroups(
   queue: Pick<RaisedQueue, 'open'>,
   /** The plan's rows, when they have been through `sortAsksWithJev` first. */
   rows: WaitingRow[] = waitingOnYou(sections),
+  /** Proposed changes to specs; only a yes or a no finishes one. */
+  specChanges: readonly WaitingSpecChange[] = [],
 ): WaitingGroup[] {
   const entries: Record<WaitingGroupKey, WaitingEntry[]> = {
     actions: [],
@@ -372,6 +382,12 @@ export function waitingGroups(
   // were in when every raise sat in one fold.
   for (const raise of queue.open) {
     entries[groupOf(raise)].push({ kind: 'raise', id: raise.id, raise });
+  }
+  // Last in To approve: a spec change is a read of a diff before the yes, and
+  // the proposals above it are one press each.
+  for (const spec of specChanges) {
+    if (spec.change.status !== 'proposed') continue;
+    entries.approve.push({ kind: 'spec', id: spec.change.id, spec });
   }
 
   return (['actions', 'questions', 'approve'] as const).map((key) => ({

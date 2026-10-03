@@ -9,6 +9,7 @@ import {
   waitingOnYou,
 } from '@/lib/plan/waiting';
 import { raisedQueueFrom, type RaisedRow } from '@/lib/raised/load';
+import type { SpecChange } from '@/lib/specs/changes';
 
 let counter = 0;
 
@@ -75,7 +76,11 @@ function laidOut(items: PlanItem[], raises: RaisedRow[] = []) {
     groups(items, raises).map((group) => [
       group.title,
       group.entries.map((entry) =>
-        entry.kind === 'plan' ? `#${entry.row.number}` : entry.raise.title,
+        entry.kind === 'plan'
+          ? `#${entry.row.number}`
+          : entry.kind === 'raise'
+            ? entry.raise.title
+            : entry.spec.change.title,
       ),
     ]),
   );
@@ -270,6 +275,32 @@ describe('the row a page has to finish', () => {
 });
 
 describe('waitingGroups', () => {
+  it('puts a proposed spec change last under To approve, and an approved one nowhere', () => {
+    const change = (id: string, status: SpecChange['status']): SpecChange => ({
+      id,
+      spec: 'spec-layer',
+      title: `Change ${id}`,
+      why: 'Because.',
+      diff: '--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b',
+      status,
+      madeBy: 'claude',
+      planItemId: null,
+      decidedAt: status === 'proposed' ? null : '2026-10-01T00:00:00Z',
+      createdAt: '2026-10-01T00:00:00Z',
+    });
+    const laid = waitingGroups(
+      buildPlanTree({ items: [item({ id: 'a', number: 1, status: 'proposed' })], dependencies: [] }),
+      raisedQueueFrom([]),
+      undefined,
+      [
+        { change: change('s1', 'proposed'), specTitle: 'Spec layer' },
+        { change: change('s2', 'approved'), specTitle: 'Spec layer' },
+      ],
+    );
+    const approve = laid.find((group) => group.key === 'approve')!;
+    expect(approve.entries.map((entry) => `${entry.kind}:${entry.id}`)).toEqual(['plan:a', 'spec:s1']);
+  });
+
   it('sorts a stopped step, a question and a proposal into the three groups', () => {
     expect(
       laidOut([
