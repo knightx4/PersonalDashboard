@@ -144,6 +144,8 @@ export const PAID_ACTIONS = {
   // Dev: Dash's reply to a comment that tags it
   'app/dev/comment-actions.ts#addComment': ['reply-to-comment'],
   'app/dev/raised/actions.ts#decideRaise': ['reply-to-comment'],
+  // Any other thread, a file's first (plan #1441): Dash's reply when tagged
+  'app/thread-actions.ts#addRowComment': ['reply-to-comment'],
 
   // News: making the list of recommended newsletters. The view also presses
   // this once on its own, the first time it opens with no list stored.

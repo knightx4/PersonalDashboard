@@ -23,9 +23,9 @@ vi.mock('@/app/goals/[goalId]/comment-actions', () => {
   const noop = async () => ({});
   return { addGoalComment: noop, deleteGoalComment: noop };
 });
-vi.mock('@/app/goals/files/[fileId]/comment-actions', () => {
+vi.mock('@/app/thread-actions', () => {
   const noop = async () => ({});
-  return { addFileComment: noop, deleteFileCommentAction: noop };
+  return { addRowComment: noop, deleteRowComment: noop };
 });
 vi.mock('@/app/jobs/(app)/roles/[id]/comment-actions', () => {
   const noop = async () => ({});
@@ -151,14 +151,13 @@ describe('one thread for any row', () => {
     expect(html).toContain(`name="subject" value="job_search.roles:${ROW}"`);
   });
 
-  it('offers the tag wherever Dash answers, and not on a file', () => {
-    for (const target of ['step', 'idea', 'goal', 'role'] as const) {
+  it('offers the tag on every thread, a file included (plan #1441)', () => {
+    for (const target of ['step', 'idea', 'goal', 'role', 'file'] as const) {
       expect(open({ subject: threadRef(target, ROW) })).toContain('Tag @dash');
     }
 
-    const file = open({ subject: threadRef('file', ROW) });
-    expect(file).not.toContain('Tag @dash');
-    expect(file).toContain('Dash reads it before revising the file.');
+    // Untagged, a note on a file is still read before the file is revised.
+    expect(open({ subject: threadRef('file', ROW) })).toContain('Dash reads it before revising the file.');
   });
 
   it('says a raise is an answer, tagged or not', () => {

@@ -20,7 +20,8 @@
  * answer is not coming.
  */
 import { mentionsDash } from './mention';
-import type { CommentAuthor, CommentTarget } from './load';
+import type { CommentAuthor } from './load';
+import type { ThreadTarget } from '@/lib/thread/subjects';
 
 /** How long a thread goes on expecting an answer before it stops saying so. */
 export const REPLY_EXPECTED_MINUTES = 120;
@@ -29,8 +30,8 @@ type Turn = { author: CommentAuthor; body: string; createdAt: string };
 
 export function awaitingDash(
   thread: readonly Turn[],
-  /** A dev row's target, 'goal' for a goal or step (plan #957), or 'role' for a role in Jobs. */
-  target: CommentTarget | 'goal' | 'role',
+  /** Which kind of row the thread is on (lib/thread/subjects.ts). */
+  target: ThreadTarget,
   now: number,
 ): boolean {
   const last = thread[thread.length - 1];
