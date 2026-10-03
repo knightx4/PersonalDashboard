@@ -7,9 +7,9 @@
 -- (docs/CORE-AND-DASH-SPEC.md, decision 1). The notes on a company, a contact,
 -- an application or a round are notes rather than a conversation with Dash,
 -- and they stay here and keep taking writes: only a note with role_id set is
--- refused. Nothing is deleted.
+-- turned away. Nothing is deleted.
 --
--- In this folder rather than migrations-job-search, which runs before
+-- In this folder rather than the job-search folder, which runs before
 -- core.conversations exists on a fresh database. The same order as 0168:
 -- lock, then copy, in one transaction, then count per role and stop if any
 -- differs. Each note keeps its id as the turn's id, so the copy can run again
