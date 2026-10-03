@@ -196,42 +196,88 @@ You are given what the section was picked for, how deep to pitch it, the ideas t
 
 3. Write a card for each idea. The person reads its parts in this order, knowing nothing about the section beforehand, and each card must stand on its own.
 
-name: The idea in two to six words, as a title ("Demand fails before cash"). Sentence case.
+name: The idea in two to six words, as a title ("Demand fails before cash"). Sentence case. At most ${MAX_NAME_CHARS} characters.
 
-claim: The idea as one plain sentence: the thing to remember if they read nothing else. Everyday words, no jargon, no names the reader would have to look up.
+claim: The idea as one plain sentence: the thing to remember if they read nothing else. Everyday words, no jargon, no names the reader would have to look up. At most ${MAX_TAKEAWAY_CHARS} characters.
 
-context: Two or three sentences giving only what this claim needs to be followed: the terms it uses and the one or two facts it rests on, pitched at the level you were given. Do not introduce any person, organisation, place or term that the other parts of this card do not use, even if the section mentions it. You may draw on well-established knowledge here.
+context: Two or three sentences giving only what this claim needs to be followed: the terms it uses and the one or two facts it rests on, pitched at the level you were given. Do not introduce any person, organisation, place or term that the other parts of this card do not use, even if the section mentions it. You may draw on well-established knowledge here. At most ${MAX_CONTEXT_CHARS} characters.
 
-evidence: One or two sentences with the concrete support from the section: a number, a named case, a measured result. Never a definition.
+evidence: One or two sentences with the concrete support from the section: a number, a named case, a measured result. Never a definition. At most ${MAX_HOOK_CHARS} characters, so pick the single strongest piece of support rather than listing several.
 
-why: Two or three sentences on why the claim holds: the mechanism or reasoning. Use the section. Where it gives a result without the reason, you may give the well-established reason. State the reasoning itself, never a report on the text ("The section argues...").
+why: Two or three sentences on why the claim holds: the mechanism or reasoning. Use the section. Where it gives a result without the reason, you may give the well-established reason. State the reasoning itself, never a report on the text ("The section argues..."). At most ${MAX_SUMMARY_CHARS} characters.
 
-example: Two to four sentences applying the idea to one specific situation: a real event, firm, experiment or policy, or a worked calculation with numbers. Only what is well established; name the case and do not invent figures you are unsure of. If the idea has an obvious everyday application, prefer a less obvious one.
+example: Two to four sentences applying the idea to one specific situation: a real event, firm, experiment or policy, or a worked calculation with numbers. Only what is well established; name the case and do not invent figures you are unsure of. If the idea has an obvious everyday application, prefer a less obvious one. At most ${MAX_EXAMPLE_CHARS} characters.
 
-question and answer: One question that makes the person use this idea on a situation, predict an outcome, or explain why something happens. Never ask them to recall a definition, a figure or a date. The answer is two or three sentences, and says why.
+question and answer: One question that makes the person use this idea on a situation, predict an outcome, or explain why something happens. Never ask them to recall a definition, a figure or a date. The answer is two or three sentences, and says why. At most ${MAX_QUESTION_CHARS} characters for the question and ${MAX_ANSWER_CHARS} for the answer.
 
 mentions: The two or three other ideas this card leans on that a reader might not know, such as a technique, a named effect or a term of art the card uses without explaining. For each, the phrase copied exactly as it appears in the claim, context, evidence, why or example, and one plain line on why it matters to this card. Pick only words already in the card, never a word you would have to add, and never the card's own name. At most ${MAX_MENTIONS}; give an empty list when the card leans on nothing a reader would stop at.
 
 Style for every part: plain sentences. No slogans, no rhetorical questions outside the question field, no "not X, but Y" contrasts, no dashes used for rhythm. Never refer to "the section", "the article", "the text" or "the author". Do not address the reader as "you" outside the question.
 
-Report through ${TOOL_NAME}.`;
+The character limits are hard: a part over its limit is cut back to the whole sentences that fit, and an idea whose claim or first sentence is over it is thrown away. Put the most important sentence of each part first.
+
+Report through ${TOOL_NAME}, with ideas as a list of objects, never as a string.`;
+
+/**
+ * A text part: a string, a list of strings read as one paragraph, or anything
+ * else read as missing. The tool is not strict, so a part can come back as a
+ * list or a number; that leaves the part empty and the length checks name it,
+ * rather than failing the whole report.
+ */
+const text = z.preprocess((value) => {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && value.length > 0 && value.every((part) => typeof part === 'string'))
+    return value.join(' ');
+  return null;
+}, z.string().nullable());
 
 const ideaSchema = z.object({
-  name: z.string().nullable().optional(),
-  claim: z.string().nullable().optional(),
-  context: z.string().nullable().optional(),
-  evidence: z.string().nullable().optional(),
-  why: z.string().nullable().optional(),
-  example: z.string().nullable().optional(),
-  question: z.string().nullable().optional(),
-  answer: z.string().nullable().optional(),
-  mentions: z.array(z.unknown()).nullable().optional(),
+  name: text.optional(),
+  claim: text.optional(),
+  context: text.optional(),
+  evidence: text.optional(),
+  why: text.optional(),
+  example: text.optional(),
+  question: text.optional(),
+  answer: text.optional(),
+  mentions: z.preprocess(listOf, z.array(z.unknown()).nullable()).optional(),
 });
 
+/**
+ * A list as the model sent it. Of the cards that never reached the person in
+ * September, 32 were dropped as "the report did not match its schema" after a
+ * reply of seven hundred to eighteen hundred tokens: the ideas were written,
+ * and the report around them was refused. The tool is not strict, and a long
+ * nested list is the part models most often hand back as a JSON string (the
+ * job suggestions met the same thing; lib/jobs/suggest/payload.ts), or as the
+ * one object when only one card was asked for. Both are read as the list.
+ */
+function listOf(value: unknown): unknown {
+  let list = value;
+  if (typeof list === 'string') {
+    try {
+      list = JSON.parse(list);
+    } catch {
+      return value;
+    }
+  }
+  if (list && typeof list === 'object' && !Array.isArray(list)) return [list];
+  return list;
+}
+
+/** `matches` as a boolean, also when it comes back as "true" or "false". */
+const yesNo = z.preprocess(
+  (value) =>
+    typeof value === 'string'
+      ? ({ true: true, false: false, yes: true, no: false } as Record<string, boolean>)[value.trim().toLowerCase()] ?? value
+      : value,
+  z.boolean(),
+);
+
 const payloadSchema = z.object({
-  fit: z.string(),
-  matches: z.boolean(),
-  ideas: z.array(z.unknown()).nullable().optional(),
+  fit: text.optional(),
+  matches: yesNo,
+  ideas: z.preprocess(listOf, z.array(z.unknown()).nullable()).optional(),
 });
 
 /** What the model is told the section was picked for. Exported for the test. */
@@ -272,17 +318,44 @@ function badPart(label: string, value: string, cap: number): string | null {
   return null;
 }
 
+/** Where one sentence ends and the next begins: a stop, any closing mark, a space, then a capital, digit or quote. */
+const SENTENCE_BREAK = /(?<=[.!?][\u201d"')\]]?)\s+(?=[A-Z0-9\u201c"(])/;
+
+/**
+ * A part over its cap, cut back to the whole sentences that fit.
+ *
+ * Every card dropped for its length in September was a part that ran a
+ * sentence or two past its cap (an evidence part of 407 to 549 characters
+ * against 400, a why part of 1,232 to 1,695 against 900). The first sentences
+ * carry the point, so the card keeps them rather than being thrown away. A
+ * part whose first sentence alone is over the cap is left as it is, and the
+ * length check drops the idea as before: cutting inside a sentence would show
+ * half a claim. Exported for the test.
+ */
+export function fitToCap(value: string, cap: number): string {
+  if (value.length <= cap) return value;
+  let kept = '';
+  for (const sentence of value.split(SENTENCE_BREAK)) {
+    const next = kept ? `${kept} ${sentence}` : sentence;
+    if (next.length > cap) break;
+    kept = next;
+  }
+  return kept || value;
+}
+
 /** One idea read from the payload, or why it was left out. */
 function readIdea(input: unknown): IdeaCard | string {
   const parsed = ideaSchema.safeParse(input);
   if (!parsed.success) return 'an idea that did not match its schema';
 
+  // The name is a title and the claim one sentence, so neither is cut: one
+  // over its cap is a different idea, and is left out.
   const name = clean(parsed.data.name);
   const takeaway = clean(parsed.data.claim);
-  const context = clean(parsed.data.context);
-  const hook = clean(parsed.data.evidence);
-  const summary = clean(parsed.data.why);
-  const example = clean(parsed.data.example);
+  const context = fitToCap(clean(parsed.data.context), MAX_CONTEXT_CHARS);
+  const hook = fitToCap(clean(parsed.data.evidence), MAX_HOOK_CHARS);
+  const summary = fitToCap(clean(parsed.data.why), MAX_SUMMARY_CHARS);
+  const example = fitToCap(clean(parsed.data.example), MAX_EXAMPLE_CHARS);
   const problem =
     badPart('name', name, MAX_NAME_CHARS) ??
     badPart('claim', takeaway, MAX_TAKEAWAY_CHARS) ??
@@ -293,7 +366,7 @@ function readIdea(input: unknown): IdeaCard | string {
   if (problem) return problem;
 
   const question = clean(parsed.data.question);
-  const answer = clean(parsed.data.answer);
+  const answer = fitToCap(clean(parsed.data.answer), MAX_ANSWER_CHARS);
   const asked =
     question &&
     answer &&
@@ -330,10 +403,13 @@ function readIdea(input: unknown): IdeaCard | string {
  */
 export function readCardReport(input: unknown): CardReport {
   const parsed = payloadSchema.safeParse(input);
-  if (!parsed.success)
-    return { verdict: 'dropped', reason: 'The report did not match its schema.' };
+  if (!parsed.success) {
+    // Name the field, so the next refusal says what the reply looked like.
+    const where = parsed.error.issues.map((issue) => issue.path.join('.') || 'the report').join(', ');
+    return { verdict: 'dropped', reason: `The report did not match its schema (${where}).` };
+  }
 
-  const fit = parsed.data.fit.trim();
+  const fit = clean(parsed.data.fit);
   if (!parsed.data.matches) {
     return {
       verdict: 'dropped',
@@ -420,21 +496,21 @@ export async function writeCard(input: {
               },
               matches: { type: 'boolean' },
               ideas: {
-                type: ['array', 'null'],
-                description: `One card per idea, most important first, at most ${MAX_IDEAS}. Null when it does not match.`,
+                type: 'array',
+                description: `One card per idea, as a list of objects, most important first, at most ${MAX_IDEAS}. An empty list when it does not match.`,
                 items: {
                   type: 'object',
                   properties: {
-                    name: ideaPart('The idea in two to six words, as a title.'),
-                    claim: ideaPart('The idea as one plain sentence.'),
-                    context: ideaPart('Only the terms and facts this claim needs, in two or three sentences.'),
-                    evidence: ideaPart('The concrete support from the section: a number, a case or a result.'),
-                    why: ideaPart('Why the claim holds, in two or three sentences.'),
-                    example: ideaPart('The idea applied to one specific case or a worked number.'),
-                    question: ideaPart('One question that makes them use the idea.'),
-                    answer: ideaPart('The answer, with why, in two or three sentences.'),
+                    name: ideaPart(`The idea in two to six words, as a title. At most ${MAX_NAME_CHARS} characters.`),
+                    claim: ideaPart(`The idea as one plain sentence. At most ${MAX_TAKEAWAY_CHARS} characters.`),
+                    context: ideaPart(`Only the terms and facts this claim needs, in two or three sentences. At most ${MAX_CONTEXT_CHARS} characters.`),
+                    evidence: ideaPart(`The single strongest support from the section: a number, a case or a result, in one or two sentences. At most ${MAX_HOOK_CHARS} characters.`),
+                    why: ideaPart(`Why the claim holds, in two or three sentences. At most ${MAX_SUMMARY_CHARS} characters.`),
+                    example: ideaPart(`The idea applied to one specific case or a worked number. At most ${MAX_EXAMPLE_CHARS} characters.`),
+                    question: ideaPart(`One question that makes them use the idea. At most ${MAX_QUESTION_CHARS} characters.`),
+                    answer: ideaPart(`The answer, with why, in two or three sentences. At most ${MAX_ANSWER_CHARS} characters.`),
                     mentions: {
-                      type: ['array', 'null'],
+                      type: 'array',
                       description: `Up to ${MAX_MENTIONS} other ideas the card leans on, each in words copied exactly from the card.`,
                       items: {
                         type: 'object',
