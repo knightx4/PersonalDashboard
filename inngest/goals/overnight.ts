@@ -359,6 +359,7 @@ export async function runGoalsNight(input: {
         userId,
         stepId: step.id,
         routine,
+        surface: 'scheduled',
         now,
         fetch: input.fetch,
       });
@@ -374,6 +375,7 @@ export async function runGoalsNight(input: {
         userId,
         goal: { id: goal.id, title: goal.title, errandDueOn: goal.errandDueOn },
         routine,
+        surface: 'scheduled',
         fetch: input.fetch,
       });
       if (started.ok) {

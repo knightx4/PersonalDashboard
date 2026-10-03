@@ -136,7 +136,7 @@ function okFetch() {
 async function send(stepId: string, fixture: Partial<Fixture> = {}) {
   const { client, calls } = fakeClient({ items: ITEMS, approvedAt: APPROVED, ...fixture });
   const fetch = okFetch();
-  const result = await sendGoalStep({ client, userId: USER, stepId, routine, now: NOW, fetch });
+  const result = await sendGoalStep({ client, userId: USER, stepId, routine, surface: 'thread', now: NOW, fetch });
   return { result, calls, fetch };
 }
 
@@ -194,7 +194,7 @@ describe('sendGoalStep', () => {
   it('fires a prepare run on a step of yours (plan #1001)', async () => {
     const { client, calls } = fakeClient({ items: ITEMS, approvedAt: APPROVED });
     const fetch = okFetch();
-    const result = await sendGoalStep({ client, userId: USER, stepId: 'm', routine, mode: 'prepare', now: NOW, fetch });
+    const result = await sendGoalStep({ client, userId: USER, stepId: 'm', routine, surface: 'thread', mode: 'prepare', now: NOW, fetch });
     expect(result).toEqual({ ok: true, job: 'prepare', title: 'Log in to Edfinancial', runId: 'run-1' });
     expect(calls.find((c) => c.op === 'insert')?.values).toMatchObject({ job: 'prepare', item_id: 'm' });
     // The step itself is not written: it stays yours and open until the run stores what it prepared.
@@ -207,7 +207,7 @@ describe('sendGoalStep', () => {
   it('refuses to prepare a Claude step', async () => {
     const { client } = fakeClient({ items: ITEMS, approvedAt: APPROVED });
     const fetch = okFetch();
-    const result = await sendGoalStep({ client, userId: USER, stepId: 's', routine, mode: 'prepare', now: NOW, fetch });
+    const result = await sendGoalStep({ client, userId: USER, stepId: 's', routine, surface: 'thread', mode: 'prepare', now: NOW, fetch });
     expect(result).toEqual({ ok: false, error: 'Only a step of yours with no sub-steps can be prepared.', refused: true });
     expect(fetch).not.toHaveBeenCalled();
   });
