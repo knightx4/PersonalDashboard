@@ -99,6 +99,11 @@ jobs:
       - name: UI laws
         run: scripts/ci-step.sh "UI laws" npm run check:ui
 
+      # The counts the specs' rules hold where they are: one that rises fails.
+      # See scripts/check-specs.ts and scripts/spec-counts.ts.
+      - name: Spec counts
+        run: scripts/ci-step.sh "Spec counts" npm run check:specs
+
   audit:
     runs-on: ubuntu-latest
     steps:

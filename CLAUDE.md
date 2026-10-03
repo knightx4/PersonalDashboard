@@ -51,6 +51,19 @@ merge. On 23 September 2026 main stayed red for fourteen hours through seven
 failures, every one of which the gate catches. If the gate fails on something
 another session merged, fix that too before pushing: what you push is main.
 
+## A spec count that rises fails the gate
+
+Some spec rules are checked by a count, such as how many tables hold a comment
+thread, that may go down and never up. The counters are in
+[scripts/spec-counts.ts](scripts/spec-counts.ts) and their recorded values in
+`scripts/spec-baseline.json`; `npm run check:specs` runs them, and the gate
+runs it too. When one rises, your change has added another of the thing the
+rule is working to remove: take the addition out, or remove one elsewhere to
+make room. Do not edit the baseline upwards. When your change lowers a count,
+the check writes the lower value into the baseline, and you commit that file
+with the change. `npm run check:specs -- --list` prints what each counter
+counted.
+
 ## Write to the writing guide
 
 [docs/WRITING-GUIDE.md](docs/WRITING-GUIDE.md) is the standard for everything
