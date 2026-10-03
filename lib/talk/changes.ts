@@ -24,7 +24,17 @@ import { parseRef } from '@/lib/core/refs';
 /** The table, in the core schema. */
 export const DASH_ACTIONS = 'dash_actions';
 
-export const DASH_CHANGE_KINDS = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch'] as const;
+export const DASH_CHANGE_KINDS = [
+  'add_todo',
+  'add_goal_step',
+  'mark_returned',
+  'start_watch',
+  'add_goal',
+  'change_todo',
+  'close_todo',
+  'close_goal_step',
+  'add_role_note',
+] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
 export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
@@ -42,6 +52,17 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  *                `goalTitle` names the goal or step it serves, and `pushOn`
  *                says whether any device had push switched on when Dash
  *                proposed it, so the card can say nothing will reach them.
+ *
+ * The five kinds below were added when Ask started making changes straight
+ * away (plan #1440). Each is written by its tool in lib/dash/writes.ts and
+ * kept as done from the start; `input` holds only what the card says.
+ *
+ * add_goal         the goal and the area it went under.
+ * change_todo      the todo's title now, the title it had when renamed, and
+ *                  the day it moved to when moved (null: no day any more).
+ * close_todo       the todo ticked off.
+ * close_goal_step  the step marked done and the goal it sits under.
+ * add_role_note    the note and the role it went on.
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -60,9 +81,24 @@ export type DashChangeInput = {
     goalTitle: string | null;
     pushOn: boolean;
   };
+  add_goal: { areaId: string; areaName: string; title: string; dueOn: string | null };
+  change_todo: {
+    id: string;
+    title: string;
+    renamedFrom: string | null;
+    moved: boolean;
+    dueOn: string | null;
+    dueTime: string | null;
+  };
+  close_todo: { id: string; title: string; items: number };
+  close_goal_step: { id: string; title: string; goalId: string; goalTitle: string };
+  add_role_note: { roleId: string; roleTitle: string; body: string };
 };
 
-/** A proposal as the loop hands it to be kept. */
+/** The kinds Dash proposed for a Confirm before plan #1440, which keep their own undo in lib/ask/changes.ts. */
+export const PROPOSAL_KINDS: readonly DashChangeKind[] = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch'];
+
+/** A proposal as the loop hands it to be kept, or a change Dash has just made. */
 export type NewDashChange = {
   [K in DashChangeKind]: { kind: K; input: DashChangeInput[K] };
 }[DashChangeKind];
@@ -138,6 +174,53 @@ export async function insertProposal(
     .single();
   assertSchemaExposed(error, CORE_SCHEMA);
   if (error) throw new Error(`Keeping the proposal failed: ${error.message}`);
+  return toDashChange(data as DashChangeRow);
+}
+
+/** A change Dash has just made from Ask, as lib/dash/writes.ts reports it. */
+export type MadeDashChange = NewDashChange & {
+  subjectRef: string;
+  op: 'insert' | 'update' | 'delete';
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  summary: string;
+  undo: Record<string, unknown> | null;
+};
+
+/**
+ * Keeps a change Dash made straight away (plan #1440) in an `ask`
+ * conversation: done from the start, with the row it wrote and that row's
+ * values before and after, so its card under the answer offers Undo. Tied to
+ * the answer by attachProposals once the answer is kept, like a proposal.
+ */
+export async function insertMadeChange(
+  core: CoreSupabaseClient,
+  userId: string,
+  conversationId: string,
+  made: MadeDashChange,
+  now: string = new Date().toISOString(),
+): Promise<DashChange> {
+  const { data, error } = await core
+    .from(DASH_ACTIONS)
+    .insert({
+      user_id: userId,
+      conversation_id: conversationId,
+      surface: 'ask',
+      kind: made.kind,
+      input: made.input,
+      status: 'done',
+      done_at: now,
+      subject_ref: made.subjectRef,
+      op: made.op,
+      before_values: made.op === 'insert' ? null : made.before,
+      after_values: made.op === 'delete' ? null : made.after,
+      summary: made.summary.replace(/\s+/g, ' ').trim().slice(0, 300),
+      undo: made.undo,
+    })
+    .select(DASH_CHANGE_SELECT)
+    .single();
+  assertSchemaExposed(error, CORE_SCHEMA);
+  if (error) throw new Error(`Keeping the change failed: ${error.message}`);
   return toDashChange(data as DashChangeRow);
 }
 

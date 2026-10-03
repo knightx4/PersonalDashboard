@@ -23,6 +23,7 @@ import { askDash, type AskDashResult, type AskLookupEvent } from '@/lib/dash/ask
 import {
   attachProposals,
   discardProposals,
+  insertMadeChange,
   insertProposal,
   loadChanges,
   loadMadeChanges,
@@ -73,6 +74,9 @@ export async function askDashInRequest(input: {
       execute: (name, args) => executeAskTool(name, args, ctx),
       propose: (name, args, seen, save) =>
         executeProposal(name, args, { ...ctx, seen, save, timezone: settings.timezone }),
+      // A write runs as the person, through their own clients (plan #1440).
+      write: (tool, args, seen) =>
+        tool.apply({ ...ctx, seen, goals: (history) => createGoalsClient(history), createTask }, args),
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
       onLookup: input.onLookup,
     },
@@ -83,6 +87,7 @@ export async function askDashInRequest(input: {
       recordSpend: (reports) =>
         recordSpendReports(core, user.id, { module: 'core', operation: 'ask-dash' }, reports),
       saveProposal: (conversationId, change) => insertProposal(core, user.id, conversationId, change),
+      saveChange: (conversationId, made) => insertMadeChange(core, user.id, conversationId, made),
       attachProposals: (ids, turnId) => attachProposals(core, ids, turnId),
       discardProposals: (ids) => discardProposals(core, ids),
       ...(canHandOff

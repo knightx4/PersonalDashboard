@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getUser } from '@/lib/auth/server';
 import { parseAskInput } from '@/lib/talk/ask-input';
 import { askDashInRequest } from '@/lib/talk/ask-request';
+import { changePaths } from '@/lib/ask/changes';
 import { encodeStreamLine, lookupWire, type AskStreamLine } from '@/lib/talk/lookups';
 
 export const dynamic = 'force-dynamic';
@@ -82,6 +83,10 @@ export async function POST(request: Request) {
         // The list of past questions reads the table, so a new question or a new
         // answer has to show there the next time it is opened.
         if (result.conversation) revalidatePath('/ask');
+        // A change Dash made in the answer shows on the pages that hold its row (plan #1440).
+        for (const change of result.changes ?? []) {
+          if (change.status === 'done') for (const path of changePaths(change)) revalidatePath(path);
+        }
         send({ result });
       } catch {
         send({ result: { turns: [], error: 'Dash could not be asked. Check your connection and try again.' } });

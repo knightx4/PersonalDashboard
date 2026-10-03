@@ -38,11 +38,27 @@ export type LookupWire = {
 export type AskStreamLine = { lookup: LookupWire } | { result: AskDashResult };
 
 /**
- * Proposals have their cards under the answer and a hand-off says so in the
- * answer, so the lines are the reads alone.
+ * The write tools (lib/dash/writes.ts, plan #1440), named here because this
+ * file is drawn in the browser and the tools are not; a test holds the two
+ * lists together.
+ */
+export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
+  'add_todo',
+  'change_todo',
+  'close_todo',
+  'add_goal',
+  'add_goal_step',
+  'close_goal_step',
+  'mark_returned',
+  'add_role_note',
+];
+
+/**
+ * Writes and proposals have their cards under the answer and a hand-off says
+ * so in the answer, so the lines are the reads alone.
  */
 export function isShownLookup(name: string): boolean {
-  return !name.startsWith('propose_') && name !== 'hand_off';
+  return !name.startsWith('propose_') && name !== 'hand_off' && !WRITE_TOOL_NAMES_SHOWN_AS_CARDS.includes(name);
 }
 
 const MAX_QUOTED = 60;
