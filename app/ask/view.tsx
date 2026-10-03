@@ -66,7 +66,7 @@ export function AskConversation({
       openHandoffs={openHandoffs}
       label="Ask a follow-up"
       placeholder="Ask more about this"
-      hint={<PaidHint action="app/ask/actions.ts#askDashQuestion" what="Cost of each answer from Dash" />}
+      hint={<PaidHint action="app/api/ask/route.ts#POST" what="Cost of each answer from Dash" />}
     />
   );
 }

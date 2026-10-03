@@ -159,8 +159,8 @@ export const PAID_ACTIONS = {
   'app/goals/home-actions.ts#askDashAction': ['reply-to-goal-comment'],
 
   // Dash: a question about anything in the app, from the sheet in the shell,
-  // ⌘K or /ask (plan #1090)
-  'app/ask/actions.ts#askDashQuestion': ['ask-dash'],
+  // ⌘K or /ask (plan #1090), streaming its lookups as they run (plan #1438)
+  'app/api/ask/route.ts#POST': ['ask-dash'],
 
   // Timeline: writing a year up, or the current year again (plan #1121)
   'app/timeline/actions.ts#writeYearReview': ['write-year-review'],

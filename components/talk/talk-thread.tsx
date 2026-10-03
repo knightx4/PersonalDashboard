@@ -223,6 +223,7 @@ export function TalkThread({
   assistant = DASH,
   activity,
   incoming,
+  working,
 }: {
   /** Unique on the page: the textarea's id is built from it. */
   id: string;
@@ -273,6 +274,11 @@ export function TalkThread({
    * the thread are added at the end.
    */
   incoming?: readonly TalkTurn[];
+  /**
+   * Under the waiting line while a reply is coming: what Dash is looking up
+   * for an Ask Dash answer, as each lookup starts (plan #1438).
+   */
+  working?: React.ReactNode;
 }) {
   const [own, setTurns] = useState<TalkTurn[]>([...initial]);
   // The thread's own turns, with any written elsewhere slotted in by time.
@@ -375,9 +381,10 @@ export function TalkThread({
                   activity={activity}
                 />
               </div>
-              <p className="min-w-0 flex-1 text-body text-ink-muted">
-                {waiting ?? `${assistant.name} is replying…`}
-              </p>
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="text-body text-ink-muted">{waiting ?? `${assistant.name} is replying…`}</p>
+                {working}
+              </div>
             </li>
           )}
           {!sending && failed && (

@@ -166,8 +166,14 @@ export const TRIP_GOAL = '/goals/00000000-0000-4000-8000-0000000000a1';
 export const FAILING_QUESTION = 'How much did I spend on flights this year?';
 
 const FIXTURES: AskSource = {
-  ask: async (question) => {
-    await new Promise((resolve) => setTimeout(resolve, 600));
+  ask: async (question, _ref, _page, onLookup) => {
+    // The lookups appear one by one while the answer is written (plan #1438).
+    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    const search = { id: 'l1', index: 0, name: 'search', input: { query: question.slice(0, 40) } };
+    onLookup?.({ phase: 'started', ...search });
+    await wait(300);
+    onLookup?.({ phase: 'finished', ...search, ok: true, found: 2 });
+    await wait(300);
     const conversation = { ref: '00000000-0000-4000-8000-000000000009', title: question };
     if (question === FAILING_QUESTION) {
       return {
@@ -194,7 +200,7 @@ const FIXTURES: AskSource = {
   decline: pressed('declined'),
   undo: pressed('undone'),
   costs: async () => ({
-    'app/ask/actions.ts#askDashQuestion': {
+    'app/api/ask/route.ts#POST': {
       lowMicros: 20_000,
       medianMicros: 45_000,
       highMicros: 110_000,
