@@ -46,6 +46,7 @@ import { TravelDemo } from './travel-demo';
 import { SettleDemo } from './settle-demo';
 import { ProgressMoveDemo } from './progress-move-demo';
 import { GoalCloseDemo } from './goal-close-demo';
+import { DayCloseDemo } from './day-close-demo';
 import { ClearDemo } from './clear-demo';
 import { MOMENT_WORKSPACES, MOMENTS, MOMENTS_PER_WORKSPACE, type Moment } from './moments';
 import { LAW_GROUPS } from './laws';
@@ -1579,6 +1580,9 @@ export default function DevUiPage() {
         </Card>
         <Card id="motion-goal-close" padding="standard" className="scroll-mt-6">
           <GoalCloseDemo />
+        </Card>
+        <Card id="motion-day-close" padding="standard" className="scroll-mt-6">
+          <DayCloseDemo />
         </Card>
         <Rows rows={M.MOTION} labelWidth="sm:grid-cols-[7rem_1fr]" />
         <Rules items={M.MOTION_RULES} />

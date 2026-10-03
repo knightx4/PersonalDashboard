@@ -68,12 +68,11 @@ export const MOMENTS: readonly Moment[] = [
     reducedMotion:
       'The pile is shown folded, the sigil is there at once, and the count is the same.',
     state: {
-      built: 'partly',
+      built: 'yes',
       where:
-        'The sigil draws in when the agenda or Open tasks is cleared on screen (QueueCleared in components/motion/clear.tsx). The pile and the count are not built.',
-      step: 1556,
+        'DayClosed in components/todo/day-closed.tsx, above the piles on /todo, with the done tasks read by loadDoneSinceMidnight and the rule in lib/todo/agenda/day-close.ts.',
     },
-    demo: 'motion-clear',
+    demo: 'motion-day-close',
   },
   {
     workspace: 'news',

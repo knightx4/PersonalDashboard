@@ -3,7 +3,8 @@ import 'server-only';
 import { createTodoClient } from '@/lib/todo/auth/server';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { TODO_SCHEMA, type TodoSupabaseClient } from '@/lib/todo/db/schema-name';
-import type { Task, TaskStatus } from '@/lib/todo/tasks/model';
+import { todayIn, type Task, type TaskStatus } from '@/lib/todo/tasks/model';
+import { wallClockToInstant } from '@/lib/todo/time';
 
 /**
  * Reading the list. The deciding is next door in model.ts, on purpose.
@@ -50,6 +51,35 @@ export async function loadOpenTasks(userId: string, client?: TodoSupabaseClient)
     .select(COLUMNS)
     .eq('user_id', userId)
     .or('status.eq.open,and(status.eq.done,parent_id.not.is.null)')
+    .limit(LIMIT);
+
+  assertSchemaExposed(error, TODO_SCHEMA);
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map(toTask);
+}
+
+/**
+ * The whole tasks finished since midnight in `timezone`, for the day closing
+ * on the agenda (plan #1556). Which of them were due by today is decided in
+ * lib/todo/agenda/day-close.ts; this only reads the day's done rows.
+ */
+export async function loadDoneSinceMidnight(
+  userId: string,
+  timezone: string,
+  now: Date = new Date(),
+  client?: TodoSupabaseClient,
+): Promise<Task[]> {
+  const supabase = client ?? (await createTodoClient());
+  const since = wallClockToInstant(todayIn(timezone, now), '00:00', timezone);
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .select(COLUMNS)
+    .eq('user_id', userId)
+    .eq('status', 'done')
+    .is('parent_id', null)
+    .gte('completed_at', since)
     .limit(LIMIT);
 
   assertSchemaExposed(error, TODO_SCHEMA);
