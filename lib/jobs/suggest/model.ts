@@ -182,7 +182,8 @@ For each, give:
 Never suggest anyone on the lists of people they already know or were already
 suggested, and never anyone whose company works in an industry they will not
 work in${seeker.excludedIndustries.length > 0 ? ` (${seeker.excludedIndustries.join(', ')})` : ''}, even as a
-finance role there. Write plainly. Do not use these anywhere: ${[...seeker.banned, '—'].map((b) => `"${b}"`).join(', ')}.${
+finance role there. Write headline, why and move to the job seeker, as "you",
+never he, she or they; the message stays in their own voice. Write plainly. Do not use these anywhere: ${[...seeker.banned, '—'].map((b) => `"${b}"`).join(', ')}.${
     seeker.writingStyle ? `\n\nHow they like their writing to sound: ${seeker.writingStyle}` : ''
   }
 
@@ -439,6 +440,9 @@ For each, give:
 - move: how to go about it, as two or three short numbered steps: what to
   lead with in the application, and who to look for at the company for a
   referral before applying.
+
+Write why and move to the person, as "you": "You applied to a strategist
+role here in May". Never he, she or they for them, and never "the candidate".
 
 Write plainly, with no em dashes. If nothing suitable turns up, report an
 empty list rather than a weak match.`;

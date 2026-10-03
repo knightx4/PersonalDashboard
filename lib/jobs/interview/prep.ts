@@ -73,6 +73,9 @@ Say what is thin. A note that only lists strengths is the note that costs them
 the interview. Where the map says gap, the useful sentence is what to say when
 it comes up, not how to disguise it.
 
+Write every field to them, as "you": "You led the pricing rebuild". Never he,
+she or they for them.
+
 Write it to be read the morning of, not to be impressive. Short paragraphs,
 their own vocabulary, no headings inside a field, no preamble about how
 exciting the opportunity is, and no closing encouragement.`;
