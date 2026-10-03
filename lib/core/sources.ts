@@ -12,7 +12,7 @@ export const coreSources: ModuleSources = {
     {
       table: 'core.conversations',
       module: 'Learn',
-      holds: 'Conversations they had with Dash: about a Learn card or a newsletter story, one per thing read, or a question they asked from anywhere in the app.',
+      holds: 'Every comment thread and conversation with Dash: the thread under any row (a plan step, an idea, a goal or step, a role, a file, a Learn card, a newsletter story), or a question they asked from anywhere in the app.',
       weight: 'record',
       search: ['title'],
       title: 'title',
@@ -22,7 +22,7 @@ export const coreSources: ModuleSources = {
         reads: ['subject_kind', 'subject_ref'],
         href: (row) => (row.subject_kind === 'ask' && row.subject_ref ? `/ask/${row.subject_ref}` : null),
       },
-      note: "subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as learn.feed_cards:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id.",
+      note: "subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as goals.items:<id>, job_search.roles:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id; core.thread_turns lists a row thread's turns with the ref beside each.",
     },
     {
       table: 'core.conversation_turns',

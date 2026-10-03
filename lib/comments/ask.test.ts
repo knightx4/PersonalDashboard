@@ -26,6 +26,15 @@ vi.mock('@/lib/ideas/load', () => ({
   IDEA_COLUMNS: '*',
   ideaRowFrom: () => ({ id: 'idea-1', body: 'Show the count on Home', module: null, source: 'me', thread: [] }),
 }));
+// The thread is read from and written to the shared store (plan #1470).
+vi.mock('@/lib/thread/store', async (original) => ({
+  ...(await original<typeof import('@/lib/thread/store')>()),
+  loadThread: vi.fn(async () => []),
+  addThreadTurn: vi.fn(async (_client: unknown, turn: Record<string, unknown>) => {
+    mocks.inserted.push({ table: 'thread', ...turn });
+    return 'turn-1';
+  }),
+}));
 vi.mock('./context', async (original) => ({
   ...(await original<typeof import('./context')>()),
   ideaContext: () => '# An idea\n\nShow the count on Home',
@@ -61,7 +70,7 @@ function ask(question: string) {
   });
 }
 
-const said = () => mocks.inserted.filter((row) => row.table === 'dev_comments').map((row) => row.body);
+const said = () => mocks.inserted.filter((row) => row.table === 'thread').map((row) => row.body);
 
 beforeEach(() => {
   vi.clearAllMocks();

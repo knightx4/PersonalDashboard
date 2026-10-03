@@ -83,12 +83,14 @@ describe('dev comment actions record what they write', () => {
     const added = tables['public.plan_items'].find((r) => r.title === 'A step beneath')!;
     expect(actions()[0]).toMatchObject({ kind: 'add_step', op: 'insert', subject_ref: `public.plan_items:${added.id}` });
 
-    tables['public.dev_comments'] = [{ id: 'c1', user_id: ME, plan_item_id: added.id, body: 'Do this one first.' }];
+    tables['core.conversation_turns'] = [
+      { id: 'c1', user_id: ME, ref: `public.plan_items:${added.id}`, author: 'me', body: 'Do this one first.' },
+    ];
     const refused = await undoDashAction(dash, actions()[0].id as string);
     expect(refused).toMatchObject({ ok: false, error: 'Something has been added to it since, so undoing would lose that too.' });
     expect(tables['public.plan_items'].some((r) => r.id === added.id)).toBe(true);
 
-    tables['public.dev_comments'] = [];
+    tables['core.conversation_turns'] = [];
     expect((await undoDashAction(dash, actions()[0].id as string)).ok).toBe(true);
     expect(tables['public.plan_items'].some((r) => r.id === added.id)).toBe(false);
   });

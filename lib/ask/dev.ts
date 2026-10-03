@@ -229,12 +229,18 @@ const KIND_ALIASES: Record<string, DevRowKind> = {
   decision: 'step',
 };
 
-/** The dev_comments column that ties a comment to each kind of row. */
+/** The column each kind of row's id goes under when a comment search folds turns by row. */
 const COMMENT_COLUMN: Record<DevRowKind, string> = {
   idea: 'idea_id',
   note: 'feedback_item_id',
   step: 'plan_item_id',
   raise: 'raised_item_id',
+};
+
+/** The same columns by the table in a thread's ref, with spec sections as well. */
+const REF_COLUMN: Record<string, string> = {
+  ...Object.fromEntries(DEV_ROW_KINDS.map((kind) => [DEV_ROW_TABLES[kind], COMMENT_COLUMN[kind]])),
+  'public.spec_sections': 'spec_section_id',
 };
 
 /** The most comments one read returns: the newest, still oldest first. */
@@ -509,13 +515,14 @@ export async function readDevRowLookup(ctx: AskContext, input: Input): Promise<A
     return { ok: true, rows: [], note: `There is no ${kind} ${ref.value} to read: none of theirs has it, or it was dismissed.` };
   }
 
-  const { data, error } = await client
-    .from('dev_comments')
+  // The thread from the shared store, under the row's ref (plan #1470).
+  const { data, error } = await (await ctx.db('core'))
+    .from('thread_turns')
     .select('author, body, created_at')
     .eq('user_id', ctx.userId)
-    .eq(COMMENT_COLUMN[kind], found.id)
+    .eq('ref', `${DEV_ROW_TABLES[kind]}:${found.id}`)
     .order('created_at', { ascending: true });
-  if (error) throw new Error(`dev_comments: ${error.message}`);
+  if (error) throw new Error(`thread_turns: ${error.message}`);
   const comments = thread((data ?? []) as DevComment[]);
 
   return {
@@ -734,15 +741,24 @@ async function readComments(
   pattern: string,
   words: readonly string[],
 ): Promise<TextHit[]> {
-  const { data, error } = await client
-    .from('dev_comments')
-    .select('id, author, body, created_at, idea_id, feedback_item_id, plan_item_id, raised_item_id, spec_section_id')
+  const { data, error } = await (await ctx.db('core'))
+    .from('thread_turns')
+    .select('id, ref, author, body, created_at')
     .eq('user_id', ctx.userId)
+    .like('ref', 'public.%')
     .ilike('body', pattern)
     .order('created_at', { ascending: false })
     .limit(DEV_TEXT_READ);
-  if (error) throw new Error(`dev_comments: ${error.message}`);
-  const comments = ((data ?? []) as unknown as Row[]).filter((c) => hasEveryWord(str(c.body), words));
+  if (error) throw new Error(`thread_turns: ${error.message}`);
+  // Each turn with the column its row would have had in dev_comments, so the
+  // parents are found the same way for every kind of row.
+  const comments = ((data ?? []) as unknown as Row[])
+    .filter((c) => hasEveryWord(str(c.body), words))
+    .flatMap((c) => {
+      const ref = str(c.ref);
+      const column = REF_COLUMN[ref.slice(0, ref.indexOf(':'))];
+      return column ? [{ ...c, [column]: ref.slice(ref.indexOf(':') + 1) }] : [];
+    });
   if (comments.length === 0) return [];
 
   const idsOf = (column: string) => [...new Set(comments.map((c) => c[column]).filter((v): v is string => typeof v === 'string'))];

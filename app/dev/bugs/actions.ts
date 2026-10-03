@@ -21,6 +21,7 @@ import { triageView, type TriageTable, type TriageView } from '@/lib/feedback/tr
 import { triageRow } from '@/lib/feedback/triage-run';
 import { scoreIdeaRow } from '@/lib/ideas/score-run';
 import { jevEnabledFor } from '@/lib/jev/enabled';
+import { addThreadTurn } from '@/lib/thread/store';
 
 /** One queue, one page. The old per-workspace pages redirect to it. */
 function revalidateFeedback(): void {
@@ -308,13 +309,16 @@ export async function respondToFeedback(
 
   // The comment first: a note put back in the queue without the answer under it
   // is a note the next run picks up and blocks again for the same reason.
-  const { error: unwritten } = await supabase.from('dev_comments').insert({
-    user_id: user.id,
-    feedback_item_id: parsed.data.id,
-    author: 'me',
-    body: parsed.data.body,
-  });
-  if (unwritten) return { error: unwritten.message };
+  try {
+    await addThreadTurn(supabase, {
+      userId: user.id,
+      ref: `public.feedback_items:${parsed.data.id}`,
+      author: 'me',
+      body: parsed.data.body,
+    });
+  } catch (unwritten) {
+    return { error: unwritten instanceof Error ? unwritten.message : 'The answer could not be saved.' };
+  }
 
   const { error } = await supabase
     .from('feedback_items')

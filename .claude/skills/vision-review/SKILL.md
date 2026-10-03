@@ -93,8 +93,8 @@ select i.id, i.source, i.body, i.dismissed_at from ideas i
 where i.user_id = '…' and i.module = '<workspace>'
   and i.dismissed_at >= '<window start>'
   and not exists (
-    select 1 from dev_comments c
-    where c.idea_id = i.id and c.author = 'claude'
+    select 1 from core.thread_turns c
+    where c.ref = 'public.ideas:' || i.id and c.author = 'claude'
       and c.body like 'Dismissed by the vision review%'
   );
 ```
@@ -323,9 +323,8 @@ where id = '<idea>' and user_id = '…' and source = 'claude' and dismissed_at i
 select core.record_dash_action('…', 'public.ideas:<idea>', 'update', 'dismiss_idea',
   $s$Dash set aside the idea "<its first words>" in the vision review: <why, in a few words>.$s$);
 
-insert into dev_comments (user_id, idea_id, author, body)
-values ('…', '<idea>', 'claude',
-        'Dismissed by the vision review of <D Mon YYYY>: <which part of the vision it does not serve, or what already did it>.');
+select core.add_thread_turn('…', 'public.ideas:<idea>', 'claude',
+  'Dismissed by the vision review of <D Mon YYYY>: <which part of the vision it does not serve, or what already did it>.');
 ```
 
 Keep the opening words exactly. The next run finds its own dismissals by

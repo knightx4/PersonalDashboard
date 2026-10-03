@@ -49,8 +49,9 @@ describe('feedbackRowFrom', () => {
 });
 
 describe('FEEDBACK_COLUMNS', () => {
-  it('asks for the thread as well as the note', () => {
-    expect(FEEDBACK_COLUMNS).toContain('thread:dev_comments(');
+  // The thread is read from the shared store after the rows (plan #1470).
+  it('asks for the note and leaves the thread to the shared store', () => {
+    expect(FEEDBACK_COLUMNS).not.toContain('dev_comments');
     expect(FEEDBACK_COLUMNS).toContain('resolution_note');
   });
 });

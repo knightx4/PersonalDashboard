@@ -171,7 +171,7 @@ something the person decided.
    *Not applied*, the spec has moved under the change. Put the change back to
    proposed (`update spec_changes set status = 'proposed', decided_at = null
    where id = '<id>' and user_id = '<user>' and status = 'approved'`), write a
-   comment on its thread (`dev_comments`, `spec_change_id`, author `claude`)
+   comment on its thread (`core.add_thread_turn` under `public.spec_changes:<id>`, author `claude`)
    saying which lines are gone and that `@dash` can redraft it, and stop.
 
    For a spec the change creates, the file does not exist yet and the script

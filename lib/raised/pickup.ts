@@ -20,7 +20,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { raiseContext, threadText } from '@/lib/comments/context';
 import { planRoutine } from '@/lib/feedback/routine';
 import { startRoutineRun } from '@/lib/plan/runs';
-import { raisedRowFrom, RAISED_COLUMNS, type RaisedRow } from './load';
+import { raisedRowFrom, RAISED_COLUMNS, RAISED_TABLE, type RaisedRow } from './load';
+import { threadReplySql, withThreads } from '@/lib/thread/store';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
@@ -77,8 +78,7 @@ export function pickupTurn(input: {
     (said ? `${said.trimEnd()}\n\n` : '') +
     `## Their answer\n\n${input.answer}\n\n` +
     '## Where what you did goes\n\n' +
-    "insert into dev_comments (user_id, raised_item_id, author, body) values " +
-    `('${input.userId}', '${input.row.id}', 'claude', '<what you did>');\n\n` +
+    `${threadReplySql(input.userId, `${RAISED_TABLE}:${input.row.id}`, '<what you did>')}\n\n` +
     '## Closing it, once there is nothing left in it\n\n' +
     "update raised_items set status = 'closed' where id = " +
     `'${input.row.id}' and user_id = '${input.userId}';\n\n` +
@@ -104,7 +104,10 @@ export async function pickUpRaise(input: PickupInput): Promise<PickupOutcome> {
     .maybeSingle();
   if (!data) return { ok: false, said: null };
 
-  const row = raisedRowFrom(data as unknown as Record<string, unknown>);
+  const [withThread] = await withThreads(input.supabase, RAISED_TABLE, [data as unknown as Record<string, unknown>], {
+    userId: input.userId,
+  });
+  const row = raisedRowFrom(withThread);
   if (row.status !== 'open' && row.status !== 'answered') return { ok: false, said: null };
   // A flag on a goal is answered on the goal's page, which starts a goal run
   // (lib/goals/flags-store.ts). The plan routine would not know the goals.

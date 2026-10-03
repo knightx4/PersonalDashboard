@@ -172,7 +172,7 @@ goal tied to Learn or the job search, the files the goal and its steps link to
 (`goals.links` with `kind` `file`, then `core.files`; read them before redoing
 work an earlier run already wrote up), the newest note on the goal
 (`goals.briefs`), the comments on the goal and its steps
-(`goals.comments`), and the recent `goals.history` rows for this goal's steps.
+(`core.thread_turns` where `ref` is `goals.items:<id>`), and the recent `goals.history` rows for this goal's steps.
 A step the person dropped or archived tells you what they did not want. Do not
 propose it again.
 
@@ -2310,7 +2310,7 @@ A comment tagged `@dash` on a goal or a step is answered by a quick model call
 in the app. When that call cannot do it from the goal alone (research, email,
 changing steps), it fires this routine on the goal with the comment in the
 brief: which goal or step it is on, the thread so far, and the insert that
-puts your reply in `goals.comments`.
+puts your reply in the thread (`core.add_thread_turn`, under `goals.items:<id>`).
 
 - A question is answered, and only answered. Write one reply and stop.
 - An instruction is carried out inside "What you may change", then reported
@@ -2382,8 +2382,8 @@ the old one; you never write `version` or `core.file_versions`. Set
 `change_note` in the same update to one sentence on what changed.
 
 Read the file's thread first. Comments the person wrote on it are in
-`core.file_comments` (`select author, body, created_at from core.file_comments
-where file_id = '<file id>' order by created_at`), and what they ask for there
+`core.thread_turns` (`select author, body, created_at from core.thread_turns
+where ref = 'core.files:<file id>' order by created_at`), and what they ask for there
 is what this revision does. A file with comments newer than its `updated_at`
 is waiting on a revision: make it when the step it serves is next worked, and
 name the comment in `change_note`.

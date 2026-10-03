@@ -1,8 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
+import { threadFrom, type DevComment } from '@/lib/comments/load';
+import { loadTableThreads } from '@/lib/thread/store';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { readAll } from '@/lib/learn/db/read-all';
 import { planScopeOf, type PlanScope } from '@/lib/plan/projects';
+
+/** The table plan rows live in, the table half of a plan row's ref. */
+const PLAN_TABLE = 'public.plan_items';
 
 /**
  * The plan: what is being built, as a tree.
@@ -307,15 +311,11 @@ export async function loadPlan(
   supabase: SupabaseClient<any, 'public'>,
   userId: string,
 ): Promise<PlanData> {
-  const [rows, deps] = await Promise.all([
+  const [rows, deps, threads] = await Promise.all([
     readAll<Record<string, unknown>>((from, to) =>
       supabase
         .from('plan_items')
-        // The thread is read with the row rather than as a second query, the
-        // same as on a raise. It is not in ITEM_COLUMNS because an embedded
-        // select is PostgREST's and the CLI reads these columns over a direct
-        // connection.
-        .select(`${ITEM_COLUMNS}, thread:dev_comments(${COMMENT_COLUMNS})`)
+        .select(ITEM_COLUMNS)
         .eq('user_id', userId)
         .order('position', { ascending: true })
         .order('created_at', { ascending: true })
@@ -331,10 +331,13 @@ export async function loadPlan(
         .order('id', { ascending: true })
         .range(from, to),
     ),
+    // Every thread under a plan row, from the shared store (plan #1470), in
+    // one read keyed by ref rather than a ref per row.
+    loadTableThreads(supabase, PLAN_TABLE, { userId }),
   ]);
 
   return {
-    items: rows.map(planItemFromRow),
+    items: rows.map((row) => planItemFromRow({ ...row, thread: threads.get(`${PLAN_TABLE}:${row.id}`) })),
     dependencies: deps.map((row) => ({
       id: row.id as string,
       itemId: row.item_id as string,

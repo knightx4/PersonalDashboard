@@ -14,6 +14,7 @@
 import { threadText } from '@/lib/comments/context';
 import type { DevComment } from '@/lib/comments/load';
 import type { WaitingItem } from '@/lib/goals/daily';
+import { threadReplySql } from '@/lib/thread/store';
 
 /**
  * Open is waiting on you. Answered is waiting on the run your answer started,
@@ -93,8 +94,7 @@ export function flagRunText(input: {
     '',
     '## Where your reply goes',
     '',
-    'insert into public.dev_comments (user_id, raised_item_id, author, body) values ' +
-      `('${userId}', '${flag.id}', 'claude', '<what you did>');`,
+    threadReplySql(userId, `public.raised_items:${flag.id}`, '<what you did>'),
     '',
     '## Closing the flag, once nothing is left in it',
     '',

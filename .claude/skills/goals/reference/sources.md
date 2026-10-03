@@ -217,7 +217,7 @@ Each time they reached out to a contact, and what came back.
 
 ### `job_search.notes` (Job search)
 
-Notes they wrote on roles, companies and applications. On a role these are its comment thread, where author 'claude' marks Dash's replies.
+Notes they wrote on roles, companies and applications. A role's comment thread moved to core.conversations (ref job_search.roles:<id>) on 3 October 2026; the role notes here are its earlier copy, where author 'claude' marks Dash's replies.
 
 - Search: `body`
 - Name a row by `body`; link it by `id`
@@ -449,15 +449,15 @@ Longer pieces written for them and kept as pages: research notes, breakdowns of 
 - Search: `title`, `summary`, `body`
 - Name a row by `title`; link it by `id`
 - Opens at `/goals/files/<id>`
-- Skip rows with archived_at set. made_by 'claude' is a run's work, 'you' is theirs. A goal or step links one through goals.links with kind 'file'. Read the file before redoing its work, and revise it rather than writing a second one on the same question. Before revising one, read its thread in core.file_comments (file_id): what they wrote there is what they want changed.
+- Skip rows with archived_at set. made_by 'claude' is a run's work, 'you' is theirs. A goal or step links one through goals.links with kind 'file'. Read the file before redoing its work, and revise it rather than writing a second one on the same question. Before revising one, read its thread in core.thread_turns (ref 'core.files:<id>'): what they wrote there is what they want changed.
 
 ### `core.conversations` (Learn)
 
-Conversations they had with Dash: about a Learn card or a newsletter story, one per thing read, or a question they asked from anywhere in the app.
+Every comment thread and conversation with Dash: the thread under any row (a plan step, an idea, a goal or step, a role, a file, a Learn card, a newsletter story), or a question they asked from anywhere in the app.
 
 - Search: `title`
 - Name a row by `title`; link it by `id`
-- subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as learn.feed_cards:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id.
+- subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as goals.items:<id>, job_search.roles:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id; core.thread_turns lists a row thread's turns with the ref beside each.
 
 ### `public.social_posts` (Dev)
 

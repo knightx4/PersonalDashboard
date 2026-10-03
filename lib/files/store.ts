@@ -1,6 +1,7 @@
 import 'server-only';
 
-import { threadFrom, type DevComment } from '@/lib/comments/load';
+import type { DevComment } from '@/lib/comments/load';
+import { addThreadTurn, loadThread, removeThreadTurn } from '@/lib/thread/store';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import {
@@ -92,18 +93,15 @@ export async function loadListingsById(
   return byId;
 }
 
-/** The thread under a file, oldest first (migration 0119). */
+/**
+ * The thread under a file, oldest first, kept under the file's ref in
+ * core.conversations since plan #1470 (core.file_comments is read-only).
+ */
 export async function loadFileThread(
   core: CoreSupabaseClient,
   fileId: string,
 ): Promise<DevComment[]> {
-  const { data, error } = await core
-    .from('file_comments')
-    .select('id, author, body, created_at')
-    .eq('file_id', fileId)
-    .order('created_at');
-  if (error) throw new Error(`Could not read the comments: ${error.message}`);
-  return threadFrom(data ?? []);
+  return loadThread(core, `core.files:${fileId}`);
 }
 
 /** Write one comment of yours on a file. */
@@ -111,15 +109,10 @@ export async function writeFileComment(
   core: CoreSupabaseClient,
   input: { userId: string; fileId: string; body: string },
 ): Promise<void> {
-  const { error } = await core
-    .from('file_comments')
-    .insert({ user_id: input.userId, file_id: input.fileId, author: 'me', body: input.body });
-  if (error) throw new Error(error.message);
+  await addThreadTurn(core, { userId: input.userId, ref: `core.files:${input.fileId}`, author: 'me', body: input.body });
 }
 
 /** Take a comment back out. False when there was none of yours with that id. */
 export async function deleteFileComment(core: CoreSupabaseClient, id: string): Promise<boolean> {
-  const { data, error } = await core.from('file_comments').delete().eq('id', id).select('id');
-  if (error) throw new Error(error.message);
-  return (data ?? []).length > 0;
+  return (await removeThreadTurn(core, { id })) !== null;
 }

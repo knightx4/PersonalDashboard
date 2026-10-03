@@ -8,7 +8,7 @@ it starts a session with the row, what was written, and where the reply goes.
 That session is you, and the turn says which of the two it was handed.
 
 **A question is answered, and only answered.** Read what it is about, write one
-comment into the thread (the `dev_comments` insert in `offline.md`), and stop. Do not answer a
+comment into the thread (the `core.add_thread_turn` call in `offline.md`), and stop. Do not answer a
 decision, do not change a status, a detail or a done-when, do not shape the idea,
 do not close or dismiss the raise, and do not commit. The person asked what
 something means; a session that answers by settling it has taken the decision

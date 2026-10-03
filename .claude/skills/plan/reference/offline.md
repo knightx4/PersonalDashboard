@@ -183,21 +183,23 @@ select r.id, r.title, r.detail, r.ask, r.consequence, r.module, r.source, r.stat
        (
          select json_agg(json_build_object('author', c.author, 'body', c.body)
                          order by c.created_at)
-         from dev_comments c where c.raised_item_id = r.id
+         from core.thread_turns c
+         where c.ref = 'public.raised_items:' || r.id and c.user_id = r.user_id
        ) as comments
 from raised_items r
 where r.user_id = '…' and r.status in ('open', 'answered')
 order by r.created_at desc;
 
--- replying to an answer, which is how a raise takes a second round.
-insert into dev_comments (user_id, raised_item_id, author, body)
-values ('…', '<the raise>', 'claude', '…');
+-- replying to an answer, which is how a raise takes a second round. Every
+-- thread is kept in core.conversations under the row's ref (plan #1470), and
+-- core.add_thread_turn writes a turn into it, starting the thread if needed.
+select core.add_thread_turn('…', 'public.raised_items:<the raise>', 'claude', $c$…$c$);
 
--- answering a question asked on a row. The same table, and which column is
--- set says what the question was about: `plan_item_id` a step or a decision,
--- `idea_id` an idea, `raised_item_id` a raise. Exactly one of the three.
-insert into dev_comments (user_id, plan_item_id, author, body)
-values ('…', '<the step>', 'claude', '…');
+-- answering a question asked on a row. The same call, and the ref says what
+-- the question was about: `public.plan_items:<id>` a step or a decision,
+-- `public.ideas:<id>` an idea, `public.raised_items:<id>` a raise. Read a
+-- thread from core.thread_turns by the same ref.
+select core.add_thread_turn('…', 'public.plan_items:<the step>', 'claude', $c$…$c$);
 ```
 
 `started_at` and `completed_at` are kept by a trigger from the status; do not

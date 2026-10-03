@@ -12,6 +12,7 @@ import type { DashChangeInput, DashChangeKind, NewDashChange } from '@/lib/talk/
 import { taskInput } from '@/lib/todo/tasks/input';
 import { wallClockToInstant } from '@/lib/todo/time';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
+import { addThreadTurn } from '@/lib/thread/store';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -51,7 +52,8 @@ const TABLE = {
   item: 'public.inventory_items',
   role: 'job_search.roles',
   application: 'job_search.applications',
-  note: 'job_search.notes',
+  // A note on a role is a turn in the role's thread (plan #1470).
+  note: 'core.conversation_turns',
 } as const;
 
 const WORKSPACE_LABELS: Partial<Record<ModuleId, string>> = {
@@ -487,15 +489,14 @@ async function addRoleNote(ctx: DashWriteContext, args: Args): Promise<DashWrite
   if (!role) throw new Refused('That role is not one of theirs, or it has been deleted.');
   const roleTitle = `${role.title}${role.companies?.name ? ` at ${role.companies.name}` : ''}`;
 
-  // Their note, written down for them: it reads as theirs on the role, and
-  // the record says Dash wrote it.
-  const { data, error } = await jobs
-    .from('notes')
-    .insert({ user_id: ctx.userId, role_id: roleId, author: 'me', body })
-    .select('id')
-    .single();
-  if (error || !data) throw new Error(error?.message ?? 'The note was not written.');
-  const noteId = (data as { id: string }).id;
+  // Their note, written down for them in the role's thread: it reads as
+  // theirs on the role, and the record says Dash wrote it.
+  const noteId = await addThreadTurn(await ctx.db('core'), {
+    userId: ctx.userId,
+    ref: toRef(TABLE.role, roleId),
+    author: 'me',
+    body,
+  });
   const ref = toRef(TABLE.note, noteId);
   return made(
     'add_role_note',

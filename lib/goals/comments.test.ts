@@ -224,7 +224,7 @@ describe('the brief for the goals routine', () => {
     expect(text).toContain('Claude: Which servicer?');
     expect(text).toContain('Find my Navient statement in Gmail');
     expect(text).toContain(
-      "insert into goals.comments (user_id, item_id, author, body) values ('user-1', 'step-2', 'claude', '<your reply>');",
+      "select core.add_thread_turn('user-1', 'goals.items:step-2', 'claude', '<your reply>');",
     );
   });
 });

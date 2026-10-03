@@ -16,11 +16,11 @@ export const filesSources: ModuleSources = {
       search: ['title', 'summary', 'body'],
       title: 'title',
       href: fileHref,
-      note: "Skip rows with archived_at set. made_by 'claude' is a run's work, 'you' is theirs. A goal or step links one through goals.links with kind 'file'. Read the file before redoing its work, and revise it rather than writing a second one on the same question. Before revising one, read its thread in core.file_comments (file_id): what they wrote there is what they want changed.",
+      note: "Skip rows with archived_at set. made_by 'claude' is a run's work, 'you' is theirs. A goal or step links one through goals.links with kind 'file'. Read the file before redoing its work, and revise it rather than writing a second one on the same question. Before revising one, read its thread in core.thread_turns (ref 'core.files:<id>'): what they wrote there is what they want changed.",
     },
   ],
   notSources: [
     { table: 'core.file_versions', reason: 'Earlier versions of a file; the file holds the current one.' },
-    { table: 'core.file_comments', reason: 'The thread under a file; read with the file it is on, never searched alone.' },
+    { table: 'core.file_comments', reason: 'The thread under a file until 3 October 2026, now read-only; the thread is in core.conversations under core.files:<id>.' },
   ],
 };

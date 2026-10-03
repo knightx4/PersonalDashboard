@@ -53,10 +53,10 @@ beforeAll(async () => {
   await admin`insert into ideas (user_id, body) values (${other}, 'Not the owner''s idea.')`;
   await admin`insert into feedback_items (user_id, kind, body) values (${other}, 'bug', 'Another account''s bug.')`;
 
-  await admin`insert into dev_comments (user_id, idea_id, author, body)
-              values (${owner}, ${ids.idea}, 'me', 'Newest first would be better.'),
-                     (${owner}, ${ids.idea}, 'claude', 'Grouping is in plan #12.'),
-                     (${owner}, ${ids.dismissed}, 'me', 'Under a dismissed idea.')`;
+  // Threads are kept in core.conversations under the row's ref (plan #1470).
+  await admin`select core.add_thread_turn(${owner}, ${`public.ideas:${ids.idea}`}, 'me', 'Newest first would be better.')`;
+  await admin`select core.add_thread_turn(${owner}, ${`public.ideas:${ids.idea}`}, 'claude', 'Grouping is in plan #12.')`;
+  await admin`select core.add_thread_turn(${owner}, ${`public.ideas:${ids.dismissed}`}, 'me', 'Under a dismissed idea.')`;
 
   const [step] = await admin<{ id: string }[]>`
     insert into plan_items (user_id, title, detail, acceptance, comment)
@@ -78,8 +78,7 @@ beforeAll(async () => {
   const [section] = await admin<{ id: string }[]>`
     insert into spec_sections (user_id, slug, anchor, heading, position)
     values (${owner}, 'plan', 'opening', 'Opening', 0) returning id`;
-  await admin`insert into dev_comments (user_id, spec_section_id, author, body)
-              values (${owner}, ${section.id}, 'me', 'Small is relative.')`;
+  await admin`select core.add_thread_turn(${owner}, ${`public.spec_sections:${section.id}`}, 'me', 'Small is relative.')`;
 });
 
 afterAll(async () => {

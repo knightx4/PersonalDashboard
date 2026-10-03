@@ -1,10 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import {
-  COMMENT_COLUMNS,
-  threadFrom,
-  type DevComment,
-} from '@/lib/comments/load';
+import { threadFrom, type DevComment } from '@/lib/comments/load';
+import { loadTableThreads, withThreads } from '@/lib/thread/store';
 import { splitSections, type SpecSection } from '@/lib/specs/sections';
 import { readSpec, type SpecDoc } from '@/lib/specs/registry';
 import { parseRules, type ParsedRules } from '@/lib/specs/rules';
@@ -37,8 +34,10 @@ type Row = {
   id: string;
   anchor: string;
   heading: string;
-  dev_comments?: unknown;
+  thread?: unknown;
 };
+
+const SECTIONS_TABLE = 'public.spec_sections';
 
 async function storedSections(
   supabase: SupabaseClient,
@@ -47,10 +46,11 @@ async function storedSections(
 ): Promise<Row[]> {
   const { data } = await supabase
     .from('spec_sections')
-    .select(`id, anchor, heading, dev_comments (${COMMENT_COLUMNS})`)
+    .select('id, anchor, heading')
     .eq('user_id', userId)
     .eq('slug', slug);
-  return (data ?? []) as Row[];
+  // Each section's thread, from the shared store (plan #1470).
+  return withThreads(supabase, SECTIONS_TABLE, (data ?? []) as Row[], { userId });
 }
 
 export async function loadSpec(
@@ -69,11 +69,11 @@ export async function loadSpec(
       sections: null,
       rules: null,
       orphans: rows
-        .filter((row) => threadFrom(row.dev_comments).length > 0)
+        .filter((row) => threadFrom(row.thread).length > 0)
         .map((row) => ({
           id: row.id,
           heading: row.heading,
-          thread: threadFrom(row.dev_comments),
+          thread: threadFrom(row.thread),
         })),
     };
   }
@@ -107,12 +107,12 @@ export async function loadSpec(
     // A section whose row did not come back is one the upsert could not write,
     // which is a database problem rather than a page problem. Dropping it beats
     // rendering a thread box that cannot save.
-    return row ? [{ ...section, id: row.id, thread: threadFrom(row.dev_comments) }] : [];
+    return row ? [{ ...section, id: row.id, thread: threadFrom(row.thread) }] : [];
   });
 
   const orphans = rows
     .filter((row) => !live.has(row.anchor))
-    .map((row) => ({ id: row.id, heading: row.heading, thread: threadFrom(row.dev_comments) }))
+    .map((row) => ({ id: row.id, heading: row.heading, thread: threadFrom(row.thread) }))
     .filter((row) => row.thread.length > 0);
 
   return { doc, sections, orphans, rules: parseRules(markdown) };
@@ -123,14 +123,14 @@ export async function specCommentCounts(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<Record<string, number>> {
-  const { data } = await supabase
-    .from('spec_sections')
-    .select('slug, dev_comments (id)')
-    .eq('user_id', userId);
+  const [{ data }, threads] = await Promise.all([
+    supabase.from('spec_sections').select('id, slug').eq('user_id', userId),
+    loadTableThreads(supabase, SECTIONS_TABLE, { userId }),
+  ]);
 
   const counts: Record<string, number> = {};
-  for (const row of (data ?? []) as { slug: string; dev_comments?: unknown }[]) {
-    const n = Array.isArray(row.dev_comments) ? row.dev_comments.length : 0;
+  for (const row of (data ?? []) as { id: string; slug: string }[]) {
+    const n = threads.get(`${SECTIONS_TABLE}:${row.id}`)?.length ?? 0;
     counts[row.slug] = (counts[row.slug] ?? 0) + n;
   }
   return counts;

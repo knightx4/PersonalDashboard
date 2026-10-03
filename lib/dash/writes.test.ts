@@ -92,7 +92,7 @@ beforeEach(() => {
     ],
     'job_search.roles': [{ id: ROLE, user_id: ME, title: 'Product designer' }],
     'job_search.applications': [{ id: APPLICATION, user_id: ME, role_id: ROLE }],
-    'job_search.notes': [],
+    'core.conversation_turns': [],
   };
 });
 
@@ -189,8 +189,9 @@ describe('add_role_note', () => {
   it('adds a note to the role an application names, and links to the role', async () => {
     seen.add(`job_search.applications:${APPLICATION}`);
     const result = ok(await apply('add_role_note', { role_ref: APPLICATION, body: 'Recruiter is Sam.' }));
-    expect(tables['job_search.notes']).toEqual([
-      expect.objectContaining({ role_id: ROLE, body: 'Recruiter is Sam.', author: 'me', user_id: ME }),
+    // A turn in the role's thread, in the shared store (plan #1470).
+    expect(tables['core.conversation_turns']).toEqual([
+      expect.objectContaining({ ref: `job_search.roles:${ROLE}`, body: 'Recruiter is Sam.', author: 'me', user_id: ME }),
     ]);
     expect(result).toMatchObject({
       kind: 'add_role_note',
@@ -201,7 +202,7 @@ describe('add_role_note', () => {
 
     const { undone } = await keepAndUndo(result);
     expect(undone.ok).toBe(true);
-    expect(tables['job_search.notes']).toEqual([]);
+    expect(tables['core.conversation_turns']).toEqual([]);
   });
 
   it('refuses while Jobs is switched off', async () => {

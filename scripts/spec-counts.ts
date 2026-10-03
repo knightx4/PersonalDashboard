@@ -14,7 +14,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { filesMatching, tablesCreated, type SpecCounter } from '../lib/specs/counts';
+import { filesMatching, listFiles, tablesCreated, type SpecCounter } from '../lib/specs/counts';
 
 /** A file's text, or an error naming the counter that needed it. */
 function read(root: string, file: string, counter: string): string {
@@ -40,6 +40,25 @@ const THREAD_AUTHOR =
  * index, which copies turns out of the threads to search them.
  */
 const NOT_THREADS = new Set(['core.memory_chunks']);
+
+/**
+ * A table whose thread was copied into core.conversations and which takes no
+ * more turns (plan #1470): a trigger before insert or update runs
+ * core.refuse_thread_writes. It still holds its old rows until the person says
+ * it can go, but no thread lives there any more.
+ */
+const READ_ONLY_TRIGGER =
+  /create\s+(?:or\s+replace\s+)?trigger\s+\w+\s+before\s+insert\s+or\s+update\s+on\s+([a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*)[^;]*?execute\s+(?:function|procedure)\s+core\.refuse_thread_writes\s*\(\s*\)/gi;
+
+function readOnlyThreadTables(root: string): Set<string> {
+  const tables = new Set<string>();
+  const dirs = ['supabase/migrations', 'supabase/migrations-goals', 'supabase/migrations-job-search'];
+  for (const file of listFiles(root, dirs, ['.sql'])) {
+    const sql = readFileSync(join(root, file), 'utf8').replace(/--[^\n]*/g, '');
+    for (const m of sql.matchAll(READ_ONLY_TRIGGER)) tables.add(m[1].toLowerCase());
+  }
+  return tables;
+}
 
 /**
  * A link table with a column per target says which row it points at with one
@@ -75,11 +94,13 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
     name: 'thread-tables',
     counts: 'tables holding turns between the person and Dash',
     target: 1,
-    measure: (root) =>
-      tablesCreated(root)
-        .filter((t) => !NOT_THREADS.has(t.name))
+    measure: (root) => {
+      const readOnly = readOnlyThreadTables(root);
+      return tablesCreated(root)
+        .filter((t) => !NOT_THREADS.has(t.name) && !readOnly.has(t.name))
         .filter((t) => [t.definition, ...t.alterations].some((sql) => THREAD_AUTHOR.test(sql)))
-        .map((t) => t.name),
+        .map((t) => t.name);
+    },
   },
   {
     name: 'conversational-model-paths',

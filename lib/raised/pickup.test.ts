@@ -9,6 +9,12 @@ vi.mock('@/lib/plan/runs', () => ({
   startRoutineRun: vi.fn(async () => ({ ok: true, runId: 'run-1', status: 200, body: null })),
 }));
 
+// The thread comes from the shared store; the fixture rows carry theirs.
+vi.mock('@/lib/thread/store', async (original) => ({
+  ...(await original<typeof import('@/lib/thread/store')>()),
+  withThreads: vi.fn(async (_client: unknown, _table: string, rows: unknown[]) => rows),
+}));
+
 const USER = '11111111-1111-1111-1111-111111111111';
 
 const row = (over: Partial<Record<string, unknown>> = {}) => ({
@@ -63,7 +69,7 @@ describe('the turn a picked-up raise is handed', () => {
     expect(turn).toContain('## Their answer\n\nyes');
     // Both writes are spelled out, because the CLI cannot reach the database
     // from Claude Code on the web.
-    expect(turn).toContain('insert into dev_comments');
+    expect(turn).toContain("select core.add_thread_turn('11111111-1111-1111-1111-111111111111', 'public.raised_items:22222222-2222-2222-2222-222222222222', 'claude'");
     expect(turn).toContain("update raised_items set status = 'closed'");
   });
 });

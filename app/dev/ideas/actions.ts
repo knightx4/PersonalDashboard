@@ -7,7 +7,8 @@ import { requireOwner } from '@/lib/dev/owner';
 import { threadText } from '@/lib/comments/context';
 import { codeMatches } from '@/lib/feedback/code';
 import { planRoutine } from '@/lib/feedback/routine';
-import { IDEA_COLUMNS, ideaRowFrom } from '@/lib/ideas/load';
+import { IDEA_COLUMNS, IDEAS_TABLE, ideaRowFrom } from '@/lib/ideas/load';
+import { withThreads } from '@/lib/thread/store';
 import { FOG_RULE, PLAIN_ENGLISH_RULE, QUESTION_RULE, visionFor } from '@/lib/plan/brief';
 import { MODULE_IDS, MODULES } from '@/lib/modules';
 import { shapeHoldReason } from '@/lib/plan/hold';
@@ -257,7 +258,10 @@ export async function shapeIdea(
     .eq('id', id.data)
     .maybeSingle();
   if (!data) return { error: 'That idea no longer exists.' };
-  const idea = ideaRowFrom(data as unknown as Record<string, unknown>);
+  const [withThread] = await withThreads(supabase, IDEAS_TABLE, [data as unknown as Record<string, unknown>], {
+    userId: user.id,
+  });
+  const idea = ideaRowFrom(withThread);
   if (idea.planItem) return { error: 'This idea is already in the plan.' };
   // The four-week hold (plan #1484): a session's own suggestion waits.
   const held = shapeHoldReason(idea.source);

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
+import { threadFrom, type DevComment } from '@/lib/comments/load';
+import { withThreads } from '@/lib/thread/store';
 import { triageFrom, type Triage } from '@/lib/feedback/triage';
 
 /**
@@ -121,7 +122,10 @@ export function queueOfKind(queue: FeedbackQueue, kind: FeedbackKind | null): Fe
 /** Every column the app reads off a note. Shared with the changelog. */
 export const FEEDBACK_COLUMNS =
   'id, kind, body, page_path, status, priority, resolution_note, commit_sha, triage, ' +
-  `created_at, completed_at, thread:dev_comments(${COMMENT_COLUMNS})`;
+  'created_at, completed_at';
+
+/** The table notes live in, the table half of a note's ref. */
+export const FEEDBACK_TABLE = 'public.feedback_items';
 
 /** A row as the app reads it. One shape leaves here, whoever selected it. */
 export function feedbackRowFrom(row: Record<string, unknown>): FeedbackRow {
@@ -161,9 +165,12 @@ export async function loadFeedbackQueue(
   // Through `unknown`: the column list is built as an expression, so the client
   // cannot infer a row shape from it and types the result as its error case
   // instead. Same as the ideas loader.
-  const rows: FeedbackRow[] = ((data ?? []) as unknown as Array<Record<string, unknown>>).map(
-    feedbackRowFrom,
-  );
+  // Each note's thread, from the shared store (plan #1470).
+  const rows: FeedbackRow[] = (
+    await withThreads(supabase, FEEDBACK_TABLE, (data ?? []) as unknown as Array<Record<string, unknown>>, {
+      userId,
+    })
+  ).map(feedbackRowFrom);
 
   const outstanding = sortOutstanding(rows.filter(isOutstanding));
 

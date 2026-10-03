@@ -48,7 +48,7 @@ export type TakeawayRowData = {
   /** Jev's score (note 790c745a); absent from fixtures written before it. */
   score?: unknown;
   /** The thread under it (notes c934aefe and eef7e9f1); absent from fixtures written before it. */
-  dev_comments?: unknown;
+  thread?: unknown;
 };
 
 export type LinkRow = {
@@ -238,7 +238,7 @@ export function buildInspirationPage(input: {
     createdAt: row.created_at,
     cover: coverOf(row),
     score: scoreFrom(row.score),
-    thread: threadFrom(row.dev_comments),
+    thread: threadFrom(row.thread),
     sources: (linksByTakeaway.get(row.id) ?? []).map(sourceOf),
   }));
 
