@@ -199,10 +199,11 @@ marks, the themes and a few designed moments. The person chose this balance
 on 3 October 2026: restrained in the data and the voice, expressive in motion.
 
 The start of this is already in the app. Capture plays a puff and flies a chip
-to where the item went (`components/ui/puff.ts`, `fly-chip.ts`, `landed.ts`).
-Clearing a worked list draws the day's sigil, a mark made from the account and
-the date (`components/ui/sigil.tsx`, `queue-cleared.tsx`), on Todo, Quick read
-and the shopping review. A goal closing plays a ring and a fold. What is
+to where the item went (`components/motion/clear.tsx`, `travel.ts`,
+`settle.ts`, played in order by `place.ts`). Clearing a worked list draws the
+day's sigil, a mark made from the account and the date
+(`components/ui/sigil.tsx`, and `QueueCleared` in `components/motion/clear.tsx`),
+on Todo, Quick read and the shopping review. A goal closing plays a ring and a fold. What is
 missing is a system: each animation has its own duration, they share one
 easing curve, nothing springs, nothing responds to touch beyond the swipe, and
 sound is listed on `/dev/ui` as "not yet".
@@ -228,7 +229,8 @@ name already does.
 
 A moment is a designed response to something that matters. Each workspace has
 at most three, so they stay noticeable. They are listed on `/dev/ui` with
-their trigger, what the person sees and their reduced-motion version.
+their trigger, what the person sees, their reduced-motion version and whether
+they are built yet, from the catalogue in `app/dev/ui/moments.ts`.
 
 | Workspace | Moment |
 |---|---|
@@ -262,10 +264,9 @@ that step is.
 
 ## Rules
 
-Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. None
-of these checks exists yet, so each rule is marked pending on the plan step
-that builds its check. That step takes the mark off, and gives R1 its baseline
-measured on main.
+Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. A rule
+whose check is not built yet is marked pending on the plan step that builds
+it. That step takes the mark off, and gives R1 its baseline measured on main.
 
 **R1.** Every page under `app/` has at least one surface in the gallery.
 Checked by: count `routes-without-surface`, target 0, pending #1539.
@@ -284,13 +285,13 @@ Checked by: test `lib/plan/ui-check-guard.test.ts`, pending #1534.
 Checked by: test `tests/dev-ui-taste.test.ts`, pending #1529.
 
 **R6.** Every animation has a reduced-motion version.
-Checked by: test `tests/dev-ui-moments.test.ts`, pending #1554.
+Checked by: test `tests/dev-ui-moments.test.ts`.
 
 **R7.** Animation timings and easings come from the motion tokens.
 Checked by: count `raw-motion-values`, baseline 234, target 0.
 
 **R8.** No workspace has more than three moments.
-Checked by: test `tests/dev-ui-moments.test.ts`, pending #1554.
+Checked by: test `tests/dev-ui-moments.test.ts`.
 
 ## Decisions
 
