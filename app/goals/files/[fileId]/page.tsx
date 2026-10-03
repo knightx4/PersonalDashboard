@@ -101,7 +101,8 @@ export default async function FilePage({
           />
         )}
 
-        {/* Notes on the file (note 7a6a37aa), read by the goals run before it revises it. */}
+        {/* Notes on the file (note 7a6a37aa), read by the goals run before it revises it;
+            one tagged @dash is answered in the thread, from the file (plan #1441). */}
         <section aria-label="Comments" className="px-1">
           <Thread
             subject={threadRef('file', file.id)}

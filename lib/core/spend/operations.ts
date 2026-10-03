@@ -74,7 +74,9 @@ export const SPEND_OPERATIONS = {
     'read-book-photo',
   ],
   core: [
-    // Dash answering a comment on a dev page. Haiku.
+    // Dash answering a comment tagged @dash on a dev page, and under any row
+    // whose thread has no reply of its own, a file first (plan #1441,
+    // lib/thread/ask.ts). Sonnet since plan #1465.
     'reply-to-comment',
     // Suggesting plan steps from the daily dev digest. Haiku; background.
     'suggest-from-digest',

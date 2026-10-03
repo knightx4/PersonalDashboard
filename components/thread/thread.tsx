@@ -5,8 +5,8 @@ import { ArrowUp, CircleUser, X } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
 import { addComment, deleteComment, type CommentActionState } from '@/app/dev/comment-actions';
 import { addGoalComment, deleteGoalComment } from '@/app/goals/[goalId]/comment-actions';
-import { addFileComment, deleteFileCommentAction } from '@/app/goals/files/[fileId]/comment-actions';
 import { addRoleComment, deleteRoleComment } from '@/app/jobs/(app)/roles/[id]/comment-actions';
+import { addRowComment, deleteRowComment } from '@/app/thread-actions';
 import type { PaidAction } from '@/lib/core/spend/paid-actions';
 import { CommentBody } from '@/components/dev/comment-body';
 import { AddTrigger } from '@/components/ui/add-trigger';
@@ -34,7 +34,7 @@ import { PaidHint } from '@/components/ui/paid-hint';
  * nobody is waiting on.
  *
  * The row is named by its ref, `schema.table:id` (lib/thread/subjects.ts), and
- * the table in it says which actions take the turns and how Dash takes them: a raise always reaches Dash, a file never answers, everything
+ * the table in it says which actions take the turns and how Dash takes them: a raise always reaches Dash, everything
  * else answers when tagged.
  *
  * The list is the whole thread including Dash's replies, told apart by who
@@ -53,7 +53,9 @@ type ThreadAction = (
  * Every target writes to the same store, core.conversations under the row's
  * ref (plan #1470, lib/thread/store.ts). The actions still differ in what
  * follows the write: a raise starts a run, a goal's reply can hand on to the
- * goals routine, a role's reply reads the application, a file never answers.
+ * goals routine, a role's reply reads the application. Every other target,
+ * a file first, takes ROW_STORE, whose reply reads the row from its ref
+ * (plan #1441), so a new thread gets Dash's replies with no actions of its own.
  * The cost keys are named here, beside the PaidHint that shows them, which is
  * where lib/core/spend/paid-actions.test.ts looks for them.
  */
@@ -85,11 +87,11 @@ const ROLE_STORE: CommentStore = {
   paid: 'app/jobs/(app)/roles/[id]/comment-actions.ts#addRoleComment',
 };
 
-/** Files. No reply is paid for here, since Dash does not answer in it. */
-const FILES_STORE: CommentStore = {
-  add: addFileComment,
-  remove: deleteFileCommentAction,
-  paid: 'app/goals/[goalId]/comment-actions.ts#addGoalComment',
+/** Any other row, a file first: Dash's reply reads the row from its ref (plan #1441). */
+const ROW_STORE: CommentStore = {
+  add: addRowComment,
+  remove: deleteRowComment,
+  paid: 'app/thread-actions.ts#addRowComment',
 };
 
 const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
@@ -102,7 +104,7 @@ const THREAD_STORES: Record<ThreadTarget, CommentStore> = {
   change: DEV_STORE,
   goal: GOALS_STORE,
   role: ROLE_STORE,
-  file: FILES_STORE,
+  file: ROW_STORE,
 };
 
 function DeleteComment({
@@ -375,8 +377,7 @@ export function Thread({
   // A raise is a question put to you, so anything you write on one reaches
   // Dash whether or not it carries the tag -- #541. Everywhere else the tag is
   // what does it.
-  const answers = target !== 'file';
-  const reaches = (body: string) => target === 'raise' || (answers && mentionsDash(body));
+  const reaches = (body: string) => target === 'raise' || mentionsDash(body);
   // Nothing is coming back from an action of somebody else's, so the line
   // saying an answer is on its way would be describing a wait that is not
   // happening.
@@ -387,7 +388,7 @@ export function Thread({
   // after a reload. `awaitingDash` holds it until Dash answers or until the
   // wait has gone on longer than an answer ever takes.
   const asking =
-    awaitingReply || (!submit && target !== 'file' && awaitingDash(shown, target, now));
+    awaitingReply || (!submit && awaitingDash(shown, target, now));
   /** Whether what is in the box right now would reach Dash. */
   const tagged = reaches(draft);
 
@@ -503,7 +504,7 @@ export function Thread({
                   addressed to somebody starts. Lit once the tag is in, so it
                   also says who will read this. Left off a box writing
                   somewhere else, where nothing reads the tag. */}
-              {!submit && answers && (
+              {!submit && (
                 <button
                   type="button"
                   // Keeps the caret where it is. Without this the box loses
@@ -588,10 +589,12 @@ export function Thread({
                 <p className="min-w-0 flex-1 text-small text-ink-muted">
                   {target === 'raise'
                     ? 'This is your answer. A session acts on it and replies in the thread.'
-                    : target === 'file'
-                      ? 'A note on the file. Dash reads it before revising the file.'
-                      : tagged
-                        ? 'Dash will read this and reply in the thread.'
+                    : tagged
+                      ? target === 'file'
+                        ? 'Dash will read this and the file, and reply in the thread.'
+                        : 'Dash will read this and reply in the thread.'
+                      : target === 'file'
+                        ? 'A note on the file. Dash reads it before revising the file.'
                         : 'A note on the row. Nothing reads it.'}
                 </p>
               )}
