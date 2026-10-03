@@ -66,7 +66,7 @@ While you are in a file, laws 10 and 12 are yours to judge:
   worked example — read it.
 - **A labelled full-width `<Select>`** is usually a `ChipSelect`: the value is
   the label, and three chips are a row where three labelled selects are three
-  rows. `app/dev/plan/plan-view.tsx` is the worked example.
+  rows. `app/dev/plan/step-forms.tsx` is the worked example.
 - **A create form with a caption above every field** is usually a compose
   surface: `ComposeTitle`, `ComposeBody`, a chip row, actions bottom-right.
 
@@ -117,9 +117,11 @@ npm run build
 npm test
 ```
 
-`npm test` has a standing baseline: the RLS suites need a database on port 5433
-and the FX suite needs network. Run it on a clean tree first so you can prove
-you did not add to it. Report the numbers you actually got. Never describe a
+The RLS suites in `npm test` need the test database on port 5433.
+`npm run gate` starts it (`scripts/test-db-up.sh`), applies the migrations and
+runs every check above, so it is the simplest way to run them all. The FX
+suite needs network. Run the tests on a clean tree first so you can prove you
+did not add to what fails. Report the numbers you actually got. Never describe a
 suite as passing when it did not run.
 
 ## Committing
