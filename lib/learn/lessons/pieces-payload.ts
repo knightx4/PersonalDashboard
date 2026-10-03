@@ -105,8 +105,48 @@ export type WrittenPiece = { title: string; ideas: number[] };
 
 export type PiecesResult = { ok: true; pieces: WrittenPiece[] } | { ok: false; detail: string };
 
+/**
+ * A list as the model sent it. The tool is not strict, and Sonnet hands a
+ * nested list back as a JSON string, or as the one object when the unit has a
+ * single piece, which is the shape the feed cards met (lib/learn/feed/write-card.ts).
+ * The pass retried such a unit every hour: 33 calls on 2 October, most of
+ * them a reply of about 70 tokens for a one-piece unit. Both are read as the
+ * list; anything else is left for the schema to refuse.
+ */
+function listOf(value: unknown): unknown {
+  let list = value;
+  if (typeof list === 'string') {
+    try {
+      list = JSON.parse(list);
+    } catch {
+      return value;
+    }
+  }
+  if (list && typeof list === 'object' && !Array.isArray(list)) return [list];
+  return list;
+}
+
+/** An idea's number, also when it comes back as a string ("3"). */
+const ideaNumber = z.preprocess(
+  (value) => (typeof value === 'string' && /^\s*\d+\s*$/.test(value) ? Number(value) : value),
+  z.number(),
+);
+
+/** The idea numbers, also as one number or a string of them ("1, 2"). */
+function numberList(value: unknown): unknown {
+  if (typeof value === 'number') return [value];
+  if (typeof value === 'string') {
+    const parts = value.replace(/^\s*\[|\]\s*$/g, '').split(/[\s,]+/).filter(Boolean);
+    if (parts.length > 0 && parts.every((part) => /^\d+$/.test(part))) return parts.map(Number);
+  }
+  return value;
+}
+
 const payloadSchema = z.object({
-  pieces: z.array(z.object({ title: z.string(), ideas: z.array(z.number()) })),
+  pieces: z.preprocess(
+    listOf,
+    z.array(z.object({ title: z.string(), ideas: z.preprocess(numberList, z.array(ideaNumber)) })),
+  ),
 });
 
 function clean(text: string): string {
@@ -125,7 +165,11 @@ function clean(text: string): string {
  */
 export function readPieces(input: unknown, ideaCount: number): PiecesResult {
   const parsed = payloadSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, detail: 'The pieces did not match their schema.' };
+  if (!parsed.success) {
+    // Name the field, so the next refusal says what the reply looked like.
+    const where = parsed.error.issues.map((issue) => issue.path.join('.') || 'the report').join(', ');
+    return { ok: false, detail: `The pieces did not match their schema (${where}).` };
+  }
 
   const taken = new Set<number>();
   const pieces: WrittenPiece[] = [];
