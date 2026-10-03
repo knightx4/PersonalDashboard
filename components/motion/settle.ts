@@ -171,13 +171,20 @@ export const SETTLE_IN_KEYFRAMES: Keyframe[] = [
  * item went: a move on the spring, with only transform and opacity animated
  * so nothing around it reflows. Resolves when it has settled, and at once,
  * leaving the element simply there, under reduced motion, outside a browser,
- * or when the browser has no Web Animations.
+ * or when the browser has no Web Animations. `opacity` is where it lands when
+ * the element is drawn fainter than full.
  */
-export function settleIn(element: Element): Promise<void> {
+export function settleIn(element: Element, options: { opacity?: number } = {}): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve();
   if (prefersReducedMotion()) return Promise.resolve();
   if (typeof element.animate !== 'function') return Promise.resolve();
-  const animation = element.animate(SETTLE_IN_KEYFRAMES, {
+  // A row drawn faded, as a finished step is, lands at its own opacity
+  // rather than at full and then dropping back.
+  const keyframes =
+    options.opacity === undefined
+      ? SETTLE_IN_KEYFRAMES
+      : [SETTLE_IN_KEYFRAMES[0], { ...SETTLE_IN_KEYFRAMES[1], opacity: options.opacity }];
+  const animation = element.animate(keyframes, {
     duration: MOTION_MS.move,
     easing: EASE.spring,
   });
