@@ -224,7 +224,7 @@ Each is one file. Read the one you were sent for; do not read the others.
 | | |
 |---|---|
 | `reference/building.md` | Building one step, start to close. What a subagent reads. |
-| `reference/shaping.md` | Turning an idea into a proposed feature. |
+| `reference/shaping.md` | Turning an idea into a proposed feature, or an approved spec change into approved work. |
 | `reference/reshaping.md` | Re-reading a feature against the answers beneath it. |
 | `reference/comments.md` | Answering a comment that tags `@dash`. |
 | `reference/writing.md` | How to write a title and a detail. Read before writing any row. |
