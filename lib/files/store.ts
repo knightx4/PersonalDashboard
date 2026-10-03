@@ -1,7 +1,7 @@
 import 'server-only';
 
 import type { DevComment } from '@/lib/comments/load';
-import { addThreadTurn, loadThread, removeThreadTurn } from '@/lib/thread/store';
+import { loadThread } from '@/lib/thread/store';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import {
@@ -102,17 +102,4 @@ export async function loadFileThread(
   fileId: string,
 ): Promise<DevComment[]> {
   return loadThread(core, `core.files:${fileId}`);
-}
-
-/** Write one comment of yours on a file. */
-export async function writeFileComment(
-  core: CoreSupabaseClient,
-  input: { userId: string; fileId: string; body: string },
-): Promise<void> {
-  await addThreadTurn(core, { userId: input.userId, ref: `core.files:${input.fileId}`, author: 'me', body: input.body });
-}
-
-/** Take a comment back out. False when there was none of yours with that id. */
-export async function deleteFileComment(core: CoreSupabaseClient, id: string): Promise<boolean> {
-  return (await removeThreadTurn(core, { id })) !== null;
 }

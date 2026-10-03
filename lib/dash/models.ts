@@ -14,6 +14,7 @@ export const DASH_MODELS = {
   devThread: MODELS.devCommentReply,
   goalThread: MODELS.goalCommentReply,
   roleThread: MODELS.roleCommentReply,
+  rowThread: MODELS.rowCommentReply,
   capture: MODELS.goalCapture,
 } as const;
 

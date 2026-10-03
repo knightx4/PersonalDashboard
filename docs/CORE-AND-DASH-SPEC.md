@@ -111,6 +111,12 @@ thread on plan rows, ideas, raises, goal steps, files and roles, and adds one
 to todo tasks, orders, inventory items, news stories and vault notes. The
 role's notes stay as notes; only the conversation with Dash moves.
 
+Dev rows, goals and roles keep their own @dash replies, because each offers
+tools only it has. Every other thread, files first, is answered by one reply
+keyed by the ref alone (`lib/thread/ask.ts`): it reads the whole row as the
+person's session sees it, written out from its catalogue entry, and runs the
+shared loop. A new thread gets Dash's replies without code of its own.
+
 What happens to the threads already written is the first decision below.
 
 ## Part 3: One whose-move vocabulary
