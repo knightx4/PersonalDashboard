@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type Anthropic from '@anthropic-ai/sdk';
+import { recordScheduled, scheduledBefore } from '@/lib/core/scheduled-actions';
 import { sumByModel, type SpendReport } from '@/lib/core/spend/pricing';
 import { decideWithJev } from '@/lib/jev/decide';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
@@ -83,6 +84,7 @@ type ItemRow = {
 };
 
 type ListRow = {
+  id: string;
   user_id: string;
   video_id: string;
   summary: string | null;
@@ -90,7 +92,7 @@ type ListRow = {
   item: ItemRow | null;
 };
 
-type ListVideo = VideoToScreen & { userId: string; keyPoints: string[] };
+type ListVideo = VideoToScreen & { rowId: string; userId: string; keyPoints: string[] };
 
 export type JudgePassResult = {
   /** Clear skips written by the first pass, with no transcript asked for. */
@@ -106,12 +108,13 @@ export type JudgePassResult = {
 };
 
 const SELECT =
-  'user_id, video_id, summary, key_points, item:catalogue_items!watch_list_item_id_fkey(title, author, description, duration_seconds, provider:catalogue_providers!catalogue_items_provider_id_fkey(name))';
+  'id, user_id, video_id, summary, key_points, item:catalogue_items!watch_list_item_id_fkey(title, author, description, duration_seconds, provider:catalogue_providers!catalogue_items_provider_id_fkey(name))';
 
 function toVideo(row: ListRow): ListVideo | null {
   if (!row.item) return null;
   const provider = Array.isArray(row.item.provider) ? row.item.provider[0] : row.item.provider;
   return {
+    rowId: row.id,
     userId: row.user_id,
     videoId: row.video_id,
     title: row.item.title,
@@ -231,15 +234,34 @@ async function transcriptStatuses(learn: LearnSupabaseClient, videoIds: string[]
   return out;
 }
 
-/** Write to one row unless you have set its verdict yourself. */
+/**
+ * Write to one row unless you have set its verdict yourself.
+ *
+ * A skip takes the video off your list, so each one is recorded as Dash's
+ * change with an Undo on Home (plan #1572): the row is read before the write
+ * and recorded after it, and only when the write landed, since a row you
+ * moved meanwhile is left as it is. The record never stops the write.
+ */
 async function writeRow(learn: LearnSupabaseClient, video: ListVideo, update: Record<string, unknown>): Promise<void> {
-  const { error } = await learn
+  const skip = update.verdict === 'skip';
+  const ref = `learn.watch_list:${video.rowId}`;
+  const before = skip ? await scheduledBefore(learn, video.userId, ref) : null;
+  const { data, error } = await learn
     .from('watch_list')
     .update(update)
     .eq('user_id', video.userId)
     .eq('video_id', video.videoId)
-    .or('verdict_by.is.null,verdict_by.neq.you');
+    .or('verdict_by.is.null,verdict_by.neq.you')
+    .select('id');
   if (error) throw new Error(`Storing the verdict failed: ${error.message}`);
+  if (!skip || (data ?? []).length === 0) return;
+  await recordScheduled(learn, video.userId, {
+    kind: 'skip_video',
+    subjectRef: ref,
+    op: 'update',
+    summary: `Dash marked "${video.title}" as a skip on your watch list.`,
+    beforeValues: before,
+  });
 }
 
 type ScreenRow = { videoId: string; decision: 'skip' | 'look'; why: string | null };
