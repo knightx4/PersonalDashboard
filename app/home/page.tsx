@@ -42,7 +42,7 @@ import type { ShownObservation } from '@/lib/timeline/observations-view';
 import { ObservationList } from '@/app/timeline/observations';
 import { formatClock } from '@/lib/clock';
 import { BRIEF_ANCHOR, shownBrief, type ShownBrief } from '@/lib/day-brief/shown';
-import { openedFromPush } from '@/lib/day-brief/opens';
+import { briefDaysOpened, openedFromPush } from '@/lib/day-brief/opens';
 import { DayBrief } from './day-brief';
 import { WatchingSection, WatchMark } from './watching';
 
@@ -180,11 +180,6 @@ export default async function HomePage({
   // section, and any that finished lately as lines for Updates.
   const watching = safe(loadWatching(now), { running: [], ended: [] });
 
-  // Opened from the morning notification (plan #1242): stamp that day's brief
-  // as opened, once. Any other visit carries no from=push and records nothing.
-  const openedDay = openedFromPush(params, today);
-  const opened = openedDay ? safe(core.rpc('open_day_brief', { p_day: openedDay }), null) : null;
-
   // This morning's brief (plan #1123), written by the hourly day-brief cron
   // from six in the person's zone. Before then there is none, and the page
   // opens on the date as it always did. Since #1241 it is the picks, with
@@ -202,6 +197,18 @@ export default async function HomePage({
         ),
       ),
     null,
+  );
+
+  // Stamp the brief as opened, once per day (plans #1242, #1494): the day the
+  // notification was for when it was pressed, and today's whenever the page
+  // shows it, since most mornings it is read here without the notification.
+  const pushDay = openedFromPush(params, today);
+  const opened = dayBrief.then((shown) =>
+    Promise.all(
+      briefDaysOpened(pushDay, today, shown !== null).map((day) =>
+        safe(core.rpc('open_day_brief', { p_day: day }), null),
+      ),
+    ),
   );
 
   const date = new Intl.DateTimeFormat('en-GB', {
@@ -338,14 +345,14 @@ export default async function HomePage({
   );
 }
 
-/** This morning's brief, and the stamp that it was opened from the push. */
+/** This morning's brief, and the stamp that it was opened. */
 async function DayBriefSection({
   brief,
   opened,
   day,
 }: {
   brief: Promise<ShownBrief | null>;
-  opened: Promise<unknown> | null;
+  opened: Promise<unknown>;
   day: string;
 }) {
   const [shown] = await Promise.all([brief, opened]);
