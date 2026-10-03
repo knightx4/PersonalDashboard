@@ -6,6 +6,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { LearnOperation } from '@/lib/learn/spend';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { MAX_TURN } from '@/lib/talk/talk';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Maya's answer to what the person said in a thread, and where they have got
@@ -22,7 +23,7 @@ import { MAX_TURN } from '@/lib/talk/talk';
  * the thread. Never the note's path. The privacy page says the same.
  */
 
-export const MAYA_REPLY_MODEL = 'claude-sonnet-5';
+export const MAYA_REPLY_MODEL = MODELS.mayaReply;
 
 /** The name this call has in core.model_spend. Stable: renaming it splits the history. */
 export const MAYA_REPLY_OPERATION: LearnOperation = 'reply-to-maya';

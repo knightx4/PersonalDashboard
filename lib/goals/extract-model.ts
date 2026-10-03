@@ -15,8 +15,9 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { CollectionField, CollectionShape } from '@/lib/goals/collections';
 import type { LearnedKind } from '@/lib/goals/document-kinds';
 import { EXTRACT_TOOL, extractionPrompt, extractionTool } from '@/lib/goals/extract';
+import { MODELS } from '@/lib/core/models';
 
-export const EXTRACT_MODEL = 'claude-haiku-4-5';
+export const EXTRACT_MODEL = MODELS.goalExtract;
 
 /** What is read: text, or a file's bytes as base64. */
 export type ExtractSource =

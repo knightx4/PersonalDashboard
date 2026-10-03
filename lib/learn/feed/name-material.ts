@@ -6,6 +6,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { describeDepth, type DepthContext } from './depth';
 import type { FeedTarget } from './targets';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Naming what to read for one target (LEARN-NOW-SPEC, "How cards are made",
@@ -21,7 +22,7 @@ import type { FeedTarget } from './targets';
  * naming well-known articles does not need more.
  */
 
-export const NAME_MATERIAL_MODEL = 'claude-sonnet-5';
+export const NAME_MATERIAL_MODEL = MODELS.learnNameMaterial;
 
 /** The most articles kept from one call. */
 export const MAX_NAMED = 3;

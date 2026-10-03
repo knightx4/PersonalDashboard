@@ -9,6 +9,7 @@ import {
   type AppliedCase,
 } from '@/lib/learn/graph/applied-payload';
 import { gradeWrittenAnswer, type WrittenGrade } from '@/lib/learn/graph/opening-probe';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * The second rung of #386: a situation somebody has not seen, answered in
@@ -29,7 +30,7 @@ import { gradeWrittenAnswer, type WrittenGrade } from '@/lib/learn/graph/opening
  */
 
 /** Stored on every applied row, so what asked it is recorded with it. */
-export const APPLIED_MODEL = 'claude-haiku-4-5';
+export const APPLIED_MODEL = MODELS.learnApplied;
 const WRITE_TOOL = 'report_case';
 
 const WRITE_SYSTEM = `You write one short case testing whether somebody can use one specific claim,

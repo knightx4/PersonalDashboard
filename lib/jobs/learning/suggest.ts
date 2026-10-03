@@ -11,12 +11,13 @@ import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { AIM_DEPTH_LABELS } from '@/lib/learn/aims';
 import { MAX_SUGGESTIONS, parseSuggestionPayload, trackKey, type SuggestionResult } from './payload';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Judgement about what a career needs, from free writing. Opus, as the other
  * Jobs calls that read the person's own words are.
  */
-export const SUGGEST_MODEL = 'claude-opus-5';
+export const SUGGEST_MODEL = MODELS.jobsLearningSuggest;
 const TOOL_NAME = 'suggest_learning_tracks';
 
 /** How much of the career goals writing is sent, newest entry first. */

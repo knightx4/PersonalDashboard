@@ -9,6 +9,7 @@ import {
   type ResolvedSource,
 } from '@/lib/learn/import/resolve-payload';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Turning a citation into something you can open.
@@ -26,7 +27,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
  * proposer makes in lib/jobs/evidence/propose.ts.
  */
 
-const MODEL = 'claude-opus-5';
+const MODEL = MODELS.learnImportResolve;
 // Four, not six. Each search is a round trip inside one already-slow call,
 // and the sixth rarely changes the answer -- it is usually the model
 // double-checking a URL it already had. Fewer searches is the single cheapest

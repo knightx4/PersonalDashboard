@@ -11,6 +11,7 @@ import {
   JOB_EMAIL_QUESTION,
   jobEmailState,
 } from '@/lib/jobs/email/jev-question';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Tier B: the model pass, for anything Tier A could not place confidently.
@@ -21,7 +22,7 @@ import {
  */
 
 const MAX_BODY_CHARS = 6_000;
-const TIER_B_MODEL = 'claude-haiku-4-5-20251001';
+const TIER_B_MODEL = MODELS.jobsInboxTierB;
 
 export interface TierBResult {
   extracted: ExtractedMessage | null;

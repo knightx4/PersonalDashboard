@@ -6,6 +6,7 @@ import { MAX_IN_FLIGHT, mapWithCap } from '@/lib/learn/graph/opening-probe';
 import { toWrittenQuestion } from '@/lib/learn/graph/opening-payload';
 import { planQuizQuestions, type PlannableSource, type QuizChunk } from '@/lib/learn/quiz/plan';
 import { quizChunkSchema, MIN_QUIZ_QUESTIONS, QUIZ_QUESTIONS } from '@/lib/learn/quiz/payload';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Turning the material you picked into questions.
@@ -25,7 +26,7 @@ import { quizChunkSchema, MIN_QUIZ_QUESTIONS, QUIZ_QUESTIONS } from '@/lib/learn
  * claiming ten.
  */
 
-export const QUIZ_MODEL = 'claude-haiku-4-5';
+export const QUIZ_MODEL = MODELS.learnQuiz;
 const TOOL_NAME = 'report_questions';
 
 const SYSTEM = `You write quiz questions from material somebody chose to be tested on. They

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { Level3Article } from '@/lib/learn/areas/level3';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Placing things into the areas (docs/LEARN-AREAS-SPEC.md).
@@ -25,7 +26,7 @@ import type { Level3Article } from '@/lib/learn/areas/level3';
  * Opus, because the value is in the close calls. Forty items is one call.
  */
 
-export const PLACE_MODEL = 'claude-opus-5';
+export const PLACE_MODEL = MODELS.learnAreaPlace;
 
 /** Items per call. Small enough that one reply fits well inside max_tokens. */
 export const PLACE_BATCH = 40;

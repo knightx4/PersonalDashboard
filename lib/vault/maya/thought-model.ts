@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import type { MayaMaterial } from './retrieve';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * The call that writes Maya's thought on one note (plan #1284).
@@ -22,7 +23,7 @@ import type { MayaMaterial } from './retrieve';
  * Nothing here checks what the model said. That is verify.ts.
  */
 
-export const THOUGHT_MODEL = 'claude-opus-5';
+export const THOUGHT_MODEL = MODELS.mayaThought;
 const TOOL_NAME = 'report_thought';
 
 /** At most this many points reach the person. */

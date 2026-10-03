@@ -10,6 +10,7 @@ import {
   type OpeningClaim,
   type OpeningQuestionRejection,
 } from '@/lib/learn/graph/opening-payload';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * The question asked about each of the ten claims, and the grading of what
@@ -28,7 +29,7 @@ import {
  * sweep runs with nine. One bad claim should not cost the opening.
  */
 
-export const OPENING_MODEL = 'claude-haiku-4-5';
+export const OPENING_MODEL = MODELS.learnOpeningProbe;
 const WRITE_TOOL = 'report_question';
 const GRADE_TOOL = 'report_grade';
 

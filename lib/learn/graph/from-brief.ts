@@ -21,6 +21,7 @@ import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { cutLong } from '@/lib/learn/graph/note-chunks';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * A briefing somebody wrote for you, read into things you have yet to learn.
@@ -48,7 +49,7 @@ import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
  * until somebody ticks the rows.
  */
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = MODELS.learnGraphFromBrief;
 const TOOL_NAME = 'report_chain';
 
 /** Passes per import. Eight tokens plus the market is the shape to cover; at

@@ -1,9 +1,11 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { recordScheduled } from '@/lib/core/scheduled-actions';
 import { moveCharges } from './corrections';
 import { extractRecurringFromEmail, type RecurringReading } from './extract';
 import { namesTheStore, payeeKey } from './extraction';
+import { MOVED_NO_UNDO, movedSummary, paymentRef } from './record';
 import { classifyRecurring, STORE_PAYEE_KEYS } from './rules';
 
 /**
@@ -25,6 +27,11 @@ import { classifyRecurring, STORE_PAYEE_KEYS } from './rules';
  *
  * A store row the person left out of the total (status 'ignored', plan #1213)
  * is theirs to sort out and is not re-read.
+ *
+ * Each move is recorded as a scheduled change Home lists (plan #1571), under
+ * the payment the charge now sits on, with the sentence saying why it has no
+ * Undo: a move touches the charge and both payments, and the Recurring page
+ * is where a charge is moved back.
  */
 
 export const REREAD_ERROR_PREFIX = 'reread:';
@@ -49,6 +56,7 @@ type ChargeRow = {
   message_id: string;
   occurred_on: string;
   amount_cents: number | null;
+  currency?: string | null;
 };
 
 export async function rereadStoreReceipts(
@@ -72,7 +80,7 @@ export async function rereadStoreReceipts(
 
   const { data: payments, error: paymentsError } = await supabase
     .from('recurring_payments')
-    .select('id, payee_key, status')
+    .select('id, payee, payee_key, status')
     .eq('user_id', userId)
     .in('payee_key', [...STORE_PAYEE_KEYS]);
   if (paymentsError) throw new Error(`reread payments failed: ${paymentsError.message}`);
@@ -85,7 +93,7 @@ export async function rereadStoreReceipts(
 
     const { data: charges, error: chargesError } = await supabase
       .from('recurring_charges')
-      .select('id, message_id, occurred_on, amount_cents')
+      .select('id, message_id, occurred_on, amount_cents, currency')
       .eq('user_id', userId)
       .eq('payment_id', paymentId);
     if (chargesError) throw new Error(`reread charges failed: ${chargesError.message}`);
@@ -127,6 +135,7 @@ export async function rereadStoreReceipts(
         userId,
         paymentId,
         storeKey: payment.payee_key as string,
+        storeName: (payment.payee as string | null) ?? (payment.payee_key as string),
         charge,
         providerId,
         fetchMessage: opts.fetchMessage,
@@ -154,6 +163,7 @@ async function rereadOne(
     userId: string;
     paymentId: string;
     storeKey: string;
+    storeName: string;
     charge: ChargeRow;
     providerId: string;
     fetchMessage: (providerMessageId: string) => Promise<RereadMessage>;
@@ -193,5 +203,28 @@ async function rereadOne(
     to: { payee },
   });
   if (moved.error) return { unreadable: moved.error };
+
+  if (moved.paymentId) {
+    const { data: store } = await supabase
+      .from('recurring_payments')
+      .select('id')
+      .eq('user_id', opts.userId)
+      .eq('id', opts.paymentId)
+      .maybeSingle();
+    await recordScheduled(supabase, opts.userId, {
+      kind: 'reread_recurring_charge',
+      subjectRef: paymentRef(moved.paymentId),
+      op: 'update',
+      summary: movedSummary({
+        store: opts.storeName,
+        payee,
+        amountCents: opts.charge.amount_cents,
+        currency: opts.charge.currency ?? 'USD',
+        occurredOn: opts.charge.occurred_on,
+        storeRemoved: !store,
+      }),
+      noUndo: MOVED_NO_UNDO,
+    });
+  }
   return { movedTo: payee };
 }

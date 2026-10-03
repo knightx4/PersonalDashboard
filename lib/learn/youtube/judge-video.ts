@@ -6,6 +6,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { segmentsFromCues, type Chapter, type TranscriptCue } from '@/lib/learn/catalogue/segment';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { clockTime } from './format';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Judging the videos on your list against what you are learning (plan #1066).
@@ -28,7 +29,7 @@ import { clockTime } from './format';
  * either.
  */
 
-export const JUDGE_VIDEO_MODEL = 'claude-haiku-4-5';
+export const JUDGE_VIDEO_MODEL = MODELS.learnJudgeVideo;
 
 /** Videos read per screening call: the profile is sent once for all of them. */
 export const SCREEN_BATCH = 10;

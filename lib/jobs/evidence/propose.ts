@@ -24,13 +24,14 @@ import {
   type EvidenceProposalResult,
   type EvidenceSourceKind,
 } from './propose-payload';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Judgment, not retrieval: deciding what counts as a story and what is a
  * skill claim in a bullet's clothing is the whole job. Haiku is the house
  * default for lookups; this is not a lookup.
  */
-const MODEL = 'claude-opus-5';
+const MODEL = MODELS.jobsEvidencePropose;
 const TOOL_NAME = 'propose_evidence';
 
 const SOURCE_GUIDANCE: Record<EvidenceSourceKind, string> = {

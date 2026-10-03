@@ -11,6 +11,7 @@ import { isRooted, type Rooting } from '@/lib/learn/graph/rooting';
 import type { KnowledgeState } from '@/lib/learn/graph/model';
 import type { Aim } from '@/lib/learn/graph/aim';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Finding something to read about a subject you wrote down.
@@ -27,7 +28,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
  * plausible options rather than short of them.
  */
 
-const MODEL = 'claude-opus-5';
+const MODEL = MODELS.learnImportSuggest;
 const MAX_SEARCHES = 8;
 const TOOL_NAME = 'report_sources';
 

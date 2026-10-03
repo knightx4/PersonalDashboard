@@ -10,6 +10,7 @@ import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { folded, SURVEY_NOTE_CHARS, type IdeaResult, type SurveyIdea } from './idea';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * The idea a Practice Flow question about a learning goal tests (plan #1383).
@@ -30,7 +31,7 @@ import { folded, SURVEY_NOTE_CHARS, type IdeaResult, type SurveyIdea } from './i
  * inside a subject, not judging whether it is true.
  */
 
-const MODEL = 'claude-haiku-4-5';
+const MODEL = MODELS.learnSurveyGoalIdea;
 const TOOL_NAME = 'report_idea';
 
 /** The shortest quote accepted from a card's section. */

@@ -3,6 +3,7 @@ import { changeHref, changeSentence } from '@/lib/ask/change-view';
 import {
   DASH_ACTION_SELECT,
   DASH_ACTIONS_TABLE,
+  noUndoReason,
   toDashAction,
   undoDashAction,
   type DashAction,
@@ -51,6 +52,12 @@ export type DashTodayEntry = {
   /** When Dash made it. */
   at: string;
   workspace: ModuleId | null;
+  /**
+   * Why it has no Undo, shown in place of the button, for a change its
+   * writer recorded as one that cannot be put back (plan #1571). Null when
+   * Undo is offered.
+   */
+  noUndo: string | null;
 };
 
 export type DashTodayGroup = {
@@ -98,6 +105,7 @@ export function dashTodayEntry(row: Row, today: string): DashTodayEntry | null {
       href: action.status === 'done' ? changeHref(change) : null,
       at,
       workspace,
+      noUndo: null,
     };
   }
 
@@ -113,6 +121,7 @@ export function dashTodayEntry(row: Row, today: string): DashTodayEntry | null {
         : null,
     at,
     workspace,
+    noUndo: action.status === 'done' ? noUndoReason(action) : null,
   };
 }
 

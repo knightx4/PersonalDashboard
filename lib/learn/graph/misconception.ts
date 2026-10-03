@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { ProbeRow } from '@/lib/learn/graph/session';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * The same wrong answer, twice.
@@ -19,7 +20,7 @@ import type { ProbeRow } from '@/lib/learn/graph/session';
  * question, a mis-click. Twice on the same option is a position.
  */
 
-const MODEL = 'claude-haiku-4-5';
+const MODEL = MODELS.learnMisconception;
 const TOOL_NAME = 'name_misconception';
 
 const SYSTEM = `Somebody has answered questions about one idea and picked the same

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { fetchDocument } from '@/lib/learn/providers';
 import { buildTextFragmentUrl, containsAnchor, toPlainText } from '@/lib/learn/locate/html';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
+import { MODELS } from '@/lib/core/models';
 
 /**
  * Finding the paragraph, when you open the reading and not before.
@@ -21,7 +22,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
  * you spend the twenty minutes anyway and you stop trusting the queue.
  */
 
-const MODEL = 'claude-haiku-4-5-20251001';
+const MODEL = MODELS.learnLocate;
 const TOOL_NAME = 'report_passage';
 
 /** Enough of a document to find a passage in; past this it is a book. */
