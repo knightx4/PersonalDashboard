@@ -287,6 +287,35 @@ describe('the mail sync in the job search', () => {
     expect(tables['job_search.application_events']).toHaveLength(0);
   });
 
+  it('files an old confirmation on the rejected pursuit it belongs to, and opens a new one for a re-application', async () => {
+    const tables: FakeTables = {};
+    seedPursuit(tables, { status: 'rejected' });
+    tables['job_search.roles'][0].applications = [
+      { id: APP, status: 'rejected', attempt: 1, closed_at: '2026-09-20T00:00:00Z', created_at: '2026-09-01T00:00:00Z' },
+    ];
+    stub.extracted = { roleTitle: 'Designer' };
+    stub.decision = {
+      action: 'create_inferred_application',
+      company: { kind: 'existing', id: COMPANY, name: 'Acme' },
+      confidence: 0.9,
+      reasons: [],
+    } satisfies LinkDecision;
+
+    // A rescan finds the confirmation from before the rejection.
+    stub.message = { ...stub.message, internalDate: new Date('2026-09-02T09:00:00Z') };
+    await sync(tables);
+    expect(tables['job_search.roles']).toHaveLength(1);
+    expect(tables['job_search.applications']).toHaveLength(1);
+    expect(tables['job_search.application_events'].map((e) => e.application_id)).toEqual([APP]);
+
+    // A confirmation dated after the rejection is a fresh attempt.
+    tables['core.ingested_messages'] = [];
+    tables['job_search.ingested_messages'] = [];
+    stub.message = { ...stub.message, internalDate: new Date('2026-10-03T07:00:00Z') };
+    await sync(tables);
+    expect(tables['job_search.roles']).toHaveLength(2);
+  });
+
   it('records a round the email booked as one change, refused once the person writes on the interview', async () => {
     const tables: FakeTables = {};
     seedPursuit(tables);
