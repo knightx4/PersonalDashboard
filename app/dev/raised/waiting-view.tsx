@@ -86,7 +86,7 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
 
   return (
     // The anchor a search hit on this row lands on (plan #1154).
-    <li id={waitingAnchor(row.id)} className="scroll-mt-20 space-y-1 p-3">
+    <li id={waitingAnchor(row.id)} className="scroll-mt-bar space-y-1 p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         {/* The row itself, not the top of the plan. Every one of these is a
             discrete thing to go and settle, and landing on the plan page and

@@ -3350,6 +3350,38 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The same card inside the News shell (plan #1446), so a phone shot shows
+     * the top bar, the dock, and Back and Next held just above the dock. The
+     * entry above has no shell, so its row sits over nothing. */
+    id: 'news-quick-in-shell',
+    label: 'News · Quick read inside the shell',
+    module: 'news',
+    width: 'page',
+    render: () => (
+      <div data-workspace="news">
+        <AppShell
+          account="preview"
+          module="news"
+          sections={[
+            { href: '/news', label: 'Quick read', icon: 'quickRead', exact: true },
+            { href: '/news/all', label: 'Newsletters', icon: 'newsletters', exact: true },
+            { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
+          ]}
+          settingsHref="/news/settings"
+          settingsLabel="News settings"
+          displayName="Chris"
+          email="chris@example.com"
+          isOwner
+          counts={{ jobs: '12', shopping: '3', todo: '8' }}
+          theme={{ kind: 'written', id: 'paper' }}
+          brief={null}
+        >
+          <QuickReadView {...quickStory} />
+        </AppShell>
+      </div>
+    ),
+  },
+  {
     id: 'news-quick-essay',
     label: 'News · Quick read single-essay card',
     module: 'news',

@@ -238,7 +238,7 @@ function RaiseCard({ row, titles }: { row: RaisedRow; titles?: PlanRefTitles }) 
 
   return (
     // The anchor a search hit on this raise lands on (plan #1154).
-    <li id={raiseAnchor(row.id)} className="flex scroll-mt-20 flex-col gap-2 px-4 py-3">
+    <li id={raiseAnchor(row.id)} className="flex scroll-mt-bar flex-col gap-2 px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded-full bg-accent-tint px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-accent">
           {scopeLabel(row.module)}

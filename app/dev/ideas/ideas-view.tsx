@@ -249,7 +249,7 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
 
   return (
     // The id is where the app-wide search lands an idea: /dev/ideas#idea-<id>.
-    <li id={`idea-${idea.id}`} className="flex scroll-mt-20 flex-col gap-2 px-4 py-3">
+    <li id={`idea-${idea.id}`} className="flex scroll-mt-bar flex-col gap-2 px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
         {/* With the workspace's own mark (note 7bdcb540), and the home mark
             for Everything, so the chip reads before its word does. */}

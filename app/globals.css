@@ -1315,6 +1315,28 @@ body,
   }
 }
 
+/* The heights of the shell's top bar and of the dock on a phone, above the
+ * safe-area insets. Everything that has to clear one of them reads it from
+ * here: the header and the dock themselves, the room under the page, the
+ * header's popover, Quick read's Back and Next row held above the dock, and
+ * the scroll margin on anchors a link lands on. Change the bar here and they
+ * all move with it. The dock's figure includes its 1px top border. */
+:root {
+  --bar-h: 5rem;
+  --dock-h: 4.875rem;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --bar-h: 3.5rem;
+  }
+}
+
+/* An anchor a link scrolls to stops just below the top bar, notch included. */
+@utility scroll-mt-bar {
+  scroll-margin-top: calc(var(--bar-h) + env(safe-area-inset-top) + 0.5rem);
+}
+
 body {
   /* A phone on its side puts the notch at one edge. The viewport covers it
      (viewportFit in app/layout.tsx), so the page steps in by the insets,
