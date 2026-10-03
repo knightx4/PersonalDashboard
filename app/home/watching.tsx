@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ArrowDown, ArrowUp, Eye } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/cn';

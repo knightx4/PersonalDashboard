@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ArrowRight, Check } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
@@ -74,7 +74,7 @@ export function PlanSection({
           </p>
           <Link
             href={pieceHref(progress.next.pieceId)}
-            className={cn(buttonVariants({ variant: 'primary' }), 'mt-3')}
+            className={cn(buttonVariants({ variant: 'primary' }), 'press mt-3')}
           >
             {progress.next.state === 'open' ? 'Start it' : 'Carry on'}
             <ArrowRight className="size-3.5" strokeWidth={2} aria-hidden />

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import { NOW_HREF, practiceHref } from '@/lib/learn/flow/href';
