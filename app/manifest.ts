@@ -17,7 +17,10 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Personal Dashboard',
     short_name: 'Dash',
-    description: 'What you own, what you spent, and where your job search stands, in one account.',
+    // The workspaces in lib/modules.ts, less Dev, which only the owner sees.
+    // Change this when a workspace is added.
+    description:
+      'Your goals, to-do list, job search, learning, news, shopping and vault of notes, in one app.',
     id: '/',
     start_url: '/',
     scope: '/',
@@ -26,7 +29,27 @@ export default function manifest(): MetadataRoute.Manifest {
       '#f7f4ed' /* ui-ok: the manifest is JSON for the OS, which cannot read a token; this is --c-canvas */,
     theme_color:
       '#f7f4ed' /* ui-ok: the manifest is JSON for the OS, which cannot read a token; this is --c-canvas */,
+    /*
+     * Android wants 192 and 512 PNGs, and a maskable one for the launcher's
+     * own shape (circle, squircle, rounded square). Without a maskable icon,
+     * Android shrinks the transparent-cornered mark onto a white disc.
+     *
+     * icon-192 and icon-512 are app/icon.svg at those sizes. The maskable one
+     * is the composition of apple-icon.png: the ground runs to every edge and
+     * the dash spans 56% of the width, inside the central 80% circle that every
+     * launcher mask keeps. They live in public/ rather than app/ because a
+     * numbered icon file in app/ becomes another <link rel="icon"> on every
+     * page. If the mark changes, redraw these with it.
+     */
     icons: [
+      { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      {
+        src: '/icons/icon-maskable-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
       { src: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
       { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' },
     ],
