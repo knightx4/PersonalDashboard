@@ -43,6 +43,7 @@ import { openCount, SNOOZE_DAYS, type Task, type TaskStatus } from '@/lib/todo/t
 import { InlineInput } from '@/components/ui/field';
 import { clockIn, dayIn } from '@/lib/todo/time';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
+import { completionMoment } from '@/components/motion/complete';
 import { HandToDash } from './hand-to-dash';
 import { TaskAbout } from './task-about';
 import { EditTask } from './task-form';
@@ -241,6 +242,7 @@ export function TaskRow({
       write: async () => {
         const result = await completeTask(task.id);
         ticked.push(...result.items);
+        if (!result.error) completionMoment();
         return result;
       },
       toast: {
@@ -728,6 +730,8 @@ function TaskItems({
     status: TaskStatus,
     run: () => Promise<{ error: string | null }>,
     said?: ToastInput,
+    /** Whether this write finishes the item, so a success is a completion moment. */
+    completes = false,
   ) {
     start(async () => {
       change({ id, status });
@@ -736,6 +740,7 @@ function TaskItems({
         toast({ text: error });
         return;
       }
+      if (completes) completionMoment();
       if (said) toast(said);
     });
   }
@@ -768,8 +773,12 @@ function TaskItems({
               key={item.id}
               item={item}
               onTick={() =>
-                write(item.id, item.status === 'done' ? 'open' : 'done', () =>
-                  item.status === 'done' ? reopenTask(item.id) : completeTask(item.id),
+                write(
+                  item.id,
+                  item.status === 'done' ? 'open' : 'done',
+                  () => (item.status === 'done' ? reopenTask(item.id) : completeTask(item.id)),
+                  undefined,
+                  item.status !== 'done',
                 )
               }
               onDrop={() =>

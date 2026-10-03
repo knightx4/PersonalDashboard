@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { completionMoment } from '@/components/motion/complete';
 import { updateStatus, type ReadingActionState } from '../r/[id]/actions';
 
 /**
@@ -16,7 +17,7 @@ import { updateStatus, type ReadingActionState } from '../r/[id]/actions';
  * one click away on the reading's own page.
  */
 export function FinishButton({ readingId }: { readingId: string }) {
-  const [state, formAction] = useActionState<ReadingActionState, FormData>(updateStatus, {});
+  const [state, formAction] = useActionState<ReadingActionState, FormData>(finish, {});
 
   return (
     <form action={formAction} className="inline-flex items-center gap-2">
@@ -26,6 +27,13 @@ export function FinishButton({ readingId }: { readingId: string }) {
       {state.error && <span className="text-small text-danger">{state.error}</span>}
     </form>
   );
+}
+
+/** Mark it read, and play the completion moment when that went through. */
+async function finish(previous: ReadingActionState, form: FormData): Promise<ReadingActionState> {
+  const state = await updateStatus(previous, form);
+  if (!state.error) completionMoment();
+  return state;
 }
 
 function Submit() {

@@ -14,6 +14,7 @@ import { modulesFor, type ModuleId } from '@/lib/modules';
 import { updateAccountSettings, updateEnabledModules, type AccountState } from './actions';
 import { cardVariants } from '@/components/ui/card';
 import { NotificationsSection } from './notifications';
+import { FeelSection } from './haptics';
 import { ConnectedAppsSection } from './connected-apps';
 import type { ConnectedApp } from '@/lib/connector/apps';
 
@@ -43,6 +44,7 @@ export function AccountView({
       <YouSection email={email} settings={settings} />
       <ModulesSection enabled={settings.enabledModules} isOwner={isOwner} />
       <NotificationsSection publicKey={vapidPublicKey} />
+      <FeelSection />
       <ConnectedAppsSection {...connected} timezone={settings.timezone} />
       <ModuleSettingsSection enabled={settings.enabledModules} />
       <TimelineSection />

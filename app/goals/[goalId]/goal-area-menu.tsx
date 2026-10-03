@@ -5,6 +5,7 @@ import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
 import { ChipInput } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
+import { completionMoment } from '@/components/motion/complete';
 import { formatDay } from '@/lib/goals/dates';
 import type { GoalStatus } from '@/lib/goals/tree';
 import { editGoal, settleGoalAction } from '../actions';
@@ -67,6 +68,7 @@ export function GoalAreaMenu({
     form.set('id', goal.id);
     form.set('move', move);
     const result = await settleGoalAction({}, form);
+    if (move === 'close' && !result.error) completionMoment();
     const text = result.error ?? result.message;
     if (text) toast({ text });
   }
