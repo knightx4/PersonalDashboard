@@ -191,6 +191,10 @@ Stop and ask only when at least one of these holds:
 - **It changes the scope.** Whether to build something at all, or building
   noticeably more or less than the step asked for.
 
+A fourth moment in one workspace always meets the second: the catalogue in
+`app/dev/ui/moments.ts` holds three at most, and choosing which three is the
+person's. `shaping.md` has the decision to write.
+
 Names, wording, layout within the design laws, defaults, thresholds, ordering,
 and which of two equivalent implementations to use are not on that list.
 

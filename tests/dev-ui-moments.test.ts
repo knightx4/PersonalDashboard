@@ -134,7 +134,10 @@ describe('R6: every animation has a reduced-motion version', () => {
 describe('R8: no workspace has more than three moments', () => {
   it('the catalogue holds at most three per workspace', () => {
     expect(MOMENTS_PER_WORKSPACE).toBe(3);
-    expect(overfullWorkspaces(MOMENTS)).toEqual([]);
+    expect(
+      overfullWorkspaces(MOMENTS),
+      'A fourth moment in a workspace is the person’s to choose: take it out of the catalogue and write it as a decision (.claude/skills/plan/reference/shaping.md)',
+    ).toEqual([]);
   });
 
   it('a fourth moment in one workspace is caught', () => {
