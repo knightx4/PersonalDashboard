@@ -6,7 +6,10 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { isDay, isPickKey } from '@/lib/day-brief/opens';
 import { requestDashDeps } from '@/lib/ask/clients';
 import { changePaths } from '@/lib/ask/changes';
-import { undoDashTodayWith } from '@/lib/shell/dash-today';
+import type { DashAction, DashActionDeps } from '@/lib/core/dash-actions';
+import { createGoalsClient } from '@/lib/goals/auth/server';
+import { undoFiledAction } from '@/lib/goals/capture-store';
+import { undoDashTodayWith, type DashTodayUndo } from '@/lib/shell/dash-today';
 import { undoAskChange } from '@/lib/talk/ask-request';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -66,6 +69,24 @@ export async function stopWatch(formData: FormData): Promise<StopWatchResult> {
   return { ok: true };
 }
 
+/**
+ * Undo a line filed from capture, from its record (plan #1569): the same
+ * reversal as the capture panel's Undo, through a client made as the capture
+ * actor so goals.history ties it to the same sentence.
+ */
+async function undoCaptureLine(deps: DashActionDeps, action: DashAction): Promise<DashTodayUndo> {
+  const captureId = action.undo?.capture_id;
+  if (typeof captureId !== 'string' || !UUID.test(captureId)) {
+    return { ok: false, error: 'Dash did not keep which capture this came from, so it cannot be undone here.' };
+  }
+  const client = await createGoalsClient({ actor: 'capture', captureId });
+  const result = await undoFiledAction(client, captureId, action.id, deps);
+  if (!result.ok) return { ok: false, error: result.error };
+  revalidatePath('/goals', 'layout');
+  revalidatePath('/todo', 'layout');
+  return { ok: true, paths: [] };
+}
+
 export type UndoDashTodayResult = { ok: true } | { ok: false; error: string };
 
 /**
@@ -79,8 +100,13 @@ export async function undoDashToday(id: string): Promise<UndoDashTodayResult> {
   if (typeof id !== 'string' || !UUID.test(id)) return { ok: false, error: 'That change is not there any more.' };
   const user = await requireUser();
   try {
-    const result = await undoDashTodayWith(await requestDashDeps(user.id), id, undoAskChange, (outcome) =>
-      changePaths(outcome.change),
+    const deps = await requestDashDeps(user.id);
+    const result = await undoDashTodayWith(
+      deps,
+      id,
+      undoAskChange,
+      (outcome) => changePaths(outcome.change),
+      (action) => undoCaptureLine(deps, action),
     );
     if (!result.ok) return result;
     for (const path of result.paths) revalidatePath(path);

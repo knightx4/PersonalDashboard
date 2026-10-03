@@ -1,11 +1,19 @@
 import 'server-only';
 
+import {
+  markDashActionUndone,
+  readSubjectOrNull,
+  recordDashAction,
+  type DashActionDeps,
+  type DashActionOp,
+} from '@/lib/core/dash-actions';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
   MAX_CONTEXT_STEPS,
   addedProgress,
   asksEstimate,
   captureContext,
+  captureSummary,
   estimateAsked,
   markUndone,
   progressTotal,
@@ -47,6 +55,12 @@ import {
  * change lands in goals.history as capture's, pointing at the sentence that
  * made it. Undo goes through the same kind of client, so the reversal is
  * tied to the same capture.
+ *
+ * Each line filed is also recorded in core.dash_actions with surface
+ * 'capture' (plan #1569), so Home lists it among what Dash did today. The
+ * line keeps the record's id in `action_id`; the record keeps the capture's
+ * id in `undo`. Either Undo goes through undoFiled, which puts the line back
+ * by capture's own rule and marks the record undone.
  */
 
 /** Keep the sentence exactly as typed, under an id chosen here so the history can name it. */
@@ -90,23 +104,81 @@ export async function loadCaptureContext(
   return captureContext(goals, byGoal, records, progress);
 }
 
-/** Carry out one move. Null when it no longer applies. */
+/** What a move did, and the row its record names. */
+type CarriedOut = {
+  entry: FiledEntry;
+  kind: string;
+  ref: string;
+  op: DashActionOp;
+  before?: Record<string, unknown> | null;
+};
+
+/** A rhythm's period row as it is, for the record's before values. */
+async function periodRow(
+  dash: DashActionDeps | null,
+  client: GoalsSupabaseClient,
+  itemId: string,
+  startsOn: string,
+): Promise<Record<string, unknown> | null> {
+  if (!dash) return null;
+  try {
+    const { data } = await client
+      .from('periods')
+      .select('*')
+      .eq('item_id', itemId)
+      .eq('starts_on', startsOn)
+      .maybeSingle();
+    return (data as Record<string, unknown> | null) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Carry out one move, and record it as Dash's when `dash` is given. Null
+ * when it no longer applies. The record is best-effort: a line whose record
+ * could not be written is filed all the same, without an `action_id`.
+ */
 export async function applyCaptureAction(
+  client: GoalsSupabaseClient,
+  context: Today & { captureId: string; dash?: DashActionDeps | null },
+  action: PlannedAction,
+): Promise<FiledEntry | null> {
+  const dash = context.dash ?? null;
+  const done = await carryOut(client, context, action, dash);
+  if (!done) return null;
+  if (!dash) return done.entry;
+  const actionId = await recordDashAction(dash, {
+    surface: 'capture',
+    kind: done.kind,
+    subjectRef: done.ref,
+    op: done.op,
+    summary: captureSummary(done.entry),
+    beforeValues: done.before ?? null,
+    undo: { capture_id: context.captureId },
+  });
+  return actionId ? { ...done.entry, action_id: actionId } : done.entry;
+}
+
+async function carryOut(
   client: GoalsSupabaseClient,
   { userId, today, captureId }: Today & { captureId: string },
   action: PlannedAction,
-): Promise<FiledEntry | null> {
+  dash: DashActionDeps | null,
+): Promise<CarriedOut | null> {
   switch (action.kind) {
     case 'close': {
+      const ref = `goals.items:${action.step.id}`;
+      const before = dash ? await readSubjectOrNull(dash, ref) : null;
       const changed = await setStepStatus(client, action.step.id, 'done');
       if (!changed) return null;
-      return {
+      return { kind: 'close_step', ref, op: 'update', before, entry: {
         kind: 'close',
         step_id: action.step.id,
         title: action.step.title,
         goal_title: action.step.goalTitle,
         undone_at: null,
-      };
+      } };
     }
     case 'count': {
       const rhythm = action.step.rhythm;
@@ -115,15 +187,20 @@ export async function applyCaptureAction(
       // day before the rhythm's first period has no row to count in, so it
       // goes towards the current one rather than being lost.
       let startsOn = action.startsOn;
+      let before = await periodRow(dash, client, action.step.id, startsOn);
       let counted = await countTowards(client, action.step.id, startsOn, action.amount, {
         closed: true,
       });
       if (!counted && startsOn !== rhythm.startsOn) {
         startsOn = rhythm.startsOn;
+        before = await periodRow(dash, client, action.step.id, startsOn);
         counted = await countTowards(client, action.step.id, startsOn, action.amount);
       }
       if (!counted) return null;
-      return {
+      // Without the period's id there is no row to name, so the record goes
+      // on the step: Undo still goes by the line, which keeps the period.
+      const ref = before?.id ? `goals.periods:${before.id as string}` : `goals.items:${action.step.id}`;
+      return { kind: 'count_towards', ref, op: 'update', before: before?.id ? before : null, entry: {
         kind: 'count',
         step_id: action.step.id,
         title: action.step.title,
@@ -132,7 +209,7 @@ export async function applyCaptureAction(
         amount: action.amount,
         counted_on: startsOn === action.startsOn ? (action.happenedOn ?? today) : today,
         undone_at: null,
-      };
+      } };
     }
     case 'progress': {
       // On the step when it named one, else on the goal; dated today unless
@@ -155,7 +232,7 @@ export async function applyCaptureAction(
         const set = await setTotalIfNone(client, action.step.id, total.total, total.total_unit);
         if (!set) total = null;
       }
-      return {
+      return { kind: 'log_progress', ref: `goals.progress_entries:${id}`, op: 'insert', entry: {
         kind: 'progress',
         entry_id: id,
         item_id: itemId,
@@ -168,7 +245,7 @@ export async function applyCaptureAction(
         ...(total ?? {}),
         ...(asksEstimate(action, total) ? { ask_estimate: true } : {}),
         undone_at: null,
-      };
+      } };
     }
     case 'reading': {
       // Read on the day the sentence was filed, tied to the capture.
@@ -178,7 +255,7 @@ export async function applyCaptureAction(
         captureId,
       });
       if (!id) return null;
-      return {
+      return { kind: 'record_reading', ref: `goals.readings:${id}`, op: 'insert', entry: {
         kind: 'reading',
         reading_id: id,
         goal_id: action.goal.id,
@@ -186,7 +263,7 @@ export async function applyCaptureAction(
         value: action.value,
         unit: action.goal.unit,
         undone_at: null,
-      };
+      } };
     }
     case 'add': {
       const id = await insertStep(client, userId, action.parent?.id ?? action.goal.id, {
@@ -226,7 +303,7 @@ export async function applyCaptureAction(
           };
         }
       }
-      return {
+      return { kind: 'add_step', ref: `goals.items:${id}`, op: 'insert', entry: {
         kind: 'add',
         step_id: id,
         title: action.title,
@@ -234,7 +311,7 @@ export async function applyCaptureAction(
         goal_title: action.goal.title,
         ...(logged ? { progress: logged } : {}),
         undone_at: null,
-      };
+      } };
     }
   }
 }
@@ -265,6 +342,7 @@ export async function undoFiled(
   client: GoalsSupabaseClient,
   captureId: string,
   index: number,
+  dash: DashActionDeps | null = null,
 ): Promise<UndoResult> {
   const { data, error } = await client
     .from('captures')
@@ -277,7 +355,14 @@ export async function undoFiled(
   const filed = readFiled(data.filed);
   const entry = filed[index];
   if (!entry) return { ok: false, error: 'That line is no longer there.' };
-  if (entry.undone_at) return { ok: true, filed };
+  // The record follows the line, also when an earlier Undo could not mark it.
+  const markRecord = async () => {
+    if (dash && entry.action_id) await markDashActionUndone(dash, entry.action_id);
+  };
+  if (entry.undone_at) {
+    await markRecord();
+    return { ok: true, filed };
+  }
 
   const move = undoMove(entry);
   switch (move.move) {
@@ -330,7 +415,31 @@ export async function undoFiled(
   const next = markUndone(filed, index, new Date().toISOString());
   if (!next) return { ok: true, filed };
   await saveFiled(client, captureId, next);
+  await markRecord();
   return { ok: true, filed: next };
+}
+
+/**
+ * Undo the line a core.dash_actions record names, for Home's Undo on a
+ * capture row (plan #1569): the same reversal as the panel's Undo, found by
+ * the record's id rather than the line's place in the list.
+ */
+export async function undoFiledAction(
+  client: GoalsSupabaseClient,
+  captureId: string,
+  actionId: string,
+  dash: DashActionDeps,
+): Promise<UndoResult> {
+  const { data, error } = await client
+    .from('captures')
+    .select('filed')
+    .eq('id', captureId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return { ok: false, error: 'That capture is no longer there.' };
+  const index = readFiled(data.filed).findIndex((entry) => entry.action_id === actionId);
+  if (index < 0) return { ok: false, error: 'That line is no longer there.' };
+  return undoFiled(client, captureId, index, dash);
 }
 
 /**

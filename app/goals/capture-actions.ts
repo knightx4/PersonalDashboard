@@ -3,6 +3,7 @@
 import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { requestDashDeps } from '@/lib/ask/clients';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -49,7 +50,9 @@ import { todayIn } from '@/lib/todo/tasks/model';
  *
  * Both write through a client made as the capture actor with the capture's
  * id, so goals.history records each change as capture's and names the
- * sentence it came from.
+ * sentence it came from. Each line filed is recorded as Dash's in
+ * core.dash_actions too (plan #1569), and undoing a line marks its record
+ * undone, so Home's list of what Dash did today agrees with the panel.
  */
 
 export type GoalCaptureState = {
@@ -99,6 +102,7 @@ export async function fileGoalCapture(
   // Reading the tree opens and closes rhythm periods as every page read does;
   // that housekeeping is not the capture's doing, so it goes as a plain read.
   const reader = await createGoalsClient();
+  const dash = await requestDashDeps(user.id);
   const spend: SpendReport[] = [];
 
   try {
@@ -108,7 +112,7 @@ export async function fileGoalCapture(
       ask: (message) =>
         askCaptureModel({ apiKey: key, onSpend: (report) => spend.push(report) }, message),
       apply: (id, action) =>
-        applyCaptureAction(client, { userId: user.id, today, captureId: id }, action),
+        applyCaptureAction(client, { userId: user.id, today, captureId: id, dash }, action),
       save: (id, filed) => saveFiled(client, id, filed),
     }, hintLine);
     await recordSessionSpend(user.id, { module: 'goals', operation: 'file-capture' }, spend);
@@ -187,12 +191,17 @@ const Undo = z.object({ captureId: z.string().uuid(), index: z.number().int().mi
 
 // latency: pending
 export async function undoGoalCapture(captureId: string, index: number): Promise<GoalCaptureState> {
-  await requireUser();
+  const user = await requireUser();
   const parsed = Undo.safeParse({ captureId, index });
   if (!parsed.success) return { error: 'Could not tell which line that was.' };
   try {
     const client = await createGoalsClient({ actor: 'capture', captureId: parsed.data.captureId });
-    const result = await undoFiled(client, parsed.data.captureId, parsed.data.index);
+    const result = await undoFiled(
+      client,
+      parsed.data.captureId,
+      parsed.data.index,
+      await requestDashDeps(user.id),
+    );
     if (!result.ok) return { error: result.error };
     refresh();
     return { captureId: parsed.data.captureId, filed: result.filed };

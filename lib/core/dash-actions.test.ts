@@ -134,6 +134,7 @@ describe('planUndo', () => {
     beforeValues: TASK_BEFORE,
     afterValues: TASK_AFTER,
     summary: null,
+    undo: null,
     createdAt: '2026-10-03T08:00:00Z',
     doneAt: '2026-10-03T08:00:00Z',
     undoneAt: null,

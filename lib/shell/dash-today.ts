@@ -5,6 +5,7 @@ import {
   DASH_ACTIONS_TABLE,
   toDashAction,
   undoDashAction,
+  type DashAction,
   type DashActionDeps,
   type DashActionSurface,
 } from '@/lib/core/dash-actions';
@@ -178,7 +179,9 @@ export type DashTodayUndo =
  * surface (lib/core/dash-actions.ts): the row goes back to how it was, only
  * while it still holds what Dash wrote. An Ask Dash change keeps its own undo
  * (lib/ask/changes.ts), which undoDashAction says by refusing it with the
- * action in hand, so that one is handed to `undoAsk`. A refusal is the
+ * action in hand, so that one is handed to `undoAsk`. A line filed from
+ * capture is undone by capture's own rule (plan #1569), handed to
+ * `undoCapture` the same way. A refusal is the
  * sentence the person reads in place of the button. `paths` are the pages
  * besides Home that show the row, for the caller to refresh.
  */
@@ -187,6 +190,7 @@ export async function undoDashTodayWith(
   id: string,
   undoAsk: (id: string) => Promise<ChangeOutcome>,
   askPaths: (outcome: Extract<ChangeOutcome, { ok: true }>) => string[] = () => [],
+  undoCapture?: (action: DashAction) => Promise<DashTodayUndo>,
 ): Promise<DashTodayUndo> {
   const result = await undoDashAction(deps, id);
   if (result.ok) {
@@ -194,6 +198,9 @@ export async function undoDashTodayWith(
     // A ref that opens through /open names no page to refresh by itself.
     const path = href && !href.startsWith(`${OPEN_PATH}/`) ? href.split(/[?#]/)[0] : null;
     return { ok: true, paths: path ? [path] : [] };
+  }
+  if (result.action?.surface === 'capture' && result.action.status === 'done' && undoCapture) {
+    return undoCapture(result.action);
   }
   if (result.action?.surface !== 'ask') return { ok: false, error: result.error };
   const outcome = await undoAsk(id);

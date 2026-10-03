@@ -30,7 +30,9 @@ import { parseRef } from '@/lib/core/refs';
  * Ask Dash's own changes keep their per-kind undo in lib/ask/changes.ts,
  * because some of them touch two rows (a return writes the item and a
  * returns row) and the generic rule sees only one. undoDashAction refuses
- * them and says where they are undone.
+ * them and says where they are undone. Capture's filings (plan #1569) are the
+ * same: one line can add a step and the progress on it, so capture's own
+ * Undo puts the line back and marks the record undone.
  *
  * No `server-only` and no clients made here: callers hand in the person's
  * clients (requestAskDb() in a request), and the tests hand in stubs. Every
@@ -58,13 +60,15 @@ export type DashAction = {
   beforeValues: Values | null;
   afterValues: Values | null;
   summary: string | null;
+  /** What undoing needs beyond the row: for a capture, { capture_id }. */
+  undo: Values | null;
   createdAt: string;
   doneAt: string | null;
   undoneAt: string | null;
 };
 
 export const DASH_ACTION_SELECT =
-  'id, surface, kind, status, subject_ref, op, before_values, after_values, summary, created_at, done_at, undone_at';
+  'id, surface, kind, status, subject_ref, op, before_values, after_values, summary, undo, created_at, done_at, undone_at';
 
 type DashActionRow = {
   id: string;
@@ -76,6 +80,7 @@ type DashActionRow = {
   before_values: Values | null;
   after_values: Values | null;
   summary: string | null;
+  undo?: Values | null;
   created_at: string;
   done_at: string | null;
   undone_at: string | null;
@@ -92,6 +97,7 @@ export function toDashAction(row: DashActionRow): DashAction {
     beforeValues: row.before_values,
     afterValues: row.after_values,
     summary: row.summary,
+    undo: row.undo ?? null,
     createdAt: row.created_at,
     doneAt: row.done_at,
     undoneAt: row.undone_at,
@@ -262,6 +268,12 @@ export function planUndo(
   if (action.surface === 'ask') {
     return { ok: false, reason: 'This change was made in Ask Dash, and is undone from there.' };
   }
+  // A capture line can touch more than its one row (an added step and the
+  // progress filed on it), so it is undone by capture's own rule
+  // (lib/goals/capture-store.ts, undoFiledAction), which marks this undone.
+  if (action.surface === 'capture') {
+    return { ok: false, reason: 'This was filed from capture, and is undone from there.' };
+  }
   const { op, beforeValues: before, afterValues: after } = action;
   const recorded =
     action.subjectRef !== null &&
@@ -377,7 +389,8 @@ async function apply(deps: DashActionDeps, ref: string, plan: UndoPlan, current:
   if ((data ?? []).length === 0) throw new Refused(CHANGED);
 }
 
-async function loadAction(deps: DashActionDeps, id: string): Promise<DashAction | null> {
+/** One action of the person's, or null when there is none with that id. */
+export async function loadDashAction(deps: DashActionDeps, id: string): Promise<DashAction | null> {
   const { data, error } = await deps.core
     .from(DASH_ACTIONS_TABLE)
     .select(DASH_ACTION_SELECT)
@@ -394,12 +407,12 @@ async function loadAction(deps: DashActionDeps, id: string): Promise<DashAction 
  * row has moved on since Dash wrote it.
  */
 export async function undoDashAction(deps: DashActionDeps, id: string): Promise<DashActionUndo> {
-  const action = await loadAction(deps, id);
+  const action = await loadDashAction(deps, id);
   if (!action) return { ok: false, error: GONE, action: null };
 
   const ref = action.subjectRef;
   const [current, later] =
-    action.status === 'done' && ref && action.surface !== 'ask'
+    action.status === 'done' && ref && action.surface !== 'ask' && action.surface !== 'capture'
       ? await Promise.all([readSubject(deps.db, ref), laterActionOn(deps, action)])
       : [null, false];
   const decided = planUndo(action, current, later);
@@ -430,7 +443,7 @@ export async function undoDashAction(deps: DashActionDeps, id: string): Promise<
   if (error) throw new Error(`Marking the change undone failed: ${error.message}`);
   const rows = (data ?? []) as DashActionRow[];
   if (rows.length === 0) {
-    const now = await loadAction(deps, id);
+    const now = await loadDashAction(deps, id);
     return { ok: false, error: now ? notDone(now.status) : GONE, action: now };
   }
   return { ok: true, action: toDashAction(rows[0]) };
@@ -455,6 +468,8 @@ export type DashActionEntry = {
    * or a delete. Left out for an insert.
    */
   beforeValues?: Values | null;
+  /** What undoing needs beyond the row, kept in the `undo` column. */
+  undo?: Values | null;
 };
 
 /** Longest summary kept; a longer one is cut at a word. */
@@ -514,6 +529,7 @@ export async function recordDashAction(
         before_values: before,
         after_values: after,
         summary: clipped(entry.summary),
+        undo: entry.undo ?? null,
       })
       .select('id')
       .single();
@@ -522,5 +538,28 @@ export async function recordDashAction(
   } catch (error) {
     console.error(`dash action: could not record ${entry.kind} on ${entry.subjectRef}`, error);
     return null;
+  }
+}
+
+/**
+ * Mark a done action undone, for a surface that undid the change by its own
+ * rule (capture's per-line Undo). Best-effort, like recording: the undo has
+ * already happened, and a record left saying done is put right the next time
+ * either Undo is pressed. True when the record now says undone.
+ */
+export async function markDashActionUndone(deps: DashActionDeps, id: string): Promise<boolean> {
+  try {
+    const { data, error } = await deps.core
+      .from(DASH_ACTIONS_TABLE)
+      .update({ status: 'undone', undone_at: deps.now ? deps.now() : new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', deps.userId)
+      .eq('status', 'done')
+      .select('id');
+    if (error) throw new Error(error.message);
+    return (data ?? []).length > 0;
+  } catch (error) {
+    console.error(`dash action: could not mark ${id} undone`, error);
+    return false;
   }
 }
