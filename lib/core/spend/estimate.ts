@@ -60,6 +60,7 @@ export function guessEstimate(operation: OperationName): CostEstimate {
       ...EMPTY_USAGE,
       inputTokens: guess.inputTokens,
       outputTokens: guess.outputTokens,
+      webSearchRequests: guess.searches ?? 0,
     }) ?? 0;
   return {
     lowMicros: Math.round(median / 2),
