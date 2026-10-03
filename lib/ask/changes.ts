@@ -3,6 +3,7 @@ import { insertStep, setStepArchived } from '@/lib/goals/steps-store';
 import type { ModuleId } from '@/lib/modules';
 import { markReturned, unmarkReturned } from '@/lib/returns/mark';
 import type { TaskInput } from '@/lib/todo/tasks/input';
+import { readSubject } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
 import {
   DASH_ACTIONS,
@@ -21,7 +22,8 @@ import type { AskDb, SchemaClient } from './db';
  * Confirm writes the change through the code the page itself uses: a todo
  * through createTask, a step through insertStep on a goals client that records
  * it in goals.history as Dash's, a return through markReturned (the returns
- * page's own). It then marks the change done with the row it wrote, in
+ * page's own). It then marks the change done with the row it wrote and that
+ * row's values before and after (plan #1458), in
  * one update that only a still-proposed change takes, so a second Confirm
  * (another window, a double press) finds nothing to update and the row it
  * wrote is taken back again. A change is written once.
@@ -462,6 +464,26 @@ async function rollBack(deps: ChangeDeps, change: DashChange, written: Written):
   }
 }
 
+/** The row an update kind changes, named before the write. */
+function updatedId(change: DashChange): string {
+  if (change.kind === 'mark_returned') return change.input.id;
+  throw new Error(`${change.kind} adds a row and changes none.`);
+}
+
+/**
+ * The row's values for the record (plan #1458). Best effort: a failed read
+ * leaves the values empty rather than failing a write that has happened, and
+ * the per-kind undo above does not need them.
+ */
+async function valuesOf(deps: ChangeDeps, ref: string): Promise<Record<string, unknown> | null> {
+  try {
+    return await readSubject(deps.db, ref);
+  } catch (error) {
+    console.error(`ask change: reading ${ref} for the record failed`, error);
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // The three presses
 // ---------------------------------------------------------------------------
@@ -488,20 +510,29 @@ export async function confirmChange(deps: ChangeDeps, id: string): Promise<Chang
     return { ok: false, error: `The ${workspace.label} workspace is switched off, so this cannot be written.`, change };
   }
 
+  // An update records the row as it was, read before the write; an insert
+  // has no row before it.
+  const op = WRITTEN_OP[change.kind];
+  const before = op === 'update' ? await valuesOf(deps, toRef(WRITTEN_TABLE[change.kind], updatedId(change))) : null;
+
   let written: Written;
   try {
     written = await write(deps, change);
   } catch (error) {
     return refusedOrThrow(error, change);
   }
+  const subjectRef = toRef(WRITTEN_TABLE[change.kind], written.ref);
+  const after = await valuesOf(deps, subjectRef);
 
   const { data, error } = await deps.core
     .from(DASH_ACTIONS)
     .update({
       status: 'done',
       done_at: now(deps),
-      subject_ref: toRef(WRITTEN_TABLE[change.kind], written.ref),
-      op: WRITTEN_OP[change.kind],
+      subject_ref: subjectRef,
+      op,
+      before_values: before,
+      after_values: after,
       undo: written.undo,
     })
     .eq('id', change.id)

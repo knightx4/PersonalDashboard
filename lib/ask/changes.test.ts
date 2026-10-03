@@ -212,7 +212,12 @@ describe('add_todo', () => {
       writtenRef: task.id,
       doneAt: '2026-09-29T12:00:00Z',
     });
-    expect(tables['core.dash_actions'][0]).toMatchObject({ surface: 'ask', op: 'insert' });
+    expect(tables['core.dash_actions'][0]).toMatchObject({
+      surface: 'ask',
+      op: 'insert',
+      before_values: null,
+      after_values: { id: task.id, title: 'Call the bank', due_on: '2026-10-02', status: 'open' },
+    });
     expect(confirmed.ok && changeHref(confirmed.change)).toBe(`/todo/all?status=all&focus=${task.id}`);
 
     const undone = await undoChange(deps, change.id as string);
@@ -318,7 +323,12 @@ describe('mark_returned', () => {
       writtenRef: ITEM,
       undo: { return_id: ret.id, refund_amount_cents: 4500 },
     });
-    expect(tables['core.dash_actions'][0]).toMatchObject({ subject_ref: `public.inventory_items:${ITEM}`, op: 'update' });
+    expect(tables['core.dash_actions'][0]).toMatchObject({
+      subject_ref: `public.inventory_items:${ITEM}`,
+      op: 'update',
+      before_values: { id: ITEM, status: 'owned' },
+      after_values: { id: ITEM, status: 'returned' },
+    });
 
     const undone = await undoChange(deps, change.id as string);
     expect(undone.ok && undone.change.status).toBe('undone');
