@@ -185,13 +185,13 @@ export const Z_LADDER: readonly { z: string; utility: string; what: string }[] =
 
 export const MOTION: readonly Row4[] = [
   ['instant', '90ms', 'A state flipping: a shortcut hint appearing, the delay before a pending link dims. --motion-instant, duration-instant.', '--ease-out-soft'],
-  ['quick', '160ms', 'A control answering: press, lift, hover colours, a toggle, a card leaving on a swipe. The default for a bare transition. --motion-quick, duration-quick.', '--ease-out-soft'],
+  ['quick', '160ms', 'A control answering: press, lift, hover colours, a toggle. The default for a bare transition. --motion-quick, duration-quick.', '--ease-out-soft'],
   ['move', '260ms', 'Something moving to a new place or size: the puff, the landing pulse, a row settling in, a progress bar, a sigil cell, the toast. --motion-move, duration-move.', '--ease-out-soft or --ease-spring'],
   ['moment', '600ms', 'A designed moment and a loop’s beat: the goal ring, a count-up, a fill bar. Loops run a number of moments. --motion-moment, duration-moment.', '--ease-out-soft or --ease-sway'],
   ['press', 'scale(0.98)', 'Every button, chip and summary, while held.', 'quick'],
   ['lift', 'translateY(-2px) + shadow', 'An interactive card under the cursor.', 'quick'],
   ['dragging', 'scale(0.98) rotate(-0.5°), 55% opacity', 'The pipeline card mid-drag.', '—'],
-  ['swipe', 'follows the finger, springs back', 'A Quick read card dragged left. Still under reduced motion.', 'quick'],
+  ['swipe', 'follows the finger exactly, springs away or back', 'A Quick read or Learn now card dragged. Each touch is written straight onto the card, and on release it springs off the screen if the swipe counted or back to rest if it did not (follow and release in components/motion/swipe.ts). Under reduced motion it goes or returns at once.', 'move, on the spring'],
   ['toast-in', '6px rise, fade in, on the spring', 'A toast arriving, with a little give. Nothing on the way out.', 'move'],
   ['flight', 'a chip crossing, fading as it lands', 'An item filed from capture, flying to the list it went to (travel in components/motion/travel.ts). A move and a quick together, so the eye can follow it across the screen. Skipped in code under reduced motion.', 'move + quick (420ms)'],
   ['puff', 'five soft circles spreading out and fading', 'The point something just left: the capture input as an item is filed, before the flight (puffAt in components/motion/clear.tsx). Keyframes in app/globals.css, hidden under reduced motion, and skipped in code as well.', 'move'],

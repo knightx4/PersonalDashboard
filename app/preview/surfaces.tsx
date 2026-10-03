@@ -3350,7 +3350,7 @@ export const SURFACES: readonly Surface[] = [
       kind: 'swipe',
       target: '[data-quick-swipe]',
       direction: 'left',
-      shows: 'The card follows the finger left, then slides off as the essay behind it comes in.',
+      shows: 'The card follows the finger left, then springs off as the essay behind it comes in.',
     },
     // The essay drawn behind it, so Next shows it at once (note 452a90d9).
     render: () => (

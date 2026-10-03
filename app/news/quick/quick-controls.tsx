@@ -28,7 +28,7 @@ import {
   recordArticleOpened,
   unpassQuickPage,
 } from './actions';
-import { MOTION_MS } from '@/lib/motion';
+import { SWIPE_RELEASE_MS, follow, release } from '@/components/motion/swipe';
 
 /**
  * The id of the form Next submits. A swipe on the card (#855) submits the
@@ -445,23 +445,27 @@ export function ArticleLink({
  * fold keeps its tap, and nothing is sent while a Next is still pending or
  * while text is selected.
  *
- * The card follows the finger, with the story QuickDeck has drawn behind it
- * coming in from the right as it goes (note 3164d419), or the card Back
- * would bring back coming in from the left. Let go short and both
- * spring back; let go far enough and the card slides the rest of the way out
- * before the form is sent, so the deck swaps to a story already in place.
- * Under prefers-reduced-motion it stays still and the swipe still works.
- * Keyed on the story by the caller, so a drag never carries over to the next
- * card.
+ * The card follows the finger exactly (`follow` in components/motion/swipe.ts
+ * writes each touch straight onto its style, with no render between), with
+ * the story QuickDeck has drawn behind it coming in from the right as it goes
+ * (note 3164d419), or the card Back would bring back coming in from the left.
+ * Let go short and both spring back to rest; let go far enough and the card
+ * springs the rest of the way out (`release`, plan #1551) before the form is
+ * sent, so the deck swaps to a story already in place. Under
+ * prefers-reduced-motion it stays still and the swipe still works. Keyed on
+ * the story by the caller, so a drag never carries over to the next card.
  */
 export function QuickSwipe({ children }: { children: ReactNode }) {
   const surface = useRef<HTMLDivElement>(null);
-  const [offset, setOffset] = useState<number | null>(null);
-  // Let go far enough: the card is sliding the rest of the way out, to the
+  const card = useRef<HTMLDivElement>(null);
+  // Which side's card is drawn while a drag or a spring back goes its way:
+  // the story behind for a drag left, the one Back brings back for a drag
+  // right. Set only when the side changes, so a drag does not re-render.
+  const [toward, setToward] = useState<'next' | 'back' | null>(null);
+  // Let go far enough: the card is springing the rest of the way out, to the
   // left for Next and to the right for Back, and the form is sent when it
   // has gone.
   const [leaving, setLeaving] = useState<'next' | 'back' | null>(null);
-  const sent = useRef(false);
   const peek = useContext(PeekContext);
   // Read by the touch handlers, which are attached once.
   const hasPeek = useRef({ next: false, previous: false });
@@ -469,31 +473,31 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
     hasPeek.current = { next: Boolean(peek?.next), previous: Boolean(peek?.previous) };
   }, [peek]);
 
-  // Sends the form once, when the card has finished leaving.
-  const send = () => {
-    if (sent.current) return;
-    sent.current = true;
-    if (leaving === 'back') submitForm(QUICK_BACK_FORM);
-    else submitForm(QUICK_NEXT_FORM);
-  };
-
-  // A transitionend that never comes (the tab hidden mid-slide) still sends.
-  useEffect(() => {
-    if (!leaving) return;
-    const timer = window.setTimeout(send, LEAVE_MS + 100);
-    return () => window.clearTimeout(timer);
-  });
-
   // Attached by hand rather than through React so the move handler can be
   // non-passive: it cancels the page's own scroll once a drag is a swipe.
   useEffect(() => {
     const element = surface.current;
-    if (!element) return;
+    const moving = card.current;
+    if (!element || !moving) return;
     const still = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     let start: { x: number; y: number } | null = null;
     let axis: 'swipe' | 'back' | 'page' | null = null;
     let dx = 0;
+    let side: 'next' | 'back' | null = null;
+    let gone = false;
+    let sent = false;
 
+    const show = (next: 'next' | 'back' | null) => {
+      if (next === side) return;
+      side = next;
+      setToward(next);
+    };
+    // Sends the form once, when the card has finished leaving.
+    const send = (direction: 'next' | 'back') => {
+      if (sent) return;
+      sent = true;
+      submitForm(direction === 'back' ? QUICK_BACK_FORM : QUICK_NEXT_FORM);
+    };
     const selecting = () => {
       const selection = window.getSelection();
       return !!selection && !selection.isCollapsed;
@@ -501,7 +505,7 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
 
     const onStart = (event: TouchEvent) => {
       start = null;
-      if (event.touches.length !== 1 || selecting()) return;
+      if (gone || event.touches.length !== 1 || selecting()) return;
       const target = event.target as Element | null;
       if (target?.closest('a, button, summary, input, textarea, select, label')) return;
       start = { x: event.touches[0]!.clientX, y: event.touches[0]!.clientY };
@@ -512,7 +516,7 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
       if (!start) return;
       if (event.touches.length !== 1) {
         start = null;
-        setOffset(null);
+        void release(moving, '').then(() => show(null));
         return;
       }
       const moveX = event.touches[0]!.clientX - start.x;
@@ -521,15 +525,18 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
       if (axis !== 'swipe' && axis !== 'back') return;
       event.preventDefault();
       dx = axis === 'swipe' ? Math.min(0, moveX) : Math.max(0, moveX);
-      if (!still?.matches) setOffset(dx);
+      if (still?.matches) return;
+      follow(moving, `translateX(${dx}px)`);
+      show(dx < 0 ? 'next' : dx > 0 ? 'back' : side);
     };
     const onEnd = () => {
       if (!start) return;
       const claimed = axis;
       start = null;
       axis = null;
-      setOffset(null);
-      if (selecting()) return;
+      const back = () => void release(moving, '').then(() => show(null));
+      if (claimed !== 'swipe' && claimed !== 'back') return;
+      if (selecting()) return back();
       const width = element.offsetWidth;
       const direction =
         claimed === 'swipe' && swipeFarEnough(dx, width)
@@ -537,7 +544,7 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
           : claimed === 'back' && swipeBackFarEnough(dx, width)
             ? 'back'
             : null;
-      if (!direction) return;
+      if (!direction) return back();
       const id = direction === 'next' ? QUICK_NEXT_FORM : QUICK_BACK_FORM;
       // Either button is disabled while its form is pending, so a second
       // swipe before the page comes back sends nothing.
@@ -547,13 +554,25 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
         formPending(QUICK_NEXT_FORM) ||
         formPending(QUICK_BACK_FORM)
       )
-        return;
+        return back();
       // Without motion there is nothing to watch go, and with no card drawn
       // on that side there is nothing to bring in: send at once, and the
       // card springs back to wait for the page as it did before.
       const drawn = direction === 'next' ? hasPeek.current.next : hasPeek.current.previous;
-      if (still?.matches || !drawn) submitForm(id);
-      else setLeaving(direction);
+      if (still?.matches || !drawn) {
+        submitForm(id);
+        return back();
+      }
+      gone = true;
+      setLeaving(direction);
+      void release(
+        moving,
+        direction === 'next'
+          ? `translateX(calc(-100% - ${PEEK_GAP}))`
+          : `translateX(calc(100% + ${PEEK_GAP}))`,
+      ).then(() => send(direction));
+      // A spring that never finishes (the tab hidden mid-slide) still sends.
+      window.setTimeout(() => send(direction), SWIPE_RELEASE_MS + 100);
     };
 
     element.addEventListener('touchstart', onStart, { passive: true });
@@ -571,18 +590,10 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
   // The story behind this one rides a card's width and a gap to the right,
   // in the same track, so it comes in exactly as far as this one goes out;
   // the card Back would bring back rides the same distance to the left.
-  // Each is only drawn while a drag or the slide out goes its way.
-  const showNext = Boolean(peek?.next) && (leaving === 'next' || (offset !== null && offset < 0));
-  const showPrevious =
-    Boolean(peek?.previous) && (leaving === 'back' || (offset !== null && offset > 0));
-  const transform =
-    leaving === 'next'
-      ? `translateX(calc(-100% - ${PEEK_GAP}))`
-      : leaving === 'back'
-        ? `translateX(calc(100% + ${PEEK_GAP}))`
-        : offset === null
-          ? undefined
-          : `translateX(${offset}px)`;
+  // Each is only drawn while a drag, a spring back or the way out goes its
+  // way.
+  const showNext = Boolean(peek?.next) && (leaving ?? toward) === 'next';
+  const showPrevious = Boolean(peek?.previous) && (leaving ?? toward) === 'back';
 
   return (
     // Clip rather than hidden, so the sticky Next row inside still sticks to
@@ -593,17 +604,8 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
       data-quick-swipe
       className={cn((showNext || showPrevious) && 'overflow-clip')}
     >
-      <div
-        className={cn(
-          'relative',
-          offset === null && 'transition-transform ease-out-soft',
-          'duration-quick',
-        )}
-        style={{ transform }}
-        onTransitionEnd={(event) => {
-          if (leaving && event.target === event.currentTarget) send();
-        }}
-      >
+      {/* Its transform is written by follow and release, never by React. */}
+      <div ref={card} className="relative">
         {children}
         {(showNext || showPrevious) && (
           <PeekContext.Provider value={null}>
@@ -628,9 +630,6 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
 
 /** The space between the card going out and the one coming in. */
 const PEEK_GAP = '1rem';
-
-/** How long the card takes to finish leaving once let go; `duration-quick` above. */
-const LEAVE_MS = MOTION_MS.quick;
 
 /**
  * The Next or Back form. The card coming in carries ones with the same ids
