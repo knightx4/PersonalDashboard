@@ -158,6 +158,12 @@ export type CreatedTable = {
   file: string;
   /** The text of its `create table` statement, for counters that look at columns. */
   definition: string;
+  /**
+   * The text of every later `alter table` statement on it, in file order. A
+   * column or constraint added after the table was created is here and not in
+   * `definition`, so a counter about one reads both.
+   */
+  alterations: string[];
 };
 
 const IDENT = String.raw`(?:"?[a-z_][a-z0-9_]*"?\.)?"?[a-z_][a-z0-9_]*"?`;
@@ -170,8 +176,9 @@ function qualify(name: string, schema: string): string {
 /**
  * The tables the migrations leave standing: every `create table` in the
  * `supabase/migrations*` directories, in file order, less the ones a later
- * `drop table` removes, with `alter table … rename to` followed. An
- * unqualified name is in `public`. Statements are found by pattern rather than
+ * `drop table` removes, with `alter table … rename to` followed and every
+ * other `alter table` kept beside the definition. An unqualified name is in
+ * `public`. Statements are found by pattern rather than
  * parsed, which is right for how these migrations are written and would be
  * wrong for SQL built inside a function body.
  */
@@ -188,7 +195,8 @@ export function tablesCreated(root: string): CreatedTable[] {
     String.raw`create\s+table\s+(?:if\s+not\s+exists\s+)?(${IDENT})\s*\(` +
       String.raw`|drop\s+table\s+(?:if\s+exists\s+)?(${IDENT}(?:\s*,\s*${IDENT})*)` +
       String.raw`|alter\s+table\s+(?:if\s+exists\s+)?(?:only\s+)?(${IDENT})\s+rename\s+to\s+("?[a-z_][a-z0-9_]*"?)` +
-      String.raw`|set\s+(?:local\s+)?search_path\s*(?:=|to)\s*("?[a-z_][a-z0-9_]*"?)`,
+      String.raw`|set\s+(?:local\s+)?search_path\s*(?:=|to)\s*("?[a-z_][a-z0-9_]*"?)` +
+      String.raw`|alter\s+table\s+(?:if\s+exists\s+)?(?:only\s+)?(${IDENT})\s`,
     'gi',
   );
   for (const dir of dirs) {
@@ -204,7 +212,12 @@ export function tablesCreated(root: string): CreatedTable[] {
         } else if (m[1]) {
           const name = qualify(m[1], schema);
           const end = sql.indexOf(';', m.index);
-          tables.set(name, { name, file, definition: sql.slice(m.index, end === -1 ? undefined : end) });
+          tables.set(name, {
+            name,
+            file,
+            definition: sql.slice(m.index, end === -1 ? undefined : end),
+            alterations: [],
+          });
         } else if (m[2]) {
           for (const t of m[2].split(',')) tables.delete(qualify(t.trim(), schema));
         } else if (m[3] && m[4]) {
@@ -213,7 +226,10 @@ export function tablesCreated(root: string): CreatedTable[] {
           const into = from.slice(0, from.indexOf('.'));
           const to = `${into}.${m[4].replaceAll('"', '').toLowerCase()}`;
           tables.delete(from);
-          tables.set(to, { name: to, file, definition: was?.definition ?? '' });
+          tables.set(to, { name: to, file, definition: was?.definition ?? '', alterations: was?.alterations ?? [] });
+        } else if (m[6]) {
+          const end = sql.indexOf(';', m.index);
+          tables.get(qualify(m[6], schema))?.alterations.push(sql.slice(m.index, end === -1 ? undefined : end));
         }
       }
     }

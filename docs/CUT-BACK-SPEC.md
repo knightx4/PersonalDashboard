@@ -169,6 +169,32 @@ review is scheduled `11 * * * 0`, which fires every hour on Sundays, and
 morning brief records an open only when it is reached from the push
 notification, so its open count says nothing about whether it is read on Home.
 
+## Rules
+
+Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. The
+baseline was measured on main on 3 October 2026.
+
+**R1.** Learn has four tabs at most: Now, Subjects, Reading lists and, for the
+owner, Videos.
+Checked by: count `learn-nav-tabs`, baseline 4.
+
+**R2.** Every page opened is recorded in `core.page_views`, and a prefetch or
+an `/api` call is not.
+Checked by: test `tests/proxy-page-views.test.ts`.
+
+**R3.** A page that only redirects is removed once it has gone 30 days with no
+opens.
+Checked by: audit.
+
+**R4.** Cutting a page leaves its tables and their rows in place.
+Checked by: audit.
+
+`learn-nav-tabs` counts the entries in the nav in `app/learn/layout.tsx`, the
+owner's Videos tab included. R3 is left to the audit because only the page
+views say whether a redirect is opened, and a count of redirect-only pages
+would fail the merges in Part 4, each of which adds one. There are 15 such
+pages today, five of them named for removal in Part 4.
+
 ## Decisions
 
 **1. What happens to Quizzes, clips and lesson plans in Learn?**
