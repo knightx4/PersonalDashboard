@@ -27,7 +27,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-// Two of the loaders record that they ran. A non-owner must not make either
+// Three of the loaders record that they ran. A non-owner must not make any of them
 // fire: a layout that fetched the owner's plan and then declined to draw it
 // has already put it in somebody else's response.
 vi.mock('@/lib/plan/load', () => ({
@@ -41,6 +41,15 @@ vi.mock('@/lib/raised/notifications', () => ({
   loadRaisedNotifications: async () => {
     state.loaded.push('raised');
     return [];
+  },
+}));
+
+// The count of spec changes waiting on the Home badge (plan #1506) reads the
+// owner's rows too, so it records that it ran as well.
+vi.mock('@/lib/specs/changes', () => ({
+  countProposedSpecChanges: async () => {
+    state.loaded.push('spec-changes');
+    return 0;
   },
 }));
 
@@ -88,6 +97,6 @@ describe('the dev layout', () => {
     expect(html).not.toContain('You do not have permission');
     expect(html).toContain('Bugs and requests');
     expect(html).toContain('Changelog');
-    expect(state.loaded.sort()).toEqual(['plan', 'raised']);
+    expect(state.loaded.sort()).toEqual(['plan', 'raised', 'spec-changes']);
   });
 });
