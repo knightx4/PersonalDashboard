@@ -33,7 +33,8 @@ import {
 } from '@/lib/ideas/view';
 import { cardVariants } from '@/components/ui/card';
 import { CommentCount } from '@/components/dev/comment-count';
-import { CommentThread } from '@/components/dev/comment-thread';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { ideaHealth, type IdeaHealth } from '@/lib/dev/health';
 import { IDEA_HEALTH_WORD } from '@/lib/dev/words';
@@ -304,10 +305,9 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
           <p className="whitespace-pre-wrap text-body text-ink">
             <LinkedText text={idea.body} />
           </p>
-          <CommentThread
-            target="idea"
-            id={idea.id}
-            thread={idea.thread}
+          <Thread
+            subject={threadRef('idea', idea.id)}
+            turns={idea.thread}
             placeholder="What you think about this idea, or what you would want it to do. Shaping reads it; tag @dash to ask about it."
           />
           <div className="flex flex-wrap items-center gap-2">

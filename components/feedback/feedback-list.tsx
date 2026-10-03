@@ -10,7 +10,8 @@ import {
   type FeedbackActionState,
 } from '@/app/dev/bugs/actions';
 import { Button } from '@/components/ui/button';
-import { CommentThread } from '@/components/dev/comment-thread';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { cardVariants } from '@/components/ui/card';
 import { FieldError, Select, Textarea } from '@/components/ui/field';
@@ -209,10 +210,9 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
           was written after filing belongs with the report, not among the
           controls for triaging it. A closed note keeps its thread, which is the
           record of what was said while it was being fixed. */}
-      <CommentThread
-        target="note"
-        id={row.id}
-        thread={row.thread}
+      <Thread
+        subject={threadRef('note', row.id)}
+        turns={row.thread}
         submit={canAnswer ? { action: respondToFeedback, label: 'Answer and reopen' } : undefined}
         placeholder={
           canAnswer

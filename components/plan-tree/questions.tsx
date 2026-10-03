@@ -5,7 +5,8 @@ import { Check } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { ComposeTitle, FieldError } from '@/components/ui/field';
-import { CommentThread } from '@/components/dev/comment-thread';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 import {
   AnswerBox,
   TheAnswered,
@@ -227,11 +228,9 @@ export function QuestionRow({
               decision beneath a step is deliberately not a row of its own in
               the tree, so this is the only place to say anything about it. */}
           {node.status !== 'dropped' && (
-            <CommentThread
-              target={comments.target}
-              store={comments.store}
-              id={node.id}
-              thread={node.thread}
+            <Thread
+              subject={threadRef(comments.target, node.id)}
+              turns={node.thread}
               label="Comment"
               titles={titles}
               placeholder="What is unclear about the question, or what you are weighing. Tag @dash to ask; either way it does not answer it."

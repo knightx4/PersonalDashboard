@@ -1,4 +1,5 @@
-import { CommentThread } from '@/components/dev/comment-thread';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 import { cardVariants } from '@/components/ui/card';
 import { Markdown } from '@/components/ui/markdown';
 import { cn } from '@/lib/cn';
@@ -39,10 +40,9 @@ export function SpecSectionCard({ section }: { section: SpecSectionWithThread })
       )}
 
       <div className="mt-4 border-t border-border pt-3">
-        <CommentThread
-          target="spec"
-          id={section.id}
-          thread={section.thread}
+        <Thread
+          subject={threadRef('spec', section.id)}
+          turns={section.thread}
           label="Comment on this section"
           placeholder="What is wrong with this, or a question for Dash about it."
         />
@@ -59,10 +59,9 @@ export function SpecOrphan({
   return (
     <div className={cn(cardVariants({ padding: 'dense' }), 'border-dashed')}>
       <h3 className="mb-2 text-ui font-semibold text-ink-muted">{orphan.heading}</h3>
-      <CommentThread
-        target="spec"
-        id={orphan.id}
-        thread={orphan.thread}
+      <Thread
+        subject={threadRef('spec', orphan.id)}
+        turns={orphan.thread}
         label="Thread"
         placeholder="Add to this."
       />

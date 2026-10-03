@@ -40,7 +40,8 @@ import type { MatchVerdict, RequirementMatch } from '@/lib/jobs/evidence/match-p
 import type { AnswerDraft } from '@/lib/jobs/evidence/draft-payload';
 import type { PrepNote } from '@/lib/jobs/interview/prep-payload';
 import { RoundPrep } from './prep-note';
-import { RoleThread } from './role-thread';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 import type { DevComment } from '@/lib/comments/load';
 import {
   addQuestions,
@@ -320,7 +321,16 @@ export function RoleDetailPanels(props: PanelProps & { initialTab?: Tab }) {
       {tab === 'interviews' && (
         <Interviews {...props} seed={interviewSeed} onSeedUsed={() => setInterviewSeed(null)} />
       )}
-      {tab === 'notes' && <RoleThread roleId={props.roleId} thread={props.thread} />}
+      {/* Untagged, a comment is a note to yourself; tagged @dash, Dash answers
+          from the role, its description and your evidence bank, and "@dash
+          write my cover letter" writes one into the Application tab. */}
+      {tab === 'notes' && (
+        <Thread
+          subject={threadRef('role', props.roleId)}
+          turns={props.thread}
+          placeholder="Anything worth remembering about this role, or @dash write my cover letter."
+        />
+      )}
       {tab === 'mail' && <LinkedMail {...props} onAddInterview={startInterviewFrom} />}
 
       <NotRealPursuit applicationId={props.applicationId} />

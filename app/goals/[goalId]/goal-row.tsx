@@ -45,7 +45,6 @@ import {
   removeGoalStepDependency,
   setGoalStepStatus,
 } from './block-actions';
-import { GOALS_STORE } from './goal-comments';
 import { InformationStep, type InformationSeam } from './information-step';
 import {
   prepareStepAction,
@@ -96,7 +95,7 @@ const GOAL_TREE_ACTIONS: TreeActions = {
   dismissFog: setFogAsideAction,
 };
 
-const GOAL_COMMENTS = { target: 'goal' as const, store: GOALS_STORE };
+const GOAL_COMMENTS = { target: 'goal' as const };
 
 /** What every row on one goal page shares. */
 const NO_FILES: LinkedFile[] = [];

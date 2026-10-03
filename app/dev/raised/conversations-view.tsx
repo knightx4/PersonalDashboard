@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { markConversationRead } from './actions';
-import { CommentThread } from '@/components/dev/comment-thread';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 import { cardVariants } from '@/components/ui/card';
 import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
@@ -21,8 +22,8 @@ import { DashCredit } from '@/components/ui/dash-mark';
  * answer written overnight is found by remembering which idea, step, raise or
  * note the question was asked on. Here they are one list, most recently active
  * first, and a reply goes into the same thread from here as from the row's own
- * page -- the box is the same `CommentThread`, given the target and row id it
- * takes everywhere else, so `@dash` behaves the same too.
+ * page -- the box is the same `Thread`, given the ref of the row it sits under
+ * everywhere else, so `@dash` behaves the same too.
  *
  * Under the raises rather than above them: a raise is waiting on you and a
  * conversation usually is not.
@@ -109,10 +110,9 @@ function Line({ conversation, titles }: { conversation: Conversation; titles?: P
         }
       >
         <div className="space-y-2">
-          <CommentThread
-            target={conversation.target}
-            id={conversation.rowId}
-            thread={conversation.thread}
+          <Thread
+            subject={threadRef(conversation.target, conversation.rowId)}
+            turns={conversation.thread}
             label="Reply"
             placeholder="A reply on this row. Tag @dash to ask for an answer."
             titles={titles}

@@ -11,7 +11,7 @@ import { answerGoalFlag, deleteFlagComment, dismissGoalFlag } from '@/lib/goals/
 /**
  * Answering, and putting aside, what a goals run flagged on a goal (plan
  * #1015). The answer box is the dev pages' thread
- * (components/dev/comment-thread.tsx), so the fields are its: `id` is the
+ * (components/thread/thread.tsx), so the fields are its: `id` is the
  * flag, `body` the answer. Everything an answer sets off is in
  * lib/goals/flags-store.ts.
  */

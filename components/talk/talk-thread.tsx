@@ -22,7 +22,7 @@ import { LinkedText } from '@/components/ui/linked-text';
 /**
  * A saved conversation with Dash about a card or a story, and the box to add
  * to it (plan #1053). Modelled on the dev pages' comment thread
- * (components/dev/comment-thread.tsx): one row per turn, the author as a glyph
+ * (components/thread/thread.tsx): one row per turn, the author as a glyph
  * in a column of its own, a run by one author headed once.
  *
  * The caller owns the write. `send` keeps the person's turn, asks for Dash's

@@ -67,7 +67,8 @@ import type { Place } from '../move-goal';
 import { GoalContext } from './goal-context';
 import { GoalFlags } from './goal-flags';
 import { GoalHeadingField } from './goal-heading';
-import { GoalThread } from './goal-comments';
+import { Thread } from '@/components/thread/thread';
+import { threadRef } from '@/lib/thread/subjects';
 import { GoalHelp } from './goal-help';
 import { GoalLearn } from './goal-learn';
 import { GoalLinksSection } from './goal-links';
@@ -464,9 +465,9 @@ export default async function GoalMapPage({
             />
             {/* The goal's own thread (plan #957). Each step has its own, under its details. */}
             <Card padding="dense">
-              <GoalThread
-                itemId={map.goal.id}
-                thread={thread}
+              <Thread
+                subject={threadRef('goal', map.goal.id)}
+                turns={thread}
                 label="Comment on this goal"
                 placeholder="A note on the goal. Tag @dash to ask about it, or to give it figures to file."
               />
