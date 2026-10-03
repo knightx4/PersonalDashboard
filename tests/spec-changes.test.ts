@@ -82,6 +82,17 @@ describe('a spec change', () => {
       update spec_changes set status = 'declined', decided_at = now() where id = ${change.id}`);
   });
 
+  it("keeps one audit's findings together by its audit_id (0162)", async () => {
+    const [audit] = await admin<{ id: string }[]>`select gen_random_uuid() as id`;
+    await asUser(userId, (tx) => tx`
+      insert into spec_findings (user_id, audit_id, spec, kind, finding)
+      values (${userId}, ${audit.id}, 'plan', 'holds', 'The tree matches.'),
+             (${userId}, ${audit.id}, 'todo', 'drifted', 'A rule names the wrong guard.')`);
+    const rows = await asUser(userId, (tx) => tx<{ spec: string }[]>`
+      select spec from spec_findings where audit_id = ${audit.id} order by spec`);
+    expect(rows.map((row) => row.spec)).toEqual(['plan', 'todo']);
+  });
+
   it('is not visible to anybody else', async () => {
     const changes = await asUser(otherId, (tx) => tx`select id from spec_changes`);
     const findings = await asUser(otherId, (tx) => tx`select id from spec_findings`);
