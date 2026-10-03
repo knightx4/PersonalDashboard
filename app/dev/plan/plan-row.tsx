@@ -46,6 +46,7 @@ import { quietSendAsk } from '@/lib/plan/liveness';
 import { isResolvingAnswers, type LastRun } from '@/lib/plan/run-end';
 import { type RunRaise } from '@/lib/plan/work';
 import { checkLine, type CommitCheck } from '@/lib/plan/checks';
+import { countPhrase, type OverhaulProgress } from '@/lib/plan/overhaul-progress';
 import {
   AnswerBox,
   QuestionPartLabel,
@@ -492,6 +493,7 @@ export function PlanRow({
   runRaises = [],
   liveness: serverLiveness = {},
   commitChecks,
+  overhaulProgress = {},
   view,
   searching,
   unfolded,
@@ -524,6 +526,8 @@ export function PlanRow({
   liveness?: PlanLiveness;
   /** What CI said about each commit a step shipped in, by the commit's sha. */
   commitChecks: Readonly<Record<string, CommitCheck>>;
+  /** Each overhaul's rule counts, by its plan item id. Absent: none to show. */
+  overhaulProgress?: Readonly<Record<string, OverhaulProgress>>;
   /** Which view is on. Only Dismissed shows what has been put aside. */
   view: View;
   /** Whether a search is narrowing the page. Unfolds closed rows that hold a hit. */
@@ -864,6 +868,7 @@ export function PlanRow({
               Overhaul
             </span>
           )}
+          {node.track === 'overhaul' && <OverhaulCounts progress={overhaulProgress[node.id]} />}
           {/* And whether the checks passed on what it shipped in. */}
           {node.status === 'done' && node.commitSha && (
             <CheckMark check={commitChecks[node.commitSha]} />
@@ -1124,6 +1129,7 @@ export function PlanRow({
           runRaises={runRaises}
           liveness={serverLiveness}
           commitChecks={commitChecks}
+          overhaulProgress={overhaulProgress}
           view={view}
           searching={searching}
           unfolded={unfolded}
@@ -1131,5 +1137,66 @@ export function PlanRow({
         />
       )}
     />
+  );
+}
+
+/**
+ * An overhaul's progress beside its label: each rule count its spec's Contract
+ * names, from where it started to its target, with the count now. Progress
+ * on an overhaul is the old way shrinking, so these are what the row says
+ * rather than how many steps have closed (docs/SPEC-LAYER-SPEC.md, Part 4).
+ *
+ * The count now is the one recorded at the last commit that passed the gate,
+ * and the tooltip says so. Until the spec has a Contract there is nothing to
+ * count, and the row says that rather than showing nothing, so an overhaul
+ * with no counts does not read as one whose counts did not load.
+ */
+function OverhaulCounts({ progress }: { progress: OverhaulProgress | undefined }) {
+  const quiet = 'shrink-0 text-micro text-ink-muted';
+  if (!progress || progress.state === 'no-spec') {
+    return (
+      <span className={quiet} title="Its detail names no spec, so there are no rule counts to show.">
+        No rule counts yet
+      </span>
+    );
+  }
+  if (progress.state === 'missing') {
+    return (
+      <span className={quiet} title={`${progress.spec} could not be read, so its counts cannot be shown.`}>
+        No rule counts yet
+      </span>
+    );
+  }
+  if (progress.state === 'no-contract') {
+    return (
+      <span
+        className={quiet}
+        title={`${progress.spec} has no Contract naming the rules this overhaul brings to target yet.`}
+      >
+        No rule counts yet
+      </span>
+    );
+  }
+  const unread =
+    progress.unread.length > 0
+      ? ` ${progress.unread.join(', ')} ${progress.unread.length === 1 ? 'is' : 'are'} not a count with a target and a recorded value, so ${progress.unread.length === 1 ? 'it is' : 'they are'} not shown.`
+      : '';
+  return (
+    <>
+      {progress.counts.map((count) => (
+        <span
+          key={count.counter}
+          title={`R${count.rule} of ${progress.spec}, counted by ${count.counter}. Now is the count at the last commit that passed the gate.${unread}`}
+          className={cn(quiet, 'tabular-nums', count.now <= count.target && 'text-positive')}
+        >
+          {countPhrase(count)}
+        </span>
+      ))}
+      {progress.counts.length === 0 && (
+        <span className={quiet} title={`${progress.spec}'s Contract names no rule the row can count.${unread}`}>
+          No rule counts yet
+        </span>
+      )}
+    </>
   );
 }

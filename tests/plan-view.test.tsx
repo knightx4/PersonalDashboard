@@ -300,6 +300,40 @@ describe('PlanView', () => {
     );
     expect((html.match(/>Overhaul</g) ?? []).length).toBe(1);
     expect(html).toContain('>Move threads onto the core</span><span title="Overhaul.');
+    // With no counts handed over, the row says so rather than showing nothing.
+    expect((html.match(/No rule counts yet/g) ?? []).length).toBe(1);
+  });
+
+  it("shows an overhaul's rule counts from start to target with the count now", () => {
+    const rows = buildPlanTree({
+      items: [item({ id: 'overhaul', title: 'Move threads onto the core', track: 'overhaul' })],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(rows, 'open')}
+        finished={[]}
+        summary={summarize(rows)}
+        view="open"
+        catalog={catalogOf(rows)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        overhaulProgress={{
+          overhaul: {
+            state: 'counting',
+            spec: 'Core and Dash',
+            counts: [
+              { rule: 1, counter: 'thread-tables', label: 'thread tables', start: 6, target: 1, now: 4 },
+            ],
+            unread: [],
+          },
+        }}
+      />,
+    );
+    expect(html).toContain('thread tables 6 to 1: now 4');
+    expect(html).not.toContain('No rule counts yet');
   });
 
   it('reads an underway step as a session\'s unless you kept it', () => {
