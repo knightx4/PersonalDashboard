@@ -19,7 +19,7 @@ describe('parseTheme', () => {
   });
 
   it('still reads the written themes', () => {
-    for (const id of ['paper', 'ink', 'darkroom', 'dusk', 'aurora', 'dawn', 'poster'] as const) {
+    for (const id of ['paper', 'ink', 'darkroom', 'dusk', 'aurora', 'dawn', 'poster', 'poster-dark'] as const) {
       expect(parseTheme(id)).toEqual({ kind: 'written', id });
     }
   });

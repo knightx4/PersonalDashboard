@@ -34,10 +34,8 @@ export type PaletteId = (typeof PALETTE_IDS)[number];
 /** The palette the theme block is written in. Choosing it writes no tokens. */
 export const DEFAULT_PALETTE: PaletteId = 'primary';
 
-export type Palette = {
-  id: PaletteId;
-  label: string;
-  mood: string;
+/** One side of a palette: the colours it prints in light, or in dark. */
+export type PaletteSide = {
   /** The page ground. */
   paper: string;
   /** A card, a menu, a raised panel. */
@@ -68,6 +66,26 @@ export type Palette = {
   onLink: string;
 };
 
+/**
+ * A palette is its day side, written at the top level as it always was, and a
+ * night side for Lightbox in dark: dark paper, cards a step lighter, and the
+ * paper's own colour for the outline and the shadow, so the poster is printed
+ * in light ink on dark stock.
+ */
+export type Palette = PaletteSide & {
+  id: PaletteId;
+  label: string;
+  mood: string;
+  night: PaletteSide;
+};
+
+export type PosterPolarity = 'day' | 'night';
+
+/** The side of a palette a polarity prints. */
+export function sideOf(palette: Palette, polarity: PosterPolarity): PaletteSide {
+  return polarity === 'night' ? palette.night : palette;
+}
+
 export type Band = { fill: string; ink: string };
 
 export const PALETTES: readonly Palette[] = [
@@ -96,6 +114,29 @@ export const PALETTES: readonly Palette[] = [
     linkHover: '#1739a8',
     linkTint: '#e3e9fb',
     onLink: '#ffffff',
+    night: {
+      paper: '#151412',
+      card: '#201f1c',
+      well: '#1a1917',
+      line: '#34322e',
+      ink: '#f3efe6',
+      muted: '#b9b3a8',
+      ghost: '#8a857c',
+      side: '#0b0b0a',
+      sideText: '#f3efe6',
+      sideMuted: '#a8a297',
+      sideHover: '#262421',
+      bands: [
+        { fill: '#1f4bd8', ink: '#ffffff' },
+        { fill: '#f4c430', ink: '#111111' },
+        { fill: '#db2e1f', ink: '#ffffff' },
+      ],
+      highlight: { fill: '#f4c430', ink: '#111111' },
+      link: '#8fa8ff',
+      linkHover: '#b3c3ff',
+      linkTint: '#1d2440',
+      onLink: '#111111',
+    },
   },
   {
     id: 'midcentury',
@@ -122,6 +163,29 @@ export const PALETTES: readonly Palette[] = [
     linkHover: '#175753',
     linkTint: '#dcefec',
     onLink: '#ffffff',
+    night: {
+      paper: '#1c140e',
+      card: '#2a1e15',
+      well: '#22180f',
+      line: '#3e2f22',
+      ink: '#f7ecd8',
+      muted: '#cdb79c',
+      ghost: '#9a8670',
+      side: '#120c08',
+      sideText: '#f7ecd8',
+      sideMuted: '#c4ad92',
+      sideHover: '#33251a',
+      bands: [
+        { fill: '#1f6f6b', ink: '#ffffff' },
+        { fill: '#e3a72f', ink: '#2a1a0c' },
+        { fill: '#b94a19', ink: '#ffffff' },
+      ],
+      highlight: { fill: '#e3a72f', ink: '#2a1a0c' },
+      link: '#6fd0c8',
+      linkHover: '#9ae0da',
+      linkTint: '#12302e',
+      onLink: '#10201f',
+    },
   },
   {
     id: 'navy',
@@ -148,6 +212,29 @@ export const PALETTES: readonly Palette[] = [
     linkHover: '#164c9e',
     linkTint: '#e3edf9',
     onLink: '#ffffff',
+    night: {
+      paper: '#0d1529',
+      card: '#15203a',
+      well: '#111a31',
+      line: '#26345a',
+      ink: '#eef2f8',
+      muted: '#aebbd6',
+      ghost: '#7d8bab',
+      side: '#080e1d',
+      sideText: '#eef2f8',
+      sideMuted: '#a3b1cf',
+      sideHover: '#1a2747',
+      bands: [
+        { fill: '#2f6db5', ink: '#ffffff' },
+        { fill: '#f2c14e', ink: '#14244a' },
+        { fill: '#c44a39', ink: '#ffffff' },
+      ],
+      highlight: { fill: '#f2c14e', ink: '#14244a' },
+      link: '#8ab8ff',
+      linkHover: '#b0cfff',
+      linkTint: '#172a4f',
+      onLink: '#0d1529',
+    },
   },
   {
     id: 'slate',
@@ -174,6 +261,29 @@ export const PALETTES: readonly Palette[] = [
     linkHover: '#2e4563',
     linkTint: '#e2e8f0',
     onLink: '#ffffff',
+    night: {
+      paper: '#12161d',
+      card: '#1c222c',
+      well: '#171c24',
+      line: '#2f3744',
+      ink: '#eef0f4',
+      muted: '#a9b1c0',
+      ghost: '#7a8394',
+      side: '#0b0e13',
+      sideText: '#eef0f4',
+      sideMuted: '#9ea7b7',
+      sideHover: '#232a36',
+      bands: [
+        { fill: '#3d5a80', ink: '#ffffff' },
+        { fill: '#e0b25c', ink: '#1c2330' },
+        { fill: '#b5543c', ink: '#ffffff' },
+      ],
+      highlight: { fill: '#e0b25c', ink: '#1c2330' },
+      link: '#9cbbe6',
+      linkHover: '#bdd2f0',
+      linkTint: '#1d2a3d',
+      onLink: '#12161d',
+    },
   },
   {
     id: 'ocean',
@@ -200,6 +310,29 @@ export const PALETTES: readonly Palette[] = [
     linkHover: '#145668',
     linkTint: '#dcedf0',
     onLink: '#ffffff',
+    night: {
+      paper: '#0a1d22',
+      card: '#10292f',
+      well: '#0d2328',
+      line: '#1f4048',
+      ink: '#e8f0ef',
+      muted: '#a6c1c3',
+      ghost: '#74939a',
+      side: '#061317',
+      sideText: '#e8f0ef',
+      sideMuted: '#98b6b9',
+      sideHover: '#153840',
+      bands: [
+        { fill: '#1b6f86', ink: '#ffffff' },
+        { fill: '#e9c46a', ink: '#0f2c33' },
+        { fill: '#dc7055', ink: '#0f2c33' },
+      ],
+      highlight: { fill: '#e9c46a', ink: '#0f2c33' },
+      link: '#7fd3e6',
+      linkHover: '#a9e3ef',
+      linkTint: '#0f3640',
+      onLink: '#0a1d22',
+    },
   },
   {
     id: 'nordic',
@@ -226,6 +359,29 @@ export const PALETTES: readonly Palette[] = [
     linkHover: '#234836',
     linkTint: '#e1ece5',
     onLink: '#ffffff',
+    night: {
+      paper: '#131a16',
+      card: '#1c2620',
+      well: '#17201b',
+      line: '#2e3c34',
+      ink: '#ece8de',
+      muted: '#b5c2b9',
+      ghost: '#849189',
+      side: '#0c110e',
+      sideText: '#ece8de',
+      sideMuted: '#a9b7ad',
+      sideHover: '#223029',
+      bands: [
+        { fill: '#2f5d47', ink: '#ffffff' },
+        { fill: '#d9c49a', ink: '#1d2a24' },
+        { fill: '#a3304e', ink: '#ffffff' },
+      ],
+      highlight: { fill: '#d9c49a', ink: '#1d2a24' },
+      link: '#8fd1ae',
+      linkHover: '#b3e0c7',
+      linkTint: '#1a3428',
+      onLink: '#131a16',
+    },
   },
   {
     id: 'plum',
@@ -252,6 +408,29 @@ export const PALETTES: readonly Palette[] = [
     linkHover: '#552f60',
     linkTint: '#efe4f2',
     onLink: '#ffffff',
+    night: {
+      paper: '#1a1019',
+      card: '#261824',
+      well: '#20141e',
+      line: '#3d2a3a',
+      ink: '#f3ece9',
+      muted: '#c9b3c2',
+      ghost: '#957f8f',
+      side: '#110a10',
+      sideText: '#f3ece9',
+      sideMuted: '#bba4b4',
+      sideHover: '#301f2d',
+      bands: [
+        { fill: '#6b3d78', ink: '#ffffff' },
+        { fill: '#d9a441', ink: '#2e1a2b' },
+        { fill: '#b5486a', ink: '#ffffff' },
+      ],
+      highlight: { fill: '#d9a441', ink: '#2e1a2b' },
+      link: '#d7a6e6',
+      linkHover: '#e6c4f0',
+      linkTint: '#3a2440',
+      onLink: '#1a1019',
+    },
   },
 ];
 
@@ -270,7 +449,7 @@ export function paletteById(id: string | null | undefined): Palette | undefined 
  * have to agree. The band tokens are not in the shared `--c-*` set the
  * generator clears, so `POSTER_TOKENS` below lists them for applyTheme.
  */
-export function paletteTokens(palette: Palette): Record<string, string> {
+export function paletteTokens(palette: PaletteSide): Record<string, string> {
   const [b1, b2, b3] = palette.bands;
   return {
     '--c-page-ground': palette.paper,
@@ -319,9 +498,13 @@ export const POSTER_TOKENS: readonly string[] = Object.keys(
   paletteTokens(PALETTES[0]!),
 ).filter((token) => token.startsWith('--c-poster-'));
 
-/** What a palette writes over the block. Empty for the default, which the block already is. */
-export function posterTokens(id: PaletteId): Record<string, string> {
+/**
+ * What a palette writes over its block. Empty for the default, which each
+ * block already is: `[data-theme='poster']` is Primary's day side and
+ * `[data-theme='poster-dark']` its night side.
+ */
+export function posterTokens(id: PaletteId, polarity: PosterPolarity = 'day'): Record<string, string> {
   if (id === DEFAULT_PALETTE) return {};
   const palette = paletteById(id);
-  return palette ? paletteTokens(palette) : {};
+  return palette ? paletteTokens(sideOf(palette, polarity)) : {};
 }

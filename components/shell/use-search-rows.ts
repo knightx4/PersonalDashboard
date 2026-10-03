@@ -196,12 +196,19 @@ function themeCommands(theme: Theme): SearchCommand[] {
   return [
     ...THEME_ROOMS.map((option) => ({
       id: `theme:${option.id}`,
-      label: `Theme: ${option.label}`,
-      hint: option.id === 'lightbox' ? 'The poster, in its last palette' : 'Keeps the colour you are in',
+      label: option.id === 'darkroom' ? 'Theme: Lightbox, dark' : `Theme: ${option.label}`,
+      hint:
+        option.id === 'lightbox' || option.id === 'darkroom'
+          ? 'The poster, in its last palette'
+          : 'Keeps the colour you are in',
       icon: 'theme' as const,
-      // Lightbox in light is the poster now, a written theme with palettes.
+      // Lightbox is the poster now, in light and in dark, a written theme with palettes.
       run: applying(
-        option.id === 'lightbox' ? posterFor(paletteOf(theme)) : { kind: 'generated', mode: option.id, hue, way },
+        option.id === 'lightbox'
+          ? posterFor(paletteOf(theme), 'light')
+          : option.id === 'darkroom'
+            ? posterFor(paletteOf(theme), 'dark')
+            : { kind: 'generated', mode: option.id, hue, way },
       ),
     })),
     ...PALETTES.map((palette) => ({
@@ -209,7 +216,7 @@ function themeCommands(theme: Theme): SearchCommand[] {
       label: `Lightbox: ${palette.label}`,
       hint: palette.mood,
       icon: 'theme' as const,
-      run: applying(posterFor(palette.id)),
+      run: applying(posterFor(palette.id, polarity)),
     })),
     ...COLOURWAYS.map((colour) => ({
       id: `theme:${colour.id}`,

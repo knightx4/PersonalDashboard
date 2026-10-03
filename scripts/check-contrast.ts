@@ -76,9 +76,9 @@ const SKIED: Record<string, Vars> = Object.fromEntries(
 
 /** Lightbox's poster palettes, each as the whole theme it makes. Primary is the block itself. */
 const PRINTED: Record<string, Vars> = Object.fromEntries(
-  PALETTES.filter((palette) => palette.id !== DEFAULT_PALETTE).map((palette) => [
-    `poster ${palette.id}`,
-    { ...WRITTEN.poster, ...posterTokens(palette.id) },
+  PALETTES.filter((palette) => palette.id !== DEFAULT_PALETTE).flatMap((palette) => [
+    [`poster ${palette.id}`, { ...WRITTEN.poster, ...posterTokens(palette.id, 'day') }],
+    [`poster-dark ${palette.id}`, { ...WRITTEN['poster-dark'], ...posterTokens(palette.id, 'night') }],
   ]),
 );
 
