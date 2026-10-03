@@ -64,6 +64,7 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     acceptance: null,
     status: 'not_started',
     kind: 'build',
+    track: 'feature',
     fog: null,
     resolution: null,
     dismissedAt: null,
@@ -272,6 +273,33 @@ describe('PlanView', () => {
     );
     // The robot that marked a handed-over step is gone with it.
     expect(html).not.toContain('lucide-bot');
+  });
+
+  it('labels an overhaul on its row, and only the overhaul', () => {
+    const rows = buildPlanTree({
+      items: [
+        item({ id: 'overhaul', title: 'Move threads onto the core', track: 'overhaul' }),
+        item({ id: 'phase', title: 'Build the core alongside', parentId: 'overhaul' }),
+        item({ id: 'plain', title: 'Outlook ingestion' }),
+      ],
+      dependencies: [],
+    });
+    const html = renderToStaticMarkup(
+      <PlanView
+        sections={applyView(rows, 'open')}
+        finished={[]}
+        summary={summarize(rows)}
+        view="open"
+        catalog={catalogOf(rows)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />,
+    );
+    expect((html.match(/>Overhaul</g) ?? []).length).toBe(1);
+    expect(html).toContain('>Move threads onto the core</span><span title="Overhaul.');
   });
 
   it('reads an underway step as a session\'s unless you kept it', () => {
