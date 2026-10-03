@@ -293,7 +293,7 @@ function PracticeCard({
             <p className="text-small text-ink-muted">Dash is writing the task…</p>
           ) : (
             <span className="inline-flex items-center gap-1">
-              <Button type="button" variant="primary" onClick={write}>
+              <Button type="button" variant="primary" onClick={write} pending={writing}>
                 Write the task
               </Button>
               <PaidHint action="app/learn/s/[id]/p/[piece]/actions.ts#writePiecePractice" what="Cost of writing the task" />

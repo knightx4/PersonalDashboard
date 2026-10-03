@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { AGENDA_HREF } from '@/lib/day-brief/picks';
 import { BRIEF_ANCHOR, type ShownBrief } from '@/lib/day-brief/shown';
 import { PickLink } from './pick-link';

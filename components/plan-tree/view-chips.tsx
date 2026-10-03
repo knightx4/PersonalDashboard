@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ChevronDown } from 'lucide-react';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { cn } from '@/lib/cn';
