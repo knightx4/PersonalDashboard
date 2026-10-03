@@ -77,7 +77,9 @@ approves the overhaul's work, but nothing of the phases is written or built
 until the person has tried the design in one workspace and accepted it. So
 an overhaul starts with three rows: the design session, a setup step of the
 person's to try it and accept it, and a step to write the phases, which
-waits on the setup step. #1517 is the first one.
+waits on the setup step. #1517 is the first one. An approved spec change
+that replaces how something works is written in this shape by
+`scripts/overhaul-opening.ts` (`shaping.md`, step 7).
 
 ## 1. The design session
 
@@ -101,8 +103,10 @@ workspace; when it does not, take the smallest one the change touches.
   (`dev_comments`, `plan_item_id`, author `claude`), with what to try.
 
 Do not merge the branch to main. It stays a branch until the person accepts
-it. Hand the design step to the try-it step instead: add the dependency
-from the design step to the try-it step, and block the design step with
+it. Hand the design step to the try-it step instead: turn the dependency
+round, so the try-it step no longer waits on the design step
+(`undepend <try-it> --on <design>`) and the design step waits on the try-it
+step (`depends <design> --on <try-it>`), and block the design step with
 `--on-steps` and the ask `Try the design at <link> and accept it on
 #<try-it step>.` When they close the try-it step the block clears itself.
 
