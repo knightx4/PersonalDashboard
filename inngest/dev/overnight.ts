@@ -24,6 +24,7 @@ import {
   type OvernightRun,
 } from '@/lib/plan/overnight';
 import { chooseOvernightFeature, OVERNIGHT_NOTHING_READY } from '@/lib/plan/overnight-choice';
+import { remainingUntil } from '@/lib/plan/elapsed';
 import { endsRun } from '@/lib/plan/run-end';
 import { endQuietRuns } from '@/lib/plan/runs';
 import { subtreeBlockedAt, subtreeClosedAt, subtreeTrail } from '@/lib/plan/subtree';
@@ -221,9 +222,11 @@ export function chooseOvernightFire(
   now: number,
   /** When each feature was last fired, by feature id. */
   lastFiredAt: Readonly<Record<string, string>>,
-): ReturnType<typeof chooseOvernightFeature> {
+  /** When each feature was fired before that, by feature id. */
+  previousFiredAt: Readonly<Record<string, string>> = {},
+): OvernightFireChoice {
   let remaining: readonly PlanSection[] = sections;
-  let passedOver = false;
+  const passedOver: PassedOver[] = [];
 
   // One pass per top-level feature at the outside; each turn either answers or
   // removes one.
@@ -231,17 +234,94 @@ export function chooseOvernightFire(
   for (let round = 0; round < rounds; round += 1) {
     const choice = chooseOvernightFeature(remaining, run, now);
     if (choice.act !== 'fire') {
-      if (passedOver && choice.act === 'end' && choice.reason === OVERNIGHT_NOTHING_READY) {
-        return { act: 'end', reason: OVERNIGHT_NO_PROGRESS };
+      if (passedOver.length > 0 && choice.act === 'end' && choice.reason === OVERNIGHT_NOTHING_READY) {
+        return { act: 'end', reason: OVERNIGHT_NO_PROGRESS, passedOver };
       }
       return choice;
     }
-    if (!closedNothingSince(choice.feature, lastFiredAt[choice.feature.id] ?? null)) return choice;
-    passedOver = true;
+    const held = heldBack(
+      choice.feature,
+      lastFiredAt[choice.feature.id] ?? null,
+      previousFiredAt[choice.feature.id] ?? null,
+      now,
+    );
+    if (!held) return choice;
+    passedOver.push(held);
     remaining = without(remaining, choice.feature.id);
   }
 
-  return { act: 'end', reason: OVERNIGHT_NO_PROGRESS };
+  return { act: 'end', reason: OVERNIGHT_NO_PROGRESS, passedOver };
+}
+
+/**
+ * How long a feature whose session closed nothing is left before it is sent
+ * once more.
+ *
+ * The zero-progress guard lasts the whole run, and a run with no limit lasts
+ * days. On 3 October #1528 was sent at 08:08, its session closed nothing, and
+ * the runner passed it over for the rest of the day while five features that
+ * wait on its steps sat behind it and the runner fired nothing at all. Most
+ * sessions that close nothing hit something passing: a red main, an API
+ * outage, a claim that was later swept. Six hours is long enough for those to
+ * have cleared and short enough that the night gets a second go.
+ */
+export const OVERNIGHT_RETRY_AFTER_MINUTES = 6 * 60;
+
+/** A feature the guard passed over, and when it may be sent again. */
+export type PassedOver = {
+  number: number;
+  title: string;
+  /** When the one retry is due, or null when the retry has been spent. */
+  retryAt: string | null;
+};
+
+/** What the tick's chooser says, with the passed-over features named on an end. */
+export type OvernightFireChoice =
+  | ReturnType<typeof chooseOvernightFeature>
+  | { act: 'end'; reason: string; passedOver: PassedOver[] };
+
+/**
+ * Whether the zero-progress guard holds a feature back, and until when.
+ *
+ * A feature whose last session closed nothing is held for
+ * `OVERNIGHT_RETRY_AFTER_MINUTES`, then sent once more. If that retry closes
+ * nothing either -- nothing has closed since the fire before it -- it is held
+ * for the rest of the run, so a feature that is truly stuck costs two sessions
+ * and not one every six hours.
+ */
+export function heldBack(
+  feature: PlanNode,
+  last: string | null,
+  previous: string | null,
+  now: number,
+): PassedOver | null {
+  if (!last || !closedNothingSince(feature, last)) return null;
+  const said = { number: feature.number, title: feature.title };
+  if (previous && closedNothingSince(feature, previous)) return { ...said, retryAt: null };
+  const retry = new Date(last).getTime() + OVERNIGHT_RETRY_AFTER_MINUTES * 60_000;
+  if (now >= retry) return null;
+  return { ...said, retryAt: new Date(retry).toISOString() };
+}
+
+/** How many held features the note names before it counts the rest. */
+const NAMED_HELD = 3;
+
+/**
+ * The features the guard is holding, in sentences for the runner's note.
+ *
+ * Without it the note said every feature had been tried without a close and
+ * nothing more, which left the person to work out which feature was stuck and
+ * why the runner sat idle with ready work on the plan.
+ */
+export function passedOverNote(held: readonly PassedOver[], now: number): string {
+  const named = held.slice(0, NAMED_HELD).map((one) =>
+    one.retryAt
+      ? `#${one.number} ${one.title} closed nothing in its last session; it is sent once more in ${remainingUntil(one.retryAt, now)}.`
+      : `#${one.number} ${one.title} closed nothing in its last two sessions, so it waits for you.`,
+  );
+  const rest = held.length - named.length;
+  if (rest > 0) named.push(`${rest} more ${rest === 1 ? 'is' : 'are'} held the same way.`);
+  return named.join(' ');
 }
 
 /** What one tick did, which is usually nothing. */
@@ -336,6 +416,12 @@ export type OvernightPorts = {
   loadSections: () => Promise<readonly PlanSection[]>;
   /** When each feature was last fired, by feature id. */
   lastFiredAt: () => Promise<Record<string, string>>;
+  /**
+   * When each feature was fired before its last fire, by feature id. What
+   * tells a feature's first session that closed nothing from its retry.
+   * None means no feature has been retried.
+   */
+  previousFiredAt?: () => Promise<Record<string, string>>;
   /**
    * The feature sessions still going, each with the feature it was sent at.
    * Sessions that have finished or ended are left out. A fire that left no
@@ -440,7 +526,11 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
   }
   const runningIds = inFlight.map((one) => one.featureId as string);
 
-  const [allFires, sections] = await Promise.all([ports.lastFiredAt(), ports.loadSections()]);
+  const [allFires, earlierFires, sections] = await Promise.all([
+    ports.lastFiredAt(),
+    ports.previousFiredAt?.() ?? Promise.resolve({}),
+    ports.loadSections(),
+  ]);
 
   // Only the fires this run made. The guard below passes over a feature whose
   // last session closed nothing, and that is the right rule inside one run: it
@@ -453,12 +543,14 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
   // has been excluded since 18 September by a session that never got as far as
   // claiming its step, and it is still handed to Claude and still ready.
   const since = run.startedAt ? new Date(run.startedAt).getTime() : null;
-  const lastFiredAt: Record<string, string> =
+  const thisRun = (fires: Record<string, string>): Record<string, string> =>
     since === null
-      ? allFires
+      ? fires
       : Object.fromEntries(
-          Object.entries(allFires).filter(([, at]) => new Date(at).getTime() >= since),
+          Object.entries(fires).filter(([, at]) => new Date(at).getTime() >= since),
         );
+  const lastFiredAt = thisRun(allFires);
+  const previousFiredAt = thisRun(earlierFires);
 
   // A refused feature is the same case as one whose last run closed nothing:
   // take it out of the tree and ask again.
@@ -479,13 +571,17 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
   const rounds = remaining.reduce((total, section) => total + section.nodes.length, 0) + 1;
 
   for (let round = 0; round < rounds; round += 1) {
-    const choice = chooseOvernightFire(remaining, run, ports.now, lastFiredAt);
+    const choice = chooseOvernightFire(remaining, run, ports.now, lastFiredAt, previousFiredAt);
     if (choice.act === 'end') {
       // The chooser can only say the tree ran out, and once anything has been
       // refused that is no longer the whole truth: the reason has to name them,
       // because the row's sentence is all the morning gets.
-      const reason =
+      const said =
         refused.length > 0 ? overnightRefusedReason(refused, choice.reason) : choice.reason;
+      // Which features the guard is holding, by name, so the note on the plan
+      // page says what the runner is waiting for rather than only that it is.
+      const held = 'passedOver' in choice ? choice.passedOver : [];
+      const reason = held.length > 0 ? `${said} ${passedOverNote(held, ports.now)}` : said;
       // Nothing ready is a reading of one instant, so the night keeps its
       // clock and asks again in four minutes. The budget and the stop time are
       // settled and do end it; this is not.
@@ -561,14 +657,18 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
 type Db = SupabaseClient<any, 'public'>;
 
 /**
- * When each feature was last sent a session, by feature id.
+ * When each feature was last sent a session, and when it was sent the one
+ * before, by feature id.
  *
  * One read of the account's feature runs rather than one per candidate: there
  * are tens of them and the tick may pass over several features before it finds
  * one worth firing. Newest first, so the first row seen for a feature is its
- * last run.
+ * last run and the second is the one before.
  */
-async function lastFeatureFires(supabase: Db, userId: string): Promise<Record<string, string>> {
+async function featureFires(
+  supabase: Db,
+  userId: string,
+): Promise<{ last: Record<string, string>; previous: Record<string, string> }> {
   const { data, error } = await supabase
     .from('plan_runs')
     .select('plan_item_id, created_at')
@@ -578,14 +678,16 @@ async function lastFeatureFires(supabase: Db, userId: string): Promise<Record<st
     .order('created_at', { ascending: false });
   if (error) {
     console.error(`plan_runs could not be read for the overnight tick: ${error.message}`);
-    return {};
+    return { last: {}, previous: {} };
   }
 
   const last: Record<string, string> = {};
+  const previous: Record<string, string> = {};
   for (const row of (data ?? []) as Array<{ plan_item_id: string; created_at: string }>) {
     if (!last[row.plan_item_id]) last[row.plan_item_id] = row.created_at;
+    else if (!previous[row.plan_item_id]) previous[row.plan_item_id] = row.created_at;
   }
-  return last;
+  return { last, previous };
 }
 
 /**
@@ -759,6 +861,9 @@ function portsFor(input: {
 }): OvernightPorts {
   const { supabase, userId, now } = input;
   let sections: readonly PlanSection[] | null = null;
+  // Both fire readings come from one read of the account's feature runs.
+  let fires: ReturnType<typeof featureFires> | null = null;
+  const readFires = () => (fires ??= featureFires(supabase, userId));
   const loadSections = async (): Promise<readonly PlanSection[]> => {
     sections ??= buildPlanTree(await loadPlan(supabase, userId));
     return sections;
@@ -768,7 +873,8 @@ function portsFor(input: {
     now,
     loadRun: () => loadOvernightRun(supabase, userId),
     loadSections,
-    lastFiredAt: () => lastFeatureFires(supabase, userId),
+    lastFiredAt: async () => (await readFires()).last,
+    previousFiredAt: async () => (await readFires()).previous,
     runsInFlight: (run) => featureRunsInFlight({ supabase, userId, run, now, fetch: input.fetch }),
     sweepClaims: async () => {
       // The same sweep the daily cron runs, and every account's claims at once

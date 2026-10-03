@@ -34,6 +34,8 @@ import { buildPlanTree, findNode, type PlanSection } from '@/lib/plan/tree';
 const MIDNIGHT = Date.parse('2026-09-17T23:00:00.000Z');
 const SEVEN_AM = '2026-09-18T07:00:00.000Z';
 const YESTERDAY = '2026-09-16T12:00:00.000Z';
+const HOUR_AGO = '2026-09-17T22:00:00.000Z';
+const SEVEN_HOURS_AGO = '2026-09-17T16:00:00.000Z';
 
 let counter = 0;
 
@@ -200,19 +202,63 @@ describe('chooseOvernightFire', () => {
 
   it('passes over a feature whose last run closed no steps and takes the next', () => {
     const choice = chooseOvernightFire(tree(twoFeatures()), night(), MIDNIGHT, {
-      first: YESTERDAY,
+      first: HOUR_AGO,
     });
 
     expect(choice.act === 'fire' && choice.feature.id).toBe('second');
   });
 
-  it('ends the night saying so when every ready feature is passed over', () => {
+  it('ends the night saying so, and naming what it held, when every ready feature is passed over', () => {
     const choice = chooseOvernightFire(tree(twoFeatures()), night(), MIDNIGHT, {
-      first: YESTERDAY,
-      second: YESTERDAY,
+      first: HOUR_AGO,
+      second: HOUR_AGO,
     });
 
-    expect(choice).toEqual({ act: 'end', reason: OVERNIGHT_NO_PROGRESS });
+    expect(choice).toMatchObject({ act: 'end', reason: OVERNIGHT_NO_PROGRESS });
+    expect(choice.act === 'end' && 'passedOver' in choice && choice.passedOver).toEqual([
+      { number: expect.any(Number), title: 'Step first', retryAt: '2026-09-18T04:00:00.000Z' },
+      { number: expect.any(Number), title: 'Step second', retryAt: '2026-09-18T04:00:00.000Z' },
+    ]);
+  });
+
+  it('sends a feature once more when its session closed nothing six hours ago', () => {
+    // #1528 on 3 October: one session at 08:08 closed nothing, and the runner
+    // passed it over for the rest of the run while five features waited on it.
+    const choice = chooseOvernightFire(tree(twoFeatures()), night(), MIDNIGHT, {
+      first: YESTERDAY,
+    });
+
+    expect(choice.act === 'fire' && choice.feature.id).toBe('first');
+  });
+
+  it('holds it for the rest of the run once that retry has closed nothing too', () => {
+    const choice = chooseOvernightFire(
+      tree(twoFeatures()),
+      night(),
+      MIDNIGHT,
+      { first: SEVEN_HOURS_AGO },
+      { first: YESTERDAY },
+    );
+
+    expect(choice.act === 'fire' && choice.feature.id).toBe('second');
+  });
+
+  it('allows the retry again once a session has closed something in between', () => {
+    const sections = tree([
+      item({ id: 'feature' }),
+      item({ id: 'closed', parentId: 'feature', status: 'done', completedAt: '2026-09-17T12:00:00.000Z' }),
+      item({ id: 'step', parentId: 'feature' }),
+    ]);
+
+    const choice = chooseOvernightFire(
+      sections,
+      night(),
+      MIDNIGHT,
+      { feature: SEVEN_HOURS_AGO },
+      { feature: YESTERDAY },
+    );
+
+    expect(choice.act === 'fire' && choice.feature.id).toBe('feature');
   });
 
   it('still says nothing was ready when nothing was passed over', () => {
@@ -262,8 +308,34 @@ describe('overnightTick', () => {
     const tick = await overnightTick(p);
 
     expect(tick.act).toBe('nothing-ready');
+    // The note on the page names the feature it is holding and when it goes
+    // again, rather than only saying that everything has been tried.
+    expect(tick.act === 'nothing-ready' && tick.reason).toMatch(
+      /^Every feature left had already been tried.* #\d+ Step feature closed nothing in its last session; it is sent once more in 6h 30m\.$/,
+    );
     expect(calls.fired).toEqual([]);
     expect(calls.stopped).toEqual([]);
+  });
+
+  it('sends that feature once more six hours on, and only once', async () => {
+    const retried = ports({
+      now: Date.parse('2026-09-18T06:00:00.000Z'),
+      loadRun: async () => night({ startedAt: '2026-09-17T23:00:00.000Z', stopBy: null }),
+      lastFiredAt: async () => ({ feature: '2026-09-17T23:30:00.000Z' }),
+    });
+    await expect(overnightTick(retried.ports)).resolves.toMatchObject({ act: 'fired' });
+
+    const spent = ports({
+      now: Date.parse('2026-09-18T13:00:00.000Z'),
+      loadRun: async () => night({ startedAt: '2026-09-17T23:00:00.000Z', stopBy: null }),
+      lastFiredAt: async () => ({ feature: '2026-09-18T06:00:00.000Z' }),
+      previousFiredAt: async () => ({ feature: '2026-09-17T23:30:00.000Z' }),
+    });
+    const tick = await overnightTick(spent.ports);
+    expect(tick.act === 'nothing-ready' && tick.reason).toContain(
+      'closed nothing in its last two sessions, so it waits for you.',
+    );
+    expect(spent.calls.fired).toEqual([]);
   });
 
   it('fires a run with no cap without counting anything down', async () => {
