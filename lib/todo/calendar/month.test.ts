@@ -43,6 +43,7 @@ function item(over: Partial<AgendaItem> = {}): AgendaItem {
   return {
     key: 'job_reminders:r1',
     source: 'job_reminders',
+    ref: 'job_search.reminders:r1',
     title: 'Follow up with Acme',
     day: '2026-03-10',
     at: null,
@@ -57,6 +58,7 @@ function item(over: Partial<AgendaItem> = {}): AgendaItem {
 function context(over: Partial<DayContext> = {}): DayContext {
   return {
     key: 'interview:i1',
+    ref: 'job_search.interviews:i1',
     day: '2026-03-10',
     at: '2026-03-10T14:00:00.000Z',
     label: 'Acme · Staff Engineer',

@@ -40,6 +40,7 @@ export function courseHit(row: CourseRow): SearchHit {
     module: 'vault',
     kind: 'course',
     id: row.id,
+    ref: `obsidian.courses:${row.id}`,
     title: row.code ? `${row.code} ${row.title}` : row.title,
     subtitle: ['Course', row.school, when].filter(Boolean).join(' · '),
     match: [row.term, row.year, row.school].filter((part) => part !== null && part !== '').join(' '),

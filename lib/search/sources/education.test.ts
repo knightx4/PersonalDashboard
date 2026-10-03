@@ -5,6 +5,7 @@ vi.mock('@/lib/vault/auth/server', () => ({ createVaultClient: vi.fn() }));
 
 import { rankHits } from '@/lib/search/rank';
 import { courseHit } from './education';
+import { parseRef } from '@/lib/core/refs';
 
 /** Courses in the palette and Dash's search (plan #1309). */
 describe('courseHit', () => {
@@ -25,6 +26,7 @@ describe('courseHit', () => {
       subtitle: 'Course · State University · Fall 2019',
       href: '/vault/education#course-c1',
     });
+    expect(parseRef(econ.ref!)).toMatchObject({ table: 'obsidian.courses', id: 'c1' });
   });
 
   it('is found by its term and school as well as its title', () => {

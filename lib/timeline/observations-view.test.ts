@@ -14,6 +14,7 @@ function event(source_table: string, source_id: string, occurred_at: string, mod
     source_table,
     source_id,
     link_ref: null,
+    ref: `${source_table}:${source_id}`,
   };
 }
 

@@ -33,6 +33,7 @@ function row(
     source_table: 'fixture.rows',
     source_id: `row-${n}`,
     link_ref: null,
+    ref: `fixture.rows:row-${n}`,
   };
 }
 

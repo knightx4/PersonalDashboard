@@ -24,6 +24,7 @@ function event(occurred_at: string, kind: TimelineEvent['kind'], module: Timelin
     source_table: 'x.y',
     source_id: `${kind}-${occurred_at}`,
     link_ref: null,
+    ref: `x.y:${kind}-${occurred_at}`,
   };
 }
 

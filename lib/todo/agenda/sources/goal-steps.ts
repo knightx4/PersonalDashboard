@@ -76,6 +76,7 @@ export const goalStepsSource: AgendaSource = {
     const suggestionItems: AgendaItem[] = todoSuggestions(going, today, ctx.to).map((s) => ({
       key: `${SUGGESTION_PREFIX}${s.id}`,
       source: 'goal_steps',
+      ref: `goals.suggestions:${s.id}`,
       title: s.title,
       day: s.happensOn,
       at: s.startsAt,
@@ -90,6 +91,7 @@ export const goalStepsSource: AgendaSource = {
     const rhythmItems: AgendaItem[] = rhythms.map((rhythm) => ({
       key: `${RHYTHM_PREFIX}${rhythm.id}:${rhythm.startsOn}`,
       source: 'goal_steps',
+      ref: `goals.items:${rhythm.id}`,
       title: rhythm.title,
       // Today, every day of the period until it is met: it is something to
       // do now, and a rhythm is never late, only kept or missed.
@@ -107,6 +109,7 @@ export const goalStepsSource: AgendaSource = {
       return {
         key: `${QUESTION_PREFIX}${question.id}`,
         source: 'goal_steps',
+        ref: `goals.items:${question.id}`,
         title: question.title,
         // Today: a question holds up whatever sits above it on the goal.
         day: today,
@@ -142,6 +145,7 @@ export const goalStepsSource: AgendaSource = {
           (step): AgendaItem => ({
             key: `${PREFIX}${step.id}`,
             source: 'goal_steps',
+            ref: `goals.items:${step.id}`,
             title: step.title,
             day: step.dueOn ?? step.startsOn ?? (step.next ? today : null),
             at: null,

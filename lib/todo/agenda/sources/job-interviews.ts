@@ -104,6 +104,8 @@ export const jobInterviewsSource: AgendaSource = {
           .filter((group): group is NonNullable<typeof group> => group !== null),
       ).map(({ group, interviews: inRound, lead }) => ({
         key: group ? `${INTERVIEW_ROUND_KEY}${group.id}:${lead.day}` : `${INTERVIEW_KEY}${lead.id}`,
+        // The round where there is one, as the key is; the interview otherwise.
+        ref: group ? `job_search.interview_groups:${group.id}` : `job_search.interviews:${lead.id}`,
         day: lead.day,
         // The round starts when its first conversation does, which is what the
         // rest of the day is read against.

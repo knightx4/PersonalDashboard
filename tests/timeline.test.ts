@@ -6,7 +6,8 @@
 import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { TIMELINE_KINDS, TIMELINE_MODULES, eventRef, timelineHref, type TimelineEvent } from '@/lib/timeline/timeline';
+import { parseRef } from '@/lib/core/refs';
+import { TIMELINE_KINDS, TIMELINE_MODULES, eventRef, timelineHref, withRefs, type TimelineEvent, type TimelineRow } from '@/lib/timeline/timeline';
 import { admin, asUser, closeDb, createUser, truncateAll } from './helpers/db';
 
 let userA: string;
@@ -101,9 +102,10 @@ async function seed(userId: string, tag: string): Promise<void> {
 }
 
 async function readAs(userId: string): Promise<TimelineEvent[]> {
-  return asUser(userId, (tx) => tx<TimelineEvent[]>`
+  const rows = await asUser(userId, (tx) => tx<TimelineRow[]>`
     select occurred_at, module, kind, title, detail, amount_cents, currency, source_table, source_id, link_ref
     from core.timeline order by occurred_at`);
+  return withRefs(rows);
 }
 
 /** Whether an in-app path has a page under app/, dynamic segments included. */
@@ -210,5 +212,16 @@ describe('core.timeline', () => {
     expect(timelineHref(step)).toBe(`/goals/${step.link_ref}#step-${step.source_id}`);
     const note = events.find((e) => e.kind === 'note_written')!;
     expect(timelineHref(note)).toBe('/vault/n/Journal/New%20note.md');
+  });
+
+  it('names every event by a ref to a row of its own person', async () => {
+    const events = await readAs(userA);
+    // The seed holds an event from every module (the first test above).
+    expect(events.length).toBeGreaterThan(0);
+    for (const event of events) {
+      expect(parseRef(event.ref), event.ref).toMatchObject({ table: event.source_table, id: event.source_id });
+      const [{ owned }] = await admin<{ owned: boolean }[]>`select core.ref_owned(${event.ref}, ${userA}) as owned`;
+      expect(owned, event.ref).toBe(true);
+    }
   });
 });

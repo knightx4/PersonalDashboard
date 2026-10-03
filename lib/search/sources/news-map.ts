@@ -44,6 +44,8 @@ export function storyHits(
         module: 'news',
         kind: 'story',
         id: `${issue.id}:${index}`,
+        // The issue the story is printed in: a story is a part of its row.
+        ref: `news.issues:${issue.id}`,
         title: story.headline,
         subtitle: issue.subject?.trim() ? `Story · ${firstLine(issue.subject, 60)}` : 'Story',
         href: `/news/i/${issue.id}`,

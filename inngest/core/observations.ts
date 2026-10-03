@@ -11,7 +11,7 @@ import {
   type ObservationRunResult,
 } from '@/lib/timeline/observations-run';
 import { observationWeek } from '@/lib/timeline/observations';
-import { TIMELINE_COLUMNS, type TimelineEvent } from '@/lib/timeline/timeline';
+import { TIMELINE_COLUMNS, withRefs, type TimelineEvent, type TimelineRow } from '@/lib/timeline/timeline';
 
 /**
  * The weekly observations run (plan #1119), called once a week by pg_cron
@@ -54,7 +54,7 @@ export function observationPorts(core: CoreSupabaseClient): ObservationRunPorts 
           .order('source_id', { ascending: true })
           .range(offset, offset + PAGE - 1);
         if (error) throw new Error(`Reading the timeline failed: ${error.message}`);
-        const page = (data ?? []) as unknown as TimelineEvent[];
+        const page = withRefs((data ?? []) as unknown as TimelineRow[]);
         events.push(...page);
         if (page.length < PAGE) return events;
       }

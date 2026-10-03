@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parseRef } from '@/lib/core/refs';
 import { goalHits, type GoalItemRow } from './goals-map';
 
 const row = (over: Partial<GoalItemRow> & { id: string; title: string }): GoalItemRow => ({
@@ -22,7 +23,7 @@ const rows: GoalItemRow[] = [
 describe('goals search hits', () => {
   it('opens a goal on its own page', () => {
     expect(goalHits(rows, { query: 'marathon', limit: 6 })).toEqual([
-      { module: 'goals', kind: 'goal', id: 'g1', title: 'Run a marathon', subtitle: 'Goal', href: '/goals/g1' },
+      { module: 'goals', kind: 'goal', id: 'g1', ref: 'goals.items:g1', title: 'Run a marathon', subtitle: 'Goal', href: '/goals/g1' },
     ]);
   });
 
@@ -30,9 +31,11 @@ describe('goals search hits', () => {
     const [hit] = goalHits(rows, { query: 'shoes', limit: 6 });
     expect(hit).toMatchObject({
       kind: 'step',
+      ref: 'goals.items:s2',
       subtitle: 'Step · Run a marathon',
       href: '/goals/g1#step-s2',
     });
+    expect(parseRef(hit.ref!)).toMatchObject({ table: 'goals.items', id: 's2' });
   });
 
   it('leaves out decisions, dropped rows and steps with no goal, and puts open first', () => {
