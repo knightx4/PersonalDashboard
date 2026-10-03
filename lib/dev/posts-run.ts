@@ -22,7 +22,7 @@ export async function startPostsRun(input: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any, any, any>;
   userId: string;
-  /** One step to write about instead of everything since the last post. */
+  /** One step or one ask to write about instead of everything since the last post. */
   focus?: PostsRunFocus | null;
   now?: number;
   fetch?: typeof globalThis.fetch;

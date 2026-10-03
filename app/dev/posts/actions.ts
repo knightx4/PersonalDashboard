@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import { sourceProblems } from '@/lib/dev/post-check';
-import { cleanThread, MAX_THREAD_POSTS, parsePostedUrl } from '@/lib/dev/posts';
+import { cleanThread, MAX_POST_ASK, MAX_THREAD_POSTS, parsePostedUrl } from '@/lib/dev/posts';
 import { startPostsRun } from '@/lib/dev/posts-run';
 
 /**
@@ -34,17 +34,33 @@ const idSchema = z.string().uuid();
  * shipped since the last posted one (lib/dev/posts-run.ts). It is refused
  * while the last run is still going.
  *
+ * With an `ask` in the form (note 114ff495), the run writes one draft about
+ * what the person typed instead.
+ *
  * No cost hint, the same as the other buttons that start a routine (shaping
  * an idea, a UI review, sending a step): the run is a Claude Code session,
  * not a priced model call, so the spend ledger has nothing to estimate it
  * from.
  */
 // latency: pending -- starts a routine, which answers within a few seconds
-export async function suggestPosts(): Promise<PostsActionState> {
+export async function suggestPosts(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
   const supabase = await createClient();
   const user = await requireOwner({ supabase });
 
-  const result = await startPostsRun({ supabase, userId: user.id });
+  const raw = formData.get('ask');
+  const ask = typeof raw === 'string' ? raw.trim() : '';
+  if (ask.length > MAX_POST_ASK) {
+    return { error: `Keep it under ${MAX_POST_ASK} characters.` };
+  }
+
+  const result = await startPostsRun({
+    supabase,
+    userId: user.id,
+    focus: ask ? { ask } : null,
+  });
   revalidatePath(POSTS_PATH);
   if (!result.ok) return { error: result.error };
   return { message: result.message };
