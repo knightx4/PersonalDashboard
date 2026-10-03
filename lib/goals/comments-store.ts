@@ -1,14 +1,18 @@
 import 'server-only';
 
-import { threadFrom, type CommentAuthor, type DevComment } from '@/lib/comments/load';
+import type { CommentAuthor, DevComment } from '@/lib/comments/load';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
+import { addThreadTurn, loadThreads as loadRowThreads, removeThreadTurn, rowRef } from '@/lib/thread/store';
 
 /**
- * Reads and writes for the threads on goals and steps (plan #957), in
- * goals.comments (goals migration 0013). As everywhere in Goals, the client
- * decides whose rows are seen, and a client made as the `claude` actor may
- * only add Dash's own replies: the database refuses it anything else.
+ * Reads and writes for the threads on goals and steps (plan #957). Since plan
+ * #1470 they are kept in core.conversations under each item's ref,
+ * `goals.items:<id>`, like every other thread (lib/thread/store.ts);
+ * goals.comments is read-only. The client decides whose threads are seen.
  */
+
+/** The table goals and steps live in, the table half of their refs. */
+export const GOAL_ITEMS_TABLE = 'goals.items';
 
 /** Every thread on the given goals and steps, oldest first, keyed by item id. */
 export async function loadThreads(
@@ -17,42 +21,34 @@ export async function loadThreads(
 ): Promise<Record<string, DevComment[]>> {
   const ids = [...new Set(itemIds)];
   if (ids.length === 0) return {};
-  const { data, error } = await client
-    .from('comments')
-    .select('id, item_id, author, body, created_at')
-    .in('item_id', ids)
-    .order('created_at');
-  if (error) throw new Error(`Could not read comments: ${error.message}`);
-  const rows = (data ?? []) as { item_id: string }[];
-  const byItem: Record<string, unknown[]> = {};
-  for (const row of rows) (byItem[row.item_id] ??= []).push(row);
-  return Object.fromEntries(Object.entries(byItem).map(([id, list]) => [id, threadFrom(list)]));
+  const byRef = await loadRowThreads(
+    client,
+    ids.map((id) => rowRef(GOAL_ITEMS_TABLE, id)),
+  );
+  return Object.fromEntries(
+    ids.flatMap((id) => {
+      const thread = byRef.get(rowRef(GOAL_ITEMS_TABLE, id));
+      return thread ? [[id, thread]] : [];
+    }),
+  );
 }
 
-/** Write one comment; the new row's id. */
+/** Write one comment; the new turn's id. */
 export async function writeComment(
   client: GoalsSupabaseClient,
   input: { userId: string; itemId: string; author: CommentAuthor; body: string },
 ): Promise<string> {
-  const { data, error } = await client
-    .from('comments')
-    .insert({
-      user_id: input.userId,
-      item_id: input.itemId,
-      author: input.author,
-      body: input.body,
-    })
-    .select('id')
-    .single();
-  if (error || !data) throw new Error(error?.message ?? 'The comment was not saved.');
-  return data.id as string;
+  return addThreadTurn(client, {
+    userId: input.userId,
+    ref: rowRef(GOAL_ITEMS_TABLE, input.itemId),
+    author: input.author,
+    body: input.body,
+  });
 }
 
 /** Take a comment back out. False when there was none of yours with that id. */
 export async function deleteComment(client: GoalsSupabaseClient, id: string): Promise<boolean> {
-  const { data, error } = await client.from('comments').delete().eq('id', id).select('id');
-  if (error) throw new Error(error.message);
-  return (data ?? []).length > 0;
+  return (await removeThreadTurn(client, { id })) !== null;
 }
 
 /**

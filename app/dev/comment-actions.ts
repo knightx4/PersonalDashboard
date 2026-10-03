@@ -7,13 +7,9 @@ import { requireOwner } from '@/lib/dev/owner';
 import { requestDashDeps } from '@/lib/ask/clients';
 import { threadDashInRequest } from '@/lib/talk/ask-request';
 import { askDash } from '@/lib/comments/ask';
-import {
-  COMMENT_TARGETS,
-  CONVERSATIONS_PATH,
-  TARGET_COLUMN,
-  TARGET_PATH,
-  type CommentTarget,
-} from '@/lib/comments/load';
+import { COMMENT_TARGETS, CONVERSATIONS_PATH, TARGET_PATH, type CommentTarget } from '@/lib/comments/load';
+import { addThreadTurn, removeThreadTurn } from '@/lib/thread/store';
+import { threadRef } from '@/lib/thread/subjects';
 import { mentionsDash, questionFrom } from '@/lib/comments/mention';
 import { pickUpRaise } from '@/lib/raised/pickup';
 
@@ -58,9 +54,10 @@ const bodySchema = z.string().trim().min(1, 'Write something.').max(4000);
  * put to you, so a comment on one is an answer whether or not it carries the
  * tag, and an answer starts a session that acts on it.
  *
- * Ownership of the row being commented on is checked by the insert policy in
- * migration 0062 rather than here: a comment on somebody else's row matches no
- * policy and is refused, which is the check that holds whoever is calling.
+ * Ownership of the row being commented on is checked by the database rather
+ * than here: core.refs_check refuses a thread under somebody else's row
+ * (migrations 0165 and 0167), which is the check that holds whoever is
+ * calling.
  */
 // latency: pending
 export async function addComment(
@@ -77,19 +74,18 @@ export async function addComment(
   if (!id.success) return { error: 'Missing what the comment is about.' };
   if (!body.success) return { error: body.error.issues[0].message };
 
-  const { data: written, error } = await supabase
-    .from('dev_comments')
-    .insert({
-      user_id: user.id,
-      [TARGET_COLUMN[target.data]]: id.data,
+  // Into the shared store, under the row's ref (plan #1470).
+  let writtenId: string;
+  try {
+    writtenId = await addThreadTurn(supabase, {
+      userId: user.id,
+      ref: threadRef(target.data, id.data),
       author: 'me',
       body: body.data,
-    })
-    .select('id')
-    .single();
-  if (error) return { error: error.message };
-
-  const writtenId = (written as { id: string } | null)?.id ?? '';
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'The comment could not be saved.' };
+  }
 
   // Untagged, so it is a note to yourself and this is the end of it -- except
   // on a raise, where there is nobody else it could be addressed to. The raise
@@ -150,12 +146,11 @@ export async function deleteComment(
   if (!target.success) return { error: 'Missing which page to redraw.' };
   if (!id.success) return { error: 'Missing comment.' };
 
-  const { error } = await supabase
-    .from('dev_comments')
-    .delete()
-    .eq('id', id.data)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
+  try {
+    await removeThreadTurn(supabase, { id: id.data, userId: user.id });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'The comment could not be deleted.' };
+  }
 
   redraw(target.data);
   return { message: 'Deleted.' };

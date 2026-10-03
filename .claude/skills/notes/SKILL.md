@@ -69,8 +69,8 @@ order by (kind = 'bug') desc, priority asc, created_at asc;
 -- Read it before claiming the note. An answer to a blocked note arrives here
 -- as an 'me' comment rather than on the end of the body, and so does anything
 -- else written on the card afterwards.
-select author, body, created_at from dev_comments
-where feedback_item_id = '…' order by created_at;
+select author, body, created_at from core.thread_turns
+where ref = 'public.feedback_items:…' order by created_at;
 
 -- start (a like is never claimed, so the update refuses one)
 update feedback_items set status = 'in_progress' where id = '…' and kind <> 'like';

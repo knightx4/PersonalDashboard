@@ -10,7 +10,7 @@ import { deleteFileComment, loadFile, writeFileComment } from '@/lib/files/store
 
 /**
  * Writing and removing a comment on a file (note 7a6a37aa), in
- * core.file_comments (migration 0119). The same form the goal thread posts:
+ * core.conversations under the file's ref (plan #1470). The same form the goal thread posts:
  * `id` is the file, `body` the words. Nothing answers here; the goals run
  * reads the thread before it revises the file.
  */

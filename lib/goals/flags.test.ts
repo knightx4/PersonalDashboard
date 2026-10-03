@@ -12,6 +12,11 @@ vi.mock('@/lib/goals/shaping-store', () => ({
   loadShaping: mocks.loadShaping,
   recordAndFire: mocks.recordAndFire,
 }));
+// The thread comes from the shared store; the fixture rows carry theirs.
+vi.mock('@/lib/thread/store', async (original) => ({
+  ...(await original<typeof import('@/lib/thread/store')>()),
+  withThreads: vi.fn(async (_client: unknown, _table: string, rows: unknown[]) => rows),
+}));
 
 const USER = '11111111-1111-1111-1111-111111111111';
 const GOAL = '33333333-3333-3333-3333-333333333333';
@@ -74,7 +79,7 @@ describe('the brief an answer starts', () => {
     expect(text).toContain('Asked: Move autopay to the 28th?');
     expect(text).toContain('Found it on the statement.');
     expect(text).toContain('## Their answer\n\nYes, move it and tell me when it is done.');
-    expect(text).toContain(`'${FLAG}', 'claude'`);
+    expect(text).toContain(`'public.raised_items:${FLAG}', 'claude'`);
     expect(text).toContain("set status = 'closed', outcome =");
     expect(text).toContain('"Flagging something on a goal"');
   });
@@ -99,6 +104,13 @@ function db(found: Record<string, unknown> | null) {
         select: () => chain(table, 'select'),
         insert: (value: unknown) => chain(table, 'insert', value),
         update: (value: unknown) => chain(table, 'update', value),
+      }),
+      // The answer goes into the shared store through core.add_thread_turn.
+      schema: () => ({
+        rpc: (name: string, value: unknown) => {
+          writes.push({ table: `core.${name}`, op: 'rpc', value });
+          return Promise.resolve({ data: 'c9', error: null });
+        },
       }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any,
@@ -146,7 +158,11 @@ describe('answering a flag', () => {
     });
 
     expect(outcome.ok).toBe(true);
-    expect(writes[0]).toMatchObject({ table: 'dev_comments', op: 'insert' });
+    expect(writes[0]).toMatchObject({
+      table: 'core.add_thread_turn',
+      op: 'rpc',
+      value: { p_ref: `public.raised_items:${FLAG}`, p_author: 'me' },
+    });
     const fired = mocks.recordAndFire.mock.calls[0][0];
     expect(fired.job).toBe('raise');
     expect(fired.itemId).toBe(GOAL);
@@ -168,6 +184,6 @@ describe('answering a flag', () => {
 
     expect(outcome).toMatchObject({ ok: false });
     expect(mocks.recordAndFire).not.toHaveBeenCalled();
-    expect(writes.map((w) => w.table)).toEqual(['dev_comments']);
+    expect(writes.map((w) => w.table)).toEqual(['core.add_thread_turn']);
   });
 });

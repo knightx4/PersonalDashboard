@@ -33,6 +33,7 @@ import { isDate } from '@/lib/ask/db';
 import { displayValue } from '@/lib/goals/information';
 import { STEP_KIND_LABELS, STEP_STATUS_LABELS, type StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
+import { threadReplySql } from '@/lib/thread/store';
 
 /** The column takes 4000 characters. */
 export const COMMENT_MAX = 4000;
@@ -381,7 +382,7 @@ export function commentRunText(input: {
     'The comment:',
     input.question,
     '',
-    'Write your reply into the thread, in the same call as the actor and run settings:',
-    `insert into goals.comments (user_id, item_id, author, body) values ('${input.userId}', '${input.itemId}', 'claude', '<your reply>');`,
+    'Write your reply into the thread:',
+    threadReplySql(input.userId, `goals.items:${input.itemId}`, '<your reply>'),
   ].join('\n');
 }

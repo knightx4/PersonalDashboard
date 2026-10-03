@@ -121,10 +121,16 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.raised_items = raised.id;
 
-  const [raisedComment] = await admin<{ id: string }[]>`
-    insert into dev_comments (user_id, raised_item_id, author, body)
-    values (${userId}, ${raised.id}, 'me', ${`${tag} answered it`})
-    returning id`;
+  // dev_comments refuses writes since plan #1470, which copied its threads
+  // into core.conversations; it still holds the old rows, so it is still
+  // checked. The seed goes in past the trigger.
+  const [raisedComment] = await admin.begin(async (tx) => {
+    await tx`set local session_replication_role = replica`;
+    return tx<{ id: string }[]>`
+      insert into dev_comments (user_id, raised_item_id, author, body)
+      values (${userId}, ${raised.id}, 'me', ${`${tag} answered it`})
+      returning id`;
+  });
   ids.dev_comments = raisedComment.id;
 
   const [specSection] = await admin<{ id: string }[]>`

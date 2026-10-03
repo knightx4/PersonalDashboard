@@ -92,15 +92,15 @@ function currentCommit(): string | null {
  * detail the phone was too small for -- and a run that reads only the body is
  * working from the first sentence anybody wrote about it.
  *
- * Raw SQL because `dev_comments` is not in lib/db/schema.ts, which mirrors the
- * migrations the app itself reads.
+ * Raw SQL because core.thread_turns, where every thread is kept since plan
+ * #1470, is not in lib/db/schema.ts.
  */
 type ThreadRow = { author: string; body: string; created_at: Date };
 
 async function threadOf(database: Db, noteId: string): Promise<ThreadRow[]> {
   return database.execute<ThreadRow>(
-    sql`select author, body, created_at from dev_comments
-        where feedback_item_id = ${noteId}
+    sql`select author, body, created_at from core.thread_turns
+        where ref = ${`public.feedback_items:${noteId}`}
         order by created_at`,
   );
 }

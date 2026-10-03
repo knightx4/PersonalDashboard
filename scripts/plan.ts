@@ -743,7 +743,8 @@ async function main(): Promise<void> {
                           json_build_object('author', c.author, 'body', c.body)
                           order by c.created_at
                         )
-                 from dev_comments c where c.raised_item_id = r.id
+                 from core.thread_turns c
+                 where c.ref = 'public.raised_items:' || r.id and c.user_id = r.user_id
                ) as comments
         from raised_items r
         where r.user_id = ${userId} and r.status in ('open', 'answered')

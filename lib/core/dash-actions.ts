@@ -176,6 +176,7 @@ export function noUndoReason(action: Pick<DashAction, 'undo'>): string | null {
 
 /**
  * The rows that can hang off a row Dash added, by the table it added it to.
+ * A thread under it is checked for every table, by ref, in hasDependents.
  * Undoing an add deletes the row, and the database would take these with it
  * (or blank the link to it), so an add that has gained any is not undone:
  * the comment, sub-step or idea written on it since is later work too.
@@ -274,7 +275,6 @@ const ROLE_DEPENDENTS: Dependent[] = [
 const DEPENDENTS: Record<string, Dependent[]> = {
   'public.plan_items': [
     { schema: 'public', table: 'plan_items', column: 'parent_id' },
-    { schema: 'public', table: 'dev_comments', column: 'plan_item_id' },
     { schema: 'public', table: 'plan_dependencies', column: 'item_id' },
     { schema: 'public', table: 'plan_dependencies', column: 'depends_on_id' },
     { schema: 'public', table: 'plan_runs', column: 'plan_item_id' },
@@ -282,15 +282,10 @@ const DEPENDENTS: Record<string, Dependent[]> = {
     { schema: 'public', table: 'ideas', column: 'plan_item_id' },
     { schema: 'public', table: 'spec_changes', column: 'plan_item_id' },
   ],
-  'public.ideas': [
-    { schema: 'public', table: 'dev_comments', column: 'idea_id' },
-    { schema: 'public', table: 'inspiration_takeaways', column: 'idea_id' },
-  ],
-  'public.feedback_items': [{ schema: 'public', table: 'dev_comments', column: 'feedback_item_id' }],
+  'public.ideas': [{ schema: 'public', table: 'inspiration_takeaways', column: 'idea_id' }],
   // What routines add through core.record_dash_action (plan #1460).
   'goals.items': [
     { schema: 'goals', table: 'items', column: 'parent_id' },
-    { schema: 'goals', table: 'comments', column: 'item_id' },
     { schema: 'goals', table: 'answers', column: 'item_id' },
     { schema: 'goals', table: 'dependencies', column: 'item_id' },
     { schema: 'goals', table: 'dependencies', column: 'depends_on_id' },
@@ -306,7 +301,6 @@ const DEPENDENTS: Record<string, Dependent[]> = {
     { schema: 'goals', table: 'collection_goals', column: 'collection_id' },
   ],
   'goals.records': [{ schema: 'goals', table: 'answers', column: 'changed_record_id' }],
-  'core.files': [{ schema: 'core', table: 'file_comments', column: 'file_id' }],
   // What scheduled runs add (plan #1570): the job sweep's withdrawal events.
   'job_search.application_events': [
     { schema: 'job_search', table: 'waiting_dismissals', column: 'application_event_id' },
@@ -534,6 +528,16 @@ export async function readSubject(db: AskDb, ref: string): Promise<Values | null
 
 /** Whether anything has been written on the row since Dash added it. */
 async function hasDependents(db: AskDb, ref: string, recordedAt: string): Promise<boolean> {
+  // A thread under the row, whatever kind of row it is (plan #1470): what was
+  // said on it is later work.
+  const { data: turns, error: turnsError } = await (await db('core'))
+    .from('thread_turns')
+    .select('id')
+    .eq('ref', ref)
+    .limit(1);
+  if (turnsError) throw new Error(`Reading the thread under ${ref} failed: ${turnsError.message}`);
+  if ((turns ?? []).length > 0) return true;
+
   const parsed = parseRef(ref);
   const dependents = parsed ? (DEPENDENTS[parsed.table] ?? []) : [];
   for (const { schema, table, column, through, since } of dependents) {

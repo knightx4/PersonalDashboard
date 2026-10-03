@@ -100,7 +100,7 @@ workspace; when it does not, take the smallest one the change touches.
 - Push the branch and find its preview deployment (the Vercel connector's
   deployments for the branch, or the deployment check on the pushed commit).
   Put the preview's link in a comment on the person's try-it step
-  (`dev_comments`, `plan_item_id`, author `claude`), with what to try.
+  (`core.add_thread_turn` under `public.plan_items:<id>`, author `claude`), with what to try.
 
 Do not merge the branch to main. It stays a branch until the person accepts
 it. Hand the design step to the try-it step instead: turn the dependency
@@ -186,7 +186,7 @@ closing it, run `npm run check:specs` and read the counter's value with
 lowered `scripts/spec-baseline.json` with the step. When it is still above,
 the step stays open: block it with what is left in the ask, such as `3
 thread tables remain: learn.discussions, vault.note_threads,
-dev_comments.`
+obsidian.maya_messages.`
 
 The overhaul itself closes only when every phase is done and every rule on
 its `Rules:` line is at its target. Never close an overhaul whose counts

@@ -8,11 +8,15 @@ import { mentionsDash, questionFrom } from '@/lib/comments/mention';
 import { COMMENT_MAX } from '@/lib/goals/comments';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { askDashOnRole } from '@/lib/jobs/role-thread/ask';
+import { toRef } from '@/lib/core/refs';
+import { ROLE_THREAD_TABLE } from '@/lib/dash/thread-tools';
+import { addThreadTurn, removeThreadTurn } from '@/lib/thread/store';
 
 /**
- * Writing and removing a comment on a role (note 89ad8bef). The thread is the
- * role's notes in job_search.notes, oldest first, with `author` telling your
- * comments from Dash's (migration 0033). The same form the other threads post
+ * Writing and removing a comment on a role (note 89ad8bef). The thread is kept
+ * in core.conversations under the role's ref, `job_search.roles:<id>`, since
+ * plan #1470 (lib/thread/store.ts); it used to be the role's notes in
+ * job_search.notes, which no longer take it. The same form the other threads post
  * (components/thread/thread.tsx): `id` is the role, `body` the words. A
  * comment tagged @dash gets its reply in the thread before this returns.
  */
@@ -34,12 +38,17 @@ export async function addRoleComment(
   if (!body.success) return { error: body.error.issues[0].message };
 
   const supabase = await createClient();
-  const { data: written, error } = await supabase
-    .from('notes')
-    .insert({ user_id: user.id, role_id: id.data, author: 'me', body: body.data })
-    .select('id')
-    .single();
-  if (error || !written) return { error: 'The comment could not be saved. Try again.' };
+  let writtenId: string;
+  try {
+    writtenId = await addThreadTurn(supabase, {
+      userId: user.id,
+      ref: toRef(ROLE_THREAD_TABLE, id.data),
+      author: 'me',
+      body: body.data,
+    });
+  } catch {
+    return { error: 'The comment could not be saved. Try again.' };
+  }
 
   const path = `/jobs/roles/${id.data}`;
   // Untagged, it is a note on the role and nothing reads it.
@@ -52,7 +61,7 @@ export async function addRoleComment(
     client: supabase,
     userId: user.id,
     roleId: id.data,
-    commentId: written.id as string,
+    commentId: writtenId,
     question: questionFrom(body.data),
     apiKey: process.env.ANTHROPIC_API_KEY ?? null,
     dash: await requestDashDeps(user.id),
@@ -74,16 +83,14 @@ export async function deleteRoleComment(
   const id = Id.safeParse(form.get('id'));
   if (!id.success) return { error: 'Could not tell which comment that was.' };
 
-  const supabase = await createClient();
-  const { data: gone, error } = await supabase
-    .from('notes')
-    .delete()
-    .eq('id', id.data)
-    .eq('user_id', user.id)
-    .select('role_id');
-  if (error) return { error: 'The comment could not be deleted. Try again.' };
-  const roleId = gone?.[0]?.role_id as string | undefined;
-  if (!roleId) return { error: 'That comment is already gone.' };
+  let ref: string | null;
+  try {
+    ref = await removeThreadTurn(await createClient(), { id: id.data, userId: user.id });
+  } catch {
+    return { error: 'The comment could not be deleted. Try again.' };
+  }
+  if (!ref) return { error: 'That comment is already gone.' };
+  const roleId = ref.slice(ref.indexOf(':') + 1);
 
   revalidatePath(`/jobs/roles/${roleId}`);
   return { message: 'Deleted.' };

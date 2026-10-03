@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
+import { threadFrom, type DevComment } from '@/lib/comments/load';
+import { withThreads } from '@/lib/thread/store';
 import { triageFrom, type Triage } from '@/lib/feedback/triage';
 import { SUGGESTION_SCORE_FLOOR, scoreFrom, type IdeaScore } from '@/lib/ideas/score';
 import { isModuleId, type ModuleId } from '@/lib/modules';
@@ -70,8 +71,10 @@ export const IDEA_COLUMNS =
   'id, body, module, created_at, source, dismissed_at, triage, score, ' +
   // Two foreign keys point at plan_items, so both joins name theirs.
   'plan_item:plan_items!ideas_plan_item_id_fkey(id, number, title, status), ' +
-  'from_plan_item:plan_items!ideas_from_plan_item_id_fkey(number, title), ' +
-  `thread:dev_comments(${COMMENT_COLUMNS})`;
+  'from_plan_item:plan_items!ideas_from_plan_item_id_fkey(number, title)';
+
+/** The table ideas live in, the table half of an idea's ref. */
+export const IDEAS_TABLE = 'public.ideas';
 
 /** A row as the app reads it. One shape leaves here, whoever selected it. */
 export function ideaRowFrom(row: Record<string, unknown>): IdeaRow {
@@ -215,5 +218,6 @@ export async function loadIdeas(supabase: SupabaseClient, userId: string): Promi
   // error case instead.
   const rows = (data ?? []) as unknown as Array<Record<string, unknown>>;
 
-  return ideaListFrom(rows.map(ideaRowFrom));
+  // Each idea's thread, from the shared store (plan #1470).
+  return ideaListFrom((await withThreads(supabase, IDEAS_TABLE, rows, { userId })).map(ideaRowFrom));
 }

@@ -26,6 +26,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { DASH_MODELS } from '@/lib/dash/models';
 import { replyInThread, subjectLine, threadVoice, type ThreadDash } from '@/lib/dash/thread';
 import { ROLE_THREAD_TABLE } from '@/lib/dash/thread-tools';
+import { addThreadTurn, loadThread } from '@/lib/thread/store';
 import type { DashThreadActs } from '@/lib/dash/registry';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
@@ -87,13 +88,12 @@ export type RoleAskInput = {
 export type RoleAskOutcome = { ok: true; message: string } | { ok: false; error: string };
 
 async function say(input: RoleAskInput, body: string): Promise<void> {
-  const { error } = await input.client.from('notes').insert({
-    user_id: input.userId,
-    role_id: input.roleId,
+  await addThreadTurn(input.client, {
+    userId: input.userId,
+    ref: toRef(ROLE_THREAD_TABLE, input.roleId),
     author: 'claude',
     body,
   });
-  if (error) throw new Error(error.message);
 }
 
 export async function askDashOnRole(input: RoleAskInput): Promise<RoleAskOutcome> {
@@ -149,12 +149,8 @@ async function produceReply(input: RoleAskInput): Promise<RoleAskOutcome> {
       .select('writing_style_notes, banned_constructions')
       .eq('id', userId)
       .maybeSingle(),
-    client
-      .from('notes')
-      .select('id, author, body, created_at')
-      .eq('role_id', roleId)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: true }),
+    // The role's thread, from the shared store (plan #1470).
+    loadThread(client, toRef(ROLE_THREAD_TABLE, roleId), { userId }).then((data) => ({ data })),
   ]);
 
   if (roleError) throw new Error(roleError.message);

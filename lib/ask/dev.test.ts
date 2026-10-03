@@ -59,6 +59,12 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
     this.filters.push((row) => typeof row[column] === 'string' && regex.test(row[column] as string));
     return this;
   }
+  /** A trailing `%` only, which is all the thread reads use. */
+  like(column: string, pattern: string) {
+    const prefix = pattern.replace(/%$/, '');
+    this.filters.push((row) => typeof row[column] === 'string' && (row[column] as string).startsWith(prefix));
+    return this;
+  }
   is(column: string, value: null) {
     this.filters.push((row) => (row[column] ?? null) === value);
     return this;
@@ -88,6 +94,24 @@ class FakeQuery implements PromiseLike<{ data: Row[]; error: null }> {
   }
 }
 
+/**
+ * The fixtures write comments the way dev_comments held them, a column per
+ * kind of row; the shared store (plan #1470) reads them by ref instead.
+ */
+const COMMENT_REFS: Record<string, string> = {
+  idea_id: 'public.ideas',
+  feedback_item_id: 'public.feedback_items',
+  plan_item_id: 'public.plan_items',
+  raised_item_id: 'public.raised_items',
+  spec_section_id: 'public.spec_sections',
+};
+function threadTurns(tables: Tables): Row[] {
+  return (tables.dev_comments ?? []).flatMap((row) => {
+    const column = Object.keys(COMMENT_REFS).find((c) => typeof row[c] === 'string');
+    return column ? [{ ...row, ref: `${COMMENT_REFS[column]}:${row[column]}` }] : [];
+  });
+}
+
 function context({ owner = true, modules = ALL_MODULES, tables = {} as Tables } = {}): AskContext & {
   rpcs: string[];
   patterns: string[];
@@ -102,7 +126,8 @@ function context({ owner = true, modules = ALL_MODULES, tables = {} as Tables } 
     enabledModules: modules,
     db: async () =>
       ({
-        from: (table: string) => new FakeQuery(tables[table] ?? [], patterns),
+        from: (table: string) =>
+          new FakeQuery(table === 'thread_turns' ? threadTurns(tables) : (tables[table] ?? []), patterns),
         rpc: async (fn: string) => {
           rpcs.push(fn);
           return fn === 'is_owner' ? { data: owner, error: null } : { data: null, error: { message: 'no' } };

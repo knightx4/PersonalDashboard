@@ -1280,61 +1280,28 @@ describe('collections and records (plan #953)', () => {
 });
 
 describe('comments on goals and steps (plan #957)', () => {
-  async function asClaude<T>(fn: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
-    return admin.begin(async (tx) => {
-      await tx.unsafe(`set local goals.actor = 'claude'`);
-      return fn(tx);
-    }) as Promise<T>;
-  }
+  // Since plan #1470 a goal's thread is kept in core.conversations under the
+  // item's ref, and goals.comments only holds the old rows, read-only.
+  it('refuses a new comment in goals.comments', async () => {
+    await expect(
+      asUser(userA, (tx) => tx`
+        insert into comments (user_id, item_id, author, body)
+        values (${userA}, ${goalA}, 'me', '@dash which loan first?')`),
+    ).rejects.toThrow(/read-only/);
+  });
 
-  it('keeps a thread on a goal to its account, with history', async () => {
-    const [comment] = await asUser(userA, (tx) => tx<{ id: string }[]>`
-      insert into comments (user_id, item_id, author, body)
-      values (${userA}, ${goalA}, 'me', '@dash which loan first?') returning id`);
-    const history = await historyOf(comment.id);
-    expect(history[0]).toMatchObject({ table_name: 'comments', action: 'insert', actor: 'me' });
+  it('keeps a thread on a goal to its account, in the shared store', async () => {
+    const ref = `goals.items:${goalA}`;
+    const [{ add_thread_turn: id }] = await asUser(userA, (tx) => tx<{ add_thread_turn: string }[]>`
+      select core.add_thread_turn(${userA}, ${ref}, 'me', '@dash which loan first?')`);
 
-    const seen = await asUser(userB, (tx) => tx`select id from comments where id = ${comment.id}`);
+    const mine = await asUser(userA, (tx) => tx`select id from core.thread_turns where id = ${id}`);
+    expect(mine).toHaveLength(1);
+    const seen = await asUser(userB, (tx) => tx`select id from core.thread_turns where id = ${id}`);
     expect(seen).toHaveLength(0);
     await expect(
-      asUser(userB, (tx) => tx`
-        insert into comments (user_id, item_id, author, body)
-        values (${userB}, ${goalA}, 'me', 'not mine')`),
-    ).rejects.toThrow();
-  });
-
-  it('lets Claude add its own replies and nothing else', async () => {
-    const [mine] = await asUser(userA, (tx) => tx<{ id: string }[]>`
-      insert into comments (user_id, item_id, author, body)
-      values (${userA}, ${goalA}, 'me', 'A note') returning id`);
-
-    await expect(
-      asClaude((tx) => tx`
-        insert into comments (user_id, item_id, author, body)
-        values (${userA}, ${goalA}, 'me', 'Pretending to be you')`),
-    ).rejects.toThrow(/only write its own replies/);
-    await expect(
-      asClaude((tx) => tx`delete from comments where id = ${mine.id}`),
-    ).rejects.toThrow(/may not delete a comment you wrote/);
-
-    const [reply] = await asClaude((tx) => tx<{ id: string }[]>`
-      insert into comments (user_id, item_id, author, body)
-      values (${userA}, ${goalA}, 'claude', 'Avalanche first.') returning id`);
-    const history = await historyOf(reply.id);
-    expect(history[0]).toMatchObject({ table_name: 'comments', actor: 'claude' });
-
-    await asUser(userA, (tx) => tx`delete from comments where id = ${reply.id}`);
-  });
-
-  it('refuses an empty comment and one by nobody', async () => {
-    await expect(
-      asUser(userA, (tx) => tx`
-        insert into comments (user_id, item_id, author, body) values (${userA}, ${goalA}, 'me', '  ')`),
-    ).rejects.toThrow(/comments_body_ck/);
-    await expect(
-      asUser(userA, (tx) => tx`
-        insert into comments (user_id, item_id, author, body) values (${userA}, ${goalA}, 'dash', 'hi')`),
-    ).rejects.toThrow(/comments_author_ck/);
+      asUser(userB, (tx) => tx`select core.add_thread_turn(${userB}, ${ref}, 'me', 'not mine')`),
+    ).rejects.toThrow(/not a row of yours/);
   });
 });
 

@@ -49,7 +49,9 @@ import {
   takeawayContext,
   threadText,
 } from './context';
-import { TARGET_COLUMN, threadFrom, type CommentTarget, type DevComment } from './load';
+import { type CommentTarget, type DevComment } from './load';
+import { addThreadTurn, loadThread, threadReplySql } from '@/lib/thread/store';
+import { threadRef } from '@/lib/thread/subjects';
 import { readSpec, specBySlug } from '@/lib/specs/registry';
 import { splitSections } from '@/lib/specs/sections';
 import { SPEC_CHANGE_COLUMNS, sectionsTouched, specChangeFrom } from '@/lib/specs/changes';
@@ -156,6 +158,15 @@ function apiKey(): string | null {
  * assembled in lib/comments/context.ts.
  */
 async function subjectOf(input: AskInput): Promise<Subject | null> {
+  const subject = await subjectRowOf(input);
+  if (!subject) return null;
+  // The thread comes from the shared store (plan #1470), whichever row it is.
+  const thread = await loadThread(input.supabase, threadRef(input.target, input.id), { userId: input.userId });
+  return { ...subject, thread };
+}
+
+/** The row written out, before its thread is read. */
+async function subjectRowOf(input: AskInput): Promise<Subject | null> {
   const { supabase, userId, target, id } = input;
 
   if (target === 'step') {
@@ -197,8 +208,7 @@ async function subjectOf(input: AskInput): Promise<Subject | null> {
     const { data } = await supabase
       .from('inspiration_takeaways')
       .select(
-        'title, body, module, status, dev_comments (id, author, body, created_at), ' +
-          'inspiration_takeaway_videos (inspiration_videos (title))',
+        'title, body, module, status, inspiration_takeaway_videos (inspiration_videos (title))',
       )
       .eq('user_id', userId)
       .eq('id', id)
@@ -214,7 +224,7 @@ async function subjectOf(input: AskInput): Promise<Subject | null> {
         status: String(row.status),
         videos: links.map((link) => link.inspiration_videos?.title).filter((title): title is string => !!title),
       }),
-      thread: threadFrom(row.dev_comments),
+      thread: [],
       label: `the inspiration takeaway "${String(row.title)}"`,
     };
   }
@@ -252,7 +262,7 @@ async function subjectOf(input: AskInput): Promise<Subject | null> {
   if (target === 'spec') {
     const { data } = await supabase
       .from('spec_sections')
-      .select('slug, anchor, heading, dev_comments (id, author, body, created_at)')
+      .select('slug, anchor, heading')
       .eq('user_id', userId)
       .eq('id', id)
       .maybeSingle();
@@ -277,7 +287,7 @@ async function subjectOf(input: AskInput): Promise<Subject | null> {
         // heading alone.
         body: section?.body ?? '(This section is no longer in the document.)',
       }),
-      thread: threadFrom(row.dev_comments),
+      thread: [],
       label: `${doc.title} — ${row.heading}`,
     };
   }
@@ -299,9 +309,9 @@ async function subjectOf(input: AskInput): Promise<Subject | null> {
 
 /** A reply in the thread, under the same account and marked as Claude's. */
 async function say(input: AskInput, body: string): Promise<void> {
-  await input.supabase.from('dev_comments').insert({
-    user_id: input.userId,
-    [TARGET_COLUMN[input.target]]: input.id,
+  await addThreadTurn(input.supabase, {
+    userId: input.userId,
+    ref: threadRef(input.target, input.id),
     author: 'claude',
     body,
   });
@@ -373,9 +383,7 @@ function sessionTurn(
     (said ? `${said.trimEnd()}\n\n` : '') +
     `## ${instruction ? 'What they asked for' : 'The question'}\n\n${input.question}\n\n` +
     `## Where ${instruction ? 'what you did goes' : 'the answer goes'}\n\n` +
-    'insert into dev_comments (user_id, ' +
-    `${TARGET_COLUMN[input.target]}, author, body) values ('${input.userId}', '${input.id}', ` +
-    `'claude', '<${instruction ? 'what you did' : 'your answer'}>');\n\n` +
+    `${threadReplySql(input.userId, threadRef(input.target, input.id), `<${instruction ? 'what you did' : 'your answer'}>`)}\n\n` +
     (instruction ? INSTRUCTION_RULE : QUESTION_RULE)
   );
 }

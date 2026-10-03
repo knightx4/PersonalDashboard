@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { COMMENT_COLUMNS } from '@/lib/comments/load';
+import { withThreads } from '@/lib/thread/store';
 import {
   buildInspirationPage,
   type InspirationPage,
@@ -11,7 +11,7 @@ import {
 
 const VIDEO_COLUMNS =
   'id, video_id, title, channel_title, duration_seconds, thumbnail_url, playlist_position, added_at, left_playlist_at, transcript_state, transcript_error, processed_at, takeaway_count, process_error, summary_points';
-const TAKEAWAY_COLUMNS = `id, title, body, module, status, idea_id, plan_item_id, created_at, score, dev_comments (${COMMENT_COLUMNS})`;
+const TAKEAWAY_COLUMNS = 'id, title, body, module, status, idea_id, plan_item_id, created_at, score';
 const LINK_COLUMNS = 'takeaway_id, video_id, said, quote, start_seconds';
 
 /**
@@ -36,7 +36,13 @@ export async function loadInspiration(supabase: SupabaseClient, userId: string):
     if (result.error) throw new Error(`Could not read the inspiration playlist: ${result.error.message}`);
   }
 
-  const takeawayRows = (takeaways.data ?? []) as TakeawayRowData[];
+  // Each takeaway's thread, from the shared store (plan #1470).
+  const takeawayRows: TakeawayRowData[] = await withThreads(
+    supabase,
+    'public.inspiration_takeaways',
+    (takeaways.data ?? []) as TakeawayRowData[],
+    { userId },
+  );
 
   const ideaIds = [...new Set(takeawayRows.map((row) => row.idea_id).filter((id): id is string => !!id))];
   const ideaPlanItems = new Map<string, string | null>();

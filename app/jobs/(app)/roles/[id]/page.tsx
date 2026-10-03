@@ -32,7 +32,7 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { relatedNotes, toLink } from '@/lib/vault/notes/related';
 import { RelatedNotes } from '@/components/vault/related-notes';
-import { threadFrom } from '@/lib/comments/load';
+import { loadThread } from '@/lib/thread/store';
 
 /** The columns of an interview row the prep key is computed from. */
 type PrepInterviewRow = {
@@ -164,13 +164,9 @@ export default async function RoleDetailPage({
         'id, answer, status, word_limit, evidence_item_ids, unsupported_claims, questions!application_answers_question_id_fkey!inner ( id, text, kind, canonical_answer, times_seen )',
       )
       .eq('application_id', current.id),
-    // The comment thread (note 89ad8bef): your notes and Dash's replies,
-    // oldest first so it reads downwards.
-    supabase
-      .from('notes')
-      .select('id, author, body, created_at')
-      .eq('role_id', id)
-      .order('created_at', { ascending: true }),
+    // The comment thread (note 89ad8bef): yours and Dash's replies, oldest
+    // first so it reads downwards, from the shared store (plan #1470).
+    loadThread(supabase, `job_search.roles:${id}`).then((data) => ({ data })),
     // The occasions several rounds belong to -- a superday and its
     // impression of the day as a whole. Empty for almost every pursuit.
     supabase
@@ -600,7 +596,7 @@ export default async function RoleDetailPage({
               unsupportedClaims: (answer.unsupported_claims as string[]) ?? [],
             };
           })}
-          thread={threadFrom(notes)}
+          thread={notes ?? []}
           interviewGroups={(interviewGroups ?? []).map((group) => ({
             id: group.id as string,
             label: (group.label as string | null) ?? null,

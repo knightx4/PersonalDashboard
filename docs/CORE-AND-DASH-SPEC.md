@@ -284,7 +284,9 @@ The counters count these things:
   Maya, told apart by an author or role column checked to one of each, such
   as `author in ('me', 'claude')`. `core.memory_chunks` marks its rows the
   same way and is left out, because it copies turns out of the threads to
-  search them.
+  search them. So is a table whose threads were copied into the shared store
+  and which now refuses writes through `core.refuse_thread_writes` (plan
+  #1470), kept until the person says it can go.
 - `conversational-model-paths`: spend operations under which a model answers
   what the person typed, which are the ones named `ask-`, `reply-` or
   `discuss-`, and capture's `file-capture`.

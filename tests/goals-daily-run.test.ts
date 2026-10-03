@@ -41,7 +41,11 @@ function fakeClient(fixture: Fixture) {
       if (table === 'areas') return { data: [{ id: 'area', name: 'Money' }], error: null };
       if (table === 'answers') return { data: fixture.answers ?? [], error: null };
       if (table === 'reviews' || table === 'readings') return { data: [], error: null };
-      if (table === 'comments') return { data: fixture.comments ?? [], error: null };
+      // Your turns in the threads on steps, from core.thread_turns (plan #1470).
+      if (table === 'thread_turns') {
+        const comments = (fixture.comments ?? []) as { item_id: string; created_at: string }[];
+        return { data: comments.map((c) => ({ ref: `goals.items:${c.item_id}`, created_at: c.created_at })), error: null };
+      }
       if (table === 'progress_entries') return { data: fixture.progress ?? [], error: null };
       return { data: fixture.items, error: null };
     };
@@ -62,7 +66,7 @@ function fakeClient(fixture: Fixture) {
         return Promise.resolve(result()).then(resolve);
       },
     };
-    for (const name of ['select', 'eq', 'in', 'is', 'not', 'gte', 'order', 'limit', 'single']) {
+    for (const name of ['select', 'eq', 'in', 'is', 'not', 'gte', 'order', 'limit', 'single', 'like']) {
       builder[name] = () => builder;
     }
     return builder;
@@ -70,7 +74,10 @@ function fakeClient(fixture: Fixture) {
 
   const client = {
     from: query,
-    schema: () => ({ rpc: async () => ({ data: { userId: USER, email: 'o@example.test' }, error: null }) }),
+    schema: () => ({
+      rpc: async () => ({ data: { userId: USER, email: 'o@example.test' }, error: null }),
+      from: query,
+    }),
   } as unknown as GoalsSupabaseClient;
   return { client, writes };
 }

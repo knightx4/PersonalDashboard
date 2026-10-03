@@ -1,7 +1,8 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { COMMENT_COLUMNS, threadFrom } from '@/lib/comments/load';
+import { threadFrom } from '@/lib/comments/load';
+import { addThreadTurn, removeThreadTurn, rowRef, withThreads } from '@/lib/thread/store';
 import { resolveRoutineId, type RoutineTarget } from '@/lib/feedback/routine';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { flagRunText, type FlagStatus, type GoalFlag } from '@/lib/goals/flags';
@@ -19,8 +20,10 @@ import { loadShaping, recordAndFire } from '@/lib/goals/shaping-store';
 type Db = SupabaseClient<any, 'public'>;
 
 const FLAG_COLUMNS =
-  'id, goal_id, title, detail, ask, status, created_at, ' +
-  `thread:dev_comments(${COMMENT_COLUMNS})`;
+  'id, goal_id, title, detail, ask, status, created_at';
+
+/** A flag is a raise, and its thread sits under the raise's ref (plan #1470). */
+const RAISED_TABLE = 'public.raised_items';
 
 function flagFrom(row: Record<string, unknown>): GoalFlag {
   return {
@@ -57,7 +60,11 @@ export async function loadGoalFlags(
     console.error(`Flags on goals could not be read: ${error.message}`);
     return [];
   }
-  return ((data ?? []) as unknown as Record<string, unknown>[]).map(flagFrom);
+  return (
+    await withThreads(supabase, RAISED_TABLE, (data ?? []) as unknown as Record<string, unknown>[], {
+      userId: input.userId,
+    })
+  ).map(flagFrom);
 }
 
 /** The title of each live goal among `goalIds`, for naming a flag's goal. */
@@ -107,17 +114,24 @@ export async function answerGoalFlag(input: {
     .not('goal_id', 'is', null)
     .maybeSingle();
   if (!data) return { ok: false, error: 'That flag is no longer on the page.' };
-  const flag = flagFrom(data as unknown as Record<string, unknown>);
+  const [withThread] = await withThreads(supabase, RAISED_TABLE, [data as unknown as Record<string, unknown>], {
+    userId,
+  });
+  const flag = flagFrom(withThread);
   if (flag.status !== 'open' && flag.status !== 'answered') {
     return { ok: false, error: 'That flag is already closed.' };
   }
 
-  const written = await supabase
-    .from('dev_comments')
-    .insert({ user_id: userId, raised_item_id: flag.id, author: 'me', body: input.answer })
-    .select('id')
-    .single();
-  if (written.error) return { ok: false, error: 'Your answer could not be saved. Try again.' };
+  try {
+    await addThreadTurn(supabase, {
+      userId,
+      ref: rowRef(RAISED_TABLE, flag.id),
+      author: 'me',
+      body: input.answer,
+    });
+  } catch {
+    return { ok: false, error: 'Your answer could not be saved. Try again.' };
+  }
 
   const unsaid = (why: string): AnswerFlagOutcome => ({
     ok: false,
@@ -176,15 +190,7 @@ export async function answerGoalFlag(input: {
 
 /** Take one of your answers back out of a flag's thread. False when it was already gone. */
 export async function deleteFlagComment(supabase: Db, userId: string, id: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('dev_comments')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', userId)
-    .not('raised_item_id', 'is', null)
-    .select('id');
-  if (error) throw new Error(error.message);
-  return (data ?? []).length > 0;
+  return (await removeThreadTurn(supabase, { id, userId })) !== null;
 }
 
 /** Put a flag aside without answering it. False when it was not open. */

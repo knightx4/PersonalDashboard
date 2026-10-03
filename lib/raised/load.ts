@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
+import { threadFrom, type DevComment } from '@/lib/comments/load';
+import { withThreads } from '@/lib/thread/store';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 import { consequenceFrom, type RaiseConsequence } from './consequence';
 
@@ -84,8 +85,10 @@ export function needsFollowThrough(row: RaisedRow): boolean {
 /** Every column the app reads off a raise, and the thread under it. */
 export const RAISED_COLUMNS =
   'id, title, detail, ask, consequence, outcome, module, source, status, created_at, ' +
-  'answered_at, goal_id, ' +
-  `thread:dev_comments(${COMMENT_COLUMNS})`;
+  'answered_at, goal_id';
+
+/** The table raises live in, the table half of a raise's ref. */
+export const RAISED_TABLE = 'public.raised_items';
 
 /** A row as the app reads it. One shape leaves here, whoever selected it. */
 export function raisedRowFrom(row: Record<string, unknown>): RaisedRow {
@@ -171,5 +174,6 @@ export async function loadRaised(
   // error case instead.
   const rows = (data ?? []) as unknown as Array<Record<string, unknown>>;
 
-  return raisedQueueFrom(rows.map(raisedRowFrom));
+  // Each raise's thread, from the shared store (plan #1470).
+  return raisedQueueFrom((await withThreads(supabase, RAISED_TABLE, rows, { userId })).map(raisedRowFrom));
 }

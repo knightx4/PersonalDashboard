@@ -140,7 +140,7 @@ const WRITTEN_TABLE: Record<DashChangeKind, string> = {
   change_todo: 'todo.tasks',
   close_todo: 'todo.tasks',
   close_goal_step: 'goals.items',
-  add_role_note: 'job_search.notes',
+  add_role_note: 'core.conversation_turns',
 };
 
 /** What each kind does to that row: a return changes the item, the rest add one. */

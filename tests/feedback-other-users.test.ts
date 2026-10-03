@@ -71,6 +71,15 @@ function stubClient(rows: Row[], emails: Row | null, rpcError = false) {
 
   const supabase = {
     from: builder,
+    // The threads under the notes (plan #1470): none in these cases.
+    schema: () => ({
+      from: () => {
+        const none: Record<string, unknown> = {};
+        for (const name of ['select', 'eq', 'in', 'like']) none[name] = () => none;
+        none.then = (resolve: (value: { data: Row[]; error: null }) => unknown) => resolve({ data: [], error: null });
+        return none;
+      },
+    }),
     rpc: async () =>
       rpcError
         ? { data: null, error: { message: 'no such function' } }

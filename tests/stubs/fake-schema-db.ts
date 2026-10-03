@@ -13,6 +13,11 @@ import type { AskSchema, SchemaClient } from '@/lib/ask/db';
  * rows whatever columns it selected. An insert without an id gets one, and a
  * created_at, so a writer that asks for its new row's id gets one back; an
  * insert with one is kept exactly as given.
+ *
+ * The shared thread store (lib/thread/store.ts) is there too: `schema(name)`
+ * hands back that schema's client, core.thread_turns is the same list as
+ * core.conversation_turns (a thread's turns carry `ref` and `author`), `like`
+ * matches a trailing `%`, and `rpc('add_thread_turn', ...)` adds a turn.
  */
 
 type Row = Record<string, unknown>;
@@ -29,8 +34,26 @@ export function fakeId(): string {
 export function fakeSchemaDb(tables: FakeTables, now = '2026-10-03T08:00:00Z') {
   return function client(schema: string): SchemaClient {
     return {
+      schema: (name: string) => client(name),
+      rpc(name: string, args: Row) {
+        if (schema !== 'core' || name !== 'add_thread_turn') {
+          return Promise.resolve({ data: null, error: { message: `no function ${schema}.${name}` } });
+        }
+        const row = {
+          id: fakeId(),
+          user_id: args.p_user_id,
+          ref: args.p_ref,
+          author: args.p_author,
+          role: args.p_author === 'me' ? 'user' : 'assistant',
+          body: args.p_body,
+          created_at: now,
+        };
+        (tables['core.conversation_turns'] ??= []).push(row);
+        return Promise.resolve({ data: row.id, error: null });
+      },
       from(table: string) {
-        const rows = (tables[`${schema}.${table}`] ??= []);
+        const key = schema === 'core' && table === 'thread_turns' ? 'core.conversation_turns' : `${schema}.${table}`;
+        const rows = (tables[key] ??= []);
         const filters: ((row: Row) => boolean)[] = [];
         let op: 'select' | 'insert' | 'upsert' | 'update' | 'delete' = 'select';
         let conflict = { columns: ['id'], ignore: false };
@@ -116,6 +139,9 @@ export function fakeSchemaDb(tables: FakeTables, now = '2026-10-03T08:00:00Z') {
             filters.push((r) => typeof r[c] === 'string' && (r[c] as string).toLowerCase() === v.toLowerCase()), query
           ),
           in: (c: string, vs: unknown[]) => (filters.push((r) => vs.includes(r[c])), query),
+          like: (c: string, v: string) => (
+            filters.push((r) => typeof r[c] === 'string' && (r[c] as string).startsWith(v.replace(/%$/, ''))), query
+          ),
           not: (c: string) => (filters.push((r) => (r[c] ?? null) !== null), query),
           or: (spec: string) => {
             const parts = spec.split(',').map((part) => part.split('.'));

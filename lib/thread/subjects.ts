@@ -4,10 +4,9 @@ import type { CommentTarget } from '@/lib/comments/load';
  * What a thread is on, named by its ref (docs/CORE-AND-DASH-SPEC.md, Part 2).
  *
  * `<Thread subject={ref} />` takes a ref, `schema.table:id`, the same string
- * core.conversations keys a row thread by (plan #1468). Until the existing
- * threads are copied into that store (plan #1470), each one is still written
- * where it always was, and the table in the ref is what says where: this file
- * maps each table that has a thread to the target its actions already take.
+ * core.conversations keys a row thread by (plan #1468), where every thread is
+ * kept since plan #1470. This file maps each table that has a thread to the
+ * target its actions take, which decides what follows a comment there.
  *
  * Client-safe: no database, no server imports. lib/core/refs.ts has the same
  * parse, but it reads the sources catalogue to resolve pages, which a client

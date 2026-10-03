@@ -55,6 +55,7 @@ import {
   type PlanSection,
 } from '@/lib/plan/tree';
 import { planScopeOf, type PlanScope } from '@/lib/plan/projects';
+import { addThreadTurn } from '@/lib/thread/store';
 
 export type PlanActionState = {
   error?: string;
@@ -950,10 +951,16 @@ export async function answerBlockedStep(
   if (!current) return { error: 'That step no longer exists.' };
   if (current.status !== 'blocked') return { error: 'That step is no longer blocked.' };
 
-  const { error: unsaid } = await supabase
-    .from('dev_comments')
-    .insert({ user_id: user.id, plan_item_id: id.data, author: 'me', body: answer.data });
-  if (unsaid) return { error: unsaid.message };
+  try {
+    await addThreadTurn(supabase, {
+      userId: user.id,
+      ref: `public.plan_items:${id.data}`,
+      author: 'me',
+      body: answer.data,
+    });
+  } catch (unsaid) {
+    return { error: unsaid instanceof Error ? unsaid.message : 'The answer could not be saved.' };
+  }
 
   const stamp = new Date().toISOString().slice(0, 10);
   const line = `Answered ${stamp}: ${answer.data}`;

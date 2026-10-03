@@ -11,6 +11,7 @@ import { askDash } from '@/lib/comments/ask';
 import { isCommentTarget, type CommentTarget } from '@/lib/comments/load';
 import { isModuleId } from '@/lib/modules';
 import { consequenceFrom } from '@/lib/raised/consequence';
+import { addThreadTurn } from '@/lib/thread/store';
 
 export type RaisedActionState = {
   error?: string;
@@ -36,12 +37,11 @@ async function say(
   author: 'me' | 'claude',
   body: string,
 ): Promise<string | null> {
-  const { data } = await supabase
-    .from('dev_comments')
-    .insert({ user_id: userId, raised_item_id: id, author, body })
-    .select('id')
-    .maybeSingle();
-  return (data as { id: string } | null)?.id ?? null;
+  try {
+    return await addThreadTurn(supabase, { userId, ref: `public.raised_items:${id}`, author, body });
+  } catch {
+    return null;
+  }
 }
 
 /**

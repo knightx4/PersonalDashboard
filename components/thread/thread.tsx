@@ -34,8 +34,7 @@ import { PaidHint } from '@/components/ui/paid-hint';
  * nobody is waiting on.
  *
  * The row is named by its ref, `schema.table:id` (lib/thread/subjects.ts), and
- * the table in it says where the turns are written (./stores.ts) and how Dash
- * takes them: a raise always reaches Dash, a file never answers, everything
+ * the table in it says which actions take the turns and how Dash takes them: a raise always reaches Dash, a file never answers, everything
  * else answers when tagged.
  *
  * The list is the whole thread including Dash's replies, told apart by who
@@ -49,13 +48,14 @@ type ThreadAction = (
 ) => Promise<CommentActionState>;
 
 /**
- * Where a thread's turns are written, and what a reply there costs.
+ * Which actions a thread's forms post to, and what a reply there costs.
  *
- * Each of the six surfaces still writes to its own table until plan #1470
- * copies them into core.conversations; this is the one place that says which.
- * When that lands, every target here points at the same pair of actions and
- * the map goes. The cost keys are named here, beside the PaidHint that shows
- * them, which is where lib/core/spend/paid-actions.test.ts looks for them.
+ * Every target writes to the same store, core.conversations under the row's
+ * ref (plan #1470, lib/thread/store.ts). The actions still differ in what
+ * follows the write: a raise starts a run, a goal's reply can hand on to the
+ * goals routine, a role's reply reads the application, a file never answers.
+ * The cost keys are named here, beside the PaidHint that shows them, which is
+ * where lib/core/spend/paid-actions.test.ts looks for them.
  */
 export type CommentStore = {
   add: ThreadAction;
@@ -64,28 +64,28 @@ export type CommentStore = {
   paid: PaidAction;
 };
 
-/** dev_comments: ideas, plan steps, raises, bug notes, spec sections, takeaways, spec changes. */
+/** Ideas, plan steps, raises, bug notes, spec sections, takeaways, spec changes. */
 const DEV_STORE: CommentStore = {
   add: addComment,
   remove: deleteComment,
   paid: 'app/dev/comment-actions.ts#addComment',
 };
 
-/** goals.comments, for every signed-in account rather than the owner alone (plan #957). */
+/** Goals and steps, for every signed-in account rather than the owner alone (plan #957). */
 const GOALS_STORE: CommentStore = {
   add: addGoalComment,
   remove: deleteGoalComment,
   paid: 'app/goals/[goalId]/comment-actions.ts#addGoalComment',
 };
 
-/** A role's notes, with Dash's replies among them (note 89ad8bef). */
+/** A role's thread, with Dash's replies in it (note 89ad8bef). */
 const ROLE_STORE: CommentStore = {
   add: addRoleComment,
   remove: deleteRoleComment,
   paid: 'app/jobs/(app)/roles/[id]/comment-actions.ts#addRoleComment',
 };
 
-/** core.file_comments. No reply is paid for here, since Dash does not answer in it. */
+/** Files. No reply is paid for here, since Dash does not answer in it. */
 const FILES_STORE: CommentStore = {
   add: addFileComment,
   remove: deleteFileCommentAction,

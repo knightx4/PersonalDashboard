@@ -14,7 +14,8 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { COMMENT_COLUMNS, threadFrom, type DevComment } from '@/lib/comments/load';
+import { threadFrom, type DevComment } from '@/lib/comments/load';
+import { withThreads } from '@/lib/thread/store';
 import { splitSections, type SpecSection } from './sections';
 
 export type SpecChangeStatus = 'proposed' | 'approved' | 'declined' | 'applied';
@@ -75,8 +76,10 @@ export type SpecChange = {
 };
 
 export const SPEC_CHANGE_COLUMNS =
-  'id, spec, title, why, diff, status, made_by, plan_item_id, decided_at, created_at, ' +
-  `dev_comments (${COMMENT_COLUMNS})`;
+  'id, spec, title, why, diff, status, made_by, plan_item_id, decided_at, created_at';
+
+/** The table spec changes live in, the table half of a change's ref. */
+export const SPEC_CHANGES_TABLE = 'public.spec_changes';
 
 type SpecChangeRow = {
   id: string;
@@ -89,8 +92,8 @@ type SpecChangeRow = {
   plan_item_id: string | null;
   decided_at: string | null;
   created_at: string;
-  /** Absent when a caller selected the change without its thread. */
-  dev_comments?: unknown;
+  /** The thread from the shared store; absent when a caller read the change without it. */
+  thread?: unknown;
 };
 
 export function specChangeFrom(row: SpecChangeRow): SpecChange {
@@ -105,7 +108,7 @@ export function specChangeFrom(row: SpecChangeRow): SpecChange {
     planItemId: row.plan_item_id,
     decidedAt: row.decided_at,
     createdAt: row.created_at,
-    thread: threadFrom(row.dev_comments),
+    thread: threadFrom(row.thread),
   };
 }
 
@@ -128,7 +131,10 @@ export async function loadOpenSpecChanges(
     console.error(`Could not read the spec changes: ${error.message}`);
     return [];
   }
-  return ((data ?? []) as unknown as SpecChangeRow[]).map(specChangeFrom);
+  // Each change's thread, from the shared store (plan #1470).
+  return (await withThreads(supabase, SPEC_CHANGES_TABLE, (data ?? []) as unknown as SpecChangeRow[], { userId })).map(
+    specChangeFrom,
+  );
 }
 
 /** How many changes are waiting on the person, for the Home tab's badge. */

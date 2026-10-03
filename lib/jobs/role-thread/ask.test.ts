@@ -66,7 +66,10 @@ function setup(coverLetter: string | null) {
     'job_search.applications': [
       { id: APPLICATION, user_id: ME, role_id: ROLE, attempt: 1, status: 'drafting', cover_letter: coverLetter, updated_at: '2026-10-01T09:00:00Z' },
     ],
-    'job_search.notes': [{ id: 'q', user_id: ME, role_id: ROLE, author: 'me', body: '@dash write my letter', created_at: '2026-10-03T08:00:00Z' }],
+    // The role's thread, in the shared store (plan #1470).
+    'core.conversation_turns': [
+      { id: 'q', user_id: ME, ref: `job_search.roles:${ROLE}`, author: 'me', role: 'user', body: '@dash write my letter', created_at: '2026-10-03T08:00:00Z' },
+    ],
     'todo.tasks': [],
   };
   const dash = fakeDashDeps(tables, ME);
@@ -136,7 +139,9 @@ function ask(state: ReturnType<typeof setup>, anthropic: Anthropic, question = '
 }
 
 const replies = (tables: FakeTables) =>
-  tables['job_search.notes'].filter((n) => n.author === 'claude').map((n) => n.body as string);
+  tables['core.conversation_turns']
+    .filter((n) => n.ref === `job_search.roles:${ROLE}` && n.author === 'claude')
+    .map((n) => n.body as string);
 
 describe('Dash on a role', () => {
   it('runs the shared loop on Sonnet, with the lookups, the writes and the letter, and no hand-off', async () => {

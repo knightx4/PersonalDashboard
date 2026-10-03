@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
-  COMMENT_COLUMNS,
   COMMENT_TARGETS,
   TARGET_COLUMN,
   TARGET_PATH,
@@ -10,16 +9,17 @@ import {
   type CommentTarget,
   type DevComment,
 } from './load';
+import { threadSubject } from '@/lib/thread/subjects';
 
 /**
  * Every conversation on the account, wherever it was started.
  *
  * A thread is only visible from the row it lives on, so an answer written
  * overnight is found by remembering which idea, step, raise or note the
- * question was asked on. `dev_comments` already holds all four through its
- * four nullable foreign keys, which means one read can have the lot: the
- * comments with their parent rows embedded, folded into one conversation per
- * row.
+ * question was asked on. Every thread on a dev row is in core.conversations
+ * under the row's ref (plan #1470), so one read of the turns has the lot, and
+ * one more per kind of row names them; they are folded into one conversation
+ * per row.
  *
  * The fold is pure and the loader beside it takes a client, the same shape
  * lib/digest/load.ts has. Nothing here caps the list — the page decides how
@@ -88,18 +88,6 @@ export function isUnread(
   return read < last;
 }
 
-/**
- * The comments, the columns that say which row each is about, and the row
- * itself. One embed per target, named after the target so the fold can look it
- * up by the same key.
- */
-export const CONVERSATION_COLUMNS =
-  `${COMMENT_COLUMNS}, idea_id, plan_item_id, raised_item_id, feedback_item_id, ` +
-  'spec_section_id, inspiration_takeaway_id, spec_change_id, ' +
-  'idea:ideas(body), step:plan_items(number, title), raise:raised_items(title), ' +
-  'note:feedback_items(kind, body), spec:spec_sections(slug, heading), ' +
-  'takeaway:inspiration_takeaways(title), change:spec_changes(title)';
-
 /** Long enough to tell two rows apart, short enough to sit on one line. */
 const ONE_LINE = 80;
 
@@ -128,7 +116,7 @@ const UNNAMED: Record<CommentTarget, string> = {
   change: 'A spec change',
 };
 
-/** Exactly one of the target columns is set — `dev_comments_one_target_ck`. */
+/** The target column the loader set on the row (one per turn). */
 function targetOf(row: Record<string, unknown>): CommentTarget | null {
   return COMMENT_TARGETS.find((target) => row[TARGET_COLUMN[target]]) ?? null;
 }
@@ -241,17 +229,34 @@ export function conversationsFrom(
   return found.map((entry) => entry.row);
 }
 
+/**
+ * What each target's row is read for, to name the conversation: the same
+ * columns the old embeds named, read by id now that the turns are in the
+ * shared store and cannot embed the row (plan #1470).
+ */
+const PARENT_READS: Record<CommentTarget, { table: string; columns: string }> = {
+  idea: { table: 'ideas', columns: 'id, body' },
+  step: { table: 'plan_items', columns: 'id, number, title' },
+  raise: { table: 'raised_items', columns: 'id, title' },
+  note: { table: 'feedback_items', columns: 'id, kind, body' },
+  spec: { table: 'spec_sections', columns: 'id, slug, heading' },
+  takeaway: { table: 'inspiration_takeaways', columns: 'id, title' },
+  change: { table: 'spec_changes', columns: 'id, title' },
+};
+
 /** Takes a client rather than building one, like everything else in lib/. */
 export async function loadConversations(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any, 'public'>,
   userId: string,
 ): Promise<Conversation[]> {
-  const [comments, marks] = await Promise.all([
+  const [turns, marks] = await Promise.all([
     supabase
-      .from('dev_comments')
-      .select(CONVERSATION_COLUMNS)
+      .schema('core')
+      .from('thread_turns')
+      .select('id, ref, author, body, created_at')
       .eq('user_id', userId)
+      .like('ref', 'public.%')
       // Newest first, so a cap this ever grows into drops the oldest messages
       // rather than an arbitrary slice of them.
       .order('created_at', { ascending: false })
@@ -259,11 +264,35 @@ export async function loadConversations(
     supabase.from('dev_comment_reads').select('target, row_id, read_at').eq('user_id', userId),
   ]);
 
-  // Through `unknown`: the column list is built as an expression, so the
-  // client cannot infer a row shape from it and types the result as its error
-  // case instead.
-  const rows = (comments.data ?? []) as unknown as Array<Record<string, unknown>>;
-  const reads = (marks.data ?? []) as unknown as Array<Record<string, unknown>>;
+  // Each turn as the row the fold reads: the comment, the column naming its
+  // row, and (below) the row itself under the target's name.
+  const rows: Record<string, unknown>[] = [];
+  const idsByTarget = new Map<CommentTarget, Set<string>>();
+  for (const turn of (turns.data ?? []) as { id: string; ref: string; author: string; body: string; created_at: string }[]) {
+    const subject = threadSubject(turn.ref);
+    if (!subject || !isCommentTarget(subject.target)) continue;
+    const target = subject.target;
+    rows.push({ id: turn.id, author: turn.author, body: turn.body, created_at: turn.created_at, [TARGET_COLUMN[target]]: subject.id });
+    const ids = idsByTarget.get(target) ?? new Set<string>();
+    ids.add(subject.id);
+    idsByTarget.set(target, ids);
+  }
 
+  const parents = new Map<string, Record<string, unknown>>();
+  await Promise.all(
+    [...idsByTarget.entries()].map(async ([target, ids]) => {
+      const { table, columns } = PARENT_READS[target];
+      const { data } = await supabase.from(table).select(columns).eq('user_id', userId).in('id', [...ids]);
+      for (const parent of (data ?? []) as unknown as Record<string, unknown>[]) {
+        parents.set(conversationKey(target, String(parent.id)), parent);
+      }
+    }),
+  );
+  for (const row of rows) {
+    const target = targetOf(row);
+    if (target) row[target] = parents.get(conversationKey(target, String(row[TARGET_COLUMN[target]]))) ?? null;
+  }
+
+  const reads = (marks.data ?? []) as unknown as Array<Record<string, unknown>>;
   return conversationsFrom(rows, readsFrom(reads));
 }

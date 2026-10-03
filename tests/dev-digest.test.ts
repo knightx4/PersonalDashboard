@@ -27,6 +27,8 @@ function stubClient(tables: Record<string, Row[]>) {
       eq: () => self,
       order: () => self,
       range: () => self,
+      in: () => self,
+      like: () => self,
       limit: () => self,
       maybeSingle: async () => ({ data: rows()[0] ?? null, error: null }),
       insert: async (row: Row) => {
@@ -40,7 +42,8 @@ function stubClient(tables: Record<string, Row[]>) {
     return self;
   };
 
-  return { supabase: { from: builder } as unknown as SupabaseClient, inserted };
+  // Threads are read from core.thread_turns (plan #1470), through schema('core').
+  return { supabase: { from: builder, schema: () => ({ from: builder }) } as unknown as SupabaseClient, inserted };
 }
 
 const NOW = new Date('2026-03-02T12:00:00Z');

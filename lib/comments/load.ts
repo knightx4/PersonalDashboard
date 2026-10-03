@@ -4,14 +4,14 @@
  * One thread shape for an idea, a plan step, a raise, a bug note and a section
  * of a specification, because the exchange is the same one wherever it happens:
  * you write something on a row, and a session can write back on the same row.
- * `dev_comments` holds all five (migrations 0062, 0066 and 0085), so the type,
- * the column list and the ordering live here rather than five times over in the
- * five loaders.
+ * Every thread is kept in core.conversations under the row's ref (plan #1470;
+ * lib/thread/store.ts), so the type and the ordering live here rather than
+ * over again in each loader.
  *
- * Nothing in here reads the database. The loaders embed `COMMENT_COLUMNS` in
- * their own select and hand the result to `threadFrom`; the CLI, which reads
- * plan rows over a direct connection and asks for no thread, gets an empty one
- * back rather than a crash.
+ * Nothing in here reads the database. The loaders set `thread` on each row
+ * from the shared store and hand it to `threadFrom`; the CLI, which reads plan
+ * rows over a direct connection and asks for no thread, gets an empty one back
+ * rather than a crash.
  */
 
 /** Which row a comment is about. */
@@ -23,8 +23,8 @@ export function isCommentTarget(value: string): value is CommentTarget {
 }
 
 /**
- * The column each target writes. Four nullable foreign keys rather than one
- * generic id, so a deleted row takes its thread with it — see 0062.
+ * The column each target wrote in public.dev_comments, read-only since plan
+ * #1470. The conversations list still folds turns by it.
  */
 export const TARGET_COLUMN: Record<
   CommentTarget,
@@ -84,9 +84,6 @@ export type DevComment = {
   body: string;
   createdAt: string;
 };
-
-/** Every column a thread is read from. Embedded in the target's own select. */
-export const COMMENT_COLUMNS = 'id, author, body, created_at';
 
 /**
  * Oldest first, so the thread reads downwards. Sorted here rather than in the
