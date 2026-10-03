@@ -93,15 +93,25 @@ export const MOMENTS: readonly Moment[] = [
     trigger: 'Opening Home for the first time on a new day.',
     sees: 'The greeting, the brief and Today arrive one after another rather than all at once.',
     reducedMotion: 'All three are there at once.',
-    state: { built: 'no', step: 1558 },
+    state: {
+      built: 'yes',
+      where:
+        'HomeArrival in app/home/arrival.tsx round the column on /home, played when the home_arrived cookie has not seen today (lib/home/first-visit.ts).',
+    },
+    demo: 'motion-home-arrival',
   },
   {
     workspace: 'home',
     name: 'A finished day',
-    trigger: 'Nothing due today is left.',
-    sees: 'The day’s sigil sits beside the date.',
+    trigger: 'Nothing due today is left, and something due was finished.',
+    sees: 'The day’s sigil, the same one the agenda draws when the day closes, sits beside the date. It draws in the first time Home shows it that day.',
     reducedMotion: 'The sigil is there without drawing in.',
-    state: { built: 'no', step: 1558 },
+    state: {
+      built: 'yes',
+      where:
+        'DaySigil in app/home/arrival.tsx beside the date on /home, shown by the rule in lib/todo/agenda/day-close.ts.',
+    },
+    demo: 'motion-home-arrival',
   },
   {
     workspace: 'jobs',

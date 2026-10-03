@@ -12,6 +12,7 @@ import { DayCloseDemo } from '@/app/dev/ui/day-close-demo';
 import { DayClosed } from '@/components/todo/day-closed';
 import { GotThroughDemo } from '@/app/dev/ui/got-through-demo';
 import { GotThrough } from '@/app/news/quick/got-through';
+import { HomeArrivalDemo } from '@/app/dev/ui/home-arrival-demo';
 import { ItemDetailsPanel } from '@/app/shopping/inventory/[id]/item-details-panel';
 import { EstimatesTable } from '@/app/account/spend/estimates-table';
 import { compareEstimate } from '@/lib/core/spend/comparison';
@@ -3624,6 +3625,53 @@ export const SURFACES: readonly Surface[] = [
           due: [{ from: 'The Morning Letter', when: 'tomorrow around 6:00\u00a0AM' }],
         }}
       />
+    ),
+  },
+
+  /* Home's first visit of the day and a finished day (plan #1558): played
+   * from the gallery demo, and at rest with the day already finished. */
+  {
+    id: 'home-arrival',
+    label: 'Home · The first visit of the day',
+    module: 'dev',
+    width: 'narrow',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="home-arrival"]',
+      shows:
+        'The greeting, the date, the brief line and the Today card each rise in a beat after the one before, all settled by about three quarters of a second.',
+    },
+    render: () => (
+      <div className={cardVariants({ padding: 'standard' })}>
+        <HomeArrivalDemo />
+      </div>
+    ),
+  },
+  {
+    id: 'home-finished-day',
+    label: 'Home · A finished day',
+    module: 'dev',
+    width: 'narrow',
+    interaction: {
+      kind: 'completion',
+      target: '[data-motion-demo="home-finished"]',
+      shows: "The Today card goes, and the day's sigil draws in cell by cell beside the date.",
+    },
+    render: () => (
+      <div className={cardVariants({ padding: 'standard' })}>
+        <HomeArrivalDemo />
+      </div>
+    ),
+  },
+  {
+    id: 'home-finished-day-rest',
+    label: 'Home · A day already finished',
+    module: 'dev',
+    width: 'narrow',
+    render: () => (
+      <div className={cardVariants({ padding: 'standard' })}>
+        <HomeArrivalDemo finished />
+      </div>
     ),
   },
 
