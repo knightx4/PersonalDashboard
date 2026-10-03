@@ -4,6 +4,7 @@ import { OwlIcon } from '@/components/shell/owl-icon';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cardVariants } from '@/components/ui/card';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import { loadThreads, MAYA_THREAD_LIMIT } from '@/lib/vault/maya/store';
 import { mayaThreadHref } from '@/lib/vault/paths';
 import { cn } from '@/lib/cn';
@@ -19,8 +20,7 @@ export const dynamic = 'force-dynamic';
  * after a sync, marked here as picked by Maya.
  */
 export default async function MayaPage() {
-  const vault = await createVaultClient();
-  const threads = await loadThreads(vault);
+  const threads = await loadThreads({ core: await createCoreClient(), vault: await createVaultClient() });
 
   if (threads.length === 0) {
     return (

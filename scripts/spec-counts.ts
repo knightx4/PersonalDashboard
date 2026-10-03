@@ -52,7 +52,13 @@ const READ_ONLY_TRIGGER =
 
 function readOnlyThreadTables(root: string): Set<string> {
   const tables = new Set<string>();
-  const dirs = ['supabase/migrations', 'supabase/migrations-goals', 'supabase/migrations-job-search'];
+  const dirs = [
+    'supabase/migrations',
+    'supabase/migrations-goals',
+    'supabase/migrations-job-search',
+    // Maya's threads, read-only since plan #1479.
+    'supabase/migrations-vault',
+  ];
   for (const file of listFiles(root, dirs, ['.sql'])) {
     const sql = readFileSync(join(root, file), 'utf8').replace(/--[^\n]*/g, '');
     for (const m of sql.matchAll(READ_ONLY_TRIGGER)) tables.add(m[1].toLowerCase());

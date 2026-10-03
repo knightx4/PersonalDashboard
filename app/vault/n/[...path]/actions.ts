@@ -203,7 +203,8 @@ export async function askMaya(_prev: AskMayaState, formData: FormData): Promise<
   const note = await loadNote(vault, path.data);
   if (!note) return { error: 'That note is not in the vault any more.' };
 
-  const existing = await loadNoteThread(vault, note.id);
+  const db = { core: await createCoreClient(), vault };
+  const existing = await loadNoteThread(db, note.id);
   if (existing) return { threadHref: mayaThreadHref(existing.id) };
 
   const spend = collectSpend();
@@ -225,7 +226,7 @@ export async function askMaya(_prev: AskMayaState, formData: FormData): Promise<
     return { message: 'Maya read this note and had nothing worth saying about it yet.' };
   }
 
-  const saved = await saveThought(vault, {
+  const saved = await saveThought(db, {
     userId: user.id,
     noteId: note.id,
     origin: 'asked',

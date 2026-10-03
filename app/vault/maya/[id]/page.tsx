@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { ChevronLeft } from 'lucide-react';
 import { MapQuote } from '@/components/vault/map-position';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import { quoteFragment } from '@/lib/vault/map/fragment';
 import { loadNoteLinks, loadThread, type MayaThreadNote } from '@/lib/vault/maya/store';
 import { MAYA_QUESTION_MAX } from '@/lib/vault/maya/thought-model';
@@ -28,7 +29,7 @@ export const dynamic = 'force-dynamic';
 export default async function MayaThreadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const vault = await createVaultClient();
-  const thread = await loadThread(vault, id);
+  const thread = await loadThread({ core: await createCoreClient(), vault }, id);
   if (!thread) notFound();
 
   const thought = thread.messages.find((message) => message.kind === 'thought')?.thought ?? null;

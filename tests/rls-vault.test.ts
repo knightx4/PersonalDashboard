@@ -177,16 +177,30 @@ beforeAll(async () => {
     values (${userA}, 'plan #879', 'theme', ${mergeA}, 'failed', 'name-taken: taken')`;
 
   // Maya (plan #1283): a thread on A's note, its thought, and the gate check
-  // that looked at the note first.
-  const [thread] = await admin<{ id: string }[]>`
-    insert into maya_threads (user_id, note_id, question, origin)
-    values (${userA}, ${noteA}, 'Should I quit?', 'asked')
-    returning id`;
+  // that looked at the note first. The old tables are read-only since plan
+  // #1479 moved the threads to core.conversations, so the thread from before
+  // the move is written past the trigger, and the same thread as it now is
+  // goes in core.conversations under the note's ref.
+  const [thread] = await admin.begin(async (tx) => {
+    await tx`set local session_replication_role = replica`;
+    const rows = await tx<{ id: string }[]>`
+      insert into maya_threads (user_id, note_id, question, origin)
+      values (${userA}, ${noteA}, 'Should I quit?', 'asked')
+      returning id`;
+    await tx`
+      insert into maya_messages (thread_id, user_id, role, kind, body, points, note_blob_sha, model)
+      values (${rows[0].id}, ${userA}, 'maya', 'thought', 'Three things bear on this.', '[]'::jsonb,
+              'sha-Journal/2019-04-02.md', 'claude-opus')`;
+    return rows;
+  });
   threadA = thread.id;
   await admin`
-    insert into maya_messages (thread_id, user_id, role, kind, body, points, note_blob_sha, model)
-    values (${threadA}, ${userA}, 'maya', 'thought', 'Three things bear on this.', '[]'::jsonb,
-            'sha-Journal/2019-04-02.md', 'claude-opus')`;
+    insert into core.conversations (id, user_id, subject_kind, subject_ref, title, voice, origin)
+    values (${threadA}, ${userA}, 'row', ${`obsidian.notes:${noteA}`}, 'Should I quit?', 'maya', 'asked')`;
+  await admin`
+    insert into core.conversation_turns (conversation_id, user_id, role, body, detail)
+    values (${threadA}, ${userA}, 'assistant', 'Three things bear on this.',
+            '{"kind": "thought", "points": []}'::jsonb)`;
   await admin`
     insert into maya_gate_checks (user_id, note_id, blob_sha, probability, outcome, jev_model)
     values (${userA}, ${noteA}, 'sha-Journal/2019-04-02.md', 0.9, 'thought', 'jev')`;
@@ -1084,50 +1098,49 @@ describe('Maya, across users (plan #1283)', () => {
     expect(await seen(userB)).toEqual({ threads: 0, messages: 0, checks: 0 });
   });
 
-  it('lets the owner rewrite the question and nobody else', async () => {
-    const byB = await asUser(userB, (tx) => tx`
-      update maya_threads set question = 'hijacked' where id = ${threadA} returning id`);
-    expect(byB).toEqual([]);
-    const byA = await asUser(userA, (tx) => tx`
-      update maya_threads set question = 'Is it time to leave?' where id = ${threadA} returning id`);
-    expect(byA.length).toBe(1);
+  it('takes no more writes in the old tables (plan #1479)', async () => {
     await expect(
-      asUser(userA, (tx) => tx`update maya_threads set origin = 'automatic' where id = ${threadA}`),
-    ).rejects.toThrow();
-  });
-
-  it('lets the owner add to their own thread and nobody else to it', async () => {
-    const own = await asUser(userA, (tx) => tx`
-      insert into maya_messages (thread_id, user_id, role, kind, body)
-      values (${threadA}, ${userA}, 'person', 'reply', 'I think so.') returning id`);
-    expect(own.length).toBe(1);
-
-    await expect(
-      asUser(userB, (tx) => tx`
-        insert into maya_messages (thread_id, user_id, role, kind, body)
-        values (${threadA}, ${userA}, 'person', 'reply', 'planted')`),
-    ).rejects.toThrow();
-    await expect(
-      asUser(userB, (tx) => tx`
-        insert into maya_messages (thread_id, user_id, role, kind, body)
-        values (${threadA}, ${userB}, 'person', 'reply', 'planted')`),
-    ).rejects.toThrow();
-    await admin`delete from maya_messages where role = 'person'`;
-  });
-
-  it('refuses a thread on someone else\'s note, a second thread on a note, and a person\'s thought', async () => {
-    await expect(
-      asUser(userB, (tx) => tx`
-        insert into maya_threads (user_id, note_id, question, origin)
-        values (${userB}, ${noteA}, 'Whose note?', 'asked')`),
-    ).rejects.toThrow();
-    await expect(
-      admin`insert into maya_threads (user_id, note_id, question, origin)
-            values (${userA}, ${noteA}, 'Again', 'automatic')`,
-    ).rejects.toThrow();
+      admin`update maya_threads set question = 'Is it time to leave?' where id = ${threadA}`,
+    ).rejects.toThrow(/read-only/);
     await expect(
       admin`insert into maya_messages (thread_id, user_id, role, kind, body)
-            values (${threadA}, ${userA}, 'person', 'thought', 'not mine to write')`,
+            values (${threadA}, ${userA}, 'person', 'reply', 'I think so.')`,
+    ).rejects.toThrow(/read-only/);
+  });
+
+  it('keeps the thread in core.conversations: the owner rewrites the question and adds to it, nobody else', async () => {
+    const byB = await asUser(userB, (tx) => tx`
+      update core.conversations set title = 'hijacked' where id = ${threadA} returning id`);
+    expect(byB).toEqual([]);
+    const byA = await asUser(userA, (tx) => tx`
+      update core.conversations set title = 'Is it time to leave?' where id = ${threadA} returning id`);
+    expect(byA.length).toBe(1);
+
+    const own = await asUser(userA, (tx) => tx`
+      insert into core.conversation_turns (conversation_id, user_id, role, body)
+      values (${threadA}, ${userA}, 'user', 'I think so.') returning id`);
+    expect(own.length).toBe(1);
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into core.conversation_turns (conversation_id, user_id, role, body)
+        values (${threadA}, ${userB}, 'user', 'planted')`),
+    ).rejects.toThrow();
+    await admin`delete from core.conversation_turns where conversation_id = ${threadA} and role = 'user'`;
+  });
+
+  it('refuses a thread on someone else\'s note, a second thread on a note, and a thought of the person\'s', async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into core.conversations (user_id, subject_kind, subject_ref, voice, origin)
+        values (${userB}, 'row', ${`obsidian.notes:${noteA}`}, 'maya', 'asked')`),
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into core.conversations (user_id, subject_kind, subject_ref, voice, origin)
+            values (${userA}, 'row', ${`obsidian.notes:${noteA}`}, 'maya', 'automatic')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into core.conversation_turns (conversation_id, user_id, role, body, detail)
+            values (${threadA}, ${userA}, 'user', 'not mine to write', '{"kind": "thought"}'::jsonb)`,
     ).rejects.toThrow();
   });
 

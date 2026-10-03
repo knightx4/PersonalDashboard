@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { SpendReport } from '@/lib/core/spend/pricing';
+import { DASH_MODELS } from '@/lib/dash/models';
 import { MAYA_REPLY_MODEL, MAYA_SUMMARY_MAX, replyInThread, replyMessages, replySystem } from './reply';
 
 /**
- * Maya's reply in a thread with a fake model client (plan #1286): what is
- * sent, and what comes back as the reply and the new summary.
+ * Maya's reply in a thread with a fake model client (plan #1286), in Maya's
+ * voice on Dash's loop (plan #1479): what is sent, and what comes back as the
+ * reply and the new summary.
  */
 
 type Reply = { content: unknown[] };
@@ -20,8 +22,10 @@ function fakeClient(reply: Reply, calls: Record<string, unknown>[] = []) {
   } as unknown as NonNullable<Parameters<typeof replyInThread>[0]['client']>;
 }
 
-function answer(input: unknown): Reply {
-  return { content: [{ type: 'tool_use', id: 't1', name: 'answer', input }] };
+function answer(input: { reply: string; summary: string }): Reply {
+  return {
+    content: [{ type: 'tool_use', id: 't1', name: 'answer', input: { answer: input.reply, summary: input.summary, cited: [] } }],
+  };
 }
 
 const base = {
@@ -79,10 +83,25 @@ describe('replyInThread', () => {
       client: fakeClient(answer({ reply: 'Looking back is itself an act.', summary: 'You now hold both.' }), calls),
       onSpend: (report) => spent.push(report),
     });
-    expect(result).toEqual({ ok: true, reply: 'Looking back is itself an act.', summary: 'You now hold both.' });
+    expect(result).toEqual({
+      ok: true,
+      reply: 'Looking back is itself an act.',
+      summary: 'You now hold both.',
+      citations: [],
+    });
     expect(calls[0]?.model).toBe(MAYA_REPLY_MODEL);
-    expect(calls[0]?.tool_choice).toEqual({ type: 'tool', name: 'answer' });
-    expect(calls[0]?.messages).toEqual([{ role: 'user', content: 'But I only know what I did once I look back.' }]);
+    expect(MAYA_REPLY_MODEL).toBe(DASH_MODELS.maya);
+    expect(calls[0]?.tool_choice).toEqual({ type: 'auto' });
+    expect(calls[0]?.messages).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'But I only know what I did once I look back.', cache_control: { type: 'ephemeral' } },
+        ],
+      },
+    ]);
+    const tools = (calls[0]?.tools as { name: string; max_uses?: number }[]).map((tool) => tool.name);
+    expect(tools).toEqual(expect.arrayContaining(['web_search', 'note_positions', 'recall', 'answer']));
     expect(spent).toHaveLength(1);
     expect(spent[0]?.model).toBe(MAYA_REPLY_MODEL);
   });
@@ -102,6 +121,51 @@ describe('replyInThread', () => {
       client: fakeClient(answer({ reply: 'Good.', summary: 'x'.repeat(MAYA_SUMMARY_MAX + 50) })),
     });
     expect(long.ok && long.summary.length).toBe(MAYA_SUMMARY_MAX);
+  });
+
+  it('looks the note up with note_positions and cites what it found', async () => {
+    const replies = [
+      { content: [{ type: 'tool_use', id: 'l1', name: 'note_positions', input: { ref: 'Essays/Self.md' } }] },
+      {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'a1',
+            name: 'answer',
+            input: {
+              answer: 'Your essay holds the opposite.',
+              summary: 'You now hold both.',
+              cited: [{ table: 'obsidian.notes', ref: 'Essays/Self.md' }],
+            },
+          },
+        ],
+      },
+    ];
+    let index = 0;
+    const client = {
+      messages: {
+        create: async () => ({ usage: { input_tokens: 10, output_tokens: 10 }, stop_reason: 'tool_use', ...replies[index++]! }),
+      },
+    } as unknown as NonNullable<Parameters<typeof replyInThread>[0]['client']>;
+    const looked: string[] = [];
+    const result = await replyInThread({
+      ...base,
+      turns: [{ role: 'person', body: 'What else have I said about this?' }],
+      client,
+      execute: async (name) => {
+        looked.push(name);
+        return {
+          ok: true,
+          rows: [{ table: 'obsidian.notes', ref: 'Essays/Self.md', title: 'Self', href: '/vault/n/Essays/Self.md' }],
+        };
+      },
+    });
+    expect(looked).toEqual(['note_positions']);
+    expect(result).toMatchObject({
+      ok: true,
+      reply: 'Your essay holds the opposite.',
+      citations: [{ table: 'obsidian.notes', ref: 'Essays/Self.md', title: 'Self' }],
+    });
   });
 
   it('refuses a thread whose last turn is not the person’s, and an empty reply', async () => {

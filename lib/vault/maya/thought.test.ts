@@ -11,6 +11,7 @@ import {
 } from './fixtures/example';
 import { readStoredPoints, thoughtBody, thoughtFromMaterial, MAYA_BODY_MAX } from './thought';
 import { buildThoughtPrompt, MAX_SEARCHES, MAYA_SYSTEM, THOUGHT_MODEL } from './thought-model';
+import { DASH_MODELS } from '@/lib/dash/models';
 
 /**
  * Maya's thought with a fake model client: what is kept of the report once
@@ -251,12 +252,14 @@ describe('the call', () => {
     });
     expect(out.ok).toBe(true);
     expect(calls).toHaveLength(2);
-    expect(calls[0]!.tool_choice).toBeUndefined();
+    // Maya's voice on Dash's loop chooses, so it can search (plan #1479).
+    expect(calls[0]!.tool_choice).toEqual({ type: 'auto' });
     expect(calls[0]!.tools).toEqual(
       expect.arrayContaining([expect.objectContaining({ type: 'web_search_20260209', name: 'web_search' })]),
     );
     expect(calls[1]!.tool_choice).toEqual({ type: 'tool', name: 'report_thought' });
     expect(calls[0]!.model).toBe(THOUGHT_MODEL);
+    expect(THOUGHT_MODEL).toBe(DASH_MODELS.maya);
   });
 
   it('caches the system prompt and the material, and allows two searches', async () => {
@@ -264,8 +267,8 @@ describe('the call', () => {
     await thoughtFromMaterial(exampleMaterial(), {
       client: fakeClient([report({ question: 'q', points: [point(1)] })], calls),
     });
-    const [call] = calls as { system: unknown; messages: { content: unknown }[]; tools: unknown[] }[];
-    expect(call!.system).toEqual([{ type: 'text', text: MAYA_SYSTEM, cache_control: { type: 'ephemeral' } }]);
+    const [call] = calls as { system: unknown[]; messages: { content: unknown }[]; tools: unknown[] }[];
+    expect(call!.system[0]).toEqual({ type: 'text', text: MAYA_SYSTEM, cache_control: { type: 'ephemeral' } });
     expect(call!.messages[0]!.content).toEqual([
       expect.objectContaining({ type: 'text', cache_control: { type: 'ephemeral' } }),
     ]);
@@ -284,7 +287,7 @@ describe('the call', () => {
       ),
     });
     expect(calls).toHaveLength(2);
-    expect(calls[1]!.tool_choice).toBeUndefined();
+    expect(calls[1]!.tool_choice).toEqual({ type: 'auto' });
     expect((calls[1]!.messages as unknown[]).length).toBe(2);
   });
 

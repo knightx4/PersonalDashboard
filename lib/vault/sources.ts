@@ -57,25 +57,26 @@ export const vaultSources: ModuleSources = {
     {
       table: 'obsidian.maya_threads',
       module: 'Vault',
-      holds: 'The questions they are working through with Maya, one per note, and where they have got to on each.',
+      holds: 'The questions they were working through with Maya before plan #1479, one per note. Read-only: the threads are in core.conversations now.',
       weight: 'intent',
       search: ['question', 'summary'],
       title: 'question',
       href: (id) => `/vault/maya/${id}`,
       note:
         'note_id points at obsidian.notes. summary is where they have got to, rewritten after each exchange. ' +
-        "origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked.",
+        "origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked. " +
+        "Every thread here was copied into core.conversations (voice 'maya', same id), which is the one to read.",
     },
     {
       table: 'obsidian.maya_messages',
       module: 'Vault',
-      holds: 'Their exchanges with Maya about their notes.',
+      holds: 'Their exchanges with Maya about their notes before plan #1479. Read-only: the turns are in core.conversation_turns now.',
       weight: 'intent',
       search: ['body'],
       title: 'body',
       note:
         "Read their turns (role = 'person') as intent and Maya's (role = 'maya') only as context for them, like core.conversation_turns. " +
-        'thread_id points at maya_threads.',
+        'thread_id points at maya_threads. Every message here was copied into core.conversation_turns with the same id.',
     },
     {
       table: 'obsidian.tensions',

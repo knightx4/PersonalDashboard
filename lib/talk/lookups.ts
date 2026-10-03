@@ -107,6 +107,8 @@ export function lookupLabel(name: string, input: unknown): string {
       const q = quoted(field(input, 'query'));
       return q ? `Searching vault notes for ${q}` : 'Reading recent vault notes';
     }
+    case 'note_positions':
+      return 'Reading the notes and positions around a note';
     case 'courses':
       return 'Checking courses';
     case 'read_spec': {

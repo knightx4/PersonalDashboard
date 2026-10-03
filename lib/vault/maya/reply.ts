@@ -1,21 +1,24 @@
 import 'server-only';
 
-import Anthropic from '@anthropic-ai/sdk';
+import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
+import type { SpendSink } from '@/lib/core/spend/pricing';
 import type { LearnOperation } from '@/lib/learn/spend';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
-import { MAX_TURN } from '@/lib/talk/talk';
-import { MODELS } from '@/lib/core/models';
+import { runDash, type DashExecutor } from '@/lib/dash/loop';
+import { dashToolsOf } from '@/lib/dash/registry';
+import { MAX_TURN, type TalkCitation } from '@/lib/talk/talk';
+import { MAYA_MODEL, mayaVoice } from './voice';
 
 /**
  * Maya's answer to what the person said in a thread, and where they have got
- * to (plan #1286). One call, not streamed, following lib/talk/reply.ts:
- * Sonnet, one forced tool, and the spend handed to `onSpend` for the caller
- * to record under MAYA_REPLY_OPERATION.
+ * to (plan #1286), in Maya's voice on Dash's loop (plan #1479,
+ * lib/vault/maya/voice.ts): Opus, web search, and every lookup Ask Dash has,
+ * so a reply can read the person's other notes and positions (note_positions)
+ * or anything else in the app. The spend goes to `onSpend` for the caller to
+ * record under MAYA_REPLY_OPERATION.
  *
- * The same call rewrites the thread's summary, so the summary always reflects
- * the exchange that has just happened and costs no second request.
+ * The same answer rewrites the thread's summary, so the summary always
+ * reflects the exchange that has just happened and costs no second request.
  *
  * What is sent: the note's title and its first MAYA_REPLY_NOTE_CHARS
  * characters, the thread's question, Maya's thought as stored (which carries
@@ -23,7 +26,7 @@ import { MODELS } from '@/lib/core/models';
  * the thread. Never the note's path. The privacy page says the same.
  */
 
-export const MAYA_REPLY_MODEL = MODELS.mayaReply;
+export const MAYA_REPLY_MODEL = MAYA_MODEL;
 
 /** The name this call has in core.model_spend. Stable: renaming it splits the history. */
 export const MAYA_REPLY_OPERATION: LearnOperation = 'reply-to-maya';
@@ -31,7 +34,7 @@ export const MAYA_REPLY_OPERATION: LearnOperation = 'reply-to-maya';
 /** How much of the note goes in the prompt. */
 export const MAYA_REPLY_NOTE_CHARS = 12_000;
 
-/** maya_threads.summary is kept to this length. */
+/** The thread's summary is kept to this length. */
 export const MAYA_SUMMARY_MAX = 1_500;
 
 const TOOL_NAME = 'answer';
@@ -49,6 +52,13 @@ material. Bring in their other notes as your thought quoted them, and outside
 thinkers by author and specific work, giving the gist in your own words. Never
 invent a quote. Never answer with a bare question or ask them to reflect: where
 something is still open, say what would settle it.
+
+LOOKING THINGS UP
+When their reply turns on something the thread does not hold, look it up
+before answering: note_positions reads the notes nearest this one and the
+positions their notes hold, with the passages behind them; recall and
+vault_notes find what else they have written. Search the web only for a
+source's exact words. Most replies need no lookup at all.
 
 HOW TO WRITE
 Plain, direct prose addressed to the person as "you". A few short paragraphs at
@@ -74,9 +84,39 @@ export type MayaReplyInput = {
   turns: readonly MayaReplyTurn[];
 };
 
-export type MayaReply = { ok: true; reply: string; summary: string } | { ok: false; detail: string };
+export type MayaReply =
+  | { ok: true; reply: string; summary: string; citations: TalkCitation[] }
+  | { ok: false; detail: string };
 
-const answerSchema = z.object({ reply: z.string(), summary: z.string() });
+const answerSchema = z.object({ answer: z.string().optional(), summary: z.string().optional() });
+
+/** How Maya's reply ends: its answer, the rows it rests on, and where they have got to. */
+const ANSWER_TOOL: Anthropic.Tool = {
+  name: TOOL_NAME,
+  description: 'Give your reply, and where they have now got to. It ends your turn.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      answer: { type: 'string', description: 'Your reply, in plain prose.' },
+      summary: {
+        type: 'string',
+        description: 'Where they have now got to on the question, in two to four sentences.',
+      },
+      cited: {
+        type: 'array',
+        description: 'The rows a lookup returned that the reply rests on, each by its table and ref. Empty when you looked nothing up.',
+        items: {
+          type: 'object',
+          properties: { table: { type: 'string' }, ref: { type: 'string' } },
+          required: ['table', 'ref'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['answer', 'summary', 'cited'],
+    additionalProperties: false,
+  },
+};
 
 /**
  * The turns as the model is sent them: starting with the person and
@@ -120,12 +160,21 @@ export function replySystem(input: Omit<MayaReplyInput, 'turns'>): string {
   ].join('\n\n');
 }
 
+/** Refuses every lookup, where none can be run. */
+const NO_LOOKUPS: DashExecutor = async () => ({ ok: false, error: 'Nothing can be looked up here. Answer from the thread.' });
+
 /** Maya's reply to the thread so far, and the new summary. Never throws. */
 export async function replyInThread(
   input: MayaReplyInput & {
     anthropicApiKey?: string;
     client?: Pick<Anthropic, 'messages'>;
     onSpend?: SpendSink;
+    /** The thread's ref: `obsidian.notes:<id>`. */
+    subjectRef?: string;
+    /** Runs one lookup as the person (lib/talk/ask-request.ts). Absent: every lookup is refused. */
+    execute?: DashExecutor;
+    /** YYYY-MM-DD in the person's timezone; today in UTC when absent. */
+    today?: string;
   },
 ): Promise<MayaReply> {
   const messages = replyMessages(input.turns);
@@ -136,51 +185,33 @@ export async function replyInThread(
     return { ok: false, detail: 'ANTHROPIC_API_KEY is not set.' };
   }
 
-  const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
-  let response;
-  try {
-    response = await client.messages.create({
-      model: MAYA_REPLY_MODEL,
-      max_tokens: 2000,
-      system: replySystem(input),
-      tools: [
-        {
-          name: TOOL_NAME,
-          description: 'Give your reply, and where they have now got to.',
-          input_schema: {
-            type: 'object',
-            properties: {
-              reply: { type: 'string', description: 'Your reply, in plain prose.' },
-              summary: {
-                type: 'string',
-                description: 'Where they have now got to on the question, in two to four sentences.',
-              },
-            },
-            required: ['reply', 'summary'],
-          },
-        },
-      ],
-      tool_choice: forceTool(TOOL_NAME),
-      messages,
-    });
-  } catch (error) {
-    return { ok: false, detail: error instanceof Error ? error.message : 'The reply failed.' };
-  }
+  const answer = await runDash({
+    voice: mayaVoice({ system: replySystem(input), tools: dashToolsOf('lookup'), finish: ANSWER_TOOL }),
+    context: {
+      surface: 'thread',
+      subject: input.subjectRef ? { ref: input.subjectRef, title: input.question } : null,
+      page: null,
+    },
+    turns: messages.map((message) => ({ role: message.role, body: message.content })),
+    today: input.today ?? new Date().toISOString().slice(0, 10),
+    execute: input.execute ?? NO_LOOKUPS,
+    anthropicApiKey: input.anthropicApiKey ?? '',
+    client: input.client as Anthropic | undefined,
+    onSpend: input.onSpend,
+  });
+  if (!answer.ok) return { ok: false, detail: answer.detail };
 
-  input.onSpend?.({ model: MAYA_REPLY_MODEL, usage: usageFrom(response.usage) });
-
-  const block = response.content.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use') return { ok: false, detail: whyNoReport(response) };
-
-  const parsed = answerSchema.safeParse(block.input);
-  const reply = parsed.success ? parsed.data.reply.trim() : '';
+  const parsed = answerSchema.safeParse(answer.report ?? {});
+  // The body is the answer, or what the lookups found when no answer came.
+  const reply = (answer.body || (parsed.success ? (parsed.data.answer ?? '') : '')).trim();
   if (!reply) return { ok: false, detail: 'The reply came back empty.' };
-  const summary = parsed.success ? parsed.data.summary.trim() : '';
+  const summary = parsed.success ? (parsed.data.summary ?? '').trim() : '';
   return {
     ok: true,
     reply: reply.slice(0, MAX_TURN),
     // An empty summary keeps the one there was.
     summary: clip(summary || input.summary?.trim() || '', MAYA_SUMMARY_MAX),
+    citations: answer.citations,
   };
 }
 

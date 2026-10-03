@@ -118,3 +118,59 @@ describe('runDash', () => {
     expect(answer.ok && answer.toolCalls.map((c) => c.name)).toEqual(['add_goal']);
   });
 });
+
+describe('a voice with server tools and its own ending (plan #1479, Maya)', () => {
+  const REPORT: Anthropic.Tool = {
+    name: 'report_thought',
+    description: 'Report the thought.',
+    input_schema: { type: 'object', properties: { question: { type: 'string' } } },
+  };
+  const SEARCH = { type: 'web_search_20260209', name: 'web_search', max_uses: 2 } as unknown as Anthropic.ToolUnion;
+  const maya: DashVoice = { model: 'opus', system: 'Maya.', tools: [], serverTools: [SEARCH], finish: REPORT };
+  const execute = vi.fn(async () => ({ ok: false as const, error: 'none' }));
+
+  it('lets the model choose, sends a paused turn back, asks once for the ending, and returns it with the cited passages', async () => {
+    const { client: stub, sent } = client([
+      { content: [{ type: 'server_tool_use', id: 's1', name: 'web_search', input: {} }], stop_reason: 'pause_turn', usage: USAGE },
+      {
+        content: [
+          {
+            type: 'text',
+            text: 'Hesse wrote it.',
+            citations: [{ type: 'web_search_result_location', cited_text: 'Each man is a road.' }],
+          },
+        ],
+        stop_reason: 'end_turn',
+        usage: USAGE,
+      },
+      call('r1', 'report_thought', { question: 'Who are you?' }),
+    ]);
+    const answer = await runDash({
+      voice: maya,
+      context,
+      turns,
+      today: '2026-10-03',
+      execute,
+      anthropicApiKey: 'k',
+      client: stub,
+    });
+
+    expect(sent.map((s) => (s as unknown as { tool_choice: unknown }).tool_choice)).toEqual([
+      { type: 'auto' },
+      { type: 'auto' },
+      { type: 'tool', name: 'report_thought' },
+    ]);
+    expect(sent[0]!.tools.map((t) => t.name)).toEqual(['web_search', 'report_thought']);
+    expect(answer).toMatchObject({ ok: true, body: '', report: { question: 'Who are you?' }, webCited: ['Each man is a road.'] });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('fails rather than taking prose as the ending', async () => {
+    const { client: stub } = client([
+      { content: [{ type: 'text', text: 'Thinking.' }], stop_reason: 'end_turn', usage: USAGE },
+      { content: [{ type: 'text', text: 'Still thinking.' }], stop_reason: 'end_turn', usage: USAGE },
+    ]);
+    const answer = await runDash({ voice: maya, context, turns, today: '2026-10-03', execute, anthropicApiKey: 'k', client: stub });
+    expect(answer.ok).toBe(false);
+  });
+});

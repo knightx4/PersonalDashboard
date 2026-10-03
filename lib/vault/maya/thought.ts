@@ -10,11 +10,11 @@ import { verifyThought, type MayaPoint, type MayaSynthesis, type MayaThought, ty
 
 /**
  * Maya's thought on one note, end to end (plan #1284): read the material,
- * call the model, check what it said. Writes nothing; the caller stores the
- * result in obsidian.maya_threads and maya_messages (plan #1285) and records
- * the spend under MAYA_THOUGHT_OPERATION with recordLearnSpend.
+ * call the model, check what it said. Writes nothing; the caller keeps the
+ * result as the note's thread in core.conversations (store.ts, plan #1479)
+ * and records the spend under MAYA_THOUGHT_OPERATION with recordLearnSpend.
  *
- * `body` and `points` are shaped for maya_messages as they are: `body` is the
+ * `body` and `points` are shaped for the thread's turn as they are: `body` is the
  * thought as plain text, empty when there are no points, and never longer
  * than MAYA_BODY_MAX; `points` is a JSON array of the points followed by the
  * synthesis when there is one, each tagged by `kind`.

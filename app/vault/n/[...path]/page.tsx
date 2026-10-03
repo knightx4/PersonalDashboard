@@ -12,6 +12,7 @@ import {
 import { VaultPanel } from '@/components/vault/vault-panel';
 import { VaultSheet } from '@/components/vault/vault-sheet';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import {
   groupByFolder,
   loadAttachments,
@@ -116,7 +117,7 @@ export default async function NotePage({
   const [{ timezone }, linkedTasks, mayaThread, comments] = await Promise.all([
     loadAccountSettings(user.id),
     loadTasksFor(user.id, 'note', note.id),
-    notRead ? null : loadNoteThread(supabase, note.id),
+    notRead ? null : createCoreClient().then((core) => loadNoteThread({ core, vault: supabase }, note.id)),
     // A failed read leaves the thread empty rather than the page broken.
     loadThread(supabase, threadRef('vault_note', note.id), { userId: user.id }).catch(
       (): DevComment[] => [],

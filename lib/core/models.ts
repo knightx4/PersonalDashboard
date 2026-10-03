@@ -156,10 +156,8 @@ export const MODELS = {
   vaultMapExtract: HAIKU,
   /** lib/vault/map/merge-pass.ts */
   vaultMapMerge: HAIKU,
-  /** lib/vault/maya/reply.ts */
-  mayaReply: SONNET,
-  /** lib/vault/maya/thought-model.ts */
-  mayaThought: OPUS,
+  /** lib/vault/maya/thought-model.ts and reply.ts: Maya's voice, its thoughts and its replies (lib/dash/models.ts maya) */
+  maya: OPUS,
   /** lib/vault/notes/connections-model.ts */
   vaultConnections: HAIKU,
   /** lib/vault/transcript-model.ts */
