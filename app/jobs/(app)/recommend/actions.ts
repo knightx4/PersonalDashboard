@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
-import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { recordSessionSpend } from '@/lib/core/spend/session';
@@ -243,10 +242,11 @@ export async function markSuggestionSent(id: string): Promise<{ error: string | 
 }
 
 /**
- * Save a suggested posting to the pipeline as a lead, then open its role page,
- * where the description can be fetched from the link.
+ * Save a suggested posting to the pipeline as a lead. The person stays where
+ * they are to keep going through the recommendations; the new role appears in
+ * the roles table, and its page fetches the description from the link.
  */
-// latency: pending -- redirects to the new role
+// latency: pending
 export async function saveOpening(id: string): Promise<{ error: string | null }> {
   const parsed = SuggestionId.safeParse(id);
   if (!parsed.success) return { error: 'Could not tell which suggestion that was.' };
@@ -298,5 +298,5 @@ export async function saveOpening(id: string): Promise<{ error: string | null }>
   if (closed.error) return closed;
   revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/roles');
-  redirect(`/jobs/roles/${role.id}`);
+  return { error: null };
 }
