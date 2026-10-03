@@ -77,16 +77,16 @@ export default function HomePage() {
             style={{ '--delay': '80ms' } as CSSProperties}
           >
             Your orders, job search, notes and goals,{' '}
-            <span className={s.glow}>in one place.</span>
+            <span className={s.glow}>working as&nbsp;one.</span>
           </h1>
 
           <p
             className={cn(s.rise, s.muted, 'mx-auto mt-6 max-w-2xl text-body leading-relaxed')}
             style={{ '--delay': '160ms' } as CSSProperties}
           >
-            Personal Dashboard reads the order confirmations in your inbox, keeps your job search on
-            one board, mirrors your Obsidian vault, and holds your todos, reading and goals beside
-            them. Dash, its assistant, answers questions about any of it.
+            Your inbox fills in your orders and interviews. Return deadlines, job reminders and goal
+            steps land on one agenda. Goals tick themselves off when the work shows up elsewhere, and
+            Dash, the assistant, can answer questions across all of it.
           </p>
 
           <div
@@ -145,7 +145,8 @@ export default function HomePage() {
                     <PreviewTile module={byId('goals')} label="Steps done this week" figure="6 of 8" fill={75} />
                   </div>
 
-                  <div className={cn(s.well, 'mt-3 divide-y divide-white/5')}>
+                  <p className={cn(s.ghost, 'mt-5 text-small')}>Today, from every workspace</p>
+                  <div className={cn(s.well, 'mt-2 divide-y divide-white/5')}>
                     {[
                       { id: 'todo' as const, text: 'Send the portfolio link to Northwind', meta: 'Today' },
                       { id: 'jobs' as const, text: 'Second interview, product designer', meta: 'Tue 10:30' },
@@ -169,6 +170,8 @@ export default function HomePage() {
           </div>
         </section>
 
+        <Connections byId={byId} />
+
         {/* ---- Workspaces ---- */}
         <section className="mx-auto max-w-6xl px-4 pt-28 sm:px-6 sm:pt-36">
           <div className="max-w-2xl">
@@ -176,7 +179,7 @@ export default function HomePage() {
               Workspaces
             </p>
             <h2 className={cn(s.ink, 'font-display mt-3 text-figure font-semibold tracking-[-0.03em]')}>
-              Each part of your life gets a room of its own.
+              A room for each part of your life.
             </h2>
             <p className={cn(s.muted, 'mt-4 text-body leading-relaxed')}>
               Turn on the workspaces you use and leave the rest off. They share one search, one
@@ -350,6 +353,188 @@ export default function HomePage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+/** The three things the page claims come into the app from outside it. */
+const SOURCES = [
+  {
+    icon: 'inbox',
+    title: 'Your Gmail',
+    body: 'Order confirmations and interview invites, read with read-only access.',
+  },
+  { icon: 'note', title: 'Your Obsidian vault', body: 'Every note, mirrored and searchable.' },
+  {
+    icon: 'paper',
+    title: 'Your newsletter address',
+    body: 'Issues from the newsletters you point at it.',
+  },
+] as const;
+
+/** What the workspaces make together that none of them makes alone. */
+const OUTCOMES: { id: ModuleId; title: string; body: string }[] = [
+  {
+    id: 'todo',
+    title: 'One agenda',
+    body: 'Job reminders, return deadlines and goal steps on a single list for the day.',
+  },
+  {
+    id: 'goals',
+    title: 'Goals that keep score',
+    body: 'A step closes when Jobs, Todo or an email shows it has happened.',
+  },
+  {
+    id: 'learn',
+    title: 'Learning with a purpose',
+    body: 'What you want to learn sits among your goals, with questions to practise it in Learn.',
+  },
+];
+
+/** One interview, followed through four workspaces. */
+const STORY: { id: ModuleId | null; title: string; body: string }[] = [
+  {
+    id: 'jobs',
+    title: 'An interview invite arrives',
+    body: 'Jobs adds the interview to its application, at the time written on the invite.',
+  },
+  {
+    id: 'todo',
+    title: 'Todo has it on the day',
+    body: 'Reminders you set on the application appear on your agenda when they fall due.',
+  },
+  {
+    id: 'goals',
+    title: 'Goals ticks the step off',
+    body: '"Get to a second interview" closes, with a note naming the email that showed it.',
+  },
+  {
+    id: null,
+    title: 'Dash knows about it',
+    body: 'Ask what is on this week and the interview is in the answer, linked to the application.',
+  },
+];
+
+function SourceIcon({ icon }: { icon: (typeof SOURCES)[number]['icon'] }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {icon === 'inbox' ? (
+        <>
+          <path d="M4 13l2.5-7h11L20 13v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" />
+          <path d="M4 13h4.5l1 2h5l1-2H20" />
+        </>
+      ) : icon === 'note' ? (
+        <>
+          <path d="M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+          <path d="M9 12h6M9 16h4" />
+        </>
+      ) : (
+        <>
+          <path d="M5 5h11v14H6a1 1 0 0 1-1-1z" />
+          <path d="M16 9h3v9a1 1 0 0 1-1 1h-2" />
+          <path d="M8 9h5M8 13h5" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function Connections({ byId }: { byId: (id: ModuleId) => AppModule }) {
+  const workspaces = modulesFor(false);
+
+  return (
+    <section className="mx-auto max-w-6xl px-4 pt-28 sm:px-6 sm:pt-36">
+      <div className="mx-auto max-w-2xl text-center">
+        <p className={cn(s.hueText, 'text-small font-semibold tracking-wide uppercase')} style={hue(byId('goals'))}>
+          How it fits together
+        </p>
+        <h2 className={cn(s.ink, 'font-display mt-3 text-figure font-semibold tracking-[-0.03em] sm:text-figure-lg')}>
+          Each workspace feeds the others.
+        </h2>
+        <p className={cn(s.muted, 'mt-4 text-body leading-relaxed')}>
+          Nothing has to be copied from one place to another. What arrives in your inbox, what you
+          write down and what you finish reach every workspace that needs them.
+        </p>
+      </div>
+
+      <div className={cn(s.flow, 'mt-14')}>
+        <div className="flex flex-col gap-3">
+          <p className={cn(s.ghost, 'text-small font-semibold tracking-wide uppercase')}>Comes in</p>
+          {SOURCES.map((source) => (
+            <div key={source.title} className={cn(s.glass, 'flex gap-3 p-4')}>
+              <span className={s.sourceIcon}>
+                <SourceIcon icon={source.icon} />
+              </span>
+              <div>
+                <p className={cn(s.ink, 'text-ui font-semibold')}>{source.title}</p>
+                <p className={cn(s.muted, 'mt-0.5 text-small leading-relaxed')}>{source.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className={s.wire} aria-hidden />
+
+        <div className={cn(s.glass, s.window, s.hub, 'p-5')}>
+          <p className={cn(s.ghost, 'text-small font-semibold tracking-wide uppercase')}>Your workspaces</p>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            {workspaces.map((module, index) => (
+              <div
+                key={module.id}
+                className={cn(
+                  s.chip,
+                  'flex items-center gap-2 px-2.5 py-2 text-ui',
+                  index === workspaces.length - 1 && workspaces.length % 2 === 1 && 'col-span-2 justify-center',
+                )}
+                style={hue(module)}
+              >
+                <ModuleMark module={module.id} size="xs" />
+                <span className={s.ink}>{module.label}</span>
+              </div>
+            ))}
+          </div>
+          <div className={cn(s.dashRow, 'mt-4 flex items-center gap-3 p-3')}>
+            <ModuleMark module={null} size="sm" />
+            <p className={cn(s.muted, 'text-small leading-relaxed')}>
+              <span className={cn(s.ink, 'font-semibold')}>Dash</span> reads across all of them
+              and links every answer to where it came from.
+            </p>
+          </div>
+        </div>
+
+        <div className={s.wire} aria-hidden />
+
+        <div className="flex flex-col gap-3">
+          <p className={cn(s.ghost, 'text-small font-semibold tracking-wide uppercase')}>Comes together</p>
+          {OUTCOMES.map((outcome) => (
+            <div key={outcome.title} className={cn(s.glass, 'flex gap-3 p-4')} style={hue(byId(outcome.id))}>
+              <ModuleMark module={outcome.id} size="sm" />
+              <div>
+                <p className={cn(s.ink, 'text-ui font-semibold')}>{outcome.title}</p>
+                <p className={cn(s.muted, 'mt-0.5 text-small leading-relaxed')}>{outcome.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={cn(s.glass, 'mt-16 p-6 sm:p-8')}>
+        <p className={cn(s.ink, 'font-display text-title font-semibold tracking-tight')}>
+          One interview, followed through four workspaces
+        </p>
+        <ol className={cn(s.story, 'mt-8 grid gap-8 md:grid-cols-4 md:gap-6')}>
+          {STORY.map((step, index) => (
+            <li key={step.title} className="relative">
+              <div className="flex items-center gap-3">
+                <span className={cn(s.stepNum, 'text-small font-semibold')}>{index + 1}</span>
+                <ModuleMark module={step.id} size="sm" />
+              </div>
+              <p className={cn(s.ink, 'mt-4 text-ui font-semibold')}>{step.title}</p>
+              <p className={cn(s.muted, 'mt-1 text-small leading-relaxed')}>{step.body}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
   );
 }
 
