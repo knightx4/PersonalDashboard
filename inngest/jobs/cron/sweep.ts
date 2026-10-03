@@ -65,9 +65,12 @@ export function coldLeadCutoffDays(ghostThresholdDays: number): number {
 export async function closeColdLeads(
   supabase: ReturnType<typeof createServiceSupabase>,
 ): Promise<number> {
+  // applications and profiles both reference auth.users and not each other,
+  // so PostgREST cannot embed one in the other: the threshold is read on its
+  // own. An embed here failed every night with a 400 and closed nothing.
   const { data: candidates } = await supabase
     .from('applications')
-    .select('id, user_id, created_at, profiles!inner ( ghost_threshold_days ), roles ( title, companies ( name ) )')
+    .select('id, user_id, created_at, roles ( title, companies ( name ) )')
     .in('status', ['lead', 'drafting'])
     .limit(500);
 
@@ -75,12 +78,20 @@ export async function closeColdLeads(
     id: string;
     user_id: string;
     created_at: string;
-    profiles: { ghost_threshold_days: number | null };
     roles?: { title: string | null; companies: { name: string | null } | null } | null;
   };
 
   const rows = (candidates ?? []) as unknown as Row[];
   if (rows.length === 0) return 0;
+
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, ghost_threshold_days')
+    .in('id', [...new Set(rows.map((row) => row.user_id))]);
+  const thresholdOf = new Map<string, number | null>();
+  for (const profile of profiles ?? []) {
+    thresholdOf.set(profile.id as string, (profile.ghost_threshold_days as number | null) ?? null);
+  }
 
   const { data: activity } = await supabase
     .from('application_events')
@@ -106,7 +117,7 @@ export async function closeColdLeads(
 
   for (const row of rows) {
     if (alreadyClosed.has(row.id)) continue;
-    const cutoff = coldLeadCutoffDays(row.profiles.ghost_threshold_days ?? 30);
+    const cutoff = coldLeadCutoffDays(thresholdOf.get(row.user_id) ?? 30);
     const last = new Date(lastAt.get(row.id) ?? row.created_at).getTime();
     if (now - last <= cutoff * DAY_MS) continue;
 
@@ -191,13 +202,14 @@ export async function generateReminders(
 
   // 1. A completed interview with no debrief. Asked for the same evening,
   //    because a debrief written three days later is worth very little.
+  //    The debrief is `notes` since job_search 0011 merged debrief, went_well
+  //    and went_poorly into it.
   const { data: interviews } = await supabase
     .from('interviews')
     .select('id, user_id, application_id, scheduled_at')
     .lt('scheduled_at', new Date(now).toISOString())
     .gt('scheduled_at', new Date(now - DEBRIEF_NUDGE_WINDOW_DAYS * DAY_MS).toISOString())
-    .is('debrief', null)
-    .is('went_well', null)
+    .is('notes', null)
     .limit(500);
 
   for (const interview of interviews ?? []) {

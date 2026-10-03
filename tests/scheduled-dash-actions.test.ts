@@ -104,10 +104,10 @@ describe('the jobs sweep (/api/cron/jobs-sweep, and the daily stage)', () => {
           user_id: USER,
           status: 'lead',
           created_at: new Date(Date.now() - 90 * DAY).toISOString(),
-          profiles: { ghost_threshold_days: 30 },
           roles: { title: 'Designer', companies: { name: 'Acme' } },
         },
       ],
+      'job_search.profiles': [{ id: USER, ghost_threshold_days: 30 }],
       'job_search.application_events': [],
     };
     const closed = await closeColdLeads(serviceClient(tables, 'job_search') as never);
@@ -134,8 +134,7 @@ describe('the jobs sweep (/api/cron/jobs-sweep, and the daily stage)', () => {
           user_id: USER,
           application_id: 'app-1',
           scheduled_at: new Date(Date.now() - DAY / 2).toISOString(),
-          debrief: null,
-          went_well: null,
+          notes: null,
           prep_notes: 'done',
         },
         {

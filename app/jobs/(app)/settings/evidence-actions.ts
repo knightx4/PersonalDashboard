@@ -257,9 +257,9 @@ export async function proposeEvidence(
   if (kind === 'debriefs') {
     const { data: rows, error } = await supabase
       .from('interviews')
-      .select(
-        'debrief, went_well, went_poorly, applications!inner (roles!inner (title, companies!inner (name)))',
-      )
+      // `notes` is the debrief: job_search 0011 merged debrief, went_well and
+      // went_poorly into it, and selecting the old three failed every time.
+      .select('notes, applications!inner (roles!inner (title, companies!inner (name)))')
       .eq('user_id', user.id)
       .order('scheduled_at', { ascending: false, nullsFirst: false })
       .limit(40);
@@ -273,9 +273,9 @@ export async function proposeEvidence(
         const label = role ? [role.companies?.name, role.title].filter(Boolean).join(', ') : null;
         return {
           label: label || null,
-          debrief: (row.debrief as string) ?? null,
-          wentWell: (row.went_well as string) ?? null,
-          wentPoorly: (row.went_poorly as string) ?? null,
+          debrief: (row.notes as string) ?? null,
+          wentWell: null,
+          wentPoorly: null,
         };
       }),
     );
