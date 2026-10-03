@@ -7,6 +7,7 @@ import {
 } from '@/lib/comments/load';
 import { splitSections, type SpecSection } from '@/lib/specs/sections';
 import { readSpec, type SpecDoc } from '@/lib/specs/registry';
+import { parseRules, type ParsedRules } from '@/lib/specs/rules';
 
 /**
  * A specification, its sections, and the thread under each one.
@@ -28,6 +29,8 @@ export type LoadedSpec = {
   sections: SpecSectionWithThread[] | null;
   /** Threads whose heading no longer appears in the document. */
   orphans: { id: string; heading: string; thread: DevComment[] }[];
+  /** The `## Rules` section, read; null when the file is gone. */
+  rules: ParsedRules | null;
 };
 
 type Row = {
@@ -64,6 +67,7 @@ export async function loadSpec(
     return {
       doc,
       sections: null,
+      rules: null,
       orphans: rows
         .filter((row) => threadFrom(row.dev_comments).length > 0)
         .map((row) => ({
@@ -111,7 +115,7 @@ export async function loadSpec(
     .map((row) => ({ id: row.id, heading: row.heading, thread: threadFrom(row.dev_comments) }))
     .filter((row) => row.thread.length > 0);
 
-  return { doc, sections, orphans };
+  return { doc, sections, orphans, rules: parseRules(markdown) };
 }
 
 /** How many comments a document carries, for the list page. */

@@ -6,8 +6,18 @@ import { cardVariants } from '@/components/ui/card';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadSpec } from '@/lib/specs/load';
 import { specBySlug } from '@/lib/specs/registry';
+import { ruleStates } from '@/lib/specs/rule-states';
+import { SPEC_COUNTERS } from '@/scripts/spec-counts';
+import specBaseline from '@/scripts/spec-baseline.json';
 import { cn } from '@/lib/cn';
 import { SpecSectionCard, SpecOrphan } from './spec-view';
+import { SpecRules } from './spec-rules';
+
+/**
+ * Names and targets only: the counters' `measure` is never called here, since
+ * what it walks is not deployed. The numbers are the baseline file's.
+ */
+const COUNTERS = new Map(SPEC_COUNTERS.map((c) => [c.name, { target: c.target }]));
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +46,10 @@ export default async function SpecPage({ params }: { params: Promise<{ slug: str
 
   const user = await requireUser();
   const supabase = await createClient();
-  const { sections, orphans } = await loadSpec(supabase, user.id, doc);
+  const { sections, orphans, rules } = await loadSpec(supabase, user.id, doc);
+  const states = rules
+    ? ruleStates(rules, { baseline: specBaseline as Record<string, number>, counters: COUNTERS })
+    : [];
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -51,6 +64,8 @@ export default async function SpecPage({ params }: { params: Promise<{ slug: str
       </p>
 
       <PageHeader title={doc.title} description={`docs/${doc.file}`} />
+
+      <SpecRules states={states} />
 
       {sections === null ? (
         // The file is gone from the repository. Said plainly, with whatever was
