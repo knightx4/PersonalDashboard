@@ -114,11 +114,9 @@ export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: s
       )}
 
       {board.waiting.length > 0 && (
-        <Section
-          icon={MailQuestion}
-          title="Waiting on you"
-          hint="Mail that asked for something and has not been answered."
-        >
+        // No hint: "Waiting on you" already says it, and the line restating it
+        // took a row of its own on a phone (law 15).
+        <Section icon={MailQuestion} title="Waiting on you">
           <ul className="divide-y divide-border">
             {board.waiting.map((row) => (
               <li key={row.eventId} className="row-pad flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -203,7 +201,7 @@ function Section({
 }: {
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   title: string;
-  hint: string;
+  hint?: string;
   tone?: 'brand';
   children: React.ReactNode;
 }) {
@@ -219,7 +217,7 @@ function Section({
           aria-hidden
         />
         <h3 className="text-ui font-semibold text-ink">{title}</h3>
-        <span className="w-full text-small text-ink-muted sm:w-auto">{hint}</span>
+        {hint && <span className="w-full text-small text-ink-muted sm:w-auto">{hint}</span>}
       </header>
       {children}
     </Card>

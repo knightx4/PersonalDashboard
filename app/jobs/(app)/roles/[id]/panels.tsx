@@ -266,8 +266,21 @@ interface InterviewSeed {
   fromSubject: string | null;
 }
 
-export function RoleDetailPanels(props: PanelProps & { initialTab?: Tab }) {
-  const [tab, setTab] = useState<Tab>(props.initialTab ?? 'timeline');
+/** The tab a `?tab=` value names, or none when it names no tab here. */
+function tabFrom(value: string | undefined): Tab | undefined {
+  return TABS.find((entry) => entry.id === value)?.id;
+}
+
+export function RoleDetailPanels(props: PanelProps & { initialTab?: string }) {
+  const [tab, setTab] = useState<Tab>(tabFrom(props.initialTab) ?? 'timeline');
+  // A link on this same page (the coverage pill opens Posting) changes only
+  // the search param, so the panels stay mounted: follow the new value.
+  const [seenInitialTab, setSeenInitialTab] = useState(props.initialTab);
+  if (props.initialTab !== seenInitialTab) {
+    setSeenInitialTab(props.initialTab);
+    const next = tabFrom(props.initialTab);
+    if (next) setTab(next);
+  }
   const [interviewSeed, setInterviewSeed] = useState<InterviewSeed | null>(null);
 
   // Adding the round from a message is one move, not "go to the other tab and
@@ -2508,8 +2521,12 @@ function InterviewGroupCard({
             focus, so they are text until they are touched and the value and
             its editor are the same object in the same place (law 12). Folded,
             the round is something you are scanning past and nothing there is
-            editable at all. */}
-        <h3 className="flex min-w-0 flex-1 items-baseline gap-x-1.5 text-ui font-semibold text-ink">
+            editable at all.
+
+            On a phone the heading keeps room for "Round 2 · Technical" and
+            the count wraps beneath it, rather than the count being drawn over
+            the heading. */}
+        <h3 className="flex min-w-48 flex-1 items-baseline gap-x-1.5 text-ui font-semibold text-ink">
           {open ? (
             <>
               <span className="text-ink-muted">Round</span>
@@ -2582,8 +2599,8 @@ function InterviewGroupCard({
             way a round's own notes behave one level down. A textarea shown on
             every round whether or not anything had been written in it made an
             empty round take the space of a full one and read as filled in. */}
-          <div className="mt-3">
-            {showNotes ? (
+          <div className="mt-3 space-y-2">
+            {showNotes && (
               // The same law one level up: the round's own note was a
               // permanently open textarea holding its value, under a heading,
               // over a Save button. It reads as writing now and opens where it
@@ -2602,23 +2619,25 @@ function InterviewGroupCard({
                   }}
                 />
               </CollapsibleField>
-            ) : (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <NoteKindButton label="Note on this round" onClick={() => setShowNotes(true)} />
-                {/* The number and the name still need saving with nothing written
-                  under them, so the button stays reachable while the note is
-                  folded away. */}
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={save}
-                  className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
-                >
-                  Save the round
-                </button>
-                {saved && <span className="text-small text-ink-muted">{saved}</span>}
-              </div>
             )}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {!showNotes && (
+                <NoteKindButton label="Note on this round" onClick={() => setShowNotes(true)} />
+              )}
+              {/* The number and the name are saved here whether or not the
+                round has a note. The button used to sit in the no-note branch
+                only, so once a note was written an edited number or name had
+                nothing to save it. */}
+              <button
+                type="button"
+                disabled={pending}
+                onClick={save}
+                className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
+              >
+                Save the round
+              </button>
+              {saved && <span className="text-small text-ink-muted">{saved}</span>}
+            </div>
           </div>
 
           <RoundMail groupId={group.id} messageIds={group.messageIds} roleMail={roleMail} />

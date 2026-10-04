@@ -44,6 +44,7 @@ type PrepInterviewRow = {
 import { RoleDetailPanels } from './panels';
 import { RoleTitle } from './role-title';
 import { RoleCompany } from './role-company';
+import { ExcitementPicker } from './excitement-picker';
 
 export const metadata = { title: 'Role' };
 
@@ -101,7 +102,7 @@ export default async function RoleDetailPage({
     .select(
       `id, attempt, status, source, submitted_at, confirmation_received_at,
        first_human_response_at, closed_at, outcome, rejection_stage, rejection_stage_override,
-       excitement, next_action, next_action_due, needs_review, created_by, cover_letter`,
+       excitement, needs_review, created_by, cover_letter`,
     )
     .eq('role_id', id)
     .eq('user_id', user.id)
@@ -406,6 +407,10 @@ export default async function RoleDetailPage({
                   status={current.status as ApplicationStatus}
                   submittedAt={current.submitted_at as string | null}
                 />
+                <ExcitementPicker
+                  applicationId={current.id as string}
+                  excitement={(current.excitement as number | null) ?? null}
+                />
                 {role.jd_url && (
                   <a
                     href={role.jd_url as string}
@@ -516,7 +521,7 @@ export default async function RoleDetailPage({
           bankSize={evidence.length}
           coverLetter={(current.cover_letter as string | null) ?? ''}
           timezone={timezone}
-          initialTab={tab === 'interviews' ? 'interviews' : undefined}
+          initialTab={tab}
           focusInterviewId={focusInterviewId ?? null}
           events={(events ?? []).map((event) => ({
             id: event.id as string,

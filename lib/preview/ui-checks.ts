@@ -154,7 +154,11 @@ export function parseVerdict(raw: string, surface: string, round: number): Criti
   const earlier = earlierIn.map((item, i) => {
     if (!item || typeof item !== 'object') throw new Error(`Earlier item ${i + 1} is not an object.`);
     const e = item as Record<string, unknown>;
-    return { where: text(e.where, `earlier ${i + 1} where`), done: text(e.done, `earlier ${i + 1} done`) };
+    // The critic's own contract (.claude/agents/ui-critic.md) writes `done` as
+    // true or false; older verdicts wrote it as text. Both are kept as text.
+    const done =
+      typeof e.done === 'boolean' ? (e.done ? 'yes' : 'no') : text(e.done, `earlier ${i + 1} done`);
+    return { where: text(e.where, `earlier ${i + 1} where`), done };
   });
 
   const notes = v.notes === undefined || v.notes === null ? null : text(v.notes, 'notes');

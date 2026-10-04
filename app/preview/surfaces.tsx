@@ -1,4 +1,6 @@
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
+import { ExcitementPicker } from '@/app/jobs/(app)/roles/[id]/excitement-picker';
+import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
@@ -273,7 +275,17 @@ const rolePanels: PanelProps = {
     },
   ],
   thread: [],
-  interviewGroups: [{ id: 'g1', label: 'First round', roundNumber: 1, notes: '', messageIds: [] }],
+  interviewGroups: [
+    { id: 'g1', label: 'First round', roundNumber: 1, notes: '', messageIds: [] },
+    {
+      id: 'g2',
+      label: 'Technical',
+      roundNumber: 2,
+      notes:
+        'Two interviewers, one system design and one code review. Ask about on-call before the end.',
+      messageIds: [],
+    },
+  ],
   companyName: 'The D. E. Shaw group',
   matchCandidates: [],
   otherAttempts: [],
@@ -2400,7 +2412,27 @@ export const SURFACES: readonly Surface[] = [
     label: 'Role · Interviews',
     module: 'jobs',
     width: 'wide',
-    render: () => <RoleDetailPanels {...rolePanels} initialTab="interviews" />,
+    // The header too, so the status and the excitement beside it are drawn as
+    // the role page sets them.
+    render: () => (
+      <div>
+        <PageHeader
+          title="Senior Software Engineer, Platform"
+          description="The D. E. Shaw group · New York · Hybrid"
+          actions={
+            <div className="flex items-center gap-2">
+              <StatusPicker
+                applicationId="app-1"
+                status="in_process"
+                submittedAt="2026-07-31T12:00:00.000Z"
+              />
+              <ExcitementPicker applicationId="app-1" excitement={4} />
+            </div>
+          }
+        />
+        <RoleDetailPanels {...rolePanels} initialTab="interviews" />
+      </div>
+    ),
   },
   {
     id: 'jobs-pipeline-board',
