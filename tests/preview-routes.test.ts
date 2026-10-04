@@ -3,8 +3,9 @@
  * (lib/preview/routes.ts), checked against the gallery and the app's pages,
  * and against the files of screen changes that have already shipped.
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { importedBy, pagesUsing } from '@/lib/preview/importers';
 import {
@@ -14,6 +15,7 @@ import {
   surfacesForFiles,
   surfacesInText,
 } from '@/lib/preview/routes';
+import { SPEC_COUNTERS } from '@/scripts/spec-counts';
 
 const root = process.cwd();
 
@@ -122,5 +124,27 @@ describe('surfacesInText', () => {
       Object.keys(SURFACE_ROUTES).filter((id) => SURFACE_ROUTES[id].includes('/jobs/roles/[id]')),
     );
     expect(surfacesInText('Edit app/preview/surfaces.tsx and docs/UI-QUALITY-SPEC.md')).toEqual([]);
+  });
+});
+
+describe('the routes-without-surface counter (docs/UI-QUALITY-SPEC.md R1)', () => {
+  const counter = SPEC_COUNTERS.find((c) => c.name === 'routes-without-surface')!;
+
+  it('counts a new page with no gallery entry, and not one that has an entry or only redirects', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'routes-without-surface-'));
+    const write = (file: string, text: string) => {
+      mkdirSync(dirname(join(fixture, file)), { recursive: true });
+      writeFileSync(join(fixture, file), text);
+    };
+    try {
+      write('app/(app)/brand-new/page.tsx', 'export default function P() {\n  return <p>new</p>;\n}\n');
+      write('app/news/saved/page.tsx', 'export default function P() {\n  return <p>saved</p>;\n}\n');
+      write('app/old/page.tsx', "import { redirect } from 'next/navigation';\nexport default function P() {\n  redirect('/news');\n}\n");
+      write('app/api/thing/route.ts', 'export function GET() {}\n');
+      write('app/preview/page.tsx', 'export default function P() {\n  return null;\n}\n');
+      expect(counter.measure(fixture)).toEqual(['/brand-new']);
+    } finally {
+      rmSync(fixture, { recursive: true, force: true });
+    }
   });
 });

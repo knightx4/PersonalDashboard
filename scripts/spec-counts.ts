@@ -14,6 +14,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { routeOfFile, surfacesForRoute } from '../lib/preview/routes';
 import { filesMatching, listFiles, tablesCreated, type SpecCounter } from '../lib/specs/counts';
 
 /** A file's text, or an error naming the counter that needed it. */
@@ -162,6 +163,33 @@ function rawMotionInCode(file: string, text: string): string[] {
   return out;
 }
 
+// -- docs/UI-QUALITY-SPEC.md ------------------------------------------------
+
+/** A page that returns nothing and calls `redirect`: a moved address, not a screen. */
+function isRedirectOnly(text: string): boolean {
+  const code = withoutComments(text);
+  return /\b(?:permanentRedirect|redirect)\(/.test(code) && !/\breturn\b/.test(code);
+}
+
+/**
+ * The pages under `app/` that no gallery surface stands for: every `page.tsx`
+ * whose route (route groups and slots taken out, as lib/preview/routes.ts
+ * reads them) has no entry in `SURFACE_ROUTES`. API routes and the gallery
+ * itself are not pages a person reads, and `routeOfFile` leaves them out.
+ * Neither is a page that only sends the visitor on (`app/dev/page.tsx`
+ * redirecting to /dev/raised): it draws nothing to picture.
+ */
+function routesWithoutSurface(root: string): string[] {
+  const routes = new Set<string>();
+  for (const file of listFiles(root, ['app'], ['.tsx', '.ts', '.jsx', '.js'])) {
+    if (!/\/page\.[jt]sx?$/.test(file)) continue;
+    if (isRedirectOnly(readFileSync(join(root, file), 'utf8'))) continue;
+    const route = routeOfFile(file);
+    if (route !== null && surfacesForRoute(route).length === 0) routes.add(route);
+  }
+  return [...routes].sort();
+}
+
 export const SPEC_COUNTERS: readonly SpecCounter[] = [
   {
     name: 'thread-tables',
@@ -225,5 +253,11 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
         .filter((file) => !/\.test\.tsx?$/.test(file) && file !== 'lib/motion.ts')
         .flatMap((file) => rawMotionInCode(file, readFileSync(join(root, file), 'utf8'))),
     ],
+  },
+  {
+    name: 'routes-without-surface',
+    counts: 'pages under app/ with no surface in the gallery',
+    target: 0,
+    measure: routesWithoutSurface,
   },
 ];
