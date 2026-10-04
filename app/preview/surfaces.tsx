@@ -1,5 +1,8 @@
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import { ExcitementPicker } from '@/app/jobs/(app)/roles/[id]/excitement-picker';
+import { Property } from '@/components/shell/detail-layout';
+import { ChannelPicker } from '@/app/jobs/(app)/roles/[id]/channel-picker';
+import type { ReferrerOption } from '@/lib/jobs/contacts/referrers';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
@@ -858,6 +861,13 @@ const contact: ContactRow = {
     },
   ],
 };
+
+/** People to name as a referrer: one with the longest name, one with no company. */
+const referrerFixtures: ReferrerOption[] = [
+  { id: 'contact-1', name: 'Alexandra Montgomery-Fitzwilliam', company: 'The D. E. Shaw group' },
+  { id: 'contact-2', name: 'Priya Raman', company: 'Ramp' },
+  { id: 'contact-3', name: 'Sam Okafor', company: null },
+];
 
 const knownCompanies = [...new Set(pipelineRows.map((row) => row.companyName))].map((name) => ({
   name,
@@ -2447,24 +2457,43 @@ export const SURFACES: readonly Surface[] = [
     label: 'Role · Interviews',
     module: 'jobs',
     width: 'wide',
-    // The header too, so the status and the excitement beside it are drawn as
-    // the role page sets them.
+    // The header and the facts too, in the role page's one column, so the
+    // status, the excitement and the channel are drawn as the page sets them. A referral, so the
+    // channel shows who referred you as well.
     render: () => (
-      <div>
-        <PageHeader
-          title="Senior Software Engineer, Platform"
-          description="The D. E. Shaw group · New York · Hybrid"
-          actions={
-            <div className="flex items-center gap-2">
-              <StatusPicker
-                applicationId="app-1"
-                status="in_process"
-                submittedAt="2026-07-31T12:00:00.000Z"
-              />
-              <ExcitementPicker applicationId="app-1" excitement={4} />
-            </div>
-          }
-        />
+      <div className="space-y-4">
+          <PageHeader
+            title="Senior Software Engineer, Platform"
+            description="The D. E. Shaw group · New York · Hybrid"
+            actions={
+              <div className="flex items-center gap-2">
+                <StatusPicker
+                  applicationId="app-1"
+                  status="in_process"
+                  submittedAt="2026-07-31T12:00:00.000Z"
+                />
+                <ExcitementPicker applicationId="app-1" excitement={4} />
+              </div>
+            }
+          />
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+            <Property label="Applied" value="31 Jul 2026" />
+            <Property label="Confirmed" value="31 Jul 2026" />
+            <Property label="First human reply" value="6 Aug 2026" />
+            <Property
+              label="Channel"
+              value={
+                <ChannelPicker
+                  applicationId="app-1"
+                  source="referral"
+                  referralContactId="contact-2"
+                  contacts={referrerFixtures}
+                />
+              }
+            />
+            <Property label="Comp band" value="$180k–$220k" />
+            <Property label="Outcome" value="—" />
+          </dl>
         <RoleDetailPanels {...rolePanels} initialTab="interviews" />
       </div>
     ),
@@ -2835,7 +2864,10 @@ export const SURFACES: readonly Surface[] = [
     label: 'Role · New',
     module: 'jobs',
     width: 'wide',
-    render: () => <RoleForm companies={knownCompanies} />,
+    // Opened on Referral, so the field naming who referred you is drawn too.
+    render: () => (
+      <RoleForm companies={knownCompanies} contacts={referrerFixtures} defaultSource="referral" />
+    ),
   },
   {
     id: 'jobs-recommended-roles',

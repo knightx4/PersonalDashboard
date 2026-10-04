@@ -8,7 +8,8 @@ import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { CardSection, cardVariants } from '@/components/ui/card';
 import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
-import { APPLICATION_SOURCES, SOURCE_LABELS } from '@/lib/jobs/pipeline';
+import { APPLICATION_SOURCES, SOURCE_LABELS, type ApplicationSource } from '@/lib/jobs/pipeline';
+import { referrerLabel, type ReferrerOption } from '@/lib/jobs/contacts/referrers';
 import { createRole, fetchJobDescription, type RoleFormState } from '../actions';
 
 function Submit({ label }: { label: string }) {
@@ -26,7 +27,17 @@ function Submit({ label }: { label: string }) {
  * never work — that burying the paste box as a fallback would be dishonest
  * about how the feature actually behaves.
  */
-export function RoleForm({ companies }: { companies: Array<{ name: string }> }) {
+export function RoleForm({
+  companies,
+  contacts = [],
+  defaultSource = 'portal',
+}: {
+  companies: Array<{ name: string }>;
+  /** The people you know, for naming who referred you. */
+  contacts?: ReferrerOption[];
+  /** The channel the form opens on; the gallery opens it on Referral. */
+  defaultSource?: ApplicationSource;
+}) {
   const [fetchState, fetchAction] = useActionState<RoleFormState, FormData>(
     fetchJobDescription,
     {},
@@ -34,6 +45,7 @@ export function RoleForm({ companies }: { companies: Array<{ name: string }> }) 
   const [createState, createAction] = useActionState<RoleFormState, FormData>(createRole, {});
 
   const [jdUrl, setJdUrl] = useState('');
+  const [source, setSource] = useState<ApplicationSource>(defaultSource);
 
   /*
    * The fetched posting fills the fields by REMOUNTING them, not by syncing
@@ -122,17 +134,38 @@ export function RoleForm({ companies }: { companies: Array<{ name: string }> }) 
 
           <Field
             id="source"
-            label="How you found it"
-            hint="This drives the by-channel funnel, which is where the diagnosis lives."
+            label="How you applied"
+            hint="Insights compares how far each channel gets you."
           >
-            <Select name="source" defaultValue="portal">
-              {APPLICATION_SOURCES.map((source) => (
-                <option key={source} value={source}>
-                  {SOURCE_LABELS[source]}
+            <Select
+              name="source"
+              value={source}
+              onChange={(event) => setSource(event.target.value as ApplicationSource)}
+            >
+              {APPLICATION_SOURCES.map((option) => (
+                <option key={option} value={option}>
+                  {SOURCE_LABELS[option]}
                 </option>
               ))}
             </Select>
           </Field>
+
+          {source === 'referral' && (
+            <Field
+              id="referralContactId"
+              label="Who referred you"
+              hint={contacts.length === 0 ? 'Add them under Contacts to name them here.' : undefined}
+            >
+              <Select name="referralContactId" defaultValue="">
+                <option value="">Not named</option>
+                {contacts.map((contact) => (
+                  <option key={contact.id} value={contact.id}>
+                    {referrerLabel(contact)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
 
           <Field id="submittedAt" label="Date applied">
             <Input name="submittedAt" type="date" />

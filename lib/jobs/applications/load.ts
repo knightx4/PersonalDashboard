@@ -199,10 +199,13 @@ export async function loadPipeline(
 /** Flatten to the shape lib/pipeline.ts computes from. */
 export function toFunnelApplications(rows: readonly PipelineRow[]): FunnelApplication[] {
   return rows.map((row) => {
-    // A recruiter who wrote first leaves nothing to submit, so the pursuit
-    // enters the funnel on the first human reply. Without this, sixteen
-    // inbound pursuits with interviews behind them were left out entirely.
-    const enteredAt = row.submittedAt ?? (row.source === 'recruiter_inbound' ? row.firstHumanResponseAt : null);
+    // A pursuit with no submission on file enters the funnel on the first
+    // human reply: a recruiter who wrote first leaves nothing to submit, and
+    // an application found only through its later mail never had its
+    // submission seen. Without this, sixteen inbound pursuits with interviews
+    // behind them were left out entirely, and the 59 relabelled as portal
+    // (plan #1588) would have been. A lead nobody applied to stays out.
+    const enteredAt = row.submittedAt ?? (row.status !== 'lead' ? row.firstHumanResponseAt : null);
     const submittedAt = enteredAt ? new Date(enteredAt) : null;
     const confirmationReceivedAt = row.confirmationReceivedAt
       ? new Date(row.confirmationReceivedAt)
