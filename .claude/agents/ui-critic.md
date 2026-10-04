@@ -106,10 +106,13 @@ done. A fix that is done does not come back reworded. A new fix this round
 must be either something the change made worse, or something you missed and
 can now point to in a shot; say which.
 
-Three rounds is the limit the spec sets. What happens after a third failed
-round is the person's open decision (#1535 on the plan), not yours: on round
-3, give the verdict exactly as on any other round and say nothing about what
-should follow it.
+Three rounds is the limit the spec sets. After a third failed round the
+builder stops and hands the screen to the person with your last fixes, and
+they accept it or say what to change. That is theirs and the builder's, not
+yours: on round 3, give the verdict exactly as on any other round and say
+nothing about what should follow it. When the person has said what to change,
+you may be sent rounds 4 to 6 with their words in the prompt; judge those the
+same way, with their words as part of the done-when.
 
 ## What you answer
 

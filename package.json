@@ -21,6 +21,7 @@
     "record": "tsx scripts/shoot.ts --record",
     "ui-check": "tsx scripts/ui-check.ts",
     "ui-guard": "tsx scripts/ui-guard.ts",
+    "ui-stop": "tsx scripts/ui-stop.ts",
     "check:ebay": "tsx scripts/check-ebay.ts",
     "typecheck": "tsc --noEmit",
     "share:add": "tsx scripts/share-add.ts",
