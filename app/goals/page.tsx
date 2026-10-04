@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { isOwner } from '@/lib/dev/owner';
 import { writtenWhen, type Brief } from '@/lib/goals/briefs';
 import { loadBrief } from '@/lib/goals/briefs-store';
 import { createGoalsClient } from '@/lib/goals/auth/server';
@@ -46,7 +47,7 @@ export default async function GoalsPage() {
   const account = await loadAccountSettings(user.id);
   const client = await createGoalsClient();
   const today = todayIn(account.timezone);
-  const [home, visit, brief, areas] = await Promise.all([
+  const [home, visit, brief, areas, owner] = await Promise.all([
     createClient().then((supabase) =>
       loadHome(client, supabase, {
         userId: user.id,
@@ -60,6 +61,8 @@ export default async function GoalsPage() {
     loadBrief(client, null).catch((): Brief | null => null),
     // The areas an errand can go in; a failed read leaves Add an errand out.
     loadAreas(client).catch(() => []),
+    // Ask Dash starts a run, which only the owner's account may (shaping-actions.ts).
+    isOwner({ user }),
   ]);
   // A failed read says so in its section rather than failing the page.
   const done = await loadDoneSince(client, visit.previousVisitAt ?? visit.lastVisitAt).catch(
@@ -89,6 +92,7 @@ export default async function GoalsPage() {
         timeZone={account.timezone}
         todayOn={today}
         areas={areas.map((area) => ({ id: area.id, name: area.name }))}
+        canRun={owner}
       />
     </div>
   );

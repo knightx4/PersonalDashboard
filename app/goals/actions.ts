@@ -120,7 +120,7 @@ export async function setAreaNoteAction(
 
 /**
  * Plan this area: fire the goals routine to propose the goals an area needs.
- * Only the owner's account can, as with Work on this on a goal, because the
+ * Only the owner's account can, as with Ask Dash on a goal, because the
  * run spends the owner's routine allowance.
  */
 // latency: pending

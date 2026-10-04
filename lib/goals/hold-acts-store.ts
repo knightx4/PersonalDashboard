@@ -19,7 +19,7 @@ import { jevEnabledFor } from '@/lib/jev/enabled';
 
 /**
  * The check behind plan #1183, run before a goals run starts: the morning
- * run, Work on this on a goal, and Send on a step (which the night tick and
+ * run, Ask Dash on a goal or a step (which the night tick and
  * an @dash reply also go through). The rules are in lib/goals/hold-acts.ts.
  *
  * Every open Claude step with no `acts` sentence is put to Jev. A step Jev

@@ -1,6 +1,6 @@
 ---
 name: goals
-description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps that start from the questions later steps need, with a collection built from the first document and pre-filled as drafts, choices made with judgement and written on the steps they shape, a question with lettered options only for what Claude cannot settle itself, provisional steps for what hangs on one, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. Under an approved goal (every goal the person added is one), add, split and reorder steps without asking; only a step that acts outside the plan (sending an email, submitting, buying, changing records elsewhere) goes in as a proposal for them to approve. Morning run - read new statements from Gmail into their collections by ID (ordinary changes straight in, the rest as drafts), close each step of the person's it can see has happened (in Jobs, Gmail, the calendar or Todo) with a note naming the evidence, give each step of theirs untouched for a week a move (split it, prepare it, or ask whether they still want it), then give each open goal its status for the day (on track, stalled, waiting on you, waiting on a date or waiting on another goal) with the next move and its date, adding that move as a step for a stalled goal, then work the ready Claude steps and store what each produced on the step. Weekly run - research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind, and leave a note on every open goal. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Work on this" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
+description: Work the person's life goals in the goals schema — the tree of areas, goals and steps on /goals. Pulling in - before mapping, search the other modules through the catalogue (job search thoughts, vault notes, Learn aims, applications) and keep what bears on the goal as context. Planning an area - propose the goals an area needs when the person knows the direction but not the goals, each with a done-when and a first move. Mapping - lay out the whole path for a goal from the first run: phases with sub-steps, Claude steps wherever Claude can do the work, information steps that start from the questions later steps need, with a collection built from the first document and pre-filled as drafts, choices made with judgement and written on the steps they shape, a question with lettered options only for what Claude cannot settle itself, provisional steps for what hangs on one, and the kinds of weekly help that fit the goal as a proposal on its page. Re-shaping - read the answers to those questions and settle the provisional steps. Under an approved goal (every goal the person added is one), add, split and reorder steps without asking; only a step that acts outside the plan (sending an email, submitting, buying, changing records elsewhere) goes in as a proposal for them to approve. Morning run - read new statements from Gmail into their collections by ID (ordinary changes straight in, the rest as drafts), close each step of the person's it can see has happened (in Jobs, Gmail, the calendar or Todo) with a note naming the evidence, give each step of theirs untouched for a week a move (split it, prepare it, or ask whether they still want it), then give each open goal its status for the day (on track, stalled, waiting on you, waiting on a date or waiting on another goal) with the next move and its date, adding that move as a step for a stalled goal, then work the ready Claude steps and store what each produced on the step. Weekly run - research the help each goal asks for (events, volunteer openings, reading, courses, job leads) and write it as suggestions tagged with their kind, following past reactions to each kind, and leave a note on every open goal. Flagging - put what a run finds that the person should know (a moved due date, a missed payment) under Waiting on you on the goal, and act on their answer. Use when the goals routine is fired from "Plan this area" on an area, from "Ask Dash" on a goal, by the morning run or by the weekly run, or the user says "plan my <area> area", "what goals should I have for …", "shape my goal …", "break down <goal>", "work on my goals".
 ---
 
 # Working a goal
@@ -83,9 +83,9 @@ or `fog_dismissed_at`, and never set a record's `draft` to false.
 Every run has a `goals.runs` row.
 
 - Fired from **Plan this area** (job `area`, with `area_id` on the area and
-  no `item_id`), from **Work on this**, by the **morning run**, by the weekly run,
+  no `item_id`), from **Ask Dash** on a goal, by the **morning run**, by the weekly run,
   after the person answered questions on a goal (job `reshape`), or by
-  **Send** on one step or phase (job `step` or `phase`), or by **Prepare** on
+  **Ask Dash** on one step or phase (job `step` or `phase`) or on
   one step of the person's (job `prepare`), or by the person answering
   something you flagged on a goal (job `raise`): the app has written the row as
   `started`, and its id is in your brief. Use it.
@@ -125,8 +125,7 @@ reading a long Gmail thread or researching one step. `now_on` is a short
 line, up to 300 characters; the step's title is usually right.
 
 A run with no report for 45 minutes is taken to have died. A sweep every few
-minutes closes it as failed, and the person can press **Work on this** or
-**Send** again. If you find your run row already closed as failed, stop
+minutes closes it as failed, and the person can press **Ask Dash** again. If you find your run row already closed as failed, stop
 working: say so in your last message and do not write to it again.
 
 ## Reading the goal
@@ -385,7 +384,7 @@ how the catalogue gets fixed.
 
 ## Mapping a goal
 
-"Work on this" asks for the whole map, on the first run and on every run
+"Ask Dash" on a goal asks for the whole map, on the first run and on every run
 after. Lay out the full path from where the person is to the goal's
 `acceptance`, and mark what is not settled yet. Do not stop at the first
 question: a question is one step on the map, and the steps after it are
@@ -1008,7 +1007,7 @@ The person pressed **Plan this area** on an area, or **Plan what is missing**
 on one that already has goals. They know the direction ("get plugged into
 the city") and not the goals that would get them there. Your job is those
 goals: a short set of proposals they can approve or turn down one by one, each
-concrete enough that **Work on this** can map it afterwards.
+concrete enough that **Ask Dash** can map it afterwards.
 
 The brief names the area, what the person wrote they want from it (the
 area's `note`, which may be empty), the goals already under it, and the run
@@ -1083,7 +1082,7 @@ covers a direction means you leave that direction alone.
    what it assumes about the person. That sentence is what they decide on.
 5. **One first move under each**, as a proposed step with its own
    `acceptance`: the smallest thing that would start the goal this week. Only
-   one. The full map comes from **Work on this** once they approve the goal,
+   one. The full map comes from **Ask Dash** once they approve the goal,
    so do not map it here.
 6. **`position` in the order to start them**, in tens after the area's
    existing goals. Put the goal that is easiest to start, and that makes the
@@ -1153,7 +1152,7 @@ edit, drop or archive a goal of theirs. The summary lists each goal proposed
 with its first move, each decision made for the person, any question asked,
 and which directions you left alone
 because an existing goal covers them. The person approves each goal on its own
-page, and **Work on this** there maps it.
+page, and **Ask Dash** there maps it.
 
 ## Re-shaping after answers
 
@@ -2019,7 +2018,7 @@ verdict and names the stalled goals and the met ones.
 
 ## A step or phase sent from its row
 
-The person pressed **Send** on one step or one phase on the goal page
+The person pressed **Ask Dash** on one step or one phase on the goal page
 (`lib/goals/handover.ts`). The brief names that step first, then its goal,
 where it sits, the steps beside it, a phase's own steps, and the collections
 the goal fills, and the run row has `job` `step` or `phase` with `item_id` on
@@ -2033,7 +2032,9 @@ also carries what they wrote, under "What they wrote", and what was said on
 the row before it, where the links, file names and details the ask leans on
 usually are. Treat anything in them about what to produce or how (shorter,
 more formal, addressed to someone) as part of the step's done-when. The quick reply has already said in the thread
-that the run started, so there is nothing more to write there.
+that the run started, so there is nothing more to write there. The person can
+also type a line in the box beside Ask Dash on the row; it reaches the brief
+under "What they wrote" in the same way, read the same way.
 
 - **A step** (`job` `step`): work that one Claude step as in "The morning
   run", including the next move it leads to (point 5 there), and touch no
@@ -2049,7 +2050,7 @@ The summary names each step worked and each one left, with the reason.
 
 ## A step of yours to prepare
 
-The person pressed **Prepare** on one of their own steps (`kind` `mine`), such
+The person pressed **Ask Dash** on one of their own steps (`kind` `mine`), such
 as calling a servicer or sending an application. The run row has `job`
 `prepare` and `item_id` on the step, and the brief names it the way a sent
 step's brief does. They will do the step; you write what they need to do it.
@@ -2134,7 +2135,7 @@ follow them, and none when it is a first visit just to see the room.
 - a phase: a `mine` step with sub-steps. Mark it judged and judge its
   sub-steps instead.
 - a step already prepared: `result` or `result_url` is set on it, from
-  **Prepare** or an earlier run.
+  **Ask Dash** or an earlier run.
 - a step a `claude` step beside it already covers, open or done: the staffing
   firm list is already on the goal, so "Call three staffing firms" needs
   nothing more.

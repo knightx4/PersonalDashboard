@@ -16,7 +16,7 @@ import {
   canSetAside,
 } from '@/lib/goals/set-aside';
 import type { TodayItem, TodayKind } from '@/lib/goals/today';
-import { prepareStepAction } from './[goalId]/shaping-actions';
+import { askDashStepAction } from './[goalId]/shaping-actions';
 import { restoreAsideAction, setAsideAction } from './home-actions';
 import { countRhythmAction, setStepStatusAction } from './[goalId]/actions';
 import { addGoalComment } from './[goalId]/comment-actions';
@@ -33,7 +33,7 @@ import { reactToSuggestionAction, recordAttendedAction } from './suggestion-acti
  * Anything that is a step can be put aside with Not now (Tomorrow, This
  * weekend, Next week, Next month; lib/goals/set-aside.ts). The row leaves at
  * once, the toast offers Undo, and the step comes back on the day chosen. A
- * step of yours that Dash could prepare also offers Dash preps it, which
+ * step of yours that Dash could prepare also offers Ask Dash, which
  * writes a draft, a script or a checklist onto the step and leaves it yours.
  *
  * Each kind's button is the write that already exists for it:
@@ -302,9 +302,9 @@ function NotNow({ item, onAside }: { item: TodayItem; onAside: (hidden: boolean)
 }
 
 /**
- * Dash prepares it: a prepare run on one step of yours (plan #1001). It is a
- * button of its own, outside the row's form, so its press never posts the
- * row's answer.
+ * Ask Dash on one step of yours: askDash picks a prepare run for it (plan
+ * #1001). It is a button of its own, outside the row's form, so its press
+ * never posts the row's answer.
  */
 function PrepareButton({ item, onHanded }: { item: TodayItem; onHanded?: () => void }) {
   const toast = useToast();
@@ -314,7 +314,7 @@ function PrepareButton({ item, onHanded }: { item: TodayItem; onHanded?: () => v
     return (
       <span className="inline-flex items-center gap-1 text-small text-ink-muted" role="status">
         <DashMark state="working" activity="writing" size="2xs" tone="brand" decorative />
-        Dash is preparing it
+        Dash is on it
       </span>
     );
   }
@@ -329,7 +329,7 @@ function PrepareButton({ item, onHanded }: { item: TodayItem; onHanded?: () => v
         setPending(true);
         const form = new FormData();
         form.set('id', item.id);
-        const result = await prepareStepAction({}, form);
+        const result = await askDashStepAction({}, form);
         setPending(false);
         if (result.error) {
           toast({ text: result.error });
@@ -340,7 +340,7 @@ function PrepareButton({ item, onHanded }: { item: TodayItem; onHanded?: () => v
       }}
     >
       <DashMark size="2xs" tone="brand" decorative />
-      {pending ? 'Asking…' : 'Dash preps it'}
+      {pending ? 'Asking…' : 'Ask Dash'}
     </Button>
   );
 }
