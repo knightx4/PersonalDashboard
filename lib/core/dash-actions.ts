@@ -162,6 +162,17 @@ export function undoneByAsk(action: Pick<DashAction, 'surface' | 'kind'>): boole
 }
 
 /**
+ * Whether capture's own rule undoes this change: a line filed into Goals,
+ * which keeps the capture it came from in `undo.capture_id` and can touch
+ * more than its one row (lib/goals/capture-store.ts, undoFiledAction). A todo
+ * or a note on a job filed from the one capture box (plan #1581) touches one
+ * row, keeps no capture id, and is undone by the generic rule here.
+ */
+export function undoneByCapture(action: Pick<DashAction, 'surface' | 'undo'>): boolean {
+  return action.surface === 'capture' && typeof action.undo?.capture_id === 'string';
+}
+
+/**
  * Why a change has no Undo, when its writer said so (plan #1571). Some writes
  * cannot sensibly be put back by restoring one row: a payment's amount is
  * worked out from every charge filed on it, and a charge moved between
@@ -452,10 +463,10 @@ export function planUndo(
           : 'This change is undone by Ask Dash\'s own rule, from Home.',
     };
   }
-  // A capture line can touch more than its one row (an added step and the
+  // A Goals line from capture can touch more than its one row (an added step and the
   // progress filed on it), so it is undone by capture's own rule
   // (lib/goals/capture-store.ts, undoFiledAction), which marks this undone.
-  if (action.surface === 'capture') {
+  if (undoneByCapture(action)) {
     return { ok: false, reason: 'This was filed from capture, and is undone from there.' };
   }
   const { op, beforeValues: before, afterValues: after } = action;
@@ -630,7 +641,7 @@ export async function undoDashAction(
   const fromAsk = options.fromAsk === true;
   const ref = action.subjectRef;
   const [current, later] =
-    action.status === 'done' && ref && (!undoneByAsk(action) || fromAsk) && action.surface !== 'capture'
+    action.status === 'done' && ref && (!undoneByAsk(action) || fromAsk) && !undoneByCapture(action)
       ? await Promise.all([readSubject(deps.db, ref), laterActionOn(deps, action)])
       : [null, false];
   const decided = planUndo(action, current, later, fromAsk);
