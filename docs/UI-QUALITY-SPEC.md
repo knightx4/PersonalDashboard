@@ -165,6 +165,13 @@ Two more run on surfaces of the deck pattern and on links:
 - a press shows its pressed or loading state within 100 milliseconds
 - the next item's data and image are fetched before Next is pressed
 
+A surface is a deck when its gallery entry declares `deck`, naming its Next
+and its item (`lib/preview/deck.ts`); Quick read's story card is the first.
+Next is pressed with every new request held, so the next item shows only if
+it was already in the page. Each control and link is pressed with motion on,
+and passes when anything about it changes within 100 milliseconds: its
+`press` scale, a loading label, or the page it opens.
+
 They run in the gate on the surfaces the commit touched, so they add seconds
 rather than minutes. `npm run check:phone` serves the gate's own build with
 the gallery on and runs them after the Build step, since the lint lane has no

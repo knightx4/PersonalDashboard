@@ -5,7 +5,7 @@ import { SURFACE_ROUTES } from '../../lib/preview/routes';
 import { compare, surfaceIdsIn, touchedSurfaces, type Baseline } from './baseline';
 import type { Findings } from './checks';
 
-const none: Findings = { sideways: [], targets: [], dock: [], contrast: [] };
+const none: Findings = { sideways: [], targets: [], dock: [], contrast: [], next: [], press: [] };
 
 describe('compare', () => {
   it('fails a count that rises, and holds a surface the baseline does not name to zero', () => {

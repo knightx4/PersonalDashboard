@@ -1,5 +1,5 @@
 /**
- * The four phone checks on the gallery surfaces a change touched
+ * The phone checks on the gallery surfaces a change touched
  * (docs/UI-QUALITY-SPEC.md, Part 5).
  *
  *   npm run check:phone                    # the surfaces this branch touched
@@ -10,7 +10,10 @@
  * Each surface is opened at 390 pixels in a headless Chromium and measured
  * for sideways scrolling, press targets under 44 pixels, pressable things
  * under the dock, and text under the contrast floor in light and dark (see
- * tests/interaction/checks.ts). Counts are held against
+ * tests/interaction/checks.ts). A surface that declares a deck
+ * (lib/preview/deck.ts) is also pressed: Next has to show the next item with
+ * the network held, and every control and link has to show a press within
+ * 100ms (tests/interaction/deck.ts). Counts are held against
  * scripts/phone-baseline.json: one that rises fails, one that falls is
  * written back, to be committed with the change that lowered it. `--record`
  * writes the baseline from scratch and refuses when one exists: it made the
@@ -37,6 +40,8 @@ import { SURFACE_ROUTES, surfacesForFiles } from '../lib/preview/routes';
 import { compare, sortBaseline, surfaceIdsIn, touchedSurfaces, type Baseline } from '../tests/interaction/baseline';
 import { chromePath, launch } from '../tests/interaction/browser';
 import { CHECK_RULES, checkPage, type Findings } from '../tests/interaction/checks';
+import { checkDeck } from '../tests/interaction/deck';
+import { readDecks } from '../lib/preview/deck';
 
 const ROOT = process.cwd();
 const BASELINE = join(ROOT, 'scripts/phone-baseline.json');
@@ -163,9 +168,13 @@ async function main(): Promise<number> {
   const browser = await launch();
   const measured: Record<string, Findings> = {};
   try {
+    const decks = readDecks(await (await fetch(`${server.url}/preview`)).text());
     for (const surface of surfaces) {
-      await browser.page.open(`${server.url}/preview?s=${surface}`);
+      const url = `${server.url}/preview?s=${surface}`;
+      await browser.page.open(url);
       measured[surface] = await checkPage(browser.page, THEMES);
+      const deck = decks[surface];
+      if (deck) Object.assign(measured[surface], await checkDeck(browser.page, url, deck));
     }
   } finally {
     await browser.close();

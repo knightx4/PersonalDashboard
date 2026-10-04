@@ -9,8 +9,8 @@
  * while a preview server and a shoot are running in another terminal.
  *
  * Kept small and general on purpose. The four checks in ./checks.ts use
- * `open` and `evaluate`; the deck checks that come after them (plan #1538)
- * need `send` for input and network events, and `on` to hear them.
+ * `open` and `evaluate`; the deck checks in ./deck.ts use `send` for input
+ * and network events, `on` to hear them, and open the page with motion on.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
@@ -54,7 +54,19 @@ export type Page = {
    * fonts and a moment for the client components to mount, with motion
    * reduced so nothing is caught halfway through a fade.
    */
-  open: (url: string, size?: { width: number; height: number }) => Promise<void>;
+  open: (url: string, size?: { width: number; height: number }, options?: OpenOptions) => Promise<void>;
+};
+
+export type OpenOptions = {
+  /**
+   * Leave motion as a person without reduced motion has it, transitions
+   * running, and wait for the page's entrance animations to finish instead
+   * of cutting them short. The press check needs this: the app's pressed
+   * state is a transition, and it drops out under reduced motion.
+   */
+  motion?: boolean;
+  /** How long to wait after the fonts, in milliseconds (600 when left out). */
+  settle?: number;
 };
 
 export type Browser = { page: Page; close: () => Promise<void> };
@@ -173,7 +185,7 @@ export async function launch(): Promise<Browser> {
       return reply.result?.value as T;
     };
 
-    const open: Page['open'] = async (url, size = PHONE) => {
+    const open: Page['open'] = async (url, size = PHONE, options = {}) => {
       await send('Emulation.setDeviceMetricsOverride', {
         width: size.width,
         height: size.height,
@@ -181,7 +193,7 @@ export async function launch(): Promise<Browser> {
         mobile: size.width < 1024,
       });
       await send('Emulation.setEmulatedMedia', {
-        features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
+        features: [{ name: 'prefers-reduced-motion', value: options.motion ? 'no-preference' : 'reduce' }],
       });
       const loaded = new Promise<void>((resolve) => {
         const stop = on('Page.loadEventFired', () => {
@@ -193,8 +205,15 @@ export async function launch(): Promise<Browser> {
       if (nav.errorText) throw new Error(`${url}: ${nav.errorText}`);
       await Promise.race([loaded, wait(15_000)]);
       await evaluate(
-        `document.fonts.ready.then(function(){return new Promise(function(r){setTimeout(r,600)})})`,
+        `document.fonts.ready.then(function(){return new Promise(function(r){setTimeout(r,${options.settle ?? 600})})})`,
       );
+      if (options.motion) {
+        // Entrance animations run out, up to two seconds; a looping one is left looping.
+        await evaluate(
+          `Promise.race([Promise.all(document.getAnimations().filter(function(a){var t=a.effect&&a.effect.getComputedTiming();return t&&t.iterations!==Infinity}).map(function(a){return a.finished.catch(function(){})})),new Promise(function(r){setTimeout(r,2000)})]).then(function(){return true})`,
+        );
+        return;
+      }
       // Transitions off, and animations straight to their end, so a theme
       // put on afterwards is measured where it lands rather than on its way.
       await evaluate(
