@@ -165,7 +165,9 @@ function Turn({
   );
 }
 
-const CITED_LINK = 'min-w-0 truncate text-ui text-accent underline-offset-2 hover:underline';
+// Taller on a phone so each row is a 44-pixel press (docs/UI-QUALITY-SPEC.md,
+// R3): a `press-area` would be clipped by the truncation's overflow.
+const CITED_LINK = 'min-w-0 truncate text-ui text-accent underline-offset-2 hover:underline max-sm:py-3';
 
 /**
  * The rows an answer rests on, each a link to where it lives (plan #1090).

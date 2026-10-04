@@ -152,7 +152,7 @@ function ShapeIdea({ idea }: { idea: IdeaRow }) {
     return (
       <Link
         href="/dev/plan?view=all"
-        className="inline-flex items-center gap-1.5 text-small text-accent hover:underline"
+        className="press-area inline-flex items-center gap-1.5 text-small text-accent hover:underline"
       >
         <Sparkles className="size-3.5" aria-hidden />
         In the plan as #{idea.planItem.number}

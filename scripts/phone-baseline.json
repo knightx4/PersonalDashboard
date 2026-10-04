@@ -1,319 +1,205 @@
 {
   "anatomy-compose": {
-    "targets": 6
-  },
-  "anatomy-dashboard": {
-    "targets": 1
-  },
-  "anatomy-detail": {
-    "targets": 1
+    "targets": 4
   },
   "anatomy-list": {
-    "targets": 3
+    "targets": 1
   },
   "anatomy-settings": {
-    "targets": 3
-  },
-  "ask-dash-answer": {
-    "targets": 31
+    "targets": 1
   },
   "ask-dash-changes": {
-    "targets": 5
-  },
-  "ask-dash-failed": {
-    "targets": 27
+    "targets": 1
   },
   "ask-dash-new": {
-    "targets": 30
+    "targets": 2
   },
   "ask-dash-page": {
-    "targets": 30
-  },
-  "ask-dash-proposal": {
-    "targets": 31
+    "targets": 2
   },
   "ask-made-changes": {
-    "targets": 8
-  },
-  "core-cost-hint": {
-    "targets": 6
-  },
-  "dev-comment-thread": {
-    "targets": 6
-  },
-  "dev-comment-thread-composer": {
-    "targets": 7
-  },
-  "dev-comment-thread-empty": {
-    "targets": 1
+    "targets": 3
   },
   "dev-inspiration": {
-    "targets": 21
-  },
-  "dev-inspiration-list": {
-    "targets": 13
-  },
-  "dev-inspiration-unread": {
-    "targets": 2
-  },
-  "dev-motion-clear": {
-    "targets": 2
-  },
-  "dev-motion-settle": {
-    "targets": 1
-  },
-  "dev-motion-travel": {
-    "targets": 2
-  },
-  "dev-plan-opened": {
-    "targets": 107
-  },
-  "dev-plan-tree": {
-    "targets": 38
-  },
-  "dev-posts": {
-    "targets": 17
-  },
-  "dev-posts-drafting": {
-    "targets": 2
-  },
-  "dev-surfaces": {
     "targets": 6
   },
+  "dev-inspiration-list": {
+    "targets": 1
+  },
+  "dev-posts": {
+    "targets": 1
+  },
+  "dev-surfaces": {
+    "targets": 2
+  },
   "dev-ui": {
-    "targets": 86,
+    "targets": 55,
     "contrast": 11
   },
   "goals-all": {
-    "targets": 40
+    "targets": 19
   },
   "goals-home": {
-    "targets": 31
+    "targets": 15
   },
   "goals-info-list": {
-    "targets": 46
+    "targets": 9
   },
   "goals-info-list-open": {
-    "targets": 62
+    "targets": 10
   },
   "goals-info-one": {
-    "targets": 29
-  },
-  "goals-page-bare": {
     "targets": 6
   },
   "goals-page-linking": {
-    "targets": 4
+    "targets": 1
   },
   "goals-page-top": {
-    "targets": 16
-  },
-  "goals-steps-opened": {
-    "targets": 170
-  },
-  "goals-steps-tree": {
-    "targets": 23
-  },
-  "home-arrival": {
-    "targets": 2
-  },
-  "home-finished-day": {
-    "targets": 2
-  },
-  "home-finished-day-rest": {
-    "targets": 2
-  },
-  "home-watching": {
     "targets": 6
   },
+  "goals-steps-opened": {
+    "targets": 50
+  },
+  "home-watching": {
+    "targets": 3
+  },
   "jobs-company": {
-    "targets": 14
+    "targets": 8
   },
   "jobs-contact": {
-    "targets": 11
+    "targets": 7
   },
   "jobs-contacts": {
-    "targets": 10
+    "targets": 9
   },
   "jobs-interviews": {
     "targets": 4
   },
   "jobs-pipeline-board": {
-    "targets": 17,
+    "targets": 11,
     "contrast": 4
   },
   "jobs-pipeline-dense": {
     "targets": 9
   },
   "jobs-pipeline-list": {
-    "targets": 17,
+    "targets": 11,
     "contrast": 4
   },
   "jobs-recommended-roles": {
-    "targets": 28,
+    "targets": 13,
     "contrast": 12
   },
   "jobs-review": {
-    "targets": 17
-  },
-  "jobs-role-answers": {
-    "targets": 12
+    "targets": 3
   },
   "jobs-role-interviews": {
-    "targets": 26
+    "targets": 3
   },
   "jobs-role-new": {
-    "targets": 10
+    "targets": 8
   },
   "jobs-role-posting": {
-    "targets": 12
+    "targets": 1
   },
   "jobs-role-timeline": {
-    "targets": 13
+    "targets": 2
   },
   "jobs-roles-table": {
     "targets": 21
   },
   "jobs-settings": {
-    "targets": 27
-  },
-  "jobs-today": {
-    "targets": 13
+    "targets": 4
   },
   "learn-clips": {
-    "targets": 5
-  },
-  "learn-clips-empty": {
-    "targets": 1
+    "targets": 2
   },
   "learn-course-check": {
-    "targets": 7
-  },
-  "learn-courses-empty": {
-    "targets": 1
-  },
-  "learn-courses-list": {
-    "targets": 9
+    "targets": 4
   },
   "learn-flow-scope": {
-    "targets": 4
+    "targets": 1
   },
   "learn-goals-list": {
     "targets": 5
   },
   "learn-now-deck": {
-    "targets": 13,
+    "targets": 1,
     "dock": 3
   },
   "learn-subject-chain": {
-    "targets": 6
+    "targets": 4
   },
   "news-issue-digest": {
-    "targets": 20
+    "targets": 3
   },
   "news-issue-digest-no-pictures": {
-    "targets": 20
+    "targets": 3
   },
   "news-issue-essay": {
-    "targets": 4
+    "targets": 1
   },
   "news-issue-failed": {
-    "targets": 4
+    "targets": 1
   },
   "news-issue-original": {
-    "targets": 5
+    "targets": 1
   },
   "news-quick-caught-up": {
     "sideways": 1,
-    "targets": 5
+    "targets": 3
   },
   "news-quick-essay": {
     "sideways": 1,
-    "targets": 8
-  },
-  "news-quick-got-through": {
-    "targets": 2
+    "targets": 4
   },
   "news-quick-in-shell": {
     "sideways": 1,
-    "targets": 25
+    "targets": 8
   },
   "news-quick-page": {
     "sideways": 1,
-    "targets": 17
+    "targets": 8
   },
   "news-quick-page-full": {
     "sideways": 1,
-    "targets": 17
+    "targets": 8
   },
   "news-quick-story": {
     "sideways": 1,
-    "targets": 17
+    "targets": 8
   },
   "news-saved": {
-    "targets": 17
-  },
-  "news-saved-empty": {
-    "targets": 1
+    "targets": 3
   },
   "news-story-grid": {
-    "targets": 5
-  },
-  "news-story-grid-no-pictures": {
-    "targets": 5
-  },
-  "shell-display-options": {
-    "targets": 1
-  },
-  "shell-full": {
-    "targets": 21
-  },
-  "shell-search-bar": {
-    "targets": 2
-  },
-  "shopping-item-details": {
     "targets": 4
   },
-  "shopping-recurring": {
-    "targets": 19
+  "news-story-grid-no-pictures": {
+    "targets": 4
   },
-  "shopping-recurring-empty": {
+  "shopping-item-details": {
     "targets": 1
   },
+  "shopping-recurring": {
+    "targets": 9
+  },
   "timeline-page": {
-    "targets": 12
+    "targets": 1
   },
   "timeline-year": {
-    "targets": 15
+    "targets": 10
   },
   "todo-calendar-month": {
     "targets": 42
   },
-  "todo-day-close": {
-    "targets": 2
-  },
-  "todo-feed-event": {
-    "targets": 4
-  },
-  "vault-education-check": {
-    "targets": 7
-  },
-  "vault-education-empty": {
-    "targets": 1
-  },
   "vault-education-list": {
-    "targets": 14
-  },
-  "vault-education-upload": {
     "targets": 2
   },
   "vault-note-attachments": {
     "targets": 1
   },
-  "vault-note-edit": {
-    "targets": 1
-  },
   "vault-note-editing": {
-    "targets": 4
+    "targets": 1
   }
 }

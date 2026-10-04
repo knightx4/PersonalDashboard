@@ -168,7 +168,8 @@ Approving a change does three things. A routine commits the diff to `docs/`
 and marks the change applied. The change is shaped into work: features through
 the plan skill's shaping job, or an overhaul through Part 4. And the features
 it becomes are approved with it, since approving the change was the decision.
-Whether that last part holds for overhauls is the first decision below.
+For an overhaul it holds with one stop, as decision 1 settled: its build
+steps wait until the person has tried the design and accepted it.
 
 The person can write a change too, by asking Dash for one in chat, in Ask, or
 on a spec's thread. Dash drafts it, and the person approves it like any other.
@@ -272,6 +273,8 @@ the changes table to write into.
 
 Recommendation: A. A feature can be judged from its spec change. An overhaul
 cannot be judged until its design exists in code.
+
+Answered A on 3 October 2026 (#1508), and built in #1527.
 
 ## Costs
 

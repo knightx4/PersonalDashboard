@@ -27,7 +27,7 @@ export type WeekReviewViewProps =
   | { state: 'shown'; review: ShownWeekReview; weeks: string[]; timezone: string };
 
 const HOME_LINK = (
-  <Link href="/home" className="text-ui text-accent hover:underline">
+  <Link href="/home" className="press-area text-ui text-accent hover:underline">
     Home
   </Link>
 );
@@ -35,8 +35,8 @@ const HOME_LINK = (
 export function WeekReviewView(props: WeekReviewViewProps) {
   if (props.state === 'none') {
     const when = props.next.due
-      ? 'Dash writes the first one this morning, from 9am New York time, so it should be here within the hour.'
-      : `Dash writes the first one on ${dayLabel(props.next.day)} at 9am New York time.`;
+      ? 'Dash writes the first one this morning, from 9:00\u00a0AM New York time, so it should be here within the hour.'
+      : `Dash writes the first one on ${dayLabel(props.next.day)} at 9:00\u00a0AM New York time.`;
     return (
       <>
         <PageHeader title="The week in review" actions={HOME_LINK} />
@@ -165,14 +165,14 @@ function OtherWeeks({ week, weeks }: { week: string; weeks: string[] }) {
       {(earlier || later) && (
         <nav aria-label="Other weeks" className="flex items-center justify-between gap-3 text-ui">
           {earlier ? (
-            <Link href={`/home/week/${earlier}`} className="text-accent hover:underline">
+            <Link href={`/home/week/${earlier}`} className="press-area text-accent hover:underline">
               {weekShortLabel(earlier)}
             </Link>
           ) : (
             <span />
           )}
           {later && (
-            <Link href={`/home/week/${later}`} className="text-accent hover:underline">
+            <Link href={`/home/week/${later}`} className="press-area text-accent hover:underline">
               {weekShortLabel(later)}
             </Link>
           )}
@@ -187,9 +187,9 @@ function OtherWeeks({ week, weeks }: { week: string; weeks: string[] }) {
             {weeks.map((other) => (
               <li key={other}>
                 {other === week ? (
-                  <span className="block px-1 py-2 text-ui font-medium text-ink">{weekRangeLabel(other)}</span>
+                  <span className="block px-1 py-3 text-ui font-medium text-ink">{weekRangeLabel(other)}</span>
                 ) : (
-                  <Link href={`/home/week/${other}`} className="block px-1 py-2 text-ui text-ink hover:bg-sunken">
+                  <Link href={`/home/week/${other}`} className="block px-1 py-3 text-ui text-ink hover:bg-sunken">
                     {weekRangeLabel(other)}
                   </Link>
                 )}

@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { PRESS_AREA } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 
 /**
  * Privacy policy.
@@ -483,7 +485,7 @@ export default function PrivacyPage() {
       </p>
 
       <p className="!mt-8 !text-ui">
-        <Link href="/terms" className="text-accent hover:underline">
+        <Link href="/terms" className={cn(PRESS_AREA, 'text-accent hover:underline')}>
           Terms of Service
         </Link>
       </p>

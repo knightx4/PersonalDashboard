@@ -3,7 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { cn } from '@/lib/cn';
 
-const chipClass = 'press rounded-full px-2.5 py-1 text-small font-medium transition-colors';
+const chipClass = 'press press-area rounded-full px-2.5 py-1 text-small font-medium transition-colors';
 const chipOn = 'bg-accent text-surface';
 const chipOff = 'text-ink-muted hover:bg-accent-tint hover:text-accent';
 
@@ -52,7 +52,7 @@ export function ViewChips<V extends string>({
   const inMenu = menu.includes(view);
 
   return (
-    <nav aria-label="View" className={cn('flex flex-wrap items-center gap-1', className)}>
+    <nav aria-label="View" className={cn('flex flex-wrap items-center gap-x-1 gap-y-2', className)}>
       {chips.map((candidate) => (
         <Link
           key={candidate}

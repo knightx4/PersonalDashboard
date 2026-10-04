@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useActionState } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, PRESS_AREA } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 import { Field, Input } from '@/components/ui/field';
 import { requestPasswordReset, type AuthState } from '../actions';
 
@@ -51,7 +52,7 @@ export default function ResetPasswordPage() {
       </form>
 
       <p className="mt-5 text-center text-ui text-ink-muted">
-        <Link href="/login" className="hover:text-ink">
+        <Link href="/login" className={cn(PRESS_AREA, 'hover:text-ink')}>
           Back to sign in
         </Link>
       </p>
