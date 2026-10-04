@@ -16,6 +16,8 @@ export const DASH_MODELS = {
   roleThread: MODELS.roleCommentReply,
   rowThread: MODELS.rowCommentReply,
   capture: MODELS.goalCapture,
+  /** The one capture box's sort into a todo, a goal, a job or the vault (plan #1580). */
+  captureSort: MODELS.captureSort,
   /**
    * Maya, the voice Dash takes on the vault's notes (plan #1479): Opus for its
    * thoughts and its replies, as decided on 2 October 2026. Its replies were
