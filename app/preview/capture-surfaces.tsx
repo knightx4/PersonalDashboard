@@ -17,13 +17,15 @@ import type { CapturePlace, CaptureSort } from '@/lib/capture/sort';
 /**
  * The one capture box (plan #1581) in the surface gallery, drawn twice from
  * fixtures: while a two-part sentence is typed, with the line saying where
- * each part will go, and after three things were filed, with a sentence Dash
+ * each part will go, and after four things were filed (a note into the
+ * vault's Inbox among them, plan #1582), with a sentence Dash
  * is not sure about asking for a place. The real panel floats over the page;
  * here the same pieces sit in its surface without the scrim.
  */
 
 const ACTION = captureAction('anything') as CaptureAction;
-const PLACES: CapturePlace[] = ['todo', 'goals', 'jobs'];
+/** Every place, the vault included: its token can write (plan #1582). */
+const PLACES: CapturePlace[] = ['todo', 'goals', 'jobs', 'vault'];
 const ROLE = { id: '00000000-0000-4000-8000-000000000002', title: 'Senior Product Analyst, Payments Risk', company: 'Stripe' };
 const GOAL = { id: '00000000-0000-4000-8000-000000000001', title: 'Run a half marathon before the end of March' };
 
@@ -37,6 +39,15 @@ const TWO_PARTS: CaptureSort = {
 };
 
 const FILED: FiledCapture[] = [
+  {
+    place: 'vault',
+    text: 'A book about tide pools, told through one rock over a whole year of tides',
+    where: 'Vault · Inbox',
+    href: '/vault',
+    actionId: '00000000-0000-4000-8000-000000000010',
+    goals: null,
+    undoneAt: null,
+  },
   {
     place: 'todo',
     text: 'Book the dentist for the week after next',

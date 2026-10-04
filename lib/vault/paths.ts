@@ -136,6 +136,9 @@ export function toRepoPath(vaultPath: string, subpath: string): string {
   return root ? `${root}/${vaultPath}` : vaultPath;
 }
 
+/** The folder capture writes new notes into, at the top of the vault (plan #1582). */
+export const INBOX_FOLDER = 'Inbox';
+
 /** The folder a note lives in, or '' for one at the vault root. */
 export function folderOf(vaultPath: string): string {
   const cut = vaultPath.lastIndexOf('/');

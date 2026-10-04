@@ -5,6 +5,7 @@ import { decryptToken } from '@/lib/crypto/tokens';
 import { ATTACHMENT_MAX_BYTES, VAULT_ATTACHMENTS_BUCKET, type AttachmentMimeType } from '@/lib/vault/paths';
 import { createVaultSource, type VaultSource } from '@/lib/vault/providers';
 import type { AttachmentPlan, KnownAttachment, KnownAttachments } from '@/lib/vault/sync/attachments';
+import type { CreateNotePorts, RemoveNotePorts } from '@/lib/vault/notes/create';
 import type { SaveNotePorts, SavableNote } from '@/lib/vault/notes/save';
 import type { KnownNotes } from '@/lib/vault/sync/plan';
 import type {
@@ -383,13 +384,23 @@ export function noteSavePorts(opts: {
 export async function openConnectedSource(
   supabase: VaultSupabaseClient,
 ): Promise<VaultSource | 'none' | 'reauth'> {
+  const opened = await openConnection(supabase);
+  return typeof opened === 'string' ? opened : opened.source;
+}
+
+/** openConnectedSource, with the connection the source was opened from. */
+async function openConnection(
+  supabase: VaultSupabaseClient,
+): Promise<{ source: VaultSource; connectionId: string; userId: string } | 'none' | 'reauth'> {
   const { data, error } = await supabase
     .from('vault_connections')
-    .select('repo_owner, repo_name, branch, subpath, access_token, status')
+    .select('id, user_id, repo_owner, repo_name, branch, subpath, access_token, status')
     .maybeSingle();
   if (error) throw new Error(`Reading the vault connection failed: ${error.message}`);
   if (!data) return 'none';
   const row = data as {
+    id: string;
+    user_id: string;
     repo_owner: string;
     repo_name: string;
     branch: string;
@@ -398,7 +409,7 @@ export async function openConnectedSource(
     status: string;
   };
   if (row.status !== 'active' || !row.access_token) return 'reauth';
-  return createVaultSource({
+  const source = createVaultSource({
     provider: 'github',
     repoOwner: row.repo_owner,
     repoName: row.repo_name,
@@ -406,6 +417,86 @@ export async function openConnectedSource(
     subpath: row.subpath,
     token: decryptAccessToken(row.access_token),
   });
+  return { source, connectionId: row.id, userId: row.user_id };
+}
+
+/**
+ * The ports for writing a new note from capture (plan #1582), over the
+ * session client. The note is stored against the connection the source was
+ * opened from; a deleted note at the same path comes back in place, keeping
+ * its id, as the sync brings one back.
+ */
+export function noteCreatePorts(opts: {
+  supabase: VaultSupabaseClient;
+  afterSave: (noteId: string) => void;
+}): CreateNotePorts {
+  const { supabase } = opts;
+  let opened: { connectionId: string; userId: string } | null = null;
+
+  return {
+    async openSource() {
+      const connection = await openConnection(supabase);
+      if (typeof connection === 'string') return connection;
+      opened = { connectionId: connection.connectionId, userId: connection.userId };
+      return connection.source;
+    },
+
+    async storeNote(row) {
+      if (!opened) throw new Error('The vault was not opened before storing the note.');
+      const { data, error } = await supabase
+        .from('notes')
+        .upsert(
+          {
+            user_id: opened.userId,
+            connection_id: opened.connectionId,
+            path: row.path,
+            title: row.title,
+            body: row.body,
+            frontmatter: row.frontmatter,
+            blob_sha: row.blobSha,
+            size_bytes: row.sizeBytes,
+            git_updated_at: row.gitUpdatedAt,
+            deleted_at: null,
+          },
+          { onConflict: 'user_id,path' },
+        )
+        .select('id')
+        .single();
+      if (error) throw new Error(`Storing the new note failed: ${error.message}`);
+      return (data as { id: string }).id;
+    },
+
+    afterSave: opts.afterSave,
+  };
+}
+
+/** The ports for taking a note capture wrote back out (plan #1582), over the session client. */
+export function noteRemovePorts(supabase: VaultSupabaseClient): RemoveNotePorts {
+  return {
+    openSource: () => openConnectedSource(supabase),
+
+    async loadNote(noteId) {
+      const { data, error } = await supabase
+        .from('notes')
+        .select('id, path, title, blob_sha, deleted_at')
+        .eq('id', noteId)
+        .maybeSingle();
+      if (error) throw new Error(`Reading the note failed: ${error.message}`);
+      if (!data) return null;
+      const row = data as { id: string; path: string; title: string; blob_sha: string; deleted_at: string | null };
+      return { id: row.id, path: row.path, title: row.title, blobSha: row.blob_sha, deleted: row.deleted_at !== null };
+    },
+
+    async markDeleted(noteId, blobSha) {
+      const { error } = await supabase
+        .from('notes')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', noteId)
+        .eq('blob_sha', blobSha)
+        .is('deleted_at', null);
+      if (error) throw new Error(`Removing the note failed: ${error.message}`);
+    },
+  };
 }
 
 /** The stored token, in usable form. Never logged, never returned to a client. */
