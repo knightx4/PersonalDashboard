@@ -8,6 +8,7 @@ import {
   writeInteractions,
   type Interaction,
 } from '@/lib/preview/interaction';
+import { DECKS_SCRIPT_ID, writeDecks, type Deck } from '@/lib/preview/deck';
 
 /**
  * The surface gallery: the app's own components, on the app's own ground.
@@ -84,6 +85,9 @@ export default async function PreviewPage({
   // the index the same way it reads the list of surfaces.
   const interactions: Record<string, Interaction> = {};
   for (const entry of SURFACES) if (entry.interaction) interactions[entry.id] = entry.interaction;
+  // The declared decks, for scripts/check-phone.ts, read off the index the same way.
+  const decks: Record<string, Deck> = {};
+  for (const entry of SURFACES) if (entry.deck) decks[entry.id] = entry.deck;
 
   return (
     <div className="bg-page min-h-screen px-6 py-10">
@@ -91,6 +95,11 @@ export default async function PreviewPage({
         type="application/json"
         id={INTERACTIONS_SCRIPT_ID}
         dangerouslySetInnerHTML={{ __html: writeInteractions(interactions) }}
+      />
+      <script
+        type="application/json"
+        id={DECKS_SCRIPT_ID}
+        dangerouslySetInnerHTML={{ __html: writeDecks(decks) }}
       />
       <div className="mx-auto max-w-2xl space-y-4">
         <div>

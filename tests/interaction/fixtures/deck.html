@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A deck that passes</title>
+<style>
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #1a1a1a; background: #f4f1ea; }
+  main { padding: 24px 16px 120px; }
+  article { background: #ffffff; border-radius: 12px; padding: 16px; }
+  img { display: block; width: 100%; height: auto; }
+  a { color: #1d4ed8; }
+  button, a.button { appearance: none; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 16px; font: inherit; color: #ffffff; background: #1d4ed8; border: 0; border-radius: 8px; text-decoration: none; }
+  .bar { display: flex; gap: 8px; padding: 8px 0; }
+  /* The pressed state: a scale while the button is down, as `press` does in the app. */
+  button, a.button { transition: transform 120ms ease-out; }
+  button:active, a.button:active { transform: scale(0.96); }
+</style>
+</head>
+<body>
+<main>
+  <article data-deck-item>
+    <h1>Story one</h1>
+    <img src="picture.svg?story=1" alt="">
+    <p>The first story, with the second drawn ahead below.</p>
+    <!-- No pressed state of its own: the browser answers it by opening the page. -->
+    <p><a href="https://example.com/story-one" target="_blank" rel="noopener">Read the article</a></p>
+  </article>
+  <!-- The next story is in the page already, and its picture fetched. -->
+  <template id="up-next">
+    <h1>Story two</h1>
+    <img src="picture.svg?story=2" alt="">
+    <p>The second story, shown the moment Next is pressed.</p>
+  </template>
+  <img src="picture.svg?story=2" alt="" hidden>
+  <div class="bar"><a class="button" href="#issue">Whole issue</a><button id="next">Next story</button></div>
+</main>
+<script>
+  document.getElementById('next').addEventListener('click', function () {
+    var item = document.querySelector('[data-deck-item]');
+    item.replaceChildren(document.getElementById('up-next').content.cloneNode(true));
+    fetch('deck-pass', { method: 'POST' }).catch(function () {});
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A deck with no prefetch</title>
+<style>
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #1a1a1a; background: #f4f1ea; }
+  main { padding: 24px 16px 120px; }
+  article { background: #ffffff; border-radius: 12px; padding: 16px; }
+  img { display: block; width: 100%; height: auto; }
+  a { color: #1d4ed8; }
+  button, a.button { appearance: none; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 16px; font: inherit; color: #ffffff; background: #1d4ed8; border: 0; border-radius: 8px; text-decoration: none; }
+  .bar { display: flex; gap: 8px; padding: 8px 0; }
+</style>
+</head>
+<body>
+<main>
+  <article data-deck-item>
+    <h1>Story one</h1>
+    <img src="picture.svg?story=1" alt="">
+    <p>The first story. Nothing of the second is in the page.</p>
+  </article>
+  <!-- No pressed state on either, and Next fetches the story it shows. -->
+  <div class="bar"><a class="button" href="#issue">Whole issue</a><button id="next">Next story</button></div>
+</main>
+<script>
+  document.getElementById('next').addEventListener('click', function () {
+    fetch('deck-next.json').then(function (r) { return r.json(); }).then(function (story) {
+      var item = document.querySelector('[data-deck-item]');
+      item.innerHTML = '<h1></h1><img alt=""><p></p>';
+      item.querySelector('h1').textContent = story.title;
+      item.querySelector('img').src = story.picture;
+      item.querySelector('p').textContent = story.body;
+    });
+  });
+</script>
+</body>
+</html>

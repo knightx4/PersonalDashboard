@@ -40,6 +40,7 @@ import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
 import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
 import type { Interaction } from '@/lib/preview/interaction';
+import type { Deck } from '@/lib/preview/deck';
 import { CalendarMonthGrid } from '@/components/todo/calendar-month';
 import { FeedEventCard } from '@/components/todo/feed-event-card';
 import {
@@ -166,6 +167,13 @@ export type Surface = {
    * surface is not recorded.
    */
   interaction?: Interaction;
+  /**
+   * Marks a screen you move through one item at a time, and where its Next
+   * and its item are (lib/preview/deck.ts). The phone checks then hold it to
+   * Next showing the next item with the network held, and to every control
+   * and link showing a press within 100 milliseconds.
+   */
+  deck?: Deck;
 };
 
 /**
@@ -3358,6 +3366,7 @@ export const SURFACES: readonly Surface[] = [
       direction: 'left',
       shows: 'The card follows the finger left, then springs off as the essay behind it comes in.',
     },
+    deck: { next: '#quick-read-next button[type="submit"]', item: '[data-quick-swipe]' },
     // The essay drawn behind it, so Next shows it at once (note 452a90d9).
     render: () => (
       <QuickReadView

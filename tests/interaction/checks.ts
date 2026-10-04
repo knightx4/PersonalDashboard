@@ -1,10 +1,15 @@
 /**
- * The four phone checks of docs/UI-QUALITY-SPEC.md, Part 5, at 390 pixels:
+ * The phone checks of docs/UI-QUALITY-SPEC.md, Part 5, at 390 pixels:
  *
  *   sideways   nothing scrolls sideways
  *   targets    every press target is at least 44 by 44 pixels
  *   dock       nothing a person can press sits under the dock
  *   contrast   text meets the floor check:contrast uses (4.5:1, 3:1 large)
+ *   next       a deck's Next shows the next item with the network held
+ *   press      every control and link on a deck shows a press within 100ms
+ *
+ * The last two run only on surfaces that declare a deck, and live in
+ * ./deck.ts; `checkPage` leaves them empty.
  *
  * `checkPage` measures whatever page is open (./probe.ts does the measuring)
  * and returns one list of findings per check, each finding a line a person
@@ -17,7 +22,7 @@ import { formatTheme, type Theme } from '../../lib/theme';
 import type { Page } from './browser';
 import { PROBE } from './probe';
 
-export const CHECKS = ['sideways', 'targets', 'dock', 'contrast'] as const;
+export const CHECKS = ['sideways', 'targets', 'dock', 'contrast', 'next', 'press'] as const;
 export type Check = (typeof CHECKS)[number];
 
 /** What each check holds, for messages. */
@@ -26,6 +31,8 @@ export const CHECK_RULES: Record<Check, string> = {
   targets: 'every press target is at least 44 by 44px',
   dock: 'nothing pressable sits under the dock',
   contrast: 'text meets 4.5:1 against its ground (3:1 when large or in a ghost ink)',
+  next: 'Next shows the next item at once, its words and picture fetched before it is pressed',
+  press: 'every control and link shows it was pressed within 100ms',
 };
 
 export const MIN_TARGET = 44;
@@ -90,6 +97,8 @@ export function findingsOf(measured: Measured, label = ''): Findings {
     contrast: contrast.faint.map(
       (f) => `${prefix}${f.what} is ${f.ratio}:1 (${f.ink} on ${f.ground}), needs ${f.floor}:1`,
     ),
+    next: [],
+    press: [],
   };
 }
 
@@ -100,7 +109,7 @@ export async function applyTheme(page: Page, theme: Theme): Promise<void> {
 }
 
 /**
- * The four checks on the open page. Layout is measured once, in the theme the
+ * The four layout checks on the open page (`next` and `press` come back empty). Layout is measured once, in the theme the
  * page opened in; contrast is measured in each of `themes`, since a pair that
  * reads in light can vanish in dark. With no themes, contrast is measured as
  * the page stands.
