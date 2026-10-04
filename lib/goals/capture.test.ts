@@ -210,6 +210,25 @@ describe('parseFiling', () => {
     expect(parseFiling({ actions: [{ type: 'count', step: 's1' }] }, without)).toEqual([]);
   });
 
+  it('shows a rhythm that counts itself but refuses a count on it', () => {
+    const jobs = contextOf(
+      [goal('g')],
+      [
+        step('apply', 'g', {
+          kind: 'rhythm',
+          rhythmCount: 5,
+          rhythmPeriod: 'week',
+          countSource: 'applications',
+        }),
+      ],
+      new Map([['apply', { current: period('apply', { target: 5, count: 2 }), past: [], missed: 0 }]]),
+    );
+    expect(captureMessage(jobs, 'sent two applications', '2026-09-24')).toContain(
+      's1 [rhythm, 2 of 5 this week · from Jobs, counts itself, never count it]',
+    );
+    expect(parseFiling({ actions: [{ type: 'count', step: 's1' }] }, jobs)).toEqual([]);
+  });
+
   it('files a repeated move once, and no more than the cap', () => {
     const twice = parseFiling(
       {

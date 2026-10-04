@@ -96,6 +96,40 @@ recurrence), so the rhythm lives in Goals and shows on Todo through the agenda
 source described below, as an item for the current period until that period's
 count is met.
 
+A rhythm is counted by hand (Count one on the step, a tick on Todo, or a
+sentence in the capture box) unless it names a source its count is read from
+(goals migration 0069, `lib/goals/rhythm-sources.ts`). The person's first ten
+closed periods had nine missed, mostly because nothing was logged, while the
+work was already on record in Jobs or the calendar. The sources are:
+
+- **Applications sent in Jobs**: `job_search.applications` by the day
+  `submitted_at` falls on in the person's zone. *Send 5 applications* counts
+  this way.
+- **Matching calendar events**: events typed in Todo (`todo.events`) or read
+  from a subscribed feed (`todo.feed_events`) whose title contains the
+  rhythm's match text, ignoring case, by the day they start. Alternatives are
+  separated by `|`: `urbanism|community board` counts a "Community Board 6"
+  meeting. An event counts once its day has come.
+
+X posts are not a source: `public.social_posts` holds drafts about building
+this app, and none is marked posted, so nothing records what was published.
+
+For a rhythm with a source, the period's count is what the source says.
+Count one and Take one back are not offered, Todo shows the item without a
+tick, and capture does not count towards it: the model is told the rhythm
+counts itself and a count move on it is refused, so the same application is
+never counted twice. The rhythm's line says where the count comes from: "2 of
+5 this week · from Jobs". The source is set on the step's edit form under
+**Counts itself from**, with the match text beside it for the calendar.
+
+Periods are synced whenever a page reads the rhythms, and also each morning
+by the daily cron (`inngest/goals/rhythms.ts`), so a period ends as kept or
+missed on its last day even when no page is opened. The sync reads each
+source once over the periods it touches, writes the count onto the open
+period, and closes an ended one on the source's count. It reads the period
+just closed again too, so an application entered a day late still counts
+towards last week until this week ends. Running it twice writes nothing new.
+
 ### Steps for later
 
 Some steps belong in a goal's map long before they can be done. Turning on
@@ -250,8 +284,9 @@ on your answer to Y", and its Undo reopens the step.
 Closing a whole goal stays yours (plan #1084). When the morning run reads a
 goal's done-when as met, its status for the day is `met`, with a short
 summary of how it got there, and Today offers **Close goal** with it. A goal
-with nothing done in three weeks (no step closed as done, no reading logged)
-is offered **Park goal**: a parked goal keeps its steps and leaves the home,
+with nothing done in three weeks (no step closed as done, no reading, no
+progress entry, nothing counted towards a rhythm and no confirmed record in
+its collections) is offered **Park goal**: a parked goal keeps its steps and leaves the home,
 Todo and the runs until you press **Take it back up** on the All goals page.
 Both offers carry a quiet **Keep it open**, which records `kept_open_at` on
 the goal: a met status older than that is not offered again, and the three
@@ -507,9 +542,11 @@ what is logged and the next piece to do. A step whose tally has reached its
 estimated total, or that has no total and was last answered "Nearly done", is
 listed for an offer to close it in the same notes. Dash never closes it on
 the tally, since the total is an estimate; it closes only on evidence, as any
-step of the person's. A step under way is left out of the list of steps
-untouched for a week, so it gets the nudge rather than a split, a prep or a
-question. The rules are in `lib/goals/progress-nudges.ts`.
+step of the person's. A step under way, one with a progress entry that was not undone, is left
+out of the list of steps untouched for a week (`staleSteps` in
+`lib/goals/stale-steps.ts`), so it gets the nudge rather than a split, a prep
+or a question. An entry on a sub-step also counts as a touch on the steps
+above it. The rules are in `lib/goals/progress-nudges.ts`.
 
 ## What Claude does, and when
 
@@ -523,7 +560,10 @@ the same allowance. So Goals runs on a schedule rather than on every change:
   with one sentence on why, the next move and its date. A met goal's reason
   is a summary of how it got there, and it is the proposal to close it
   ("Approval" above). A goal with nothing done in three weeks
-  reads stalled, and its next move is added as a step (plan #1018). Before
+  reads stalled, and its next move is added as a step (plan #1018). Done
+  means the same as for Park goal: a step closed as done, a reading, a
+  progress entry, a rhythm period with something counted, or a confirmed
+  record (`goalActivity` in `lib/goals/reviews.ts`). Before
   the verdicts, each step of yours untouched for a week gets a move (plan
   #1083, "Approval" above). The
   same run then works up to ten ready `claude` steps (`DAILY_STEP_LIMIT` in
@@ -1074,7 +1114,8 @@ A sketch for the migration, not the migration itself.
   whether it needs a prep step; plan #1215), `errand` (on a goal, that it
   is a one-off job with a date it is due by; an errand always has `due_on`,
   and a step is never one; plan #1261), `position`, and `rhythm_count` with
-  `rhythm_period` for rhythms. A goal's status can also be `parked`. A goal's
+  `rhythm_period` for rhythms, with `count_source` and `count_match` on a
+  rhythm that counts itself ("Rhythms" above; migration 0069). A goal's status can also be `parked`. A goal's
   `help_kinds` lists the weekly help it asks for, each an entry of `kind`
   (events, volunteering, reading, courses or job_leads) and a `note` on what
   to look for (plan #1027). When Claude maps a goal it proposes kinds in

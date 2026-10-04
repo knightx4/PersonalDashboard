@@ -34,7 +34,7 @@ export function GoalRhythms({
             const now = record?.current ?? null;
             const last = record?.past.at(-1) ?? null;
             const facts = [
-              now ? progressLine(period, now) : null,
+              now ? progressLine(period, now, step.countSource) : null,
               last ? `${last.count} last ${period}` : null,
               record && record.missed > 0 ? missedLine(period, record.missed) : null,
             ].filter(Boolean);

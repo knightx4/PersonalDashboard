@@ -7,7 +7,9 @@ import {
   missedLine,
   periodOf,
   progressLine,
+  countKey,
   recordsOf,
+  sourcedSpans,
   syncPlan,
   type LiveRhythm,
   type PeriodRow,
@@ -68,13 +70,13 @@ describe('syncPlan', () => {
     const plan = syncPlan([rhythm()], [], '2026-09-24');
     expect(plan.close).toEqual([]);
     expect(plan.insert).toEqual([
-      { itemId: 'r', startsOn: MON, endsOn: '2026-09-28', target: 1, kept: null },
+      { itemId: 'r', startsOn: MON, endsOn: '2026-09-28', target: 1, count: 0, kept: null },
     ]);
   });
 
   it('writes nothing when the current period is already open', () => {
     const plan = syncPlan([rhythm()], [row()], '2026-09-24');
-    expect(plan).toEqual({ close: [], reshape: [], insert: [] });
+    expect(plan).toEqual({ close: [], reshape: [], recount: [], insert: [] });
   });
 
   it('closes an ended period as kept or missed on its count and opens the next', () => {
@@ -102,9 +104,9 @@ describe('syncPlan', () => {
     );
     expect(plan.close).toEqual([{ id: 'old', kept: true }]);
     expect(plan.insert).toEqual([
-      { itemId: 'r', startsOn: '2026-09-07', endsOn: '2026-09-14', target: 1, kept: false },
-      { itemId: 'r', startsOn: '2026-09-14', endsOn: MON, target: 1, kept: false },
-      { itemId: 'r', startsOn: MON, endsOn: '2026-09-28', target: 1, kept: null },
+      { itemId: 'r', startsOn: '2026-09-07', endsOn: '2026-09-14', target: 1, count: 0, kept: false },
+      { itemId: 'r', startsOn: '2026-09-14', endsOn: MON, target: 1, count: 0, kept: false },
+      { itemId: 'r', startsOn: MON, endsOn: '2026-09-28', target: 1, count: 0, kept: null },
     ]);
   });
 
@@ -140,7 +142,7 @@ describe('syncPlan', () => {
     const plan = syncPlan([rhythm({ period: 'day' })], [row({ count: 1 })], '2026-09-24');
     expect(plan.close).toEqual([{ id: 'p', kept: true }]);
     expect(plan.insert).toEqual([
-      { itemId: 'r', startsOn: '2026-09-24', endsOn: '2026-09-25', target: 1, kept: null },
+      { itemId: 'r', startsOn: '2026-09-24', endsOn: '2026-09-25', target: 1, count: 0, kept: null },
     ]);
   });
 
@@ -148,8 +150,109 @@ describe('syncPlan', () => {
     expect(syncPlan([], [row({ startsOn: '2026-01-05', endsOn: '2026-01-12' })], MON)).toEqual({
       close: [],
       reshape: [],
+      recount: [],
       insert: [],
     });
+  });
+});
+
+describe('syncPlan with counts from a source', () => {
+  const jobs = rhythm({ target: 5, source: { kind: 'applications', match: null } });
+  const counts = (entries: [string, number][]) =>
+    new Map(entries.map(([startsOn, n]) => [countKey('r', startsOn), n]));
+
+  it('writes the source count onto the open period, and nothing when it already holds it', () => {
+    const plan = syncPlan([jobs], [row({ target: 5, count: 1 })], '2026-09-24', counts([[MON, 3]]));
+    expect(plan.recount).toEqual([{ id: 'p', count: 3, kept: null }]);
+    const same = syncPlan([jobs], [row({ target: 5, count: 3 })], '2026-09-24', counts([[MON, 3]]));
+    expect(same.recount).toEqual([]);
+  });
+
+  it('closes an ended period on the source count, not the stored one', () => {
+    const plan = syncPlan(
+      [jobs],
+      [row({ id: 'old', startsOn: '2026-09-14', endsOn: MON, target: 5, count: 0 })],
+      '2026-09-22',
+      counts([
+        ['2026-09-14', 5],
+        [MON, 1],
+      ]),
+    );
+    expect(plan.close).toEqual([{ id: 'old', kept: true, count: 5 }]);
+    expect(plan.insert).toEqual([
+      { itemId: 'r', startsOn: MON, endsOn: '2026-09-28', target: 5, count: 1, kept: null },
+    ]);
+  });
+
+  it('writes a period nobody opened as kept when the source counted enough in it', () => {
+    const plan = syncPlan(
+      [jobs],
+      [
+        row({
+          id: 'old',
+          startsOn: '2026-09-07',
+          endsOn: '2026-09-14',
+          target: 5,
+          kept: true,
+          closedAt: 'x',
+        }),
+      ],
+      '2026-09-24',
+      counts([['2026-09-14', 6]]),
+    );
+    expect(plan.insert[0]).toMatchObject({ startsOn: '2026-09-14', count: 6, kept: true });
+  });
+
+  it('recounts the period just closed, working out kept again', () => {
+    const plan = syncPlan(
+      [jobs],
+      [
+        row({
+          id: 'last',
+          startsOn: '2026-09-14',
+          endsOn: MON,
+          target: 5,
+          count: 4,
+          kept: false,
+          closedAt: 'x',
+        }),
+        row({ target: 5, count: 0 }),
+      ],
+      '2026-09-22',
+      counts([
+        ['2026-09-14', 5],
+        [MON, 0],
+      ]),
+    );
+    expect(plan.recount).toEqual([{ id: 'last', count: 5, kept: true }]);
+  });
+});
+
+describe('sourcedSpans', () => {
+  it('asks for the open periods, the new ones and the one just closed of a sourced rhythm only', () => {
+    const jobs = rhythm({ source: { kind: 'applications', match: null } });
+    const byHand = rhythm({ id: 'h' });
+    const rows = [
+      row({ id: 'older', startsOn: '2026-09-07', endsOn: '2026-09-14', kept: false, closedAt: 'x' }),
+      row({ id: 'last', startsOn: '2026-09-14', endsOn: MON, kept: false, closedAt: 'x' }),
+      row({ id: 'h1', itemId: 'h' }),
+    ];
+    const plan = syncPlan([jobs, byHand], rows, '2026-09-24');
+    const spans = sourcedSpans([jobs, byHand], rows, plan, '2026-09-24');
+    expect(spans.get('r')).toEqual([
+      { startsOn: '2026-09-14', endsOn: MON },
+      { startsOn: MON, endsOn: '2026-09-28' },
+    ]);
+    expect(spans.has('h')).toBe(false);
+  });
+});
+
+describe('progressLine', () => {
+  it('says where a rhythm that counts itself is counted from', () => {
+    expect(progressLine('week', { count: 2, target: 5 }, 'applications')).toBe(
+      '2 of 5 this week · from Jobs',
+    );
+    expect(progressLine('week', { count: 2, target: 5 })).toBe('2 of 5 this week');
   });
 });
 

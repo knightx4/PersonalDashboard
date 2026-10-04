@@ -12,12 +12,20 @@
  * or missed, periods nobody opened the app in are written as missed, and the
  * current one is opened. Running it twice writes nothing the second time.
  *
+ * A rhythm that counts itself (lib/goals/rhythm-sources.ts) takes its count
+ * from its source in the same pass: the store reads the source over the
+ * periods the plan touches, and syncPlan writes that count onto them, closing
+ * ended periods on it. The period just closed is read again too, so an
+ * application entered a day late still counts towards last week until this
+ * week ends.
+ *
  * A period runs from `startsOn` up to but not including `endsOn`, so a day's
  * period ends the next day. Weeks start on Monday, as the Todo calendar's do.
  *
  * Pure, so the dates and the rules are tested without a database. The reads
  * and writes are in lib/goals/rhythms-store.ts.
  */
+import { rhythmSource, sourceSuffix, type CountSource, type RhythmSource } from '@/lib/goals/rhythm-sources';
 import type { RhythmPeriod, StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 import { startOfWeek } from '@/lib/todo/calendar/range';
@@ -43,6 +51,8 @@ export type LiveRhythm = {
   period: RhythmPeriod;
   goalId: string;
   goalTitle: string;
+  /** Where its count is read from; null or absent when it is counted by hand. */
+  source?: RhythmSource | null;
 };
 
 /**
@@ -90,6 +100,7 @@ export function liveRhythms(goals: Goal[], byGoal: Map<string, StepNode[]>): Liv
             period: node.rhythmPeriod,
             goalId: goal.id,
             goalTitle: goal.title,
+            source: rhythmSource(node.countSource, node.countMatch),
           });
         }
         walk(node.children);
@@ -101,16 +112,28 @@ export function liveRhythms(goals: Goal[], byGoal: Map<string, StepNode[]>): Liv
 }
 
 export type SyncPlan = {
-  /** Open periods to close. kept is whether the count reached the target. */
-  close: { id: string; kept: boolean }[];
+  /**
+   * Open periods to close. kept is whether the count reached the target;
+   * count is set when a source gave the period a new one.
+   */
+  close: { id: string; kept: boolean; count?: number }[];
   /**
    * The current period's target and end, when the rhythm's own have changed
    * since it was opened.
    */
   reshape: { id: string; target: number; endsOn: string }[];
-  /** New rows: missed periods (closed, count 0) and the current one (open). */
-  insert: (PeriodSpan & { itemId: string; target: number; kept: boolean | null })[];
+  /**
+   * Stored periods whose count a source now reads differently: the open one,
+   * and the one just closed, whose kept is worked out again (null for an
+   * open period).
+   */
+  recount: { id: string; count: number; kept: boolean | null }[];
+  /** New rows: missed periods (closed) and the current one (open), with the count a source gave them. */
+  insert: (PeriodSpan & { itemId: string; target: number; count: number; kept: boolean | null })[];
 };
+
+/** The key of one rhythm's period in the counts a source gave. */
+export const countKey = (itemId: string, startsOn: string) => `${itemId}:${startsOn}`;
 
 /**
  * What has to be written so each live rhythm has its periods up to today.
@@ -122,9 +145,20 @@ export type SyncPlan = {
  * on the same day: then the one row is kept and given the new end, since the
  * table holds one period per rhythm per start day. The current period also
  * takes the rhythm's target when that has changed.
+ *
+ * `counts` holds what a rhythm's source counted for some of its periods,
+ * keyed by countKey. A period with a count there takes it: an open row is
+ * recounted, an ended one closed on it, a closed one recounted with its kept
+ * worked out again, and a new row inserted with it. A missed period that
+ * gets a count is inserted as kept when the count reaches the target.
  */
-export function syncPlan(rhythms: LiveRhythm[], rows: PeriodRow[], today: string): SyncPlan {
-  const plan: SyncPlan = { close: [], reshape: [], insert: [] };
+export function syncPlan(
+  rhythms: LiveRhythm[],
+  rows: PeriodRow[],
+  today: string,
+  counts: ReadonlyMap<string, number> = new Map(),
+): SyncPlan {
+  const plan: SyncPlan = { close: [], reshape: [], recount: [], insert: [] };
   const byItem = new Map<string, PeriodRow[]>();
   for (const row of rows) {
     const list = byItem.get(row.itemId) ?? [];
@@ -137,11 +171,16 @@ export function syncPlan(rhythms: LiveRhythm[], rows: PeriodRow[], today: string
     const own = (byItem.get(rhythm.id) ?? []).sort((a, b) =>
       a.startsOn < b.startsOn ? -1 : a.startsOn > b.startsOn ? 1 : 0,
     );
+    const counted = (startsOn: string) => counts.get(countKey(rhythm.id, startsOn));
 
     let hasCurrent = false;
     for (const row of own) {
+      const fresh = counted(row.startsOn);
       if (row.closedAt !== null) {
         if (row.startsOn === current.startsOn) hasCurrent = true;
+        if (fresh !== undefined && fresh !== row.count) {
+          plan.recount.push({ id: row.id, count: fresh, kept: fresh >= row.target });
+        }
         continue;
       }
       if (row.startsOn === current.startsOn) {
@@ -149,13 +188,21 @@ export function syncPlan(rhythms: LiveRhythm[], rows: PeriodRow[], today: string
         if (row.target !== rhythm.target || row.endsOn !== current.endsOn) {
           plan.reshape.push({ id: row.id, target: rhythm.target, endsOn: current.endsOn });
         }
+        if (fresh !== undefined && fresh !== row.count) {
+          plan.recount.push({ id: row.id, count: fresh, kept: null });
+        }
         continue;
       }
-      plan.close.push({ id: row.id, kept: row.count >= row.target });
+      if (fresh !== undefined && fresh !== row.count) {
+        plan.close.push({ id: row.id, kept: fresh >= row.target, count: fresh });
+      } else {
+        plan.close.push({ id: row.id, kept: row.count >= row.target });
+      }
     }
     if (hasCurrent) continue;
 
-    // Periods between the last row and today that nobody opened: missed.
+    // Periods between the last row and today that nobody opened: missed,
+    // unless a source counted enough in one.
     const last = own.at(-1);
     const missed: PeriodSpan[] = [];
     if (last && last.endsOn < current.startsOn) {
@@ -167,11 +214,59 @@ export function syncPlan(rhythms: LiveRhythm[], rows: PeriodRow[], today: string
       }
     }
     for (const span of missed.slice(-MAX_BACKFILL)) {
-      plan.insert.push({ ...span, itemId: rhythm.id, target: rhythm.target, kept: false });
+      const count = counted(span.startsOn) ?? 0;
+      plan.insert.push({
+        ...span,
+        itemId: rhythm.id,
+        target: rhythm.target,
+        count,
+        kept: count >= rhythm.target,
+      });
     }
-    plan.insert.push({ ...current, itemId: rhythm.id, target: rhythm.target, kept: null });
+    plan.insert.push({
+      ...current,
+      itemId: rhythm.id,
+      target: rhythm.target,
+      count: counted(current.startsOn) ?? 0,
+      kept: null,
+    });
   }
   return plan;
+}
+
+/**
+ * The periods a sourced rhythm's count is read for, by rhythm id: every
+ * period `plan` (made without counts) opens, keeps open or closes, and the
+ * closed period just before the current one, so a late entry still counts
+ * there. A rhythm counted by hand has none.
+ */
+export function sourcedSpans(
+  rhythms: LiveRhythm[],
+  rows: PeriodRow[],
+  plan: SyncPlan,
+  today: string,
+): Map<string, PeriodSpan[]> {
+  const out = new Map<string, PeriodSpan[]>();
+  const sourced = new Map(rhythms.filter((r) => r.source).map((r) => [r.id, r]));
+  const add = (itemId: string, span: PeriodSpan) => {
+    const list = out.get(itemId) ?? [];
+    if (!list.some((s) => s.startsOn === span.startsOn)) {
+      list.push({ startsOn: span.startsOn, endsOn: span.endsOn });
+    }
+    out.set(itemId, list);
+  };
+  for (const row of rows) {
+    const rhythm = sourced.get(row.itemId);
+    if (!rhythm) continue;
+    // The current period is read over the rhythm's own dates, which a
+    // reshape may be about to give it.
+    const current = periodOf(rhythm.period, today);
+    const previous = periodOf(rhythm.period, addDays(current.startsOn, -1)).startsOn;
+    if (row.startsOn === current.startsOn) add(row.itemId, current);
+    else if (row.closedAt === null || row.startsOn === previous) add(row.itemId, row);
+  }
+  for (const row of plan.insert) if (sourced.has(row.itemId)) add(row.itemId, row);
+  return out;
 }
 
 /** Days left in a period, today included. */
@@ -206,9 +301,13 @@ export function periodLabel(period: RhythmPeriod): string {
   return period === 'day' ? 'today' : `this ${period}`;
 }
 
-/** "1 of 3 this week". */
-export function progressLine(period: RhythmPeriod, row: Pick<PeriodRow, 'target' | 'count'>) {
-  return `${row.count} of ${row.target} ${periodLabel(period)}`;
+/** "1 of 3 this week", and "2 of 5 this week · from Jobs" for a rhythm that counts itself. */
+export function progressLine(
+  period: RhythmPeriod,
+  row: Pick<PeriodRow, 'target' | 'count'>,
+  source?: CountSource | null,
+) {
+  return `${row.count} of ${row.target} ${periodLabel(period)}${sourceSuffix(source)}`;
 }
 
 /**

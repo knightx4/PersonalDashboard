@@ -435,6 +435,16 @@ Every step has a `kind`:
   something that is not a question you can put to them.
 - `rhythm` for a practice, with `rhythm_count` (1 to 100) and `rhythm_period`
   (`day`, `week` or `month`): log the balance monthly, review every quarter.
+  When the practice already leaves a record in the app, set where its count
+  is read from so the person never has to log it: `count_source =
+  'applications'` for sending job applications (counted from Jobs), or
+  `count_source = 'calendar'` with `count_match` for attending something that
+  goes on their calendar. `count_match` is text the event title contains,
+  ignoring case, with alternatives separated by `|`
+  (`urbanism|community board`); look at the titles in `todo.feed_events` and
+  `todo.events` first and write it only when real events would match. Leave
+  both null for anything else, posts on X included. A rhythm with a source is
+  counted by the sync, so never count towards it yourself.
 - `decision` for a question (below).
 
 For every `mine` step you write, and every open one already on the goal that

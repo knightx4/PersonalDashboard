@@ -469,9 +469,10 @@ export function GoalRow({
         : [];
   // Counting is offered on a rhythm with a period open now; the period is
   // named in the form, so a press after the week has turned is refused
-  // rather than counted towards the new one.
+  // rather than counted towards the new one. A rhythm that counts itself
+  // from a source is not counted by hand (lib/goals/rhythm-sources.ts).
   const countOne = menuAction(countRhythmAction);
-  const rhythmItems: ActionMenuItem[] = current
+  const rhythmItems: ActionMenuItem[] = current && !step.countSource
     ? [
         {
           id: 'count',
@@ -643,7 +644,7 @@ export function GoalRow({
           <span className="whitespace-normal text-caution">An answer changed</span>
         ) : current && step.rhythmPeriod ? (
           <span className="whitespace-normal text-ink-muted">
-            {progressLine(step.rhythmPeriod, current)}
+            {progressLine(step.rhythmPeriod, current, step.countSource)}
           </span>
         ) : step.waitsUntil ? (
           <span className="text-ink-muted">Starts {formatDate(step.waitsUntil)}</span>
@@ -740,7 +741,7 @@ export function GoalRow({
           {step.kind === 'rhythm' && step.rhythmCount && step.rhythmPeriod && (
             <span>{describeRhythm(step.rhythmCount, step.rhythmPeriod)}</span>
           )}
-          {current && step.rhythmPeriod && <span>{progressLine(step.rhythmPeriod, current)}</span>}
+          {current && step.rhythmPeriod && <span>{progressLine(step.rhythmPeriod, current, step.countSource)}</span>}
           {step.waitsUntil && <span>Starts {formatDate(step.waitsUntil)}</span>}
           {step.dueOn && <span>Due {formatDate(step.dueOn)}</span>}
           {step.estimatedTotal && step.totalUnit && (
