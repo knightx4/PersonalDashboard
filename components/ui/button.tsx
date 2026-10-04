@@ -2,6 +2,24 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/cn';
 
 /**
+ * A press area of at least 44 by 44 pixels on a phone, without changing what
+ * the control looks like: an invisible ::after centred on the control, as
+ * tall and wide as the control or 44 pixels, whichever is more. The phone
+ * checks (docs/UI-QUALITY-SPEC.md, Part 5) measure a control with that
+ * pseudo-element included. Below `sm` only, because a mouse does not need it
+ * and a dense table row on a laptop would otherwise have its neighbours'
+ * press areas reaching into it.
+ *
+ * `relative` holds the pseudo-element to the control. It is unconditional so
+ * that a caller passing `absolute` or `sticky` replaces it through `cn`; a
+ * `max-sm:relative` would win over theirs at phone width instead.
+ */
+export const PRESS_AREA =
+  'relative max-sm:after:absolute max-sm:after:top-1/2 max-sm:after:left-1/2 ' +
+  'max-sm:after:h-full max-sm:after:min-h-11 max-sm:after:w-full max-sm:after:min-w-11 ' +
+  'max-sm:after:-translate-x-1/2 max-sm:after:-translate-y-1/2';
+
+/**
  * Simple, with interactive elements that make it feel alive without getting in
  * the way: the quick duration and the soft ease (lib/motion.ts), 0.98 scale
  * on press. `press` drops out entirely under prefers-reduced-motion -- see
@@ -10,7 +28,8 @@ import { cn } from '@/lib/cn';
 const button = cva(
   'press inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-control font-medium ' +
     'transition-colors duration-quick disabled:pointer-events-none disabled:opacity-50 ' +
-    'focus-visible:outline-2 focus-visible:outline-offset-2',
+    'focus-visible:outline-2 focus-visible:outline-offset-2 ' +
+    PRESS_AREA,
   {
     variants: {
       variant: {

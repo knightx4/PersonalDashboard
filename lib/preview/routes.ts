@@ -141,6 +141,18 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'anatomy-dashboard': ['/dev/ui'],
   'anatomy-settings': ['/dev/ui'],
   'anatomy-compose': ['/dev/ui'],
+  'front-door': ['/'],
+  'auth-login': ['/login'],
+  'auth-signup': ['/signup'],
+  'auth-reset-password': ['/reset-password'],
+  'auth-code-error': ['/auth/auth-code-error'],
+  'auth-consent': ['/oauth/consent'],
+  'legal-privacy': ['/privacy'],
+  'legal-terms': ['/terms'],
+  'onboarding-welcome': ['/onboarding'],
+  'onboarding-gmail': ['/onboarding'],
+  'share-form': ['/s/[token]'],
+  'open-missing': ['/open/[ref]'],
 };
 
 /** A route split into its segments; `/` is no segments. */

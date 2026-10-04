@@ -127,6 +127,20 @@ import {
   InformationListSurface,
   InformationOneSurface,
 } from './goal-page-surfaces';
+import {
+  AuthCodeErrorSurface,
+  ConsentSurface,
+  FrontDoorSurface,
+  LoginSurface,
+  OnboardingGmailSurface,
+  OnboardingWelcomeSurface,
+  OpenMissingSurface,
+  PrivacySurface,
+  ResetPasswordSurface,
+  ShareFormSurface,
+  SignupSurface,
+  TermsSurface,
+} from './public-surfaces';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -157,9 +171,12 @@ export type Surface = {
   /**
    * How wide the thing is meant to be read at, in the real app. `page` is for
    * a whole page arrangement, which draws its own box the way a page does
-   * rather than being centred in a column this route picked for it.
+   * rather than being centred in a column this route picked for it. `screen`
+   * is for a page outside the shell that draws the whole screen itself (the
+   * front door, the sign-in card, a shared form): no box and no workspace,
+   * as the app serves it.
    */
-  width: 'narrow' | 'wide' | 'page';
+  width: 'narrow' | 'wide' | 'page' | 'screen';
   render: () => React.ReactNode;
   /**
    * The press, swipe or completion `npm run record` plays on this surface and
@@ -3683,6 +3700,93 @@ export const SURFACES: readonly Surface[] = [
         <HomeArrivalDemo finished />
       </div>
     ),
+  },
+
+  /* The pages outside the shell, and /open's not-found (plan #1599).
+   * Fixtures in public-surfaces.tsx. */
+  {
+    id: 'front-door',
+    label: 'Front door · The public homepage',
+    module: 'dev',
+    width: 'screen',
+    render: () => <FrontDoorSurface />,
+  },
+  {
+    id: 'auth-login',
+    label: 'Sign in · After Google sign-in failed',
+    module: 'dev',
+    width: 'screen',
+    render: () => <LoginSurface />,
+  },
+  {
+    id: 'auth-signup',
+    label: 'Sign up',
+    module: 'dev',
+    width: 'screen',
+    render: () => <SignupSurface />,
+  },
+  {
+    id: 'auth-reset-password',
+    label: 'Sign in · Reset your password',
+    module: 'dev',
+    width: 'screen',
+    render: () => <ResetPasswordSurface />,
+  },
+  {
+    id: 'auth-code-error',
+    label: 'Sign in · A link that did not work',
+    module: 'dev',
+    width: 'screen',
+    render: () => <AuthCodeErrorSurface />,
+  },
+  {
+    id: 'auth-consent',
+    label: 'Sign in · An app asking to connect',
+    module: 'dev',
+    width: 'screen',
+    render: () => <ConsentSurface />,
+  },
+  {
+    id: 'legal-privacy',
+    label: 'Privacy policy',
+    module: 'dev',
+    width: 'screen',
+    render: () => <PrivacySurface />,
+  },
+  {
+    id: 'legal-terms',
+    label: 'Terms',
+    module: 'dev',
+    width: 'screen',
+    render: () => <TermsSurface />,
+  },
+  {
+    id: 'onboarding-welcome',
+    label: 'Onboarding · Welcome',
+    module: 'shopping',
+    width: 'screen',
+    render: () => <OnboardingWelcomeSurface />,
+  },
+  {
+    id: 'onboarding-gmail',
+    label: 'Onboarding · Gmail, after access was refused',
+    module: 'shopping',
+    width: 'screen',
+    render: () => <OnboardingGmailSurface />,
+  },
+  {
+    id: 'share-form',
+    label: 'Shared list · Keep, sell or give away',
+    module: 'shopping',
+    width: 'screen',
+    render: () => <ShareFormSurface />,
+  },
+  {
+    id: 'open-missing',
+    label: 'Open · A link to a row that has gone',
+    module: 'dev',
+    width: 'page',
+    render: () => <OpenMissingSurface />,
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on

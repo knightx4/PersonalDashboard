@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { modulesFor, type AppModule, type ModuleId } from '@/lib/modules';
 import { cn } from '@/lib/cn';
+import { PRESS_AREA } from '@/components/ui/button';
 import s from './front-door.module.css';
 
 /**
@@ -42,17 +43,17 @@ export default function HomePage() {
       <div className={s.rays} aria-hidden />
 
       <header className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-5 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5">
+        <Link href="/" className={cn(PRESS_AREA, 'flex items-center gap-2.5')}>
           <ModuleMark module={null} size="md" />
           <span className={cn('text-body font-semibold tracking-tight whitespace-nowrap', s.ink)}>
             Dash
           </span>
         </Link>
         <nav className="flex items-center gap-1 sm:gap-2">
-          <Link href="/login" className={cn(s.quiet, 'px-3 py-2 text-ui')}>
+          <Link href="/login" className={cn(s.quiet, PRESS_AREA, 'px-3 py-2 text-ui')}>
             Sign in
           </Link>
-          <Link href="/signup" className={cn(s.primary, 'px-4 py-2 text-ui')}>
+          <Link href="/signup" className={cn(s.primary, PRESS_AREA, 'px-4 py-2 text-ui')}>
             Get started
           </Link>
         </nav>
@@ -134,7 +135,7 @@ export default function HomePage() {
                 </aside>
 
                 <div className="min-w-0 flex-1 p-4 sm:p-6">
-                  <p className={cn(s.ghost, 'text-small')}>Friday 3 October</p>
+                  <p className={cn(s.ghost, 'text-small')}>Saturday 3 October</p>
                   <p className={cn(s.ink, 'font-display mt-1 text-title font-semibold tracking-tight')}>
                     Good morning
                   </p>
@@ -149,7 +150,7 @@ export default function HomePage() {
                   <div className={cn(s.well, 'mt-2 divide-y divide-white/5')}>
                     {[
                       { id: 'todo' as const, text: 'Send the portfolio link to Northwind', meta: 'Today' },
-                      { id: 'jobs' as const, text: 'Second interview, product designer', meta: 'Tue 10:30' },
+                      { id: 'jobs' as const, text: 'Second interview, product designer', meta: 'Tue 10:30 AM' },
                       { id: 'learn' as const, text: '12 questions waiting on statistics', meta: 'Learn' },
                     ].map((row) => (
                       <div key={row.text} className="flex items-center gap-3 px-3 py-2.5">
@@ -343,10 +344,10 @@ export default function HomePage() {
             Dash
           </span>
           <nav className="flex gap-5">
-            <Link href="/privacy" className={s.quiet}>
+            <Link href="/privacy" className={cn(s.quiet, PRESS_AREA)}>
               Privacy
             </Link>
-            <Link href="/terms" className={s.quiet}>
+            <Link href="/terms" className={cn(s.quiet, PRESS_AREA)}>
               Terms
             </Link>
           </nav>
