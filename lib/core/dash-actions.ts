@@ -169,7 +169,17 @@ export function undoneByAsk(action: Pick<DashAction, 'surface' | 'kind'>): boole
  * row, keeps no capture id, and is undone by the generic rule here.
  */
 export function undoneByCapture(action: Pick<DashAction, 'surface' | 'undo'>): boolean {
-  return action.surface === 'capture' && typeof action.undo?.capture_id === 'string';
+  return action.surface === 'capture' && (typeof action.undo?.capture_id === 'string' || undoneByVault(action));
+}
+
+/**
+ * Whether this is a note capture wrote into the vault (plan #1582): undoing
+ * it commits the file's removal to the notes repository before the row goes,
+ * so the generic rule, which only sees the row, leaves it to capture. The
+ * record keeps the blob SHA the note was written at in `undo.vault_blob_sha`.
+ */
+export function undoneByVault(action: Pick<DashAction, 'surface' | 'undo'>): boolean {
+  return action.surface === 'capture' && typeof action.undo?.vault_blob_sha === 'string';
 }
 
 /**

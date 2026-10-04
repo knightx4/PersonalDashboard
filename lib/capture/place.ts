@@ -24,17 +24,27 @@ import {
   type CaptureSortRole,
 } from '@/lib/capture/sort';
 import type { FiledEntry } from '@/lib/goals/capture';
+import { INBOX_FOLDER } from '@/lib/vault/paths';
 
 /**
- * The places the box can file into today. The vault is left out until notes
- * can be written into it (plan #1582); adding 'vault' here, with its writer in
- * app/capture-actions.ts, is what switches it on.
+ * The places the box can file into. The vault is one only while its token
+ * can write (plan #1582): an account whose vault is read-only is never
+ * offered it, and capture keeps the other places.
  */
-export const LIVE_CAPTURE_PLACES: readonly CapturePlace[] = ['todo', 'goals', 'jobs'];
+export const LIVE_CAPTURE_PLACES: readonly CapturePlace[] = ['todo', 'goals', 'jobs', 'vault'];
 
-/** The places offered to an account: live, and in a workspace it has. */
-export function offeredCapturePlaces(modules: readonly ModuleId[] | undefined): CapturePlace[] {
-  return availableCapturePlaces(modules).filter((place) => LIVE_CAPTURE_PLACES.includes(place));
+/**
+ * The places offered to an account: live, and in a workspace it has. The
+ * vault only when the server has found its token can write, so the box,
+ * which cannot ask GitHub, leaves it out until a sort says otherwise.
+ */
+export function offeredCapturePlaces(
+  modules: readonly ModuleId[] | undefined,
+  options: { vaultWritable?: boolean } = {},
+): CapturePlace[] {
+  return availableCapturePlaces(modules).filter(
+    (place) => LIVE_CAPTURE_PLACES.includes(place) && (place !== 'vault' || options.vaultWritable === true),
+  );
 }
 
 /** How the line under the field names one part: "Update a goal · Run a half marathon". */
@@ -93,7 +103,7 @@ export type FiledCapture = {
   /** The workspace's home, which the landing flies to. */
   href: string;
   /**
-   * The core.dash_actions record a todo or a job note was kept as; Undo
+   * The core.dash_actions record a todo, a job note or a vault note was kept as; Undo
    * hands it to the generic undo. Null for a goal update, whose lines carry
    * their own, or when the record could not be written.
    */
@@ -118,7 +128,9 @@ export function filedDestination(
         ? goalsPlaceName(detail.entries ?? [])
         : place === 'jobs' && detail.role
           ? roleName(detail.role)
-          : null;
+          : place === 'vault'
+            ? INBOX_FOLDER
+            : null;
   return {
     module: workspace.id,
     href: workspace.home,

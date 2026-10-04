@@ -21,7 +21,8 @@ import { sortCapture } from '@/lib/capture/sort-model';
 import { todoCaptureForm } from '@/lib/capture/todo';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { recordDashAction, undoDashAction } from '@/lib/core/dash-actions';
+import { loadDashAction, recordDashAction, undoDashAction, undoneByVault } from '@/lib/core/dash-actions';
+import { fileVaultNote, undoVaultCapture, vaultWritable } from '@/lib/capture/vault';
 import { estimatePaidActions, type PaidCosts } from '@/lib/core/spend/paid-actions';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
@@ -43,8 +44,9 @@ import { fileGoalCapture } from '@/app/goals/capture-actions';
  *
  * Filing goes through the writers that already exist: addTask for a todo,
  * fileGoalCapture for a goal update, and the add_role_note write for a job
- * (lib/capture/file.ts). Each todo and note is recorded in core.dash_actions
- * with surface 'capture'; Goals records its own lines.
+ * (lib/capture/file.ts), and a new note in the vault's Inbox through
+ * lib/capture/vault.ts (plan #1582). Each todo and note is recorded in
+ * core.dash_actions with surface 'capture'; Goals records its own lines.
  */
 
 function apiKey(): string | null {
@@ -69,7 +71,10 @@ type RoleJoin = { id: string; title: string; companies: { name: string } | null 
  */
 async function sortContext(userId: string): Promise<CaptureSortContext> {
   const settings = await loadAccountSettings(userId);
-  const places = offeredCapturePlaces(settings.enabledModules as ModuleId[]);
+  const modules = settings.enabledModules as ModuleId[];
+  // GitHub is asked only for an account with the vault, and at most every ten minutes.
+  const vault = modules.includes('vault') && (await vaultWritable(userId));
+  const places = offeredCapturePlaces(modules, { vaultWritable: vault });
   const held = LISTS.get(userId);
   if (held && Date.now() - held.at < LISTS_TTL_MS) return { places, goals: held.goals, roles: held.roles };
 
@@ -244,8 +249,10 @@ export async function fileCaptureBox(body: string, shown: CaptureBoxShown): Prom
         ? { ok: true as const, subjectRef: written.subjectRef }
         : { ok: false as const, error: written.error };
     },
+    vault: (text) => fileVaultNote(user.id, text),
     record: (entry) => recordDashAction(deps, entry),
   });
+  if (result.filed.some((item) => item.place === 'vault')) revalidatePath('/vault', 'layout');
   if (result.filed.some((item) => item.place === 'jobs')) revalidatePath('/jobs', 'layout');
   revalidatePath('/home');
   return result;
@@ -255,13 +262,27 @@ export type CaptureBoxUndo = { ok: true; undoneAt: string } | { ok: false; error
 
 const Id = z.string().uuid();
 
-/** Undo a todo or a job note the box filed, by its record, through the generic rule. */
+/**
+ * Undo a todo, a job note or a vault note the box filed, by its record: the
+ * generic rule for the first two, and for a note its removal from the
+ * repository as well (lib/capture/vault.ts).
+ */
 // latency: pending
 export async function undoCaptureBox(actionId: string): Promise<CaptureBoxUndo> {
   const user = await requireUser();
   if (!Id.safeParse(actionId).success) return { ok: false, error: 'That is not there any more.' };
   try {
-    const result = await undoDashAction(await requestDashDeps(user.id), actionId);
+    const deps = await requestDashDeps(user.id);
+    const action = await loadDashAction(deps, actionId);
+    if (action && undoneByVault(action)) {
+      const undone = await undoVaultCapture(deps, action);
+      if (undone.ok) {
+        revalidatePath('/vault', 'layout');
+        revalidatePath('/home');
+      }
+      return undone;
+    }
+    const result = await undoDashAction(deps, actionId);
     if (!result.ok) return { ok: false, error: result.error };
     revalidatePath('/todo', 'layout');
     revalidatePath('/jobs', 'layout');

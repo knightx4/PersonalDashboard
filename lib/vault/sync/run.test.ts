@@ -53,6 +53,12 @@ function harness(opts: {
     canWrite: async () => {
       throw new Error('the sync never checks write access');
     },
+    createNote: async () => {
+      throw new Error('the sync never writes');
+    },
+    deleteNote: async () => {
+      throw new Error('the sync never writes');
+    },
   };
 
   const ports = {

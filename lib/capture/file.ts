@@ -3,7 +3,8 @@
  * the writer its workspace already has, and each todo or job note recorded in
  * core.dash_actions with surface 'capture' so Undo, in the box and on Home,
  * takes it back by the generic rule. A goal update goes through Goals' own
- * filing, which records each line it files itself (plan #1569).
+ * filing, which records each line it files itself (plan #1569). A note for
+ * the vault is committed to the notes repository and stored (plan #1582).
  *
  * The writers are passed in, so this is tested without a session; the server
  * action in app/capture-actions.ts binds them to the signed-in person.
@@ -25,6 +26,10 @@ export type CaptureWriters = {
     roleId: string,
     text: string,
   ) => Promise<{ ok: true; subjectRef: string } | { ok: false; error: string }>;
+  /** createCapturedNote: a new note in the vault's Inbox, committed and stored. */
+  vault: (
+    text: string,
+  ) => Promise<{ ok: true; noteId: string; title: string; blobSha: string } | { ok: false; error: string }>;
   /** recordDashAction, bound to the person. */
   record: (entry: DashActionEntry) => Promise<string | null>;
 };
@@ -129,8 +134,36 @@ export async function fileCaptureParts(
       continue;
     }
 
-    // A place with no writer yet (the vault, until plan #1582) is never
-    // offered, so a part for it only arrives from a stale box.
+    if (part.place === 'vault') {
+      const result = await writers.vault(text);
+      if (!result.ok) {
+        errors.push(result.error);
+        continue;
+      }
+      const where = filedDestination('vault', {});
+      // Undo removes the file from the repository as well as the row, so it
+      // is capture's own (lib/capture/vault.ts), told apart by the blob SHA
+      // the note was written at.
+      const actionId = await writers.record({
+        surface: 'capture',
+        kind: 'add_vault_note',
+        subjectRef: `obsidian.notes:${result.noteId}`,
+        op: 'insert',
+        summary: `Dash added the note "${quoted(result.title)}" to your vault's Inbox from capture.`,
+        undo: { vault_blob_sha: result.blobSha },
+      });
+      filed.push({
+        place: 'vault',
+        text,
+        where: where?.name ?? 'Vault',
+        href: where?.href ?? '/vault',
+        actionId,
+        goals: null,
+        undoneAt: null,
+      });
+      continue;
+    }
+
     errors.push(`${capturePartLabel(part)} is not something capture can do yet.`);
   }
 

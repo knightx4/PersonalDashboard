@@ -117,6 +117,21 @@ export interface VaultSource {
   writeNote(path: string, text: string, expectedBlobSha: string, message: string): Promise<VaultWriteResult>;
 
   /**
+   * Commit a new note at `path` (plan #1582), for a note filed from capture.
+   * Refused with VaultConflictError when a file is already there, so nothing
+   * the person has is overwritten; VaultReadOnlyError as for writeNote.
+   */
+  createNote(path: string, text: string, message: string): Promise<VaultWriteResult>;
+
+  /**
+   * Commit the removal of a note (plan #1582), for Undo on a note capture
+   * filed. Refused with VaultConflictError when the file is no longer at
+   * `expectedBlobSha`, so an edit made since is never thrown away. Returns
+   * the commit, or null when the file was already gone.
+   */
+  deleteNote(path: string, expectedBlobSha: string, message: string): Promise<string | null>;
+
+  /**
    * Whether the token is allowed to write to the repository (plan #1426), for
    * the line on vault settings. Answered by a write that cannot succeed, so
    * nothing in the repository changes either way. Raises VaultAuthError when

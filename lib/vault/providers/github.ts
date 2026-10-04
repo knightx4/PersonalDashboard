@@ -297,14 +297,32 @@ export class GithubVaultSource implements VaultSource {
     expectedBlobSha: string,
     message: string,
   ): Promise<VaultWriteResult> {
-    const repoPath = toRepoPath(path, this.config.subpath ?? '');
-    const encodedPath = repoPath.split('/').map(encodeURIComponent).join('/');
-
     // The contents API takes the blob SHA the change was based on and refuses
     // the write when the file has moved on, which is the whole of the
     // protection against overwriting an edit made in Obsidian meanwhile.
-    const res = await fetch(`${API}${this.base}/contents/${encodedPath}`, {
-      method: 'PUT',
+    return this.putContents(path, text, message, expectedBlobSha);
+  }
+
+  async createNote(path: string, text: string, message: string): Promise<VaultWriteResult> {
+    // With no blob SHA the contents API only creates: a file already at the
+    // path is refused (422), so a note the person has is never overwritten.
+    return this.putContents(path, text, message, null);
+  }
+
+  async deleteNote(path: string, expectedBlobSha: string, message: string): Promise<string | null> {
+    const res = await this.contents('DELETE', path, { message, sha: expectedBlobSha });
+    // Gone already, by Obsidian or by hand: there is nothing left to remove.
+    if (res.status === 404) return null;
+    await this.refused(res, path, 'removed');
+    const body = (await res.json()) as ContentsPutResponse;
+    return body.commit?.sha ?? null;
+  }
+
+  private contents(method: 'PUT' | 'DELETE', path: string, body: Record<string, unknown>): Promise<Response> {
+    const repoPath = toRepoPath(path, this.config.subpath ?? '');
+    const encodedPath = repoPath.split('/').map(encodeURIComponent).join('/');
+    return fetch(`${API}${this.base}/contents/${encodedPath}`, {
+      method,
       headers: {
         accept: 'application/vnd.github+json',
         authorization: `Bearer ${this.config.token}`,
@@ -312,18 +330,19 @@ export class GithubVaultSource implements VaultSource {
         'x-github-api-version': '2022-11-28',
         'user-agent': 'personal-dashboard-vault',
       },
-      body: JSON.stringify({
-        message,
-        content: Buffer.from(text, 'utf8').toString('base64'),
-        sha: expectedBlobSha,
-        branch: this.config.branch,
-      }),
+      body: JSON.stringify({ ...body, branch: this.config.branch }),
       cache: 'no-store',
     });
+  }
 
+  /** Throws the error a refused contents write means; returns when it went through. */
+  private async refused(res: Response, path: string, what: 'saved' | 'created' | 'removed'): Promise<void> {
+    const repoPath = toRepoPath(path, this.config.subpath ?? '');
     if (res.status === 409 || res.status === 422) {
       throw new VaultConflictError(
-        `${path} changed in the vault since it was opened, so the edit was not saved.`,
+        what === 'created'
+          ? `${path} is already in the vault, so a new note was not written over it.`
+          : `${path} changed in the vault since it was opened, so it was not ${what}.`,
         path,
       );
     }
@@ -346,11 +365,26 @@ export class GithubVaultSource implements VaultSource {
     if (!res.ok) {
       throw new VaultSourceError(`GitHub ${res.status} writing ${repoPath}`, res.status);
     }
+  }
+
+  private async putContents(
+    path: string,
+    text: string,
+    message: string,
+    expectedBlobSha: string | null,
+  ): Promise<VaultWriteResult> {
+    const res = await this.contents('PUT', path, {
+      message,
+      content: Buffer.from(text, 'utf8').toString('base64'),
+      ...(expectedBlobSha ? { sha: expectedBlobSha } : {}),
+    });
+    await this.refused(res, path, expectedBlobSha ? 'saved' : 'created');
 
     const body = (await res.json()) as ContentsPutResponse;
     const blobSha = body.content?.sha;
     const commitSha = body.commit?.sha;
     if (!blobSha || !commitSha) {
+      const repoPath = toRepoPath(path, this.config.subpath ?? '');
       throw new VaultSourceError(`GitHub saved ${repoPath} but did not say which commit`);
     }
     return { blobSha, commitSha };
