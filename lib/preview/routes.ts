@@ -39,6 +39,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-comment-thread-composer': ['/dev/plan'],
   'dev-plan-tree': ['/dev/plan'],
   'dev-plan-opened': ['/dev/plan'],
+  'dev-plan-critic-stop': ['/dev/plan'],
   'goals-steps-tree': ['/goals/[goalId]'],
   'goals-steps-opened': ['/goals/[goalId]'],
   'goals-home': ['/goals'],

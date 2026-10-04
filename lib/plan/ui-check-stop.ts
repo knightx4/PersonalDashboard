@@ -145,3 +145,90 @@ export function criticStopBlockSql(input: {
     `  $a$Dash stopped step #${input.step} after the design critic's last round and handed the screen to you.$a$);`,
   ].join('\n');
 }
+
+/**
+ * The branch a stop ask names, or null when it names none. Accepting the
+ * screen hands that branch to the session that merges and closes the step.
+ */
+export function stopBranch(ask: string | null | undefined): string | null {
+  if (!ask) return null;
+  const m = /The work is on branch (\S+?)\.?\s+Look at the shots/.exec(ask);
+  return m ? m[1] : null;
+}
+
+/** One fix as the critic wrote it, with every part a string (plan #1610). */
+export type StopFix = {
+  shot: string;
+  where: string;
+  problem: string;
+  breaks: string;
+  change: string;
+};
+
+/** Reads a `ui_checks.fixes` array as the critic wrote it, keeping what is readable. */
+export function readStopFixes(raw: unknown): StopFix[] {
+  if (!Array.isArray(raw)) return [];
+  const text = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  return raw
+    .filter((f): f is Record<string, unknown> => typeof f === 'object' && f !== null)
+    .map((f) => ({
+      shot: text(f.shot),
+      where: text(f.where),
+      problem: text(f.problem),
+      breaks: text(f.breaks),
+      change: text(f.change),
+    }))
+    .filter((f) => f.problem || f.change);
+}
+
+/** One shot of a stopped round, with a link the page can open, or none. */
+export type StopShot = { name: string; url: string | null };
+
+/** A stopped surface as /dev/plan draws it: the last fixes and the shots. */
+export type StopSurfaceView = {
+  surface: string;
+  round: number;
+  fixes: StopFix[];
+  shots: StopShot[];
+};
+
+/** What /dev/plan shows on a step the critic stopped, by step id. */
+export type CriticStopView = { surfaces: StopSurfaceView[]; branch: string | null };
+
+/** The shot's name from its bucket path: `…/r3/phone-light.png` is `phone-light`. */
+export function shotName(path: string): string {
+  return (path.split('/').pop() ?? path).replace(/\.png$/i, '');
+}
+
+/**
+ * The rows accepting writes: one `accepted` round per stopped surface,
+ * numbered on from the round that stopped, so it becomes the latest and the
+ * close guard reads it as passed.
+ */
+export function acceptedRounds(
+  stopped: readonly Pick<StoppedSurface, 'surface' | 'round'>[],
+): { surface: string; round: number; verdict: 'accepted' }[] {
+  return stopped.map((s) => ({ surface: s.surface, round: s.round + 1, verdict: 'accepted' }));
+}
+
+/** The dated line accepting adds to the step's history, saying what the next session does. */
+export function acceptedLine(input: {
+  date: string;
+  surfaces: readonly string[];
+  branch: string | null;
+}): string {
+  const which = input.surfaces.join(', ');
+  const next = input.branch
+    ? `The work is on branch ${input.branch}: merge it and close the step.`
+    : 'Merge the branch that holds the work and close the step.';
+  return `Accepted ${input.date}: the screen as it is, past the design critic's last round (${which}). ${next}`;
+}
+
+/**
+ * The Needs line /dev/plan draws on a stopped step in place of the whole ask,
+ * since the panel beneath it lists the surfaces, fixes and shots.
+ */
+export function criticStopNeeds(branch: string | null): string {
+  const where = branch ? ` The work is on branch ${branch}.` : '';
+  return `Your call on a screen the design critic would not pass.${where}`;
+}

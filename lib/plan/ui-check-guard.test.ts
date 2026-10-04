@@ -62,6 +62,20 @@ describe('uiCheckRefusal', () => {
     ).toContain('todo-day');
   });
 
+  it('lets a screen the person accepted after round 3 close (plan #1610)', () => {
+    expect(
+      uiCheckRefusal({
+        step: 42,
+        files: screen,
+        surfaces: ['news-saved'],
+        checks: [
+          { surface: 'news-saved', round: 3, verdict: 'fix' },
+          { surface: 'news-saved', round: 4, verdict: 'accepted' },
+        ],
+      }),
+    ).toBeNull();
+  });
+
   it('lets a step that changed no screen close', () => {
     expect(
       uiCheckRefusal({ step: 7, files: ['lib/news/load.ts', 'scripts/plan.ts'], surfaces: [], checks: [] }),
@@ -140,7 +154,7 @@ describe('uiGuardSql', () => {
     expect(sql).toContain("array['news-saved', 'news-home']");
     expect(sql).toContain('c.step = 42');
     expect(sql).toContain('order by c.round desc limit 1');
-    expect(sql).toContain("not in ('pass')");
+    expect(sql).toContain("not in ('pass', 'accepted')");
     expect(sql).toContain('from plan_items p where p.number = 42');
   });
 

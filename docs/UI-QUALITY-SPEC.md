@@ -334,7 +334,10 @@ decision, such as which pattern the screen should use, and that is the
 person's to make.
 
 Answered A on the plan (#1535). The stop is plan #1609; accepting or
-redirecting from the step's row is plan #1610.
+redirecting from the step's row is plan #1610. Accepting writes a round with
+the verdict `accepted` for each surface that stopped. Only the person writes
+it, and the close guard counts it as passed, so the record keeps who let the
+screen through.
 
 ## Order of work
 
