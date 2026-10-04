@@ -156,7 +156,7 @@ export function RoleForm({
               label="Who referred you"
               hint={contacts.length === 0 ? 'Add them under Contacts to name them here.' : undefined}
             >
-              <Select name="referralContactId" defaultValue="">
+              <Select name="referralContactId" defaultValue="" className="max-sm:min-h-11">
                 <option value="">Not named</option>
                 {contacts.map((contact) => (
                   <option key={contact.id} value={contact.id}>
