@@ -150,6 +150,27 @@ export function Select({
 }
 
 /**
+ * A press area for a field that has no visible label, on a phone: an empty
+ * label 44 pixels tall across the field's width, so a thumb landing just above
+ * or below the field still focuses it (docs/UI-QUALITY-SPEC.md, R3). A field
+ * cannot take the ::after the buttons use, since an input draws no
+ * pseudo-elements, and its label's box counts as part of it.
+ *
+ * Put it in a `relative` box beside the field, and give the field `relative`
+ * too, so the field is drawn over it and a press on the field itself lands on
+ * the field: a select opened through its label would only take focus.
+ */
+export function PressLabel({ htmlFor }: { htmlFor: string }) {
+  return (
+    <label
+      htmlFor={htmlFor}
+      aria-hidden
+      className="absolute inset-x-0 top-1/2 hidden h-11 -translate-y-1/2 max-sm:block"
+    />
+  );
+}
+
+/**
  * Grows with what is typed into it.
  *
  * `field-sizing: content` is the whole mechanism -- no ref, no resize

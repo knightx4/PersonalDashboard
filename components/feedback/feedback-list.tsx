@@ -14,7 +14,7 @@ import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { cardVariants } from '@/components/ui/card';
-import { FieldError, Select, Textarea } from '@/components/ui/field';
+import { FieldError, PressLabel, Select, Textarea } from '@/components/ui/field';
 import { SubmitOnChange } from '@/components/shell/submit-on-change';
 import { cn } from '@/lib/cn';
 import { feedbackHealth, type FeedbackHealth } from '@/lib/dev/health';
@@ -222,12 +222,14 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
       />
 
       <div className="flex flex-wrap items-center gap-2">
-        <form action={statusAction} className="flex items-center gap-2">
+        <form action={statusAction} className="relative flex items-center gap-2">
           <input type="hidden" name="id" value={row.id} />
+          <PressLabel htmlFor={`status-${row.id}`} />
           <Select
+            id={`status-${row.id}`}
             name="status"
             defaultValue={row.status}
-            className="w-32"
+            className="relative w-32"
             aria-label="Status"
             disabled={statusPending}
           >

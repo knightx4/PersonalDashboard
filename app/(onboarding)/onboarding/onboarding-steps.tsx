@@ -1,0 +1,241 @@
+import Link from 'next/link';
+import { Mail, Package, Shield } from 'lucide-react';
+import { Banner } from '@/components/ui/banner';
+import { buttonVariants } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { FinishOnboardingForm, SkipGmailForm, WelcomeForm } from './forms';
+
+/**
+ * The three onboarding steps, apart from the page that reads the session, so
+ * the surface gallery can draw each one.
+ */
+
+export const STEPS = ['welcome', 'gmail', 'done'] as const;
+export type Step = (typeof STEPS)[number];
+
+export function parseStep(raw: string | undefined): Step {
+  if (raw && STEPS.includes(raw as Step)) return raw as Step;
+  return 'welcome';
+}
+
+/**
+ * The tones are the Banner's own rather than a third vocabulary of our own --
+ * and `connected` is `info`, not `good`. Law 4 keeps green for money coming
+ * back; an inbox that linked is the system reporting what happened, which is
+ * exactly what `info` is for.
+ */
+export function inboxBanner(
+  code: string | undefined,
+): { tone: 'info' | 'warn' | 'bad'; text: string } | null {
+  switch (code) {
+    case 'schema':
+      return {
+        tone: 'bad',
+        text: 'Google connected, but the inbox could not be saved: the database schema that stores it is not exposed by the API. In Supabase open Settings → API → Exposed schemas and include public, job_search and core.',
+      };
+    case 'connected':
+      return {
+        tone: 'info',
+        text: 'Gmail connected. You can import order confirmations from Settings whenever you are ready.',
+      };
+    case 'denied':
+      return { tone: 'warn', text: 'Google access was not granted. You can try again or skip.' };
+    case 'scope_denied':
+      return {
+        tone: 'warn',
+        text: 'Gmail read access was not granted. Connect again and leave “See and download your email” checked.',
+      };
+    case 'unconfigured':
+      return {
+        tone: 'bad',
+        text: 'Gmail OAuth is not configured on this deployment yet. You can skip and add orders by hand.',
+      };
+    case 'state':
+    case 'exchange':
+    case 'error':
+    case 'missing_code':
+      return { tone: 'bad', text: 'Something went wrong connecting Gmail. Try again or skip for now.' };
+    default:
+      return null;
+  }
+}
+
+/** One step of onboarding, with the banner for what came back from Google. */
+export function OnboardingSteps({
+  step,
+  inbox,
+  configured,
+}: {
+  step: Step;
+  inbox: string | undefined;
+  configured: boolean;
+}) {
+  const banner = inboxBanner(inbox);
+  return (
+    <div className="mx-auto w-full max-w-lg">
+      <div className="mb-8 flex items-center gap-2">
+        {STEPS.map((entry, index) => {
+          const active = entry === step;
+          const done =
+            STEPS.indexOf(step) > index || (step === 'done' && entry === 'done');
+          return (
+            <div key={entry} className="flex flex-1 items-center gap-2">
+              <div
+                className={
+                  active || done
+                    ? 'h-1 flex-1 rounded-full bg-accent'
+                    : 'h-1 flex-1 rounded-full bg-border'
+                }
+                aria-hidden
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {step === 'welcome' && (
+        <section className="space-y-6">
+          <div>
+            <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
+              Welcome
+            </p>
+            <h1 className="font-display mt-2 text-figure font-semibold tracking-tight text-ink">
+              Know what you own before you buy it again
+            </h1>
+            <p className="mt-3 text-body leading-relaxed text-ink-muted">
+              Dash turns order confirmations into inventory and a spending picture.
+              It is not a delivery tracker and never handles payment.
+            </p>
+          </div>
+
+          <ul className="space-y-3 text-body text-ink">
+            <li className="flex gap-3">
+              <Package className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} />
+              <span>Every purchase lands as something you own, searchable later.</span>
+            </li>
+            <li className="flex gap-3">
+              <Mail className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} />
+              <span>Optional Gmail import finds confirmations so you do not type them all.</span>
+            </li>
+            <li className="flex gap-3">
+              <Shield className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} />
+              <span>Email bodies are never stored — only structured order facts.</span>
+            </li>
+          </ul>
+
+          <WelcomeForm />
+        </section>
+      )}
+
+      {step === 'gmail' && (
+        <section className="space-y-6">
+          <div>
+            <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
+              Connect inbox
+            </p>
+            <h1 className="font-display mt-2 text-figure font-semibold tracking-tight text-ink">
+              Before you grant Gmail access
+            </h1>
+            <p className="mt-3 text-body leading-relaxed text-ink-muted">
+              Google sign-in and Gmail read access are separate. This step asks only for
+              read-only mail access, and only if you want automatic imports.
+            </p>
+          </div>
+
+          {banner && <Banner tone={banner.tone}>{banner.text}</Banner>}
+
+          <Card padding="standard" className="space-y-4 text-body">
+            <div>
+              <h2 className="font-medium text-ink">What we read</h2>
+              <p className="mt-1 text-ink-muted">
+                Purchase-related messages only — order confirmations, shipping and delivery
+                notices, cancellations, returns and refunds — inside a time window you choose
+                later (180 days by default).
+              </p>
+            </div>
+            <div>
+              <h2 className="font-medium text-ink">What we keep</h2>
+              <p className="mt-1 text-ink-muted">
+                Structured facts: merchant, order number, dates, line items, totals, tracking,
+                and refund amounts. Plus the message id, subject, and sender so you can check
+                our work.
+              </p>
+            </div>
+            <div>
+              <h2 className="font-medium text-ink">What we never keep</h2>
+              <p className="mt-1 text-ink-muted">
+                The body of any email. Content is held in memory while parsing, then discarded.
+                We cannot send, modify, or delete anything in your mailbox.
+              </p>
+            </div>
+            <p className="text-ui text-ink-muted">
+              Full detail in the{' '}
+              <Link href="/privacy" className="text-accent hover:underline">
+                privacy policy
+              </Link>
+              .
+            </p>
+          </Card>
+
+          {/* On a phone the disclosure above runs past the fold, so the answer
+              stays pinned to the bottom of the screen while it scrolls. It is
+              the top layer here: onboarding draws no shell, so there is no
+              dock or other chrome for it to sit under. */}
+          <div className="flex flex-col gap-2 max-sm:sticky max-sm:bottom-0 max-sm:z-(--z-overlay) max-sm:-mx-4 max-sm:border-t max-sm:border-border max-sm:bg-page max-sm:px-4 max-sm:pt-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:flex-wrap sm:gap-3">
+            {configured ? (
+              <Link
+                href="/api/auth/gmail/connect?return_to=%2Fonboarding%3Fstep%3Ddone"
+                className={buttonVariants({ size: 'md' })}
+              >
+                <Mail className="size-4" strokeWidth={1.75} />
+                Connect Gmail
+              </Link>
+            ) : (
+              <p className="text-body text-caution">
+                Gmail OAuth is not configured on this server yet. Skip and add orders manually.
+              </p>
+            )}
+            <SkipGmailForm />
+          </div>
+        </section>
+      )}
+
+      {step === 'done' && (
+        <section className="space-y-6">
+          <div>
+            <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
+              Ready
+            </p>
+            <h1 className="font-display mt-2 text-figure font-semibold tracking-tight text-ink">
+              {inbox === 'connected' ? 'Inbox connected' : 'You are set'}
+            </h1>
+            <p className="mt-3 text-body leading-relaxed text-ink-muted">
+              {inbox === 'connected'
+                ? 'Import order confirmations from Settings when you want to fill inventory. You can also add orders by hand anytime.'
+                : 'Add orders by hand, save product URLs to your queue, and connect Gmail later from Settings if you change your mind.'}
+            </p>
+          </div>
+
+          {banner && inbox === 'connected' && (
+            <Banner tone={banner.tone}>{banner.text}</Banner>
+          )}
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            {inbox === 'connected' ? (
+              <>
+                <Link href="/shopping/settings#inboxes" className={buttonVariants()}>
+                  Import from Settings
+                </Link>
+                <Link href="/home" className={buttonVariants({ variant: 'secondary' })}>
+                  Go to dashboard
+                </Link>
+              </>
+            ) : (
+              <FinishOnboardingForm />
+            )}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}

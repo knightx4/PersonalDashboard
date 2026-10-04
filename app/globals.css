@@ -2080,6 +2080,55 @@ body::before {
   }
 }
 
+/* Every button and fold is at least 44 by 44 pixels to a finger on a phone
+ * (docs/UI-QUALITY-SPEC.md, R3), without being drawn any bigger: an invisible
+ * ::after centred on it, as large as it or 44 pixels, whichever is more. The
+ * phone checks measure a control with that pseudo-element included. Below
+ * `sm` only: a mouse does not need it, and a dense row on a laptop would have
+ * its neighbours' areas reaching into it.
+ *
+ * Buttons and folds get it from the base layer, so a utility on the element
+ * (`absolute`, `sticky`, an `after:` of its own) wins over it. Links cannot
+ * get it that way, because a link inside a sentence would reach over the
+ * lines above and below; a link that stands alone takes `press-area`. Nothing
+ * that holds one may clip it with `overflow: hidden`, or the area is drawn
+ * but cannot be pressed. */
+@layer base {
+  @media (width < 40rem) {
+    :where(button, summary, [role='button']) {
+      position: relative;
+    }
+    :where(button, summary, [role='button'])::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100%;
+      height: 100%;
+      min-width: 2.75rem;
+      min-height: 2.75rem;
+      transform: translate(-50%, -50%);
+    }
+  }
+}
+
+@utility press-area {
+  position: relative;
+  @media (width < 40rem) {
+    &::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 100%;
+      height: 100%;
+      min-width: 2.75rem;
+      min-height: 2.75rem;
+      transform: translate(-50%, -50%);
+    }
+  }
+}
+
 @utility card-pad {
   padding: var(--card-p);
 }

@@ -73,18 +73,17 @@ describe('parseVerdict', () => {
     expect(checkLine(verdict)).toBe('UI-check: news-quick-story round 2 fix (1 fix)');
   });
 
-  it('reads an earlier fix marked done as true or false, as the critic writes it', () => {
-    const base = JSON.parse(fixVerdict);
-    const marked = {
-      ...base,
-      earlier: [
-        { where: 'the header', done: true },
-        { where: 'the footer', done: false },
-      ],
-    };
-    expect(parseVerdict(JSON.stringify(marked), 'news-quick-story', 2).earlier).toEqual([
-      { where: 'the header', done: 'yes' },
-      { where: 'the footer', done: 'no' },
+  it('takes an earlier fix marked done as true, the way the critic is told to write it', () => {
+    const raw = JSON.stringify({
+      surface: 'home-week',
+      round: 2,
+      verdict: 'pass',
+      fixes: [],
+      earlier: [{ where: 'the line under the title', done: true }],
+      notes: null,
+    });
+    expect(parseVerdict(raw, 'home-week', 2).earlier).toEqual([
+      { where: 'the line under the title', done: true },
     ]);
   });
 

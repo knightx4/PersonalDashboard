@@ -80,7 +80,7 @@ export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: s
                   </span>
                   <Link
                     href={`/jobs/roles/${lead.roleId}?tab=interviews&interview=${lead.id}`}
-                    className="text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
+                    className="press-area text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
                   >
                     {/* The whole row opens the same place -- prep materials on
                         the role's Interviews tab -- so this stretches to cover
@@ -95,7 +95,7 @@ export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: s
                       href={joinable.meetingUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="relative inline-flex items-center gap-1 text-small font-medium text-accent underline underline-offset-2"
+                      className="press-area inline-flex items-center gap-1 text-small font-medium text-accent underline underline-offset-2"
                     >
                       <Video className="size-3.5" strokeWidth={1.75} aria-hidden />
                       Join
@@ -125,7 +125,7 @@ export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: s
                 </span>
                 <Link
                   href={`/jobs/roles/${row.roleId}`}
-                  className="text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
+                  className="press-area text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
                 >
                   {row.companyName} · {row.roleTitle}
                 </Link>
@@ -149,7 +149,7 @@ export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: s
                 {reminder.roleId ? (
                   <Link
                     href={`/jobs/roles/${reminder.roleId}`}
-                    className="text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
+                    className="press-area text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
                   >
                     {reminder.companyName} · {reminder.roleTitle}
                   </Link>

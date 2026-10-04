@@ -60,8 +60,8 @@ export function SkipGmailForm() {
         dispatch(formData);
       }}
     >
-      <Button type="submit" variant="secondary" disabled={pending}>
-        {pending ? 'Skipping…' : 'Skip for now — add orders by hand'}
+      <Button type="submit" variant="secondary" disabled={pending} className="w-full sm:w-auto">
+        {pending ? 'Skipping…' : 'Skip for now'}
       </Button>
       <FieldError>{state.error}</FieldError>
     </form>

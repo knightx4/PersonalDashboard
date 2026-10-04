@@ -1,3 +1,5 @@
+import { PageHeader } from '@/components/shell/page-header';
+import { projectById } from '@/lib/plan/projects';
 import { PlanView, type PlanCatalogEntry } from '@/app/dev/plan/plan-view';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import {
@@ -218,5 +220,75 @@ export function PlanOpenedSurface() {
       unfolded
       opened
     />
+  );
+}
+
+/**
+ * A project's page in Dev (/dev/projects/[id]): the plan page drawn with only
+ * that project's section, under the project's own header, its view links
+ * kept on the project's page (plan #1600).
+ */
+const projectItems: PlanItem[] = [
+  item({
+    id: 'site-writing',
+    module: 'website',
+    title: 'Publish the writing page with the three essays already drafted',
+    detail: 'The site gets a writing page listing each essay with its date.',
+    acceptance: 'selveyknight.com/writing lists the three essays, newest first.',
+    priority: 1,
+    size: 'm',
+  }),
+  item({
+    id: 'site-writing-list',
+    module: 'website',
+    parentId: 'site-writing',
+    title: 'List the essays from their front matter',
+    status: 'done',
+    size: 's',
+    commitSha: 'b4c5d6e',
+    completedAt: '2026-09-30T10:00:00Z',
+    startedAt: '2026-09-30T09:00:00Z',
+  }),
+  item({
+    id: 'site-writing-rss',
+    module: 'website',
+    parentId: 'site-writing',
+    title: 'Add an RSS feed for the writing page',
+    size: 's',
+  }),
+  item({
+    id: 'site-domain',
+    module: 'website',
+    title: 'Serve the site from the apex domain and the www name',
+    status: 'proposed',
+    priority: 3,
+    detail: 'Points the A record at Vercel and redirects www to the apex.',
+  }),
+];
+
+const project = buildPlanTree({ items: projectItems, dependencies: [] });
+const site = projectById('website')!;
+
+export function ProjectPlanSurface() {
+  return (
+    <div className="mx-auto max-w-5xl space-y-6">
+      <PageHeader
+        title={site.label}
+        description={`${site.description}, built from this plan in ${site.repo.owner}/${site.repo.repo}. Send a step to Dash and it is built there, pushed to ${site.repo.branch} and closed here with the commit.`}
+      />
+      <PlanView
+        basePath="/dev/projects/website"
+        sections={applyView(project, 'open')}
+        finished={[]}
+        summary={summarize(project)}
+        view="open"
+        catalog={catalogOf(project)}
+        empty={false}
+        canSend={false}
+        lastRuns={{}}
+        commitChecks={{}}
+        unfolded
+      />
+    </div>
   );
 }
