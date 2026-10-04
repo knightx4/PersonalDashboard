@@ -4,6 +4,7 @@ import { FileBody } from '@/components/files/file-body';
 import { Card } from '@/components/ui/card';
 import { DashMark } from '@/components/ui/dash-mark';
 import { EmptyState } from '@/components/ui/empty-state';
+import { daysAway } from '@/lib/goals/catch-up';
 import { formatInstant } from '@/lib/goals/dates';
 import type { DoneSince } from '@/lib/goals/done-since';
 import type { DashOffer, GoalHolders } from '@/lib/goals/hand-off';
@@ -36,6 +37,10 @@ import { DashCredit } from '@/components/ui/dash-mark';
  *    (done-since-list.tsx), and the link to every run.
  * 4. This week: four numbers that say whether Goals is working (plan #1079),
  *    counted by weekHealth in lib/goals/home.ts.
+ *
+ * The day you come back after five or more days away (lib/goals/catch-up.ts),
+ * the briefing says how long you were gone, What Dash did moves up under it,
+ * and This week is left out.
  *
  * What the old home listed in its own sections is reached from these: the
  * steps of yours, questions, approvals, flags, rhythms and suggestions are
@@ -74,6 +79,8 @@ export type HomeViewProps = {
   laterOn?: LaterLaneItem[];
   /** Whether this account can start a run (the owner's only), which Ask Dash needs. */
   canRun?: boolean;
+  /** The visit before the time away, on the day you came back from it; otherwise null. */
+  awayFrom?: string | null;
 };
 
 export function HomeView({
@@ -93,6 +100,7 @@ export function HomeView({
   dash = [],
   laterOn = [],
   canRun = false,
+  awayFrom = null,
 }: HomeViewProps) {
   if (goals.length === 0 && today.length === 0 && later.length === 0) {
     return (
@@ -106,6 +114,8 @@ export function HomeView({
   }
 
   const summary = homeSummary(goals);
+  const away = awayFrom && todayOn ? daysAway(awayFrom, todayOn) : null;
+  const doneSection = <DoneSection done={done} timeZone={timeZone} />;
   const { errands, others } = splitErrands(goals);
   return (
     <div className="space-y-8">
@@ -118,6 +128,12 @@ export function HomeView({
             </h2>
             {brief?.when && <span className="text-small text-ink-muted">written {brief.when}</span>}
           </div>
+          {away !== null && (
+            <p className="text-body text-ink">
+              Welcome back. You were away {away} days; here is what Dash did while you were gone,
+              then what is on you.
+            </p>
+          )}
           {brief && (
             <div className="max-w-prose">
               <FileBody markdown={brief.body} />
@@ -134,6 +150,8 @@ export function HomeView({
         </Card>
       </section>
 
+      {away !== null && doneSection}
+
       {goals.length > 0 && (
         <GoalLanes
           goals={[...errands, ...others]}
@@ -149,9 +167,9 @@ export function HomeView({
         />
       )}
 
-      <DoneSection done={done} timeZone={timeZone} />
+      {away === null && doneSection}
 
-      <WeekSection health={health} />
+      {away === null && <WeekSection health={health} />}
     </div>
   );
 }

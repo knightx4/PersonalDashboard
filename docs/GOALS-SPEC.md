@@ -773,9 +773,11 @@ point is that opening the app after a busy fortnight should not feel like a
 debt.
 
 After five or more days since the last visit, the home opens with a catch-up
-for the rest of that day: what Dash did while you were away (the list below),
-what is waiting on you, and one next step per goal, with everything else
-folded under it. The last visit is kept in `goals.visits`.
+for the rest of that day. The briefing says how many days you were away,
+what Dash did while you were gone (the list below) moves up under it, ahead
+of the lanes, and the week's numbers are left out. On you already holds what
+is waiting and each goal's next step, so the catch-up has no list of its
+own. The last visit is kept in `goals.visits`.
 
 ### Since your last visit
 

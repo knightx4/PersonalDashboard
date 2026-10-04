@@ -10,6 +10,7 @@ import { loadDoneSince } from '@/lib/goals/done-since-store';
 import { weekHealth } from '@/lib/goals/home';
 import { loadHome } from '@/lib/goals/home-store';
 import { loadAreas } from '@/lib/goals/store';
+import { catchUpSince } from '@/lib/goals/catch-up';
 import { recordVisit } from '@/lib/goals/visits-store';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { HomeView } from './home-view';
@@ -69,6 +70,9 @@ export default async function GoalsPage() {
     (): DoneSince | null => null,
   );
 
+  // The day you come back after time away, the home leads with what Dash did.
+  const awayFrom = catchUpSince(visit, today);
+
   const { week, ...rest } = home;
   // The count of what is on you is the whole of Today, folded part included.
   const health = week
@@ -93,6 +97,7 @@ export default async function GoalsPage() {
         todayOn={today}
         areas={areas.map((area) => ({ id: area.id, name: area.name }))}
         canRun={owner}
+        awayFrom={awayFrom}
       />
     </div>
   );

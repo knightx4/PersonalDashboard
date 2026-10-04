@@ -296,6 +296,13 @@ describe('the Goals home', () => {
     expect(withArea).toContain('A new goal');
   });
 
+  it('leads with what Dash did and leaves out the week on the day you come back', () => {
+    const html = render({ awayFrom: '2026-09-18T21:30:00Z', todayOn: '2026-09-24' });
+    expect(html).toContain('You were away 6 days');
+    expect(html.indexOf('What Dash did')).toBeLessThan(html.indexOf('On you'));
+    expect(html).not.toContain('This week');
+  });
+
   it('offers to add a goal when there are none', () => {
     expect(render({ goals: [], today: [], later: [] })).toContain('No goals yet');
   });
