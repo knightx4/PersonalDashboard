@@ -78,7 +78,7 @@ function sent(args: Args, key: string): boolean {
   return key in args && args[key] !== undefined;
 }
 
-function requireWorkspace(ctx: DashWriteContext, module: ModuleId) {
+function requireWorkspace(ctx: Pick<DashWriteContext, 'enabledModules'>, module: ModuleId) {
   if (!ctx.enabledModules.includes(module)) {
     throw new Refused(`The ${WORKSPACE_LABELS[module] ?? module} workspace is switched off, so nothing can be changed there.`);
   }
@@ -470,7 +470,40 @@ export const ROLE_NOTE_MAX = 5000;
 async function addRoleNote(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
   requireWorkspace(ctx, 'jobs');
   const { table, id } = seenRef(ctx, args, 'role_ref', [TABLE.role, TABLE.application]);
-  const body = text(args, 'body');
+  return noteOnRole(ctx, table, id, text(args, 'body'));
+}
+
+/** What writing a note on a role needs: the person, their workspaces and their clients. */
+export type RoleNoteContext = Pick<DashWriteContext, 'userId' | 'enabledModules' | 'db'>;
+
+/**
+ * The add_role_note write for a role already known to be theirs by id, for
+ * the capture box (plan #1581), which names the role from the sorter's list
+ * of their roles rather than from a lookup. Checked and written exactly as
+ * the tool writes it. Never throws.
+ */
+export async function writeRoleNote(
+  ctx: RoleNoteContext,
+  roleId: string,
+  body: string,
+): Promise<DashWriteResult> {
+  try {
+    requireWorkspace(ctx, 'jobs');
+    if (!isUuid(roleId)) throw new Refused('Could not tell which role that was.');
+    return await noteOnRole(ctx, TABLE.role, roleId, body.trim());
+  } catch (error) {
+    if (error instanceof Refused) return { ok: false, error: error.message };
+    console.error('dash write add_role_note failed', error);
+    return { ok: false, error: 'The note could not be added. Nothing was changed.' };
+  }
+}
+
+async function noteOnRole(
+  ctx: RoleNoteContext,
+  table: string,
+  id: string,
+  body: string,
+): Promise<DashWriteResult> {
   if (!body) throw new Refused('body is missing: write the note.');
   if (body.length > ROLE_NOTE_MAX) throw new Refused(`Keep the note under ${ROLE_NOTE_MAX} characters.`);
 

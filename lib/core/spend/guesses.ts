@@ -298,6 +298,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The idea, its workspace, that workspace's vision and a triage line in;
   // one five-level score out.
   'score-idea': background(unit(JEV, 600, 0)),
+  // The places, the open goals and the roles being applied for by name, and
+  // the sentence in; the places it goes out. About three pauses in typing a
+  // sentence.
+  'place-capture': run(HAIKU, 3 * 1_200, 3 * 120),
   // One passage of about 1,500 characters and its row's title.
   'embed-memory': background(unit(VOYAGE_LITE, 450, 0)),
   // One question of a sentence or so.

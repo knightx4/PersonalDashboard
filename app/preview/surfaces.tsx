@@ -3,6 +3,7 @@ import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
+import { CaptureBoxSurface } from './capture-surfaces';
 import DevUiPage from '@/app/dev/ui/page';
 import { ANATOMIES } from '@/app/dev/ui/anatomy';
 import { TravelDemo } from '@/app/dev/ui/travel-demo';
@@ -3125,6 +3126,17 @@ export const SURFACES: readonly Surface[] = [
         <SearchBarSurface />
       </div>
     ),
+  },
+
+  {
+    /* The one capture box (plan #1581) that the plus in the top bar and ⌥C
+     * open: the line under the field while a sentence is typed, the chips
+     * when Dash is not sure, and where three filed things went. */
+    id: 'shell-capture',
+    label: 'Top bar · Capture anything',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <CaptureBoxSurface />,
   },
 
   {

@@ -42,9 +42,15 @@ describe('the capture actions', () => {
   it('offers an action only to an account that has its workspace', () => {
     const ids = (modules?: Parameters<typeof availableCaptureActions>[0]) =>
       availableCaptureActions(modules).map((action) => action.id);
-    expect(ids(['todo'])).toEqual(['todo']);
-    expect(ids(['todo', 'goals'])).toEqual(['todo', 'goals']);
+    // The one box belongs to no workspace, so every account has it.
+    expect(ids(['todo'])).toEqual(['anything', 'todo']);
+    expect(ids(['todo', 'goals'])).toEqual(['anything', 'todo', 'goals']);
     expect(ids(undefined)).toEqual(CAPTURE_ACTIONS.map((action) => action.id));
+  });
+
+  it('opens the one box from the shortcut, with no workspace of its own', () => {
+    expect(DEFAULT_CAPTURE_ACTION).toBe('anything');
+    expect(captureAction('anything')).toMatchObject({ module: null, field: 'prose', dated: false });
   });
 
   it('finds logging what happened by the words for it', () => {

@@ -89,6 +89,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
     '/shopping/inventory',
   ],
   'shell-search-bar': ['/home'],
+  'shell-capture': ['/home'],
   'ask-dash-new': ['/ask', '/ask/[ref]'],
   'ask-dash-answer': ['/ask', '/ask/[ref]'],
   'ask-dash-failed': ['/ask', '/ask/[ref]'],

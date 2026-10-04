@@ -7,6 +7,7 @@ import {
   toDashAction,
   undoDashAction,
   undoneByAsk,
+  undoneByCapture,
   type DashAction,
   type DashActionDeps,
   type DashActionSurface,
@@ -209,7 +210,7 @@ export async function undoDashTodayWith(
     const path = href && !href.startsWith(`${OPEN_PATH}/`) ? href.split(/[?#]/)[0] : null;
     return { ok: true, paths: path ? [path] : [] };
   }
-  if (result.action?.surface === 'capture' && result.action.status === 'done' && undoCapture) {
+  if (result.action && undoneByCapture(result.action) && result.action.status === 'done' && undoCapture) {
     return undoCapture(result.action);
   }
   if (!result.action || !undoneByAsk(result.action)) return { ok: false, error: result.error };

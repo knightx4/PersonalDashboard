@@ -15,9 +15,15 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 import { popoverSurface, scrim } from '@/components/ui/popover';
-import { ModuleMark } from '@/components/ui/module-mark';
 import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
 import { Kbd } from '@/components/shell/key-hints';
+import {
+  CaptureFoot,
+  CaptureHeader,
+  FiledCaptures,
+  PlaceLine,
+  type PlaceGuess,
+} from '@/components/shell/capture-places';
 import { usePopover } from '@/lib/use-popover';
 import {
   availableCaptureActions,
@@ -27,6 +33,12 @@ import {
 } from '@/lib/capture/actions';
 import { isCalendarDay, todoCaptureForm, type CaptureDay } from '@/lib/capture/todo';
 import { captureDestination, type CaptureDestination } from '@/lib/capture/destination';
+import { goalsPlaceName } from '@/lib/capture/destination';
+import {
+  offeredCapturePlaces,
+  type FiledCapture,
+} from '@/lib/capture/place';
+import { CAPTURE_PLACE_MODULE, type CapturePlace, type CaptureSort } from '@/lib/capture/sort';
 import { sendToPlace } from '@/components/motion/place';
 import { landingTarget } from '@/components/motion/settle';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
@@ -56,6 +68,12 @@ import {
   type CaptureMoveHint,
 } from '@/app/goals/capture-actions';
 import type { RelativeDay } from '@/lib/todo/tasks/model';
+import {
+  captureBoxCosts,
+  fileCaptureBox,
+  sortCaptureBox,
+  undoCaptureBox,
+} from '@/app/capture-actions';
 
 /**
  * Write it down here, wherever you are.
@@ -138,6 +156,14 @@ export function CaptureProvider({
   );
 
   const close = useCallback(() => setSession(null), []);
+  /** Where the one box can file for this account (plan #1581). */
+  const places = useMemo(
+    () =>
+      offeredCapturePlaces(
+        moduleKey === undefined ? undefined : (moduleKey.split(',').filter(Boolean) as ModuleId[]),
+      ),
+    [moduleKey],
+  );
 
   const handle = useMemo<CaptureHandle>(
     () => ({ open, close, actions }),
@@ -179,7 +205,17 @@ export function CaptureProvider({
   return (
     <CaptureContext.Provider value={handle}>
       {children}
-      {session && (
+      {session && session.action.id === 'anything' && (
+        <AnythingPanel
+          key={session.action.id}
+          session={session}
+          actions={actions}
+          places={places}
+          onSwitch={(action) => setSession({ action, seed: '' })}
+          onClose={close}
+        />
+      )}
+      {session && session.action.id !== 'anything' && (
         <CapturePanel
           // A fresh panel per action: switching from a todo to logging what
           // happened starts with that action's own empty state.
@@ -235,6 +271,9 @@ async function file(
         filed: { captureId: result.captureId, entries },
       };
     }
+    case 'anything':
+      // The one box files through fileCaptureBox, in AnythingPanel.
+      return { error: 'Nothing was filed.' };
   }
 }
 
@@ -256,6 +295,32 @@ async function file(
  */
 function showLanding(from: DOMRectReadOnly | undefined, where: CaptureDestination, text: string) {
   void sendToPlace({ from, to: landingTarget(where.href), label: text, name: where.name });
+}
+
+/**
+ * The overlay contract both panels keep: focus back where it was on close,
+ * and escape, outside-click and the focus trap from `usePopover`.
+ */
+function usePanelChrome(onClose: () => void, panelRef: React.RefObject<HTMLFormElement | null>) {
+  /**
+   * Back where you were, on close.
+   *
+   * `usePopover` offers this, and only fires it while focus is still inside
+   * the panel -- which by the time a *conditionally rendered* panel's cleanup
+   * runs it is not, because the field has already been removed from the
+   * document and focus fell back to the body. So the return is taken here,
+   * where the element to go back to is outside the panel and still exists.
+   * Declared above the hook, so it reads the field-holder before the hook has
+   * moved focus and restores it before the hook's own attempt no-ops.
+   */
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null;
+    return () => before?.focus?.();
+  }, []);
+
+  // No trigger passed: this opens from a shortcut as often as from a button,
+  // and the line above already knows which.
+  usePopover({ open: true, onClose, panelRef });
 }
 
 /** The paid press the panel's File it button makes, where there is one. */
@@ -314,25 +379,7 @@ function CapturePanel({
   const panelRef = useRef<HTMLFormElement>(null);
   const fieldRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
-  /**
-   * Back where you were, on close.
-   *
-   * `usePopover` offers this, and only fires it while focus is still inside
-   * the panel -- which by the time a *conditionally rendered* panel's cleanup
-   * runs it is not, because the field has already been removed from the
-   * document and focus fell back to the body. So the return is taken here,
-   * where the element to go back to is outside the panel and still exists.
-   * Declared above the hook, so it reads the field-holder before the hook has
-   * moved focus and restores it before the hook's own attempt no-ops.
-   */
-  useEffect(() => {
-    const before = document.activeElement as HTMLElement | null;
-    return () => before?.focus?.();
-  }, []);
-
-  // No trigger passed: this opens from a shortcut as often as from a button,
-  // and the line above already knows which.
-  usePopover({ open: true, onClose, panelRef });
+  usePanelChrome(onClose, panelRef);
 
   /**
    * File it, and stay open with an empty field.
@@ -411,32 +458,7 @@ function CapturePanel({
         tabIndex={-1}
         className={cn(popoverSurface, 'relative w-full max-w-lg overflow-hidden shadow-2xl')}
       >
-        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-          {/* Whose workspace the result belongs to, said the way every other
-              row in the shell says it. */}
-          <ModuleMark module={action.module} size="sm" />
-          <span className="min-w-0 flex-1 truncate text-ui font-medium text-ink">
-            {action.label}
-          </span>
-          {/* The other things this box can take, one press away, so the
-              header button and ⌥C reach every action and not only the
-              default one. */}
-          {actions
-            .filter((other) => other.id !== action.id)
-            .map((other) => (
-              <button
-                key={other.id}
-                type="button"
-                onClick={() => onSwitch(other)}
-                className="press flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-small text-ink-muted transition-colors duration-quick hover:bg-accent-tint hover:text-accent"
-              >
-                <ModuleMark module={other.module} size="sm" />
-                {other.label}
-              </button>
-            ))}
-          {/* `always`: inside an open panel there is no modifier being held. */}
-          <Kbd always>esc</Kbd>
-        </div>
+        <CaptureHeader action={action} actions={actions} onSwitch={onSwitch} />
 
         {/* What the field is, is the action's own answer: a todo is a title,
             a note will be prose. Which is also what decides what Enter does --
@@ -546,6 +568,235 @@ function CapturePanel({
       </form>
     </div>
   );
+}
+
+/**
+ * The one box (plan #1581): type anything, and Dash files it as a todo, a
+ * goal update or a note on a job.
+ *
+ * As you type, the line under the field says where it will go
+ * (usePlaceGuess); when Dash is not sure it offers the places as chips
+ * instead. Enter files, through fileCaptureBox, and the list underneath says
+ * where each thing went with an Undo. Shift-Enter is a new line, since what
+ * is typed here is as often a sentence as a title.
+ */
+function AnythingPanel({
+  session,
+  actions,
+  places,
+  onSwitch,
+  onClose,
+}: {
+  session: Session;
+  actions: readonly CaptureAction[];
+  places: readonly CapturePlace[];
+  onSwitch: (action: CaptureAction) => void;
+  onClose: () => void;
+}) {
+  const { action, seed } = session;
+  const [text, setText] = useState(seed);
+  /** What this panel has filed since it opened, newest first. */
+  const [filed, setFiled] = useState<FiledCapture[]>([]);
+  const [costs, setCosts] = useState<PaidCosts>({});
+  useEffect(() => {
+    let live = true;
+    captureBoxCosts()
+      .then((found) => {
+        if (live) setCosts(found);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  const guessed = usePlaceGuess(text);
+  /** The sort Enter came back with when Dash was not sure, which asks for a pick. */
+  const [asked, setAsked] = useState<CaptureSort | null | undefined>(undefined);
+  const [picked, setPicked] = useState<CapturePlace | null>(null);
+  const [message, setMessage] = useState<string | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
+  const [undoing, setUndoing] = useState<string | null>(null);
+  const [undoError, setUndoError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const panelRef = useRef<HTMLFormElement>(null);
+  const fieldRef = useRef<HTMLTextAreaElement | null>(null);
+  usePanelChrome(onClose, panelRef);
+
+  const guess: PlaceGuess = asked !== undefined ? { state: 'answered', sort: asked } : guessed;
+
+  function submit() {
+    if (pending || !text.trim()) return;
+    const sort = guess.state === 'answered' ? guess.sort : null;
+    // Dash has said it is not sure and nothing is picked: the line is
+    // already asking, so Enter waits for the answer rather than guessing.
+    if (guess.state === 'answered' && !picked && !sort?.sure) {
+      setMessage('Pick where it goes.');
+      return;
+    }
+    start(async () => {
+      const result = await fileCaptureBox(text, { sort: sort?.sure ? sort : null, picked });
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      if (result.ask) {
+        setAsked(result.ask.sort);
+        setMessage('Pick where it goes.');
+        return;
+      }
+      if (result.filed.length === 0) {
+        setError(result.errors[0] ?? 'Nothing was filed.');
+        return;
+      }
+      const from = fieldRef.current?.getBoundingClientRect();
+      const first = result.filed[0];
+      setFiled((list) => [...result.filed, ...list]);
+      setMessage(undefined);
+      setError(result.errors[0] ?? null);
+      setText('');
+      setPicked(null);
+      setAsked(undefined);
+      fieldRef.current?.focus();
+      showLanding(
+        from,
+        { module: CAPTURE_PLACE_MODULE[first.place], href: first.href, name: first.where },
+        text,
+      );
+    });
+  }
+
+  function retype(value: string) {
+    setText(value);
+    if (!value.trim()) setPicked(null);
+    // What Enter asked about was the sentence as it stood.
+    if (asked !== undefined) setAsked(undefined);
+    if (error || message) {
+      setError(null);
+      setMessage(undefined);
+    }
+  }
+
+  function undo(item: FiledCapture) {
+    const id = item.actionId;
+    if (!id) return;
+    setUndoing(id);
+    setUndoError(null);
+    start(async () => {
+      const result = await undoCaptureBox(id);
+      setUndoing(null);
+      if (!result.ok) {
+        setUndoError(result.error);
+        return;
+      }
+      setFiled((list) =>
+        list.map((other) => (other.actionId === id ? { ...other, undoneAt: result.undoneAt } : other)),
+      );
+    });
+  }
+
+  function goalsChanged(captureId: string, entries: FiledEntry[]) {
+    setFiled((list) =>
+      list.map((item) =>
+        item.goals?.captureId === captureId ? { ...item, goals: { captureId, entries } } : item,
+      ),
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-modal flex items-start justify-center px-4 pt-[12vh]">
+      <button type="button" aria-label="Close" onClick={onClose} className={scrim} />
+      <form
+        ref={panelRef}
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={action.label}
+        tabIndex={-1}
+        className={cn(popoverSurface, 'relative w-full max-w-lg overflow-hidden shadow-2xl')}
+      >
+        <CaptureHeader action={action} actions={actions} onSwitch={onSwitch} />
+        <textarea
+          ref={(node) => {
+            fieldRef.current = node;
+          }}
+          value={text}
+          onChange={(event) => retype(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              submit();
+            }
+          }}
+          placeholder={action.placeholder}
+          aria-label={action.label}
+          rows={3}
+          data-focus-ring="none"
+          className="w-full resize-none bg-transparent px-3 py-3 text-body text-ink outline-none placeholder:text-ink-ghost"
+        />
+        <PlaceLine guess={guess} places={places} picked={picked} onPick={setPicked} />
+        <CaptureFoot message={message} pending={pending && undoing === null} costs={costs} />
+        {error && (
+          <div className="px-3 pb-2">
+            <FieldError>{error}</FieldError>
+          </div>
+        )}
+        <FiledCaptures
+          filed={filed}
+          busy={undoing}
+          error={undoError}
+          onUndo={undo}
+          goalLines={(item) =>
+            item.goals ? (
+              <FiledLines
+                filed={item.goals}
+                onChanged={goalsChanged}
+                withinGoal={goalsPlaceName(item.goals.entries)}
+              />
+            ) : null
+          }
+        />
+      </form>
+    </div>
+  );
+}
+
+/**
+ * Where Dash will put the sentence as it stands, asked once typing has
+ * paused for CAPTURE_SORT_DEBOUNCE_MS, the same pacing as the goals box's
+ * guess below. Each answer is kept for the text it was asked about, so a late
+ * answer is never shown against a different sentence and going back to one
+ * already asked about does not ask again.
+ */
+function usePlaceGuess(text: string): PlaceGuess {
+  const [answers, setAnswers] = useState<ReadonlyMap<string, CaptureSort | null>>(new Map());
+  const sentence = text.trim();
+  const ready = sentence.length >= CAPTURE_SORT_MIN_CHARS;
+  const known = answers.has(sentence);
+
+  useEffect(() => {
+    if (!ready || known) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      sortCaptureBox(sentence)
+        .then((answer) => answer.sort)
+        .catch(() => null)
+        .then((sort) => {
+          if (!live) return;
+          setAnswers((held) => new Map(held).set(sentence, sort));
+        });
+    }, CAPTURE_SORT_DEBOUNCE_MS);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [ready, known, sentence]);
+
+  if (!ready) return { state: 'idle' };
+  if (!known) return { state: 'reading' };
+  return { state: 'answered', sort: answers.get(sentence) ?? null };
 }
 
 /**
@@ -661,12 +912,19 @@ function MoveGuess({
  * and the chips go; leaving them is a fine answer too, and the question is
  * not asked again for that step.
  */
-function FiledLines({
+export function FiledLines({
   filed,
   onChanged,
+  withinGoal,
 }: {
   filed: Filed;
   onChanged: (captureId: string, entries: FiledEntry[]) => void;
+  /**
+   * The goal the heading above already names, in the one box: its lines
+   * leave that name out rather than say it twice (plan #1581), and drop
+   * their own side padding to line up with the rows around them.
+   */
+  withinGoal?: string;
 }) {
   const [busy, setBusy] = useState<number | null>(null);
   const [answering, setAnswering] = useState<number | null>(null);
@@ -704,7 +962,7 @@ function FiledLines({
   if (filed.entries.length === 0) return null;
 
   return (
-    <div className="px-3 py-2">
+    <div className={withinGoal === undefined ? 'px-3 py-2' : 'pt-1'}>
       <ul className="space-y-1">
         {filed.entries.map((entry, index) => (
           <li key={index} className="text-small">
@@ -715,10 +973,12 @@ function FiledLines({
                   entry.undone_at ? 'text-ink-muted line-through' : 'text-ink',
                 )}
               >
-                {describeFiled(entry)}
+                {withinGoal !== undefined && entry.goal_title === withinGoal
+                  ? describeFiledWithin(entry)
+                  : describeFiled(entry)}
               </span>
               {entry.undone_at ? (
-                <span className="shrink-0 py-1 text-ink-muted">Undone</span>
+                <span className="shrink-0 px-2.5 py-1 text-ink-muted">Undone</span>
               ) : (
                 <Button
                   type="button"
@@ -758,6 +1018,16 @@ function FiledLines({
       {error && <FieldError>{error}</FieldError>}
     </div>
   );
+}
+
+/** A filed line without the goal's name, for under a heading that names it. */
+function describeFiledWithin(entry: FiledEntry): string {
+  const goal = entry.goal_title;
+  return describeFiled(entry)
+    .replace(` in ${goal}`, '')
+    .replace(` against ${goal}`, '')
+    .replace(` for ${goal}`, '')
+    .replace(` on ${goal}`, '');
 }
 
 /**
