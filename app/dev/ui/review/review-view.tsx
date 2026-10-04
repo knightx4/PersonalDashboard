@@ -77,7 +77,7 @@ function StandingRow({ standing }: { standing: Standing }) {
         {surfaces > 0 ? (
           <Link
             href={`/dev/surfaces#surfaces-${scope}`}
-            className="text-small text-accent hover:underline"
+            className="press-area text-small text-accent hover:underline"
           >
             {surfaces} surface{surfaces === 1 ? '' : 's'}
           </Link>
@@ -100,7 +100,7 @@ function StandingRow({ standing }: { standing: Standing }) {
         <StartReview scope={scope} />
         <Link
           href={{ pathname: '/dev/ui/review', query: { module: scope } }}
-          className="text-small text-accent hover:underline"
+          className="press-area text-small text-accent hover:underline"
         >
           Just this one
         </Link>
@@ -145,7 +145,7 @@ function FindingRow({ finding }: { finding: UiFinding }) {
         {finding.surface && (
           <Link
             href={`/preview?s=${finding.surface}`}
-            className="text-small text-accent hover:underline"
+            className="press-area text-small text-accent hover:underline"
           >
             {finding.surface}
           </Link>
@@ -221,12 +221,12 @@ export function ReviewView({ standings, only }: { standings: Standing[]; only: U
 
   return (
     <div className="space-y-6">
-      <nav aria-label="Module" className="flex flex-wrap items-center gap-1">
+      <nav aria-label="Module" className="flex flex-wrap items-center gap-x-1 gap-y-2">
         <Link
           href="/dev/ui/review"
           aria-current={only === null ? 'page' : undefined}
           className={cn(
-            'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-quick',
+            'press press-area rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-quick',
             only === null
               ? 'bg-accent text-surface'
               : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
@@ -240,7 +240,7 @@ export function ReviewView({ standings, only }: { standings: Standing[]; only: U
             href={{ pathname: '/dev/ui/review', query: { module: scope } }}
             aria-current={only === scope ? 'page' : undefined}
             className={cn(
-              'press rounded-full px-2.5 py-1 text-small font-medium capitalize transition-colors duration-quick',
+              'press press-area rounded-full px-2.5 py-1 text-small font-medium capitalize transition-colors duration-quick',
               only === scope
                 ? 'bg-accent text-surface'
                 : 'text-ink-muted hover:bg-accent-tint hover:text-accent',

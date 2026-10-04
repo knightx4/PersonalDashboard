@@ -1,8 +1,4 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
-import { PageHeader } from '@/components/shell/page-header';
-import { cardVariants } from '@/components/ui/card';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadSpec } from '@/lib/specs/load';
 import { specBySlug } from '@/lib/specs/registry';
@@ -10,10 +6,7 @@ import { ruleStates } from '@/lib/specs/rule-states';
 import { loadLatestFindings } from '@/lib/specs/findings';
 import { SPEC_COUNTERS } from '@/scripts/spec-counts';
 import specBaseline from '@/scripts/spec-baseline.json';
-import { cn } from '@/lib/cn';
-import { SpecSectionCard, SpecOrphan } from './spec-view';
-import { SpecRules } from './spec-rules';
-import { SpecFindings } from '../spec-findings';
+import { SpecDocView } from './spec-doc-view';
 
 /**
  * Names and targets only: the counters' `measure` is never called here, since
@@ -56,58 +49,5 @@ export default async function SpecPage({ params }: { params: Promise<{ slug: str
     ? ruleStates(rules, { baseline: specBaseline as Record<string, number>, counters: COUNTERS })
     : [];
 
-  return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <p>
-        <Link
-          href="/dev/specs"
-          className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          Specs
-        </Link>
-      </p>
-
-      <PageHeader title={doc.title} description={`docs/${doc.file}`} />
-
-      <SpecRules states={states} />
-
-      {/* What the weekly audit found when it compared the code with this
-          spec (plan #1525), under the rules and above the text it was
-          compared with. */}
-      <SpecFindings auditAt={audit.auditAt} findings={audit.findings} />
-
-      {sections === null ? (
-        // The file is gone from the repository. Said plainly, with whatever was
-        // written about it still readable, because the conversation outlives
-        // the heading it was filed under.
-        <p className={cn(cardVariants(), 'border-dashed px-4 py-6 text-body text-ink-muted')}>
-          <code>docs/{doc.file}</code> is not in the repository any more. Anything written about it
-          is below.
-        </p>
-      ) : (
-        <div className="space-y-4">
-          {sections.map((section) => (
-            <SpecSectionCard key={section.anchor} section={section} />
-          ))}
-        </div>
-      )}
-
-      {orphans.length > 0 && (
-        <section className="space-y-3 border-t border-border pt-5">
-          <div>
-            <h2 className="text-body font-semibold text-ink">Written about sections that have gone</h2>
-            <p className="mt-1 text-ui text-ink-muted">
-              These headings were rewritten or removed after somebody commented on them. The threads
-              are kept: what was said about a decision is worth more than the heading it was said
-              under.
-            </p>
-          </div>
-          {orphans.map((orphan) => (
-            <SpecOrphan key={orphan.id} orphan={orphan} />
-          ))}
-        </section>
-      )}
-    </div>
-  );
+  return <SpecDocView doc={doc} sections={sections} orphans={orphans} states={states} audit={audit} />;
 }

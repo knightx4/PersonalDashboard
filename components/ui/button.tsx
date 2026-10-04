@@ -2,15 +2,18 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/cn';
 
 /**
- * Simple, with interactive elements that make it feel alive without getting in
- * the way: the quick duration and the soft ease (lib/motion.ts), 0.98 scale
- * on press. `press` drops out entirely under prefers-reduced-motion -- see
- * globals.css.
+ * The class that gives a link standing on its own a press area of at least
+ * 44 by 44 pixels on a phone, without changing how it looks (the
+ * `press-area` utility in app/globals.css says how). Buttons and folds have
+ * one already; a link inside a sentence must not take it.
  */
+export const PRESS_AREA = 'press-area';
+
 const button = cva(
   'press inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-control font-medium ' +
     'transition-colors duration-quick disabled:pointer-events-none disabled:opacity-50 ' +
-    'focus-visible:outline-2 focus-visible:outline-offset-2',
+    'focus-visible:outline-2 focus-visible:outline-offset-2 ' +
+    PRESS_AREA,
   {
     variants: {
       variant: {

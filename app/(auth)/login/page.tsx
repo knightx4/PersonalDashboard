@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { Banner } from '@/components/ui/banner';
+import { PRESS_AREA } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 import { AuthForm } from '../auth-form';
 
 export const metadata = { title: 'Sign in' };
@@ -35,8 +37,8 @@ export default async function LoginPage({
           Sign up
         </Link>
       </p>
-      <p className="mt-1.5 text-center text-ui text-ink-muted">
-        <Link href="/reset-password" className="hover:text-ink">
+      <p className="mt-4 text-center text-ui text-ink-muted">
+        <Link href="/reset-password" className={cn(PRESS_AREA, 'hover:text-ink')}>
           Forgot your password?
         </Link>
       </p>

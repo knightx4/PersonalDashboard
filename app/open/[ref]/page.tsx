@@ -1,9 +1,8 @@
 import { redirect } from 'next/navigation';
-import { PageHeader } from '@/components/shell/page-header';
-import { EmptyState } from '@/components/ui/empty-state';
 import { requestAskDb } from '@/lib/ask/clients';
 import { requireUser } from '@/lib/auth/server';
-import { NO_LONGER_THERE, readRowsWith, refTitles } from '@/lib/core/refs';
+import { readRowsWith, refTitles } from '@/lib/core/refs';
+import { NoLongerThere } from './no-longer-there';
 
 export const metadata = { title: 'Open' };
 
@@ -19,14 +18,5 @@ export default async function OpenRefPage({ params }: { params: Promise<{ ref: s
   const target = (await refTitles([ref], readRowsWith(requestAskDb()))).get(ref);
   if (target && !target.missing && target.href) redirect(target.href);
 
-  return (
-    <>
-      <PageHeader title="Not found" />
-      <EmptyState
-        title={`This is ${NO_LONGER_THERE}`}
-        description="The row this link named has been deleted, or has no page to open."
-        action={{ label: 'Home', href: '/' }}
-      />
-    </>
-  );
+  return <NoLongerThere />;
 }

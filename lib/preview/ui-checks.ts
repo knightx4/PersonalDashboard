@@ -34,7 +34,7 @@ export type CriticVerdict = {
   round: number;
   verdict: 'pass' | 'fix';
   fixes: CriticFix[];
-  earlier: Array<{ where: string; done: string }>;
+  earlier: Array<{ where: string; done: boolean | string }>;
   notes: string | null;
 };
 
@@ -46,7 +46,7 @@ export type UiCheckRow = {
   round: number;
   verdict: 'pass' | 'fix';
   fixes: CriticFix[];
-  earlier: Array<{ where: string; done: string }>;
+  earlier: Array<{ where: string; done: boolean | string }>;
   notes: string | null;
   shots: string[];
   commit_sha: string | null;
@@ -154,7 +154,10 @@ export function parseVerdict(raw: string, surface: string, round: number): Criti
   const earlier = earlierIn.map((item, i) => {
     if (!item || typeof item !== 'object') throw new Error(`Earlier item ${i + 1} is not an object.`);
     const e = item as Record<string, unknown>;
-    return { where: text(e.where, `earlier ${i + 1} where`), done: text(e.done, `earlier ${i + 1} done`) };
+    // The critic's instructions write `done` as true or false; older verdicts
+    // wrote it as a word. Both are kept as given.
+    const done = typeof e.done === 'boolean' ? e.done : text(e.done, `earlier ${i + 1} done`);
+    return { where: text(e.where, `earlier ${i + 1} where`), done };
   });
 
   const notes = v.notes === undefined || v.notes === null ? null : text(v.notes, 'notes');
