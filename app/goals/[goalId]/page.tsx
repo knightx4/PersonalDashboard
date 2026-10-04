@@ -456,6 +456,7 @@ export default async function GoalMapPage({
             files={filesOf}
             progress={summariseProgress(progressEntries)}
             arrivals={arrivals}
+            canRun={owner}
           />
         </GoalStepsFold>
         <GoalRhythms steps={rhythmSteps(map.steps)} records={map.rhythms} />

@@ -129,6 +129,8 @@ export type GoalRowContext = {
   progressBeneath?: Record<string, LatestBeneath>;
   /** The finished steps Dash closed lately, which arrive with its mark (plan #1561). */
   arrivals?: ReadonlySet<string>;
+  /** Whether this account can start a goals run. Ask Dash shows only when it can. */
+  canRun: boolean;
 };
 
 /**
@@ -491,7 +493,7 @@ export function GoalRow({
           : []),
       ]
     : [];
-  const askable = offersAsk(step);
+  const askable = context.canRun && offersAsk(step);
   const askLabel = askDashLabel(step);
   const askItems: ActionMenuItem[] = askable
     ? [{ id: 'ask', label: askLabel, formAction: askAction, formFields: { id: step.id } }]
