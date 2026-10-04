@@ -285,10 +285,12 @@ that step is.
 
 Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. A rule
 whose check is not built yet is marked pending on the plan step that builds
-it. That step takes the mark off, and gives R1 its baseline measured on main.
+it. R1's baseline was measured on main on 4 October 2026: 72 pages had no
+surface. A page that only redirects draws nothing and is not counted, nor are
+API routes or the gallery itself.
 
 **R1.** Every page under `app/` has at least one surface in the gallery.
-Checked by: count `routes-without-surface`, target 0, pending #1539.
+Checked by: count `routes-without-surface`, baseline 72, target 0.
 
 **R2.** No surface scrolls sideways at 390 pixels.
 Checked by: test `tests/interaction/no-sideways-scroll.test.ts`.
