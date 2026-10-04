@@ -300,7 +300,7 @@ Checked by: test `tests/interaction/press-targets.test.ts`.
 
 **R4.** A step that changes a surface has a passing design check before it
 closes.
-Checked by: test `lib/plan/ui-check-guard.test.ts`, pending #1534.
+Checked by: test `lib/plan/ui-check-guard.test.ts`.
 
 **R5.** Every preference names the note it came from.
 Checked by: test `tests/dev-ui-taste.test.ts`.

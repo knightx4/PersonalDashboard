@@ -298,9 +298,15 @@ What the recorder can reach depends on the session:
   the bucket.
 
 A round whose recorder you could not run at all is not recorded: say so in
-the report rather than leaving it out. Plan #1534 makes `done` refuse a step
-whose commit changes a `.tsx` file under `app/` or `components/` while one of
-its surfaces has no `pass` row in `ui_checks`.
+the report rather than leaving it out.
+
+**The close checks the rounds.** `done` refuses a step whose commits change a
+`.tsx` file under `app/` or `components/` while the latest recorded round of
+any surface those files serve is not a `pass`, and names each such surface
+(plan #1534, `lib/plan/ui-check-guard.ts`). `npm run ui-guard -- <n>` runs
+the same check from your branch, and prints the SQL for the connector where
+there is no `DATABASE_URL`. Run it before you report a screen step: a
+surface it names is a round still to run or record.
 
 ## When you reach something you should not decide
 

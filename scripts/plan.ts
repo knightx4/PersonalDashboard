@@ -44,7 +44,9 @@
  *   npx tsx scripts/plan.ts start <n>
  *   npx tsx scripts/plan.ts done <n> --note "what shipped" [--commit <sha>]
  *                                # refused unless GitHub says that commit is on
- *                                # main, and refused if GitHub cannot be asked
+ *                                # main, and refused if GitHub cannot be asked;
+ *                                # refused while a screen it changed has no
+ *                                # passing design check (plan #1534)
  *   npx tsx scripts/plan.ts answer <n> --note "what was decided"   # a decision
  *   npx tsx scripts/plan.ts block <n> --ask "what it needs" [--note "the rest"]
  *                                [--on-steps]   # waiting on the steps it names,
@@ -79,6 +81,8 @@ import { isAppScope, isPlanScope, planScopeLabel, planScopeOf } from '../lib/pla
 import { planBrief, STATUS_WORD } from '../lib/plan/brief';
 import { importedBy, pagesUsing } from '../lib/preview/importers';
 import { surfacesForFiles } from '../lib/preview/routes';
+import { uiCheckRefusal, type CheckRound } from '../lib/plan/ui-check-guard';
+import { stepScreenInputs } from '../lib/plan/ui-check-local';
 import type { VisionBodies } from '../lib/specs/vision';
 import { closeRefusal, commitOnMain } from '../lib/plan/github';
 import { branchesContaining } from '../lib/plan/branches';
@@ -1377,6 +1381,27 @@ async function main(): Promise<void> {
           branches: branchesContaining(commit),
         });
         if (refusal) fail(refusal);
+
+        // A step that changed a screen closes only once each surface it
+        // touched has passed the design critic (plan #1534). Git that cannot
+        // read the step's files refuses too: a guard that cannot look does
+        // not wave the close through.
+        let inputs: { files: string[]; surfaces: string[] };
+        try {
+          inputs = stepScreenInputs(item.number, commit);
+        } catch (error) {
+          fail(
+            `Could not read what #${item.number} changed at ${commit} to check its screens ` +
+              `(${error instanceof Error ? error.message : String(error)}). Run git fetch origin and try again.`,
+          );
+        }
+        const checks = inputs.surfaces.length
+          ? await sql<CheckRound[]>`
+              select surface, round, verdict from ui_checks
+              where user_id = ${userId} and step = ${item.number}`
+          : [];
+        const screenRefusal = uiCheckRefusal({ step: item.number, ...inputs, checks });
+        if (screenRefusal) fail(screenRefusal);
       }
 
       const stamp = new Date().toISOString().slice(0, 10);
