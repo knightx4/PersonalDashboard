@@ -2,6 +2,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { projectById } from '@/lib/plan/projects';
 import { PlanView, type PlanCatalogEntry } from '@/app/dev/plan/plan-view';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
+import type { CriticStopView } from '@/lib/plan/ui-check-stop';
 import {
   applyView,
   buildPlanTree,
@@ -290,5 +291,117 @@ export function ProjectPlanSurface() {
         unfolded
       />
     </div>
+  );
+}
+
+/**
+ * A step the design critic stopped after its third round (plan #1610): the
+ * last fixes for each surface that did not pass, the shots where they were
+ * uploaded and a line where they were not, and the two ways on.
+ */
+const stopAsk =
+  "The design critic did not pass #1612's screen: jobs-contact after round 3 (2 fixes open, shots in ui-shots under 1612/jobs-contact/r3); jobs-contacts after round 3 (1 fix open, shots not uploaded, kept in .preview-shots/checks/ by the session that ran it). The work is on branch claude/contact-card. Look at the shots and the fixes, then accept it as it is, or say what to change.";
+
+const stopItems: PlanItem[] = [
+  item({
+    id: 'contacts',
+    module: 'jobs',
+    title: 'Keep every contact at a company on one card',
+    size: 'l',
+  }),
+  item({
+    id: 'contact-card',
+    module: 'jobs',
+    parentId: 'contacts',
+    title: 'Draw the contact card with the last conversation under the name',
+    detail: 'The contact page leads with the person and the last thing said between you.',
+    acceptance: 'A contact reads as one card at 390, with the last conversation under the name.',
+    status: 'blocked',
+    blockKind: 'outside',
+    blockAsk: stopAsk,
+    size: 'm',
+  }),
+];
+
+const stopTree = buildPlanTree({ items: stopItems, dependencies: [] });
+
+/**
+ * A shot, drawn as a page in miniature so the gallery needs no bucket.
+ * ui-ok-file: raw-hex -- the colours are a picture of a page, not the page's own theme.
+ */
+function fixtureShot(dark: boolean, wide: boolean): string {
+  const bg = dark ? '#16181d' : '#f7f6f3';
+  const card = dark ? '#22252c' : '#ffffff';
+  const ink = dark ? '#5d6370' : '#c9c6bf';
+  const w = wide ? 400 : 300;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} 400"><rect width="${w}" height="400" fill="${bg}"/><rect x="16" y="20" width="${w - 32}" height="150" rx="10" fill="${card}"/><rect x="32" y="40" width="${w / 2}" height="14" rx="4" fill="${ink}"/><rect x="32" y="66" width="${w - 96}" height="10" rx="4" fill="${ink}"/><rect x="32" y="84" width="${w - 130}" height="10" rx="4" fill="${ink}"/><rect x="16" y="190" width="${w - 32}" height="90" rx="10" fill="${card}"/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+const criticStops: Record<string, CriticStopView> = {
+  'contact-card': {
+    branch: 'claude/contact-card',
+    surfaces: [
+      {
+        surface: 'jobs-contact',
+        round: 3,
+        fixes: [
+          {
+            shot: 'phone-light',
+            where: 'the header, under the name',
+            problem:
+              'The company, the role and the last conversation wrap to three lines each at 390, so the card is a screen and a half tall before the first message.',
+            breaks: 'taste:fits-one-screen',
+            change: 'Put the company and role on one line and fold the conversation to its first line.',
+          },
+          {
+            shot: 'laptop-dark',
+            where: 'the notes box',
+            problem: 'The notes box sits inside the card inside a second card.',
+            breaks: 'law 13',
+            change: 'Drop the inner card and let the notes sit on the card itself.',
+          },
+        ],
+        shots: [
+          { name: 'phone-light', url: fixtureShot(false, false) },
+          { name: 'phone-dark', url: fixtureShot(true, false) },
+          { name: 'laptop-light', url: fixtureShot(false, true) },
+          { name: 'laptop-dark', url: fixtureShot(true, true) },
+        ],
+      },
+      {
+        surface: 'jobs-contacts',
+        round: 3,
+        fixes: [
+          {
+            shot: 'phone-dark',
+            where: 'each row',
+            problem: 'The last-spoken date is bare text on the background in dark.',
+            breaks: 'taste:no-bare-text',
+            change: 'Put the date inside the row with the name.',
+          },
+        ],
+        shots: [],
+      },
+    ],
+  },
+};
+
+export function PlanCriticStopSurface() {
+  return (
+    <PlanView
+      sections={applyView(stopTree, 'open')}
+      finished={[]}
+      summary={summarize(stopTree)}
+      view="open"
+      catalog={catalogOf(stopTree)}
+      empty={false}
+      canSend={false}
+      lastRuns={{}}
+      commitChecks={{}}
+      criticStops={criticStops}
+      unfolded
+      opened
+    />
   );
 }

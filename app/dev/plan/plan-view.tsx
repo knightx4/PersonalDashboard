@@ -17,6 +17,7 @@ import {
   PressLabel,
 } from '@/components/ui/field';
 import { VIEW_LABEL } from '@/lib/core/move';
+import type { CriticStopView } from '@/lib/plan/ui-check-stop';
 import {
   PLAN_VIEW_CHIPS,
   PLAN_VIEW_MENU,
@@ -386,6 +387,7 @@ export function PlanView({
   liveness,
   commitChecks,
   overhaulProgress = {},
+  criticStops = {},
   empty,
   canSend,
   unfolded = false,
@@ -421,6 +423,8 @@ export function PlanView({
   commitChecks: Record<string, CommitCheck>;
   /** Each overhaul's rule counts, by its plan item id. Absent: none to show. */
   overhaulProgress?: Readonly<Record<string, OverhaulProgress>>;
+  /** What the design critic last asked of each step it stopped, by step id (plan #1610). */
+  criticStops?: Readonly<Record<string, CriticStopView>>;
   empty: boolean;
   canSend: boolean;
   /**
@@ -601,6 +605,7 @@ export function PlanView({
                       liveness={liveness}
                       commitChecks={ci.checks}
                       overhaulProgress={overhaulProgress}
+                      criticStops={criticStops}
                       view={view}
                       searching={searching}
                       unfolded={unfolded}
@@ -684,6 +689,7 @@ export function PlanView({
                 liveness={liveness}
                 commitChecks={ci.checks}
                 overhaulProgress={overhaulProgress}
+                criticStops={criticStops}
                 view={view}
                 searching={searching}
                 unfolded={unfolded}

@@ -17,11 +17,12 @@
  */
 
 /**
- * Verdicts that let a surface through. Plan #1610 adds `accepted`, for a
- * screen the person let through after a third failed round; it goes here and
- * in the table's verdict check, and nowhere else.
+ * Verdicts that let a surface through: the critic's `pass`, and `accepted`,
+ * which the person writes from /dev/plan for a screen they let through after
+ * the critic's last round (plan #1610, migration 0175). The critic never
+ * writes `accepted`.
  */
-export const PASSING_VERDICTS: readonly string[] = ['pass'];
+export const PASSING_VERDICTS: readonly string[] = ['pass', 'accepted'];
 
 /** One recorded round, as much of a `ui_checks` row as the guard reads. */
 export type CheckRound = { surface: string; round: number; verdict: string };

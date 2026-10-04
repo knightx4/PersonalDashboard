@@ -100,7 +100,12 @@ import { QuickReadView, type QuickReadViewProps } from '@/app/news/quick/quick-v
 import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
-import { PlanOpenedSurface, PlanTreeSurface, ProjectPlanSurface } from './plan-surfaces';
+import {
+  PlanCriticStopSurface,
+  PlanOpenedSurface,
+  PlanTreeSurface,
+  ProjectPlanSurface,
+} from './plan-surfaces';
 import { GoalOpenedSurface, GoalTreeSurface } from './goal-surfaces';
 import {
   AskChangesSurface,
@@ -2595,6 +2600,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanOpenedSurface />,
+  },
+  {
+    /* A step the design critic stopped after round 3 (plan #1610): the last
+     * fixes and shots for each surface, one with its shots uploaded and one
+     * without, and accept or say what to change. */
+    id: 'dev-plan-critic-stop',
+    label: 'Plan · a screen the critic stopped',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanCriticStopSurface />,
   },
   {
     /* A goal's steps, drawn with the plan's shared row (plan #982), beside

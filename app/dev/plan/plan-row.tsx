@@ -78,6 +78,8 @@ import {
 } from './step-forms';
 import type { TreeActions } from '@/components/plan-tree/types';
 import { LinkedText } from '@/components/ui/linked-text';
+import { criticStopNeeds, type CriticStopView } from '@/lib/plan/ui-check-stop';
+import { CriticStop } from './critic-stop';
 
 /**
  * One row of the dev plan, drawn through the shared tree row.
@@ -494,6 +496,7 @@ export function PlanRow({
   liveness: serverLiveness = {},
   commitChecks,
   overhaulProgress = {},
+  criticStops = {},
   view,
   searching,
   unfolded,
@@ -528,6 +531,8 @@ export function PlanRow({
   commitChecks: Readonly<Record<string, CommitCheck>>;
   /** Each overhaul's rule counts, by its plan item id. Absent: none to show. */
   overhaulProgress?: Readonly<Record<string, OverhaulProgress>>;
+  /** What the design critic last asked of each step it stopped, by step id (plan #1610). */
+  criticStops?: Readonly<Record<string, CriticStopView>>;
   /** Which view is on. Only Dismissed shows what has been put aside. */
   view: View;
   /** Whether a search is narrowing the page. Unfolds closed rows that hold a hit. */
@@ -605,6 +610,9 @@ export function PlanRow({
     {} as PlanActionState,
   );
 
+  // A step the design critic stopped draws its fixes and shots in a panel of
+  // its own, so the Needs line says only what that panel does not (plan #1610).
+  const criticStop = node.status === 'blocked' ? criticStops[node.id] : undefined;
   const descendants = flatten([node]).length - 1;
   const closed = isClosed(node.status);
   const isDecision = node.kind === 'decision';
@@ -820,7 +828,7 @@ export function PlanRow({
 
   return (
     <TreeRow
-      node={node}
+      node={criticStop ? { ...node, blockAsk: criticStopNeeds(criticStop.branch) } : node}
       trail={trail}
       row={row}
       health={health}
@@ -1033,6 +1041,10 @@ export function PlanRow({
             />
           )}
 
+          {/* A screen the critic stopped after its last round: its fixes and
+              shots, and the two ways on (plan #1610). */}
+          {criticStop && <CriticStop id={node.id} view={criticStop} />}
+
           {setupOpen && (
             <SetupJob
               node={node}
@@ -1130,6 +1142,7 @@ export function PlanRow({
           liveness={serverLiveness}
           commitChecks={commitChecks}
           overhaulProgress={overhaulProgress}
+          criticStops={criticStops}
           view={view}
           searching={searching}
           unfolded={unfolded}

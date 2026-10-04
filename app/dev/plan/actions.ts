@@ -56,6 +56,13 @@ import {
 } from '@/lib/plan/tree';
 import { planScopeOf, type PlanScope } from '@/lib/plan/projects';
 import { addThreadTurn } from '@/lib/thread/store';
+import {
+  acceptedLine,
+  acceptedRounds,
+  isCriticStopAsk,
+  stopBranch,
+  stoppedSurfaces,
+} from '@/lib/plan/ui-check-stop';
 
 export type PlanActionState = {
   error?: string;
@@ -975,6 +982,88 @@ export async function answerBlockedStep(
 
   revalidatePlan();
   return { message: 'Answered. The step is back to not started.' };
+}
+
+/**
+ * Let a screen through that the design critic would not pass (plan #1610,
+ * decision #1535).
+ *
+ * Only on a step the critic stopped after its last round. For each surface
+ * that stopped it writes one more round to `ui_checks` with the verdict
+ * `accepted`, which the close guard counts as passed, then lifts the block
+ * the way `answerBlockedStep` does. The dated line on the comment names the
+ * branch, so the session that picks the step up merges it and closes it
+ * rather than building it again.
+ *
+ * Saying what to change instead is `answerBlockedStep`: the words go on the
+ * step's thread and the next session runs three more rounds against them.
+ */
+// latency: pending
+export async function acceptCriticStop(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing step.' };
+
+  const { data: current } = await supabase
+    .from('plan_items')
+    .select('number, status, block_ask, comment')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .maybeSingle();
+  if (!current) return { error: 'That step no longer exists.' };
+  if (current.status !== 'blocked' || !isCriticStopAsk(current.block_ask)) {
+    return { error: 'That step is no longer waiting on the design critic.' };
+  }
+
+  const { data: rounds, error: readError } = await supabase
+    .from('ui_checks')
+    .select('surface, round, verdict, fixes, shots')
+    .eq('user_id', user.id)
+    .eq('step', current.number);
+  if (readError) return { error: readError.message };
+  const stopped = stoppedSurfaces(
+    (rounds ?? []).map((r) => ({
+      surface: r.surface as string,
+      round: r.round as number,
+      verdict: r.verdict as string,
+      fixes: Array.isArray(r.fixes) ? r.fixes : [],
+      shots: (r.shots as string[] | null) ?? [],
+    })),
+  );
+  if (stopped.length === 0) {
+    return { error: 'No round on record stopped this screen, so there is nothing to accept.' };
+  }
+
+  const { error: writeError } = await supabase.from('ui_checks').insert(
+    acceptedRounds(stopped).map((r) => ({
+      user_id: user.id,
+      step: current.number,
+      ...r,
+      notes: "Accepted as it is from /dev/plan, past the critic's last round.",
+    })),
+  );
+  if (writeError) return { error: writeError.message };
+
+  const line = acceptedLine({
+    date: new Date().toISOString().slice(0, 10),
+    surfaces: stopped.map((s) => s.surface),
+    branch: stopBranch(current.block_ask),
+  });
+  const comment = current.comment ? `${current.comment}\n\n${line}` : line;
+  const { error } = await supabase
+    .from('plan_items')
+    .update({ status: 'not_started', ...blockPatch('not_started'), assignee: null, comment })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  return { message: 'Accepted. The step is ready for a session to merge and close.' };
 }
 
 /** Deleting a step takes its sub-steps with it; the confirm says how many. */
