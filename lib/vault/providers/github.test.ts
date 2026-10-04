@@ -343,6 +343,36 @@ describe('writeNote', () => {
     stubWrite({ status: 401 });
     await expect(source.writeNote('Ideas.md', 'x', 'old', 'm')).rejects.toBeInstanceOf(VaultAuthError);
   });
+
+  it('creates a note with no SHA, so a file already there is refused rather than replaced', async () => {
+    const sent = stubWrite({ body: { content: { sha: 'blob-1' }, commit: { sha: 'commit-1' } } });
+    const source = new GithubVaultSource({ ...config, subpath: 'Vault' });
+
+    const result = await source.createNote('Inbox/Idea.md', 'Idea\n', 'Add Idea from Dash');
+
+    expect(result).toEqual({ blobSha: 'blob-1', commitSha: 'commit-1' });
+    expect(sent[0].method).toBe('PUT');
+    expect(sent[0].url).toBe('https://api.github.com/repos/knightx4/vault/contents/Vault/Inbox/Idea.md');
+    expect(sent[0].body).not.toHaveProperty('sha');
+
+    stubWrite({ status: 422, body: { message: '"sha" wasn\'t supplied.' } });
+    await expect(source.createNote('Inbox/Idea.md', 'x', 'm')).rejects.toBeInstanceOf(VaultConflictError);
+  });
+
+  it('removes a note at the SHA it was written at, and treats one already gone as removed', async () => {
+    const sent = stubWrite({ body: { commit: { sha: 'commit-2' } } });
+    const source = new GithubVaultSource(config);
+
+    expect(await source.deleteNote('Inbox/Idea.md', 'blob-1', 'Remove Idea from Dash')).toBe('commit-2');
+    expect(sent[0].method).toBe('DELETE');
+    expect(sent[0].body).toEqual({ message: 'Remove Idea from Dash', sha: 'blob-1', branch: 'main' });
+
+    stubWrite({ status: 404 });
+    expect(await source.deleteNote('Inbox/Idea.md', 'blob-1', 'm')).toBeNull();
+
+    stubWrite({ status: 409 });
+    await expect(source.deleteNote('Inbox/Idea.md', 'stale', 'm')).rejects.toBeInstanceOf(VaultConflictError);
+  });
 });
 
 describe('canWrite', () => {

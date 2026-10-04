@@ -6,7 +6,8 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { isDay, isPickKey } from '@/lib/day-brief/opens';
 import { requestDashDeps } from '@/lib/ask/clients';
 import { changePaths } from '@/lib/ask/changes';
-import type { DashAction, DashActionDeps } from '@/lib/core/dash-actions';
+import { undoneByVault, type DashAction, type DashActionDeps } from '@/lib/core/dash-actions';
+import { undoVaultCapture } from '@/lib/capture/vault';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { undoFiledAction } from '@/lib/goals/capture-store';
 import { undoDashTodayWith, type DashTodayUndo } from '@/lib/shell/dash-today';
@@ -75,6 +76,12 @@ export async function stopWatch(formData: FormData): Promise<StopWatchResult> {
  * actor so goals.history ties it to the same sentence.
  */
 async function undoCaptureLine(deps: DashActionDeps, action: DashAction): Promise<DashTodayUndo> {
+  // A note capture wrote into the vault: its file comes out of the repository too (plan #1582).
+  if (undoneByVault(action)) {
+    const undone = await undoVaultCapture(deps, action);
+    if (!undone.ok) return { ok: false, error: undone.error };
+    return { ok: true, paths: ['/vault'] };
+  }
   const captureId = action.undo?.capture_id;
   if (typeof captureId !== 'string' || !UUID.test(captureId)) {
     return { ok: false, error: 'Dash did not keep which capture this came from, so it cannot be undone here.' };

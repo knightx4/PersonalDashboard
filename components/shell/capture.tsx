@@ -609,7 +609,12 @@ function AnythingPanel({
       live = false;
     };
   }, []);
-  const guessed = usePlaceGuess(text);
+  const { guess: guessed, places: sortedPlaces } = usePlaceGuess(text);
+  /** The places Enter came back with when it asked. */
+  const [askedPlaces, setAskedPlaces] = useState<readonly CapturePlace[] | null>(null);
+  // The server's list once it has answered: it alone knows whether the vault
+  // can be written (plan #1582), so the box's own list never has it.
+  const offered = askedPlaces ?? (sortedPlaces && sortedPlaces.length > 0 ? sortedPlaces : places);
   /** The sort Enter came back with when Dash was not sure, which asks for a pick. */
   const [asked, setAsked] = useState<CaptureSort | null | undefined>(undefined);
   const [picked, setPicked] = useState<CapturePlace | null>(null);
@@ -641,6 +646,7 @@ function AnythingPanel({
       }
       if (result.ask) {
         setAsked(result.ask.sort);
+        if (result.ask.places.length > 0) setAskedPlaces(result.ask.places);
         setMessage('Pick where it goes.');
         return;
       }
@@ -736,7 +742,7 @@ function AnythingPanel({
           data-focus-ring="none"
           className="w-full resize-none bg-transparent px-3 py-3 text-body text-ink outline-none placeholder:text-ink-ghost"
         />
-        <PlaceLine guess={guess} places={places} picked={picked} onPick={setPicked} />
+        <PlaceLine guess={guess} places={offered} picked={picked} onPick={setPicked} />
         <CaptureFoot message={message} pending={pending && undoing === null} costs={costs} />
         {error && (
           <div className="px-3 pb-2">
@@ -770,8 +776,10 @@ function AnythingPanel({
  * answer is never shown against a different sentence and going back to one
  * already asked about does not ask again.
  */
-function usePlaceGuess(text: string): PlaceGuess {
+function usePlaceGuess(text: string): { guess: PlaceGuess; places: readonly CapturePlace[] | null } {
   const [answers, setAnswers] = useState<ReadonlyMap<string, CaptureSort | null>>(new Map());
+  /** The places the server offered with its latest answer. */
+  const [places, setPlaces] = useState<readonly CapturePlace[] | null>(null);
   const sentence = text.trim();
   const ready = sentence.length >= CAPTURE_SORT_MIN_CHARS;
   const known = answers.has(sentence);
@@ -781,11 +789,11 @@ function usePlaceGuess(text: string): PlaceGuess {
     let live = true;
     const timer = setTimeout(() => {
       sortCaptureBox(sentence)
-        .then((answer) => answer.sort)
         .catch(() => null)
-        .then((sort) => {
+        .then((answer) => {
           if (!live) return;
-          setAnswers((held) => new Map(held).set(sentence, sort));
+          if (answer && answer.places.length > 0) setPlaces(answer.places);
+          setAnswers((held) => new Map(held).set(sentence, answer?.sort ?? null));
         });
     }, CAPTURE_SORT_DEBOUNCE_MS);
     return () => {
@@ -794,9 +802,9 @@ function usePlaceGuess(text: string): PlaceGuess {
     };
   }, [ready, known, sentence]);
 
-  if (!ready) return { state: 'idle' };
-  if (!known) return { state: 'reading' };
-  return { state: 'answered', sort: answers.get(sentence) ?? null };
+  if (!ready) return { guess: { state: 'idle' }, places };
+  if (!known) return { guess: { state: 'reading' }, places };
+  return { guess: { state: 'answered', sort: answers.get(sentence) ?? null }, places };
 }
 
 /**
