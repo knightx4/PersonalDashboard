@@ -34,10 +34,11 @@ import { TodayRow } from './today-list';
  * The lanes sort what is next by who holds it:
  *
  * - On you: everything ranked as on you (lib/goals/today.ts), each with its
- *   one button, Not now, and Dash preps it where Dash can.
+ *   one button, Not now, and Ask Dash where Dash can prepare it.
  * - Dash has it: the runs going now, Dash's open steps (working, queued, or
  *   waiting on an answer from you), and goals Dash has left alone, offered
- *   with Work on it.
+ *   with Ask Dash. Ask Dash shows only to the account that owns the app, as
+ *   on a goal's page, because only that account can start a run.
  * - Later: what is set aside until a later day, with Bring back now.
  *
  * Moves between lanes show at once: a step set aside leaves On you, a step
@@ -61,6 +62,8 @@ export type GoalLanesProps = {
   laterOn: LaterLaneItem[];
   working: RunListing[];
   offers: DashOffer[];
+  /** Whether this account can start a run (the owner's only), which Ask Dash needs. */
+  canRun?: boolean;
 };
 
 /** "today", "tomorrow", "in 6 days" or "3 days late", from today to a due date. */
@@ -86,6 +89,7 @@ export function GoalLanes({
   laterOn,
   working,
   offers,
+  canRun = false,
 }: GoalLanesProps) {
   const [filter, setFilter] = useState<string | null>(null);
   // Moves made on this page, shown before the server's redraw arrives.
@@ -127,7 +131,7 @@ export function GoalLanes({
       offer.kind === 'goal' && inFilter(offer.goalId),
   );
   const later = laterOn.filter((item) => inFilter(item.goalId) && !back.has(item.id));
-  const canPrepare = new Set(preparable);
+  const canPrepare = new Set(canRun ? preparable : []);
   const chosen = goals.find((line) => line.goal.id === filter) ?? null;
 
   return (
@@ -203,7 +207,11 @@ export function GoalLanes({
           title="Dash has it"
           dot="bg-status-submitted"
           count={dashRows.length + runs.length}
-          empty="Nothing with Dash. Press Dash preps it on a step of yours, or ask Dash above."
+          empty={
+            canRun
+              ? 'Nothing with Dash. Press Ask Dash on a step of yours, or ask Dash above.'
+              : 'Nothing with Dash.'
+          }
           rows={[
             ...runs.map((run) => <WorkingRow key={`run:${run.id}`} run={run} />),
             ...dashRows.map((item) => <DashRow key={`dash:${item.id}`} item={item} />),
@@ -216,7 +224,7 @@ export function GoalLanes({
                 </p>
                 <ul className="divide-y divide-border">
                   {quiet.map((offer) => (
-                    <QuietGoalRow key={offer.goalId} offer={offer} />
+                    <QuietGoalRow key={offer.goalId} offer={offer} canRun={canRun} />
                   ))}
                 </ul>
               </>
@@ -434,7 +442,13 @@ function DashRow({ item }: { item: DashLaneItem }) {
 
 type RunState = { error?: string; message?: string; done?: number };
 
-function QuietGoalRow({ offer }: { offer: Extract<DashOffer, { kind: 'goal' }> }) {
+function QuietGoalRow({
+  offer,
+  canRun,
+}: {
+  offer: Extract<DashOffer, { kind: 'goal' }>;
+  canRun: boolean;
+}) {
   const [state, action, pending] = useActionState(
     (prev: RunState, form: FormData) => workOnGoalAction(prev, form),
     {} as RunState,
@@ -455,12 +469,14 @@ function QuietGoalRow({ offer }: { offer: Extract<DashOffer, { kind: 'goal' }> }
           <MoveLabel move={{ state: 'dash_working' }} />
         </p>
       ) : (
-        <form action={action} className="pt-1">
-          <input type="hidden" name="goalId" value={offer.goalId} />
-          <Button type="submit" size="sm" variant="secondary" pending={pending}>
-            {pending ? 'Starting…' : 'Work on it'}
-          </Button>
-        </form>
+        canRun && (
+          <form action={action} className="pt-1">
+            <input type="hidden" name="goalId" value={offer.goalId} />
+            <Button type="submit" size="sm" variant="secondary" pending={pending}>
+              {pending ? 'Asking…' : 'Ask Dash'}
+            </Button>
+          </form>
+        )
       )}
     </li>
   );

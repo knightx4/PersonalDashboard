@@ -6,7 +6,6 @@ import { requireUser } from '@/lib/auth/server';
 import { isOwner } from '@/lib/dev/owner';
 import { goalsRoutine } from '@/lib/feedback/routine';
 import { createGoalsClient } from '@/lib/goals/auth/server';
-import type { SendMode } from '@/lib/goals/handover';
 import { sendGoalStep } from '@/lib/goals/handover-store';
 import { runInFlight } from '@/lib/goals/shaping';
 import {
@@ -97,37 +96,30 @@ export async function workOnGoalAction(
   return saved();
 }
 
+/** The most a note written beside Ask Dash on a row may hold. */
+const ASKED_MAX = 4000;
+
 /**
- * Send one Claude step, or one phase, to Claude from its row (plan #1000).
- * Every rule about what may be sent is in lib/goals/handover.ts; a refusal
- * comes back as the sentence the row shows.
+ * Ask Dash on a step's row: one press, and askDash in lib/goals/handover.ts
+ * picks the run from the step. A Dash step or a phase is handed over
+ * (plan #1000); a step of yours with no sub-steps is prepared (plan #1001),
+ * which writes a draft email, a call script or a checklist into its result
+ * and leaves it yours and open. What they wrote in the box beside the button,
+ * if anything, goes into the brief. A refusal comes back as the sentence the
+ * row shows.
  */
 // latency: pending
-export async function sendStepAction(
+export async function askDashStepAction(
   _prev: ShapingActionState,
   form: FormData,
 ): Promise<ShapingActionState> {
-  return handOver(form, 'send');
-}
-
-/**
- * Ask Claude to prepare one of your steps from its row (plan #1001): a run
- * that writes a draft email, a call script or a checklist into the step's
- * result and leaves the step yours and open. The rules are sendRefusal's,
- * in lib/goals/handover.ts, with mode `prepare`.
- */
-// latency: pending
-export async function prepareStepAction(
-  _prev: ShapingActionState,
-  form: FormData,
-): Promise<ShapingActionState> {
-  return handOver(form, 'prepare');
-}
-
-async function handOver(form: FormData, mode: SendMode): Promise<ShapingActionState> {
   const user = await requireUser();
   const id = Id.safeParse(form.get('id'));
   if (!id.success) return { error: 'Could not tell which step that was.' };
+  const note = String(form.get('asked') ?? '').trim();
+  if (note.length > ASKED_MAX) {
+    return { error: `That is too long to pass on. Keep it under ${ASKED_MAX} characters.` };
+  }
   if (!(await isOwner({ user }))) {
     return { error: 'Only the account that owns this app can start a Dash run.' };
   }
@@ -149,12 +141,11 @@ async function handOver(form: FormData, mode: SendMode): Promise<ShapingActionSt
       stepId: id.data,
       routine,
       surface: 'thread',
-      mode,
+      mode: 'ask',
+      ...(note ? { asked: note, askedOn: 'row' as const } : {}),
     });
   } catch {
-    return {
-      error: mode === 'prepare' ? 'Dash could not be asked. Try again.' : 'The step could not be sent. Try again.',
-    };
+    return { error: 'Dash could not be asked. Try again.' };
   }
   if (!sent.ok) {
     // A fire that failed still wrote a failed run row, which the Runs page lists.
@@ -162,12 +153,12 @@ async function handOver(form: FormData, mode: SendMode): Promise<ShapingActionSt
     return { error: sent.error };
   }
   if (sent.job === 'prepare') {
-    return saved(`Asked Dash to prepare "${sent.title}". What it writes will show on the step, which stays yours.`);
+    return saved(`Dash is on it. What it writes for "${sent.title}" will show on the step, which stays yours.`);
   }
   return saved(
     sent.job === 'phase'
-      ? `Sent "${sent.title}" to Dash. It will work Dash’s steps in it, in order.`
-      : `Sent "${sent.title}" to Dash. What it produces will show on the step.`,
+      ? `Dash is on it. It will work Dash’s steps in "${sent.title}", in order.`
+      : `Dash is on it. What it produces for "${sent.title}" will show on the step.`,
   );
 }
 

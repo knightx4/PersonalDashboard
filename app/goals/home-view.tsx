@@ -71,6 +71,8 @@ export type HomeViewProps = {
   dash?: DashLaneItem[];
   /** The Later lane. */
   laterOn?: LaterLaneItem[];
+  /** Whether this account can start a run (the owner's only), which Ask Dash needs. */
+  canRun?: boolean;
 };
 
 export function HomeView({
@@ -89,6 +91,7 @@ export function HomeView({
   preparable = [],
   dash = [],
   laterOn = [],
+  canRun = false,
 }: HomeViewProps) {
   if (goals.length === 0 && today.length === 0 && later.length === 0) {
     return (
@@ -141,6 +144,7 @@ export function HomeView({
           laterOn={laterOn}
           working={working}
           offers={offers}
+          canRun={canRun}
         />
       )}
 

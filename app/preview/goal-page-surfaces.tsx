@@ -359,7 +359,7 @@ export function GoalsHomeSurface() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Goals" />
-      <HomeView {...home} timeZone="Europe/London" />
+      <HomeView {...home} timeZone="Europe/London" canRun />
     </div>
   );
 }

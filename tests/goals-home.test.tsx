@@ -23,7 +23,7 @@ vi.mock('@/app/goals/[goalId]/comment-actions', () => ({ addGoalComment: vi.fn()
 vi.mock('@/app/goals/[goalId]/flag-actions', () => ({ answerFlagAction: vi.fn() }));
 vi.mock('@/app/goals/[goalId]/tree-actions', () => ({ answerGoalQuestion: vi.fn() }));
 vi.mock('@/app/goals/[goalId]/shaping-actions', () => ({
-  prepareStepAction: vi.fn(),
+  askDashStepAction: vi.fn(),
   workOnGoalAction: vi.fn(),
 }));
 vi.mock('@/app/goals/home-actions', () => ({
@@ -184,8 +184,10 @@ describe('the Goals home', () => {
     expect(html).toContain('>Answer<');
     expect(html).toContain('>Done<');
     expect(html).toContain('Not now');
-    expect(html).not.toContain('Dash preps it</button>');
-    expect(render({ preparable: ['a'] })).toContain('Dash preps it</button>');
+    const asks = (markup: string) => markup.split('Ask Dash</button>').length - 1;
+    // Ask Dash on a step of yours shows only to the owner, who alone can start a run.
+    expect(asks(render({ preparable: ['a'], canRun: true }))).toBe(asks(html) + 1);
+    expect(asks(render({ preparable: ['a'] }))).toBe(asks(html));
     expect(html).toContain('frees 3 steps');
     expect(html).toContain('Call the card company');
   });
@@ -272,7 +274,14 @@ describe('the Goals home', () => {
   });
 
   it('offers goals Dash has left alone in its lane, and a new errand once there is an area', () => {
+    const offers = [
+      { kind: 'goal' as const, goalId: 'g1', title: 'Pay off the debts', reason: 'Dash has not worked on it yet.' },
+    ];
+    const asks = (markup: string) => markup.split('Ask Dash</button>').length - 1;
+    // Only the owner's account can start a run, so only it is offered Ask Dash.
+    expect(asks(render({ offers, canRun: true }))).toBe(asks(render({ offers })) + 1);
     const html = render({
+      canRun: true,
       offers: [
         { kind: 'prepare', stepId: 'a', title: 'Call the card company', goalId: 'g1', goalTitle: 'Pay off the debts' },
         { kind: 'goal', goalId: 'g1', title: 'Pay off the debts', reason: 'Dash has not worked on it yet.' },
@@ -280,7 +289,6 @@ describe('the Goals home', () => {
     });
     expect(html).toContain('Dash could take these');
     expect(html).toContain('Dash has not worked on it yet.');
-    expect(html).toContain('>Work on it<');
     expect(html).not.toContain('A new errand');
     expect(render({ areas: [{ id: 'area', name: 'Money' }] })).toContain('A new errand');
   });

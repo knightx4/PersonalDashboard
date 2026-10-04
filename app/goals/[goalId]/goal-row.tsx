@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
-import { CircleUser, ClipboardList, Play, Repeat } from 'lucide-react';
+import { CircleUser, Repeat } from 'lucide-react';
 import { RowIconButton } from '@/components/plan-tree/row-icon-button';
 import { StateLabel } from '@/components/dev/state-label';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
@@ -16,7 +16,7 @@ import { useDashArrival } from './dash-arrival';
 import type { LinkedFile } from '@/lib/files/files';
 import { awaitsReview } from '@/lib/goals/daily';
 import type { PrepTarget, StepPrep } from '@/lib/goals/goal-page';
-import { offersPrepare, offersSend, sendJob } from '@/lib/goals/handover';
+import { askDash, offersAsk } from '@/lib/goals/handover';
 import type { GoalRowNode } from '@/lib/goals/plan-rows';
 import {
   PROGRESS_ESTIMATE_WORDS,
@@ -48,8 +48,7 @@ import {
 } from './block-actions';
 import { InformationStep, type InformationSeam } from './information-step';
 import {
-  prepareStepAction,
-  sendStepAction,
+  askDashStepAction,
   setFogAsideAction,
   settleProposalAction,
   type ShapingActionState,
@@ -308,6 +307,12 @@ function BlockForm({
   );
 }
 
+/** Ask Dash, or Ask Dash again on a step of yours Dash has already prepared. */
+function askDashLabel(step: GoalRowNode['step']): string {
+  const prepared = askDash(step)?.mode === 'prepare' && Boolean(step.result || step.resultUrl);
+  return prepared ? 'Ask Dash again' : 'Ask Dash';
+}
+
 const STATUS_WORDS = [
   ['not_started', 'Open'],
   ['blocked', 'Blocked'],
@@ -346,18 +351,13 @@ export function GoalRow({
   // time you see it (plan #1561).
   const arrived = step.status === 'done' && (context.arrivals?.has(step.id) ?? false);
   const markRef = useDashArrival(step.id, arrived);
-  // Send to Claude (plan #1000). Held by the row rather than by a button,
-  // because there are three ways to press it -- the quick icon, the button in
-  // the opened row and the menu -- and what came back is said once, on the
-  // row, as the dev plan does.
-  const [sendState, sendAction, sendPending] = useActionState(
-    sendStepAction,
-    {} as ShapingActionState,
-  );
-  // Prepare (plan #1001): Claude writes what you need to do one of your own
-  // steps into its result. Its answer is said on the row the same way.
-  const [prepareState, prepareAction, preparePending] = useActionState(
-    prepareStepAction,
+  // Ask Dash (plans #1000 and #1001): askDash picks whether the step is
+  // handed over or prepared. Held by the row rather than by a button, because
+  // there are three ways to press it -- the quick icon, the button in the
+  // opened row and the menu -- and what came back is said once, on the row,
+  // as the dev plan does.
+  const [askState, askAction, askPending] = useActionState(
+    askDashStepAction,
     {} as ShapingActionState,
   );
   const toast = useToast();
@@ -491,25 +491,11 @@ export function GoalRow({
           : []),
       ]
     : [];
-  const sendable = offersSend(step);
-  const sendLabel = sendJob(step) === 'phase' ? 'Send this phase to Dash' : 'Send to Dash';
-  const sendItems: ActionMenuItem[] = sendable
-    ? [{ id: 'send', label: sendLabel, formAction: sendAction, formFields: { id: step.id } }]
+  const askable = offersAsk(step);
+  const askLabel = askDashLabel(step);
+  const askItems: ActionMenuItem[] = askable
+    ? [{ id: 'ask', label: askLabel, formAction: askAction, formFields: { id: step.id } }]
     : [];
-  const preparable = offersPrepare(step);
-  const prepareLabel =
-    step.result || step.resultUrl ? 'Prepare it again' : 'Ask Dash to prepare this';
-  const prepareItems: ActionMenuItem[] = preparable
-    ? [
-        {
-          id: 'prepare',
-          label: prepareLabel,
-          formAction: prepareAction,
-          formFields: { id: step.id },
-        },
-      ]
-    : [];
-  const handedOver = (sendState.error ?? sendState.message) ? sendState : prepareState;
   const run = context.runs[step.id];
   const stepFiles = context.files?.[step.id] ?? NO_FILES;
   const prep = context.prepFor?.[step.id];
@@ -521,11 +507,10 @@ export function GoalRow({
   // Once the page holds the run a press started, its line says what the
   // press's message said and more, so the message gives way to it. A refusal
   // is still said: it started nothing.
-  const pressNote = handedOver.error ?? (run?.running ? undefined : handedOver.message);
+  const pressNote = askState.error ?? (run?.running ? undefined : askState.message);
   const move = menuAction(moveStepAction);
   const menu: ActionMenuItem[] = [
-    ...sendItems,
-    ...prepareItems,
+    ...askItems,
     ...rhythmItems,
     ...todoItems,
     { id: 'add-child', label: 'Add a sub-step', onSelect: row.addChild },
@@ -652,22 +637,13 @@ export function GoalRow({
         ) : null
       }
       quickActions={
-        sendable ? (
-          <form action={sendAction}>
+        askable && (
+          <form action={askAction}>
             <input type="hidden" name="id" value={step.id} />
-            <RowIconButton type="submit" label={sendLabel} pending={sendPending}>
-              <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
+            <RowIconButton type="submit" label={askLabel} pending={askPending}>
+              <DashMark size="2xs" decorative />
             </RowIconButton>
           </form>
-        ) : (
-          preparable && (
-            <form action={prepareAction}>
-              <input type="hidden" name="id" value={step.id} />
-              <RowIconButton type="submit" label={prepareLabel} pending={preparePending}>
-                <ClipboardList className="size-3.5" strokeWidth={1.75} aria-hidden />
-              </RowIconButton>
-            </form>
-          )
         )
       }
       notices={
@@ -675,11 +651,11 @@ export function GoalRow({
           {blocking && (
             <BlockForm node={node} inset={rowInset(trail)} onDone={() => setBlocking(false)} />
           )}
-          {/* What the last send or prepare did, or why it was refused, wherever it was pressed. */}
+          {/* What the last Ask Dash started, or why it was refused, wherever it was pressed. */}
           {pressNote && (
             <li style={rowInset(trail)} className="pb-1.5 pr-3 text-small">
-              <FieldError>{handedOver.error}</FieldError>
-              {!handedOver.error && <span className="text-ink-muted">{handedOver.message}</span>}
+              <FieldError>{askState.error}</FieldError>
+              {!askState.error && <span className="text-ink-muted">{askState.message}</span>}
             </li>
           )}
           {/* The step's own latest run, read with the page (plan #1044). */}
@@ -764,21 +740,20 @@ export function GoalRow({
       panelActions={
         <>
           {proposed && <ProposalButtons node={step} />}
-          {sendable && (
-            <form action={sendAction}>
+          {/* Ask Dash, with room to say what you want: the words go into the
+              run's brief as a comment's would. Left empty, the step says it. */}
+          {askable && (
+            <form action={askAction} className="flex min-w-0 flex-[1_1_18rem] items-center gap-2">
               <input type="hidden" name="id" value={step.id} />
-              <Button type="submit" size="sm" variant="secondary" pending={sendPending}>
-                <Play className="size-3.5" aria-hidden />
-                {sendPending ? 'Sending…' : sendLabel}
-              </Button>
-            </form>
-          )}
-          {preparable && (
-            <form action={prepareAction}>
-              <input type="hidden" name="id" value={step.id} />
-              <Button type="submit" size="sm" variant="secondary" pending={preparePending}>
-                <ClipboardList className="size-3.5" aria-hidden />
-                {preparePending ? 'Asking…' : 'Prepare'}
+              <InlineInput
+                name="asked"
+                maxLength={4000}
+                placeholder="What you want, if anything"
+                aria-label={`What you want Dash to do with ${step.title}`}
+              />
+              <Button type="submit" size="sm" variant="secondary" pending={askPending} className="shrink-0">
+                <DashMark size="2xs" decorative />
+                {askPending ? 'Asking…' : askLabel}
               </Button>
             </form>
           )}

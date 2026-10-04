@@ -147,7 +147,7 @@ sentence on why it serves the area, and one first move beneath it.
 
 The goals arrive as proposals. You approve the ones that fit on each goal's
 page and archive the rest, and turning one down is how you tell Claude which
-reading of the area you meant. **Work on this** on an approved goal then maps
+reading of the area you meant. **Ask Dash** on an approved goal then maps
 it in full. Once the area has goals, the button reads **Plan what is
 missing** and proposes only what the existing goals leave out, never
 something you turned down. The rules for the run are in
@@ -166,7 +166,7 @@ it is an errand and when it is due, so Dash maps it as the goals skill's "An
 errand" says: three to five steps with no stages, its own research worked in
 the same run, and no weekly help. If the run cannot start, because no goals
 routine is set or the fire fails, the errand is still saved and the message
-says why Dash did not start; **Work on this** on its page tries again.
+says why Dash did not start; **Ask Dash** on its page tries again.
 
 The home lists open errands under **Errands**, above the areas, soonest due
 first, each with its date. An errand is not listed under its area as well.
@@ -178,7 +178,7 @@ track and weekly help. The goal's menu turns any goal into an errand or back.
 due date, which starts on the task's own. The save and the run are one helper,
 `saveErrandAndStart` in `lib/goals/errand-store.ts`, which Add an errand calls
 too, so the two cannot drift. The task is ticked off and links to the errand.
-Every other start of a goal run (Work on this, the overnight map, an answered
+Every other start of a goal run (Ask Dash, the overnight map, an answered
 flag and a comment to Dash) briefs an errand as an errand.
 
 ## Approval
@@ -202,7 +202,7 @@ What waits on you:
   approve that step. The database refuses Claude writing such a step in any
   other status, opening one, or changing what a live step does.
   Dash may not notice that a step acts, so the app checks as well (plan
-  #1183): before a goals run starts, and when you press Work on this or Send,
+  #1183): before a goals run starts, and when you press Ask Dash,
   Jev is asked about every open Claude step with no sentence. A step it gives
   a yes of 0.3 or more goes back to proposed with a sentence Haiku writes,
   through `goals.hold_acting_step` (`migrations-goals/0058`), which writes it
@@ -239,7 +239,7 @@ No step of yours sits for more than a week without a move (plan #1083). The
 morning brief lists each open step of yours that nothing has touched in seven
 days (its row unchanged, nothing added or changed beneath it, no comment from
 you), and the run gives each one move: it splits the step into smaller
-sub-steps, prepares it as **Prepare** would, or adds a question beside it
+sub-steps, prepares it as **Ask Dash** would, or adds a question beside it
 asking whether you still want it and makes the step wait on that question.
 Each is an ordinary change on the Goals home with an Undo. If you answer that
 you no longer want it, the re-shape run drops the step with `dropped_on`
@@ -544,10 +544,10 @@ the same allowance. So Goals runs on a schedule rather than on every change:
   counts as yes; the brief reads the answer beside the reaction (plan #1020). Sources such as Eventbrite,
   Meetup and org newsletters vary in how reachable and current they are, so
   the first few weeks will be uneven and should improve with the feedback.
-- **On request.** A **Work on this** button on a goal fires one run for it,
-  and **Plan this area** on an area fires one run proposing its goals. One
-  step or phase can be sent on its own, and one of your steps can be
-  prepared, as described in "Claude's own work" below.
+- **On request.** **Ask Dash** on a goal fires one run for it, and **Plan
+  this area** on an area fires one run proposing its goals. The same **Ask
+  Dash** on a step works that step or phase on its own, or prepares one of
+  your steps, as described in "Claude's own work" below.
 - **After an answer.** Answering a question on a goal fires one run for that
   goal once ten minutes pass with no further answer, so several answers in
   one sitting cost one run. It settles the provisional steps the answers
@@ -560,12 +560,29 @@ overnight runner works Claude steps while you sleep. Every way in goes
 through one hand-over, `sendGoalStep` in `lib/goals/handover-store.ts`, so
 each refuses the same things and writes the same run row and brief.
 
+### Ask Dash
+
+Every step Dash can help with has one control, **Ask Dash**, in the row's
+menu, as the row's quick button and in the opened row, and the goal has the
+same control in its Dash panel. The code picks the job, through `askDash` in
+`lib/goals/handover.ts`:
+
+- a Claude step with nothing under it is sent (job `step`);
+- a step with sub-steps is a phase, whoever's it is (job `phase`);
+- one of your steps with no sub-steps is prepared (job `prepare`), and the
+  button reads **Ask Dash again** once it has a result;
+- the goal itself gets a goal run (job `goal`).
+
+A question and a rhythm have nothing to ask for, so they do not offer it. An
+`@dash` comment taking a step chooses through the same function. The opened
+row has a box beside the button for what you want; what you write goes into
+the brief under "What they wrote", as a comment's words do. While the run
+goes the row reads "Dash is on it".
+
 ### Sending a step or a phase
 
-A Claude step with nothing under it has **Send to Claude** on its row. A step
-with sub-steps is a phase, whoever's it is, and has **Send this phase to
-Claude**. Pressing either writes a `goals.runs` row with job `step` or
-`phase` and `item_id` on the step, then fires the goals routine with a brief
+Ask Dash on a Claude step or a phase writes a `goals.runs` row with job
+`step` or `phase` and `item_id` on the step, then fires the goals routine with a brief
 that names the step first, followed by its goal, where it sits, the steps
 beside it, a phase's own steps and the collections the goal fills.
 
@@ -590,9 +607,9 @@ with the reason shown on the row, when:
 
 ### Preparing one of your steps
 
-One of your steps with no sub-steps, such as calling a servicer or sending an
-application, has **Ask Claude to prepare this**, and **Prepare it again** once
-it has a result. A rhythm is yours too, but it repeats, so it is not offered.
+Ask Dash on one of your steps with no sub-steps, such as calling a servicer
+or sending an application, prepares it. A rhythm is yours too, but it
+repeats, so it is not offered.
 The run has job `prepare`. Claude writes what you need to do the step: a
 draft email, a call script or numbered instructions, naming the real
 servicer, account and amounts from the goal's collections and your email. It
@@ -614,7 +631,7 @@ before an application and a shortlist of firms before a round of calls;
 clearing the couch gets nothing. The prep step is not a dependency, so your
 step never waits on it. Your step's `prep_checked_at` records that it was
 judged, whether or not a prep step went in. A phase, a step already prepared
-with **Prepare**, and a step whose Claude sibling already covers it get
+with **Ask Dash**, and a step whose Claude sibling already covers it get
 none. A step you add on the page is judged by the next morning run, and the
 morning run works the prep steps it added that same morning within its ten
 steps. The rules and examples are in the goals skill, "A Dash step before
@@ -626,15 +643,15 @@ The `@dash` reply on a step (`lib/goals/ask.ts`) runs on Dash's shared loop,
 with Ask Dash's lookups and writes. Beside answering, it can file facts as
 drafts, date the step or put it on Todo, pass the comment to the goals
 routine, or take the step. When it takes the step, `commentMode` picks the
-job: a step of yours with no sub-steps is prepared, and anything else is
-sent (`lib/goals/ask.ts`). The comment goes into the brief under "What they
+job from `askDash`, as the Ask Dash control does: a step of yours with no
+sub-steps is prepared, and anything else is sent. The comment goes into the brief under "What they
 wrote", and the run treats what it says about the result, such as shorter or
 addressed to someone, as part of the step's done-when.
 
 The reply in the thread says what happened, including a refusal ("I did not
 start it: …" with the reason). On the goal itself there is no single step to
 take, so a comment asking Claude to work on the goal fires the whole-goal run
-(job `goal`), as **Work on this** does.
+(job `goal`), as **Ask Dash** on the goal does.
 
 ### Progress while a run goes
 
@@ -652,7 +669,7 @@ A run with no report for 45 minutes (`RUN_QUIET_MS` in
 `inngest/goals/quiet-runs.ts` closes each one as failed, with the step it was
 last on in the error. It runs on the overnight clock, which pg_cron calls
 every four minutes all day, and in the daily cron, so a dead run is closed
-within the hour and **Work on this** and **Send** work again. This replaced a
+within the hour and **Ask Dash** works again. This replaced a
 flat two hours in which any started run held its goal.
 
 ### The night run
@@ -670,7 +687,7 @@ runs after the feature half:
   without progress, then page order. It takes one step per goal, and skips a
   goal that already has a run going and a step whose last two runs failed or
   never reported back.
-- The first step is sent through `sendGoalStep`, as Send would send it. A
+- The first step is sent through `sendGoalStep`, as Ask Dash would send it. A
   step the hand-over refuses is passed over for the next one, and a fire that
   fails ends the tick.
 

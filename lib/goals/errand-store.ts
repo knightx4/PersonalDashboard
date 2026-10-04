@@ -50,7 +50,7 @@ export async function saveErrandAndStart(input: {
   if (!routine.id) {
     return kept(
       'The errand is saved. Dash did not start: no goals routine is set on this deployment. Set ' +
-        'CLAUDE_GOALS_ROUTINE_ID and CLAUDE_GOALS_ROUTINE_TOKEN, then press Work on this on its page.',
+        'CLAUDE_GOALS_ROUTINE_ID and CLAUDE_GOALS_ROUTINE_TOKEN, then press Ask Dash on its page.',
     );
   }
   try {
@@ -64,11 +64,11 @@ export async function saveErrandAndStart(input: {
     if (!started.ok) {
       return kept(
         `The errand is saved. Dash could not start (${started.error.replace(/\.$/, '')}). ` +
-          'Press Work on this on its page to try again.',
+          'Press Ask Dash on its page to try again.',
       );
     }
   } catch {
-    return kept('The errand is saved. Dash could not start. Press Work on this on its page to try again.');
+    return kept('The errand is saved. Dash could not start. Press Ask Dash on its page to try again.');
   }
   return { ok: true, goalId, started: true, message: 'Errand saved. Dash is on it.' };
 }
