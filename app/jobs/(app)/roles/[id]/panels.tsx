@@ -2541,7 +2541,7 @@ function InterviewGroupCard({
                 // Sized to the number rather than to a fixed box, or the
                 // heading reads "Round 1      ·  First round" with a hole in
                 // it where the empty half of the input is.
-                className="field-sizing-content w-auto min-w-6 max-w-14 shrink-0 font-semibold"
+                className="field-sizing-content min-h-11 w-auto min-w-11 max-w-14 shrink-0 font-semibold sm:min-h-0 sm:min-w-6"
               />
               <span className="shrink-0 text-ink-ghost">·</span>
               <InlineInput
@@ -2549,7 +2549,7 @@ function InterviewGroupCard({
                 onChange={(event) => setLabel(event.target.value)}
                 aria-label="What to call this round"
                 placeholder="Technical round"
-                className="field-sizing-content min-w-0 max-w-56 flex-1 font-semibold"
+                className="field-sizing-content min-h-11 min-w-0 max-w-56 flex-1 font-semibold sm:min-h-0"
               />
             </>
           ) : (

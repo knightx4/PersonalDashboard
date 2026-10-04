@@ -34,7 +34,7 @@ export function ExcitementPicker({
       aria-invalid={failed}
       title="How much you want this one"
       onChange={(event) => run(event.target.value === '' ? null : Number(event.target.value))}
-      className="h-7 w-auto px-1.5 text-small"
+      className="h-11 w-auto px-1.5 text-small sm:h-7"
     >
       <option value="">Not rated</option>
       {[5, 4, 3, 2, 1].map((level) => (
