@@ -22,6 +22,7 @@ export function ReminderActions({ id }: { id: string }) {
         size="sm"
         pending={busy}
         onClick={() => startTransition(() => void snoozeReminder(id))}
+        title={`Brings it back in ${SNOOZE_DAYS} days`}
       >
         Later
       </Button>
@@ -31,7 +32,7 @@ export function ReminderActions({ id }: { id: string }) {
         size="sm"
         pending={busy}
         onClick={() => startTransition(() => void completeReminder(id))}
-        title={`Snoozing pushes it ${SNOOZE_DAYS} days`}
+        title="Marks the reminder done and takes it off this list"
       >
         Done
       </Button>

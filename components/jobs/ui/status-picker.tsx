@@ -68,7 +68,7 @@ export function StatusPicker({
         onChange={(event) => run(event.target.value as ApplicationStatus)}
         // The field primitive already draws aria-invalid in the danger colour,
         // so the mark on a refused status is the flag rather than a class here.
-        className="h-7 w-auto px-1.5 text-small"
+        className="h-7 min-h-11 w-auto px-1.5 text-small sm:min-h-0"
       >
         {SETTABLE.map((option) => (
           <option key={option} value={option}>

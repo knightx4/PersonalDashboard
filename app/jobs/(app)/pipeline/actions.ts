@@ -64,7 +64,7 @@ export async function moveApplication(
   return { error: null };
 }
 
-// latency: pending -- nothing calls this yet
+// latency: optimistic -- the role header's picker shows the new rating at once
 export async function setExcitement(
   applicationId: string,
   excitement: number | null,
@@ -81,27 +81,8 @@ export async function setExcitement(
     .eq('user_id', user.id);
   if (error) return { error: error.message };
   revalidatePath('/jobs/pipeline');
-  return { error: null };
-}
-
-// latency: pending -- nothing calls this yet
-export async function setNextAction(
-  applicationId: string,
-  nextAction: string | null,
-  dueDate: string | null,
-): Promise<{ error: string | null }> {
-  const user = await requireUser();
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from('applications')
-    .update({
-      next_action: nextAction?.trim() || null,
-      next_action_due: dueDate || null,
-    })
-    .eq('id', applicationId)
-    .eq('user_id', user.id);
-  if (error) return { error: error.message };
-  revalidatePath('/jobs/pipeline');
+  revalidatePath('/jobs/roles');
+  revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
 }
 

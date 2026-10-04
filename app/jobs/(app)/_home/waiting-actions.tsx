@@ -26,6 +26,7 @@ function DismissActions({
         size="sm"
         pending={busy}
         onClick={() => startTransition(() => void onSnooze())}
+        title={`Brings it back in ${SNOOZE_DAYS} days`}
       >
         Later
       </Button>
@@ -35,7 +36,7 @@ function DismissActions({
         size="sm"
         pending={busy}
         onClick={() => startTransition(() => void onComplete())}
-        title={`Snoozing pushes it ${SNOOZE_DAYS} days`}
+        title="Takes it off this list for good"
       >
         Dismiss
       </Button>
