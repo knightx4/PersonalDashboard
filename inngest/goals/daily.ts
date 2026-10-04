@@ -220,14 +220,14 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
   );
   // A step of the person's untouched for a week gets a move (plan #1083).
   // Only an open goal has one, so the review above already starts the run.
+  // A step under way is left to the nudge above.
   const sitting = staleSteps(
     goals.map((g) => g.goal),
     byGoal,
     touched,
     now,
-  )
-    .filter((step) => !progress[step.id])
-    .slice(0, STALE_STEP_LIMIT);
+    new Set(Object.keys(progress)),
+  ).slice(0, STALE_STEP_LIMIT);
   // A step of the person's not judged yet for a Dash prep step, ten a morning,
   // newest first (plan #1217). One listed above as stale gets only that move,
   // since preparing it is one of those moves.

@@ -36,6 +36,7 @@ import {
   type RhythmRecord,
 } from '@/lib/goals/rhythms';
 import { loadLatestReviews } from '@/lib/goals/reviews-store';
+import { isCountSource } from '@/lib/goals/rhythm-sources';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
 import { goalProgress, type GoalProgress } from '@/lib/goals/status';
 import {
@@ -77,6 +78,8 @@ type ItemRow = {
   position: number;
   rhythm_count: number | null;
   rhythm_period: RhythmPeriod | null;
+  count_source?: string | null;
+  count_match?: string | null;
   on_todo: boolean;
   result: string | null;
   result_url: string | null;
@@ -125,8 +128,8 @@ async function loadDependencies(
 const ITEM_COLUMNS =
   'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, fog_dismissed_at, ' +
   'resolution, ' +
-  'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
-  'unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
+  'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, count_source, count_match, on_todo, result, ' +
+  'result_url, reviewed_at, unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
   'kept_open_at, prepares_id, prep_checked_at, errand, created_at, estimated_total, total_unit';
 
 const toStep = (row: ItemRow): Step => ({
@@ -145,6 +148,8 @@ const toStep = (row: ItemRow): Step => ({
   position: row.position,
   rhythmCount: row.rhythm_count,
   rhythmPeriod: row.rhythm_period,
+  countSource: isCountSource(row.count_source) ? row.count_source : null,
+  countMatch: row.count_match ?? null,
   onTodo: row.on_todo,
   result: row.result,
   resultUrl: row.result_url,

@@ -11,15 +11,19 @@
  *
  * What counts as touched is anything that changes the step or its branch:
  * the step's own row changing (updated_at, which a prepare, an edit or a
- * reopen moves), a sub-step added or changed beneath it, and a comment of
- * yours on it. Each of the three moves touches the step by that measure: a
- * prepare writes the step, a split adds sub-steps beneath it, and a question
- * makes it wait, which takes it off this list until the answer.
+ * reopen moves), a sub-step added or changed beneath it, a comment of yours
+ * on it, and a progress entry logged on it that was not undone. Each of the
+ * three moves touches the step by that measure: a prepare writes the step, a
+ * split adds sub-steps beneath it, and a question makes it wait, which takes
+ * it off this list until the answer.
  *
  * Which steps are listed: a step of yours (`mine`), open, under an open goal
  * and reached through open steps only, with nothing open beneath it and
  * nothing it waits on, and whose start date has come. A blocked step already
- * waits on something, and a rhythm repeats, so neither is listed.
+ * waits on something, and a rhythm repeats, so neither is listed. Nor is a
+ * step under way, one with a progress entry: lib/goals/progress-nudges.ts
+ * nudges it when nothing has been logged for a week, so it never gets both
+ * moves.
  *
  * Pure. The reads are in lib/goals/stale-steps-store.ts.
  */
@@ -52,8 +56,18 @@ export type TouchRow = { id: string; created_at: string | null; updated_at: stri
 /** A comment of yours on a step. */
 export type CommentTouch = { item_id: string | null; created_at: string | null };
 
-/** When each step itself was last touched: its row changing, or a comment of yours on it. */
-export function touchTimes(items: TouchRow[], comments: CommentTouch[]): Map<string, number> {
+/** A progress entry on a step, not undone. */
+export type ProgressTouch = { item_id: string | null; created_at: string | null };
+
+/**
+ * When each step itself was last touched: its row changing, a comment of
+ * yours on it, or a progress entry logged on it.
+ */
+export function touchTimes(
+  items: TouchRow[],
+  comments: CommentTouch[],
+  progress: ProgressTouch[] = [],
+): Map<string, number> {
   const touched = new Map<string, number>();
   const bump = (id: unknown, at: unknown) => {
     if (typeof id !== 'string' || typeof at !== 'string') return;
@@ -66,6 +80,7 @@ export function touchTimes(items: TouchRow[], comments: CommentTouch[]): Map<str
     bump(row.id, row.updated_at);
   }
   for (const comment of comments) bump(comment.item_id, comment.created_at);
+  for (const entry of progress) bump(entry.item_id, entry.created_at);
   return touched;
 }
 
@@ -83,12 +98,16 @@ function branchTouched(node: StepNode, touched: Map<string, number>): number | n
   return latest;
 }
 
-/** Every step of yours that has sat for STALE_AFTER_DAYS or more, longest first. */
+/**
+ * Every step of yours that has sat for STALE_AFTER_DAYS or more, longest
+ * first. `underWay` holds the steps with a progress entry, which are left out.
+ */
 export function staleSteps(
   goals: Goal[],
   stepsByGoal: Map<string, StepNode[]>,
   touched: Map<string, number>,
   now: number,
+  underWay: ReadonlySet<string> = new Set(),
 ): StaleStep[] {
   const stale: StaleStep[] = [];
   for (const goal of goals) {
@@ -97,7 +116,7 @@ export function staleSteps(
       for (const node of nodes) {
         if (node.status !== 'open') continue;
         if (node.waitsUntil) continue;
-        if (node.kind === 'mine' && waitsOnNothing(node)) {
+        if (node.kind === 'mine' && waitsOnNothing(node) && !underWay.has(node.id)) {
           const last = branchTouched(node, touched);
           if (last !== null) {
             const idleDays = Math.floor((now - last) / DAY_MS);
