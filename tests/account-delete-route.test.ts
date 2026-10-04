@@ -71,11 +71,12 @@ beforeEach(() => {
       'user-2/conn-9/ddd',
     ],
     'vault-transcripts': ['user-1/t1-record.pdf', 'user-2/t2-theirs.pdf'],
+    'ui-shots': ['user-1/1533/vault-note/r1/phone-light.png', 'user-2/1533/vault-note/r1/phone-dark.png'],
   });
 });
 
 describe('POST /api/account/delete', () => {
-  it('removes the vault attachments, transcripts and goals documents folders', async () => {
+  it('removes the vault attachments, transcripts, goals documents and check shots folders', async () => {
     const res = await POST(request('delete everything'));
 
     expect(res.status).toBe(200);
@@ -83,6 +84,7 @@ describe('POST /api/account/delete', () => {
     expect(state.store!.left('vault-attachments')).toEqual(['user-2/conn-9/ddd']);
     expect(state.store!.left('goals-documents')).toEqual(['user-2/theirs.pdf']);
     expect(state.store!.left('vault-transcripts')).toEqual(['user-2/t2-theirs.pdf']);
+    expect(state.store!.left('ui-shots')).toEqual(['user-2/1533/vault-note/r1/phone-dark.png']);
   });
 
   it('removes nothing without the confirmation', async () => {

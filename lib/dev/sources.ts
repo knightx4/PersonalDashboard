@@ -62,6 +62,7 @@ export const devSources: ModuleSources = {
     'public.spec_changes',
     'public.spec_findings',
     'public.spec_sections',
+    'public.ui_checks',
     'public.ui_findings',
     'public.ui_reviews',
     'public.vision_reviews',

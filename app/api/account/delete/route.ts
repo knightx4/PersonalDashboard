@@ -11,6 +11,7 @@ import { decryptToken } from '@/lib/crypto/tokens';
 import { gmailProvider } from '@/lib/email/providers/gmail';
 import { removeAttachmentFolder, vaultAttachmentFolder } from '@/lib/vault/attachment-storage';
 import { VAULT_TRANSCRIPTS_BUCKET } from '@/lib/vault/transcripts';
+import { UI_SHOTS_BUCKET } from '@/lib/preview/ui-checks';
 
 export const maxDuration = 60;
 
@@ -31,8 +32,9 @@ export const maxDuration = 60;
  *      only they can delete it. The account page says so rather than implying
  *      this reaches further than it does.
  *   2. Delete the storage objects, which do not cascade with database rows --
- *      and only from this app's own buckets (job search, goals documents and
- *      vault attachments), since buckets are shared project-wide.
+ *      and only from this app's own buckets (job search, goals documents,
+ *      vault attachments and design check shots), since buckets are shared
+ *      project-wide.
  *   3. Delete the auth.users row. Every table that names a user cascades from
  *      it, in all six schemas -- public, core, job_search, obsidian, todo and
  *      learn -- which is why one delete is enough, and why
@@ -143,6 +145,14 @@ export async function POST(request: NextRequest) {
   //    of their own with one folder per account.
   try {
     await removeAttachmentFolder(admin, user.id, VAULT_TRANSCRIPTS_BUCKET);
+  } catch {
+    // As above.
+  }
+
+  //    And the shots each design check judged (plan #1533), one folder per
+  //    account, written only by the service role.
+  try {
+    await removeAttachmentFolder(admin, user.id, UI_SHOTS_BUCKET);
   } catch {
     // As above.
   }

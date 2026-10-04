@@ -202,6 +202,15 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.ui_findings = uiFinding.id;
 
+  const [uiCheck] = await admin<{ id: string }[]>`
+    insert into ui_checks (user_id, step, surface, round, verdict, fixes)
+    values (
+      ${userId}, 1533, 'vault-note', 1, 'fix',
+      ${admin.json([{ shot: 'phone-light', where: 'the header', problem: `${tag} crowded`, breaks: 'law 1', change: 'space it' }])}::jsonb
+    )
+    returning id`;
+  ids.ui_checks = uiCheck.id;
+
   const [planItem] = await admin<{ id: string }[]>`
     insert into plan_items (user_id, module, title, detail, status, position)
     values (
