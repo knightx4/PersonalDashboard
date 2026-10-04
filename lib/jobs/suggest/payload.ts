@@ -8,10 +8,13 @@
  * out where that can be done without rewriting (the em dash, above all). A
  * suggestion in an industry the person excluded is dropped, whatever the model
  * made of the rule, and so is a posting at a company they turned down for
- * being that company.
+ * being that company. A LinkedIn connection note over the 300 characters
+ * LinkedIn allows is dropped too.
  */
 export const MAX_OUTREACH = 3;
 export const MAX_OPENINGS = 8;
+/** LinkedIn refuses a connection note longer than this, spaces included. */
+export const CONNECT_NOTE_MAX = 300;
 
 export const CHANNELS = [
   'linkedin_dm',
@@ -237,6 +240,9 @@ export function parsePeoplePayload(
     const channel = CHANNELS.includes(item.channel as Channel)
       ? (item.channel as Channel)
       : 'other';
+    // A note LinkedIn will not take cannot be sent as written, and cutting it
+    // would lose the question at its end, so the suggestion goes.
+    if (channel === 'linkedin_connect' && message.length > CONNECT_NOTE_MAX) continue;
     out.push({
       personName,
       personTitle,
