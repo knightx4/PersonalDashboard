@@ -46,6 +46,7 @@ beside them.
 | `acceptance` | *Done when.* Written before the work, it is what the work is checked against. A step without one is closed on somebody's opinion. |
 | `status` | `proposed`, `not_started`, `in_progress`, `blocked`, `done`, `dropped`. A proposed step is waiting on the person's approve: a feature a session shaped, the steps shaped under it, or a step that acts outside the repository. See *Proposals* below. |
 | `kind` | `build`, `decision` or `setup`. A build step closes on a commit; a decision closes on an answer; a setup step is a job of the person's outside the repo and closes when they say they have done it, with no commit. See *Decisions, setup and fog* below. |
+| `track` | `feature` or `overhaul`, read on the feature at the top. An overhaul replaces how something works and is built in its own order by its own routine ([SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md), Part 4). Default `feature`. |
 | `fog` | The *not yet specified* note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. |
 | `dismissed_at`, `fog_dismissed_at` | Put aside as not right now — the row, and the patch of fog on it, separately. Not a status: nothing has been settled, it is only out of sight. See *Not right now* below. |
 | `resolution` | The answer a decision closed with, in the person's words. Null on a build step and on a decision nobody has settled. |
@@ -100,7 +101,9 @@ was written.
 
 Every routine a dev button starts, and what Anthropic answered. One row per
 press: the step it is about where there is one, which button fired it (`job` —
-`step`, `feature`, `queue`, `reshape`, `shape`, `notes`, `review`, `comment`),
+`step`, `feature`, `queue`, `reshape`, `shape`, `notes`, `review`, `comment`,
+`raise`, `check_back`, `vision`, `vision_reshape`, `ci_fix`, `posts`,
+`spec_change`),
 the routine the request went to, and the response body kept whole in
 `response`. `external_id` is whatever in that body looks like a name for the
 run; it is null until it is known what the endpoint returns, which is why the

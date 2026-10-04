@@ -1,0 +1,112 @@
+{
+  "about": "Sentences for the capture sorter (plan #1580). Each case says what the sort must come to: clear cases name the places and the goal or role, unclear cases must come back under 0.8. `reply` is the sort_capture tool input the model returned, and `recorded` says where it came from: 'written' for a reply written by hand in the model's shape, or the model and date once scripts/record-capture-sort.ts has re-recorded it against Haiku.",
+  "goals": [
+    { "id": "goal-half", "title": "Run a half marathon" },
+    { "id": "goal-debt", "title": "Pay off student debt" },
+    { "id": "goal-people", "title": "Know ten people in the city" }
+  ],
+  "roles": [
+    { "id": "role-stripe", "title": "Product Analyst", "company": "Stripe" },
+    { "id": "role-figma", "title": "Data Scientist", "company": "Figma" },
+    { "id": "role-ramp", "title": "Strategic Finance Analyst", "company": "Ramp" }
+  ],
+  "cases": [
+    {
+      "name": "errand",
+      "sentence": "buy milk and eggs",
+      "expect": { "clear": true, "parts": [{ "place": "todo" }] },
+      "recorded": "written",
+      "reply": { "parts": [{ "place": "todo", "text": "buy milk and eggs" }], "confidence": 0.95 }
+    },
+    {
+      "name": "dated errand",
+      "sentence": "renew passport before March",
+      "expect": { "clear": true, "parts": [{ "place": "todo" }] },
+      "recorded": "written",
+      "reply": { "parts": [{ "place": "todo", "text": "renew passport before March" }], "confidence": 0.93 }
+    },
+    {
+      "name": "run logged",
+      "sentence": "ran 8 miles this morning, longest yet",
+      "expect": { "clear": true, "parts": [{ "place": "goals", "goal": "Run a half marathon" }] },
+      "recorded": "written",
+      "reply": { "parts": [{ "place": "goals", "text": "ran 8 miles this morning, longest yet", "goal_ref": "g1" }], "confidence": 0.94 }
+    },
+    {
+      "name": "payment",
+      "sentence": "paid another $400 off the loan",
+      "expect": { "clear": true, "parts": [{ "place": "goals", "goal": "Pay off student debt" }] },
+      "recorded": "written",
+      "reply": { "parts": [{ "place": "goals", "text": "paid another $400 off the loan", "goal_ref": "g2" }], "confidence": 0.92 }
+    },
+    {
+      "name": "text message",
+      "sentence": "Hey!! so great meeting you at the climbing gym last night, coffee next week? - Priya",
+      "expect": { "clear": true, "parts": [{ "place": "goals", "goal": "Know ten people in the city" }] },
+      "recorded": "written",
+      "reply": { "parts": [{ "place": "goals", "text": "Hey!! so great meeting you at the climbing gym last night, coffee next week? - Priya", "goal_ref": "g3" }], "confidence": 0.84 }
+    },
+    {
+      "name": "recruiter news",
+      "sentence": "the Stripe recruiter said the panel is next Thursday",
+      "expect": { "clear": true, "parts": [{ "place": "jobs", "role": "Product Analyst at Stripe" }] },
+      "recorded": "written",
+      "reply": { "parts": [{ "place": "jobs", "text": "the Stripe recruiter said the panel is next Thursday", "role_ref": "r1" }], "confidence": 0.93 }
+    },
+    {
+      "name": "rejection",
+      "sentence": "Ramp said no, they went with someone more senior",
+      "expect": { "clear": true, "parts": [{ "place": "jobs", "role": "Strategic Finance Analyst at Ramp" }] },
+      "recorded": "written",
+      "reply": { "parts": [{ "place": "jobs", "text": "Ramp said no, they went with someone more senior", "role_ref": "r3" }], "confidence": 0.95 }
+    },
+    {
+      "name": "idea to keep",
+      "sentence": "idea: a weekly review that starts with what went well",
+      "expect": { "clear": true, "parts": [{ "place": "vault" }] },
+      "recorded": "written",
+      "reply": { "parts": [{ "place": "vault", "text": "idea: a weekly review that starts with what went well" }], "confidence": 0.9 }
+    },
+    {
+      "name": "quote to keep",
+      "sentence": "quote from the book: we are what we repeatedly do",
+      "expect": { "clear": true, "parts": [{ "place": "vault" }] },
+      "recorded": "written",
+      "reply": { "parts": [{ "place": "vault", "text": "quote from the book: we are what we repeatedly do" }], "confidence": 0.91 }
+    },
+    {
+      "name": "two things",
+      "sentence": "sent the cover letter to Figma, call Sam on Friday",
+      "expect": { "clear": true, "parts": [{ "place": "jobs", "role": "Data Scientist at Figma" }, { "place": "todo" }] },
+      "recorded": "written",
+      "reply": {
+        "parts": [
+          { "place": "jobs", "text": "sent the cover letter to Figma", "role_ref": "r2" },
+          { "place": "todo", "text": "call Sam on Friday" }
+        ],
+        "confidence": 0.88
+      }
+    },
+    {
+      "name": "person or job",
+      "sentence": "met Alex from Figma at the meetup",
+      "expect": { "clear": false },
+      "recorded": "written",
+      "reply": { "parts": [{ "place": "goals", "text": "met Alex from Figma at the meetup", "goal_ref": "g3" }], "confidence": 0.55 }
+    },
+    {
+      "name": "which interview",
+      "sentence": "think about the interview",
+      "expect": { "clear": false },
+      "recorded": "written",
+      "reply": { "parts": [{ "place": "todo", "text": "think about the interview" }], "confidence": 0.45 }
+    },
+    {
+      "name": "too short",
+      "sentence": "Jordan coffee",
+      "expect": { "clear": false },
+      "recorded": "written",
+      "reply": { "parts": [{ "place": "todo", "text": "Jordan coffee" }], "confidence": 0.3 }
+    }
+  ]
+}
