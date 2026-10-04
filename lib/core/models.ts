@@ -44,6 +44,8 @@ export const MODELS = {
   emailOrderExtract: HAIKU_DATED,
   /** lib/games/shelf-photo.ts */
   gamesShelfPhoto: OPUS,
+  /** lib/capture/sort-model.ts, where a typed capture belongs */
+  captureSort: HAIKU,
   /** lib/goals/capture-model.ts */
   goalCapture: HAIKU,
   /** lib/goals/ask.ts, Dash's reply on a goal (lib/dash/models.ts goalThread) */
