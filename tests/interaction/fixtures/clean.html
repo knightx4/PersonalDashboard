@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Passes all four</title>
+<style>
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #1a1a1a; background: #f4f1ea; }
+  main { padding: 24px 16px 120px; }
+  .panel { background: #ffffff; border-radius: 12px; padding: 16px; }
+  button, a.button { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 16px; font: inherit; }
+</style>
+<style>
+  .bar { position: sticky; bottom: 78px; display: flex; gap: 8px; padding: 8px 0; background: #ffffff; }
+</style>
+</head>
+<body>
+<main>
+  <div class="panel">
+    <h1>A surface that passes</h1>
+    <p>Readable text on a white panel, with <a href="#more">a link inside the sentence</a> that is exempt from the target size.</p>
+    <p style="color:#5c5c5c">Secondary text, still above 4.5 to 1.</p>
+    <label style="display:flex;align-items:center;gap:8px;min-height:44px"><input type="checkbox"> A checkbox whose label is the target</label>
+    <div style="height:900px"></div>
+    <div class="bar"><button>Back</button><button>Next</button></div>
+  </div>
+</main>
+</body>
+</html>

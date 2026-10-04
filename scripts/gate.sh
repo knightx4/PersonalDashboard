@@ -16,8 +16,12 @@
 # The database comes up first, then three lanes run side by side, since run one
 # after another the checks took seven minutes a step:
 #
-#   types   typecheck, then build. The build rewrites .next/types, which tsc
-#           reads, so the two cannot overlap.
+#   types   typecheck, then build, then the phone checks. The build rewrites
+#           .next/types, which tsc reads, so the two cannot overlap. The
+#           phone checks (docs/UI-QUALITY-SPEC.md, Part 5) serve that build
+#           with the gallery on and measure the surfaces the branch touched
+#           at 390px, so they wait for it; with none touched they take no
+#           time. The spec puts them in the lint lane, which has no build.
 #   lint    lint, contrast, UI laws, spec counts
 #   test    the whole vitest suite, tests/ included, and with it the
 #           whole-flow tests in tests/flows/ (tests/flows-in-gate.test.ts)
@@ -78,7 +82,7 @@ step "Apply migrations" scripts/db-reset.sh
 rm -rf .next/types
 
 start=$SECONDS
-lane types "Typecheck" npm run -s typecheck -- "Build" npm run -s build &
+lane types "Typecheck" npm run -s typecheck -- "Build" npm run -s build -- "Phone checks" npm run -s check:phone &
 types=$!
 lane lint "Lint" npm run -s lint -- "Contrast" npm run -s check:contrast -- "UI laws" npm run -s check:ui -- "Spec counts" npm run -s check:specs &
 lint=$!
