@@ -115,8 +115,8 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
 
    Then check the done-when line by line. If a line is not met, it is not
    done. A step that changes a screen is not done until the critic has passed
-   each of its surfaces, or the third round has failed (see **Building a
-   screen**).
+   each of its surfaces. A third failed round blocks it instead (see
+   **Building a screen**).
 
    **Do not run the full suite and do not run `next build`.** The session that
    sent you runs both when it merges your step to main, which is as soon as you
@@ -257,12 +257,27 @@ a surface with no routes. A step that changes no surface skips this section.
 as it came back. You do not edit it, summarise it into a pass, or judge the
 pictures yourself in its place.
 
-**Three rounds at most.** If round 3 comes back `fix`, stop the loop. What
-happens after a third failed round is decision #1535 on the plan, and it is
-unanswered: do not run a fourth round and do not choose what follows. Report
-the step with the last verdict's fixes and where the shots are, and leave the
-next move to the session that sent you or, with nobody, to the person. Once
-#1535 is answered, its answer replaces this paragraph.
+**Three rounds, then the person.** If round 3 comes back `fix`, stop the
+loop: no fourth round, and no guess at what the critic would accept. A screen
+that fails three rounds is usually missing a decision, such as which pattern
+it should use, and that is the person's (decision #1535). So:
+
+1. Record round 3 like any other (below).
+2. Commit what you have and push your branch, so the work outlives the
+   session.
+3. Run `npm run ui-stop -- <step>`. It reads the recorded verdicts and prints
+   the ask: each surface that did not pass, how many fixes are open, where the
+   shots are and the branch, ending "accept it as it is, or say what to
+   change". It also prints the last fixes in full, and the block to write:
+   `plan.ts block <n> --ask "…"` with no `--on-steps`, or the statement for
+   the connector. Write that block. It waits on the person, not on other
+   steps.
+4. Report the block, with the last verdict's fixes and where the shots are.
+
+The person either accepts the screen as it is or says what to change (plan
+#1610). After they say what to change, the step is ready again and its
+builder gets three fresh rounds, numbered on from 4, against their words;
+the stop then falls on round 6, and so on.
 
 **Recording a round.** Every round goes on record, passed or failed, before
 you make its fixes:
