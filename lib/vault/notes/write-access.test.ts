@@ -11,6 +11,8 @@ function source(canWrite: () => Promise<boolean>): VaultSource {
     readBlob: vi.fn(),
     readBlobBytes: vi.fn(),
     writeNote: vi.fn(),
+    createNote: vi.fn(),
+    deleteNote: vi.fn(),
     canWrite,
   };
 }

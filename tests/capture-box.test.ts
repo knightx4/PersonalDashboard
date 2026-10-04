@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fileCaptureParts, type CaptureWriters } from '@/lib/capture/file';
 import type { CapturePart } from '@/lib/capture/sort';
-import { recordDashAction, undoDashAction } from '@/lib/core/dash-actions';
+import { markDashActionUndone, recordDashAction, undoDashAction, undoneByVault } from '@/lib/core/dash-actions';
 import { writeRoleNote } from '@/lib/dash/writes';
 import type { FiledEntry } from '@/lib/goals/capture';
 import { undoDashTodayWith } from '@/lib/shell/dash-today';
+import { createCapturedNote, removeCapturedNote, type RemoveNotePorts } from '@/lib/vault/notes/create';
+import type { VaultSource } from '@/lib/vault/providers/types';
 import { fakeDashDeps, fakeId, type FakeTables } from './stubs/fake-schema-db';
 
 /**
@@ -31,6 +33,38 @@ function setup() {
     'todo.tasks': [],
     'job_search.roles': [{ id: ROLE.id, user_id: ME, title: ROLE.title }],
     'core.dash_actions': [],
+    'obsidian.notes': [],
+  };
+  /** The notes repository: path to blob SHA, and each commit made. */
+  const repo = new Map<string, string>();
+  const commits: string[] = [];
+  const source = {
+    async createNote(path: string, _text: string, message: string) {
+      if (repo.has(path)) throw new Error('exists');
+      const blobSha = `blob-${repo.size + 1}`;
+      repo.set(path, blobSha);
+      commits.push(message);
+      return { blobSha, commitSha: `commit-${commits.length}` };
+    },
+    async deleteNote(path: string, _sha: string, message: string) {
+      repo.delete(path);
+      commits.push(message);
+      return `commit-${commits.length}`;
+    },
+  } as unknown as VaultSource;
+  const notes = tables['obsidian.notes'];
+  const removePorts: RemoveNotePorts = {
+    openSource: async () => source,
+    loadNote: async (id) => {
+      const row = notes.find((note) => note.id === id);
+      return row
+        ? { id, path: String(row.path), title: String(row.title), blobSha: String(row.blob_sha), deleted: row.deleted_at !== null }
+        : null;
+    },
+    markDeleted: async (id) => {
+      const row = notes.find((note) => note.id === id);
+      if (row) row.deleted_at = '2026-10-04T10:00:00Z';
+    },
   };
   const dash = fakeDashDeps(tables, ME);
   const goals = vi.fn(async () => ({ captureId: CAPTURE, filed: [GOAL_LINE] }));
@@ -45,9 +79,24 @@ function setup() {
       const written = await writeRoleNote({ userId: ME, enabledModules: ['jobs'], db: dash.db }, roleId, text);
       return written.ok ? { ok: true, subjectRef: written.subjectRef } : { ok: false, error: written.error };
     },
+    vault: async (text) => {
+      const result = await createCapturedNote(
+        {
+          openSource: async () => source,
+          storeNote: async (row) => {
+            const id = fakeId();
+            notes.push({ id, user_id: ME, path: row.path, title: row.title, body: row.body, blob_sha: row.blobSha, deleted_at: null });
+            return id;
+          },
+          afterSave: () => {},
+        },
+        text,
+      );
+      return result.ok ? result : { ok: false, error: result.error };
+    },
     record: (entry) => recordDashAction(dash, entry),
   };
-  return { tables, dash, writers, goals };
+  return { tables, dash, writers, goals, repo, commits, removePorts };
 }
 
 const parts: CapturePart[] = [
@@ -110,6 +159,43 @@ describe('filing from the one capture box', () => {
     expect(out.ok).toBe(true);
     expect(undoCapture).not.toHaveBeenCalled();
     expect(world.tables['todo.tasks']).toEqual([]);
+  });
+
+  it('writes a vault note into the Inbox, in the repository and in the app, and Undo takes it out of both', async () => {
+    const world = setup();
+    const { filed, errors } = await fileCaptureParts(
+      [{ place: 'vault', text: 'Idea: a book about tide pools\nwith photos', goal: null, role: null }],
+      world.writers,
+    );
+
+    expect(errors).toEqual([]);
+    expect(filed[0]).toMatchObject({ place: 'vault', where: 'Vault · Inbox', href: '/vault' });
+    expect([...world.repo.keys()]).toEqual(['Inbox/Idea a book about tide pools.md']);
+    expect(world.tables['obsidian.notes']).toMatchObject([
+      { path: 'Inbox/Idea a book about tide pools.md', title: 'Idea a book about tide pools', blob_sha: 'blob-1', deleted_at: null },
+    ]);
+    const [action] = world.tables['core.dash_actions'];
+    expect(action).toMatchObject({ surface: 'capture', kind: 'add_vault_note', undo: { vault_blob_sha: 'blob-1' } });
+    expect(filed[0].actionId).toBe(action.id);
+
+    // The generic rule would only delete the row, so it leaves the note to capture.
+    const generic = await undoDashAction(world.dash, action.id as string);
+    expect(generic.ok).toBe(false);
+    expect(generic.action && undoneByVault(generic.action)).toBe(true);
+    expect(world.repo.size).toBe(1);
+
+    // Home hands it to capture's own undo, as app/home/actions.ts does.
+    const out = await undoDashTodayWith(world.dash, action.id as string, vi.fn(), undefined, async (found) => {
+      const removed = await removeCapturedNote(world.removePorts, found.subjectRef!.split(':')[1], String(found.undo!.vault_blob_sha));
+      if (!removed.ok) return removed;
+      await markDashActionUndone(world.dash, found.id);
+      return { ok: true, paths: ['/vault'] };
+    });
+    expect(out.ok).toBe(true);
+    expect(world.repo.size).toBe(0);
+    expect(world.commits).toEqual(['Add Idea a book about tide pools from Dash', 'Remove Idea a book about tide pools from Dash']);
+    expect(world.tables['obsidian.notes'][0].deleted_at).not.toBeNull();
+    expect(world.tables['core.dash_actions'][0].status).toBe('undone');
   });
 
   it('says why a job note with no role was not filed, and files the rest', async () => {

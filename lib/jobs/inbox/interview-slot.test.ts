@@ -7,7 +7,7 @@
  * is what keeps the second row out.
  */
 import { describe, expect, it } from 'vitest';
-import { interviewInSlot, SAME_SLOT_MS, type BookedInterview } from '@/lib/jobs/inbox/ingest-messages';
+import { interviewInSlot, SAME_SLOT_MS, undatedInterview, type BookedInterview } from '@/lib/jobs/inbox/ingest-messages';
 
 function row(over: Partial<BookedInterview> = {}): BookedInterview {
   return { id: 'i-1', scheduled_at: '2026-10-05 16:30:00+00', status: 'scheduled', ics_uid: null, ...over };
@@ -42,5 +42,20 @@ describe('interviewInSlot', () => {
 
   it('matches nothing for a time it cannot read', () => {
     expect(interviewInSlot([row()], 'next Tuesday')).toBeNull();
+  });
+});
+
+describe('undatedInterview', () => {
+  it('finds the round an email booked with the date to be set', () => {
+    expect(undatedInterview([row(), row({ id: 'i-2', scheduled_at: null })])?.id).toBe('i-2');
+  });
+
+  it('passes over a cancelled one and one an invite holds', () => {
+    expect(
+      undatedInterview([
+        row({ id: 'i-2', scheduled_at: null, status: 'cancelled' }),
+        row({ id: 'i-3', scheduled_at: null, ics_uid: 'uid-1' }),
+      ]),
+    ).toBeNull();
   });
 });

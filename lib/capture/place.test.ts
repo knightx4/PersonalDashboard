@@ -30,9 +30,11 @@ const unsure: CaptureSort = {
 };
 
 describe('the places the box offers', () => {
-  it('leaves the vault out until notes can be written there', () => {
+  it('offers the vault only when its token can write', () => {
     expect(offeredCapturePlaces(undefined)).toEqual(['todo', 'goals', 'jobs']);
     expect(offeredCapturePlaces(['todo', 'vault'])).toEqual(['todo']);
+    expect(offeredCapturePlaces(['todo', 'vault'], { vaultWritable: true })).toEqual(['todo', 'vault']);
+    expect(offeredCapturePlaces(['todo'], { vaultWritable: true })).toEqual(['todo']);
   });
 
   it('offers only the workspaces an account has', () => {

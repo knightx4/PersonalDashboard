@@ -10,6 +10,8 @@ import { eventKindFor, type MessageClassification } from '@/lib/jobs/email/class
 import { excludableDomains } from '@/lib/jobs/review/exclusions';
 import { handLinkedEventNeedsReview } from '@/lib/jobs/review/flagging';
 import { type ApplicationStatus } from '@/lib/jobs/pipeline';
+import { channelForMessage } from '@/lib/jobs/applications/channel';
+import { ensureInterviewRound } from '@/lib/jobs/interview/ensure-round';
 
 /**
  * Working the queue.
@@ -88,6 +90,17 @@ export async function linkMessage(
       summary: (message.subject as string) ?? 'Linked by hand from the review queue',
       needs_review: conflict,
     });
+
+    // An interview the email announced gets its round, with the date to be
+    // set when the email gave none, so the pursuit reads as having reached
+    // one. ensureInterviewRound books nothing where an interview is on file.
+    if (kind === 'interview_scheduled') {
+      await ensureInterviewRound(supabase, {
+        userId: user.id,
+        applicationId: parsed.data.applicationId,
+        kind: null,
+      });
+    }
   }
 
   revalidatePath('/jobs/review');
@@ -129,12 +142,17 @@ export async function createRoleFromMessage(input: {
 
   const { data: message } = await supabase
     .from('inbox_messages')
-    .select('id, user_id')
+    .select('id, user_id, classification')
     .eq('id', parsed.data.messageId)
     .eq('user_id', user.id)
     .maybeSingle();
 
   if (!message) return { error: 'That message is no longer in the queue.', roleId: null };
+
+  // Recruiter inbound only when the recruiter wrote first; mail about a role
+  // with nothing on file is usually an application whose confirmation was
+  // never found. The role page changes it.
+  const channel = channelForMessage(message.classification as string | null);
 
   const company = await ensureCompany(supabase, user.id, parsed.data.companyName);
   if (company.error) return { error: company.error, roleId: null };
@@ -145,7 +163,7 @@ export async function createRoleFromMessage(input: {
       user_id: user.id,
       company_id: company.id,
       title: parsed.data.title,
-      source: 'recruiter_inbound',
+      source: channel,
     })
     .select('id')
     .single();
@@ -159,7 +177,7 @@ export async function createRoleFromMessage(input: {
     .insert({
       user_id: user.id,
       role_id: role.id,
-      source: 'recruiter_inbound',
+      source: channel,
       // A person read the message and said this is a real pursuit, which is
       // exactly what the inferred flag exists to ask about.
       created_by: 'manual',
