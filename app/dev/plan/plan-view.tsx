@@ -14,6 +14,7 @@ import { Banner } from '@/components/ui/banner';
 import {
   FieldError,
   Input,
+  PressLabel,
 } from '@/components/ui/field';
 import { VIEW_LABEL } from '@/lib/core/move';
 import {
@@ -140,13 +141,13 @@ function SummaryStrip({
 
   return (
     <div className={cn(cardVariants({ padding: 'dense' }), 'flex flex-wrap items-center gap-x-4 gap-y-2')}>
-      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-ui text-ink-muted">
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-3 text-ui text-ink-muted sm:gap-y-1">
         {facts.map((fact) =>
           fact.view ? (
             <Link
               key={fact.noun}
               href={viewHref(fact.view, basePath)}
-              className="hover:text-accent hover:underline"
+              className="press-area hover:text-accent hover:underline"
             >
               <span className="tabular font-semibold text-ink">{fact.value}</span> {fact.noun}
             </Link>
@@ -233,7 +234,9 @@ function SearchThePlan({
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <div className="relative min-w-0 flex-1 sm:max-w-xs">
+        <PressLabel htmlFor="plan-search" />
         <Input
+          id="plan-search"
           type="search"
           value={query}
           onChange={(event) => onQuery(event.target.value)}
@@ -242,7 +245,7 @@ function SearchThePlan({
           }}
           placeholder="Search the plan — a number, a title, a phrase"
           aria-label="Search the plan"
-          className="w-full"
+          className="relative w-full"
         />
       </div>
 

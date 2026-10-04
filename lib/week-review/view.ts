@@ -5,6 +5,7 @@ import { addDays } from '@/lib/todo/tasks/model';
 import { wallClockToInstant } from '@/lib/todo/time';
 import { localDay, WEEK_REVIEW_ZONE, type WeekFact, type WeekFacts } from './facts';
 import { REVIEW_HOUR, type ReviewObservation } from './review';
+import { formatClock } from '@/lib/clock';
 
 /**
  * The Week page's rules (plan #1233): a stored core.week_reviews row turned
@@ -93,7 +94,7 @@ export function weekShortLabel(week: string): string {
 export function whenLabel(iso: string, timezone: string): string {
   const at = new Date(iso);
   const day = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: timezone }).format(at);
-  const time = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone }).format(at);
+  const time = formatClock(at, { timeZone: timezone });
   return `${day}, ${time}`;
 }
 

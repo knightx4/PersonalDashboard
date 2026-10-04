@@ -56,6 +56,11 @@ export default async function PreviewPage({
 
   if (s && !surface) notFound();
 
+  if (surface?.width === 'screen') {
+    // A page outside the shell: drawn on the bare body, as the app serves it.
+    return surface.render();
+  }
+
   if (surface) {
     return (
       <div data-workspace={surface.module} className="bg-page min-h-screen">
