@@ -3,8 +3,8 @@
 import { Search, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
-import { Input } from '@/components/ui/field';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Input, PressLabel } from '@/components/ui/field';
 import { otherParams, searchHref, SEARCH_PARAM } from '@/lib/list-search';
 
 /**
@@ -44,6 +44,7 @@ export function SearchField({
   const fromUrl = params.get(paramName) ?? '';
 
   const [value, setValue] = useState(fromUrl);
+  const fieldId = useId();
   // A search cleared from elsewhere -- a rail link that drops the query, the
   // back button -- has to be reflected here, but not while it is being typed.
   const typing = useRef(false);
@@ -73,13 +74,15 @@ export function SearchField({
     >
       <div className="relative">
         <Search
-          className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
+          className="pointer-events-none absolute left-2.5 top-1/2 z-1 size-4 -translate-y-1/2 text-ink-muted"
           strokeWidth={1.75}
           aria-hidden
         />
         {/* The shared control, inset for the two glyphs. It draws no box of its
          * own, so it follows the density dial with every other field. */}
+        <PressLabel htmlFor={fieldId} />
         <Input
+          id={fieldId}
           type="search"
           name={paramName}
           value={value}
@@ -89,7 +92,7 @@ export function SearchField({
           }}
           placeholder={placeholder}
           aria-label={placeholder}
-          className="pl-8 pr-8"
+          className="relative pl-8 pr-8"
         />
         {value && (
           <Link

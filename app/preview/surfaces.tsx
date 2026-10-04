@@ -98,7 +98,7 @@ import { QuickReadView, type QuickReadViewProps } from '@/app/news/quick/quick-v
 import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
-import { PlanOpenedSurface, PlanTreeSurface } from './plan-surfaces';
+import { PlanOpenedSurface, PlanTreeSurface, ProjectPlanSurface } from './plan-surfaces';
 import { GoalOpenedSurface, GoalTreeSurface } from './goal-surfaces';
 import {
   AskChangesSurface,
@@ -141,6 +141,18 @@ import {
   SignupSurface,
   TermsSurface,
 } from './public-surfaces';
+import { WeekReviewNoneSurface, WeekReviewSurface } from './week-surfaces';
+import {
+  AccountSurface,
+  DevBugsSurface,
+  DevChangelogSurface,
+  DevIdeasSurface,
+  DevRaisedSurface,
+  DevSpecSurface,
+  DevSpecsSurface,
+  DevUiReviewSurface,
+  DevUsageSurface,
+} from './dev-page-surfaces';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -3787,6 +3799,93 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <OpenMissingSurface />,
+  },
+
+  /* The account, the week review and the Dev tabs (plan #1600). Fixtures
+   * in dev-page-surfaces.tsx, week-surfaces.tsx and plan-surfaces.tsx. */
+  {
+    id: 'account',
+    label: "Account · Settings across every workspace",
+    module: 'dev',
+    width: 'page',
+    render: () => <AccountSurface />,
+  },
+  {
+    id: 'home-week',
+    label: "Home · The week in review",
+    module: 'goals',
+    width: 'page',
+    render: () => <WeekReviewSurface />,
+  },
+  {
+    id: 'home-week-none',
+    label: "Home · The week in review, before the first",
+    module: 'goals',
+    width: 'page',
+    render: () => <WeekReviewNoneSurface />,
+  },
+  {
+    id: 'dev-bugs',
+    label: "Dev · Bugs and requests",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevBugsSurface />,
+  },
+  {
+    id: 'dev-changelog',
+    label: "Dev · Changelog",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevChangelogSurface />,
+  },
+  {
+    id: 'dev-ideas',
+    label: "Dev · Ideas",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevIdeasSurface />,
+  },
+  {
+    id: 'dev-project-plan',
+    label: "Dev · A project's plan",
+    module: 'dev',
+    width: 'page',
+    render: () => <ProjectPlanSurface />,
+  },
+  {
+    id: 'dev-raised',
+    label: "Dev · Home, what is waiting on you",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevRaisedSurface />,
+  },
+  {
+    id: 'dev-specs',
+    label: "Dev · Specs",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevSpecsSurface />,
+  },
+  {
+    id: 'dev-spec',
+    label: "Dev · One spec",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevSpecSurface />,
+  },
+  {
+    id: 'dev-ui-review',
+    label: "Dev · UI review",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevUiReviewSurface />,
+  },
+  {
+    id: 'dev-usage',
+    label: "Dev · Usage",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevUsageSurface />,
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on

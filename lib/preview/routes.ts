@@ -153,6 +153,18 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'onboarding-gmail': ['/onboarding'],
   'share-form': ['/s/[token]'],
   'open-missing': ['/open/[ref]'],
+  'account': ['/account'],
+  'home-week': ['/home/week', '/home/week/[week]'],
+  'home-week-none': ['/home/week', '/home/week/[week]'],
+  'dev-bugs': ['/dev/bugs'],
+  'dev-changelog': ['/dev/changelog'],
+  'dev-ideas': ['/dev/ideas'],
+  'dev-project-plan': ['/dev/projects/[id]'],
+  'dev-raised': ['/dev/raised'],
+  'dev-specs': ['/dev/specs'],
+  'dev-spec': ['/dev/specs/[slug]'],
+  'dev-ui-review': ['/dev/ui/review'],
+  'dev-usage': ['/dev/usage'],
 };
 
 /** A route split into its segments; `/` is no segments. */

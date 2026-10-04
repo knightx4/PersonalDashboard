@@ -120,7 +120,7 @@ function Line({ conversation, titles }: { conversation: Conversation; titles?: P
           {elsewhere && (
             <Link
               href={conversation.href}
-              className="press inline-flex rounded-control text-small text-ink-ghost hover:text-ink"
+              className="press press-area inline-flex rounded-control text-small text-ink-ghost hover:text-ink"
             >
               {elsewhere}
             </Link>
