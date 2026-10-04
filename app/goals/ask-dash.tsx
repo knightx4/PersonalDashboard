@@ -13,10 +13,13 @@ import { askDashAction, type AskDashState } from './home-actions';
  * Ask Dash, under the briefing on the Goals home: words, and where they go.
  * On a goal they are an @dash comment on it, answered in the goal's thread
  * or by a run; as a new errand they are saved with a due date and handed to
- * Dash in the same press (saveErrandAndStart). It replaces Add an errand.
+ * Dash in the same press (saveErrandAndStart); as a new goal they are its
+ * title, in the area chosen, handed to Dash the same way (saveGoalAndStart).
+ * It replaces Add an errand.
  */
 
 const ERRAND = 'errand';
+const GOAL = 'goal';
 
 export function AskDash({
   goals,
@@ -33,7 +36,10 @@ export function AskDash({
 }) {
   const toast = useToast();
   const errandsOn = areas.length > 0 && defaultAreaId !== null;
-  const [target, setTarget] = useState<string>(goals[0]?.id ?? (errandsOn ? ERRAND : ''));
+  const goalsOn = areas.length > 0;
+  const [target, setTarget] = useState<string>(
+    goals[0]?.id ?? (goalsOn ? GOAL : errandsOn ? ERRAND : ''),
+  );
   const [body, setBody] = useState('');
   const [state, ask, asking] = useActionState(async (prev: AskDashState, form: FormData) => {
     const next = await askDashAction(prev, form);
@@ -46,6 +52,9 @@ export function AskDash({
 
   if (!target) return null;
   const errand = target === ERRAND;
+  const goal = target === GOAL;
+  // A new errand or goal is saved and handed to Dash; an ask on a goal is a reply.
+  const handing = errand || goal;
 
   return (
     <form action={ask} className={cn('space-y-2', className)}>
@@ -63,7 +72,9 @@ export function AskDash({
           placeholder={
             errand
               ? 'A one-off job, such as find a birthday present for Sam'
-              : 'Ask Dash to take something on: research, a draft, a plan for the week'
+              : goal
+                ? 'An outcome that ends, such as pay off the credit cards'
+                : 'Ask Dash to take something on: research, a draft, a plan for the week'
           }
           onKeyDown={(event) => {
             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
@@ -84,28 +95,37 @@ export function AskDash({
                 {goal.title}
               </option>
             ))}
+            {goalsOn && <option value={GOAL}>A new goal</option>}
             {errandsOn && <option value={ERRAND}>A new errand</option>}
           </ChipSelect>
           {errand && (
-            <>
-              <ChipInput type="date" name="due" icon="Due" required aria-label="The date it is due by" />
-              <ChipSelect
-                name="areaId"
-                defaultValue={defaultAreaId ?? undefined}
-                icon={<Folder className="size-3.5" strokeWidth={1.75} />}
-                aria-label="Which area it is for"
-              >
-                {areas.map((area) => (
-                  <option key={area.id} value={area.id}>
-                    {area.name}
-                  </option>
-                ))}
-              </ChipSelect>
-            </>
+            <ChipInput
+              type="date"
+              name="due"
+              icon="Due"
+              required
+              aria-label="The date it is due by"
+            />
+          )}
+          {handing && (
+            <ChipSelect
+              // A new goal starts on the first area; an errand on errandAreaDefault's.
+              key={target}
+              name="areaId"
+              defaultValue={(errand ? defaultAreaId : areas[0]?.id) ?? undefined}
+              icon={<Folder className="size-3.5" strokeWidth={1.75} />}
+              aria-label="Which area it is for"
+            >
+              {areas.map((area) => (
+                <option key={area.id} value={area.id}>
+                  {area.name}
+                </option>
+              ))}
+            </ChipSelect>
           )}
           <span className="ml-auto flex items-center gap-2">
-            {/* An ask on a goal is a reply from Dash; a new errand starts a run, which is not metered here. */}
-            {!errand && (
+            {/* An ask on a goal is a reply from Dash; a new errand or goal starts a run, which is not metered here. */}
+            {!handing && (
               <PaidHint
                 action="app/goals/home-actions.ts#askDashAction"
                 what="Cost of Dash's reply"
@@ -114,7 +134,7 @@ export function AskDash({
               />
             )}
             <Button type="submit" size="sm" disabled={asking || !body.trim()}>
-              {asking ? 'Asking Dash…' : errand ? 'Hand it to Dash' : 'Ask Dash'}
+              {asking ? 'Asking Dash…' : handing ? 'Hand it to Dash' : 'Ask Dash'}
             </Button>
           </span>
         </div>

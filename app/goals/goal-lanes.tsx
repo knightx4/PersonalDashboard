@@ -7,7 +7,9 @@ import { Card, cardVariants } from '@/components/ui/card';
 import { DashMark } from '@/components/ui/dash-mark';
 import { Bands } from '@/components/ui/meter';
 import { MoveLabel } from '@/components/ui/move-label';
+import { ChipSelect } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
+import { ListFilter } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
 import type { DashOffer, GoalHolders } from '@/lib/goals/hand-off';
@@ -28,8 +30,8 @@ import { TodayRow } from './today-list';
  * The goals are small tiles, every one on the page at once: errands first,
  * then page order, so a goal is in the same place from day to day. A tile
  * says its status, a bar of its steps by who holds them, and how much is on
- * you. Pressing one filters the lanes to that goal; pressing it again, or
- * Show every goal, clears the filter.
+ * you. Pressing one opens the goal. A chip under the tiles narrows the lanes
+ * to one goal, and the tile of that goal is ringed while it does.
  *
  * The lanes sort what is next by who holds it:
  *
@@ -128,7 +130,6 @@ export function GoalLanes({
   );
   const later = laterOn.filter((item) => inFilter(item.goalId) && !back.has(item.id));
   const canPrepare = new Set(preparable);
-  const chosen = goals.find((line) => line.goal.id === filter) ?? null;
 
   return (
     <div className="space-y-6">
@@ -156,27 +157,27 @@ export function GoalLanes({
               line={line}
               holders={holders[line.goal.id]}
               today={todayOn}
-              pressed={filter === line.goal.id}
-              onPress={() => setFilter(filter === line.goal.id ? null : line.goal.id)}
+              chosen={filter === line.goal.id}
             />
           ))}
         </ul>
-        {chosen && (
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-small text-ink-muted" role="status">
-            <span>
-              Showing <span className="font-semibold text-ink">{chosen.goal.title}</span>
-            </span>
-            <Link href={`/goals/${chosen.goal.id}`} className="text-accent underline-offset-2 hover:underline">
-              Open the goal
-            </Link>
-            <button
-              type="button"
-              className="text-accent underline-offset-2 hover:underline"
-              onClick={() => setFilter(null)}
+        {goals.length > 1 && (
+          <div className="flex items-center gap-1 px-1 text-small text-ink-muted">
+            <ChipSelect
+              value={filter ?? ''}
+              onChange={(event) => setFilter(event.target.value || null)}
+              icon={<ListFilter className="size-3.5" strokeWidth={1.75} />}
+              placeholderValue=""
+              aria-label="Which goal the lanes show"
             >
-              Show every goal
-            </button>
-          </p>
+              <option value="">Lanes for every goal</option>
+              {goals.map((line) => (
+                <option key={line.goal.id} value={line.goal.id}>
+                  Lanes for {line.goal.title}
+                </option>
+              ))}
+            </ChipSelect>
+          </div>
         )}
       </section>
 
@@ -246,14 +247,13 @@ function GoalTile({
   line,
   holders,
   today,
-  pressed,
-  onPress,
+  chosen,
 }: {
   line: HomeGoal;
   holders: GoalHolders | undefined;
   today?: string;
-  pressed: boolean;
-  onPress: () => void;
+  /** The goal the lanes are narrowed to, if this is it. */
+  chosen: boolean;
 }) {
   const { goal, progress, review } = line;
   const late = Boolean(goal.errand && goal.dueOn && today && goal.dueOn < today);
@@ -261,19 +261,19 @@ function GoalTile({
   const move = nextMove(line);
   return (
     <li className="min-w-0">
-      <button
-        type="button"
-        aria-pressed={pressed}
+      <Link
+        href={`/goals/${goal.id}`}
         title={move ? `Next: ${move.text}${move.on ? `, ${formatDay(move.on)}` : ''}` : undefined}
-        onClick={onPress}
         className={cn(
           cardVariants({ padding: 'dense', interactive: true }),
           'flex h-full w-full flex-col gap-1.5 text-left',
-          pressed && 'ring-2 ring-accent',
+          chosen && 'ring-2 ring-accent',
         )}
       >
         <span className="flex items-baseline justify-between gap-2 text-small">
-          <span className={cn('min-w-0 truncate text-ink-muted', late && 'font-semibold text-danger')}>
+          <span
+            className={cn('min-w-0 truncate text-ink-muted', late && 'font-semibold text-danger')}
+          >
             {goal.errand && goal.dueOn
               ? `Due ${formatDay(goal.dueOn)}${today ? `, ${dueIn(goal.dueOn, today)}` : ''}`
               : line.areaName}
@@ -290,7 +290,9 @@ function GoalTile({
             >
               {VERDICT_LABELS[review.verdict]}
               {/* A status from a missed morning run is greyed, and says its day to a screen reader. */}
-              {!line.current && <span className="sr-only"> as of {formatDay(review.createdAt.slice(0, 10))}</span>}
+              {!line.current && (
+                <span className="sr-only"> as of {formatDay(review.createdAt.slice(0, 10))}</span>
+              )}
             </span>
           )}
         </span>
@@ -314,7 +316,13 @@ function GoalTile({
             <span className="flex-1 text-small text-ink-ghost">No steps yet</span>
           )}
           {holders?.working ? (
-            <DashMark state="working" activity="thinking" size="2xs" tone="brand" label="Dash is on it now" />
+            <DashMark
+              state="working"
+              activity="thinking"
+              size="2xs"
+              tone="brand"
+              label="Dash is on it now"
+            />
           ) : null}
           {progress.live > 0 && (
             <span className="tabular shrink-0 text-small text-ink-muted">
@@ -322,10 +330,12 @@ function GoalTile({
             </span>
           )}
           {(holders?.onYou ?? 0) > 0 && (
-            <span className="tabular shrink-0 text-small text-caution">{holders!.onYou} on you</span>
+            <span className="tabular shrink-0 text-small text-caution">
+              {holders!.onYou} on you
+            </span>
           )}
         </span>
-      </button>
+      </Link>
     </li>
   );
 }

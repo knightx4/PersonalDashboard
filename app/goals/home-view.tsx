@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Flag } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
 import { Card } from '@/components/ui/card';
@@ -26,13 +27,13 @@ import { DashCredit } from '@/components/ui/dash-mark';
  *
  * 1. The briefing: Dash's morning note on all the goals (goals.briefs), with
  *    one sentence on where the goals stand under it, and Ask Dash, which
- *    goes to a goal or starts a new errand (ask-dash.tsx). Before the first
- *    note is written, the sentence stands alone.
- * 2. Your goals and the lanes (goal-lanes.tsx): every goal as a small tile,
- *    and what is next sorted into On you, Dash has it, and Later. A tile
- *    filters the lanes to its goal.
+ *    goes to a goal or starts a new goal or errand (ask-dash.tsx). Before
+ *    the first note is written, the sentence stands alone.
+ * 2. Your goals and the lanes (goal-lanes.tsx): every goal as a small tile
+ *    that opens it, and what is next sorted into On you, Dash has it, and
+ *    Later.
  * 3. What Dash did since your last visit, with Read and Undo
- *    (done-since-list.tsx).
+ *    (done-since-list.tsx), and the link to every run.
  * 4. This week: four numbers that say whether Goals is working (plan #1079),
  *    counted by weekHealth in lib/goals/home.ts.
  *
@@ -40,7 +41,7 @@ import { DashCredit } from '@/components/ui/dash-mark';
  * steps of yours, questions, approvals, flags, rhythms and suggestions are
  * all in On you; results to read, the context and drafts Dash found, and the
  * Claude steps waiting on an approval are on each goal's page; every run is
- * on the Runs tab.
+ * on /goals/runs, linked from What Dash did.
  */
 
 export type HomeViewProps = {
@@ -154,17 +155,21 @@ export function HomeView({
 function DoneSection({ done, timeZone }: { done: DoneSince | null; timeZone: string }) {
   return (
     <section aria-labelledby="done-heading" className="space-y-2">
-      <h2 id="done-heading" className="px-1 text-ui font-semibold text-ink">
-        <DashCredit className="text-ink-muted" />
-        {done ? `What Dash did since ${formatInstant(done.since, timeZone)}` : 'What Dash did'}
-      </h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-1">
+        <h2 id="done-heading" className="text-ui font-semibold text-ink">
+          <DashCredit className="text-ink-muted" />
+          {done ? `What Dash did since ${formatInstant(done.since, timeZone)}` : 'What Dash did'}
+        </h2>
+        {/* Runs left the tab bar: an audit log, read from here when wanted. */}
+        <Link href="/goals/runs" className="text-small text-accent underline-offset-2 hover:underline">
+          Every run
+        </Link>
+      </div>
       {done && done.items.length > 0 ? (
         <DoneSinceList done={done} />
       ) : (
         <p className="px-1 text-small text-ink-muted">
-          {done
-            ? 'Nothing new since your last visit.'
-            : 'This could not be read just now. Every run is on the Runs tab.'}
+          {done ? 'Nothing new since your last visit.' : 'This could not be read just now.'}
         </p>
       )}
     </section>

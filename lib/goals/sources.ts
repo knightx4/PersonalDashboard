@@ -20,7 +20,8 @@ const PAGES: Record<string, Page> = {
     href: (row) =>
       row.level === 'goal' || !row.parent_id ? `/goals/${row.id}` : `/goals/${row.parent_id}#step-${row.id}`,
   },
-  'goals.areas': { title: 'name', href: (row) => `/goals/area/${row.id}` },
+  // An area is a section of All goals (areaHref in lib/goals/all-goals.ts).
+  'goals.areas': { title: 'name', href: (row) => `/goals/all#area-${row.id}` },
   'goals.runs': {
     title: { reads: ['summary', 'job'], of: (row) => (row.summary as string | null) || (row.job as string | null) },
     href: (row) => `/goals/runs/${row.id}`,

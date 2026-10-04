@@ -40,16 +40,60 @@ export async function saveErrandAndStart(input: {
     return { ok: false, error: 'The errand could not be saved. Try again.' };
   }
   if (!goalId) return { ok: false, error: 'That area is no longer on the page.' };
+  return startOnSaved({
+    client,
+    user,
+    goal: { id: goalId, title, errandDueOn: dueOn },
+    noun: 'errand',
+  });
+}
 
+/**
+ * Save a goal and start Dash on it, for Ask Dash on the Goals home when it is
+ * a new goal. The same press as an errand without the due date: the goal is
+ * saved approved, as any goal the person adds is, then a goal run starts, and
+ * the goal is kept when the run cannot start. The caller checks the title
+ * with parseGoalFields, the rule the goal composer on All goals uses.
+ */
+export async function saveGoalAndStart(input: {
+  client: GoalsSupabaseClient;
+  user: SessionUser;
+  areaId: string;
+  title: string;
+}): Promise<ErrandResult> {
+  const { client, user, areaId, title } = input;
+  let goalId: string | null;
+  try {
+    goalId = await insertGoal(client, user.id, areaId, { title });
+  } catch {
+    return { ok: false, error: 'The goal could not be saved. Try again.' };
+  }
+  if (!goalId) return { ok: false, error: 'That area is no longer on the page.' };
+  return startOnSaved({ client, user, goal: { id: goalId, title }, noun: 'goal' });
+}
+
+/** Start a goal run on a goal or errand just saved, saying why when it cannot start. */
+async function startOnSaved({
+  client,
+  user,
+  goal,
+  noun,
+}: {
+  client: GoalsSupabaseClient;
+  user: SessionUser;
+  goal: { id: string; title: string; errandDueOn?: string };
+  noun: 'errand' | 'goal';
+}): Promise<ErrandResult> {
+  const goalId = goal.id;
   const kept = (message: string) => ({ ok: true as const, goalId, started: false, message });
 
   if (!(await isOwner({ user }))) {
-    return kept('The errand is saved. Only the account that owns this app can start Dash on it.');
+    return kept(`The ${noun} is saved. Only the account that owns this app can start Dash on it.`);
   }
   const routine = goalsRoutine();
   if (!routine.id) {
     return kept(
-      'The errand is saved. Dash did not start: no goals routine is set on this deployment. Set ' +
+      `The ${noun} is saved. Dash did not start: no goals routine is set on this deployment. Set ` +
         'CLAUDE_GOALS_ROUTINE_ID and CLAUDE_GOALS_ROUTINE_TOKEN, then press Work on this on its page.',
     );
   }
@@ -57,20 +101,23 @@ export async function saveErrandAndStart(input: {
     const started = await startGoalRun({
       client,
       userId: user.id,
-      goal: { id: goalId, title, errandDueOn: dueOn },
+      goal,
       routine,
       surface: 'thread',
     });
     if (!started.ok) {
       return kept(
-        `The errand is saved. Dash could not start (${started.error.replace(/\.$/, '')}). ` +
+        `The ${noun} is saved. Dash could not start (${started.error.replace(/\.$/, '')}). ` +
           'Press Work on this on its page to try again.',
       );
     }
   } catch {
-    return kept('The errand is saved. Dash could not start. Press Work on this on its page to try again.');
+    return kept(
+      `The ${noun} is saved. Dash could not start. Press Work on this on its page to try again.`,
+    );
   }
-  return { ok: true, goalId, started: true, message: 'Errand saved. Dash is on it.' };
+  const saved = noun === 'errand' ? 'Errand saved.' : 'Goal saved.';
+  return { ok: true, goalId, started: true, message: `${saved} Dash is on it.` };
 }
 
 /**

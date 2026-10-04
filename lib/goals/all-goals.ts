@@ -28,6 +28,15 @@ export function allGoalsViewOf(param: string | string[] | undefined): AllGoalsVi
   return requested && isAllGoalsView(requested) ? requested : (DEFAULT_GOAL_VIEW as AllGoalsView);
 }
 
+/**
+ * Where an area is: its section on All goals, which took the place of the
+ * area's own page. An area with no open goal is hidden from Open, the
+ * default view, so it is reached under Everything.
+ */
+export function areaHref(areaId: string, { open = true }: { open?: boolean } = {}): string {
+  return `/goals/all${open ? '' : '?view=all'}#area-${areaId}`;
+}
+
 /** How many things on you each goal holds, keyed by goal id, from the Today list. */
 export function onYouByGoal(items: readonly { goalId: string }[]): Map<string, number> {
   const counts = new Map<string, number>();

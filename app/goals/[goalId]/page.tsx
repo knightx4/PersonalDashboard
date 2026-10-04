@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
+import { areaHref } from '@/lib/goals/all-goals';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { noLinks, weekInstants, type GoalLinks } from '@/lib/goals/links';
 import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
@@ -384,8 +385,9 @@ export default async function GoalMapPage({
   // nine rem, and its description wrapped after a few words (note 68fd31b5).
   return (
     <div className="mx-auto max-w-5xl">
+      {/* Back to the goal's area, which is a section of All goals. */}
       <Link
-        href="/goals"
+        href={areaHref(map.goal.areaId, { open: !closed && map.goal.status !== 'dropped' })}
         className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
       >
         <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> {map.areaName}
@@ -471,9 +473,14 @@ export default async function GoalMapPage({
             {!linksEmpty && <GoalLinksSection {...linked} />}
             {files.length > 0 && (
               <section aria-labelledby="files-heading" className="space-y-2">
-                <h2 id="files-heading" className="px-1 text-ui font-semibold text-ink">
-                  Files
-                </h2>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 px-1">
+                  <h2 id="files-heading" className="text-ui font-semibold text-ink">
+                    Files
+                  </h2>
+                  <Link href="/goals/files" className="text-small text-accent underline-offset-2 hover:underline">
+                    Files for every goal
+                  </Link>
+                </div>
                 <FileLinks files={files} />
               </section>
             )}

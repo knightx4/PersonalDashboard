@@ -399,6 +399,16 @@ export function GoalsAllSurface() {
           [job.id]: home.goals[2].progress!,
         }}
         areaRuns={{}}
+        rhythms={{
+          'a-money': [
+            {
+              id: 'r-budget',
+              title: 'Check the budget every week',
+              goalId: cards.id,
+              line: '0 of 1 this week · For Pay off the credit cards',
+            },
+          ],
+        }}
         canRun
       />
     </div>
