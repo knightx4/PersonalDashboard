@@ -42,6 +42,8 @@ import { interviewFromInvite, inviteSupersedes, type InviteInterview } from '@/l
 import { pairSlots } from '@/lib/jobs/calendar/slots';
 import { scheduledChanged } from '@/lib/core/scheduled-actions';
 import { JobRecorder, jobRef } from '@/lib/jobs/inbox/record';
+import { ensureInterviewRound } from '@/lib/jobs/interview/ensure-round';
+import { channelForMessage } from '@/lib/jobs/applications/channel';
 
 
 /** Parallel Gmail metadata fetches — well under the per-user rate quota. */
@@ -566,7 +568,17 @@ async function writeEvent(
     rec: opts.rec,
   });
 
-  if (!legal) return;
+  // An interview with a time, booked or not yet read. screen_scheduled is a
+  // search for a time (a booking link, a request for availability), which
+  // books nothing until the time is found.
+  const announcesInterview = kind === 'interview_scheduled';
+
+  if (!legal) {
+    // The funnel does not move, but the interview still happened: an invite
+    // read after the rejection it preceded is the usual way here.
+    if (announcesInterview) await bookUndatedRound(supabase, opts, interviewKind);
+    return;
+  }
 
   if (invite) {
     // An invite is unambiguous evidence of a booking whatever the classifier
@@ -586,17 +598,45 @@ async function writeEvent(
 
   // No invite: the model's date, on the same terms as before.
   const interviewDate = opts.extracted?.dates?.find((d) => d.kind === 'interview');
-  if (interviewDate && (kind === 'interview_scheduled' || kind === 'screen_scheduled')) {
+  if (!interviewDate && announcesInterview) {
+    // Announced with no time to put on it, such as an AI interview to sit,
+    // or a time the extractor did not read. The round is real all the same.
+    await bookUndatedRound(supabase, opts, interviewKind);
+    return;
+  }
+  if (interviewDate && (announcesInterview || kind === 'screen_scheduled')) {
     await oneAtATime(interviewLockKey(opts.applicationId), async () => {
       const people = contactsFromNames(namesForSlot(opts.extracted, interviewDate));
+      const booked = await interviewsFor(supabase, opts.userId, opts.applicationId);
+
+      // The time for a round an earlier email booked without one.
+      const undated = undatedInterview(booked);
+      if (undated) {
+        const before = await opts.rec.before('interviews', undated.id);
+        const { data: dated } = await supabase
+          .from('interviews')
+          .update({ scheduled_at: interviewDate.at, ...(interviewKind ? { kind: interviewKind } : {}) })
+          .eq('id', undated.id)
+          .select('id');
+        if ((dated ?? []).length > 0) {
+          opts.rec.interviewChanged({ interviewId: undated.id, applicationId: opts.applicationId, before });
+        }
+        await recordParticipants(supabase, {
+          userId: opts.userId,
+          companyId: await companyForApplication(supabase, opts.applicationId),
+          applicationId: opts.applicationId,
+          interviewId: undated.id,
+          interviewFresh: false,
+          people,
+          rec: opts.rec,
+        });
+        return;
+      }
 
       // The same interview told twice: an invite already booked it, or another
       // message about it came first. Nothing stops a second row at the same
       // time except this, because the unique index only covers invites.
-      const already = interviewInSlot(
-        await interviewsFor(supabase, opts.userId, opts.applicationId),
-        interviewDate.at,
-      );
+      const already = interviewInSlot(booked, interviewDate.at);
       if (already) {
         await recordParticipants(supabase, {
           userId: opts.userId,
@@ -647,6 +687,42 @@ async function writeEvent(
       }
     });
   }
+}
+
+/**
+ * Book a round with the date to be set, for an email that announced an
+ * interview without a time (see ensureInterviewRound).
+ */
+async function bookUndatedRound(
+  supabase: AppSupabaseClient,
+  opts: { userId: string; applicationId: string; rec: JobRecorder; fresh: boolean },
+  interviewKind: string | null,
+): Promise<void> {
+  await oneAtATime(interviewLockKey(opts.applicationId), async () => {
+    const booked = await ensureInterviewRound(supabase, {
+      userId: opts.userId,
+      applicationId: opts.applicationId,
+      kind: interviewKind,
+    });
+    // A round that was already there is not Dash's to take back with it.
+    if (booked && booked.groupCreated && !opts.fresh) {
+      opts.rec.interviewBooked({
+        groupId: booked.groupId,
+        interviewId: booked.interviewId,
+        applicationId: opts.applicationId,
+      });
+    }
+  });
+}
+
+/**
+ * The interview an earlier email booked with no time, which the next dated
+ * email or invite fills in rather than booking a second round beside it.
+ */
+export function undatedInterview(booked: readonly BookedInterview[]): BookedInterview | null {
+  return (
+    booked.find((row) => row.scheduled_at === null && row.status !== 'cancelled' && !row.ics_uid) ?? null
+  );
 }
 
 /** How far apart two times can be and still be one interview. */
@@ -882,10 +958,14 @@ async function bookInvite(
       : interviewInSlot(await interviewsFor(supabase, opts.userId, opts.applicationId), invite.scheduledAt, {
           uidless: true,
         });
+  // Or the round an earlier email booked with the date to be set.
+  const undated =
+    byUid.data || bySlot ? null : undatedInterview(await interviewsFor(supabase, opts.userId, opts.applicationId));
+  const claimed = bySlot ?? undated;
   const existing = byUid.data
     ? byUid
-    : bySlot
-      ? { data: { id: bySlot.id, ics_sequence: null as number | null } }
+    : claimed
+      ? { data: { id: claimed.id, ics_sequence: null as number | null } }
       : { data: null };
 
   if (existing.data) {
@@ -1389,7 +1469,7 @@ async function findOrCreatePursuit(
       company_id: opts.companyId,
       title,
       ats_job_id: opts.atsJobId,
-      source: opts.asLead ? 'recruiter_inbound' : 'portal',
+      source: opts.asLead ? channelForMessage(opts.classification) : 'portal',
       first_seen_at: opts.receivedAt?.toISOString() ?? new Date().toISOString(),
     })
     .select('id')
@@ -1405,7 +1485,7 @@ async function findOrCreatePursuit(
     .insert({
       user_id: opts.userId,
       role_id: role.id,
-      source: opts.asLead ? 'recruiter_inbound' : 'portal',
+      source: opts.asLead ? channelForMessage(opts.classification) : 'portal',
       created_by: 'email_inferred',
       // Flagged only where there is something to decide -- see
       // lib/jobs/review/flagging. Everything created here stays visible and

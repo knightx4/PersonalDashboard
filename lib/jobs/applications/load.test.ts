@@ -49,12 +49,14 @@ describe('toFunnelApplications', () => {
     expect(screen.highWaterStatus).toBe('in_process');
   });
 
-  it('enters a recruiter-inbound pursuit on its first human reply', () => {
-    const [inbound, portal] = toFunnelApplications([
+  it('enters a pursuit with no submission on its first human reply', () => {
+    const [inbound, portal, lead] = toFunnelApplications([
       row({ source: 'recruiter_inbound', submittedAt: null }),
       row({ submittedAt: null }),
+      row({ status: 'lead', submittedAt: null }),
     ]);
     expect(inbound.submittedAt).toEqual(new Date('2026-07-03T00:00:00Z'));
-    expect(portal.submittedAt).toBeNull();
+    expect(portal.submittedAt).toEqual(new Date('2026-07-03T00:00:00Z'));
+    expect(lead.submittedAt).toBeNull();
   });
 });

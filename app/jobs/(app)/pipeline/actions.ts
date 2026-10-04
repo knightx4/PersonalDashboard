@@ -3,7 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { APPLICATION_STATUSES, type ApplicationStatus } from '@/lib/jobs/pipeline';
+import {
+  APPLICATION_SOURCES,
+  APPLICATION_STATUSES,
+  type ApplicationSource,
+  type ApplicationStatus,
+} from '@/lib/jobs/pipeline';
 
 /**
  * Moving a card writes a status_override EVENT and sets the override column.
@@ -82,6 +87,45 @@ export async function setExcitement(
   if (error) return { error: error.message };
   revalidatePath('/jobs/pipeline');
   revalidatePath('/jobs/roles');
+  revalidatePath('/jobs/roles/[id]', 'page');
+  return { error: null };
+}
+
+const channelSchema = z.object({
+  applicationId: z.string().uuid(),
+  source: z.enum(APPLICATION_SOURCES),
+  referralContactId: z.string().uuid().nullable(),
+});
+
+/**
+ * How you applied, corrected where you read about the role.
+ *
+ * The inbox has to guess the channel from the first email it finds, and the
+ * by-channel funnel is only as good as that guess. A referral names who
+ * referred you; any other channel clears it, so a stale name does not stay
+ * behind a channel that no longer has one.
+ */
+// latency: optimistic -- the picker shows the new channel
+export async function setChannel(
+  applicationId: string,
+  source: ApplicationSource,
+  referralContactId: string | null,
+): Promise<{ error: string | null }> {
+  const parsed = channelSchema.safeParse({ applicationId, source, referralContactId });
+  if (!parsed.success) return { error: 'That is not a channel this can set.' };
+  const user = await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('applications')
+    .update({
+      source: parsed.data.source,
+      referral_contact_id: parsed.data.source === 'referral' ? parsed.data.referralContactId : null,
+    })
+    .eq('id', parsed.data.applicationId)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/pipeline');
+  revalidatePath('/jobs/analytics');
   revalidatePath('/jobs/roles/[id]', 'page');
   return { error: null };
 }

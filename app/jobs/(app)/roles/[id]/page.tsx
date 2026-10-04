@@ -4,7 +4,7 @@ import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { cn } from '@/lib/cn';
 import { Banner } from '@/components/ui/banner';
 import { PageHeader } from '@/components/shell/page-header';
-import { DetailLayout, Property, PropertyList } from '@/components/shell/detail-layout';
+import { Property } from '@/components/shell/detail-layout';
 import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
@@ -18,7 +18,6 @@ import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { findUnlinkedMessages } from '@/lib/jobs/inbox/link-candidates';
 import {
   DEBRIEF_NUDGE_WINDOW_DAYS,
-  SOURCE_LABELS,
   formatCoverage,
   requirementCoverage,
   type ApplicationSource,
@@ -45,6 +44,8 @@ import { RoleDetailPanels } from './panels';
 import { RoleTitle } from './role-title';
 import { RoleCompany } from './role-company';
 import { ExcitementPicker } from './excitement-picker';
+import { ChannelPicker } from './channel-picker';
+import { referrerOptions } from '@/lib/jobs/contacts/referrers';
 
 export const metadata = { title: 'Role' };
 
@@ -102,7 +103,7 @@ export default async function RoleDetailPage({
     .select(
       `id, attempt, status, source, submitted_at, confirmation_received_at,
        first_human_response_at, closed_at, outcome, rejection_stage, rejection_stage_override,
-       excitement, needs_review, created_by, cover_letter`,
+       excitement, needs_review, created_by, cover_letter, referral_contact_id`,
     )
     .eq('role_id', id)
     .eq('user_id', user.id)
@@ -110,6 +111,13 @@ export default async function RoleDetailPage({
 
   const current = (applications ?? [])[0];
   if (!current) notFound();
+
+  // The people you know, for naming who referred you in the channel picker.
+  const { data: contactRows } = await supabase
+    .from('contacts')
+    .select('id, full_name, companies ( name )')
+    .eq('user_id', user.id)
+    .order('full_name');
 
   // No description, no text and no lookup (lib/jobs/related-notes.ts).
   const matchText = pursuitMatchText({
@@ -345,9 +353,10 @@ export default async function RoleDetailPage({
     [rowRef('job_search.applications', current.id as string), rowRef('job_search.roles', id)],
   );
 
+  // One column, facts above the tabs: a detail page reads top to bottom, and
+  // a rail beside the tabs squeezed them off the edge at laptop width.
   return (
-    <DetailLayout
-      header={
+    <div className="space-y-4">
         <>
           <PageHeader
             leading={
@@ -437,9 +446,7 @@ export default async function RoleDetailPage({
             </Banner>
           )}
         </>
-      }
-      properties={
-        <PropertyList>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
           <Property
             label="Applied"
             value={formatDate(current.submitted_at as string | null, timezone)}
@@ -454,8 +461,15 @@ export default async function RoleDetailPage({
             hint="Automated confirmations never set this."
           />
           <Property
-            label="Source"
-            value={SOURCE_LABELS[current.source as ApplicationSource] ?? (current.source as string)}
+            label="Channel"
+            value={
+              <ChannelPicker
+                applicationId={current.id as string}
+                source={current.source as ApplicationSource}
+                referralContactId={(current.referral_contact_id as string | null) ?? null}
+                contacts={referrerOptions(contactRows ?? [])}
+              />
+            }
           />
           <Property
             label="Comp band"
@@ -481,9 +495,7 @@ export default async function RoleDetailPage({
                 : '—'
             }
           />
-        </PropertyList>
-      }
-    >
+        </dl>
       <div className="space-y-6">
         {/* What has to happen about this role, from the todo module. Here rather
             than inside the panels because it is not one of the tabs: it is the
@@ -661,7 +673,7 @@ export default async function RoleDetailPage({
           }))}
         />
       </div>
-    </DetailLayout>
+    </div>
   );
 }
 
