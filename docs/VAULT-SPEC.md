@@ -411,16 +411,17 @@ contains all of the above.
 
 ## Security and privacy
 
-- The PAT is read-only, scoped to one repository, encrypted at rest, and never
-  returned to a client. Same handling as Gmail refresh tokens.
+- The PAT is scoped to one repository, encrypted at rest, and never returned to
+  a client. Same handling as Gmail refresh tokens. It needs write access only
+  for editing a note on its page (plan #1422); a read-only token still syncs.
 - RLS on all three tables; the isolation test extended before feature code.
 - No raw HTML rendering, as above.
-- **No vault content is sent to any LLM in v1.** Worth stating explicitly, and
-  worth revisiting explicitly rather than by drift: a vault plausibly contains
-  journals, health notes, and things about other people who did not consent to
-  being in anyone's training-adjacent pipeline. The privacy policy currently
-  describes mail ingestion only, and it must be updated **before** the first
-  vault-content model call, not after.
+- **Vault content reaches a model only through the paths the privacy page
+  names**: the map sweep, the note classifier, quiz generation and Maya. A
+  vault plausibly contains journals, health notes, and things about other
+  people who did not consent to being in anyone's pipeline, so a new path is
+  added to the privacy page before its first model call, not after. The sweep
+  turns journal notes and excluded folders away before anything is sent.
 - Vault sync involves no Google scope and no change to the CASA position.
 
 ## What this unlocks (not v1)
