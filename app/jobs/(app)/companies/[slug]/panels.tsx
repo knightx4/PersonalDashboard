@@ -55,16 +55,15 @@ export function CompanyPanels(props: {
   notes: Array<{ id: string; body: string; createdAt: string }>;
 }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
-      <div className="space-y-4 lg:col-span-2">
-        <Research {...props} />
-        <Contacts {...props} />
-        <Touches {...props} />
-      </div>
-      <div className="space-y-4">
-        <Details {...props} />
-        <Notes {...props} />
-      </div>
+    // One column at every width: the details first, then the long text, then
+    // the rest (taste one-column-detail). Details used to be a side column
+    // on a laptop and the fourth card on a phone.
+    <div className="space-y-4">
+      <Details {...props} />
+      <Research {...props} />
+      <Contacts {...props} />
+      <Touches {...props} />
+      <Notes {...props} />
     </div>
   );
 }
@@ -113,10 +112,7 @@ function Research({ companyId, research }: { companyId: string; research: string
   // leading. Read by default now, and expandable, because a column inside a
   // card is the wrong shape for something this long (laws 14 and 12).
   return (
-    <CardSection
-      title="What you know about this place"
-      hint="The one long-form field. It outlives every posting."
-    >
+    <CardSection title="What you know about this place">
       <div className="mt-2">
         <EditableProse
           label="What you know about this place"
