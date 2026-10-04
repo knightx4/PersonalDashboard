@@ -32,6 +32,8 @@ import {
 export interface TaskFormState {
   error?: string;
   message?: string;
+  /** The task addTask wrote, for the capture box to record it as Dash's (plan #1581). */
+  id?: string;
 }
 
 /**
@@ -106,7 +108,7 @@ export async function addTask(
   }
 
   revalidateTodo();
-  return { message: 'Added.' };
+  return { message: 'Added.', id: id ?? undefined };
 }
 
 // latency: pending

@@ -153,6 +153,10 @@ export const SPEND_OPERATIONS = {
     // (note 790c745a). One short call per takeaway not yet scored; background,
     // from the daily idea-score catch-up.
     'score-inspiration-takeaway',
+    // Working out where something typed into the one capture box belongs: a
+    // todo, a goal update or a note on a job (plan #1581). Haiku, one call
+    // per pause in typing, and one on Enter when no guess had come back yet.
+    'place-capture',
   ],
   news: [
     // Reading one newsletter issue into its stories and a summary. Haiku, one

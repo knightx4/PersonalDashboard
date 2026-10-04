@@ -19,7 +19,7 @@
 import { score } from '@/lib/search/score';
 import type { ModuleId } from '@/lib/modules';
 
-export type CaptureActionId = 'todo' | 'goals';
+export type CaptureActionId = 'anything' | 'todo' | 'goals';
 
 export type CaptureAction = {
   id: CaptureActionId;
@@ -57,6 +57,19 @@ export type CaptureAction = {
 
 export const CAPTURE_ACTIONS: readonly CaptureAction[] = [
   {
+    // One box for whatever you type: Dash reads it and files it as a todo, a
+    // goal update or a note on a job (plan #1581, feature #1579). No module,
+    // because it files into whichever workspace the sentence belongs in, so
+    // its mark is the home key.
+    id: 'anything',
+    label: 'Capture anything',
+    module: null,
+    placeholder: 'Type anything. Dash files it where it belongs.',
+    field: 'prose',
+    dated: false,
+    keywords: ['capture', 'jot', 'write down', 'file', 'note'],
+  },
+  {
     id: 'todo',
     label: 'Add a todo',
     module: 'todo',
@@ -91,8 +104,13 @@ export function availableCaptureActions(
   return CAPTURE_ACTIONS.filter((action) => action.module === null || modules.includes(action.module));
 }
 
-/** What the shortcut and the header control open when nothing else is named. */
-export const DEFAULT_CAPTURE_ACTION: CaptureActionId = 'todo';
+/**
+ * What the shortcut and the header control open when nothing else is named:
+ * the one box, so nothing has to be chosen before typing (plan #1581). Add a
+ * todo and Log what happened stay in the palette and the panel's header for
+ * when you want to pick.
+ */
+export const DEFAULT_CAPTURE_ACTION: CaptureActionId = 'anything';
 
 export function captureAction(id: string): CaptureAction | null {
   return CAPTURE_ACTIONS.find((action) => action.id === id) ?? null;
