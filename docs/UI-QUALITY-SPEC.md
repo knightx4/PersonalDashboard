@@ -165,8 +165,14 @@ Two more run on surfaces of the deck pattern and on links:
 - a press shows its pressed or loading state within 100 milliseconds
 - the next item's data and image are fetched before Next is pressed
 
-They run in the gate's lint lane beside `check:ui`, on the surfaces the
-commit touched, so they add seconds rather than minutes.
+They run in the gate on the surfaces the commit touched, so they add seconds
+rather than minutes. `npm run check:phone` serves the gate's own build with
+the gallery on and runs them after the Build step, since the lint lane has no
+build to serve. A surface's counts are held in `scripts/phone-baseline.json`
+as `check:ui` holds its own: a touched surface that measures more than main
+fails, and one that measures less writes the lower count back. Main had
+about 1,570 press targets under 44 pixels when the checks arrived, so a
+check that demanded zero would have failed every screen change.
 
 ## Part 6: The person sees pictures
 
@@ -278,10 +284,10 @@ it. That step takes the mark off, and gives R1 its baseline measured on main.
 Checked by: count `routes-without-surface`, target 0, pending #1539.
 
 **R2.** No surface scrolls sideways at 390 pixels.
-Checked by: test `tests/interaction/no-sideways-scroll.test.ts`, pending #1537.
+Checked by: test `tests/interaction/no-sideways-scroll.test.ts`.
 
 **R3.** Every press target is at least 44 by 44 pixels at 390 pixels wide.
-Checked by: test `tests/interaction/press-targets.test.ts`, pending #1537.
+Checked by: test `tests/interaction/press-targets.test.ts`.
 
 **R4.** A step that changes a surface has a passing design check before it
 closes.

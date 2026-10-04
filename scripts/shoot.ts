@@ -37,7 +37,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { formatTheme, parseTheme, type Theme } from '../lib/theme';
-import { themeAttribute, themeStyle } from '../lib/theme/apply';
+import { themeExpression } from '../lib/preview/theme-expression';
 import {
   FRAME_MS,
   frameTimes,
@@ -143,27 +143,7 @@ function slug(theme: Theme): string {
   return (formatTheme(theme) ?? 'system').replace(':', '-');
 }
 
-/**
- * The expression that puts a theme on the page, built here rather than there.
- *
- * The browser has no module loader in a CDP evaluate, so the palette is
- * generated in Node and the values travel as literals. Same two halves the
- * root layout writes: the attribute for the polarity, the tokens for the
- * colour.
- */
-function applyExpression(theme: Theme): string {
-  const attribute = themeAttribute(theme);
-  const style = themeStyle(theme) ?? {};
-  const declarations = Object.entries(style)
-    .map(([token, value]) => `${token}:${value}`)
-    .join(';');
-
-  return [
-    'var r=document.documentElement;',
-    attribute ? `r.setAttribute('data-theme','${attribute}');` : "r.removeAttribute('data-theme');",
-    `r.setAttribute('style',${JSON.stringify(declarations)});`,
-  ].join('');
-}
+const applyExpression = themeExpression;
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
