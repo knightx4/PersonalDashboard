@@ -17,6 +17,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   CHANNELS,
+  CONNECT_NOTE_MAX,
   MAX_OPENINGS,
   MAX_OUTREACH,
   parseOpeningsPayload,
@@ -169,15 +170,55 @@ For each, give:
 - move: two to four short numbered steps: how to find them, what to send,
   and what to do if they reply.
 - channel: one of ${CHANNELS.join(', ')}. A LinkedIn connection note is
-  linkedin_connect and must be under 300 characters. For an event, use event.
-- message: the message itself, ready to send, in their voice. Short: under 100
-  words, a connection note under 300 characters. Name the specific thing that
-  prompted it (their talk, their article, the school or employer in common).
-  One clear, small ask: a 15-minute call about how they got into the role, or
-  their view on one question. Never ask a stranger for a job or a referral in
-  the first message. No flattery, no filler. For an event, the message is what
-  to say when introducing themselves there. For an email, make the first line
-  "Subject: " and the subject, then a blank line, then the body.
+  linkedin_connect. For an event, use event.
+- message: the message itself, ready to send, written as the next section
+  says. For an event, it is what to say when introducing themselves there.
+  For an email, make the first line "Subject: " and a short, plain subject,
+  then a blank line, then the body.
+
+Writing the message
+
+It goes out under their name to a stranger who owes them nothing and gets
+messages like it every week. Write what a busy person would answer: the note
+someone sharp and a little informal types themselves, not a cover letter.
+
+- Open with the other person, not the job seeker: the specific thing that
+  prompted the message, such as a line from their talk or article, a move
+  they made, or a team they built. If nothing specific to this person can be
+  named, they are the wrong suggestion.
+- Say who the job seeker is in one short clause, and only the part that
+  matters to this reader. Never a list of credentials, a degree and class
+  year, or "I'm now aiming at" a list of roles.
+- End with one real question this person could answer in a two-line reply,
+  about their work or the move they made. Do not ask for "fifteen minutes"
+  or a call in a connection note. An email may offer a short call after the
+  question, once, as an aside.
+- Never ask for a job, a referral or "who else I should talk to" in a first
+  message.
+- A connection note is at most ${CONNECT_NOTE_MAX} characters, spaces included, and
+  usually 150 to 250: count before you report it, since a longer one is
+  thrown away. Anything else is under 80 words.
+- No sign-off or name at the end of a LinkedIn note. An email signs off with
+  the first name only.
+- Contractions and plain sentences, no preamble, no thanks in advance. Never
+  write "I'm reaching out", "I hope this finds you well", "I came across",
+  "caught my eye", "I'd love to", "I'd appreciate", "I'd be grateful", "pick
+  your brain", "on my list", "fellow alum", "happy to work around your
+  schedule", "whatever time works" or "I know you're busy".
+- When samples of their own emails are given, match them: their greeting,
+  their sentence length, how formal they are, how they sign off an email.
+  The samples show how they sound, not what to say; never copy their content.
+
+A message nobody answers:
+"Hi Dana, I'm a 2026 MBA graduate of State University, and before that I
+spent three years in FP&A at Acme. I'm now pursuing strategic finance roles
+in New York, and Ramp is on my list. Could I have fifteen minutes to hear
+about your path? I'd really appreciate it."
+
+One that gets a reply:
+"Hi Dana, your post on moving Ramp's forecast to weekly cash got me
+rethinking ours at Acme. I'm in FP&A and trying to get into strategic
+finance. Was that move a different job, or the same one with more say?"
 
 Never suggest anyone on the lists of people they already know or were already
 suggested, and never anyone whose company works in an industry they will not
@@ -199,7 +240,15 @@ export type PeopleInput = {
   known: readonly string[];
   /** personKey of every name in `known`, for the check after the call. */
   taken: ReadonlySet<string>;
+  /** Short emails they sent, to write the messages in their voice (voice.ts). */
+  voice?: readonly string[];
 };
+
+function voiceText(samples: readonly string[]): string {
+  if (samples.length === 0) return '';
+  const blocks = samples.map((sample, i) => `Sample ${i + 1}:\n${sample}`);
+  return `\n\nEmails they wrote themselves, for how they sound (not what to say):\n\n${blocks.join('\n\n')}`;
+}
 
 export async function findPeople(
   options: SuggestOptions,
@@ -210,6 +259,7 @@ export async function findPeople(
     seekerText(input.seeker) +
     listed('People they know who could introduce them (a good way in, not a suggestion on their own)', input.warm, 30) +
     listed('Already contacts or already suggested (do not suggest these)', input.known, 150) +
+    voiceText(input.voice ?? []) +
     `\n\nSearch, then call ${PEOPLE_TOOL} once with every suggestion.`;
 
   return searchThenReport(client, options, {

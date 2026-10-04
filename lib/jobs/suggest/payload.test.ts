@@ -50,6 +50,21 @@ describe('parsePeoplePayload', () => {
     expect(out[0]).toMatchObject({ personName: null, channel: 'event' });
   });
 
+  it('drops a connection note LinkedIn would refuse, and leaves a long message on another channel', () => {
+    const long = `Hi Lee, ${'a'.repeat(300)}`;
+    const out = parsePeoplePayload(
+      {
+        suggestions: [
+          entry({ person_name: 'Lee Park', message: long }),
+          entry({ person_name: 'Kim Roe', channel: 'email', message: long }),
+          entry({ person_name: 'Jo Lin', message: 'a'.repeat(300) }),
+        ],
+      },
+      { people: new Set() },
+    );
+    expect(out.map((s) => s.personName)).toEqual(['Kim Roe', 'Jo Lin']);
+  });
+
   it('keeps at most three and reads an unknown channel as other', () => {
     const out = parsePeoplePayload(
       { suggestions: ['A B', 'C D', 'E F', 'G H'].map((name) => entry({ person_name: name, channel: 'fax' })) },

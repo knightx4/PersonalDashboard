@@ -165,6 +165,17 @@ describe('findPeople', () => {
     expect(create.mock.calls[0][0].max_tokens).toBe(32_000);
   });
 
+  it('gives the model their own emails as voice samples, and the length of a connection note', async () => {
+    const create = vi.fn().mockResolvedValue({ content: [report], stop_reason: 'tool_use', usage });
+    await findPeople(
+      { apiKey: 'k', client: streaming(create) },
+      { seeker, warm: [], known: [], taken: new Set(), voice: ['Hey Sam, the second model is the one.'] },
+    );
+    const request = create.mock.calls[0][0];
+    expect(request.messages[0].content).toContain('Sample 1:\nHey Sam, the second model is the one.');
+    expect(request.system).toContain('at most 300 characters');
+  });
+
   it('reads a list the model sent back as a JSON string', async () => {
     const stringified = { ...report, input: { suggestions: JSON.stringify(report.input.suggestions) } };
     const create = vi.fn().mockResolvedValue({ content: [stringified], stop_reason: 'tool_use', usage });

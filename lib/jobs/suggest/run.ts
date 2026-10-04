@@ -13,6 +13,7 @@ import 'server-only';
 
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { CAPPED_ORIGINS, cadenceState, STALE_DAYS, suggestionDue, type SuggestionKind } from './cadence';
 import { findOpenings, findPeople, type SeekerContext } from './model';
@@ -24,6 +25,7 @@ import { readPreferences } from './preferences';
 import type { SearchProgress } from './search-runs';
 import { queueSearch } from './search-batch';
 import { storeOpenings, storePeople, type BoardOrigin } from './store';
+import { loadVoiceSamples } from './voice';
 import type { SearchRequest } from './model';
 
 export type KindOutcome = {
@@ -169,11 +171,14 @@ async function runReachOut(
 ): Promise<KindOutcome> {
   const spend: SpendReport[] = [];
   await progress?.stage('reach_out', 'searching');
-  const { data, error } = await supabase
-    .from('contacts')
-    .select('full_name, title, relationship, how_we_connect, companies ( name )')
-    .eq('user_id', userId)
-    .limit(1000);
+  const [{ data, error }, voice] = await Promise.all([
+    supabase
+      .from('contacts')
+      .select('full_name, title, relationship, how_we_connect, companies ( name )')
+      .eq('user_id', userId)
+      .limit(1000),
+    loadVoiceSamples(supabase.schema('core') as unknown as CoreSupabaseClient, userId),
+  ]);
   if (error) throw new Error(`Reading the contacts failed: ${error.message}`);
   const contacts = (data ?? []) as Row[];
 
@@ -198,6 +203,7 @@ async function runReachOut(
       warm: contacts.filter((row) => WARM.has(row.relationship as string)).map(describe),
       known,
       taken,
+      voice,
     },
   );
   if (!result.ok) {
