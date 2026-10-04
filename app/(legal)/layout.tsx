@@ -1,12 +1,14 @@
 import Link from 'next/link';
 import { ModuleMark } from '@/components/ui/module-mark';
+import { PRESS_AREA } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 
 export default function LegalLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh">
       <header className="border-b border-border">
         <div className="mx-auto flex h-14 max-w-3xl items-center px-6">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className={cn(PRESS_AREA, 'flex items-center gap-2')}>
             <ModuleMark module={null} size="sm" />
             <span className="text-body font-semibold tracking-tight">
               Dash

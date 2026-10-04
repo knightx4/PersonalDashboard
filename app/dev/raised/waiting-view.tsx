@@ -97,7 +97,7 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
             All view, so a row a filter would have hidden is still reached. */}
         <Link
           href={planRefHref(row.number)}
-          className="text-body font-semibold text-ink hover:underline"
+          className="press-area text-body font-semibold text-ink hover:underline"
         >
           #{row.number} {row.title}
         </Link>
