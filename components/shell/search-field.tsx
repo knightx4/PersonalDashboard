@@ -73,11 +73,6 @@ export function SearchField({
       }}
     >
       <div className="relative">
-        <Search
-          className="pointer-events-none absolute left-2.5 top-1/2 z-1 size-4 -translate-y-1/2 text-ink-muted"
-          strokeWidth={1.75}
-          aria-hidden
-        />
         {/* The shared control, inset for the two glyphs. It draws no box of its
          * own, so it follows the density dial with every other field. */}
         <PressLabel htmlFor={fieldId} />
@@ -93,6 +88,13 @@ export function SearchField({
           placeholder={placeholder}
           aria-label={placeholder}
           className="relative pl-8 pr-8"
+        />
+        {/* After the field, so it is drawn over it: the field is positioned
+            now, to sit over its PressLabel. */}
+        <Search
+          className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-muted"
+          strokeWidth={1.75}
+          aria-hidden
         />
         {value && (
           <Link

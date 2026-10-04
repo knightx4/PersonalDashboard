@@ -8,23 +8,14 @@
   "anatomy-settings": {
     "targets": 1
   },
-  "ask-dash-answer": {
-    "targets": 7
-  },
   "ask-dash-changes": {
     "targets": 1
   },
-  "ask-dash-failed": {
-    "targets": 7
-  },
   "ask-dash-new": {
-    "targets": 9
+    "targets": 2
   },
   "ask-dash-page": {
-    "targets": 9
-  },
-  "ask-dash-proposal": {
-    "targets": 7
+    "targets": 2
   },
   "ask-made-changes": {
     "targets": 3
@@ -120,9 +111,6 @@
   "jobs-settings": {
     "targets": 4
   },
-  "jobs-today": {
-    "targets": 6
-  },
   "learn-clips": {
     "targets": 2
   },
@@ -167,7 +155,7 @@
   },
   "news-quick-in-shell": {
     "sideways": 1,
-    "targets": 9
+    "targets": 8
   },
   "news-quick-page": {
     "sideways": 1,
@@ -189,9 +177,6 @@
   },
   "news-story-grid-no-pictures": {
     "targets": 4
-  },
-  "shell-full": {
-    "targets": 7
   },
   "shopping-item-details": {
     "targets": 1
