@@ -7,9 +7,7 @@ import { Card, cardVariants } from '@/components/ui/card';
 import { DashMark } from '@/components/ui/dash-mark';
 import { Bands } from '@/components/ui/meter';
 import { MoveLabel } from '@/components/ui/move-label';
-import { ChipSelect } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
-import { ListFilter } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
 import type { DashOffer, GoalHolders } from '@/lib/goals/hand-off';
@@ -30,8 +28,7 @@ import { TodayRow } from './today-list';
  * The goals are small tiles, every one on the page at once: errands first,
  * then page order, so a goal is in the same place from day to day. A tile
  * says its status, a bar of its steps by who holds them, and how much is on
- * you. Pressing one opens the goal. A chip under the tiles narrows the lanes
- * to one goal, and the tile of that goal is ringed while it does.
+ * you. Pressing one opens the goal.
  *
  * The lanes sort what is next by who holds it:
  *
@@ -93,7 +90,6 @@ export function GoalLanes({
   offers,
   canRun = false,
 }: GoalLanesProps) {
-  const [filter, setFilter] = useState<string | null>(null);
   // Moves made on this page, shown before the server's redraw arrives.
   const [aside, setAside] = useState<ReadonlySet<string>>(new Set());
   const [handed, setHanded] = useState<TodayItem[]>([]);
@@ -105,11 +101,8 @@ export function GoalLanes({
     return next;
   };
 
-  const inFilter = (goalId: string) => filter === null || goalId === filter;
   const handedKeys = new Set(handed.map(keyOf));
-  const mine = onYou.filter(
-    (item) => inFilter(item.goalId) && !aside.has(keyOf(item)) && !handedKeys.has(keyOf(item)),
-  );
+  const mine = onYou.filter((item) => !aside.has(keyOf(item)) && !handedKeys.has(keyOf(item)));
   const listed = new Set(dash.map((item) => item.id));
   const dashRows: DashLaneItem[] = [
     ...handed
@@ -124,17 +117,12 @@ export function GoalLanes({
         needs: null,
       })),
     ...dash,
-  ].filter((item) => inFilter(item.goalId));
-  const runs = working.filter(
-    (run) => !run.item || (run.item.level === 'goal' ? inFilter(run.item.id) : filter === null),
-  );
+  ];
   const quiet = offers.filter(
-    (offer): offer is Extract<DashOffer, { kind: 'goal' }> =>
-      offer.kind === 'goal' && inFilter(offer.goalId),
+    (offer): offer is Extract<DashOffer, { kind: 'goal' }> => offer.kind === 'goal',
   );
-  const later = laterOn.filter((item) => inFilter(item.goalId) && !back.has(item.id));
+  const later = laterOn.filter((item) => !back.has(item.id));
   const canPrepare = new Set(canRun ? preparable : []);
-  const chosen = goals.find((line) => line.goal.id === filter) ?? null;
 
   return (
     <div className="space-y-6">
@@ -162,28 +150,9 @@ export function GoalLanes({
               line={line}
               holders={holders[line.goal.id]}
               today={todayOn}
-              chosen={filter === line.goal.id}
             />
           ))}
         </ul>
-        {goals.length > 1 && (
-          <div className="flex items-center gap-1 px-1 text-small text-ink-muted">
-            <ChipSelect
-              value={filter ?? ''}
-              onChange={(event) => setFilter(event.target.value || null)}
-              icon={<ListFilter className="size-3.5" strokeWidth={1.75} />}
-              placeholderValue=""
-              aria-label="Which goal the lanes show"
-            >
-              <option value="">Lanes for every goal</option>
-              {goals.map((line) => (
-                <option key={line.goal.id} value={line.goal.id}>
-                  Lanes for {line.goal.title}
-                </option>
-              ))}
-            </ChipSelect>
-          </div>
-        )}
       </section>
 
       <div className="grid items-start gap-4 lg:grid-cols-3">
@@ -208,14 +177,14 @@ export function GoalLanes({
           id="lane-dash"
           title="Dash has it"
           dot="bg-status-submitted"
-          count={dashRows.length + runs.length}
+          count={dashRows.length + working.length}
           empty={
             canRun
               ? 'Nothing with Dash. Press Ask Dash on a step of yours, or ask Dash above.'
               : 'Nothing with Dash.'
           }
           rows={[
-            ...runs.map((run) => <WorkingRow key={`run:${run.id}`} run={run} />),
+            ...working.map((run) => <WorkingRow key={`run:${run.id}`} run={run} />),
             ...dashRows.map((item) => <DashRow key={`dash:${item.id}`} item={item} />),
           ]}
           footer={
@@ -256,13 +225,10 @@ function GoalTile({
   line,
   holders,
   today,
-  chosen,
 }: {
   line: HomeGoal;
   holders: GoalHolders | undefined;
   today?: string;
-  /** The goal the lanes are narrowed to, if this is it. */
-  chosen: boolean;
 }) {
   const { goal, progress, review } = line;
   const late = Boolean(goal.errand && goal.dueOn && today && goal.dueOn < today);
@@ -276,7 +242,6 @@ function GoalTile({
         className={cn(
           cardVariants({ padding: 'dense', interactive: true }),
           'flex h-full w-full flex-col gap-1.5 text-left',
-          chosen && 'ring-2 ring-accent',
         )}
       >
         <span className="flex items-baseline justify-between gap-2 text-small">

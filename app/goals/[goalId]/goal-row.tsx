@@ -752,6 +752,7 @@ export function GoalRow({
                 name="asked"
                 maxLength={4000}
                 placeholder="What you want, if anything"
+                className="max-sm:min-h-11"
                 aria-label={`What you want Dash to do with ${step.title}`}
               />
               <Button type="submit" size="sm" variant="secondary" pending={askPending} className="shrink-0">

@@ -784,9 +784,9 @@ steps is too much to read every morning.
 
 ### Tiles, Ask Dash and the tabs
 
-Each goal on the home is a tile, and pressing it opens the goal. A chip
-under the tiles narrows the lanes (On you, Dash has it, Later) to one goal,
-and that goal's tile is ringed while it does.
+Each goal on the home is a tile, and pressing it opens the goal. The lanes
+(On you, Dash has it, Later) always show every goal; a goal's own page is
+where to look at one goal alone.
 
 Ask Dash, under the briefing, sends its words where a chip says: to a goal,
 as an @dash comment on it; to **A new errand** (Errands, above); or to **A

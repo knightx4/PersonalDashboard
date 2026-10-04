@@ -183,7 +183,10 @@ function DoneSection({ done, timeZone }: { done: DoneSince | null; timeZone: str
           {done ? `What Dash did since ${formatInstant(done.since, timeZone)}` : 'What Dash did'}
         </h2>
         {/* Runs left the tab bar: an audit log, read from here when wanted. */}
-        <Link href="/goals/runs" className="text-small text-accent underline-offset-2 hover:underline">
+        <Link
+          href="/goals/runs"
+          className="inline-flex items-center text-small text-accent underline-offset-2 hover:underline max-sm:min-h-11"
+        >
           Every run
         </Link>
       </div>
