@@ -346,10 +346,14 @@ gallery:
    round" says what each kind of session can reach.
 4. On `fix`, make the changes, shoot again and run the next round. You never
    write the verdict yourself.
-5. Three rounds at most. If round 3 fails, stop: what follows a third failed
-   round is the person's open decision #1535 on the plan, so do not run a
-   fourth round and do not decide what happens to the note. List the
-   surface, the last fixes and where the shots are in the report.
+5. Three rounds, then the person. If round 3 fails, stop: run no fourth
+   round and do not decide what happens to the screen (decision #1535 on the
+   plan). Push the batch branch, run `npm run ui-stop -- <note-id>` for the
+   ask, and `block` the note with that ask as its note. The ask names each
+   surface that did not pass, how many fixes are open, where the shots are
+   and the branch, and ends "accept it as it is, or say what to change". List
+   the last fixes in full in the report. When the person says what to change,
+   the next run gets three fresh rounds, numbered on from 4.
 
 A note closes on a pass for every surface its fix touched. With a cluster
 fixed by one law, each surface the commit changed goes through the loop.
