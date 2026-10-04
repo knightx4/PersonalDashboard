@@ -11,6 +11,7 @@ import {
 } from '@/lib/plan/runs';
 import { loadCommitChecks } from '@/lib/plan/ci';
 import { loadOverhaulProgress } from '@/lib/plan/overhaul-progress-load';
+import { loadCriticStops } from '@/lib/plan/critic-stop-load';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
 import { keyRefusal } from '@/lib/plan/work';
@@ -200,6 +201,11 @@ export async function renderPlanPage({
     flattenSections(whole).filter((node) => node.track === 'overhaul'),
   );
 
+  // What the design critic last asked of each step it stopped after its final
+  // round, with the shots, for the row's accept-or-redirect panel (plan #1610).
+  // Nothing is read when no step is stopped.
+  const criticStops = await loadCriticStops(supabase, user.id, flattenSections(whole));
+
   // Every step, for the pickers: a parent to move under, a step to wait on.
   // Light on purpose -- the tree is already on the page once.
   const catalog: PlanCatalogEntry[] = flattenSections(everything).map((node) => ({
@@ -274,6 +280,7 @@ export async function renderPlanPage({
         liveness={liveness}
         commitChecks={commitChecks}
         overhaulProgress={overhaulProgress}
+        criticStops={criticStops}
         empty={project ? flattenSections(whole).length === 0 : data.items.length === 0}
         canSend={canSend}
       />

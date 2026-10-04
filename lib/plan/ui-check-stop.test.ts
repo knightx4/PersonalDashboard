@@ -6,6 +6,12 @@ import {
   isStopRound,
   STOP_ASK_ENDING,
   stoppedSurfaces,
+  acceptedLine,
+  acceptedRounds,
+  criticStopNeeds,
+  readStopFixes,
+  shotName,
+  stopBranch,
   type StopRound,
 } from './ui-check-stop';
 
@@ -97,5 +103,56 @@ describe('criticStopBlockSql', () => {
   it('refuses a bad date or user id', () => {
     expect(() => criticStopBlockSql({ step: 1, ask: 'a', date: 'today' })).toThrow();
     expect(() => criticStopBlockSql({ step: 1, ask: 'a', date: '2026-10-04', userId: 'x' })).toThrow();
+  });
+});
+
+describe('accepting a stopped screen (plan #1610)', () => {
+  const ask = criticStopAsk({
+    owner: 1612,
+    branch: 'claude/contact-card',
+    surfaces: [{ surface: 'jobs-contact', round: 3, fixes: 2, uploaded: false }],
+  });
+
+  it('reads the branch back out of the ask', () => {
+    expect(stopBranch(ask)).toBe('claude/contact-card');
+    expect(stopBranch('Something else.')).toBeNull();
+    expect(stopBranch(null)).toBeNull();
+  });
+
+  it('writes the accepted round as the next one, so it is the latest', () => {
+    expect(acceptedRounds([{ surface: 'jobs-contact', round: 3 }])).toEqual([
+      { surface: 'jobs-contact', round: 4, verdict: 'accepted' },
+    ]);
+  });
+
+  it('a surface accepted after its stop is no longer stopped', () => {
+    expect(
+      stoppedSurfaces([
+        fix('jobs-contact', 3),
+        { surface: 'jobs-contact', round: 4, verdict: 'accepted', fixes: [], shots: [] },
+      ]),
+    ).toEqual([]);
+  });
+
+  it('says on the history which branch to merge', () => {
+    const line = acceptedLine({ date: '2026-10-04', surfaces: ['jobs-contact'], branch: 'claude/x' });
+    expect(line).toMatch(/^Accepted 2026-10-04: /);
+    expect(line).toContain('jobs-contact');
+    expect(line).toContain('branch claude/x: merge it and close the step.');
+  });
+
+  it('shortens the Needs line to what the panel does not say', () => {
+    expect(criticStopNeeds('claude/x')).toBe(
+      'Your call on a screen the design critic would not pass. The work is on branch claude/x.',
+    );
+    expect(criticStopNeeds(null)).not.toContain('branch');
+  });
+
+  it('keeps the readable fixes and names the shots', () => {
+    expect(
+      readStopFixes([{ shot: 'phone-light', where: 'top', problem: 'Crowded', breaks: 'law 9', change: 'Fold it' }, 4, {}]),
+    ).toEqual([{ shot: 'phone-light', where: 'top', problem: 'Crowded', breaks: 'law 9', change: 'Fold it' }]);
+    expect(readStopFixes(null)).toEqual([]);
+    expect(shotName('u/1612/jobs-contact/r3/laptop-dark.png')).toBe('laptop-dark');
   });
 });

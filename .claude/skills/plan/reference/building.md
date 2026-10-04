@@ -274,10 +274,17 @@ it should use, and that is the person's (decision #1535). So:
    steps.
 4. Report the block, with the last verdict's fixes and where the shots are.
 
-The person either accepts the screen as it is or says what to change (plan
-#1610). After they say what to change, the step is ready again and its
-builder gets three fresh rounds, numbered on from 4, against their words;
-the stop then falls on round 6, and so on.
+The person either accepts the screen as it is or says what to change, from
+the step's row on /dev/plan, which shows the last fixes and shots (plan
+#1610). Either way the step comes back ready, and its history says which:
+
+- **Accepted** (a dated `Accepted …` line naming the branch): the person has
+  written an `accepted` round for each surface that stopped, and the close
+  guard counts it as passed. Do not build it again or run more rounds: merge
+  the named branch and close the step.
+- **Said what to change** (their words on the step's thread, and an
+  `Answered …` line): the builder gets three fresh rounds, numbered on from
+  4, against their words; the stop then falls on round 6, and so on.
 
 **Recording a round.** Every round goes on record, passed or failed, before
 you make its fixes:
