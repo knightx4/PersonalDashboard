@@ -187,7 +187,11 @@ thousand tokens, and gets to the end.
      step #N: <title>`, and push.
    - Then close the step: `done <n> --note "…"`, with the note the subagent
      wrote. `done` refuses a commit that is not on main, so the merge comes
-     first; a subagent cannot close its own step and does not try.
+     first; a subagent cannot close its own step and does not try. It also
+     refuses a step that changed a screen while one of its gallery surfaces
+     has no passing design check (plan #1534), so before the merge run
+     `npm run ui-guard -- <n> --commit <the branch's head>` and send a step
+     it refuses back to the critic rather than merging it.
 
    Anything that fails belongs to whichever step broke it: fix it, and amend or
    add a commit against that step's number, before the merge. That includes

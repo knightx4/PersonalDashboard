@@ -106,7 +106,12 @@ where id = '<the stopped step>';
 -- start (never on a proposed step, never on a decision, never on a setup step)
 update plan_items set status = 'in_progress' where id = '…';
 
--- done (after committing, so HEAD is the commit that did it)
+-- done (after committing, so HEAD is the commit that did it). First, for a
+-- step that changed a screen: `npm run ui-guard -- <n> --commit <sha>` names
+-- the gallery surfaces its files serve and prints a select to run here. Each
+-- row it returns is a surface whose latest design check is not a pass, and
+-- the step does not close while there is one: say which, and send it back to
+-- the critic (plan #1534; the CLI's `done` refuses the same).
 update plan_items
 set status = 'done', commit_sha = '…',
     comment = coalesce(comment || E'\n\n', '') || 'Done <date>: …'
