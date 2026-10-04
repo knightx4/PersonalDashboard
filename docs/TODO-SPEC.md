@@ -950,9 +950,11 @@ ones that will otherwise be violated by a well-meaning later commit.
   account's row is refused.
 - **A task about something is a foreign key**, not a text field holding a name.
   If the role is deleted the link goes with it.
-- **Nothing in this module writes to the vault.** Enforced by the existing
-  boundary: the vault's provider interface is read-only and lint already stops
-  anything outside `lib/vault/providers/` from reaching git at all.
+- **Nothing in this module writes to the vault.** The vault's provider can
+  write since a note became editable on its page (plan #1424), so this is no
+  longer a property of the interface. Lint still stops anything outside
+  `lib/vault/providers/` from reaching git, and nothing in `lib/todo/` or
+  `app/todo/` calls `writeNote`.
 - **Deferring a job reminder moves its own due date.** There is no second place
   a job reminder can be hidden, because two places would disagree.
 - **Every source goes through the registry.** A page that queries a workspace
