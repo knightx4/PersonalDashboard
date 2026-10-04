@@ -64,7 +64,7 @@ export type HomeViewProps = {
   /** The week's four numbers; null when they could not be read. */
   health: WeekHealth | null;
   /** Your live areas, for the area an errand goes in; none when they could not be read. */
-  areas?: { id: string; name: string }[];
+  areas?: { id: string; name: string; learn?: boolean }[];
   /** Each goal's holders by goal id (lib/goals/hand-off.ts). */
   holders?: Record<string, GoalHolders>;
   /** The runs going now. */

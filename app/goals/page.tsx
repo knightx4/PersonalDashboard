@@ -95,7 +95,7 @@ export default async function GoalsPage() {
         brief={brief ? { body: brief.body, when: noteWhen(brief, account.timezone) } : null}
         timeZone={account.timezone}
         todayOn={today}
-        areas={areas.map((area) => ({ id: area.id, name: area.name }))}
+        areas={areas.map((area) => ({ id: area.id, name: area.name, learn: area.learn }))}
         canRun={owner}
         awayFrom={awayFrom}
       />

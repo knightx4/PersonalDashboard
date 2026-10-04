@@ -29,7 +29,7 @@ export function AskDash({
 }: {
   goals: { id: string; title: string }[];
   /** Your live areas, for a new errand; none leaves the errand choice out. */
-  areas: { id: string; name: string }[];
+  areas: { id: string; name: string; learn?: boolean }[];
   /** The area a new errand starts in (errandAreaDefault). */
   defaultAreaId: string | null;
   className?: string;
@@ -41,6 +41,8 @@ export function AskDash({
     goals[0]?.id ?? (goalsOn ? GOAL : errandsOn ? ERRAND : ''),
   );
   const [body, setBody] = useState('');
+  // The area picked for a new goal or errand, null until the chip is changed.
+  const [areaPick, setAreaPick] = useState<string | null>(null);
   const [state, ask, asking] = useActionState(async (prev: AskDashState, form: FormData) => {
     const next = await askDashAction(prev, form);
     if (next.done) {
@@ -55,6 +57,9 @@ export function AskDash({
   const goal = target === GOAL;
   // A new errand or goal is saved and handed to Dash; an ask on a goal is a reply.
   const handing = errand || goal;
+  const areaId = areaPick ?? (errand ? defaultAreaId : areas[0]?.id) ?? null;
+  // A goal added to the Learn area is placed and given a plan, which costs.
+  const learnGoal = goal && areas.some((area) => area.id === areaId && area.learn);
 
   return (
     <form action={ask} className={cn('space-y-2', className)}>
@@ -86,7 +91,10 @@ export function AskDash({
           <ChipSelect
             name="target"
             value={target}
-            onChange={(event) => setTarget(event.target.value)}
+            onChange={(event) => {
+              setTarget(event.target.value);
+              setAreaPick(null);
+            }}
             icon={<Target className="size-3.5" strokeWidth={1.75} />}
             aria-label="What it is for"
           >
@@ -110,9 +118,9 @@ export function AskDash({
           {handing && (
             <ChipSelect
               // A new goal starts on the first area; an errand on errandAreaDefault's.
-              key={target}
               name="areaId"
-              defaultValue={(errand ? defaultAreaId : areas[0]?.id) ?? undefined}
+              value={areaId ?? undefined}
+              onChange={(event) => setAreaPick(event.target.value)}
               icon={<Folder className="size-3.5" strokeWidth={1.75} />}
               aria-label="Which area it is for"
             >
@@ -129,6 +137,14 @@ export function AskDash({
               <PaidHint
                 action="app/goals/home-actions.ts#askDashAction"
                 what="Cost of Dash's reply"
+                align="end"
+                className="self-center"
+              />
+            )}
+            {learnGoal && (
+              <PaidHint
+                action="app/goals/home-actions.ts#askDashAction:new-goal"
+                what="Cost of placing the goal and writing its plan"
                 align="end"
                 className="self-center"
               />
