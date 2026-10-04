@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Minus, Package, Plus } from 'lucide-react';
+import { Minus, Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { buttonVariants } from '@/components/ui/button';
-import { cardVariants } from '@/components/ui/card';
+import { PRESS_AREA, buttonVariants } from '@/components/ui/button';
 import type { ShareGroup } from '@/lib/share/read/load-disposition';
 import { respondToShare } from './actions';
 
@@ -149,30 +148,24 @@ export function DispositionGroup({
 
   return (
     <li
-      className={cn(
-        cardVariants({ padding: 'dense' }),
-        'transition-opacity',
-        pending && 'opacity-70',
-      )}
+      className={cn('py-3 transition-opacity first:pt-0 last:pb-0', pending && 'opacity-70')}
     >
       <div className="flex gap-4">
         {/* A filled tile, not an outlined one. The edge was there to stop a
             white product shot bleeding into a white card, and a recessed
-            ground does that without drawing a frame inside a frame. */}
-        <div className="size-16 shrink-0 overflow-hidden rounded-card bg-sunken">
-          {group.imageUrl ? (
-            // A plain <img>, as everywhere else in this app. It also keeps the
-            // promise the rest of this feature makes: next/image would have the
-            // server fetch and re-encode the remote file on render, which is an
-            // outbound call made by an anonymous page view.
-            // eslint-disable-next-line @next/next/no-img-element
+            ground does that without drawing a frame inside a frame. With no
+            picture there is no tile: a row of identical placeholder boxes
+            only made every row taller. */}
+        {group.imageUrl && (
+          <div className="size-16 shrink-0 overflow-hidden rounded-card bg-sunken">
+            {/* A plain <img>, as everywhere else in this app. It also keeps the
+                promise the rest of this feature makes: next/image would have the
+                server fetch and re-encode the remote file on render, which is an
+                outbound call made by an anonymous page view. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={group.imageUrl} alt="" className="size-full object-cover" />
-          ) : (
-            <div className="flex size-full items-center justify-center text-ink-muted">
-              <Package className="size-5" aria-hidden />
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="min-w-0 flex-1">
           <p className="text-body font-medium text-ink">
@@ -232,7 +225,7 @@ export function DispositionGroup({
                       onClick={() => step(choice.id, -1)}
                       disabled={counts[choice.id] === 0}
                       aria-label={`One fewer to ${choice.label.toLowerCase()}`}
-                      className="press grid size-7 place-items-center rounded-control hover:bg-surface disabled:opacity-30"
+                      className={cn(PRESS_AREA, 'press grid size-7 place-items-center rounded-control hover:bg-surface disabled:opacity-30')}
                     >
                       <Minus className="size-3.5" aria-hidden />
                     </button>
@@ -244,7 +237,7 @@ export function DispositionGroup({
                       onClick={() => step(choice.id, 1)}
                       disabled={undecided === 0}
                       aria-label={`One more to ${choice.label.toLowerCase()}`}
-                      className="press grid size-7 place-items-center rounded-control hover:bg-surface disabled:opacity-30"
+                      className={cn(PRESS_AREA, 'press grid size-7 place-items-center rounded-control hover:bg-surface disabled:opacity-30')}
                     >
                       <Plus className="size-3.5" aria-hidden />
                     </button>

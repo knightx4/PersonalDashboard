@@ -5,7 +5,12 @@ import { cn } from '@/lib/cn';
  * rather than buttons. Same idea as `cardVariants`: one spelling of the box,
  * wherever the thing inside it has to be something else.
  */
-export const segmentedFrame = 'inline-flex overflow-hidden rounded-control border border-control';
+export const segmentedFrame =
+  'inline-flex rounded-control border border-control *:press-area ' +
+  // The ends are rounded on the segments rather than clipped by the frame:
+  // `overflow: hidden` here would cut off the press area each segment has on
+  // a phone (`press-area`, app/globals.css), leaving it drawn but unpressable.
+  '*:first:rounded-l-control *:last:rounded-r-control';
 
 /**
  * One of a few mutually exclusive modes, as a joined control.
