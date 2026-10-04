@@ -139,7 +139,7 @@ describe('the Goals home', () => {
       'Your one goal is waiting on you.',
       'Ask Dash',
       'Your goals',
-      'aria-pressed',
+      'href="/goals/g1"',
       'On you',
       'Avalanche or snowball?',
       'Dash has it',
@@ -273,7 +273,7 @@ describe('the Goals home', () => {
     expect(html).toContain('3 on you');
   });
 
-  it('offers goals Dash has left alone in its lane, and a new errand once there is an area', () => {
+  it('offers goals Dash has left alone in its lane, and a new goal or errand once there is an area', () => {
     const offers = [
       { kind: 'goal' as const, goalId: 'g1', title: 'Pay off the debts', reason: 'Dash has not worked on it yet.' },
     ];
@@ -290,7 +290,10 @@ describe('the Goals home', () => {
     expect(html).toContain('Dash could take these');
     expect(html).toContain('Dash has not worked on it yet.');
     expect(html).not.toContain('A new errand');
-    expect(render({ areas: [{ id: 'area', name: 'Money' }] })).toContain('A new errand');
+    expect(html).not.toContain('A new goal');
+    const withArea = render({ areas: [{ id: 'area', name: 'Money' }] });
+    expect(withArea).toContain('A new errand');
+    expect(withArea).toContain('A new goal');
   });
 
   it('offers to add a goal when there are none', () => {

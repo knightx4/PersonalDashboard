@@ -26,8 +26,11 @@ Each level has one test, and a thing that fails it belongs at another level.
 
 **Areas** are directions that never finish, named as nouns: Money, Career,
 The city, Relationships, Health. An area has no done-when. It holds a
-sentence of what you want from it (its note), the goals that serve it, and
-its own page (`/goals/area/<id>`). A name that reads as an outcome, such as
+sentence of what you want from it (its note) and the goals that serve it. It
+has no page of its own: it is a section of All goals (`/goals/all#area-<id>`),
+which lists its goals, the goals Dash proposed for it and its rhythms, and
+edits them there. The old area page, `/goals/area/<id>`, redirects to that
+section. A name that reads as an outcome, such as
 "Get a job", is a goal in the wrong place: it ends, so it goes under an area
 as a goal (Career, then *Land your next role*).
 
@@ -88,8 +91,8 @@ event a week* inside *Know ten people in the scene by name*, *send five
 applications a week* inside the applying stage of *Land your next role*,
 *log each balance monthly* inside *Pay off student debt*. A rhythm has a
 target count per period, and progress on it is whether the recent periods
-were kept. It never shows as done. An area's page lists the practices of all
-its goals together, with this period's progress.
+were kept. It never shows as done. Each area's section on All goals lists
+the rhythms of all its goals under **Rhythms**, with this period's progress.
 
 Todo has no repeating tasks today (`lib/todo/tasks/model.ts` has no
 recurrence), so the rhythm lives in Goals and shows on Todo through the agenda
@@ -159,7 +162,7 @@ An errand is a one-off job with a date, such as finding a birthday present or
 booking a car service. It is a goal with `errand` set and a `due_on`, and the
 database refuses an errand without the date.
 
-**Add an errand** on the Goals home takes what the job is, the date it is due
+**A new errand**, as the target of Ask Dash on the Goals home, takes what the job is, the date it is due
 by and the area it goes in, which starts on the area of the soonest errand
 (or the first area). One press saves it and starts a goal run whose brief says
 it is an errand and when it is due, so Dash maps it as the goals skill's "An
@@ -176,7 +179,7 @@ track and weekly help. The goal's menu turns any goal into an errand or back.
 **Hand to Dash** on a Todo task makes the same errand from the task (plan
 #1263): its title, its notes as the errand's detail, the area you pick and the
 due date, which starts on the task's own. The save and the run are one helper,
-`saveErrandAndStart` in `lib/goals/errand-store.ts`, which Add an errand calls
+`saveErrandAndStart` in `lib/goals/errand-store.ts`, which Ask Dash calls
 too, so the two cannot drift. The task is ticked off and links to the errand.
 Every other start of a goal run (Ask Dash, the overnight map, an answered
 flag and a comment to Dash) briefs an errand as an errand.
@@ -269,7 +272,7 @@ Goals links to it:
 
 - **Learn.** Each learning goal (a row in Learn's `aims` table) is a goal in
   the Learn area here (plan #1490), and Learn has no Goals tab of its own:
-  `/learn/goals` redirects to that area, and Subjects links to it (plan
+  `/learn/goals` redirects to that area's section on All goals, and Subjects links to it (plan
   #1491). The goal owns the wording; how well you want to know it, its plan
   and a way to practise it sit in a Learning section on the goal's page, and
   the Level 3 goal is one press on Subjects. A goal elsewhere can still link
@@ -738,6 +741,28 @@ for a tick.
 The full tree for a goal is one tap away and is for when you want to look at
 the map, usually on a laptop. It is not the default because a tree of eighty
 steps is too much to read every morning.
+
+### Tiles, Ask Dash and the tabs
+
+Each goal on the home is a tile, and pressing it opens the goal. A chip
+under the tiles narrows the lanes (On you, Dash has it, Later) to one goal,
+and that goal's tile is ringed while it does.
+
+Ask Dash, under the briefing, sends its words where a chip says: to a goal,
+as an @dash comment on it; to **A new errand** (Errands, above); or to **A
+new goal**, as the title of a goal in the area chosen, which starts on the
+first area. A new goal is saved approved, as any goal you add is, and a goal
+run starts in the same press (`saveGoalAndStart` in
+`lib/goals/errand-store.ts`). The title is checked by `parseGoalFields`, the
+rule the composer on All goals uses, so a rate or a streak is refused here
+too. If the run cannot start, the goal is still saved and the message says
+why.
+
+Goals has two tabs, Home and All goals. Runs (`/goals/runs`) is linked as
+**Every run** beside What Dash did on the home. Files (`/goals/files`) is
+linked from the top of All goals and from the Files list in a goal's
+Details. A goal page's back link names its area and opens that area's
+section on All goals.
 
 ### Coming back after time away
 
