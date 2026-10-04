@@ -27,7 +27,7 @@ export function GoalRow({ daily }: { daily: DailyGoal }) {
   return (
     <li className="card-pad-x row-pad space-y-0.5">
       <p className="text-ui font-semibold break-words text-ink">
-        <Link href={tree} className="underline-offset-2 hover:underline">
+        <Link href={tree} className="press-area underline-offset-2 hover:underline">
           {goal.title}
         </Link>
       </p>
@@ -35,7 +35,7 @@ export function GoalRow({ daily }: { daily: DailyGoal }) {
       {review && <ReviewLine review={review} />}
       <Link
         href={tree}
-        className="inline-flex items-center gap-1.5 text-small text-ink-muted transition-colors duration-quick hover:text-ink"
+        className="press-area inline-flex items-center gap-1.5 text-small text-ink-muted transition-colors duration-quick hover:text-ink"
       >
         <ListTree className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
         {treeLabel}

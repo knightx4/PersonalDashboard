@@ -1,9 +1,7 @@
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { PageHeader } from '@/components/shell/page-header';
-import { ActivityFeed } from '@/components/jobs/activity/activity-feed';
-import { CheckInboxNow } from '@/components/jobs/activity/check-inbox-now';
 import { loadActivity } from '@/lib/jobs/activity/load';
+import { ActivityView } from './activity-view';
 
 export const metadata = { title: 'Activity' };
 
@@ -30,21 +28,16 @@ export default async function ActivityPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title="Activity"
-        description="What the syncs have actually changed. The inbox reads mail and opens or moves roles; the nightly sweep closes what has gone quiet and raises the nudges on This week."
-      />
-      <CheckInboxNow
-        accounts={(accounts ?? []).map((account) => ({
-          id: account.id as string,
-          emailAddress: account.email_address as string,
-          status: account.status as string,
-          lastSyncedAt: (account.last_synced_at as string) ?? null,
-          backfillCompletedAt: (account.backfill_completed_at as string) ?? null,
-        }))}
-      />
-      <ActivityFeed activity={activity} timezone={profile?.timezone ?? 'UTC'} />
-    </div>
+    <ActivityView
+      accounts={(accounts ?? []).map((account) => ({
+        id: account.id as string,
+        emailAddress: account.email_address as string,
+        status: account.status as string,
+        lastSyncedAt: (account.last_synced_at as string) ?? null,
+        backfillCompletedAt: (account.backfill_completed_at as string) ?? null,
+      }))}
+      activity={activity}
+      timezone={profile?.timezone ?? 'UTC'}
+    />
   );
 }

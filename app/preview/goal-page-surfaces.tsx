@@ -25,6 +25,10 @@ import { buildForest, type Step } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import type { AreaWithGoals, Goal } from '@/lib/goals/tree';
 import { DashCredit } from '@/components/ui/dash-mark';
+import { AreaView } from '@/app/goals/area/[areaId]/area-view';
+import { RunView } from '@/app/goals/runs/[runId]/run-view';
+import type { ChangeLine } from '@/lib/goals/run-changes';
+import { runMeta } from '@/lib/goals/runs';
 
 /**
  * The Goals home, All goals, the top of a goal page and an information step,
@@ -957,5 +961,118 @@ export function GoalLinkingSurface() {
         startAdding
       />
     </div>
+  );
+}
+
+/* ------------------------------------------------------------ area page */
+
+/**
+ * The Money area (plan #1601): the two goals under it, two goals Dash
+ * proposed for it, and two practices, one of them behind.
+ */
+export function AreaSurface() {
+  return (
+    <AreaView
+      areaId="a-money"
+      name="Money"
+      note="Owe nothing on a card, and have three months of spending put by before the end of next year."
+      goals={[
+        {
+          goal: cards,
+          areaName: 'Money',
+          next: [],
+          more: 4,
+          hasSteps: true,
+          progress: cardsProgress,
+          review: review(cards.id, {
+            verdict: 'waiting_on_you',
+            reason: 'The order of the cards decides the next three steps.',
+            nextMove: 'Choose which card to pay first',
+          }),
+        },
+        {
+          goal: fund,
+          areaName: 'Money',
+          next: [],
+          more: 0,
+          hasSteps: false,
+        },
+      ]}
+      proposed={[
+        { id: 'g-pension', title: 'Move the old workplace pension into the one I pay into now' },
+        { id: 'g-budget', title: 'Know where every dollar goes for one whole month' },
+      ]}
+      practices={[
+        {
+          id: 'rh-balances',
+          title: 'Check both card balances',
+          target: 1,
+          period: 'week',
+          goalId: cards.id,
+          goalTitle: cards.title,
+          count: 0,
+          missed: 2,
+        },
+        {
+          id: 'rh-save',
+          title: 'Move $50 into savings',
+          target: 2,
+          period: 'month',
+          goalId: fund.id,
+          goalTitle: fund.title,
+          count: 1,
+          missed: 0,
+        },
+      ]}
+      run={{
+        runId: 'run-area',
+        running: null,
+        error: null,
+        summary: 'Proposed two goals for Money: the old pension, and a month of tracked spending.',
+      }}
+      canRun
+    />
+  );
+}
+
+/* -------------------------------------------------------------- one run */
+
+function change(key: string, sentence: string, extra: Partial<ChangeLine> = {}): ChangeLine {
+  return { key, sentence, actor: 'claude', state: 'undoable', reason: null, targets: [], ...extra };
+}
+
+const reshape = run('run-3', '2026-09-24T07:40:00Z', '2026-09-24T07:52:00Z', {
+  job: 'reshape',
+  summary:
+    'Read your answer on which card goes first and settled the three steps that hung on it. Drafted the call script for the 27% card.',
+});
+
+/** The re-shape on the credit cards: five changes, one undone and one changed since. */
+export function RunSurface() {
+  const { outcome, meta } = runMeta(reshape, NOW, 'Europe/London');
+  return (
+    <RunView
+      run={reshape}
+      failed={outcome === 'failed'}
+      meta={meta}
+      lines={[
+        change(
+          'h1',
+          'Added the step "Call about the rate on the 27% card" under "Pay off the credit cards".',
+        ),
+        change('h2', 'Settled "Pay the highest rate first" from a proposal into a step of yours.'),
+        change('h3', 'Wrote the call script into the file "Which card to pay first".', {
+          state: 'kept',
+          reason: 'You have edited it since',
+        }),
+        change('h4', 'Dated "Raise the standing order to $300" for 1 November.', {
+          state: 'undone',
+        }),
+        change('h5', 'Answered "Which card goes first?" with the 27% card.', {
+          actor: 'me',
+          state: 'none',
+        }),
+      ]}
+    />
   );
 }

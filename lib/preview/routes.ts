@@ -166,6 +166,15 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-spec': ['/dev/specs/[slug]'],
   'dev-ui-review': ['/dev/ui/review'],
   'dev-usage': ['/dev/usage'],
+  'goals-area': ['/goals/area/[areaId]'],
+  'goals-run': ['/goals/runs/[runId]'],
+  'jobs-activity': ['/jobs/activity'],
+  'jobs-analytics': ['/jobs/analytics'],
+  'jobs-answers': ['/jobs/answers'],
+  'jobs-thoughts': ['/jobs/thoughts'],
+  'jobs-onboarding': ['/jobs/onboarding'],
+  'jobs-case-page': ['/jobs/p/[slug]'],
+  'mail-message': ['/mail/[id]'],
 };
 
 /** A route split into its segments; `/` is no segments. */

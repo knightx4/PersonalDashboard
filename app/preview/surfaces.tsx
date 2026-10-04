@@ -131,6 +131,8 @@ import {
   GoalsHomeSurface,
   InformationListSurface,
   InformationOneSurface,
+  AreaSurface,
+  RunSurface,
 } from './goal-page-surfaces';
 import {
   AuthCodeErrorSurface,
@@ -158,6 +160,15 @@ import {
   DevUiReviewSurface,
   DevUsageSurface,
 } from './dev-page-surfaces';
+import {
+  JobsActivitySurface,
+  JobsAnalyticsSurface,
+  JobsAnswersSurface,
+  JobsCasePageSurface,
+  JobsOnboardingWelcomeSurface,
+  JobsThoughtsSurface,
+  MailSurface,
+} from './jobs-page-surfaces';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -3901,6 +3912,69 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevUsageSurface />,
+  },
+  {
+    id: 'goals-area',
+    label: 'Goals · One area',
+    module: 'goals',
+    width: 'page',
+    render: () => <AreaSurface />,
+  },
+  {
+    id: 'goals-run',
+    label: 'Goals · One run and what it changed',
+    module: 'goals',
+    width: 'page',
+    render: () => <RunSurface />,
+  },
+  {
+    id: 'jobs-activity',
+    label: 'Job search · Activity',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsActivitySurface />,
+  },
+  {
+    id: 'jobs-analytics',
+    label: 'Job search · Analytics',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsAnalyticsSurface />,
+  },
+  {
+    id: 'jobs-answers',
+    label: 'Job search · Answers',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsAnswersSurface />,
+  },
+  {
+    id: 'jobs-thoughts',
+    label: 'Job search · Career goals',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsThoughtsSurface />,
+  },
+  {
+    id: 'jobs-onboarding',
+    label: 'Job search · Onboarding, the first step (without the header)',
+    module: 'jobs',
+    width: 'screen',
+    render: () => <JobsOnboardingWelcomeSurface />,
+  },
+  {
+    id: 'jobs-case-page',
+    label: 'Job search · A shared case page',
+    module: 'jobs',
+    width: 'screen',
+    render: () => <JobsCasePageSurface />,
+  },
+  {
+    id: 'mail-message',
+    label: 'Mail · An email in the reader',
+    module: 'jobs',
+    width: 'page',
+    render: () => <MailSurface />,
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on

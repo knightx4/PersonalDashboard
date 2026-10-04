@@ -1,10 +1,8 @@
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
-import { PageHeader } from '@/components/shell/page-header';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { loadLearningTracks } from '@/lib/jobs/learning/load';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { ThoughtList } from './thoughts';
-import { LearningTracks } from './tracks';
+import { ThoughtsView } from './thoughts-view';
 
 export const metadata = { title: 'Career goals' };
 
@@ -49,33 +47,19 @@ export default async function ThoughtsPage() {
   }>;
 
   return (
-    <>
-      <PageHeader
-        title="Career goals"
-        description="What you want from the next job and where you are now, in your own words. Add a new entry when your thinking changes; the newest one counts."
-      />
-      {tracks && (
-        <div className="mb-3 max-w-3xl">
-          <LearningTracks
-            suggested={tracks.suggested}
-            started={tracks.started}
-            hasEntries={rows.length > 0}
-          />
-        </div>
-      )}
-      <ThoughtList
-        thoughts={rows.map((row) => ({
-          id: row.id,
-          body: row.body,
-          written: formatDate(row.created_at, timezone),
-          // A minute's grace, because the insert and its trigger stamp both
-          // columns a few microseconds apart.
-          edited:
-            new Date(row.updated_at).getTime() - new Date(row.created_at).getTime() > 60_000
-              ? formatDate(row.updated_at, timezone)
-              : null,
-        }))}
-      />
-    </>
+    <ThoughtsView
+      tracks={tracks}
+      thoughts={rows.map((row) => ({
+        id: row.id,
+        body: row.body,
+        written: formatDate(row.created_at, timezone),
+        // A minute's grace, because the insert and its trigger stamp both
+        // columns a few microseconds apart.
+        edited:
+          new Date(row.updated_at).getTime() - new Date(row.created_at).getTime() > 60_000
+            ? formatDate(row.updated_at, timezone)
+            : null,
+      }))}
+    />
   );
 }
