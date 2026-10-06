@@ -59,68 +59,84 @@ export function WaitingOnYou({
   const flagOf = new Map(flags.map((flag) => [flag.id, flag]));
   const reads = rows.filter((row) => row.kind === 'read' && row.href.startsWith('#step-'));
   const shown = rows.filter((row) => row.kind !== 'do' && !reads.includes(row));
-  // Flags already answered stay until Dash closes them, below the open ones.
+  // A flag you answered waits on Dash's reply, not on you: it is listed apart
+  // until the run closes it, and is not counted here.
   const answered = flags.filter((flag) => flag.status !== 'open');
-  const count = shown.length + (reads.length > 0 ? 1 : 0) + answered.length;
-  if (count === 0) return null;
+  const count = shown.length + (reads.length > 0 ? 1 : 0);
+  if (count === 0 && answered.length === 0) return null;
   return (
-    <section aria-labelledby="waiting-heading" className="space-y-2">
-      <h2
-        id="waiting-heading"
-        className="flex items-baseline gap-2 px-1 text-ui font-semibold text-ink"
-      >
-        Waiting on you
-        <span className="tabular text-small font-normal text-ink-muted">{count}</span>
-      </h2>
-      <Card padding="none">
-        <ul className="divide-y divide-border">
-          {shown.map((row) => {
-            const flag = row.kind === 'flag' ? flagOf.get(row.id) : undefined;
-            const question = row.kind === 'question' ? questions[row.id] : undefined;
-            if (flag) return <FlagItem key={`flag-${flag.id}`} flag={flag} />;
-            if (question) {
-              return (
-                <li key={`question-${row.id}`} className="card-pad-x row-pad">
-                  <Disclosure
-                    summaryClassName="items-baseline py-0"
-                    bodyClassName="mt-1 -mx-1"
-                    title={
-                      <span className="inline-flex items-baseline gap-1.5 break-words">
-                        <CircleHelp
-                          className="size-3.5 shrink-0 translate-y-0.5 text-caution"
-                          strokeWidth={1.75}
-                          aria-hidden
-                        />
-                        {row.title}
-                      </span>
-                    }
-                    meta="Answer"
-                  >
-                    <Question node={question} />
-                  </Disclosure>
-                </li>
-              );
-            }
-            return <LinkItem key={`${row.kind}-${row.id}`} row={row} />;
-          })}
-          {reads.length > 0 && (
-            <LinkItem
-              row={{
-                ...reads[0],
-                label: 'Read',
-                title:
-                  reads.length === 1
-                    ? reads[0].title
-                    : `${reads.length} results Dash wrote, starting with ${reads[0].title}`,
-              }}
-            />
-          )}
-          {answered.map((flag) => (
-            <FlagItem key={`flag-${flag.id}`} flag={flag} />
-          ))}
-        </ul>
-      </Card>
-    </section>
+    <>
+      {count > 0 && (
+        <section aria-labelledby="waiting-heading" className="space-y-2">
+          <h2
+            id="waiting-heading"
+            className="flex items-baseline gap-2 px-1 text-ui font-semibold text-ink"
+          >
+            Waiting on you
+            <span className="tabular text-small font-normal text-ink-muted">{count}</span>
+          </h2>
+          <Card padding="none">
+            <ul className="divide-y divide-border">
+              {shown.map((row) => {
+                const flag = row.kind === 'flag' ? flagOf.get(row.id) : undefined;
+                const question = row.kind === 'question' ? questions[row.id] : undefined;
+                if (flag) return <FlagItem key={`flag-${flag.id}`} flag={flag} />;
+                if (question) {
+                  return (
+                    <li key={`question-${row.id}`} className="card-pad-x row-pad">
+                      <Disclosure
+                        summaryClassName="items-baseline py-0"
+                        bodyClassName="mt-1 -mx-1"
+                        title={
+                          <span className="inline-flex items-baseline gap-1.5 break-words">
+                            <CircleHelp
+                              className="size-3.5 shrink-0 translate-y-0.5 text-caution"
+                              strokeWidth={1.75}
+                              aria-hidden
+                            />
+                            {row.title}
+                          </span>
+                        }
+                        meta="Answer"
+                      >
+                        <Question node={question} />
+                      </Disclosure>
+                    </li>
+                  );
+                }
+                return <LinkItem key={`${row.kind}-${row.id}`} row={row} />;
+              })}
+              {reads.length > 0 && (
+                <LinkItem
+                  row={{
+                    ...reads[0],
+                    label: 'Read',
+                    title:
+                      reads.length === 1
+                        ? reads[0].title
+                        : `${reads.length} results Dash wrote, starting with ${reads[0].title}`,
+                  }}
+                />
+              )}
+            </ul>
+          </Card>
+        </section>
+      )}
+      {answered.length > 0 && (
+        <section aria-labelledby="answered-heading" className="space-y-2">
+          <h2 id="answered-heading" className="px-1 text-ui font-semibold text-ink">
+            Answered, waiting on Dash
+          </h2>
+          <Card padding="none">
+            <ul className="divide-y divide-border">
+              {answered.map((flag) => (
+                <FlagItem key={`flag-${flag.id}`} flag={flag} />
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
+    </>
   );
 }
 
