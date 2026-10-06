@@ -3,6 +3,7 @@ import { FileText } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
 import { allGoalsViewOf } from '@/lib/goals/all-goals';
+import { allGoalsCrumbs } from '@/lib/goals/crumbs';
 import { GoalsView } from '../goals-view';
 import { loadAllGoals } from './data';
 
@@ -39,6 +40,7 @@ export default async function AllGoalsPage({
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="All goals"
+        crumbs={allGoalsCrumbs()}
         actions={
           // Files has no tab; the longer pieces Dash wrote are reached from here and from each goal.
           <Link

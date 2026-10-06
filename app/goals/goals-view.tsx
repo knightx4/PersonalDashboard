@@ -57,6 +57,7 @@ import { GoalProgress } from './goal-progress';
 import { useMoveToItems, type Place } from './move-goal';
 import { DashCredit } from '@/components/ui/dash-mark';
 import { stepHref } from '@/lib/goals/all-goals';
+import { areaCrumbs } from '@/lib/goals/crumbs';
 
 /**
  * Areas and the goals under them (plan #924).
@@ -339,6 +340,7 @@ function AreaSection({
     <section id={`area-${area.id}`} aria-label={area.name} className="scroll-mt-bar space-y-2">
       {page ? (
         <PageHeader
+          crumbs={areaCrumbs(area)}
           title={
             <form action={rename}>
               <input type="hidden" name="id" value={area.id} />

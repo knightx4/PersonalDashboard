@@ -1,7 +1,6 @@
 import type { ComponentProps } from 'react';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { allGoalsCrumbs, goalCrumbs } from '@/lib/goals/crumbs';
 import { Card } from '@/components/ui/card';
 import { HomeView } from '@/app/goals/home-view';
 import { GoalsView } from '@/app/goals/goals-view';
@@ -394,7 +393,7 @@ const areas: AreaWithGoals[] = [
 export function GoalsAllSurface() {
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="All goals" />
+      <PageHeader title="All goals" crumbs={allGoalsCrumbs()} />
       <GoalsView
         areas={areas}
         view="open"
@@ -447,12 +446,6 @@ const moneyArea: AreaWithGoals = {
 export function GoalsAreaSurface() {
   return (
     <div className="mx-auto max-w-3xl">
-      <Link
-        href="/goals/all"
-        className="press-area mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> All goals
-      </Link>
       <GoalsView
         areas={[moneyArea, ...areas.slice(1)]}
         areaId="a-money"
@@ -615,7 +608,7 @@ export function FileSurface() {
  * note folded, Ask Dash, the number with four monthly readings, and Waiting
  * on you with a question to answer in place and a result to read. Under it,
  * one Learn goal linked and a file, as More holds them. The page header is
- * the real one; the back link above it is the page's own and is left out.
+ * the real one, with the path above it (plan #1622).
  */
 export function GoalTopSurface() {
   const which = {
@@ -629,7 +622,11 @@ export function GoalTopSurface() {
   };
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title={cards.title} description={cards.acceptance ?? undefined} />
+      <PageHeader
+        title={cards.title}
+        description={cards.acceptance ?? undefined}
+        crumbs={goalCrumbs(cards, 'Money')}
+      />
       <div className="space-y-6">
         <div className="space-y-4">
           <GoalStatusCard

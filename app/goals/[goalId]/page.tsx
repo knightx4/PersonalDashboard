@@ -1,11 +1,10 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
-import { areaHref } from '@/lib/goals/all-goals';
+import { goalCrumbs } from '@/lib/goals/crumbs';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { noLinks, weekInstants, type GoalLinks } from '@/lib/goals/links';
 import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
@@ -406,14 +405,10 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
   // date now, and a long line of it read worse on a laptop than a wrapped one.
   return (
     <div className="mx-auto max-w-3xl">
-      {/* Back to the goal's area, on its own page. */}
-      <Link
-        href={areaHref(map.goal.areaId, { open: !closed && map.goal.status !== 'dropped' })}
-        className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> {map.areaName}
-      </Link>
       <PageHeader
+        crumbs={goalCrumbs(map.goal, map.areaName, {
+          open: !closed && map.goal.status !== 'dropped',
+        })}
         title={
           <span className="flex items-center gap-2.5">
             <GoalGlyph glyph={hexagon.glyph} label={hexagon.label} closed={closed} />
