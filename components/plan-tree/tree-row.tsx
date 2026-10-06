@@ -441,7 +441,9 @@ export function TreeRow<E extends TreeCatalogEntry>({
           // A goal's finished rows sit under their own Finished fold, which
           // says they are finished; dimmed as well, their muted text fell
           // under the contrast floor.
-          closed && !list && 'opacity-70',
+          // Opened, a finished step is being read, as its title already is
+          // in full: dimmed, its #number fell to 2.3:1 (plan #1541).
+          closed && !list && !open && 'opacity-70',
         )}
       >
         <div className={cn('flex min-w-0 items-stretch', list && 'flex-1')}>
