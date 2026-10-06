@@ -50,7 +50,8 @@ export type RunJob =
   | 'ci_fix'
   | 'posts'
   | 'spec_change'
-  | 'overhaul';
+  | 'overhaul'
+  | 'audit';
 
 /**
  * What to call the press, where the page names the run behind a step.
@@ -77,6 +78,7 @@ export const RUN_JOB_LABEL: Record<RunJob, string> = {
   posts: 'A run drafting posts',
   spec_change: 'A run writing in a spec change',
   overhaul: 'An overhaul run',
+  audit: 'A spec audit',
 };
 
 /**
@@ -104,6 +106,7 @@ export const RUN_JOB_NOUN: Record<RunJob, string> = {
   posts: 'posts run',
   spec_change: 'spec change run',
   overhaul: 'overhaul run',
+  audit: 'spec audit',
 };
 
 /**
