@@ -57,7 +57,8 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  * away (plan #1440). Each is written by its tool in lib/dash/writes.ts and
  * kept as done from the start; `input` holds only what the card says.
  *
- * add_goal         the goal and the area it went under.
+ * add_goal         the goal and the area it went under, and whether Dash
+ *                  made that area for it.
  * change_todo      the todo's title now, the title it had when renamed, and
  *                  the day it moved to when moved (null: no day any more).
  * close_todo       the todo ticked off.
@@ -81,7 +82,7 @@ export type DashChangeInput = {
     goalTitle: string | null;
     pushOn: boolean;
   };
-  add_goal: { areaId: string; areaName: string; title: string; dueOn: string | null };
+  add_goal: { areaId: string; areaName: string; areaMade?: boolean; title: string; dueOn: string | null };
   change_todo: {
     id: string;
     title: string;

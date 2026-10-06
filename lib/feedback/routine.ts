@@ -110,6 +110,22 @@ export function visionRoutine(): RoutineTarget {
 }
 
 /**
+ * The routine that audits the specs against the code -- fired each Monday by
+ * /api/cron/spec-audit (plan #1524). Its standing prompt is
+ * .claude/skills/spec-audit/reference/routine-prompt.md.
+ *
+ * No fallback to the shared id or the shared token: an audit sent to the
+ * plan routine would build a step instead. With either unset the weekly tick
+ * records a failed fire naming the one that is missing.
+ */
+export function specAuditRoutine(): RoutineTarget {
+  return {
+    id: firstSet(process.env.CLAUDE_SPEC_AUDIT_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_SPEC_AUDIT_ROUTINE_TOKEN),
+  };
+}
+
+/**
  * The routine Ask Dash hands a request to when none of its own tools can do
  * it (plan #1402). It follows .claude/skills/dash-backup and replies in the
  * conversation the request came from.

@@ -158,6 +158,9 @@ export async function unpassQuickPage(formData: FormData): Promise<void> {
  * was so you can come back to it and press Next. Nothing is revalidated, so
  * the page is not drawn again under you. Next records the same story a second
  * time, which the upsert ignores.
+ *
+ * The Daily review records its opens here too (plan #1616): a line opened
+ * there counts as interest exactly as an article opened here does.
  */
 // latency: instant -- the link opens its tab at once and nothing on the page waits for the write
 export async function recordArticleOpened(issueId: string, storyIndex: number): Promise<void> {
