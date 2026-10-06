@@ -110,7 +110,7 @@ function review(
 }
 
 const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
-  today: [
+  onYou: [
     {
       kind: 'question',
       id: 'which',
@@ -132,6 +132,17 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       action: 'Done',
       unblocks: 0,
       on: '2026-10-01',
+      prepared: {
+        text: [
+          '**Standing order** from the current account to the savings account.',
+          '',
+          '- Amount: $200',
+          '- Day: the 28th, the day after payday',
+          '- Reference: Emergency fund',
+          '',
+          'In the app: Payments, then Standing orders, then New.',
+        ].join('\n'),
+      },
     },
     {
       kind: 'rhythm',
@@ -168,8 +179,6 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       on: '2026-10-01',
       url: 'https://example.com/meetup',
     },
-  ],
-  later: [
     {
       kind: 'plan',
       id: 'a-health',
@@ -243,6 +252,22 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       next: null,
       hasSteps: false,
     },
+    {
+      goal: goal('g-boiler', 'a-money', 'Book the boiler service', {
+        errand: true,
+        dueOn: '2026-10-20',
+        position: 30,
+      }),
+      areaName: 'Money',
+      progress: progress({
+        bands: { on_you: 0, waiting: 0, with_dash: 1, done: 0 },
+        move: 'with_dash',
+      }),
+      review: null,
+      current: false,
+      next: null,
+      hasSteps: true,
+    },
   ],
   done: {
     since: '2026-09-24T19:30:00Z',
@@ -262,33 +287,11 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
     ],
     more: 0,
   },
-  health: { dashFinished: 4, waitingOnYou: 3, stuck: 1, daysVisited: 2 },
   todayOn: TODAY,
   areas: [
     { id: 'a-money', name: 'Money' },
     { id: 'a-career', name: 'Career' },
   ],
-  holders: {
-    [cards.id]: { onYou: 2, dashOpen: 1, working: null, lastDashAt: `${TODAY}T06:00:00Z` },
-    [fund.id]: { onYou: 1, dashOpen: 0, working: null, lastDashAt: null },
-    [job.id]: {
-      onYou: 1,
-      dashOpen: 0,
-      working: {
-        id: 'run-live',
-        job: 'goal',
-        status: 'started',
-        createdAt: `${TODAY}T09:10:00Z`,
-        endedAt: null,
-        summary: null,
-        error: null,
-        lastSeenAt: `${TODAY}T09:14:00Z`,
-        nowOn: 'Find quant research openings in London',
-        item: { id: job.id, title: job.title, level: 'goal' },
-      },
-      lastDashAt: `${TODAY}T09:10:00Z`,
-    },
-  },
   working: [
     {
       id: 'run-live',
@@ -350,7 +353,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
     },
   ],
   brief: {
-    body: 'The card balance is down to **$6,980**, $730 lower than August. The one thing waiting on you is *Which card first?* on **Pay off the credit cards**: it decides the next three steps.',
+    body: 'The card balance is down to **$6,980**, $730 lower than August. The one thing waiting on you is *Which card first?* on **Pay off the credit cards**: it decides the next three steps.\n\nThe job search is quiet until the recruiters reply, which they said would be by Monday. The half marathon has no steps yet; ask me to map it when you want to start.',
     when: 'today',
   },
 };
