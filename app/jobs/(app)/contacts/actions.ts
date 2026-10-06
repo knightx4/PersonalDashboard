@@ -59,6 +59,8 @@ export async function createContact(
 
   if (error) return { error: error.message };
   revalidatePath('/jobs/contacts');
+  // Added from a company's People card (note 4323ee10), so it lists there too.
+  if (parsed.data.companyId) revalidatePath('/jobs/companies/[slug]', 'page');
   return { message: 'Added.' };
 }
 
