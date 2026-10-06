@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -11,6 +12,7 @@ import { serverEnv } from '@/lib/env';
 import { createNewsClient } from '@/lib/news/auth/server';
 import { NEWS_SCHEMA } from '@/lib/news/db/schema-name';
 import { openStory, passStories, unpassStories } from '@/lib/news/issues/quick';
+import { aheadValue, QUICK_AHEAD_COOKIE } from '@/lib/news/quick/next';
 import { readStories } from '@/lib/news/issues/stories';
 import {
   discussGuidance,
@@ -52,6 +54,32 @@ function readPairs(formData: FormData) {
 }
 
 /**
+ * Keep the story the phone slid in on Next as the next card (note a0fc267e),
+ * or forget it. The form sends it as `aheadIssueId` and `aheadStoryIndex`; the
+ * page reads it back with readAhead and nextCard keeps it while it is unread.
+ * A quarter of an hour, so a page opened much later ranks afresh.
+ */
+async function keepAhead(formData?: FormData): Promise<void> {
+  const jar = await cookies();
+  const ahead = formData
+    ? PassInput.safeParse({
+        issueId: formData.get('aheadIssueId'),
+        storyIndex: formData.get('aheadStoryIndex'),
+      })
+    : null;
+  if (ahead?.success) {
+    jar.set(QUICK_AHEAD_COOKIE, aheadValue(ahead.data), {
+      maxAge: 15 * 60,
+      sameSite: 'lax',
+      httpOnly: true,
+      path: '/news',
+    });
+  } else {
+    jar.delete({ name: QUICK_AHEAD_COOKIE, path: '/news' });
+  }
+}
+
+/**
  * Record the story you were shown, and its repeats in other newsletters, and
  * bring up the next one.
  *
@@ -70,6 +98,7 @@ export async function passQuickStory(formData: FormData): Promise<void> {
   const user = await requireUser();
   const client = await createNewsClient();
   const { finished } = await passStories(client, { userId: user.id, stories });
+  await keepAhead(formData);
 
   revalidatePath('/news');
   if (finished) revalidatePath('/news/all');
@@ -93,6 +122,7 @@ export async function passQuickPage(formData: FormData): Promise<void> {
   const user = await requireUser();
   const client = await createNewsClient();
   const { finished } = await passStories(client, { userId: user.id, stories });
+  await keepAhead();
 
   revalidatePath('/news');
   if (finished) revalidatePath('/news/all');
@@ -112,6 +142,8 @@ export async function unpassQuickPage(formData: FormData): Promise<void> {
   await requireUser();
   const client = await createNewsClient();
   await unpassStories(client, { stories });
+  // The card Back brings back is the one to show, not the one Next slid in.
+  await keepAhead();
 
   revalidatePath('/news');
   revalidatePath('/news/all');

@@ -399,6 +399,7 @@ export function OvernightControl({
   fresh = false,
   label = 'Overnight',
   bare = false,
+  mark = null,
   showBlocked = true,
   progress = null,
   refreshReadings = false,
@@ -454,6 +455,11 @@ export function OvernightControl({
    * (law 11).
    */
   bare?: boolean;
+  /**
+   * Drawn under the label, on the left: the Status panel on Dash puts Dash's
+   * own mark here, working while a run is going (note 076e7744).
+   */
+  mark?: React.ReactNode;
   /**
    * List the steps the night left blocked on you. Dash leaves it off: the same
    * steps are the first rows of its "waiting on you" list a little further
@@ -555,131 +561,147 @@ export function OvernightControl({
     (state) => state.error ?? state.message,
   );
 
+  // As tall as a control, so the label lines up with the row beside it when
+  // the mark puts it in a column of its own.
+  const labelText = (
+    <span className="inline-flex min-h-(--control-h) items-center gap-1.5 text-ui font-medium text-ink">
+      <Moon className="size-4 text-ink-muted" aria-hidden />
+      {label}
+    </span>
+  );
+
   return (
     <section
       aria-label="The overnight runner"
       className={cn(!bare && cardVariants({ padding: 'dense' }), 'space-y-2')}
     >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="inline-flex items-center gap-1.5 text-ui font-medium text-ink">
-          <Moon className="size-4 text-ink-muted" aria-hidden />
-          {label}
-        </span>
-        {resting && (ready > 0 || goalsReady) ? (
-          <StateLabel glyph="half" word={DEV_STATE_WORD.ready} tone="accent" />
-        ) : (
-          <OvernightState standing={resting ? 'off' : standing} />
+      {/* With a mark, the label and the mark under it are a column of their
+          own, and the rest of the row starts on one edge beside them. */}
+      <div className="flex items-start gap-3">
+        {mark && (
+          <span className="flex shrink-0 flex-col items-start gap-1.5">
+            {labelText}
+            {mark}
+          </span>
         )}
-        {/* The totals are the headline while a night is on; a night that is
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+          {!mark && labelText}
+          {resting && (ready > 0 || goalsReady) ? (
+            <StateLabel glyph="half" word={DEV_STATE_WORD.ready} tone="accent" />
+          ) : (
+            <OvernightState standing={resting ? 'off' : standing} />
+          )}
+          {/* The totals are the headline while a night is on; a night that is
             over or has never run has none, and says what it is doing instead.
             A fresh card says neither: the ready count beside it is the news. */}
-        {resting ? null : night && (live || night.features.length > 0) ? (
-          <Totals night={night} />
-        ) : (
-          <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
-        )}
-        {/* What there is left for it to pick up, which nothing else on the card
+          {resting ? null : night && (live || night.features.length > 0) ? (
+            <Totals night={night} />
+          ) : (
+            <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
+          )}
+          {/* What there is left for it to pick up, which nothing else on the card
             can say: the budget counts what a night has spent, and a night with
             three features left in it and nothing ready stops on its next tick.
             In features because that is what a tick fires and what the budget is
             spent in -- the ask on note 2721ff74 was "features (not steps)".
             Said in both states, because before bed it is what decides whether
             to start a night at all. */}
-        <p className="text-small text-ink-muted">{readyFeaturesLine(ready, readySteps)}</p>
-        {goalsReady && <p className="text-small text-ink-muted">{goalsReady}</p>}
+          <p className="text-small text-ink-muted">{readyFeaturesLine(ready, readySteps)}</p>
+          {goalsReady && <p className="text-small text-ink-muted">{goalsReady}</p>}
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {standing === 'running' && (
-            <form action={pauseAction}>
-              <Button
-                type="submit"
-                size="sm"
-                variant="secondary"
-                pending={pausing}
-                title="Fire nothing more. What is already building finishes and commits."
-              >
-                <Pause className="size-3.5" aria-hidden />
-                {pausing ? 'Holding…' : 'Hold'}
-              </Button>
-            </form>
-          )}
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {standing === 'running' && (
+              <form action={pauseAction}>
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="secondary"
+                  pending={pausing}
+                  title="Fire nothing more. What is already building finishes and commits."
+                >
+                  <Pause className="size-3.5" aria-hidden />
+                  {pausing ? 'Holding…' : 'Hold'}
+                </Button>
+              </form>
+            )}
 
-          {standing === 'paused' && (
-            <form action={resumeAction}>
-              <Button
-                type="submit"
-                size="sm"
-                variant="secondary"
-                pending={resuming}
-                title="Carry on from wherever the plan now is, on what is left of the budget and the clock"
-              >
-                <Play className="size-3.5" aria-hidden />
-                {resuming ? 'Resuming…' : 'Resume'}
-              </Button>
-            </form>
-          )}
+            {standing === 'paused' && (
+              <form action={resumeAction}>
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="secondary"
+                  pending={resuming}
+                  title="Carry on from wherever the plan now is, on what is left of the budget and the clock"
+                >
+                  <Play className="size-3.5" aria-hidden />
+                  {resuming ? 'Resuming…' : 'Resume'}
+                </Button>
+              </form>
+            )}
 
-          {(standing === 'running' || standing === 'paused') && (
-            <form action={stopAction}>
-              <Button
-                type="submit"
-                size="sm"
-                variant="ghost"
-                pending={stopping}
-                title="End the night. What is already building still finishes; nothing follows it."
-              >
-                <Square className="size-3.5" aria-hidden />
-                {stopping ? 'Stopping…' : 'Stop'}
-              </Button>
-            </form>
-          )}
+            {(standing === 'running' || standing === 'paused') && (
+              <form action={stopAction}>
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="ghost"
+                  pending={stopping}
+                  title="End the night. What is already building still finishes; nothing follows it."
+                >
+                  <Square className="size-3.5" aria-hidden />
+                  {stopping ? 'Stopping…' : 'Stop'}
+                </Button>
+              </form>
+            )}
 
-          {/* The start form is the whole of the resting state, so it stands
+            {/* The start form is the whole of the resting state, so it stands
               open rather than behind a trigger: two fields with their defaults
               already right is not a compose box, and the press this control
               exists for is the one made on the way to bed. */}
-          {(standing === 'off' || standing === 'stopped') && (
-            <form action={startAction} className="flex flex-wrap items-center gap-2">
-              {/* The features field goes away on "until I stop it" rather than
+            {(standing === 'off' || standing === 'stopped') && (
+              <form action={startAction} className="flex flex-wrap items-center gap-2">
+                {/* The features field goes away on "until I stop it" rather than
                   greying out: a cap that does not apply is a number to wonder
                   about, and the sentence reads as one thing either way. */}
-              {!keepGoing && (
-                <>
-                  <span className="text-small text-ink-muted">Up to</span>
-                  <Input
-                    type="number"
-                    name="features"
-                    min={1}
-                    max={OVERNIGHT_FEATURE_CAP}
-                    step={1}
-                    defaultValue={OVERNIGHT_DEFAULT_FEATURES}
-                    aria-label="Features it may fire"
-                    className="w-16"
-                  />
-                  <span className="text-small text-ink-muted">features, over</span>
-                </>
-              )}
-              {keepGoing && <span className="text-small text-ink-muted">Run</span>}
-              <Select
-                name="hours"
-                value={hours}
-                onChange={(event) => setHours(Number(event.target.value))}
-                aria-label="How long it may run for"
-                className="w-auto"
-              >
-                {/* First, because it is the default and the ordinary press. */}
-                <option value={OVERNIGHT_NO_LIMIT}>until I stop it</option>
-                {OVERNIGHT_HOUR_CHOICES.map((choice) => (
-                  <option key={choice} value={choice}>
-                    {choice === 1 ? '1 hour' : `${choice} hours`}
-                  </option>
-                ))}
-              </Select>
-              <Button type="submit" size="sm" pending={starting} disabled={!canSend}>
-                {starting ? 'Starting…' : 'Start'}
-              </Button>
-            </form>
-          )}
+                {!keepGoing && (
+                  <>
+                    <span className="text-small text-ink-muted">Up to</span>
+                    <Input
+                      type="number"
+                      name="features"
+                      min={1}
+                      max={OVERNIGHT_FEATURE_CAP}
+                      step={1}
+                      defaultValue={OVERNIGHT_DEFAULT_FEATURES}
+                      aria-label="Features it may fire"
+                      className="w-16"
+                    />
+                    <span className="text-small text-ink-muted">features, over</span>
+                  </>
+                )}
+                {keepGoing && <span className="text-small text-ink-muted">Run</span>}
+                <Select
+                  name="hours"
+                  value={hours}
+                  onChange={(event) => setHours(Number(event.target.value))}
+                  aria-label="How long it may run for"
+                  className="min-h-11 w-auto sm:min-h-0"
+                >
+                  {/* First, because it is the default and the ordinary press. */}
+                  <option value={OVERNIGHT_NO_LIMIT}>until I stop it</option>
+                  {OVERNIGHT_HOUR_CHOICES.map((choice) => (
+                    <option key={choice} value={choice}>
+                      {choice === 1 ? '1 hour' : `${choice} hours`}
+                    </option>
+                  ))}
+                </Select>
+                <Button type="submit" size="sm" pending={starting} disabled={!canSend}>
+                  {starting ? 'Starting…' : 'Start'}
+                </Button>
+              </form>
+            )}
+          </div>
         </div>
       </div>
 
