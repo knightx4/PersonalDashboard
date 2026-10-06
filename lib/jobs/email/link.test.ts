@@ -14,6 +14,7 @@ import {
   isDatePlausible,
   mentionsRoleTitle,
   normalizeCompanyName,
+  roleHintFor,
   scoreCandidate,
   titleSimilarity,
   type LinkCandidate,
@@ -703,5 +704,40 @@ describe('the acceptance criteria', () => {
       candidate({ atsJobId: null, roleTitle: 'Warehouse Operative' }),
     );
     expect(wrong.confidence).toBeLessThan(right.confidence);
+  });
+});
+
+describe('roleHintFor (note b48d2b61)', () => {
+  const strategist = candidate({ applicationId: 'a-ds', roleTitle: 'Deployment Strategist' });
+  const opsLead = candidate({ applicationId: 'a-ops', roleTitle: 'Strategy and Ops Leader' });
+
+  it('keeps the role the extractor read', () => {
+    expect(roleHintFor(message({ extractedRole: ' Deployment Strategist ' }), [opsLead])).toBe('Deployment Strategist');
+  });
+
+  it('falls back to the role the body names word for word', () => {
+    const input = message({
+      extractedRole: null,
+      subject: 'Thanks for applying',
+      bodyPreview: 'Thanks for applying to the Deployment Strategist role at Moment.',
+    });
+    expect(roleHintFor(input, [opsLead, strategist])).toBe('Deployment Strategist');
+  });
+
+  it('has nothing to keep when neither names a role', () => {
+    expect(roleHintFor(message({ extractedRole: null, subject: 'Hello', bodyPreview: 'Hi there.' }), [opsLead])).toBeNull();
+  });
+
+  it('separates two roles at one company once the review queue scores with it', () => {
+    // As the review page scores a held message: no body, the hint as the role.
+    const held = message({
+      subject: 'Thanks for applying',
+      bodyPreview: null,
+      extractedCompany: null,
+      extractedRole: 'Deployment Strategist',
+    });
+    const right = scoreCandidate(held, strategist).confidence;
+    const wrong = scoreCandidate(held, opsLead).confidence;
+    expect(right).toBeGreaterThan(wrong);
   });
 });
