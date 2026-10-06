@@ -9,7 +9,8 @@ import { GoalStatusCard } from '@/app/goals/[goalId]/goal-status';
 import { FileBody } from '@/components/files/file-body';
 import { FileLinks } from '@/components/files/file-links';
 import { GoalNumber } from '@/app/goals/[goalId]/goal-number';
-import { GoalFog, GoalShaping } from '@/app/goals/[goalId]/goal-shaping';
+import { WaitingOnYou } from '@/app/goals/[goalId]/goal-flags';
+import { GoalFog, GoalShaping, RunHistory } from '@/app/goals/[goalId]/goal-shaping';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
 import type { InformationSeam } from '@/app/goals/[goalId]/information-step';
 import type { StepAnswer } from '@/lib/goals/answers';
@@ -552,19 +553,71 @@ export function FileSurface() {
 }
 
 /**
- * The top of a goal page that has something in each section: the Claude
- * line, the number with four monthly readings, and one Learn goal linked. The
- * page header is the real one; the back link above it is the page's own and
- * is left out.
+ * The top of a goal page that has something in each part of its header
+ * (plan #1078): Dash's verdict and the status line, the next move, Dash's
+ * note folded, Ask Dash, the number with four monthly readings, and Waiting
+ * on you with a question to answer in place and a result to read. Under it,
+ * one Learn goal linked and a file, as More holds them. The page header is
+ * the real one; the back link above it is the page's own and is left out.
  */
 export function GoalTopSurface() {
+  const which = {
+    ...step('which', {
+      title: 'Which card first?',
+      kind: 'decision',
+      detail:
+        'A — The 27% card. Saves the most interest.\nB — The smaller balance. Closes one card soonest.\nRecommend A.',
+    }),
+    children: [],
+  };
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title={cards.title} description={cards.acceptance ?? undefined} />
       <div className="space-y-6">
-        <GoalStatusCard
-          status={{
-            yourMove: [
+        <div className="space-y-4">
+          <GoalStatusCard
+            line="3 on you · 1 step ready for Dash · due 30 Jun"
+            brief={{
+              id: 'brief-1',
+              itemId: cards.id,
+              runId: null,
+              body: 'Down to **$6,980** from $8,420 in June, about $480 a month, which clears both cards by next June. I compared the two rates ([the file](#)): paying the 27% card first saves about $310. Answering *Which card first?* settles the next three steps.',
+              createdAt: '2026-09-25T08:00:00Z',
+            }}
+            briefWhen="today"
+            current
+            review={{
+              id: 'rev-1',
+              goalId: cards.id,
+              verdict: 'waiting_on_you',
+              reason: 'Two steps closed this week and the next one is yours.',
+              nextMove: 'Answer “Which card first?” so Dash can plan the payments.',
+              nextOn: null,
+              stepId: null,
+              waitsOnId: null,
+              runId: null,
+              createdAt: '2026-09-21T08:00:00Z',
+            }}
+            ask={
+              <GoalShaping
+                goalId={cards.id}
+                approval={approvalLine({
+                  goalStatus: 'open',
+                  approvedAt: '2026-09-01T09:00:00Z',
+                  proposed: 0,
+                  questions: 1,
+                })}
+                runs={cardRuns}
+                moreRuns={false}
+                running={null}
+                canRun
+                quiet
+              />
+            }
+          />
+          <GoalNumber goalId={cards.id} unit="$" target={0} readings={readings} today={TODAY} />
+          <WaitingOnYou
+            rows={[
               {
                 id: 'which',
                 kind: 'question',
@@ -586,85 +639,20 @@ export function GoalTopSurface() {
                 title: 'Call the card company',
                 href: '#step-call',
               },
-            ],
-            moreSteps: 2,
-            claudeReady: 1,
-            claudeHeld: 0,
-          }}
-          brief={{
-            id: 'brief-1',
-            itemId: cards.id,
-            runId: null,
-            body: 'Down to **$6,980** from $8,420 in June, about $480 a month, which clears both cards by next June. I compared the two rates ([the file](#)): paying the 27% card first saves about $310. Answering *Which card first?* settles the next three steps.',
-            createdAt: '2026-09-25T08:00:00Z',
-          }}
-          briefWhen="today"
-          current
-          stages={[
-            {
-              id: 's1',
-              title: 'Know what you owe',
-              index: 1,
-              state: 'done',
-              done: 3,
-              live: 3,
-              waitsOn: [],
-              waitsElsewhere: false,
-            },
-            {
-              id: 's2',
-              title: 'Pay the dearest card first',
-              index: 2,
-              state: 'current',
-              done: 1,
-              live: 4,
-              waitsOn: [],
-              waitsElsewhere: false,
-            },
-            {
-              id: 's3',
-              title: 'Both cards at zero',
-              index: 3,
-              state: 'waiting',
-              done: 0,
-              live: 2,
-              waitsOn: [2],
-              waitsElsewhere: false,
-            },
-          ]}
-          review={{
-            id: 'rev-1',
-            goalId: cards.id,
-            verdict: 'waiting_on_you',
-            reason: 'Two steps closed this week and the next one is yours.',
-            nextMove: 'Answer “Which card first?” on the goal.',
-            nextOn: null,
-            stepId: null,
-            waitsOnId: null,
-            runId: null,
-            createdAt: '2026-09-21T08:00:00Z',
-          }}
-        />
-        <GoalShaping
-          goalId={cards.id}
-          approval={approvalLine({
-            goalStatus: 'open',
-            approvedAt: '2026-09-01T09:00:00Z',
-            proposed: 0,
-            questions: 1,
-          })}
-          runs={cardRuns}
-          moreRuns={false}
-          running={null}
-          canRun
-        />
-        <GoalNumber goalId={cards.id} unit="$" target={0} readings={readings} today={TODAY} />
+            ]}
+            flags={[]}
+            questions={{ which }}
+          />
+        </div>
         <GoalLinksSection goalId={cards.id} links={links} aimChoices={aimChoices} jobsOn />
         <section aria-labelledby="files-heading" className="space-y-2">
           <h2 id="files-heading" className="px-1 text-ui font-semibold text-ink">
             Files
           </h2>
           <FileLinks files={cardFiles} />
+        </section>
+        <section aria-label="Runs" className="px-1">
+          <RunHistory runs={cardRuns} more={false} />
         </section>
       </div>
     </div>
@@ -695,6 +683,7 @@ export function GoalBareSurface() {
           moreRuns={false}
           running={null}
           canRun
+          quiet
         />
         <GoalAddRow
           number={number}
