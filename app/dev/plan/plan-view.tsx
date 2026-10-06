@@ -107,6 +107,9 @@ const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> 
   },
 };
 
+/** The view names on the chip row: the shared ones, with the whole plan as "All". */
+const PLAN_CHIP_LABEL = { ...VIEW_LABEL, all: 'All' };
+
 /**
  * The numbers across the plan, and the views over it.
  *
@@ -123,7 +126,7 @@ function SummaryStrip({
   view: View;
   basePath: string;
 }) {
-  const facts: Array<{ view: View | null; value: number; noun: string }> = [
+  const counts: Array<{ view: View | null; value: number; noun: string }> = [
     { view: 'open', value: summary.open, noun: 'open' },
     // Second, because it is the one number on this line that is a request.
     { view: 'you', value: summary.onYou, noun: 'on you' },
@@ -139,7 +142,11 @@ function SummaryStrip({
     { view: null, value: summary.inProgress, noun: 'underway' },
     { view: 'claude', value: summary.claude, noun: "Dash's" },
     { view: null, value: summary.done, noun: 'done' },
+    // A zero says nothing is there, which the missing count says as well and
+    // in less room (law 1): at 390 the three zeros took a line of their own.
+    // Open stays, since "0 open" is the answer to the page's first question.
   ];
+  const facts = counts.filter((fact) => fact.value > 0 || fact.noun === 'open');
 
   return (
     <div className={cn(cardVariants({ padding: 'dense' }), 'flex flex-wrap items-center gap-x-4 gap-y-2')}>
@@ -161,11 +168,15 @@ function SummaryStrip({
         )}
       </p>
       <ViewChips
-        className="ml-auto"
+        // Pushed right only beside the counts; on a phone it has a line of its
+        // own and starts at the edge like everything else.
+        className="-ml-2.5 sm:ml-auto [&>*:last-child]:ml-1.5"
         view={view}
         chips={PLAN_VIEW_CHIPS}
         menu={PLAN_VIEW_MENU}
-        labels={VIEW_LABEL}
+        // "All" rather than "Everything" on this row, so the chips and More
+        // stay on one line at 390 (taste: categories-one-line).
+        labels={PLAN_CHIP_LABEL}
         hrefOf={(chip) => viewHref(chip, basePath)}
       />
     </div>

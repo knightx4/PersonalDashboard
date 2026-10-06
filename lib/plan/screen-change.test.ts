@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  appendCommentLine,
   isBeforeShot,
   ownsShotPath,
   screenChanges,
   screenChangeViews,
+  sentBackLine,
+  surfacesChangedWithin,
   shotHref,
   type ScreenCheckRow,
 } from './screen-change';
@@ -126,5 +129,63 @@ describe('shot paths', () => {
     expect(ownsShotPath(USER, `someone-else/1541/s/r1/phone-light.png`)).toBe(false);
     expect(ownsShotPath(USER, `${USER}/../other/s/r1/phone-light.png`)).toBe(false);
     expect(ownsShotPath(USER, `${USER}/1541/s/r1/phone-light.jpg`)).toBe(false);
+  });
+});
+
+describe('surfacesChangedWithin', () => {
+  const now = new Date('2026-10-06T12:00:00Z');
+  const change = (surface: string, checkedAt: string) => ({
+    surface,
+    round: 1,
+    verdict: 'pass' as const,
+    checkedAt,
+    before: null,
+    after: null,
+  });
+
+  it('keeps only surfaces changed in the last seven days', () => {
+    const found = surfacesChangedWithin(
+      {
+        1500: [change('dev-ui', '2026-09-28T12:00:00Z')],
+        1541: [change('dev-plan-tree', '2026-10-05T10:00:00Z')],
+        1542: [change('dev-surfaces', '2026-09-29T12:00:00Z')],
+      },
+      now,
+    );
+    expect([...found.keys()].sort()).toEqual(['dev-plan-tree', 'dev-surfaces']);
+    expect(found.get('dev-surfaces')).toEqual({ step: 1542, checkedAt: '2026-09-29T12:00:00Z' });
+  });
+
+  it('names the latest step when two changed the same surface', () => {
+    const found = surfacesChangedWithin(
+      {
+        1541: [change('dev-plan-tree', '2026-10-05T10:00:00Z')],
+        1540: [change('dev-plan-tree', '2026-10-01T10:00:00Z')],
+      },
+      now,
+    );
+    expect(found.get('dev-plan-tree')?.step).toBe(1541);
+  });
+});
+
+describe('sentBackLine and appendCommentLine', () => {
+  it('dates the line and names the surface', () => {
+    expect(sentBackLine({ date: '2026-10-06', surface: 'dev-surfaces', words: ' Too\n cramped. ' })).toBe(
+      'Sent back 2026-10-06 from the dev-surfaces pictures: Too cramped.',
+    );
+  });
+
+  it('clips long words in the line', () => {
+    const line = sentBackLine({ date: '2026-10-06', surface: 's', words: 'x'.repeat(3000) });
+    expect(line.length).toBeLessThan(1100);
+    expect(line.endsWith('…')).toBe(true);
+  });
+
+  it('appends under the comment and keeps the newest text within the limit', () => {
+    expect(appendCommentLine(null, 'new')).toBe('new');
+    expect(appendCommentLine('old', 'new')).toBe('old\n\nnew');
+    const long = appendCommentLine('o'.repeat(3990), 'the newest line');
+    expect(long.length).toBe(4000);
+    expect(long.endsWith('the newest line')).toBe(true);
   });
 });

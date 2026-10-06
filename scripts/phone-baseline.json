@@ -29,9 +29,6 @@
   "dev-posts": {
     "targets": 1
   },
-  "dev-surfaces": {
-    "targets": 2
-  },
   "dev-ui": {
     "targets": 55,
     "contrast": 11
