@@ -22,9 +22,8 @@ function Picture({ src, alt, className }: { src: string; alt: string; className?
         src={src}
         alt={alt}
         loading="lazy"
-        // ui-ok: the edge of a photograph of a screen, so a dark shot keeps its outline on the panel
         className={cn(
-          'aspect-[9/16] w-full rounded-md border border-border bg-sunken object-cover object-top',
+          'aspect-[9/16] w-full rounded-md border border-border bg-sunken object-cover object-top' /* ui-ok: a photograph of a phone screen, not a container; the hairline keeps a shot whose ground matches the panel from dissolving into it */,
           className,
         )}
       />
