@@ -118,21 +118,39 @@ function DashTodayRow({
     });
   }
 
+  const time = formatClock(entry.at, { timeZone: timezone });
   return (
     <li className="py-2">
       <div className="flex items-baseline gap-3">
-        <span className="tabular w-12 shrink-0 text-small text-ink-muted">
-          {formatClock(entry.at, { timeZone: timezone })}
-        </span>
-        <p className={undone ? 'min-w-0 flex-1 text-ui text-ink-muted' : 'min-w-0 flex-1 text-ui text-ink'}>
-          {entry.href && !undone ? (
-            <Link href={entry.href} className="hover:text-accent">
-              {entry.sentence}
-            </Link>
-          ) : (
-            entry.sentence
-          )}
-        </p>
+        <span className="tabular hidden w-16 shrink-0 text-small text-ink-muted sm:block">{time}</span>
+        <div className="min-w-0 flex-1">
+          <p className={undone ? 'text-ui text-ink-muted' : 'text-ui text-ink'}>
+            {entry.href && !undone ? (
+              <Link href={entry.href} className="hover:text-accent">
+                {entry.sentence}
+              </Link>
+            ) : (
+              entry.sentence
+            )}
+          </p>
+          {/* On a phone the time sits on this quiet line, so the sentence
+              has the row's width; from sm up it has its own column. */}
+          <p className={entry.from ? 'text-small text-ink-muted' : 'text-small text-ink-muted sm:hidden'}>
+            <span className="tabular sm:hidden">{time}</span>
+            {entry.from && (
+              <>
+                <span className="sm:hidden" aria-hidden>
+                  {' · '}
+                </span>
+                <Link href={entry.from} className="hover:text-accent">
+                  From your comment
+                </Link>
+              </>
+            )}
+          </p>
+          {entry.noUndo && !undone && <p className="text-small text-ink-muted">{entry.noUndo}</p>}
+          {error && <FieldError>{error}</FieldError>}
+        </div>
         {undone ? (
           <span className="inline-flex shrink-0 items-center gap-1 text-small font-medium text-ink-muted">
             <Undo2 className="size-3.5" strokeWidth={2} aria-hidden />
@@ -153,19 +171,6 @@ function DashTodayRow({
           </Button>
         )}
       </div>
-      {entry.noUndo && !undone && <p className="pl-15 text-small text-ink-muted">{entry.noUndo}</p>}
-      {entry.from && (
-        <p className="pl-15 text-small text-ink-muted">
-          <Link href={entry.from} className="hover:text-accent">
-            From your comment
-          </Link>
-        </p>
-      )}
-      {error && (
-        <div className="pl-15">
-          <FieldError>{error}</FieldError>
-        </div>
-      )}
     </li>
   );
 }
