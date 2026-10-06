@@ -1,6 +1,6 @@
 ---
 name: notes
-description: Work the queue of in-app bug reports and feature requests in feedback_items — triage, fix one at a time, verify, commit, and close each with a reason. Use when the user says "knock out the notes", "work my feedback", "do my bug reports", or asks what is outstanding.
+description: Work the queue of in-app bug reports and feature requests in feedback_items — triage, group by shared cause and by area, fix group by group, verify, commit, and close each with a reason. Use when the user says "knock out the notes", "work my feedback", "do my bug reports", or asks what is outstanding.
 ---
 
 # Working the notes queue
@@ -134,17 +134,20 @@ one is a debt: every run ends by listing them to the user.
 
 ## The loop
 
-Run this for each note, one at a time. Do not start the next until the current
-one is closed.
+Run this for each note, one at a time and group by group (*Grouping the
+batch*). Do not start the next until the current one is closed. A same-cause
+group counts as one note.
 
-1. **Read the queue.** `list` orders it correctly: bugs before features, then
-   priority, then oldest. Work it top to bottom. State the plan for the batch
-   before starting — how many notes, and in what order.
+1. **Read the queue and group it.** `list` orders it bugs first, then by
+   priority, then oldest. That is the order for choosing what matters, and
+   not the order to work in.
 
    Before claiming anything, do the two checks in *Requests that point at a
    missing rule* below: settle the notes waiting on a spec change that has
    since been decided, and look for a request filed on three pages. A note
-   that goes into a proposed rule leaves the batch.
+   that goes into a proposed rule leaves the batch. Then group what is left,
+   as *Grouping the batch* says, and state the plan for the batch: each
+   group, its notes, and why they are together.
 2. **Claim one.** `start <id>`. Read it with `show <id>`, which prints the
    thread under the note as well as its text, and re-read the page path — it
    says where the user was standing. Read the thread before starting: an
@@ -187,7 +190,9 @@ one is closed.
    so when you close it.
 6. **Commit the note on its own.** One note per commit, so a change can be
    traced back to the ask and reverted alone. End the subject with the short
-   id: `Fix the shelf photo picker (note 3f9c1a2b)`.
+   id: `Fix the shelf photo picker (note 3f9c1a2b)`. A same-cause group is
+   the one exception: its single fix is one commit naming every note in it,
+   `Search reads goal files and interview notes (notes 3d0b5fd8, f02c0850)`.
 7. **Do not close it yet.** Write down its id, its commit and the one-sentence
    resolution, and leave it `in_progress`. A note's commit on the batch branch
    is not shipped, and the queue must not say it is.
@@ -199,6 +204,50 @@ one is closed.
 the dependencies are installed. The SessionStart hook in `.claude/hooks/`
 does that before the session starts; if it has not run for some reason,
 `npm install` first rather than reading the failure as a broken repo.
+
+## Grouping the batch
+
+Worked in `list` order, a batch moves from Goals to Jobs to Learn and back,
+and reads the same large files again each time it returns. Twenty notes from
+two days on 4 and 5 October 2026 held four about one search gap and nine on
+the Goals pages. Group the queue before claiming anything, so each file is
+read once and each cause is fixed once.
+
+There are two kinds of group, and a note is in at most one.
+
+**Same cause.** Notes that one change fixes, however differently they are
+worded and whatever page they were filed on. "Dash couldn't find my interview
+notes" and "the command search can't see goal files" are one note if both go
+through the same search and the fix is to widen what it reads. Wording,
+`triage.duplicate` (a guess made when the note was filed) and the page paths
+are enough to suspect a group, and not enough to work one. Confirm it in the
+code when its first note is claimed: name the function or file the fix goes
+in, and the notes that name the same one stay in the group. A note that turns
+out to need a different fix goes back to its area. This is a different test from *Requests that point at a missing
+rule*, which is the same behaviour asked for on three pages and settled by a
+rule in a spec. A same-cause group shares one code path.
+
+Work a same-cause group as one note. Claim every note in it, make one fix,
+commit it once (step 6), and close each note against that commit with its own
+resolution saying what it now does for that note's page. When the shared fix
+is too large for a batch, block every note in the group with the same proposed
+split, and name the other notes in each block note so the answer to one
+settles them all.
+
+**Same area.** The rest, grouped by the code they touch. The page path's
+first segment names the workspace, so `/goals/files` and `/goals/runs` are both
+Goals. Split a workspace by its second segment when its notes touch separate
+parts of it, so `/learn/videos` is the video player and `/learn/r/…` the
+reader. `triage.module` is a hint for
+a note whose page path says little, such as one filed from Home; it is often
+wrong, so the page path wins when they disagree. Work one area to the end
+before starting the next.
+
+**Order.** A group that holds a bug goes before any group that does not, and
+groups holding bugs go in the order of their most urgent bug in `list`. Groups
+without bugs follow, by their most urgent note. Inside an area, keep `list`
+order. A run that cannot finish the queue finishes whole groups, and leaves
+whole groups for the next run, rather than one note from each area.
 
 ## Requests that point at a missing rule
 
@@ -511,9 +560,9 @@ closed notes, so a missed update costs only the two hours until it looks.
 outcome — done, blocked, planned or declined. It is the first thing in the
 report, not an appendix:
 
-| Note | Type | Page | Issue | Result |
-|---|---|---|---|---|
-| `3f9c1a2b` | Bug | `/sell` | what they wrote, quoted or trimmed | One sentence: what changed and the commit, or what it is waiting on. |
+| Note | Group | Type | Page | Issue | Result |
+|---|---|---|---|---|---|
+| `3f9c1a2b` | Sell | Bug | `/sell` | what they wrote, quoted or trimmed | One sentence: what changed and the commit, or what it is waiting on. |
 
 For surface notes, say which law each one turned out to be, and where else that
 law was broken and fixed — the count of other places is the thing worth
