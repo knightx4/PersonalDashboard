@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Repeat } from 'lucide-react';
+import { Repeat } from 'lucide-react';
 import { RowIconButton } from '@/components/plan-tree/row-icon-button';
 import { StateLabel } from '@/components/dev/state-label';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
@@ -189,11 +189,14 @@ function idsBeneath(node: GoalRowNode): string[] {
  * progress only beneath it says when and on which step instead.
  */
 function ProgressLine({
+  goalId,
   progress,
   beneath,
   total,
   inset,
 }: {
+  /** The goal the step is under, whose page the step beneath is on. */
+  goalId: string;
   progress: ItemProgress | undefined;
   beneath: LatestBeneath | undefined;
   total: { quantity: number | null | undefined; unit: string | null | undefined };
@@ -226,9 +229,12 @@ function ProgressLine({
   return (
     <li style={inset} className="pb-1.5 pr-3 text-small text-ink-muted">
       Last progress {formatDate(beneath.on)} on{' '}
-      <a href={`#step-${beneath.stepId}`} className="underline-offset-2 hover:underline">
+      <Link
+        href={stepHref(goalId, beneath.stepId)}
+        className="press-area underline-offset-2 hover:underline"
+      >
         {beneath.title}
-      </a>
+      </Link>
     </li>
   );
 }
@@ -695,6 +701,9 @@ export function GoalRow({
       menu={menu}
       actions={GOAL_TREE_ACTIONS}
       anchorId={`step-${step.id}`}
+      // The title opens the step's own page (plan #1621); the chevron still
+      // opens the row in place, for editing here.
+      titleHref={page ? undefined : stepHref(fromGoal?.id ?? context.goalId, step.id)}
       source={fromGoal ? `From ${fromGoal.title}` : undefined}
       // What a step waiting on you is waiting for (note 5aa7216c), or the
       // steps and questions it waits on (plan #1159), as the dev plan's Needs
@@ -774,6 +783,7 @@ export function GoalRow({
           {draft && <DashDraft {...draft} inset={rowInset(trail)} />}
           {stepOpen && (
             <ProgressLine
+              goalId={fromGoal?.id ?? context.goalId}
               progress={progress}
               beneath={context.progressBeneath?.[step.id]}
               total={{ quantity: step.estimatedTotal, unit: step.totalUnit }}
@@ -803,7 +813,7 @@ export function GoalRow({
           {/* What Dash wrote is the fold under the row (DashDraft); here
               only the files a step of another kind links to. */}
           {!draft && stepFiles.length > 0 && <StepFiles files={stepFiles} />}
-          {prep && !prep.done && <PrepNote prep={prep} />}
+          {prep && !prep.done && <PrepNote goalId={context.goalId} prep={prep} />}
           {progress && <ProgressList progress={progress} />}
           {rhythm && rhythm.past.length > 0 && step.rhythmPeriod && (
             <PastPeriods past={rhythm.past} period={step.rhythmPeriod} />
@@ -843,9 +853,9 @@ export function GoalRow({
             </span>
           )}
           {prepares && (
-            <a href={`#step-${prepares.id}`} className="underline">
+            <Link href={stepHref(context.goalId, prepares.id)} className="press-area underline">
               For {prepares.title}
-            </a>
+            </Link>
           )}
           {onTodo && <span>On Todo</span>}
           {links.map((link) => (
@@ -858,10 +868,9 @@ export function GoalRow({
             <Link
               href={stepHref(fromGoal?.id ?? context.goalId, step.id)}
               aria-label={`Open ${step.title} on its own page`}
-              className="press-area inline-flex items-center gap-0.5 underline"
+              className="press-area underline"
             >
               Open
-              <ArrowUpRight className="size-3" strokeWidth={1.75} aria-hidden />
             </Link>
           )}
         </p>

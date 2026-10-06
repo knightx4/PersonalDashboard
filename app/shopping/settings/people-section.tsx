@@ -52,7 +52,7 @@ export function PeopleSection({ people }: { people: Person[] }) {
         </div>
         <input type="hidden" name="colour" value={colour} />
         <ColourPicker value={colour} onChange={setColour} />
-        <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+        <Button type="submit" size="sm" variant="secondary" pending={pending}>
           {pending ? 'Adding…' : 'Add person'}
         </Button>
       </form>
@@ -97,7 +97,7 @@ function PersonRow({ person, canRemove }: { person: Person; canRemove: boolean }
       )}
 
       {dirty && (
-        <Button type="button" size="sm" disabled={pending} onClick={save}>
+        <Button type="button" size="sm" pending={pending} onClick={save}>
           {pending ? 'Saving…' : 'Save'}
         </Button>
       )}

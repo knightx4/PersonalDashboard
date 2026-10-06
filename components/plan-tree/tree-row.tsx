@@ -8,6 +8,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
+import Link from 'next/link';
 import { ChevronDown, HelpCircle, Wrench } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
@@ -204,7 +205,15 @@ export function TreeRow<E extends TreeCatalogEntry>({
   layout = 'grid',
   after,
   heading = false,
+  titleHref,
 }: {
+  /**
+   * Where the title goes, when the row has a page of its own (a goal step's,
+   * plan #1621). The title is then a link to it, and the chevron in the fold
+   * slot opens the panel in place, on a leaf as well. The dev plan passes
+   * none, so its titles stay the fold.
+   */
+  titleHref?: string;
   /**
    * The row is what its page is about (a goal step's own page, plan #1620):
    * the title is the page's heading rather than a fold, since the page is the
@@ -343,6 +352,16 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // panel condenses the panel and leaves the sub-steps.
   const foldable = hasChildren || foldableFog;
   const expanded = open || (foldable && showChildren);
+  // A leaf has nothing to fold, so its chevron (drawn when the title links
+  // away) opens and closes the panel, and says so.
+  const foldLabel = foldable
+    ? `${expanded ? 'Fold' : 'Unfold'} #${handle}`
+    : `${expanded ? 'Close' : 'Open'} #${handle}`;
+  const titleClass = cn(
+    'min-w-0',
+    open ? 'break-words' : 'break-words sm:truncate',
+    node.status === 'dropped' && 'text-ink-muted line-through',
+  );
   const toggle = () => {
     const next = !expanded;
     setOpen(next);
@@ -359,6 +378,12 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // On the step's own page the details are what the page is for, so they
   // do not fold.
   const condensable = hasChildren && showChildren && !heading;
+  // The first line of the detail, or of the done-when, without markdown's
+  // link brackets: what a folded panel shows beside Show details.
+  const foldedPreview = (node.detail ?? node.acceptance ?? '')
+    .split('\n')
+    .map((line) => line.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/[*_#>`]/g, '').trim())
+    .find((line) => line.length > 0);
 
   // A link to this row by its own id (a goal step from the Goals home, or
   // from Go to the step under a finding) opens its panel as well as scrolling
@@ -427,6 +452,109 @@ export function TreeRow<E extends TreeCatalogEntry>({
     />
   );
 
+  // What the title cell says: the title and the lines under it. A button
+  // that folds the row, or, where the title links to the step's own page, a
+  // plain cell beside the chevron that folds it.
+  const rowLines = (
+    <>
+      <span
+        className={cn(
+          'flex min-w-0 items-baseline gap-1.5 text-ui',
+          trail.length === 0 ? 'font-medium text-ink' : 'text-ink',
+        )}
+      >
+        {/* Where the row sits, not just what it is called: a feature
+              reads #595 and its second step reads #595.2, so a step says
+              which feature it belongs to and how far through it is
+              without the tree guides having to be traced up by eye.
+              `number` is still the handle -- it is what the commits, the
+              comments and the CLI say, it is the anchor a `#597` link
+              lands on, and the button around this says "Open #597" -- and
+              the search box takes either. */}
+        {!list && (
+          <span className="tabular shrink-0 text-small text-ink-ghost">#{node.outline}</span>
+        )}
+        {/* Truncated closed, whole open. A row is a line and a long title
+         * has to give way to keep it one; but opening the step is the
+         * gesture that means "show me this one", and a name still cut
+         * off after it leaves no way to read it at all. On a phone it
+         * wraps closed as well: the name cell there is what is left
+         * after the health and the menu, which cut titles to two words
+         * (plan #1041). */}
+        {titleHref ? (
+          <Link
+            href={titleHref}
+            className={cn(
+              titleClass,
+              'press-area underline-offset-2 hover:text-accent hover:underline',
+            )}
+          >
+            {node.title}
+          </Link>
+        ) : (
+          <span className={titleClass}>{node.title}</span>
+        )}
+        {/* A question waiting on this step, said on the row. The section
+         * that answers it is behind the fold, and a question nobody
+         * knows is there is the thing this whole section exists to
+         * stop. */}
+        {unanswered > 0 && !open && (
+          <span
+            title={`${unanswered} unanswered ${unanswered === 1 ? 'question' : 'questions'}`}
+            className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution"
+          >
+            <HelpCircle className="size-3" strokeWidth={2} aria-hidden />
+            {unanswered}
+            <span className="sr-only">
+              unanswered {unanswered === 1 ? 'question' : 'questions'}
+            </span>
+          </span>
+        )}
+        {/* And whether anything has been said about it. */}
+        <CommentCount count={node.thread.length} />
+        {marks}
+      </span>
+      {/* Where it came from, when it did not come from you. On the row
+            and not behind the fold, because a step that appeared under a
+            feature you approved last week is exactly the one you would
+            never think to open. */}
+      {origin && (
+        <span className="block truncate text-small text-ink-ghost">
+          From #{origin.number}&apos;s answer: {origin.gist}
+        </span>
+      )}
+      {/* The same, for a step a session wrote ready to build. Approval
+            stops at the feature, so this row never asked you; saying so
+            is what the Drop at the top of its menu is for. */}
+      {addedBy && (
+        <span
+          title={addedBy.session ? `Session ${addedBy.session}` : undefined}
+          className="block truncate text-small text-ink-ghost"
+        >
+          <DashCredit />
+          Added by Dash on {addedBy.date}
+        </span>
+      )}
+      {source && <span className="block truncate text-small text-ink-ghost">{source}</span>}
+      {need && !open && (
+        <span className="block truncate text-small text-ink">
+          <span className="font-medium text-caution">Needs: </span>
+          {need}
+        </span>
+      )}
+      {gloss && !open && !need && (
+        <span className="block truncate text-small text-ink-muted">
+          {!node.detail && 'Note: '}
+          {gloss}
+        </span>
+      )}
+      {/* On a phone the list layout's last cell goes under the title. */}
+      {list && priority && (
+        <span className="block text-small text-ink-muted sm:hidden">{priority}</span>
+      )}
+    </>
+  );
+
   return (
     <>
       {/* The anchor a `#494` written in a comment lands on. `scroll-mt` keeps
@@ -451,17 +579,19 @@ export function TreeRow<E extends TreeCatalogEntry>({
 
           {/* The fold, where there is something beneath to fold. A spacer
               where there is not, so the titles at one depth line up. */}
-          {heading ? null : hasChildren || foldableFog ? (
+          {heading ? null : foldable || (titleHref && !isDecision && !setupOpen) ? (
             <button
               type="button"
               onClick={toggle}
               aria-expanded={expanded}
-              title={expanded ? `Fold #${handle}` : `Unfold #${handle}`}
-              aria-label={expanded ? `Fold #${handle}` : `Unfold #${handle}`}
+              title={foldLabel}
+              aria-label={foldLabel}
               className={cn(
                 LEVEL,
-                'press flex shrink-0 items-center justify-center self-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
-                'h-5',
+                'press flex shrink-0 items-center justify-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
+                // In the list the row can run to several lines (the title,
+                // Needs, a date), so the fold sits on the title's line.
+                list ? 'mt-1 h-5 self-start' : 'h-5 self-center',
               )}
             >
               <ChevronDown
@@ -522,6 +652,15 @@ export function TreeRow<E extends TreeCatalogEntry>({
                 {marks}
               </span>
             </h1>
+          ) : titleHref ? (
+            <div
+              className={cn(
+                'min-w-0 flex-1 text-left',
+                list ? 'self-start py-1 pl-1' : 'self-center',
+              )}
+            >
+              {rowLines}
+            </div>
           ) : (
             <button
               type="button"
@@ -533,99 +672,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                 list ? 'self-start py-1 pl-1' : 'self-center',
               )}
             >
-              <span
-                className={cn(
-                  'flex min-w-0 items-baseline gap-1.5 text-ui',
-                  trail.length === 0 ? 'font-medium text-ink' : 'text-ink',
-                )}
-              >
-                {/* Where the row sits, not just what it is called: a feature
-                  reads #595 and its second step reads #595.2, so a step says
-                  which feature it belongs to and how far through it is
-                  without the tree guides having to be traced up by eye.
-                  `number` is still the handle -- it is what the commits, the
-                  comments and the CLI say, it is the anchor a `#597` link
-                  lands on, and the button around this says "Open #597" -- and
-                  the search box takes either. */}
-                {!list && (
-                  <span className="tabular shrink-0 text-small text-ink-ghost">
-                    #{node.outline}
-                  </span>
-                )}
-                {/* Truncated closed, whole open. A row is a line and a long title
-                 * has to give way to keep it one; but opening the step is the
-                 * gesture that means "show me this one", and a name still cut
-                 * off after it leaves no way to read it at all. On a phone it
-                 * wraps closed as well: the name cell there is what is left
-                 * after the health and the menu, which cut titles to two words
-                 * (plan #1041). */}
-                <span
-                  className={cn(
-                    'min-w-0',
-                    open ? 'break-words' : 'break-words sm:truncate',
-                    node.status === 'dropped' && 'text-ink-muted line-through',
-                  )}
-                >
-                  {node.title}
-                </span>
-                {/* A question waiting on this step, said on the row. The section
-                 * that answers it is behind the fold, and a question nobody
-                 * knows is there is the thing this whole section exists to
-                 * stop. */}
-                {unanswered > 0 && !open && (
-                  <span
-                    title={`${unanswered} unanswered ${unanswered === 1 ? 'question' : 'questions'}`}
-                    className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution"
-                  >
-                    <HelpCircle className="size-3" strokeWidth={2} aria-hidden />
-                    {unanswered}
-                    <span className="sr-only">
-                      unanswered {unanswered === 1 ? 'question' : 'questions'}
-                    </span>
-                  </span>
-                )}
-                {/* And whether anything has been said about it. */}
-                <CommentCount count={node.thread.length} />
-                {marks}
-              </span>
-              {/* Where it came from, when it did not come from you. On the row
-                and not behind the fold, because a step that appeared under a
-                feature you approved last week is exactly the one you would
-                never think to open. */}
-              {origin && (
-                <span className="block truncate text-small text-ink-ghost">
-                  From #{origin.number}&apos;s answer: {origin.gist}
-                </span>
-              )}
-              {/* The same, for a step a session wrote ready to build. Approval
-                stops at the feature, so this row never asked you; saying so
-                is what the Drop at the top of its menu is for. */}
-              {addedBy && (
-                <span
-                  title={addedBy.session ? `Session ${addedBy.session}` : undefined}
-                  className="block truncate text-small text-ink-ghost"
-                >
-                  <DashCredit />
-                  Added by Dash on {addedBy.date}
-                </span>
-              )}
-              {source && <span className="block truncate text-small text-ink-ghost">{source}</span>}
-              {need && !open && (
-                <span className="block truncate text-small text-ink">
-                  <span className="font-medium text-caution">Needs: </span>
-                  {need}
-                </span>
-              )}
-              {gloss && !open && !need && (
-                <span className="block truncate text-small text-ink-muted">
-                  {!node.detail && 'Note: '}
-                  {gloss}
-                </span>
-              )}
-              {/* On a phone the list layout's last cell goes under the title. */}
-              {list && priority && (
-                <span className="block text-small text-ink-muted sm:hidden">{priority}</span>
-              )}
+              {rowLines}
             </button>
           )}
         </div>
@@ -735,7 +782,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   type="button"
                   onClick={() => setDetailsShown(!detailsShown)}
                   aria-expanded={detailsShown}
-                  className="press -mx-1 flex items-center gap-1 rounded px-1 text-small font-semibold text-ink-muted hover:bg-accent-tint hover:text-accent"
+                  className="press -mx-1 flex w-full min-w-0 items-center gap-1 rounded px-1 text-small font-semibold text-ink-muted hover:bg-accent-tint hover:text-accent"
                 >
                   <ChevronDown
                     className={cn(
@@ -746,6 +793,13 @@ export function TreeRow<E extends TreeCatalogEntry>({
                     aria-hidden
                   />
                   {detailsShown ? 'Hide details' : 'Show details'}
+                  {/* Folded, the line carries the first of what the details
+                  say, so the space is worth having (note 886d6e4f). */}
+                  {!detailsShown && foldedPreview && (
+                    <span className="min-w-0 flex-1 truncate text-left font-normal text-ink-muted">
+                      {foldedPreview}
+                    </span>
+                  )}
                 </button>
               )}
               {(!condensable || detailsShown) && (

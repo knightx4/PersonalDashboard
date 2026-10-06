@@ -141,7 +141,7 @@ function MarkPosted({ id, onCancel }: { id: string; onCancel: () => void }) {
       <Button type="submit" size="sm" pending={pending}>
         {pending ? 'Saving…' : 'Mark posted'}
       </Button>
-      <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={pending}>
+      <Button type="button" size="sm" variant="ghost" onClick={onCancel} pending={pending}>
         Cancel
       </Button>
       <div className="basis-full">

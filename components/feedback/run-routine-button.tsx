@@ -157,7 +157,7 @@ export function RunRoutineButton({
             away on an inference is worse than saying what it thinks is true and
             leaving the decision -- the button says the run is already going, so
             pressing it is a choice rather than an accident. */}
-        <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+        <Button type="submit" size="sm" variant="secondary" pending={pending}>
           <Play className="size-3.5" aria-hidden />
           {pending ? 'Starting…' : running ? 'Run it again anyway' : 'Run Feature Routine'}
         </Button>

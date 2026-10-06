@@ -30,6 +30,7 @@
 import type { ChangeLine, UndoState } from '@/lib/goals/run-changes';
 import type { RunListing } from '@/lib/goals/runs';
 import { JOB_LABELS } from '@/lib/goals/runs';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /** The most change lines the list shows; the rest are on each run's page. Results are never capped. */
 export const DONE_CHANGES_SHOWN = 10;
@@ -135,14 +136,14 @@ function onlyOn(line: ChangeLine, stepId: string): boolean {
   );
 }
 
-function stepHref(goal: DoneGoal | null, stepId: string): string {
-  return goal ? `/goals/${goal.id}#step-${stepId}` : '/goals/all';
+function stepLink(goal: DoneGoal | null, stepId: string): string {
+  return goal ? stepHref(goal.id, stepId) : '/goals/all';
 }
 
 function runHref(entry: DoneRun): string {
   const { run, goal } = entry;
   if (!goal) return `/goals/runs/${run.id}`;
-  return run.item?.level === 'step' ? `/goals/${goal.id}#step-${run.item.id}` : `/goals/${goal.id}`;
+  return run.item?.level === 'step' ? stepHref(goal.id, run.item.id) : `/goals/${goal.id}`;
 }
 
 function runTitle(run: RunListing): string {
@@ -214,7 +215,7 @@ export function doneSince(
         title: step.title,
         goalId: stepGoal?.id ?? null,
         goalTitle: stepGoal?.title ?? null,
-        href: stepHref(stepGoal, stepId),
+        href: stepLink(stepGoal, stepId),
         unread: step.hasResult && step.kind === 'claude' && step.reviewedAt === null,
         runId: run.id,
         undo:
@@ -260,7 +261,7 @@ export function doneSince(
       title: step.title,
       goalId: step.goal?.id ?? null,
       goalTitle: step.goal?.title ?? null,
-      href: stepHref(step.goal, step.id),
+      href: stepLink(step.goal, step.id),
       unread: true,
       runId: null,
       undo: null,

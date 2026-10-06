@@ -1,5 +1,5 @@
 import type { SearchHit } from '@/lib/search/sources';
-import { areaHref } from '@/lib/goals/all-goals';
+import { areaHref, stepHref } from '@/lib/goals/all-goals';
 
 /**
  * Areas, goals and their steps into hits, apart from the read so the hrefs can be
@@ -43,7 +43,7 @@ export function goalOf(
 }
 
 /**
- * Where an item opens: a goal on its own page, a step as a row on its goal's.
+ * Where an item opens: a goal on its own page, a step on its own under its goal.
  * A step whose goal is not among the rows read falls back to its parent's
  * page, which is the goal for every step that is not a sub-step.
  */
@@ -53,7 +53,7 @@ export function goalItemHref(
 ): string {
   if (item.level === 'goal') return `/goals/${item.id}`;
   const goalId = goalOf(item, byId)?.id ?? item.parent_id;
-  return goalId ? `/goals/${goalId}#step-${item.id}` : `/goals/${item.id}`;
+  return goalId ? stepHref(goalId, item.id) : `/goals/${item.id}`;
 }
 
 const FINISHED = new Set(['done']);

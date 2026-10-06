@@ -121,7 +121,7 @@ describe('a step with progress on it', () => {
   it('tells the parent when it last moved', () => {
     const html = render([phase, bags, shelf], entries);
     expect(html).toMatch(
-      /Last progress 29 Sept? on <a href="#step-bags"[^>]*>Move the bags to their spot</,
+      /Last progress 29 Sept? on <a [^>]*href="\/goals\/goal-move\/s\/bags"[^>]*>Move the bags to their spot</,
     );
   });
 

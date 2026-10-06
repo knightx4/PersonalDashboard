@@ -185,7 +185,7 @@ describe('close_goal_step', () => {
     expect(result).toMatchObject({
       kind: 'close_goal_step',
       input: { id: STEP, goalId: GOAL, goalTitle: 'Run a half marathon' },
-      row: { href: `/goals/${GOAL}#step-${STEP}` },
+      row: { href: `/goals/${GOAL}/s/${STEP}` },
     });
 
     const { undone } = await keepAndUndo(result);

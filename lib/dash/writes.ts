@@ -13,6 +13,7 @@ import { taskInput } from '@/lib/todo/tasks/input';
 import { wallClockToInstant } from '@/lib/todo/time';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 import { addThreadTurn } from '@/lib/thread/store';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -192,7 +193,7 @@ async function addGoalStep(ctx: DashWriteContext, input: unknown): Promise<DashW
     const step = change.input as DashChangeInput['add_goal_step'];
     return {
       summary: `Dash added the step "${step.title}" under the goal "${step.goalTitle}".`,
-      row: { table: TABLE.goalItem, ref: id, title: step.title, href: `/goals/${step.parentId}#step-${id}` },
+      row: { table: TABLE.goalItem, ref: id, title: step.title, href: stepHref(step.parentId, id) },
     };
   });
 }
@@ -461,7 +462,7 @@ async function closeGoalStep(ctx: DashWriteContext, args: Args): Promise<DashWri
       before,
       after,
       summary: `Dash marked the step "${step.title}" done, under the goal "${goal.title}".`,
-      row: { table: TABLE.goalItem, ref: id, title: step.title, href: `/goals/${goal.id}#step-${id}` },
+      row: { table: TABLE.goalItem, ref: id, title: step.title, href: stepHref(goal.id, id) },
     },
   );
 }
