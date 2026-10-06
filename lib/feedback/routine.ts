@@ -127,6 +127,23 @@ export function dashBackupRoutine(): RoutineTarget {
 }
 
 /**
+ * The routine that works one overhaul -- "Work this overhaul" on an
+ * overhaul's row of /dev/plan (plan #1514). Its standing prompt is
+ * .claude/skills/plan/reference/overhaul-routine.md.
+ *
+ * No fallback to the shared id or the shared token: an overhaul sent to the
+ * plan routine would be built step by step without its design session, its
+ * phases or its review against the Contract. With either unset the row says
+ * so and starts nothing.
+ */
+export function overhaulRoutine(): RoutineTarget {
+  return {
+    id: firstSet(process.env.CLAUDE_OVERHAUL_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_OVERHAUL_ROUTINE_TOKEN),
+  };
+}
+
+/**
  * The routine that builds a project's steps (lib/plan/projects) -- "Send to
  * Dash" on a row in that project's section of /dev/plan.
  *

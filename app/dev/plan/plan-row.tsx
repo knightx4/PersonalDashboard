@@ -12,6 +12,7 @@ import {
   removePlanDependency,
   reshapePlanFeature,
   sendPlanFeatureToClaude,
+  workPlanOverhaul,
   dismissPlanDecision,
   dismissPlanFog,
   sendPlanItemToClaude,
@@ -254,6 +255,9 @@ function SendToClaude({
   batchPending,
   reshapeAction,
   reshapePending,
+  overhaulAction,
+  overhaulPending,
+  running,
   quiet,
   quietAsk,
   onAskQuiet,
@@ -269,6 +273,11 @@ function SendToClaude({
   /** The other direction: re-read the feature against what has been settled. */
   reshapeAction: (formData: FormData) => void;
   reshapePending: boolean;
+  /** An overhaul's own press: start the overhaul routine on it (plan #1514). */
+  overhaulAction: (formData: FormData) => void;
+  overhaulPending: boolean;
+  /** A run against this row is going now, so the overhaul press waits. */
+  running: boolean;
   /** Nothing has been said about the last run yet, so the missing-key note is
       worth the room. */
   quiet: boolean;
@@ -296,13 +305,15 @@ function SendToClaude({
     (step) => step.id !== node.id && !isClosed(step.status) && step.status !== 'proposed',
   ).length;
 
+  const overhaul = node.track === 'overhaul' && node.status !== 'proposed';
+
   const held = resolving
     ? 'Dash is re-reading this feature against the answers you just gave. This comes back when it is done.'
     : undefined;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {quietAsk ? (
+      {overhaul ? null : quietAsk ? (
         // Nothing is submitted from here while the run is quiet. The press
         // raises the question on the row, and answering it is what sends --
         // one question in one place, however Send was reached.
@@ -333,7 +344,31 @@ function SendToClaude({
           </Button>
         </form>
       )}
-      {beneath > 0 && (
+      {/* An overhaul is worked by its own routine in its own order, so it
+          gets that press in place of Send and the batch, which would hand
+          its steps to the plan routine one after another. */}
+      {overhaul && (
+        <form action={overhaulAction}>
+          <input type="hidden" name="id" value={node.id} />
+          <Button
+            type="submit"
+            size="sm"
+            variant="secondary"
+            pending={overhaulPending}
+            disabled={resolving || running}
+            title={
+              held ??
+              (running
+                ? 'A run is working this now. This comes back when it is done.'
+                : 'Start the overhaul routine on this overhaul. It works the steps in phase order and stops at the first thing that needs you.')
+            }
+          >
+            <Play className="size-3.5" aria-hidden />
+            {overhaulPending ? 'Starting…' : 'Work this overhaul'}
+          </Button>
+        </form>
+      )}
+      {beneath > 0 && !overhaul && (
         <form action={batchAction}>
           <input type="hidden" name="id" value={node.id} />
           <Button
@@ -379,7 +414,7 @@ function SendToClaude({
           Re-reading this against your answers. The buttons come back when it is done.
         </span>
       )}
-      {!canSend && quiet && !resolving && (
+      {!canSend && quiet && !resolving && !overhaul && (
         <span className="text-small text-ink-muted">
           Needs the plan routine&apos;s token on the deployment.
         </span>
@@ -609,6 +644,11 @@ export function PlanRow({
     reshapePlanFeature,
     {} as PlanActionState,
   );
+  // An overhaul's own press: the overhaul routine, not the plan routine.
+  const [overhaulState, overhaulAction, overhaulPending] = useActionState(
+    workPlanOverhaul,
+    {} as PlanActionState,
+  );
 
   // A step the design critic stopped draws its fixes and shots in a panel of
   // its own, so the Needs line says only what that panel does not (plan #1610).
@@ -659,7 +699,16 @@ export function PlanRow({
       ),
     [catalog],
   );
-  const move = moveFor(node, resolving);
+  // An overhaul's run claims nothing on the row itself, so its move would go
+  // on reading as before while the routine works it. Said in the Status
+  // column instead, the way a claimed step says it (plan #1514).
+  const overhaulRunning = node.track === 'overhaul' && run?.status === 'started';
+  const move = overhaulRunning
+    ? {
+        move: { state: 'dash_working' } as const,
+        title: 'The overhaul routine is working this now.',
+      }
+    : moveFor(node, resolving);
   // Whether this row itself is the one being re-read. The rollup above would
   // also be true of a feature whose child is being re-shaped, and it is the
   // child's buttons that should be shut, not this one's.
@@ -752,7 +801,8 @@ export function PlanRow({
     },
     // The quick icons are only there from sm up and only under a pointer, so
     // the menu carries the same two actions for a phone and for a keyboard.
-    ...(closed
+    // An overhaul is sent by its own press below, never to the plan routine.
+    ...(closed || node.track === 'overhaul'
       ? []
       : [
           {
@@ -781,6 +831,18 @@ export function PlanRow({
             id: 'reshape',
             label: 'Re-shape against what is decided',
             formAction: (formData: FormData) => reshapePlanFeature({}, formData),
+            formFields: { id: node.id },
+          },
+        ]
+      : []),
+    // The overhaul press, for a phone and a keyboard as the others are.
+    ...(node.track === 'overhaul' && !closed && node.status !== 'proposed'
+      ? [
+          {
+            id: 'overhaul',
+            label: 'Work this overhaul',
+            disabled: beingResolved || run?.status === 'started',
+            formAction: (formData: FormData) => workPlanOverhaul({}, formData),
             formFields: { id: node.id },
           },
         ]
@@ -818,12 +880,14 @@ export function PlanRow({
     sendState.error ??
     batchState.error ??
     reshapeState.error ??
+    overhaulState.error ??
     answerState.error;
   const actionMessage =
     assignState.message ??
     sendState.message ??
     batchState.message ??
     reshapeState.message ??
+    overhaulState.message ??
     answerState.message;
 
   return (
@@ -1112,6 +1176,9 @@ export function PlanRow({
               batchPending={batchPending}
               reshapeAction={reshapeAction}
               reshapePending={reshapePending}
+              overhaulAction={overhaulAction}
+              overhaulPending={overhaulPending}
+              running={run?.status === 'started'}
               resolving={beingResolved}
               quietAsk={quietAsk}
               onAskQuiet={() => setConfirmingSend(true)}
@@ -1166,16 +1233,19 @@ export function PlanRow({
  */
 function OverhaulCounts({ progress }: { progress: OverhaulProgress | undefined }) {
   const quiet = 'shrink-0 text-micro text-ink-muted';
+  // "No rule counts yet" says nothing to act on, and on a phone it squeezed
+  // the title beside it to a letter a line, so it is left to wider screens.
+  const placeholder = 'hidden shrink-0 text-micro text-ink-muted sm:inline';
   if (!progress || progress.state === 'no-spec') {
     return (
-      <span className={quiet} title="Its detail names no spec, so there are no rule counts to show.">
+      <span className={placeholder} title="Its detail names no spec, so there are no rule counts to show.">
         No rule counts yet
       </span>
     );
   }
   if (progress.state === 'missing') {
     return (
-      <span className={quiet} title={`${progress.spec} could not be read, so its counts cannot be shown.`}>
+      <span className={placeholder} title={`${progress.spec} could not be read, so its counts cannot be shown.`}>
         No rule counts yet
       </span>
     );
@@ -1183,7 +1253,7 @@ function OverhaulCounts({ progress }: { progress: OverhaulProgress | undefined }
   if (progress.state === 'no-contract') {
     return (
       <span
-        className={quiet}
+        className={placeholder}
         title={`${progress.spec} has no Contract naming the rules this overhaul brings to target yet.`}
       >
         No rule counts yet
@@ -1206,7 +1276,7 @@ function OverhaulCounts({ progress }: { progress: OverhaulProgress | undefined }
         </span>
       ))}
       {progress.counts.length === 0 && (
-        <span className={quiet} title={`${progress.spec}'s Contract names no rule the row can count.${unread}`}>
+        <span className={placeholder} title={`${progress.spec}'s Contract names no rule the row can count.${unread}`}>
           No rule counts yet
         </span>
       )}
