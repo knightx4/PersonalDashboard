@@ -320,7 +320,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // five-level score out, as score-idea.
   'score-inspiration-takeaway': background(unit(JEV, 600, 0)),
 
-  // News. All but the last two from the digest cron or a script.
+  // News. All but discuss-story and recommend-newsletters run on a cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),
   'group-stories': background(unit(VOYAGE_LITE, 2_000, 0)),
   // About twenty stories a newsletter, each put to Jev on its own.
@@ -331,6 +331,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The story's summary and text, the discussion so far and the view in; a
   // counterpoint or a question out.
   'discuss-story': run(SONNET, 3_000, 300),
+  // Up to eleven stories' headlines and summaries in; a short overview and a
+  // line for each story out.
+  'daily-review': background(run(SONNET, 3_000, 700)),
 
   // Goals: one sentence filed against open goals and steps, which are
   // listed in the prompt. Grows with the size of the tree.
