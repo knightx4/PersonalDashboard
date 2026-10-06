@@ -282,6 +282,8 @@ const rolePanels: PanelProps = {
       kind: 'phone_screen',
       scheduledAt: '2026-09-15T14:00:00.000Z',
       timeKnown: true,
+      meetingUrl: 'https://meet.google.com/abc-defg-hij',
+      calendarHref: 'https://calendar.google.com/calendar/event?eid=YWJjMTIzIG1lQGV4YW1wbGUuY29t',
       debriefDue: false,
       format: 'video',
       status: 'scheduled',
