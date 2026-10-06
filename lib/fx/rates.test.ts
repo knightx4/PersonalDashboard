@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { extractCurrencyCode } from '@/lib/email/extract/currency';
 import { convertCents } from '@/lib/fx/money-fx';
 import { clearMemoryFxCache, convertAmounts, getFxRate, memoryFxCache } from '@/lib/fx/rates';
@@ -23,6 +23,29 @@ describe('convertCents', () => {
 });
 
 describe('getFxRate / convertAmounts', () => {
+  // Frankfurter itself, not a stand-in, until 6 October 2026: it answered in a
+  // quarter of a second or not within 25, and the gate timed out on it twice.
+  // The answer here has Frankfurter's shape and a rate where HKD trades
+  // against USD, so the checks below still test what the code does with one.
+  let calls = 0;
+  beforeEach(() => {
+    calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        calls += 1;
+        const to = new URL(url).searchParams.get('to') ?? 'USD';
+        return new Response(
+          JSON.stringify({ amount: 1, base: 'HKD', date: '2026-05-22', rates: { [to]: 0.12761 } }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }),
+    );
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('returns identity for same currency', async () => {
     const quote = await getFxRate({ from: 'USD', to: 'usd', date: '2026-05-22' });
     expect(quote.rate).toBe(1);
@@ -48,6 +71,7 @@ describe('getFxRate / convertAmounts', () => {
       cache,
     );
     expect(again.rate).toBe(quote.rate);
+    expect(calls).toBe(1);
   });
 
   it('converts a batch of mixed native amounts', async () => {
