@@ -11,7 +11,7 @@ import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { createContact } from './actions';
 
-const RELATIONSHIPS = [
+export const RELATIONSHIPS = [
   'cold',
   'alum',
   'second_degree',

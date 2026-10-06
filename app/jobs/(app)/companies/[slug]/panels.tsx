@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useTransition } from 'react';
+import { useActionState, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';
 import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
@@ -11,6 +11,8 @@ import { FoldingMarkdown } from '@/components/ui/folding-markdown';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { addNote } from '@/app/jobs/(app)/roles/[id]/actions';
+import { createContact } from '@/app/jobs/(app)/contacts/actions';
+import { RELATIONSHIPS } from '@/app/jobs/(app)/contacts/view';
 import {
   applyAiCompanyEnrichment,
   applyCompanyEnrichment,
@@ -53,6 +55,8 @@ export function CompanyPanels(props: {
     contactName: string;
   }>;
   notes: Array<{ id: string; body: string; createdAt: string }>;
+  /** The surface gallery's: draw People with its add form open. */
+  addingPerson?: boolean;
 }) {
   return (
     // One column at every width: the details first, then the long text, then
@@ -586,13 +590,68 @@ function AiEnrichment({ companyId }: { companyId: string }) {
   );
 }
 
-function Contacts({ contacts }: { contacts: CompanyContact[] }) {
+/**
+ * The people at this company, and a way to add one without going over to
+ * Contacts (note 4323ee10). The form opens from a line, as Notes' does
+ * (law 14), and the person it adds is attached to this company.
+ */
+function Contacts({
+  companyId,
+  contacts,
+  addingPerson = false,
+}: {
+  companyId: string;
+  contacts: CompanyContact[];
+  addingPerson?: boolean;
+}) {
+  const [adding, setAdding] = useState(addingPerson);
+  const [state, action, pending] = useActionState(
+    async (prev: { error?: string; message?: string }, formData: FormData) => {
+      const result = await createContact(prev, formData);
+      if (!result.error) setAdding(false);
+      return result;
+    },
+    {},
+  );
+
   return (
     <CardSection title="People">
+      {adding ? (
+        // Placeholders name the fields rather than labels above them, and the
+        // short fields share rows from sm up, so five short strings do not
+        // fill a screen (law 9).
+        <form action={action} className="mt-2 mb-4 space-y-2">
+          <input type="hidden" name="companyId" value={companyId} />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Input name="fullName" aria-label="Name" placeholder="Name" required autoFocus />
+            <Input name="title" aria-label="Title" placeholder="Title, e.g. Head of Finance" />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)]">
+            <Select name="relationship" aria-label="Relationship" defaultValue="cold">
+              {RELATIONSHIPS.map((entry) => (
+                <option key={entry} value={entry}>
+                  {entry.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </Select>
+            <Input name="linkedinUrl" type="url" aria-label="LinkedIn" placeholder="LinkedIn URL" />
+            <Input name="email" type="email" aria-label="Work email" placeholder="Work email" />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Button type="submit" size="sm" pending={pending}>
+              Add person
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setAdding(false)}>
+              Cancel
+            </Button>
+            <FieldError>{state.error}</FieldError>
+          </div>
+        </form>
+      ) : (
+        <AddTrigger label="Add a person" onClick={() => setAdding(true)} className="mt-2" />
+      )}
       {contacts.length === 0 ? (
-        <p className="mt-2 text-ui text-ink-muted">
-          Nobody recorded here yet. Add people from the contacts page.
-        </p>
+        !adding && <p className="mt-2 text-ui text-ink-muted">Nobody recorded here yet.</p>
       ) : (
         <ul className="mt-2 divide-y divide-border">
           {contacts.map((contact) => (

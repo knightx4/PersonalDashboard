@@ -56,6 +56,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-pipeline-dense': ['/jobs/pipeline'],
   'jobs-pipeline-list': ['/jobs/pipeline'],
   'jobs-company': ['/jobs/companies/[slug]'],
+  'jobs-company-add-person': ['/jobs/companies/[slug]'],
   'jobs-review': ['/jobs/review'],
   'jobs-settings': ['/jobs/settings'],
   'jobs-contacts': ['/jobs/contacts'],

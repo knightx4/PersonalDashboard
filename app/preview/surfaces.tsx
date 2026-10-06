@@ -2809,6 +2809,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <CompanyPanels {...companyPanels} />,
   },
   {
+    /* People with its add form open (note 4323ee10). */
+    id: 'jobs-company-add-person',
+    label: 'Company · Adding a person',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <CompanyPanels {...companyPanels} addingPerson />,
+  },
+  {
     id: 'jobs-review',
     label: 'Review queue',
     module: 'jobs',
