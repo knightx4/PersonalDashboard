@@ -509,7 +509,7 @@ export function ClipStream({
               disabled={!begun}
               aria-label={`Back ${BACK_SECONDS} seconds`}
               title={`Back ${BACK_SECONDS} seconds`}
-              className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-ml-2.5 shrink-0 px-2')}
+              className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-ml-2.5 size-11 shrink-0 px-0')}
             >
               <RotateCcw className="size-4" strokeWidth={2} aria-hidden />
             </button>
@@ -539,7 +539,8 @@ export function ClipStream({
               onPointerCancel={() => {
                 scrubbing.current = false;
               }}
-              className="h-6 min-w-0 flex-1 cursor-pointer accent-accent disabled:cursor-default"
+              // ui-ok: the hit area is the 44px touch minimum, not a control height
+              className="h-11 min-w-0 flex-1 cursor-pointer accent-accent disabled:cursor-default"
             />
             <span>{clockTime(length)}</span>
           </div>
