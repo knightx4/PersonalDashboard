@@ -128,6 +128,7 @@ import {
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { WatchingSurface } from './watching-surfaces';
+import { DashTodaySurface } from './dash-today-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface } from './clip-surfaces';
 import {
   InspirationByVideoSurface,
@@ -3482,6 +3483,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'wide',
     render: () => <WatchingSurface />,
+  },
+  {
+    /* Home's list of what Dash did today (plan #1461), with a thread's
+     * change linked back to the role whose comment asked for it (plan
+     * #1518). Fixtures in dash-today-surfaces.tsx. */
+    id: 'home-dash-today',
+    label: 'Home · What Dash did today',
+    module: 'goals',
+    width: 'wide',
+    render: () => <DashTodaySurface />,
   },
   {
     /* The timeline (plan #1118): the months newest first, the newest open,

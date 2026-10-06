@@ -1,7 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import { parseRef } from '@/lib/core/refs';
-import type { MadeDashChange } from '@/lib/talk/changes';
+import type { MadeDashChange, ThreadCause } from '@/lib/talk/changes';
 import type { TalkCitation } from '@/lib/talk/talk';
 import { MAX_LOOKUPS, runDash, type DashExecutor, type DashSeen, type DashVoice, type DashWriter } from './loop';
 import {
@@ -95,8 +95,11 @@ export type ThreadDash = {
     seen: DashSeen,
     acts: DashThreadActs,
   ) => Promise<DashWriteResult | DashRecordedWrite | { ok: false; error: string }>;
-  /** Keeps a registry write's record in core.dash_actions, with surface 'thread'. */
-  saveChange: (made: MadeDashChange) => Promise<unknown>;
+  /**
+   * Keeps a registry write's record in core.dash_actions, with surface
+   * 'thread', under the comment that asked for it when there is one.
+   */
+  saveChange: (made: MadeDashChange, cause: ThreadCause | null) => Promise<unknown>;
 };
 
 /** What a thread's hand-off did: started something, or why not. */
@@ -156,6 +159,11 @@ export async function replyInThread(input: {
   dash: ThreadDash;
   /** The thread's own write tools, bound to its row. */
   acts: DashThreadActs;
+  /**
+   * The comment being answered, which every registry write is recorded
+   * under (plan #1518). Absent: the writes are recorded with no comment.
+   */
+  cause?: ThreadCause | null;
   /** The thread's own hand-offs, by tool name. Absent: every hand-off is refused. */
   handOff?: (name: string, input: unknown) => Promise<ThreadHandOff>;
   anthropicApiKey: string;
@@ -187,7 +195,7 @@ export async function replyInThread(input: {
         after: result.after,
         summary: result.summary,
         undo: result.undo ?? null,
-      } as MadeDashChange);
+      } as MadeDashChange, input.cause ?? null);
     } catch (error) {
       console.error(`thread write ${tool.name} was made but not kept`, error);
       kept = false;

@@ -126,7 +126,7 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
     execute: (name, args) => executeAskTool(name, args, ctx),
     apply: (tool, args, seen, acts) =>
       tool.apply({ ...ctx, seen, goals: (history) => createGoalsClient(history), createTask, thread: acts }, args),
-    saveChange: (made) => insertMadeChange(core, userId, null, made),
+    saveChange: (made, cause) => insertMadeChange(core, userId, cause, made),
   };
 }
 

@@ -111,6 +111,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-posts': ['/dev/posts'],
   'dev-posts-drafting': ['/dev/posts'],
   'home-watching': ['/home'],
+  'home-dash-today': ['/home'],
   'timeline-page': ['/timeline'],
   'timeline-year': ['/timeline/year/[year]'],
   'shell-full': ['/home'],
