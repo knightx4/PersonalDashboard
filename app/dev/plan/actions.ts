@@ -6,7 +6,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { loadVisionBodies } from '@/lib/specs/vision';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
-import { planRoutine, type FireRoutineResult } from '@/lib/feedback/routine';
+import {
+  overhaulRoutine,
+  planRoutine,
+  type FireRoutineResult,
+} from '@/lib/feedback/routine';
+import { overhaulRefusal, overhaulTurn } from '@/lib/plan/overhaul-run';
 import {
   DISMISSAL_RULE,
   FOG_RULE,
@@ -1380,6 +1385,60 @@ export async function reshapePlanFeature(
       `${answered === 0 ? 'no answers yet' : `${answered} ${answered === 1 ? 'answer' : 'answers'}`}` +
       `${node.fog ? ' and its fog' : ''}. ${result.detail}`,
   };
+}
+
+/**
+ * Start the overhaul routine on one overhaul (plan #1514).
+ *
+ * An overhaul is built in its own order, which the overnight runner and the
+ * plan routine do not know, so it has its own routine and its own press. The
+ * run is recorded against the overhaul's row under the job `overhaul`, and the
+ * row then says a run is going, the same as after any other press.
+ */
+// latency: pending
+export async function workPlanOverhaul(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing step.' };
+
+  const data = await loadPlan(supabase, user.id);
+  const sections = buildPlanTree(data);
+  const node = findNode(sections, id.data);
+  if (!node) return { error: 'That step no longer exists.' };
+
+  const { data: runs } = await supabase
+    .from('plan_runs')
+    .select('status, job')
+    .eq('user_id', user.id)
+    .eq('plan_item_id', node.id)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  const latest = (runs?.[0] ?? null) as { status: string; job: string } | null;
+
+  const routine = overhaulRoutine();
+  const refused = overhaulRefusal(node, { id: !!routine.id, token: !!routine.token }, latest);
+  if (refused) return { error: refused };
+
+  const brief = planBrief(sections, node, {
+    thread: true,
+    visions: await loadVisionBodies(supabase, user.id),
+  });
+  const result = await startRoutineRun({
+    supabase,
+    userId: user.id,
+    job: 'overhaul',
+    routine,
+    planItemId: node.id,
+    text: overhaulTurn(node, user.id, brief),
+  });
+  revalidatePlan();
+  if (!result.ok) return { error: result.error };
+  return { message: `Started the overhaul routine on #${node.number}. ${result.detail}` };
 }
 
 /**
