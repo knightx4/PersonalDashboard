@@ -126,7 +126,12 @@ function DashTodayRow({
         <div className="min-w-0 flex-1">
           <p className={undone ? 'text-ui text-ink-muted' : 'text-ui text-ink'}>
             {entry.href && !undone ? (
-              <Link href={entry.href} className="hover:text-accent">
+              // Block, with a 44px hit area centred on it: a one-line
+              // sentence is otherwise a 16px press target on a phone.
+              <Link
+                href={entry.href}
+                className="relative block hover:text-accent before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-['']"
+              >
                 {entry.sentence}
               </Link>
             ) : (
