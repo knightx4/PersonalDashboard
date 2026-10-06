@@ -71,6 +71,11 @@ export type Goal = {
    * or took it back up (plan #1084); null when you never have.
    */
   keptOpenAt?: string | null;
+  /**
+   * Whether it is one of this week's focus goals, chosen by the person (goals
+   * 0070). While any goal has it, Home and Todo show only focus goals' steps.
+   */
+  focus?: boolean;
 };
 
 export type AreaWithGoals = Area & { goals: Goal[] };

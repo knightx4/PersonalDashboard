@@ -27,6 +27,15 @@ function run(
 const ids = (steps: readonly NightStep[]) => steps.map((s) => s.id);
 
 describe('chooseNightSteps', () => {
+  it("puts a focus goal's step before an earlier due date on another goal", () => {
+    const steps: NightStep[] = [
+      step('due-soon', 'g-rest', '2026-09-26'),
+      { ...step('focus', 'g-focus'), focus: true },
+    ];
+    const { chosen } = chooseNightSteps({ steps, runs: [], lastProgressAt: new Map(), now: NOW });
+    expect(ids(chosen)).toEqual(['focus', 'due-soon']);
+  });
+
   it('orders a fixture by due date, then by the goal longest without progress, and skips what it should', () => {
     const steps = [
       step('fresh', 'g-fresh'),
