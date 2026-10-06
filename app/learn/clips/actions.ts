@@ -41,13 +41,14 @@ async function owner() {
 
 /**
  * More clips for the queue, leaving out the ones already in it. The queued
- * ones still count against their video's two a week.
+ * ones still count against their video's two a week and the ten-clip gap.
  */
 // latency: pending
 export async function loadMoreClipsAction(queued: string[]): Promise<PlayerClip[]> {
   const { user, learn } = await owner();
   return loadPlayerClips(learn, user.id, {
-    excludeIds: queued.filter((id) => UUID.test(id)).slice(0, 200),
+    // The newest 200, in queue order: the end of the queue is what the ten-clip gap reads.
+    excludeIds: queued.filter((id) => UUID.test(id)).slice(-200),
   });
 }
 

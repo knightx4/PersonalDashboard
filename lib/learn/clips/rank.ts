@@ -13,23 +13,27 @@
  *      play after every unseen one, so they fill in rather than crowd out.
  *   2. Clips with a rating or a score before clips that have neither. An
  *      unranked clip is still offered, after the others, so the stream does
- *      not run dry while rating catches up.
+ *      not run dry while rating and scoring catch up.
  *   3. Within that, one number for every clip, playlist and channel alike.
  *      It starts from Jev's rating of the clip (educational value,
  *      entertainment and quality, averaged by combinedRating), or from the
- *      relevance score where the clip is not rated yet. A playlist clip gets
- *      PLAYLIST_EDGE points on top, and the person's own filings move it
- *      either way: Jev reads no examples, so skips and saves are a rule here,
- *      the way their filings override the video judge.
+ *      relevance score where the clip is not rated yet. A clip from the
+ *      person's own playlist gets PLAYLIST_BONUS points, and their filings
+ *      move it either way: Jev reads no examples, so skips and saves are a
+ *      rule here, the way their filings override the video judge.
  *
  * #1396 first answered that every playlist clip plays before any channel
  * clip. The person has since replaced that answer: channel clips are mixed in
  * by how good they are, so a good channel clip plays before a mediocre
- * playlist one, and the playlist keeps only the small edge above.
+ * playlist one, and the playlist keeps only the bonus above.
  *
- * Then at most two clips from one video in any seven days, counted from when
- * clips were shown, and no two clips of the same video back to back where
- * another clip of the same rank tier can go between them.
+ * Then two limits on how often one video comes up. At most MAX_PER_VIDEO
+ * clips of one video in any seven days, counting the clips shown in that time
+ * (shownThisWeek) and the ones queued and not yet shown (queuedVideos). And
+ * never two clips of one video within VIDEO_GAP clips of each other, counting
+ * the clips played just before (recentVideos). Where the best clip left is
+ * too close to its video's last one, the next best that is not takes its
+ * place; when none is left, fewer are returned.
  */
 
 /** A clip as the picker sees it. Times are ISO strings, as supabase-js returns them. */
@@ -77,13 +81,6 @@ export const MAX_PER_VIDEO = 2;
 /** The window MAX_PER_VIDEO counts over: clips shown in the last seven days. */
 export const SHOWN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
-/**
- * Points on for a clip from the person's own playlist. Small on purpose: the
- * playlist is what they chose, but a channel clip rated more than this much
- * higher still plays first.
- */
-export const PLAYLIST_EDGE = 5;
-
 /** Points off a clip's 1-100 score for each early skip on its channel or theme. */
 export const EARLY_SKIP_PENALTY = 6;
 /** Points on for each clip of its channel or theme finished or saved. */
@@ -92,6 +89,10 @@ export const LIKED_BONUS = 4;
 export const FILING_CAP = 24;
 /** Points on for a clip whose track came up in a Learn now card in the last few days. */
 export const RECENT_CARD_BONUS = 5;
+/** Points on for a clip from the person's own playlist, over one from a channel Learn follows. */
+export const PLAYLIST_BONUS = 8;
+/** One video plays at most once in any run of this many clips. */
+export const VIDEO_GAP = 10;
 
 export type Lean = { channel: Map<string, number>; theme: Map<string, number> };
 
@@ -164,14 +165,14 @@ export function baseScore(clip: Pick<RankableClip, 'rating' | 'score'>): number 
 }
 
 /**
- * The number the picker ranks by: the base score, the playlist edge, the
+ * The number the picker ranks by: the base score, moved by the playlist, the
  * filings and a recent Learn now card. Null when the clip has neither a
  * rating nor a score.
  */
 export function adjustedScore(clip: RankableClip, lean: Lean, recentThemes: ReadonlySet<string>): number | null {
   const base = baseScore(clip);
   if (base === null) return null;
-  let score = base + (clip.cameFrom === 'playlist' ? PLAYLIST_EDGE : 0);
+  let score = base + (clip.cameFrom === 'playlist' ? PLAYLIST_BONUS : 0);
   if (clip.channel) score += lean.channel.get(clip.channel) ?? 0;
   if (clip.theme) {
     score += lean.theme.get(clip.theme) ?? 0;
@@ -192,10 +193,17 @@ export type PickOptions = {
   /** Clips shown per video in the last SHOWN_WINDOW_MS, counted against MAX_PER_VIDEO. */
   shownThisWeek?: ReadonlyMap<string, number>;
   /**
-   * Clips to leave out, such as ones already queued on the phone. A queued
-   * clip not shown yet still counts against its video's MAX_PER_VIDEO, since
-   * it is about to play.
+   * The videos of the clips queued on the phone and not shown yet, one entry
+   * per clip. Each counts against its video's MAX_PER_VIDEO, since it is
+   * about to play.
    */
+  queuedVideos?: readonly string[];
+  /**
+   * The videos of the clips played or queued just before these, oldest
+   * first, so VIDEO_GAP holds across calls. Only the last VIDEO_GAP - 1 count.
+   */
+  recentVideos?: readonly string[];
+  /** Clips to leave out, such as ones already queued on the phone. */
   excludeIds?: ReadonlySet<string>;
 };
 
@@ -212,19 +220,17 @@ export function pickNextClips<T extends RankableClip>(clips: readonly T[], optio
   const recent = options.recentThemes ?? new Set<string>();
   const exclude = options.excludeIds ?? new Set<string>();
 
-  const perVideo = new Map(options.shownThisWeek ?? []);
   const ranked: Ranked<T>[] = [];
   for (const clip of clips) {
-    if (exclude.has(clip.id)) {
-      if (!clip.shownAt) perVideo.set(clip.videoId, (perVideo.get(clip.videoId) ?? 0) + 1);
-      continue;
-    }
+    if (exclude.has(clip.id)) continue;
     const kind = eligibility(clip, options.now);
     if (!kind) continue;
     ranked.push({ clip, tier: tierOf(clip, kind), score: adjustedScore(clip, lean, recent) });
   }
   ranked.sort((a, b) => a.tier - b.tier || (b.score ?? 0) - (a.score ?? 0) || a.clip.id.localeCompare(b.clip.id));
 
+  const perVideo = new Map(options.shownThisWeek ?? []);
+  for (const videoId of options.queuedVideos ?? []) perVideo.set(videoId, (perVideo.get(videoId) ?? 0) + 1);
   const capped = ranked.filter((r) => {
     const n = perVideo.get(r.clip.videoId) ?? 0;
     if (n >= MAX_PER_VIDEO) return false;
@@ -232,20 +238,18 @@ export function pickNextClips<T extends RankableClip>(clips: readonly T[], optio
     return true;
   });
 
-  // Spread: take the best remaining clip, but where it is the same video as
-  // the one just picked, take the next clip of the same tier instead if there
-  // is one. Never reaches into a later tier, so an unseen clip stays before a
-  // returning one.
+  // Spacing: take the best remaining clip whose video has not played in the
+  // last VIDEO_GAP - 1 clips, counting the ones before this call.
   const out: T[] = [];
   const pool = [...capped];
-  while (out.length < options.limit && pool.length > 0) {
-    const last = out[out.length - 1];
-    let index = 0;
-    if (last && pool[0].clip.videoId === last.videoId) {
-      const other = pool.findIndex((r) => r.tier === pool[0].tier && r.clip.videoId !== last.videoId);
-      if (other > 0) index = other;
-    }
-    out.push(pool.splice(index, 1)[0].clip);
+  const sequence = [...(options.recentVideos ?? [])];
+  while (out.length < options.limit) {
+    const near = new Set(sequence.slice(-(VIDEO_GAP - 1)));
+    const index = pool.findIndex((r) => !near.has(r.clip.videoId));
+    if (index < 0) break;
+    const [picked] = pool.splice(index, 1);
+    out.push(picked.clip);
+    sequence.push(picked.clip.videoId);
   }
   return out;
 }
