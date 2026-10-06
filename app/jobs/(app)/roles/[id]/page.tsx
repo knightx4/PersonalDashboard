@@ -26,6 +26,7 @@ import {
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { matchKey, type RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import { prepKey, type PrepNote } from '@/lib/jobs/interview/prep-payload';
+import { interviewCalendarHref } from '@/lib/jobs/interview/calendar-link';
 import { pursuitMatchText } from '@/lib/jobs/related-notes';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
@@ -159,7 +160,7 @@ export default async function RoleDetailPage({
       // that make the name worth clicking.
       .select(
         `id, round, kind, scheduled_at, time_known, duration_minutes, format, status, prep_notes, notes,
-           questions_asked, group_id, prep_note, prep_note_at, prep_note_key,
+           questions_asked, group_id, prep_note, prep_note_at, prep_note_key, ics_uid, meeting_url,
            interview_participants ( role, contacts ( id, full_name, title ) )`,
       )
       .eq('application_id', current.id)
@@ -223,6 +224,10 @@ export default async function RoleDetailPage({
   ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
+  // The mailbox this role's mail arrives in, which is the calendar its
+  // invites land on (note 7b1975cb).
+  const calendarEmail =
+    ((messages ?? []).find((message) => message.email_address)?.email_address as string | undefined) ?? null;
 
   /**
    * Which emails each round is about.
@@ -549,6 +554,13 @@ export default async function RoleDetailPage({
             kind: interview.kind as string,
             scheduledAt: interview.scheduled_at as string | null,
             timeKnown: (interview.time_known as boolean | null) ?? true,
+            meetingUrl: (interview.meeting_url as string | null) ?? null,
+            calendarHref: interviewCalendarHref({
+              icsUid: (interview.ics_uid as string | null) ?? null,
+              scheduledAt: interview.scheduled_at as string | null,
+              calendarEmail,
+              timezone,
+            }),
             debriefDue: debriefDue(interview.scheduled_at as string | null),
             format: interview.format as string | null,
             status: interview.status as string,

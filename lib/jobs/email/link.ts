@@ -228,6 +228,23 @@ export function mentionsRoleTitle(input: LinkInput, candidate: LinkCandidate): b
   return false;
 }
 
+/**
+ * The role title a message names, kept on its row for the review queue (note
+ * b48d2b61): the body is not stored, so this is the one fact from it the
+ * queue can score with. The extractor's reading first; failing that, the
+ * longest of your role titles the subject or body names word for word.
+ */
+export function roleHintFor(input: LinkInput, candidates: readonly LinkCandidate[]): string | null {
+  const extracted = input.extractedRole?.trim();
+  if (extracted) return extracted;
+  let named: string | null = null;
+  for (const candidate of candidates) {
+    if (!mentionsRoleTitle(input, candidate)) continue;
+    if (!named || candidate.roleTitle.length > named.length) named = candidate.roleTitle;
+  }
+  return named;
+}
+
 function domainHit(candidate: LinkCandidate, domains: readonly (string | null)[]): boolean {
   for (const domain of domains) {
     if (!domain) continue;
