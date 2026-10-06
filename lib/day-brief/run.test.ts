@@ -29,7 +29,7 @@ const RESULT: Candidate = {
   kind: 'dash-result',
   key: 'dash-result:d1',
   title: 'Price the sofa',
-  href: '/goals/g1#step-d1',
+  href: '/goals/g1/s/d1',
   goalTitle: 'Furnish the flat',
   result: 'Three sofas under $900.',
   closedAt: '2026-09-28T02:00:00Z',

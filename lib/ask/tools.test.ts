@@ -729,7 +729,7 @@ describe('recall', () => {
     expect(rows.map((r) => [r.table, r.href])).toEqual([
       ['obsidian.notes', '/vault/n/Career/YC%20Jobs%20Application.md'],
       ['core.files', '/goals/files/f0000000-0000-4000-8000-000000000001'],
-      ['goals.items', '/goals/a0000000-0000-4000-8000-000000000001#step-a0000000-0000-4000-8000-000000000002'],
+      ['goals.items', '/goals/a0000000-0000-4000-8000-000000000001/s/a0000000-0000-4000-8000-000000000002'],
       ['job_search.notes', '/jobs/roles/r1'],
       ['learn.card_notes', '/learn/c/k1'],
       ['public.order_items', '/shopping/orders/o1'],

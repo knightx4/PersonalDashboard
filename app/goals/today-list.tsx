@@ -12,7 +12,7 @@ import { LinkedText } from '@/components/ui/linked-text';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
-import { areaHref } from '@/lib/goals/all-goals';
+import { areaHref, stepHref } from '@/lib/goals/all-goals';
 import { preparedExcerpt } from '@/lib/goals/home';
 import {
   SET_ASIDE_CHOICES,
@@ -132,7 +132,7 @@ function hrefFor(item: TodayItem): string {
     case 'ask':
     case 'step':
     case 'rhythm':
-      return `/goals/${item.goalId}#step-${item.id}`;
+      return stepHref(item.goalId, item.id);
     default:
       return `/goals/${item.goalId}`;
   }

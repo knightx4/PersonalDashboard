@@ -13,6 +13,7 @@ import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
 import { SNOOZE_DAYS, todayIn } from '@/lib/todo/tasks/model';
 import { optionAnswer, planOptions, recommendedLetter } from '@/lib/plan/options';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
  * Each open goal's next step of yours, and the goal steps you pressed Show on
@@ -122,7 +123,7 @@ export const goalStepsSource: AgendaSource = {
         // Today: a question holds up whatever sits above it on the goal.
         day: today,
         at: null,
-        link: { href: `/goals/${question.goalId}#step-${question.id}`, label: question.goalTitle },
+        link: { href: stepHref(question.goalId, question.id), label: question.goalTitle },
         action: null,
         detail: options.length > 0 ? 'Waiting on your answer' : 'Answer it on the goal',
         completable: false,
