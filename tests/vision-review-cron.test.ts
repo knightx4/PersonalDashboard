@@ -67,9 +67,44 @@ function okFetch() {
 }
 
 describe('the vision review tick', () => {
-  it('starts nothing without a routine', async () => {
-    const result = await runVisionReviewTick({ routine: { id: null, token: null }, now: NOW });
-    expect(result).toEqual({ skipped: 'CLAUDE_VISION_ROUTINE_ID is not set' });
+  it('records a failed fire when a due week has no routine, so the Dash tab shows it', async () => {
+    const { client, inserts } = fakeClient({ reviews: [{ created_at: '2026-09-27T16:00:00Z' }] });
+    const fetch = okFetch();
+    const result = await runVisionReviewTick({
+      client,
+      routine: { id: null, token: null },
+      now: NOW,
+      fetch,
+    });
+    expect(result).toEqual({
+      failed:
+        'CLAUDE_VISION_ROUTINE_ID is not set on the deployment, so the weekly vision review could not start.',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0]!.values).toMatchObject({
+      user_id: USER,
+      job: 'vision',
+      status: 'failed',
+      routine_id: null,
+    });
+  });
+
+  it('names the token when the id is set and the token is not', async () => {
+    const { client } = fakeClient({ reviews: [{ created_at: '2026-09-27T16:00:00Z' }] });
+    const result = await runVisionReviewTick({
+      client,
+      routine: { id: 'trig_vision', token: null },
+      now: NOW,
+    });
+    expect(result).toMatchObject({ failed: expect.stringContaining('CLAUDE_VISION_ROUTINE_TOKEN') });
+  });
+
+  it('records nothing for a missing routine in a week that already had a review', async () => {
+    const { client, inserts } = fakeClient({ reviews: [{ created_at: '2026-10-01T16:00:00Z' }] });
+    const result = await runVisionReviewTick({ client, routine: { id: null, token: null }, now: NOW });
+    expect(result).toMatchObject({ skipped: expect.stringContaining('a review was written') });
+    expect(inserts).toHaveLength(0);
   });
 
   it('fires once a week has passed, and records the fire as a vision run', async () => {
