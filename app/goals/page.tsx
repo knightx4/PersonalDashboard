@@ -13,6 +13,9 @@ import { catchUpSince } from '@/lib/goals/catch-up';
 import { recordVisit } from '@/lib/goals/visits-store';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { HomeView } from './home-view';
+import { FocusLine, PlanWeek } from './plan-week';
+import { PLAN_PARAM } from '@/lib/goals/focus';
+import { loadPlanWeek, type PlanWeekData } from '@/lib/goals/focus-store';
 
 export const metadata = { title: 'Goals' };
 export const dynamic = 'force-dynamic';
@@ -32,8 +35,9 @@ function now(): number {
  * week's focus goals, and lines that open to what Dash is on, what Dash did
  * since your last visit, Later and the other goals. The layout is in
  * home-view.tsx, which also takes the week's focus goals by name and the
- * card that plans the week as `focusLine` and `planWeek`; neither is passed
- * yet.
+ * card that plans the week as `focusLine` and `planWeek`. The card shows
+ * while the week is not yet planned (lib/goals/focus.ts, needsPlanning) or
+ * when Change on the focus line adds `?plan=1`.
  *
  * Each visit is recorded (plan #1019), and what Dash did is read from the
  * visit before this sitting (plan #1076); after time away that is the visit
@@ -44,12 +48,17 @@ function now(): number {
  * is not exposed to PostgREST says so here instead of showing an empty page
  * that looks right.
  */
-export default async function GoalsPage() {
+export default async function GoalsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [PLAN_PARAM]?: string | string[] }>;
+}) {
+  const replanning = (await searchParams)[PLAN_PARAM] === '1';
   const user = await requireUser();
   const account = await loadAccountSettings(user.id);
   const client = await createGoalsClient();
   const today = todayIn(account.timezone);
-  const [home, visit, brief, areas, owner] = await Promise.all([
+  const [home, visit, brief, areas, owner, plan] = await Promise.all([
     createClient().then((supabase) =>
       loadHome(client, supabase, {
         userId: user.id,
@@ -64,6 +73,8 @@ export default async function GoalsPage() {
     loadAreas(client).catch(() => []),
     // Ask Dash starts a run, which only the owner's account may (shaping-actions.ts).
     isOwner({ user }),
+    // A failed read leaves the week's plan out rather than the page.
+    loadPlanWeek(client, { userId: user.id, today }).catch((): PlanWeekData | null => null),
   ]);
   // A failed read says so in its section rather than failing the page.
   const done = await loadDoneSince(client, visit.previousVisitAt ?? visit.lastVisitAt).catch(
@@ -85,6 +96,12 @@ export default async function GoalsPage() {
         areas={areas.map((area) => ({ id: area.id, name: area.name, learn: area.learn }))}
         canRun={owner}
         awayFrom={awayFrom}
+        focusLine={plan ? <FocusLine goals={plan.focused} /> : undefined}
+        planWeek={
+          plan && plan.goals.length > 0 && (plan.needsPlanning || replanning) ? (
+            <PlanWeek goals={plan.goals} recap={plan.recap} />
+          ) : undefined
+        }
       />
     </div>
   );

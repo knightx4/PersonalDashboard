@@ -3,7 +3,6 @@ import {
   briefParts,
   errandAreaDefault,
   homeAreas,
-  homeInFocus,
   homeLists,
   homeSummary,
   nextMove,
@@ -174,31 +173,6 @@ function focused(id: string, areaId: string, focus: boolean): HomeGoal {
   const base = line(id, areaId);
   return { ...base, goal: { ...base.goal, focus } as HomeGoal['goal'] };
 }
-
-describe('homeInFocus', () => {
-  const today = '2026-10-06';
-  it('counts every goal while none is marked as a focus goal', () => {
-    const goals = [{ id: 'a' }, { id: 'b', focus: false }];
-    expect(goals.every((goal) => homeInFocus(goal, goals, today))).toBe(true);
-  });
-
-  it('counts the focus goals, and an errand due within a week or late', () => {
-    const goals = [
-      { id: 'focus', focus: true },
-      { id: 'other' },
-      { id: 'soon', errand: true, dueOn: '2026-10-13' },
-      { id: 'far', errand: true, dueOn: '2026-10-14' },
-      { id: 'late', errand: true, dueOn: '2026-10-01' },
-    ];
-    expect(goals.filter((goal) => homeInFocus(goal, goals, today)).map((g) => g.id)).toEqual([
-      'focus',
-      'soon',
-      'late',
-    ]);
-    // Without today an errand counts only by its own mark.
-    expect(homeInFocus(goals[2], goals)).toBe(false);
-  });
-});
 
 function onYou(id: string, goalId: string, kind: TodayKind = 'step'): TodayItem {
   return {

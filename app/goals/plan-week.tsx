@@ -11,6 +11,7 @@ import { cn } from '@/lib/cn';
 import {
   FOCUS_SUGGESTED,
   overSuggested,
+  PLAN_PARAM,
   type PlanWeekGoal,
   type WeekRecap,
 } from '@/lib/goals/focus';
@@ -27,8 +28,6 @@ import { planWeekAction } from './focus-actions';
  * it again.
  */
 
-/** The search param that opens the card again once the week is planned. */
-export const PLAN_PARAM = 'plan';
 
 export type PlanWeekProps = {
   /** Open goals that are not errands, in page order, with their focus now (PlanWeekData.goals). */

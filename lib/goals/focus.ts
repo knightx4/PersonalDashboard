@@ -35,6 +35,9 @@ export type PlanWeekGoal = { id: string; title: string; focus: boolean };
  */
 export type WeekRecap = { stepsClosed: number; rhythmsKept: number; rhythmsMissed: number };
 
+/** The search param that reopens Plan your week on the home: `?plan=1`. */
+export const PLAN_PARAM = 'plan';
+
 type FocusGoal = Pick<Goal, 'id' | 'status' | 'focus' | 'errand' | 'dueOn'>;
 
 /** Whether the person has chosen a focus: some open goal has it. */

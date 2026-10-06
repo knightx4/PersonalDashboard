@@ -10,6 +10,7 @@
  *
  * Pure, so the wording is tested without a database.
  */
+import { inFocus } from '@/lib/goals/focus';
 import type { NextItem } from '@/lib/goals/daily';
 import type { GoalReview, Verdict } from '@/lib/goals/reviews';
 import type { GoalProgress } from '@/lib/goals/status';
@@ -170,35 +171,8 @@ export function nextVisitDays(days: readonly string[], today: string): string[] 
 // Do next and Other goals: what the home lists from the week's focus goals.
 // ---------------------------------------------------------------------------
 
-/** An errand due within this many days is in focus, whatever the week's focus goals are. */
-export const ERRAND_SOON_DAYS = 7;
-
-/** The fields homeInFocus reads from a goal. */
-export type FocusFields = { id: string; focus?: boolean; errand?: boolean; dueOn?: string | null };
-
-/** Whole days from `from` to `to`, both YYYY-MM-DD; negative when `to` is earlier. */
-function daysFrom(from: string, to: string): number {
-  return Math.round(
-    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000,
-  );
-}
-
-/**
- * Whether a goal is one of this week's. While no goal is marked as a focus
- * goal, every goal is. Otherwise the focus goals are, and so is an errand
- * due within ERRAND_SOON_DAYS of today or already late. Without today, an
- * errand counts only by its own mark.
- */
-export function homeInFocus(
-  goal: FocusFields,
-  goals: readonly FocusFields[],
-  today?: string,
-): boolean {
-  if (!goals.some((other) => other.focus)) return true;
-  if (goal.focus) return true;
-  if (!goal.errand || !goal.dueOn || !today) return false;
-  return daysFrom(today, goal.dueOn) <= ERRAND_SOON_DAYS;
-}
+// Which goals are in focus is lib/goals/focus.ts's inFocus, the rule Todo and
+// Dash's runs read too.
 
 /**
  * The kinds of thing on you that Do next takes from any goal. A question, a
@@ -237,15 +211,15 @@ export function homeLists(
   cap: number,
 ): HomeLists {
   const all = goals.map((line) => line.goal);
-  const inFocus = new Set(
-    all.filter((goal) => homeInFocus(goal, all, today)).map((goal) => goal.id),
+  const focused = new Set(
+    all.filter((goal) => inFocus(goal, all, today)).map((goal) => goal.id),
   );
-  const kept = ranked.filter((item) => ANY_GOAL_KINDS.has(item.kind) || inFocus.has(item.goalId));
+  const kept = ranked.filter((item) => ANY_GOAL_KINDS.has(item.kind) || focused.has(item.goalId));
   const doNext = kept.slice(0, cap);
   const listed = new Set(doNext.map((item) => item.goalId));
   const { errands, others } = splitErrands(goals);
   const otherGoals = [...errands, ...others].filter(
-    (line) => !inFocus.has(line.goal.id) || (line.goal.errand && !listed.has(line.goal.id)),
+    (line) => !focused.has(line.goal.id) || (line.goal.errand && !listed.has(line.goal.id)),
   );
   return { doNext, rest: kept.slice(cap), otherGoals };
 }
