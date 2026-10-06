@@ -170,7 +170,7 @@ export function RunRoutineButton({
           <Link
             href={allHref}
             onClick={onNavigate}
-            className="ml-auto text-ui text-accent hover:underline"
+            className="press-area ml-auto text-ui text-accent hover:underline"
           >
             See all
           </Link>

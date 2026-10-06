@@ -686,7 +686,7 @@ export function OvernightControl({
                   value={hours}
                   onChange={(event) => setHours(Number(event.target.value))}
                   aria-label="How long it may run for"
-                  className="w-auto"
+                  className="min-h-11 w-auto sm:min-h-0"
                 >
                   {/* First, because it is the default and the ordinary press. */}
                   <option value={OVERNIGHT_NO_LIMIT}>until I stop it</option>

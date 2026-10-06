@@ -191,7 +191,7 @@ function Details({
                   href={form.website}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-accent underline underline-offset-2"
+                  className="press-area text-accent underline underline-offset-2"
                 >
                   {form.website}
                 </a>
@@ -206,7 +206,7 @@ function Details({
                   href={form.careersUrl}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-accent underline underline-offset-2"
+                  className="press-area text-accent underline underline-offset-2"
                 >
                   {form.careersUrl}
                 </a>
@@ -221,7 +221,7 @@ function Details({
                   href={form.linkedinUrl}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-accent underline underline-offset-2"
+                  className="press-area text-accent underline underline-offset-2"
                 >
                   {form.linkedinUrl}
                 </a>
@@ -623,19 +623,19 @@ function Contacts({
         <form action={action} className="mt-2 mb-4 space-y-2">
           <input type="hidden" name="companyId" value={companyId} />
           <div className="grid gap-2 sm:grid-cols-2">
-            <Input name="fullName" aria-label="Name" placeholder="Name" required autoFocus />
-            <Input name="title" aria-label="Title" placeholder="Title, e.g. Head of Finance" />
+            <Input name="fullName" aria-label="Name" placeholder="Name" required autoFocus className={phoneTall} />
+            <Input name="title" aria-label="Title" placeholder="Title, e.g. Head of Finance" className={phoneTall} />
           </div>
           <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)]">
-            <Select name="relationship" aria-label="Relationship" defaultValue="cold">
+            <Select name="relationship" aria-label="Relationship" defaultValue="cold" className={phoneTall}>
               {RELATIONSHIPS.map((entry) => (
                 <option key={entry} value={entry}>
                   {entry.replace(/_/g, ' ')}
                 </option>
               ))}
             </Select>
-            <Input name="linkedinUrl" type="url" aria-label="LinkedIn" placeholder="LinkedIn URL" />
-            <Input name="email" type="email" aria-label="Work email" placeholder="Work email" />
+            <Input name="linkedinUrl" type="url" aria-label="LinkedIn" placeholder="LinkedIn URL" className={phoneTall} />
+            <Input name="email" type="email" aria-label="Work email" placeholder="Work email" className={phoneTall} />
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <Button type="submit" size="sm" pending={pending}>
@@ -658,7 +658,7 @@ function Contacts({
             <li key={contact.id} className="row-pad flex flex-wrap items-baseline gap-2">
               <Link
                 href={`/jobs/contacts/${contact.id}`}
-                className="text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
+                className="press-area text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
                 title="See details, notes and logged sends"
               >
                 {contact.fullName}
@@ -673,7 +673,7 @@ function Contacts({
                   href={contact.linkedinUrl}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-small text-accent underline underline-offset-2"
+                  className="press-area text-small text-accent underline underline-offset-2"
                 >
                   LinkedIn
                 </a>
@@ -689,6 +689,9 @@ function Contacts({
     </CardSection>
   );
 }
+
+/** A field drawn at a phone's 44px press height below sm, at the control height above. */
+const phoneTall = 'min-h-11 sm:min-h-0';
 
 type CompanyContact = {
   id: string;
