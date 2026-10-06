@@ -82,7 +82,6 @@ export type TreeHealth = {
   name: string;
 };
 
-
 /**
  * The row's own state, held by the page's row so its menus can open the panel,
  * the edit form or the add form.
@@ -202,7 +201,19 @@ export function TreeRow<E extends TreeCatalogEntry>({
   titles,
   threadPlaceholder = 'A note on this step. Tag @dash to ask something, or to tell it to reword the step, file an idea or build it.',
   renderChild,
+  layout = 'grid',
+  after,
 }: {
+  /**
+   * `grid` is the dev plan's row: the shared columns under a header, with the
+   * outline number, health word, move, priority and count of what is beneath.
+   * `list` is a goal's row (plan #1078): the status control before the title
+   * as a glyph, the title with its marks, the `priority` cell at the end
+   * (under the title on a phone), and the menu. The panel is the same.
+   */
+  layout?: 'grid' | 'list';
+  /** Drawn under the sub-steps while they show: on a goal, the fold of the finished ones. */
+  after?: ReactNode;
   node: TreeRowNode;
   /** One entry per level above: whether that level's line carries on below this row. */
   trail: readonly boolean[];
@@ -357,6 +368,56 @@ export function TreeRow<E extends TreeCatalogEntry>({
     return () => window.removeEventListener('hashchange', openIfNamed);
   }, [anchorId, setOpen]);
 
+  const list = layout === 'list';
+  // Health is a word you click to change, not a badge you have to open the
+  // step to change: "where is this" is the question the page exists for, and
+  // answering it differently should not be a form. The grid draws it after
+  // the title; the list draws it before, where a checkbox would be.
+  const healthMenu = (
+    <ActionMenu
+      label={`Status of #${node.outline} ${node.title}`}
+      items={statusMenu}
+      align="start"
+      className={list ? 'shrink-0' : 'justify-self-start'}
+      triggerClassName={cn(
+        list
+          ? 'size-7 px-0 text-small font-medium'
+          : 'h-7 w-auto gap-1.5 px-1.5 text-small font-medium',
+        TONE_TEXT[health.tone],
+      )}
+      trigger={
+        <StateLabel
+          // Inherits the trigger's own text size and tone, which is what
+          // makes the health a word you click rather than a badge inside a
+          // button.
+          className="text-inherit"
+          tone={health.tone}
+          title={health.title}
+          word={health.word}
+          // No glyph on a dropped row. The slash was a third way of
+          // saying what the ghost tone and the struck-through title
+          // already say, on the one state nobody is scanning for -- so it
+          // read as clutter beside the rows that are still live, which is
+          // where the eye is actually going (law 15). Every other state
+          // keeps its shape: those are the ones being scanned, and the
+          // glyph is how they are told apart at a glance. The count
+          // beside the module heading keeps its slash too, because there
+          // a bare number would say nothing at all.
+          glyph={health.name === 'dropped' && !list ? null : health.glyph}
+          // On a phone the glyph stands for the word, which stays for
+          // screen readers, so a dropped row gets its slash back there.
+          // In the list layout the glyph is the control at every width,
+          // and the word is its accessible name and tooltip.
+          wordClassName={list ? 'sr-only' : 'max-sm:sr-only'}
+        >
+          {health.name === 'dropped' && !list && (
+            <StatusGlyph glyph={health.glyph} className="sm:hidden" />
+          )}
+        </StateLabel>
+      }
+    />
+  );
+
   return (
     <>
       {/* The anchor a `#494` written in a comment lands on. `scroll-mt` keeps
@@ -364,14 +425,17 @@ export function TreeRow<E extends TreeCatalogEntry>({
       <li
         id={anchorId ?? planRowId(node.number)}
         className={cn(
-          ROW_GRID,
+          list ? 'flex items-start gap-x-1' : ROW_GRID,
           'group scroll-mt-24 px-3',
           (gloss || need) && !open ? 'py-1.5' : 'py-2',
           !node.matches && 'opacity-60',
-          closed && 'opacity-70',
+          // A goal's finished rows sit under their own Finished fold, which
+          // says they are finished; dimmed as well, their muted text fell
+          // under the contrast floor.
+          closed && !list && 'opacity-70',
         )}
       >
-        <div className="flex min-w-0 items-stretch">
+        <div className={cn('flex min-w-0 items-stretch', list && 'flex-1')}>
           <TreeGuides trail={trail} />
 
           {/* The fold, where there is something beneath to fold. A spacer
@@ -430,6 +494,8 @@ export function TreeRow<E extends TreeCatalogEntry>({
             <span className={cn(LEVEL, 'shrink-0')} aria-hidden />
           )}
 
+          {list && healthMenu}
+
           {/* The title and the chevron beside it are one fold: either opens
               the step's panel and its sub-steps together. Renamed in place
               where the page gives the title an editor. */}
@@ -441,7 +507,10 @@ export function TreeRow<E extends TreeCatalogEntry>({
               onClick={toggle}
               aria-expanded={expanded}
               title={expanded ? `Close #${handle}` : `Open #${handle}`}
-              className="min-w-0 flex-1 self-center text-left hover:text-accent"
+              className={cn(
+                'min-w-0 flex-1 text-left hover:text-accent',
+                list ? 'self-start py-1 pl-1' : 'self-center',
+              )}
             >
               <span
                 className={cn(
@@ -457,7 +526,11 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   comments and the CLI say, it is the anchor a `#597` link
                   lands on, and the button around this says "Open #597" -- and
                   the search box takes either. */}
-                <span className="tabular shrink-0 text-small text-ink-ghost">#{node.outline}</span>
+                {!list && (
+                  <span className="tabular shrink-0 text-small text-ink-ghost">
+                    #{node.outline}
+                  </span>
+                )}
                 {/* Truncated closed, whole open. A row is a line and a long title
                  * has to give way to keep it one; but opening the step is the
                  * gesture that means "show me this one", and a name still cut
@@ -528,51 +601,15 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   {gloss}
                 </span>
               )}
+              {/* On a phone the list layout's last cell goes under the title. */}
+              {list && priority && (
+                <span className="block text-small text-ink-muted sm:hidden">{priority}</span>
+              )}
             </button>
           )}
         </div>
 
-        {/* Health is a word you click to change, not a badge you have to open
-            the step to change: "where is this" is the question the page exists
-            for, and answering it differently should not be a form. */}
-        <ActionMenu
-          label={`Status of #${node.outline} ${node.title}`}
-          items={statusMenu}
-          align="start"
-          className="justify-self-start"
-          triggerClassName={cn(
-            'h-7 w-auto gap-1.5 px-1.5 text-small font-medium',
-            TONE_TEXT[health.tone],
-          )}
-          trigger={
-            <StateLabel
-              // Inherits the trigger's own text size and tone, which is what
-              // makes the health a word you click rather than a badge inside a
-              // button.
-              className="text-inherit"
-              tone={health.tone}
-              title={health.title}
-              word={health.word}
-              // No glyph on a dropped row. The slash was a third way of
-              // saying what the ghost tone and the struck-through title
-              // already say, on the one state nobody is scanning for -- so it
-              // read as clutter beside the rows that are still live, which is
-              // where the eye is actually going (law 15). Every other state
-              // keeps its shape: those are the ones being scanned, and the
-              // glyph is how they are told apart at a glance. The count
-              // beside the module heading keeps its slash too, because there
-              // a bare number would say nothing at all.
-              glyph={health.name === 'dropped' ? null : health.glyph}
-              // On a phone the glyph stands for the word, which stays for
-              // screen readers, so a dropped row gets its slash back there.
-              wordClassName="max-sm:sr-only"
-            >
-              {health.name === 'dropped' && (
-                <StatusGlyph glyph={health.glyph} className="sm:hidden" />
-              )}
-            </StateLabel>
-          }
-        />
+        {!list && healthMenu}
 
         {/* Whose move it is, beside how far along it is.
 
@@ -587,22 +624,32 @@ export function TreeRow<E extends TreeCatalogEntry>({
             to, what it waits on, whether it is a question -- so there is
             nothing here to pick. Changing it means handing the step over or
             answering what it asks, which are the buttons already on the row. */}
-        <span className="hidden min-w-0 truncate text-small sm:block">{move}</span>
+        {list ? (
+          priority && (
+            <span className="hidden max-w-48 shrink-0 pt-1.5 text-right text-small sm:block">
+              {priority}
+            </span>
+          )
+        ) : (
+          <>
+            <span className="hidden min-w-0 truncate text-small sm:block">{move}</span>
 
-        <span className="hidden truncate text-small sm:block">{priority}</span>
+            <span className="hidden truncate text-small sm:block">{priority}</span>
 
-        {/* No "Who" column. It was a column of dashes with the occasional
-            name in it -- one fact, on a plan whose every approved step the
-            runner takes unless you keep it, and keeping it is a button. */}
-        <span className="hidden sm:block">
-          <Breakdown rollup={node.rollup} />
-        </span>
+            {/* No "Who" column. It was a column of dashes with the occasional
+                name in it -- one fact, on a plan whose every approved step the
+                runner takes unless you keep it, and keeping it is a button. */}
+            <span className="hidden sm:block">
+              <Breakdown rollup={node.rollup} />
+            </span>
+          </>
+        )}
 
         {/* The things done to a step without reading it first, then the menu
             for everything else. Under the pointer or under focus, so a plan at
             rest is a plan rather than a wall of icons; the same actions are in
             the menu, which is how a phone reaches them. */}
-        <div className="flex items-center justify-self-end">
+        <div className={cn('flex items-center justify-self-end', list && 'shrink-0')}>
           {quickActions && (
             <div className="hidden items-center opacity-0 transition-opacity duration-quick group-focus-within:opacity-100 group-hover:opacity-100 sm:flex">
               {quickActions}
@@ -766,6 +813,8 @@ export function TreeRow<E extends TreeCatalogEntry>({
             {renderChild(child, [...trail, index < substeps.length - 1])}
           </Fragment>
         ))}
+
+      {showChildren && after}
 
       {row.addingChild && addChild && (
         <li style={inset} className="py-2 pr-3">

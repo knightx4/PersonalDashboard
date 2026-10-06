@@ -31,6 +31,9 @@ const RUN_POLL_MS = 15_000;
  * control a step's row has); Approve opens what it proposed
  * and lets it change the steps here without asking from then on. With nothing
  * to approve it is one line rather than a card.
+ *
+ * On the goal page (plan #1078) it is `quiet`: with nothing to approve it is
+ * Ask Dash alone, in the status card, and the runs are listed under More.
  */
 export function GoalShaping({
   goalId,
@@ -39,6 +42,7 @@ export function GoalShaping({
   moreRuns,
   running: progress,
   canRun,
+  quiet = false,
 }: {
   goalId: string;
   approval: { text: string; approve: string | null };
@@ -53,6 +57,8 @@ export function GoalShaping({
   running: string | null;
   /** Whether this account can start a run (the owner's only). */
   canRun: boolean;
+  /** Leave out the approval line while there is nothing to approve, and the run history always. */
+  quiet?: boolean;
 }) {
   const router = useRouter();
   const running = progress !== null;
@@ -72,7 +78,8 @@ export function GoalShaping({
       <span>Dash is on it · {progress}</span>
     </p>
   );
-  const history = runs.length > 0 && <RunHistory runs={runs} more={moreRuns} />;
+  const history = !quiet && runs.length > 0 && <RunHistory runs={runs} more={moreRuns} />;
+  const text = quiet && !approval.approve ? '' : approval.text;
   const workButton = canRun && (
     <form action={work}>
       <input type="hidden" name="goalId" value={goalId} />
@@ -102,14 +109,14 @@ export function GoalShaping({
   // heading or card around them (ui finding 133242ff, plan #1038). The card
   // comes back when Claude proposes something.
   if (!approval.approve) {
-    if (!approval.text && !status && !history && !workButton && !feedback) return null;
+    if (!text && !status && !history && !workButton && !feedback) return null;
     return (
       <div className="space-y-1 px-1">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {/* A basis, so on a phone the button drops under the lines instead
               of squeezing them into a column beside it. */}
           <div className="min-w-0 flex-[1_1_18rem] space-y-0.5">
-            {approval.text && <p className="text-ui text-ink">{approval.text}</p>}
+            {text && <p className="text-ui text-ink">{text}</p>}
             {status}
           </div>
           {workButton}
@@ -149,7 +156,7 @@ export function GoalShaping({
  * ended and when, and its summary or its error. Each opens to its own page,
  * which lists what it changed; the Runs page has the older ones.
  */
-function RunHistory({ runs, more }: { runs: GoalRunRow[]; more: boolean }) {
+export function RunHistory({ runs, more }: { runs: GoalRunRow[]; more: boolean }) {
   return (
     <div className="space-y-1 pt-1">
       <h3 className="text-small font-semibold text-ink">Runs</h3>

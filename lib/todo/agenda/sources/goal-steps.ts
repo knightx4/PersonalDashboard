@@ -34,6 +34,12 @@ import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/
  * Todo settings page could only hide what you need to see. Turning the Goals
  * workspace off still takes them away, as it does for every source.
  *
+ * **The week's focus narrows it** (goals 0070; lib/goals/focus.ts). Once the
+ * person has picked the goals they are pushing this week, only those goals,
+ * and errands due within a week, put their next step and their rhythms here.
+ * A flagged step and a question still come from any goal. The rules are
+ * goalTodoSteps and focusRhythms in lib/goals/todo.ts.
+ *
  * **Rhythms come here too, with no button** (plan #928): each live rhythm is
  * an item for its current period until the period's count is met. Its key
  * carries the period's first day, so "Later" and "Not this one" hide only
@@ -63,7 +69,7 @@ export const goalStepsSource: AgendaSource = {
   module: 'goals',
   alwaysOn: true,
   description:
-    "Each goal's next step, steps you chose to show on Todo, and your rhythms until each is met.",
+    "Each goal's next step (only your focus goals' while you have chosen a focus), steps you chose to show on Todo, and your rhythms until each is met.",
 
   async fetch(ctx: SourceContext): Promise<AgendaItem[]> {
     const today = todayIn(ctx.timezone, ctx.now);

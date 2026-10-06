@@ -1,21 +1,24 @@
+import { GoalRhythms } from '@/app/goals/[goalId]/goal-found';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
+import { rhythmSteps } from '@/lib/goals/goal-page';
 import { attachDependencies, type DependencyRow } from '@/lib/goals/dependencies';
 import { buildForest, type Step } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import type { Collection } from '@/lib/goals/collections-store';
 
 /**
- * A goal's page of steps, drawn from fixtures for the gallery (plan #982).
+ * A goal's steps, drawn from fixtures for the gallery (plans #982, #1078).
  *
- * Beside the dev plan's surfaces in plan-surfaces.tsx, so the two can be
- * photographed together: the goal page draws its steps with the plan's
- * shared row. The tree holds a step of each kind -- yours, Claude's, a
- * question, a rhythm and an information step with a form -- and the states a
- * goal step can be in: blocked on you, waiting on another step, a proposal, a
- * Claude result to read, done and dropped. A step from another goal is linked
- * in, and one step waits on a step in a goal that is not on the page (plan
- * #983). No clock anywhere in it, so two shots only differ when the page
- * does.
+ * The goal is in three stages: Know what you owe, open under Now with an
+ * information step of yours ready; Get the rates lowered, open because it
+ * holds a question and a draft of Dash's for the call; and Move the balance,
+ * waiting on the second, as one line under Other stages. The tree holds a
+ * step of each kind (yours, Dash's, a question, a rhythm and an information
+ * step with a form) and the states a goal step can be in: blocked on you,
+ * waiting on another step, a proposal, done and dropped. A step from another
+ * goal is linked in, and one step waits on a step in a goal that is not on
+ * the page (plan #983). No clock anywhere in it, so two shots only differ
+ * when the page does.
  */
 
 function step(id: string, parentId: string, extra: Partial<Step> & { title: string }): Step {
@@ -43,7 +46,12 @@ function step(id: string, parentId: string, extra: Partial<Step> & { title: stri
 const GOAL = 'goal-debt';
 
 const steps: Step[] = [
-  step('list', GOAL, {
+  step('owe', GOAL, {
+    title: 'Know what you owe',
+    acceptance: 'Every debt and every income written down.',
+    position: 5,
+  }),
+  step('list', 'owe', {
     title: 'List every balance',
     detail: 'Every card, loan and overdraft, with what is owed and the rate.',
     acceptance: 'Each debt has a balance and a rate written down.',
@@ -58,7 +66,10 @@ const steps: Step[] = [
   step('script', 'rates', {
     title: 'Draft what to say on the call',
     kind: 'claude',
-    result: 'A short script: the balance, how long you have been a customer, and the rate a competitor offers.',
+    status: 'done',
+    preparesId: 'call',
+    result:
+      'A short script for the call. Give the balance, say you have been a customer for six years, and name the 19% a competitor offers.\n\n1. Ask for the retention team.\n2. Ask them to match 19% for twelve months.',
     position: 10,
   }),
   step('call', 'rates', {
@@ -76,10 +87,19 @@ const steps: Step[] = [
       'A — The highest rate. Saves the most interest.\nB — The smallest balance. Closes one soonest.\nRecommend A.',
     position: 30,
   }),
-  step('transfer', GOAL, {
+  step('move', GOAL, {
+    title: 'Move the balance',
+    position: 30,
+  }),
+  step('transfer', 'move', {
     title: 'Move the balance to a 0% card',
     detail: 'Only once the rates are known.',
-    position: 30,
+    position: 10,
+  }),
+  step('fees', 'move', {
+    title: 'Compare the transfer fees',
+    kind: 'claude',
+    position: 20,
   }),
   step('review', GOAL, {
     title: 'Check the budget every week',
@@ -94,7 +114,7 @@ const steps: Step[] = [
     status: 'proposed',
     position: 50,
   }),
-  step('income', GOAL, {
+  step('income', 'owe', {
     title: 'Write down what comes in each month',
     detail: 'Pay and anything else that arrives regularly.',
     collectionId: 'col-income',
@@ -123,7 +143,7 @@ const otherSteps: Step[] = [
 ];
 
 const dependencies: DependencyRow[] = [
-  { id: 'dep-1', itemId: 'transfer', dependsOnId: 'rates' },
+  { id: 'dep-1', itemId: 'move', dependsOnId: 'rates' },
   { id: 'dep-2', itemId: 'review', dependsOnId: 'payday' },
 ];
 
@@ -234,9 +254,15 @@ const map: GoalMap = {
   },
 };
 
-/** The steps as a list, every step unfolded: the page as it opens. */
+/** The steps as the page opens: Now, the rhythm under it, and the other stage folded. */
 export function GoalTreeSurface() {
-  return <StepTree map={map} todoOn={false} />;
+  return (
+    <StepTree
+      map={map}
+      todoOn={false}
+      belowNow={<GoalRhythms steps={rhythmSteps(map.steps)} records={map.rhythms} />}
+    />
+  );
 }
 
 /** The same steps with every row opened: the panel behind each row. */
