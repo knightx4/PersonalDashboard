@@ -102,6 +102,7 @@ import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
 import { QuickReadView, type QuickReadViewProps } from '@/app/news/quick/quick-view';
 import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
+import { ReviewView, type ReviewViewProps } from '@/app/news/review/review-view';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
 import {
@@ -1751,7 +1752,7 @@ function SharedDisplayOptions() {
 const issueBase: IssueViewProps = {
   issueId: 'issue-1',
   subject: 'The Week in Infrastructure #212: queues, caches and one bad deploy',
-  byline: 'Infra Weekly · Tue 22 Sep, 07:14',
+  byline: 'Infra Weekly · Tue 22 Sep, 7:14\u00a0AM',
   back: { href: '/news/all', label: 'Newsletters' },
   digest: {
     summary:
@@ -1806,7 +1807,7 @@ const issueEssay: IssueViewProps = {
   ...issueBase,
   issueId: 'issue-2',
   subject: 'On leaving things unfinished',
-  byline: 'Slow Letters · Sun 20 Sep, 09:02',
+  byline: 'Slow Letters · Sun 20 Sep, 9:02\u00a0AM',
   digest: {
     summary:
       "An essay about the half-built projects that pile up in any maker's life, and the argument that abandoning one on purpose is a skill. The writer keeps a list of what they stopped and why, and rereads it before starting anything new. Their point is that the list is less about guilt than about noticing which kinds of project they never finish.",
@@ -1820,7 +1821,7 @@ const issueFailed: IssueViewProps = {
   ...issueBase,
   issueId: 'issue-3',
   subject: 'Market notes for Monday',
-  byline: 'Morning Tape · Mon 21 Sep, 06:30',
+  byline: 'Morning Tape · Mon 21 Sep, 6:30\u00a0AM',
   digest: null,
   digestError: 'model returned no summary',
   showDigest: false,
@@ -1873,7 +1874,7 @@ const quickStory: QuickReadViewProps = {
     reason: 'Ran in 3 of your newsletters',
     rating: 81,
   },
-  arrived: '22 Sep, 07:14',
+  arrived: '22 Sep, 7:14\u00a0AM',
   nothingYet: false,
   related: previewRelatedNotes,
   pictures: true,
@@ -1911,7 +1912,7 @@ const quickEssay: QuickReadViewProps = {
     repeats: [],
     reason: null,
   },
-  arrived: '20 Sep, 09:02',
+  arrived: '20 Sep, 9:02\u00a0AM',
   issueHref: '/news/i/issue-2',
 };
 
@@ -1924,14 +1925,14 @@ const quickPageView: QuickReadViewProps = {
   page: [
     {
       card: quickStory.card!,
-      arrived: '22 Sep, 07:14',
+      arrived: '22 Sep, 7:14\u00a0AM',
       saved: false,
       related: previewRelatedNotes,
       issueHref: '/news/i/issue-1',
     },
     {
       card: quickEssay.card!,
-      arrived: '20 Sep, 09:02',
+      arrived: '20 Sep, 9:02\u00a0AM',
       saved: false,
       issueHref: '/news/i/issue-2',
     },
@@ -2039,7 +2040,7 @@ const quickFullPage: QuickReadViewProps = {
         repeats: [],
         reason: null,
       },
-      arrived: '22 Sep, 07:14',
+      arrived: '22 Sep, 7:14\u00a0AM',
       saved: false,
       issueHref: `/news/i/issue-${index + 1}`,
     };
@@ -2051,6 +2052,55 @@ const quickFullPage: QuickReadViewProps = {
  * its picture, full text and link; the second's newsletter has been deleted,
  * so its sender is not a link; the third has no link or text of its own.
  */
+
+/**
+ * A full evening's review (plan #1616): the overview, ten stories and the
+ * local one, with the longest line the model is allowed and events several
+ * newsletters ran. Earlier days exist, so the back arrow is live and the
+ * forward one, on the latest day, is not.
+ */
+const reviewLines: [string, number][] = [
+  ['The rail strike planned for Thursday was called off at midnight after the union accepted a revised pay offer worth 5% over two years.', 4],
+  ['The Bank of England held rates at 4.75% and signalled one cut before the end of the year.', 3],
+  ['Wildfires north of Athens forced 12,000 people from their homes as winds picked up overnight.', 2],
+  ['A new study finds four-day-week trials kept output steady at 61 firms.', 1],
+  ['Apple delayed its smart-home display to next spring.', 2],
+  ['EU ministers agreed a common line on asylum returns after a nine-hour meeting.', 1],
+  ['The Met Office warned of the wettest October week in a decade for the south west.', 1],
+  ['Chip shares fell after export rules on advanced processors were tightened again.', 1],
+  ['A transfer window record: three clubs each spent over £200m.', 1],
+  ['NASA set a new date in March for the next crewed Moon flyby.', 1],
+];
+
+const reviewFull: ReviewViewProps = {
+  review: {
+    dayLabel: 'Tuesday 6 October',
+    writtenAt: '8:04\u00a0PM',
+    overview:
+      'A quieter day for markets and a busy one for transport. The rail strike that would have shut most lines on Thursday is off, the Bank of England held rates, and wildfires in Greece were the main story abroad. Closer to home, the council approved the new cycle lanes on Mill Road.',
+    lines: [
+      ...reviewLines.map(([line, sources], i) => ({
+        issueId: `issue-${i + 1}`,
+        storyIndex: i % 3,
+        href: `/news/i/issue-${i + 1}/s/${i % 3}?from=review`,
+        line,
+        sources,
+      })),
+      {
+        issueId: 'issue-local',
+        storyIndex: 2,
+        href: '/news/i/issue-local/s/2?from=review',
+        line: 'The council approved protected cycle lanes on Mill Road, with work starting in January.',
+        sources: 1,
+        local: true,
+      },
+    ],
+  },
+  earlier: { href: '/news/review?day=2026-10-05', label: 'Mon 5 Oct' },
+  later: null,
+  todayAt: null,
+};
+
 const savedStories: SavedViewProps = {
   stories: [
     {
@@ -2065,7 +2115,7 @@ const savedStories: SavedViewProps = {
       receivedAt: '2026-09-22T07:14:00Z',
       savedAt: '2026-09-23T08:02:00Z',
       discussedIndex: 0,
-      arrived: '22 Sep, 07:14',
+      arrived: '22 Sep, 7:14\u00a0AM',
       related: previewRelatedNotes.slice(0, 1),
     },
     {
@@ -2079,7 +2129,7 @@ const savedStories: SavedViewProps = {
       senderName: 'Infra Weekly',
       receivedAt: '2026-09-15T07:10:00Z',
       savedAt: '2026-09-16T21:40:00Z',
-      arrived: '15 Sep, 07:10',
+      arrived: '15 Sep, 7:10\u00a0AM',
     },
     {
       id: 'saved-3',
@@ -2092,7 +2142,7 @@ const savedStories: SavedViewProps = {
       senderName: 'Slow Letters',
       receivedAt: '2026-09-20T09:02:00Z',
       savedAt: '2026-09-20T12:30:00Z',
-      arrived: '20 Sep, 09:02',
+      arrived: '20 Sep, 9:02\u00a0AM',
     },
   ],
 };
@@ -3516,7 +3566,7 @@ export const SURFACES: readonly Surface[] = [
         {...quickStory}
         upNext={{
           card: quickEssay.card!,
-          arrived: '20 Sep, 09:02',
+          arrived: '20 Sep, 9:02\u00a0AM',
           saved: false,
           issueHref: '/news/i/issue-2',
         }}
@@ -3538,6 +3588,7 @@ export const SURFACES: readonly Surface[] = [
           module="news"
           sections={[
             { href: '/news', label: 'Quick read', icon: 'quickRead', exact: true },
+            { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
             { href: '/news/all', label: 'Newsletters', icon: 'newsletters', exact: true },
             { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
           ]}
@@ -3621,6 +3672,36 @@ export const SURFACES: readonly Surface[] = [
     module: 'news',
     width: 'page',
     render: () => <SavedView {...savedStories} />,
+  },
+  {
+    id: 'news-review',
+    label: 'News · Daily review',
+    module: 'news',
+    width: 'page',
+    render: () => <ReviewView {...reviewFull} />,
+  },
+  {
+    id: 'news-review-empty',
+    label: 'News · Daily review before the first one',
+    module: 'news',
+    width: 'page',
+    render: () => <ReviewView review={null} earlier={null} later={null} todayAt={'8:00\u00a0PM'} />,
+  },
+  {
+    /* Tonight's run failed and is tried again on the hour until midnight;
+     * earlier days are still there behind the back arrow. */
+    id: 'news-review-failed',
+    label: 'News · Daily review that could not be written',
+    module: 'news',
+    width: 'page',
+    render: () => (
+      <ReviewView
+        review={{ dayLabel: 'Tuesday 6 October', writtenAt: '9:00\u00a0PM', overview: null, lines: [], retrying: true }}
+        earlier={{ href: '/news/review?day=2026-10-05', label: 'Mon 5 Oct' }}
+        later={null}
+        todayAt={null}
+      />
+    ),
   },
   {
     id: 'news-saved-empty',
