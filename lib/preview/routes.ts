@@ -246,6 +246,13 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-usage-empty': ['/dev/usage'],
   'dev-modules': ['/dev/modules'],
   'dev-module': ['/dev/modules/[id]'],
+  'goals-run': ['/goals/runs/[runId]'],
+  'jobs-activity': ['/jobs/activity'],
+  'jobs-analytics': ['/jobs/analytics'],
+  'jobs-answers': ['/jobs/answers'],
+  'jobs-thoughts': ['/jobs/thoughts'],
+  'jobs-case-page': ['/jobs/p/[slug]'],
+  'mail-message': ['/mail/[id]'],
 };
 
 /**
