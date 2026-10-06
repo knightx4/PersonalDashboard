@@ -12,6 +12,7 @@ import {
 import { loadCommitChecks } from '@/lib/plan/ci';
 import { loadOverhaulProgress } from '@/lib/plan/overhaul-progress-load';
 import { loadCriticStops } from '@/lib/plan/critic-stop-load';
+import { loadScreenChanges } from '@/lib/plan/screen-change-load';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
 import { keyRefusal } from '@/lib/plan/work';
@@ -206,6 +207,10 @@ export async function renderPlanPage({
   // Nothing is read when no step is stopped.
   const criticStops = await loadCriticStops(supabase, user.id, flattenSections(whole));
 
+  // Each step's changed screens, before and after, for its opened row (plan
+  // #1541). One small read; the pictures themselves load when a row opens.
+  const screenChanges = await loadScreenChanges(supabase, user.id);
+
   // Every step, for the pickers: a parent to move under, a step to wait on.
   // Light on purpose -- the tree is already on the page once.
   const catalog: PlanCatalogEntry[] = flattenSections(everything).map((node) => ({
@@ -281,6 +286,7 @@ export async function renderPlanPage({
         commitChecks={commitChecks}
         overhaulProgress={overhaulProgress}
         criticStops={criticStops}
+        screenChanges={screenChanges}
         empty={project ? flattenSections(whole).length === 0 : data.items.length === 0}
         canSend={canSend}
       />

@@ -7,6 +7,8 @@ import { ReviewView, type Standing } from '@/app/dev/ui/review/review-view';
 import { SpecsView } from '@/app/dev/specs/specs-view';
 import { SpecDocView } from '@/app/dev/specs/[slug]/spec-doc-view';
 import { ChangelogView } from '@/app/dev/changelog/changelog-view';
+import type { ScreenChangeView } from '@/lib/plan/screen-change';
+import { phoneShot } from './plan-surfaces';
 import { RaisedView } from '@/app/dev/raised/raised-view';
 import { ConversationsView } from '@/app/dev/raised/conversations-view';
 import { StatusPanel } from '@/app/dev/raised/status-panel';
@@ -410,6 +412,54 @@ const changelog: ChangelogEntry[] = [
 
 export function DevChangelogSurface() {
   return <ChangelogView entries={changelog} grouping="issue" query="" workspace={null} />;
+}
+
+/**
+ * The changelog by day with the screens two steps changed (plan #1541): the
+ * after picture under each line, without opening it. One step changed two
+ * surfaces, one changed one, and the note changed none.
+ */
+const changelogScreens: Record<number, ScreenChangeView[]> = {
+  1539: [
+    {
+      surface: 'dev-surfaces',
+      round: 2,
+      verdict: 'pass',
+      checkedAt: '2026-10-04T01:00:00Z',
+      before: phoneShot(true),
+      after: phoneShot(false),
+    },
+    {
+      surface: 'dev-surfaces-a-very-long-surface-name-empty',
+      round: 1,
+      verdict: 'pass',
+      checkedAt: '2026-10-04T01:05:00Z',
+      before: null,
+      after: phoneShot(false),
+    },
+  ],
+  1440: [
+    {
+      surface: 'todo-day-close',
+      round: 4,
+      verdict: 'accepted',
+      checkedAt: '2026-10-02T10:30:00Z',
+      before: phoneShot(true),
+      after: phoneShot(false),
+    },
+  ],
+};
+
+export function DevChangelogScreensSurface() {
+  return (
+    <ChangelogView
+      entries={changelog}
+      grouping="day"
+      query=""
+      workspace={null}
+      screens={changelogScreens}
+    />
+  );
 }
 
 // ---- Dev home: what is waiting on you --------------------------------------
