@@ -643,7 +643,7 @@ function ChipTarget({ htmlFor, children }: { htmlFor: string; children: React.Re
       <label
         htmlFor={htmlFor}
         aria-hidden
-        className="absolute inset-x-0 top-1/2 -z-10 hidden h-11 -translate-y-1/2 max-sm:block"
+        className="absolute inset-x-0 top-1/2 -z-10 hidden min-h-11 -translate-y-1/2 max-sm:block"
       />
       {children}
     </span>
