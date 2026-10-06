@@ -9,6 +9,7 @@ import { SpecDocView } from '@/app/dev/specs/[slug]/spec-doc-view';
 import { ChangelogView } from '@/app/dev/changelog/changelog-view';
 import { RaisedView } from '@/app/dev/raised/raised-view';
 import { ConversationsView } from '@/app/dev/raised/conversations-view';
+import { StatusPanel } from '@/app/dev/raised/status-panel';
 import { AccountView } from '@/app/account/view';
 import {
   isOutstanding,
@@ -516,6 +517,26 @@ export function DevRaisedSurface() {
       <RaisedView queue={raisedQueue} groups={groups} />
       <ConversationsView conversations={conversations} />
     </>,
+  );
+}
+
+/**
+ * The Status panel at the top of Home in Dev: the plan runner resting with
+ * three features ready, and the notes routine with twelve notes open. Dash's
+ * mark sits under Plan (note 076e7744).
+ */
+export function DevRaisedStatusSurface() {
+  return column(
+    <StatusPanel
+      run={null}
+      canSend
+      card={{ night: null, on: [], progress: null, push: null, ready: 3, readySteps: 9, next: [] }}
+      goals={null}
+      openNotes={12}
+      notesLastRun={null}
+      vision={null}
+      now={Date.parse('2026-10-06T08:00:00Z')}
+    />,
   );
 }
 

@@ -159,6 +159,7 @@ import {
   DevChangelogSurface,
   DevIdeasSurface,
   DevRaisedSurface,
+  DevRaisedStatusSurface,
   DevSpecSurface,
   DevSpecsSurface,
   DevUiReviewSurface,
@@ -3949,6 +3950,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevRaisedSurface />,
+  },
+  {
+    /* The Status panel at the top of Home in Dev, with Dash's mark under
+     * Plan (note 076e7744). */
+    id: 'dev-raised-status',
+    label: 'Dev · Home, the Status panel',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevRaisedStatusSurface />,
   },
   {
     id: 'dev-specs',
