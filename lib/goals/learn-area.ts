@@ -6,7 +6,7 @@ import { createGoalsClient } from '@/lib/goals/auth/server';
 /**
  * Where the learning goals are on /goals (plan #1491): the person's Learn
  * area, which goals 0066 makes the first time they have a learning goal. It
- * is a section of All goals, /goals/all#area-<id>. Without one, or when it
+ * has its own page, /goals/area/<id>. Without one, or when it
  * cannot be read, /goals, where adding a goal to a new Learn area starts.
  */
 export const GOALS_HOME = '/goals';

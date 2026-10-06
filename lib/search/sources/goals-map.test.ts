@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseRef } from '@/lib/core/refs';
-import { goalHits, type GoalItemRow } from './goals-map';
+import { areaHits, goalHits, type GoalItemRow } from './goals-map';
 
 const row = (over: Partial<GoalItemRow> & { id: string; title: string }): GoalItemRow => ({
   level: 'step',
@@ -45,5 +45,23 @@ describe('goals search hits', () => {
   it('lists everything with no query, up to the cap', () => {
     expect(goalHits(rows, { limit: 10 }).map((hit) => hit.id)).toEqual(['g1', 's1', 's3', 's2']);
     expect(goalHits(rows, { limit: 2 })).toHaveLength(2);
+  });
+});
+
+describe('area search hits', () => {
+  const areas = [
+    { id: 'a1', name: 'Health' },
+    { id: 'a2', name: 'Career' },
+  ];
+
+  it('opens an area on its own page', () => {
+    expect(areaHits(areas, { query: 'heal', limit: 6 })).toEqual([
+      { module: 'goals', kind: 'area', id: 'a1', ref: 'goals.areas:a1', title: 'Health', subtitle: 'Area', href: '/goals/area/a1' },
+    ]);
+    expect(parseRef(areaHits(areas, { query: 'career', limit: 6 })[0].ref!)).toMatchObject({ table: 'goals.areas', id: 'a2' });
+  });
+
+  it('lists every area with no query, up to the limit', () => {
+    expect(areaHits(areas, { limit: 1 }).map((hit) => hit.id)).toEqual(['a1']);
   });
 });

@@ -54,8 +54,8 @@ type ExtraPage = {
 };
 
 const EXTRA_PAGES: readonly ExtraPage[] = [
-  // An area has no page of its own: it is a section of All goals (#area-<id>).
   { table: 'goals.items', href: (id) => `/goals/${id}`, title: 'title', module: 'goals' },
+  { table: 'goals.areas', href: (id) => `/goals/area/${id}`, title: 'name', module: 'goals' },
 ];
 
 /** What a row is called where the table's own name does not say it. */

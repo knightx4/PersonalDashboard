@@ -134,6 +134,7 @@ import {
   GoalTopSurface,
   FileSurface,
   GoalsAllSurface,
+  GoalsAreaSurface,
   GoalsHomeSurface,
   InformationListSurface,
   InformationOneSurface,
@@ -2682,6 +2683,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalsAllSurface />,
+  },
+  {
+    /* An area's own page (plan #1619): one area, its goals and proposals. */
+    id: 'goals-area',
+    label: 'Goals · an area',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAreaSurface />,
   },
   {
     /* The top of a goal page with every section holding something: the

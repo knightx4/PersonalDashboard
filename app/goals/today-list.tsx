@@ -12,6 +12,7 @@ import { LinkedText } from '@/components/ui/linked-text';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
+import { areaHref } from '@/lib/goals/all-goals';
 import { preparedExcerpt } from '@/lib/goals/home';
 import {
   SET_ASIDE_CHOICES,
@@ -124,7 +125,7 @@ function act(kind: TodayKind, form: FormData): Promise<State> {
 function hrefFor(item: TodayItem): string {
   switch (item.kind) {
     case 'plan':
-      return `/goals/all#area-${item.id}`;
+      return areaHref(item.id);
     case 'flag':
       return `/goals/${item.goalId}#flag-${item.id}`;
     case 'question':
