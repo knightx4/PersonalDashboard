@@ -1,6 +1,7 @@
 /**
  * The path above a page (plan #1622): every part a link, the last marked as
- * the page you are on, the middle parts folded to an ellipsis on a phone.
+ * the page you are on, the parts above the parent folded to an ellipsis on a
+ * phone.
  */
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -22,12 +23,14 @@ describe('Breadcrumb', () => {
     expect(html).toMatch(/aria-current="page"[^>]*href="\/goals\/g1\/s\/cake"/);
   });
 
-  it('folds the middle parts into one ellipsis on a phone, and keeps the first and last', () => {
+  it('folds the parts above the parent into one ellipsis on a phone', () => {
     const html = renderToStaticMarkup(<Breadcrumb crumbs={crumbs} />);
-    expect(html.match(/max-sm:hidden/g)).toHaveLength(2);
+    // Only Family folds: Goals, the parent and the page stay.
+    expect(html.match(/max-sm:hidden/g)).toHaveLength(1);
+    expect(html).toMatch(/max-sm:hidden[^"]*"><span[^>]*>›<\/span><a[^>]*href="\/goals\/area\/a1"/);
     expect(html.match(/…/g)).toHaveLength(1);
-    // Two parts have nothing between them to fold.
-    expect(renderToStaticMarkup(<Breadcrumb crumbs={crumbs.slice(0, 2)} />)).not.toContain('…');
+    // Three parts have nothing between the first and the parent to fold.
+    expect(renderToStaticMarkup(<Breadcrumb crumbs={crumbs.slice(0, 3)} />)).not.toContain('…');
   });
 
   it('draws nothing for an empty path', () => {

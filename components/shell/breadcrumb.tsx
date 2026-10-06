@@ -12,8 +12,8 @@ export type Crumb = { label: string; href: string };
  * or on its own where a page has no PageHeader.
  *
  * It stays one line at any width. On a phone the parts between the first
- * and the last fold into an ellipsis, so the path reads Goals › … › the
- * page; at every width a part too long for what is left is cut with an
+ * and the page's parent fold into an ellipsis, so the path reads Goals › … ›
+ * the parent › the page and the way up one level stays in view; at every width a part too long for what is left is cut with an
  * ellipsis of its own rather than wrapping. The cut is on an inner span: a
  * link that clipped itself would clip its own press area (`press-area`, the
  * 44-pixel target a phone needs) along with the text.
@@ -31,7 +31,7 @@ export function Breadcrumb({
     <nav aria-label="Breadcrumb" className={cn('min-w-0', className)}>
       <ol className="flex min-w-0 items-center text-ui whitespace-nowrap text-ink-muted">
         {crumbs.map((crumb, index) => {
-          const middle = index > 0 && index < last;
+          const middle = index > 0 && index < last - 1;
           return (
             <Fragment key={`${index}-${crumb.href}`}>
               <li
@@ -55,7 +55,7 @@ export function Breadcrumb({
                 </Link>
               </li>
               {/* Where the middle parts were, on a phone. */}
-              {index === 0 && last > 1 && (
+              {index === 0 && last > 2 && (
                 <li aria-hidden className="hidden shrink-0 items-center max-sm:flex">
                   <Separator />
                   <span>…</span>
