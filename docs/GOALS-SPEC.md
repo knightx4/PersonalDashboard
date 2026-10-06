@@ -56,14 +56,16 @@ matters, a dependency says so (a step that waits on a step in another
 stage, under "Blocked and waiting steps"), and that is the only thing that
 holds a stage back.
 
-The goal page opens every stage under way under its own "Stage 3 of 6"
-heading: the first stage neither finished nor held, and any other stage
-with a step done or a result from Dash. It folds every other stage to one
-line saying whether it is done, how far along it is, or which stage it is
-waiting on ("1 step · waiting on stage 2"). A stage waits when a step in
-another stage holds it, by a dependency on the stage itself or on every
-open step in it. A track of all the stages sits under Dash's status. A
-stage closes itself when every step under it is closed
+The goal page opens two kinds of stage under **Now** (plan #1078): the first
+stage neither finished nor held, and any other stage holding something that
+waits on you now, which is a ready step of yours, a question, a proposal or a
+result of Dash's to read. A stage where only Dash is working stays closed.
+Every other stage is one line under **Other stages** saying whether it is
+done, how far along it is, or which stage it is waiting on ("1 step ·
+waiting on stage 2"), and it opens in place when pressed. The rule is
+`nowStages` in `lib/goals/goal-page.ts`. A stage waits when a step in
+another stage holds it, by a dependency on the stage itself or on every open
+step in it. A stage closes itself when every step under it is closed
 (`migrations-goals/0040`), whatever state the stages before it are in.
 
 A goal whose parts are independent outcomes is several goals instead;
@@ -335,7 +337,8 @@ handled differently:
   search, and what bears on a goal is kept on it as **context**: a row in
   `goals.context` naming the table and row, one sentence on why it matters
   here, and the words that do. The goal page shows it under "From your other
-  modules", each linking back to where it lives. Facts from it fill the
+  modules", each linking back to where it lives: under More, or above More
+  while some of it waits for Keep or Not relevant. Facts from it fill the
   goal's collections as drafts, with `source = 'app'`.
 
 **Where to look is a catalogue, not a rule per goal.** Each module declares
@@ -489,8 +492,8 @@ a line under its row gives the summed amount per unit ("7 bags so far") and
 the day it was last touched, and its opened panel lists the entries newest
 first. Under way is read from the entries, not stored as a status, so closing
 the step still means done. A step whose progress is all on steps beneath it
-says when and on which one, and the Steps heading says when anything on the
-goal last moved. A step with no entries looks as it did before.
+says when and on which one, and the status line under the goal's title says
+when anything on the goal last moved. A step with no entries looks as it did before.
 
 A step with an estimated total says roughly how much is left (plan #1277).
 Its line reads "7 of about 100 bags, about 93 to go", and at or past the total
@@ -701,7 +704,7 @@ take, so a comment asking Claude to work on the goal fires the whole-goal run
 The goals skill reports at each step it starts by writing `last_seen_at` and
 a short `now_on` line to the run row (goals migration 0024). A run in
 progress then reads "on Draft the letter, 3 minutes ago". A run on the whole
-goal shows this in the goal page's Claude panel, and the Runs page
+goal shows this in the goal page's status, beside Ask Dash, and the Runs page
 (`/goals/runs`) shows it for every run, including a sent or prepared step.
 A step's row says it was sent when you press the button and shows the result
 once the run closes the step, but it does not show the run itself after the
@@ -745,8 +748,9 @@ question, such as a servicer moving your due date or a statement showing a
 missed payment. It flags it: a row in `public.raised_items` with the goal's
 id in `goal_id` and module `goals` (goals migration 0031). An open flag is
 listed under Waiting on you on the home, after the questions, and opens to
-the flag on the goal's page. There it shows what was found, the thread under
-it, a box to answer it and **Put aside**.
+the flag on the goal's page, where it is a line under Waiting on you. Opened,
+it shows what was found, the thread under it, a box to answer it and **Put
+aside**.
 
 Answering writes your answer into the flag's thread and starts a goal run
 with job `raise`, whose brief carries the flag, the thread and your answer
@@ -800,8 +804,8 @@ why.
 
 Goals has two tabs, Home and All goals. Runs (`/goals/runs`) is linked as
 **Every run** beside What Dash did on the home. Files (`/goals/files`) is
-linked from the top of All goals and from the Files list in a goal's
-Details. A goal page's back link names its area and opens that area's
+linked from the top of All goals and from the Files list under a goal's
+More. A goal page's back link names its area and opens that area's
 section on All goals.
 
 ### Coming back after time away
@@ -825,7 +829,8 @@ On any other day, the home opens with what Dash did since your last sitting
 (plan #1076), newest run first, in three kinds of line:
 
 - A result: the note or draft a run stored on a step. **Read** opens the step
-  on its goal's page, where the result is shown and marked read. When the
+  on its goal's page, where the result is a fold on its row, and opening the
+  fold marks it read. When the
   same run closed the step, the line has an **Undo** that puts the step back
   as it was and clears the result.
 - A change to the map, worded as the run's own page words it ("Added step
@@ -845,6 +850,61 @@ press on it, keeps the list and shows an undone line as undone; the next
 sitting clears it. After time away that visit is the one before the gap, so
 the catch-up shows the same list. The rules are in `lib/goals/done-since.ts`
 and the reads in `lib/goals/done-since-store.ts`.
+
+## The goal page
+
+A goal's page (`app/goals/[goalId]/page.tsx`, plan #1078) is one column in
+four parts, so the next thing to do is near the top rather than under a
+dozen sections.
+
+**The header** is the title and done-when, each edited where it is read,
+then one card: Dash's verdict, one line of counts ("3 on you · Dash on 1 ·
+due 31 Oct · last progress 3 Oct", `statusLine` in
+`lib/goals/goal-status.ts`), the verdict's next move as a sentence, Dash's
+latest note folded, what Dash is on or finished in the last day, and **Ask
+Dash** for the whole goal. While Dash has something to approve, a run is
+going, or every step is finished, Ask Dash is instead the panel with the
+approval line and **Approve**. The goal's number and chart follow when it
+has one. **Waiting on you** lists, one line each, what Dash flagged, the
+questions, the proposals and the results to read. A flag or a question opens
+in place to be answered; a proposal or a result is a link to its row under
+Now. Your own ready steps are not listed there, since they are the open rows
+under Now and the status line counts them.
+
+**Now** is the stages in hand (under "Stages" above), each a row with its
+open steps beneath it, and any open step outside the stages. A goal that is
+one list is Now alone. The goal's rhythms sit under it as a strip,
+"Applications 2 of 5 this week from Jobs", each name going to its row.
+
+**Other stages** is the rest of the map, one line per stage.
+
+**More**, closed on arrival, holds what feeds the goal rather than being
+its work: context from the other modules, the kinds of weekly help, links
+to Learn and the job search, the Learn section, files, related vault notes,
+the add lines for whatever is still empty, the goal's last ten runs and its
+comments.
+
+A step's row is its status glyph, its title, Dash's mark on Dash's steps
+and, at the end, its date or a rhythm's count; on a stage, how far along it
+is. The glyph is the status menu. Finished steps fold under **Finished** at
+every level. Pressing the title opens the panel with the detail, done-when,
+questions, dependencies, thread and the row's actions, as on the dev plan.
+
+What Dash wrote for a step is a fold on that step's row, shown as its first
+sentence and opening to the whole text with **Copy** and the place it
+points to. On a step of yours it is **Dash's draft**: the result of the
+Dash step that prepares it (`prepares_id`), or what Ask Dash prepared on the
+step itself. On a Dash step that prepares nothing it is **Dash found**.
+Opening a result still unread marks that Dash step read, the write the
+**Mark read** button made (`readResultAction`). The page is not read again
+then, so the row stays where it is until the next visit, when a finished
+Dash step folds under Finished. A finished prep step folds there at once,
+since its result is read on the step it prepares.
+
+The page had view chips (Open, On you, Everything, and Ready and To read in
+a menu, plan #1157). They are gone: Now and Other stages divide the steps
+by stage, Waiting on you is the On you list, and Finished is a fold rather
+than a view.
 
 ## Your examples, broken down
 
@@ -1098,7 +1158,11 @@ autopay (yours); then log the balance monthly and a quarterly Claude review.
 ### Taken from the dev plan
 
 The dev plan page already has these, and Goals reuses the components rather
-than rebuilding them:
+than rebuilding them. The goal page draws each step with the plan's shared
+row in its list layout (`layout="list"` in
+`components/plan-tree/tree-row.tsx`): the same fold, status menu and panel,
+without the plan's column header, outline numbers, Who and When columns,
+tally or banded bar.
 
 1. **Question buttons**, from `components/dev/question.tsx` and
    `lib/plan/options.ts`: the lettered options as buttons with the
@@ -1109,8 +1173,9 @@ than rebuilding them:
    that writes out the goal, its collections and its steps for the model, and
    hands anything bigger to the goals routine.
 3. **Status words and colours**: On you, With Claude, Waiting, the health
-   glyphs with their tooltips, a progress bar per goal, and the question
-   marker on rows waiting on you.
+   glyphs with their tooltips, and the question marker on rows waiting on
+   you. On a goal the glyph is the status control and the word is its
+   tooltip.
 4. **Read-only detail**: an opened step shows its detail, Done when and Needs
    as text, with Edit as a separate action.
 5. **Proposals and fog**: approve or reject one proposed step, and the goal's
@@ -1124,7 +1189,7 @@ than rebuilding them:
    `isStaleBlock` apply on the plan. A step blocked on you is On you. Only a
    step can be blocked, never a goal.
 
-Priority, filters and search stay on the dev plan for now.
+Priority, views, filters and search stay on the dev plan.
 
 ## Not in this version
 
