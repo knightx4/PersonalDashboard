@@ -81,6 +81,8 @@ import type { TreeActions } from '@/components/plan-tree/types';
 import { LinkedText } from '@/components/ui/linked-text';
 import { criticStopNeeds, type CriticStopView } from '@/lib/plan/ui-check-stop';
 import { CriticStop } from './critic-stop';
+import { ScreenChanges } from '@/components/dev/screen-change';
+import type { ScreenChangeView } from '@/lib/plan/screen-change';
 
 /**
  * One row of the dev plan, drawn through the shared tree row.
@@ -532,6 +534,7 @@ export function PlanRow({
   commitChecks,
   overhaulProgress = {},
   criticStops = {},
+  screenChanges = {},
   view,
   searching,
   unfolded,
@@ -568,6 +571,8 @@ export function PlanRow({
   overhaulProgress?: Readonly<Record<string, OverhaulProgress>>;
   /** What the design critic last asked of each step it stopped, by step id (plan #1610). */
   criticStops?: Readonly<Record<string, CriticStopView>>;
+  /** Each step's changed screens with their pictures, by step number (plan #1541). */
+  screenChanges?: Readonly<Record<number, readonly ScreenChangeView[]>>;
   /** Which view is on. Only Dismissed shows what has been put aside. */
   view: View;
   /** Whether a search is narrowing the page. Unfolds closed rows that hold a hit. */
@@ -1109,6 +1114,10 @@ export function PlanRow({
               shots, and the two ways on (plan #1610). */}
           {criticStop && <CriticStop id={node.id} view={criticStop} />}
 
+          {/* The screens this step changed, before and after, as the critic
+              passed them (plan #1541). */}
+          <ScreenChanges changes={screenChanges[node.number] ?? []} />
+
           {setupOpen && (
             <SetupJob
               node={node}
@@ -1210,6 +1219,7 @@ export function PlanRow({
           commitChecks={commitChecks}
           overhaulProgress={overhaulProgress}
           criticStops={criticStops}
+          screenChanges={screenChanges}
           view={view}
           searching={searching}
           unfolded={unfolded}

@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/field';
 import { VIEW_LABEL } from '@/lib/core/move';
 import type { CriticStopView } from '@/lib/plan/ui-check-stop';
+import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import {
   PLAN_VIEW_CHIPS,
   PLAN_VIEW_MENU,
@@ -388,6 +389,7 @@ export function PlanView({
   commitChecks,
   overhaulProgress = {},
   criticStops = {},
+  screenChanges = {},
   empty,
   canSend,
   unfolded = false,
@@ -425,6 +427,8 @@ export function PlanView({
   overhaulProgress?: Readonly<Record<string, OverhaulProgress>>;
   /** What the design critic last asked of each step it stopped, by step id (plan #1610). */
   criticStops?: Readonly<Record<string, CriticStopView>>;
+  /** Each step's changed screens with their pictures, by step number (plan #1541). */
+  screenChanges?: Readonly<Record<number, readonly ScreenChangeView[]>>;
   empty: boolean;
   canSend: boolean;
   /**
@@ -606,6 +610,7 @@ export function PlanView({
                       commitChecks={ci.checks}
                       overhaulProgress={overhaulProgress}
                       criticStops={criticStops}
+                      screenChanges={screenChanges}
                       view={view}
                       searching={searching}
                       unfolded={unfolded}
@@ -690,6 +695,7 @@ export function PlanView({
                 commitChecks={ci.checks}
                 overhaulProgress={overhaulProgress}
                 criticStops={criticStops}
+                screenChanges={screenChanges}
                 view={view}
                 searching={searching}
                 unfolded={unfolded}
