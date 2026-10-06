@@ -93,7 +93,7 @@ export type QuickSignals = {
 
 export type StoryGroupRow = { issueId: string; storyIndex: number; groupId: string };
 
-type Slot = {
+export type Slot = {
   storyIndex: number;
   /** The story's place among the readable stories, or null for an essay. */
   readIndex: number | null;
@@ -109,7 +109,7 @@ type Slot = {
  * its summary; that covers the empty list an essay is stored with, and keeps a
  * newsletter whose every story is malformed from vanishing from Quick read.
  */
-function slots(issue: QuickIssue): Slot[] {
+export function slots(issue: QuickIssue): Slot[] {
   if (!issue.summary?.trim() || !Array.isArray(issue.stories)) return [];
   const found: Slot[] = [];
   issue.stories.forEach((entry, storyIndex) => {
@@ -195,13 +195,17 @@ function candidates(
 }
 
 /**
- * Which of a group's cards stands for it: the one with an article link, then
- * a picture, then the email's own text, then the newest.
+ * How full a telling of a story is, for choosing which of a group's stories
+ * stands for it: one with an article link, then a picture, then the email's
+ * own text. The daily review (lib/news/review/choose.ts) chooses the same way.
  */
-function fullness(c: Candidate): number {
-  if (c.slot.body.kind !== 'story') return 0;
-  const { story } = c.slot.body;
+export function storyFullness(story: NewsStory): number {
   return (story.link ? 4 : 0) + (story.image ? 2 : 0) + (story.text ? 1 : 0);
+}
+
+/** Which of a group's cards stands for it: the fullest (storyFullness), then the newest. */
+function fullness(c: Candidate): number {
+  return c.slot.body.kind === 'story' ? storyFullness(c.slot.body.story) : 0;
 }
 
 /**
@@ -349,7 +353,9 @@ export function nextCard(
   const ranked = rankedCards(issues, senders, passes, filter, signals);
   const kept = ahead
     ? ranked.find((card) =>
-        cardPasses(card).some((p) => p.issueId === ahead.issueId && p.storyIndex === ahead.storyIndex),
+        cardPasses(card).some(
+          (p) => p.issueId === ahead.issueId && p.storyIndex === ahead.storyIndex,
+        ),
       )
     : undefined;
   return kept ?? ranked[0] ?? null;
