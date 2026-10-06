@@ -1,6 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { UI_SHOTS_BUCKET } from '@/lib/preview/ui-checks';
+import { isBeforeShot } from './screen-change';
 import {
   isCriticStopAsk,
   readStopFixes,
@@ -52,7 +53,9 @@ export async function loadCriticStops(
   }
   const rows = (data ?? []) as Row[];
 
-  const paths = rows.flatMap((r) => r.shots ?? []);
+  // The round's own shots. The before shots beside them (plan #1541) are
+  // main's screen, which is not what the critic stopped on.
+  const paths = rows.flatMap((r) => r.shots ?? []).filter((p) => !isBeforeShot(p));
   const links = new Map<string, string>();
   if (paths.length > 0) {
     const { data: signed, error: signError } = await supabase.storage
@@ -73,10 +76,12 @@ export async function loadCriticStops(
         surface: s.surface,
         round: s.round,
         fixes: readStopFixes(last?.fixes),
-        shots: (last?.shots ?? []).map((path) => ({
-          name: shotName(path),
-          url: links.get(path) ?? null,
-        })),
+        shots: (last?.shots ?? [])
+          .filter((path) => !isBeforeShot(path))
+          .map((path) => ({
+            name: shotName(path),
+            url: links.get(path) ?? null,
+          })),
       };
     });
     out[node.id] = { surfaces, branch: stopBranch(node.blockAsk) };

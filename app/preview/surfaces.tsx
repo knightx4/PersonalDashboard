@@ -107,6 +107,7 @@ import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
 import {
   PlanCriticStopSurface,
+  PlanScreenChangeSurface,
   PlanOpenedSurface,
   PlanTreeSurface,
   ProjectPlanSurface,
@@ -164,6 +165,7 @@ import {
   AccountSurface,
   DevBugsSurface,
   DevChangelogSurface,
+  DevChangelogScreensSurface,
   DevIdeasSurface,
   DevRaisedSurface,
   DevRaisedStatusSurface,
@@ -2703,6 +2705,16 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PlanCriticStopSurface />,
   },
   {
+    /* A finished step opened on the screens it changed (plan #1541): before
+     * and after on a phone, side by side, for a surface with both, a new
+     * surface with no before, and one whose pictures were not uploaded. */
+    id: 'dev-plan-screen-change',
+    label: 'Plan · a step’s screens before and after',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanScreenChangeSurface />,
+  },
+  {
     /* A goal's steps, drawn with the plan's shared row (plan #982), beside
      * the plan's own shots so the two can be compared. */
     id: 'goals-steps-tree',
@@ -4054,6 +4066,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevChangelogSurface />,
+  },
+  {
+    /* By day, with the after picture under each line that changed a screen
+     * (plan #1541). */
+    id: 'dev-changelog-screens',
+    label: 'Dev · Changelog with changed screens',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevChangelogScreensSurface />,
   },
   {
     id: 'dev-ideas',
