@@ -41,6 +41,10 @@ export const newsSources: ModuleSources = {
   ],
   notSources: [
     { table: 'news.addresses', reason: 'Inbound mail addresses.' },
+    {
+      table: 'news.daily_reviews',
+      reason: 'The evening review, restating stories news.issues already holds.',
+    },
     { table: 'news.hidden_topics', reason: 'Topics hidden from the digest.' },
     { table: 'news.recommendations', reason: 'The digest’s own picks.' },
     { table: 'news.senders', reason: 'Newsletter senders.' },
