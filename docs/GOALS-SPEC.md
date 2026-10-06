@@ -373,6 +373,46 @@ week.
 Claude reading vault content is settled: the app has one user, who has said
 the vault is open to it.
 
+## The week's focus
+
+In early October 2026 fifteen goals were open, more than a hundred steps of
+the person's were open under them, and about one a day was closed. Every goal
+put its next step on the home and on Todo every day, so no goal stood out
+from the others. Each week the person now picks the two or three goals they
+are pushing, and the rest wait (goals migration 0070).
+
+- **Focus is a flag on a goal**, `goals.items.focus`. Only the person sets
+  or clears it: a trigger refuses a change made as Dash, and the history
+  keeps every choice. A goal with focus is a **focus goal**.
+- **While no goal has focus, every goal counts**, as before. Once one open
+  goal has it, a goal counts as in focus when it is a focus goal or an errand
+  due within seven days or already late (`inFocus` in `lib/goals/focus.ts`).
+  An errand never needs picking, because its date brings it in.
+- **The Plan your week card** is on the Goals home while this week has no
+  plan: `goals.visits.planned_week` holds the Monday of the last week planned,
+  and a newer Monday brings the card back (`needsPlanning`). It opens with
+  last week in one line (steps of yours closed, rhythm targets met out of
+  those due) and a link to Dash's review of the week at `/home/week`. Then
+  the open goals that are not errands, as chips, with the current focus
+  already picked, and **Set this week's focus**. Saving gives focus to the
+  picked goals, takes it from every other goal, records this Monday and
+  folds the card away. Saving with nothing picked is a week without a focus.
+- **Three is suggested, not enforced.** Picking a fourth is allowed, and the
+  card says three is the most that tends to work (`FOCUS_SUGGESTED`).
+- **The home's header names the focus goals** with a Change link that opens
+  the card again (`?plan=1`). On All goals each open goal that is not an
+  errand has a target button that turns its focus on or off, and a focus
+  goal's title carries the same target.
+- **Todo shows focus goals' next steps only** while a focus is chosen. See
+  "Todo" below for what still comes through from every goal.
+- **Dash works focus goals first.** The morning run lists their ready Claude
+  steps before the rest, so `DAILY_STEP_LIMIT` spends its places on them and
+  other goals' steps fill what is left (`readyClaudeSteps` in
+  `lib/goals/daily-run.ts`). The night run puts a focus goal's step ahead of
+  any due date (`chooseNightSteps`). The morning brief and the note on the
+  home start with the focus goals. Closing steps from evidence, statements
+  and each goal's daily verdict still cover every open goal.
+
 ## Todo
 
 This follows the rule in [TODO-SPEC.md](TODO-SPEC.md): an obligation is shown
@@ -387,6 +427,12 @@ owned by Goals and is never copied into `todo.tasks`.
   waits on another and a step for later put nothing there. A next step keeps
   its own due date on Todo, overdue or not, and one with no date shows today.
   The rule is `goalTodoSteps` in `lib/goals/todo.ts`.
+- **While a focus is chosen** (see "The week's focus"), only a goal in focus
+  puts its next step on Todo: a focus goal, or an errand due within seven
+  days. A step you pressed Show on Todo on, an open question and Dash's
+  results to read still come from every goal. Rhythms come only from goals
+  in focus (`focusRhythms`), and every rhythm's periods are still kept up to
+  date.
 - Each `mine` step also has a **Show on Todo** button, for any step beyond
   the next one. Pressing it sets a flag on the step, and it stays on Todo
   until it is closed; an undated one goes in Someday. A step that is both
@@ -726,7 +772,8 @@ runs after the feature half:
 - It starts nothing while any goals run is going, so goal steps are worked
   one at a time.
 - `chooseNightSteps` in `lib/goals/overnight-choice.ts` orders the ready
-  Claude steps: soonest due first, then the goal that has gone longest
+  Claude steps: a focus goal's step first (see "The week's focus"), then
+  soonest due, then the goal that has gone longest
   without progress, then page order. It takes one step per goal, and skips a
   goal that already has a run going and a step whose last two runs failed or
   never reported back.

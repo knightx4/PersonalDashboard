@@ -40,6 +40,7 @@ import { isCountSource } from '@/lib/goals/rhythm-sources';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
 import { goalProgress, type GoalProgress } from '@/lib/goals/status';
 import {
+  focusRhythms,
   goalsForTodo,
   unreadDashResults,
   type TodoQuestion,
@@ -698,6 +699,8 @@ export type TodoRhythm = LiveRhythm & { startsOn: string; count: number };
  * dailyView (goalsForTodo). And every live
  * rhythm until its current period's count is met (plan #928). Rhythms need no
  * flag, as the spec says; "Not this one" on Todo hides only this period.
+ * While the week's focus is chosen, only the rhythms of goals in focus
+ * (focusRhythms); every period is still brought up to date.
  */
 export async function loadTodoGoals(
   client: GoalsSupabaseClient,
@@ -716,7 +719,7 @@ export async function loadTodoGoals(
       { ...rhythm, target: current.target, startsOn: current.startsOn, count: current.count },
     ];
   });
-  return { ...goalsForTodo(goals, byGoal, today), rhythms };
+  return { ...goalsForTodo(goals, byGoal, today), rhythms: focusRhythms(rhythms, goalList, today) };
 }
 
 /**
