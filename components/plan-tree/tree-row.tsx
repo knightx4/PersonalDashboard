@@ -582,8 +582,10 @@ export function TreeRow<E extends TreeCatalogEntry>({
               aria-label={foldLabel}
               className={cn(
                 LEVEL,
-                'press flex shrink-0 items-center justify-center self-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
-                'h-5',
+                'press flex shrink-0 items-center justify-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
+                // In the list the row can run to several lines (the title,
+                // Needs, a date), so the fold sits on the title's line.
+                list ? 'mt-1 h-5 self-start' : 'h-5 self-center',
               )}
             >
               <ChevronDown

@@ -99,7 +99,7 @@ const done: DoneSince = {
       title: 'Drafted the payoff order',
       goalId: 'g1',
       goalTitle: 'Pay off the debts',
-      href: '/goals/g1#step-s9',
+      href: '/goals/g1/s/s9',
       unread: true,
       runId: 'r1',
       undo: { runId: 'r1', key: '41', state: 'undoable', reason: null },
@@ -316,7 +316,7 @@ describe('the Goals home', () => {
   it('lists what Dash did with Read and Undo behind one line', () => {
     const html = render();
     expect(html).toContain('1 result');
-    expect(html).toMatch(/href="\/goals\/g1#step-s9"[^>]*>Read</);
+    expect(html).toMatch(/href="\/goals\/g1\/s\/s9"[^>]*>Read</);
     expect(html).toContain('>Undo<');
     expect(html).toContain('Every run');
     expect(render({ done: { ...done, items: [] } })).toContain('nothing new');
