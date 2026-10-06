@@ -89,6 +89,7 @@ export const HIT_TABLES: Record<HitKind, string> = {
   area: 'goals.areas',
   goal: 'goals.items',
   step: 'goals.items',
+  file: 'core.files',
 };
 
 export const HIT_KIND_IDS = Object.keys(HIT_KINDS) as HitKind[];
