@@ -23,7 +23,6 @@ import type { PlayerClip } from '@/lib/learn/clips/stream';
  */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const STAMP = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/;
 
 function clipId(value: unknown): string {
   const id = String(value ?? '');
@@ -41,14 +40,13 @@ async function owner() {
 }
 
 /**
- * More clips for the queue, leaving out the ones already in it. `startedAt`
- * is when the page opened, so the two-a-video cap holds across fetches.
+ * More clips for the queue, leaving out the ones already in it. The queued
+ * ones still count against their video's two a week.
  */
 // latency: pending
-export async function loadMoreClipsAction(startedAt: string, queued: string[]): Promise<PlayerClip[]> {
+export async function loadMoreClipsAction(queued: string[]): Promise<PlayerClip[]> {
   const { user, learn } = await owner();
   return loadPlayerClips(learn, user.id, {
-    sessionStartedAt: STAMP.test(startedAt) ? startedAt : null,
     excludeIds: queued.filter((id) => UUID.test(id)).slice(0, 200),
   });
 }

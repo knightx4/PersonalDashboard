@@ -1,7 +1,13 @@
 import 'server-only';
 
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { pickNextClips, SKIP_RETURN_MS, type ClipReaction, type RankableClip } from './rank';
+import {
+  pickNextClips,
+  SHOWN_WINDOW_MS,
+  SKIP_RETURN_MS,
+  type ClipReaction,
+  type RankableClip,
+} from './rank';
 
 /**
  * The next clips for the stream (plan #1399).
@@ -11,12 +17,17 @@ import { pickNextClips, SKIP_RETURN_MS, type ClipReaction, type RankableClip } f
  * the person's own client, so RLS scopes every read; the user_id filter is
  * there for the index.
  *
- * The player (#1400) calls this for a handful at a time, passing when the
- * session started so the two-a-video cap holds across calls, and the ids it
- * has queued but not yet shown.
+ * The player (#1400) calls this for a handful at a time, passing the ids it
+ * has queued but not yet shown. The two-a-video cap is read from the clips
+ * shown in the last seven days, so it holds across calls and across visits.
  */
 
-/** Candidates read per source. The best of each by score, so a playlist clip is never crowded out by channel clips. */
+/**
+ * Candidates read per source and per kind: the best rated, and the best
+ * scored of those not rated yet. Read per source so neither playlist nor
+ * channel clips crowd the other out of the candidates; the order between
+ * them is rank.ts's.
+ */
 const CANDIDATES = 200;
 /** Clips skipped long enough ago to come back, read to fill in after the unseen ones. */
 const RETURNING = 50;
@@ -28,7 +39,7 @@ const RECENT_CARD_MS = 3 * 24 * 60 * 60 * 1000;
 
 const CLIP_COLUMNS =
   'id, video_id, item_id, came_from, start_seconds, end_seconds, caption, idea, serves, subject_id, goal_id, ' +
-  'score, shown_at, skipped_at, not_interested_at, saved_at, ' +
+  'score, rating, shown_at, skipped_at, not_interested_at, saved_at, ' +
   'item:catalogue_items!video_clips_item_id_fkey(title, author)';
 
 /** A clip ready to play. */
@@ -49,8 +60,6 @@ export type StreamClip = RankableClip & {
 export type NextClipsOptions = {
   /** How many to return. Default 5. */
   limit?: number;
-  /** When this viewing session started (ISO). Clips shown since count against two-a-video. */
-  sessionStartedAt?: string | null;
   /** Clips already queued on the phone, left out. */
   excludeIds?: readonly string[];
   /** Milliseconds since the epoch; for tests. */
@@ -72,6 +81,7 @@ type ClipRow = {
   subject_id: string | null;
   goal_id: string | null;
   score: number | null;
+  rating: number | null;
   shown_at: string | null;
   skipped_at: string | null;
   not_interested_at: string | null;
@@ -115,6 +125,7 @@ function toClip(row: ClipRow): StreamClip {
     itemId: row.item_id,
     cameFrom: row.came_from,
     score: row.score,
+    rating: row.rating,
     channel: channelKey(item?.author),
     theme: themeKey(row.subject_id, row.serves),
     shownAt: row.shown_at,
@@ -144,20 +155,26 @@ export async function loadNextClips(
   const now = options.now ?? Date.now();
   const returnBefore = new Date(now - SKIP_RETURN_MS).toISOString();
 
-  const unseen = (cameFrom: 'playlist' | 'channel') =>
-    learn
+  const unseen = (cameFrom: 'playlist' | 'channel', rated: boolean) => {
+    const query = learn
       .from('video_clips')
       .select(CLIP_COLUMNS)
       .eq('user_id', userId)
       .eq('came_from', cameFrom)
       .is('shown_at', null)
-      .is('not_interested_at', null)
-      .order('score', { ascending: false, nullsFirst: false })
-      .limit(CANDIDATES);
+      .is('not_interested_at', null);
+    return (
+      rated
+        ? query.not('rating', 'is', null).order('rating', { ascending: false })
+        : query.is('rating', null).order('score', { ascending: false, nullsFirst: false })
+    ).limit(CANDIDATES);
+  };
 
-  const [playlist, channel, returning, reactions, session, cards] = await Promise.all([
-    unseen('playlist'),
-    unseen('channel'),
+  const [playlistRated, playlist, channelRated, channel, returning, reactions, week, cards] = await Promise.all([
+    unseen('playlist', true),
+    unseen('playlist', false),
+    unseen('channel', true),
+    unseen('channel', false),
     learn
       .from('video_clips')
       .select(CLIP_COLUMNS)
@@ -178,13 +195,12 @@ export async function loadNextClips(
       .gte('updated_at', new Date(now - REACTION_WINDOW_MS).toISOString())
       .order('updated_at', { ascending: false })
       .limit(REACTIONS),
-    options.sessionStartedAt
-      ? learn
-          .from('video_clips')
-          .select('video_id')
-          .eq('user_id', userId)
-          .gte('shown_at', options.sessionStartedAt)
-      : Promise.resolve({ data: [], error: null }),
+    learn
+      .from('video_clips')
+      .select('video_id')
+      .eq('user_id', userId)
+      .gte('shown_at', new Date(now - SHOWN_WINDOW_MS).toISOString())
+      .limit(1000),
     learn
       .from('feed_cards')
       .select('subject_id')
@@ -193,15 +209,17 @@ export async function loadNextClips(
       .gte('created_at', new Date(now - RECENT_CARD_MS).toISOString())
       .limit(100),
   ]);
-  fail('Reading your playlist clips', playlist.error);
-  fail('Reading your channel clips', channel.error);
+  fail('Reading your playlist clips', playlistRated.error ?? playlist.error);
+  fail('Reading your channel clips', channelRated.error ?? channel.error);
   fail('Reading clips to bring back', returning.error);
   fail('Reading what you did with earlier clips', reactions.error);
-  fail('Reading this session', session.error);
+  fail('Reading the clips shown this week', week.error);
   fail('Reading your recent Learn now cards', cards.error);
 
   const clips = [
+    ...((playlistRated.data ?? []) as unknown as ClipRow[]),
     ...((playlist.data ?? []) as unknown as ClipRow[]),
+    ...((channelRated.data ?? []) as unknown as ClipRow[]),
     ...((channel.data ?? []) as unknown as ClipRow[]),
     ...((returning.data ?? []) as unknown as ClipRow[]),
   ].map(toClip);
@@ -217,9 +235,9 @@ export async function loadNextClips(
     savedAt: row.saved_at,
   }));
 
-  const played = new Map<string, number>();
-  for (const row of (session.data ?? []) as { video_id: string }[]) {
-    played.set(row.video_id, (played.get(row.video_id) ?? 0) + 1);
+  const shown = new Map<string, number>();
+  for (const row of (week.data ?? []) as { video_id: string }[]) {
+    shown.set(row.video_id, (shown.get(row.video_id) ?? 0) + 1);
   }
   const recentThemes = new Set(
     ((cards.data ?? []) as { subject_id: string }[]).map((row) => themeKey(row.subject_id, null) as string),
@@ -230,7 +248,7 @@ export async function loadNextClips(
     now,
     reactions: past,
     recentThemes,
-    playedThisSession: played,
+    shownThisWeek: shown,
     excludeIds: new Set(options.excludeIds ?? []),
   });
 }

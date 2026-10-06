@@ -120,6 +120,7 @@ describe('the operation names', () => {
       'judge-channel',
       'cut-clips',
       'score-clips',
+      'rate-clips',
     ]);
   });
 });
