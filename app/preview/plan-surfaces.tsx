@@ -556,7 +556,11 @@ export function PlanScreenChangeSurface() {
       empty={false}
       canSend={false}
       lastRuns={{}}
-      commitChecks={{}}
+      // CI passed on the merge, which is the usual state of a step whose
+      // screens passed, and the row carries no mark for it.
+      commitChecks={{
+        c0ffee1: { mergeSha: 'facade1', conclusion: 'passed', checkedAt: '2026-10-05T11:30:00Z' },
+      }}
       screenChanges={screenChangeFixtures}
       unfolded
       opened
