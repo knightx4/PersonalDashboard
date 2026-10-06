@@ -83,7 +83,7 @@ export function AddTask({ today }: { today: string }) {
           className="min-w-0 flex-1"
         />
 
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" pending={pending}>
           <Plus className="size-4" strokeWidth={1.75} aria-hidden />
           Add
         </Button>
@@ -203,7 +203,7 @@ export function EditTask({ task, onDone }: { task: Task; onDone: () => void }) {
       <FieldError>{state.error}</FieldError>
 
       <div className="flex gap-2">
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" pending={pending}>
           Save
         </Button>
         <Button type="button" variant="ghost" onClick={onDone}>

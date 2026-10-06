@@ -102,7 +102,7 @@ export function LinkedTasks({
           />
           <div className="flex items-center gap-2">
             <Input name="dueOn" type="date" aria-label="Due" className="w-40" />
-            <Button type="submit" size="sm" disabled={pending}>
+            <Button type="submit" size="sm" pending={pending}>
               Add
             </Button>
           </div>

@@ -145,7 +145,7 @@ export function TestEbayConnectionButton() {
   return (
     <form action={action} className="space-y-2">
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" variant="secondary" size="sm" disabled={pending}>
+        <Button type="submit" variant="secondary" size="sm" pending={pending}>
           {pending ? 'Testing…' : 'Test eBay connection'}
         </Button>
         <span className="text-ui text-ink-muted">

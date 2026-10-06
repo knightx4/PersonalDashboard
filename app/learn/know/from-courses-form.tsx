@@ -45,7 +45,7 @@ type Track = { id: string; name: string };
 function ReadButton({ again }: { again: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" size="sm" disabled={pending}>
+    <Button type="submit" variant="secondary" size="sm" pending={pending}>
       {pending ? 'Reading…' : again ? 'Read again' : 'Read'}
     </Button>
   );
@@ -54,7 +54,7 @@ function ReadButton({ again }: { again: boolean }) {
 function RetrackButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="ghost" disabled={pending}>
+    <Button type="submit" size="sm" variant="ghost" pending={pending}>
       {pending ? 'Reading…' : 'Read for this subject'}
     </Button>
   );
