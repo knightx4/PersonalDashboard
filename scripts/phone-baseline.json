@@ -140,27 +140,21 @@
     "targets": 1
   },
   "news-quick-caught-up": {
-    "sideways": 1,
     "targets": 3
   },
   "news-quick-essay": {
-    "sideways": 1,
     "targets": 4
   },
   "news-quick-in-shell": {
-    "sideways": 1,
     "targets": 8
   },
   "news-quick-page": {
-    "sideways": 1,
     "targets": 8
   },
   "news-quick-page-full": {
-    "sideways": 1,
     "targets": 8
   },
   "news-quick-story": {
-    "sideways": 1,
     "targets": 8
   },
   "news-saved": {

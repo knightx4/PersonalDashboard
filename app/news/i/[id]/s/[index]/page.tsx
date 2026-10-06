@@ -24,14 +24,22 @@ export const dynamic = 'force-dynamic';
  * story inside its card. The headline, who sent it and when, the summary, the
  * story as the email told it, and the ways on: the article itself and the
  * whole newsletter. Save, Send to Learn and Make a todo sit under it as they
- * do on every other story (plan #1370).
+ * do on every other story (plan #1370). A story opened from the Daily review
+ * carries `from=review`, and its back link returns there (plan #1616).
  */
 export default async function StoryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; index: string }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
-  const { id, index } = await params;
+  const [{ id, index }, { from: cameFrom }] = await Promise.all([params, searchParams]);
+  // Opened from the Daily review (plan #1616), back goes to the review.
+  const back =
+    cameFrom === 'review'
+      ? { href: '/news/review', label: 'Daily review' }
+      : { href: '/news', label: 'News' };
   if (!/^\d{1,3}$/.test(index)) notFound();
   const user = await requireUser();
   const client = await createNewsClient();
@@ -54,10 +62,10 @@ export default async function StoryPage({
   return (
     <div className="mx-auto max-w-3xl">
       <Link
-        href="/news"
+        href={back.href}
         className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
       >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> News
+        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> {back.label}
       </Link>
       <PageHeader
         title={story.headline}

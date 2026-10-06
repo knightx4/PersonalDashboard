@@ -28,6 +28,7 @@ import {
   Lightbulb,
   List,
   ListTodo,
+  Newspaper,
   Mail,
   Megaphone,
   Map,
@@ -150,6 +151,9 @@ export const NAV_ICONS = {
   // Quick read deals the stories out one card at a time, so it gets the
   // stack of cards.
   quickRead: GalleryHorizontalEnd,
+  // The evening's review of the day's news (plan #1616): a newspaper, the
+  // day's stories on one page.
+  dailyReview: Newspaper,
   // Goals. A flag, the same object the workspace's own mark draws, as News
   // does with its envelope. Not Target, which is Learn's Goals tab.
   goalsHome: Flag,

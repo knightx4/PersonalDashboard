@@ -88,6 +88,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/news/all',
   '/news/i/[id]',
   '/news/i/[id]/s/[index]',
+  '/news/review',
   '/news/saved',
   '/news/settings',
   '/oauth/consent',
