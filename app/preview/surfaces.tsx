@@ -159,6 +159,7 @@ import {
   DevChangelogSurface,
   DevIdeasSurface,
   DevRaisedSurface,
+  DevRaisedStatusSurface,
   DevSpecSurface,
   DevSpecsSurface,
   DevUiReviewSurface,
@@ -2808,6 +2809,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <CompanyPanels {...companyPanels} />,
   },
   {
+    /* People with its add form open (note 4323ee10). */
+    id: 'jobs-company-add-person',
+    label: 'Company · Adding a person',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <CompanyPanels {...companyPanels} addingPerson />,
+  },
+  {
     id: 'jobs-review',
     label: 'Review queue',
     module: 'jobs',
@@ -3306,7 +3315,7 @@ export const SURFACES: readonly Surface[] = [
 
   {
     /* Learn's clip player (plan #1400): three clips queued, before the first
-     * tap. Full screen below lg, in the page pane above. Fixtures in
+     * tap. A card in the page at every width. Fixtures in
      * clip-surfaces.tsx. */
     id: 'learn-clips',
     label: 'Learn · Clips',
@@ -3949,6 +3958,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevRaisedSurface />,
+  },
+  {
+    /* The Status panel at the top of Home in Dev, with Dash's mark under
+     * Plan (note 076e7744). */
+    id: 'dev-raised-status',
+    label: 'Dev · Home, the Status panel',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevRaisedStatusSurface />,
   },
   {
     id: 'dev-specs',

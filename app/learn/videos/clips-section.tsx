@@ -14,7 +14,7 @@ import { ClipsEmpty } from '@/app/learn/clips/empty';
  *
  * The player is only mounted when the URL asks for it. The page opening is
  * the session the picker counts two clips a video against, so a visit to the
- * list should not start one, and below lg the player covers the whole screen.
+ * list should not start one.
  */
 
 /** Where the old Clips tab, and the Watch as clips button, now land. */

@@ -331,6 +331,12 @@ function rankedCards(
  * newsletters that have not been summarised. `filter` narrows it further;
  * `remainingInIssue` then counts only the cards that fit it. The order is
  * rankedCards': #846's newest-first without `signals`, ranked with them.
+ *
+ * `ahead` is the story the phone already drew behind the last card and has
+ * slid in on Next (note a0fc267e). A pass changes the ranking, since passing
+ * counts a story as seen, so the page asked again could choose another and
+ * replace the card being read. While that story is still unread and fits the
+ * filter it is the card; anything ranked higher comes after it.
  */
 export function nextCard(
   issues: readonly QuickIssue[],
@@ -338,8 +344,29 @@ export function nextCard(
   passes: readonly StoryPass[],
   filter: QuickFilter = {},
   signals?: QuickSignals,
+  ahead?: StoryPass | null,
 ): QuickCard | null {
-  return rankedCards(issues, senders, passes, filter, signals)[0] ?? null;
+  const ranked = rankedCards(issues, senders, passes, filter, signals);
+  const kept = ahead
+    ? ranked.find((card) =>
+        cardPasses(card).some((p) => p.issueId === ahead.issueId && p.storyIndex === ahead.storyIndex),
+      )
+    : undefined;
+  return kept ?? ranked[0] ?? null;
+}
+
+/** The cookie Next leaves the story it slid in under, for the page drawn after the pass. */
+export const QUICK_AHEAD_COOKIE = 'news-quick-ahead';
+
+/** A story as the ahead cookie holds it: `issueId:storyIndex`. */
+export function aheadValue(story: StoryPass): string {
+  return `${story.issueId}:${story.storyIndex}`;
+}
+
+/** The ahead cookie read back, or null for anything that is not one story. */
+export function readAhead(value: string | undefined | null): StoryPass | null {
+  const match = /^([0-9a-f-]{36}):(\d{1,4})$/i.exec(value ?? '');
+  return match ? { issueId: match[1]!, storyIndex: Number(match[2]) } : null;
 }
 
 /**
