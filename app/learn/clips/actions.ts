@@ -49,7 +49,8 @@ export async function loadMoreClipsAction(startedAt: string, queued: string[]): 
   const { user, learn } = await owner();
   return loadPlayerClips(learn, user.id, {
     sessionStartedAt: STAMP.test(startedAt) ? startedAt : null,
-    excludeIds: queued.filter((id) => UUID.test(id)).slice(0, 200),
+    // The newest 200, in queue order: the end of the queue is what the ten-clip gap reads.
+    excludeIds: queued.filter((id) => UUID.test(id)).slice(-200),
   });
 }
 

@@ -12,12 +12,14 @@ import { loadTranscript } from './transcripts';
  * Cutting clips from the library run (plan #1398).
  *
  * Which videos: only those whose transcript is already stored (state
- * 'fetched'), so cutting never spends a transcript credit. The person's own
- * playlist comes first (learn.watch_list, newest added first), then videos
+ * 'fetched'), so cutting never spends a transcript credit. Two lists: the
+ * person's own playlist (learn.watch_list, newest added first) and videos
  * from the channels Learn follows (catalogue providers with a YouTube channel,
  * newest published first), cut for the app's owner, since the catalogue
- * belongs to nobody (#1396). A video already in learn.video_clip_cuts for that
- * person is not sent again; a video on both lists is cut once, as playlist.
+ * belongs to nobody (#1396). They are taken in turn, one from each, so the
+ * channels are cut alongside the playlist rather than only once it is
+ * finished. A video already in learn.video_clip_cuts for that person is not
+ * sent again; a video on both lists is cut once, as playlist.
  *
  * Each video is one Haiku call (clips.ts). Its clips are upserted on (person,
  * video, start second), and a row goes in video_clip_cuts even when it gave
@@ -163,22 +165,34 @@ async function channelVideos(learn: LearnSupabaseClient, owner: string, fetched:
   }));
 }
 
+/** Two lists taken in turn, one from each, until both run out. */
+export function alternate<T>(first: readonly T[], second: readonly T[]): T[] {
+  const out: T[] = [];
+  for (let i = 0; i < Math.max(first.length, second.length); i++) {
+    if (i < first.length) out.push(first[i]);
+    if (i < second.length) out.push(second[i]);
+  }
+  return out;
+}
+
 /**
- * Every video waiting to be cut, in the order they are cut: playlist first,
- * then channels. Each person and video once.
+ * Every video waiting to be cut, in the order they are cut: a playlist video,
+ * then a channel video, and so on. Each person and video once.
  */
 export async function videosToClip(learn: LearnSupabaseClient, owner: string | null): Promise<VideoToClip[]> {
   const fetched = await fetchedVideoIds(learn);
   if (fetched.size === 0) return [];
   const done = await cutAlready(learn);
-  const candidates = [
-    ...(await playlistVideos(learn, fetched)),
-    ...(owner ? await channelVideos(learn, owner, fetched) : []),
-  ];
+  const playlist = await playlistVideos(learn, fetched);
+  const onPlaylist = new Set(playlist.map((video) => `${video.userId}:${video.videoId}`));
+  const fresh = (video: VideoToClip) => !done.has(`${video.userId}:${video.videoId}`);
+  const channels = (owner ? await channelVideos(learn, owner, fetched) : []).filter(
+    (video) => !onPlaylist.has(`${video.userId}:${video.videoId}`),
+  );
   const seen = new Set<string>();
-  return candidates.filter((video) => {
+  return alternate(playlist.filter(fresh), channels.filter(fresh)).filter((video) => {
     const id = `${video.userId}:${video.videoId}`;
-    if (done.has(id) || seen.has(id)) return false;
+    if (seen.has(id)) return false;
     seen.add(id);
     return true;
   });
