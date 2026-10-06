@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Bookmark, BookmarkCheck, ChevronDown, ExternalLink, Play, ThumbsDown, Volume2 } from 'lucide-react';
+import { Bookmark, BookmarkCheck, ChevronDown, ExternalLink, Play, RotateCcw, ThumbsDown, Volume2 } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
-import { Meter } from '@/components/ui/meter';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { clockTime, thumbnailUrl, watchAt } from '@/lib/learn/youtube/format';
@@ -48,7 +47,10 @@ import {
  * It is a card in Videos' Clips section (plan #1488) at every width, with
  * the shell and its top bar still showing (note 2f0f3ace). Only the frame the
  * video plays in is black. A time bar under it says how far into the clip
- * the player is and how long the clip runs (note 5868fbef).
+ * the player is and how long the clip runs (note 5868fbef). It can be
+ * dragged to any point in the clip, and a button beside it goes back ten
+ * seconds; the left and right arrow keys move five. Seeking stays inside the
+ * clip's own start and end.
  */
 
 // -- The parts of the YouTube IFrame API this uses ---------------------------
@@ -57,6 +59,7 @@ type YTPlayer = {
   cueVideoById(options: { videoId: string; startSeconds?: number; endSeconds?: number }): void;
   playVideo(): void;
   pauseVideo(): void;
+  seekTo(seconds: number, allowSeekAhead: boolean): void;
   getCurrentTime(): number;
   getPlayerState(): number;
   isMuted(): boolean;
@@ -88,6 +91,10 @@ declare global {
     onYouTubeIframeAPIReady?: () => void;
   }
 }
+
+/** How far the back button goes, and how far an arrow key moves. */
+const BACK_SECONDS = 10;
+const ARROW_SECONDS = 5;
 
 const STATE = { UNSTARTED: -1, ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 } as const;
 
@@ -139,6 +146,8 @@ export function ClipStream({
   const [exhausted, setExhausted] = useState(false);
   /** Seconds into the clip the player holds, for the time bar. */
   const [elapsed, setElapsed] = useState(0);
+  /** True while the time bar is held, so the player's clock does not pull it back under the finger. */
+  const scrubbing = useRef(false);
 
   const mount = useRef<HTMLDivElement>(null);
   const player = useRef<YTPlayer | null>(null);
@@ -282,7 +291,7 @@ export function ClipStream({
       const { clip, shown, done } = live.current;
       if (!clip || !shown || done || !player.current) return;
       const time = player.current.getCurrentTime();
-      setElapsed(watchedSeconds(clip, time));
+      if (!scrubbing.current) setElapsed(watchedSeconds(clip, time));
       if (player.current.getPlayerState() !== STATE.PLAYING) return;
       if (reachedEnd(clip, time)) {
         live.current.done = true;
@@ -366,12 +375,30 @@ export function ClipStream({
     });
   }, [current, failed]);
 
+  /** Move to `seconds` into the clip, kept inside it. Only once the clip has started playing. */
+  const seek = useCallback((seconds: number) => {
+    const { clip, shown, done } = live.current;
+    if (!clip || !shown || done || !player.current) return;
+    const at = Math.min(clip.endSeconds - clip.startSeconds, Math.max(0, seconds));
+    setElapsed(at);
+    player.current.seekTo(clip.startSeconds + at, true);
+  }, []);
+
+  const nudge = useCallback(
+    (by: number) => {
+      const { clip } = live.current;
+      if (!clip || !player.current) return;
+      seek(watchedSeconds(clip, player.current.getCurrentTime()) + by);
+    },
+    [seek],
+  );
+
   const unmute = useCallback(() => {
     player.current?.unMute();
     setCover(null);
   }, []);
 
-  // ArrowDown or j for the next clip, space or k to pause.
+  // ArrowDown or j for the next clip, space or k to pause, ArrowLeft and ArrowRight to move back and on.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target;
@@ -383,11 +410,14 @@ export function ClipStream({
       } else if (event.key === ' ' || event.key === 'k') {
         event.preventDefault();
         togglePause();
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault();
+        nudge(event.key === 'ArrowLeft' ? -ARROW_SECONDS : ARROW_SECONDS);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [next, togglePause]);
+  }, [next, togglePause, nudge]);
 
   // Swipe up anywhere on the stage.
   const touch = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -473,12 +503,43 @@ export function ClipStream({
       {current && (
         <div className="space-y-3 card-pad-x pt-3 pb-4 lg:pb-5">
           <div className="flex items-center gap-2 text-small tabular-nums text-ink-muted">
+            <button
+              type="button"
+              onClick={() => nudge(-BACK_SECONDS)}
+              disabled={!begun}
+              aria-label={`Back ${BACK_SECONDS} seconds`}
+              title={`Back ${BACK_SECONDS} seconds`}
+              className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-ml-2.5 shrink-0 px-2')}
+            >
+              <RotateCcw className="size-4" strokeWidth={2} aria-hidden />
+            </button>
             <span>{clockTime(elapsed)}</span>
-            <Meter
-              value={elapsed}
+            <input
+              type="range"
+              min={0}
               max={length}
-              label={`${clockTime(elapsed)} of ${clockTime(length)}`}
-              className="flex-1"
+              step={1}
+              value={Math.round(elapsed)}
+              disabled={!begun}
+              aria-label="Time in clip"
+              aria-valuetext={`${clockTime(elapsed)} of ${clockTime(length)}`}
+              onPointerDown={() => {
+                scrubbing.current = true;
+              }}
+              onChange={(event) => {
+                const at = Number(event.target.value);
+                // A drag shows where it is going and seeks when let go; a key or a tap seeks at once.
+                if (scrubbing.current) setElapsed(at);
+                else seek(at);
+              }}
+              onPointerUp={(event) => {
+                scrubbing.current = false;
+                seek(Number(event.currentTarget.value));
+              }}
+              onPointerCancel={() => {
+                scrubbing.current = false;
+              }}
+              className="h-6 min-w-0 flex-1 cursor-pointer accent-accent disabled:cursor-default"
             />
             <span>{clockTime(length)}</span>
           </div>
