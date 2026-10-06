@@ -2,8 +2,10 @@
 
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Archive, CloudFog, Flag, ListFilter, ListTree, Repeat } from 'lucide-react';
 import { ViewChips } from '@/components/plan-tree/view-chips';
+import { PageHeader } from '@/components/shell/page-header';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
@@ -14,6 +16,7 @@ import { ComposeBody, ComposeTitle, InlineInput, InlineTextarea } from '@/compon
 import { useToast } from '@/components/ui/toast';
 import {
   ALL_GOALS_VIEWS,
+  areaInView,
   areasInView,
   countAllGoalsView,
   type AllGoalsView,
@@ -58,11 +61,11 @@ import { DashCredit } from '@/components/ui/dash-mark';
  * Each area is a heading, a line saying what you want from it, and its goals
  * in a card beneath, then the rhythms inside those goals with this period's
  * progress, and Plan this area asking Dash to propose the goals it needs.
- * The section's id, `area-<id>`, is where a link to an area lands: this
- * took the place of the area's own page. Everything but a goal's title is
- * edited where it stands (law 12): a name, a done-when or a note of fog is an
- * inline input saved on blur. A goal's title opens its tree, where it is
- * renamed. Reordering and archiving sit in each
+ * An area's name opens its own page (plan #1619), which draws the same
+ * section alone with the area's name as its heading, and is where the area
+ * is renamed, as a goal's title opens its tree, where it is renamed.
+ * Everything else is edited where it stands (law 12): a note, a done-when or
+ * a note of fog is an inline input saved on blur. Reordering and archiving sit in each
  * row's menu, which works the same with a thumb as with a mouse. Archiving
  * offers an undo, and the record of it stays in the history either way.
  *
@@ -151,6 +154,7 @@ export function GoalsView({
   areaRuns,
   rhythms = {},
   canRun,
+  areaId,
 }: {
   areas: AreaWithGoals[];
   /** Which goals show (plan #1158); in the address as `?view=`. */
@@ -164,29 +168,58 @@ export function GoalsView({
   rhythms?: Record<string, AreaRhythm[]>;
   /** Whether this account can start a Claude run (the owner's only). */
   canRun: boolean;
+  /** Draw this one area as its own page (plan #1619) rather than every area. */
+  areaId?: string;
 }) {
   const onYou = new Map(Object.entries(onYouCounts));
-  const areas = areasInView(allAreas, view, onYou);
   // Where a goal can be moved to: every live area, shown in this view or not.
   const places = allAreas.map((area) => ({ id: area.id, name: area.name }));
+  const pageIndex = areaId ? allAreas.findIndex((area) => area.id === areaId) : -1;
+  const pageArea = pageIndex >= 0 ? allAreas[pageIndex] : null;
+  const counted = pageArea ? [pageArea] : allAreas;
+  const chips = counted.length > 0 && (
+    <div className="flex items-center gap-2">
+      <ListFilter className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+      <ViewChips
+        view={view}
+        chips={ALL_GOALS_VIEWS}
+        labels={VIEW_LABEL}
+        hrefOf={(candidate) =>
+          goalViewHref(pageArea ? `/goals/area/${pageArea.id}` : '/goals/all', candidate)
+        }
+        counts={{
+          open: countAllGoalsView(counted, 'open', onYou),
+          you: countAllGoalsView(counted, 'you', onYou),
+        }}
+        scroll={false}
+      />
+    </div>
+  );
+
+  if (pageArea) {
+    const area = areaInView(pageArea, view, onYou);
+    return (
+      <AreaSection
+        area={area}
+        index={pageIndex}
+        count={allAreas.length}
+        progress={progress}
+        run={areaRuns[area.id] ?? null}
+        rhythms={rhythms[area.id] ?? []}
+        canRun={canRun}
+        places={places}
+        page={{
+          chips,
+          empty: area.goals.length === 0 && pageArea.goals.length > 0 ? EMPTY_VIEW[view] : null,
+        }}
+      />
+    );
+  }
+
+  const areas = areasInView(allAreas, view, onYou);
   return (
     <div className="space-y-6">
-      {allAreas.length > 0 && (
-        <div className="flex items-center gap-2">
-          <ListFilter className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
-          <ViewChips
-            view={view}
-            chips={ALL_GOALS_VIEWS}
-            labels={VIEW_LABEL}
-            hrefOf={(candidate) => goalViewHref('/goals/all', candidate)}
-            counts={{
-              open: countAllGoalsView(allAreas, 'open', onYou),
-              you: countAllGoalsView(allAreas, 'you', onYou),
-            }}
-            scroll={false}
-          />
-        </div>
-      )}
+      {chips}
       {allAreas.length === 0 ? (
         <EmptyState
           icon={Flag}
@@ -207,6 +240,7 @@ export function GoalsView({
             rhythms={rhythms[area.id] ?? []}
             canRun={canRun}
             places={places}
+            view={view}
           />
         ))
       )}
@@ -224,6 +258,8 @@ function AreaSection({
   rhythms,
   canRun,
   places,
+  view = 'open',
+  page,
 }: {
   area: AreaInView;
   index: number;
@@ -233,7 +269,16 @@ function AreaSection({
   rhythms: AreaRhythm[];
   canRun: boolean;
   places: Place[];
+  /** The view All goals is on, which the area's link keeps. */
+  view?: AllGoalsView;
+  /**
+   * Drawn as the area's own page: the name is the page's heading and is
+   * renamed there, the view chips sit under the note, and a view that leaves
+   * none of its goals says so.
+   */
+  page?: { chips: React.ReactNode; empty: { title: string; description: string } | null };
 }) {
+  const router = useRouter();
   const [renameState, rename, renaming] = useActionState(renameAreaAction, initial);
   const [noteState, saveNote, savingNote] = useActionState(setAreaNoteAction, initial);
   const menuAction = useMenuAction();
@@ -245,6 +290,8 @@ function AreaSection({
       toast({ text: result.error });
       return;
     }
+    // An archived area has no page, so its own page goes back to All goals.
+    if (page) router.push('/goals/all');
     toast({
       text: `Archived ${area.name}.`,
       undo: async () => {
@@ -282,28 +329,44 @@ function AreaSection({
 
   return (
     <section id={`area-${area.id}`} aria-label={area.name} className="scroll-mt-bar space-y-2">
-      <div className="flex items-center gap-2">
-        <form action={rename} className="min-w-0 flex-1">
-          <input type="hidden" name="id" value={area.id} />
-          <InlineInput
-            name="name"
-            required
-            maxLength={AREA_NAME_MAX}
-            defaultValue={area.name}
-            key={`name-${area.name}`}
-            aria-label={`Rename ${area.name}`}
-            disabled={renaming}
-            onBlur={commitOnBlur(area.name, { required: true })}
-            onKeyDown={revertOnEscape(area.name)}
-            className="font-semibold"
-          />
-        </form>
-        <ActionMenu label={`${area.name} actions`} items={items} />
-      </div>
+      {page ? (
+        <PageHeader
+          title={
+            <form action={rename}>
+              <input type="hidden" name="id" value={area.id} />
+              <InlineInput
+                name="name"
+                required
+                maxLength={AREA_NAME_MAX}
+                defaultValue={area.name}
+                key={`name-${area.name}`}
+                aria-label={`Rename ${area.name}`}
+                disabled={renaming}
+                onBlur={commitOnBlur(area.name, { required: true })}
+                onKeyDown={revertOnEscape(area.name)}
+                className="font-display text-title tracking-tight sm:text-title"
+              />
+            </form>
+          }
+          actions={<ActionMenu label={`${area.name} actions`} items={items} />}
+        />
+      ) : (
+        <div className="flex items-center gap-2">
+          <Link
+            href={goalViewHref(`/goals/area/${area.id}`, view)}
+            // The size the rename field had here (InlineInput), so the area still heads its goals.
+            // eslint-disable-next-line no-restricted-syntax -- text-base matches InlineInput's phone size.
+            className="min-w-0 flex-1 border border-transparent px-1 py-0.5 text-base font-semibold text-ink underline-offset-2 [overflow-wrap:anywhere] hover:underline sm:text-ui"
+          >
+            {area.name}
+          </Link>
+          <ActionMenu label={`${area.name} actions`} items={items} />
+        </div>
+      )}
       {renameState.error && <p className="px-1 text-small text-danger">{renameState.error}</p>}
       <form action={saveNote}>
         <input type="hidden" name="id" value={area.id} />
-        <InlineInput
+        <InlineTextarea
           name="note"
           maxLength={AREA_NOTE_MAX}
           defaultValue={area.note ?? ''}
@@ -317,6 +380,8 @@ function AreaSection({
         />
       </form>
       {noteState.error && <p className="px-1 text-small text-danger">{noteState.error}</p>}
+      {page?.chips && <div className="pt-2 pb-1">{page.chips}</div>}
+      {page?.empty && <EmptyState icon={Flag} {...page.empty} />}
 
       {proposedCount > 1 && <ApproveArea areaId={area.id} count={proposedCount} />}
       {goalCount > 0 && (

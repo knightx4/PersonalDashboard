@@ -1,10 +1,12 @@
 import type { SearchHit } from '@/lib/search/sources';
+import { areaHref } from '@/lib/goals/all-goals';
 
 /**
- * Goals and their steps into hits, apart from the read so the hrefs can be
+ * Areas, goals and their steps into hits, apart from the read so the hrefs can be
  * tested without a database -- the same split as dev-map.ts.
  *
- * A goal has a page, /goals/<id>. A step does not: it is a row on its goal's
+ * An area has a page, /goals/area/<id> (areaHref), and so does a goal,
+ * /goals/<id>. A step does not: it is a row on its goal's
  * page, anchored as `step-<id>` (the same href the done-since list and the
  * files page write). A step can sit under another step, so its goal is found
  * by walking `parent_id` up to the item whose level is `goal`; a step whose
@@ -106,4 +108,26 @@ export function goalHits(
     .sort((a, b) => Number(a.finished) - Number(b.finished))
     .slice(0, limit)
     .map(({ hit }) => hit);
+}
+
+export type AreaRow = { id: string; name: string };
+
+/** Areas whose name holds the query, each opening its own page. */
+export function areaHits(
+  areas: readonly AreaRow[],
+  { query, limit }: { query?: string; limit: number },
+): SearchHit[] {
+  const needle = query?.trim().toLowerCase();
+  return areas
+    .filter((area) => !needle || area.name.toLowerCase().includes(needle))
+    .slice(0, limit)
+    .map((area) => ({
+      module: 'goals',
+      kind: 'area',
+      id: area.id,
+      ref: `goals.areas:${area.id}`,
+      title: area.name,
+      subtitle: 'Area',
+      href: areaHref(area.id),
+    }));
 }

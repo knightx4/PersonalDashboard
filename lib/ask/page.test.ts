@@ -43,9 +43,9 @@ describe('matchPage', () => {
     });
   });
 
-  it('reads a goal, which the catalogue does not link, and no area, which has no page', () => {
+  it('reads a goal and an area, which the catalogue does not link', () => {
     expect(matchPage(`/goals/${GOAL}`).row).toEqual({ table: 'goals.items', ref: GOAL });
-    expect(matchPage(`/goals/area/${GOAL}`).row).toBeNull();
+    expect(matchPage(`/goals/area/${GOAL}`).row).toEqual({ table: 'goals.areas', ref: GOAL });
     expect(matchPage(`/goals/${GOAL}`).page).toBe('Goals goal');
   });
 

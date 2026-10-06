@@ -38,7 +38,14 @@ export function GoalProgress({
 
   return (
     <span className={cn('flex flex-wrap items-center gap-x-3 gap-y-1', className)}>
-      {move.move && <MoveLabel move={move.move} title={move.title} />}
+      {/* The questions sit with whose move it is, so at 390 the mark never
+          wraps onto a line of its own under the bar. */}
+      {(move.move || progress.questions > 0) && (
+        <span className="flex items-center gap-2">
+          {move.move && <MoveLabel move={move.move} title={move.title} />}
+          <QuestionMark count={progress.questions} />
+        </span>
+      )}
       {progress.live > 0 && (
         <span className="flex items-center gap-2">
           <Bands
@@ -49,14 +56,14 @@ export function GoalProgress({
               label: `${progress.bands[band]} ${PROGRESS_BAND_WORD[band]}`,
             }))}
             track="sunken"
-            className="w-24"
+            // Narrower on a phone, so whose move it is, the bar and the count share one line at 390.
+            className="w-16 sm:w-24"
             label={label}
             moves
           />
           <ProgressCount progress={progress} />
         </span>
       )}
-      <QuestionMark count={progress.questions} />
     </span>
   );
 }

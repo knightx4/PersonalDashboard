@@ -385,7 +385,7 @@ export default async function GoalMapPage({
   // nine rem, and its description wrapped after a few words (note 68fd31b5).
   return (
     <div className="mx-auto max-w-5xl">
-      {/* Back to the goal's area, which is a section of All goals. */}
+      {/* Back to the goal's area, on its own page. */}
       <Link
         href={areaHref(map.goal.areaId, { open: !closed && map.goal.status !== 'dropped' })}
         className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"

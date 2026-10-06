@@ -13,7 +13,7 @@ describe('waitingLines', () => {
   });
 
   it('opens the Learn area for goals without a plan when the page knows it', () => {
-    const area = '/goals/all#area-00000000-0000-4000-8000-000000000001';
+    const area = '/goals/area/00000000-0000-4000-8000-000000000001';
     expect(waitingLines({ reviews: 0, readings: 0, goals: 1 }, { goalsHref: area })).toEqual([
       { key: 'goals', text: '1 goal without a plan yet', href: area },
     ]);

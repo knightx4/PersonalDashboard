@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
+import { areaHref } from '@/lib/goals/all-goals';
 import {
   SET_ASIDE_CHOICES,
   SET_ASIDE_LABELS,
@@ -117,7 +118,7 @@ function act(kind: TodayKind, form: FormData): Promise<State> {
 function hrefFor(item: TodayItem): string {
   switch (item.kind) {
     case 'plan':
-      return `/goals/all#area-${item.id}`;
+      return areaHref(item.id);
     case 'flag':
       return `/goals/${item.goalId}#flag-${item.id}`;
     case 'question':
