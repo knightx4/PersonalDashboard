@@ -218,7 +218,7 @@ not in this file, find it here and read it:
 | Merging duplicate steps, Closing a step from evidence, Moving a step that has sat for a week, Steps under way | `reference/tending.md` |
 | Blocked and waiting steps, Steps for later, Watching a price outside the app | `reference/step-states.md` |
 | The week's focus, The morning run, Reading new statements from Gmail, Reviewing each goal | `reference/morning.md` |
-| Working the ready steps, People and roles you find go to Jobs, Files | `reference/working-steps.md` |
+| Working the ready steps, People and roles you find go to Jobs, A cover letter goes on its role, Files | `reference/working-steps.md` |
 | A step or phase sent from its row, Replying to a comment | `reference/requests.md` |
 | A step of yours to prepare, A Dash step before yours | `reference/prep.md` |
 | The weekly run, Researching the help each goal asks for, The week's notes | `reference/weekly.md` |
