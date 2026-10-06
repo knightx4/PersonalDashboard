@@ -1,39 +1,32 @@
 'use client';
 
 import type { LinkedFile } from '@/lib/files/files';
-import { useEffect, useMemo, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import { ListFilter, ListTree } from 'lucide-react';
-import { Progress, SectionTally } from '@/components/plan-tree/counts';
-import { ColumnHeader } from '@/components/plan-tree/grid';
-import { ViewChips } from '@/components/plan-tree/view-chips';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
+import { ListTree } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cardVariants } from '@/components/ui/card';
-import { Disclosure } from '@/components/ui/disclosure';
+import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { cn } from '@/lib/cn';
-import { VIEW_LABEL } from '@/lib/core/move';
 import {
-  DEFAULT_GOAL_VIEW,
-  GOAL_VIEWS,
-  GOAL_VIEW_CHIPS,
-  GOAL_VIEW_MENU,
-  countGoalView,
   goalCatalog,
   goalRows,
-  goalViewHref,
   numberSteps,
   outlineSteps,
-  viewGoalRows,
+  staysOpen,
   type GoalRowNode,
-  type GoalView,
 } from '@/lib/goals/plan-rows';
-import { stepPreps } from '@/lib/goals/goal-page';
-import { lastProgressOn, latestBeneath, type ItemProgress } from '@/lib/goals/progress';
-import { formatDay } from '@/lib/goals/dates';
+import {
+  goalStages,
+  nowLabel,
+  nowStages,
+  stageMeta,
+  stepPreps,
+  type Stage,
+} from '@/lib/goals/goal-page';
+import { latestBeneath, type ItemProgress } from '@/lib/goals/progress';
 import { countAside, type StepRunView } from '@/lib/goals/shaping';
 import type { GoalMap } from '@/lib/goals/steps-store';
-import { GoalRow, type GoalRowContext } from './goal-row';
+import { FinishedFold, GoalRow, type GoalRowContext } from './goal-row';
 import { StepComposer } from './step-parts';
 import type { InformationSeam } from './information-step';
 
@@ -45,51 +38,32 @@ const NO_FILES: Record<string, LinkedFile[]> = {};
 const NO_PROGRESS: Record<string, ItemProgress> = {};
 const NO_ARRIVALS: readonly string[] = [];
 
-/** A step that is finished or dropped, which folds away under the open ones. */
-function isClosed(row: GoalRowNode): boolean {
-  return row.step.status === 'done' || row.step.status === 'dropped';
-}
-
-/** What a narrowed view says when nothing is in it. */
-const EMPTY_VIEW: Record<Exclude<GoalView, 'all'>, { title: string; description: string }> = {
-  open: {
-    title: 'Nothing open',
-    description: 'Every step on this goal is done or dropped.',
-  },
-  you: {
-    title: 'Nothing waiting on you',
-    description:
-      'No question to answer, nothing blocked on you and nothing of yours ready to do. The goal can move without you.',
-  },
-  ready: {
-    title: 'Nothing ready for Dash',
-    description:
-      'Every open step is waiting on you or on another step. Settle one and the next becomes ready.',
-  },
-  read: {
-    title: 'Nothing to read',
-    description: 'You have read everything Dash has found for this goal.',
-  },
-};
+type Placed = { row: GoalRowNode; stage?: Stage };
 
 /**
- * A goal's full tree (plan #925), drawn as the dev plan draws a module
- * (plan #982).
+ * A goal's steps (plan #925), in two parts (plan #1078).
  *
- * One card: a heading with the plan's count of steps by state and its banded
- * bar, the column header, and a row per step from the plan's shared tree.
- * Finished steps fold away under the open ones. A goal whose top-level steps
- * have steps of their own was drawn a card per stage (plan #1078); it is one
- * card like any other now (note 014bae50), each stage a row that opens, and
- * the view above it, set to Open, is what used to fold the other stages away
- * (note 9e8cd196).
- * Steps from other goals that count towards this one follow in a second card,
- * which has no column header of its own since its columns line up with the
- * first, and each row names the goal it comes from under its title.
+ * **Now** is the work in hand. On a goal in stages it is the stages
+ * `nowStages` opens, each a row with its open steps beneath it, and any open
+ * step outside the stages; on a goal that is one list, every open step.
+ * **Other stages** is the rest of the map: each stage one row, folded, saying
+ * whether it is done, how far along it is or what it waits on, and opening in
+ * place when pressed. Finished steps fold under Finished at every level, and
+ * what Dash wrote for a step is a fold on that step's row.
+ *
+ * Each step is the dev plan's shared row in its list layout (goal-row.tsx):
+ * no column header, tally or banded bar, and no view chips. Open, On you and
+ * Everything were a way to cut the one long list; Now and the map cut it by
+ * stage instead, Waiting on you at the top of the page lists what is on you,
+ * and Finished is a fold rather than a view.
+ *
+ * Steps from other goals that count towards this one follow in a card of
+ * their own, each naming the goal it comes from.
  */
 export function StepTree({
   map,
   todoOn,
+  stages: given,
   unfolded = true,
   opened = false,
   informationSeam,
@@ -97,16 +71,17 @@ export function StepTree({
   files = NO_FILES,
   progress = NO_PROGRESS,
   arrivals = NO_ARRIVALS,
-  view = DEFAULT_GOAL_VIEW,
   canRun = true,
+  belowNow,
 }: {
   map: GoalMap;
-  /**
-   * Which of the views to show: the page's `?view=` (plan #1157), so the
-   * choice is in the address and survives a reload. Open when none is named.
-   */
-  view?: GoalView;
   todoOn: boolean;
+  /**
+   * The goal's stages, as the page read them with `goalStages`. Null draws
+   * the goal as one list, which an errand always is; left out, they are read
+   * here.
+   */
+  stages?: Stage[] | null;
   /** The latest run on each step sent or prepared from its row, by step id (plan #1044). */
   runs?: Record<string, StepRunView>;
   /** The files each step links to, by step id. */
@@ -126,13 +101,14 @@ export function StepTree({
   informationSeam?: InformationSeam;
   /** Whether this account can start a goals run, which Ask Dash on each row needs. */
   canRun?: boolean;
+  /** Drawn under Now, before the other stages: the page's strip of rhythms. */
+  belowNow?: ReactNode;
 }) {
   const [showAside, setShowAside] = useState(false);
   const aside = countAside(map.steps);
   // While a step's run is going, read the page again now and then, so its
   // row moves on to what the run is on now and then to how it ended.
   const router = useRouter();
-  const path = usePathname() ?? `/goals/${map.goal.id}`;
   const anyRunning = Object.values(runs).some((run) => run.running !== null);
   useEffect(() => {
     if (!anyRunning) return;
@@ -140,11 +116,17 @@ export function StepTree({
     return () => clearInterval(timer);
   }, [anyRunning, router]);
 
+  const stages = useMemo(
+    () => (given === undefined ? goalStages(map.steps) : given),
+    [given, map.steps],
+  );
+
   const { own, linked, context } = useMemo(() => {
     const trees = [map.steps, ...map.linked.map((entry) => [entry.step])];
     const numbers = numberSteps(trees);
     const outlines = outlineSteps(trees);
     const options = { numbers, outlines, threads: map.threads, showAside };
+    const preps = stepPreps(trees);
     const context: GoalRowContext = {
       goalTitle: map.goal.title,
       todoOn,
@@ -163,35 +145,46 @@ export function StepTree({
       progressBeneath: latestBeneath(trees.flat(), progress),
       arrivals: new Set(arrivals),
       canRun,
-      ...stepPreps(trees),
+      ...preps,
+      // A prep step's result is read on the step it prepares.
+      readElsewhere: new Set(Object.keys(preps.targetOf)),
     };
     return {
       own: goalRows(map.steps, options),
-      linked: map.linked.map((entry) => ({
-        entry,
-        row: goalRows([entry.step], options).rows[0],
-      })),
+      linked: map.linked.flatMap((entry) => {
+        const row = goalRows([entry.step], options).rows[0];
+        return row ? [{ entry, row }] : [];
+      }),
       context,
     };
-  }, [map, todoOn, showAside, unfolded, opened, informationSeam, runs, files, progress, arrivals, canRun]);
-  // When anything on the goal last moved, its own entries included.
-  const lastOn = lastProgressOn(progress);
+  }, [
+    map,
+    todoOn,
+    showAside,
+    unfolded,
+    opened,
+    informationSeam,
+    runs,
+    files,
+    progress,
+    arrivals,
+    canRun,
+  ]);
 
+  const now = useMemo(() => nowStages(stages, map.steps), [stages, map.steps]);
+  const stageOf = new Map((stages ?? []).map((stage) => [stage.id, stage]));
+  const readElsewhere = context.readElsewhere ?? new Set<string>();
+  const inNow: Placed[] = [];
+  const onMap: Placed[] = [];
+  const finished: GoalRowNode[] = [];
+  for (const row of own.rows) {
+    const stage = stageOf.get(row.id);
+    if (stage) (now.has(row.id) ? inNow : onMap).push({ row, stage });
+    else if (staysOpen(row.step, readElsewhere)) inNow.push({ row });
+    else finished.push(row);
+  }
   const substeps = own.rows.filter((row) => row.kind !== 'decision');
-
-  const shown = viewGoalRows(own.rows, view);
-  // Finished steps fold away under the open ones, except under To read,
-  // where nearly every row is a finished Dash step (note 704c8e3a).
-  const folds = view !== 'read';
-  const shownOpen = folds ? shown.filter((row) => !isClosed(row)) : shown;
-  const shownDone = folds ? shown.filter(isClosed) : [];
-  const shownLinked = linked.flatMap(({ entry, row }) => {
-    const narrowed = row ? viewGoalRows([row], view)[0] : undefined;
-    return narrowed ? [{ entry, row: narrowed }] : [];
-  });
-  const emptyView = view !== 'all' && shown.length === 0 ? EMPTY_VIEW[view] : null;
-  const counts = [...own.rows, ...linked.flatMap(({ row }) => (row ? [row] : []))];
-  const rowOf = (row: GoalRowNode) => (
+  const rowOf = ({ row, stage }: Placed, folded = false) => (
     <GoalRow
       key={row.id}
       node={row}
@@ -199,125 +192,123 @@ export function StepTree({
       context={context}
       index={substeps.findIndex((step) => step.id === row.id)}
       count={substeps.length}
+      unfolded={folded ? false : undefined}
+      summary={stage ? stageMeta(stage) : undefined}
     />
   );
+  const finishedFold = finished.length > 0 && (
+    <div className="border-t border-border px-3 py-1.5">
+      <FinishedFold count={finished.length}>
+        {() => (
+          <ul className="-ml-5.5 divide-y divide-border">
+            {finished.map((row) => rowOf({ row }))}
+          </ul>
+        )}
+      </FinishedFold>
+    </div>
+  );
+  // Inside the last card, under a rule, as the plan's "Add a step" sits at
+  // the foot of a module (plan #983).
+  const composer = (
+    <div className="border-t border-border px-3 py-1.5">
+      <StepComposer parentId={map.goal.id} label="Add a step" bare />
+    </div>
+  );
+  const nowMeta = stages ? nowLabel(stages, now) : null;
+
+  if (map.steps.length === 0) {
+    return (
+      <section aria-label="Steps" className="space-y-2">
+        <EmptyState
+          icon={ListTree}
+          title="No steps yet"
+          description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
+        />
+        <StepComposer parentId={map.goal.id} label="Add a step" />
+      </section>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <section aria-label="Steps" className="space-y-2">
-        {map.steps.length === 0 && (
-          <EmptyState
-            icon={ListTree}
-            title="No steps yet"
-            description="Break the goal into the things that have to happen. Any step can hold sub-steps of its own."
-          />
-        )}
-        {map.steps.length > 0 && (
-          <div className={cn(cardVariants({ padding: 'none' }), 'overflow-hidden')}>
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2.5">
-              <h2 className="text-body font-semibold text-ink">Steps</h2>
-              <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                {lastOn && (
-                  <span className="tabular text-small text-ink-muted">
-                    Last progress {formatDay(lastOn)}
-                  </span>
-                )}
-                <SectionTally tally={own.tally} label={map.goal.title} />
-                <Progress label={map.goal.title} progress={own.progress} bands={own.bands} />
-              </span>
-            </div>
-            <div className="flex items-center gap-2 overflow-x-auto border-b border-border px-3 py-2">
-              <ListFilter
-                className="size-3.5 shrink-0 text-ink-muted"
-                strokeWidth={1.75}
-                aria-hidden
-              />
-              <ViewChips
-                view={view}
-                chips={GOAL_VIEW_CHIPS}
-                menu={GOAL_VIEW_MENU}
-                labels={VIEW_LABEL}
-                hrefOf={(candidate) => goalViewHref(path, candidate)}
-                counts={Object.fromEntries(
-                  GOAL_VIEWS.filter((candidate) => candidate !== 'all').map((candidate) => [
-                    candidate,
-                    countGoalView(counts, candidate),
-                  ]),
-                )}
-                scroll={false}
-              />
-            </div>
-            {emptyView && (
-              <div className="p-3">
-                <EmptyState
-                  icon={ListTree}
-                  title={emptyView.title}
-                  description={emptyView.description}
-                />
-              </div>
-            )}
-            {shownOpen.length > 0 && (
-              <ul className="divide-y divide-border">
-                <ColumnHeader status="Who" priority="When" />
-                {shownOpen.map(rowOf)}
-              </ul>
-            )}
-            {shownDone.length > 0 && (
-              <div className="border-t border-border px-3 py-1.5">
-                <Disclosure title="Finished" meta={shownDone.length}>
-                  <ul className="divide-y divide-border">{shownDone.map(rowOf)}</ul>
-                </Disclosure>
-              </div>
-            )}
-            {/* Inside the card, under a rule, as the plan's "Add a step" sits
-                at the foot of a module (plan #983), on the same py-1.5 line as
-                every other add line on the page. */}
-            <div className="border-t border-border px-3 py-1.5">
-              <StepComposer parentId={map.goal.id} label="Add a step" bare />
-            </div>
-          </div>
-        )}
-        {map.steps.length === 0 && <StepComposer parentId={map.goal.id} label="Add a step" />}
-        {aside > 0 && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            aria-pressed={showAside}
-            onClick={() => setShowAside(!showAside)}
-          >
-            {showAside
-              ? 'Hide the questions put aside'
-              : `Show ${aside === 1 ? 'the question' : `the ${aside} questions`} put aside`}
-          </Button>
-        )}
+      <section aria-labelledby="now-heading" className="space-y-2">
+        <h2
+          id="now-heading"
+          className="flex items-baseline gap-2 px-1 text-ui font-semibold text-ink"
+        >
+          Now
+          {nowMeta && <span className="text-small font-normal text-ink-muted">{nowMeta}</span>}
+        </h2>
+        <Card padding="none">
+          {inNow.length > 0 ? (
+            <ul className="divide-y divide-border">{inNow.map((placed) => rowOf(placed))}</ul>
+          ) : (
+            <p className="px-3 py-2.5 text-ui text-ink-muted">
+              {stages ? 'Every stage is done.' : 'Every step is done or dropped.'}
+            </p>
+          )}
+          {!stages && finishedFold}
+          {!stages && composer}
+        </Card>
+        {belowNow}
       </section>
 
-      {shownLinked.length > 0 && (
-        <section
-          aria-labelledby="linked-heading"
-          className={cn(cardVariants({ padding: 'none' }), 'overflow-hidden')}
-        >
+      {stages && (
+        <section aria-labelledby="map-heading" className="space-y-2">
           <h2
-            id="linked-heading"
-            className="border-b border-border px-3 py-2.5 text-body font-semibold text-ink"
+            id="map-heading"
+            className="flex items-baseline gap-2 px-1 text-ui font-semibold text-ink"
           >
+            Other stages
+            <span className="tabular text-small font-normal text-ink-muted">{onMap.length}</span>
+          </h2>
+          <Card padding="none">
+            {onMap.length > 0 && (
+              <ul className="divide-y divide-border">
+                {onMap.map((placed) => rowOf(placed, true))}
+              </ul>
+            )}
+            {finishedFold}
+            {composer}
+          </Card>
+        </section>
+      )}
+
+      {aside > 0 && (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          aria-pressed={showAside}
+          onClick={() => setShowAside(!showAside)}
+        >
+          {showAside
+            ? 'Hide the questions put aside'
+            : `Show ${aside === 1 ? 'the question' : `the ${aside} questions`} put aside`}
+        </Button>
+      )}
+
+      {linked.length > 0 && (
+        <section aria-labelledby="linked-heading" className="space-y-2">
+          <h2 id="linked-heading" className="px-1 text-ui font-semibold text-ink">
             Also counts towards this goal
           </h2>
-          <ul className="divide-y divide-border">
-            {shownLinked.map(({ entry, row }) => (
-              <GoalRow
-                key={entry.linkId}
-                node={row}
-                trail={[]}
-                context={context}
-                index={0}
-                count={1}
-                unlinkId={entry.linkId}
-                fromGoal={entry.fromGoal}
-              />
-            ))}
-          </ul>
+          <Card padding="none">
+            <ul className="divide-y divide-border">
+              {linked.map(({ entry, row }) => (
+                <GoalRow
+                  key={entry.linkId}
+                  node={row}
+                  trail={[]}
+                  context={context}
+                  index={0}
+                  count={1}
+                  unlinkId={entry.linkId}
+                  fromGoal={entry.fromGoal}
+                />
+              ))}
+            </ul>
+          </Card>
         </section>
       )}
     </div>

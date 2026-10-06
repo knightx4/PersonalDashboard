@@ -9,12 +9,10 @@
  * shows while `backOn` is today: it survives going into a goal and back, and
  * opening the home the next day finds an ordinary daily view.
  *
- * On that day the home says how long you were away, puts what Dash did
- * while you were gone (lib/goals/done-since.ts, the same list as any other
- * sitting's) ahead of the lanes, and leaves out the week's numbers, which
- * would only count the days you were not there. On you already holds what is
- * waiting and the next step of each goal, so the catch-up adds no list of its
- * own.
+ * On that day the home says how long you were away and opens the line for
+ * what Dash did while you were gone (lib/goals/done-since.ts, the same list
+ * as any other sitting's). Do next already holds what is waiting, so the
+ * catch-up adds no list of its own.
  *
  * Pure. The read and write are in lib/goals/visits-store.ts.
  */

@@ -40,7 +40,7 @@
     "targets": 19
   },
   "goals-home": {
-    "targets": 15
+    "targets": 13
   },
   "goals-info-list": {
     "targets": 9
@@ -55,16 +55,13 @@
     "targets": 1
   },
   "goals-page-top": {
-    "targets": 6
+    "targets": 3
   },
   "goals-steps-opened": {
     "targets": 50
   },
   "home-watching": {
     "targets": 3
-  },
-  "jobs-company": {
-    "targets": 8
   },
   "jobs-contact": {
     "targets": 7
@@ -110,9 +107,6 @@
   },
   "jobs-settings": {
     "targets": 4
-  },
-  "learn-clips": {
-    "targets": 2
   },
   "learn-course-check": {
     "targets": 4

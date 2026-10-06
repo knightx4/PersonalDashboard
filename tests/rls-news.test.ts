@@ -482,6 +482,67 @@ describe('news.recommendations', () => {
   });
 });
 
+describe('news.daily_reviews', () => {
+  const items = [
+    {
+      issue_id: '00000000-0000-0000-0000-000000000000',
+      story_index: 0,
+      headline: 'Council approves the tram extension',
+      line: 'The council voted for the tram extension to the harbour.',
+      sources: 2,
+    },
+  ];
+
+  it('keeps one review per user per day, and a second run replaces it', async () => {
+    await asUser(userA, (tx) => tx`
+      insert into daily_reviews (user_id, day, overview, items)
+      values (${userA}, '2026-10-05', 'A first draft.', ${tx.json([])})`);
+    await asUser(userA, (tx) => tx`
+      insert into daily_reviews (user_id, day, overview, items)
+      values (${userA}, '2026-10-05', 'A quiet day for transport.', ${tx.json(items)})
+      on conflict (user_id, day) do update
+        set overview = excluded.overview, items = excluded.items, written_at = excluded.written_at`);
+    await asUser(userB, (tx) => tx`
+      insert into daily_reviews (user_id, day, error)
+      values (${userB}, '2026-10-05', 'The model call failed.')`);
+
+    const mine = await asUser(userA, (tx) => tx<{ overview: string; items: unknown[] }[]>`
+      select overview, items from daily_reviews`);
+    expect(mine).toEqual([{ overview: 'A quiet day for transport.', items }]);
+  });
+
+  it('does not let another account read, change or remove a review', async () => {
+    await asUser(userB, async (tx) => {
+      const read = await tx<{ user_id: string }[]>`select user_id from daily_reviews`;
+      const changed = await tx`
+        update daily_reviews set overview = 'Changed.' where user_id = ${userA}`;
+      const removed = await tx`delete from daily_reviews where user_id = ${userA}`;
+      expect(read.map((r) => r.user_id)).toEqual([userB]);
+      expect(changed.count).toBe(0);
+      expect(removed.count).toBe(0);
+    });
+
+    const [row] = await admin<{ overview: string }[]>`
+      select overview from daily_reviews where user_id = ${userA} and day = '2026-10-05'`;
+    expect(row.overview).toBe('A quiet day for transport.');
+  });
+
+  it('refuses a review under another account\'s id, one with neither overview nor error, or items that are not an array', async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into daily_reviews (user_id, day, overview)
+        values (${userA}, '2026-10-04', 'Not mine.')`),
+    ).rejects.toThrow(/row-level security/);
+    await expect(
+      admin`insert into daily_reviews (user_id, day, overview) values (${userB}, '2026-10-03', '  ')`,
+    ).rejects.toThrow(/daily_reviews_written_ck/);
+    await expect(
+      admin`insert into daily_reviews (user_id, day, overview, items)
+        values (${userB}, '2026-10-02', 'Fine.', '{}'::jsonb)`,
+    ).rejects.toThrow(/daily_reviews_items_ck/);
+  });
+});
+
 describe('RLS coverage', () => {
   it('has row level security enabled on every table in the schema', async () => {
     const rows = await admin<{ tablename: string }[]>`
@@ -502,6 +563,7 @@ describe('RLS coverage', () => {
       order by 1`;
     expect(rows.map((r) => r.tablename)).toEqual([
       'addresses',
+      'daily_reviews',
       'hidden_topics',
       'issues',
       'preferences',

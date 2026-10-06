@@ -46,7 +46,14 @@ const QUICK_BACK_FORM = 'quick-read-back';
  * and the page comes back with the next card. `stories` is cardPasses of the
  * card: its own first, then its repeats.
  */
-export function QuickNextForm({ stories }: { stories: readonly StoryPass[] }) {
+export function QuickNextForm({
+  stories,
+  ahead = null,
+}: {
+  stories: readonly StoryPass[];
+  /** The story drawn behind this card, which Next slides in and the page then keeps (note a0fc267e). */
+  ahead?: StoryPass | null;
+}) {
   const raw = useSyncExternalStore(subscribeBack, readBackStoriesRaw, () => null);
   const back = useMemo(() => parseBack(raw), [raw]);
   const previous = back.at(-1);
@@ -77,6 +84,12 @@ export function QuickNextForm({ stories }: { stories: readonly StoryPass[] }) {
         }}
       >
         <PassFields stories={stories} />
+        {ahead && (
+          <>
+            <input type="hidden" name="aheadIssueId" value={ahead.issueId} />
+            <input type="hidden" name="aheadStoryIndex" value={ahead.storyIndex} />
+          </>
+        )}
         <NextButton />
       </form>
     </>

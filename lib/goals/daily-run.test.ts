@@ -109,6 +109,47 @@ describe('readyClaudeSteps', () => {
   });
 });
 
+describe("the week's focus", () => {
+  const goals = [
+    goal('rest'),
+    goal('focus', { focus: true }),
+    goal('errand', { errand: true, dueOn: '2026-10-09' }),
+  ];
+  const steps = [step('r1', 'rest'), step('r2', 'rest'), step('f1', 'focus'), step('e1', 'errand')];
+
+  function readyFull(today?: string) {
+    const { byGoal } = buildForest(
+      goals.map((g) => g.id),
+      steps,
+    );
+    return readyClaudeSteps(goals, byGoal, today);
+  }
+
+  it("works focus goals' steps first, and an errand due within a week with them", () => {
+    expect(readyFull('2026-10-06').map((s) => [s.id, s.focus ?? false])).toEqual([
+      ['f1', true],
+      ['e1', true],
+      ['r1', false],
+      ['r2', false],
+    ]);
+  });
+
+  it('keeps page order and marks nothing while no focus is chosen', () => {
+    expect(ready([goal('a'), goal('b')], [step('a1', 'a'), step('b1', 'b')])).toEqual(['a1', 'b1']);
+    const { byGoal } = buildForest(['a'], [step('a1', 'a')]);
+    expect(readyClaudeSteps([goal('a')], byGoal)[0]).not.toHaveProperty('focus');
+  });
+
+  it('names a focus goal in the brief', () => {
+    const text = dailyRunText({
+      userId: 'u',
+      runId: 'r',
+      steps: [{ id: 's', title: 'Draft', goalId: 'g', goalTitle: 'Move', focus: true }],
+    });
+    expect(text).toContain(`under the goal "Move", one of this week's focus goals`);
+  });
+});
+
 describe('ranRecently', () => {
   const now = Date.parse('2026-09-24T12:00:00Z');
   it('refuses a second morning run within the gap and allows one after it', () => {

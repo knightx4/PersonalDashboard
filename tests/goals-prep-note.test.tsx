@@ -85,14 +85,17 @@ describe('a Dash prep step on the step it serves', () => {
     expect(html).toMatch(/href="#step-prep"[^>]*>Draft the Kroll cover letter</);
   });
 
-  it('gives a finished one its first result sentence and links to the whole result', () => {
+  it('puts a finished one on the step as Dash’s draft, folded to its first sentence', () => {
     const html = render([
       prep({ status: 'done', result: 'A letter leading on the fraud work. More below.' }),
       apply,
     ]);
-    expect(html).toContain('Dash prepared: ');
-    expect(html).toContain('A letter leading on the fraud work.');
-    expect(html).toMatch(/href="#step-prep"[^>]*>Read it</);
+    const row = html.slice(html.indexOf('id="step-apply"'));
+    expect(row).toMatch(/Dash’s draft<\/span><span class="text-accent"> · new<\/span><span>: A letter leading on the fraud work.<\/span>/);
+    // The whole result is in the fold, with Copy.
+    expect(row).toContain('More below.');
+    expect(row).toContain('>Copy<');
+    expect(html).not.toContain('Dash is preparing');
   });
 
   it('names the step a prep step is for on its own row', () => {

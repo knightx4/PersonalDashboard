@@ -1,14 +1,15 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { CircleUser, Repeat } from 'lucide-react';
+import { Repeat } from 'lucide-react';
 import { RowIconButton } from '@/components/plan-tree/row-icon-button';
 import { StateLabel } from '@/components/dev/state-label';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
 import type { TreeActionState, TreeActions, TreeCatalogEntry } from '@/components/plan-tree/types';
 import type { ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
+import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError, InlineInput } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { awaitsSeenIt } from '@/lib/goals/answer-change';
@@ -17,7 +18,7 @@ import type { LinkedFile } from '@/lib/files/files';
 import { awaitsReview } from '@/lib/goals/daily';
 import type { PrepTarget, StepPrep } from '@/lib/goals/goal-page';
 import { askDash, offersAsk } from '@/lib/goals/handover';
-import type { GoalRowNode } from '@/lib/goals/plan-rows';
+import { staysOpen, type GoalRowNode } from '@/lib/goals/plan-rows';
 import {
   PROGRESS_ESTIMATE_WORDS,
   amountWords,
@@ -53,14 +54,15 @@ import {
   settleProposalAction,
   type ShapingActionState,
 } from './shaping-actions';
+import { DashDraft } from './dash-draft';
 import {
-  ClaudeResult,
   PrepNote,
   PastPeriods,
   ProposalButtons,
   Question,
   StepComposer,
   StepFacts,
+  StepFiles,
   StepText,
   StepTitleEditor,
   formatDate,
@@ -71,15 +73,16 @@ import { DashMark } from '@/components/ui/dash-mark';
 import { MoveLabel } from '@/components/ui/move-label';
 
 /**
- * One goal step, drawn through the dev plan's shared row (plan #982).
+ * One goal step, drawn through the dev plan's shared row (plan #982) in its
+ * list layout (plan #1078).
  *
- * The same row, fold, guides, health word, status column and opened panel as
- * /dev/plan, with a goal's writes behind them. What only a goal has goes in
- * the row's slots: a question's answer box, Claude's result, a rhythm's
- * periods and an information step's form in the panel body; how often a
- * rhythm runs and when a step is due in the fourth column; whose kind of
- * step it is as a mark after the title. Commits, checks, priority and size
- * are the plan's and are left out.
+ * The same fold, guides, status menu and opened panel as /dev/plan, with a
+ * goal's writes behind them, but none of the plan's columns: a row is its
+ * status glyph, its title with Dash's mark on Dash's steps, and at the end
+ * its date, a rhythm's count or, on a stage, how far along it is. What only
+ * a goal has goes in the row's slots: Dash's draft or result as a fold under
+ * the row, a question's answer box, a rhythm's periods and an information
+ * step's form in the panel body. Finished sub-steps fold under the open ones.
  */
 
 /** The goal's writes, for the shared tree components. */
@@ -131,7 +134,49 @@ export type GoalRowContext = {
   arrivals?: ReadonlySet<string>;
   /** Whether this account can start a goals run. Ask Dash shows only when it can. */
   canRun: boolean;
+  /**
+   * The finished prep steps whose result is read as Dash's draft on the step
+   * they prepare, so they fold under Finished rather than stay open.
+   */
+  readElsewhere?: ReadonlySet<string>;
 };
+
+const NO_IDS: ReadonlySet<string> = new Set();
+
+/**
+ * The finished steps under a row or a page, folded with their count (plan
+ * #1078). Their rows are drawn once the fold is first opened, not before: a
+ * goal of sixty steps has dozens finished, and each is a row with a panel
+ * nobody asked to see.
+ */
+export function FinishedFold({
+  count,
+  className,
+  children,
+}: {
+  count: number;
+  className?: string;
+  children: () => React.ReactNode;
+}) {
+  const [shown, setShown] = useState(false);
+  return (
+    <Disclosure
+      title="Finished"
+      meta={count}
+      className={className}
+      onToggle={(open) => {
+        if (open) setShown(true);
+      }}
+    >
+      {shown && children()}
+    </Disclosure>
+  );
+}
+
+/** Every step id beneath a row, at any depth. */
+function idsBeneath(node: GoalRowNode): string[] {
+  return node.children.flatMap((child) => [child.id, ...idsBeneath(child)]);
+}
 
 /**
  * An open step with progress on it (plan #1276): under way, its running
@@ -330,6 +375,8 @@ export function GoalRow({
   count,
   unlinkId,
   fromGoal,
+  unfolded,
+  summary,
 }: {
   node: GoalRowNode;
   trail: readonly boolean[];
@@ -341,13 +388,36 @@ export function GoalRow({
   unlinkId?: string;
   /** The goal a linked step lives under, said on the row and linked in the opened panel. */
   fromGoal?: { id: string; title: string };
+  /** Start with the sub-steps showing, in place of the page's choice: a stage under Now does, one on the map does not. */
+  unfolded?: boolean;
+  /** What the row says at its end in place of a date: on a stage, how far along it is. */
+  summary?: string;
 }) {
   const { step } = node;
   const row = useTreeRow(node, {
     searching: false,
-    unfolded: context.unfolded,
+    unfolded: unfolded ?? context.unfolded,
     opened: context.opened,
   });
+  // A link to a step folded away beneath this row (from Waiting on you, or
+  // a stage on the map) unfolds this row, so the step is drawn and its own
+  // row can open on the link; then the page goes to it.
+  const { setShowChildren } = row;
+  useEffect(() => {
+    const beneath = new Set(idsBeneath(node).map((id) => `#step-${id}`));
+    if (beneath.size === 0) return;
+    const unfoldIfNamed = () => {
+      const hash = window.location.hash;
+      if (!beneath.has(hash)) return;
+      setShowChildren(true);
+      window.requestAnimationFrame(() =>
+        document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' }),
+      );
+    };
+    unfoldIfNamed();
+    window.addEventListener('hashchange', unfoldIfNamed);
+    return () => window.removeEventListener('hashchange', unfoldIfNamed);
+  }, [node, setShowChildren]);
   const [blocking, setBlocking] = useState(false);
   // A step Dash finished lately settles in with its mark flashing, the first
   // time you see it (plan #1561).
@@ -474,26 +544,27 @@ export function GoalRow({
   // rather than counted towards the new one. A rhythm that counts itself
   // from a source is not counted by hand (lib/goals/rhythm-sources.ts).
   const countOne = menuAction(countRhythmAction);
-  const rhythmItems: ActionMenuItem[] = current && !step.countSource
-    ? [
-        {
-          id: 'count',
-          label: 'Count one',
-          formAction: countOne,
-          formFields: { id: step.id, startsOn: current.startsOn, by: '1' },
-        },
-        ...(current.count > 0
-          ? [
-              {
-                id: 'uncount',
-                label: 'Take one back',
-                formAction: countOne,
-                formFields: { id: step.id, startsOn: current.startsOn, by: '-1' },
-              },
-            ]
-          : []),
-      ]
-    : [];
+  const rhythmItems: ActionMenuItem[] =
+    current && !step.countSource
+      ? [
+          {
+            id: 'count',
+            label: 'Count one',
+            formAction: countOne,
+            formFields: { id: step.id, startsOn: current.startsOn, by: '1' },
+          },
+          ...(current.count > 0
+            ? [
+                {
+                  id: 'uncount',
+                  label: 'Take one back',
+                  formAction: countOne,
+                  formFields: { id: step.id, startsOn: current.startsOn, by: '-1' },
+                },
+              ]
+            : []),
+        ]
+      : [];
   const askable = context.canRun && offersAsk(step);
   const askLabel = askDashLabel(step);
   const askItems: ActionMenuItem[] = askable
@@ -556,15 +627,47 @@ export function GoalRow({
     },
   ];
 
-  // Whose the step is, on every row (plan #1159): Dash's mark, or the
-  // dev plan's Yours mark, by the same reading as the Who column, which is
-  // hidden below sm. A stage over both kinds carries both. A rhythm keeps its
-  // own mark beside the Yours one.
-  const yours = node.who.word !== 'Dash';
-  // A step of yours that Dash closed from evidence carries the mark too.
+  // Dash's mark on a step that is Dash's (plan #1159), by the same reading
+  // the Who column used, so a stage over Dash's steps carries it too. Steps
+  // of yours carry no mark, since most steps are yours and a mark on every
+  // one said nothing (plan #1078). A step of yours that Dash closed from
+  // evidence carries Dash's mark as it arrives.
   const dashes = node.who.word !== 'You' || arrived;
   const onTodo = context.todoOn && step.onTodo && canShowOnTodo(step);
   const substeps = node.children.filter((child) => child.kind !== 'decision');
+  // Finished sub-steps fold away under the open ones (plan #1078).
+  const readElsewhere = context.readElsewhere ?? NO_IDS;
+  const finished = substeps.filter((child) => !staysOpen(child.step, readElsewhere));
+  // Dash's draft for a step of yours: a prep step's result, else what Ask
+  // Dash prepared on the step itself. On a Dash step, what it found.
+  const draft =
+    step.kind === 'claude'
+      ? step.result || step.resultUrl || stepFiles.length > 0
+        ? {
+            label: step.preparesId ? 'Dash’s draft' : 'Dash found',
+            markdown: step.result,
+            url: step.resultUrl,
+            files: stepFiles,
+            readId: awaitsReview(step) ? step.id : null,
+          }
+        : null
+      : prep?.done && (prep.result || prep.resultUrl)
+        ? {
+            label: 'Dash’s draft',
+            markdown: prep.result,
+            url: prep.resultUrl,
+            files: context.files?.[prep.id] ?? NO_FILES,
+            readId: prep.unread ? prep.id : null,
+          }
+        : step.kind === 'mine' && (step.result || step.resultUrl || stepFiles.length > 0)
+          ? {
+              label: 'Dash’s draft',
+              markdown: step.result,
+              url: step.resultUrl,
+              files: stepFiles,
+              readId: null,
+            }
+          : null;
 
   return (
     <TreeRow
@@ -575,7 +678,10 @@ export function GoalRow({
       // Who the step is on, where the plan says whose move it is (note
       // 6d242e62). That is a different fact from the move, so it keeps its own
       // words rather than MoveLabel's; the goal's move is on GoalProgress.
-      move={<StateLabel glyph={null} word={node.who.word} tone={node.who.tone} title={node.who.title} />}
+      move={
+        <StateLabel glyph={null} word={node.who.word} tone={node.who.tone} title={node.who.title} />
+      }
+      layout="list"
       statusMenu={statusMenu}
       menu={menu}
       actions={GOAL_TREE_ACTIONS}
@@ -590,15 +696,6 @@ export function GoalRow({
       dependencies={{ catalog: context.catalog, groupOf: () => context.goalTitle }}
       marks={
         <>
-          {yours && (
-            <span
-              title={node.who.title}
-              className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1 py-0.5 text-accent"
-            >
-              <CircleUser className="size-3" strokeWidth={2} aria-hidden />
-              <span className="sr-only">Yours</span>
-            </span>
-          )}
           {dashes && (
             <span
               ref={markRef}
@@ -627,7 +724,9 @@ export function GoalRow({
            size. A rhythm's count runs to three or four words ("0 of 1 this
            week"), so it wraps onto a second line the way the plan's "Next ·
            L" does rather than being cut off (plan #983). */
-        answerChanged ? (
+        summary ? (
+          <span className="text-ink-muted">{summary}</span>
+        ) : answerChanged ? (
           <span className="whitespace-normal text-caution">An answer changed</span>
         ) : current && step.rhythmPeriod ? (
           <span className="whitespace-normal text-ink-muted">
@@ -663,6 +762,7 @@ export function GoalRow({
           )}
           {/* The step's own latest run, read with the page (plan #1044). */}
           {run && <StepRunLine run={run} inset={rowInset(trail)} />}
+          {draft && <DashDraft {...draft} inset={rowInset(trail)} />}
           {stepOpen && (
             <ProgressLine
               progress={progress}
@@ -684,14 +784,10 @@ export function GoalRow({
           {isDecision &&
             step.status !== 'dropped' &&
             (step.status === 'open' || step.resolution !== null) && <Question node={step} />}
-          {step.kind === 'claude' &&
-            (awaitsReview(step) || step.result || step.resultUrl || stepFiles.length > 0) && (
-              <ClaudeResult node={step} files={stepFiles} />
-            )}
-          {step.kind === 'mine' && (step.result || step.resultUrl || stepFiles.length > 0) && (
-            <ClaudeResult node={step} files={stepFiles} />
-          )}
-          {prep && <PrepNote prep={prep} />}
+          {/* What Dash wrote is the fold under the row (DashDraft); here
+              only the files a step of another kind links to. */}
+          {!draft && stepFiles.length > 0 && <StepFiles files={stepFiles} />}
+          {prep && !prep.done && <PrepNote prep={prep} />}
           {progress && <ProgressList progress={progress} />}
           {rhythm && rhythm.past.length > 0 && step.rhythmPeriod && (
             <PastPeriods past={rhythm.past} period={step.rhythmPeriod} />
@@ -719,7 +815,9 @@ export function GoalRow({
           {step.kind === 'rhythm' && step.rhythmCount && step.rhythmPeriod && (
             <span>{describeRhythm(step.rhythmCount, step.rhythmPeriod)}</span>
           )}
-          {current && step.rhythmPeriod && <span>{progressLine(step.rhythmPeriod, current, step.countSource)}</span>}
+          {current && step.rhythmPeriod && (
+            <span>{progressLine(step.rhythmPeriod, current, step.countSource)}</span>
+          )}
           {step.waitsUntil && <span>Starts {formatDate(step.waitsUntil)}</span>}
           {step.dueOn && <span>Due {formatDate(step.dueOn)}</span>}
           {step.estimatedTotal && step.totalUnit && (
@@ -755,7 +853,13 @@ export function GoalRow({
                 className="max-sm:min-h-11"
                 aria-label={`What you want Dash to do with ${step.title}`}
               />
-              <Button type="submit" size="sm" variant="secondary" pending={askPending} className="shrink-0">
+              <Button
+                type="submit"
+                size="sm"
+                variant="secondary"
+                pending={askPending}
+                className="shrink-0"
+              >
                 <DashMark size="2xs" decorative />
                 {askPending ? 'Asking…' : askLabel}
               </Button>
@@ -772,7 +876,30 @@ export function GoalRow({
           onClose={() => row.setAddingChild(false)}
         />
       }
+      after={
+        finished.length > 0 && (
+          <li style={rowInset([...trail, false])} className="pb-1.5 pr-3">
+            <FinishedFold count={finished.length}>
+              {() => (
+                <ul className="-ml-5.5">
+                  {finished.map((child) => (
+                    <GoalRow
+                      key={child.id}
+                      node={child}
+                      trail={[]}
+                      context={context}
+                      index={substeps.indexOf(child)}
+                      count={substeps.length}
+                    />
+                  ))}
+                </ul>
+              )}
+            </FinishedFold>
+          </li>
+        )
+      }
       renderChild={(child, childTrail) => {
+        if (finished.includes(child as GoalRowNode)) return null;
         const at = substeps.indexOf(child as GoalRowNode);
         return (
           <GoalRow

@@ -7,6 +7,7 @@ import {
   quickPage,
   quickProgress,
   quickTopics,
+  readAhead,
   type QuickIssue,
   type StoryPass,
 } from '@/lib/news/quick/next';
@@ -376,5 +377,42 @@ describe('quickProgress', () => {
     expect(
       quickProgress([older, newer], senders, [{ issueId: 'new', storyIndex: 0 }], {}, groups),
     ).toEqual({ read: 1, total: 3 });
+  });
+});
+
+describe('nextCard with the story drawn ahead (note a0fc267e)', () => {
+  it('keeps the story Next slid in, though the ranking now puts another first', () => {
+    expect(nextCard([older, newer], senders, [], {}, undefined, { issueId: 'old', storyIndex: 1 })).toMatchObject({
+      issueId: 'old',
+      storyIndex: 1,
+    });
+  });
+
+  it('ranks afresh once that story has been passed', () => {
+    const passes = [{ issueId: 'old', storyIndex: 1 }];
+    expect(nextCard([older, newer], senders, passes, {}, undefined, passes[0])).toMatchObject({
+      issueId: 'new',
+      storyIndex: 0,
+    });
+  });
+
+  it('ranks afresh when that story is outside the filter', () => {
+    const card = nextCard([older, newer], senders, [], {}, undefined, { issueId: 'gone', storyIndex: 0 });
+    expect(card).toMatchObject({ issueId: 'new', storyIndex: 0 });
+  });
+});
+
+describe('readAhead', () => {
+  it('reads one story back from the cookie', () => {
+    expect(readAhead('0b5c2b90-a07f-463a-8474-26b0d9e13d73:3')).toEqual({
+      issueId: '0b5c2b90-a07f-463a-8474-26b0d9e13d73',
+      storyIndex: 3,
+    });
+  });
+
+  it('reads anything else as no story', () => {
+    expect(readAhead(undefined)).toBeNull();
+    expect(readAhead('old:1')).toBeNull();
+    expect(readAhead('0b5c2b90-a07f-463a-8474-26b0d9e13d73:x')).toBeNull();
   });
 });

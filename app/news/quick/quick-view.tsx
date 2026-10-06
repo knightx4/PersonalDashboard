@@ -15,7 +15,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { RelatedNotes } from '@/components/vault/related-notes';
 import { cn } from '@/lib/cn';
-import { cardPasses, type QuickCard } from '@/lib/news/quick/next';
+import { cardPasses, type QuickCard, type StoryPass } from '@/lib/news/quick/next';
 import type { Reaction } from '@/lib/news/quick/reactions';
 import type { StorySent } from '@/lib/news/saved/sent';
 import type { RelatedNoteLink } from '@/lib/vault/notes/related';
@@ -252,6 +252,7 @@ export function QuickReadView({
                 pictures={pictures}
                 issueHref={issueHref}
                 topic={topic}
+                ahead={upNext ? { issueId: upNext.card.issueId, storyIndex: upNext.card.storyIndex } : null}
               />
             }
             next={
@@ -329,6 +330,7 @@ function PhoneCard({
   pictures,
   issueHref,
   topic,
+  ahead = null,
 }: {
   card: QuickCard;
   arrived: string | null;
@@ -339,6 +341,8 @@ function PhoneCard({
   pictures: boolean;
   issueHref: string | null;
   topic: string | null;
+  /** The story drawn behind this card, for Next to keep as the next one. */
+  ahead?: StoryPass | null;
 }) {
   const story = card.kind === 'story' ? card.story : null;
   const headline = story ? story.headline : (card.subject ?? 'No subject');
@@ -436,7 +440,7 @@ function PhoneCard({
               a phone screen. From lg there is no tab bar, and the status line
               has the foot of the window. */}
           <div className="card-pad-x sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] flex items-center justify-end gap-2 border-t border-border bg-surface py-2.5 lg:static">
-            <QuickNextForm stories={cardPasses(card)} />
+            <QuickNextForm stories={cardPasses(card)} ahead={ahead} />
           </div>
         </article>
       </Card>

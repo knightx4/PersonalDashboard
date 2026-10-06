@@ -4,7 +4,6 @@ import { formatDay } from '@/lib/goals/dates';
 import { useActionState, useRef, useState, useTransition } from 'react';
 import { CircleUser, Repeat, Target } from 'lucide-react';
 import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
-import { FileBody } from '@/components/files/file-body';
 import { FileLinks } from '@/components/files/file-links';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
@@ -39,12 +38,10 @@ import {
 } from './actions';
 import {
   answerQuestionAction,
-  reviewResultAction,
   setQuestionAsideAction,
   settleProposalAction,
   type ShapingActionState,
 } from './shaping-actions';
-import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
  * What a goal step has that a plan step does not (plan #982): the answer box
@@ -157,81 +154,33 @@ export function Question({ node }: { node: StepNode }) {
 }
 
 /**
- * What the morning run produced for a Claude step (plan #933): the note or
- * draft, its link when it has one, and while it is unread a button to mark it
- * read, which takes it off the home. Once read it moves into the details.
- *
- * On a step of yours it is what Claude prepared for you to do it (plan
- * #1001). That waits on the step itself, which is still yours to tick, so it
- * has no Mark read.
- *
- * The text is markdown. A longer piece is kept as a file (core.files) and the
- * result is its summary, with the file linked under it.
+ * The files a step links to, in its opened panel, on a step whose row has no
+ * fold of what Dash wrote to list them under (dash-draft.tsx): a question or a
+ * rhythm a run filed something against.
  */
-export function ClaudeResult({ node, files = [] }: { node: StepNode; files?: LinkedFile[] }) {
-  const [state, review, reviewing] = useActionState(reviewResultAction, answerInitial);
-  const prepared = node.kind !== 'claude';
-  const unread = !prepared && node.reviewedAt === null;
+export function StepFiles({ files }: { files: LinkedFile[] }) {
   return (
     <div className="mt-1 space-y-1 px-1">
-      <p className="text-small text-ink-muted">
-        <DashCredit />
-        {prepared
-          ? 'What Dash prepared for this'
-          : unread
-            ? 'Dash’s result, to read'
-            : 'Dash’s result'}
-      </p>
-      {node.result && <FileBody markdown={node.result} compact />}
-      {files.length > 0 && <FileLinks files={files} />}
-      {node.resultUrl && (
-        <a
-          href={node.resultUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="block text-small break-all text-ink underline"
-        >
-          {node.resultUrl}
-        </a>
-      )}
-      {unread && (
-        <form action={review} className="flex items-center gap-2">
-          <input type="hidden" name="id" value={node.id} />
-          <Button type="submit" size="sm" variant="secondary" pending={reviewing}>
-            Mark read
-          </Button>
-          {state.error && <span className="text-small text-danger">{state.error}</span>}
-        </form>
-      )}
+      <p className="text-small text-ink-muted">Files</p>
+      <FileLinks files={files} />
     </div>
   );
 }
 
 /**
- * The Dash step that prepares one of yours, said on your step (plan #1218):
- * "Dash is preparing" with the prep step's title while it is open, "Dash
- * prepared" with the first sentence of its result once done. Either links to
- * the prep step's row, which opens on the link and holds the whole result.
- * Prepare (the button) writes onto the step itself and shows in ClaudeResult;
- * this is what Dash does unasked, as a step of its own.
+ * The Dash step that prepares one of yours, said on your step (plan #1218)
+ * while it is open: "Dash is preparing" with the prep step's title, linked to
+ * its row. Once it is done, its result is Dash's draft on your step's row
+ * (dash-draft.tsx), as is what Prepare (the button) writes onto the step
+ * itself.
  */
 export function PrepNote({ prep }: { prep: StepPrep }) {
-  const href = `#step-${prep.id}`;
   return (
     <p className="mt-1 px-1 text-small text-ink-muted">
-      {prep.done ? 'Dash prepared: ' : 'Dash is preparing: '}
-      {prep.done && prep.line ? (
-        <>
-          <span className="text-ink">{prep.line}</span>{' '}
-          <a href={href} className="underline underline-offset-2">
-            Read it
-          </a>
-        </>
-      ) : (
-        <a href={href} className="text-ink underline underline-offset-2">
-          {prep.title}
-        </a>
-      )}
+      Dash is preparing:{' '}
+      <a href={`#step-${prep.id}`} className="text-ink underline underline-offset-2">
+        {prep.title}
+      </a>
     </p>
   );
 }
