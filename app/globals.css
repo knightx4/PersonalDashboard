@@ -2224,6 +2224,25 @@ tr:has([data-link-pending]) {
   animation: link-pending var(--motion-moment) var(--ease-sway) var(--motion-instant) infinite alternate;
 }
 
+/* A button whose action is in flight glows softly in the accent while it works
+ * (note 01f7a4ee), so a long run reads as working rather than as a dead,
+ * disabled button. Button's `pending` marks it aria-busy, which is the hook. */
+@keyframes working-glow {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 0%, transparent);
+  }
+  to {
+    box-shadow:
+      0 0 0 3px color-mix(in oklab, var(--color-accent) 25%, transparent),
+      0 0 12px 2px color-mix(in oklab, var(--color-accent) 35%, transparent);
+  }
+}
+
+button[aria-busy='true'] {
+  cursor: progress;
+  animation: working-glow calc(var(--motion-moment) * 2) var(--ease-sway) infinite alternate;
+}
+
 @keyframes toast-in {
   from {
     transform: translateY(6px);
@@ -2735,6 +2754,7 @@ tr:has([data-link-pending]) {
     transform: none;
   }
 
+  button[aria-busy='true'],
   a:has([data-link-pending]),
   tr:has([data-link-pending]) {
     animation: none;

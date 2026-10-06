@@ -8,6 +8,7 @@ import { DashMark } from '@/components/ui/dash-mark';
 import { MoveLabel } from '@/components/ui/move-label';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
+import { areaHref } from '@/lib/goals/all-goals';
 import { formatDay } from '@/lib/goals/dates';
 import type { DashOffer } from '@/lib/goals/hand-off';
 import { nextMove, type HomeGoal } from '@/lib/goals/home';
@@ -36,7 +37,8 @@ import { stepHref } from '@/lib/goals/all-goals';
  * - What Dash did since your last visit, passed in as `since`.
  * - Later: the rest of what is on you in the week's goals, and what is set
  *   aside until a later day, with Bring back now.
- * - Other goals: the goals that are not this week's, one line each.
+ * - Other goals: the goals that are not this week's, one line each, under
+ *   their areas.
  *
  * Moves show at once: a step set aside leaves Do next, a step handed to Dash
  * joins Dash's line, and one brought back leaves Later. The server's redraw
@@ -247,13 +249,28 @@ export function GoalLanes({
 
         {otherGoals.length > 0 && (
           <FoldLine title="Other goals" meta={String(otherGoals.length)}>
-            <Card>
-              <ul className="divide-y divide-border">
-                {otherGoals.map((line) => (
-                  <OtherGoalRow key={line.goal.id} line={line} today={todayOn} />
-                ))}
-              </ul>
-            </Card>
+            {/* By area, each area's name opening its page (note b4595cb6). */}
+            {byArea(otherGoals).map((group) => (
+              <section key={group.areaId} aria-label={group.areaName} className="space-y-1">
+                <Link
+                  href={areaHref(group.areaId)}
+                  className={cn(
+                    'inline-flex items-baseline gap-2 px-1 text-small font-medium text-ink-muted',
+                    'underline-offset-2 hover:text-ink hover:underline max-sm:min-h-11 max-sm:items-center',
+                  )}
+                >
+                  {group.areaName}
+                  <span className="font-normal text-ink-ghost">{group.goals.length}</span>
+                </Link>
+                <Card>
+                  <ul className="divide-y divide-border">
+                    {group.goals.map((line) => (
+                      <OtherGoalRow key={line.goal.id} line={line} today={todayOn} />
+                    ))}
+                  </ul>
+                </Card>
+              </section>
+            ))}
             <Link
               href="/goals/all"
               className="inline-flex items-center px-1 text-small text-accent underline-offset-2 hover:underline max-sm:min-h-11"
@@ -265,6 +282,20 @@ export function GoalLanes({
       </div>
     </div>
   );
+}
+
+/**
+ * The other goals under their areas, each area where its first goal falls in
+ * the order given, so the errands that lead the list still lead it.
+ */
+export function byArea(lines: HomeGoal[]): { areaId: string; areaName: string; goals: HomeGoal[] }[] {
+  const groups = new Map<string, { areaId: string; areaName: string; goals: HomeGoal[] }>();
+  for (const line of lines) {
+    const group = groups.get(line.goal.areaId);
+    if (group) group.goals.push(line);
+    else groups.set(line.goal.areaId, { areaId: line.goal.areaId, areaName: line.areaName, goals: [line] });
+  }
+  return [...groups.values()];
 }
 
 /**

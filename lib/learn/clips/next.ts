@@ -1,7 +1,7 @@
 import 'server-only';
 
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { pickNextClips, SKIP_RETURN_MS, type ClipReaction, type RankableClip } from './rank';
+import { pickNextClips, SKIP_RETURN_MS, VIDEO_GAP, type ClipReaction, type RankableClip } from './rank';
 
 /**
  * The next clips for the stream (plan #1399).
@@ -13,10 +13,12 @@ import { pickNextClips, SKIP_RETURN_MS, type ClipReaction, type RankableClip } f
  *
  * The player (#1400) calls this for a handful at a time, passing when the
  * session started so the two-a-video cap holds across calls, and the ids it
- * has queued but not yet shown.
+ * has queued, in queue order. The videos of the clips shown last, then of the
+ * ones queued and not yet shown, go to the picker as recentVideos, so no video
+ * plays twice within VIDEO_GAP clips, across calls and across sessions.
  */
 
-/** Candidates read per source. The best of each by score, so a playlist clip is never crowded out by channel clips. */
+/** Candidates read per source. The best of each by score, so neither source crowds the other out of the read. */
 const CANDIDATES = 200;
 /** Clips skipped long enough ago to come back, read to fill in after the unseen ones. */
 const RETURNING = 50;
@@ -155,7 +157,9 @@ export async function loadNextClips(
       .order('score', { ascending: false, nullsFirst: false })
       .limit(CANDIDATES);
 
-  const [playlist, channel, returning, reactions, session, cards] = await Promise.all([
+  const queuedIds = [...(options.excludeIds ?? [])];
+
+  const [playlist, channel, returning, reactions, session, cards, lastShown, queued] = await Promise.all([
     unseen('playlist'),
     unseen('channel'),
     learn
@@ -192,6 +196,16 @@ export async function loadNextClips(
       .not('subject_id', 'is', null)
       .gte('created_at', new Date(now - RECENT_CARD_MS).toISOString())
       .limit(100),
+    learn
+      .from('video_clips')
+      .select('id, video_id')
+      .eq('user_id', userId)
+      .not('shown_at', 'is', null)
+      .order('shown_at', { ascending: false })
+      .limit(VIDEO_GAP - 1),
+    queuedIds.length > 0
+      ? learn.from('video_clips').select('id, video_id, shown_at').eq('user_id', userId).in('id', queuedIds)
+      : Promise.resolve({ data: [], error: null }),
   ]);
   fail('Reading your playlist clips', playlist.error);
   fail('Reading your channel clips', channel.error);
@@ -199,6 +213,8 @@ export async function loadNextClips(
   fail('Reading what you did with earlier clips', reactions.error);
   fail('Reading this session', session.error);
   fail('Reading your recent Learn now cards', cards.error);
+  fail('Reading the clips you watched last', lastShown.error);
+  fail('Reading the clips queued to play', queued.error);
 
   const clips = [
     ...((playlist.data ?? []) as unknown as ClipRow[]),
@@ -225,7 +241,21 @@ export async function loadNextClips(
     ((cards.data ?? []) as { subject_id: string }[]).map((row) => themeKey(row.subject_id, null) as string),
   );
 
+  // Oldest first: the clips shown last, then the queued ones not shown yet, in queue order.
+  const shownRows = ((lastShown.data ?? []) as { id: string; video_id: string }[]).reverse();
+  const shownIds = new Set(shownRows.map((row) => row.id));
+  const queuedVideo = new Map(
+    ((queued.data ?? []) as { id: string; video_id: string; shown_at: string | null }[])
+      .filter((row) => !row.shown_at)
+      .map((row) => [row.id, row.video_id]),
+  );
+  const recentVideos = [
+    ...shownRows.map((row) => row.video_id),
+    ...queuedIds.filter((id) => !shownIds.has(id) && queuedVideo.has(id)).map((id) => queuedVideo.get(id) as string),
+  ];
+
   return pickNextClips(clips, {
+    recentVideos,
     limit: options.limit ?? 5,
     now,
     reactions: past,

@@ -143,9 +143,33 @@ export type DashContext = {
   page: PageContext | null;
 };
 
-/** What the model is told the date is: after the cache breakpoint, since it changes daily. */
-function dateLine(today: string): string {
-  return `Today is ${today} in the person's timezone. Read "this month", "last week" and the like from it.`;
+/** "Sunday, 4 October 2026", from a YYYY-MM-DD day read as a calendar day. */
+function spelledDay(day: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${day}T00:00:00Z`));
+}
+
+/**
+ * What the model is told the date is: after the cache breakpoint, since it
+ * changes daily. The weekday and tomorrow are spelled out (note de8e7fbb):
+ * given only the bare date, Dash argued with "tomorrow" in its own reply.
+ */
+export function dateLine(today: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) {
+    return `Today is ${today} in the person's timezone. Read "this month", "last week" and the like from it.`;
+  }
+  const next = new Date(`${today}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  const tomorrow = next.toISOString().slice(0, 10);
+  return (
+    `Today is ${spelledDay(today)} (${today}) in the person's timezone, and tomorrow is ` +
+    `${spelledDay(tomorrow)} (${tomorrow}). Read "tomorrow", "this month", "last week" and the like from it.`
+  );
 }
 
 /**

@@ -114,7 +114,7 @@ export function HandToDash({
         <Button type="submit" disabled={pending || !areaId || !dueOn}>
           {pending ? 'Handing it to Dash…' : 'Hand it to Dash'}
         </Button>
-        <Button type="button" variant="ghost" onClick={onDone} disabled={pending}>
+        <Button type="button" variant="ghost" onClick={onDone} pending={pending}>
           Cancel
         </Button>
       </div>

@@ -68,6 +68,8 @@ import {
   stopBranch,
   stoppedSurfaces,
 } from '@/lib/plan/ui-check-stop';
+import { PASSING_VERDICTS } from '@/lib/plan/ui-check-guard';
+import { appendCommentLine, sentBackLine } from '@/lib/plan/screen-change';
 
 export type PlanActionState = {
   error?: string;
@@ -1069,6 +1071,95 @@ export async function acceptCriticStop(
 
   revalidatePlan();
   return { message: 'Accepted. The step is ready for a session to merge and close.' };
+}
+
+/**
+ * Send a changed screen back from its pictures (plan #1542,
+ * docs/UI-QUALITY-SPEC.md Part 6).
+ *
+ * The thumbs-down under a surface's before and after on a finished step. Your
+ * words go on the step's thread as yours, a dated line naming the surface
+ * goes on its comment, and the step goes back to not started with nobody's
+ * mark on it, so the next session that picks it up builds against what you
+ * said. The correction reaches the step that made the screen rather than the
+ * general notes queue.
+ *
+ * Only on a finished step, and only for a surface the step has a passing
+ * round for: the press is about a screen that step changed. The commit stays
+ * on the row, since it is still the commit that changed the screen.
+ */
+// latency: pending
+export async function sendScreenBack(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  const surface = z
+    .string()
+    .regex(/^[\w-]+$/)
+    .max(80)
+    .safeParse(formData.get('surface'));
+  if (!id.success || !surface.success) return { error: 'Missing step or screen.' };
+
+  const words = text(4000).safeParse(field(formData, 'words'));
+  if (!words.success) return { error: 'That is too long.' };
+  if (!words.data) return { error: 'Say what is wrong with the screen.' };
+
+  const { data: current } = await supabase
+    .from('plan_items')
+    .select('number, status, comment')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .maybeSingle();
+  if (!current) return { error: 'That step no longer exists.' };
+  if (current.status !== 'done') return { error: 'That step is already open.' };
+
+  const { data: passed, error: readError } = await supabase
+    .from('ui_checks')
+    .select('round')
+    .eq('user_id', user.id)
+    .eq('step', current.number)
+    .eq('surface', surface.data)
+    .in('verdict', [...PASSING_VERDICTS])
+    .limit(1);
+  if (readError) return { error: readError.message };
+  if (!passed || passed.length === 0) {
+    return { error: 'This step has no passed screen by that name.' };
+  }
+
+  try {
+    await addThreadTurn(supabase, {
+      userId: user.id,
+      ref: `public.plan_items:${id.data}`,
+      author: 'me',
+      body: words.data,
+    });
+  } catch (unsaid) {
+    return { error: unsaid instanceof Error ? unsaid.message : 'Your words could not be saved.' };
+  }
+
+  const comment = appendCommentLine(
+    current.comment,
+    sentBackLine({
+      date: new Date().toISOString().slice(0, 10),
+      surface: surface.data,
+      words: words.data,
+    }),
+  );
+  const { error } = await supabase
+    .from('plan_items')
+    .update({ status: 'not_started', ...blockPatch('not_started'), assignee: null, comment })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  revalidatePath('/dev/changelog');
+  revalidatePath('/dev/surfaces');
+  return { message: `Sent back. #${current.number} is open again with your words on it.` };
 }
 
 /** Deleting a step takes its sub-steps with it; the confirm says how many. */

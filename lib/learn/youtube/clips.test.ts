@@ -1,7 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { cutClips } from './clip-run';
+import { alternate, cutClips } from './clip-run';
 import { cutPrompt, cutVideo, matchServes, readCutReply, sentencesFromCues } from './clips';
 import { CLIP_TRANSCRIPT } from './fixtures/clip-transcript';
 import type { LearnerProfile } from './judge-video';
@@ -231,8 +231,15 @@ function world() {
   return { tables, learn: fakeLearn(tables, stored) };
 }
 
+describe('alternate', () => {
+  it('takes one from each list in turn, then the rest of the longer', () => {
+    expect(alternate<number | string>([1, 2, 3], ['a'])).toEqual([1, 'a', 2, 3]);
+    expect(alternate([], ['a', 'b'])).toEqual(['a', 'b']);
+  });
+});
+
 describe('cutClips', () => {
-  it('cuts your list first, then followed channels newest first, and skips what is cut or not transcribed', async () => {
+  it('cuts your list and followed channels in turn, each newest first, and skips what is cut or not transcribed', async () => {
     const { tables, learn } = world();
     const { client, create } = stubClient();
     const spend = vi.fn();
@@ -254,8 +261,8 @@ describe('cutClips', () => {
     const cuts = tables.video_clip_cuts.filter((row) => row.video_id !== DONE);
     expect(cuts.map((row) => [row.video_id, row.came_from, row.clip_count])).toEqual([
       [LISTED, 'playlist', 2],
-      [LISTED_OLDER, 'playlist', 2],
       [CHANNEL_NEW, 'channel', 2],
+      [LISTED_OLDER, 'playlist', 2],
     ]);
     const first = tables.video_clips.find((row) => row.video_id === CHANNEL_NEW && row.start_seconds === 21);
     expect(first).toMatchObject({ user_id: OWNER, item_id: 'item-c1', came_from: 'channel', end_seconds: 61, subject_id: 'subject-1' });
@@ -271,7 +278,7 @@ describe('cutClips', () => {
     const failing = { messages: { create: vi.fn(async () => Promise.reject(new Error('timeout'))) } } as unknown as Anthropic;
     const result = await cutClips(learn, { anthropicApiKey: 'k', owner: OWNER, deadline: Date.now() + 60_000, limit: 1, client: failing, now: () => NOW, profileFor: async () => PROFILE });
     expect(result.failed).toBe(1);
-    expect(tables.video_clip_cuts.some((row) => row.video_id === LISTED_OLDER)).toBe(false);
+    expect(tables.video_clip_cuts.some((row) => row.video_id === CHANNEL_NEW)).toBe(false);
   });
 
   it('cuts nothing for a person who already has forty clips not yet shown', async () => {

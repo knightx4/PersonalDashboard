@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useActionState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { ChangeLine } from '@/lib/goals/run-changes';
@@ -12,17 +13,26 @@ import { undoRunChangeAction, type UndoChangeState } from './actions';
 
 const initial: UndoChangeState = {};
 
-export function RunChanges({ runId, lines }: { runId: string; lines: ChangeLine[] }) {
+export function RunChanges({
+  runId,
+  lines,
+  hrefs = {},
+}: {
+  runId: string;
+  lines: ChangeLine[];
+  /** The page of the goal or step each change was made to, by the line's key. */
+  hrefs?: Record<string, string>;
+}) {
   return (
     <ul className="divide-y divide-border">
       {lines.map((line) => (
-        <ChangeRow key={line.key} runId={runId} line={line} />
+        <ChangeRow key={line.key} runId={runId} line={line} href={hrefs[line.key]} />
       ))}
     </ul>
   );
 }
 
-function ChangeRow({ runId, line }: { runId: string; line: ChangeLine }) {
+function ChangeRow({ runId, line, href }: { runId: string; line: ChangeLine; href?: string }) {
   const [state, undo, pending] = useActionState(undoRunChangeAction, initial);
   const note =
     line.state === 'undone'
@@ -44,7 +54,13 @@ function ChangeRow({ runId, line }: { runId: string; line: ChangeLine }) {
             : 'min-w-0 flex-1 text-ui break-words text-ink'
         }
       >
-        {line.sentence}
+        {href ? (
+          <Link href={href} className="underline-offset-2 hover:underline">
+            {line.sentence}
+          </Link>
+        ) : (
+          line.sentence
+        )}
       </span>
       {note && <span className="text-small text-ink-muted">{note}</span>}
       {line.state === 'undoable' && (

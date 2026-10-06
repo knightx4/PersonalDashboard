@@ -116,7 +116,7 @@ function SuggestedRow({ track }: { track: SuggestedTrackView }) {
           Start track
         </Button>
         <PaidHint action="app/jobs/(app)/thoughts/actions.ts#startTrack" what="Cost of starting the track" />
-        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => answer(dismissTrack)}>
+        <Button type="button" size="sm" variant="ghost" pending={pending} onClick={() => answer(dismissTrack)}>
           Not now
         </Button>
         {error && <span className="text-small text-danger">{error}</span>}

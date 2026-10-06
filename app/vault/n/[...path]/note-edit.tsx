@@ -172,7 +172,7 @@ export function EditForm({
         <Button type="submit" size="sm" pending={pending}>
           {pending ? 'Saving…' : 'Save'}
         </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={onDone} disabled={pending}>
+        <Button type="button" size="sm" variant="ghost" onClick={onDone} pending={pending}>
           Cancel
         </Button>
       </div>

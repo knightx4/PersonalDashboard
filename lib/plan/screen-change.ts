@@ -146,3 +146,76 @@ export function ownsShotPath(userId: string, path: string): boolean {
   if (path.includes('..') || path.includes('\\')) return false;
   return /^[0-9a-f-]+\/[\w-]+\/[a-z0-9-]+\/r\d+\/[\w-]+\.png$/i.test(path);
 }
+
+/**
+ * How far back "Changed this week" on /dev/surfaces looks (plan #1542): seven
+ * days, counted back from now rather than from the start of a calendar week,
+ * so the filter never empties on a Monday morning.
+ */
+export const CHANGED_WINDOW_DAYS = 7;
+
+/** The step that last changed a surface, and when its passing round was recorded. */
+export type SurfaceChange = { step: number; checkedAt: string };
+
+/**
+ * Each surface a step changed in the last `days` days, by surface id, with
+ * the latest step to change it when there were several. A change is a passing
+ * round (the critic's `pass` or the person's `accepted`), dated by when that
+ * round was recorded, which is as close as the record gets to when the screen
+ * changed. A round dated after `now` is still counted, so a clock a few
+ * seconds out does not hide one.
+ */
+export function surfacesChangedWithin(
+  changes: Readonly<Record<number, readonly ScreenChange[]>>,
+  now: Date,
+  days: number = CHANGED_WINDOW_DAYS,
+): Map<string, SurfaceChange> {
+  const since = now.getTime() - days * 24 * 60 * 60 * 1000;
+  const out = new Map<string, SurfaceChange>();
+  for (const [step, list] of Object.entries(changes)) {
+    for (const change of list) {
+      const at = Date.parse(change.checkedAt);
+      if (Number.isNaN(at) || at < since) continue;
+      const seen = out.get(change.surface);
+      if (seen && Date.parse(seen.checkedAt) >= at) continue;
+      out.set(change.surface, { step: Number(step), checkedAt: change.checkedAt });
+    }
+  }
+  return out;
+}
+
+/** The longest the person's words run in the dated line; the thread keeps all of them. */
+const SENT_BACK_WORDS = 1000;
+
+/** The column's limit (`plan_items_comment_length_ck`). */
+const COMMENT_LIMIT = 4000;
+
+/**
+ * The dated line a thumbs-down appends to a step's comment (plan #1542):
+ * which screen was sent back and what was wrong with it, for the session that
+ * picks the step up again.
+ */
+export function sentBackLine({
+  date,
+  surface,
+  words,
+}: {
+  date: string;
+  surface: string;
+  words: string;
+}): string {
+  const said = words.trim().replace(/\s+/g, ' ');
+  const clipped = said.length > SENT_BACK_WORDS ? `${said.slice(0, SENT_BACK_WORDS - 1)}…` : said;
+  return `Sent back ${date} from the ${surface} pictures: ${clipped}`;
+}
+
+/**
+ * The comment with a line added at the end. When the whole would pass the
+ * column's limit, the oldest text goes first: the newest line is the one the
+ * next session needs, and the history before it is also in the thread.
+ */
+export function appendCommentLine(comment: string | null, line: string): string {
+  const whole = comment ? `${comment}\n\n${line}` : line;
+  if (whole.length <= COMMENT_LIMIT) return whole;
+  return `…${whole.slice(whole.length - (COMMENT_LIMIT - 1))}`;
+}

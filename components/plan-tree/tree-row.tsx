@@ -378,6 +378,12 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // On the step's own page the details are what the page is for, so they
   // do not fold.
   const condensable = hasChildren && showChildren && !heading;
+  // The first line of the detail, or of the done-when, without markdown's
+  // link brackets: what a folded panel shows beside Show details.
+  const foldedPreview = (node.detail ?? node.acceptance ?? '')
+    .split('\n')
+    .map((line) => line.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/[*_#>`]/g, '').trim())
+    .find((line) => line.length > 0);
 
   // A link to this row by its own id (a goal step from the Goals home, or
   // from Go to the step under a finding) opens its panel as well as scrolling
@@ -776,7 +782,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   type="button"
                   onClick={() => setDetailsShown(!detailsShown)}
                   aria-expanded={detailsShown}
-                  className="press -mx-1 flex items-center gap-1 rounded px-1 text-small font-semibold text-ink-muted hover:bg-accent-tint hover:text-accent"
+                  className="press -mx-1 flex w-full min-w-0 items-center gap-1 rounded px-1 text-small font-semibold text-ink-muted hover:bg-accent-tint hover:text-accent"
                 >
                   <ChevronDown
                     className={cn(
@@ -787,6 +793,13 @@ export function TreeRow<E extends TreeCatalogEntry>({
                     aria-hidden
                   />
                   {detailsShown ? 'Hide details' : 'Show details'}
+                  {/* Folded, the line carries the first of what the details
+                  say, so the space is worth having (note 886d6e4f). */}
+                  {!detailsShown && foldedPreview && (
+                    <span className="min-w-0 flex-1 truncate text-left font-normal text-ink-muted">
+                      {foldedPreview}
+                    </span>
+                  )}
                 </button>
               )}
               {(!condensable || detailsShown) && (

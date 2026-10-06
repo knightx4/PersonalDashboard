@@ -623,6 +623,8 @@ describe('recall', () => {
         'Write the target down in one sentence', 0.5),
       passage(ME, 'job_search.notes', 'b0000000-0000-4000-8000-000000000001', 0,
         'Note on Strategic Finance at Ramp\n\nThe kind of team I would take a pay cut for.', 0.48),
+      passage(ME, 'job_search.interviews', 'b0000000-0000-4000-8000-000000000002', 0,
+        'Interview for Strategic Finance at Ramp, round 1\n\nNotes: They want someone who owns the model end to end.', 0.46),
       passage(ME, 'learn.card_notes', 'c0000000-0000-4000-8000-000000000001', 0,
         'Note on Career capital\n\nSkills that travel matter more than the title.', 0.44),
       passage(ME, 'public.order_items', 'd0000000-0000-4000-8000-000000000001', 0,
@@ -638,6 +640,10 @@ describe('recall', () => {
     'job_search.notes': [
       { id: 'b0000000-0000-4000-8000-000000000001', user_id: ME, role_id: 'r1', company_id: 'co1', contact_id: null },
     ],
+    'job_search.interviews': [
+      { id: 'b0000000-0000-4000-8000-000000000002', user_id: ME, application_id: 'ap1' },
+    ],
+    'job_search.applications': [{ id: 'ap1', user_id: ME, role_id: 'r1' }],
     'learn.card_notes': [{ id: 'c0000000-0000-4000-8000-000000000001', user_id: ME, concept_id: 'k1' }],
     'public.order_items': [{ id: 'd0000000-0000-4000-8000-000000000001', order_id: 'o1' }],
   };
@@ -731,6 +737,7 @@ describe('recall', () => {
       ['core.files', '/goals/files/f0000000-0000-4000-8000-000000000001'],
       ['goals.items', '/goals/a0000000-0000-4000-8000-000000000001/s/a0000000-0000-4000-8000-000000000002'],
       ['job_search.notes', '/jobs/roles/r1'],
+      ['job_search.interviews', '/jobs/roles/r1'],
       ['learn.card_notes', '/learn/c/k1'],
       ['public.order_items', '/shopping/orders/o1'],
     ]);
