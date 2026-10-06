@@ -58,4 +58,8 @@ the skill says and work every open goal that is new or has fog.
 
 You change rows, not code. Do not commit or push. Close the run row with a
 summary before you stop.
+
+Environment (Claude Code on the web):
+- Read and write through the claude.ai Supabase connector (tools mcp__Supabase__*, loaded with ToolSearch before the first call). This repository has no .mcp.json on purpose; use only the connector.
+- The goals tables are in the goals schema. Do not run npm ci; you do not need the app built.
 ```
