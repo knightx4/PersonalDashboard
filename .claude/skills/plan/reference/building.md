@@ -210,7 +210,12 @@ a surface with no routes. A step that changes no surface skips this section.
    checkout's `node_modules`), shooting it as in 3 below, so the shots land
    in that worktree's `.preview-shots/`. Stop its preview server before
    starting your own, since both use port 3400. A new surface has no before
-   shots; the critic is told "none".
+   shots; the critic is told "none". Copy the worktree's
+   `.preview-shots/<id>--*.png` into this checkout's `.preview-shots/before/`:
+   the recorder uploads them beside each round as `before-<shot>`, and the
+   step's plan row shows them next to the after (plan #1541). Turbopack
+   refuses a `node_modules` symlink that points outside the worktree, so
+   give the worktree a hard-linked copy (`cp -al`) instead.
 2. **Draw it in the gallery.** Add or update the surface's entry in
    `app/preview/surfaces.tsx` with typed fixtures and the real components.
    Fixtures as long and as empty as real data gets: the longest name, the
