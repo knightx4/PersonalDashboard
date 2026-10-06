@@ -606,7 +606,15 @@ export function StepFacts({
                   name="goalId"
                   aria-label="Another goal this counts towards"
                   icon={<Target className="size-3.5" strokeWidth={2} />}
+                  // Unset until picked: with the first goal chosen, the chip
+                  // read as a link the step already had (note 4a2c79b9).
+                  defaultValue=""
+                  placeholderValue=""
+                  required
                 >
+                  <option value="" disabled>
+                    Another goal
+                  </option>
                   {linkable.map((goal) => (
                     <option key={goal.id} value={goal.id}>
                       {goal.title}
