@@ -38,6 +38,11 @@ export function areaHref(areaId: string, { open = true }: { open?: boolean } = {
   return `/goals/area/${areaId}${open ? '' : '?view=all'}`;
 }
 
+/** A step's own page (plan #1620), under the goal it belongs to. A sub-step's is the same. */
+export function stepHref(goalId: string, stepId: string): string {
+  return `/goals/${goalId}/s/${stepId}`;
+}
+
 /** How many things on you each goal holds, keyed by goal id, from the Today list. */
 export function onYouByGoal(items: readonly { goalId: string }[]): Map<string, number> {
   const counts = new Map<string, number>();

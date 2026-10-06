@@ -1,4 +1,5 @@
 import { GoalRhythms } from '@/app/goals/[goalId]/goal-found';
+import { StepPage } from '@/app/goals/[goalId]/step-page';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
 import { rhythmSteps } from '@/lib/goals/goal-page';
 import { attachDependencies, type DependencyRow } from '@/lib/goals/dependencies';
@@ -268,4 +269,18 @@ export function GoalTreeSurface() {
 /** The same steps with every row opened: the panel behind each row. */
 export function GoalOpenedSurface() {
   return <StepTree map={map} todoOn={false} opened />;
+}
+
+/**
+ * A step on its own page (plan #1620): Get the rates lowered, opened, with
+ * Dash's draft for the call, a step blocked on you with a comment, and a
+ * question beneath it.
+ */
+export function GoalStepSurface() {
+  return <StepPage map={map} stepId="rates" todoOn={false} />;
+}
+
+/** A sub-step on its own page: Call the card company, under Get the rates lowered. */
+export function GoalSubStepSurface() {
+  return <StepPage map={map} stepId="call" todoOn={false} />;
 }
