@@ -3,7 +3,7 @@
 import { useActionState, useRef, useState } from 'react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { CardSection } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { ComposeBody } from '@/components/ui/field';
@@ -21,15 +21,33 @@ export type ThoughtView = {
 
 const initial: ThoughtState = { error: null };
 
+/**
+ * The career goals entries as one folding section: a composer, then the
+ * entries newest first as rows in one panel (law 13). Folded, its heading
+ * still says when the latest entry was written.
+ */
 export function ThoughtList({ thoughts }: { thoughts: ThoughtView[] }) {
   return (
-    <div className="max-w-3xl space-y-3">
-      {/* With nothing written yet the composer is the page, so it starts open. */}
+    <CardSection
+      fold="jobs.fold.Career goals"
+      title="Career goals"
+      meta={thoughts.length > 0 ? `latest ${thoughts[0].written}` : undefined}
+      hint={
+        thoughts.length === 0
+          ? 'What you want from the next job and where you are now, in your own words. Add a new entry when your thinking changes; the newest one counts.'
+          : undefined
+      }
+    >
+      {/* With nothing written yet the composer is the section, so it starts open. */}
       <Composer startOpen={thoughts.length === 0} />
-      {thoughts.map((thought, index) => (
-        <Entry key={thought.id} thought={thought} latest={index === 0} />
-      ))}
-    </div>
+      {thoughts.length > 0 && (
+        <ul className="mt-2 divide-y divide-border border-t border-border">
+          {thoughts.map((thought, index) => (
+            <Entry key={thought.id} thought={thought} latest={index === 0} />
+          ))}
+        </ul>
+      )}
+    </CardSection>
   );
 }
 
@@ -49,7 +67,7 @@ function Composer({ startOpen }: { startOpen: boolean }) {
   if (!open) return <AddTrigger label="New entry" onClick={() => setOpen(true)} />;
 
   return (
-    <Card>
+    <div className="rounded-control border border-border">
       <form
         ref={form}
         action={add}
@@ -88,15 +106,15 @@ function Composer({ startOpen }: { startOpen: boolean }) {
           </span>
         </div>
       </form>
-    </Card>
+    </div>
   );
 }
 
 function Entry({ thought, latest }: { thought: ThoughtView; latest: boolean }) {
   return (
-    <Card padding="dense">
+    <li className="py-3">
       <header className="flex flex-wrap items-baseline gap-2">
-        <h2 className="text-ui font-medium text-ink">{thought.written}</h2>
+        <h3 className="text-ui font-medium text-ink">{thought.written}</h3>
         {latest && (
           <span className="rounded-full bg-accent-tint px-1.5 py-0.5 text-small text-accent">
             Latest
@@ -119,7 +137,7 @@ function Entry({ thought, latest }: { thought: ThoughtView; latest: boolean }) {
         </ConfirmStep>
       </header>
       <EditableProse
-        className="mt-2"
+        className="mt-1"
         label={`Career goals entry from ${thought.written}`}
         value={thought.body}
         editLabel="Edit this entry"
@@ -128,6 +146,6 @@ function Entry({ thought, latest }: { thought: ThoughtView; latest: boolean }) {
           return result.error;
         }}
       />
-    </Card>
+    </li>
   );
 }

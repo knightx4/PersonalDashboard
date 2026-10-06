@@ -38,21 +38,41 @@ export function LearningTracks({
       <Button type="button" size="sm" variant="secondary" pending={pending} onClick={suggest}>
         {pending ? 'Suggesting…' : suggested.length > 0 ? 'Suggest more' : 'Suggest tracks'}
       </Button>
-      <PaidHint action="app/jobs/(app)/thoughts/actions.ts#suggestTracks" what="Cost of suggesting tracks" align="end" />
+      <PaidHint action="app/jobs/(app)/find/actions.ts#suggestTracks" what="Cost of suggesting tracks" align="end" />
     </span>
   ) : null;
 
   return (
     <CardSection
+      fold="jobs.fold.Learning tracks"
       title="Learning tracks"
-      action={action}
-      hint={
-        hasEntries
-          ? 'Subjects to learn for the job you describe below. Starting one adds it to your Learn goals, and Now in Learn brings you its lessons.'
-          : 'Write a career goals entry and Dash can suggest what to learn for it.'
+      meta={
+        started.length + suggested.length > 0
+          ? [
+              started.length > 0 ? `${started.length} started` : null,
+              suggested.length > 0 ? `${suggested.length} suggested` : null,
+            ]
+              .filter(Boolean)
+              .join(', ')
+          : undefined
       }
     >
-      {message && <p className="mb-2 text-small text-ink-muted">{message}</p>}
+      {/* The button sits in the body, as on the recommended roles and people,
+          so the heading and its counts keep to one line at 390. The line
+          beside it explains the section only while it is empty (law 15). */}
+      <div className="mb-2 flex items-start gap-3">
+        <div className="min-w-0 flex-1 space-y-1">
+          {started.length + suggested.length === 0 && (
+            <p className="text-small text-ink-muted">
+              {hasEntries
+                ? 'Subjects to learn for the job your career goals describe. Starting one adds it to your Learn goals, and Now in Learn brings you its lessons.'
+                : 'Write a career goals entry and Dash can suggest what to learn for it.'}
+            </p>
+          )}
+          {message && <p className="text-small text-ink-muted">{message}</p>}
+        </div>
+        {action}
+      </div>
 
       {started.length > 0 && (
         <ul className="divide-y divide-border">
@@ -115,7 +135,7 @@ function SuggestedRow({ track }: { track: SuggestedTrackView }) {
         <Button type="button" size="sm" pending={pending} onClick={() => answer(startTrack)}>
           Start track
         </Button>
-        <PaidHint action="app/jobs/(app)/thoughts/actions.ts#startTrack" what="Cost of starting the track" />
+        <PaidHint action="app/jobs/(app)/find/actions.ts#startTrack" what="Cost of starting the track" />
         <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => answer(dismissTrack)}>
           Not now
         </Button>

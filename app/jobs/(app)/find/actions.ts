@@ -36,7 +36,7 @@ export async function addThought(_prev: ThoughtState, form: FormData): Promise<T
   const { error } = await supabase.from('thoughts').insert({ user_id: user.id, body: body.trim() });
   if (error) return { error: error.message };
 
-  revalidatePath('/jobs/thoughts');
+  revalidatePath('/jobs/find');
   return { error: null };
 }
 
@@ -54,7 +54,7 @@ export async function updateThought(id: string, body: string): Promise<{ error: 
     .eq('user_id', user.id);
   if (error) return { error: error.message };
 
-  revalidatePath('/jobs/thoughts');
+  revalidatePath('/jobs/find');
   return { error: null };
 }
 
@@ -65,7 +65,7 @@ export async function deleteThought(id: string): Promise<{ error: string | null 
   const { error } = await supabase.from('thoughts').delete().eq('id', id).eq('user_id', user.id);
   if (error) return { error: error.message };
 
-  revalidatePath('/jobs/thoughts');
+  revalidatePath('/jobs/find');
   return { error: null };
 }
 
@@ -148,7 +148,7 @@ export async function suggestTracks(): Promise<TrackActionState> {
     else if (error.code !== '23505') console.error('[jobs learning tracks] insert', error.message);
   }
 
-  revalidatePath('/jobs/thoughts');
+  revalidatePath('/jobs/find');
   if (added === 0) return { error: null, message: 'Nothing new to suggest from what you have written so far.' };
   return { error: null };
 }
@@ -195,7 +195,7 @@ export async function startTrack(id: string): Promise<TrackActionState> {
     await giveAimsTracks(learn, user.id);
   });
 
-  revalidatePath('/jobs/thoughts');
+  revalidatePath('/jobs/find');
   revalidatePath('/goals', 'layout');
   return { error: null };
 }
@@ -215,6 +215,41 @@ export async function dismissTrack(id: string): Promise<TrackActionState> {
     .eq('status', 'proposed');
   if (error) return { error: 'That could not be saved. Try again.' };
 
-  revalidatePath('/jobs/thoughts');
+  revalidatePath('/jobs/find');
   return { error: null };
+}
+
+export interface AimState {
+  error?: string;
+}
+
+const aimSchema = z.object({
+  field: z.enum(['targetTitles', 'excludedIndustries']),
+  value: z.string().trim().max(2000, 'Keep the list under 2,000 characters.'),
+});
+
+/**
+ * Target titles or the industries never to suggest, saved from the field on
+ * Find where they are shown (law 12). Both are comma lists on the profile; the
+ * classifier and the scores read the titles, the searches leave out the
+ * industries.
+ */
+// latency: pending -- saves one value where it is shown
+export async function saveAim(_prev: AimState, form: FormData): Promise<AimState> {
+  const parsed = aimSchema.safeParse({ field: form.get('field'), value: form.get('value') ?? '' });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const list = parsed.data.value
+    .split(/[,\n]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  const patch =
+    parsed.data.field === 'targetTitles' ? { target_titles: list } : { excluded_industries: list };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.from('profiles').update(patch).eq('id', user.id);
+  if (error) return { error: error.message };
+  revalidatePath('/jobs/find');
+  return {};
 }

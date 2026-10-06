@@ -86,9 +86,10 @@ export const NAV_ICONS = {
   answers: MessageSquareText,
   analytics: BarChart3,
   activity: Activity,
-  // Career goals: which way you are heading, so the compass. Not Target,
-  // which is Learn's Goals tab, and not Flag, which is the Goals workspace.
-  careerGoals: Compass,
+  // Find: which way the search is heading and what turned up along it, so
+  // the compass it had as Career goals. Not Target, which is Learn's Goals
+  // tab, and not Flag, which is the Goals workspace.
+  find: Compass,
   // Dev
   bugs: Bug,
   raised: MessageCircleQuestion,
