@@ -110,7 +110,12 @@ import {
   PlanTreeSurface,
   ProjectPlanSurface,
 } from './plan-surfaces';
-import { GoalOpenedSurface, GoalTreeSurface } from './goal-surfaces';
+import {
+  GoalOpenedSurface,
+  GoalStepSurface,
+  GoalSubStepSurface,
+  GoalTreeSurface,
+} from './goal-surfaces';
 import {
   AskChangesSurface,
   AskDashSurface,
@@ -2664,6 +2669,23 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalOpenedSurface />,
+  },
+  {
+    /* A step on its own page (plan #1620): the row from the goal page,
+     * opened, with its sub-steps beneath. */
+    id: 'goals-step',
+    label: 'Goal · a step on its own page',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalStepSurface />,
+  },
+  {
+    /* A sub-step on its own page, naming the step it sits under. */
+    id: 'goals-substep',
+    label: 'Goal · a sub-step on its own page',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalSubStepSurface />,
   },
   {
     /* The Goals home on an ordinary week (plans #1043, #1077): Dash's card

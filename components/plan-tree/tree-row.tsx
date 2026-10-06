@@ -203,7 +203,14 @@ export function TreeRow<E extends TreeCatalogEntry>({
   renderChild,
   layout = 'grid',
   after,
+  heading = false,
 }: {
+  /**
+   * The row is what its page is about (a goal step's own page, plan #1620):
+   * the title is the page's heading rather than a fold, since the page is the
+   * step opened, and the status control and menu stay beside it.
+   */
+  heading?: boolean;
   /**
    * `grid` is the dev plan's row: the shared columns under a header, with the
    * outline number, health word, move, priority and count of what is beneath.
@@ -349,7 +356,9 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // opens straight to its panel. A row that starts open, or is opened by a
   // link to it, shows its details, since that is what was asked for.
   const [detailsShown, setDetailsShown] = useState(open);
-  const condensable = hasChildren && showChildren;
+  // On the step's own page the details are what the page is for, so they
+  // do not fold.
+  const condensable = hasChildren && showChildren && !heading;
 
   // A link to this row by its own id (a goal step from the Goals home, or
   // from Go to the step under a finding) opens its panel as well as scrolling
@@ -440,7 +449,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
 
           {/* The fold, where there is something beneath to fold. A spacer
               where there is not, so the titles at one depth line up. */}
-          {hasChildren || foldableFog ? (
+          {heading ? null : hasChildren || foldableFog ? (
             <button
               type="button"
               onClick={toggle}
@@ -501,6 +510,16 @@ export function TreeRow<E extends TreeCatalogEntry>({
               where the page gives the title an editor. */}
           {row.editing && titleEditor ? (
             <div className="min-w-0 flex-1 self-center">{titleEditor}</div>
+          ) : heading ? (
+            <h1 className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1 self-center pl-1 font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
+              <span className={cn(node.status === 'dropped' && 'text-ink-muted line-through')}>
+                {node.title}
+              </span>
+              <span className="inline-flex items-center gap-1.5 font-sans text-ui font-normal tracking-normal">
+                <CommentCount count={node.thread.length} />
+                {marks}
+              </span>
+            </h1>
           ) : (
             <button
               type="button"
@@ -625,7 +644,8 @@ export function TreeRow<E extends TreeCatalogEntry>({
             nothing here to pick. Changing it means handing the step over or
             answering what it asks, which are the buttons already on the row. */}
         {list ? (
-          priority && (
+          priority &&
+          !heading && (
             <span className="hidden max-w-48 shrink-0 pt-1.5 text-right text-small sm:block">
               {priority}
             </span>
@@ -699,8 +719,15 @@ export function TreeRow<E extends TreeCatalogEntry>({
           // rows at the next indent, which made opening a step look like
           // unfolding one more level of the tree -- the same gesture and the
           // same shape for two different meanings.
-          <li style={inset} className="pb-3 pr-3">
-            <div className="space-y-3 border-l-2 border-accent bg-canvas px-3 py-2.5">
+          // On the step's own page the panel is the page, so it has no edge of
+          // its own and lines up with the heading (plan #1620).
+          <li style={heading ? { paddingLeft: '0.75rem' } : inset} className="pb-3 pr-3">
+            <div
+              className={cn(
+                'space-y-3',
+                heading ? 'py-1' : 'border-l-2 border-accent bg-canvas px-3 py-2.5',
+              )}
+            >
               {condensable && (
                 <button
                   type="button"
@@ -790,6 +817,8 @@ export function TreeRow<E extends TreeCatalogEntry>({
                       type="button"
                       size="sm"
                       variant="ghost"
+                      // On the step's own page its words line up with the text above.
+                      className={heading ? '-ml-2.5' : undefined}
                       onClick={() => row.setEditing(true)}
                     >
                       {titleEditor ? 'Rename' : 'Edit'}

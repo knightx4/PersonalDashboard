@@ -106,59 +106,7 @@ export function StepTree({
 }) {
   const [showAside, setShowAside] = useState(false);
   const aside = countAside(map.steps);
-  // While a step's run is going, read the page again now and then, so its
-  // row moves on to what the run is on now and then to how it ended.
-  const router = useRouter();
-  const anyRunning = Object.values(runs).some((run) => run.running !== null);
-  useEffect(() => {
-    if (!anyRunning) return;
-    const timer = setInterval(() => router.refresh(), RUN_POLL_MS);
-    return () => clearInterval(timer);
-  }, [anyRunning, router]);
-
-  const stages = useMemo(
-    () => (given === undefined ? goalStages(map.steps) : given),
-    [given, map.steps],
-  );
-
-  const { own, linked, context } = useMemo(() => {
-    const trees = [map.steps, ...map.linked.map((entry) => [entry.step])];
-    const numbers = numberSteps(trees);
-    const outlines = outlineSteps(trees);
-    const options = { numbers, outlines, threads: map.threads, showAside };
-    const preps = stepPreps(trees);
-    const context: GoalRowContext = {
-      goalTitle: map.goal.title,
-      todoOn,
-      rhythms: map.rhythms,
-      information: map.information,
-      answers: map.answers,
-      linksOf: map.linksOf,
-      otherGoals: map.otherGoals,
-      catalog: goalCatalog(map.steps, numbers, outlines),
-      unfolded,
-      opened,
-      informationSeam,
-      runs,
-      files,
-      progress,
-      progressBeneath: latestBeneath(trees.flat(), progress),
-      arrivals: new Set(arrivals),
-      canRun,
-      ...preps,
-      // A prep step's result is read on the step it prepares.
-      readElsewhere: new Set(Object.keys(preps.targetOf)),
-    };
-    return {
-      own: goalRows(map.steps, options),
-      linked: map.linked.flatMap((entry) => {
-        const row = goalRows([entry.step], options).rows[0];
-        return row ? [{ entry, row }] : [];
-      }),
-      context,
-    };
-  }, [
-    map,
+  const { own, linked, context } = useGoalRows(map, {
     todoOn,
     showAside,
     unfolded,
@@ -169,7 +117,12 @@ export function StepTree({
     progress,
     arrivals,
     canRun,
-  ]);
+  });
+
+  const stages = useMemo(
+    () => (given === undefined ? goalStages(map.steps) : given),
+    [given, map.steps],
+  );
 
   const now = useMemo(() => nowStages(stages, map.steps), [stages, map.steps]);
   const stageOf = new Map((stages ?? []).map((stage) => [stage.id, stage]));
@@ -313,4 +266,96 @@ export function StepTree({
       )}
     </div>
   );
+}
+
+/**
+ * A goal's steps as rows, and what every row on the page shares: the goal
+ * page's tree and a step's own page (plan #1620) draw the same rows from
+ * this. While a step's run is going it reads the page again now and then,
+ * so the row moves on to what the run is on now and then to how it ended.
+ */
+export function useGoalRows(
+  map: GoalMap,
+  {
+    todoOn,
+    showAside = false,
+    unfolded,
+    opened = false,
+    informationSeam,
+    runs = NO_RUNS,
+    files = NO_FILES,
+    progress = NO_PROGRESS,
+    arrivals = NO_ARRIVALS,
+    canRun = true,
+  }: {
+    todoOn: boolean;
+    showAside?: boolean;
+    unfolded: boolean;
+    opened?: boolean;
+    informationSeam?: InformationSeam;
+    runs?: Record<string, StepRunView>;
+    files?: Record<string, LinkedFile[]>;
+    progress?: Record<string, ItemProgress>;
+    arrivals?: readonly string[];
+    canRun?: boolean;
+  },
+) {
+  const router = useRouter();
+  const anyRunning = Object.values(runs).some((run) => run.running !== null);
+  useEffect(() => {
+    if (!anyRunning) return;
+    const timer = setInterval(() => router.refresh(), RUN_POLL_MS);
+    return () => clearInterval(timer);
+  }, [anyRunning, router]);
+
+  return useMemo(() => {
+    const trees = [map.steps, ...map.linked.map((entry) => [entry.step])];
+    const numbers = numberSteps(trees);
+    const outlines = outlineSteps(trees);
+    const options = { numbers, outlines, threads: map.threads, showAside };
+    const preps = stepPreps(trees);
+    const context: GoalRowContext = {
+      goalId: map.goal.id,
+      goalTitle: map.goal.title,
+      todoOn,
+      rhythms: map.rhythms,
+      information: map.information,
+      answers: map.answers,
+      linksOf: map.linksOf,
+      otherGoals: map.otherGoals,
+      catalog: goalCatalog(map.steps, numbers, outlines),
+      unfolded,
+      opened,
+      informationSeam,
+      runs,
+      files,
+      progress,
+      progressBeneath: latestBeneath(trees.flat(), progress),
+      arrivals: new Set(arrivals),
+      canRun,
+      ...preps,
+      // A prep step's result is read on the step it prepares.
+      readElsewhere: new Set(Object.keys(preps.targetOf)),
+    };
+    return {
+      own: goalRows(map.steps, options),
+      linked: map.linked.flatMap((entry) => {
+        const row = goalRows([entry.step], options).rows[0];
+        return row ? [{ entry, row }] : [];
+      }),
+      context,
+    };
+  }, [
+    map,
+    todoOn,
+    showAside,
+    unfolded,
+    opened,
+    informationSeam,
+    runs,
+    files,
+    progress,
+    arrivals,
+    canRun,
+  ]);
 }
