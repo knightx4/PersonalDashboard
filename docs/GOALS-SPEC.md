@@ -26,8 +26,11 @@ Each level has one test, and a thing that fails it belongs at another level.
 
 **Areas** are directions that never finish, named as nouns: Money, Career,
 The city, Relationships, Health. An area has no done-when. It holds a
-sentence of what you want from it (its note), the goals that serve it, and
-its own page (`/goals/area/<id>`). A name that reads as an outcome, such as
+sentence of what you want from it (its note) and the goals that serve it. It
+has no page of its own: it is a section of All goals (`/goals/all#area-<id>`),
+which lists its goals, the goals Dash proposed for it and its rhythms, and
+edits them there. The old area page, `/goals/area/<id>`, redirects to that
+section. A name that reads as an outcome, such as
 "Get a job", is a goal in the wrong place: it ends, so it goes under an area
 as a goal (Career, then *Land your next role*).
 
@@ -88,13 +91,47 @@ event a week* inside *Know ten people in the scene by name*, *send five
 applications a week* inside the applying stage of *Land your next role*,
 *log each balance monthly* inside *Pay off student debt*. A rhythm has a
 target count per period, and progress on it is whether the recent periods
-were kept. It never shows as done. An area's page lists the practices of all
-its goals together, with this period's progress.
+were kept. It never shows as done. Each area's section on All goals lists
+the rhythms of all its goals under **Rhythms**, with this period's progress.
 
 Todo has no repeating tasks today (`lib/todo/tasks/model.ts` has no
 recurrence), so the rhythm lives in Goals and shows on Todo through the agenda
 source described below, as an item for the current period until that period's
 count is met.
+
+A rhythm is counted by hand (Count one on the step, a tick on Todo, or a
+sentence in the capture box) unless it names a source its count is read from
+(goals migration 0069, `lib/goals/rhythm-sources.ts`). The person's first ten
+closed periods had nine missed, mostly because nothing was logged, while the
+work was already on record in Jobs or the calendar. The sources are:
+
+- **Applications sent in Jobs**: `job_search.applications` by the day
+  `submitted_at` falls on in the person's zone. *Send 5 applications* counts
+  this way.
+- **Matching calendar events**: events typed in Todo (`todo.events`) or read
+  from a subscribed feed (`todo.feed_events`) whose title contains the
+  rhythm's match text, ignoring case, by the day they start. Alternatives are
+  separated by `|`: `urbanism|community board` counts a "Community Board 6"
+  meeting. An event counts once its day has come.
+
+X posts are not a source: `public.social_posts` holds drafts about building
+this app, and none is marked posted, so nothing records what was published.
+
+For a rhythm with a source, the period's count is what the source says.
+Count one and Take one back are not offered, Todo shows the item without a
+tick, and capture does not count towards it: the model is told the rhythm
+counts itself and a count move on it is refused, so the same application is
+never counted twice. The rhythm's line says where the count comes from: "2 of
+5 this week · from Jobs". The source is set on the step's edit form under
+**Counts itself from**, with the match text beside it for the calendar.
+
+Periods are synced whenever a page reads the rhythms, and also each morning
+by the daily cron (`inngest/goals/rhythms.ts`), so a period ends as kept or
+missed on its last day even when no page is opened. The sync reads each
+source once over the periods it touches, writes the count onto the open
+period, and closes an ended one on the source's count. It reads the period
+just closed again too, so an application entered a day late still counts
+towards last week until this week ends. Running it twice writes nothing new.
 
 ### Steps for later
 
@@ -147,7 +184,7 @@ sentence on why it serves the area, and one first move beneath it.
 
 The goals arrive as proposals. You approve the ones that fit on each goal's
 page and archive the rest, and turning one down is how you tell Claude which
-reading of the area you meant. **Work on this** on an approved goal then maps
+reading of the area you meant. **Ask Dash** on an approved goal then maps
 it in full. Once the area has goals, the button reads **Plan what is
 missing** and proposes only what the existing goals leave out, never
 something you turned down. The rules for the run are in
@@ -159,14 +196,14 @@ An errand is a one-off job with a date, such as finding a birthday present or
 booking a car service. It is a goal with `errand` set and a `due_on`, and the
 database refuses an errand without the date.
 
-**Add an errand** on the Goals home takes what the job is, the date it is due
+**A new errand**, as the target of Ask Dash on the Goals home, takes what the job is, the date it is due
 by and the area it goes in, which starts on the area of the soonest errand
 (or the first area). One press saves it and starts a goal run whose brief says
 it is an errand and when it is due, so Dash maps it as the goals skill's "An
 errand" says: three to five steps with no stages, its own research worked in
 the same run, and no weekly help. If the run cannot start, because no goals
 routine is set or the fire fails, the errand is still saved and the message
-says why Dash did not start; **Work on this** on its page tries again.
+says why Dash did not start; **Ask Dash** on its page tries again.
 
 The home lists open errands under **Errands**, above the areas, soonest due
 first, each with its date. An errand is not listed under its area as well.
@@ -176,9 +213,9 @@ track and weekly help. The goal's menu turns any goal into an errand or back.
 **Hand to Dash** on a Todo task makes the same errand from the task (plan
 #1263): its title, its notes as the errand's detail, the area you pick and the
 due date, which starts on the task's own. The save and the run are one helper,
-`saveErrandAndStart` in `lib/goals/errand-store.ts`, which Add an errand calls
+`saveErrandAndStart` in `lib/goals/errand-store.ts`, which Ask Dash calls
 too, so the two cannot drift. The task is ticked off and links to the errand.
-Every other start of a goal run (Work on this, the overnight map, an answered
+Every other start of a goal run (Ask Dash, the overnight map, an answered
 flag and a comment to Dash) briefs an errand as an errand.
 
 ## Approval
@@ -202,7 +239,7 @@ What waits on you:
   approve that step. The database refuses Claude writing such a step in any
   other status, opening one, or changing what a live step does.
   Dash may not notice that a step acts, so the app checks as well (plan
-  #1183): before a goals run starts, and when you press Work on this or Send,
+  #1183): before a goals run starts, and when you press Ask Dash,
   Jev is asked about every open Claude step with no sentence. A step it gives
   a yes of 0.3 or more goes back to proposed with a sentence Haiku writes,
   through `goals.hold_acting_step` (`migrations-goals/0058`), which writes it
@@ -239,7 +276,7 @@ No step of yours sits for more than a week without a move (plan #1083). The
 morning brief lists each open step of yours that nothing has touched in seven
 days (its row unchanged, nothing added or changed beneath it, no comment from
 you), and the run gives each one move: it splits the step into smaller
-sub-steps, prepares it as **Prepare** would, or adds a question beside it
+sub-steps, prepares it as **Ask Dash** would, or adds a question beside it
 asking whether you still want it and makes the step wait on that question.
 Each is an ordinary change on the Goals home with an Undo. If you answer that
 you no longer want it, the re-shape run drops the step with `dropped_on`
@@ -250,8 +287,9 @@ on your answer to Y", and its Undo reopens the step.
 Closing a whole goal stays yours (plan #1084). When the morning run reads a
 goal's done-when as met, its status for the day is `met`, with a short
 summary of how it got there, and Today offers **Close goal** with it. A goal
-with nothing done in three weeks (no step closed as done, no reading logged)
-is offered **Park goal**: a parked goal keeps its steps and leaves the home,
+with nothing done in three weeks (no step closed as done, no reading, no
+progress entry, nothing counted towards a rhythm and no confirmed record in
+its collections) is offered **Park goal**: a parked goal keeps its steps and leaves the home,
 Todo and the runs until you press **Take it back up** on the All goals page.
 Both offers carry a quiet **Keep it open**, which records `kept_open_at` on
 the goal: a met status older than that is not offered again, and the three
@@ -269,7 +307,7 @@ Goals links to it:
 
 - **Learn.** Each learning goal (a row in Learn's `aims` table) is a goal in
   the Learn area here (plan #1490), and Learn has no Goals tab of its own:
-  `/learn/goals` redirects to that area, and Subjects links to it (plan
+  `/learn/goals` redirects to that area's section on All goals, and Subjects links to it (plan
   #1491). The goal owns the wording; how well you want to know it, its plan
   and a way to practise it sit in a Learning section on the goal's page, and
   the Level 3 goal is one press on Subjects. A goal elsewhere can still link
@@ -507,9 +545,11 @@ what is logged and the next piece to do. A step whose tally has reached its
 estimated total, or that has no total and was last answered "Nearly done", is
 listed for an offer to close it in the same notes. Dash never closes it on
 the tally, since the total is an estimate; it closes only on evidence, as any
-step of the person's. A step under way is left out of the list of steps
-untouched for a week, so it gets the nudge rather than a split, a prep or a
-question. The rules are in `lib/goals/progress-nudges.ts`.
+step of the person's. A step under way, one with a progress entry that was not undone, is left
+out of the list of steps untouched for a week (`staleSteps` in
+`lib/goals/stale-steps.ts`), so it gets the nudge rather than a split, a prep
+or a question. An entry on a sub-step also counts as a touch on the steps
+above it. The rules are in `lib/goals/progress-nudges.ts`.
 
 ## What Claude does, and when
 
@@ -523,7 +563,10 @@ the same allowance. So Goals runs on a schedule rather than on every change:
   with one sentence on why, the next move and its date. A met goal's reason
   is a summary of how it got there, and it is the proposal to close it
   ("Approval" above). A goal with nothing done in three weeks
-  reads stalled, and its next move is added as a step (plan #1018). Before
+  reads stalled, and its next move is added as a step (plan #1018). Done
+  means the same as for Park goal: a step closed as done, a reading, a
+  progress entry, a rhythm period with something counted, or a confirmed
+  record (`goalActivity` in `lib/goals/reviews.ts`). Before
   the verdicts, each step of yours untouched for a week gets a move (plan
   #1083, "Approval" above). The
   same run then works up to ten ready `claude` steps (`DAILY_STEP_LIMIT` in
@@ -544,10 +587,10 @@ the same allowance. So Goals runs on a schedule rather than on every change:
   counts as yes; the brief reads the answer beside the reaction (plan #1020). Sources such as Eventbrite,
   Meetup and org newsletters vary in how reachable and current they are, so
   the first few weeks will be uneven and should improve with the feedback.
-- **On request.** A **Work on this** button on a goal fires one run for it,
-  and **Plan this area** on an area fires one run proposing its goals. One
-  step or phase can be sent on its own, and one of your steps can be
-  prepared, as described in "Claude's own work" below.
+- **On request.** **Ask Dash** on a goal fires one run for it, and **Plan
+  this area** on an area fires one run proposing its goals. The same **Ask
+  Dash** on a step works that step or phase on its own, or prepares one of
+  your steps, as described in "Claude's own work" below.
 - **After an answer.** Answering a question on a goal fires one run for that
   goal once ten minutes pass with no further answer, so several answers in
   one sitting cost one run. It settles the provisional steps the answers
@@ -560,12 +603,29 @@ overnight runner works Claude steps while you sleep. Every way in goes
 through one hand-over, `sendGoalStep` in `lib/goals/handover-store.ts`, so
 each refuses the same things and writes the same run row and brief.
 
+### Ask Dash
+
+Every step Dash can help with has one control, **Ask Dash**, in the row's
+menu, as the row's quick button and in the opened row, and the goal has the
+same control in its Dash panel. The code picks the job, through `askDash` in
+`lib/goals/handover.ts`:
+
+- a Claude step with nothing under it is sent (job `step`);
+- a step with sub-steps is a phase, whoever's it is (job `phase`);
+- one of your steps with no sub-steps is prepared (job `prepare`), and the
+  button reads **Ask Dash again** once it has a result;
+- the goal itself gets a goal run (job `goal`).
+
+A question and a rhythm have nothing to ask for, so they do not offer it. An
+`@dash` comment taking a step chooses through the same function. The opened
+row has a box beside the button for what you want; what you write goes into
+the brief under "What they wrote", as a comment's words do. While the run
+goes the row reads "Dash is on it".
+
 ### Sending a step or a phase
 
-A Claude step with nothing under it has **Send to Claude** on its row. A step
-with sub-steps is a phase, whoever's it is, and has **Send this phase to
-Claude**. Pressing either writes a `goals.runs` row with job `step` or
-`phase` and `item_id` on the step, then fires the goals routine with a brief
+Ask Dash on a Claude step or a phase writes a `goals.runs` row with job
+`step` or `phase` and `item_id` on the step, then fires the goals routine with a brief
 that names the step first, followed by its goal, where it sits, the steps
 beside it, a phase's own steps and the collections the goal fills.
 
@@ -590,9 +650,9 @@ with the reason shown on the row, when:
 
 ### Preparing one of your steps
 
-One of your steps with no sub-steps, such as calling a servicer or sending an
-application, has **Ask Claude to prepare this**, and **Prepare it again** once
-it has a result. A rhythm is yours too, but it repeats, so it is not offered.
+Ask Dash on one of your steps with no sub-steps, such as calling a servicer
+or sending an application, prepares it. A rhythm is yours too, but it
+repeats, so it is not offered.
 The run has job `prepare`. Claude writes what you need to do the step: a
 draft email, a call script or numbered instructions, naming the real
 servicer, account and amounts from the goal's collections and your email. It
@@ -614,7 +674,7 @@ before an application and a shortlist of firms before a round of calls;
 clearing the couch gets nothing. The prep step is not a dependency, so your
 step never waits on it. Your step's `prep_checked_at` records that it was
 judged, whether or not a prep step went in. A phase, a step already prepared
-with **Prepare**, and a step whose Claude sibling already covers it get
+with **Ask Dash**, and a step whose Claude sibling already covers it get
 none. A step you add on the page is judged by the next morning run, and the
 morning run works the prep steps it added that same morning within its ten
 steps. The rules and examples are in the goals skill, "A Dash step before
@@ -626,15 +686,15 @@ The `@dash` reply on a step (`lib/goals/ask.ts`) runs on Dash's shared loop,
 with Ask Dash's lookups and writes. Beside answering, it can file facts as
 drafts, date the step or put it on Todo, pass the comment to the goals
 routine, or take the step. When it takes the step, `commentMode` picks the
-job: a step of yours with no sub-steps is prepared, and anything else is
-sent (`lib/goals/ask.ts`). The comment goes into the brief under "What they
+job from `askDash`, as the Ask Dash control does: a step of yours with no
+sub-steps is prepared, and anything else is sent. The comment goes into the brief under "What they
 wrote", and the run treats what it says about the result, such as shorter or
 addressed to someone, as part of the step's done-when.
 
 The reply in the thread says what happened, including a refusal ("I did not
 start it: …" with the reason). On the goal itself there is no single step to
 take, so a comment asking Claude to work on the goal fires the whole-goal run
-(job `goal`), as **Work on this** does.
+(job `goal`), as **Ask Dash** on the goal does.
 
 ### Progress while a run goes
 
@@ -652,7 +712,7 @@ A run with no report for 45 minutes (`RUN_QUIET_MS` in
 `inngest/goals/quiet-runs.ts` closes each one as failed, with the step it was
 last on in the error. It runs on the overnight clock, which pg_cron calls
 every four minutes all day, and in the daily cron, so a dead run is closed
-within the hour and **Work on this** and **Send** work again. This replaced a
+within the hour and **Ask Dash** works again. This replaced a
 flat two hours in which any started run held its goal.
 
 ### The night run
@@ -670,7 +730,7 @@ runs after the feature half:
   without progress, then page order. It takes one step per goal, and skips a
   goal that already has a run going and a step whose last two runs failed or
   never reported back.
-- The first step is sent through `sendGoalStep`, as Send would send it. A
+- The first step is sent through `sendGoalStep`, as Ask Dash would send it. A
   step the hand-over refuses is passed over for the next one, and a fire that
   fails ends the tick.
 
@@ -722,6 +782,28 @@ The full tree for a goal is one tap away and is for when you want to look at
 the map, usually on a laptop. It is not the default because a tree of eighty
 steps is too much to read every morning.
 
+### Tiles, Ask Dash and the tabs
+
+Each goal on the home is a tile, and pressing it opens the goal. The lanes
+(On you, Dash has it, Later) always show every goal; a goal's own page is
+where to look at one goal alone.
+
+Ask Dash, under the briefing, sends its words where a chip says: to a goal,
+as an @dash comment on it; to **A new errand** (Errands, above); or to **A
+new goal**, as the title of a goal in the area chosen, which starts on the
+first area. A new goal is saved approved, as any goal you add is, and a goal
+run starts in the same press (`saveGoalAndStart` in
+`lib/goals/errand-store.ts`). The title is checked by `parseGoalFields`, the
+rule the composer on All goals uses, so a rate or a streak is refused here
+too. If the run cannot start, the goal is still saved and the message says
+why.
+
+Goals has two tabs, Home and All goals. Runs (`/goals/runs`) is linked as
+**Every run** beside What Dash did on the home. Files (`/goals/files`) is
+linked from the top of All goals and from the Files list in a goal's
+Details. A goal page's back link names its area and opens that area's
+section on All goals.
+
 ### Coming back after time away
 
 After a gap, missed items collapse rather than pile up. Overdue `mine` steps
@@ -731,9 +813,11 @@ point is that opening the app after a busy fortnight should not feel like a
 debt.
 
 After five or more days since the last visit, the home opens with a catch-up
-for the rest of that day: what Dash did while you were away (the list below),
-what is waiting on you, and one next step per goal, with everything else
-folded under it. The last visit is kept in `goals.visits`.
+for the rest of that day. The briefing says how many days you were away,
+what Dash did while you were gone (the list below) moves up under it, ahead
+of the lanes, and the week's numbers are left out. On you already holds what
+is waiting and each goal's next step, so the catch-up has no list of its
+own. The last visit is kept in `goals.visits`.
 
 ### Since your last visit
 
@@ -1074,7 +1158,8 @@ A sketch for the migration, not the migration itself.
   whether it needs a prep step; plan #1215), `errand` (on a goal, that it
   is a one-off job with a date it is due by; an errand always has `due_on`,
   and a step is never one; plan #1261), `position`, and `rhythm_count` with
-  `rhythm_period` for rhythms. A goal's status can also be `parked`. A goal's
+  `rhythm_period` for rhythms, with `count_source` and `count_match` on a
+  rhythm that counts itself ("Rhythms" above; migration 0069). A goal's status can also be `parked`. A goal's
   `help_kinds` lists the weekly help it asks for, each an entry of `kind`
   (events, volunteering, reading, courses or job_leads) and a `note` on what
   to look for (plan #1027). When Claude maps a goal it proposes kinds in

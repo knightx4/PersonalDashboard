@@ -128,8 +128,8 @@ describe('goalRunRows', () => {
     );
     expect(rows.map((r) => [r.id, r.label, r.text])).toEqual([
       ['third', 'After your answers', 'Asked which card.'],
-      ['second', 'Work on this', 'Added two steps.'],
-      ['first', 'Work on this', 'Mapped it.'],
+      ['second', 'Asked Dash about the goal', 'Added two steps.'],
+      ['first', 'Asked Dash about the goal', 'Mapped it.'],
     ]);
     expect(rows[0].meta).toContain('Finished');
     expect(rows[0].meta).toContain('took 12 min');

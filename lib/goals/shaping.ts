@@ -2,7 +2,7 @@
  * Claude shaping a goal, and approving what it proposed (docs/GOALS-SPEC.md,
  * "Fog and refining a goal" and "Approval"; plan #932).
  *
- * "Work on this" on a goal fires the goals routine for that goal. The session
+ * Ask Dash on a goal fires the goals routine for that goal. The session
  * follows .claude/skills/goals: it maps the whole path for the goal (phases,
  * Claude steps, information steps pre-filled from Gmail, provisional steps,
  * choices made with judgement, a question only where it cannot decide), proposed until you approve the goal;
@@ -325,7 +325,7 @@ export function approvalLine(input: {
   }
   if (input.nothingOpen && input.goalStatus === 'open') {
     return {
-      text: 'Every step on this goal is finished, and the goal is not done yet. Work on this and Dash will lay out what comes next.',
+      text: 'Every step on this goal is finished, and the goal is not done yet. Ask Dash and it will lay out what comes next.',
       approve: null,
     };
   }

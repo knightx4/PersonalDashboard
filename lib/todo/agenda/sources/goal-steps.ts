@@ -99,8 +99,10 @@ export const goalStepsSource: AgendaSource = {
       at: null,
       link: { href: `/goals/${rhythm.goalId}`, label: rhythm.goalTitle },
       action: null,
-      detail: progressLine(rhythm.period, rhythm),
-      completable: true,
+      detail: progressLine(rhythm.period, rhythm, rhythm.source?.kind),
+      // A rhythm that counts itself from Jobs or the calendar is kept by
+      // doing the thing, not by ticking it here.
+      completable: !rhythm.source,
     }));
 
     const questionItems: AgendaItem[] = questions.map((question) => {

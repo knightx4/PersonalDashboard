@@ -1,8 +1,10 @@
+import Link from 'next/link';
 import { Flag } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
 import { Card } from '@/components/ui/card';
 import { DashMark } from '@/components/ui/dash-mark';
 import { EmptyState } from '@/components/ui/empty-state';
+import { daysAway } from '@/lib/goals/catch-up';
 import { formatInstant } from '@/lib/goals/dates';
 import type { DoneSince } from '@/lib/goals/done-since';
 import type { DashOffer, GoalHolders } from '@/lib/goals/hand-off';
@@ -26,21 +28,25 @@ import { DashCredit } from '@/components/ui/dash-mark';
  *
  * 1. The briefing: Dash's morning note on all the goals (goals.briefs), with
  *    one sentence on where the goals stand under it, and Ask Dash, which
- *    goes to a goal or starts a new errand (ask-dash.tsx). Before the first
- *    note is written, the sentence stands alone.
- * 2. Your goals and the lanes (goal-lanes.tsx): every goal as a small tile,
- *    and what is next sorted into On you, Dash has it, and Later. A tile
- *    filters the lanes to its goal.
+ *    goes to a goal or starts a new goal or errand (ask-dash.tsx). Before
+ *    the first note is written, the sentence stands alone.
+ * 2. Your goals and the lanes (goal-lanes.tsx): every goal as a small tile
+ *    that opens it, and what is next sorted into On you, Dash has it, and
+ *    Later.
  * 3. What Dash did since your last visit, with Read and Undo
- *    (done-since-list.tsx).
+ *    (done-since-list.tsx), and the link to every run.
  * 4. This week: four numbers that say whether Goals is working (plan #1079),
  *    counted by weekHealth in lib/goals/home.ts.
+ *
+ * The day you come back after five or more days away (lib/goals/catch-up.ts),
+ * the briefing says how long you were gone, What Dash did moves up under it,
+ * and This week is left out.
  *
  * What the old home listed in its own sections is reached from these: the
  * steps of yours, questions, approvals, flags, rhythms and suggestions are
  * all in On you; results to read, the context and drafts Dash found, and the
  * Claude steps waiting on an approval are on each goal's page; every run is
- * on the Runs tab.
+ * on /goals/runs, linked from What Dash did.
  */
 
 export type HomeViewProps = {
@@ -58,7 +64,7 @@ export type HomeViewProps = {
   /** The week's four numbers; null when they could not be read. */
   health: WeekHealth | null;
   /** Your live areas, for the area an errand goes in; none when they could not be read. */
-  areas?: { id: string; name: string }[];
+  areas?: { id: string; name: string; learn?: boolean }[];
   /** Each goal's holders by goal id (lib/goals/hand-off.ts). */
   holders?: Record<string, GoalHolders>;
   /** The runs going now. */
@@ -71,6 +77,10 @@ export type HomeViewProps = {
   dash?: DashLaneItem[];
   /** The Later lane. */
   laterOn?: LaterLaneItem[];
+  /** Whether this account can start a run (the owner's only), which Ask Dash needs. */
+  canRun?: boolean;
+  /** The visit before the time away, on the day you came back from it; otherwise null. */
+  awayFrom?: string | null;
 };
 
 export function HomeView({
@@ -89,6 +99,8 @@ export function HomeView({
   preparable = [],
   dash = [],
   laterOn = [],
+  canRun = false,
+  awayFrom = null,
 }: HomeViewProps) {
   if (goals.length === 0 && today.length === 0 && later.length === 0) {
     return (
@@ -102,6 +114,8 @@ export function HomeView({
   }
 
   const summary = homeSummary(goals);
+  const away = awayFrom && todayOn ? daysAway(awayFrom, todayOn) : null;
+  const doneSection = <DoneSection done={done} timeZone={timeZone} />;
   const { errands, others } = splitErrands(goals);
   return (
     <div className="space-y-8">
@@ -114,6 +128,12 @@ export function HomeView({
             </h2>
             {brief?.when && <span className="text-small text-ink-muted">written {brief.when}</span>}
           </div>
+          {away !== null && (
+            <p className="text-body text-ink">
+              Welcome back. You were away {away} days; here is what Dash did while you were gone,
+              then what is on you.
+            </p>
+          )}
           {brief && (
             <div className="max-w-prose">
               <FileBody markdown={brief.body} />
@@ -130,6 +150,8 @@ export function HomeView({
         </Card>
       </section>
 
+      {away !== null && doneSection}
+
       {goals.length > 0 && (
         <GoalLanes
           goals={[...errands, ...others]}
@@ -141,12 +163,13 @@ export function HomeView({
           laterOn={laterOn}
           working={working}
           offers={offers}
+          canRun={canRun}
         />
       )}
 
-      <DoneSection done={done} timeZone={timeZone} />
+      {away === null && doneSection}
 
-      <WeekSection health={health} />
+      {away === null && <WeekSection health={health} />}
     </div>
   );
 }
@@ -154,17 +177,24 @@ export function HomeView({
 function DoneSection({ done, timeZone }: { done: DoneSince | null; timeZone: string }) {
   return (
     <section aria-labelledby="done-heading" className="space-y-2">
-      <h2 id="done-heading" className="px-1 text-ui font-semibold text-ink">
-        <DashCredit className="text-ink-muted" />
-        {done ? `What Dash did since ${formatInstant(done.since, timeZone)}` : 'What Dash did'}
-      </h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-1">
+        <h2 id="done-heading" className="text-ui font-semibold text-ink">
+          <DashCredit className="text-ink-muted" />
+          {done ? `What Dash did since ${formatInstant(done.since, timeZone)}` : 'What Dash did'}
+        </h2>
+        {/* Runs left the tab bar: an audit log, read from here when wanted. */}
+        <Link
+          href="/goals/runs"
+          className="inline-flex items-center text-small text-accent underline-offset-2 hover:underline max-sm:min-h-11"
+        >
+          Every run
+        </Link>
+      </div>
       {done && done.items.length > 0 ? (
         <DoneSinceList done={done} />
       ) : (
         <p className="px-1 text-small text-ink-muted">
-          {done
-            ? 'Nothing new since your last visit.'
-            : 'This could not be read just now. Every run is on the Runs tab.'}
+          {done ? 'Nothing new since your last visit.' : 'This could not be read just now.'}
         </p>
       )}
     </section>

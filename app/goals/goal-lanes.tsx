@@ -28,16 +28,16 @@ import { TodayRow } from './today-list';
  * The goals are small tiles, every one on the page at once: errands first,
  * then page order, so a goal is in the same place from day to day. A tile
  * says its status, a bar of its steps by who holds them, and how much is on
- * you. Pressing one filters the lanes to that goal; pressing it again, or
- * Show every goal, clears the filter.
+ * you. Pressing one opens the goal.
  *
  * The lanes sort what is next by who holds it:
  *
  * - On you: everything ranked as on you (lib/goals/today.ts), each with its
- *   one button, Not now, and Dash preps it where Dash can.
+ *   one button, Not now, and Ask Dash where Dash can prepare it.
  * - Dash has it: the runs going now, Dash's open steps (working, queued, or
  *   waiting on an answer from you), and goals Dash has left alone, offered
- *   with Work on it.
+ *   with Ask Dash. Ask Dash shows only to the account that owns the app, as
+ *   on a goal's page, because only that account can start a run.
  * - Later: what is set aside until a later day, with Bring back now.
  *
  * Moves between lanes show at once: a step set aside leaves On you, a step
@@ -61,6 +61,8 @@ export type GoalLanesProps = {
   laterOn: LaterLaneItem[];
   working: RunListing[];
   offers: DashOffer[];
+  /** Whether this account can start a run (the owner's only), which Ask Dash needs. */
+  canRun?: boolean;
 };
 
 /** "today", "tomorrow", "in 6 days" or "3 days late", from today to a due date. */
@@ -86,8 +88,8 @@ export function GoalLanes({
   laterOn,
   working,
   offers,
+  canRun = false,
 }: GoalLanesProps) {
-  const [filter, setFilter] = useState<string | null>(null);
   // Moves made on this page, shown before the server's redraw arrives.
   const [aside, setAside] = useState<ReadonlySet<string>>(new Set());
   const [handed, setHanded] = useState<TodayItem[]>([]);
@@ -99,11 +101,8 @@ export function GoalLanes({
     return next;
   };
 
-  const inFilter = (goalId: string) => filter === null || goalId === filter;
   const handedKeys = new Set(handed.map(keyOf));
-  const mine = onYou.filter(
-    (item) => inFilter(item.goalId) && !aside.has(keyOf(item)) && !handedKeys.has(keyOf(item)),
-  );
+  const mine = onYou.filter((item) => !aside.has(keyOf(item)) && !handedKeys.has(keyOf(item)));
   const listed = new Set(dash.map((item) => item.id));
   const dashRows: DashLaneItem[] = [
     ...handed
@@ -118,17 +117,12 @@ export function GoalLanes({
         needs: null,
       })),
     ...dash,
-  ].filter((item) => inFilter(item.goalId));
-  const runs = working.filter(
-    (run) => !run.item || (run.item.level === 'goal' ? inFilter(run.item.id) : filter === null),
-  );
+  ];
   const quiet = offers.filter(
-    (offer): offer is Extract<DashOffer, { kind: 'goal' }> =>
-      offer.kind === 'goal' && inFilter(offer.goalId),
+    (offer): offer is Extract<DashOffer, { kind: 'goal' }> => offer.kind === 'goal',
   );
-  const later = laterOn.filter((item) => inFilter(item.goalId) && !back.has(item.id));
-  const canPrepare = new Set(preparable);
-  const chosen = goals.find((line) => line.goal.id === filter) ?? null;
+  const later = laterOn.filter((item) => !back.has(item.id));
+  const canPrepare = new Set(canRun ? preparable : []);
 
   return (
     <div className="space-y-6">
@@ -156,28 +150,9 @@ export function GoalLanes({
               line={line}
               holders={holders[line.goal.id]}
               today={todayOn}
-              pressed={filter === line.goal.id}
-              onPress={() => setFilter(filter === line.goal.id ? null : line.goal.id)}
             />
           ))}
         </ul>
-        {chosen && (
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-small text-ink-muted" role="status">
-            <span>
-              Showing <span className="font-semibold text-ink">{chosen.goal.title}</span>
-            </span>
-            <Link href={`/goals/${chosen.goal.id}`} className="text-accent underline-offset-2 hover:underline">
-              Open the goal
-            </Link>
-            <button
-              type="button"
-              className="text-accent underline-offset-2 hover:underline"
-              onClick={() => setFilter(null)}
-            >
-              Show every goal
-            </button>
-          </p>
-        )}
       </section>
 
       <div className="grid items-start gap-4 lg:grid-cols-3">
@@ -202,10 +177,14 @@ export function GoalLanes({
           id="lane-dash"
           title="Dash has it"
           dot="bg-status-submitted"
-          count={dashRows.length + runs.length}
-          empty="Nothing with Dash. Press Dash preps it on a step of yours, or ask Dash above."
+          count={dashRows.length + working.length}
+          empty={
+            canRun
+              ? 'Nothing with Dash. Press Ask Dash on a step of yours, or ask Dash above.'
+              : 'Nothing with Dash.'
+          }
           rows={[
-            ...runs.map((run) => <WorkingRow key={`run:${run.id}`} run={run} />),
+            ...working.map((run) => <WorkingRow key={`run:${run.id}`} run={run} />),
             ...dashRows.map((item) => <DashRow key={`dash:${item.id}`} item={item} />),
           ]}
           footer={
@@ -216,7 +195,7 @@ export function GoalLanes({
                 </p>
                 <ul className="divide-y divide-border">
                   {quiet.map((offer) => (
-                    <QuietGoalRow key={offer.goalId} offer={offer} />
+                    <QuietGoalRow key={offer.goalId} offer={offer} canRun={canRun} />
                   ))}
                 </ul>
               </>
@@ -246,14 +225,10 @@ function GoalTile({
   line,
   holders,
   today,
-  pressed,
-  onPress,
 }: {
   line: HomeGoal;
   holders: GoalHolders | undefined;
   today?: string;
-  pressed: boolean;
-  onPress: () => void;
 }) {
   const { goal, progress, review } = line;
   const late = Boolean(goal.errand && goal.dueOn && today && goal.dueOn < today);
@@ -261,19 +236,18 @@ function GoalTile({
   const move = nextMove(line);
   return (
     <li className="min-w-0">
-      <button
-        type="button"
-        aria-pressed={pressed}
+      <Link
+        href={`/goals/${goal.id}`}
         title={move ? `Next: ${move.text}${move.on ? `, ${formatDay(move.on)}` : ''}` : undefined}
-        onClick={onPress}
         className={cn(
           cardVariants({ padding: 'dense', interactive: true }),
           'flex h-full w-full flex-col gap-1.5 text-left',
-          pressed && 'ring-2 ring-accent',
         )}
       >
         <span className="flex items-baseline justify-between gap-2 text-small">
-          <span className={cn('min-w-0 truncate text-ink-muted', late && 'font-semibold text-danger')}>
+          <span
+            className={cn('min-w-0 truncate text-ink-muted', late && 'font-semibold text-danger')}
+          >
             {goal.errand && goal.dueOn
               ? `Due ${formatDay(goal.dueOn)}${today ? `, ${dueIn(goal.dueOn, today)}` : ''}`
               : line.areaName}
@@ -290,7 +264,9 @@ function GoalTile({
             >
               {VERDICT_LABELS[review.verdict]}
               {/* A status from a missed morning run is greyed, and says its day to a screen reader. */}
-              {!line.current && <span className="sr-only"> as of {formatDay(review.createdAt.slice(0, 10))}</span>}
+              {!line.current && (
+                <span className="sr-only"> as of {formatDay(review.createdAt.slice(0, 10))}</span>
+              )}
             </span>
           )}
         </span>
@@ -314,7 +290,13 @@ function GoalTile({
             <span className="flex-1 text-small text-ink-ghost">No steps yet</span>
           )}
           {holders?.working ? (
-            <DashMark state="working" activity="thinking" size="2xs" tone="brand" label="Dash is on it now" />
+            <DashMark
+              state="working"
+              activity="thinking"
+              size="2xs"
+              tone="brand"
+              label="Dash is on it now"
+            />
           ) : null}
           {progress.live > 0 && (
             <span className="tabular shrink-0 text-small text-ink-muted">
@@ -322,10 +304,12 @@ function GoalTile({
             </span>
           )}
           {(holders?.onYou ?? 0) > 0 && (
-            <span className="tabular shrink-0 text-small text-caution">{holders!.onYou} on you</span>
+            <span className="tabular shrink-0 text-small text-caution">
+              {holders!.onYou} on you
+            </span>
           )}
         </span>
-      </button>
+      </Link>
     </li>
   );
 }
@@ -434,7 +418,13 @@ function DashRow({ item }: { item: DashLaneItem }) {
 
 type RunState = { error?: string; message?: string; done?: number };
 
-function QuietGoalRow({ offer }: { offer: Extract<DashOffer, { kind: 'goal' }> }) {
+function QuietGoalRow({
+  offer,
+  canRun,
+}: {
+  offer: Extract<DashOffer, { kind: 'goal' }>;
+  canRun: boolean;
+}) {
   const [state, action, pending] = useActionState(
     (prev: RunState, form: FormData) => workOnGoalAction(prev, form),
     {} as RunState,
@@ -455,12 +445,14 @@ function QuietGoalRow({ offer }: { offer: Extract<DashOffer, { kind: 'goal' }> }
           <MoveLabel move={{ state: 'dash_working' }} />
         </p>
       ) : (
-        <form action={action} className="pt-1">
-          <input type="hidden" name="goalId" value={offer.goalId} />
-          <Button type="submit" size="sm" variant="secondary" pending={pending}>
-            {pending ? 'Starting…' : 'Work on it'}
-          </Button>
-        </form>
+        canRun && (
+          <form action={action} className="pt-1">
+            <input type="hidden" name="goalId" value={offer.goalId} />
+            <Button type="submit" size="sm" variant="secondary" pending={pending}>
+              {pending ? 'Asking…' : 'Ask Dash'}
+            </Button>
+          </form>
+        )
       )}
     </li>
   );

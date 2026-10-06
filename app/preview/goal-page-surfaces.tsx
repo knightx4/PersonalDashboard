@@ -359,7 +359,7 @@ export function GoalsHomeSurface() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Goals" />
-      <HomeView {...home} timeZone="Europe/London" />
+      <HomeView {...home} timeZone="Europe/London" canRun />
     </div>
   );
 }
@@ -399,6 +399,16 @@ export function GoalsAllSurface() {
           [job.id]: home.goals[2].progress!,
         }}
         areaRuns={{}}
+        rhythms={{
+          'a-money': [
+            {
+              id: 'r-budget',
+              title: 'Check the budget every week',
+              goalId: cards.id,
+              line: '0 of 1 this week · For Pay off the credit cards',
+            },
+          ],
+        }}
         canRun
       />
     </div>

@@ -15,6 +15,7 @@ import type { StepQuestion } from '@/lib/goals/answers';
 import type { StepBlockKind, StepLink, StepRef } from '@/lib/goals/dependencies';
 import { PROGRESS_UNIT_MAX } from '@/lib/goals/progress';
 import { parseNumber } from '@/lib/goals/readings';
+import { COUNT_MATCH_MAX, isCountSource, type CountSource } from '@/lib/goals/rhythm-sources';
 import type { GoalStatus } from '@/lib/goals/tree';
 
 /** The limits the table's checks set (supabase/migrations-goals/0001). */
@@ -75,6 +76,14 @@ export type Step = {
   position: number;
   rhythmCount: number | null;
   rhythmPeriod: RhythmPeriod | null;
+  /**
+   * On a rhythm, where its count is read from instead of being kept by hand,
+   * and for `calendar` the text an event's title has to contain (goals
+   * migration 0069; lib/goals/rhythm-sources.ts). Null or absent for a
+   * rhythm counted by hand.
+   */
+  countSource?: CountSource | null;
+  countMatch?: string | null;
   /** Whether you pressed Show on Todo on it (plan #927). */
   onTodo: boolean;
   /**
@@ -251,6 +260,8 @@ export type StepFields = {
   starts_on?: string | null;
   rhythm_count?: number | null;
   rhythm_period?: RhythmPeriod | null;
+  count_source?: CountSource | null;
+  count_match?: string | null;
   estimated_total?: number | null;
   total_unit?: string | null;
 };
@@ -278,7 +289,8 @@ function isDate(value: string): boolean {
  *
  * Kind and rhythm go together, because the table refuses one without the
  * other: choosing `rhythm` needs a count (the period defaults to a week), and
- * choosing any other kind clears the count and period.
+ * choosing any other kind clears the count and period, and where the count
+ * is read from.
  */
 export function parseStepFields(
   get: (key: string) => unknown,
@@ -392,12 +404,42 @@ export function parseStepFields(
     } else {
       fields.rhythm_count = null;
       fields.rhythm_period = null;
+      fields.count_source = null;
+      fields.count_match = null;
     }
   } else {
     // Changing how often without changing the kind; the table refuses it on
     // a step that is not a rhythm.
     if (count !== undefined) fields.rhythm_count = count;
     if (period !== undefined) fields.rhythm_period = period;
+  }
+
+  // Where a rhythm's count is read from (0069). Sent empty, it is counted by
+  // hand again. The match text goes with `calendar` and nothing else. A kind
+  // changed away from rhythm has already cleared both above.
+  const rawSource = get('countSource');
+  const leavingRhythm = fields.kind !== undefined && fields.kind !== 'rhythm';
+  if (present(rawSource) && !leavingRhythm) {
+    const source = clean(rawSource);
+    if (source === null) {
+      fields.count_source = null;
+      fields.count_match = null;
+    } else if (!isCountSource(source)) {
+      return { ok: false, error: 'Choose where the count comes from.' };
+    } else if (source === 'calendar') {
+      const match = clean(get('countMatch'));
+      if (!match || !match.split('|').some((piece) => piece.trim() !== '')) {
+        return { ok: false, error: 'Say what a calendar event is called, such as urbanism.' };
+      }
+      if (match.length > COUNT_MATCH_MAX) {
+        return { ok: false, error: `Keep the match under ${COUNT_MATCH_MAX} characters.` };
+      }
+      fields.count_source = source;
+      fields.count_match = match;
+    } else {
+      fields.count_source = source;
+      fields.count_match = null;
+    }
   }
 
   return { ok: true, value: fields };

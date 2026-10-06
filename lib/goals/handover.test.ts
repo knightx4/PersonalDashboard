@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  askDash,
   commentMode,
   hasClaudeWork,
+  jobFor,
   locateStep,
-  offersPrepare,
-  offersSend,
+  offersAsk,
   prepareJob,
   sendJob,
   sendRefusal,
@@ -51,7 +52,7 @@ function refusal(steps: StepNode[], id: string, runs: { itemId: string; job: str
   );
 }
 
-describe('sendJob and offersSend', () => {
+describe('sendJob and offersAsk', () => {
   it('reads a Dash leaf as a step, anything with sub-steps as a phase, and your own leaf as neither', () => {
     expect(sendJob(node('a'))).toBe('step');
     expect(sendJob(node('p', { kind: 'mine', children: [node('a')] }))).toBe('phase');
@@ -62,8 +63,42 @@ describe('sendJob and offersSend', () => {
   });
 
   it('offers nothing on a closed step', () => {
-    expect(offersSend(node('a', { status: 'done' }))).toBe(false);
-    expect(offersSend(node('a', { status: 'proposed' }))).toBe(true);
+    expect(offersAsk(node('a', { status: 'done' }))).toBe(false);
+    expect(offersAsk(node('a', { status: 'proposed' }))).toBe(true);
+  });
+});
+
+describe('askDash', () => {
+  it('picks the job from what is pressed', () => {
+    expect(askDash(node('a'))).toEqual({ mode: 'send', job: 'step' });
+    expect(askDash(node('p', { kind: 'mine', children: [node('a')] }))).toEqual({ mode: 'send', job: 'phase' });
+    expect(askDash(node('p', { children: [node('m', { kind: 'mine' })] }))).toEqual({ mode: 'send', job: 'phase' });
+    expect(askDash(node('m', { kind: 'mine' }))).toEqual({ mode: 'prepare', job: 'prepare' });
+    expect(askDash(node('m', { kind: 'mine', children: [node('q', { kind: 'decision' })] }))).toEqual({
+      mode: 'prepare',
+      job: 'prepare',
+    });
+    expect(askDash(null)).toEqual({ mode: 'goal', job: 'goal' });
+  });
+
+  it('has nothing to ask on a question or a rhythm', () => {
+    expect(askDash(node('q', { kind: 'decision' }))).toBeNull();
+    expect(askDash(node('r', { kind: 'rhythm' }))).toBeNull();
+    expect(offersAsk(node('r', { kind: 'rhythm' }))).toBe(false);
+  });
+
+  it('chooses as an @dash comment does, for every kind of step', () => {
+    const steps = [
+      node('a'),
+      node('m', { kind: 'mine' }),
+      node('p', { kind: 'mine', children: [node('a')] }),
+      node('p2', { children: [node('a')] }),
+    ];
+    for (const step of steps) {
+      const choice = askDash(step);
+      expect(choice?.mode).toBe(commentMode(step));
+      expect(choice?.job).toBe(jobFor(step, commentMode(step)));
+    }
   });
 });
 
@@ -130,8 +165,8 @@ describe('prepare (plan #1001)', () => {
     expect(prepareJob(node('p', { kind: 'mine', children: [node('a')] }))).toBeNull();
     expect(prepareJob(node('a'))).toBeNull();
     expect(prepareJob(node('r', { kind: 'rhythm' }))).toBeNull();
-    expect(offersPrepare(node('m', { kind: 'mine' }))).toBe(true);
-    expect(offersPrepare(node('m', { kind: 'mine', status: 'done' }))).toBe(false);
+    expect(offersAsk(node('m', { kind: 'mine' }))).toBe(true);
+    expect(offersAsk(node('m', { kind: 'mine', status: 'done' }))).toBe(false);
   });
 
   it('lets a step of yours go, even one waiting on another', () => {
@@ -182,6 +217,17 @@ describe('from an @dash comment (plan #1003)', () => {
     });
     expect(text).toContain('asked for from a comment on its row');
     expect(text).toContain('draft this for me, keep it short');
+    const boxed = sendRunText({
+      target,
+      job: 'prepare',
+      collections: [],
+      userId: 'u',
+      runId: 'r',
+      asked: 'keep it short',
+      askedOn: 'row',
+    });
+    expect(boxed).toContain('asked for from its row on the goal page');
+    expect(boxed).toContain('What they wrote, which may say what to produce or how:\nkeep it short');
     const plain = sendRunText({ target, job: 'prepare', collections: [], userId: 'u', runId: 'r' });
     expect(plain).toContain('asked for from its row on the goal page');
     expect(plain).not.toContain('What they wrote');

@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import Link from 'next/link';
-import { Archive, CloudFog, Flag, ListFilter, ListTree } from 'lucide-react';
+import { Archive, CloudFog, Flag, ListFilter, ListTree, Repeat } from 'lucide-react';
 import { ViewChips } from '@/components/plan-tree/view-chips';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
@@ -56,8 +56,10 @@ import { DashCredit } from '@/components/ui/dash-mark';
  * Areas and the goals under them (plan #924).
  *
  * Each area is a heading, a line saying what you want from it, and its goals
- * in a card beneath, with Plan this area asking Claude to propose the goals
- * it needs. Everything but a goal's title is
+ * in a card beneath, then the rhythms inside those goals with this period's
+ * progress, and Plan this area asking Dash to propose the goals it needs.
+ * The section's id, `area-<id>`, is where a link to an area lands: this
+ * took the place of the area's own page. Everything but a goal's title is
  * edited where it stands (law 12): a name, a done-when or a note of fog is an
  * inline input saved on blur. A goal's title opens its tree, where it is
  * renamed. Reordering and archiving sit in each
@@ -147,6 +149,7 @@ export function GoalsView({
   onYou: onYouCounts,
   progress,
   areaRuns,
+  rhythms = {},
   canRun,
 }: {
   areas: AreaWithGoals[];
@@ -157,6 +160,8 @@ export function GoalsView({
   progress: Progress;
   /** Each area's latest Plan this area run, keyed by area id. */
   areaRuns: Record<string, AreaRunView>;
+  /** Each area's rhythms, keyed by area id; an area with none is absent. */
+  rhythms?: Record<string, AreaRhythm[]>;
   /** Whether this account can start a Claude run (the owner's only). */
   canRun: boolean;
 }) {
@@ -199,6 +204,7 @@ export function GoalsView({
             count={areas.length}
             progress={progress}
             run={areaRuns[area.id] ?? null}
+            rhythms={rhythms[area.id] ?? []}
             canRun={canRun}
             places={places}
           />
@@ -215,6 +221,7 @@ function AreaSection({
   count,
   progress,
   run,
+  rhythms,
   canRun,
   places,
 }: {
@@ -223,6 +230,7 @@ function AreaSection({
   count: number;
   progress: Progress;
   run: AreaRunView | null;
+  rhythms: AreaRhythm[];
   canRun: boolean;
   places: Place[];
 }) {
@@ -253,7 +261,6 @@ function AreaSection({
   // The confirm counts every live goal the archive takes, shown in this view or not.
   const liveCount = area.liveCount;
   const items: ActionMenuItem[] = [
-    { id: 'open', label: 'Open the area', href: `/goals/area/${area.id}` },
     ...moveItems(menuAction(moveAreaAction), area.id, index, count),
     {
       id: 'archive',
@@ -269,6 +276,9 @@ function AreaSection({
   ];
 
   const proposedCount = area.goals.filter((goal) => goal.status === 'proposed').length;
+  // The rhythms of the goals this view shows, so On you does not list the rest.
+  const shownGoals = new Set(area.goals.map((goal) => goal.id));
+  const shownRhythms = rhythms.filter((rhythm) => shownGoals.has(rhythm.goalId));
 
   return (
     <section id={`area-${area.id}`} aria-label={area.name} className="scroll-mt-bar space-y-2">
@@ -325,6 +335,7 @@ function AreaSection({
           </ul>
         </Card>
       )}
+      {shownRhythms.length > 0 && <AreaRhythms areaId={area.id} rhythms={shownRhythms} />}
       <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} />
       <GoalComposer areaId={area.id} areaName={area.name} learn={area.learn ?? false} />
     </section>
@@ -536,6 +547,43 @@ function TakeBackUp({ goalId, status }: { goalId: string; status: 'parked' | 'do
       </Button>
       {state.error && <span className="text-small text-danger">{state.error}</span>}
     </form>
+  );
+}
+
+/** A rhythm as an area lists it: its name, the goal it serves, and this period's progress in one line. */
+export type AreaRhythm = { id: string; title: string; goalId: string; line: string };
+
+/**
+ * The rhythms inside the area's goals, with this period's progress and the
+ * periods missed behind it. Each opens the goal it lives in, where it is
+ * edited and counted.
+ */
+function AreaRhythms({ areaId, rhythms }: { areaId: string; rhythms: AreaRhythm[] }) {
+  const headingId = `area-${areaId}-rhythms`;
+  return (
+    <section aria-labelledby={headingId} className="space-y-1 pt-1">
+      <h3 id={headingId} className="px-1 text-small font-semibold text-ink-muted">
+        Rhythms
+      </h3>
+      <Card>
+        <ul className="divide-y divide-border">
+          {rhythms.map((rhythm) => (
+            <li key={rhythm.id}>
+              <Link
+                href={`/goals/${rhythm.goalId}#step-${rhythm.id}`}
+                className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-quick hover:bg-sunken"
+              >
+                <Repeat className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-ui break-words text-ink">{rhythm.title}</span>
+                  <span className="block text-small break-words text-ink-muted">{rhythm.line}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </section>
   );
 }
 

@@ -10,13 +10,14 @@ import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EditableProse } from '@/components/ui/editable-prose';
-import { ChipInput, ChipSelect, ComposeTitle, InlineInput } from '@/components/ui/field';
+import { ChipInput, ChipSelect, ComposeTitle, InlineInput, Select } from '@/components/ui/field';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import type { LinkedFile } from '@/lib/files/files';
 import type { StepPrep } from '@/lib/goals/goal-page';
 import { PROGRESS_UNIT_MAX } from '@/lib/goals/progress';
+import { COUNT_MATCH_MAX, COUNT_SOURCE_CHOICES, COUNT_SOURCES } from '@/lib/goals/rhythm-sources';
 import { countProposed } from '@/lib/goals/shaping';
 import {
   RHYTHM_COUNT_MAX,
@@ -311,6 +312,8 @@ function onlyChanged(form: FormData, node: StepNode): FormData {
     startsOn: node.startsOn ?? '',
     estimatedTotal: node.estimatedTotal ? String(node.estimatedTotal) : '',
     totalUnit: node.totalUnit ?? '',
+    countSource: node.countSource ?? '',
+    countMatch: node.countMatch ?? '',
   };
   // The two dates go together when either changed, so the start can be
   // checked against the due date the form shows.
@@ -322,9 +325,14 @@ function onlyChanged(form: FormData, node: StepNode): FormData {
   const totalChanged = ['estimatedTotal', 'totalUnit'].some(
     (key) => String(form.get(key) ?? '').trim() !== before[key],
   );
+  // So do a rhythm's source and its match text (goals migration 0069).
+  const sourceChanged = ['countSource', 'countMatch'].some(
+    (key) => form.has(key) && String(form.get(key) ?? '').trim() !== before[key],
+  );
   for (const [key, value] of Object.entries(before)) {
     if (datesChanged && (key === 'dueOn' || key === 'startsOn')) continue;
     if (totalChanged && (key === 'estimatedTotal' || key === 'totalUnit')) continue;
+    if (sourceChanged && (key === 'countSource' || key === 'countMatch')) continue;
     if (String(form.get(key) ?? '').trim() === value) form.delete(key);
   }
   if (form.get('kind') === node.kind) {
@@ -448,6 +456,8 @@ export function StepFacts({
     const total = String(data.get('estimatedTotal') ?? '').trim();
     const unit = String(data.get('totalUnit') ?? '').trim();
     if (data.has('estimatedTotal') && Boolean(total) !== Boolean(unit)) return;
+    // A calendar source waits for the text its events are matched on.
+    if (data.get('countSource') === 'calendar' && !String(data.get('countMatch') ?? '').trim()) return;
     form.requestSubmit();
   };
 
@@ -488,6 +498,7 @@ export function StepFacts({
         {kind === 'rhythm' && (
           <RhythmFields count={node.rhythmCount} period={node.rhythmPeriod} onCommit={commit} />
         )}
+        {kind === 'rhythm' && <CountSourceFields node={node} onCommit={commit} />}
         {(kind === 'mine' || kind === 'claude') && (
           <span className="inline-flex items-center">
             <ChipInput
@@ -632,6 +643,52 @@ function RhythmFields({
         <Button type="submit" size="sm" variant="ghost">
           {submitLabel}
         </Button>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Where a rhythm's count is read from, so the period is kept without logging
+ * anything (lib/goals/rhythm-sources.ts): nothing, applications sent in Jobs,
+ * or calendar events whose title contains the match text.
+ */
+function CountSourceFields({ node, onCommit }: { node: StepNode; onCommit: () => void }) {
+  const [source, setSource] = useState(node.countSource ?? '');
+  return (
+    <span className="inline-flex flex-wrap items-center gap-0.5">
+      <span className="text-ui text-ink-muted">Counts itself from</span>
+      {/* A full-size select, so a thumb can reach it on a phone. */}
+      <Select
+        name="countSource"
+        value={source}
+        className="w-auto max-sm:min-h-11"
+        onChange={(event) => {
+          setSource(event.target.value);
+          // The form reads the select after React has drawn the match box.
+          requestAnimationFrame(onCommit);
+        }}
+        aria-label={`Where the count for ${node.title} comes from`}
+      >
+        <option value="">nothing, counted by hand</option>
+        {COUNT_SOURCES.map((option) => (
+          <option key={option} value={option}>
+            {COUNT_SOURCE_CHOICES[option]}
+          </option>
+        ))}
+      </Select>
+      {source === 'calendar' && (
+        <ChipInput
+          type="text"
+          name="countMatch"
+          maxLength={COUNT_MATCH_MAX}
+          defaultValue={node.countMatch ?? ''}
+          placeholder="urbanism|community board"
+          size={20}
+          onBlur={onCommit}
+          aria-label={`What a calendar event for ${node.title} is called`}
+          title="An event counts when its title contains this. Separate alternatives with |."
+        />
       )}
     </span>
   );

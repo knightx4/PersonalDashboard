@@ -26,8 +26,9 @@ const RUN_POLL_MS = 15_000;
 
 /**
  * Claude on this goal (plan #932): whether you have approved it, what Claude
- * has proposed and asked, its last ten runs (plan #1014), and the two presses. Work on
- * this fires the goals routine for this goal; Approve opens what it proposed
+ * has proposed and asked, its last ten runs (plan #1014), and the two presses.
+ * Ask Dash fires the goals routine for this goal (askDash's goal run, the same
+ * control a step's row has); Approve opens what it proposed
  * and lets it change the steps here without asking from then on. With nothing
  * to approve it is one line rather than a card.
  */
@@ -68,7 +69,7 @@ export function GoalShaping({
   const status = running && (
     <p role="status" className="flex items-center gap-1.5 text-small text-accent">
       <span className="size-1.5 animate-pulse rounded-full bg-accent" aria-hidden />
-      <span>Dash is working on this · {progress}</span>
+      <span>Dash is on it · {progress}</span>
     </p>
   );
   const history = runs.length > 0 && <RunHistory runs={runs} more={moreRuns} />;
@@ -81,7 +82,7 @@ export function GoalShaping({
         pending={starting}
         disabled={running}
       >
-        Work on this
+        Ask Dash
       </Button>
     </form>
   );
@@ -97,7 +98,7 @@ export function GoalShaping({
     )
   );
 
-  // Nothing to approve: the run line and Work on this as one line, with no
+  // Nothing to approve: the run line and Ask Dash as one line, with no
   // heading or card around them (ui finding 133242ff, plan #1038). The card
   // comes back when Claude proposes something.
   if (!approval.approve) {

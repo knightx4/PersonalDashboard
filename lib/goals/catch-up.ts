@@ -9,15 +9,15 @@
  * shows while `backOn` is today: it survives going into a goal and back, and
  * opening the home the next day finds an ordinary daily view.
  *
- * The catch-up itself is three things, in this order: what Dash did while
- * you were away (lib/goals/done-since.ts, the same list as any other
- * sitting's), what is waiting on you, and one next step per goal. Everything
- * else on the home is folded under it.
+ * On that day the home says how long you were away, puts what Dash did
+ * while you were gone (lib/goals/done-since.ts, the same list as any other
+ * sitting's) ahead of the lanes, and leaves out the week's numbers, which
+ * would only count the days you were not there. On you already holds what is
+ * waiting and the next step of each goal, so the catch-up adds no list of its
+ * own.
  *
  * Pure. The read and write are in lib/goals/visits-store.ts.
  */
-import type { DailyGoal, NextItem, WaitingItem } from '@/lib/goals/daily';
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** This many days or more since the last visit counts as time away. */
@@ -72,25 +72,13 @@ export function catchUpSince(record: VisitRecord | null, today: string): string 
   return record.awayFrom;
 }
 
-export type CatchUp = {
-  /** ISO instant the time away began. */
-  since: string;
-  waiting: WaitingItem[];
-  /** The first next item of each goal that has one, in the home's goal order. */
-  next: { goalId: string; goalTitle: string; item: NextItem }[];
-};
-
-export function catchUp(
-  since: string,
-  view: { goals: DailyGoal[]; waiting: WaitingItem[] },
-): CatchUp {
-  return {
-    since,
-    waiting: view.waiting,
-    next: view.goals.flatMap((daily) =>
-      daily.next.length > 0
-        ? [{ goalId: daily.goal.id, goalTitle: daily.goal.title, item: daily.next[0] }]
-        : [],
-    ),
-  };
+/**
+ * Whole days between the visit before the time away and `today`, both read
+ * as days in UTC. Rough by up to a day around midnight, which is fine for
+ * "back after 6 days".
+ */
+export function daysAway(awayFrom: string, today: string): number {
+  const from = Date.parse(`${awayFrom.slice(0, 10)}T00:00:00Z`);
+  const to = Date.parse(`${today}T00:00:00Z`);
+  return Math.max(0, Math.round((to - from) / DAY_MS));
 }

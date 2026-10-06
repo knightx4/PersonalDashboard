@@ -98,6 +98,7 @@ export function StepTree({
   progress = NO_PROGRESS,
   arrivals = NO_ARRIVALS,
   view = DEFAULT_GOAL_VIEW,
+  canRun = true,
 }: {
   map: GoalMap;
   /**
@@ -123,6 +124,8 @@ export function StepTree({
   opened?: boolean;
   /** An information step's list as the gallery wants it. Nothing in the app passes it. */
   informationSeam?: InformationSeam;
+  /** Whether this account can start a goals run, which Ask Dash on each row needs. */
+  canRun?: boolean;
 }) {
   const [showAside, setShowAside] = useState(false);
   const aside = countAside(map.steps);
@@ -159,6 +162,7 @@ export function StepTree({
       progress,
       progressBeneath: latestBeneath(trees.flat(), progress),
       arrivals: new Set(arrivals),
+      canRun,
       ...stepPreps(trees),
     };
     return {
@@ -169,7 +173,7 @@ export function StepTree({
       })),
       context,
     };
-  }, [map, todoOn, showAside, unfolded, opened, informationSeam, runs, files, progress, arrivals]);
+  }, [map, todoOn, showAside, unfolded, opened, informationSeam, runs, files, progress, arrivals, canRun]);
   // When anything on the goal last moved, its own entries included.
   const lastOn = lastProgressOn(progress);
 

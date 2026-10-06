@@ -80,7 +80,7 @@ export function reviewRoutine(): RoutineTarget {
 }
 
 /**
- * The routine that shapes and works personal goals -- "Work on this" on a
+ * The routine that shapes and works personal goals -- Ask Dash on a
  * goal's page (plan #932), and the scheduled goals runs after it.
  *
  * No fallback to the shared id, for the reason the review routine has none:
