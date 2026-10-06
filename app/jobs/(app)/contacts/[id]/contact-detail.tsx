@@ -327,10 +327,10 @@ function ContactEditForm({
       </Field>
       <FieldError>{error}</FieldError>
       <div className="flex gap-2">
-        <Button type="button" size="sm" disabled={pending} onClick={save}>
+        <Button type="button" size="sm" pending={pending} onClick={save}>
           Save
         </Button>
-        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={onCancel}>
+        <Button type="button" size="sm" variant="ghost" pending={pending} onClick={onCancel}>
           Cancel
         </Button>
       </div>

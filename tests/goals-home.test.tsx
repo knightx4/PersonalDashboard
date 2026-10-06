@@ -349,3 +349,19 @@ describe('the Goals home', () => {
     expect(render({ goals: [], onYou: [] })).toContain('No goals yet');
   });
 });
+
+describe('the other goals by area (note b4595cb6)', () => {
+  it('groups goals under their areas, each area where its first goal falls', async () => {
+    const { byArea } = await import('@/app/goals/goal-lanes');
+    const at = (id: string, areaId: string, areaName: string): HomeGoal => ({
+      ...goal,
+      goal: { ...goal.goal, id, areaId },
+      areaName,
+    });
+    const groups = byArea([at('a', 'home', 'Home'), at('b', 'money', 'Money'), at('c', 'home', 'Home')]);
+    expect(groups.map((g) => [g.areaName, g.goals.map((l) => l.goal.id)])).toEqual([
+      ['Home', ['a', 'c']],
+      ['Money', ['b']],
+    ]);
+  });
+});

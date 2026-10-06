@@ -90,6 +90,7 @@ export const HIT_TABLES: Record<HitKind, string> = {
   area: 'goals.areas',
   goal: 'goals.items',
   step: 'goals.items',
+  file: 'core.files',
 };
 
 export const HIT_KIND_IDS = Object.keys(HIT_KINDS) as HitKind[];
@@ -783,6 +784,7 @@ const RECALL_LANDING: Record<string, string> = {
   'job_search.thoughts': '/jobs/thoughts',
   'job_search.profiles': '/jobs/settings',
   'job_search.notes': '/jobs',
+  'job_search.interviews': '/jobs',
   'goals.items': '/goals',
   'goals.captures': '/goals',
   'learn.aims': '/goals',
@@ -798,6 +800,7 @@ const RECALL_KINDS: Record<string, string> = {
   'obsidian.transcripts': 'Transcript (courses taken)',
   'job_search.thoughts': 'Job search thoughts',
   'job_search.notes': 'Job search note',
+  'job_search.interviews': 'Interview notes',
   'job_search.profiles': 'Job search profile',
   'goals.items': 'Goal or step',
   'goals.captures': 'Goals capture',
@@ -879,6 +882,26 @@ async function recallHrefs(ctx: AskContext, hits: readonly MemoryRowHit[]): Prom
               ? `/jobs/contacts/${note.contact_id}`
               : null;
         if (href) out.set(key('job_search.notes', note.id), href);
+      }
+    });
+  }
+
+  // An interview opens on its role's page, by way of its application.
+  const interviews = refs('job_search.interviews').filter(isUuid);
+  if (interviews.length > 0) {
+    attempt('job_search.interviews', async () => {
+      const client = await ctx.db('job_search');
+      type InterviewLink = { id: string; application_id: string | null };
+      const rows = await readIn<InterviewLink>(client, 'interviews', 'id, application_id', 'id', interviews, ctx.userId);
+      const applicationIds = rows.map((r) => r.application_id).filter((id): id is string => Boolean(id));
+      const applications =
+        applicationIds.length > 0
+          ? await readIn<{ id: string; role_id: string | null }>(client, 'applications', 'id, role_id', 'id', applicationIds, ctx.userId)
+          : [];
+      const roles = new Map(applications.map((a) => [a.id, a.role_id]));
+      for (const row of rows) {
+        const roleId = row.application_id ? roles.get(row.application_id) : null;
+        if (roleId) out.set(key('job_search.interviews', row.id), `/jobs/roles/${roleId}`);
       }
     });
   }

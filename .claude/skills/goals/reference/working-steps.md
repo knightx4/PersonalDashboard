@@ -166,6 +166,25 @@ on conflict do nothing;
 
 The summary says how many people and roles went to Jobs.
 
+## A cover letter goes on its role
+
+A cover letter written for a role that is in Jobs also goes on that role
+(note 654346da). The role page shows the letter from its application's
+`applications.cover_letter`, and a letter kept only as a file is not seen
+there. In the same run, find the application for the role by its company
+and title, and write the letter's text into `cover_letter` when it is empty:
+
+```sql
+update job_search.applications set cover_letter = $l$…$l$
+where id = '<application>' and user_id = '<user>' and cover_letter is null;
+```
+
+Never write over a letter already there, which may be the one that was sent.
+Say in the step's result that the letter is on the role, or, when one was
+already there, that this draft is in the file only. Keep the file either way.
+A letter for a role that is not in Jobs yet waits for the role, which goes
+in as "People and roles you find go to Jobs" says.
+
 ## Files
 
 A file is a piece of writing kept as its own page (`core.files`, opened at

@@ -51,6 +51,8 @@ export const TARGET_FOR_HIT: Record<HitKind, LinkTarget | null> = {
   // fa4800bc).
   goal: 'goal',
   step: 'goal',
+  // task_links has no column for a file.
+  file: null,
 };
 
 /** What a task would point at if it were pointed at this hit. */

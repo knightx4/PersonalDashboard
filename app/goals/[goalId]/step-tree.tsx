@@ -28,6 +28,7 @@ import { countAside, type StepRunView } from '@/lib/goals/shaping';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import { FinishedFold, GoalRow, type GoalRowContext } from './goal-row';
 import { StepComposer } from './step-parts';
+import { StepFinder } from './step-finder';
 import type { InformationSeam } from './information-step';
 
 /** How often the page looks again while a step's run is going, as the Claude panel does. */
@@ -184,6 +185,7 @@ export function StepTree({
 
   return (
     <div className="space-y-6">
+      <StepFinder goalId={map.goal.id} steps={map.steps} />
       <section aria-labelledby="now-heading" className="space-y-2">
         <h2
           id="now-heading"

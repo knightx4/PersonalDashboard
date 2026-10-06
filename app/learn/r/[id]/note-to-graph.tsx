@@ -25,7 +25,7 @@ import { approveNoteConcepts, readNoteIntoGraph, type NoteGraphState } from './a
 function SubmitButton({ idle, busy }: { idle: string; busy: string }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" size="sm" disabled={pending}>
+    <Button type="submit" variant="secondary" size="sm" pending={pending}>
       {pending ? busy : idle}
     </Button>
   );

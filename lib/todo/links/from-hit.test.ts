@@ -45,11 +45,11 @@ describe('the map from a hit to a target', () => {
     expect(LINKABLE_HIT_KINDS).toContain('reading');
     // A task, and the Dev workspace's kinds: the plan, specs, ideas, notes,
     // raises and visions are about the app, and a task has no column to point at them with.
-    // News stories, courses and areas have no column on task_links either.
-    for (const kind of ['plan', 'spec', 'idea', 'feedback', 'raise', 'vision', 'story', 'course', 'area'] as const) {
+    // News stories, courses, areas and files have no column on task_links either.
+    for (const kind of ['plan', 'spec', 'idea', 'feedback', 'raise', 'vision', 'story', 'course', 'area', 'file'] as const) {
       expect(LINKABLE_HIT_KINDS).not.toContain(kind);
     }
-    expect(LINKABLE_HIT_KINDS).toHaveLength(Object.keys(HIT_KINDS).length - 10);
+    expect(LINKABLE_HIT_KINDS).toHaveLength(Object.keys(HIT_KINDS).length - 11);
   });
 
   it('links a goal and a step through the goal column', () => {
