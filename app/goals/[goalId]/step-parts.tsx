@@ -1,7 +1,7 @@
 'use client';
 
 import { formatDay } from '@/lib/goals/dates';
-import { useActionState, useRef, useState, useTransition } from 'react';
+import { useActionState, useId, useRef, useState, useTransition } from 'react';
 import { CircleUser, Repeat, Target } from 'lucide-react';
 import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
 import { FileLinks } from '@/components/files/file-links';
@@ -373,19 +373,77 @@ export function StepText({ node, field }: { node: StepNode; field: 'detail' | 'a
  * many in all. Then the other goals it counts towards. These were the foot of
  * a form with a Save button; each now saves on its own.
  */
+type QuietFact = 'start' | 'due' | 'total';
+
+/**
+ * A fact on the step's own page that is set, read as text: "Due 3 Oct".
+ * Pressing it puts its editor in its place. Unset, it keeps the value in the
+ * form and draws nothing, so saving another fact leaves it as it was.
+ */
+function QuietFactText({
+  name,
+  value,
+  label,
+  onOpen,
+  'aria-label': ariaLabel,
+}: {
+  name: string;
+  value: string | null | undefined;
+  label: string | null;
+  onOpen: () => void;
+  'aria-label': string;
+}) {
+  return (
+    <>
+      <input type="hidden" name={name} value={value ?? ''} />
+      {label && (
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label={ariaLabel}
+          className="press-area rounded-control px-1.5 py-0.5 text-ui text-ink hover:bg-sunken"
+        >
+          {label}
+        </button>
+      )}
+    </>
+  );
+}
+
 export function StepFacts({
   node,
   links,
   otherGoals,
+  quiet = false,
 }: {
   node: StepNode;
   links: { linkId: string; goalId: string; title: string }[];
   otherGoals: OtherGoals;
+  /**
+   * The step's own page (plan #1620): a date or amount that is set reads as
+   * text and turns into its editor when pressed, and the unset ones wait
+   * behind one quiet add control rather than standing open.
+   */
+  quiet?: boolean;
 }) {
   const menuAction = useMenuAction();
   const linkable = otherGoals.filter((goal) => !links.some((link) => link.goalId === goal.id));
   const [kind, setKind] = useState<StepKind>(node.kind);
   const formRef = useRef<HTMLFormElement>(null);
+  const [opened, setOpened] = useState<ReadonlySet<QuietFact>>(new Set());
+  const [adding, setAdding] = useState(false);
+  const linkPickerId = useId();
+  const open = (fact: QuietFact) => setOpened((now) => new Set(now).add(fact));
+  const hasTotal = Boolean(node.estimatedTotal || node.totalUnit);
+  // Whether each fact is drawn as its editor. Off the step page, always.
+  const editing = (fact: QuietFact) => !quiet || adding || opened.has(fact);
+  const showsTotal = kind === 'mine' || kind === 'claude';
+  const unsetLeft =
+    quiet &&
+    !adding &&
+    ((!node.startsOn && !opened.has('start')) ||
+      (!node.dueOn && !opened.has('due')) ||
+      (showsTotal && !hasTotal && !opened.has('total')));
   const [state, save, saving] = useActionState(async (prev: StepActionState, form: FormData) => {
     // A step turned into a rhythm before its count is drawn comes round
     // once a week until it is told otherwise.
@@ -419,23 +477,45 @@ export function StepFacts({
         aria-busy={saving}
       >
         <input type="hidden" name="id" value={node.id} />
-        <ChipInput
-          type="date"
-          name="startsOn"
-          icon="Start"
-          defaultValue={node.startsOn ?? ''}
-          onChange={commit}
-          aria-label={`The first day ${node.title} can be done`}
-          title="Until this day the step stays off your list and out of Dash's runs"
-        />
-        <ChipInput
-          type="date"
-          name="dueOn"
-          icon="Due"
-          defaultValue={node.dueOn ?? ''}
-          onChange={commit}
-          aria-label={`When ${node.title} is due`}
-        />
+        {editing('start') ? (
+          <ChipInput
+            type="date"
+            name="startsOn"
+            icon="Start"
+            defaultValue={node.startsOn ?? ''}
+            onChange={commit}
+            autoFocus={quiet && opened.has('start')}
+            aria-label={`The first day ${node.title} can be done`}
+            title="Until this day the step stays off your list and out of Dash's runs"
+          />
+        ) : (
+          <QuietFactText
+            name="startsOn"
+            value={node.startsOn}
+            label={node.startsOn ? `Starts ${formatDay(node.startsOn)}` : null}
+            onOpen={() => open('start')}
+            aria-label={`Change the first day ${node.title} can be done`}
+          />
+        )}
+        {editing('due') ? (
+          <ChipInput
+            type="date"
+            name="dueOn"
+            icon="Due"
+            defaultValue={node.dueOn ?? ''}
+            onChange={commit}
+            autoFocus={quiet && opened.has('due')}
+            aria-label={`When ${node.title} is due`}
+          />
+        ) : (
+          <QuietFactText
+            name="dueOn"
+            value={node.dueOn}
+            label={node.dueOn ? `Due ${formatDay(node.dueOn)}` : null}
+            onOpen={() => open('due')}
+            aria-label={`Change when ${node.title} is due`}
+          />
+        )}
         <KindChip
           value={kind}
           onChange={(next) => {
@@ -448,7 +528,28 @@ export function StepFacts({
           <RhythmFields count={node.rhythmCount} period={node.rhythmPeriod} onCommit={commit} />
         )}
         {kind === 'rhythm' && <CountSourceFields node={node} onCommit={commit} />}
-        {(kind === 'mine' || kind === 'claude') && (
+        {showsTotal && !editing('total') && (
+          <>
+            <input type="hidden" name="estimatedTotal" value={node.estimatedTotal ?? ''} />
+            <QuietFactText
+              name="totalUnit"
+              value={node.totalUnit}
+              label={
+                hasTotal ? `About ${node.estimatedTotal ?? ''} ${node.totalUnit ?? ''}`.trim() : null
+              }
+              onOpen={() => open('total')}
+              aria-label={`Change about how many in all for ${node.title}`}
+            />
+          </>
+        )}
+        {unsetLeft && (
+          <AddTrigger
+            label="Dates and amount"
+            onClick={() => setAdding(true)}
+            className="press-area ml-0"
+          />
+        )}
+        {showsTotal && editing('total') && (
           <span className="inline-flex items-center">
             <ChipInput
               type="text"
@@ -478,7 +579,7 @@ export function StepFacts({
       </form>
       {state.error && <p className="px-1 text-small text-danger">{state.error}</p>}
       {(links.length > 0 || linkable.length > 0) && (
-        <div className="space-y-1 px-1 text-small">
+        <div className="space-y-1 text-small">
           {links.map((link) => (
             <form
               key={link.linkId}
@@ -494,19 +595,25 @@ export function StepFacts({
             </form>
           ))}
           {linkable.length > 0 && (
-            <form action={menuAction(linkStepAction)} className="flex flex-wrap items-center gap-2">
+            <form
+              action={menuAction(linkStepAction)}
+              className="-ml-1.5 flex flex-wrap items-center gap-2"
+            >
               <input type="hidden" name="id" value={node.id} />
-              <ChipSelect
-                name="goalId"
-                aria-label="Another goal this counts towards"
-                icon={<Target className="size-3.5" strokeWidth={2} />}
-              >
-                {linkable.map((goal) => (
-                  <option key={goal.id} value={goal.id}>
-                    {goal.title}
-                  </option>
-                ))}
-              </ChipSelect>
+              <ChipTarget htmlFor={linkPickerId}>
+                <ChipSelect
+                  id={linkPickerId}
+                  name="goalId"
+                  aria-label="Another goal this counts towards"
+                  icon={<Target className="size-3.5" strokeWidth={2} />}
+                >
+                  {linkable.map((goal) => (
+                    <option key={goal.id} value={goal.id}>
+                      {goal.title}
+                    </option>
+                  ))}
+                </ChipSelect>
+              </ChipTarget>
               <Button type="submit" size="sm" variant="ghost">
                 Count towards it too
               </Button>
@@ -523,6 +630,26 @@ export function StepFacts({
  * plan's composer sets priority and assignee (app/dev/plan/step-forms.tsx).
  * It was a boxed select, the one bordered control in a row of words.
  */
+/**
+ * A chip select's 44px press target on a phone. The chip is drawn about 25px
+ * tall in a dense row, so a label for it sits behind it, 44px tall and as
+ * wide as the chip, placed absolutely so the row keeps its height: a press
+ * on the chip reaches the select, and a press just above or below it reaches
+ * the label, which focuses the select.
+ */
+function ChipTarget({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) {
+  return (
+    <span className="relative isolate inline-flex">
+      <label
+        htmlFor={htmlFor}
+        aria-hidden
+        className="absolute inset-x-0 top-1/2 -z-10 hidden min-h-11 -translate-y-1/2 max-sm:block"
+      />
+      {children}
+    </span>
+  );
+}
+
 function KindChip({
   value,
   onChange,
@@ -532,20 +659,24 @@ function KindChip({
   onChange: (kind: StepKind) => void;
   label: string;
 }) {
+  const id = useId();
   return (
-    <ChipSelect
-      name="kind"
-      value={value}
-      onChange={(event) => onChange(event.target.value as StepKind)}
-      aria-label={label}
-      icon={<CircleUser className="size-3.5" strokeWidth={2} />}
-    >
-      {STEP_KINDS.map((option) => (
-        <option key={option} value={option}>
-          {STEP_KIND_LABELS[option]}
-        </option>
-      ))}
-    </ChipSelect>
+    <ChipTarget htmlFor={id}>
+      <ChipSelect
+        id={id}
+        name="kind"
+        value={value}
+        onChange={(event) => onChange(event.target.value as StepKind)}
+        aria-label={label}
+        icon={<CircleUser className="size-3.5" strokeWidth={2} />}
+      >
+        {STEP_KINDS.map((option) => (
+          <option key={option} value={option}>
+            {STEP_KIND_LABELS[option]}
+          </option>
+        ))}
+      </ChipSelect>
+    </ChipTarget>
   );
 }
 

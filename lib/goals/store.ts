@@ -113,19 +113,25 @@ async function writeOrder(
   if (failed?.error) throw new Error(failed.error.message);
 }
 
+/** A new area at the end of yours, and its id. */
 export async function insertArea(
   client: GoalsSupabaseClient,
   userId: string,
   name: string,
-): Promise<void> {
+): Promise<string> {
   const { data: rows, error: readError } = await client
     .from('areas')
     .select('position')
     .is('archived_at', null);
   if (readError) throw new Error(readError.message);
   const position = nextPosition((rows ?? []).map((row) => row.position as number));
-  const { error } = await client.from('areas').insert({ user_id: userId, name, position });
+  const { data, error } = await client
+    .from('areas')
+    .insert({ user_id: userId, name, position })
+    .select('id')
+    .single();
   if (error) throw new Error(error.message);
+  return data.id as string;
 }
 
 /** False when no live area has that id. */

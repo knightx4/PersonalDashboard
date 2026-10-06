@@ -99,7 +99,7 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
       return {
         verb: done ? 'Added the goal' : 'Add the goal',
         what: change.input.title,
-        rest: ` under ${change.input.areaName}${change.input.dueOn ? `, due ${dueDay(change.input.dueOn, today)}` : ''}`,
+        rest: ` under ${change.input.areaName}${change.input.areaMade ? ', a new area' : ''}${change.input.dueOn ? `, due ${dueDay(change.input.dueOn, today)}` : ''}`,
       };
     case 'change_todo': {
       const { renamedFrom, moved, dueOn, dueTime } = change.input;

@@ -30,9 +30,11 @@ never approves or declines a change, and never touches a vision.
 
 ## How it is fired
 
-By hand for now: a session told to audit the specs. The Monday schedule is
-plan #1524, which fires the routine whose prompt is
-`reference/routine-prompt.md`.
+Each Monday at 14:47 UTC, pg_cron calls `/api/cron/spec-audit`, which fires
+the routine whose prompt is `reference/routine-prompt.md` and records the
+fire in `plan_runs` with job `audit` (plan #1524). It fires nothing when an
+audit wrote findings or was started in the last six days. A session told to
+audit the specs runs the same skill by hand.
 
 ## Working without the CLI
 

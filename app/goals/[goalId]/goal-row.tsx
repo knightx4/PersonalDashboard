@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Repeat } from 'lucide-react';
+import { ArrowUpRight, Repeat } from 'lucide-react';
 import { RowIconButton } from '@/components/plan-tree/row-icon-button';
 import { StateLabel } from '@/components/dev/state-label';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError, InlineInput } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
+import { stepHref } from '@/lib/goals/all-goals';
 import { awaitsSeenIt } from '@/lib/goals/answer-change';
 import { useDashArrival } from './dash-arrival';
 import type { LinkedFile } from '@/lib/files/files';
@@ -104,6 +105,7 @@ const GOAL_COMMENTS = { target: 'goal' as const };
 const NO_FILES: LinkedFile[] = [];
 
 export type GoalRowContext = {
+  goalId: string;
   goalTitle: string;
   todoOn: boolean;
   rhythms: GoalMap['rhythms'];
@@ -377,6 +379,7 @@ export function GoalRow({
   fromGoal,
   unfolded,
   summary,
+  page = false,
 }: {
   node: GoalRowNode;
   trail: readonly boolean[];
@@ -392,12 +395,17 @@ export function GoalRow({
   unfolded?: boolean;
   /** What the row says at its end in place of a date: on a stage, how far along it is. */
   summary?: string;
+  /**
+   * The row is the step its own page is about (plan #1620): it starts opened,
+   * and its panel does not link to the page it is already on.
+   */
+  page?: boolean;
 }) {
   const { step } = node;
   const row = useTreeRow(node, {
     searching: false,
     unfolded: unfolded ?? context.unfolded,
-    opened: context.opened,
+    opened: page || context.opened,
   });
   // A link to a step folded away beneath this row (from Waiting on you, or
   // a stage on the map) unfolds this row, so the step is drawn and its own
@@ -682,6 +690,7 @@ export function GoalRow({
         <StateLabel glyph={null} word={node.who.word} tone={node.who.tone} title={node.who.title} />
       }
       layout="list"
+      heading={page}
       statusMenu={statusMenu}
       menu={menu}
       actions={GOAL_TREE_ACTIONS}
@@ -780,7 +789,14 @@ export function GoalRow({
       acceptanceView={isDecision ? undefined : <StepText node={step} field="acceptance" />}
       body={
         <>
-          {!isDecision && <StepFacts node={step} links={links} otherGoals={context.otherGoals} />}
+          {!isDecision && (
+            <StepFacts
+              node={step}
+              links={links}
+              otherGoals={context.otherGoals}
+              quiet={page}
+            />
+          )}
           {isDecision &&
             step.status !== 'dropped' &&
             (step.status === 'open' || step.resolution !== null) && <Question node={step} />}
@@ -806,7 +822,8 @@ export function GoalRow({
       }
       meta={
         <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
-          <span>{STEP_KIND_LABELS[step.kind]}</span>
+          {/* On its own page the chips above already say the kind and the dates. */}
+          {!page && <span>{STEP_KIND_LABELS[step.kind]}</span>}
           {fromGoal && (
             <Link href={`/goals/${fromGoal.id}`} className="underline">
               From {fromGoal.title}
@@ -818,8 +835,8 @@ export function GoalRow({
           {current && step.rhythmPeriod && (
             <span>{progressLine(step.rhythmPeriod, current, step.countSource)}</span>
           )}
-          {step.waitsUntil && <span>Starts {formatDate(step.waitsUntil)}</span>}
-          {step.dueOn && <span>Due {formatDate(step.dueOn)}</span>}
+          {!page && step.waitsUntil && <span>Starts {formatDate(step.waitsUntil)}</span>}
+          {!page && step.dueOn && <span>Due {formatDate(step.dueOn)}</span>}
           {step.estimatedTotal && step.totalUnit && (
             <span className="tabular">
               About {amountWords(step.estimatedTotal, step.totalUnit)} in all
@@ -836,6 +853,17 @@ export function GoalRow({
               Also {link.title}
             </Link>
           ))}
+          {/* The step's own page (plan #1620), last in the line. */}
+          {!page && (
+            <Link
+              href={stepHref(fromGoal?.id ?? context.goalId, step.id)}
+              aria-label={`Open ${step.title} on its own page`}
+              className="press-area inline-flex items-center gap-0.5 underline"
+            >
+              Open
+              <ArrowUpRight className="size-3" strokeWidth={1.75} aria-hidden />
+            </Link>
+          )}
         </p>
       }
       panelActions={
@@ -844,13 +872,16 @@ export function GoalRow({
           {/* Ask Dash, with room to say what you want: the words go into the
               run's brief as a comment's would. Left empty, the step says it. */}
           {askable && (
-            <form action={askAction} className="flex min-w-0 flex-[1_1_18rem] items-center gap-2">
+            <form
+              action={askAction}
+              className="flex min-w-0 flex-[1_1_18rem] items-center gap-2 max-sm:flex-wrap"
+            >
               <input type="hidden" name="id" value={step.id} />
               <InlineInput
                 name="asked"
                 maxLength={4000}
                 placeholder="What you want, if anything"
-                className="max-sm:min-h-11"
+                className="max-sm:min-h-11 max-sm:basis-full"
                 aria-label={`What you want Dash to do with ${step.title}`}
               />
               <Button
