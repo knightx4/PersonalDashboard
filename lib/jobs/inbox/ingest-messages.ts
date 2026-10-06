@@ -16,6 +16,8 @@ import type { AtsVendor } from '@/lib/jobs/email/ats-senders';
 import { isBoardVendor } from '@/lib/jobs/ats/detect';
 import {
   decideLink,
+  roleHintFor,
+  type LinkInput,
   type LinkCandidate,
   type LinkCompany,
   type LinkDecision,
@@ -364,6 +366,8 @@ async function writeLedger(
     linkMethod?: string | null;
     parseConfidence?: number | null;
     error?: string | null;
+    /** The role title the message names; left as it was when not given. */
+    roleHint?: string | null;
   },
 ): Promise<string | null> {
   // The envelope belongs to core; this row is only what the job workspace
@@ -381,6 +385,7 @@ async function writeLedger(
     link_method: opts.linkMethod ?? null,
     parse_confidence: opts.parseConfidence ?? null,
     error: opts.error ?? null,
+    ...(opts.roleHint !== undefined && { role_hint: opts.roleHint }),
   };
 
   const { error } = await supabase.from('ingested_messages').upsert(row);
@@ -1730,23 +1735,22 @@ async function handleMessage(
     return;
   }
 
-  const decision = decideLink(
-    {
-      threadId: message.threadId,
-      fromAddress: message.fromAddress,
-      replyToAddress: message.replyToAddress,
-      subject: message.subject,
-      bodyPreview: message.text.slice(0, 2000),
-      receivedAt: message.internalDate,
-      classification,
-      extractedCompany: tierB.extracted?.companyName ?? null,
-      extractedRole: tierB.extracted?.roleTitle ?? null,
-      extractedAtsJobId: tierB.extracted?.atsJobId ?? null,
-      companyHint: tierA.companyHint,
-    },
-    ctx.candidates,
-    { companies: ctx.companies.map((c) => ({ id: c.id, name: c.name, domains: c.domains })) },
-  );
+  const linkInput: LinkInput = {
+    threadId: message.threadId,
+    fromAddress: message.fromAddress,
+    replyToAddress: message.replyToAddress,
+    subject: message.subject,
+    bodyPreview: message.text.slice(0, 2000),
+    receivedAt: message.internalDate,
+    classification,
+    extractedCompany: tierB.extracted?.companyName ?? null,
+    extractedRole: tierB.extracted?.roleTitle ?? null,
+    extractedAtsJobId: tierB.extracted?.atsJobId ?? null,
+    companyHint: tierA.companyHint,
+  };
+  const decision = decideLink(linkInput, ctx.candidates, {
+    companies: ctx.companies.map((c) => ({ id: c.id, name: c.name, domains: c.domains })),
+  });
 
   await applyDecision(supabase, ctx, {
     message,
@@ -1760,6 +1764,7 @@ async function handleMessage(
     // Parsed once per message rather than per branch: two of the three
     // branches below write an event, and both want the same answer.
     invite: inviteFromMessage(message, ctx),
+    roleHint: roleHintFor(linkInput, ctx.candidates),
   });
 }
 
@@ -1793,9 +1798,11 @@ async function applyDecision(
     decision: LinkDecision;
     coreId: string;
     invite: InviteInterview | null;
+    /** The role title the message names, kept for the review queue. */
+    roleHint: string | null;
   },
 ): Promise<void> {
-  const { message, classification, tierB, coreId } = input;
+  const { message, classification, tierB, coreId, roleHint } = input;
 
   const ledger = async (
     parseStatus: 'parsed' | 'needs_review' | 'failed',
@@ -1812,6 +1819,7 @@ async function applyDecision(
       classification,
       parseStatus,
       parseConfidence: tierB?.confidence ?? null,
+      roleHint,
       ...extra,
     });
 
