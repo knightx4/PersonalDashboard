@@ -403,7 +403,7 @@ export async function readRunWork(
   }
 
   let planRows: WorkRow[] = [];
-  if (needs('feature', 'reshape')) {
+  if (needs('feature', 'overhaul', 'reshape')) {
     type Row = {
       id: string;
       parent_id: string | null;
@@ -478,7 +478,7 @@ export async function readRunWork(
       out.set(run.id, { done: done.length });
     } else if (run.job === 'reshape' && run.plan_item_id) {
       out.set(run.id, reshapeWork(planRows, run.plan_item_id, window, topLevel));
-    } else if (run.job === 'feature' && run.plan_item_id) {
+    } else if ((run.job === 'feature' || run.job === 'overhaul') && run.plan_item_id) {
       out.set(
         run.id,
         featureWork(planRows, run.plan_item_id, window, now, FEATURE_IDLE_AFTER_MINUTES),

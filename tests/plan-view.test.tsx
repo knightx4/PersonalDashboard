@@ -45,6 +45,7 @@ vi.mock('@/app/dev/plan/actions', () => {
     setPlanItemPriority: noop,
     setPlanItemStatus: noop,
     updatePlanItem: noop,
+    workPlanOverhaul: noop,
   };
 });
 
