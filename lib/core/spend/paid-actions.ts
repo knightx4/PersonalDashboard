@@ -112,9 +112,9 @@ export const PAID_ACTIONS = {
   'app/jobs/(app)/roles/[id]/comment-actions.ts#addRoleComment': ['reply-to-role-comment'],
   'app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence': ['draft-answer'],
   'app/jobs/(app)/settings/evidence-actions.ts#proposeEvidence': ['propose-evidence'],
-  'app/jobs/(app)/thoughts/actions.ts#suggestTracks': ['suggest-learning-tracks'],
+  'app/jobs/(app)/find/actions.ts#suggestTracks': ['suggest-learning-tracks'],
   // Starting a suggested track adds a Learn goal, as the Learn Goals page does.
-  'app/jobs/(app)/thoughts/actions.ts#startTrack': ['place-aim', 'write-curriculum'],
+  'app/jobs/(app)/find/actions.ts#startTrack': ['place-aim', 'write-curriculum'],
   'app/jobs/(app)/recommend/actions.ts#suggestPeople': ['suggest-outreach'],
   'app/jobs/(app)/recommend/actions.ts#suggestOpenings': ['find-openings', 'score-openings'],
 
@@ -232,9 +232,9 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
   'app/api/cron/youtube-library/route.ts#POST':
     'Fired four times a day by pg_cron to fetch and embed the YouTube library\'s transcripts; no press starts it.',
   'app/api/cron/job-suggestions/route.ts#GET':
-    'Fired daily by pg_cron; writes people to meet every three days and roles once a week, for each account whose lists are short. The search presses on Roles and Contacts are priced under app/jobs/(app)/recommend/actions.ts.',
+    'Fired daily by pg_cron; writes people to meet every three days and roles once a week, for each account whose lists are short. The search presses on Find are priced under app/jobs/(app)/recommend/actions.ts.',
   'app/api/cron/job-suggestions/route.ts#POST':
-    'Fired daily by pg_cron; writes people to meet every three days and roles once a week, for each account whose lists are short. The search presses on Roles and Contacts are priced under app/jobs/(app)/recommend/actions.ts.',
+    'Fired daily by pg_cron; writes people to meet every three days and roles once a week, for each account whose lists are short. The search presses on Find are priced under app/jobs/(app)/recommend/actions.ts.',
   'app/api/cron/job-openings/route.ts#GET':
     'Fired daily by pg_cron to read each open recommended role from its link and score the new ones with Jev; no press starts it.',
   'app/api/cron/job-openings/route.ts#POST':

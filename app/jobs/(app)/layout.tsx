@@ -76,9 +76,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
    */
   const sections: NavSection[] = [
     { href: '/jobs', label: 'Home', icon: 'jobsHome', exact: true },
-    { href: '/jobs/thoughts', label: 'Career goals', icon: 'careerGoals' },
     { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
     { href: '/jobs/roles', label: 'Roles', icon: 'roles' },
+    { href: '/jobs/find', label: 'Find', icon: 'find' },
     { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
     { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
     { href: '/jobs/interviews', label: 'Interviews', icon: 'interviews' },

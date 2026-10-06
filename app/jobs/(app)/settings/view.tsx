@@ -46,8 +46,6 @@ export function SettingsView(props: {
   gmailConfigured: boolean;
   appOrigin: string;
   profile: {
-    targetTitles: string;
-    excludedIndustries: string;
     searchStartedOn: string;
     ghostThresholdDays: number;
     writingStyleNotes: string;
@@ -126,8 +124,6 @@ function ProfileSection({
   email,
 }: {
   profile: {
-    targetTitles: string;
-    excludedIndustries: string;
     searchStartedOn: string;
     ghostThresholdDays: number;
     writingStyleNotes: string;
@@ -152,6 +148,13 @@ function ProfileSection({
         </a>
         , and so does deleting the account, which was never the job search&rsquo;s to offer.
       </p>
+      <p className="mt-2 text-small text-ink-muted">
+        The titles you are aiming for and the industries never to suggest are on{' '}
+        <a href="/jobs/find" className="font-medium text-accent underline underline-offset-2">
+          Find
+        </a>
+        , beside the roles and people they shape.
+      </p>
 
       {/* Read first. This was five labelled fields, three of them with a
           caption underneath, standing open every time the page loaded -- so a
@@ -166,8 +169,6 @@ function ProfileSection({
           <ValueList>
             <ValueRow label="Search started" value={profile.searchStartedOn} />
             <ValueRow label="Ghost after" value={`${profile.ghostThresholdDays} days of silence`} />
-            <ValueRow label="Target titles" value={profile.targetTitles} />
-            <ValueRow label="Never suggest" value={profile.excludedIndustries} />
             <PreferenceRows prefs={prefs} />
             <ValueRow label="How you want to sound" value={profile.writingStyleNotes} />
             <ValueRow
@@ -209,32 +210,6 @@ function ProfileSection({
                 abandoned pursuits as live ones.
               </p>
             </div>
-          </div>
-
-          <div>
-            <Label htmlFor="targetTitles">Target titles</Label>
-            <Input
-              id="targetTitles"
-              name="targetTitles"
-              defaultValue={profile.targetTitles}
-              placeholder="Strategic Finance Analyst, FP&A Manager"
-            />
-            <p className="mt-1 text-small text-ink-muted">
-              Seeds relevance scoring when mail is classified.
-            </p>
-          </div>
-
-          <div>
-            <Label htmlFor="excludedIndustries">Never suggest</Label>
-            <Input
-              id="excludedIndustries"
-              name="excludedIndustries"
-              defaultValue={profile.excludedIndustries}
-              placeholder="Crypto, Healthcare, Defense"
-            />
-            <p className="mt-1 text-small text-ink-muted">
-              Industries Dash leaves out of the roles and people it recommends, whatever the role.
-            </p>
           </div>
 
           <div>
