@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { paletteHits } from '@/lib/search/rank';
+import { hitPoints, mergeRanked, paletteHits } from '@/lib/search/rank';
 import { score } from '@/lib/search/score';
 import { MIN_QUERY, type SearchHit } from '@/lib/search/sources';
 import {
@@ -257,6 +257,66 @@ function themeCommands(theme: Theme): SearchCommand[] {
   ];
 }
 
+/** A command with how well it matched what was typed. */
+export type RankedCommand = { command: SearchCommand; points: number };
+
+/**
+ * One list from the two halves, in the order a box draws it.
+ *
+ * The commands and the things you own are each ranked against the query by
+ * the same scorer, and merged on those points, so the row that matches best
+ * is the one Enter opens. A command goes first on equal points, because it is
+ * the half that is always right and always instant. They used to be placed
+ * one half after the other, which put "Log what happened" above the goal
+ * "Land your next role" for a query of that whole title, since the first word
+ * alone matches the capture (plan #1618).
+ *
+ * Ask Dash goes last, or first when the query ends in a question mark.
+ */
+export function orderRows({
+  commands,
+  hits,
+  query,
+  ask,
+}: {
+  commands: readonly RankedCommand[];
+  hits: readonly SearchHit[];
+  query: string;
+  ask: SearchCommand | null;
+}): SearchRow[] {
+  const found = mergeRanked<SearchRow, SearchRow>(
+    commands.map(({ command, points }) => ({ item: { kind: 'command', command }, points })),
+    hits.map((hit) => ({ item: { kind: 'hit', hit }, points: hitPoints(hit, query) ?? 0 })),
+  );
+  if (!ask) return found;
+  const row: SearchRow = { kind: 'command', command: ask };
+  return ask.label.endsWith('?') ? [row, ...found] : [...found, row];
+}
+
+/**
+ * The places you can go and the things you can start, ranked against what was
+ * typed: each command by its label and hint, a capture by the points it
+ * already matched with. Eight at most.
+ */
+export function rankCommands({
+  commands,
+  captures,
+  query,
+}: {
+  commands: readonly SearchCommand[];
+  captures: readonly RankedCommand[];
+  query: string;
+}): RankedCommand[] {
+  return [
+    ...captures,
+    ...commands
+      .map((command) => ({ command, points: score(`${command.label} ${command.hint ?? ''}`, query) }))
+      .filter((entry): entry is RankedCommand => entry.points !== null),
+  ]
+    .sort((a, b) => b.points - a.points)
+    .slice(0, 8);
+}
+
 /** The key a box should draw a row under. Stable across keystrokes. */
 export function searchRowKey(row: SearchRow): string {
   return row.kind === 'command' ? row.command.id : `hit:${row.hit.kind}:${row.hit.id}`;
@@ -436,22 +496,11 @@ export function useSearchRows({
       // the workspace by the scope, so a box opened in one offers no other
       // workspace, no Home, no Account and no theme -- #737. The cap is the
       // same eight the list is capped at once there is a query.
-      return [...commands, ...startable].slice(0, 8);
+      return [...commands, ...startable]
+        .slice(0, 8)
+        .map((command) => ({ command, points: Number.POSITIVE_INFINITY }));
     }
-    return [
-      ...captures,
-      ...commands
-        .map((command) => ({
-          command,
-          points: score(`${command.label} ${command.hint ?? ''}`, query.trim()),
-        }))
-        .filter(
-          (entry): entry is { command: SearchCommand; points: number } => entry.points !== null,
-        ),
-    ]
-      .sort((a, b) => b.points - a.points)
-      .slice(0, 8)
-      .map((entry) => entry.command);
+    return rankCommands({ commands, captures, query: query.trim() });
   }, [captures, commands, query, startable]);
 
   const needle = query.trim();
@@ -561,14 +610,6 @@ export function useSearchRows({
   }, [needle, asking, scope]);
 
   /**
-   * One list. Commands first, then the things you own.
-   *
-   * The commands are already ranked against the query by the same scorer the
-   * hits are ranked with, so the two halves are ordered on the same terms;
-   * putting the navigation half first is the tie-break, because it is the half
-   * that is always right and always instant.
-   */
-  /**
    * Ask Dash what was typed (plan #1090), on every query. Last, so a search
    * that finds the thing still opens it on Enter, and there even when nothing
    * matches, which is when a question is most likely what was meant. First
@@ -587,15 +628,10 @@ export function useSearchRows({
     };
   }, [askDash, needle]);
 
-  const rows = useMemo<SearchRow[]>(() => {
-    const found: SearchRow[] = [
-      ...matches.map((command) => ({ kind: 'command' as const, command })),
-      ...hits.map((hit) => ({ kind: 'hit' as const, hit })),
-    ];
-    if (!ask) return found;
-    const row: SearchRow = { kind: 'command', command: ask };
-    return ask.label.endsWith('?') ? [row, ...found] : [...found, row];
-  }, [matches, hits, ask]);
+  const rows = useMemo<SearchRow[]>(
+    () => orderRows({ commands: matches, hits, query: needle, ask }),
+    [matches, hits, needle, ask],
+  );
 
   const run = useCallback(
     (row: SearchRow | undefined) => {
