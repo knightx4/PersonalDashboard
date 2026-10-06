@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { ListTree } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import {
   goalCatalog,
@@ -27,7 +26,7 @@ import {
 import { latestBeneath, type ItemProgress } from '@/lib/goals/progress';
 import { countAside, type StepRunView } from '@/lib/goals/shaping';
 import type { GoalMap } from '@/lib/goals/steps-store';
-import { GoalRow, type GoalRowContext } from './goal-row';
+import { FinishedFold, GoalRow, type GoalRowContext } from './goal-row';
 import { StepComposer } from './step-parts';
 import type { InformationSeam } from './information-step';
 
@@ -199,9 +198,13 @@ export function StepTree({
   );
   const finishedFold = finished.length > 0 && (
     <div className="border-t border-border px-3 py-1.5">
-      <Disclosure title="Finished" meta={finished.length}>
-        <ul className="-ml-5.5 divide-y divide-border">{finished.map((row) => rowOf({ row }))}</ul>
-      </Disclosure>
+      <FinishedFold count={finished.length}>
+        {() => (
+          <ul className="-ml-5.5 divide-y divide-border">
+            {finished.map((row) => rowOf({ row }))}
+          </ul>
+        )}
+      </FinishedFold>
     </div>
   );
   // Inside the last card, under a rule, as the plan's "Add a step" sits at

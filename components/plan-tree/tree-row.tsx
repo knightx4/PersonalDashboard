@@ -429,7 +429,10 @@ export function TreeRow<E extends TreeCatalogEntry>({
           'group scroll-mt-24 px-3',
           (gloss || need) && !open ? 'py-1.5' : 'py-2',
           !node.matches && 'opacity-60',
-          closed && 'opacity-70',
+          // A goal's finished rows sit under their own Finished fold, which
+          // says they are finished; dimmed as well, their muted text fell
+          // under the contrast floor.
+          closed && !list && 'opacity-70',
         )}
       >
         <div className={cn('flex min-w-0 items-stretch', list && 'flex-1')}>

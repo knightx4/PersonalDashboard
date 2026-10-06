@@ -143,6 +143,36 @@ export type GoalRowContext = {
 
 const NO_IDS: ReadonlySet<string> = new Set();
 
+/**
+ * The finished steps under a row or a page, folded with their count (plan
+ * #1078). Their rows are drawn once the fold is first opened, not before: a
+ * goal of sixty steps has dozens finished, and each is a row with a panel
+ * nobody asked to see.
+ */
+export function FinishedFold({
+  count,
+  className,
+  children,
+}: {
+  count: number;
+  className?: string;
+  children: () => React.ReactNode;
+}) {
+  const [shown, setShown] = useState(false);
+  return (
+    <Disclosure
+      title="Finished"
+      meta={count}
+      className={className}
+      onToggle={(open) => {
+        if (open) setShown(true);
+      }}
+    >
+      {shown && children()}
+    </Disclosure>
+  );
+}
+
 /** Every step id beneath a row, at any depth. */
 function idsBeneath(node: GoalRowNode): string[] {
   return node.children.flatMap((child) => [child.id, ...idsBeneath(child)]);
@@ -514,26 +544,27 @@ export function GoalRow({
   // rather than counted towards the new one. A rhythm that counts itself
   // from a source is not counted by hand (lib/goals/rhythm-sources.ts).
   const countOne = menuAction(countRhythmAction);
-  const rhythmItems: ActionMenuItem[] = current && !step.countSource
-    ? [
-        {
-          id: 'count',
-          label: 'Count one',
-          formAction: countOne,
-          formFields: { id: step.id, startsOn: current.startsOn, by: '1' },
-        },
-        ...(current.count > 0
-          ? [
-              {
-                id: 'uncount',
-                label: 'Take one back',
-                formAction: countOne,
-                formFields: { id: step.id, startsOn: current.startsOn, by: '-1' },
-              },
-            ]
-          : []),
-      ]
-    : [];
+  const rhythmItems: ActionMenuItem[] =
+    current && !step.countSource
+      ? [
+          {
+            id: 'count',
+            label: 'Count one',
+            formAction: countOne,
+            formFields: { id: step.id, startsOn: current.startsOn, by: '1' },
+          },
+          ...(current.count > 0
+            ? [
+                {
+                  id: 'uncount',
+                  label: 'Take one back',
+                  formAction: countOne,
+                  formFields: { id: step.id, startsOn: current.startsOn, by: '-1' },
+                },
+              ]
+            : []),
+        ]
+      : [];
   const askable = context.canRun && offersAsk(step);
   const askLabel = askDashLabel(step);
   const askItems: ActionMenuItem[] = askable
@@ -629,7 +660,13 @@ export function GoalRow({
             readId: prep.unread ? prep.id : null,
           }
         : step.kind === 'mine' && (step.result || step.resultUrl || stepFiles.length > 0)
-          ? { label: 'Dash’s draft', markdown: step.result, url: step.resultUrl, files: stepFiles, readId: null }
+          ? {
+              label: 'Dash’s draft',
+              markdown: step.result,
+              url: step.resultUrl,
+              files: stepFiles,
+              readId: null,
+            }
           : null;
 
   return (
@@ -641,7 +678,9 @@ export function GoalRow({
       // Who the step is on, where the plan says whose move it is (note
       // 6d242e62). That is a different fact from the move, so it keeps its own
       // words rather than MoveLabel's; the goal's move is on GoalProgress.
-      move={<StateLabel glyph={null} word={node.who.word} tone={node.who.tone} title={node.who.title} />}
+      move={
+        <StateLabel glyph={null} word={node.who.word} tone={node.who.tone} title={node.who.title} />
+      }
       layout="list"
       statusMenu={statusMenu}
       menu={menu}
@@ -776,7 +815,9 @@ export function GoalRow({
           {step.kind === 'rhythm' && step.rhythmCount && step.rhythmPeriod && (
             <span>{describeRhythm(step.rhythmCount, step.rhythmPeriod)}</span>
           )}
-          {current && step.rhythmPeriod && <span>{progressLine(step.rhythmPeriod, current, step.countSource)}</span>}
+          {current && step.rhythmPeriod && (
+            <span>{progressLine(step.rhythmPeriod, current, step.countSource)}</span>
+          )}
           {step.waitsUntil && <span>Starts {formatDate(step.waitsUntil)}</span>}
           {step.dueOn && <span>Due {formatDate(step.dueOn)}</span>}
           {step.estimatedTotal && step.totalUnit && (
@@ -812,7 +853,13 @@ export function GoalRow({
                 className="max-sm:min-h-11"
                 aria-label={`What you want Dash to do with ${step.title}`}
               />
-              <Button type="submit" size="sm" variant="secondary" pending={askPending} className="shrink-0">
+              <Button
+                type="submit"
+                size="sm"
+                variant="secondary"
+                pending={askPending}
+                className="shrink-0"
+              >
                 <DashMark size="2xs" decorative />
                 {askPending ? 'Asking…' : askLabel}
               </Button>
@@ -832,20 +879,22 @@ export function GoalRow({
       after={
         finished.length > 0 && (
           <li style={rowInset([...trail, false])} className="pb-1.5 pr-3">
-            <Disclosure title="Finished" meta={finished.length}>
-              <ul className="-ml-5.5">
-                {finished.map((child) => (
-                  <GoalRow
-                    key={child.id}
-                    node={child}
-                    trail={[]}
-                    context={context}
-                    index={substeps.indexOf(child)}
-                    count={substeps.length}
-                  />
-                ))}
-              </ul>
-            </Disclosure>
+            <FinishedFold count={finished.length}>
+              {() => (
+                <ul className="-ml-5.5">
+                  {finished.map((child) => (
+                    <GoalRow
+                      key={child.id}
+                      node={child}
+                      trail={[]}
+                      context={context}
+                      index={substeps.indexOf(child)}
+                      count={substeps.length}
+                    />
+                  ))}
+                </ul>
+              )}
+            </FinishedFold>
           </li>
         )
       }

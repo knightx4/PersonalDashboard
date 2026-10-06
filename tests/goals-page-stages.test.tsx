@@ -125,7 +125,8 @@ describe('a goal in stages', () => {
 
   it('folds a finished step in an open stage under Finished', () => {
     expect(folds(html)).toContainEqual({ open: false, text: 'Finished 1' });
-    expect(now.indexOf('Settle your pay floor')).toBeLessThan(now.indexOf('See where your search got traction'));
+    // Its rows are drawn once the fold is opened.
+    expect(now).not.toContain('See where your search got traction');
   });
 
   it('draws every other stage on the map as one line, folded, saying how far along it is', () => {
@@ -157,7 +158,8 @@ describe('a goal that is one list', () => {
     );
     expect(html).not.toContain('map-heading');
     expect(folds(html)).toContainEqual({ open: false, text: 'Finished 1' });
-    expect(html.indexOf('Call the card company')).toBeLessThan(html.indexOf('List every balance'));
+    expect(html).toContain('Call the card company');
+    expect(html).not.toContain('List every balance');
   });
 
   it('keeps an unread result of Dash’s among the open steps, as a fold on its row', () => {
