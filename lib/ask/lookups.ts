@@ -42,6 +42,7 @@ import {
   type AskToolResult,
 } from './db';
 import { devAccess, devRecallHrefs } from './dev';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
  * Each of Dash's read tools (plan #1088), as a function of its input and the
@@ -904,7 +905,7 @@ async function recallHrefs(ctx: AskContext, hits: readonly MemoryRowHit[]): Prom
         for (let depth = 0; goal && goal.level !== 'goal' && depth < 7; depth += 1) {
           goal = goal.parent_id ? seen.get(goal.parent_id) : undefined;
         }
-        if (goal) out.set(key('goals.items', id), goal.id === id ? `/goals/${id}` : `/goals/${goal.id}#step-${id}`);
+        if (goal) out.set(key('goals.items', id), goal.id === id ? `/goals/${id}` : stepHref(goal.id, id));
       }
     });
   }

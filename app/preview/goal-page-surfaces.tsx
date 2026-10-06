@@ -281,7 +281,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
         title: 'Draft what to say on the call',
         goalId: cards.id,
         goalTitle: cards.title,
-        href: `/goals/${cards.id}#step-script`,
+        href: `/goals/${cards.id}/s/script`,
         unread: true,
         runId: 'run-1',
         undo: null,

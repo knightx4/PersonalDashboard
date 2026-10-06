@@ -56,6 +56,7 @@ import { AreaPlanner } from './area-planner';
 import { GoalProgress } from './goal-progress';
 import { useMoveToItems, type Place } from './move-goal';
 import { DashCredit } from '@/components/ui/dash-mark';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
  * Areas and the goals under them (plan #924).
@@ -692,7 +693,7 @@ function AreaRhythms({ areaId, rhythms }: { areaId: string; rhythms: AreaRhythm[
           {rhythms.map((rhythm) => (
             <li key={rhythm.id}>
               <Link
-                href={`/goals/${rhythm.goalId}#step-${rhythm.id}`}
+                href={stepHref(rhythm.goalId, rhythm.id)}
                 className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-quick hover:bg-sunken"
               >
                 <Repeat className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />

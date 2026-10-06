@@ -20,6 +20,7 @@ import { FoldLine } from './fold-line';
 import { VERDICT_TONES } from './goal-line';
 import { bringBackAction } from './home-actions';
 import { TodayRow } from './today-list';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
  * What is next on the Goals home, in the order you act on it.
@@ -346,7 +347,7 @@ function DashRow({ item }: { item: DashLaneItem }) {
   return (
     <li className="card-pad-x row-pad space-y-1">
       <Link
-        href={`/goals/${item.goalId}#step-${item.id}`}
+        href={stepHref(item.goalId, item.id)}
         className="block text-ui font-semibold break-words text-ink underline-offset-2 hover:underline"
       >
         {item.title}
@@ -422,7 +423,7 @@ function LaterRow({ item, onBack }: { item: LaterLaneItem; onBack: (gone: boolea
   return (
     <li className="card-pad-x row-pad space-y-1">
       <Link
-        href={`/goals/${item.goalId}#step-${item.id}`}
+        href={stepHref(item.goalId, item.id)}
         className="block text-ui font-semibold break-words text-ink underline-offset-2 hover:underline"
       >
         {item.title}

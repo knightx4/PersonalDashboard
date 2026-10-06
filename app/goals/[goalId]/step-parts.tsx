@@ -1,6 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { formatDay } from '@/lib/goals/dates';
+import { stepHref } from '@/lib/goals/all-goals';
 import { useActionState, useId, useRef, useState, useTransition } from 'react';
 import { CircleUser, Repeat, Target } from 'lucide-react';
 import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
@@ -170,17 +172,20 @@ export function StepFiles({ files }: { files: LinkedFile[] }) {
 /**
  * The Dash step that prepares one of yours, said on your step (plan #1218)
  * while it is open: "Dash is preparing" with the prep step's title, linked to
- * its row. Once it is done, its result is Dash's draft on your step's row
+ * its own page. Once it is done, its result is Dash's draft on your step's row
  * (dash-draft.tsx), as is what Prepare (the button) writes onto the step
  * itself.
  */
-export function PrepNote({ prep }: { prep: StepPrep }) {
+export function PrepNote({ goalId, prep }: { goalId: string; prep: StepPrep }) {
   return (
     <p className="mt-1 px-1 text-small text-ink-muted">
       Dash is preparing:{' '}
-      <a href={`#step-${prep.id}`} className="text-ink underline underline-offset-2">
+      <Link
+        href={stepHref(goalId, prep.id)}
+        className="press-area text-ink underline underline-offset-2"
+      >
         {prep.title}
-      </a>
+      </Link>
     </p>
   );
 }
