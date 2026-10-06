@@ -14,7 +14,9 @@
  *
  * A letter filed into the application is recorded in core.dash_actions with
  * the application as it was before and after (plan #1459), so it can be
- * undone while nobody has edited the letter since.
+ * undone while nobody has edited the letter since. Every other write is
+ * recorded under the comment that asked for it (plan #1518), so Home's list
+ * of what Dash did links back to the role.
  */
 import 'server-only';
 
@@ -26,7 +28,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { DASH_MODELS } from '@/lib/dash/models';
 import { replyInThread, subjectLine, threadVoice, type ThreadDash } from '@/lib/dash/thread';
 import { ROLE_THREAD_TABLE } from '@/lib/dash/thread-tools';
-import { addThreadTurn, loadThread } from '@/lib/thread/store';
+import { addThreadTurn, loadThread, threadCause } from '@/lib/thread/store';
 import type { DashThreadActs } from '@/lib/dash/registry';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
@@ -216,6 +218,10 @@ async function produceReply(input: RoleAskInput): Promise<RoleAskOutcome> {
     rendered.refs,
   );
 
+  // The comment is what every write is recorded under, so Home can say the
+  // todo came from this role's thread (plan #1518).
+  const cause = await threadCause(client, { userId, turnId: input.commentId });
+
   // The one thing only this thread can do: file a letter into the application.
   let letterWritten = false;
   const writeLetter = async (args: unknown): ReturnType<DashThreadActs> => {
@@ -237,6 +243,7 @@ async function produceReply(input: RoleAskInput): Promise<RoleAskOutcome> {
       subjectRef: ref,
       op: 'update',
       beforeValues: before,
+      cause,
       summary: `${coverLetter?.trim() ? 'Rewrote' : 'Wrote'} the cover letter for ${role.title as string} at ${company.name}.`,
     });
     letterWritten = true;
@@ -255,6 +262,7 @@ async function produceReply(input: RoleAskInput): Promise<RoleAskOutcome> {
     dash: input.dashThread,
     acts: async (name, args) =>
       name === 'write_cover_letter' ? writeLetter(args) : { ok: false, error: 'That cannot be done on a role.' },
+    cause,
     anthropicApiKey: input.apiKey,
     client: input.anthropic,
     onSpend: (report) => spend.push(report),
