@@ -189,6 +189,7 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
   const ready = readyClaudeSteps(
     goals.map((g) => g.goal),
     byGoal,
+    today,
   );
   const answers = outOfDateSteps(
     goals.map((g) => g.goal),

@@ -227,22 +227,25 @@ export async function setQuestionAsideAction(
   return saved();
 }
 
-/** Mark a Claude step's result as read, which takes it off the home's list. */
-// latency: pending
-export async function reviewResultAction(
-  _prev: ShapingActionState,
-  form: FormData,
-): Promise<ShapingActionState> {
+/**
+ * Mark a Claude step's result read because it was opened on the goal page
+ * (plan #1078), which takes it off the home's list. It replaced the Mark read
+ * button: opening the result on its row, or the draft on the step it
+ * prepares, is reading it. The page is not read again,
+ * so the result stays where it was opened until the next visit, when it folds
+ * under Finished; the home reads it as read at once.
+ */
+// latency: instant
+export async function readResultAction(id: string): Promise<ShapingActionState> {
   await requireUser();
-  const id = Id.safeParse(form.get('id'));
-  if (!id.success) return { error: 'Could not tell which step that was.' };
+  const parsed = Id.safeParse(id);
+  if (!parsed.success) return { error: 'Could not tell which step that was.' };
   try {
-    const marked = await markReviewed(await createGoalsClient(), id.data);
-    if (!marked) return { error: 'That result has already been marked read or is gone.' };
+    await markReviewed(await createGoalsClient(), parsed.data);
   } catch {
     return { error: 'Could not mark it read. Try again.' };
   }
-  return saved();
+  return {};
 }
 
 /**

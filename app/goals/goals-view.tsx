@@ -1,8 +1,8 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useOptimistic, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Archive, CloudFog, Flag, ListFilter, ListTree, Repeat } from 'lucide-react';
+import { Archive, CloudFog, Flag, ListFilter, ListTree, Repeat, Target } from 'lucide-react';
 import { ViewChips } from '@/components/plan-tree/view-chips';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
@@ -32,7 +32,9 @@ import {
   type AreaWithGoals,
   type Goal,
 } from '@/lib/goals/tree';
+import { cn } from '@/lib/cn';
 import { approveGoalAction } from './[goalId]/shaping-actions';
+import { setGoalFocusAction } from './focus-actions';
 import {
   addArea,
   addGoal,
@@ -65,6 +67,11 @@ import { DashCredit } from '@/components/ui/dash-mark';
  * renamed. Reordering and archiving sit in each
  * row's menu, which works the same with a thumb as with a mouse. Archiving
  * offers an undo, and the record of it stays in the history either way.
+ *
+ * Each open goal that is not an errand has a target button beside its menu
+ * that makes it one of this week's focus goals or takes that away
+ * (docs/GOALS-SPEC.md, "The week's focus"). A focus goal's title carries the
+ * same target, so the week's choice can be read down the page.
  *
  * Open, On you and Everything narrow the goals (plan #1158), with the chips a
  * goal's steps have. Everything is the one view with finished and archived
@@ -409,6 +416,8 @@ function GoalRow({
         },
       ];
 
+  const canFocus = !archived && goal.status === 'open' && !goal.errand;
+
   return (
     <li className="card-pad-x row-pad flex items-start gap-2">
       <div className="min-w-0 flex-1">
@@ -416,8 +425,14 @@ function GoalRow({
             took the click meant for opening the goal. */}
         <Link
           href={`/goals/${goal.id}`}
-          className="block px-1 py-0.5 font-medium text-ink underline-offset-2 hover:underline"
+          className="flex items-center gap-1.5 px-1 py-0.5 font-medium text-ink underline-offset-2 hover:underline"
         >
+          {goal.focus && canFocus && (
+            <>
+              <Target className="size-3.5 shrink-0 text-accent" strokeWidth={2} aria-hidden />
+              <span className="sr-only">Focus this week: </span>
+            </>
+          )}
           {goal.title}
         </Link>
         {/* The done-when opens the tree too, where it is edited beside the
@@ -487,8 +502,48 @@ function GoalRow({
         )}
         {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
       </div>
+      {canFocus && <FocusToggle goalId={goal.id} title={goal.title} focus={goal.focus ?? false} />}
       <ActionMenu label={`${goal.title} actions`} items={items} />
     </li>
+  );
+}
+
+/**
+ * Make a goal one of this week's focus goals, or take that away. It shows the
+ * new state at once and goes back with a toast if the save is refused.
+ */
+function FocusToggle({ goalId, title, focus }: { goalId: string; title: string; focus: boolean }) {
+  const [shown, setShown] = useOptimistic(focus);
+  const [, startTransition] = useTransition();
+  const toast = useToast();
+
+  function toggle() {
+    const next = !shown;
+    startTransition(async () => {
+      setShown(next);
+      const form = new FormData();
+      form.set('id', goalId);
+      form.set('focus', String(next));
+      const result = await setGoalFocusAction(form);
+      if (result.error) toast({ text: result.error });
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      aria-pressed={shown}
+      aria-label={`Focus on ${title} this week`}
+      title={shown ? 'A focus goal this week' : 'Make it a focus goal this week'}
+      onClick={toggle}
+      className={cn(
+        'press inline-flex size-7 shrink-0 items-center justify-center rounded-control transition-colors duration-quick',
+        'max-sm:min-h-11 max-sm:min-w-11',
+        shown ? 'text-accent hover:bg-accent-tint' : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
+      )}
+    >
+      <Target className="size-4" strokeWidth={shown ? 2.25 : 1.75} aria-hidden />
+    </button>
   );
 }
 

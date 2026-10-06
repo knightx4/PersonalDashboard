@@ -2,14 +2,17 @@
 
 import Link from 'next/link';
 import { useActionState, useState } from 'react';
-import { ChevronDown, ExternalLink } from 'lucide-react';
+import { ChevronDown, Copy, ExternalLink } from 'lucide-react';
+import { FileBody } from '@/components/files/file-body';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { DashMark } from '@/components/ui/dash-mark';
 import { Input } from '@/components/ui/field';
+import { LinkedText } from '@/components/ui/linked-text';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
+import { preparedExcerpt } from '@/lib/goals/home';
 import {
   SET_ASIDE_CHOICES,
   SET_ASIDE_LABELS,
@@ -28,7 +31,11 @@ import { reactToSuggestionAction, recordAttendedAction } from './suggestion-acti
 /**
  * A row of what is on you on the Goals home (plan #1077): everything worth doing,
  * ranked by lib/goals/today.ts, each with one button that does it here or
- * opens where it is done. The rows are the On you lane (goal-lanes.tsx).
+ * opens where it is done. The rows are Do next and Later (goal-lanes.tsx).
+ *
+ * A step of yours that Dash prepared something for shows it under the title
+ * (withPrepared in lib/goals/today.ts): the first lines, Open for the rest in
+ * place, and Copy. The row's one button stays what it was.
  *
  * Anything that is a step can be put aside with Not now (Tomorrow, This
  * weekend, Next week, Next month; lib/goals/set-aside.ts). The row leaves at
@@ -194,6 +201,7 @@ export function TodayRow({
             <span className="text-ink-muted"> · frees {item.unblocks} steps</span>
           )}
         </p>
+        {item.prepared && <PreparedDraft text={item.prepared.text} title={item.title} />}
         {answered ? (
           <p className="text-small text-positive" role="status">
             {DONE_WORDS[item.kind] ?? state.message ?? 'Done.'}
@@ -245,6 +253,63 @@ export function TodayRow({
         )}
       </div>
     </li>
+  );
+}
+
+/**
+ * What Dash prepared for the step, under its title: the first lines as plain
+ * text, Open to read the whole of it here, and Copy, so a draft can be sent
+ * from the row without opening the goal.
+ */
+function PreparedDraft({ text, title }: { text: string; title: string }) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const excerpt = preparedExcerpt(text);
+  return (
+    <div className="space-y-1.5 rounded-control bg-sunken px-3 py-2">
+      <p className="inline-flex items-center gap-1.5 text-small font-semibold text-ink">
+        <DashMark size="2xs" tone="brand" decorative />
+        Dash’s draft is ready
+      </p>
+      {open ? (
+        <div className="max-w-prose">
+          <FileBody markdown={text} compact />
+        </div>
+      ) : (
+        <p className="line-clamp-3 text-small break-words whitespace-pre-line text-ink-muted">
+          <LinkedText text={excerpt} />
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          aria-expanded={open}
+          aria-label={open ? `Close Dash’s draft for ${title}` : `Open Dash’s draft for ${title}`}
+          onClick={() => setOpen(!open)}
+        >
+          {open ? 'Close' : 'Open'}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          aria-label={`Copy Dash’s draft for ${title}`}
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(text);
+              toast({ text: 'Copied.' });
+            } catch {
+              toast({ text: 'It could not be copied. Open it and copy it by hand.' });
+            }
+          }}
+        >
+          <Copy className="size-3.5" strokeWidth={1.75} aria-hidden />
+          Copy
+        </Button>
+      </div>
+    </div>
   );
 }
 
