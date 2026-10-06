@@ -568,7 +568,7 @@ export function StepFacts({
               name="totalUnit"
               maxLength={PROGRESS_UNIT_MAX}
               defaultValue={node.totalUnit ?? ''}
-              placeholder="bags"
+              placeholder="of what"
               size={8}
               onBlur={commit}
               aria-label={`What the total for ${node.title} counts`}
