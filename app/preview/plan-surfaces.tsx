@@ -3,6 +3,7 @@ import { projectById } from '@/lib/plan/projects';
 import { PlanView, type PlanCatalogEntry } from '@/app/dev/plan/plan-view';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import type { CriticStopView } from '@/lib/plan/ui-check-stop';
+import type { LastRun } from '@/lib/plan/run-end';
 import {
   applyView,
   buildPlanTree,
@@ -124,6 +125,38 @@ const items: PlanItem[] = [
     assignee: 'me',
   }),
   item({
+    id: 'overhaul',
+    module: 'dev',
+    track: 'overhaul',
+    title: 'Draw every list row with one shared component',
+    detail:
+      'An overhaul (plan #1510): built by its own routine in phases, started with “Work this overhaul”.',
+    acceptance: 'Every list row in the app is drawn by the shared row.',
+    size: 'l',
+  }),
+  item({
+    id: 'overhaul-design',
+    module: 'dev',
+    parentId: 'overhaul',
+    title: 'Design the shared row on the Learn page',
+    size: 'm',
+  }),
+  item({
+    id: 'overhaul-running',
+    module: 'dev',
+    track: 'overhaul',
+    title: 'Move every page to the shared header',
+    detail: 'An overhaul with its routine running: the row says Dash is on it.',
+    size: 'l',
+  }),
+  item({
+    id: 'overhaul-running-step',
+    module: 'dev',
+    parentId: 'overhaul-running',
+    title: 'Build the shared header beside the old one',
+    size: 'm',
+  }),
+  item({
     id: 'fog-feature',
     title: 'Plan a week around the goals',
     fog: 'Which goals get a slot each week is not settled.',
@@ -177,6 +210,21 @@ function catalogOf(tree: PlanSection[]): PlanCatalogEntry[] {
 
 const catalog = catalogOf(whole);
 
+/**
+ * The overhaul routine working one overhaul (plan #1514). Dated, but the tree
+ * draws no time for it: a started run on an overhaul reads "Dash is on it" in
+ * the Status column, and only the opened panel says how long it has gone.
+ */
+const treeRuns: Record<string, LastRun> = {
+  'overhaul-running': {
+    status: 'started',
+    createdAt: '2026-09-01T09:00:00Z',
+    error: null,
+    job: 'overhaul',
+    reading: null,
+  },
+};
+
 /** The open view, every feature unfolded: the page as a list. */
 export function PlanTreeSurface() {
   return (
@@ -188,7 +236,7 @@ export function PlanTreeSurface() {
       catalog={catalog}
       empty={false}
       canSend={false}
-      lastRuns={{}}
+      lastRuns={treeRuns}
       commitChecks={{}}
       unfolded
     />
@@ -203,7 +251,7 @@ export function PlanOpenedSurface() {
   const sections = applyView(whole, 'open')
     .map((section) => ({
       ...section,
-      nodes: section.nodes.filter((node) => node.id === 'stuck' || node.id === 'goal-tree'),
+      nodes: section.nodes.filter((node) => node.id === 'stuck' || node.id === 'goal-tree' || node.id === 'overhaul'),
     }))
     .filter((section) => section.nodes.length > 0);
 
