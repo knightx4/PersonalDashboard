@@ -3306,7 +3306,7 @@ export const SURFACES: readonly Surface[] = [
 
   {
     /* Learn's clip player (plan #1400): three clips queued, before the first
-     * tap. Full screen below lg, in the page pane above. Fixtures in
+     * tap. A card in the page at every width. Fixtures in
      * clip-surfaces.tsx. */
     id: 'learn-clips',
     label: 'Learn · Clips',

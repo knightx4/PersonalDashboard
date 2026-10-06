@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Bookmark, BookmarkCheck, ChevronDown, ExternalLink, Play, ThumbsDown, Volume2, X } from 'lucide-react';
+import { Bookmark, BookmarkCheck, ChevronDown, ExternalLink, Play, ThumbsDown, Volume2 } from 'lucide-react';
+import { buttonVariants } from '@/components/ui/button';
+import { cardVariants } from '@/components/ui/card';
+import { Meter } from '@/components/ui/meter';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { clockTime, thumbnailUrl, watchAt } from '@/lib/learn/youtube/format';
@@ -13,6 +16,7 @@ import {
   leaveWrite,
   reachedEnd,
   shouldRefill,
+  watchedSeconds,
   type Leave,
   type PlayerClip,
 } from '@/lib/learn/clips/stream';
@@ -41,9 +45,10 @@ import {
  * does not start it, the cover steps aside so the tap lands on YouTube's own
  * play button inside the frame.
  *
- * Below lg it covers the whole screen, shell included, with a close button
- * back to Videos, whose Clips section it plays in (plan #1488). From lg up it
- * sits in the page pane.
+ * It is a card in Videos' Clips section (plan #1488) at every width, with
+ * the shell and its top bar still showing (note 2f0f3ace). Only the frame the
+ * video plays in is black. A time bar under it says how far into the clip
+ * the player is and how long the clip runs (note 5868fbef).
  */
 
 // -- The parts of the YouTube IFrame API this uses ---------------------------
@@ -132,6 +137,8 @@ export function ClipStream({
   const [letThrough, setLetThrough] = useState(false);
   const [paused, setPaused] = useState(false);
   const [exhausted, setExhausted] = useState(false);
+  /** Seconds into the clip the player holds, for the time bar. */
+  const [elapsed, setElapsed] = useState(0);
 
   const mount = useRef<HTMLDivElement>(null);
   const player = useRef<YTPlayer | null>(null);
@@ -170,6 +177,7 @@ export function ClipStream({
       if (write?.kind === 'finished') quietly(clipFinishedAction(clip.id, write.watched), () => undefined);
       if (write?.kind === 'skipped') quietly(clipSkippedAction(clip.id, write.watched), () => undefined);
       live.current = { clip: null, shown: false, done: true };
+      setElapsed(0);
       setIndex((i) => i + 1);
     },
     [],
@@ -189,6 +197,7 @@ export function ClipStream({
       if (!player.current || !ready.current) return;
       live.current = { clip, shown: false, done: false };
       setPaused(false);
+      setElapsed(0);
       player.current.loadVideoById({ videoId: clip.videoId, startSeconds: clip.startSeconds, endSeconds: clip.endSeconds });
       armGrace();
     },
@@ -267,18 +276,20 @@ export function ClipStream({
     play(current);
   }, [begun, current, play]);
 
-  // A clip whose end the player stops short of still moves on.
+  // Move the time bar on, and move on from a clip whose end the player stops short of.
   useEffect(() => {
     const timer = setInterval(() => {
       const { clip, shown, done } = live.current;
       if (!clip || !shown || done || !player.current) return;
+      const time = player.current.getCurrentTime();
+      setElapsed(watchedSeconds(clip, time));
       if (player.current.getPlayerState() !== STATE.PLAYING) return;
-      if (reachedEnd(clip, player.current.getCurrentTime())) {
+      if (reachedEnd(clip, time)) {
         live.current.done = true;
         player.current.pauseVideo();
         leave('ended');
       }
-    }, 500);
+    }, 250);
     return () => clearInterval(timer);
   }, [leave]);
 
@@ -392,30 +403,13 @@ export function ClipStream({
     if (isSwipeUp(point.clientX - start.x, point.clientY - start.y, Date.now() - start.t)) next();
   };
 
-  return (
-    <div
-      className={cn(
-        'fixed inset-0 z-overlay flex flex-col bg-black text-white',
-        'lg:static lg:h-[calc(100dvh-10rem)] lg:min-h-[32rem] lg:overflow-hidden lg:rounded-card',
-      )}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
-    >
-      {/* Top: the way out, on a phone where the shell is covered. */}
-      <div className="flex items-center gap-2 px-3 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-2 lg:hidden">
-        <Link
-          href="/learn/videos"
-          className="press flex size-9 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white"
-        >
-          <X className="size-5" strokeWidth={2} aria-hidden />
-          <span className="sr-only">Close clips</span>
-        </Link>
-        <span className="text-ui font-semibold">Clips</span>
-      </div>
+  const length = current ? Math.max(0, current.endSeconds - current.startSeconds) : 0;
 
-      {/* The stage: the video letterboxed in whatever height is left. */}
-      <div className="relative flex min-h-0 flex-1 items-center justify-center">
-        <div className="relative aspect-video max-h-full w-full">
+  return (
+    <div className={cn(cardVariants(), 'flex flex-col overflow-hidden text-ink')}>
+      {/* The stage: the video in a black frame, a reading column wide from lg up. */}
+      <div className="relative touch-none bg-black text-white" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <div className="relative mx-auto aspect-video w-full lg:max-w-3xl">
           <div ref={mount} className="absolute inset-0 [&>iframe]:size-full" />
           {current && !letThrough && (
             // The layer that takes taps and swipes over the frame, which would
@@ -464,7 +458,7 @@ export function ClipStream({
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center">
             <p className="text-body font-semibold">{exhausted || fixed ? 'That is every clip for now' : 'Finding the next clip…'}</p>
             {(exhausted || fixed) && (
-              <p className="max-w-sm text-ui text-white/70">
+              <p className="max-w-sm text-ui text-white/80">
                 Dash cuts more from your videos a few times a day.{' '}
                 <Link href="/learn/now" className="underline underline-offset-2 hover:text-white">
                   Go to Now
@@ -475,12 +469,22 @@ export function ClipStream({
         )}
       </div>
 
-      {/* What the clip says, where it is from, and what you can do with it. */}
+      {/* How far into the clip, how long it runs, what it says, where it is from, and what you can do with it. */}
       {current && (
-        <div className="space-y-3 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] lg:px-6 lg:pb-5">
+        <div className="space-y-3 card-pad-x pt-3 pb-4 lg:pb-5">
+          <div className="flex items-center gap-2 text-small tabular-nums text-ink-muted">
+            <span>{clockTime(elapsed)}</span>
+            <Meter
+              value={elapsed}
+              max={length}
+              label={`${clockTime(elapsed)} of ${clockTime(length)}`}
+              className="flex-1"
+            />
+            <span>{clockTime(length)}</span>
+          </div>
           <div className="min-w-0">
             <p className="text-body font-semibold text-pretty">{current.caption}</p>
-            <p className="mt-1 truncate text-small text-white/70">
+            <p className="mt-1 truncate text-small text-ink-muted">
               {[current.title, current.channel].filter(Boolean).join(' · ') || 'YouTube'}
               <span className="tabular-nums"> · {clockTime(current.startSeconds)}–{clockTime(current.endSeconds)}</span>
             </p>
@@ -518,7 +522,8 @@ export function ClipStream({
   );
 }
 
-/** A button on the black stage: no frame, a light wash, white ink. */
-const stageButton =
-  'press inline-flex h-(--control-h) items-center gap-1.5 rounded-control bg-white/10 px-3 text-ui font-medium text-white ' +
-  'transition-colors duration-quick hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 aria-pressed:bg-white/25';
+/** A button under the stage: the ordinary secondary button, tinted while pressed. */
+const stageButton = cn(
+  buttonVariants({ variant: 'secondary' }),
+  'aria-pressed:bg-accent-tint aria-pressed:text-accent',
+);
