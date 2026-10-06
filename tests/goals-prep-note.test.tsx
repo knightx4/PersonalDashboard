@@ -82,7 +82,7 @@ describe('a Dash prep step on the step it serves', () => {
   it('says an open one is preparing, by its title, linked to its row', () => {
     const html = render([prep(), apply]);
     expect(html).toContain('Dash is preparing: ');
-    expect(html).toMatch(/href="#step-prep"[^>]*>Draft the Kroll cover letter</);
+    expect(html).toMatch(/href="\/goals\/goal-role\/s\/prep"[^>]*>Draft the Kroll cover letter</);
   });
 
   it('puts a finished one on the step as Dash’s draft, folded to its first sentence', () => {
@@ -99,7 +99,7 @@ describe('a Dash prep step on the step it serves', () => {
   });
 
   it('names the step a prep step is for on its own row', () => {
-    expect(render([prep(), apply])).toMatch(/href="#step-apply"[^>]*>For Apply to Kroll</);
+    expect(render([prep(), apply])).toMatch(/href="\/goals\/goal-role\/s\/apply"[^>]*>For Apply to Kroll</);
   });
 
   it('shows nothing for a dropped prep step, or on a step with none', () => {

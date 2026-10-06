@@ -31,7 +31,7 @@ import { Proposal } from './brief-form';
 function ReadButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+    <Button type="submit" size="sm" variant="secondary" pending={pending}>
       {pending ? 'Reading it…' : 'Read this note'}
     </Button>
   );

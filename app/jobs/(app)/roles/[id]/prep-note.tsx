@@ -151,7 +151,7 @@ export function RoundPrep({
           {heading}
           <div className="flex items-center gap-2">
             <PaidHint {...PREP_HINT} align="end" />
-            <Button type="button" size="sm" disabled={pending} onClick={() => prepare(false)}>
+            <Button type="button" size="sm" pending={pending} onClick={() => prepare(false)}>
               {pending ? 'Preparing…' : 'Prepare me'}
             </Button>
           </div>

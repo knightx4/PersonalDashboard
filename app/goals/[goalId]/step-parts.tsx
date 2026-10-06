@@ -1,6 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { formatDay } from '@/lib/goals/dates';
+import { stepHref } from '@/lib/goals/all-goals';
 import { useActionState, useId, useRef, useState, useTransition } from 'react';
 import { CircleUser, Repeat, Target } from 'lucide-react';
 import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
@@ -170,17 +172,20 @@ export function StepFiles({ files }: { files: LinkedFile[] }) {
 /**
  * The Dash step that prepares one of yours, said on your step (plan #1218)
  * while it is open: "Dash is preparing" with the prep step's title, linked to
- * its row. Once it is done, its result is Dash's draft on your step's row
+ * its own page. Once it is done, its result is Dash's draft on your step's row
  * (dash-draft.tsx), as is what Prepare (the button) writes onto the step
  * itself.
  */
-export function PrepNote({ prep }: { prep: StepPrep }) {
+export function PrepNote({ goalId, prep }: { goalId: string; prep: StepPrep }) {
   return (
     <p className="mt-1 px-1 text-small text-ink-muted">
       Dash is preparing:{' '}
-      <a href={`#step-${prep.id}`} className="text-ink underline underline-offset-2">
+      <Link
+        href={stepHref(goalId, prep.id)}
+        className="press-area text-ink underline underline-offset-2"
+      >
         {prep.title}
-      </a>
+      </Link>
     </p>
   );
 }
@@ -568,7 +573,7 @@ export function StepFacts({
               name="totalUnit"
               maxLength={PROGRESS_UNIT_MAX}
               defaultValue={node.totalUnit ?? ''}
-              placeholder="bags"
+              placeholder="of what"
               size={8}
               onBlur={commit}
               aria-label={`What the total for ${node.title} counts`}
@@ -606,7 +611,15 @@ export function StepFacts({
                   name="goalId"
                   aria-label="Another goal this counts towards"
                   icon={<Target className="size-3.5" strokeWidth={2} />}
+                  // Unset until picked: with the first goal chosen, the chip
+                  // read as a link the step already had (note 4a2c79b9).
+                  defaultValue=""
+                  placeholderValue=""
+                  required
                 >
+                  <option value="" disabled>
+                    Another goal
+                  </option>
                   {linkable.map((goal) => (
                     <option key={goal.id} value={goal.id}>
                       {goal.title}

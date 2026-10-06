@@ -487,7 +487,7 @@ describe('askDash proposals', () => {
             before: null,
             after: { id: STEP_ID, title: 'Update my CV' },
             summary: 'Dash added the step "Update my CV" under the goal "Find a new job".',
-            row: { table: 'goals.items', ref: STEP_ID, title: 'Update my CV', href: `/goals/${GOAL_ID}#step-${STEP_ID}` },
+            row: { table: 'goals.items', ref: STEP_ID, title: 'Update my CV', href: `/goals/${GOAL_ID}/s/${STEP_ID}` },
           };
         },
         anthropicApiKey: 'k',
@@ -510,7 +510,7 @@ describe('askDash proposals', () => {
     const back = sent[2].messages[sent[2].messages.length - 1].content as Anthropic.ToolResultBlockParam[];
     expect(back[0].content).toContain('Done: Dash added the step');
     expect(result.turns[1].citations).toEqual([
-      { table: 'goals.items', ref: STEP_ID, title: 'Update my CV', href: `/goals/${GOAL_ID}#step-${STEP_ID}` },
+      { table: 'goals.items', ref: STEP_ID, title: 'Update my CV', href: `/goals/${GOAL_ID}/s/${STEP_ID}` },
     ]);
 
     // The change is done and hangs from the answer.

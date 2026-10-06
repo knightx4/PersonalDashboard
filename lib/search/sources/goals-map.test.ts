@@ -33,7 +33,7 @@ describe('goals search hits', () => {
       kind: 'step',
       ref: 'goals.items:s2',
       subtitle: 'Step · Run a marathon',
-      href: '/goals/g1#step-s2',
+      href: '/goals/g1/s/s2',
     });
     expect(parseRef(hit.ref!)).toMatchObject({ table: 'goals.items', id: 's2' });
   });

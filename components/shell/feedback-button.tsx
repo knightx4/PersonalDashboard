@@ -311,7 +311,7 @@ export function FeedbackButton({
             )}
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="submit" size="sm" disabled={pending}>
+              <Button type="submit" size="sm" pending={pending}>
                 {pending ? 'Saving…' : 'Send'}
               </Button>
               {/* Saves the idea and hands it straight to Dash to shape into

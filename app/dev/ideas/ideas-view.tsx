@@ -121,7 +121,7 @@ function AddIdea() {
       />
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <ModuleSelect name="module" defaultValue={null} />
-        <Button type="submit" size="sm" disabled={pending}>
+        <Button type="submit" size="sm" pending={pending}>
           {pending ? 'Saving…' : 'Add idea'}
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={() => setComposing(false)}>

@@ -3,7 +3,7 @@
 import { useActionState, useOptimistic, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Archive, CloudFog, Flag, ListFilter, ListTree, Repeat, Target } from 'lucide-react';
+import { Archive, ChevronRight, CloudFog, Flag, ListFilter, ListTree, Repeat, Target } from 'lucide-react';
 import { ViewChips } from '@/components/plan-tree/view-chips';
 import { PageHeader } from '@/components/shell/page-header';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
@@ -56,6 +56,7 @@ import { AreaPlanner } from './area-planner';
 import { GoalProgress } from './goal-progress';
 import { useMoveToItems, type Place } from './move-goal';
 import { DashCredit } from '@/components/ui/dash-mark';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
  * Areas and the goals under them (plan #924).
@@ -290,6 +291,9 @@ function AreaSection({
   const [noteState, saveNote, savingNote] = useActionState(setAreaNoteAction, initial);
   const menuAction = useMenuAction();
   const toast = useToast();
+  // On All goals an area folds under its name (note 24a2055c); its own page does not.
+  const [open, setOpen] = useState(true);
+  const folded = !page && !open;
 
   async function archive(form: FormData) {
     const result = await archiveAreaAction(form);
@@ -359,6 +363,20 @@ function AreaSection({
         />
       ) : (
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            aria-controls={`area-body-${area.id}`}
+            aria-label={open ? `Fold ${area.name}` : `Open ${area.name}`}
+            className="press -mr-1 flex size-7 shrink-0 items-center justify-center rounded-control text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink-muted max-sm:size-11"
+          >
+            <ChevronRight
+              className={cn('size-4 transition-transform duration-quick', open && 'rotate-90')}
+              strokeWidth={1.75}
+              aria-hidden
+            />
+          </button>
           <Link
             href={goalViewHref(`/goals/area/${area.id}`, view)}
             // The size the rename field had here (InlineInput), so the area still heads its goals.
@@ -367,49 +385,56 @@ function AreaSection({
           >
             {area.name}
           </Link>
+          {folded && (
+            <span className="shrink-0 text-small text-ink-muted">
+              {goalCount === 1 ? '1 goal' : `${goalCount} goals`}
+            </span>
+          )}
           <ActionMenu label={`${area.name} actions`} items={items} />
         </div>
       )}
       {renameState.error && <p className="px-1 text-small text-danger">{renameState.error}</p>}
-      <form action={saveNote}>
-        <input type="hidden" name="id" value={area.id} />
-        <InlineTextarea
-          name="note"
-          maxLength={AREA_NOTE_MAX}
-          defaultValue={area.note ?? ''}
-          key={`note-${area.note ?? ''}`}
-          placeholder="What you want from this area, in a sentence"
-          aria-label={`What you want from ${area.name}`}
-          disabled={savingNote}
-          onBlur={commitOnBlur(area.note ?? '')}
-          onKeyDown={revertOnEscape(area.note ?? '')}
-          className="text-ink-muted"
-        />
-      </form>
-      {noteState.error && <p className="px-1 text-small text-danger">{noteState.error}</p>}
-      {page?.chips && <div className="pt-2 pb-1">{page.chips}</div>}
-      {page?.empty && <EmptyState icon={Flag} {...page.empty} />}
+      <div id={`area-body-${area.id}`} hidden={folded} className="space-y-2">
+        <form action={saveNote}>
+          <input type="hidden" name="id" value={area.id} />
+          <InlineTextarea
+            name="note"
+            maxLength={AREA_NOTE_MAX}
+            defaultValue={area.note ?? ''}
+            key={`note-${area.note ?? ''}`}
+            placeholder="What you want from this area, in a sentence"
+            aria-label={`What you want from ${area.name}`}
+            disabled={savingNote}
+            onBlur={commitOnBlur(area.note ?? '')}
+            onKeyDown={revertOnEscape(area.note ?? '')}
+            className="text-ink-muted"
+          />
+        </form>
+        {noteState.error && <p className="px-1 text-small text-danger">{noteState.error}</p>}
+        {page?.chips && <div className="pt-2 pb-1">{page.chips}</div>}
+        {page?.empty && <EmptyState icon={Flag} {...page.empty} />}
 
-      {proposedCount > 1 && <ApproveArea areaId={area.id} count={proposedCount} />}
-      {goalCount > 0 && (
-        <Card>
-          <ul className="divide-y divide-border">
-            {area.goals.map((goal, i) => (
-              <GoalRow
-                key={goal.id}
-                goal={goal}
-                index={i}
-                count={goalCount}
-                steps={progress[goal.id]}
-                places={places}
-              />
-            ))}
-          </ul>
-        </Card>
-      )}
-      {shownRhythms.length > 0 && <AreaRhythms areaId={area.id} rhythms={shownRhythms} />}
-      <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} />
-      <GoalComposer areaId={area.id} areaName={area.name} learn={area.learn ?? false} />
+        {proposedCount > 1 && <ApproveArea areaId={area.id} count={proposedCount} />}
+        {goalCount > 0 && (
+          <Card>
+            <ul className="divide-y divide-border">
+              {area.goals.map((goal, i) => (
+                <GoalRow
+                  key={goal.id}
+                  goal={goal}
+                  index={i}
+                  count={goalCount}
+                  steps={progress[goal.id]}
+                  places={places}
+                />
+              ))}
+            </ul>
+          </Card>
+        )}
+        {shownRhythms.length > 0 && <AreaRhythms areaId={area.id} rhythms={shownRhythms} />}
+        <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} />
+        <GoalComposer areaId={area.id} areaName={area.name} learn={area.learn ?? false} />
+      </div>
     </section>
   );
 }
@@ -692,7 +717,7 @@ function AreaRhythms({ areaId, rhythms }: { areaId: string; rhythms: AreaRhythm[
           {rhythms.map((rhythm) => (
             <li key={rhythm.id}>
               <Link
-                href={`/goals/${rhythm.goalId}#step-${rhythm.id}`}
+                href={stepHref(rhythm.goalId, rhythm.id)}
                 className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-quick hover:bg-sunken"
               >
                 <Repeat className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />

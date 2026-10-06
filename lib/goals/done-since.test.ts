@@ -103,7 +103,7 @@ describe('doneSince', () => {
       ['change', 'Added step List the loans'],
     ]);
     const result = list.items[0];
-    expect(result.kind === 'result' && result.href).toBe('/goals/g-debt#step-s-rates');
+    expect(result.kind === 'result' && result.href).toBe('/goals/g-debt/s/s-rates');
     expect(result.kind === 'result' && result.unread).toBe(true);
     // The result carries the undo of the write that stored it; the run's
     // earlier start of the same step folds into it rather than getting a line.
@@ -162,7 +162,7 @@ describe('doneSince', () => {
         kind: 'failed',
         title: 'Find three meetups',
         error: 'The routine refused the brief.',
-        href: '/goals/g-city#step-s-events',
+        href: '/goals/g-city/s/s-events',
       }),
     );
   });

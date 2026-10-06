@@ -24,7 +24,7 @@ const ROWS: WatchingRow[] = [
     fired: { value: 186, at: '2026-09-30T14:23:00Z' },
     reportTimes: ['09:00:00', '18:00:00'],
     endsAt: '2026-10-04T03:00:00Z',
-    goal: { title: "Sam's birthday", href: '/goals/g1#step-s1' },
+    goal: { title: "Sam's birthday", href: '/goals/g1/s/s1' },
     report: {
       title: 'Down $24: Jamie xx at Nowadays',
       body: 'Cheapest is $186, from $210 when the watch started. 11 listings, top offer $150. Still at its low, so waiting has paid so far.',

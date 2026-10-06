@@ -19,6 +19,7 @@ import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
 import { MarkFileRead } from './mark-read';
 import { DashCredit } from '@/components/ui/dash-mark';
+import { stepHref } from '@/lib/goals/all-goals';
 
 export const metadata = { title: 'File' };
 export const dynamic = 'force-dynamic';
@@ -124,7 +125,7 @@ export default async function FilePage({
                       href={
                         use.level === 'goal'
                           ? `/goals/${use.goalId}`
-                          : `/goals/${use.goalId}#step-${use.itemId}`
+                          : stepHref(use.goalId, use.itemId)
                       }
                       className="card-pad-x row-pad flex items-start gap-3 transition-colors duration-quick hover:bg-sunken"
                     >

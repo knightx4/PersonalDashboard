@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
-import { runDash, type DashContext, type DashVoice } from './loop';
+import { dateLine, runDash, type DashContext, type DashVoice } from './loop';
 import { dashTool, type DashWriteTool } from './registry';
 
 /**
@@ -172,5 +172,18 @@ describe('a voice with server tools and its own ending (plan #1479, Maya)', () =
     ]);
     const answer = await runDash({ voice: maya, context, turns, today: '2026-10-03', execute, anthropicApiKey: 'k', client: stub });
     expect(answer.ok).toBe(false);
+  });
+});
+
+describe('the date line (note de8e7fbb)', () => {
+  it('spells out the weekday and tomorrow', () => {
+    expect(dateLine('2026-10-04')).toBe(
+      "Today is Sunday, 4 October 2026 (2026-10-04) in the person's timezone, and tomorrow is " +
+        'Monday, 5 October 2026 (2026-10-05). Read "tomorrow", "this month", "last week" and the like from it.',
+    );
+  });
+
+  it('crosses a month end', () => {
+    expect(dateLine('2026-10-31')).toContain('tomorrow is Sunday, 1 November 2026 (2026-11-01)');
   });
 });
