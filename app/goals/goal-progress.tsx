@@ -57,7 +57,7 @@ export function GoalProgress({
             }))}
             track="sunken"
             // Narrower on a phone, so whose move it is, the bar and the count share one line at 390.
-            className="w-16 sm:w-24"
+            className="w-10 sm:w-24"
             label={label}
             moves
           />

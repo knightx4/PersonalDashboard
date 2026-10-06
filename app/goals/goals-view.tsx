@@ -351,7 +351,7 @@ function AreaSection({
                 disabled={renaming}
                 onBlur={commitOnBlur(area.name, { required: true })}
                 onKeyDown={revertOnEscape(area.name)}
-                className="font-display text-title tracking-tight sm:text-title"
+                className="font-display text-title tracking-tight max-sm:min-h-11 sm:text-title"
               />
             </form>
           }
@@ -363,7 +363,7 @@ function AreaSection({
             href={goalViewHref(`/goals/area/${area.id}`, view)}
             // The size the rename field had here (InlineInput), so the area still heads its goals.
             // eslint-disable-next-line no-restricted-syntax -- text-base matches InlineInput's phone size.
-            className="min-w-0 flex-1 border border-transparent px-1 py-0.5 text-base font-semibold text-ink underline-offset-2 [overflow-wrap:anywhere] hover:underline sm:text-ui"
+            className="press-area min-w-0 flex-1 border border-transparent px-1 py-0.5 text-base font-semibold text-ink underline-offset-2 [overflow-wrap:anywhere] hover:underline sm:text-ui"
           >
             {area.name}
           </Link>
@@ -490,7 +490,7 @@ function GoalRow({
             took the click meant for opening the goal. */}
         <Link
           href={`/goals/${goal.id}`}
-          className="flex items-center gap-1.5 px-1 py-0.5 font-medium text-ink underline-offset-2 hover:underline"
+          className="press-area flex items-center gap-1.5 px-1 py-0.5 font-medium text-ink underline-offset-2 hover:underline"
         >
           {goal.focus && canFocus && (
             <>
@@ -506,7 +506,7 @@ function GoalRow({
           <Link
             href={`/goals/${goal.id}`}
             // ui-ok: the done-when is itself the link to the goal, and a link cannot hold links.
-            className="block px-1 py-0.5 whitespace-pre-line text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+            className="press-area block px-1 py-0.5 whitespace-pre-line text-ink-muted underline-offset-2 hover:text-ink hover:underline"
           >
             {goal.acceptance}
           </Link>
@@ -540,10 +540,12 @@ function GoalRow({
         {/* The bar first and the way into the tree after it, on one line
             that wraps, rather than a line for each. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 pt-0.5">
-          {steps && <GoalProgress progress={steps} label={goal.title} />}
+          {/* `contents`, so its parts wrap in this line beside Full tree rather than
+              as a block of their own: at 390 a goal's meta then takes two lines. */}
+          {steps && <GoalProgress progress={steps} label={goal.title} className="contents" />}
           <Link
             href={`/goals/${goal.id}`}
-            className="inline-flex items-center gap-1 text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+            className="press-area inline-flex items-center gap-1 text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline"
           >
             <ListTree className="size-3" strokeWidth={1.75} aria-hidden />
             {goal.status === 'proposed'
