@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import {
+  CalendarDays,
+  Video,
   CalendarClock,
   CheckCircle2,
   CircleAlert,
@@ -147,6 +149,10 @@ export interface PanelProps {
     scheduledAt: string | null;
     /** False when only the day is settled: the hour is not to be shown. */
     timeKnown: boolean;
+    /** The call's link from the invite, when it had one. */
+    meetingUrl?: string | null;
+    /** Where the interview opens in the calendar (note 7b1975cb). */
+    calendarHref?: string | null;
     /** Computed on the server: reading the clock during render is unstable. */
     debriefDue: boolean;
     format: string | null;
@@ -2865,6 +2871,34 @@ function InterviewCard({
         scheduledAt={interview.scheduledAt}
         timeKnown={interview.timeKnown}
       />
+
+      {/* The call and the calendar event, from the invite (note 7b1975cb). */}
+      {(interview.meetingUrl || interview.calendarHref) && (
+        <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-small">
+          {interview.meetingUrl && (
+            <a
+              href={interview.meetingUrl}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="press-area inline-flex items-center gap-1 text-accent underline underline-offset-2"
+            >
+              <Video className="size-3.5" strokeWidth={1.75} aria-hidden />
+              Join the call
+            </a>
+          )}
+          {interview.calendarHref && (
+            <a
+              href={interview.calendarHref}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="press-area inline-flex items-center gap-1 text-accent underline underline-offset-2"
+            >
+              <CalendarDays className="size-3.5" strokeWidth={1.75} aria-hidden />
+              Open in Calendar
+            </a>
+          )}
+        </p>
+      )}
 
       <Interviewers interview={interview} companyContacts={companyContacts} />
 

@@ -34,6 +34,7 @@ export const HIT_KINDS = {
   raise: 'Raise',
   vision: 'Vision',
   story: 'Story',
+  area: 'Area',
   goal: 'Goal',
   step: 'Step',
 } as const;

@@ -134,6 +134,7 @@ import {
   GoalTopSurface,
   FileSurface,
   GoalsAllSurface,
+  GoalsAreaSurface,
   GoalsHomeSurface,
   InformationListSurface,
   InformationOneSurface,
@@ -282,6 +283,8 @@ const rolePanels: PanelProps = {
       kind: 'phone_screen',
       scheduledAt: '2026-09-15T14:00:00.000Z',
       timeKnown: true,
+      meetingUrl: 'https://meet.google.com/abc-defg-hij',
+      calendarHref: 'https://calendar.google.com/calendar/event?eid=YWJjMTIzIG1lQGV4YW1wbGUuY29t',
       debriefDue: false,
       format: 'video',
       status: 'scheduled',
@@ -614,6 +617,7 @@ const reviewRows: ReviewRow[] = [
     fromAddress: 'no-reply@greenhouse.io',
     threadId: 'thread-monzo-payments',
     replyToAddress: 'careers@monzo.example',
+    roleHint: null,
     receivedAt: '2026-09-09T07:41:00.000Z',
     classification: 'confirmation',
     reason: 'Sent by an ATS, and no pursuit on file matches the job id.',
@@ -642,6 +646,7 @@ const reviewRows: ReviewRow[] = [
     // The unplaceable one has neither, which is why the matcher has nothing.
     threadId: null,
     replyToAddress: null,
+    roleHint: null,
     receivedAt: '2026-09-08T16:03:00.000Z',
     classification: 'other',
     reason: 'A person wrote it, and nothing in it names a role.',
@@ -2678,6 +2683,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalsAllSurface />,
+  },
+  {
+    /* An area's own page (plan #1619): one area, its goals and proposals. */
+    id: 'goals-area',
+    label: 'Goals · an area',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAreaSurface />,
   },
   {
     /* The top of a goal page with every section holding something: the

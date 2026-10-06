@@ -1,4 +1,6 @@
 import type { ComponentProps } from 'react';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
 import { HomeView } from '@/app/goals/home-view';
@@ -402,6 +404,61 @@ export function GoalsAllSurface() {
           [fund.id]: home.goals[1].progress!,
           [job.id]: home.goals[2].progress!,
         }}
+        areaRuns={{}}
+        rhythms={{
+          'a-money': [
+            {
+              id: 'r-budget',
+              title: 'Check the budget every week',
+              goalId: cards.id,
+              line: '0 of 1 this week · For Pay off the credit cards',
+            },
+          ],
+        }}
+        canRun
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------- area page */
+
+const moneyArea: AreaWithGoals = {
+  id: 'a-money',
+  name: 'Money',
+  note: 'Out of card debt by spring, with three months of rent put by and nothing left to chance.',
+  position: 10,
+  goals: [
+    cards,
+    fund,
+    goal('g-pension', 'a-money', 'Move the old workplace pension into one account', {
+      status: 'proposed',
+      position: 30,
+      acceptance: 'Both old pensions are in the one account, with the transfer letters filed.',
+    }),
+    goal('g-insurance', 'a-money', 'Get contents insurance for the flat', {
+      status: 'proposed',
+      position: 40,
+    }),
+  ],
+};
+
+/** An area's own page (plan #1619): the Money area alone, two goals open and two Dash proposed. */
+export function GoalsAreaSurface() {
+  return (
+    <div className="mx-auto max-w-3xl">
+      <Link
+        href="/goals/all"
+        className="press-area mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
+      >
+        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> All goals
+      </Link>
+      <GoalsView
+        areas={[moneyArea, ...areas.slice(1)]}
+        areaId="a-money"
+        view="open"
+        onYou={{ [cards.id]: 1 }}
+        progress={{ [cards.id]: cardsProgress, [fund.id]: home.goals[1].progress! }}
         areaRuns={{}}
         rhythms={{
           'a-money': [

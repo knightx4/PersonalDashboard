@@ -27,10 +27,10 @@ Each level has one test, and a thing that fails it belongs at another level.
 **Areas** are directions that never finish, named as nouns: Money, Career,
 The city, Relationships, Health. An area has no done-when. It holds a
 sentence of what you want from it (its note) and the goals that serve it. It
-has no page of its own: it is a section of All goals (`/goals/all#area-<id>`),
-which lists its goals, the goals Dash proposed for it and its rhythms, and
-edits them there. The old area page, `/goals/area/<id>`, redirects to that
-section. A name that reads as an outcome, such as
+has its own page, `/goals/area/<id>`, which lists its goals, the goals Dash
+proposed for it and its rhythms and edits them there; it draws the same
+section All goals shows for the area, and the area's name on All goals, the
+Today list's planning rows and search all open it. A name that reads as an outcome, such as
 "Get a job", is a goal in the wrong place: it ends, so it goes under an area
 as a goal (Career, then *Land your next role*).
 

@@ -44,6 +44,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'goals-steps-opened': ['/goals/[goalId]'],
   'goals-home': ['/goals'],
   'goals-all': ['/goals/all'],
+  'goals-area': ['/goals/area/[areaId]'],
   'goals-page-top': ['/goals/[goalId]'],
   'goals-file': ['/goals/files/[fileId]'],
   'goals-page-bare': ['/goals/[goalId]'],

@@ -177,6 +177,10 @@ export const SPEND_OPERATIONS = {
     // Dash's reply when you discuss a Quick read story (plan #1060). Sonnet,
     // one call per round, three rounds at most.
     'discuss-story',
+    // The evening review of the day's newsletters (plan #1615). Sonnet, one
+    // call per person a day from the hourly news-review cron, none on a day
+    // with no newsletters; background.
+    'daily-review',
   ],
   goals: [
     // Filing a sentence from the capture box against open goals and steps

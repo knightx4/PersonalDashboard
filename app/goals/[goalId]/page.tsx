@@ -406,7 +406,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ goalId
   // date now, and a long line of it read worse on a laptop than a wrapped one.
   return (
     <div className="mx-auto max-w-3xl">
-      {/* Back to the goal's area, which is a section of All goals. */}
+      {/* Back to the goal's area, on its own page. */}
       <Link
         href={areaHref(map.goal.areaId, { open: !closed && map.goal.status !== 'dropped' })}
         className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"

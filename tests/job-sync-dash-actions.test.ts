@@ -57,7 +57,10 @@ vi.mock('@/lib/jobs/inbox/tier-b', () => ({
     parserVersion: 1,
   })),
 }));
-vi.mock('@/lib/jobs/email/link', () => ({ decideLink: vi.fn(() => stub.decision) }));
+vi.mock('@/lib/jobs/email/link', async (actual) => ({
+  ...(await actual<typeof import('@/lib/jobs/email/link')>()),
+  decideLink: vi.fn(() => stub.decision),
+}));
 vi.mock('@/lib/jobs/email/extract', async (actual) => ({
   ...(await actual<typeof import('@/lib/jobs/email/extract')>()),
   verifyExtraction: vi.fn(() => ({ ok: true })),
