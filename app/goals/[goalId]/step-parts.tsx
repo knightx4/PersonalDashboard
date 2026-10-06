@@ -10,7 +10,7 @@ import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EditableProse } from '@/components/ui/editable-prose';
-import { ChipInput, ChipSelect, ComposeTitle, InlineInput } from '@/components/ui/field';
+import { ChipInput, ChipSelect, ComposeTitle, InlineInput, Select } from '@/components/ui/field';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
@@ -658,10 +658,11 @@ function CountSourceFields({ node, onCommit }: { node: StepNode; onCommit: () =>
   return (
     <span className="inline-flex flex-wrap items-center gap-0.5">
       <span className="text-ui text-ink-muted">Counts itself from</span>
-      <ChipSelect
+      {/* A full-size select, so a thumb can reach it on a phone. */}
+      <Select
         name="countSource"
         value={source}
-        placeholderValue=""
+        className="w-auto max-sm:min-h-11"
         onChange={(event) => {
           setSource(event.target.value);
           // The form reads the select after React has drawn the match box.
@@ -675,7 +676,7 @@ function CountSourceFields({ node, onCommit }: { node: StepNode; onCommit: () =>
             {COUNT_SOURCE_CHOICES[option]}
           </option>
         ))}
-      </ChipSelect>
+      </Select>
       {source === 'calendar' && (
         <ChipInput
           type="text"
