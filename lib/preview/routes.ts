@@ -57,6 +57,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'goals-info-list': ['/goals/[goalId]'],
   'goals-info-list-open': ['/goals/[goalId]'],
   'dev-ui': ['/dev/ui'],
+  'dev-ui-corrections': ['/dev/ui'],
   'dev-surfaces': ['/dev/surfaces'],
   'dev-surfaces-changed': ['/dev/surfaces'],
   'jobs-pipeline-dense': ['/jobs/pipeline'],

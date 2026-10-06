@@ -9,7 +9,9 @@ import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
 import { CaptureBoxSurface } from './capture-surfaces';
-import DevUiPage from '@/app/dev/ui/page';
+import { UiStandard } from '@/app/dev/ui/standard';
+import { CorrectionsChart } from '@/app/dev/ui/corrections';
+import type { CorrectionWeek } from '@/lib/plan/correction-share';
 import { ANATOMIES } from '@/app/dev/ui/anatomy';
 import { TravelDemo } from '@/app/dev/ui/travel-demo';
 import { SettleDemo } from '@/app/dev/ui/settle-demo';
@@ -2495,6 +2497,22 @@ const recommendedStats: OriginStats[] = [
   { origin: 'goal', found: 41, saved: 4, applied: 1, interviews: 0, dismissed: 23, expired: 0 },
 ];
 
+/**
+ * Eight weeks of the correction measure on /dev/ui (plan #1543): a week with
+ * no notes, a week where none counted, and a high week, so the empty column,
+ * the zero and the tallest column are all drawn.
+ */
+const CORRECTION_WEEKS: CorrectionWeek[] = [
+  { week: '2026-08-17', notes: 12, corrections: 5 },
+  { week: '2026-08-24', notes: 4, corrections: 0 },
+  { week: '2026-08-31', notes: 43, corrections: 19 },
+  { week: '2026-09-07', notes: 29, corrections: 9 },
+  { week: '2026-09-14', notes: 0, corrections: 0 },
+  { week: '2026-09-21', notes: 26, corrections: 6 },
+  { week: '2026-09-28', notes: 34, corrections: 4 },
+  { week: '2026-10-05', notes: 7, corrections: 2 },
+];
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
@@ -2860,7 +2878,23 @@ export const SURFACES: readonly Surface[] = [
     label: 'UI · the design language',
     module: 'dev',
     width: 'wide',
-    render: () => <DevUiPage />,
+    render: () => <UiStandard corrections={CORRECTION_WEEKS} />,
+  },
+  {
+    /* The correction measure on /dev/ui alone (plan #1543), since the whole
+     * page photographs at sixty thousand pixels tall and a chart is lost in
+     * it. The empty and unread states are one sentence each, drawn beneath. */
+    id: 'dev-ui-corrections',
+    label: 'UI · how often you correct a new screen',
+    module: 'dev',
+    width: 'page',
+    render: () => (
+      <div className="space-y-6">
+        <CorrectionsChart weeks={CORRECTION_WEEKS} />
+        <CorrectionsChart weeks={CORRECTION_WEEKS.slice(-2)} />
+        <CorrectionsChart weeks={[]} />
+      </div>
+    ),
   },
   {
     /* The review tool, reviewed by itself. Circular on purpose: the frames it
