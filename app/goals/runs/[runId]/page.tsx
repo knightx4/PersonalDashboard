@@ -73,7 +73,7 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
         actions={
           <Link
             href="/goals/runs"
-            className="text-small text-ink-muted underline-offset-2 hover:underline"
+            className="press-area text-small text-ink-muted underline-offset-2 hover:underline"
           >
             All runs
           </Link>

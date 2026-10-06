@@ -154,6 +154,14 @@ import {
 } from './public-surfaces';
 import { WeekReviewNoneSurface, WeekReviewSurface } from './week-surfaces';
 import {
+  JobsActivitySurface,
+  JobsAnalyticsSurface,
+  JobsAnswersSurface,
+  JobsCasePageSurface,
+  JobsThoughtsSurface,
+} from './jobs-page-surfaces';
+import { GoalRunSurface, MailMessageSurface } from './mail-run-surfaces';
+import {
   AccountSurface,
   DevBugsSurface,
   DevChangelogSurface,
@@ -3977,6 +3985,58 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevUsageSurface />,
+  },
+
+  /* The Goals, Jobs and Mail pages (plan #1601). Fixtures in
+   * jobs-page-surfaces.tsx and mail-run-surfaces.tsx. */
+  {
+    id: 'goals-run',
+    label: 'Goals · One run and what it changed',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalRunSurface />,
+  },
+  {
+    id: 'jobs-activity',
+    label: 'Jobs · Activity',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsActivitySurface />,
+  },
+  {
+    id: 'jobs-analytics',
+    label: 'Jobs · Analytics',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsAnalyticsSurface />,
+  },
+  {
+    id: 'jobs-answers',
+    label: 'Jobs · Answers',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsAnswersSurface />,
+  },
+  {
+    id: 'jobs-thoughts',
+    label: 'Jobs · Career goals',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsThoughtsSurface />,
+  },
+  {
+    id: 'jobs-case-page',
+    label: 'Jobs · The case page shared with an employer',
+    module: 'jobs',
+    width: 'screen',
+    render: () => <JobsCasePageSurface />,
+  },
+  {
+    id: 'mail-message',
+    label: 'Mail · An email read in the app',
+    module: 'jobs',
+    width: 'page',
+    render: () => <MailMessageSurface />,
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on
