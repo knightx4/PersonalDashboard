@@ -158,6 +158,7 @@ import {
   JobsAnalyticsSurface,
   JobsAnswersSurface,
   JobsCasePageSurface,
+  JobsOnboardingSurface,
   JobsThoughtsSurface,
 } from './jobs-page-surfaces';
 import { GoalRunSurface, MailMessageSurface } from './mail-run-surfaces';
@@ -4023,6 +4024,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <JobsThoughtsSurface />,
+  },
+  {
+    id: 'jobs-onboarding',
+    label: 'Jobs · Onboarding, the first step',
+    module: 'jobs',
+    width: 'screen',
+    render: () => <JobsOnboardingSurface />,
   },
   {
     id: 'jobs-case-page',

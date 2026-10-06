@@ -172,6 +172,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-analytics': ['/jobs/analytics'],
   'jobs-answers': ['/jobs/answers'],
   'jobs-thoughts': ['/jobs/thoughts'],
+  'jobs-onboarding': ['/jobs/onboarding'],
   'jobs-case-page': ['/jobs/p/[slug]'],
   'mail-message': ['/mail/[id]'],
 };
