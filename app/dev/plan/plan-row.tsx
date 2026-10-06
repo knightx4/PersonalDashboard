@@ -81,6 +81,7 @@ import type { TreeActions } from '@/components/plan-tree/types';
 import { LinkedText } from '@/components/ui/linked-text';
 import { criticStopNeeds, type CriticStopView } from '@/lib/plan/ui-check-stop';
 import { CriticStop } from './critic-stop';
+import { SendScreenBack } from './send-back';
 import { ScreenChanges } from '@/components/dev/screen-change';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 
@@ -1115,8 +1116,16 @@ export function PlanRow({
           {criticStop && <CriticStop id={node.id} view={criticStop} />}
 
           {/* The screens this step changed, before and after, as the critic
-              passed them (plan #1541). */}
-          <ScreenChanges changes={screenChanges[node.number] ?? []} />
+              passed them (plan #1541), each with a thumbs-down that reopens
+              a finished step with your words on it (plan #1542). */}
+          <ScreenChanges
+            changes={screenChanges[node.number] ?? []}
+            footer={
+              node.status === 'done'
+                ? (change) => <SendScreenBack id={node.id} surface={change.surface} />
+                : undefined
+            }
+          />
 
           {setupOpen && (
             <SetupJob

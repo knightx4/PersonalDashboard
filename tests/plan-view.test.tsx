@@ -509,11 +509,18 @@ describe('PlanView', () => {
     expect(html).toMatch(/>4<\/span> Dash/);
   });
 
+  it('leaves a zero out of the count strip, except open', () => {
+    const html = render('open');
+    expect(html).not.toMatch(/>0<\/span> (on you|ready|proposed|waiting|not specified|underway|Dash|done)/);
+  });
+
   it('draws five views as chips and leaves the rest to the menu', () => {
     const row = /<nav aria-label="View"[^>]*>([\s\S]*?)<\/nav>/.exec(render('open'))?.[1] ?? '';
     expect(row).not.toBe('');
     expect([...row.matchAll(/<a /g)]).toHaveLength(5);
-    for (const label of ['Open', 'Ready', 'On you', 'Dash&#x27;s', 'Everything']) {
+    // The whole plan is "All" on this row, so the chips and More fit one
+    // line at 390 (plan #1542).
+    for (const label of ['Open', 'Ready', 'On you', 'Dash&#x27;s', '>All<']) {
       expect(row).toContain(label);
     }
     // The menu holds the other four. Its panel is a portal opened on a press,

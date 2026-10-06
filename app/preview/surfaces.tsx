@@ -108,6 +108,7 @@ import { StoryText } from '@/components/news/story-text';
 import {
   PlanCriticStopSurface,
   PlanScreenChangeSurface,
+  PlanSendBackSurface,
   PlanOpenedSurface,
   PlanTreeSurface,
   ProjectPlanSurface,
@@ -2716,6 +2717,16 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PlanScreenChangeSurface />,
   },
   {
+    /* The thumbs-down under a finished step's pictures (plan #1542): opened
+     * under the first surface, with the box that says what is wrong, and
+     * closed under the second. */
+    id: 'dev-plan-send-back',
+    label: 'Plan · sending a screen back',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanSendBackSurface />,
+  },
+  {
     /* A goal's steps, drawn with the plan's shared row (plan #982), beside
      * the plan's own shots so the two can be compared. */
     id: 'goals-steps-tree',
@@ -2866,6 +2877,7 @@ export const SURFACES: readonly Surface[] = [
             id: 'jobs-pipeline-dense',
             label: 'Pipeline · Dense list (experiment)',
             module: 'jobs',
+            changed: { step: 1541, checkedAt: '2026-10-05T10:40:00Z' },
             notes: [
               {
                 id: 'n1',
@@ -2874,6 +2886,34 @@ export const SURFACES: readonly Surface[] = [
                 resolutionNote: null,
               },
             ],
+          },
+          {
+            id: 'jobs-role-timeline',
+            label: 'Role · Timeline and to-dos',
+            module: 'jobs',
+            notes: [],
+          },
+        ]}
+      />
+    ),
+  },
+  {
+    /* The same tool filtered to "Changed this week" (plan #1542): only the
+     * surface a step changed in the last seven days, with the step named. */
+    id: 'dev-surfaces-changed',
+    label: 'Surfaces · changed this week',
+    module: 'dev',
+    width: 'wide',
+    render: () => (
+      <SurfaceReview
+        show="changed"
+        surfaces={[
+          {
+            id: 'jobs-pipeline-dense',
+            label: 'Pipeline · Dense list (experiment)',
+            module: 'jobs',
+            changed: { step: 1541, checkedAt: '2026-10-05T10:40:00Z' },
+            notes: [],
           },
           {
             id: 'jobs-role-timeline',

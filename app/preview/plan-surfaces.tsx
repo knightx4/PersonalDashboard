@@ -1,6 +1,8 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { projectById } from '@/lib/plan/projects';
 import { PlanView, type PlanCatalogEntry } from '@/app/dev/plan/plan-view';
+import { SendScreenBack } from '@/app/dev/plan/send-back';
+import { ScreenChanges } from '@/components/dev/screen-change';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import type { CriticStopView } from '@/lib/plan/ui-check-stop';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
@@ -565,5 +567,27 @@ export function PlanScreenChangeSurface() {
       unfolded
       opened
     />
+  );
+}
+
+/**
+ * The thumbs-down under a finished step's pictures, opened on the first
+ * surface to show what it asks, and closed under the second (plan #1542).
+ */
+export function PlanSendBackSurface() {
+  const changes = screenChangeFixtures[changedNumber].slice(0, 2);
+  return (
+    <div className="max-w-2xl p-4">
+      <ScreenChanges
+        changes={changes}
+        footer={(change) => (
+          <SendScreenBack
+            id="pictures-shipped"
+            surface={change.surface}
+            open={change.surface === changes[0].surface}
+          />
+        )}
+      />
+    </div>
   );
 }
