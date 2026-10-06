@@ -154,7 +154,7 @@ describe('R8: no workspace has more than three moments', () => {
   });
 
   it('a moment not fully built names the step that builds it, and a demo it names is on the page', () => {
-    const page = readFileSync(join(root, 'app/dev/ui/page.tsx'), 'utf8');
+    const page = readFileSync(join(root, 'app/dev/ui/standard.tsx'), 'utf8');
     for (const moment of MOMENTS) {
       if (moment.state.built !== 'yes') expect(moment.state.step, moment.name).toBeGreaterThan(0);
       if (moment.demo) expect(page, moment.name).toContain(`id="${moment.demo}"`);
