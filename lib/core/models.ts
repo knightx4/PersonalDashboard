@@ -138,6 +138,8 @@ export const MODELS = {
   newsDigest: HAIKU,
   /** lib/news/issues/importance.ts */
   newsImportance: HAIKU,
+  /** lib/news/review/write.ts */
+  newsDailyReview: SONNET,
   /** lib/news/recommend/make.ts */
   newsRecommend: OPUS,
   /** lib/recurring/extract.ts */
