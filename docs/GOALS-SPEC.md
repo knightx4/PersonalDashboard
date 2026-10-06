@@ -758,24 +758,49 @@ start one, the answer is kept and the flag stays open. Flags are left off
 
 ## The daily view
 
-The Goals home page is for a once-a-day visit, and it is sorted by whose
-move each thing is, so nothing Claude will do reads as yours and nothing
-waiting on your approval looks under way:
+The Goals home page is for a once-a-day visit. It is one column, in the
+order you act on it, and at 390 pixels it reads top to bottom without
+anything beside anything else:
 
-- **Your move**, grouped by what it asks of you. *Decide*: questions, and
-  what a run flagged. *Approve*: goals Claude proposed, one row per area
-  (the All goals page has Approve and Turn down on each, and Approve all for
-  an area), and steps that would act outside the plan. *Read*: a result Claude
-  produced, and the context and drafts it found for a goal. *Do*: your own
-  next steps across every goal, with the rhythms running out of days.
-- **Dash is on it**: the runs going now, the Claude steps the next morning
-  run will work, and the Claude steps held until you approve the goal they
-  sit under or the action they would take.
-- **Your goals**: each goal's bar, its status and the way into its
-  tree.
+1. **Dash's card**: one sentence on where the goals stand, the first
+   paragraph of Dash's morning note (`goals.briefs`) with **More** for the
+   rest, and Ask Dash, the home's one box for adding anything.
+2. **This week**: the week's focus goals by name, and the card that plans
+   the week. The page passes both in (`focusLine` and `planWeek` on
+   `HomeView`); without them nothing is drawn.
+3. **Do next**: at most five things on you, ranked (`lib/goals/today.ts`,
+   `TODAY_CAP`), each with its one button (Answer, Done, Review and so on),
+   Not now, and Ask Dash where Dash can prepare the step.
+4. Four lines that open in place, each saying on its closed line whether it
+   is worth opening: **Dash is on N things** (the runs going now, Dash's open
+   steps, and goals Dash could take), **Since your last visit** (below),
+   **Later** (the rest of what is on you in the week's goals, and steps set
+   aside with Not now), and **Other goals** (one line each: the title, its
+   status, or its due date for an errand, and its next move).
+
+Do next comes from the week's focus goals (`goals.items.focus`). While no
+goal is marked, every goal counts. An errand due within seven days, or late,
+counts whether it is marked or not. Questions, flags, and proposed steps or
+goals waiting on your approval come from any goal, because they hold up work
+wherever they are. The rule is `homeInFocus` and the split `homeLists`, both
+in `lib/goals/home.ts`. Other goals lists every goal out of focus, plus an
+errand with no row in Do next, so an errand with a date always shows
+somewhere.
+
+When Dash has prepared something for a step in Do next, it shows on that
+step's row: the result of the Dash step whose `prepares_id` names the step,
+or else the result a prepare run wrote onto the step itself
+(`withPrepared` in `lib/goals/today.ts`). The row shows its first three
+lines, **Open** to read all of it in place, and **Copy**, and keeps its own
+button, so a ready draft and the press that finishes the step sit together.
+Both come from the tree the home already reads, with no extra query.
+
+The home used to end with four numbers for the week. They are gone: one of
+them counted the days you visited, and none of them changed what you did
+next.
 
 A phase closes itself once every step under it is closed
-(`migrations-goals/0040`), so a finished stage never sits under Do waiting
+(`migrations-goals/0040`), so a finished stage never sits in Do next waiting
 for a tick.
 
 The full tree for a goal is one tap away and is for when you want to look at
@@ -784,11 +809,12 @@ steps is too much to read every morning.
 
 ### Tiles, Ask Dash and the tabs
 
-Each goal on the home is a tile, and pressing it opens the goal. The lanes
-(On you, Dash has it, Later) always show every goal; a goal's own page is
-where to look at one goal alone.
+The home has no goal tiles. The week's focus goals are named in the This
+week line, the others are under Other goals, and pressing a goal's name in
+either opens the goal. All goals, linked at the foot of Other goals, lists
+every goal.
 
-Ask Dash, under the briefing, sends its words where a chip says: to a goal,
+Ask Dash, in Dash's card, sends its words where a chip says: to a goal,
 as an @dash comment on it; to **A new errand** (Errands, above); or to **A
 new goal**, as the title of a goal in the area chosen, which starts on the
 first area. A new goal is saved approved, as any goal you add is, and a goal
@@ -799,7 +825,7 @@ too. If the run cannot start, the goal is still saved and the message says
 why.
 
 Goals has two tabs, Home and All goals. Runs (`/goals/runs`) is linked as
-**Every run** beside What Dash did on the home. Files (`/goals/files`) is
+**Every run** inside the Since your last visit line on the home. Files (`/goals/files`) is
 linked from the top of All goals and from the Files list in a goal's
 Details. A goal page's back link names its area and opens that area's
 section on All goals.
@@ -813,16 +839,17 @@ point is that opening the app after a busy fortnight should not feel like a
 debt.
 
 After five or more days since the last visit, the home opens with a catch-up
-for the rest of that day. The briefing says how many days you were away,
-what Dash did while you were gone (the list below) moves up under it, ahead
-of the lanes, and the week's numbers are left out. On you already holds what
-is waiting and each goal's next step, so the catch-up has no list of its
-own. The last visit is kept in `goals.visits`.
+for the rest of that day. Dash's card says how many days you were away, and
+the Since your last visit line starts open, showing what Dash did while you
+were gone. Do next already holds what is waiting, so the catch-up has no
+list of its own. The last visit is kept in `goals.visits`.
 
 ### Since your last visit
 
-On any other day, the home opens with what Dash did since your last sitting
-(plan #1076), newest run first, in three kinds of line:
+On any other day, the Since your last visit line is closed, and says how
+many results, changes and failed runs it holds. Opened, it lists what Dash
+did since your last sitting (plan #1076), newest run first, in three kinds
+of line:
 
 - A result: the note or draft a run stored on a step. **Read** opens the step
   on its goal's page, where the result is shown and marked read. When the

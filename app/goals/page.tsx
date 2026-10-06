@@ -7,7 +7,6 @@ import { loadBrief } from '@/lib/goals/briefs-store';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import type { DoneSince } from '@/lib/goals/done-since';
 import { loadDoneSince } from '@/lib/goals/done-since-store';
-import { weekHealth } from '@/lib/goals/home';
 import { loadHome } from '@/lib/goals/home-store';
 import { loadAreas } from '@/lib/goals/store';
 import { catchUpSince } from '@/lib/goals/catch-up';
@@ -29,10 +28,12 @@ function now(): number {
 }
 
 /**
- * The Goals home (plan #1077): Dash's briefing with Ask Dash, every goal as
- * a tile over three lanes (On you, Dash has it, Later), what Dash did since
- * your last visit, and the week's four numbers (plan #1079). The layout and
- * what moved where from the old home are in home-view.tsx.
+ * The Goals home (plan #1077): Dash's card with Ask Dash, Do next from the
+ * week's focus goals, and lines that open to what Dash is on, what Dash did
+ * since your last visit, Later and the other goals. The layout is in
+ * home-view.tsx, which also takes the week's focus goals by name and the
+ * card that plans the week as `focusLine` and `planWeek`; neither is passed
+ * yet.
  *
  * Each visit is recorded (plan #1019), and what Dash did is read from the
  * visit before this sitting (plan #1076); after time away that is the visit
@@ -53,7 +54,6 @@ export default async function GoalsPage() {
       loadHome(client, supabase, {
         userId: user.id,
         today,
-        timeZone: account.timezone,
         now: now(),
       }),
     ),
@@ -70,28 +70,15 @@ export default async function GoalsPage() {
     (): DoneSince | null => null,
   );
 
-  // The day you come back after time away, the home leads with what Dash did.
+  // The day you come back after time away, the line for what Dash did starts open.
   const awayFrom = catchUpSince(visit, today);
-
-  const { week, ...rest } = home;
-  // The count of what is on you is the whole of Today, folded part included.
-  const health = week
-    ? weekHealth({
-        week: week.span,
-        dashClosedAt: week.dashClosedAt,
-        waitingOnYou: home.today.length + home.later.length,
-        stuck: week.stuck,
-        visitDays: visit.visitDays,
-      })
-    : null;
 
   return (
     <div className="mx-auto max-w-6xl">
       <PageHeader title="Goals" />
       <HomeView
-        {...rest}
+        {...home}
         done={done}
-        health={health}
         brief={brief ? { body: brief.body, when: noteWhen(brief, account.timezone) } : null}
         timeZone={account.timezone}
         todayOn={today}
