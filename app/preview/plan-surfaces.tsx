@@ -3,6 +3,7 @@ import { projectById } from '@/lib/plan/projects';
 import { PlanView, type PlanCatalogEntry } from '@/app/dev/plan/plan-view';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import type { CriticStopView } from '@/lib/plan/ui-check-stop';
+import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import type { LastRun } from '@/lib/plan/run-end';
 import {
   applyView,
@@ -448,6 +449,119 @@ export function PlanCriticStopSurface() {
       lastRuns={{}}
       commitChecks={{}}
       criticStops={criticStops}
+      unfolded
+      opened
+    />
+  );
+}
+
+/**
+ * A step that changed screens, opened (plan #1541): each surface's phone
+ * picture before and after, side by side. One surface has both, one is new
+ * and has no before, and one passed with its pictures never uploaded, which
+ * is how a round recorded from the web arrives.
+ */
+const changedItems: PlanItem[] = [
+  item({
+    id: 'pictures',
+    module: 'dev',
+    title: 'See each screen change as before and after pictures',
+    size: 'm',
+  }),
+  item({
+    id: 'pictures-row',
+    module: 'dev',
+    parentId: 'pictures',
+    title: 'Draw the contact card with the last conversation under the name',
+    detail: 'The contact page leads with the person and the last thing said between you.',
+    acceptance: 'A contact reads as one card at 390, with the last conversation under the name.',
+    status: 'done',
+    size: 's',
+    commitSha: 'c0ffee1',
+    startedAt: '2026-10-05T09:00:00Z',
+    completedAt: '2026-10-05T11:00:00Z',
+  }),
+  item({
+    id: 'pictures-next',
+    module: 'dev',
+    parentId: 'pictures',
+    title: 'Send a screen back from its pictures',
+    size: 's',
+  }),
+];
+
+const changedTree = buildPlanTree({ items: changedItems, dependencies: [] });
+
+/**
+ * A phone screen in miniature, so the gallery needs no bucket. `crowded` is
+ * the before: three stacked cards where the after has one.
+ * ui-ok-file: raw-hex -- the colours are a picture of a page, not the page's own theme.
+ */
+export function phoneShot(crowded: boolean): string {
+  const bg = '#f7f6f3';
+  const card = '#ffffff';
+  const ink = '#c9c6bf';
+  const accent = '#8a7fd6';
+  const cards = crowded
+    ? [20, 150, 280, 410, 540]
+        .map(
+          (y) =>
+            `<rect x="14" y="${y}" width="362" height="116" rx="10" fill="${card}"/><rect x="28" y="${y + 16}" width="200" height="14" rx="4" fill="${ink}"/><rect x="28" y="${y + 40}" width="300" height="10" rx="4" fill="${ink}"/><rect x="28" y="${y + 58}" width="320" height="10" rx="4" fill="${ink}"/><rect x="28" y="${y + 76}" width="260" height="10" rx="4" fill="${ink}"/>`,
+        )
+        .join('')
+    : `<rect x="14" y="20" width="362" height="260" rx="12" fill="${card}"/><circle cx="58" cy="70" r="26" fill="${accent}"/><rect x="98" y="54" width="180" height="16" rx="4" fill="${ink}"/><rect x="98" y="78" width="120" height="10" rx="4" fill="${ink}"/><rect x="30" y="120" width="320" height="10" rx="4" fill="${ink}"/><rect x="30" y="140" width="280" height="10" rx="4" fill="${ink}"/><rect x="30" y="200" width="120" height="40" rx="20" fill="${accent}"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 693"><rect width="390" height="693" fill="${bg}"/>${cards}</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+const changedNumber = changedItems[1].number;
+
+export const screenChangeFixtures: Record<number, ScreenChangeView[]> = {
+  [changedNumber]: [
+    {
+      surface: 'jobs-contact',
+      round: 2,
+      verdict: 'pass',
+      checkedAt: '2026-10-05T10:40:00Z',
+      before: phoneShot(true),
+      after: phoneShot(false),
+    },
+    {
+      surface: 'jobs-contact-empty',
+      round: 1,
+      verdict: 'pass',
+      checkedAt: '2026-10-05T10:45:00Z',
+      before: null,
+      after: phoneShot(false),
+    },
+    {
+      surface: 'jobs-contacts',
+      round: 4,
+      verdict: 'accepted',
+      checkedAt: '2026-10-05T10:50:00Z',
+      before: null,
+      after: null,
+    },
+  ],
+};
+
+export function PlanScreenChangeSurface() {
+  return (
+    <PlanView
+      sections={applyView(changedTree, 'all').filter((section) => section.nodes.length > 0)}
+      finished={[]}
+      summary={summarize(changedTree)}
+      view="all"
+      catalog={catalogOf(changedTree)}
+      empty={false}
+      canSend={false}
+      lastRuns={{}}
+      // CI passed on the merge, which is the usual state of a step whose
+      // screens passed, and the row carries no mark for it.
+      commitChecks={{
+        c0ffee1: { mergeSha: 'facade1', conclusion: 'passed', checkedAt: '2026-10-05T11:30:00Z' },
+      }}
+      screenChanges={screenChangeFixtures}
       unfolded
       opened
     />

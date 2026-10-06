@@ -6,8 +6,9 @@
  * Reads the critic's verdict, saved unchanged at
  * `.preview-shots/checks/<step or note id>--<surface>--r<round>.json`, keeps a
  * copy of the round's four shots beside it (the next shoot overwrites the
- * originals), uploads them to the private `ui-shots` bucket and writes the
- * round to `public.ui_checks`. Run it after every round, pass or fix, before
+ * originals), with main's shots of the surface from `.preview-shots/before/`
+ * when the builder left them there, uploads them to the private `ui-shots`
+ * bucket and writes the round to `public.ui_checks`. Run it after every round, pass or fix, before
  * making the fixes and shooting again. Recording a round twice replaces it.
  *
  * What it can do depends on what the session has:
@@ -27,6 +28,7 @@ import { copyFileSync, existsSync, readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import postgres from 'postgres';
 import {
+  beforeShotFile,
   bucketPath,
   checkLine,
   checkRow,
@@ -41,7 +43,7 @@ import {
   UI_SHOTS_BUCKET,
   verdictFile,
   type CheckOwner,
-  type ShotName,
+  type KeptShot,
 } from '../lib/preview/ui-checks';
 
 function fail(message: string): never {
@@ -54,11 +56,21 @@ function arg(flag: string): string | null {
   return i >= 0 ? (process.argv[i + 1] ?? null) : null;
 }
 
-/** Keep this round's shots where the next shoot cannot reach them. */
-function keepShots(owner: CheckOwner, surface: string, round: number): ShotName[] {
-  const kept: ShotName[] = [];
-  for (const shot of SHOT_NAMES) {
-    const from = shotFile(surface, shot);
+/**
+ * Keep this round's shots where the next shoot cannot reach them, and main's
+ * shots of the surface beside them as `before-…` when the builder left them in
+ * `.preview-shots/before/` (plan #1541).
+ */
+function keepShots(owner: CheckOwner, surface: string, round: number): KeptShot[] {
+  const kept: KeptShot[] = [];
+  const sources: Array<[KeptShot, string]> = [
+    ...SHOT_NAMES.map((shot): [KeptShot, string] => [shot, shotFile(surface, shot)]),
+    ...SHOT_NAMES.map((shot): [KeptShot, string] => [
+      `before-${shot}`,
+      beforeShotFile(surface, shot),
+    ]),
+  ];
+  for (const [shot, from] of sources) {
     const to = keptShotFile(owner, surface, round, shot);
     // A copy already kept wins: by the second run of a round, the shots in
     // .preview-shots/ may be the next round's.
@@ -99,8 +111,14 @@ async function main() {
   }
 
   const kept = keepShots(owner, surface, round);
-  if (kept.length < SHOT_NAMES.length) {
-    console.warn(`Only ${kept.length} of the ${SHOT_NAMES.length} shots were found for ${surface}.`);
+  const after = kept.filter((shot) => !shot.startsWith('before-')).length;
+  if (after < SHOT_NAMES.length) {
+    console.warn(`Only ${after} of the ${SHOT_NAMES.length} shots were found for ${surface}.`);
+  }
+  if (after === kept.length) {
+    console.warn(
+      `No before shots in .preview-shots/before/ for ${surface}: fine for a new surface.`,
+    );
   }
   const commitArg = arg('--commit');
   const commitSha = commitArg && /^[0-9a-f]{7,40}$/i.test(commitArg) ? commitArg : null;
