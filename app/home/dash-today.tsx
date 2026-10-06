@@ -130,6 +130,7 @@ function DashTodayRow({
               // sentence is otherwise a 16px press target on a phone.
               <Link
                 href={entry.href}
+                // ui-ok: the hit area is the 44px touch minimum, not a control height
                 className="relative block hover:text-accent before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-['']"
               >
                 {entry.sentence}
