@@ -792,8 +792,14 @@ done when, what it needs, the questions with their answer boxes, what it waits
 on, its history and the thread. The row's presses (Mine, Send, send what is
 beneath, re-shape, and the menu) sit above whichever tab is open, so anything
 done to a feature from its row can be done here. The Steps tab lists the
-feature's steps as the plan's tree, unfolded. A step's own number opens its
-feature's page on the Steps tab at that step's row, so every number on the
+feature's steps and substeps in status groups (plan #1665): blocked, in
+progress, ready and not started open, done and dropped folded, each heading
+with its count and each folding on a press. A step is listed once, under the
+group its own health word falls in rather than what is open beneath it, and a
+substep names the step it sits under on a line below its title. A *Tree* chip,
+kept in the address as `view=tree`, swaps the groups for the plan's tree,
+unfolded. A step's own number opens its feature's page on the Steps tab at
+that step's row, opening a folded group to show it, so every number on the
 plan has an address. The row on the plan itself is unchanged; only its title
 became a link.
 

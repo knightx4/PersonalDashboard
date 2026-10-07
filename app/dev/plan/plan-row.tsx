@@ -620,6 +620,12 @@ export function usePlanRow({
    * page's Steps tab asks for this (plan #1664); /dev/plan is unchanged.
    */
   inlinePriority?: boolean;
+  /**
+   * A small line under the title saying where the row sits, for a list that
+   * does not draw the tree: the Steps tab's status groups name a substep's
+   * step this way (plan #1665). Read by `PlanRow`, not here.
+   */
+  source?: string;
 }) {
   // Ticks, so a re-shape that ages out stops holding this row's buttons shut
   // without the page being navigated. 0 before mount, which is what keeps the
@@ -1313,6 +1319,7 @@ export function PlanRow(props: PlanRowProps) {
       addedBy={parts.addedBy}
       titles={parts.refTitles}
       titleHref={feature ? featureHref(own.number) : undefined}
+      source={props.source}
       dependencies={{ catalog: props.catalog, groupOf: (entry) => scopeLabel(entry.module) }}
       marks={parts.marks}
       priority={parts.priority}

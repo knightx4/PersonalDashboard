@@ -95,8 +95,8 @@ const tree = buildPlanTree({
 const section = tree.find((s) => s.module === 'dev')!;
 const feature = section.nodes[0];
 
-function render(tab = '') {
-  search = tab ? `tab=${tab}` : '';
+function render(tab = '', extra = '') {
+  search = [tab ? `tab=${tab}` : '', extra].filter(Boolean).join('&');
   return renderToStaticMarkup(
     <FeaturePage
       feature={feature}
@@ -147,5 +147,23 @@ describe('the feature page', () => {
     // A step's title folds in place; only a feature's links away.
     expect(html).not.toContain('href="/dev/plan/3"');
     expect(html).toContain('Add a step');
+  });
+
+  it('groups the steps by status, each once, with a substep naming its step', () => {
+    const html = render('steps');
+    // A group's heading is its name and its count.
+    expect(html).toMatch(/<span>Ready<\/span><span class="tabular/);
+    expect(html).not.toMatch(/<span>Blocked<\/span>/);
+    // Listed once each, not again inside their step.
+    expect(html.split('id="plan-4"').length).toBe(2);
+    expect(html).toMatch(/Under #[\d.]+ Draw the Overview/);
+    expect(html).toContain('href="/dev/plan/1?tab=steps&amp;view=tree"');
+  });
+
+  it('draws the tree instead when the Tree chip is on', () => {
+    const html = render('steps', 'view=tree');
+    expect(html).toContain('Photograph it');
+    expect(html).not.toContain('Under #');
+    expect(html).not.toMatch(/<span>Ready<\/span><span class="tabular/);
   });
 });
