@@ -10,9 +10,24 @@ import {
   type InterviewNote,
   type InterviewQuestion,
 } from '@/lib/dash/interview';
+import { draftFromInterview, type InterviewDrafts } from '@/lib/dash/interview-draft';
 import { MODULES, moduleForPath } from '@/lib/modules';
+import { MAX_CHANGED_LINES } from './changes';
+import {
+  draftCandidates,
+  draftFits,
+  draftVisionNote,
+  draftWhy,
+  interviewCitation,
+  newSpecTarget,
+  specChangeHref,
+  specDraftDiff,
+  visionDraftHref,
+  type DraftTarget,
+} from './interview-draft';
 import {
   addInterviewTurn,
+  finishSpecInterview,
   loadSpecInterview,
   nextMove,
   requestInterviewDraft,
@@ -20,10 +35,12 @@ import {
 } from './interviews';
 import { readSpec, SPECS } from './registry';
 import { APP_VISION, type VisionScope } from './vision';
+import { writeVisionReview } from './vision-review';
 
 /**
- * The interview's two moves as a server action makes them (plan #1639): Dash
- * asking its next question, and the person answering. Each reads the
+ * The interview's moves as a server action makes them (plan #1639): Dash
+ * asking its next question, and the person answering; and when the questions
+ * end, Dash drafting the vision and the spec (plan #1640, draftInterview). Each reads the
  * interview fresh and checks whose move it is, so a double press or a second
  * tab cannot ask twice or answer a question that was never asked.
  *
@@ -197,4 +214,224 @@ export async function answerInterview(
   const after = await loadSpecInterview(client, userId, interviewId);
   if (!after) throw new Error('That interview is no longer there.');
   return after;
+}
+
+/** What drafting came to. */
+export type DraftedInterview =
+  | {
+      kind: 'drafted';
+      /** The pending edit in vision_reviews, under the vision on /dev/specs. */
+      visionReviewId: string;
+      /** The proposed change in spec_changes, under "Changes to specs". */
+      specChangeId: string;
+      /** The spec it goes into, by slug; a new one when `newSpec`. */
+      spec: string;
+      newSpec: boolean;
+      /** Where each lands on the specs page. */
+      visionHref: string;
+      specChangeHref: string;
+      /** True when the vision edit took the place of one the weekly review proposed. */
+      foldedVisionEdit: boolean;
+    }
+  /** Not time to draft: a question is waiting ('answer'), more can be asked ('ask'), or it has finished (null). */
+  | { kind: 'stop'; move: 'ask' | 'answer' | null }
+  | { kind: 'failed'; detail: string };
+
+type PendingEdit = { id: string; proposed_body: string | null; created_at: string };
+
+/**
+ * Draft the vision and the spec from an interview whose questions have ended
+ * (nextMove 'draft'), and finish it as drafted (plan #1640).
+ *
+ * The vision goes in as a pending edit in vision_reviews under the
+ * interview's id as its review_id, beside the current vision with the accept
+ * and dismiss the weekly review's edits have. A workspace holds one pending
+ * edit, so when the weekly review has one waiting the draft takes its place:
+ * that row is rewritten with the drafted text, which the model was given the
+ * old proposal to fold in, rather than dismissed, since dismissing is the
+ * person's move.
+ *
+ * The spec goes in as a proposed spec_changes row, made by Dash, whatever
+ * else is waiting: the person asked for this one, so the weekly audit's cap
+ * of five does not apply. It is held to the 60-line limit; a draft over it is
+ * asked for once more, shorter, and then refused.
+ *
+ * One model call, two when the first draft runs long: about thirty seconds to
+ * a minute in all. Spend goes to `onSpend`, which the caller records under
+ * 'ask-dash' as it does the questions.
+ */
+export async function draftInterview(
+  client: AnyClient,
+  userId: string,
+  interviewId: string,
+  deps: {
+    anthropicApiKey: string;
+    /** YYYY-MM-DD in the person's timezone. */
+    today: string;
+    onSpend?: SpendSink;
+    anthropic?: Anthropic;
+  },
+): Promise<DraftedInterview> {
+  const interview = await loadSpecInterview(client, userId, interviewId);
+  if (!interview) return { kind: 'failed', detail: 'That interview is not one of yours, or it is no longer there.' };
+  const move = nextMove(interview);
+  if (move !== 'draft') return { kind: 'stop', move };
+
+  const scope = interview.module;
+  const candidates = draftCandidates(scope, SPECS);
+  const created = candidates.length === 0 ? newSpecTarget(scope, SPECS) : null;
+
+  if (created) {
+    const { data: waiting } = await client
+      .from('spec_changes')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('spec', created.slug)
+      .in('status', ['proposed', 'approved'])
+      .limit(1);
+    if ((waiting ?? []).length > 0) {
+      return {
+        kind: 'failed',
+        detail: `A new spec for ${scopeLabel(scope)} is already waiting on the specs page. Approve or decline it before Dash drafts another.`,
+      };
+    }
+  }
+
+  const [background, pending] = await Promise.all([
+    loadInterviewBackground(client, userId, scope),
+    client
+      .from('vision_reviews')
+      .select('id, proposed_body, created_at')
+      .eq('user_id', userId)
+      .eq('module', scope)
+      .eq('status', 'pending')
+      .maybeSingle()
+      .then(({ data }) => (data as PendingEdit | null) ?? null),
+  ]);
+
+  // The specs it may go into, read whole: the background's copies are cut short.
+  const texts = new Map<string, string | null>();
+  for (const candidate of candidates) {
+    const doc = SPECS.find((spec) => spec.slug === candidate.slug);
+    texts.set(candidate.slug, doc ? await readSpec(doc) : null);
+  }
+
+  const heading = scope === APP_VISION ? 'The app as a whole' : scopeLabel(scope);
+  let retry: string | null = null;
+  let drafted: { drafts: InterviewDrafts; diff: string; target: DraftTarget } | null = null;
+  for (let attempt = 0; attempt < 2 && !drafted; attempt++) {
+    const result = await draftFromInterview({
+      interview,
+      background,
+      candidates,
+      pendingVision: pending?.proposed_body ?? null,
+      retry,
+      today: deps.today,
+      anthropicApiKey: deps.anthropicApiKey,
+      client: deps.anthropic,
+      onSpend: deps.onSpend,
+    });
+    if (result.kind === 'failed') return result;
+    const target = created ?? candidates.find((c) => c.slug === result.drafts.spec) ?? candidates[0];
+    const markdown = created ? null : (texts.get(target.slug) ?? null);
+    if (!created && markdown === null) {
+      return { kind: 'failed', detail: `The spec ${target.file} could not be read, so nothing was drafted.` };
+    }
+    const diff = specDraftDiff({ target, markdown, heading, draft: result.drafts });
+    const fits = draftFits(diff);
+    if (fits.ok) {
+      drafted = { drafts: result.drafts, diff, target };
+    } else {
+      retry =
+        `Your last draft came to ${fits.lines} changed lines, and the limit is ${MAX_CHANGED_LINES}, ` +
+        'blank lines and headings included. Write it again, shorter: fewer sections, shorter bodies, fewer rules.';
+    }
+  }
+  if (!drafted) {
+    return { kind: 'failed', detail: `Dash's spec ran over the ${MAX_CHANGED_LINES}-line limit twice, so nothing was drafted.` };
+  }
+
+  const citation = interviewCitation(scopeLabel(scope), deps.today);
+  const { data: change, error: changeError } = await client
+    .from('spec_changes')
+    .insert({
+      user_id: userId,
+      spec: drafted.target.slug,
+      title: drafted.drafts.title,
+      why: draftWhy(citation, drafted.drafts.why),
+      diff: drafted.diff,
+      made_by: 'claude',
+    })
+    .select('id')
+    .single();
+  if (changeError || !change) {
+    return { kind: 'failed', detail: `The spec could not be kept: ${changeError?.message ?? 'nothing was written'}.` };
+  }
+  const specChangeId = (change as { id: string }).id;
+  const undoChange = () => client.from('spec_changes').delete().eq('id', specChangeId).eq('user_id', userId);
+
+  const note = draftVisionNote({ citation, why: drafted.drafts.visionWhy, foldedFrom: pending?.created_at ?? null });
+  let visionReviewId: string;
+  if (pending) {
+    const { data, error } = await client
+      .from('vision_reviews')
+      .update({
+        review_id: interview.id,
+        session_id: null,
+        vision_body: background.vision,
+        proposed_body: drafted.drafts.vision,
+        note,
+      })
+      .eq('id', pending.id)
+      .eq('user_id', userId)
+      .eq('status', 'pending')
+      .select('id');
+    if (error || (data ?? []).length === 0) {
+      await undoChange();
+      return {
+        kind: 'failed',
+        detail: `The vision could not be kept: ${error?.message ?? 'the edit waiting there was decided meanwhile'}. Try again.`,
+      };
+    }
+    visionReviewId = pending.id;
+  } else {
+    const written = await writeVisionReview(client as SupabaseClient, userId, {
+      module: scope,
+      reviewId: interview.id,
+      visionBody: background.vision,
+      note,
+      outcome: 'edit',
+      proposedBody: drafted.drafts.vision,
+      evidenceIds: [],
+    });
+    if ('error' in written) {
+      await undoChange();
+      return { kind: 'failed', detail: `The vision could not be kept: ${written.error}. Try again.` };
+    }
+    visionReviewId = written.id;
+  }
+
+  try {
+    await finishSpecInterview(client, userId, interview.id, {
+      status: 'drafted',
+      summary: drafted.drafts.summary,
+      visionReviewId,
+      specChangeId,
+    });
+  } catch (error) {
+    // Another press drafted it first: keep that one's drafts, not these.
+    await undoChange();
+    return { kind: 'failed', detail: error instanceof Error ? error.message : String(error) };
+  }
+
+  return {
+    kind: 'drafted',
+    visionReviewId,
+    specChangeId,
+    spec: drafted.target.slug,
+    newSpec: created !== null,
+    visionHref: visionDraftHref(scope),
+    specChangeHref: specChangeHref(specChangeId),
+    foldedVisionEdit: pending !== null,
+  };
 }

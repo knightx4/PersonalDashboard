@@ -122,7 +122,8 @@ function clip(text: string, max: number): string {
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max).trimEnd()} [cut short]`;
 }
 
-function backgroundText(background: InterviewBackground): string {
+/** What is already written about the workspace, as the model is told it. */
+export function backgroundText(background: InterviewBackground): string {
   const parts: string[] = [];
   parts.push(
     background.vision?.trim()
