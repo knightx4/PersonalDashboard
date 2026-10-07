@@ -245,7 +245,7 @@ export async function renderPlanPage({
         description={
           project
             ? `${project.description}, built from this plan in ${project.repo.owner}/${project.repo.repo}. Send a step to Dash and it is built there, pushed to ${project.repo.branch} and closed here with the commit.`
-            : 'Features, the steps that get you there, and the steps beneath those. Seeded from the docs once; edited here after, and read from here by whoever builds next.'
+            : 'Features, the steps that get you there, and the substeps beneath those. Seeded from the docs once; edited here after, and read from here by whoever builds next.'
         }
       />
       {sync.added > 0 && (
