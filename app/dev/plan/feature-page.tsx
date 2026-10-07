@@ -410,7 +410,10 @@ function FeatureSteps({
         <ul
           className={cn(
             cardVariants({ padding: 'none' }),
-            'divide-y divide-border overflow-hidden',
+            // A finished row is not dimmed here: the plan dims one to 70%,
+            // which took its #number below 3:1 on a phone, and on a feature's
+            // own page its Done word already says it is finished.
+            'divide-y divide-border overflow-hidden [&>li]:opacity-100',
           )}
         >
           <ColumnHeader />
@@ -421,6 +424,7 @@ function FeatureSteps({
               node={step}
               trail={[]}
               asStep
+              inlinePriority
               view="open"
               searching={false}
               unfolded

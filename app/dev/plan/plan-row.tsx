@@ -546,6 +546,7 @@ export function usePlanRow({
   unfolded,
   opened = false,
   asStep = false,
+  inlinePriority = false,
 }: {
   node: PlanNode;
   /** One entry per level above: whether that level's line carries on below this row. */
@@ -612,6 +613,13 @@ export function usePlanRow({
    * link (plan #1664).
    */
   asStep?: boolean;
+  /**
+   * Keep the priority word and the size on one line. The menu's wrapper is a
+   * block, so at Normal, where the word is hidden until hover, it still took
+   * the cell's first line and pushed the size half a line low. The feature
+   * page's Steps tab asks for this (plan #1664); /dev/plan is unchanged.
+   */
+  inlinePriority?: boolean;
 }) {
   // Ticks, so a re-shape that ages out stops holding this row's buttons shut
   // without the page being navigated. 0 before mount, which is what keeps the
@@ -1027,6 +1035,7 @@ export function usePlanRow({
             label={`Priority of #${node.number} ${node.title}`}
             items={priorityMenu}
             align="start"
+            className={inlinePriority ? 'inline-block align-baseline' : undefined}
             triggerClassName={cn(
               'h-auto w-auto rounded px-0.5 py-0 font-normal',
               node.priority === 2 &&
@@ -1345,6 +1354,7 @@ export function PlanRow(props: PlanRowProps) {
           searching={searching}
           unfolded={unfolded}
           opened={opened}
+          inlinePriority={props.inlinePriority}
         />
       )}
     />
