@@ -337,7 +337,7 @@ export function PipelineBoard({
               remember={`jobs.fold.pipeline.${column.setStatus}`}
               defaultOpen={columnRows.length > 0}
               summaryClassName={cn(
-                'relative z-20 rounded-card px-3 py-2 transition-colors duration-quick',
+                'relative z-over-link rounded-card px-3 py-2 transition-colors duration-quick',
                 over === column.setStatus ? 'bg-accent-tint' : 'bg-sunken',
               )}
               bodyClassName="space-y-2 px-2 pb-2"

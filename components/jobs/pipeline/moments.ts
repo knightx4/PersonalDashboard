@@ -102,12 +102,16 @@ export function glideOffsets(
 }
 
 /**
- * Glide every lane and card from `before` to where it now stands, `raised`
- * (the card that moved) drawn over the rest while it crosses. Resolves when
- * all have arrived, and at once under reduced motion, where the board is
+ * Glide every lane and card from `before` to where it now stands. Resolves
+ * when all have arrived, and at once under reduced motion, where the board is
  * simply in its new state.
+ *
+ * Nothing is raised by hand: a forward move always lands in a later lane,
+ * which comes later on the page, so the moved card already paints over the
+ * lane it left, and it passes under the heading of the lane it enters, which
+ * sits on the `z-over-link` rung inside that lane.
  */
-export function glideBoard(root: HTMLElement | null, before: BoardLayout, raised?: HTMLElement | null): Promise<void> {
+export function glideBoard(root: HTMLElement | null, before: BoardLayout): Promise<void> {
   if (!root || prefersReducedMotion() || typeof root.animate !== 'function') return Promise.resolve();
   const after = readLayout(root);
   const elements = new Map(
@@ -132,18 +136,12 @@ export function glideBoard(root: HTMLElement | null, before: BoardLayout, raised
     }
     moves.push(element.animate([start, end], timing).finished.catch(() => undefined));
   }
-  if (raised) {
-    raised.style.zIndex = '10';
-    void Promise.all(moves).then(() => {
-      raised.style.zIndex = '';
-    });
-  }
   return Promise.all(moves).then(() => undefined);
 }
 
 /** A role moving forward: the board glides into its new state, then the card is named. */
 export async function playForward(root: HTMLElement | null, card: HTMLElement, before: BoardLayout, column: string) {
-  await glideBoard(root, before, card);
+  await glideBoard(root, before);
   settle(card, column, { at: 'edge', pulse: false });
 }
 
@@ -187,7 +185,7 @@ function ringOut(card: HTMLElement): Promise<void> {
 
 /** An offer: the glide, the card named as the offer, and the ring. */
 export async function playOffer(root: HTMLElement | null, card: HTMLElement, before: BoardLayout, company: string) {
-  await glideBoard(root, before, card);
+  await glideBoard(root, before);
   settle(card, company.trim() ? `Offer · ${company.trim()}` : 'Offer', { at: 'edge', pulse: false });
   await ringOut(card);
 }
