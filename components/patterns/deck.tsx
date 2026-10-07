@@ -87,7 +87,7 @@ export function Deck({
       </DeckSwipe>
       <Card
         padding="none"
-        className="sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] z-10 mt-3 flex items-center gap-2 px-3 py-2 lg:static"
+        className="sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] z-over-link mt-3 flex items-center gap-2 px-3 py-2 lg:static"
       >
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           {current.actions}
