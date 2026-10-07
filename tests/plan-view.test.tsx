@@ -131,7 +131,7 @@ function catalogOf(tree: PlanSection[]): PlanCatalogEntry[] {
 const catalog = catalogOf(whole);
 
 function render(
-  view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocked',
+  view: 'all' | 'open' | 'ready' | 'proposed' | 'claude' | 'blocked' | 'table',
   empty = false,
   // The page folds every feature, and a folded row renders no children at all.
   // These tests are about how a nested row is laid out, so they ask for the
@@ -187,6 +187,22 @@ describe('PlanView', () => {
     // the open ones is.
     expect(html).not.toContain('Schema and RPCs');
     expect(render('all')).toContain('Schema and RPCs');
+  });
+
+  it('lists the open features as a table, each row opening its feature page', () => {
+    // Plan #1669: one row per open feature, grouped by module.
+    const html = render('table');
+    expect(html).toContain('Open features by module');
+    expect(html).toContain('href="/dev/plan/1"');
+    expect(html).toContain('href="/dev/plan/5"');
+    expect(html).toContain('href="/dev/plan/6"');
+    // Features only: a step under one is not a row of its own.
+    expect(html).not.toContain('The anonymous page');
+    // Its columns: priority, size, open steps and done.
+    expect(html).toContain('>Next<');
+    expect(html).toContain('>L<');
+    expect(html).toContain('33%');
+    expect(html).toMatch(/>4<\/span> open/);
   });
 
   it("links a feature's title to its own page, and leaves a step's title the fold", () => {
@@ -522,13 +538,13 @@ describe('PlanView', () => {
     expect(html).not.toMatch(/>0<\/span> (on you|ready|proposed|waiting|not specified|underway|Dash|done)/);
   });
 
-  it('draws five views as chips and leaves the rest to the menu', () => {
+  it('draws five views and the table as chips and leaves the rest to the menu', () => {
     const row = /<nav aria-label="View"[^>]*>([\s\S]*?)<\/nav>/.exec(render('open'))?.[1] ?? '';
     expect(row).not.toBe('');
-    expect([...row.matchAll(/<a /g)]).toHaveLength(5);
+    expect([...row.matchAll(/<a /g)]).toHaveLength(6);
     // The whole plan is "All" on this row, so the chips and More fit one
     // line at 390 (plan #1542).
-    for (const label of ['Open', 'Ready', 'On you', 'Dash&#x27;s', '>All<']) {
+    for (const label of ['Open', 'Ready', 'On you', 'Dash&#x27;s', '>All<', '>Table<']) {
       expect(row).toContain(label);
     }
     // The menu holds the other four. Its panel is a portal opened on a press,

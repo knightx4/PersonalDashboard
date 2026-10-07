@@ -780,6 +780,19 @@ Editing a step includes moving it: *Part of* lists the module's other steps,
 less the step's own subtree. A moved step goes last under its new parent. The
 editor also holds the *not yet specified* box; emptying it clears the column.
 
+### The Table view
+
+The *Table* chip (`view=table`, plan #1669) lists every open feature one to a
+row, grouped by module in the plan's order, with its health, priority, size,
+who has it, its open steps and the percent of its live steps done. Open means
+what it means on the Open view: a closed feature with work still open
+beneath it stays, and one put aside does not. The health is the same derived
+health the tree's column shows, so the two views agree. Pressing a row opens
+the feature's page. On a phone a row keeps the title, the health and the
+percent, and Table is the first entry in *More* rather than a chip, so the
+chips stay on one line. The search narrows the table to the features it
+finds.
+
 ### A feature's page
 
 A feature's title on the plan opens `/dev/plan/<number>`, a page in the
