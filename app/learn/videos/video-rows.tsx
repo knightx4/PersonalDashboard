@@ -82,7 +82,7 @@ export function VideoRows({
         const clips = clipCounts.get(video.videoId);
         return (
           <li key={video.videoId} className="flex items-start gap-3 px-3 py-2">
-            <Link href={href} className="shrink-0" tabIndex={-1} aria-hidden>
+            <Link href={href} className="press-area shrink-0" tabIndex={-1} aria-hidden>
               {/* eslint-disable-next-line @next/next/no-img-element -- YouTube's own stills, not worth the image optimiser */}
               <img
                 src={thumbnailUrl(video.videoId)}
@@ -94,8 +94,8 @@ export function VideoRows({
               />
             </Link>
             <span className="min-w-0 flex-1">
-              <Link href={href} className="line-clamp-2 text-ui text-ink hover:underline">
-                {video.title}
+              <Link href={href} className="press-area block text-ui text-ink hover:underline">
+                <span className="line-clamp-2">{video.title}</span>
               </Link>
               <span className="block truncate text-small tabular-nums text-ink-muted">{meta.join(' · ')}</span>
               <span className="mt-0.5 block text-small text-ink-muted">
