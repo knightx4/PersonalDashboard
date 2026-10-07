@@ -31,6 +31,9 @@ The session that sends you names, for one surface:
   as what it breaks. Notes fixed outside the plan may come with no pattern;
   then there is none to check.
 - **earlier fixes**: on round 2 or 3, the fixes you asked for last round.
+- **removed preferences**: the ids of any preferences the person has taken
+  off `/dev/ui` (kept in `public.ui_taste_removals`). They are still in
+  `taste.ts`, and you never cite one of them.
 
 If the after shots are missing or a path does not open, answer with the fix
 `no shots` and nothing else. You cannot judge a screen you have not seen, and
@@ -45,6 +48,7 @@ reading its code instead is how this app got screens nobody looked at.
 - `app/dev/ui/taste.ts`: the person's own preferences in `TASTE`, cited by
   id. These are what the person has already corrected once on some other
   page. A preference broken again is the finding they most want caught.
+  Leave out any the prompt names as removed: the person took those back.
 
 Each preference names an `example` surface that shows it done right. When you
 are unsure whether a shot breaks one, and the example has shots in

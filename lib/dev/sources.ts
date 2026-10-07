@@ -64,6 +64,7 @@ export const devSources: ModuleSources = {
     'public.spec_sections',
     'public.ui_checks',
     'public.ui_findings',
+    'public.ui_taste_removals',
     'public.ui_reviews',
     'public.vision_reviews',
   ].map((table) => ({ table, reason: ABOUT_THE_APP, page: PAGES[table] })),
