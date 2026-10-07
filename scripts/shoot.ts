@@ -107,6 +107,12 @@ const WIDTHS = (() => {
 const HIDE_DEV_BADGE =
   "document.querySelectorAll('nextjs-portal').forEach(function(e){e.remove()});";
 
+/** True when something visible is fixed to the bottom half of the screen, such as Quick read's Next row. */
+const HAS_PINNED_ROW = `[...document.querySelectorAll('body *')].some(function(e){
+  var s=getComputedStyle(e);if(s.position!=='fixed'&&s.position!=='sticky')return false;
+  if(s.display==='none'||s.visibility==='hidden')return false;
+  var b=e.getBoundingClientRect();return b.height>0&&b.width>0&&b.top>innerHeight/2;})`;
+
 /**
  * Light and dark with no colour by default: the two poles, and a surface right
  * in both is right in a coloured one. Shooting more doubles a run for a
@@ -331,6 +337,36 @@ async function main() {
         writeFileSync(join(OUT, name), Buffer.from(data, 'base64'));
         console.log(`  ${name}`);
         shot += 1;
+
+        // The full-page capture stretches the window to the page, so a row
+        // fixed to the foot of the screen is drawn partway down the content
+        // rather than where a phone shows it (plan #1566). A phone page taller
+        // than the screen with such a row is shot once more, at the phone's
+        // own height and scrolled to the end, as `--phone-<theme>-end.png`.
+        if (size.name === 'phone' && pageHeight > size.height) {
+          await send('Emulation.setDeviceMetricsOverride', {
+            width: size.width,
+            height: size.height,
+            deviceScaleFactor: 2,
+            mobile: true,
+          });
+          await wait(300);
+          const pinned = await send('Runtime.evaluate', {
+            expression: HAS_PINNED_ROW,
+            returnByValue: true,
+          });
+          if ((pinned as unknown as { result?: { value?: boolean } }).result?.value) {
+            await send('Runtime.evaluate', {
+              expression: 'window.scrollTo(0, document.documentElement.scrollHeight)',
+            });
+            await wait(400);
+            const end = await send('Page.captureScreenshot', { format: 'png' });
+            const endName = `${surfaceId}--${size.name}-${slug(theme)}-end.png`;
+            writeFileSync(join(OUT, endName), Buffer.from(end.data, 'base64'));
+            console.log(`  ${endName}`);
+            shot += 1;
+          }
+        }
       }
     }
   }
@@ -382,7 +418,15 @@ function placeFinger(point: { x: number; y: number } | null): string {
     : `(function(){var d=document.getElementById('${FINGER_ID}');if(d)d.style.display='none';})()`;
 }
 
-/** Plays one input event through CDP: touch for a swipe, mouse for a press. */
+/**
+ * Plays one input event through CDP: touch for a swipe, mouse for a press.
+ *
+ * From the third move of a drag on, Chrome held each touchmove back until the
+ * next input arrived, so the page got every move one frame late and the strip
+ * showed the card trailing the finger by a whole step (plan #1566). Each move
+ * is now followed by a copy of itself half a pixel lower: the copy is the one
+ * held, and the real move reaches the page in its own frame.
+ */
 async function dispatch(send: Send, event: InputEvent): Promise<void> {
   if (event.device === 'touch') {
     const type =
@@ -391,6 +435,12 @@ async function dispatch(send: Send, event: InputEvent): Promise<void> {
       type,
       touchPoints: event.phase === 'up' ? [] : [{ x: event.x, y: event.y }],
     });
+    if (event.phase === 'move') {
+      await send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x: event.x, y: event.y + 0.5 }],
+      });
+    }
     return;
   }
   if (event.phase === 'down') {

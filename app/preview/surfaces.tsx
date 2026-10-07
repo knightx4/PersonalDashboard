@@ -76,6 +76,7 @@ import { buildAttachmentIndex, type AttachmentEntry } from '@/lib/vault/markdown
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
 import { noteHref } from '@/lib/vault/paths';
 import { PageHeader } from '@/components/shell/page-header';
+import { PersonalityScoresSurface, PersonalityTestSurface } from './personality-surfaces';
 import { AddTranscript } from '@/app/vault/education/add-transcript';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
 import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
@@ -3768,6 +3769,23 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <ClipStreamSurface />,
+  },
+  {
+    /* The Big Five test (plan #1632): fifty statements, the first seven
+     * answered. Fixtures in personality-surfaces.tsx. */
+    id: 'learn-personality-test',
+    label: 'Learn · Personality test',
+    module: 'learn',
+    width: 'page',
+    render: () => <PersonalityTestSurface />,
+  },
+  {
+    /* The same page opened with a result kept: the five scores. */
+    id: 'learn-personality-scores',
+    label: 'Learn · Personality scores',
+    module: 'learn',
+    width: 'page',
+    render: () => <PersonalityScoresSurface />,
   },
   {
     /* Clips before any are cut. */
