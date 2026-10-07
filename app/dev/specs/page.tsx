@@ -6,9 +6,16 @@ import { MODULE_IDS } from '@/lib/modules';
 import { specCommentCounts } from '@/lib/specs/load';
 import { loadModuleVisions } from '@/lib/specs/vision';
 import { loadPendingVisionEdits } from '@/lib/specs/vision-review';
+import { loadSpecInterviews } from '@/lib/specs/interviews';
+import { interviewCards } from '@/lib/specs/interview-view';
 import { SpecsView } from './specs-view';
 
 export const metadata = { title: 'Specs' };
+
+// An interview's last answer has Dash draft the vision and a spec, one or two
+// model calls of up to a minute, inside the answer's server action
+// (app/dev/specs/interview-actions.ts). The page's limit is the action's.
+export const maxDuration = 300;
 
 /**
  * The documents that argue for what got built, with somewhere to argue back.
@@ -43,14 +50,29 @@ const UNSPECCED = MODULE_IDS.filter(
 export default async function SpecsPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const [counts, visions, edits, changes, audit] = await Promise.all([
+  const [counts, visions, edits, changes, audit, interviews] = await Promise.all([
     specCommentCounts(supabase, user.id),
     loadModuleVisions(supabase, user.id),
     loadPendingVisionEdits(supabase, user.id),
     loadOpenSpecChanges(supabase, user.id),
     loadLatestFindings(supabase, user.id, UNSPECCED),
+    loadSpecInterviews(supabase, user.id).catch((error: unknown) => {
+      console.error('The interviews were not read', error);
+      return [];
+    }),
   ]);
+  const cards = interviewCards(interviews, {
+    visionEditIds: new Set(Object.values(edits).flatMap((edit) => (edit ? [edit.id] : []))),
+    specChangeIds: new Set(changes.map((change) => change.id)),
+  });
   return (
-    <SpecsView counts={counts} visions={visions} edits={edits} changes={changes} audit={audit} />
+    <SpecsView
+      counts={counts}
+      visions={visions}
+      edits={edits}
+      changes={changes}
+      audit={audit}
+      interviews={cards}
+    />
   );
 }
