@@ -27,7 +27,7 @@ export type OpenSuggestion = {
   contact: { id: string; name: string; email: string | null; linkedinUrl: string | null } | null;
   /** Jev's answers on an opening (plans #1178, #1202); null until it has been scored. */
   scores: OpeningScores | null;
-  /** Fit and chance with their reasons (plan #1206), attached by the Roles page (`withOpeningNotes`). */
+  /** Fit and chance with their reasons (plan #1206), attached by the Find page (`withOpeningNotes`). */
   scoreNote?: ScoreNote | null;
   /** Who found it (job_search 0039): the web search, a followed board or a goals run. */
   origin: string;
@@ -35,7 +35,7 @@ export type OpenSuggestion = {
   postingRead: boolean;
   compMaxCents: number | null;
   workMode: PostingWorkMode | null;
-  /** Where the posting falls outside the preferences, attached by the Roles page (`withPreferenceMisses`). */
+  /** Where the posting falls outside the preferences, attached by the Find page (`withPreferenceMisses`). */
   misses?: string[];
   createdAt: string;
 };

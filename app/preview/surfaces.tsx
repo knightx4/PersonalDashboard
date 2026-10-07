@@ -40,12 +40,14 @@ import {
 } from '@/lib/core/spend/estimate';
 import type { OperationName } from '@/lib/core/spend/guesses';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { SettingsView } from '@/app/jobs/(app)/settings/view';
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
 import { RoleForm } from '@/app/jobs/(app)/roles/new/role-form';
 import { RecommendedRoles } from '@/app/jobs/(app)/recommend/sections';
+import { FindView } from '@/app/jobs/(app)/find/view';
 import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
 import type { OriginStats } from '@/lib/jobs/suggest/stats';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
@@ -2208,9 +2210,9 @@ const savedStories: SavedViewProps = {
 /** The job search's eleven sections, as its layout lists them. */
 const shellSections: NavSection[] = [
   { href: '/jobs', label: 'Home', icon: 'jobsHome', exact: true },
-  { href: '/jobs/thoughts', label: 'Career goals', icon: 'careerGoals' },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
   { href: '/jobs/roles', label: 'Roles', icon: 'roles' },
+  { href: '/jobs/find', label: 'Find', icon: 'find' },
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
   { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
   { href: '/jobs/interviews', label: 'Interviews', icon: 'interviews' },
@@ -2564,6 +2566,112 @@ const CORRECTION_WEEKS: CorrectionWeek[] = [
   { week: '2026-09-28', notes: 34, corrections: 4 },
   { week: '2026-10-05', notes: 7, corrections: 2 },
 ];
+
+/** People to meet: one with a drafted message and a long title, one with only a move. */
+const recommendedPeople: OpenSuggestion[] = [
+  recommendedOpening({
+    id: 'pe-1',
+    kind: 'reach_out',
+    headline: 'Ask Priya Raghunathan for a referral to the deployment team at Mosaic',
+    why: 'She moved from EY Transaction Services to Mosaic last year and now runs deployment for the private equity accounts, the team behind the role you saved.',
+    move: 'Message her on LinkedIn, name the take-private work you did together on, and ask for twenty minutes.',
+    channel: 'linkedin',
+    message: 'Hi Priya, it has been a while since the take-private at EY. I saw the Deployment Strategist opening on your team and would value twenty minutes on what the work is really like.',
+    url: null,
+    location: null,
+    personName: 'Priya Raghunathan',
+    personTitle: 'Head of Deployment, Private Equity and Strategic Accounts',
+    foundIn: null,
+    scores: null,
+    scoreNote: null,
+    origin: 'search',
+  }),
+  recommendedOpening({
+    id: 'pe-2',
+    kind: 'reach_out',
+    headline: 'Introduce yourself to the strategic finance lead at Clay',
+    why: 'Clay is hiring into strategic finance and the lead posts about the FP&A-to-strategy move you wrote about.',
+    move: 'Comment on the latest post first, then send a short note.',
+    channel: null,
+    message: null,
+    url: null,
+    location: null,
+    companyName: 'Clay',
+    companySlug: 'clay',
+    personName: 'Sam Okafor',
+    personTitle: 'Strategic Finance Lead',
+    foundIn: 'From the step "Find people in strategic finance" on your career goal',
+    scores: null,
+    scoreNote: null,
+    origin: 'goal',
+  }),
+];
+
+/** Find for somebody a month in: three career goals entries, one track started and two suggested. */
+const findView = {
+  aim: {
+    targetTitles: 'Deployment Strategist, Strategic Finance, Forward Deployed Engineer, FP&A Manager',
+    excludedIndustries: 'Crypto, Defense',
+  },
+  roles: {
+    suggestions: recommendedRoles,
+    stats: recommendedStats,
+    searchCostMicros: 4_200_000,
+    searchLine: { running: false, tone: 'plain' as const, text: 'The search 2 hours ago found 3 new roles. Read 58 job boards, 12 postings worth a look.' },
+    pathname: '/jobs/find',
+  },
+  people: recommendedPeople,
+  tracks: {
+    suggested: [
+      {
+        id: 'tr-2',
+        name: 'SQL for finance analysts',
+        about: 'Window functions, cohort tables and the joins a finance team asks for.',
+        depth: 'solid' as const,
+        why: 'Most of the strategic finance postings you saved ask for SQL, and none of your entries mention it.',
+      },
+      {
+        id: 'tr-3',
+        name: 'How AI deployment teams run a pilot',
+        about: null,
+        depth: 'familiar' as const,
+        why: 'The deployment roles describe scoping and running pilots with customers, which your latest entry says you want to do.',
+      },
+    ],
+    started: [
+      {
+        id: 'tr-1',
+        name: 'Three-statement modelling',
+        about: 'Linking the income statement, balance sheet and cash flow in one model.',
+        depth: 'deep' as const,
+        why: 'Every FP&A role asks for it.',
+        subjectId: 'sub-1',
+        units: 6,
+        gone: false,
+      },
+    ],
+  },
+  thoughts: [
+    {
+      id: 'th-3',
+      body: 'I want the strategy side of deployment work: sitting with customers, working out what they need, and owning the result. A growth-stage company in New York, hybrid at most three days in. Not crypto.',
+      written: '28 Sep 2026',
+      edited: '2 Oct 2026',
+    },
+    {
+      id: 'th-2',
+      body: 'Strategic finance or FP&A at a company that is still small enough that finance sits near the founders.',
+      written: '30 Aug 2026',
+      edited: null,
+    },
+    {
+      id: 'th-1',
+      body: 'Leaving EY. Not sure yet whether to stay in finance.',
+      written: '6 Jul 2026',
+      edited: null,
+    },
+  ],
+};
 
 export const SURFACES: readonly Surface[] = [
   {
@@ -3121,7 +3229,15 @@ export const SURFACES: readonly Surface[] = [
     label: 'Company · Adding a person',
     module: 'jobs',
     width: 'wide',
-    render: () => <CompanyPanels {...companyPanels} addingPerson />,
+    // With the search's estimate, as the jobs layout provides it, so the $
+    // beside Search with AI is drawn (law 16).
+    render: () => (
+      <PaidCostsProvider
+        costs={{ 'app/jobs/(app)/companies/actions.ts#proposeAiCompanyEnrichment': guessedSummary }}
+      >
+        <CompanyPanels {...companyPanels} addingPerson />
+      </PaidCostsProvider>
+    ),
   },
   {
     id: 'jobs-review',
@@ -3181,13 +3297,29 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     // Opened on Referral, so the field naming who referred you is drawn too.
+    // The padding is the room the app shell keeps under a page for the dock,
+    // so Add role, pinned above the dock, sits where it does in the app.
     render: () => (
-      <RoleForm companies={knownCompanies} contacts={referrerFixtures} defaultSource="referral" />
+      <div className="max-sm:pb-[calc(var(--dock-h)+2.125rem)]">
+        <RoleForm companies={knownCompanies} contacts={referrerFixtures} defaultSource="referral" />
+      </div>
+    ),
+  },
+  {
+    id: 'jobs-find',
+    label: 'Find',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <>
+        <PageHeader title="Find" />
+        <FindView {...findView} />
+      </>
     ),
   },
   {
     id: 'jobs-recommended-roles',
-    label: 'Roles · Recommended roles',
+    label: 'Find · Recommended roles',
     module: 'jobs',
     width: 'wide',
     render: () => (

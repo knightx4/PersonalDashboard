@@ -64,7 +64,7 @@
     "targets": 4
   },
   "jobs-contacts": {
-    "targets": 9
+    "targets": 1
   },
   "jobs-interviews": {
     "targets": 4
@@ -80,10 +80,6 @@
     "targets": 11,
     "contrast": 4
   },
-  "jobs-recommended-roles": {
-    "targets": 13,
-    "contrast": 12
-  },
   "jobs-review": {
     "targets": 3
   },
@@ -98,9 +94,6 @@
   },
   "jobs-role-timeline": {
     "targets": 2
-  },
-  "jobs-roles-table": {
-    "targets": 21
   },
   "jobs-settings": {
     "targets": 4

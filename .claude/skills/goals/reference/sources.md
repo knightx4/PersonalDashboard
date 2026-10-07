@@ -18,7 +18,7 @@ What the person is looking for in the next job and where they are now, in their 
 
 - Search: `body`
 - Name a row by `body`; link it by `id`
-- Opens at `/jobs/thoughts`
+- Opens at `/jobs/find`
 - A newer entry supersedes an older one where they disagree; read them newest first.
 
 ### `job_search.profiles` (Job search)

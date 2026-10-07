@@ -29,26 +29,12 @@ import {
 } from '@/lib/list-display';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
-import {
-  loadJobPreferences,
-  loadOpeningStats,
-  loadOpenSuggestions,
-  withPreferenceMisses,
-} from '@/lib/jobs/suggest/load';
-import { loadOperationCost } from '@/lib/core/spend/load';
-import { describeRun, loadLatestRun } from '@/lib/jobs/suggest/search-runs';
-import { otherParams, parseOpeningView } from '@/lib/jobs/suggest/opening-view';
-import { historyFromPipeline, withApplicationNotes, withOpeningNotes } from '@/lib/jobs/suggest/score-notes-load';
+import { withApplicationNotes } from '@/lib/jobs/suggest/score-notes-load';
 import { CHANCE_BAND_LABELS } from '@/lib/jobs/suggest/chance-check';
 import { FIT_MINIMUMS, parseScoreMinimum, passesMinimum } from '@/lib/jobs/suggest/score-notes';
 import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
-import { RecommendedRoles } from '../recommend/sections';
 
 export const metadata = { title: 'Roles' };
-
-// Search now on the recommended roles runs a web search in this page's server
-// action, which can take a couple of minutes.
-export const maxDuration = 300;
 
 /**
  * The same data as the board, as a sortable table.
@@ -69,8 +55,6 @@ export default async function RolesPage({
     hide?: string | string[];
     minfit?: string;
     minchance?: string;
-    // The recommended roles' own sort and filters (opening-view.ts).
-    [key: `r${string}`]: string | string[] | undefined;
   }>;
 }) {
   const user = await requireUser();
@@ -78,26 +62,10 @@ export default async function RolesPage({
   const params = await searchParams;
 
   const core = await createCoreClient();
-  const [pipeline, openings, preferences, sourceStats, searchCost, latestRun] = await Promise.all([
-    loadPipeline(supabase, user.id),
-    loadOpenSuggestions(supabase, user.id, 'apply'),
-    loadJobPreferences(supabase, user.id),
-    loadOpeningStats(supabase, user.id),
-    loadOperationCost(core, 'jobs', 'find-openings'),
-    loadLatestRun(supabase, user.id, 'apply'),
-  ]);
-  // Fit and chance with their reasons (plan #1206), read against the pipeline as history.
+  const pipeline = await loadPipeline(supabase, user.id);
+  // Fit and chance with their reasons (plan #1206). The roles Dash recommends
+  // are on Find now (plan #1589).
   const rows = await withApplicationNotes(supabase, user.id, pipeline);
-  const recommended = withPreferenceMisses(withOpeningNotes(openings, historyFromPipeline(pipeline)), preferences);
-  const recommendedProps = {
-    suggestions: recommended,
-    stats: sourceStats,
-    searchCostMicros: searchCost,
-    searchLine: describeRun(latestRun),
-    view: parseOpeningView(params),
-    keep: otherParams(params),
-    pathname: '/jobs/roles',
-  };
 
   const displaySpec = rolesDisplay();
   const display = parseListDisplay(displaySpec, params);
@@ -142,9 +110,6 @@ export default async function RolesPage({
     return (
       <>
         <PageHeader title="Roles" description="Every role, as a table." />
-        <div className="mb-6">
-          <RecommendedRoles {...recommendedProps} />
-        </div>
         <EmptyState
           icon={Table2}
           title="No roles yet"
@@ -170,12 +135,6 @@ export default async function RolesPage({
           </>
         }
       />
-
-      {/* Above the table and its rail, full width: what Dash found is not
-          narrowed by the filters, which describe roles already on file. */}
-      <div className="mb-6">
-        <RecommendedRoles {...recommendedProps} />
-      </div>
 
       <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
         <LeftRail>
