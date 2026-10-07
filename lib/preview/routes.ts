@@ -46,6 +46,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-plan-critic-stop': ['/dev/plan'],
   'dev-plan-screen-change': ['/dev/plan'],
   'dev-plan-send-back': ['/dev/plan'],
+  'dev-plan-feature': ['/dev/plan/[number]'],
+  'dev-plan-feature-steps': ['/dev/plan/[number]'],
   'goals-steps-tree': ['/goals/[goalId]'],
   'goals-steps-opened': ['/goals/[goalId]'],
   'goals-step': ['/goals/[goalId]/s/[stepId]'],

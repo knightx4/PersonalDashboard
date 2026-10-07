@@ -780,6 +780,23 @@ Editing a step includes moving it: *Part of* lists the module's other steps,
 less the step's own subtree. A moved step goes last under its new parent. The
 editor also holds the *not yet specified* box; emptying it clears the column.
 
+### A feature's page
+
+A feature's title on the plan opens `/dev/plan/<number>`, a page in the
+tabbed detail pattern (plan #1664). The crumbs read Dev, Plan, the module and
+the feature. Under the title sit two tabs, *Overview* and *Steps*, and beside
+them the properties: status and priority as menus, health when it says more
+than the status, whose move it is, size, who holds it, the module and the
+dates. The Overview tab holds what the row's opened panel holds: the detail,
+done when, what it needs, the questions with their answer boxes, what it waits
+on, its history and the thread. The row's presses (Mine, Send, send what is
+beneath, re-shape, and the menu) sit above whichever tab is open, so anything
+done to a feature from its row can be done here. The Steps tab lists the
+feature's steps as the plan's tree, unfolded. A step's own number opens its
+feature's page on the Steps tab at that step's row, so every number on the
+plan has an address. The row on the plan itself is unchanged; only its title
+became a link.
+
 ## The changelog
 
 `/dev/changelog` is the fourth page in the workspace and the only one that

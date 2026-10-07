@@ -83,6 +83,7 @@ import { criticStopNeeds, type CriticStopView } from '@/lib/plan/ui-check-stop';
 import { CriticStop } from './critic-stop';
 import { SendScreenBack } from './send-back';
 import { ScreenChanges } from '@/components/dev/screen-change';
+import { featureHref } from '@/lib/plan/feature-page';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 
 /**
@@ -90,7 +91,7 @@ import type { ScreenChangeView } from '@/lib/plan/screen-change';
  */
 
 /** The plan's own writes, for the shared tree components. */
-const PLAN_TREE_ACTIONS: TreeActions = {
+export const PLAN_TREE_ACTIONS: TreeActions = {
   answer: answerPlanDecision,
   setStatus: setPlanItemStatus,
   dismissQuestion: dismissPlanDecision,
@@ -523,8 +524,12 @@ function useResolving(
  * one step of it is read in full. Its sub-steps follow it as rows of their
  * own, one level further in, folded with the chevron; the fold starts closed
  * on a step that is finished, because what is done is consulted, not read.
+ *
+ * Worked out here as parts rather than drawn, so the feature's own page
+ * (feature-page.tsx, plan #1664) offers every press the row does from the
+ * same menus and the same action states, and the two cannot drift.
  */
-export function PlanRow({
+export function usePlanRow({
   node,
   trail,
   catalog,
@@ -540,6 +545,7 @@ export function PlanRow({
   searching,
   unfolded,
   opened = false,
+  asStep = false,
 }: {
   node: PlanNode;
   /** One entry per level above: whether that level's line carries on below this row. */
@@ -599,6 +605,13 @@ export function PlanRow({
    * in the app passes it.
    */
   opened?: boolean;
+  /**
+   * The rows at the top of this list are steps, not features: the feature
+   * page's Steps tab lists a feature's steps with no feature row above them,
+   * so what goes under them is a substep and their titles fold rather than
+   * link (plan #1664).
+   */
+  asStep?: boolean;
 }) {
   // Ticks, so a re-shape that ages out stops holding this row's buttons shut
   // without the page being navigated. 0 before mount, which is what keeps the
@@ -663,7 +676,7 @@ export function PlanRow({
   const closed = isClosed(node.status);
   // A row at the top of its module is a feature, so what goes under it is a
   // step; anything deeper is a substep (PLAN-SPEC, "Levels").
-  const childLevel = trail.length === 0 ? 'step' : 'substep';
+  const childLevel = trail.length === 0 && !asStep ? 'step' : 'substep';
   const addChildLabel = childLevel === 'step' ? 'Add a step' : 'Add a substep';
   const isDecision = node.kind === 'decision';
   // A setup job still open. Closed, it is an ordinary finished row.
@@ -884,7 +897,6 @@ export function PlanRow({
     },
   ]);
 
-  const inset = rowInset(trail);
   const actionError =
     assignState.error ??
     sendState.error ??
@@ -899,23 +911,54 @@ export function PlanRow({
     reshapeState.message ??
     overhaulState.message ??
     answerState.message;
-
-  return (
-    <TreeRow
-      node={criticStop ? { ...node, blockAsk: criticStopNeeds(criticStop.branch) } : node}
-      trail={trail}
-      row={row}
-      health={health}
-      move={move.move && <MoveLabel move={move.move} title={move.title} />}
-      statusMenu={statusMenu}
-      menu={menu}
-      actions={PLAN_TREE_ACTIONS}
-      origin={origin}
-      addedBy={addedBy}
-      titles={refTitles}
-      dependencies={{ catalog, groupOf: (entry) => scopeLabel(entry.module) }}
-      marks={
-        <>
+  /* The question a quiet run puts in front of Send, wherever the press
+              came from. It sits where the result of that press will sit, so the
+              answer and what came back of it read as one exchange in one place.
+              Gone once something has come back, since the question has been
+              answered by then and the answer is what there is to read. */
+  const confirmNotice =
+    confirmingSend && quietAsk && !sendState.error && !sendState.message ? (
+      <>
+              <p className="text-ink-muted">{quietAsk}</p>
+              <div className="mt-1 flex items-center gap-2">
+                {/* Cancel first and plain, because doing nothing is the safe half
+                    of this and the press that sends should be the deliberate one. */}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setConfirmingSend(false)}
+                >
+                  Cancel
+                </Button>
+                <form action={sendAction}>
+                  <input type="hidden" name="id" value={node.id} />
+                  {/* The answer, and the only thing that carries it. The guard
+                      refuses the press without it. */}
+                  <input type="hidden" name="confirm" value="quiet" />
+                  <Button type="submit" size="sm" variant="secondary" pending={sendPending}>
+                    {sendPending ? 'Sending…' : 'Send it anyway'}
+                  </Button>
+                </form>
+              </div>
+      </>
+    ) : null;
+  /* Cancel first and plain, because doing nothing is the safe half
+                    of this and the press that sends should be the deliberate one. */
+  const resultNotice = (actionError ?? actionMessage) ? (
+      <>
+              <FieldError>{actionError}</FieldError>
+              {!actionError && (
+                // Ink, not green. The tones above are a status system where
+                // positive means done; this is a transient "Assigned" or "Sent"
+                // from the action that just ran, which is the system reporting
+                // itself and is not a claim about money (law 4).
+                <span className="text-ink-muted">{actionMessage}</span>
+              )}
+      </>
+    ) : null;
+  const marks = (
+    <>
           {/* The steps you kept, on the row.
            * The runner takes anything approved that is not yours, so the
            * fact worth reading off a resting row is which steps it will
@@ -966,9 +1009,9 @@ export function PlanRow({
             <Underway startedAt={node.startedAt} assignee={node.assignee} claim={claim} />
           )}
         </>
-      }
-      priority={
-        /* Priority, and only when it says something. Nearly every step is at
+  );
+  const priority = (
+    /* Priority, and only when it says something. Nearly every step is at
            Normal, so the word was on almost every row and told you nothing;
            what you are scanning for is the handful marked Next or Someday.
            The separator before the size goes with it, so a normal step at S
@@ -1007,9 +1050,9 @@ export function PlanRow({
             </span>
           )}
         </>
-      }
-      quickActions={
-        <>
+  );
+  const quickActions = (
+    <>
           {!closed &&
             (quietAsk ? (
               // Nothing is sent from here while the run is quiet: the press
@@ -1046,59 +1089,12 @@ export function PlanRow({
             <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
           </RowIconButton>
         </>
-      }
-      notices={
-        <>
-          {/* The question a quiet run puts in front of Send, wherever the press
-              came from. It sits where the result of that press will sit, so the
-              answer and what came back of it read as one exchange in one place.
-              Gone once something has come back, since the question has been
-              answered by then and the answer is what there is to read. */}
-          {confirmingSend && quietAsk && !sendState.error && !sendState.message && (
-            <li style={inset} className="pb-1.5 pr-3 text-small">
-              <p className="text-ink-muted">{quietAsk}</p>
-              <div className="mt-1 flex items-center gap-2">
-                {/* Cancel first and plain, because doing nothing is the safe half
-                    of this and the press that sends should be the deliberate one. */}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setConfirmingSend(false)}
-                >
-                  Cancel
-                </Button>
-                <form action={sendAction}>
-                  <input type="hidden" name="id" value={node.id} />
-                  {/* The answer, and the only thing that carries it. The guard
-                      refuses the press without it. */}
-                  <input type="hidden" name="confirm" value="quiet" />
-                  <Button type="submit" size="sm" variant="secondary" pending={sendPending}>
-                    {sendPending ? 'Sending…' : 'Send it anyway'}
-                  </Button>
-                </form>
-              </div>
-            </li>
-          )}
-
-          {/* What the last action did, wherever it was started from. */}
-          {(actionError ?? actionMessage) && (
-            <li style={inset} className="pb-1.5 pr-3 text-small">
-              <FieldError>{actionError}</FieldError>
-              {!actionError && (
-                // Ink, not green. The tones above are a status system where
-                // positive means done; this is a transient "Assigned" or "Sent"
-                // from the action that just ran, which is the system reporting
-                // itself and is not a claim about money (law 4).
-                <span className="text-ink-muted">{actionMessage}</span>
-              )}
-            </li>
-          )}
-        </>
-      }
-      edit={<EditStep node={node} catalog={catalog} onDone={() => setEditing(false)} />}
-      body={
-        <>
+  );
+  const edit = (
+    <EditStep node={node} catalog={catalog} onDone={() => setEditing(false)} />
+  );
+  const body = (
+    <>
           {/* What its run has done, above the questions and the thread: on a
               step you opened because it says somebody is working it, this is
               the thing you opened it to find out. */}
@@ -1140,9 +1136,9 @@ export function PlanRow({
             />
           )}
         </>
-      }
-      meta={
-        <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
+  );
+  const meta = (
+    <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
           <span>{scopeLabel(node.module)}</span>
           {node.priority !== 2 && <span>{PLAN_PRIORITY_LABEL[node.priority]}</span>}
           {node.size && <span>{SIZE_LABEL[node.size]}</span>}
@@ -1178,9 +1174,9 @@ export function PlanRow({
               is one of them too many. */}
           {run && !accountForRun && <LastRunLine run={run} />}
         </p>
-      }
-      panelActions={
-        <>
+  );
+  const panelActions = (
+    <>
           <form action={assignAction}>
             <input type="hidden" name="id" value={node.id} />
             <input type="hidden" name="assignee" value={assignValue} />
@@ -1210,30 +1206,141 @@ export function PlanRow({
             />
           )}
         </>
-      }
-      addChild={
-        <AddStep
+  );
+  const addChild = (
+    <AddStep
           module={node.module}
           parentId={node.id}
           level={childLevel}
           open
           onDone={() => row.setAddingChild(false)}
         />
+  );
+
+  // The one press a feature's own page keeps in its header: the same Send the
+  // row's opened panel leads with, asking first when the run has gone quiet.
+  const sendButton =
+    closed || node.track === 'overhaul' ? null : quietAsk ? (
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        disabled={beingResolved}
+        title={quietAsk}
+        onClick={() => setConfirmingSend(true)}
+      >
+        <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
+        {sendLabel(node)}
+      </Button>
+    ) : (
+      <form action={sendAction}>
+        <input type="hidden" name="id" value={node.id} />
+        <Button
+          type="submit"
+          size="sm"
+          variant="secondary"
+          pending={sendPending}
+          disabled={beingResolved}
+        >
+          <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
+          {sendPending ? 'Sending…' : sendLabel(node)}
+        </Button>
+      </form>
+    );
+
+  return {
+    row,
+    sendButton,
+    batchAction,
+    node: criticStop ? { ...node, blockAsk: criticStopNeeds(criticStop.branch) } : node,
+    health,
+    move: move.move ? <MoveLabel move={move.move} title={move.title} /> : null,
+    statusMenu,
+    priorityMenu,
+    menu,
+    origin,
+    addedBy,
+    refTitles,
+    closed,
+    childLevel,
+    addChildLabel,
+    marks,
+    priority,
+    quickActions,
+    confirmNotice,
+    resultNotice,
+    edit,
+    body,
+    meta,
+    panelActions,
+    addChild,
+  };
+}
+
+export type PlanRowProps = Parameters<typeof usePlanRow>[0];
+
+/**
+ * The row itself: `usePlanRow`'s parts laid into the shared tree row, with
+ * the feature's title linking to its own page (plan #1664).
+ */
+export function PlanRow(props: PlanRowProps) {
+  const { node: own, trail, view, searching, unfolded, opened = false } = props;
+  const parts = usePlanRow(props);
+  const inset = rowInset(trail);
+  // A feature is a build row at the top of its module. Its title opens the
+  // feature's page; a step's title still opens its panel in place.
+  const feature = trail.length === 0 && !props.asStep && own.kind === 'build';
+  return (
+    <TreeRow
+      node={parts.node}
+      trail={trail}
+      row={parts.row}
+      health={parts.health}
+      move={parts.move}
+      statusMenu={parts.statusMenu}
+      menu={parts.menu}
+      actions={PLAN_TREE_ACTIONS}
+      origin={parts.origin}
+      addedBy={parts.addedBy}
+      titles={parts.refTitles}
+      titleHref={feature ? featureHref(own.number) : undefined}
+      dependencies={{ catalog: props.catalog, groupOf: (entry) => scopeLabel(entry.module) }}
+      marks={parts.marks}
+      priority={parts.priority}
+      quickActions={parts.quickActions}
+      notices={
+        <>
+          {parts.confirmNotice && (
+            <li style={inset} className="pb-1.5 pr-3 text-small">
+              {parts.confirmNotice}
+            </li>
+          )}
+          {parts.resultNotice && (
+            <li style={inset} className="pb-1.5 pr-3 text-small">
+              {parts.resultNotice}
+            </li>
+          )}
+        </>
       }
+      edit={parts.edit}
+      body={parts.body}
+      meta={parts.meta}
+      panelActions={parts.panelActions}
+      addChild={parts.addChild}
       renderChild={(child, childTrail) => (
         <PlanRow
           // The shared row hands back the node it was given, so this is one.
           node={child as PlanNode}
           trail={childTrail}
-          catalog={catalog}
-          canSend={canSend}
-          lastRuns={lastRuns}
-          runRaises={runRaises}
-          liveness={serverLiveness}
-          commitChecks={commitChecks}
-          overhaulProgress={overhaulProgress}
-          criticStops={criticStops}
-          screenChanges={screenChanges}
+          catalog={props.catalog}
+          canSend={props.canSend}
+          lastRuns={props.lastRuns}
+          runRaises={props.runRaises}
+          liveness={props.liveness}
+          commitChecks={props.commitChecks}
+          overhaulProgress={props.overhaulProgress}
+          criticStops={props.criticStops}
+          screenChanges={props.screenChanges}
           view={view}
           searching={searching}
           unfolded={unfolded}

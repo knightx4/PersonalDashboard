@@ -129,6 +129,8 @@ import {
   PlanScreenChangeSurface,
   PlanSendBackSurface,
   PlanOpenedSurface,
+  PlanFeatureSurface,
+  PlanFeatureStepsSurface,
   PlanTreeSurface,
   ProjectPlanSurface,
 } from './plan-surfaces';
@@ -3003,6 +3005,24 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanOpenedSurface />,
+  },
+  {
+    /* A feature's own page (plan #1664): breadcrumbs, the Overview tab with
+     * the detail, a question, what it waits on and the thread, and the
+     * properties column. */
+    id: 'dev-plan-feature',
+    label: 'Plan · a feature’s page',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanFeatureSurface />,
+  },
+  {
+    /* The same page on its Steps tab: the steps as the plan's tree. */
+    id: 'dev-plan-feature-steps',
+    label: 'Plan · a feature’s steps',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanFeatureStepsSurface />,
   },
   {
     /* A step the design critic stopped after round 3 (plan #1610): the last

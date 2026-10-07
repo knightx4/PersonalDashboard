@@ -1,19 +1,16 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { projectById } from '@/lib/plan/projects';
-import { PlanView, type PlanCatalogEntry } from '@/app/dev/plan/plan-view';
+import { PlanView } from '@/app/dev/plan/plan-view';
 import { SendScreenBack } from '@/app/dev/plan/send-back';
+import { FeaturePage } from '@/app/dev/plan/feature-page';
+import { catalogOf } from '@/app/dev/plan/plan-catalog';
+import { SetTab } from './set-tab';
 import { ScreenChanges } from '@/components/dev/screen-change';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import type { CriticStopView } from '@/lib/plan/ui-check-stop';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import type { LastRun } from '@/lib/plan/run-end';
-import {
-  applyView,
-  buildPlanTree,
-  flattenSections,
-  summarize,
-  type PlanSection,
-} from '@/lib/plan/tree';
+import { applyView, buildPlanTree, summarize } from '@/lib/plan/tree';
 
 /**
  * The dev plan, drawn from fixtures for the gallery (plan #993).
@@ -196,21 +193,6 @@ const whole = buildPlanTree({
   dependencies: [dep('render', 'shared'), dep('blocked-steps', 'shared')],
 });
 
-function catalogOf(tree: PlanSection[]): PlanCatalogEntry[] {
-  return flattenSections(tree).map((node) => ({
-    id: node.id,
-    number: node.number,
-    outline: node.outline,
-    title: node.title,
-    module: node.module,
-    parentId: node.parentId,
-    depth: node.depth,
-    status: node.status,
-    completedAt: node.completedAt,
-    closed: node.status === 'done' || node.status === 'dropped',
-  }));
-}
-
 const catalog = catalogOf(whole);
 
 /**
@@ -254,7 +236,9 @@ export function PlanOpenedSurface() {
   const sections = applyView(whole, 'open')
     .map((section) => ({
       ...section,
-      nodes: section.nodes.filter((node) => node.id === 'stuck' || node.id === 'goal-tree' || node.id === 'overhaul'),
+      nodes: section.nodes.filter(
+        (node) => node.id === 'stuck' || node.id === 'goal-tree' || node.id === 'overhaul',
+      ),
     }))
     .filter((section) => section.nodes.length > 0);
 
@@ -403,7 +387,8 @@ const criticStops: Record<string, CriticStopView> = {
             problem:
               'The company, the role and the last conversation wrap to three lines each at 390, so the card is a screen and a half tall before the first message.',
             breaks: 'taste:fits-one-screen',
-            change: 'Put the company and role on one line and fold the conversation to its first line.',
+            change:
+              'Put the company and role on one line and fold the conversation to its first line.',
           },
           {
             shot: 'laptop-dark',
@@ -589,5 +574,144 @@ export function PlanSendBackSurface() {
         )}
       />
     </div>
+  );
+}
+
+/**
+ * A feature's own page (plan #1664), from fixtures: a feature partway
+ * through, with a long title, a question still open, a step it waits on in
+ * another feature, a note from Dash on its thread, and steps in every state
+ * on the Steps tab, one of them with a substep.
+ */
+const featureItems: PlanItem[] = [
+  item({
+    id: 'feat',
+    module: 'dev',
+    title: 'Give each feature its own page with tabs, breadcrumbs and a column of its properties',
+    detail:
+      'Each feature on the plan opens to its own page: breadcrumbs at the top, then Overview, Activity and Steps tabs, with a column of its properties beside them. The goal page moves onto the same layout so the two stay alike.',
+    acceptance:
+      'Opening a feature from /dev/plan or a goal from /goals shows the same layout: breadcrumbs, Overview, Activity and Steps tabs, and a properties column with progress split between you and Dash.',
+    priority: 1,
+    size: 'l',
+    comment:
+      'Added by session cse_01V1aoCMYL7Ckkar3cKSLtFf on 2026-10-07.\n\nBlocked 2026-10-06: waiting on the level names.',
+    thread: [
+      {
+        id: 't1',
+        author: 'me',
+        body: 'Keep the row on /dev/plan as it is; only the title should open this.',
+        createdAt: '2026-10-07T10:00:00Z',
+      },
+      {
+        id: 't2',
+        author: 'claude',
+        body: 'Done that way: the row is unchanged and its title links here.',
+        createdAt: '2026-10-07T10:05:00Z',
+      },
+    ],
+  }),
+  item({
+    id: 'feat-question',
+    module: 'dev',
+    parentId: 'feat',
+    kind: 'decision',
+    title: 'Should the Steps tab open folded or unfolded?',
+    detail:
+      'A — Unfolded. Every step and substep shows at once.\nB — Folded. Only the steps show until you open one.\nRecommend A: a feature has a dozen steps at most.',
+  }),
+  item({
+    id: 'feat-layout',
+    module: 'dev',
+    parentId: 'feat',
+    title: 'Build the shared tabbed detail layout',
+    status: 'done',
+    size: 'm',
+    commitSha: '79074ffd',
+    startedAt: '2026-10-07T08:00:00Z',
+    completedAt: '2026-10-07T09:00:00Z',
+  }),
+  item({
+    id: 'feat-page',
+    module: 'dev',
+    parentId: 'feat',
+    title: 'Open a feature on its own page with Overview',
+    status: 'in_progress',
+    size: 'm',
+  }),
+  item({
+    id: 'feat-page-gallery',
+    module: 'dev',
+    parentId: 'feat-page',
+    title: 'Draw the page in the gallery',
+    size: 's',
+  }),
+  item({
+    id: 'feat-update',
+    module: 'dev',
+    parentId: 'feat',
+    title: 'Store Dash’s update on a feature, with a health',
+    size: 'm',
+    assignee: 'me',
+  }),
+  item({
+    id: 'feat-goal',
+    module: 'dev',
+    parentId: 'feat',
+    title: 'Move the goal page onto the shared layout',
+    status: 'blocked',
+    blockKind: 'outside',
+    blockAsk: 'Which goal page parts go to Overview and which to Activity?',
+    size: 'm',
+  }),
+  item({
+    id: 'other',
+    module: 'dev',
+    title: 'Name the plan’s levels module, feature, step and substep',
+    status: 'in_progress',
+    size: 's',
+  }),
+];
+
+const featureTree = buildPlanTree({
+  items: featureItems,
+  dependencies: [dep('feat', 'other')],
+});
+const featureSection = featureTree.find((section) => section.module === 'dev');
+const featureNode = featureSection?.nodes.find((node) => node.id === 'feat');
+
+function FeatureFixture() {
+  if (!featureSection || !featureNode) return null;
+  return (
+    <FeaturePage
+      feature={featureNode}
+      module="dev"
+      moduleLabel={featureSection.label}
+      catalog={catalogOf(featureTree)}
+      canSend
+      lastRuns={{}}
+      commitChecks={{
+        '79074ffd': {
+          mergeSha: '79074ffd',
+          conclusion: 'passed',
+          checkedAt: '2026-10-07T09:30:00Z',
+        },
+      }}
+    />
+  );
+}
+
+/** The feature page on its Overview tab. */
+export function PlanFeatureSurface() {
+  return <FeatureFixture />;
+}
+
+/** The same page on its Steps tab: the feature's steps as the plan's tree. */
+export function PlanFeatureStepsSurface() {
+  return (
+    <>
+      <SetTab tab="steps" />
+      <FeatureFixture />
+    </>
   );
 }

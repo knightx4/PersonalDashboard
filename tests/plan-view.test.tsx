@@ -189,6 +189,14 @@ describe('PlanView', () => {
     expect(render('all')).toContain('Schema and RPCs');
   });
 
+  it("links a feature's title to its own page, and leaves a step's title the fold", () => {
+    // Plan #1664: the row stays as it is, and its title opens /dev/plan/<n>.
+    const html = render('open');
+    expect(html).toContain('href="/dev/plan/1"');
+    expect(html).not.toContain('href="/dev/plan/3"');
+    expect(html).toContain('Open #3');
+  });
+
   it('makes priority a word on the row you click, not a form you open', () => {
     // Note 3bfb2749: it was a label, and changing it meant opening the step
     // and going through the edit form for one of three values.
@@ -270,7 +278,7 @@ describe('PlanView', () => {
     // you kept -- not on the runner's steps.
     expect((html.match(/Marked yours/g) ?? []).length).toBe(1);
     expect(html).toContain(
-      '>Account deletion</span><span title="Yours. The runner will not take this one."',
+      '>Account deletion</a><span title="Yours. The runner will not take this one."',
     );
     // The robot that marked a handed-over step is gone with it.
     expect(html).not.toContain('lucide-bot');
@@ -300,7 +308,7 @@ describe('PlanView', () => {
       />,
     );
     expect((html.match(/>Overhaul</g) ?? []).length).toBe(1);
-    expect(html).toContain('>Move threads onto the core</span><span title="Overhaul.');
+    expect(html).toContain('>Move threads onto the core</a><span title="Overhaul.');
     // With no counts handed over, the row says so rather than showing nothing.
     expect((html.match(/No rule counts yet/g) ?? []).length).toBe(1);
   });
