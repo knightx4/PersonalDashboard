@@ -108,6 +108,7 @@ describe('surfacesForFiles, on screen changes that shipped', () => {
       'jobs-moment-forward',
       'jobs-moment-offer',
       'jobs-moment-reject',
+      'jobs-pipeline-focus',
       'jobs-pipeline-dense',
       'jobs-roles-table',
       'shell-display-options',

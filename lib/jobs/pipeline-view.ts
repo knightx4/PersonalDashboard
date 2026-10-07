@@ -17,7 +17,12 @@ import { parseScoreMinimum, passesMinimum, type ScoreMinimum } from '@/lib/jobs/
 
 export const PIPELINE_PATH = '/jobs/pipeline';
 
-export type PipelineViewName = 'board' | 'table';
+/**
+ * Focus is the default (the live applications read top to bottom by where
+ * they stand, components/jobs/pipeline/focus.tsx); the board is for dragging
+ * and the table for sorting and the closed ones.
+ */
+export type PipelineViewName = 'focus' | 'board' | 'table';
 
 /** Which applications are in play: the live ones, the closed ones or every one. */
 export type PipelineScope = 'live' | 'closed' | 'all';
@@ -57,9 +62,10 @@ export const EXCITEMENT_MINIMUMS = [5, 4, 3] as const;
 export function parsePipeline(params: PipelineParams): PipelineState {
   const scope: PipelineScope =
     params.status === 'closed' || params.status === 'all' ? params.status : 'live';
-  // The board is the live applications; asking it for the closed ones means
-  // the table, which is where they are kept.
-  const view: PipelineViewName = params.view === 'table' || scope !== 'live' ? 'table' : 'board';
+  // Focus and the board are the live applications; asking either for the
+  // closed ones means the table, which is where they are kept.
+  const view: PipelineViewName =
+    params.view === 'table' || scope !== 'live' ? 'table' : params.view === 'board' ? 'board' : 'focus';
   const excitement = Number(params.excitement);
   const page = Number(params.page);
   return {
@@ -148,7 +154,7 @@ export function pipelineHref(
     else delete next[key];
   }
   // The defaults stay out of the address, so the bare page is the bare link.
-  if (next.view === 'board') delete next.view;
+  if (next.view === 'focus') delete next.view;
   if (next.status === 'live') delete next.status;
   if (next.page === '1') delete next.page;
   const query = new URLSearchParams(next).toString();

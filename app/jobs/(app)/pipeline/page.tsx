@@ -25,12 +25,13 @@ export default async function Page({ searchParams }: { searchParams: Promise<Pip
   const core = await createCoreClient();
   const params = await searchParams;
 
-  const [pipeline, inboxCount, working, savedViews] = await Promise.all([
+  const [pipeline, inboxCount, working, savedViews, { data: profile }] = await Promise.all([
     loadPipeline(supabase, user.id),
     countConnectedInboxes(core, user.id),
     // What an Ask Dash hand-off is working on (plan #1568).
     loadWorkingRefs(core, user.id),
     savedViewsFor(core, rolesDisplay().pathname),
+    supabase.from('profiles').select('timezone').eq('id', user.id).maybeSingle(),
   ]);
 
   // A saved view marked as the default opens when the bare page is asked for.
@@ -47,6 +48,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Pip
       savedViews={savedViews}
       working={working}
       hasInbox={(inboxCount ?? 0) > 0}
+      timezone={(profile?.timezone as string | null) ?? 'UTC'}
     />
   );
 }

@@ -1,22 +1,24 @@
 import Link from 'next/link';
-import { Columns3, Table2 } from 'lucide-react';
+import { Columns3, ListChecks, Table2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { segmentedFrame } from '@/components/ui/segmented';
 import { pipelineHref, type PipelineParams, type PipelineViewName } from '@/lib/jobs/pipeline-view';
 
 const VIEWS = [
+  { value: 'focus' as const, label: 'Focus', Icon: ListChecks },
   { value: 'board' as const, label: 'Board', Icon: Columns3 },
   { value: 'table' as const, label: 'Table', Icon: Table2 },
 ];
 
 /**
- * Board or table, in the address (plan #1590).
+ * Focus, board or table, in the address (plan #1590).
  *
  * Links rather than buttons: the view is part of the URL, so the back button
  * undoes it and a link to the table opens the table. It was a preference on
  * the profile, written by a server action, when the second view was a list.
- * The board keeps only what is live, so going to it drops a closed filter;
- * the table's sort and grouping stay in the address for the way back.
+ * Focus and the board keep only what is live, so going to either drops a
+ * closed filter; the table's sort and grouping stay in the address for the
+ * way back.
  */
 export function PipelineViewToggle({
   view,
@@ -32,9 +34,9 @@ export function PipelineViewToggle({
           key={value}
           href={pipelineHref(
             params,
-            value === 'board'
-              ? { view: undefined, status: undefined }
-              : { view: 'table' },
+            value === 'table'
+              ? { view: 'table' }
+              : { view: value === 'focus' ? undefined : value, status: undefined },
           )}
           scroll={false}
           aria-current={view === value ? 'true' : undefined}

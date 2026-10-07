@@ -26,7 +26,36 @@ export type IdeaScore = {
   confidence: number;
   /** When it was asked, as an ISO time. */
   at: string;
+  /**
+   * Which wording of IDEA_SCORE_QUESTION it was asked under. Missing on a
+   * score asked before the wording was numbered, which counts as version 1.
+   */
+  question?: number;
 };
+
+/**
+ * The wording IDEA_SCORE_QUESTION is at. Raise it whenever the question or a
+ * level changes: a score asked under other words is not comparable, so the
+ * catch-up asks every live idea again (plan #1644). Version 2 moved small
+ * fixes to often-used parts from "helps a little" to "helps somewhat".
+ */
+export const IDEA_SCORE_VERSION = 2;
+
+/**
+ * Whether a stored score has to be asked (again): there is none, or it was
+ * asked under an older wording. The same rule as SCORE_DUE_FILTER, for code
+ * that already has the row.
+ */
+export function needsScore(value: unknown): boolean {
+  const score = scoreFrom(value);
+  return score === null || (score.question ?? 1) !== IDEA_SCORE_VERSION;
+}
+
+/**
+ * needsScore as a PostgREST `or` filter on `ideas.score`, for the catch-up's
+ * read and for the guard on its write.
+ */
+export const SCORE_DUE_FILTER = `score.is.null,score->>question.is.null,score->>question.neq.${IDEA_SCORE_VERSION}`;
 
 export const SCORE_FLOOR = TRIAGE_FLOOR;
 
@@ -52,7 +81,8 @@ export function scoreFrom(value: unknown): IdeaScore | null {
   if (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 100) return null;
   if (typeof confidence !== 'number' || !Number.isFinite(confidence)) return null;
   if (typeof at !== 'string') return null;
-  return { value: v, confidence, at };
+  const { question } = value as Record<string, unknown>;
+  return typeof question === 'number' ? { value: v, confidence, at, question } : { value: v, confidence, at };
 }
 
 /**
@@ -68,8 +98,8 @@ export const IDEA_SCORE_QUESTION = {
     'When no vision is written, judge it against what the workspace plainly does.',
   levels: [
     'Does nothing for what the workspace is for, or works against it',
-    'Helps a little: a small convenience at the edge of what the workspace is for',
-    'Helps somewhat: a real improvement to one part of what the workspace is for',
+    'Helps a little: a convenience at the edge of the workspace, in a part used now and then',
+    'Helps somewhat: a real improvement to one part of the workspace, including a small fix to how a part used most days looks, moves or responds',
     'Helps a lot: moves a central part of the vision forward',
     'Essential: the workspace falls well short of its vision without it',
   ],
@@ -172,6 +202,7 @@ export function readIdeaScore(
     value: scaleIdeaScore(result.answer.score),
     confidence: round(result.answer.confidence),
     at: at.toISOString(),
+    question: IDEA_SCORE_VERSION,
   };
 }
 

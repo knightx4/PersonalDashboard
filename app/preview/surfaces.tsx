@@ -80,6 +80,7 @@ import {
   PersonalityTestSurface,
   KnowPersonalitySurface,
   KnowPersonalityEmptySurface,
+  KnowPersonalityReadingSurface,
 } from './personality-surfaces';
 import { AddTranscript } from '@/app/vault/education/add-transcript';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
@@ -471,6 +472,7 @@ const pipelineRows: PipelineRow[] = [
     daysSinceActivity: 1,
     lastActivityAt: '2026-09-08T16:00:00.000Z',
     coverage: { covered: 4, total: 6, gaps: 1, rate: 0.67 },
+    nextInterview: { at: '2026-09-11T14:00:00.000Z', timeKnown: true },
   }),
   pipelineRow({
     applicationId: 'p2',
@@ -2792,6 +2794,14 @@ export const SURFACES: readonly Surface[] = [
     label: 'Pipeline · Board',
     module: 'jobs',
     width: 'wide',
+    render: () => <PipelinePage rows={pipelineRows} params={{ view: 'board' }} />,
+  },
+  {
+    /* The page as it opens: what is in process, waiting and to apply. */
+    id: 'jobs-pipeline-focus',
+    label: 'Pipeline · Focus',
+    module: 'jobs',
+    width: 'wide',
     render: () => <PipelinePage rows={pipelineRows} params={{}} />,
   },
   {
@@ -3867,13 +3877,24 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* The Big Five result on the Know page (plan #1634): the five traits,
-     * the vault themes nearest each, two typed-in types and one earlier
-     * result folded. Intellect has no theme near it. */
+     * the vault themes nearest each, Dash's read against the notes (#1635)
+     * with two clashes and two agreements, two typed-in types with their
+     * reads folded, and one earlier result folded. Intellect has no theme
+     * near it. */
     id: 'learn-know-personality',
     label: 'Learn · Know, personality result',
     module: 'learn',
     width: 'page',
     render: () => <KnowPersonalitySurface />,
+  },
+  {
+    /* Straight after a save (plan #1635): Dash's read of the result is
+     * still running, so the section says so where the read will be. */
+    id: 'learn-know-personality-reading',
+    label: 'Learn · Know, personality being read',
+    module: 'learn',
+    width: 'page',
+    render: () => <KnowPersonalityReadingSurface />,
   },
   {
     /* The same section before any test is taken: one line offering it. */

@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { Trash2 } from 'lucide-react';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { cardVariants } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
@@ -283,6 +284,10 @@ function TypedForm({
         <Button type="submit" pending={pending}>
           {pending ? 'Saving…' : 'Save'}
         </Button>
+        <PaidHint
+          action="app/learn/know/personality/actions.ts#saveTypedAction"
+          what="Cost of Dash reading your type against your notes"
+        />
         <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>
           Cancel
         </Button>
