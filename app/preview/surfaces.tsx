@@ -2256,6 +2256,8 @@ const deckCards: FeedCard[] = [
         href: '/vault/n/Housing/Rent%20control%20in%20my%20city.md',
       },
     ],
+    // A section of a lecture, so the bar under the player shows where it starts and ends (note 6c13bd61).
+    video: { videoId: 'ZK3O402wf1c', title: 'Price controls and the shortages they make', start: 724, end: 845 },
   },
   {
     id: '00000000-0000-4000-8000-000000000001',

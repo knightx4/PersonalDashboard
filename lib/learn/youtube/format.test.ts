@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { clockTime, durationLabel, embedUrl, watchAt, youtubeVideoId } from '@/lib/learn/youtube/format';
+import {
+  clockTime,
+  durationLabel,
+  embedUrl,
+  playerTime,
+  sectionProgress,
+  watchAt,
+  youtubeVideoId,
+} from '@/lib/learn/youtube/format';
 
 describe('clockTime', () => {
   it('writes minutes and seconds, and hours only when there are some', () => {
@@ -57,5 +65,38 @@ describe('youtubeVideoId', () => {
     expect(youtubeVideoId('https://www.youtube.com/playlist?list=PL49CF3715CB9EF31D')).toBeNull();
     expect(youtubeVideoId('https://www.youtube.com/watch?v=short')).toBeNull();
     expect(youtubeVideoId('https://notyoutube.com/watch?v=TSdXJw83kyA')).toBeNull();
+  });
+});
+
+describe('sectionProgress', () => {
+  it('is how far through the section the player is, held to the section', () => {
+    expect(sectionProgress(724, 845, 700)).toEqual({ watched: 0, length: 121, done: false });
+    expect(sectionProgress(724, 845, 784)).toEqual({ watched: 60, length: 121, done: false });
+    expect(sectionProgress(724, 845, 900)).toEqual({ watched: 121, length: 121, done: true });
+  });
+
+  it('counts the end as reached half a second short of it, where the player stops', () => {
+    expect(sectionProgress(724, 845, 844.6)?.done).toBe(true);
+    expect(sectionProgress(724, 845, 844)?.done).toBe(false);
+  });
+
+  it('is nothing for a clip without a closed span', () => {
+    expect(sectionProgress(null, null, 10)).toBeNull();
+    expect(sectionProgress(724, null, 800)).toBeNull();
+    expect(sectionProgress(845, 724, 800)).toBeNull();
+  });
+});
+
+describe('playerTime', () => {
+  it('reads currentTime from an infoDelivery message', () => {
+    expect(playerTime(JSON.stringify({ event: 'infoDelivery', info: { currentTime: 731.2 } }))).toBe(731.2);
+  });
+
+  it('is null for every other message', () => {
+    expect(playerTime(JSON.stringify({ event: 'infoDelivery', info: { volume: 100 } }))).toBeNull();
+    expect(playerTime(JSON.stringify({ event: 'onReady', info: null }))).toBeNull();
+    expect(playerTime('not json')).toBeNull();
+    expect(playerTime({ event: 'infoDelivery', info: { currentTime: 1 } })).toBeNull();
+    expect(playerTime(JSON.stringify(null))).toBeNull();
   });
 });
