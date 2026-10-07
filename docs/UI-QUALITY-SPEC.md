@@ -145,13 +145,19 @@ across workspaces can be promoted to a law by the person.
 Most layout problems come from a page being arranged from scratch. A small set
 of patterns, each a layout component in `components/patterns/` with a gallery
 entry and a short rule on `/dev/ui`, gives a step a shape to start from. The
-first three are the shapes the gallery shows most:
+first three are the shapes the gallery shows most, and the fourth was added
+for pages that hold several views of one thing:
 
 - **List and detail**: a list you work through, and one item's page, one
   column.
 - **Deck**: one item at a time with a fixed forward action and the next item
   loaded, as Quick read and Learn now work.
 - **Thread**: a row's comments and Dash's replies.
+- **Tabbed detail**: one thing's page with breadcrumbs, a title, tabs that
+  each have their own address, and its properties in a column on the right
+  that becomes a grid of facts under the title on a phone. The feature page
+  on the plan and the goal page use it (decision 1661, answered B, after
+  Linear's project page).
 
 A step's detail names its pattern ("Pattern: list and detail"), and shaping
 writes it. A screen that fits none of them is a new pattern, which the person

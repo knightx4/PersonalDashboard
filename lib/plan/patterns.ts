@@ -42,6 +42,12 @@ export const PATTERN_RULES: readonly PatternRule[] = [
     rule: "The thread sits on one card with the row it is about. The row's name comes first and opens the row, then its state, then the turns oldest first on the card's own ground, Dash's on a recessed ground of their own, and the box last, closed until it is pressed.",
     component: 'components/patterns/thread.tsx',
   },
+  {
+    name: 'tabbed detail',
+    label: 'Tabbed detail',
+    rule: 'Breadcrumbs first, then the title, then the tabs, then the open tab. Each tab is a link that puts the tab in the address, so a reload, the back button and a pasted link open the same tab, and the first tab is the plain address. The properties sit in a column on the right from laptop width and stay in view while the tab scrolls; on a phone they are a grid of facts between the title and the tabs. The row of tabs stays on one line at every width.',
+    component: 'components/patterns/tabbed-detail.tsx',
+  },
 ];
 
 /**
