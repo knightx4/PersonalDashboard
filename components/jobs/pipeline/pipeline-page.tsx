@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { KanbanSquare } from 'lucide-react';
 import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineFilters } from '@/components/jobs/pipeline/filters';
+import { PipelineFocus } from '@/components/jobs/pipeline/focus';
 import { RolesTable } from '@/components/jobs/pipeline/table';
 import { PipelineViewToggle } from '@/components/jobs/pipeline/view-toggle';
 import { DisplayMenu } from '@/components/shell/display-menu';
@@ -13,6 +14,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { APPLICATION_SOURCES, isLive, type ApplicationSource } from '@/lib/jobs/pipeline';
+import { openApplications } from '@/lib/jobs/board-moment';
 import {
   filterPipeline,
   pageOf,
@@ -35,8 +37,9 @@ import type { SavedView } from '@/lib/saved-views/store';
 /**
  * The Pipeline page, drawn from rows already loaded (plan #1590).
  *
- * One page where there were two: the board and the table are views of it,
- * kept in the address, and both open on the live applications. The closed
+ * One page where there were two: focus, the board and the table are views of
+ * it, kept in the address, and all open on the live applications. Focus is
+ * the default. The closed
  * ones are a status filter that takes you to the table, a page at a time.
  * One line of filters serves both views: status, source, excitement, fit and
  * chance. The page is one column, the list-and-detail pattern's list: the
@@ -52,6 +55,7 @@ export function PipelinePage({
   savedViews = [],
   working = [],
   hasInbox = false,
+  timezone = 'UTC',
 }: {
   /** Every application, live and closed, with its fit and chance. */
   rows: readonly PipelineRow[];
@@ -61,6 +65,8 @@ export function PipelinePage({
   working?: readonly string[];
   /** Whether an inbox is connected, which changes what the empty page suggests. */
   hasInbox?: boolean;
+  /** The person's zone, for the next interview's date and time. */
+  timezone?: string;
 }) {
   if (rows.length === 0) {
     return (
@@ -136,6 +142,26 @@ export function PipelinePage({
   // The count, once, after the rows (the list-and-detail pattern).
   const count = pipelineDescription(state, filtered.length, scoped.length, params.q);
 
+  if (state.view === 'focus') {
+    return (
+      <>
+        {header}
+        {tools}
+        {searchedOut ? (
+          <SearchEmpty query={params.q ?? ''} />
+        ) : (
+          <PipelineFocus
+            rows={filtered}
+            closed={rows.filter((row) => !isLive(row.status))}
+            closedHref={href({ view: 'table', status: 'closed' })}
+            working={working}
+            timezone={timezone}
+          />
+        )}
+      </>
+    );
+  }
+
   if (state.view === 'board') {
     return (
       <>
@@ -145,7 +171,7 @@ export function PipelinePage({
           <SearchEmpty query={params.q ?? ''} />
         ) : (
           <>
-            <PipelineBoard rows={filtered} working={working} />
+            <PipelineBoard rows={filtered} openCount={openApplications(rows)} working={working} />
             <p className="tabular mt-3 text-small text-ink-muted">{count}</p>
           </>
         )}

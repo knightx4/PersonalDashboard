@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useLayoutEffect, useRef, useState, useTransition } from 'react';
+import { useImperativeHandle, useLayoutEffect, useRef, useState, useTransition, type Ref } from 'react';
 import { AlertTriangle, Ban, GripVertical, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
@@ -16,10 +16,27 @@ import { rowRef, withRun } from '@/lib/core/move';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { shortAge } from '@/lib/jobs/applications/load';
 import { formatCoverage, type ApplicationStatus } from '@/lib/jobs/pipeline';
-import { useOptimisticWrite } from '@/lib/use-optimistic-write';
-import { boardMoment, openApplications, stillOpenLine, type BoardMoment } from '@/lib/jobs/board-moment';
+import { useOptimisticWrite, type WriteResult } from '@/lib/use-optimistic-write';
+import {
+  boardMoment,
+  OPEN_STATUSES,
+  openApplications,
+  stillOpenLine,
+  type BoardMoment,
+} from '@/lib/jobs/board-moment';
 import { completionMoment } from '@/components/motion/complete';
-import { CARD_ATTR, fadeInPlace, playForward, playOffer, visibleCard } from './moments';
+import { useToast } from '@/components/ui/toast';
+import {
+  CARD_ATTR,
+  LANE_ATTR,
+  fadeInPlace,
+  glideBoard,
+  playForward,
+  playOffer,
+  readLayout,
+  visibleCard,
+  type BoardLayout,
+} from './moments';
 import { dismissPursuit, moveApplication } from '@/app/jobs/(app)/pipeline/actions';
 
 /**
@@ -94,6 +111,11 @@ const COLUMNS: Array<{ statuses: ApplicationStatus[]; setStatus: ApplicationStat
   { statuses: ['offer'], setStatus: 'offer', label: 'Offer', empty: 'No offers yet' },
 ];
 
+/** Whether a status has a column on the board; a closed one leaves it. */
+function isOnBoard(status: ApplicationStatus): boolean {
+  return COLUMNS.some((column) => column.statuses.includes(status));
+}
+
 /** How long a live pursuit can go quiet before the card starts saying so. */
 export const STALE_DAYS = 14;
 
@@ -103,44 +125,74 @@ export const STALE_DAYS = 14;
  * The closed applications are a status filter on the table, a page at a time,
  * where they used to be a fold under the board drawing every one as a card.
  */
+/**
+ * A move made from outside the board, through the same path a drag or the
+ * reject button takes, so its moment plays. The gallery's moment demos use it
+ * (plan #1596): a recording at phone width has no drag to make.
+ */
+export type BoardHandle = {
+  move: (applicationId: string, status: ApplicationStatus) => void;
+};
+
 export function PipelineBoard({
   rows,
   working = [],
+  openCount,
+  handle,
+  write = moveApplication,
 }: {
   rows: PipelineRow[];
+  /**
+   * How many applications are open across the whole pipeline, for the line a
+   * rejection leaves. The rows can be a filtered few, and the line counts
+   * every open one. Counted from the rows when left out.
+   */
+  openCount?: number;
   /** Refs an open Ask Dash hand-off is about (plan #1568); those cards read "Dash is on it". */
   working?: readonly string[];
+  handle?: Ref<BoardHandle>;
+  /**
+   * The write a move makes. The server action, except in the gallery, which
+   * keeps the move in its own rows so the card stays where it went.
+   */
+  write?: (applicationId: string, status: ApplicationStatus) => Promise<WriteResult>;
 }) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<ApplicationStatus | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   /**
-   * The move waiting to play its moment (plan #1560): which card, which
-   * moment, and where the card stood before the board redrew it.
+   * The move waiting to play its moment (plans #1560, #1596): which card,
+   * which moment, and where everything on the board stood before it redrew.
    */
   const moving = useRef<{
     applicationId: string;
-    moment: Exclude<BoardMoment, 'rejection'>;
+    moment: BoardMoment;
     status: ApplicationStatus;
-    from: DOMRectReadOnly | null;
+    before: BoardLayout;
     column: string;
     company: string;
   } | null>(null);
-  /** The line a rejection leaves: where the role went, and how many are still open. */
-  const [closedLine, setClosedLine] = useState<string | null>(null);
+  /**
+   * The sentence a rejection leaves, waiting for its write to go through:
+   * where the role went, and how many applications are still open. Said in
+   * the toast, which moves nothing on the board, and only once the write has
+   * worked, so a refused move never claims it was filed.
+   */
+  const closedLines = useRef(new Map<string, string>());
+  const toast = useToast();
 
   /**
    * The moved card, drawn in its new column before the server agrees.
    *
    * The change is written into a copy of the rows rather than kept in a map
    * beside them, so everything on the board -- the columns, the counts, the
-   * closed fold, the badge on a card -- reads one status per pursuit. A refused
+   * badge on a card -- reads one status per pursuit. A refused
    * move leaves the rows the server rendered, which is the card back in the
    * column it came from, and the hook's toast says why: there is no second
    * sentence on the board itself, because the card that moved back is what the
    * person is looking at.
    */
-  const { shown, run, failed } = useOptimisticWrite<
+  const { shown, run } = useOptimisticWrite<
     PipelineRow[],
     { applicationId: string; status: ApplicationStatus }
   >({
@@ -149,10 +201,15 @@ export function PipelineBoard({
       current.map((row) =>
         row.applicationId === change.applicationId ? { ...row, status: change.status } : row,
       ),
-    write: (change) => moveApplication(change.applicationId, change.status),
+    write: (change) => write(change.applicationId, change.status),
     // An offer is a completion: the buzz once the write is through.
     onDone: (change) => {
       if (change.status === 'offer') completionMoment();
+      const line = closedLines.current.get(change.applicationId);
+      if (line) {
+        closedLines.current.delete(change.applicationId);
+        toast({ text: line });
+      }
     },
   });
 
@@ -165,26 +222,46 @@ export function PipelineBoard({
     const pending = moving.current;
     if (!pending) return;
     const row = shown.find((r) => r.applicationId === pending.applicationId);
+    if (pending.moment === 'rejection') {
+      if (row && isOnBoard(row.status)) return;
+      moving.current = null;
+      void glideBoard(boardRef.current, pending.before);
+      return;
+    }
     if (!row || row.status !== pending.status) return;
     moving.current = null;
-    const card = visibleCard(boardRef.current, pending.applicationId);
+    const card =
+      visibleCard(boardRef.current, pending.applicationId) ??
+      openFoldFor(boardRef.current, pending.applicationId);
     if (!card) return;
-    if (pending.moment === 'offer') void playOffer(card, pending.from, pending.company);
-    else void playForward(card, pending.from, pending.column);
+    if (pending.moment === 'offer') void playOffer(boardRef.current, card, pending.before, pending.company);
+    else void playForward(boardRef.current, card, pending.before, pending.column);
   }, [shown]);
 
   /**
    * Move a card, with the moment the move calls for. A rejection fades the
-   * card where it stands before the write draws it into Closed, and leaves
-   * the line saying how many applications are still open.
+   * card where it stands before the write takes it off the board, the lane
+   * closes up after it, and the toast says how many applications are still
+   * open. Every other move glides the board from where it stood.
    */
   async function move(row: PipelineRow, status: ApplicationStatus) {
     const moment = boardMoment(row.status, status);
-    setClosedLine(null);
     if (moment === 'rejection') {
       await fadeInPlace(visibleCard(boardRef.current, row.applicationId));
-      const after = shown.map((r) => (r.applicationId === row.applicationId ? { ...r, status } : r));
-      setClosedLine(stillOpenLine(row.companyName, openApplications(after)));
+      const open = openCount ?? openApplications(shown);
+      const wasOpen = OPEN_STATUSES.includes(row.status);
+      closedLines.current.set(
+        row.applicationId,
+        stillOpenLine(row.companyName, Math.max(0, open - (wasOpen ? 1 : 0))),
+      );
+      moving.current = {
+        applicationId: row.applicationId,
+        moment,
+        status,
+        before: readLayout(boardRef.current),
+        column: '',
+        company: row.companyName,
+      };
     } else if (moment) {
       const target = COLUMNS.find((column) => column.statuses.includes(status));
       const source = COLUMNS.find((column) => column.statuses.includes(row.status));
@@ -193,7 +270,7 @@ export function PipelineBoard({
           applicationId: row.applicationId,
           moment,
           status,
-          from: visibleCard(boardRef.current, row.applicationId)?.getBoundingClientRect() ?? null,
+          before: readLayout(boardRef.current),
           column: target.label,
           company: row.companyName,
         };
@@ -201,6 +278,16 @@ export function PipelineBoard({
     }
     run({ applicationId: row.applicationId, status });
   }
+
+  useImperativeHandle(
+    handle,
+    () => ({
+      move: (applicationId, status) => {
+        const row = shown.find((r) => r.applicationId === applicationId);
+        if (row && row.status !== status) void move(row, status);
+      },
+    }),
+  );
 
   function drop(status: ApplicationStatus) {
     const applicationId = dragging;
@@ -227,6 +314,7 @@ export function PipelineBoard({
           // inside it, kept per column in this browser (plan #1432).
           <div
             key={column.setStatus}
+            {...{ [LANE_ATTR]: column.setStatus }}
             onDragOver={(event) => {
               event.preventDefault();
               setOver(column.setStatus);
@@ -236,14 +324,22 @@ export function PipelineBoard({
             }
             onDrop={() => drop(column.setStatus)}
             className={cn(
-              'rounded-card bg-sunken transition-colors duration-quick',
+              // Its own stacking context, so the heading below can sit over
+              // a card gliding in without rising over the page's own bars.
+              'isolate rounded-card bg-sunken transition-colors duration-quick',
               over === column.setStatus && 'bg-accent-tint',
             )}
           >
+            {/* The heading is drawn on the lane's own ground and over the
+              * cards, so a card gliding into this lane from the one above
+              * passes under the stage's name rather than across it. */}
             <Disclosure
               remember={`jobs.fold.pipeline.${column.setStatus}`}
               defaultOpen={columnRows.length > 0}
-              summaryClassName="px-3 py-2"
+              summaryClassName={cn(
+                'relative z-over-link rounded-card px-3 py-2 transition-colors duration-quick',
+                over === column.setStatus ? 'bg-accent-tint' : 'bg-sunken',
+              )}
               bodyClassName="space-y-2 px-2 pb-2"
               title={column.label}
               meta={
@@ -269,6 +365,11 @@ export function PipelineBoard({
         );
       }
 
+      // A stage with nothing in it is a narrow lane: still somewhere to drop
+      // a card, without holding a full column open for nothing. The stages
+      // with cards share the rest, so at a laptop's width the board fits
+      // without scrolling sideways.
+      const empty = columnRows.length === 0;
       return (
         <section
           key={column.setStatus}
@@ -279,11 +380,13 @@ export function PipelineBoard({
           onDragLeave={() => setOver((current) => (current === column.setStatus ? null : current))}
           onDrop={() => drop(column.setStatus)}
           className={cn(
-            'w-72 shrink-0 rounded-card bg-sunken p-2 transition-colors duration-quick',
+            'rounded-card bg-sunken p-2 transition-colors duration-quick',
+            empty ? 'w-36 shrink-0' : 'min-w-60 flex-1',
             over === column.setStatus && 'bg-accent-tint',
           )}
           aria-label={column.label}
           data-stage={column.setStatus}
+          {...{ [LANE_ATTR]: column.setStatus }}
         >
           <header className="mb-2 flex items-baseline justify-between px-1.5 pt-1">
             <h2 className="text-ui font-semibold text-ink">{column.label}</h2>
@@ -302,8 +405,8 @@ export function PipelineBoard({
                 onReject={() => move(row, 'rejected')}
               />
             ))}
-            {columnRows.length === 0 && (
-              <p className="px-1.5 py-6 text-center text-ui text-ink-muted">{column.empty}</p>
+            {empty && (
+              <p className="px-1.5 py-6 text-center text-small text-ink-muted">{column.empty}</p>
             )}
           </div>
         </section>
@@ -312,12 +415,6 @@ export function PipelineBoard({
 
   return (
     <div ref={boardRef} className="space-y-4">
-      {/* Kept under reduced motion: the fade is the motion, this is the news. */}
-      {closedLine && !failed && (
-        <p role="status" className="text-small text-ink-muted">
-          {closedLine}
-        </p>
-      )}
       <div className="flex flex-col gap-2 sm:hidden">{renderColumns('list')}</div>
       {/* The five stages do not fit side by side at a laptop's width, so the
         * board says what is off to the right (law 2): every stage by name and
@@ -347,6 +444,25 @@ export function PipelineBoard({
       </div>
     </div>
   );
+}
+
+/**
+ * On a phone each stage is a fold, and a card moved into one the person had
+ * closed would land out of sight with nothing to play on. Open that fold, so
+ * the card is seen arriving, and hand back the card. Null when the stacked
+ * layout is not the one on screen.
+ */
+function openFoldFor(root: HTMLElement | null, applicationId: string): HTMLElement | null {
+  if (!root) return null;
+  const selector = `[${CARD_ATTR}="${CSS.escape(applicationId)}"]`;
+  for (const card of Array.from(root.querySelectorAll<HTMLElement>(selector))) {
+    const fold = card.closest('details');
+    if (fold && !fold.open && fold.getClientRects().length > 0) {
+      fold.open = true;
+      return visibleCard(root, applicationId);
+    }
+  }
+  return null;
 }
 
 /** Named apart from the ui Card: this one is a pursuit, dressed in the card's classes. */
@@ -425,9 +541,12 @@ function PipelineCard({
             * (law 18). Beside the card they took two to five stars' width
             * and moved the age with them. */}
           <div className="flex items-baseline justify-between gap-2">
+            {/* Padded out to a finger's height and pulled back by the same
+              * margin, so the title is a 44px target on a phone without the
+              * card growing. */}
             <Link
               href={`/jobs/roles/${row.roleId}`}
-              className="block min-w-0 truncate text-small font-medium text-ink transition-colors duration-quick hover:text-accent"
+              className="-my-3.5 block min-w-0 truncate py-3.5 text-small font-medium text-ink transition-colors duration-quick hover:text-accent"
             >
               {row.roleTitle}
             </Link>

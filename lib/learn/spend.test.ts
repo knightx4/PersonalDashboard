@@ -111,6 +111,7 @@ describe('the operation names', () => {
       'mark-review-question',
       'reply-about-card',
       'explain-phrase',
+      'describe-card-clip',
       'write-asked-card',
       'mark-teach-back',
       'summarise-video',
@@ -121,6 +122,7 @@ describe('the operation names', () => {
       'cut-clips',
       'score-clips',
       'rate-clips',
+      'read-personality',
     ]);
   });
 });

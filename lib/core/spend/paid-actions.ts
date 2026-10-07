@@ -44,6 +44,11 @@ export const PAID_ACTIONS = {
   'app/learn/know/actions.ts#proposeFromNote': ['classify-note', 'concepts-from-brief'],
   'app/learn/know/actions.ts#proposeFromCourse': ['concepts-from-course'],
   'app/learn/know/actions.ts#approveFromCourse': ['place-track'],
+  // Saving a personality result has Dash read it against your notes once the
+  // page has answered (plan #1635); the button under the read asks again.
+  'app/learn/know/personality/actions.ts#saveBigFiveAction': ['read-personality', 'embed-note-match'],
+  'app/learn/know/personality/actions.ts#saveTypedAction': ['read-personality', 'embed-note-match'],
+  'app/learn/know/personality/actions.ts#readAgainAction': ['read-personality', 'embed-note-match'],
   'app/learn/know/actions.ts#createCustomTrack': ['place-track', 'write-curriculum'],
   'app/learn/c/[id]/actions.ts#proposeBranch': ['branch-from-selection'],
   'app/learn/c/[id]/actions.ts#approveBranch': ['place-track'],
@@ -111,7 +116,7 @@ export const PAID_ACTIONS = {
   // Dash's reply to a comment on a role that tags it, and the letter it writes
   'app/jobs/(app)/roles/[id]/comment-actions.ts#addRoleComment': ['reply-to-role-comment'],
   'app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence': ['draft-answer'],
-  'app/jobs/(app)/settings/evidence-actions.ts#proposeEvidence': ['propose-evidence'],
+  'app/jobs/(app)/material/evidence-actions.ts#proposeEvidence': ['propose-evidence'],
   'app/jobs/(app)/find/actions.ts#suggestTracks': ['suggest-learning-tracks'],
   // Starting a suggested track adds a Learn goal, as the Learn Goals page does.
   'app/jobs/(app)/find/actions.ts#startTrack': ['place-aim', 'write-curriculum'],
@@ -173,6 +178,10 @@ export const PAID_ACTIONS = {
   // Dash: a question about anything in the app, from the sheet in the shell,
   // ⌘K or /ask (plan #1090), streaming its lookups as they run (plan #1438)
   'app/api/ask/route.ts#POST': ['ask-dash'],
+  // Dash's interview on the specs page (plan #1641): a question each press,
+  // and the vision and spec drafted from the answers at the end
+  'app/dev/specs/interview-actions.ts#startInterview': ['ask-dash'],
+  'app/dev/specs/interview-actions.ts#answerInterviewQuestion': ['ask-dash'],
 
   // Timeline: writing a year up, or the current year again (plan #1121)
   'app/timeline/actions.ts#writeYearReview': ['write-year-review'],
@@ -185,6 +194,8 @@ export type PaidAction = keyof typeof PAID_ACTIONS;
  * why. paid-actions.test.ts accepts these and nothing else.
  */
 export const PAID_WITHOUT_BUTTON: Record<string, string> = {
+  'app/learn/know/personality/actions.ts#restoreTypedAction':
+    'The undo after deleting a typed-in personality type. It saves through the same path as Save, but with the read turned off, so it spends nothing (plan #1635).',
   'app/dev/bugs/actions.ts#triageFiled':
     'Called by the header panel once a note or idea has saved, to show its type, workspace, priority and any open item it repeats (plan #1179), and to score an idea against the vision of its workspace (plan #1327). Send files the note for free; this runs after it, and there is no button of its own.',
   'app/goals/capture-actions.ts#sortGoalCapture':

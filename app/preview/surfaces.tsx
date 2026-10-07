@@ -42,6 +42,7 @@ import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { SettingsView } from '@/app/jobs/(app)/settings/view';
+import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
 import { RoleForm } from '@/app/jobs/(app)/roles/new/role-form';
@@ -83,6 +84,9 @@ import {
   PersonalityAddTypeSurface,
   PersonalityScoresSurface,
   PersonalityTestSurface,
+  KnowPersonalitySurface,
+  KnowPersonalityEmptySurface,
+  KnowPersonalityReadingSurface,
 } from './personality-surfaces';
 import { AddTranscript } from '@/app/vault/education/add-transcript';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
@@ -141,6 +145,8 @@ import {
   GoalTreeSurface,
 } from './goal-surfaces';
 import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
+import { BoardMomentDemo } from './jobs-moment-demos';
+import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
   AskChangesSurface,
   AskDashSurface,
@@ -196,6 +202,9 @@ import {
   DevRaisedStatusSurface,
   DevSpecSurface,
   DevSpecsSurface,
+  DevSpecsInterviewEmptySurface,
+  DevSpecsInterviewHalfSurface,
+  DevSpecsInterviewDraftedSurface,
   DevUiReviewSurface,
   DevUsageSurface,
 } from './dev-page-surfaces';
@@ -469,6 +478,7 @@ const pipelineRows: PipelineRow[] = [
     daysSinceActivity: 1,
     lastActivityAt: '2026-09-08T16:00:00.000Z',
     coverage: { covered: 4, total: 6, gaps: 1, rate: 0.67 },
+    nextInterview: { at: '2026-09-11T14:00:00.000Z', timeKnown: true },
   }),
   pipelineRow({
     applicationId: 'p2',
@@ -583,6 +593,9 @@ const pipelineRows: PipelineRow[] = [
     lastActivityAt: '2026-07-24T10:00:00.000Z',
   }),
 ];
+
+/** The sent applications still open, which is all the moment demos draw. */
+const momentRows = pipelineRows.filter((row) => OPEN_STATUSES.includes(row.status));
 
 /**
  * A company you have done the reading on: research written, three people on
@@ -762,8 +775,6 @@ const settings = {
     excludedIndustries: 'Crypto, Healthcare, Defense',
     searchStartedOn: '2026-07-06',
     ghostThresholdDays: 21,
-    writingStyleNotes: 'Plain sentences. No "passionate", no "excited to".',
-    bannedConstructions: 'leverage, synergy, reach out',
     preferences: {
       homeLocation: 'London',
       workplaces: ['hybrid', 'remote'] as const,
@@ -787,6 +798,61 @@ const settings = {
       },
     },
   ],
+  excludedSenders: [
+    { id: 'x1', domain: 'jobalerts.linkedin.com' },
+    { id: 'x2', domain: 'hi.wellfound.com' },
+  ],
+};
+
+
+/**
+ * Material for the same person: a question bank with long and unanswered
+ * questions across kinds, the two resumes and the evidence bank Settings used
+ * to hold, and a writing voice with its own banned phrases.
+ */
+const material: MaterialProps = {
+  part: 'answers',
+  kind: null,
+  questions: [
+    {
+      id: 'q1',
+      text: 'Why do you want to work at Fieldline, and why this team in particular rather than the wider platform organisation?',
+      kind: 'motivation',
+      canonicalAnswer:
+        'I have spent four years making slow batch systems incremental, and your settlement platform is the same problem at ten times the volume. The platform team owns the part I am best at.',
+      timesSeen: 7,
+      usedIn: 5,
+      approvedAnswer: null,
+    },
+    {
+      id: 'q2',
+      text: 'Describe a time you disagreed with a technical decision.',
+      kind: 'behavioral',
+      canonicalAnswer: null,
+      timesSeen: 4,
+      usedIn: 2,
+      approvedAnswer:
+        'We were about to shard the reconciliation tables. I argued for moving the joins into the warehouse first; we did, and sharding was never needed.',
+    },
+    {
+      id: 'q3',
+      text: 'Are you authorised to work in the UK?',
+      kind: 'logistics',
+      canonicalAnswer: 'Yes, without sponsorship.',
+      timesSeen: 12,
+      usedIn: 11,
+      approvedAnswer: null,
+    },
+    {
+      id: 'q4',
+      text: 'What is your notice period?',
+      kind: 'logistics',
+      canonicalAnswer: null,
+      timesSeen: 1,
+      usedIn: 0,
+      approvedAnswer: null,
+    },
+  ],
   resumes: [
     {
       id: 'cv1',
@@ -797,10 +863,6 @@ const settings = {
       hasPdf: true,
     },
     { id: 'cv2', label: 'Quant', isDefault: false, notes: null, hasText: false, hasPdf: false },
-  ],
-  excludedSenders: [
-    { id: 'x1', domain: 'jobalerts.linkedin.com' },
-    { id: 'x2', domain: 'hi.wellfound.com' },
   ],
   evidence: [
     {
@@ -824,6 +886,10 @@ const settings = {
       usedCount: 0,
     },
   ],
+  voice: {
+    writingStyleNotes: 'Plain sentences. No "passionate", no "excited to".',
+    bannedConstructions: 'leverage\nsynergy\nreach out',
+  },
 };
 
 /** Nine people on file, in every state a send to somebody can be in. */
@@ -2288,7 +2354,7 @@ const shellSections: NavSection[] = [
   { href: '/jobs/find', label: 'Find', icon: 'find' },
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
   { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
-  { href: '/jobs/answers', label: 'Answers', icon: 'answers' },
+  { href: '/jobs/material', label: 'Material', icon: 'answers' },
   { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
 ];
 
@@ -2338,7 +2404,17 @@ const deckCards: FeedCard[] = [
       },
     ],
     // A section of a lecture, so the bar under the player shows where it starts and ends (note 6c13bd61).
-    video: { videoId: 'ZK3O402wf1c', title: 'Price controls and the shortages they make', start: 724, end: 845 },
+    // "In this video" under it says what the stretch argues and why it is here (note cde86a10).
+    video: {
+      videoId: 'ZK3O402wf1c',
+      title: 'Price controls and the shortages they make',
+      start: 724,
+      end: 845,
+      note: {
+        said: 'A price ceiling below the market price leaves more people wanting the good than there is of it, and the gap is filled by queues and waiting lists.',
+        why: 'It walks through the same supply and demand diagram behind price controls, with rent control as its main example.',
+      },
+    },
   },
   {
     id: '00000000-0000-4000-8000-000000000001',
@@ -2854,7 +2930,79 @@ export const SURFACES: readonly Surface[] = [
     label: 'Pipeline · Board',
     module: 'jobs',
     width: 'wide',
+    render: () => <PipelinePage rows={pipelineRows} params={{ view: 'board' }} />,
+  },
+  {
+    /* The page as it opens: what is in process, waiting and to apply. */
+    id: 'jobs-pipeline-focus',
+    label: 'Pipeline · Focus',
+    module: 'jobs',
+    width: 'wide',
     render: () => <PipelinePage rows={pipelineRows} params={{}} />,
+  },
+  {
+    /* The three Jobs moments on the Pipeline board (plan #1596), each played
+     * by the button above it through the board's own move. Only the sent
+     * applications, so at phone width the stage a card leaves and the one it
+     * lands in are both on the screen. */
+    id: 'jobs-moment-forward',
+    label: 'Pipeline · a role moving forward',
+    module: 'jobs',
+    width: 'wide',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="board-move"]',
+      shows:
+        'Monzo’s Backend Engineer card glides from Submitted down into In process while the cards and lanes around it glide to their new places, then “In process” is named across the foot of Monzo’s card.',
+    },
+    render: () => (
+      <BoardMomentDemo
+        rows={momentRows}
+        applicationId="p3"
+        to="in_process"
+        label="Move Monzo to In process"
+      />
+    ),
+  },
+  {
+    id: 'jobs-moment-offer',
+    label: 'Pipeline · an offer',
+    module: 'jobs',
+    width: 'wide',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="board-move"]',
+      shows:
+        'Marshall Wace’s card glides from In process down into Offer while the D. E. Shaw card slides up and the lanes resize with it, then “Offer · Marshall Wace” is named across the card’s foot and one accent ring leaves the card and fades.',
+    },
+    render: () => (
+      <BoardMomentDemo
+        rows={momentRows}
+        applicationId="p1"
+        to="offer"
+        label="Move Marshall Wace to Offer"
+      />
+    ),
+  },
+  {
+    id: 'jobs-moment-reject',
+    label: 'Pipeline · a rejection',
+    module: 'jobs',
+    width: 'wide',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="board-move"]',
+      shows:
+        'Starling Bank’s card fades where it stands with nothing moving, Submitted then closes up over the space it left, and a toast reads “5 still open · Starling Bank is in Closed”.',
+    },
+    render: () => (
+      <BoardMomentDemo
+        rows={momentRows}
+        applicationId="p4"
+        to="rejected"
+        label="Reject Starling Bank"
+      />
+    ),
   },
   {
     /* The shopping item page's main panel, which arrived as a form until law
@@ -3338,6 +3486,35 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <SettingsView {...settings} />,
+  },
+  {
+    id: 'jobs-material',
+    label: 'Material · Answers',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <MaterialView {...material} />,
+  },
+  {
+    id: 'jobs-material-evidence',
+    label: 'Material · Evidence',
+    module: 'jobs',
+    width: 'wide',
+    // With the proposal's estimate, as the jobs layout provides it, so the $
+    // beside Propose is drawn (law 16).
+    render: () => (
+      <PaidCostsProvider
+        costs={{ 'app/jobs/(app)/material/evidence-actions.ts#proposeEvidence': guessedSummary }}
+      >
+        <MaterialView {...material} part="evidence" />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    id: 'jobs-material-voice',
+    label: 'Material · Voice',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <MaterialView {...material} part="voice" />,
   },
   {
     id: 'jobs-contacts',
@@ -3900,6 +4077,35 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <PersonalityAddTypeSurface />,
+  },
+  {
+    /* The Big Five result on the Know page (plan #1634): the five traits,
+     * the vault themes nearest each, Dash's read against the notes (#1635)
+     * with two clashes and two agreements, two typed-in types with their
+     * reads folded, and one earlier result folded. Intellect has no theme
+     * near it. */
+    id: 'learn-know-personality',
+    label: 'Learn · Know, personality result',
+    module: 'learn',
+    width: 'page',
+    render: () => <KnowPersonalitySurface />,
+  },
+  {
+    /* Straight after a save (plan #1635): Dash's read of the result is
+     * still running, so the section says so where the read will be. */
+    id: 'learn-know-personality-reading',
+    label: 'Learn · Know, personality being read',
+    module: 'learn',
+    width: 'page',
+    render: () => <KnowPersonalityReadingSurface />,
+  },
+  {
+    /* The same section before any test is taken: one line offering it. */
+    id: 'learn-know-personality-empty',
+    label: 'Learn · Know, personality not taken',
+    module: 'learn',
+    width: 'page',
+    render: () => <KnowPersonalityEmptySurface />,
   },
   {
     /* Clips before any are cut. */
@@ -4618,6 +4824,29 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevSpecsSurface />,
+  },
+  {
+    /* Dash's interview under a workspace's vision (plan #1641): just
+     * started, halfway, and drafted with its links. */
+    id: 'dev-specs-interview-empty',
+    label: 'Dev · Specs, an interview just started',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevSpecsInterviewEmptySurface />,
+  },
+  {
+    id: 'dev-specs-interview-half',
+    label: 'Dev · Specs, an interview halfway',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevSpecsInterviewHalfSurface />,
+  },
+  {
+    id: 'dev-specs-interview-drafted',
+    label: 'Dev · Specs, an interview drafted',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevSpecsInterviewDraftedSurface />,
   },
   {
     id: 'dev-spec',

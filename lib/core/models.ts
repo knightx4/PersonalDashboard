@@ -82,6 +82,8 @@ export const MODELS = {
   learnNameMaterial: HAIKU,
   /** lib/learn/feed/write-card.ts */
   learnWriteCard: SONNET,
+  /** lib/learn/feed/clip-note.ts; two sentences about a lecture clip, hourly */
+  learnClipNote: HAIKU,
   /** lib/learn/graph/applied.ts */
   learnApplied: HAIKU,
   /** lib/learn/graph/curriculum.ts */
@@ -92,6 +94,8 @@ export const MODELS = {
   learnGraphFromBrief: SONNET,
   /** lib/learn/graph/from-course.ts */
   learnGraphFromCourse: SONNET,
+  /** lib/learn/personality/read-run.ts, Dash's read of a personality result; Sonnet as #1630 settled */
+  learnPersonalityRead: SONNET,
   /** lib/learn/graph/from-note.ts */
   learnGraphFromNote: HAIKU,
   /** lib/learn/graph/from-prior.ts */

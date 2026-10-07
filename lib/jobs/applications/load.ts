@@ -74,6 +74,11 @@ export interface PipelineRow {
   /** The kind of every interview logged, which is what the funnel's high-water mark reads. */
   interviewKinds?: string[];
   /**
+   * The soonest interview still ahead, which the pipeline's In process rows
+   * show. Null when none is booked.
+   */
+  nextInterview?: { at: string; timeKnown: boolean } | null;
+  /**
    * Fit and chance with their reasons (plan #1206), attached by the pages that
    * show them (`withApplicationNotes`); absent or null when not scored.
    */
@@ -88,7 +93,7 @@ const SELECT = `
     id, title, location, work_mode, comp_min_cents, comp_max_cents, requirement_matches,
     companies!inner ( id, name, slug, logo_url, domains, website )
   ),
-  interviews ( kind )
+  interviews ( kind, scheduled_at, time_known )
 `;
 
 type RawRow = {
@@ -126,7 +131,7 @@ type RawRow = {
       website: string | null;
     };
   };
-  interviews: { kind: string }[] | null;
+  interviews: { kind: string; scheduled_at: string | null; time_known: boolean | null }[] | null;
 };
 
 export async function loadPipeline(
@@ -193,7 +198,24 @@ export async function loadPipeline(
     compMaxCents: row.roles.comp_max_cents,
     coverage: requirementCoverage(row.roles.requirement_matches),
     interviewKinds: (row.interviews ?? []).map((interview) => interview.kind),
+    nextInterview: nextInterview(row.interviews ?? []),
   }));
+}
+
+function nextInterview(
+  interviews: NonNullable<RawRow['interviews']>,
+): PipelineRow['nextInterview'] {
+  const now = Date.now();
+  let soonest: { at: string; timeKnown: boolean } | null = null;
+  for (const interview of interviews) {
+    if (!interview.scheduled_at) continue;
+    const at = new Date(interview.scheduled_at).getTime();
+    if (!Number.isFinite(at) || at < now) continue;
+    if (!soonest || at < new Date(soonest.at).getTime()) {
+      soonest = { at: interview.scheduled_at, timeKnown: interview.time_known ?? true };
+    }
+  }
+  return soonest;
 }
 
 /** Flatten to the shape lib/pipeline.ts computes from. */

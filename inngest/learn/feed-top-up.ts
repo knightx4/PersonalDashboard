@@ -28,6 +28,7 @@ import { addTeachBackCard } from '@/lib/learn/feed/teach-back-store';
 import { writeVideoCards, type VideoCardPassResult } from '@/lib/learn/youtube/video-card-run';
 import { writeClipCards, type ClipCardPassResult } from '@/lib/learn/clips/clip-card-run';
 import { loadTranscript } from '@/lib/learn/youtube/transcripts';
+import { writeClipNotes } from '@/lib/learn/feed/clip-note-run';
 import { createFeedPicker, loadFeedFields, peopleToPickFor } from './feed-picks';
 import { createLessonPorts } from './lesson-top-up';
 
@@ -79,6 +80,7 @@ export const MAX_OUTLINES_PER_RUN = 2;
 
 const OPERATION: LearnOperation = 'write-feed-card';
 const EMBED_OPERATION: LearnOperation = 'embed-feed-ideas';
+const CLIP_NOTE_OPERATION: LearnOperation = 'describe-card-clip';
 
 /**
  * The columns that say what a card was picked for and from, copied from the
@@ -437,8 +439,19 @@ async function topUpWith(
     console.error('[learn feed top-up] teach-back', error instanceof Error ? error.message : error);
     return null;
   });
+  // The ready cards with a lecture clip get "In this video" (note cde86a10),
+  // whether or not the deck was short, since the cards already in it need it.
+  const clipNotes = await writeClipNotes(learn, userId, {
+    apiKey,
+    deadline: options.deadline,
+    onSpend: (spend) => keepClipNoteSpend(core, userId, spend),
+  }).catch((error: unknown) => {
+    console.error('[learn feed top-up] clip notes', error instanceof Error ? error.message : error);
+    return null;
+  });
   const withTeach = {
     ...sections,
+    ...(clipNotes && clipNotes.written + clipNotes.failed > 0 ? { clipNotes } : {}),
     ...(teachBack === 'added' ? { teachBack: true } : {}),
     ...(pieces && pieces.written + pieces.failed.length > 0 ? { pieces } : {}),
     ...(plans && plans.laidOut.length + plans.failed.length > 0 ? { plans } : {}),
@@ -471,6 +484,18 @@ async function keepCardSpend(
   }
   for (const report of embedSpend) {
     await recordSpend(core, userId, { module: 'learn', operation: EMBED_OPERATION, model: report.model, usage: report.usage });
+  }
+}
+
+/** Spend for one clip note, under its own operation. Not named record…Spend, as keepCardSpend. */
+async function keepClipNoteSpend(core: Context['core'], userId: string, spend: SpendReport[]): Promise<void> {
+  for (const report of spend) {
+    await recordSpend(core, userId, {
+      module: 'learn',
+      operation: CLIP_NOTE_OPERATION,
+      model: report.model,
+      usage: report.usage,
+    });
   }
 }
 

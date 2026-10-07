@@ -24,9 +24,10 @@ function row(status: ApplicationStatus, extra: Partial<PipelineRow> = {}): Pipel
 }
 
 describe('parsePipeline', () => {
-  it('opens on the board and the live applications', () => {
+  it('opens on focus and the live applications', () => {
     const state = parsePipeline({});
-    expect(state.view).toBe('board');
+    expect(state.view).toBe('focus');
+    expect(parsePipeline({ view: 'board' }).view).toBe('board');
     expect(state.scope).toBe('live');
     expect(state.page).toBe(1);
   });
@@ -79,9 +80,10 @@ describe('pipelineHref', () => {
     expect(pipelineHref({ view: 'table', source: 'referral', page: '3' }, { status: 'closed' })).toBe(
       '/jobs/pipeline?view=table&source=referral&status=closed',
     );
-    expect(pipelineHref({ view: 'table', status: 'closed' }, { view: 'board', status: undefined })).toBe(
+    expect(pipelineHref({ view: 'table', status: 'closed' }, { view: 'focus', status: undefined })).toBe(
       '/jobs/pipeline',
     );
+    expect(pipelineHref({ view: 'table' }, { view: 'board' })).toBe('/jobs/pipeline?view=board');
     expect(pipelineHref({ view: 'table' }, { page: '2' })).toBe('/jobs/pipeline?view=table&page=2');
   });
 

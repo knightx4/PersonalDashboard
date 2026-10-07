@@ -607,9 +607,11 @@ Same machinery, longer output, plus a structure derived from the requirement map
 
 **Auth and onboarding.** Sign up, then a separate step to connect Gmail with the explanation screen. Skippable. Then a short setup: target titles, search start date, upload a resume, and add three to five companies so linking has something to match against on the first backfill.
 
-**Pipeline.** One page with two views, a board and a table, chosen in the address. Both open on the live applications: not closed, leads included, the same count Today shows. One line of filters above either view narrows by status, source, excitement, fit and chance; the closed applications are the status filter, shown in the table a page at a time. `/jobs/roles` was the table on its own and now redirects to it (plan #1590).
+**Pipeline.** One page with three views, focus, a board and a table, chosen in the address, focus by default. All open on the live applications: not closed, leads included, the same count Today shows. One line of filters above every view narrows by status, source, excitement, fit and chance; the closed applications are the status filter, shown in the table a page at a time. `/jobs/roles` was the table on its own and now redirects to it (plan #1590).
 
-**Pipeline board.** Kanban by status, cards showing company, title, days since last activity, next action, excitement. Drag to change status, which writes a manual override event.
+**Pipeline focus.** One line per live application in three sections: In process, with whose move it is and the next interview booked; Waiting on a reply, with those quiet for over two weeks listed apart; and To apply, drafts before leads. A last line counts the closed applications by how each ended and opens them in the table.
+
+**Pipeline board.** Kanban by status, cards showing company, title, days since last activity, next action, excitement. Drag to change status, which writes a manual override event. A stage with no cards is a narrow lane, so the others fit a laptop's width.
 
 **Pipeline table.** The same data as a sortable table, because a board is bad above about forty items and you will pass forty items. Columns are configurable, sorted by last activity by default.
 
@@ -627,7 +629,9 @@ Same machinery, longer output, plus a structure derived from the requirement map
 
 **Analytics.** The metrics from `lib/pipeline.ts`. Funnel by stage, everything grouped by source, time to first response, rejection stage distribution, activity over time. One page, no configuration.
 
-**Settings.** Profile, timezone, style notes, banned constructions, connected accounts, ghost threshold, resume versions, evidence bank editor, delete all data.
+**Material.** What drafting draws on, in one tab since 7 October 2026 (plan #1592): the question bank with its canonical answers, the evidence bank editor, resume versions, and the writing voice (style notes and banned constructions). `/jobs/answers` redirects here.
+
+**Settings.** Search start date, ghost threshold, target titles, job preferences, connected inboxes, the bookmarklet and excluded senders. Name, timezone and deleting the account are under Account.
 
 ### Phase 2, the writing layer
 

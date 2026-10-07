@@ -706,6 +706,15 @@ function DeckCard({
                 end={card.video.end}
                 className="mt-1.5"
               />
+              {/* What the clip says and why it is on this card (note
+                  cde86a10), once the top-up has written it. */}
+              {card.video.note && (
+                <div className="mt-2 rounded-control bg-sunken px-3 py-2.5">
+                  <h4 className="text-small font-semibold text-ink-muted">In this video</h4>
+                  <p className="mt-1 text-body text-ink">{card.video.note.said}</p>
+                  <p className="mt-1 text-small text-ink-muted">{card.video.note.why}</p>
+                </div>
+              )}
             </section>
           )}
 

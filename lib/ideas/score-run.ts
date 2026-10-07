@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { triageFrom, type Triage } from '@/lib/feedback/triage';
 import { scoreIdea, type ScoreIdeaInput } from '@/lib/ideas/score-ask';
-import { visionForIdea, type IdeaScore } from '@/lib/ideas/score';
+import { SCORE_DUE_FILTER, needsScore, visionForIdea, type IdeaScore } from '@/lib/ideas/score';
 import { isModuleId, type ModuleId } from '@/lib/modules';
 import { loadModuleVisions } from '@/lib/specs/vision';
 
@@ -13,13 +13,15 @@ import { loadModuleVisions } from '@/lib/specs/vision';
  * - `scoreIdeaRow`, once an idea filed from the header panel has been
  *   triaged (app/dev/bugs/actions.ts#triageFiled), so it has its score within
  *   a few seconds.
- * - `scoreUnscoredIdeas`, the catch-up: every live idea whose score is null.
- *   That covers the ideas filed before scoring, the ones sessions and the
- *   night digest file without triage, and any Jev failed on last time. The
- *   daily cron runs it (inngest/dev/idea-scores.ts).
+ * - `scoreUnscoredIdeas`, the catch-up: every live idea whose score is null
+ *   or was asked under an older wording of the question (needsScore). That
+ *   covers the ideas filed before scoring, the ones sessions and the night
+ *   digest file without triage, any Jev failed on last time, and every live
+ *   idea once after the question changes (plan #1644). The daily cron runs it
+ *   (inngest/dev/idea-scores.ts).
  *
- * A failed call writes nothing, so the score stays null and the next
- * catch-up asks again. The score is only written over a null, so the
+ * A failed call writes nothing, so the old score (or null) stays and the next
+ * catch-up asks again. The score is only written over one that is due, so the
  * catch-up never replaces one the filing hook wrote a moment earlier.
  *
  * No `server-only` guard and no client of its own: the caller passes the
@@ -72,7 +74,7 @@ async function askAndStore(
     .update({ score: result.score })
     .eq('id', idea.id)
     .eq('user_id', userId)
-    .is('score', null);
+    .or(SCORE_DUE_FILTER);
   if (error) {
     console.warn(`[idea-score] could not store ${idea.id}: ${error.message}`);
     return null;
@@ -101,7 +103,7 @@ export async function scoreIdeaRow(
     .eq('id', input.id)
     .eq('user_id', input.userId)
     .maybeSingle();
-  if (!data || data.dismissed_at || data.score) return null;
+  if (!data || data.dismissed_at || !needsScore(data.score)) return null;
   const idea = toIdea(data);
   if (input.triage) idea.triage = input.triage;
   const visions = await loadModuleVisions(supabase, input.userId);
@@ -113,12 +115,13 @@ export type CatchUpResult = {
   scored: number;
   /** Ideas Jev failed on, or whose score could not be stored; still null. */
   failed: number;
-  /** Unscored ideas left for the next run, by the limit or the deadline. */
+  /** Ideas still due left for the next run, by the limit or the deadline. */
   left: number;
 };
 
 /**
- * The catch-up: score every live idea whose score is null, oldest first, at
+ * The catch-up: score every live idea whose score is due (null, or asked
+ * under an older wording), oldest first, at
  * most two a second. Stops starting new asks at `limit` or once `deadline`
  * (epoch ms) has passed; what is left waits for the next run.
  */
@@ -144,7 +147,7 @@ export async function scoreUnscoredIdeas(
     .from('ideas')
     .select('id, body, module, triage')
     .eq('user_id', input.userId)
-    .is('score', null)
+    .or(SCORE_DUE_FILTER)
     .is('dismissed_at', null)
     .order('created_at', { ascending: true })
     .limit(limit + 1);

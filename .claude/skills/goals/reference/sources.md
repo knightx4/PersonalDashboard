@@ -241,7 +241,7 @@ Stories of their own work and results, used as evidence in applications.
 
 - Search: `title`, `body`, `context`, `skills`
 - Name a row by `title`; link it by `id`
-- Opens at `/jobs/answers`
+- Opens at `/jobs/material?part=evidence`
 
 ### `job_search.resume_versions` (Job search)
 
@@ -249,6 +249,7 @@ Each version of their résumé, as text.
 
 - Search: `label`, `text_content`, `notes`
 - Name a row by `label`; link it by `id`
+- Opens at `/jobs/material?part=resumes`
 
 ### `job_search.cover_letters` (Job search)
 
@@ -270,6 +271,7 @@ Application questions they have met, with their standing answer.
 
 - Search: `text`, `canonical_answer`
 - Name a row by `text`; link it by `id`
+- Opens at `/jobs/material`
 
 ### `job_search.reminders` (Job search)
 
@@ -394,6 +396,7 @@ Personality tests they took or typed in, each with its date: Big Five scores, or
 
 - Search: `test_name`, `typed_value`, `note`, `read_points`
 - Name a row by `test_name`; link it by `id`
+- Opens at `/learn/know#personality`
 - kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. A retake is a new row, so read the latest by taken_at. read_points is Dash's read of the result against their notes, once written.
 
 ### `todo.tasks` (Todo)

@@ -250,6 +250,9 @@ export const LEARN_OPERATIONS = [
   // Explaining a phrase selected on a Learn now card (plan #1057). One Sonnet
   // call per phrase per card; selecting it again reads the stored one.
   'explain-phrase',
+  // "In this video" on a Learn now card with a lecture clip (note
+  // cde86a10): two sentences about the clip, written by the hourly top-up.
+  'describe-card-clip',
   // Make it a card, under a phrase's explanation (plan #1057): the same call
   // as 'write-feed-card', made on the press while the person waits rather
   // than by the top-up, so what asked-for cards cost can be read on its own.
@@ -290,6 +293,11 @@ export const LEARN_OPERATIONS = [
   // score questions in one request per clip, and one Haiku call for up to
   // forty clips Jev could not rate. One row per model per person per run.
   'rate-clips',
+  // Dash's read of a personality result against your notes (plan #1635): one
+  // Sonnet call when a result is saved, after the page has answered, and one
+  // more each time the button on the Know page asks for a fresh read. The
+  // notes are found with the cached trait sentences, under 'embed-note-match'.
+  'read-personality',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
