@@ -166,10 +166,10 @@ export function Posting({
           <p className="mt-1 text-small text-ink-muted">
             Your evidence bank is empty, so there is nothing to match against.{' '}
             <Link
-              href="/jobs/settings"
+              href="/jobs/material?part=evidence"
               className="underline underline-offset-2 transition-colors duration-quick hover:text-ink"
             >
-              Fill it in Settings.
+              Fill it in Material.
             </Link>
           </p>
         )}

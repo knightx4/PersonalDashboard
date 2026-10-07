@@ -106,7 +106,7 @@ export const jobsSources: ModuleSources = {
       weight: 'record',
       search: ['title', 'body', 'context', 'skills'],
       title: 'title',
-      href: () => '/jobs/answers',
+      href: () => '/jobs/material?part=evidence',
     },
     {
       table: 'job_search.resume_versions',
@@ -115,6 +115,7 @@ export const jobsSources: ModuleSources = {
       weight: 'record',
       search: ['label', 'text_content', 'notes'],
       title: 'label',
+      href: () => '/jobs/material?part=resumes',
     },
     {
       table: 'job_search.cover_letters',
@@ -139,6 +140,7 @@ export const jobsSources: ModuleSources = {
       weight: 'record',
       search: ['text', 'canonical_answer'],
       title: 'text',
+      href: () => '/jobs/material',
     },
     {
       table: 'job_search.reminders',

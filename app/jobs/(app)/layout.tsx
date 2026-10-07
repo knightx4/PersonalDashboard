@@ -80,7 +80,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: '/jobs/find', label: 'Find', icon: 'find' },
     { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
     { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
-    { href: '/jobs/answers', label: 'Answers', icon: 'answers' },
+    { href: '/jobs/material', label: 'Material', icon: 'answers' },
     { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
   ];
 

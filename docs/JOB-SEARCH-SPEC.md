@@ -629,7 +629,9 @@ Same machinery, longer output, plus a structure derived from the requirement map
 
 **Analytics.** The metrics from `lib/pipeline.ts`. Funnel by stage, everything grouped by source, time to first response, rejection stage distribution, activity over time. One page, no configuration.
 
-**Settings.** Profile, timezone, style notes, banned constructions, connected accounts, ghost threshold, resume versions, evidence bank editor, delete all data.
+**Material.** What drafting draws on, in one tab since 7 October 2026 (plan #1592): the question bank with its canonical answers, the evidence bank editor, resume versions, and the writing voice (style notes and banned constructions). `/jobs/answers` redirects here.
+
+**Settings.** Search start date, ghost threshold, target titles, job preferences, connected inboxes, the bookmarklet and excluded senders. Name, timezone and deleting the account are under Account.
 
 ### Phase 2, the writing layer
 
