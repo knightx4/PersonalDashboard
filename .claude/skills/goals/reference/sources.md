@@ -379,6 +379,14 @@ Lists they pasted in to learn from, as pasted.
 - Search: `raw_text`, `source_hint`
 - Name a row by `source_hint`; link it by `id`
 
+### `learn.personality_results` (Learn)
+
+Personality tests they took or typed in, each with its date: Big Five scores, or a type such as INTJ or 5w4.
+
+- Search: `test_name`, `typed_value`, `read_points`
+- Name a row by `test_name`; link it by `id`
+- kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value. A retake is a new row, so read the latest by taken_at. read_points is Dash's read of the result against their notes, once written.
+
 ### `todo.tasks` (Todo)
 
 Tasks they gave themselves, open and done.
