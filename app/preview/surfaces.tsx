@@ -1899,6 +1899,14 @@ const previewRelatedNotes = [
   },
 ];
 
+/**
+ * The bottom padding AppShell's main keeps for the tab bar below lg, for the
+ * Quick read entries drawn without the shell: the Next row is fixed above
+ * where the tab bar would be, and this lets the card's foot scroll clear of
+ * it as it does in the app.
+ */
+const SHELL_FOOT = 'pb-[calc(var(--dock-h)+2.125rem)] lg:pb-0';
+
 const quickStory: QuickReadViewProps = {
   card: {
     kind: 'story',
@@ -3813,16 +3821,20 @@ export const SURFACES: readonly Surface[] = [
     },
     deck: { next: '#quick-read-next button[type="submit"]', item: '[data-quick-swipe]' },
     // The essay drawn behind it, so Next shows it at once (note 452a90d9).
+    // Under the room AppShell's main keeps for the tab bar, so the foot of
+    // the card scrolls clear of the Next row as it does in the app.
     render: () => (
-      <QuickReadView
-        {...quickStory}
-        upNext={{
-          card: quickEssay.card!,
-          arrived: '20 Sep, 9:02\u00a0AM',
-          saved: false,
-          issueHref: '/news/i/issue-2',
-        }}
-      />
+      <div className={SHELL_FOOT}>
+        <QuickReadView
+          {...quickStory}
+          upNext={{
+            card: quickEssay.card!,
+            arrived: '20 Sep, 9:02\u00a0AM',
+            saved: false,
+            issueHref: '/news/i/issue-2',
+          }}
+        />
+      </div>
     ),
   },
   {
@@ -3863,21 +3875,33 @@ export const SURFACES: readonly Surface[] = [
     label: 'News · Quick read single-essay card',
     module: 'news',
     width: 'page',
-    render: () => <QuickReadView {...quickEssay} />,
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <QuickReadView {...quickEssay} />
+      </div>
+    ),
   },
   {
     id: 'news-quick-page',
     label: 'News · Quick read page on a laptop',
     module: 'news',
     width: 'page',
-    render: () => <QuickReadView {...quickPageView} />,
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <QuickReadView {...quickPageView} />
+      </div>
+    ),
   },
   {
     id: 'news-quick-page-full',
     label: 'News · A full Quick read page, every story with a picture',
     module: 'news',
     width: 'page',
-    render: () => <QuickReadView {...quickFullPage} />,
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <QuickReadView {...quickFullPage} />
+      </div>
+    ),
   },
   {
     id: 'news-quick-caught-up',
