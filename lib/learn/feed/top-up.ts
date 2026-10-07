@@ -112,6 +112,8 @@ export type TopUpSummary = {
   teachBack?: boolean;
   /** Goal-track units split into pieces this run, and what failed (plan #1140). */
   pieces?: { written: number; failed: string[] };
+  /** The "In this video" notes written for cards with a lecture clip (note cde86a10). */
+  clipNotes?: { written: number; failed: number };
   /** Goal tracks a unit was laid out for ahead of time, and what failed (plan #1143). */
   plans?: { laidOut: string[]; failed: string[]; held: string[] };
 };

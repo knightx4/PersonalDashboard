@@ -111,6 +111,7 @@ describe('the operation names', () => {
       'mark-review-question',
       'reply-about-card',
       'explain-phrase',
+      'describe-card-clip',
       'write-asked-card',
       'mark-teach-back',
       'summarise-video',

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  areaButtons,
   briefParts,
   errandAreaDefault,
   homeAreas,
@@ -95,6 +96,24 @@ describe('homeAreas', () => {
     expect(areas.map((a) => [a.areaName, a.goals.map((g) => g.goal.id)])).toEqual([
       ['X', ['a', 'c']],
       ['Y', ['b']],
+    ]);
+  });
+});
+
+describe('areaButtons', () => {
+  it('lists every area in its own order, with its page and its open goals', () => {
+    const buttons = areaButtons(
+      [
+        { id: 'y', name: 'Y' },
+        { id: 'x', name: 'X' },
+        { id: 'z', name: 'Z' },
+      ],
+      [line('a', 'x'), line('b', 'y'), line('c', 'x')],
+    );
+    expect(buttons).toEqual([
+      { id: 'y', name: 'Y', href: '/goals/area/y', goals: 1 },
+      { id: 'x', name: 'X', href: '/goals/area/x', goals: 2 },
+      { id: 'z', name: 'Z', href: '/goals/area/z', goals: 0 },
     ]);
   });
 });
