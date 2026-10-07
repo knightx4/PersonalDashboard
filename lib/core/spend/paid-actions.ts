@@ -178,6 +178,10 @@ export const PAID_ACTIONS = {
   // Dash: a question about anything in the app, from the sheet in the shell,
   // ⌘K or /ask (plan #1090), streaming its lookups as they run (plan #1438)
   'app/api/ask/route.ts#POST': ['ask-dash'],
+  // Dash's interview on the specs page (plan #1641): a question each press,
+  // and the vision and spec drafted from the answers at the end
+  'app/dev/specs/interview-actions.ts#startInterview': ['ask-dash'],
+  'app/dev/specs/interview-actions.ts#answerInterviewQuestion': ['ask-dash'],
 
   // Timeline: writing a year up, or the current year again (plan #1121)
   'app/timeline/actions.ts#writeYearReview': ['write-year-review'],

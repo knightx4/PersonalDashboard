@@ -5,6 +5,9 @@ import { IdeasView } from '@/app/dev/ideas/ideas-view';
 import { UsageScreen } from '@/app/dev/usage/usage-view';
 import { ReviewView, type Standing } from '@/app/dev/ui/review/review-view';
 import { SpecsView } from '@/app/dev/specs/specs-view';
+import type { InterviewCardView } from '@/lib/specs/interview-view';
+import type { VisionReview } from '@/lib/specs/vision-review';
+import type { DevComment } from '@/lib/comments/load';
 import { SpecDocView } from '@/app/dev/specs/[slug]/spec-doc-view';
 import { ChangelogView } from '@/app/dev/changelog/changelog-view';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
@@ -288,6 +291,122 @@ export function DevSpecsSurface() {
       edits={{}}
       changes={[]}
       audit={{ auditAt: null, findings: [] }}
+    />
+  );
+}
+
+// ---- Specs: Dash's interview (plan #1641) --------------------------------
+
+const SPECS_VISIONS = {
+  app: {
+    module: 'app' as const,
+    body: 'It should make working with an AI builder easy, and the app it builds should be one I use every day.',
+    updatedAt: '2026-09-20T09:00:00Z',
+  },
+  jobs: {
+    module: 'jobs' as const,
+    body: 'Every application from first lead to offer in one place, so nothing falls through between an email and an interview.',
+    updatedAt: '2026-09-18T09:00:00Z',
+  },
+};
+
+function turn(id: string, author: 'me' | 'claude', body: string, createdAt: string): DevComment {
+  return { id, author, body, createdAt };
+}
+
+const JOBS_TURNS: DevComment[] = [
+  turn('q1', 'claude', 'When an application goes quiet for two weeks, what do you want the app to do about it?', '2026-10-07T09:00:00Z'),
+  turn('a1', 'me', 'Tell me on Home that it has gone quiet and offer a follow-up email I can send in one press. Nothing automatic: I want to choose who gets chased.', '2026-10-07T09:02:00Z'),
+  turn('q2', 'claude', 'You keep the cover letters in the vault today. Should a role page show the letter you sent for it, or only link to the vault?', '2026-10-07T09:02:30Z'),
+  turn('a2', 'me', 'Show it on the role. I never open the vault while I am looking at a role.', '2026-10-07T09:04:00Z'),
+  turn('q3', 'claude', 'Which matters more on the pipeline board: the stage each role is at, or how long it has been since you last heard back?', '2026-10-07T09:04:30Z'),
+];
+
+function interviewView(over: Partial<InterviewCardView>): InterviewCardView {
+  return {
+    id: 'i1',
+    module: 'jobs',
+    status: 'open',
+    move: 'answer',
+    questionLimit: 12,
+    asked: 1,
+    answered: 0,
+    turns: JOBS_TURNS.slice(0, 1),
+    summary: null,
+    finishedAt: null,
+    visionHref: null,
+    specChangeHref: null,
+    ...over,
+  };
+}
+
+function SpecsWithInterview({
+  view,
+  edits = {},
+}: {
+  view: InterviewCardView;
+  edits?: Partial<Record<'jobs', VisionReview>>;
+}) {
+  return (
+    <SpecsView
+      counts={{ 'ui-quality': 4, plan: 1 }}
+      visions={SPECS_VISIONS}
+      edits={edits}
+      changes={[]}
+      audit={{ auditAt: null, findings: [] }}
+      interviews={{ jobs: view }}
+      openInterviews
+    />
+  );
+}
+
+/** Just started: Dash's first question, and nothing answered yet. */
+export function DevSpecsInterviewEmptySurface() {
+  return <SpecsWithInterview view={interviewView({})} />;
+}
+
+/** Halfway: two answers in and the third question waiting. */
+export function DevSpecsInterviewHalfSurface() {
+  return <SpecsWithInterview view={interviewView({ asked: 3, answered: 2, turns: JOBS_TURNS })} />;
+}
+
+const DRAFTED_EDIT: VisionReview = {
+  id: 'v1',
+  module: 'jobs',
+  reviewId: 'i1',
+  sessionId: null,
+  outcome: 'edit',
+  visionBody: SPECS_VISIONS.jobs.body,
+  proposedBody:
+    'Every application from first lead to offer in one place. When one goes quiet the app says so on Home and offers a follow-up to send, and each role shows the letter that went with it.',
+  note: 'From your interview about Job search on 7 October. You want quiet applications raised, not chased for you.',
+  evidenceIds: [],
+  evidence: [],
+  status: 'pending',
+  decidedAt: null,
+  createdAt: '2026-10-07T09:20:00Z',
+};
+
+/** Drafted: the vision edit waits above, and the spec change has been decided. */
+export function DevSpecsInterviewDraftedSurface() {
+  return (
+    <SpecsWithInterview
+      edits={{ jobs: DRAFTED_EDIT }}
+      view={interviewView({
+        status: 'drafted',
+        move: null,
+        asked: 3,
+        answered: 3,
+        turns: [
+          ...JOBS_TURNS,
+          turn('a3', 'me', 'How long since I heard back. The stage I already know.', '2026-10-07T09:06:00Z'),
+        ],
+        summary:
+          'You want the app to notice when an application goes quiet and offer a follow-up, to keep each letter on its role, and to sort the board by how long since you heard back.',
+        finishedAt: '2026-10-07T09:20:00Z',
+        visionHref: '/dev/specs#vision-jobs',
+        specChangeHref: null,
+      })}
     />
   );
 }
