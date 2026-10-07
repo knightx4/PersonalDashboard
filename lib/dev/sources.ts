@@ -38,6 +38,16 @@ export const devSources: ModuleSources = {
       href: () => '/dev/posts',
       note: 'Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread.',
     },
+    {
+      table: 'public.spec_interviews',
+      module: 'Dev',
+      holds: 'Interviews Dash held about one workspace of the app, or the app as a whole: what they use it for, what they do there and their routines, in their own answers.',
+      weight: 'intent',
+      search: ['summary'],
+      title: 'module',
+      href: () => '/dev/specs',
+      note: "module is the workspace's id, or 'app'. The questions and answers are the thread under the row in core.conversations (ref public.spec_interviews:<id>): turns with role 'user' are their answers, quoted as what they said. summary is Dash's few sentences on what they said, written when it drafted; it is null while status is open.",
+    },
   ],
   notSources: [
     'public.check_backs',
