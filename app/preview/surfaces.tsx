@@ -3008,8 +3008,8 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     /* A feature's own page (plan #1664): breadcrumbs, the Overview tab with
-     * the detail, a question, what it waits on and the thread, and the
-     * properties column. */
+     * Dash's latest update (plan #1666), the detail, a question, what it
+     * waits on and the thread, and the properties column. */
     id: 'dev-plan-feature',
     label: 'Plan · a feature’s page',
     module: 'dev',

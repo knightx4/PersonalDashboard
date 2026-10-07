@@ -50,6 +50,8 @@ import { PlanRow, PLAN_TREE_ACTIONS, usePlanRow } from './plan-row';
 import { type PlanCatalogEntry } from './plan-catalog';
 import { ASSIGNEE_LABEL, SIZE_LABEL, STATUS_LABEL, scopeLabel } from './step-forms';
 import { when } from './plan-run-status';
+import { FeatureUpdate } from './feature-update';
+import type { PlanUpdate } from '@/lib/plan/updates';
 
 /**
  * A feature's own page, /dev/plan/<number> (plan #1664), in the tabbed
@@ -65,8 +67,9 @@ import { when } from './plan-run-status';
  * tab.
  *
  * Seams for the steps after this one: Activity joins `FEATURE_TABS` with
- * #1667, Dash's update goes at the top of Overview with #1666, and the
- * progress split goes at the foot of the properties with #1668.
+ * #1667 and lists the older entries of `updates`, the latest of which
+ * heads Overview (#1666), and the progress split goes at the foot of the
+ * properties with #1668.
  */
 export function FeaturePage({
   feature,
@@ -81,6 +84,7 @@ export function FeaturePage({
   overhaulProgress,
   criticStops,
   screenChanges,
+  updates = [],
 }: {
   feature: PlanNode;
   module: PlanScope | null;
@@ -94,6 +98,8 @@ export function FeaturePage({
   overhaulProgress?: Readonly<Record<string, OverhaulProgress>>;
   criticStops?: Readonly<Record<string, CriticStopView>>;
   screenChanges?: Readonly<Record<number, readonly ScreenChangeView[]>>;
+  /** Dash's updates on the feature, newest first (plan #1666). */
+  updates?: readonly PlanUpdate[];
 }) {
   const router = useRouter();
   const search = useSearchParams();
@@ -324,6 +330,7 @@ export function FeaturePage({
         <div className="max-w-2xl">{parts.edit}</div>
       ) : (
         <div className="max-w-2xl space-y-5">
+          {updates[0] && <FeatureUpdate update={updates[0]} />}
           {node.fog && node.fogDismissedAt === null && (
             <FogNote
               id={node.id}
