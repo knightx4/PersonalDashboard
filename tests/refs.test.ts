@@ -37,6 +37,7 @@ const FILL: Record<string, (user: string, id: string) => Record<string, unknown>
   'core.week_reviews': () => ({ week: '2026-09-27', facts: '{}', source: 'plain' }),
   'goals.items': () => ({ level: 'goal', area_id: randomUUID(), parent_id: null, kind: null }),
   'job_search.companies': () => ({ slug: 'a-company' }),
+  'learn.personality_results': () => ({ kind: 'mbti', typed_value: 'INTJ' }),
   'news.issues': () => ({ text_body: 'x' }),
   'obsidian.notes': () => ({ path: 'Career/A note.md' }),
   'obsidian.transcripts': (user) => ({ storage_path: `${user}/a.pdf` }),
