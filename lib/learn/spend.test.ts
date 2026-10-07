@@ -121,6 +121,7 @@ describe('the operation names', () => {
       'cut-clips',
       'score-clips',
       'rate-clips',
+      'read-personality',
     ]);
   });
 });

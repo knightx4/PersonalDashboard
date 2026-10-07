@@ -1,8 +1,10 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { Rating } from '@/components/ui/rating';
 import { cn } from '@/lib/cn';
 import { IPIP_ITEMS, IPIP_ITEM_COUNT, IPIP_SCALE } from '@/lib/learn/personality/ipip';
@@ -36,6 +38,8 @@ export function BigFiveTest({
     initialAnswers ? [...initialAnswers] : Array(IPIP_ITEM_COUNT).fill(null),
   );
   const [message, setMessage] = useState<string | null>(null);
+  /** True once a result is saved here, while Dash's read of it runs (#1635). */
+  const [justSaved, setJustSaved] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const answered = answers.filter((a) => a !== null).length;
@@ -64,6 +68,7 @@ export function BigFiveTest({
         return;
       }
       setShown(outcome.result);
+      setJustSaved(true);
       setTaking(false);
       setAnswers(Array(IPIP_ITEM_COUNT).fill(null));
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -76,6 +81,18 @@ export function BigFiveTest({
         <div className={cardVariants({ padding: 'standard' })}>
           <BigFiveScoreList scores={shown.scores} takenAt={shown.takenAt} />
         </div>
+        {justSaved ? (
+          <p className="mt-3 text-small text-ink-muted">
+            Dash is reading this against your notes. The read will be under your traits on the{' '}
+            <Link
+              href="/learn/know#personality"
+              className="text-ink underline decoration-border underline-offset-2 hover:decoration-ink"
+            >
+              Know page
+            </Link>
+            .
+          </p>
+        ) : null}
         <div className="mt-4">
           <Button variant="secondary" onClick={() => setTaking(true)}>
             Take it again
@@ -144,9 +161,15 @@ export function BigFiveTest({
         <span className="min-w-0 text-small tabular-nums text-ink-muted" aria-live="polite">
           {message ?? `${answered} of ${IPIP_ITEM_COUNT} answered`}
         </span>
-        <Button size="lg" onClick={finish} pending={pending} className="shrink-0">
-          {pending ? 'Scoring…' : 'See my scores'}
-        </Button>
+        <span className="inline-flex shrink-0 items-center gap-1">
+          <Button size="lg" onClick={finish} pending={pending}>
+            {pending ? 'Scoring…' : 'See my scores'}
+          </Button>
+          <PaidHint
+            action="app/learn/know/personality/actions.ts#saveBigFiveAction"
+            what="Cost of Dash reading your result against your notes"
+          />
+        </span>
       </div>
       {shown ? (
         <div className="mt-3">

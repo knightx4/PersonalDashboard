@@ -16,13 +16,18 @@ import {
   type TypedResult,
 } from '@/lib/learn/personality/model';
 import { todayIn } from '@/lib/todo/tasks/model';
+import {
+  readPersonalityAfterResponse,
+  runPersonalityRead,
+} from '@/lib/learn/personality/read-run';
 
 export type SaveBigFiveState = { result: BigFiveResult } | { error: string };
 
 /**
  * Score and keep a finished Big Five test (plan #1632). Called once, with
  * all 50 answers: the page holds them until the last, so leaving halfway
- * saves nothing.
+ * saves nothing. Dash then reads it against your notes once the page has
+ * answered (plan #1635), so the save does not wait on the call.
  */
 // latency: pending
 export async function saveBigFiveAction(answers: number[]): Promise<SaveBigFiveState> {
@@ -33,6 +38,7 @@ export async function saveBigFiveAction(answers: number[]): Promise<SaveBigFiveS
       loadAccountSettings(user.id),
     ]);
     const result = await saveBigFiveResult(learn, user.id, answers, todayIn(settings.timezone));
+    readPersonalityAfterResponse(learn, user.id, result.id);
     revalidatePath('/learn/know');
     return { result };
   } catch (error) {
@@ -45,7 +51,10 @@ export type SaveTypedState =
   | { result: TypedResult }
   | { error: string; field?: 'testName' | 'typedValue' | 'takenAt' | 'note' };
 
-async function typedSave(draft: TypedDraft, id?: string): Promise<SaveTypedState> {
+async function typedSave(
+  draft: TypedDraft,
+  options: { id?: string; read: boolean },
+): Promise<SaveTypedState> {
   const user = await requireUser();
   try {
     const [learn, settings] = await Promise.all([
@@ -54,7 +63,8 @@ async function typedSave(draft: TypedDraft, id?: string): Promise<SaveTypedState
     ]);
     const parsed = parseTypedInput(draft, todayIn(settings.timezone));
     if ('error' in parsed) return parsed;
-    const result = await saveTypedResult(learn, user.id, parsed.input, id);
+    const result = await saveTypedResult(learn, user.id, parsed.input, options.id);
+    if (options.read) readPersonalityAfterResponse(learn, user.id, result.id);
     revalidatePath('/learn/know');
     return { result };
   } catch (error) {
@@ -63,10 +73,13 @@ async function typedSave(draft: TypedDraft, id?: string): Promise<SaveTypedState
   }
 }
 
-/** Keep a type from another test as written (plan #1633). */
+/**
+ * Keep a type from another test as written (plan #1633), and have Dash read
+ * it against your notes once the page has answered (plan #1635).
+ */
 // latency: pending
 export async function saveTypedAction(draft: TypedDraft): Promise<SaveTypedState> {
-  return typedSave(draft);
+  return typedSave(draft, { read: true });
 }
 
 /** Delete a typed-in type, handing it back for the undo (plan #1633). */
@@ -85,7 +98,10 @@ export async function deleteTypedAction(
   }
 }
 
-/** The undo of a delete: the same row back, under the same id. */
+/**
+ * The undo of a delete: the same row back, under the same id. Its read is
+ * not run again; the restored row has none until the Know page's button asks.
+ */
 // latency: optimistic
 export async function restoreTypedAction(removed: TypedResult): Promise<SaveTypedState> {
   return typedSave(
@@ -96,6 +112,26 @@ export async function restoreTypedAction(removed: TypedResult): Promise<SaveType
       takenAt: removed.takenAt,
       note: removed.note ?? undefined,
     },
-    removed.id,
+    { id: removed.id, read: false },
   );
+}
+
+export type ReadAgainState = { ok: true } | { error: string };
+
+/**
+ * Ask Dash for a fresh read of one result against your notes (plan #1635),
+ * from the button under the read on the Know page. Waited on: the person
+ * pressed for it, and the page shows the new read when it returns.
+ */
+// latency: pending
+export async function readAgainAction(resultId: string): Promise<ReadAgainState> {
+  const user = await requireUser();
+  try {
+    const outcome = await runPersonalityRead(await createLearnClient(), user.id, resultId);
+    revalidatePath('/learn/know');
+    return outcome.ok ? { ok: true } : { error: 'Dash could not read it just now. Try again.' };
+  } catch (error) {
+    console.error('[learn personality] read again', error instanceof Error ? error.message : error);
+    return { error: 'Dash could not read it just now. Try again.' };
+  }
 }

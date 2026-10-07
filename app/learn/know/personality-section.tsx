@@ -9,8 +9,15 @@ import {
   factorPercent,
   type BigFiveFactor,
 } from '@/lib/learn/personality/ipip';
-import type { BigFiveResult, TypedResult } from '@/lib/learn/personality/model';
+import {
+  readCount,
+  readStatus,
+  type BigFiveResult,
+  type ReadStatus,
+  type TypedResult,
+} from '@/lib/learn/personality/model';
 import type { TraitThemes } from '@/lib/learn/personality/trait-themes';
+import { PersonalityReadPanel } from './personality-read';
 
 /**
  * Your personality result on the Know page (plan #1634): the latest Big Five
@@ -18,8 +25,14 @@ import type { TraitThemes } from '@/lib/learn/personality/trait-themes';
  * typed in from other tests, and earlier results folded beneath. With no Big
  * Five yet, one line offering the test.
  *
- * Dash's read of the result against your notes (#1635) goes under the traits.
+ * Dash's read of the result against your notes (#1635) goes under the traits,
+ * and the read of each typed-in type folds beneath the line that lists them.
  */
+
+/** The clock, read outside the component because reading it during render is unstable. */
+function clock(): number {
+  return Date.now();
+}
 
 export const PERSONALITY_HREF = '/learn/know/personality';
 
@@ -52,6 +65,49 @@ function ThemeLinks({ themes }: { themes: TraitThemes[BigFiveFactor] }) {
   );
 }
 
+const FOLD_META: Record<ReadStatus, string> = {
+  ready: '',
+  pending: 'reading',
+  failed: 'did not run',
+  none: 'not read yet',
+};
+
+function readMeta(result: TypedResult, status: ReadStatus): string {
+  if (status !== 'ready' || !result.read) return FOLD_META[status];
+  return readCount(result.read.points) || 'nothing to compare';
+}
+
+/** The types typed in from other tests, and Dash's read of each folded under. */
+function OtherTests({ typed, now }: { typed: TypedResult[]; now: number }) {
+  if (typed.length === 0) return null;
+  return (
+    <div className="space-y-1">
+      <p className="text-ui text-ink-muted">
+        From other tests:{' '}
+        {typed.map((t, i) => (
+          <span key={t.id}>
+            {i > 0 && ' · '}
+            <span className="text-ink">{t.typedValue}</span> on {t.testName}
+          </span>
+        ))}
+      </p>
+      {typed.map((t) => {
+        const status = readStatus(t, now);
+        return (
+          <Disclosure key={t.id} title={`Dash on ${t.typedValue}`} meta={readMeta(t, status)}>
+            <PersonalityReadPanel
+              resultId={t.id}
+              read={t.read}
+              status={status}
+              title={`Dash’s read of ${t.typedValue}`}
+            />
+          </Disclosure>
+        );
+      })}
+    </div>
+  );
+}
+
 function shortLine(result: BigFiveResult): string {
   return BIG_FIVE_FACTORS.map(
     (f) => `${FACTOR_WORDS[f].name} ${factorPercent(result.scores[f])}`,
@@ -63,6 +119,7 @@ export function PersonalitySection({
   earlier,
   typed,
   themes,
+  now,
 }: {
   latest: BigFiveResult | null;
   /** Older Big Five results, newest first. */
@@ -70,7 +127,13 @@ export function PersonalitySection({
   typed: TypedResult[];
   /** Null when the themes could not be matched. */
   themes: TraitThemes | null;
+  /**
+   * The time the page is drawn, which says whether a read is still coming.
+   * The gallery passes a fixed one; the page leaves it to the clock.
+   */
+  now?: number;
 }) {
+  const at = now ?? clock();
   return (
     <div id="personality" className="mt-8 scroll-mt-6">
       <SectionFold
@@ -78,15 +141,18 @@ export function PersonalitySection({
         hint={latest ? `Big Five, taken ${formatDay(latest.takenAt, true)}` : undefined}
       >
         {!latest ? (
-          <p className="text-ui text-ink-muted">
-            <Link
-              href={PERSONALITY_HREF}
-              className="text-ink underline decoration-border underline-offset-2 hover:decoration-ink"
-            >
-              Take the personality test
-            </Link>{' '}
-            to see your five traits beside the themes in your notes.
-          </p>
+          <div className="max-w-2xl space-y-4">
+            <p className="text-ui text-ink-muted">
+              <Link
+                href={PERSONALITY_HREF}
+                className="text-ink underline decoration-border underline-offset-2 hover:decoration-ink"
+              >
+                Take the personality test
+              </Link>{' '}
+              to see your five traits beside the themes in your notes.
+            </p>
+            <OtherTests typed={typed} now={at} />
+          </div>
         ) : (
           <div className="max-w-2xl space-y-4">
             <ul className="space-y-4">
@@ -119,17 +185,13 @@ export function PersonalitySection({
               </p>
             )}
 
-            {typed.length > 0 && (
-              <p className="text-ui text-ink-muted">
-                From other tests:{' '}
-                {typed.map((t, i) => (
-                  <span key={t.id}>
-                    {i > 0 && ' · '}
-                    <span className="text-ink">{t.typedValue}</span> on {t.testName}
-                  </span>
-                ))}
-              </p>
-            )}
+            <PersonalityReadPanel
+              resultId={latest.id}
+              read={latest.read}
+              status={readStatus(latest, at)}
+            />
+
+            <OtherTests typed={typed} now={at} />
 
             <Link href={PERSONALITY_HREF} className={buttonVariants({ variant: 'secondary' })}>
               Retake or add a type
