@@ -254,6 +254,14 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.plan_runs = planRun.id;
 
+  const [planUpdate] = await admin<{ id: string }[]>`
+    insert into plan_updates (user_id, feature_id, health, body, steps_done_before,
+                              steps_done_after, steps_total, run_id)
+    values (${userId}, ${planItem.id}, 'on_track', ${`${tag} moved a step along`}, 0, 1, 1,
+            ${planRun.id})
+    returning id`;
+  ids.plan_updates = planUpdate.id;
+
   const [checkBack] = await admin<{ id: string }[]>`
     insert into check_backs (user_id, title, detail, due_at, plan_item_id, source, woke_run_id)
     values (
