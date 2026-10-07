@@ -363,7 +363,7 @@ function SendToClaude({
               held ??
               (running
                 ? 'A run is working this now. This comes back when it is done.'
-                : 'Start the overhaul routine on this overhaul. It works the steps in phase order and stops at the first thing that needs you.')
+                : 'Start the overhaul routine on this overhaul. It works its steps in order and stops at the first thing that needs you.')
             }
           >
             <Play className="size-3.5" aria-hidden />
@@ -661,6 +661,10 @@ export function PlanRow({
   const criticStop = node.status === 'blocked' ? criticStops[node.id] : undefined;
   const descendants = flatten([node]).length - 1;
   const closed = isClosed(node.status);
+  // A row at the top of its module is a feature, so what goes under it is a
+  // step; anything deeper is a substep (PLAN-SPEC, "Levels").
+  const childLevel = trail.length === 0 ? 'step' : 'substep';
+  const addChildLabel = childLevel === 'step' ? 'Add a step' : 'Add a substep';
   const isDecision = node.kind === 'decision';
   // A setup job still open. Closed, it is an ordinary finished row.
   const setupOpen = node.kind === 'setup' && !closed;
@@ -853,7 +857,7 @@ export function PlanRow({
           },
         ]
       : []),
-    { id: 'add-child', label: 'Add a sub-step', onSelect: row.addChild },
+    { id: 'add-child', label: addChildLabel, onSelect: row.addChild },
     { id: 'edit', label: 'Edit', onSelect: () => setEditing(true) },
     {
       id: 'up',
@@ -1211,6 +1215,7 @@ export function PlanRow({
         <AddStep
           module={node.module}
           parentId={node.id}
+          level={childLevel}
           open
           onDone={() => row.setAddingChild(false)}
         />
