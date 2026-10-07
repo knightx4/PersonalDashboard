@@ -132,6 +132,7 @@ import {
   PlanFeatureSurface,
   PlanFeatureStepsSurface,
   PlanTreeSurface,
+  PlanTableSurface,
   ProjectPlanSurface,
 } from './plan-surfaces';
 import {
@@ -2996,6 +2997,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanTreeSurface />,
+  },
+  {
+    /* The plan's Table view (plan #1669): one row per open feature, grouped
+     * by module, each opening the feature's page. */
+    id: 'dev-plan-table',
+    label: 'Plan · features as a table',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanTableSurface />,
   },
   {
     /* The same plan with its rows opened, for the panel behind a row: the
