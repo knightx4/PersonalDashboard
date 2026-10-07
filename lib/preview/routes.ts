@@ -173,6 +173,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'pattern-detail': ['/dev/ui'],
   'pattern-deck': ['/dev/ui'],
   'pattern-thread': ['/dev/ui'],
+  'pattern-tabbed': ['/dev/ui'],
   'front-door': ['/'],
   'auth-login': ['/login'],
   'auth-signup': ['/signup'],

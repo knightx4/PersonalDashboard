@@ -2,9 +2,10 @@ import { Bookmark, Search } from 'lucide-react';
 import { DetailFacts, DetailPage, ListPage, ListRow } from '@/components/patterns/list-detail';
 import { Deck, type DeckItem } from '@/components/patterns/deck';
 import { ThreadPanel } from '@/components/patterns/thread';
+import { TabbedDetail } from '@/components/patterns/tabbed-detail';
 import { Thread } from '@/components/thread/thread';
 import { PageHeader } from '@/components/shell/page-header';
-import { Property } from '@/components/shell/detail-layout';
+import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { Group } from '@/components/ui/disclosure';
@@ -14,6 +15,8 @@ import { LinkedText } from '@/components/ui/linked-text';
 import type { DevComment } from '@/lib/comments/load';
 import type { Deck as DeckDeclaration } from '@/lib/preview/deck';
 import { threadRef } from '@/lib/thread/subjects';
+import type { Tab } from '@/lib/tabs';
+import { OpenTab } from './open-tab';
 
 /**
  * The page patterns (docs/UI-QUALITY-SPEC.md, Part 4), as data: each one's
@@ -41,7 +44,7 @@ export type PatternSurface = {
 
 export type PagePattern = {
   /** The fragment on /dev/ui. */
-  id: 'list-detail' | 'deck' | 'thread';
+  id: 'list-detail' | 'deck' | 'thread' | 'tabbed-detail';
   /** What a step's "Pattern:" line says, lower case. */
   name: string;
   /** The heading on /dev/ui. */
@@ -252,6 +255,122 @@ function ThreadSurface() {
   );
 }
 
+const FEATURE_TABS: readonly Tab[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'steps', label: 'Steps', count: 10 },
+];
+
+const FEATURE_STEPS: readonly { number: number; title: string; state: string }[] = [
+  { number: 1661, title: 'Which layout should the feature page and goal page use?', state: 'Answered' },
+  { number: 1662, title: 'Use module, feature, step and substep as the level names', state: 'Done' },
+  { number: 1663, title: 'Build the shared tabbed detail layout', state: 'In progress' },
+  { number: 1664, title: 'Open each feature on its own page with an Overview', state: 'Ready' },
+  { number: 1665, title: 'Group the Steps tab by status', state: 'Ready' },
+  { number: 1666, title: "Keep Dash's latest update on each feature, with a health", state: 'Ready' },
+  { number: 1667, title: 'Show what moved on the Activity tab', state: 'Ready' },
+  { number: 1668, title: 'Split progress between you and Dash', state: 'Ready' },
+  { number: 1670, title: 'Write an update from the feature page', state: 'Ready' },
+  { number: 1671, title: 'Move the goal page onto the same layout', state: 'Ready' },
+];
+
+const FEATURE_ACTIVITY: readonly { when: string; what: string }[] = [
+  { when: '7 Oct, 4:12 PM', what: 'Dash started #1663, Build the shared tabbed detail layout' },
+  { when: '7 Oct, 3:40 PM', what: 'Dash closed #1662, Use module, feature, step and substep as the level names' },
+  { when: '7 Oct, 11:05 AM', what: 'You answered #1661: add a fourth pattern, tabbed detail' },
+  { when: '7 Oct, 10:20 AM', what: 'You approved the feature' },
+];
+
+function FeatureOverview() {
+  return (
+    <div className="space-y-6">
+      <CardSection title="Latest update" meta="Dash · 7 Oct">
+        <p className="text-body text-ink">
+          On track. The level names are in, and the shared layout is being built now. The feature
+          page itself comes next, then the goal page moves onto the same layout.
+        </p>
+      </CardSection>
+      <CardSection title="What it is for">
+        <p className="text-body text-ink">
+          Each feature on the plan opens to its own page: breadcrumbs at the top, then Overview,
+          Activity and Steps tabs, with a column of its properties beside them. The goal page moves
+          onto the same layout so the two stay alike.
+        </p>
+      </CardSection>
+    </div>
+  );
+}
+
+function FeatureActivity() {
+  return (
+    <Card padding="none">
+      <ul className="divide-y divide-border">
+        {FEATURE_ACTIVITY.map((event) => (
+          <li key={event.what} className="card-pad-x row-pad">
+            <p className="text-ui text-ink">{event.what}</p>
+            <p className="tabular text-small text-ink-muted">{event.when}</p>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+function FeatureSteps() {
+  return (
+    <Card padding="none">
+      <ul className="divide-y divide-border">
+        {FEATURE_STEPS.map((step) => (
+          <ListRow
+            key={step.number}
+            href="#"
+            title={step.title}
+            meta={`#${step.number}`}
+            end={step.state}
+          />
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+function TabbedSurface() {
+  return (
+    <TabbedDetail
+      crumbs={[
+        { label: 'Plan', href: '#' },
+        { label: 'Dev', href: '#' },
+        { label: 'Give each feature its own page with tabs', href: '#' },
+      ]}
+      title="Give each feature its own page with tabs"
+      description="Feature #1660"
+      properties={
+        <PropertyList>
+          <Property label="Status" value="In progress" />
+          <Property label="Health" value="On track" />
+          <Property label="Steps" value="2 of 10 done" />
+          <Property label="Waiting on you" value="None" />
+          <Property label="Dash has" value="7 steps" />
+          <Property label="Module" value="Dev" />
+          <Property label="Size" value="Large" />
+          <Property label="Approved" value="7 Oct 2026" />
+        </PropertyList>
+      }
+      tabs={FEATURE_TABS}
+      label="Feature"
+    >
+      <OpenTab
+        tabs={FEATURE_TABS}
+        panels={{
+          overview: <FeatureOverview />,
+          activity: <FeatureActivity />,
+          steps: <FeatureSteps />,
+        }}
+      />
+    </TabbedDetail>
+  );
+}
+
 export const PATTERNS: readonly PagePattern[] = [
   {
     id: 'list-detail',
@@ -292,5 +411,17 @@ export const PATTERNS: readonly PagePattern[] = [
     rule: "The thread sits on one card with the row it is about. The row's name comes first and opens the row, then its state, then the turns oldest first on the card's own ground, Dash's on a recessed ground of their own, and the box last, closed until it is pressed.",
     component: { path: 'components/patterns/thread.tsx', exports: ['ThreadPanel'] },
     surfaces: [{ id: 'pattern-thread', label: 'A thread', render: () => <ThreadSurface /> }],
+  },
+  {
+    id: 'tabbed-detail',
+    name: 'tabbed detail',
+    label: 'Tabbed detail',
+    when: 'One thing with several views of itself and a set of facts, such as a feature on the plan or a goal.',
+    rule: 'Breadcrumbs first, then the title, then the tabs, then the open tab. Each tab is a link that puts the tab in the address, so a reload, the back button and a pasted link open the same tab, and the first tab is the plain address. The properties sit in a column on the right from laptop width and stay in view while the tab scrolls; on a phone they are a grid of facts between the title and the tabs. The row of tabs stays on one line at every width.',
+    component: {
+      path: 'components/patterns/tabbed-detail.tsx',
+      exports: ['TabbedDetail'],
+    },
+    surfaces: [{ id: 'pattern-tabbed', label: 'A feature', render: () => <TabbedSurface /> }],
   },
 ];
