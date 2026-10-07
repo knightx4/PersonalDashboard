@@ -195,6 +195,19 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'todo-all': ['/todo/all'],
   'todo-settings': ['/todo/settings'],
   'todo-waiting': ['/todo/waiting'],
+  'shopping-dashboard': ['/shopping/dashboard'],
+  'shopping-add-books': ['/shopping/inventory/add/books'],
+  'shopping-add-games': ['/shopping/inventory/add/games'],
+  'shopping-order': ['/shopping/orders/[id]'],
+  'shopping-order-new': ['/shopping/orders/new'],
+  'shopping-order-receipt': ['/shopping/orders/receipt'],
+  'shopping-returns': ['/shopping/returns'],
+  'shopping-saved': ['/shopping/saved'],
+  'shopping-saved-item': ['/shopping/saved/[id]'],
+  'shopping-settings': ['/shopping/settings'],
+  'shopping-shares': ['/shopping/share'],
+  'shopping-share': ['/shopping/share/[id]'],
+  'shopping-share-families': ['/shopping/share/families'],
 };
 
 /** A route split into its segments; `/` is no segments. */

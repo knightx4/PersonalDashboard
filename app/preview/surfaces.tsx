@@ -197,6 +197,21 @@ import {
   TodoSettingsSurface,
   TodoWaitingSurface,
 } from './news-todo-page-surfaces';
+import {
+  ShoppingAddBooksSurface,
+  ShoppingAddGamesSurface,
+  ShoppingDashboardSurface,
+  ShoppingOrderNewSurface,
+  ShoppingOrderReceiptSurface,
+  ShoppingOrderSurface,
+  ShoppingReturnsSurface,
+  ShoppingSavedItemSurface,
+  ShoppingSavedSurface,
+  ShoppingSettingsSurface,
+  ShoppingShareFamiliesSurface,
+  ShoppingShareSurface,
+  ShoppingSharesSurface,
+} from './shopping-page-surfaces';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -4402,6 +4417,100 @@ export const SURFACES: readonly Surface[] = [
     module: 'todo',
     width: 'page',
     render: () => <TodoWaitingSurface />,
+  },
+
+  /* The Shopping pages that had no picture (plan #1604). Fixtures in
+   * shopping-page-surfaces.tsx. */
+  {
+    id: 'shopping-dashboard',
+    label: 'Shopping · Dashboard, this month',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingDashboardSurface />,
+  },
+  {
+    id: 'shopping-add-books',
+    label: 'Shopping · Add owned books',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingAddBooksSurface />,
+  },
+  {
+    id: 'shopping-add-games',
+    label: 'Shopping · Add board games',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingAddGamesSurface />,
+  },
+  {
+    id: 'shopping-order',
+    label: 'Shopping · One order',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingOrderSurface />,
+  },
+  {
+    id: 'shopping-order-new',
+    label: 'Shopping · Add an order, filled in from an email',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingOrderNewSurface />,
+  },
+  {
+    id: 'shopping-order-receipt',
+    label: 'Shopping · Receipt photo',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingOrderReceiptSurface />,
+  },
+  {
+    id: 'shopping-returns',
+    label: 'Shopping · Returns due soon',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingReturnsSurface />,
+  },
+  {
+    id: 'shopping-saved',
+    label: 'Shopping · Saved',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingSavedSurface />,
+  },
+  {
+    id: 'shopping-saved-item',
+    label: 'Shopping · One saved item',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingSavedItemSurface />,
+  },
+  {
+    id: 'shopping-settings',
+    label: 'Shopping · Settings',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingSettingsSurface />,
+  },
+  {
+    id: 'shopping-shares',
+    label: 'Shopping · Shared forms',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingSharesSurface />,
+  },
+  {
+    id: 'shopping-share',
+    label: 'Shopping · One shared form',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingShareSurface />,
+  },
+  {
+    id: 'shopping-share-families',
+    label: 'Shopping · Grouping',
+    module: 'shopping',
+    width: 'page',
+    render: () => <ShoppingShareFamiliesSurface />,
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on
