@@ -151,12 +151,13 @@ export const MOMENTS: readonly Moment[] = [
   {
     workspace: 'goals',
     name: 'A goal closing',
-    trigger: 'Closing a goal on its page.',
-    sees: 'One hexagon ring grows out of the status glyph, then the steps fold into one line.',
+    trigger: 'Closing a goal on its page, or a step on its own page.',
+    sees: 'One hexagon ring grows out of the status glyph. On a goal’s page the steps then fold into one line; on a step’s page its finished sub-steps are already folded.',
     reducedMotion: 'The solid hexagon and the folded line appear at once.',
     state: {
       built: 'yes',
-      where: 'GoalGlyph and GoalStepsFold in app/goals/[goalId]/goal-close.tsx.',
+      where:
+        'GoalGlyph and GoalStepsFold in app/goals/[goalId]/goal-close.tsx; on a step’s page, StepCloseRing in app/goals/[goalId]/s/[stepId]/step-close.tsx.',
     },
     demo: 'motion-goal-close',
   },
@@ -169,7 +170,7 @@ export const MOMENTS: readonly Moment[] = [
     state: {
       built: 'yes',
       where:
-        'useDashArrival in app/goals/[goalId]/dash-arrival.ts on the step’s row, for the steps loadDashArrivals in lib/goals/dash-arrivals-store.ts finds Dash closed.',
+        'useDashArrival in app/goals/[goalId]/dash-arrival.ts on the step’s row, on the goal page and on the step’s own page, for the steps loadDashArrivals in lib/goals/dash-arrivals-store.ts finds Dash closed.',
     },
   },
   {
