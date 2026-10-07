@@ -131,7 +131,7 @@ export async function matchRoleRequirements(
     return {
       matches: null,
       error:
-        'Your evidence bank is empty. Fill it in Settings first — the map is only as good as it is.',
+        'Your evidence bank is empty. Fill it in Material first — the map is only as good as it is.',
     };
   }
 

@@ -116,7 +116,7 @@ export const PAID_ACTIONS = {
   // Dash's reply to a comment on a role that tags it, and the letter it writes
   'app/jobs/(app)/roles/[id]/comment-actions.ts#addRoleComment': ['reply-to-role-comment'],
   'app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence': ['draft-answer'],
-  'app/jobs/(app)/settings/evidence-actions.ts#proposeEvidence': ['propose-evidence'],
+  'app/jobs/(app)/material/evidence-actions.ts#proposeEvidence': ['propose-evidence'],
   'app/jobs/(app)/find/actions.ts#suggestTracks': ['suggest-learning-tracks'],
   // Starting a suggested track adds a Learn goal, as the Learn Goals page does.
   'app/jobs/(app)/find/actions.ts#startTrack': ['place-aim', 'write-curriculum'],

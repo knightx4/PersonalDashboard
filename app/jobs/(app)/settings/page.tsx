@@ -49,14 +49,12 @@ export default async function SettingsPage({
   const [
     { data: profile },
     { data: accounts },
-    { data: resumes },
-    { data: evidence },
     { data: excludedSenders },
   ] = await Promise.all([
       supabase
         .from('profiles')
         .select(
-          'search_started_on, ghost_threshold_days, writing_style_notes, banned_constructions, home_location, workplace_preferences, salary_floor_cents, company_stages',
+          'search_started_on, ghost_threshold_days, home_location, workplace_preferences, salary_floor_cents, company_stages',
         )
         .eq('id', user.id)
         .single(),
@@ -67,16 +65,6 @@ export default async function SettingsPage({
         )
         .eq('user_id', user.id)
         .order('created_at'),
-      supabase
-        .from('resume_versions')
-        .select('id, label, is_default, notes, created_at, text_content, storage_path')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('evidence_items')
-        .select('id, title, body, context, skills, metrics, strength, used_count')
-        .eq('user_id', user.id)
-        .order('strength', { ascending: false }),
       supabase
         .from('excluded_senders')
         .select('id, domain')
@@ -116,7 +104,7 @@ export default async function SettingsPage({
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Settings"
-        description="What the job search needs. Your name and timezone are under Account."
+        description="What the job search needs. Your name and timezone are under Account, and your resumes, evidence and writing voice are under Material."
       />
       <SettingsView
         email={user.email ?? ''}
@@ -126,8 +114,6 @@ export default async function SettingsPage({
         profile={{
           searchStartedOn: (profile?.search_started_on as string) ?? '',
           ghostThresholdDays: (profile?.ghost_threshold_days as number) ?? 30,
-          writingStyleNotes: (profile?.writing_style_notes as string) ?? '',
-          bannedConstructions: ((profile?.banned_constructions as string[]) ?? []).join('\n'),
           preferences: readPreferences(profile as Record<string, unknown> | null),
         }}
         accounts={(accounts ?? []).map((account) => {
@@ -152,26 +138,6 @@ export default async function SettingsPage({
         excludedSenders={(excludedSenders ?? []).map((entry) => ({
           id: entry.id as string,
           domain: entry.domain as string,
-        }))}
-        resumes={(resumes ?? []).map((resume) => ({
-          id: resume.id as string,
-          label: resume.label as string,
-          isDefault: resume.is_default as boolean,
-          notes: (resume.notes as string) ?? null,
-          // Whether it can be read, not the text: a resume is several kilobytes
-          // and the client only needs to know the option is offerable.
-          hasText: Boolean((resume.text_content as string | null)?.trim()),
-          hasPdf: Boolean(resume.storage_path),
-        }))}
-        evidence={(evidence ?? []).map((item) => ({
-          id: item.id as string,
-          title: item.title as string,
-          body: item.body as string,
-          context: (item.context as string) ?? null,
-          skills: (item.skills as string[]) ?? [],
-          metrics: (item.metrics as string) ?? null,
-          strength: item.strength as number,
-          usedCount: item.used_count as number,
         }))}
       />
     </div>

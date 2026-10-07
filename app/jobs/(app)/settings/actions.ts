@@ -22,8 +22,6 @@ export interface SettingsState {
 const profileSchema = z.object({
   searchStartedOn: z.string().optional(),
   ghostThresholdDays: z.coerce.number().int().min(7).max(180).optional(),
-  writingStyleNotes: z.string().trim().max(4000).optional(),
-  bannedConstructions: z.string().trim().optional(),
 });
 
 // latency: pending
@@ -34,8 +32,6 @@ export async function updateProfile(
   const parsed = profileSchema.safeParse({
     searchStartedOn: formData.get('searchStartedOn') ?? '',
     ghostThresholdDays: formData.get('ghostThresholdDays') || undefined,
-    writingStyleNotes: formData.get('writingStyleNotes') ?? '',
-    bannedConstructions: formData.get('bannedConstructions') ?? '',
   });
 
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -46,15 +42,6 @@ export async function updateProfile(
   const patch: Record<string, unknown> = {};
   if (parsed.data.searchStartedOn) patch.search_started_on = parsed.data.searchStartedOn;
   if (parsed.data.ghostThresholdDays) patch.ghost_threshold_days = parsed.data.ghostThresholdDays;
-  if (parsed.data.writingStyleNotes !== undefined) {
-    patch.writing_style_notes = parsed.data.writingStyleNotes || null;
-  }
-  if (parsed.data.bannedConstructions !== undefined) {
-    patch.banned_constructions = parsed.data.bannedConstructions
-      .split('\n')
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-  }
 
   const { error } = await supabase.from('profiles').update(patch).eq('id', user.id);
   if (error) return { error: error.message };

@@ -48,14 +48,12 @@ function QuestionCard({
 
   return (
     <section className={cn(cardVariants({ padding: 'dense' }))}>
-      <header className="flex flex-wrap items-baseline gap-2">
+      {/* The kind and the count sit beside the question from sm up, and on
+       * the bottom line on a phone, where beside it they took a third of the
+       * width and wrapped a short question onto two lines (law 9). */}
+      <header className="flex items-baseline gap-2">
         <h2 className="min-w-0 flex-1 text-ui font-medium text-ink">{question.text}</h2>
-        <span className="rounded-full bg-canvas px-1.5 py-0.5 text-small text-ink-muted">
-          {question.kind}
-        </span>
-        <span className="tabular text-small text-ink-muted">
-          seen {question.timesSeen}×
-        </span>
+        <QuestionMeta question={question} className="hidden sm:flex" />
       </header>
 
       {suggestion && (
@@ -66,8 +64,8 @@ function QuestionCard({
       )}
 
       {/* The answer, read. This was a five-row box standing open on every
-        * question in the bank, so a page whose job is to show what you have
-        * already written arrived as a column of empty editors (law 14). */}
+       * question in the bank, so a page whose job is to show what you have
+       * already written arrived as a column of empty editors (law 14). */}
       <EditableProse
         className="mt-2"
         label={`Your answer to: ${question.text}`}
@@ -83,7 +81,8 @@ function QuestionCard({
         }}
       />
 
-      <div className="mt-2 flex items-center gap-3">
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <QuestionMeta question={question} className="flex sm:hidden" />
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
         {question.usedIn > 0 && (
           <span className="ml-auto text-small text-ink-muted">
@@ -92,5 +91,23 @@ function QuestionCard({
         )}
       </div>
     </section>
+  );
+}
+
+/** The question's kind and how often it has come up. */
+function QuestionMeta({
+  question,
+  className,
+}: {
+  question: { kind: string; timesSeen: number };
+  className?: string;
+}) {
+  return (
+    <span className={cn('shrink-0 items-baseline gap-2', className)}>
+      <span className="rounded-full bg-canvas px-1.5 py-0.5 text-small text-ink-muted">
+        {question.kind}
+      </span>
+      <span className="tabular text-small text-ink-muted">seen {question.timesSeen}×</span>
+    </span>
   );
 }
