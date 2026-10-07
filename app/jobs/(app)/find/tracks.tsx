@@ -42,6 +42,8 @@ export function LearningTracks({
     </span>
   ) : null;
 
+  const listed = started.length + suggested.length > 0;
+
   return (
     <CardSection
       fold="jobs.fold.Learning tracks"
@@ -60,19 +62,21 @@ export function LearningTracks({
       {/* The button sits in the body, as on the recommended roles and people,
           so the heading and its counts keep to one line at 390. The line
           beside it explains the section only while it is empty (law 15). */}
-      <div className="mb-2 flex items-start gap-3">
-        <div className="min-w-0 flex-1 space-y-1">
-          {started.length + suggested.length === 0 && (
-            <p className="text-small text-ink-muted">
-              {hasEntries
-                ? 'Subjects to learn for the job your career goals describe. Starting one adds it to your Learn goals, and Now in Learn brings you its lessons.'
-                : 'Write a career goals entry and Dash can suggest what to learn for it.'}
-            </p>
-          )}
-          {message && <p className="text-small text-ink-muted">{message}</p>}
+      {(!listed || message) && (
+        <div className="mb-2 flex items-start gap-3">
+          <div className="min-w-0 flex-1 space-y-1">
+            {!listed && (
+              <p className="text-small text-ink-muted">
+                {hasEntries
+                  ? 'Subjects to learn for the job your career goals describe. Starting one adds it to your Learn goals, and Now in Learn brings you its lessons.'
+                  : 'Write a career goals entry and Dash can suggest what to learn for it.'}
+              </p>
+            )}
+            {message && <p className="text-small text-ink-muted">{message}</p>}
+          </div>
+          {action}
         </div>
-        {action}
-      </div>
+      )}
 
       {started.length > 0 && (
         <ul className="divide-y divide-border">
@@ -93,6 +97,12 @@ export function LearningTracks({
             ))}
           </ul>
         </>
+      )}
+
+      {/* With tracks listed and no message, the button closes the list
+          rather than taking a row of its own above it (plan #1589). */}
+      {listed && !message && action && (
+        <div className="mt-2 flex justify-end border-t border-border pt-2">{action}</div>
       )}
 
       {hasEntries && started.length === 0 && suggested.length === 0 && !message && (

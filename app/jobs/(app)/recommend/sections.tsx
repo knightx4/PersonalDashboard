@@ -142,6 +142,14 @@ function RecommendedSection({
       </p>
     ) : null,
   ].filter(Boolean);
+  const search = (
+    <span className="flex shrink-0 items-center gap-1">
+      <Button type="button" size="sm" variant="secondary" pending={searching} onClick={ask}>
+        {searching ? searchingLabel : button}
+      </Button>
+      {paidHint}
+    </span>
+  );
   return (
     <CardSection
       fold={`jobs.fold.${title}`}
@@ -153,17 +161,19 @@ function RecommendedSection({
       }
       meta={count > 0 ? count : undefined}
     >
-      <div className="mb-2 flex items-start gap-3">
-        <div className="min-w-0 flex-1 space-y-1">{lines}</div>
-        <span className="flex shrink-0 items-center gap-1">
-          <Button type="button" size="sm" variant="secondary" pending={searching} onClick={ask}>
-            {searching ? searchingLabel : button}
-          </Button>
-          {paidHint}
-        </span>
-      </div>
+      {lines.length > 0 || count === 0 ? (
+        <div className="mb-2 flex items-start gap-3">
+          <div className="min-w-0 flex-1 space-y-1">{lines}</div>
+          {search}
+        </div>
+      ) : null}
       {count > 0 && toolbar}
       {count > 0 && <ul className="divide-y divide-border">{children}</ul>}
+      {/* With no line to sit beside, the button closes the list instead of
+          taking a row of its own above the first item (plan #1589). */}
+      {lines.length === 0 && count > 0 && (
+        <div className="mt-2 flex justify-end border-t border-border pt-2">{search}</div>
+      )}
       {footer}
     </CardSection>
   );
