@@ -140,6 +140,9 @@ const RetreatContext = createContext<((key: string) => void) | null>(null);
  */
 const PeekContext = createContext<{ next: ReactNode; previous: ReactNode } | null>(null);
 
+/** A card or page as QuickDeck draws it: the item, and the Next row held under it. */
+type Drawn = { body: ReactNode; row: ReactNode };
+
 /**
  * The cards and pages passed in this tab, kept as they were drawn under
  * their passKey, so Back can show the one it takes back at once rather than
@@ -147,9 +150,9 @@ const PeekContext = createContext<{ next: ReactNode; previous: ReactNode } | nul
  * Back then waits for the page as it used to. Twice BACK_PAGES, as the card
  * and the laptop page each keep their own stack.
  */
-const passedCards = new Map<string, ReactNode>();
+const passedCards = new Map<string, Drawn>();
 
-function rememberPassed(key: string, node: ReactNode) {
+function rememberPassed(key: string, node: Drawn) {
   passedCards.delete(key);
   passedCards.set(key, node);
   while (passedCards.size > BACK_PAGES * 2) {
@@ -193,29 +196,38 @@ function NextButton() {
  * `stack` says which Back stack the deck reads, the phone card's or the
  * laptop page's. Next on a card Back brought back returns to the one Back
  * left, which is what the page will come back with.
+ *
+ * `row` is the phone card's Next row (plan #1636), drawn outside the swipe so
+ * it stays where it is while the card under it is dragged away and the next
+ * one comes in; `nextRow` is the row of the story behind. The laptop page
+ * keeps its Next page inside `current` and passes neither.
  */
 export function QuickDeck({
   current,
   next,
+  row = null,
+  nextRow = null,
   nextImage,
   passes,
   stack,
 }: {
   current: ReactNode;
   next: ReactNode | null;
+  row?: ReactNode;
+  nextRow?: ReactNode;
   nextImage: string | null;
   passes: readonly StoryPass[];
   stack: 'stories' | 'pages';
 }) {
   const [advanced, setAdvanced] = useState(false);
-  const [retreated, setRetreated] = useState<ReactNode>(null);
+  const [retreated, setRetreated] = useState<Drawn | null>(null);
   const raw = useSyncExternalStore(
     subscribeBack,
     stack === 'stories' ? readBackStoriesRaw : readBackPagesRaw,
     () => null,
   );
   const top = useMemo(() => parseBack(raw).at(-1), [raw]);
-  const previous = top ? (passedCards.get(passKey(top)) ?? null) : null;
+  const previous = top ? (passedCards.get(passKey(top))?.body ?? null) : null;
 
   const key = passKey(passes);
   const advance = () => {
@@ -223,7 +235,7 @@ export function QuickDeck({
       setRetreated(null);
       return;
     }
-    rememberPassed(key, current);
+    rememberPassed(key, { body: current, row });
     if (next) setAdvanced(true);
   };
   const retreat = (backKey: string) => {
@@ -233,14 +245,21 @@ export function QuickDeck({
 
   const shown = retreated ? 'retreated' : advanced && next ? 'advanced' : 'current';
   const peek = shown === 'current' ? { next, previous } : null;
+  const drawn: Drawn =
+    shown === 'retreated' && retreated
+      ? retreated
+      : shown === 'advanced'
+        ? { body: next, row: nextRow }
+        : { body: current, row };
   return (
     <AdvanceContext.Provider value={advance}>
       <RetreatContext.Provider value={retreat}>
         <PeekContext.Provider value={peek}>
-          <Fragment key={shown}>
-            {shown === 'retreated' ? retreated : shown === 'advanced' ? next : current}
-          </Fragment>
+          <Fragment key={shown}>{drawn.body}</Fragment>
         </PeekContext.Provider>
+        {/* Keyed with the card, so a pending Next on the card going out does
+            not carry over as Loading on the one coming in. */}
+        <Fragment key={`row-${shown}`}>{drawn.row}</Fragment>
       </RetreatContext.Provider>
       {shown === 'current' && nextImage && (
         // eslint-disable-next-line @next/next/no-img-element
@@ -609,8 +628,8 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
   const showPrevious = Boolean(peek?.previous) && (leaving ?? toward) === 'back';
 
   return (
-    // Clip rather than hidden, so the sticky Next row inside still sticks to
-    // the window; it keeps the story coming in from widening the page.
+    // Clip rather than hidden, so the card is not made a scroll container;
+    // it keeps the story coming in from widening the page.
     // `data-quick-swipe` is what the gallery's recorder drags (npm run record).
     <div
       ref={surface}
@@ -645,9 +664,9 @@ export function QuickSwipe({ children }: { children: ReactNode }) {
 const PEEK_GAP = '1rem';
 
 /**
- * The Next or Back form. The card coming in carries ones with the same ids
- * while a drag is under way, and it comes after this card in the document,
- * so the first is always the current card's.
+ * The Next or Back form, in the row QuickDeck holds under the card. The card
+ * coming in during a drag has no row of its own (plan #1636), so there is
+ * only ever one of each.
  */
 function form(id: string): HTMLFormElement | null {
   const element = document.getElementById(id);
