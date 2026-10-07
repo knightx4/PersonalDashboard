@@ -566,9 +566,9 @@ describe('PlanView', () => {
     expect((html.match(/answer:/g) ?? []).length).toBe(1);
   });
 
-  it('invites a step at the top of every module on the working view, and not on the narrow ones', () => {
-    expect(render('open')).toContain('Add a step');
-    expect(render('ready')).not.toContain('Add a step');
+  it('invites a feature at the top of every module on the working view, and not on the narrow ones', () => {
+    expect(render('open')).toContain('Add a feature');
+    expect(render('ready')).not.toContain('Add a feature');
   });
 
   it('says plainly when a narrow view has nothing in it', () => {

@@ -227,21 +227,34 @@ function StepFields({
   );
 }
 
+/** The level a new row lands at, which is what the add form calls it (PLAN-SPEC, "Levels"). */
+export type AddLevel = 'feature' | 'step' | 'substep';
+
+const ADD_LABEL: Record<AddLevel, { trigger: string; submit: string }> = {
+  feature: { trigger: 'Add a feature', submit: 'Add feature' },
+  step: { trigger: 'Add a step', submit: 'Add step' },
+  substep: { trigger: 'Add a substep', submit: 'Add substep' },
+};
+
 /**
- * A step of your own: at the top of a module, or under another step.
+ * A row of your own: a feature at the top of a module, a step under a
+ * feature, or a substep under a step.
  *
- * One form for both, told apart by the parent it carries. It opens closed,
+ * One form for all three, told apart by the parent it carries. It opens closed,
  * because a plan with six modules and a full form under each would be mostly
  * form.
  */
 export function AddStep({
   module,
   parentId,
+  level = parentId ? 'step' : 'feature',
   open: openAtStart = false,
   onDone,
 }: {
   module: PlanScope | null;
   parentId: string | null;
+  /** What the new row is. A feature when there is no parent, a step under one otherwise. */
+  level?: AddLevel;
   open?: boolean;
   onDone?: () => void;
 }) {
@@ -260,7 +273,7 @@ export function AddStep({
     // one. Same behaviour, one copy.
     return (
       <AddTrigger
-        label={parentId ? 'Add a sub-step' : 'Add a step'}
+        label={ADD_LABEL[level].trigger}
         onClick={() => setOpen(true)}
       />
     );
@@ -292,7 +305,7 @@ export function AddStep({
             Cancel
           </Button>
           <Button type="submit" size="sm" pending={pending}>
-            {pending ? 'Adding…' : parentId ? 'Add sub-step' : 'Add step'}
+            {pending ? 'Adding…' : ADD_LABEL[level].submit}
           </Button>
         </div>
       </div>

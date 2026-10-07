@@ -1,5 +1,23 @@
 # The plan
 
+## Levels
+
+Everything the person reads in Dev names the four levels the same way:
+
+- **Module**: a workspace of the app, such as shopping, jobs or dev, or the
+  website, which `lib/plan/projects.ts` builds from its own repository. A
+  plan row's `module` column holds it, and each one is a section on
+  `/dev/plan`.
+- **Feature**: a row at the top of a module, with no parent. It carries the
+  done-when the steps beneath it add up to.
+- **Step**: a row under a feature.
+- **Substep**: a row under a step, at any depth below that.
+
+"Project" and "phase" are not levels. Code identifiers such as `ProjectId`
+and the `/dev/projects` route keep their names; only the words on screen
+follow this list. The rest of this document says "step" for a row at any
+level where the level does not matter.
+
 `/dev/plan` is the source of truth for what gets built next. It holds the
 features that were decided on, the steps that get you to each, and the steps
 beneath those — to any depth — with each step's status, priority, size, who
@@ -725,13 +743,14 @@ typecheck at each surface rather than drawing itself as a proposal, and
 Each module is a section with its progress bar. Each step is a line: the
 status picker (one click changes it), the number, the title, and the facts
 that matter — *Next* or *Someday*, the size, *Yours*, *Ready*, *Waits on
-#n*, and *done/live steps* on a feature. The chevron folds the sub-steps,
+#n*, and *done/live steps* on a feature. The chevron folds the rows beneath,
 closed by default on a finished step. The title opens the detail: what it
 involves, done when, your note, what it waits on and unblocks, dates, the
-commit, and the actions — edit, add a sub-step, mark it yours or give it
-back, send to Claude. The menu on the line adds a sub-step, edits, moves the step up or
-down among its siblings, or deletes it with its count of sub-steps in the
-confirm.
+commit, and the actions — edit, add a row beneath, mark it yours or give it
+back, send to Claude. The menu on the line adds a step (on a feature) or a
+substep (on a step), edits, moves the row up or down among its siblings, or
+deletes it with its count of rows beneath in the confirm. The foot of each
+module adds a feature.
 
 A decision is marked where a build step's checkbox would be, with a `?`. Its
 health reads *Unanswered* rather than *Ready* — on a question, "ready" would
@@ -898,8 +917,9 @@ in progress and never closed to look tidy.
 
 ## What is deliberately not here
 
-- **Labels, projects, cycles, estimates in hours.** The module is the
-  project; the tree is the grouping; the size is the estimate.
+- **Labels, projects, cycles, estimates in hours.** The module and the
+  feature do what a project would; the tree is the grouping; the size is the
+  estimate.
 - **Drag and drop.** Move up and move down are two clicks and cannot drop a
   step somewhere by accident. Moving between parents is a select in the
   edit form.
