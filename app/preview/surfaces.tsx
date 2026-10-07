@@ -76,7 +76,11 @@ import { buildAttachmentIndex, type AttachmentEntry } from '@/lib/vault/markdown
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
 import { noteHref } from '@/lib/vault/paths';
 import { PageHeader } from '@/components/shell/page-header';
-import { PersonalityScoresSurface, PersonalityTestSurface } from './personality-surfaces';
+import {
+  PersonalityAddTypeSurface,
+  PersonalityScoresSurface,
+  PersonalityTestSurface,
+} from './personality-surfaces';
 import { AddTranscript } from '@/app/vault/education/add-transcript';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
 import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
@@ -3786,6 +3790,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <PersonalityScoresSurface />,
+  },
+  {
+    /* Typing in a type from another test (plan #1633): the compose form
+     * open beneath the scores, one type already kept. */
+    id: 'learn-personality-add-type',
+    label: 'Learn · Personality, adding a type',
+    module: 'learn',
+    width: 'page',
+    render: () => <PersonalityAddTypeSurface />,
   },
   {
     /* Clips before any are cut. */
