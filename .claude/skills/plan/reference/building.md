@@ -528,6 +528,35 @@ The ask is rewritten on every block, so it is what the step needs now; `--note`
 is for anything else worth recording, and that is appended to the history in
 the comment.
 
+### Write the ask for someone with no context
+
+The person reads an ask days later, on a phone, between other things, and
+does not remember what the step drew or which commit holds it. On #1600 and
+#1603 they were asked to accept "them as drawn" and could not tell which
+screens were meant, and the screens were on a branch they had no way to open
+(notes d3fc7228 and 6d61486b). So every ask, and above all one that asks them
+to look at screens:
+
+- **Names the screens as the app names them**, page by page: "the account
+  page, and these Dev pages: bugs, changelog, ideas". A surface id, a step
+  number or a commit hash is never the only name for anything; when one is
+  given, the sentence also says what it covers.
+- **Says where to look, with a link for each screen**: `/preview?s=<id>`,
+  which opens that drawing in the gallery on the live site.
+- **Puts what it asks them to look at on main first.** A link only opens what
+  main has, and branch deployments are switched off (`vercel.json`). A
+  gallery drawing is safe to merge before it is accepted: `/preview` is the
+  owner's alone, and an entry changes no page anyone uses. So merge the
+  drawings, as the batch merge does, before writing the ask. Where the work
+  cannot reach main (the gate will not pass, or the drawing needs a page
+  change that is not ready), the ask says so and says where the shots are,
+  rather than offering a link to something they cannot open.
+- **Ends with the move wanted** in words they can answer in one line, such as
+  "accept these as drawn, or say what to change on which one".
+
+The critic stop (`npm run ui-stop`) writes its ask with the links already in
+it. A hand-written ask is held to the same.
+
 ## The other two files you may need
 
 - **`writing.md`** — how to write a title and a detail. Read it before you

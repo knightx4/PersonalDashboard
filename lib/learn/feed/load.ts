@@ -30,7 +30,7 @@ import { goalTrackIds, notPlanLessons } from './plan-lessons';
 
 const CARD_SELECT =
   'id, reason, status, idea_name, concept_id, theme_name, aim_name, field_id, summary, why, takeaway, context, hook, example, check_question, check_answer, mentions, teach_back, depth, difficulty, ' +
-  'track_name, unit_title, subject_id, video_id, video_start_seconds, video_end_seconds, ' +
+  'track_name, unit_title, subject_id, video_id, video_start_seconds, video_end_seconds, clip_note_segment_id, clip_said, clip_why, ' +
   'item:catalogue_items!feed_cards_item_id_fkey(title, canonical_url, licence), ' +
   'segment:catalogue_segments!feed_cards_segment_id_fkey(heading, text, section_anchor), ' +
   'source_item:catalogue_items!feed_cards_source_item_id_fkey(title, canonical_url, licence), ' +
@@ -128,7 +128,8 @@ export async function loadFeedPage(
   const recent = await recentInDeck(supabase, exclude.slice(-ARTICLE_GAP));
   const dealt = spreadDeck(dealable, recent, limit).map((entry) => entry.card);
   const conceptOf = new Map(rows.map((row) => [row.id, row.concept_id ?? null]));
-  const withIdeas = await withNotes(supabase, await withVideos(supabase, dealt, conceptOf), conceptOf);
+  const clipNoteOf = new Map(rows.flatMap((row) => clipNote(row)));
+  const withIdeas = await withNotes(supabase, await withVideos(supabase, dealt, conceptOf, clipNoteOf), conceptOf);
   return withTeachEvery(supabase, await withConversations(supabase, withIdeas));
 }
 
@@ -217,6 +218,7 @@ async function withVideos(
   supabase: LearnSupabaseClient,
   cards: FeedCard[],
   conceptOf: Map<string, string | null>,
+  clipNoteOf: Map<string, ClipNoteOn> = new Map(),
 ): Promise<FeedCard[]> {
   const conceptIds = [...new Set(cards.flatMap((card) => conceptOf.get(card.id) ?? []))];
   if (conceptIds.length === 0) return cards;
@@ -230,7 +232,7 @@ async function withVideos(
     return cards;
   }
 
-  const byConcept = new Map<string, FeedVideo>();
+  const byConcept = new Map<string, FeedVideo & { segmentId: string }>();
   for (const row of (data ?? []) as VideoClipRow[]) {
     const videoId = youtubeVideoId(row.item_canonical_url);
     if (!videoId) continue;
@@ -239,6 +241,7 @@ async function withVideos(
       title: row.item_title,
       start: row.t_start_seconds,
       end: row.t_end_seconds,
+      segmentId: row.segment_id,
     });
   }
 
@@ -246,13 +249,39 @@ async function withVideos(
     const concept = conceptOf.get(card.id);
     // A card written from a video already plays the stretch it came from.
     if (card.video) return card;
-    const video = concept ? byConcept.get(concept) : undefined;
-    return video ? { ...card, video } : card;
+    const found = concept ? byConcept.get(concept) : undefined;
+    if (!found) return card;
+    const { segmentId, ...video } = found;
+    return { ...card, video: { ...video, note: clipNoteFor(clipNoteOf.get(card.id), segmentId) } };
   });
+}
+
+/** A card's stored "In this video" note, and the segment it was written about. */
+export type ClipNoteOn = { segmentId: string; said: string; why: string };
+
+/** The stored note as a map entry, or none when the card has no whole note. */
+function clipNote(row: FeedCardRow): [string, ClipNoteOn][] {
+  const said = row.clip_said?.trim();
+  const why = row.clip_why?.trim();
+  if (!row.clip_note_segment_id || !said || !why) return [];
+  return [[row.id, { segmentId: row.clip_note_segment_id, said, why }]];
+}
+
+/**
+ * The note to show under the clip that is playing: the stored one while it
+ * was written about this segment, and none once a closer clip has replaced
+ * it. Pure; exported for the test.
+ */
+export function clipNoteFor(
+  stored: ClipNoteOn | undefined,
+  segmentId: string,
+): { said: string; why: string } | null {
+  return stored && stored.segmentId === segmentId ? { said: stored.said, why: stored.why } : null;
 }
 
 type VideoClipRow = {
   concept_id: string;
+  segment_id: string;
   item_title: string;
   item_canonical_url: string;
   t_start_seconds: number | null;

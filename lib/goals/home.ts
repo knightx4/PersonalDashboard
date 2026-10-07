@@ -10,6 +10,7 @@
  *
  * Pure, so the wording is tested without a database.
  */
+import { areaHref } from '@/lib/goals/all-goals';
 import { inFocus } from '@/lib/goals/focus';
 import type { NextItem } from '@/lib/goals/daily';
 import type { GoalReview, Verdict } from '@/lib/goals/reviews';
@@ -47,6 +48,25 @@ export function homeAreas(goals: readonly HomeGoal[]): HomeArea[] {
     groups.set(line.goal.areaId, group);
   }
   return [...groups.values()];
+}
+
+/** One of the buttons above Do next: an area, its page and how many open goals it holds. */
+export type AreaButton = { id: string; name: string; href: string; goals: number };
+
+/**
+ * The buttons to each area's page, above Do next (note d79a0005): every live
+ * area in the order the areas are kept, with the count of its open goals.
+ */
+export function areaButtons(
+  areas: readonly { id: string; name: string }[],
+  goals: readonly { goal: { areaId: string } }[],
+): AreaButton[] {
+  return areas.map((area) => ({
+    id: area.id,
+    name: area.name,
+    href: areaHref(area.id),
+    goals: goals.filter((line) => line.goal.areaId === area.id).length,
+  }));
 }
 
 /**
