@@ -122,6 +122,7 @@ import {
   GoalSubStepSurface,
   GoalTreeSurface,
 } from './goal-surfaces';
+import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
 import {
   AskChangesSurface,
   AskDashSurface,
@@ -2779,6 +2780,36 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalSubStepSurface />,
+  },
+  {
+    /* Closing a step on its own page (plan #1623): the goal's close ring
+     * grows out of the step's glyph. Played by the button above it. */
+    id: 'goals-step-close',
+    label: 'Goal · closing a step on its page',
+    module: 'goals',
+    width: 'page',
+    interaction: {
+      kind: 'completion',
+      target: '[data-motion-demo="step-close"]',
+      shows:
+        'Call the card company turns done, and one accent hexagon ring grows out of its glyph and fades, settled by about two thirds of a second.',
+    },
+    render: () => <StepCloseDemo />,
+  },
+  {
+    /* A step Dash finished, opened on its own page (plan #1623): the row
+     * settles in and Dash's mark beside the title flashes once. */
+    id: 'goals-step-arrival',
+    label: 'Goal · a step Dash finished, on its page',
+    module: 'goals',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="step-arrival"]',
+      shows:
+        'Draft what to say on the call opens again as just finished by Dash: its heading row rises into place and Dash’s mark beside the title swells once, all settled within the second.',
+    },
+    render: () => <StepArrivalDemo />,
   },
   {
     /* The Goals home on an ordinary week (plans #1043, #1077): Dash's card

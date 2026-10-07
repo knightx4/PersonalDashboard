@@ -18,6 +18,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 const { StepPage } = await import('@/app/goals/[goalId]/step-page');
+const { titleHead, titleTail } = await import('@/components/plan-tree/tree-row');
 
 const GOAL = 'goal-debt';
 
@@ -121,5 +122,20 @@ describe('StepPage', () => {
 
   it('draws nothing for a step the goal does not hold', () => {
     expect(renderToStaticMarkup(<StepPage map={map} stepId="nope" todoOn={false} />)).toBe('');
+  });
+});
+
+describe('the heading keeps its marks on the title’s last line (plan #1623)', () => {
+  it('glues the last word to what follows it, and leaves the rest free to wrap', () => {
+    expect(titleTail('Draft what to say on the call')).toBe('call');
+    expect(titleHead('Draft what to say on the call')).toBe('Draft what to say on the ');
+    expect(titleTail('Call')).toBe('Call');
+    expect(titleHead('Call')).toBe('');
+  });
+
+  it('does not glue a word too long to keep whole on a phone', () => {
+    const long = 'Read https://example.com/a-very-long-address-that-runs-on';
+    expect(titleTail(long)).toBe('');
+    expect(titleHead(long)).toBe(long);
   });
 });

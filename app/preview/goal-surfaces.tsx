@@ -284,3 +284,19 @@ export function GoalStepSurface() {
 export function GoalSubStepSurface() {
   return <StepPage map={map} stepId="call" todoOn={false} />;
 }
+
+/**
+ * The same goal with some of its steps changed, for the moments on a step's
+ * own page (app/preview/goal-moment-demos.tsx): a fresh forest each time, so
+ * the fixtures above are never touched.
+ */
+export function goalMapWith(changes: Record<string, Partial<Step>>): GoalMap {
+  const changed = steps.map((one) => (changes[one.id] ? { ...one, ...changes[one.id] } : one));
+  const next = buildForest([GOAL, OTHER], [...changed, ...otherSteps]);
+  attachDependencies(next.byGoal, next.nodes, dependencies);
+  return {
+    ...map,
+    steps: next.byGoal.get(GOAL) ?? [],
+    linked: map.linked.map((link) => ({ ...link, step: next.nodes.get(link.step.id) ?? link.step })),
+  };
+}
