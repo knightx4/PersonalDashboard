@@ -193,6 +193,9 @@ import {
   DevRaisedStatusSurface,
   DevSpecSurface,
   DevSpecsSurface,
+  DevSpecsInterviewEmptySurface,
+  DevSpecsInterviewHalfSurface,
+  DevSpecsInterviewDraftedSurface,
   DevUiReviewSurface,
   DevUsageSurface,
 } from './dev-page-surfaces';
@@ -4528,6 +4531,29 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevSpecsSurface />,
+  },
+  {
+    /* Dash's interview under a workspace's vision (plan #1641): just
+     * started, halfway, and drafted with its links. */
+    id: 'dev-specs-interview-empty',
+    label: 'Dev · Specs, an interview just started',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevSpecsInterviewEmptySurface />,
+  },
+  {
+    id: 'dev-specs-interview-half',
+    label: 'Dev · Specs, an interview halfway',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevSpecsInterviewHalfSurface />,
+  },
+  {
+    id: 'dev-specs-interview-drafted',
+    label: 'Dev · Specs, an interview drafted',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevSpecsInterviewDraftedSurface />,
   },
   {
     id: 'dev-spec',
