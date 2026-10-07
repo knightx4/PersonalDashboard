@@ -781,7 +781,7 @@ const RECALL_PASSAGE_CHARS = 700;
 
 /** Where a row with no page of its own, or one whose page could not be read, opens. */
 const RECALL_LANDING: Record<string, string> = {
-  'job_search.thoughts': '/jobs/thoughts',
+  'job_search.thoughts': '/jobs/find',
   'job_search.profiles': '/jobs/settings',
   'job_search.notes': '/jobs',
   'job_search.interviews': '/jobs',
