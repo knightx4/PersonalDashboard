@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { PrepNote } from '@/lib/jobs/interview/prep-payload';
 
-vi.mock('@/app/jobs/(app)/roles/[id]/actions', () => ({ writeRoundPrepNote: vi.fn() }));
+vi.mock('@/app/jobs/(app)/roles/[id]/prep-actions', () => ({ writeRoundPrepNote: vi.fn() }));
 
 const { RoundPrep } = await import('@/app/jobs/(app)/roles/[id]/prep-note');
 

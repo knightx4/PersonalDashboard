@@ -21,14 +21,14 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Markdown } from '@/components/ui/markdown';
 import { formatDateTime } from '@/lib/jobs/applications/load';
-import type { MatchVerdict } from '@/lib/jobs/evidence/match-payload';
 import type { PrepNote } from '@/lib/jobs/interview/prep-payload';
 
-import { writeRoundPrepNote } from './actions';
+import { writeRoundPrepNote } from './prep-actions';
+import { VERDICT_STYLE } from './verdict';
 import { PaidHint } from '@/components/ui/paid-hint';
 
 const PREP_HINT = {
-  action: 'app/jobs/(app)/roles/[id]/actions.ts#writeRoundPrepNote',
+  action: 'app/jobs/(app)/roles/[id]/prep-actions.ts#writeRoundPrepNote',
   what: 'Cost of writing the prep note',
 } as const;
 
@@ -38,18 +38,6 @@ export type PrepNoteState = {
   generatedAt: string | null;
   /** The facts it was written against have changed since. */
   stale: boolean;
-};
-
-const VERDICT_LABEL: Record<MatchVerdict, string> = {
-  strong: 'Strong',
-  partial: 'Partial',
-  gap: 'Gap',
-};
-
-const VERDICT_TEXT: Record<MatchVerdict, string> = {
-  strong: 'text-positive',
-  partial: 'text-caution',
-  gap: 'text-danger',
 };
 
 /** A sentence or two of the note's own prose, through the shared renderer. */
@@ -82,8 +70,8 @@ function Points({
         {points.map((point, index) => (
           <li key={`${point.requirement}-${index}`} className="text-ui text-ink">
             {point.requirement}
-            <span className={cn('ml-2 text-small font-medium', VERDICT_TEXT[point.verdict])}>
-              {VERDICT_LABEL[point.verdict]}
+            <span className={cn('ml-2 text-small font-medium', VERDICT_STYLE[point.verdict].text)}>
+              {VERDICT_STYLE[point.verdict].label}
             </span>
             <div className="mt-0.5 text-small text-ink-muted">
               <Prose>{point.note}</Prose>
