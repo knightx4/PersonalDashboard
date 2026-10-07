@@ -1,45 +1,55 @@
-'use client';
-
-import { Columns3, Rows3 } from 'lucide-react';
-import { Segmented } from '@/components/ui/segmented';
-import { useOptimisticWrite } from '@/lib/use-optimistic-write';
-import type { PipelineView } from '@/components/jobs/pipeline/board';
-import { setPipelineView } from '@/app/jobs/(app)/pipeline/actions';
+import Link from 'next/link';
+import { Columns3, Table2 } from 'lucide-react';
+import { cn } from '@/lib/cn';
+import { segmentedFrame } from '@/components/ui/segmented';
+import { pipelineHref, type PipelineParams, type PipelineViewName } from '@/lib/jobs/pipeline-view';
 
 const VIEWS = [
-  { value: 'board' as const, label: 'Board', icon: <Columns3 className="size-3.5" strokeWidth={1.75} aria-hidden /> },
-  { value: 'list' as const, label: 'List', icon: <Rows3 className="size-3.5" strokeWidth={1.75} aria-hidden /> },
+  { value: 'board' as const, label: 'Board', Icon: Columns3 },
+  { value: 'table' as const, label: 'Table', Icon: Table2 },
 ];
 
 /**
- * Board or list, remembered.
+ * Board or table, in the address (plan #1590).
  *
- * Optimistic because the write is a preference on the profile and the redraw
- * comes back through revalidation: without it the pressed segment would stay
- * unpressed for a round trip, which reads as the button not working. The
- * failing half of that -- putting the segment back, and saying why -- comes
- * from useOptimisticWrite rather than from here.
- *
- * The control itself is the shared `Segmented`. This used to draw its own
- * bordered box at a hand-written 32px, which is one density's answer written
- * down as if it were every density's: on a phone the dial gives controls 36px
- * for a thumb and this stayed 32, and at the dense setting everything beside it
- * came down to 28 and this stayed 32 again.
+ * Links rather than buttons: the view is part of the URL, so the back button
+ * undoes it and a link to the table opens the table. It was a preference on
+ * the profile, written by a server action, when the second view was a list.
+ * The board keeps only what is live, so going to it drops a closed filter;
+ * the table's sort and grouping stay in the address for the way back.
  */
-export function PipelineViewToggle({ view }: { view: PipelineView }) {
-  const { shown, run, pending } = useOptimisticWrite<PipelineView, PipelineView>({
-    value: view,
-    apply: (_current, next) => next,
-    write: setPipelineView,
-  });
-
+export function PipelineViewToggle({
+  view,
+  params,
+}: {
+  view: PipelineViewName;
+  params: PipelineParams;
+}) {
   return (
-    <Segmented
-      label="Pipeline view"
-      value={shown}
-      options={VIEWS}
-      disabled={pending}
-      onChange={run}
-    />
+    <span role="group" aria-label="Pipeline view" className={segmentedFrame}>
+      {VIEWS.map(({ value, label, Icon }) => (
+        <Link
+          key={value}
+          href={pipelineHref(
+            params,
+            value === 'board'
+              ? { view: undefined, status: undefined }
+              : { view: 'table' },
+          )}
+          scroll={false}
+          aria-current={view === value ? 'true' : undefined}
+          className={cn(
+            'press inline-flex h-7 items-center gap-1.5 px-2.5 text-ui font-medium',
+            'transition-colors duration-quick focus-visible:outline-2 focus-visible:-outline-offset-2',
+            view === value
+              ? 'bg-accent-tint text-accent'
+              : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
+          )}
+        >
+          <Icon className="size-3.5" strokeWidth={1.75} aria-hidden />
+          {label}
+        </Link>
+      ))}
+    </span>
   );
 }

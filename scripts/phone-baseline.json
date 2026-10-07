@@ -70,15 +70,11 @@
     "targets": 4
   },
   "jobs-pipeline-board": {
-    "targets": 11,
+    "targets": 9,
     "contrast": 4
   },
   "jobs-pipeline-dense": {
     "targets": 9
-  },
-  "jobs-pipeline-list": {
-    "targets": 11,
-    "contrast": 4
   },
   "jobs-review": {
     "targets": 3

@@ -106,7 +106,8 @@ describe('surfacesForFiles, on screen changes that shipped', () => {
     expect(surfacesForFiles(['components/jobs/pipeline/board.tsx'], using)).toEqual([
       'jobs-pipeline-board',
       'jobs-pipeline-dense',
-      'jobs-pipeline-list',
+      'jobs-roles-table',
+      'shell-display-options',
     ]);
     expect(surfacesForFiles(['components/jobs/pipeline/board.tsx'])).toEqual([]);
   });
