@@ -70,8 +70,9 @@ export const TRIAGE_KIND_OPTIONS: Readonly<Record<TriageKind, string>> = {
 
 export const TRIAGE_PRIORITY_OPTIONS = {
   next: 'Do it next: something used every day is broken or blocked, or data is being lost or shown wrongly.',
-  normal: 'Normal: worth doing soon, but nothing stops working without it.',
-  someday: 'Someday: a nice-to-have, a polish, or a thought for later.',
+  normal:
+    'Normal: worth doing soon, but nothing stops working without it, such as a small fix to how something used often looks, moves or responds.',
+  someday: 'Someday: a nice-to-have, or a thought for later.',
 } as const;
 
 const PRIORITY_OF: Record<keyof typeof TRIAGE_PRIORITY_OPTIONS, TriagePriority> = {
@@ -79,6 +80,44 @@ const PRIORITY_OF: Record<keyof typeof TRIAGE_PRIORITY_OPTIONS, TriagePriority> 
   normal: 2,
   someday: 3,
 };
+
+/**
+ * A page opened this many times in the last 30 days is one the person uses
+ * most days, roughly every third day (plan #1643). Jev reads only the note's
+ * text and cannot see how often its page is used, so a note it files as
+ * Someday about such a page is stored as Normal instead: small polish on a
+ * busy page should not sink to the bottom of Dev. One number, so it is easy
+ * to change; the re-sort of older notes (#1645) reads it too.
+ */
+export const BUSY_PAGE_OPENS_30 = 10;
+
+/** Whether a page with this many opens in 30 days counts as busy. Null is unknown, read as not busy. */
+export function isBusyPage(opens30: number | null): boolean {
+  return opens30 !== null && opens30 >= BUSY_PAGE_OPENS_30;
+}
+
+/**
+ * The priority a note is stored with for Jev's answer: Someday becomes Normal
+ * when the note's page is busy, and every other answer stands as given.
+ */
+export function storedPriority(value: TriagePriority, opens30: number | null): TriagePriority {
+  return value === PRIORITY_OF.someday && isBusyPage(opens30) ? PRIORITY_OF.normal : value;
+}
+
+/**
+ * The columns a note's triage sets beside `triage` itself: `priority` and
+ * `kind` when Jev is sure of them, since nobody has set either yet. The
+ * stored triage keeps Jev's own answer; only the column is moved up for a
+ * busy page. `opens30` is the note's page's opens in the last 30 days.
+ */
+export function noteColumns(triage: Triage, opens30: number | null): Record<string, unknown> {
+  const columns: Record<string, unknown> = {};
+  if (triage.priority && isSure(triage.priority)) {
+    columns.priority = storedPriority(triage.priority.value, opens30);
+  }
+  if (triage.kind && isSure(triage.kind)) columns.kind = triage.kind.value;
+  return columns;
+}
 
 /** Each workspace in its own words, and the app as a whole. */
 export const TRIAGE_MODULE_OPTIONS: Readonly<Record<TriageModule, string>> = {
