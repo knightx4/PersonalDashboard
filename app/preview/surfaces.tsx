@@ -2520,21 +2520,21 @@ export const SURFACES: readonly Surface[] = [
     label: 'Role · Timeline and to-dos',
     module: 'jobs',
     width: 'wide',
-    render: () => <RoleDetailPanels {...rolePanels} initialTab="timeline" />,
+    render: () => <RoleDetailPanels {...rolePanels} defaultTab="timeline" />,
   },
   {
     id: 'jobs-role-posting',
     label: 'Role · Posting',
     module: 'jobs',
     width: 'wide',
-    render: () => <RoleDetailPanels {...rolePanels} initialTab="posting" />,
+    render: () => <RoleDetailPanels {...rolePanels} defaultTab="posting" />,
   },
   {
     id: 'jobs-role-answers',
     label: 'Role · Answers',
     module: 'jobs',
     width: 'wide',
-    render: () => <RoleDetailPanels {...rolePanels} initialTab="answers" />,
+    render: () => <RoleDetailPanels {...rolePanels} defaultTab="answers" />,
   },
   {
     id: 'jobs-role-interviews',
@@ -2578,7 +2578,7 @@ export const SURFACES: readonly Surface[] = [
             <Property label="Comp band" value="$180k–$220k" />
             <Property label="Outcome" value="—" />
           </dl>
-        <RoleDetailPanels {...rolePanels} initialTab="interviews" />
+        <RoleDetailPanels {...rolePanels} defaultTab="interviews" />
       </div>
     ),
   },
