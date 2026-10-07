@@ -14,6 +14,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { APPLICATION_SOURCES, isLive, type ApplicationSource } from '@/lib/jobs/pipeline';
+import { openApplications } from '@/lib/jobs/board-moment';
 import {
   filterPipeline,
   pageOf,
@@ -170,7 +171,7 @@ export function PipelinePage({
           <SearchEmpty query={params.q ?? ''} />
         ) : (
           <>
-            <PipelineBoard rows={filtered} working={working} />
+            <PipelineBoard rows={filtered} openCount={openApplications(rows)} working={working} />
             <p className="tabular mt-3 text-small text-ink-muted">{count}</p>
           </>
         )}

@@ -139,6 +139,8 @@ import {
   GoalTreeSurface,
 } from './goal-surfaces';
 import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
+import { BoardMomentDemo } from './jobs-moment-demos';
+import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
   AskChangesSurface,
   AskDashSurface,
@@ -585,6 +587,9 @@ const pipelineRows: PipelineRow[] = [
     lastActivityAt: '2026-07-24T10:00:00.000Z',
   }),
 ];
+
+/** The sent applications still open, which is all the moment demos draw. */
+const momentRows = pipelineRows.filter((row) => OPEN_STATUSES.includes(row.status));
 
 /**
  * A company you have done the reading on: research written, three people on
@@ -2808,6 +2813,70 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <PipelinePage rows={pipelineRows} params={{}} />,
+  },
+  {
+    /* The three Jobs moments on the Pipeline board (plan #1596), each played
+     * by the button above it through the board's own move. Only the sent
+     * applications, so at phone width the stage a card leaves and the one it
+     * lands in are both on the screen. */
+    id: 'jobs-moment-forward',
+    label: 'Pipeline · a role moving forward',
+    module: 'jobs',
+    width: 'wide',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="board-move"]',
+      shows:
+        'Monzo’s Backend Engineer card glides from Submitted down into In process while the cards and lanes around it glide to their new places, then “In process” is named across the foot of Monzo’s card.',
+    },
+    render: () => (
+      <BoardMomentDemo
+        rows={momentRows}
+        applicationId="p3"
+        to="in_process"
+        label="Move Monzo to In process"
+      />
+    ),
+  },
+  {
+    id: 'jobs-moment-offer',
+    label: 'Pipeline · an offer',
+    module: 'jobs',
+    width: 'wide',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="board-move"]',
+      shows:
+        'Marshall Wace’s card glides from In process down into Offer while the D. E. Shaw card slides up and the lanes resize with it, then “Offer · Marshall Wace” is named across the card’s foot and one accent ring leaves the card and fades.',
+    },
+    render: () => (
+      <BoardMomentDemo
+        rows={momentRows}
+        applicationId="p1"
+        to="offer"
+        label="Move Marshall Wace to Offer"
+      />
+    ),
+  },
+  {
+    id: 'jobs-moment-reject',
+    label: 'Pipeline · a rejection',
+    module: 'jobs',
+    width: 'wide',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="board-move"]',
+      shows:
+        'Starling Bank’s card fades where it stands with nothing moving, Submitted then closes up over the space it left, and a toast reads “5 still open · Starling Bank is in Closed”.',
+    },
+    render: () => (
+      <BoardMomentDemo
+        rows={momentRows}
+        applicationId="p4"
+        to="rejected"
+        label="Reject Starling Bank"
+      />
+    ),
   },
   {
     /* The shopping item page's main panel, which arrived as a form until law
