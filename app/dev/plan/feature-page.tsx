@@ -491,7 +491,7 @@ function FeatureSteps({
               <Link
                 href={stepsViewHref(node.number, view)}
                 scroll={false}
-                className="text-ink underline underline-offset-2"
+                className="press-area text-ink underline underline-offset-2"
               >
                 Show all steps
               </Link>
@@ -552,7 +552,7 @@ function SplitLink({ href, count, who }: { href: string; count: number; who: Hel
       href={href}
       scroll={false}
       aria-label={`${count} open ${count === 1 ? 'step' : 'steps'} ${who === 'me' ? 'yours' : 'Dash’s'}, show them`}
-      className="-mx-1.5 inline-flex min-h-7 items-center rounded-sm px-1.5 underline underline-offset-2 hover:bg-sunken"
+      className="-mx-1.5 inline-flex min-h-7 items-center max-sm:min-h-11 rounded-sm px-1.5 underline underline-offset-2 hover:bg-sunken"
     >
       {count} open
     </Link>
