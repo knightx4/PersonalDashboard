@@ -230,6 +230,7 @@ export function toFunnelApplications(rows: readonly PipelineRow[]): FunnelApplic
         firstHumanResponseAt,
         row.interviewKinds,
       ),
+      interviewed: (row.interviewKinds ?? []).length > 0,
     };
   });
 }
