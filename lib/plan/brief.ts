@@ -11,6 +11,7 @@ import {
 } from './tree';
 import { isAppScope, planScopeLabel } from '@/lib/plan/projects';
 import { SURFACE_ROUTES, surfacesInText } from '@/lib/preview/routes';
+import { PATTERN_RULES, patternNamed, patternRule } from './patterns';
 
 /**
  * A step written out for whoever is about to build it.
@@ -280,11 +281,14 @@ const SURFACES_LISTED = 20;
  * page address, gallery link or screen file, and those its changed files
  * serve. Empty for a step that touches no surface.
  */
-function surfaceLines(node: PlanNode, extra: readonly string[] = []): string[] {
+function surfaceIds(node: PlanNode, extra: readonly string[] = []): string[] {
   if (node.kind !== 'build') return [];
   const text = [node.title, node.detail ?? '', node.acceptance ?? ''].join('\n');
   const named = new Set([...surfacesInText(text), ...extra]);
-  const ids = Object.keys(SURFACE_ROUTES).filter((id) => named.has(id));
+  return Object.keys(SURFACE_ROUTES).filter((id) => named.has(id));
+}
+
+function surfaceLines(ids: readonly string[]): string[] {
   if (ids.length === 0) return [];
   const lines = ids
     .slice(0, SURFACES_LISTED)
@@ -297,6 +301,44 @@ function surfaceLines(node: PlanNode, extra: readonly string[] = []): string[] {
     'Draw and photograph these before wiring the screen to real data:',
     '',
     ...lines,
+  ];
+}
+
+/**
+ * The page pattern a build step uses (Part 4 of docs/UI-QUALITY-SPEC.md), from
+ * the "Pattern:" line in its detail, with the rule the design critic is given
+ * as its `pattern` input. A step that names none says so only when it has
+ * gallery surfaces, since a step that makes no screen has no pattern to name.
+ */
+function patternLines(node: PlanNode, hasSurfaces: boolean): string[] {
+  if (node.kind !== 'build') return [];
+  const name = patternNamed(node.detail ?? '');
+  const names = PATTERN_RULES.map((p) => p.name).join(', ');
+  if (!name) {
+    if (!hasSurfaces) return [];
+    return [
+      '',
+      '## Pattern',
+      '',
+      `None named. Use the one of ${names} that fits, say which in the close note, and give its rule to the critic. A screen that fits none is a new pattern: write it as a decision and block on it.`,
+    ];
+  }
+  const pattern = patternRule(name);
+  if (!pattern) {
+    return [
+      '',
+      '## Pattern',
+      '',
+      `The step names "${name}" rather than one of ${names}, so its layout is a new pattern and the person's to decide. Build it only once a decision under the feature has settled which.`,
+    ];
+  }
+  return [
+    '',
+    '## Pattern',
+    '',
+    `${pattern.label}, from ${pattern.component}. Give the critic this rule as its pattern:`,
+    '',
+    pattern.rule,
   ];
 }
 
@@ -455,7 +497,9 @@ export function planBrief(
     out.push('', '## Done when', '', node.acceptance);
   }
 
-  out.push(...surfaceLines(node, options.surfaces));
+  const surfaces = surfaceIds(node, options.surfaces);
+  out.push(...surfaceLines(surfaces));
+  out.push(...patternLines(node, surfaces.length > 0));
 
   // What nobody can see yet. Said plainly, because the alternative a proposal
   // reaches for is plausible steps invented to fill the gap. A patch that has

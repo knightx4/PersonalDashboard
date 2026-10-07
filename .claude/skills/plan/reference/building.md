@@ -243,12 +243,16 @@ a surface with no routes. A step that changes no surface skips this section.
    ```
 
    The prompt names the surface id, the round (1, 2 or 3), the four after
-   shots, the before shots or "none", the step's done-when, the page pattern
-   when the brief names one, and on rounds 2 and 3 the fixes from the round
-   before. It answers with a paragraph and a fenced `json` verdict:
+   shots, the before shots or "none", the step's done-when, the page
+   pattern, and on rounds 2 and 3 the fixes from the round before. The
+   pattern is the name and rule under the brief's `## Pattern` section.
+   Working offline, take the name from the `Pattern:` line of the step's
+   detail and its rule from `lib/plan/patterns.ts`. A step that names none
+   uses the pattern that fits and says which in its close note. One whose
+   screen fits none blocks on a decision for the person (`shaping.md`). It answers with a paragraph and a fenced `json` verdict:
    `verdict` is `pass` or `fix`, and each fix names the shot, where, the
-   problem, what it breaks (`law <n>`, `taste:<id>`, `done-when` or
-   `regression`) and the change.
+   problem, what it breaks (`law <n>`, `taste:<id>`, `pattern`, `done-when`
+   or `regression`) and the change.
 5. **Record the round** (below), whatever the verdict.
 6. **On `fix`, make every change it asks for**, shoot again and start the next
    round. Most surfaces fail round 1. A fix you think is wrong is still the
