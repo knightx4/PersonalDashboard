@@ -3886,14 +3886,22 @@ export const SURFACES: readonly Surface[] = [
     label: 'News · Quick read page on a laptop',
     module: 'news',
     width: 'page',
-    render: () => <QuickReadView {...quickPageView} />,
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <QuickReadView {...quickPageView} />
+      </div>
+    ),
   },
   {
     id: 'news-quick-page-full',
     label: 'News · A full Quick read page, every story with a picture',
     module: 'news',
     width: 'page',
-    render: () => <QuickReadView {...quickFullPage} />,
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <QuickReadView {...quickFullPage} />
+      </div>
+    ),
   },
   {
     id: 'news-quick-caught-up',
