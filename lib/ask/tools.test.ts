@@ -813,3 +813,48 @@ describe('recall', () => {
     expect((await recall({ question: 'land value tax', only_mine: 'yes' })).result.ok).toBe(false);
   });
 });
+
+describe('list_rows', () => {
+  const video = (userId: string, id: string, title: string, added: string, extra: Row = {}): Row => ({
+    id: `${id}-row`,
+    user_id: userId,
+    video_id: id,
+    item: { title },
+    why: `Why ${title}`,
+    summary: null,
+    key_points: null,
+    verdict: 'watch',
+    watched_at: null,
+    left_playlist_at: null,
+    added_at: added,
+    ...extra,
+  });
+  const tables: Tables = {
+    'learn.watch_list': [
+      video(ME, 'abc', 'How cities grow', '2026-10-01'),
+      video(ME, 'def', 'Land value tax explained', '2026-10-05', { watched_at: '2026-10-06' }),
+      video(THEM, 'ghi', 'Not theirs', '2026-10-07'),
+    ],
+  };
+
+  it('reads a table no other lookup covers, newest first, named by its embedded title and linked to its page', async () => {
+    const rows = expectLinkedRows(await executeAskTool('list_rows', { table: 'learn.watch_list' }, context(tables)));
+    expect(rows.map((r) => [r.ref, r.title, r.href])).toEqual([
+      ['def', 'Land value tax explained', '/learn/videos/def'],
+      ['abc', 'How cities grow', '/learn/videos/abc'],
+    ]);
+    expect(rows[0].detail).toMatchObject({ why: 'Why Land value tax explained', watched_at: '2026-10-06' });
+  });
+
+  it('keeps only rows holding every word given', async () => {
+    const result = await executeAskTool('list_rows', { table: 'learn.watch_list', contains: 'land tax' }, context(tables));
+    expect(expectLinkedRows(result).map((r) => r.ref)).toEqual(['def']);
+  });
+
+  it('refuses a table outside the catalogue, and one whose workspace is off', async () => {
+    const outside = await executeAskTool('list_rows', { table: 'auth.users' }, context(tables));
+    expect(outside).toEqual({ ok: false, error: expect.stringContaining('not a table list_rows can read') });
+    const off = await executeAskTool('list_rows', { table: 'learn.watch_list' }, context(tables, { enabledModules: ['shopping'] }));
+    expect(off).toEqual({ ok: false, error: expect.stringContaining('Learn workspace is switched off') });
+  });
+});

@@ -124,8 +124,9 @@ Notes they wrote on Learn cards and on ideas, in their own words.
 
 YouTube videos they chose to watch, saved to their playlist, or kept from a channel Dash judged for one of their subjects, with a verdict on each once judged.
 
-- Search: `why`, `summary`
-- Name a row by `video_id`; link it by `id`
+- Search: `why`, `summary`, `key_points`, `verdict`
+- Name a row by `video_id`; link it by `video_id`
+- Opens at `/learn/videos/<video_id>`
 - item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist. came_from is playlist, takeout or channel search; a channel search row names the subject it was found for in subject_id.
 
 ### `news.preferences` (News)

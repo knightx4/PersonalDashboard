@@ -3,7 +3,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { AskContext, AskToolResult, SchemaClient } from '@/lib/ask/db';
 import { executeProposal } from '@/lib/ask/propose';
 import type { SpendReport } from '@/lib/core/spend/pricing';
-import { answerQuestion, askDash, ASK_MODEL, type AskLookupEvent, type AskStores } from './ask';
+import { answerQuestion, askDash, ASK_MODEL, gapNote, type AskLookupEvent, type AskStores } from './ask';
 import {
   ANSWER_MAX_TOKENS,
   answerFromLookups,
@@ -129,6 +129,28 @@ function memoryStores(existing: TalkTurn[] = []) {
 }
 
 describe('askDash', () => {
+  it('files what it could not do as a note, with the question, once it has looked', async () => {
+    const { client } = stubClient([
+      reply([use('u1', 'search', { query: 'concert' })]),
+      reply([
+        use('u2', 'answer', {
+          answer: 'I cannot see any concert tickets.',
+          cited: [],
+          could_not: 'find concert tickets: nothing holds them',
+        }),
+      ]),
+    ]);
+    const { execute } = stubExecute();
+    const { stores } = memoryStores();
+    const gaps: [string, string][] = [];
+    stores.noteGap = async (body, ref) => {
+      gaps.push([body, ref]);
+    };
+    await askDash({ question: 'When is my next concert?', today: '2026-10-07', execute, anthropicApiKey: 'k', client }, stores);
+    expect(gaps).toEqual([[gapNote('find concert tickets: nothing holds them', 'When is my next concert?'), 'conv-new']]);
+    expect(gaps[0][0]).toContain('Asked: "When is my next concert?"');
+  });
+
   it('runs a search and a total, stops at the answer, keeps the turns and the spend, and cites only rows the tools returned', async () => {
     const { client, sent } = stubClient([
       reply([use('u1', 'search', { query: 'ebay' })]),

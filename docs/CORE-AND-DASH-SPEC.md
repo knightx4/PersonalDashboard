@@ -231,6 +231,21 @@ answered on 2 October 2026. Anything that acts outside the app, such as
 sending an email or buying something, is always a proposal. Anything no tool
 can do goes to the hand-off routine (#1402).
 
+**Reach.** `list_rows` (`lib/ask/list-rows.ts`) reads any table in the sources
+catalogue that is tied to its owner by a column, newest first, so a table is
+readable by Dash the day its module declares it. `tests/ask-reach.test.ts`
+fails a source Dash cannot list unless it says why. Before it, a table no
+lookup was written for was invisible: on 7 October 2026 Dash told the person
+it had no way to pick a YouTube video, with 122 on their watch list.
+
+**Refusing.** The `answer` tool takes `could_not`, a sentence for what the
+person asked that Dash did not do. An answer that sets it before any lookup
+is sent back once with `LOOK_FIRST` (`lib/dash/loop.ts`). In Ask, a
+`could_not` that stands is filed as a feature note on `/dev/bugs`, naming
+what was missing and quoting the question, so the gap is built rather than
+met again. Deleting, sending and spending are the only requests Ask turns
+down; anything else is looked up, done with a tool, or handed on.
+
 **Model.** One file, `lib/dash/models.ts`, names the model per surface: Sonnet
 for Ask and threads, Haiku for capture, where speed matters more than reach.
 The other model constants in the app move to `lib/core/models.ts` in the same

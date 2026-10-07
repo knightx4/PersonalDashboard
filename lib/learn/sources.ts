@@ -169,8 +169,19 @@ export const learnSources: ModuleSources = {
       module: 'Learn',
       holds: 'YouTube videos they chose to watch, saved to their playlist, or kept from a channel Dash judged for one of their subjects, with a verdict on each once judged.',
       weight: 'intent',
-      search: ['why', 'summary'],
+      search: ['why', 'summary', 'key_points', 'verdict'],
+      facts: ['watched_at', 'left_playlist_at'],
       title: 'video_id',
+      titleVia: { embed: 'item:catalogue_items!watch_list_item_id_fkey', column: 'title' },
+      ref: 'video_id',
+      href: (videoId) => `/learn/videos/${encodeURIComponent(videoId)}`,
+      newest: 'added_at',
+      // The title is on catalogue_items, which a ref's page cannot join to.
+      page: {
+        title: { reads: ['video_id'], of: (row) => (typeof row.video_id === 'string' ? `YouTube video ${row.video_id}` : null) },
+        href: (row) => (typeof row.video_id === 'string' ? `/learn/videos/${encodeURIComponent(row.video_id)}` : null),
+        reads: ['video_id'],
+      },
       note: 'item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist. came_from is playlist, takeout or channel search; a channel search row names the subject it was found for in subject_id.',
     },
     {

@@ -105,6 +105,7 @@ export const vaultSources: ModuleSources = {
       weight: 'record',
       search: ['school', 'file_name'],
       title: 'school',
+      newest: 'uploaded_at',
       href: transcriptHref,
       note: 'The courses on each are in obsidian.courses. The file is in the private vault-transcripts bucket at storage_path.',
     },
