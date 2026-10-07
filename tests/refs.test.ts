@@ -38,6 +38,7 @@ const FILL: Record<string, (user: string, id: string) => Record<string, unknown>
   'goals.items': () => ({ level: 'goal', area_id: randomUUID(), parent_id: null, kind: null }),
   'job_search.companies': () => ({ slug: 'a-company' }),
   'learn.personality_results': () => ({ kind: 'mbti', typed_value: 'INTJ' }),
+  'learn.watch_list': () => ({ video_id: 'dQw4w9WgXcQ' }),
   'news.issues': () => ({ text_body: 'x' }),
   'obsidian.notes': () => ({ path: 'Career/A note.md' }),
   'obsidian.transcripts': (user) => ({ storage_path: `${user}/a.pdf` }),

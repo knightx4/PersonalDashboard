@@ -176,6 +176,12 @@ export const learnSources: ModuleSources = {
       ref: 'video_id',
       href: (videoId) => `/learn/videos/${encodeURIComponent(videoId)}`,
       newest: 'added_at',
+      // The title is on catalogue_items, which a ref's page cannot join to.
+      page: {
+        title: { reads: ['video_id'], of: (row) => (typeof row.video_id === 'string' ? `YouTube video ${row.video_id}` : null) },
+        href: (row) => (typeof row.video_id === 'string' ? `/learn/videos/${encodeURIComponent(row.video_id)}` : null),
+        reads: ['video_id'],
+      },
       note: 'item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist. came_from is playlist, takeout or channel search; a channel search row names the subject it was found for in subject_id.',
     },
     {
