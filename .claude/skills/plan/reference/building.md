@@ -233,6 +233,15 @@ a surface with no routes. A step that changes no surface skips this section.
    Without the two placeholders the preview pages answer 500. The shots are
    `.preview-shots/<id>--{phone,laptop}-{light,dark}.png`: 390 and 1280
    pixels, light and dark. Open them yourself before sending them on.
+   A phone page taller than the screen with a row fixed to its foot also
+   gets `<id>--phone-{light,dark}-end.png`, at the phone's own height and
+   scrolled to the end, since the full-page shot draws that row partway down
+   the content. Send those to the critic as well.
+
+   A surface whose gallery entry declares an `interaction` is recorded too,
+   with the same server running: `npm run record -- <id>` writes
+   `.preview-shots/strips/<id>--phone-light.png` and its `.json`, a second
+   of frames 50ms apart. The critic judges craft from it.
 4. **Hand them to the critic.** The `ui-critic` agent
    (`.claude/agents/ui-critic.md`) judges the pictures and nothing else. Run
    it as the subagent `ui-critic`, or, where you cannot start a subagent,
@@ -243,8 +252,10 @@ a surface with no routes. A step that changes no surface skips this section.
    ```
 
    The prompt names the surface id, the round (1, 2 or 3), the four after
-   shots, the before shots or "none", the step's done-when, the page
-   pattern, and on rounds 2 and 3 the fixes from the round before. The
+   shots, the before shots or "none", the strip and its JSON or "none", the
+   moment from `app/dev/ui/moments.ts` the surface plays (its name and
+   `sees` line) or "none", the step's done-when, the page pattern, and on
+   rounds 2 and 3 the fixes from the round before. The
    pattern is the name and rule under the brief's `## Pattern` section.
    Working offline, take the name from the `Pattern:` line of the step's
    detail and its rule from `lib/plan/patterns.ts`. A step that names none
