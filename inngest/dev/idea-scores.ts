@@ -7,13 +7,16 @@ import { recordSpendReports } from '@/lib/core/spend/record';
 import { jevApiKey } from '@/lib/jev/client';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import { scoreUnscoredIdeas, type CatchUpResult } from '@/lib/ideas/score-run';
+import { SCORE_DUE_FILTER } from '@/lib/ideas/score';
 import { scoreUnscoredTakeaways } from '@/lib/dev/inspiration/score';
 
 /**
  * The idea-score catch-up, as a stage of the daily cron (plan #1327).
  *
- * Scores every live idea whose score is null: the ones sessions and the
- * night digest filed without triage, and any Jev failed on before. An idea
+ * Scores every live idea whose score is null or was asked under an older
+ * wording of the question: the ones sessions and the night digest filed
+ * without triage, any Jev failed on before, and every live idea once after
+ * the question changes (plan #1644). An idea
  * filed from the header panel is scored as it is filed and is not here.
  * Runs after the digest so the ideas it files overnight are scored the same
  * morning.
@@ -36,7 +39,7 @@ export async function runIdeaScoreCatchUp(): Promise<IdeaScoreCatchUp[]> {
   const deadline = Date.now() + BUDGET_MS;
 
   const [ideas, takeaways] = await Promise.all([
-    supabase.from('ideas').select('user_id').is('score', null).is('dismissed_at', null),
+    supabase.from('ideas').select('user_id').or(SCORE_DUE_FILTER).is('dismissed_at', null),
     supabase.from('inspiration_takeaways').select('user_id').is('score', null).neq('status', 'dismissed'),
   ]);
   if (ideas.error) throw new Error(ideas.error.message);
