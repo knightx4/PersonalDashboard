@@ -119,6 +119,16 @@ export function isTerminal(status: ApplicationStatus): boolean {
   return RANK[status] === -1;
 }
 
+/**
+ * Whether an application is live: not closed, leads included (plan #1590).
+ * The one rule Jobs counts live applications by, so Pipeline, Today and any
+ * count of them agree. Wider than OPEN_STATUSES in lib/jobs/board-moment.ts,
+ * which leaves out what has not been sent.
+ */
+export function isLive(status: ApplicationStatus): boolean {
+  return !isTerminal(status);
+}
+
 /** Statuses that mean "the application reached a live human conversation". */
 export const IN_PROCESS_OR_LATER: readonly ApplicationStatus[] = [
   'in_process',

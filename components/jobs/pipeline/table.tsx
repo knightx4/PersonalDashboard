@@ -9,19 +9,12 @@ import { ScoreReasons, chanceFigureText, fitText } from '@/components/jobs/ui/sc
 import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
 
 /**
- * The roles table, lifted out of the page so it can be photographed.
+ * The Pipeline page's table view (plan #1590), which was the Roles page.
  *
- * Nothing about it changed on the way out. The page still loads, filters and
- * sorts; this is the half a person reads, and the preview gallery cannot
- * import a page whose first line opens a database connection.
+ * Only the half a person reads: the page loads, filters, sorts and pages, and
+ * the preview gallery cannot import a page whose first line opens a database
+ * connection.
  */
-
-export function hrefFor(params: Record<string, string | undefined>): string {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) if (value) search.set(key, value);
-  const query = search.toString();
-  return query ? `/jobs/roles?${query}` : '/jobs/roles';
-}
 
 export function RolesTable({
   rows,
