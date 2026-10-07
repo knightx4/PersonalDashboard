@@ -30,7 +30,8 @@ import {
   type PlanView,
 } from '@/lib/plan/tree';
 import { OvernightControl } from './overnight-control';
-import { PlanView as PlanViewComponent, type PlanCatalogEntry } from './plan-view';
+import { PlanView as PlanViewComponent } from './plan-view';
+import { catalogOf } from './plan-catalog';
 
 /**
  * The claims on these steps, read against the last run on each.
@@ -213,18 +214,7 @@ export async function renderPlanPage({
 
   // Every step, for the pickers: a parent to move under, a step to wait on.
   // Light on purpose -- the tree is already on the page once.
-  const catalog: PlanCatalogEntry[] = flattenSections(everything).map((node) => ({
-    id: node.id,
-    number: node.number,
-    outline: node.outline,
-    title: node.title,
-    module: node.module,
-    parentId: node.parentId,
-    depth: node.depth,
-    status: node.status,
-    completedAt: node.completedAt,
-    closed: node.status === 'done' || node.status === 'dropped',
-  }));
+  const catalog = catalogOf(everything);
 
   // Wider than the other dev pages, which are prose and lists at max-w-3xl.
   // This one is a table with six columns and a tree indenting the first of

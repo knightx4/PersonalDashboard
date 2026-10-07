@@ -8,6 +8,7 @@
  */
 import type { PlanStatus } from '@/lib/plan/load';
 import type { PlanScope } from '@/lib/plan/projects';
+import { flattenSections, type PlanSection } from '@/lib/plan/tree';
 
 export type PlanCatalogEntry = {
   id: string;
@@ -26,3 +27,22 @@ export type PlanCatalogEntry = {
 // The two helpers that read it live in lib/plan/catalog.ts, typed on the
 // fields they read, so the shared tree components can use them too.
 export { catalogLabel, subtreeOf } from '@/lib/plan/catalog';
+
+/**
+ * Every step in the tree as the pickers list it. Off the whole plan rather
+ * than a view of it, since a step may wait on one in another module.
+ */
+export function catalogOf(sections: readonly PlanSection[]): PlanCatalogEntry[] {
+  return flattenSections(sections).map((node) => ({
+    id: node.id,
+    number: node.number,
+    outline: node.outline,
+    title: node.title,
+    module: node.module,
+    parentId: node.parentId,
+    depth: node.depth,
+    status: node.status,
+    completedAt: node.completedAt,
+    closed: node.status === 'done' || node.status === 'dropped',
+  }));
+}

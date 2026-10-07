@@ -46,6 +46,7 @@ import { cn } from '@/lib/cn';
 import { PlanRow } from './plan-row';
 import { AddStep } from './step-forms';
 import { ColumnHeader } from '@/components/plan-tree/grid';
+import { moduleAnchor } from '@/lib/plan/feature-page';
 import { Progress, SectionTally } from '@/components/plan-tree/counts';
 import { ViewChips } from '@/components/plan-tree/view-chips';
 
@@ -570,10 +571,12 @@ export function PlanView({
               // prop below cannot push it back: React writes that attribute on
               // a change of value, not on every render.
               key={`${section.module ?? 'app'}${searching ? ':found' : ''}`}
+              // What a feature page's module crumb lands on (plan #1664).
+              id={moduleAnchor(section.module)}
               // A search opens every module it kept, because it only kept the
               // ones with something in them.
               open={searching || !finished}
-              className={cn(cardVariants({ padding: 'none' }), 'group/section overflow-hidden')}
+              className={cn(cardVariants({ padding: 'none' }), 'group/section scroll-mt-24 overflow-hidden')}
             >
               <summary
                 className={cn(
