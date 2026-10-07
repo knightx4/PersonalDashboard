@@ -189,6 +189,12 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-spec': ['/dev/specs/[slug]'],
   'dev-ui-review': ['/dev/ui/review'],
   'dev-usage': ['/dev/usage'],
+  'news-all': ['/news/all'],
+  'news-story': ['/news/i/[id]/s/[index]'],
+  'news-settings': ['/news/settings'],
+  'todo-all': ['/todo/all'],
+  'todo-settings': ['/todo/settings'],
+  'todo-waiting': ['/todo/waiting'],
 };
 
 /** A route split into its segments; `/` is no segments. */

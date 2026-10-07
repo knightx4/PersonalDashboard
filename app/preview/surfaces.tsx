@@ -189,6 +189,14 @@ import {
   DevUiReviewSurface,
   DevUsageSurface,
 } from './dev-page-surfaces';
+import {
+  NewsAllSurface,
+  NewsSettingsSurface,
+  NewsStorySurface,
+  TodoAllSurface,
+  TodoSettingsSurface,
+  TodoWaitingSurface,
+} from './news-todo-page-surfaces';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -4349,6 +4357,51 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevUsageSurface />,
+  },
+
+  /* The News and Todo pages that had no picture (plan #1603). Fixtures in
+   * news-todo-page-surfaces.tsx. */
+  {
+    id: 'news-all',
+    label: 'News · Newsletters, newest first',
+    module: 'news',
+    width: 'page',
+    render: () => <NewsAllSurface />,
+  },
+  {
+    id: 'news-story',
+    label: 'News · One story on its own page',
+    module: 'news',
+    width: 'page',
+    render: () => <NewsStorySurface />,
+  },
+  {
+    id: 'news-settings',
+    label: 'News · Settings',
+    module: 'news',
+    width: 'page',
+    render: () => <NewsSettingsSurface />,
+  },
+  {
+    id: 'todo-all',
+    label: 'Todo · All tasks, open',
+    module: 'todo',
+    width: 'page',
+    render: () => <TodoAllSurface />,
+  },
+  {
+    id: 'todo-settings',
+    label: 'Todo · Settings',
+    module: 'todo',
+    width: 'page',
+    render: () => <TodoSettingsSurface />,
+  },
+  {
+    id: 'todo-waiting',
+    label: 'Todo · Waiting on someone else',
+    module: 'todo',
+    width: 'page',
+    render: () => <TodoWaitingSurface />,
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on
