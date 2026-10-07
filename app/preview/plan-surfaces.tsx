@@ -863,3 +863,15 @@ export function PlanFeatureStepsSurface() {
     </>
   );
 }
+
+const HELD_YOURS = { held: 'me' };
+
+/** The Steps tab after a press on "Yours" in the properties (plan #1668). */
+export function PlanFeatureStepsYoursSurface() {
+  return (
+    <>
+      <SetTab tab="steps" params={HELD_YOURS} />
+      <FeatureFixture />
+    </>
+  );
+}

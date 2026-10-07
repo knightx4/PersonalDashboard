@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRight, Plus } from 'lucide-react';
 import { TabbedDetail } from '@/components/patterns/tabbed-detail';
@@ -43,6 +44,14 @@ import {
   type StepGroup,
   type StepsView,
 } from '@/lib/plan/feature-page';
+import {
+  HELD_PARAM,
+  heldFrom,
+  heldHref,
+  progressSplit,
+  stepsHeldBy,
+  type HeldBy,
+} from '@/lib/plan/split';
 import { TAB_PARAM, tabFrom } from '@/lib/tabs';
 import { dismissPlanFog, deletePlanItem, type PlanActionState } from './actions';
 import { PlanRow, PLAN_TREE_ACTIONS, usePlanRow } from './plan-row';
@@ -52,11 +61,7 @@ import { when } from './plan-run-status';
 import { FeatureUpdate } from './feature-update';
 import { FeatureActivity } from './feature-activity';
 import type { PlanUpdate } from '@/lib/plan/updates';
-import {
-  featureActivity,
-  type ActivityDashAction,
-  type ActivityRun,
-} from '@/lib/plan/activity';
+import { featureActivity, type ActivityDashAction, type ActivityRun } from '@/lib/plan/activity';
 
 /**
  * A feature's own page, /dev/plan/<number> (plan #1664), in the tabbed
@@ -116,6 +121,7 @@ export function FeaturePage({
   const search = useSearchParams();
   const tab = tabFrom(search.get(TAB_PARAM), FEATURE_TABS);
   const stepsView = stepsViewFrom(search.get(STEPS_VIEW_PARAM));
+  const held = heldFrom(search.get(HELD_PARAM));
   const parts = usePlanRow({
     node: feature,
     trail: [],
@@ -197,6 +203,7 @@ export function FeaturePage({
   });
 
   const statusWord = STATUS_LABEL[node.status];
+  const split = progressSplit(node);
   const properties = (
     <PropertyList>
       <Property
@@ -261,6 +268,27 @@ export function FeaturePage({
       {node.commitSha && (
         <Property label="Commit" value={<span className="font-mono">{node.commitSha}</span>} />
       )}
+      {split.scope > 0 && (
+        <Property
+          label="Progress"
+          hint="Steps and substeps beneath the feature, questions and setup jobs included, not dropped."
+          value={`${split.done} of ${split.scope} done`}
+        />
+      )}
+      {split.open > 0 && (
+        <>
+          <Property
+            label="Yours"
+            hint="Open steps marked yours, with every question and setup job. Shows them on the Steps tab."
+            value={<SplitLink href={heldHref(overview, 'me')} count={split.me} who="me" />}
+          />
+          <Property
+            label="Dash’s"
+            hint="Open steps nobody has marked yours. Shows them on the Steps tab."
+            value={<SplitLink href={heldHref(overview, 'dash')} count={split.dash} who="dash" />}
+          />
+        </>
+      )}
     </PropertyList>
   );
 
@@ -300,7 +328,7 @@ export function FeaturePage({
       properties={properties}
       tabs={tabs}
       label="Feature"
-      className="gap-y-2 lg:gap-y-0"
+      className="gap-y-2 lg:grid-rows-[auto_1fr] lg:gap-y-0"
     >
       {notices}
       {tab === 'activity' ? (
@@ -310,6 +338,7 @@ export function FeaturePage({
           node={node}
           steps={steps}
           view={stepsView}
+          held={held}
           liveness={liveness}
           addChildLabel={parts.addChildLabel}
           adding={row.addingChild}
@@ -412,6 +441,7 @@ function FeatureSteps({
   node,
   steps,
   view,
+  held,
   liveness,
   addChildLabel,
   adding,
@@ -422,6 +452,7 @@ function FeatureSteps({
   node: PlanNode;
   steps: readonly PlanNode[];
   view: StepsView;
+  held: HeldBy | null;
   liveness?: PlanLiveness;
   addChildLabel: string;
   adding: boolean;
@@ -432,7 +463,8 @@ function FeatureSteps({
     'node' | 'trail' | 'view' | 'searching' | 'unfolded'
   >;
 }) {
-  const groups = stepGroups(node, liveness);
+  const heldIds = held ? new Set(stepsHeldBy(node, held).map((step) => step.id)) : undefined;
+  const groups = stepGroups(node, liveness, heldIds);
   const row = (step: PlanNode, extra: Partial<React.ComponentProps<typeof PlanRow>> = {}) => (
     <PlanRow
       key={step.id}
@@ -451,13 +483,28 @@ function FeatureSteps({
     <div className="space-y-3">
       {steps.length > 0 ? (
         <>
-          <ViewChips
-            view={view}
-            chips={STEPS_VIEWS}
-            labels={STEPS_VIEW_LABEL}
-            hrefOf={(candidate) => stepsViewHref(node.number, candidate)}
-            scroll={false}
-          />
+          {held ? (
+            <p className="flex flex-wrap items-center gap-x-3 text-ui text-ink-muted">
+              <span>
+                {held === 'me' ? 'Your' : 'Dash’s'} open steps: {heldIds?.size ?? 0}
+              </span>
+              <Link
+                href={stepsViewHref(node.number, view)}
+                scroll={false}
+                className="text-ink underline underline-offset-2"
+              >
+                Show all steps
+              </Link>
+            </p>
+          ) : (
+            <ViewChips
+              view={view}
+              chips={STEPS_VIEWS}
+              labels={STEPS_VIEW_LABEL}
+              hrefOf={(candidate) => stepsViewHref(node.number, candidate)}
+              scroll={false}
+            />
+          )}
           <ul
             className={cn(
               cardVariants({ padding: 'none' }),
@@ -468,7 +515,7 @@ function FeatureSteps({
             )}
           >
             <ColumnHeader />
-            {view === 'tree'
+            {view === 'tree' && !held
               ? steps.map((step) => row(step))
               : groups.map((group) => (
                   <StepGroupRows key={group.id} group={group}>
@@ -495,6 +542,20 @@ function FeatureSteps({
         )
       )}
     </div>
+  );
+}
+
+/** A count in the properties that opens the Steps tab on just those steps. */
+function SplitLink({ href, count, who }: { href: string; count: number; who: HeldBy }) {
+  return (
+    <Link
+      href={href}
+      scroll={false}
+      aria-label={`${count} open ${count === 1 ? 'step' : 'steps'} ${who === 'me' ? 'yours' : 'Dash’s'}, show them`}
+      className="-mx-1.5 inline-flex min-h-7 items-center rounded-sm px-1.5 underline underline-offset-2 hover:bg-sunken"
+    >
+      {count} open
+    </Link>
   );
 }
 

@@ -131,6 +131,7 @@ import {
   PlanOpenedSurface,
   PlanFeatureSurface,
   PlanFeatureStepsSurface,
+  PlanFeatureStepsYoursSurface,
   PlanFeatureActivitySurface,
   PlanTreeSurface,
   PlanTableSurface,
@@ -3044,6 +3045,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanFeatureStepsSurface />,
+  },
+  {
+    /* The Steps tab after pressing "Yours" in the properties (plan #1668):
+     * only the open steps you hold, questions and setup jobs included. */
+    id: 'dev-plan-feature-steps-yours',
+    label: 'Plan · a feature’s steps, yours only',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanFeatureStepsYoursSurface />,
   },
   {
     /* A step the design critic stopped after round 3 (plan #1610): the last

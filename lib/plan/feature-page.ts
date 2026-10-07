@@ -177,13 +177,23 @@ export type StepGroup = {
  * tree's own order. A row is grouped by its own status, not by what is open
  * beneath it: its substeps are listed in their own groups. Questions are not
  * rows of their own, as in the tree; they stay with the step they were asked
- * on. Groups with nothing in them are not returned.
+ * on. Groups with nothing in them are not returned. `only` keeps just the
+ * steps whose ids it holds (the Steps tab filtered by who holds them, plan
+ * #1668), their substeps still looked through.
  */
-export function stepGroups(feature: PlanNode, liveness?: PlanLiveness): StepGroup[] {
+export function stepGroups(
+  feature: PlanNode,
+  liveness?: PlanLiveness,
+  only?: ReadonlySet<string>,
+): StepGroup[] {
   const found: GroupedStep[] = [];
   const walk = (nodes: readonly PlanNode[], parent: PlanNode | null) => {
     for (const node of nodes) {
       if (node.kind === 'decision') continue;
+      if (only && !only.has(node.id)) {
+        walk(node.children, node);
+        continue;
+      }
       found.push({
         node,
         parent: parent && { number: parent.number, outline: parent.outline, title: parent.title },
