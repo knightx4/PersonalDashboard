@@ -72,22 +72,26 @@ import { dismissPursuit, moveApplication } from '@/app/jobs/(app)/pipeline/actio
  * everything derived from it (analytics, rejection-stage inference), is
  * untouched -- only the board stops giving it its own column.
  */
-const COLUMNS: Array<{ statuses: ApplicationStatus[]; setStatus: ApplicationStatus; label: string; hint: string }> = [
-  { statuses: ['lead'], setStatus: 'lead', label: 'Leads', hint: 'Saved, not applied' },
-  { statuses: ['drafting'], setStatus: 'drafting', label: 'Drafting', hint: 'You are working on it' },
+/**
+ * Each stage's heading is its name and count only (law 15). What the stage
+ * means is said once, by its empty state, where there is nothing else to read.
+ */
+const COLUMNS: Array<{ statuses: ApplicationStatus[]; setStatus: ApplicationStatus; label: string; empty: string }> = [
+  { statuses: ['lead'], setStatus: 'lead', label: 'Leads', empty: 'No roles saved and not yet applied for' },
+  { statuses: ['drafting'], setStatus: 'drafting', label: 'Drafting', empty: 'Nothing being written' },
   {
     statuses: ['submitted', 'acknowledged'],
     setStatus: 'acknowledged',
     label: 'Submitted',
-    hint: 'Sent, and landed somewhere real',
+    empty: 'Nothing sent and waiting',
   },
   {
     statuses: ['in_process', 'final_round'],
     setStatus: 'in_process',
     label: 'In process',
-    hint: 'A human is involved',
+    empty: 'No process with a person in it yet',
   },
-  { statuses: ['offer'], setStatus: 'offer', label: 'Offer', hint: '' },
+  { statuses: ['offer'], setStatus: 'offer', label: 'Offer', empty: 'No offers yet' },
 ];
 
 /** How long a live pursuit can go quiet before the card starts saying so. */
@@ -247,10 +251,7 @@ export function PipelineBoard({
               bodyClassName="space-y-2 px-2 pb-2"
               title={column.label}
               meta={
-                <>
-                  <span className="tabular text-ui">{columnRows.length}</span>
-                  {column.hint && <span className="ml-2">{column.hint}</span>}
-                </>
+<span className="tabular text-ui">{columnRows.length}</span>
               }
             >
               {columnRows.map((row) => (
@@ -265,7 +266,7 @@ export function PipelineBoard({
                 />
               ))}
               {columnRows.length === 0 && (
-                <p className="px-1.5 py-2 text-ui text-ink-muted">Nothing here</p>
+                <p className="px-1.5 py-2 text-ui text-ink-muted">{column.empty}</p>
               )}
             </Disclosure>
           </div>
@@ -286,14 +287,12 @@ export function PipelineBoard({
             over === column.setStatus && 'bg-accent-tint',
           )}
           aria-label={column.label}
+          data-stage={column.setStatus}
         >
           <header className="mb-2 flex items-baseline justify-between px-1.5 pt-1">
             <h2 className="text-ui font-semibold text-ink">{column.label}</h2>
             <span className="tabular text-ui text-ink-muted">{columnRows.length}</span>
           </header>
-          {column.hint && (
-            <p className="mb-2 px-1.5 text-small leading-snug text-ink-muted">{column.hint}</p>
-          )}
 
           <div className="space-y-2">
             {columnRows.map((row) => (
@@ -308,7 +307,7 @@ export function PipelineBoard({
               />
             ))}
             {columnRows.length === 0 && (
-              <p className="px-1.5 py-6 text-center text-ui text-ink-muted">Nothing here</p>
+              <p className="px-1.5 py-6 text-center text-ui text-ink-muted">{column.empty}</p>
             )}
           </div>
         </section>
@@ -324,10 +323,35 @@ export function PipelineBoard({
         </p>
       )}
       <div className="flex flex-col gap-2 sm:hidden">{renderColumns('list')}</div>
+      {/* The five stages do not fit side by side at a laptop's width, so the
+        * board says what is off to the right (law 2): every stage by name and
+        * count on one line above it, each scrolling its column into view, and
+        * the last visible column fading at the edge. */}
+      {view === 'board' && (
+        <nav aria-label="Stages" className="hidden flex-wrap items-baseline gap-x-4 gap-y-1 text-small sm:flex">
+          {COLUMNS.map((column) => (
+            <button
+              key={column.setStatus}
+              type="button"
+              onClick={() =>
+                boardRef.current
+                  ?.querySelector(`[data-stage="${column.setStatus}"]`)
+                  ?.scrollIntoView({ block: 'nearest', inline: 'start', behavior: 'smooth' })
+              }
+              className="text-ink-muted transition-colors duration-quick hover:text-accent"
+            >
+              {column.label}{' '}
+              <span className="tabular text-ink">
+                {shown.filter((row) => column.statuses.includes(row.status)).length}
+              </span>
+            </button>
+          ))}
+        </nav>
+      )}
       <div
         className={cn(
           'hidden sm:flex',
-          view === 'board' ? 'gap-3 overflow-x-auto pb-2' : 'flex-col gap-2',
+          view === 'board' ? 'scroll-fade-x gap-3 overflow-x-auto pb-2' : 'flex-col gap-2',
         )}
       >
         {renderColumns(view)}
@@ -423,12 +447,23 @@ function PipelineCard({
           className="size-7"
         />
         <div className="min-w-0 flex-1">
-          <Link
-            href={`/jobs/roles/${row.roleId}`}
-            className="block truncate text-small font-medium text-ink transition-colors duration-quick hover:text-accent"
-          >
-            {row.roleTitle}
-          </Link>
+          {/* The stars share the title's line, so the line below runs the
+            * full width and every card's age ends on the same right edge
+            * (law 18). Beside the card they took two to five stars' width
+            * and moved the age with them. */}
+          <div className="flex items-baseline justify-between gap-2">
+            <Link
+              href={`/jobs/roles/${row.roleId}`}
+              className="block min-w-0 truncate text-small font-medium text-ink transition-colors duration-quick hover:text-accent"
+            >
+              {row.roleTitle}
+            </Link>
+            {row.excitement !== null && (
+              <span className="tabular shrink-0 text-small text-ink-muted" title="Excitement">
+                {'★'.repeat(row.excitement)}
+              </span>
+            )}
+          </div>
           {/*
             * The company and the card's numbers share a line.
             *
@@ -476,11 +511,6 @@ function PipelineCard({
           <ScoreLine note={row.scoreNote} />
           {move && <MoveLabel move={move.move} title={move.title} className="mt-0.5 max-w-full" />}
         </div>
-        {row.excitement !== null && (
-          <span className="tabular shrink-0 text-small text-ink-muted" title="Excitement">
-            {'★'.repeat(row.excitement)}
-          </span>
-        )}
         {/*
           * Gone below `sm`, not merely invisible.
           *
@@ -493,7 +523,10 @@ function PipelineCard({
           * on the role's own page, which is one tap away.
           */}
         {!muted && (
-          <span className="hidden shrink-0 items-center gap-0.5 sm:flex">
+          // Laid over the card's top right corner rather than beside it, so
+          // the invisible pair holds no width at a laptop: the stars and the
+          // age end on the card's own edge there too (law 18).
+          <span className="absolute top-1 right-1 hidden items-center gap-0.5 rounded-lg focus-within:bg-surface group-hover:bg-surface sm:flex">
             {onReject && <QuickReject row={row} onReject={onReject} />}
             <Dismiss row={row} />
           </span>

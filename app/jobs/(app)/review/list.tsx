@@ -132,7 +132,7 @@ export function ReviewQueue({
     <SelectionProvider rows={selectionRows} onKey={onKey}>
       <PageHeader
         title="Review"
-        description={`${counts.all} waiting. Holding rather than guessing is what keeps the funnel worth reading.`}
+        description={`${counts.all} waiting`}
         bulk={<JobsBulkBar rows={rows} />}
       />
 
@@ -281,7 +281,10 @@ function QueueRow({
 
   return (
     <article className={className} onClick={() => selection?.focus(key)}>
-      <SelectionCheckbox rowKey={key} label={rowLabel(row)} className="mt-0.5" />
+      {/* The tick box is for picking several rows with a pointer or j/k and x;
+        * at 390 it held an empty strip down every card that cut the titles
+        * short, so a phone gets the card's full width (law 9). */}
+      <SelectionCheckbox rowKey={key} label={rowLabel(row)} className="mt-0.5 hidden sm:flex" />
       <div className="min-w-0 flex-1">
         {row.kind === 'message' && (
           <MessageRow
@@ -342,7 +345,7 @@ function MessageRow({
         <span className="rounded-full bg-canvas px-2 py-0.5 text-micro font-medium text-ink-muted">
           {classificationLabel(row.classification)}
         </span>
-        <h3 className="order-first w-full min-w-0 truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
+        <h3 className="order-first w-full min-w-0 line-clamp-2 sm:truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
           {row.subject ?? '(no subject)'}
         </h3>
         <span className="tabular text-small text-ink-muted">
@@ -369,8 +372,8 @@ function MessageRow({
                 {index + 1}
               </kbd>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-ui text-ink">{candidate.label}</p>
-                <p className="truncate text-small text-ink-muted">
+                <p className="line-clamp-2 text-ui text-ink sm:truncate">{candidate.label}</p>
+                <p className="text-small text-ink-muted sm:truncate">
                   {candidate.reason}
                   {candidate.confidence !== null &&
                     ` · ${Math.round(candidate.confidence * 100)}% match`}
@@ -670,7 +673,7 @@ function ApplicationRow({
         <span className="rounded-full bg-accent-tint px-2 py-0.5 text-micro font-medium text-accent">
           Created from email
         </span>
-        <h3 className="order-first w-full min-w-0 truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
+        <h3 className="order-first w-full min-w-0 line-clamp-2 sm:truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
           {row.companyName} · {row.roleTitle}
         </h3>
         <StatusBadge
@@ -764,7 +767,7 @@ function EventRow({
         <span className="rounded-full bg-caution-tint px-2 py-0.5 text-micro font-medium text-ink">
           Arrived after it closed
         </span>
-        <h3 className="order-first w-full min-w-0 truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
+        <h3 className="order-first w-full min-w-0 line-clamp-2 sm:truncate text-ui font-medium text-ink sm:order-none sm:w-auto sm:flex-1">
           {row.companyName} · {row.roleTitle}
         </h3>
         <StatusBadge status={row.status as ApplicationStatus} />

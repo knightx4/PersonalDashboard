@@ -13,7 +13,7 @@ export const jobsSources: ModuleSources = {
       weight: 'intent',
       search: ['body'],
       title: 'body',
-      href: () => '/jobs/thoughts',
+      href: () => '/jobs/find',
       note: 'A newer entry supersedes an older one where they disagree; read them newest first.',
     },
     {

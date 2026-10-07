@@ -189,7 +189,7 @@ function ModuleSettingsSection({ enabled }: { enabled: ModuleId[] }) {
       module: 'jobs',
       href: '/jobs/settings',
       label: 'Job search settings',
-      hint: 'Target titles, ghost threshold, résumés and evidence',
+      hint: 'Ghost threshold, résumés and evidence',
     },
     {
       module: 'vault',
