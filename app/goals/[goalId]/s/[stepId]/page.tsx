@@ -15,6 +15,7 @@ import type { StepNode } from '@/lib/goals/steps';
 import { loadGoalMap } from '@/lib/goals/steps-store';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { StepPage } from '../../step-page';
+import { StepCloseRing } from './step-close';
 
 export const metadata = { title: 'Step' };
 export const dynamic = 'force-dynamic';
@@ -85,16 +86,22 @@ export default async function StepOwnPage({
     loadDashArrivals(client, done).catch((): string[] => []),
   ]);
 
+  // Closing the step here grows the goal's close ring out of its glyph
+  // (plan #1623); the Dash arrival plays on the row itself, from `arrivals`.
+  // Keyed by the step, so going from one step's page to another's is a
+  // page loaded, not a close watched.
   return (
-    <StepPage
-      map={map}
-      stepId={step.id}
-      todoOn={moduleEnabled(account, 'todo')}
-      runs={stepRunLines(runs)}
-      files={filesOf}
-      progress={summariseProgress(entries)}
-      arrivals={arrivals}
-      canRun={owner}
-    />
+    <StepCloseRing key={step.id} closed={step.status === 'done'}>
+      <StepPage
+        map={map}
+        stepId={step.id}
+        todoOn={moduleEnabled(account, 'todo')}
+        runs={stepRunLines(runs)}
+        files={filesOf}
+        progress={summariseProgress(entries)}
+        arrivals={arrivals}
+        canRun={owner}
+      />
+    </StepCloseRing>
   );
 }

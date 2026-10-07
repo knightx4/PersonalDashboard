@@ -166,6 +166,25 @@ export function useTreeRow(
 
 export type TreeRowState = ReturnType<typeof useTreeRow>;
 
+/**
+ * A heading title's last word, which the count and marks after it are kept
+ * on a line with. A word too long to keep whole is not glued, so a long
+ * address or name still wraps anywhere rather than running off a phone.
+ */
+const GLUED_WORD_MAX = 24;
+
+export function titleTail(title: string): string {
+  const at = title.trimEnd().lastIndexOf(' ');
+  const tail = title.trimEnd().slice(at + 1);
+  return tail.length > GLUED_WORD_MAX ? '' : tail;
+}
+
+/** Everything before `titleTail`, with the space that ends it. */
+export function titleHead(title: string): string {
+  const trimmed = title.trimEnd();
+  return trimmed.slice(0, trimmed.length - titleTail(title).length);
+}
+
 /** Everything under a row sits in from the tree by the same amount the title does. */
 export function rowInset(trail: readonly boolean[]): CSSProperties {
   return { paddingLeft: `${0.75 + trail.length * 1.25 + 1.25}rem` };
@@ -643,13 +662,21 @@ export function TreeRow<E extends TreeCatalogEntry>({
           {row.editing && titleEditor ? (
             <div className="min-w-0 flex-1 self-center">{titleEditor}</div>
           ) : heading ? (
-            <h1 className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1 self-center pl-1 font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
+            <h1 className="min-w-0 flex-1 self-center pl-1 font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
+              {/* The count and the marks run on after the title's last word
+                  and wrap with it, so a title that fits on one line keeps
+                  them on that line (plan #1623). */}
               <span className={cn(node.status === 'dropped' && 'text-ink-muted line-through')}>
-                {node.title}
+                {titleHead(node.title)}
               </span>
-              <span className="inline-flex items-center gap-1.5 font-sans text-ui font-normal tracking-normal">
-                <CommentCount count={node.thread.length} />
-                {marks}
+              <span className="whitespace-nowrap">
+                <span className={cn(node.status === 'dropped' && 'text-ink-muted line-through')}>
+                  {titleTail(node.title)}
+                </span>
+                <span className="ml-2 inline-flex items-center gap-1.5 align-middle font-sans text-ui font-normal tracking-normal">
+                  <CommentCount count={node.thread.length} />
+                  {marks}
+                </span>
               </span>
             </h1>
           ) : titleHref ? (
