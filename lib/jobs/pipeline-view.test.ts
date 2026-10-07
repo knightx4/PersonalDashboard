@@ -93,6 +93,30 @@ describe('pipelineHref', () => {
   });
 });
 
+describe('the filters a number on Today sets', () => {
+  const NOW = new Date('2026-10-07T12:00:00.000Z');
+  const daysAgo = (days: number) => new Date(NOW.getTime() - days * 86_400_000).toISOString();
+
+  it('narrows to one stage, folded as the board folds it', () => {
+    const rows = [row('lead'), row('acknowledged'), row('submitted'), row('in_process'), row('rejected')];
+    const { filtered } = filterPipeline(rows, parsePipeline({ stage: 'submitted' }), NOW);
+    expect(filtered.map((r) => r.status)).toEqual(['acknowledged', 'submitted']);
+    expect(parsePipeline({ stage: 'nonsense' }).stage).toBeNull();
+  });
+
+  it('narrows to what was sent in the window, the confirmation standing in for the send', () => {
+    const rows = [
+      row('acknowledged', { submittedAt: daysAgo(2), confirmationReceivedAt: null }),
+      row('rejected', { submittedAt: null, confirmationReceivedAt: daysAgo(5) }),
+      row('acknowledged', { submittedAt: daysAgo(9), confirmationReceivedAt: null }),
+    ];
+    const { filtered } = filterPipeline(rows, parsePipeline({ status: 'all', sent: '7' }), NOW);
+    expect(filtered).toHaveLength(2);
+    expect(parsePipeline({ sent: '0' }).sentDays).toBeNull();
+    expect(parsePipeline({ sent: '400' }).sentDays).toBeNull();
+  });
+});
+
 describe('pipelineDescription', () => {
   it('says how many, of which kind', () => {
     expect(pipelineDescription(parsePipeline({}), 36, 36, undefined)).toBe('36 live applications.');

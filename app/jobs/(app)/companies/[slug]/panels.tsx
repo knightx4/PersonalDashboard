@@ -404,14 +404,10 @@ function Enrichment({ companyId }: { companyId: string }) {
     <div className="mt-4 border-t border-border pt-3">
       <div className="flex items-center gap-3">
         <Button type="button" size="sm" variant="secondary" pending={pending} onClick={lookUp}>
-          {pending ? 'Looking up…' : 'Look up on Wikidata'}
+          {pending ? 'Looking up…' : 'Fill blanks from Wikidata'}
         </Button>
         {message && <span className="text-small text-ink-muted">{message}</span>}
       </div>
-
-      <p className="mt-1 text-small leading-relaxed text-ink-muted">
-        Fills blank fields only — anything you have typed is left exactly as it is.
-      </p>
 
       {proposal && (
         // A well, not a frame. What is in here is an encyclopedia's answer and
@@ -507,7 +503,7 @@ function AiEnrichment({ companyId }: { companyId: string }) {
     <div className="mt-3 border-t border-border pt-3">
       <div className="flex items-center gap-3">
         <Button type="button" size="sm" variant="secondary" pending={pending} onClick={lookUp}>
-          {pending ? 'Searching…' : 'Search with AI'}
+          {pending ? 'Searching…' : 'Fill blanks from the web'}
         </Button>
         <PaidHint
           action="app/jobs/(app)/companies/actions.ts#proposeAiCompanyEnrichment"
@@ -515,11 +511,6 @@ function AiEnrichment({ companyId }: { companyId: string }) {
         />
         {message && <span className="text-small text-ink-muted">{message}</span>}
       </div>
-
-      <p className="mt-1 text-small leading-relaxed text-ink-muted">
-        For the companies Wikidata has never heard of. Reads the web for a homepage and a plain
-        summary; fills blank fields only.
-      </p>
 
       {proposal && (
         // Same well as the Wikidata proposal above, for the same reason: this

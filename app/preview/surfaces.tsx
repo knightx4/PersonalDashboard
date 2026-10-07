@@ -54,6 +54,11 @@ import type { ReviewRow, SearchableRole } from '@/lib/jobs/review/load';
 import { PipelinePage } from '@/components/jobs/pipeline/pipeline-page';
 import { RoundsTable, type RoundView } from '@/app/jobs/(app)/interviews/rounds-table';
 import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
+import { TodayPage } from '@/app/jobs/(app)/_home/today-page';
+import { summariseSearch } from '@/lib/jobs/home/summary';
+import type { SinceView } from '@/lib/jobs/home/since-load';
+import { liveByMove } from '@/lib/jobs/today/live';
+import type { ReviewPeek } from '@/lib/jobs/today/review-peek';
 import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
 import type { Interaction } from '@/lib/preview/interaction';
@@ -1027,6 +1032,76 @@ const todayBoard: TodayBoard = {
       followUpHref: null,
     },
   ],
+  debriefs: [],
+};
+
+/**
+ * Today with something in every section (plan #1591): five imports waiting,
+ * the week above with a round owing a debrief, the live applications split
+ * by whose move it is, and two changes since the last visit. Marshall Wace
+ * and D. E. Shaw have interviews booked, so the move is yours; Monzo's mail
+ * asked a question, which makes it yours too.
+ */
+const todayPageNow = new Date('2026-09-09T12:00:00.000Z');
+const todayPageRows: PipelineRow[] = pipelineRows.map((row) =>
+  row.applicationId === 'p1' || row.applicationId === 'p2'
+    ? { ...row, lastTurnEvent: 'interview_scheduled' }
+    : row,
+);
+const todayPageBoard: TodayBoard = {
+  ...todayBoard,
+  debriefs: [
+    {
+      key: 'tg0',
+      leadId: 'ti0',
+      roleId: 'role-p2',
+      companyName: 'The D. E. Shaw group',
+      roleTitle: 'Software Developer',
+      scheduledAt: '2026-09-08T15:00:00.000Z',
+      timeKnown: true,
+    },
+  ],
+};
+const todayPageReview: ReviewPeek = {
+  count: 5,
+  items: [
+    {
+      id: 'rv1',
+      title: 'Your application to Senior Backend Engineer, Core Banking Platform has been received',
+      kind: 'Confirmation email',
+    },
+    { id: 'rv2', title: 'Wise · Software Engineer, Treasury', kind: 'New application from mail' },
+    { id: 'rv3', title: 'Quick chat this week?', kind: 'Recruiter outreach email' },
+  ],
+};
+const todayPageSince: SinceView = {
+  state: 'loaded',
+  hint: 'Since 8 Sept, 18:40',
+  stopped: [],
+  entries: [
+    {
+      id: 'ts1',
+      at: '2026-09-09T08:10:00.000Z',
+      source: 'email',
+      label: 'interview booked',
+      subject: 'The D. E. Shaw group · Software Developer',
+      tone: 'good',
+      detail: null,
+      roleId: 'role-p2',
+    },
+    {
+      id: 'ts2',
+      at: '2026-09-08T21:30:00.000Z',
+      source: 'email',
+      label: 'new role',
+      subject: 'Wise · Software Engineer, Treasury',
+      tone: 'info',
+      detail: null,
+      roleId: 'role-p5',
+    },
+  ],
+  more: 3,
+  error: null,
 };
 
 /** Two upcoming rounds and three past ones, one of them still owing a debrief. */
@@ -2208,16 +2283,13 @@ const savedStories: SavedViewProps = {
 
 /** The job search's ten sections, as its layout lists them. */
 const shellSections: NavSection[] = [
-  { href: '/jobs', label: 'Home', icon: 'jobsHome', exact: true },
+  { href: '/jobs', label: 'Today', icon: 'jobsHome', exact: true },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
   { href: '/jobs/find', label: 'Find', icon: 'find' },
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
   { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
-  { href: '/jobs/interviews', label: 'Interviews', icon: 'interviews' },
   { href: '/jobs/answers', label: 'Answers', icon: 'answers' },
   { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
-  { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
-  { href: '/jobs/review', label: 'Review', icon: 'review', badge: 4 },
 ];
 
 /**
@@ -3214,7 +3286,14 @@ export const SURFACES: readonly Surface[] = [
     label: 'Company · Research, contacts and sends',
     module: 'jobs',
     width: 'wide',
-    render: () => <CompanyPanels {...companyPanels} />,
+    // With the search's estimate, as the jobs layout provides it (law 16).
+    render: () => (
+      <PaidCostsProvider
+        costs={{ 'app/jobs/(app)/companies/actions.ts#proposeAiCompanyEnrichment': guessedSummary }}
+      >
+        <CompanyPanels {...companyPanels} />
+      </PaidCostsProvider>
+    ),
   },
   {
     /* People with its add form open (note 4323ee10). */
@@ -3223,7 +3302,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     // With the search's estimate, as the jobs layout provides it, so the $
-    // beside Search with AI is drawn (law 16).
+    // beside "Fill blanks from the web" is drawn (law 16).
     render: () => (
       <PaidCostsProvider
         costs={{ 'app/jobs/(app)/companies/actions.ts#proposeAiCompanyEnrichment': guessedSummary }}
@@ -3334,11 +3413,42 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PipelinePage rows={pipelineRows} params={{ view: 'table' }} />,
   },
   {
-    id: 'jobs-today',
-    label: 'This week',
+    /* The table as a number on Today opens it (plan #1591): narrowed to one
+     * stage, with the filter shown as a chip that takes it off. */
+    id: 'jobs-pipeline-filtered',
+    label: 'Pipeline · Opened from Today',
     module: 'jobs',
     width: 'wide',
-    render: () => <TodayLists board={todayBoard} timezone="Europe/London" />,
+    render: () => (
+      <PipelinePage rows={pipelineRows} params={{ view: 'table', stage: 'submitted' }} />
+    ),
+  },
+  {
+    /* Today, where Jobs opens (plan #1591): the review strip, This week, the
+     * live applications by whose move it is, and what came in since. */
+    id: 'jobs-today',
+    label: 'Today',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <TodayPage
+        review={todayPageReview}
+        board={todayPageBoard}
+        summary={summariseSearch(
+          todayPageRows,
+          todayPageBoard.interviews.map((interview) => ({
+            id: interview.id,
+            scheduledAt: interview.scheduledAt,
+            timeKnown: interview.timeKnown,
+            groupId: interview.groupId,
+          })),
+          todayPageNow,
+        )}
+        live={liveByMove(todayPageRows, new Set(['p3']))}
+        since={todayPageSince}
+        timezone="Europe/London"
+      />
+    ),
   },
   {
     /* Analytics: how far each channel's applications got (plan #1595). */

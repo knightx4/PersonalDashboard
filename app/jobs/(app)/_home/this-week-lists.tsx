@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CalendarClock, Clock, MailQuestion, PenLine, Video } from 'lucide-react';
+import { CalendarClock, Clock, MailQuestion, NotebookPen, PenLine, Video } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { formatDateTime, formatInterviewWhen } from '@/lib/jobs/applications/load';
@@ -13,7 +13,8 @@ import { WaitingActions } from './waiting-actions';
  * The week itself, lifted out of the section so it can be photographed.
  *
  * ThisWeekSection takes the board and decides whether the week is clear; this
- * is the three lists. Each list's heading is an h3, under the section's h2.
+ * is the four lists: interviews coming up, rounds owing a debrief (the
+ * Interviews tab's banner until plan #1591), mail waiting on you and nudges. Each list's heading is an h3, under the section's h2.
  * The preview gallery cannot import a page whose first line asks for a
  * signed-in user.
  */
@@ -109,6 +110,29 @@ export function TodayLists({ board, timezone }: { board: TodayBoard; timezone: s
                 </li>
               );
             })}
+          </ul>
+        </Section>
+      )}
+
+      {board.debriefs.length > 0 && (
+        // Straight to the round that needs writing up, which is the only
+        // reason this list exists.
+        <Section icon={NotebookPen} title="Write these up tonight">
+          <ul className="divide-y divide-border">
+            {board.debriefs.map((round) => (
+              <li key={round.key} className="row-pad relative flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="tabular w-full text-small text-ink-muted sm:w-44">
+                  {formatInterviewWhen(round.scheduledAt, round.timeKnown, timezone)}
+                </span>
+                <Link
+                  href={`/jobs/roles/${round.roleId}?tab=interviews&interview=${round.leadId}`}
+                  className="press-area text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
+                >
+                  <span className="absolute inset-0" aria-hidden />
+                  {round.companyName} · {round.roleTitle}
+                </Link>
+              </li>
+            ))}
           </ul>
         </Section>
       )}
