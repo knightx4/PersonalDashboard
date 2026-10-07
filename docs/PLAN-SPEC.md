@@ -1,5 +1,18 @@
 # The plan
 
+`/dev/plan` is the source of truth for what gets built next. It holds the
+features that were decided on, the steps that get you to each, and the steps
+beneath those — to any depth — with each step's status, priority, size, who
+is on it, what it waits on, and what "done" means for it. A person works it
+on the page; a Claude session works it through `scripts/plan.ts` and
+`.claude/skills/plan`; both read and write the same rows, so neither can be
+out of date with the other.
+
+It is not an issue tracker. There is one account, one repository and two
+builders, and everything Linear or Jira has that exists to coordinate more
+people than that is left out. What is kept is the part that changes what gets
+picked up next.
+
 ## Levels
 
 Everything the person reads in Dev names the four levels the same way:
@@ -17,19 +30,6 @@ Everything the person reads in Dev names the four levels the same way:
 and the `/dev/projects` route keep their names; only the words on screen
 follow this list. The rest of this document says "step" for a row at any
 level where the level does not matter.
-
-`/dev/plan` is the source of truth for what gets built next. It holds the
-features that were decided on, the steps that get you to each, and the steps
-beneath those — to any depth — with each step's status, priority, size, who
-is on it, what it waits on, and what "done" means for it. A person works it
-on the page; a Claude session works it through `scripts/plan.ts` and
-`.claude/skills/plan`; both read and write the same rows, so neither can be
-out of date with the other.
-
-It is not an issue tracker. There is one account, one repository and two
-builders, and everything Linear or Jira has that exists to coordinate more
-people than that is left out. What is kept is the part that changes what gets
-picked up next.
 
 ## Where it came from
 
