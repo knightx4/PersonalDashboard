@@ -13,6 +13,7 @@ import { UiStandard } from '@/app/dev/ui/standard';
 import { CorrectionsChart } from '@/app/dev/ui/corrections';
 import type { CorrectionWeek } from '@/lib/plan/correction-share';
 import { ANATOMIES } from '@/app/dev/ui/anatomy';
+import { PATTERNS } from '@/app/dev/ui/patterns';
 import { TravelDemo } from '@/app/dev/ui/travel-demo';
 import { SettleDemo } from '@/app/dev/ui/settle-demo';
 import { ClearDemo } from '@/app/dev/ui/clear-demo';
@@ -4231,4 +4232,18 @@ export const SURFACES: readonly Surface[] = [
     width: 'page' as const,
     render: anatomy.render,
   })),
+
+  /* The page patterns (plan #1545), framed by the patterns section on
+   * /dev/ui. Registered from the same list for the same reason as the
+   * anatomies: a pattern on /dev/ui cannot be without its picture. */
+  ...PATTERNS.flatMap((pattern) =>
+    pattern.surfaces.map((surface) => ({
+      id: surface.id,
+      label: `Pattern · ${pattern.label} · ${surface.label}`,
+      module: 'dev' as const,
+      width: 'page' as const,
+      render: surface.render,
+      ...(surface.deck ? { deck: surface.deck } : {}),
+    })),
+  ),
 ];

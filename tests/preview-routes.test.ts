@@ -29,6 +29,12 @@ function idsIn(file: string, after: string): string[] {
 const GALLERY = [
   ...idsIn('app/preview/surfaces.tsx', 'export const SURFACES'),
   ...idsIn('app/dev/ui/anatomy.tsx', 'export const ANATOMIES'),
+  // The page patterns' surfaces, one per line inside each pattern's list.
+  ...[
+    ...readFileSync(join(root, 'app/dev/ui/patterns.tsx'), 'utf8').matchAll(
+      /\bid: '(pattern-[\w-]+)'/g,
+    ),
+  ].map((m) => m[1]),
 ];
 
 function pages(dir: string, out: string[] = []): string[] {
