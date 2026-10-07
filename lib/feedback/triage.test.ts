@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { JevChoiceAnswer, JevResult } from '@/lib/jev/wire';
 import {
+  BUSY_PAGE_OPENS_30,
   NO_MATCH,
+  TRIAGE_PRIORITY_OPTIONS,
+  noteColumns,
+  storedPriority,
   TRIAGE_MODULE_OPTIONS,
   duplicateQuestion,
   matchHref,
@@ -175,5 +179,39 @@ describe('the options', () => {
   it('link a match to where it lives', () => {
     expect(matchHref({ table: 'ideas', id: 'a', line: '' })).toBe('/dev/ideas#idea-a');
     expect(matchHref({ table: 'feedback_items', id: 'b', line: '' })).toBe('/dev/bugs#note-b');
+  });
+});
+
+describe('a Someday note on a busy page (plan #1643)', () => {
+  const someday = readTriage({ priority: choice('someday', 0.9), kind: choice('feature', 0.9) }, new Map());
+
+  it('is stored as Normal on a page opened 10 or more times in 30 days', () => {
+    expect(BUSY_PAGE_OPENS_30).toBe(10);
+    expect(noteColumns(someday, 10)).toEqual({ priority: 2, kind: 'feature' });
+    expect(noteColumns(someday, 42).priority).toBe(2);
+    // Jev's own answer stays in triage as it was given.
+    expect(someday.priority?.value).toBe(3);
+  });
+
+  it('stays Someday on a rarely opened page, or one whose opens are unknown', () => {
+    expect(noteColumns(someday, 9)).toEqual({ priority: 3, kind: 'feature' });
+    expect(noteColumns(someday, 0).priority).toBe(3);
+    expect(noteColumns(someday, null).priority).toBe(3);
+  });
+
+  it('leaves Next and Normal as Jev gave them, busy page or not', () => {
+    expect(storedPriority(1, 50)).toBe(1);
+    expect(storedPriority(2, 50)).toBe(2);
+    expect(storedPriority(2, 0)).toBe(2);
+  });
+
+  it('sets no priority from an unsure answer', () => {
+    const unsure = readTriage({ priority: choice('someday', 0.5) }, new Map());
+    expect(noteColumns(unsure, 50)).toEqual({});
+  });
+
+  it('no longer files polish under Someday by name', () => {
+    expect(TRIAGE_PRIORITY_OPTIONS.someday).not.toMatch(/polish/i);
+    expect(TRIAGE_PRIORITY_OPTIONS.normal).toMatch(/used often/);
   });
 });
