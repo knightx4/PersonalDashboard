@@ -22,8 +22,17 @@ describe('the role page tab in the address', () => {
     expect(roleTabFrom(undefined)).toBeUndefined();
   });
 
-  it('opens on the timeline until a stage says otherwise', () => {
+  it('opens each stage on what it needs (plan #1594)', () => {
+    expect(defaultRoleTab('lead')).toBe('posting');
+    expect(defaultRoleTab('drafting')).toBe('answers');
     expect(defaultRoleTab('submitted')).toBe('timeline');
+    expect(defaultRoleTab('acknowledged')).toBe('timeline');
+    expect(defaultRoleTab('in_process')).toBe('interviews');
+    expect(defaultRoleTab('final_round')).toBe('interviews');
+    expect(defaultRoleTab('offer')).toBe('interviews');
+    for (const closed of ['rejected', 'withdrawn', 'ghosted', 'role_closed'] as const) {
+      expect(defaultRoleTab(closed)).toBe('timeline');
+    }
   });
 
   it('writes the tab and keeps the other parameters', () => {

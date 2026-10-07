@@ -7,9 +7,8 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { EditableProse } from '@/components/ui/editable-prose';
-import { FoldingMarkdown } from '@/components/ui/folding-markdown';
-import { Textarea, Input, Label, Select } from '@/components/ui/field';
-import { formatDate, formatInterviewWhen } from '@/lib/jobs/applications/load';
+import { Input, Label, Select } from '@/components/ui/field';
+import { formatInterviewWhen } from '@/lib/jobs/applications/load';
 import { RoundPrep } from './prep-note';
 import {
   addInterviewer,
@@ -19,7 +18,6 @@ import {
   saveInterview,
   ungroupInterview,
 } from './interview-actions';
-import { addNote } from './actions';
 import {
   INTERVIEW_KIND_LABEL,
   INTERVIEW_KINDS,
@@ -34,8 +32,17 @@ export function InterviewCard({
   companyContacts,
   focused = false,
   grouped = false,
+  closed = false,
+  carriesRoundPrep = false,
 }: {
+  /**
+   * The only conversation in its round, so the round's prep note from Dash is
+   * shown in this card's Prep rather than above it.
+   */
+  carriesRoundPrep?: boolean;
   focused?: boolean;
+  /** The application has closed: Dash's prep is shown if written, never offered. */
+  closed?: boolean;
   /** Rendered inside a group card, which supplies the surround. */
   grouped?: boolean;
   interview: PanelProps['interviews'][number];
@@ -51,19 +58,22 @@ export function InterviewCard({
   /**
    * A round starts with no notes on it, because that is the truth.
    *
-   * Two empty boxes headed Prep and Interview notes were shown on every round
-   * whether or not anything had been written in either, so a card with nothing
-   * to say still took the space of one with plenty and the section read as
-   * filled in. A note appears when it exists or when you ask for it.
+   * Two fields, Prep and Notes (plan #1594). There were three -- Prep,
+   * Interview and Custom, the last a list of loose notes -- and the custom
+   * notes were folded into Notes so nothing written was lost. Each appears
+   * when it has something in it or when you ask for it.
    */
   const [showPrep, setShowPrep] = useState(interview.prepNotes.trim() !== '');
-  const [showDebrief, setShowDebrief] = useState(interview.notes.trim() !== '');
-  /** The custom note being written, or null when none is. */
-  const [draft, setDraft] = useState<string | null>(null);
-  const [draftError, setDraftError] = useState<string | null>(null);
+  const [showNotes, setShowNotes] = useState(interview.notes.trim() !== '');
+
+  // Dash's prep note lives inside Prep. In a round of several conversations
+  // the round card carries it instead, so a superday reads one note about the
+  // day rather than four. On a closed application it is shown if it was
+  // written and not offered.
+  const dashPrep = (!grouped || carriesRoundPrep) && (interview.prepNote !== null || !closed);
+  const prepOpen = showPrep || dashPrep;
 
   const needsDebrief = interview.debriefDue && !notes;
-  const empty = !showPrep && !showDebrief && draft === null && interview.customNotes.length === 0;
 
   // Arriving from This week's "click the interview, land on its prep" link:
   // the tab is already switched to Interviews, so what is left is finding
@@ -120,28 +130,13 @@ export function InterviewCard({
 
       <Interviewers interview={interview} companyContacts={companyContacts} />
 
-      {/* A round of one conversation carries its own note. Inside a group the
-          round card holds it instead, so a superday reads one note about the
-          day rather than four about its quarters. */}
-      {!grouped && (
-        <RoundPrep
-          interviewId={interview.id}
-          state={{
-            note: interview.prepNote,
-            generatedAt: interview.prepNoteAt,
-            stale: interview.prepNoteStale,
-          }}
-          timezone={timezone}
-        />
-      )}
-
       {needsDebrief && (
         <p className="mt-2 rounded bg-caution-tint px-2 py-1.5 text-small text-ink">
           Write the debrief tonight. One written three days later is worth very little.{' '}
-          {!showDebrief && (
+          {!showNotes && (
             <button
               type="button"
-              onClick={() => setShowDebrief(true)}
+              onClick={() => setShowNotes(true)}
               className="font-medium underline underline-offset-2"
             >
               Start it
@@ -150,34 +145,29 @@ export function InterviewCard({
         </p>
       )}
 
-      {/* One notes section per round, holding whatever has actually been
-          written: the prep, the debrief, and any number of loose notes.
-
-          The heading is only drawn over something (law 1). "Notes" above the
-          words "Nothing written for this round yet" was a heading and a
-          sentence restating it, on the rounds that had least to say -- which is
-          most of them. With nothing written, the buttons below are the whole
-          of it, and they say what they make. */}
-      <div className="mt-3">
-        {!empty && (
-          <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-            Notes
-          </h4>
-        )}
-
-        {!empty && (
-          <div className="mt-1 space-y-3">
-            {/* Read as writing, edited in place (laws 12 and 14). These were
-                two permanently open textareas holding their own values, with a
-                Save button under the pair -- so a round you had written up
-                showed you an editor rather than the write-up, and four rounds
-                on a superday were eight boxes. `EditableProse` is the shape the
-                rest of the app already uses for a paragraph, and it saves
-                itself, which is what retires the Save button below. */}
-            {showPrep && (
-              <CollapsibleField label="Prep" defaultOpen>
+      {/* Prep and Notes, each a field on the round, read as writing and
+          edited in place (laws 12 and 14). Dash's prep sits inside Prep, above
+          your own, since both are what you go in knowing. */}
+      <div className="mt-3 space-y-3">
+        {prepOpen && (
+          <CollapsibleField label="Prep" defaultOpen>
+            <div className="space-y-3">
+              {dashPrep && (
+                <RoundPrep
+                  interviewId={interview.id}
+                  state={{
+                    note: interview.prepNote,
+                    generatedAt: interview.prepNoteAt,
+                    stale: interview.prepNoteStale,
+                  }}
+                  timezone={timezone}
+                  heading="From Dash"
+                  flush
+                />
+              )}
+              {showPrep ? (
                 <EditableProse
-                  label="Prep for this round"
+                  label="Your prep for this round"
                   markdown
                   expandable
                   value={prep}
@@ -190,93 +180,39 @@ export function InterviewCard({
                     setPrep(next);
                   }}
                 />
-              </CollapsibleField>
-            )}
-            {showDebrief && (
-              <CollapsibleField label="Interview notes" defaultOpen>
-                <EditableProse
-                  label="Notes on this interview"
-                  markdown
-                  expandable
-                  value={notes}
-                  startEditing={notes.trim() === ''}
-                  placeholder="How it went, who was in it, what they pressed on."
-                  empty="No debrief written."
-                  onSave={async (next) => {
-                    const result = await saveInterview(interview.id, { notes: next });
-                    if (result.error) return result.error;
-                    setNotes(next);
-                  }}
-                />
-              </CollapsibleField>
-            )}
-            {interview.customNotes.map((note) => (
-              <article key={note.id} className="rounded-lg bg-sunken px-3 py-2">
-                <FoldingMarkdown markdown={note.body} className="text-ui text-ink" />
-                <p className="tabular mt-1 text-small text-ink-muted">
-                  {formatDate(note.createdAt, timezone)}
-                </p>
-              </article>
-            ))}
-            {draft !== null && (
-              <div>
-                {/* ui-ok: composer-always-open -- shown only after "+ Custom" is pressed (draft starts null). */}
-                <Textarea
-                  rows={3}
-                  value={draft}
-                  autoFocus
-                  onChange={(event) => setDraft(event.target.value)}
-                  placeholder="Anything worth remembering about this round."
-                />
-                <div className="mt-1.5 flex items-center gap-3">
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={pending || !draft.trim()}
-                    onClick={() =>
-                      startTransition(async () => {
-                        const result = await addNote({
-                          interviewId: interview.id,
-                          body: draft,
-                        });
-                        setDraftError(result.error);
-                        if (!result.error) setDraft(null);
-                      })
-                    }
-                  >
-                    Add note
-                  </Button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDraft(null);
-                      setDraftError(null);
-                    }}
-                    className="text-small text-ink-muted hover:text-ink"
-                  >
-                    Cancel
-                  </button>
-                  {draftError && <span className="text-small text-danger">{draftError}</span>}
-                </div>
-              </div>
-            )}
-          </div>
+              ) : (
+                <NoteKindButton label="Your own prep" onClick={() => setShowPrep(true)} />
+              )}
+            </div>
+          </CollapsibleField>
+        )}
+        {showNotes && (
+          <CollapsibleField label="Notes" defaultOpen>
+            <EditableProse
+              label="Notes on this interview"
+              markdown
+              expandable
+              value={notes}
+              startEditing={notes.trim() === ''}
+              placeholder="How it went, who was in it, what they pressed on."
+              empty="Nothing written yet."
+              onSave={async (next) => {
+                const result = await saveInterview(interview.id, { notes: next });
+                if (result.error) return result.error;
+                setNotes(next);
+              }}
+            />
+          </CollapsibleField>
         )}
 
-        {/* Prep and the debrief are one each -- they are fields on the round,
-            not a list -- so each offers itself only while it is not already
-            there. A custom note has no such limit. */}
-        {/* No caption over them. "Create note" above three triggers reading
-            Prep, Interview and Custom is the heading explained underneath
-            itself (law 15) -- it is read once and skipped forever, and the
-            triggers already say what they make. */}
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-          {!showPrep && <NoteKindButton label="Prep" onClick={() => setShowPrep(true)} />}
-          {!showDebrief && (
-            <NoteKindButton label="Interview" onClick={() => setShowDebrief(true)} />
-          )}
-          {draft === null && <NoteKindButton label="Custom" onClick={() => setDraft('')} />}
-        </div>
+        {/* Each field offers itself only while it is not already there. No
+            caption over the offers: they say what they make (law 15). */}
+        {(!prepOpen || !showNotes) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {!prepOpen && <NoteKindButton label="Prep" onClick={() => setShowPrep(true)} />}
+            {!showNotes && <NoteKindButton label="Notes" onClick={() => setShowNotes(true)} />}
+          </div>
+        )}
       </div>
 
       {interview.questionsAsked.length > 0 && (
@@ -296,10 +232,7 @@ export function InterviewCard({
           links broke mid-phrase instead: "Move it to its own / round" and "Not
           a real round — remove / it", each centred over two lines. A row that
           wraps puts each of them on a line whole. */}
-      {/* No Save button. Every note on this round now saves itself -- the prep
-          and the debrief through their own editors, a custom note when it is
-          added -- so the one at the bottom of the card was a button for a form
-          that is no longer here. */}
+      {/* No Save button: the prep and the notes each save themselves. */}
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
         {grouped && (
           <button

@@ -1,4 +1,10 @@
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
+import type { RoleReminder } from '@/app/jobs/(app)/roles/[id]/types';
+import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
+import type { Task } from '@/lib/todo/tasks/model';
+import { ClosedSummary } from '@/app/jobs/(app)/roles/[id]/closed-summary';
+import { defaultRoleTab } from '@/app/jobs/(app)/roles/[id]/tabs';
+import { closedSummary } from '@/lib/jobs/role-stage';
 import { ExcitementPicker } from '@/app/jobs/(app)/roles/[id]/excitement-picker';
 import { Property } from '@/components/shell/detail-layout';
 import { ChannelPicker } from '@/app/jobs/(app)/roles/[id]/channel-picker';
@@ -239,9 +245,44 @@ export type Surface = {
  * empty surface hides every density problem, and a maximal one hides which
  * problems are real.
  */
+/**
+ * The role's one to-do list (plan #1594): a task from Todo with a long title
+ * and a reminder from the job module linked to its email, drawn together.
+ */
+const roleTasks: Task[] = [
+  {
+    id: 'task-1',
+    title: 'Send Dana the paper on columnar storage she asked about in the screen',
+    body: null,
+    status: 'open',
+    dueOn: '2026-09-16',
+    dueAt: null,
+    pinned: false,
+    snoozedUntil: null,
+    completedAt: null,
+    createdAt: '2026-09-15T16:00:00.000Z',
+    position: null,
+    parentId: null,
+  },
+];
+
+const roleReminderFixtures: RoleReminder[] = [
+  {
+    id: 't1',
+    body: 'Record a video interview',
+    dueAt: '2026-09-12T00:00:00.000Z',
+    message: {
+      id: 'm1',
+      subject: 'Next steps with the D. E. Shaw group',
+      gmailHref: 'https://mail.google.com/mail/u/0/#inbox/1',
+    },
+  },
+];
+
 const rolePanels: PanelProps = {
   roleId: 'role-1',
   applicationId: 'app-1',
+  status: 'in_process',
   jdText:
     'We are looking for a quantitative developer to work alongside our systematic trading teams. You will build and maintain the research tooling that turns an idea into a backtest and a backtest into a live strategy.',
   jdLookupNote: null,
@@ -302,9 +343,9 @@ const rolePanels: PanelProps = {
       debriefDue: false,
       format: 'video',
       status: 'scheduled',
-      prepNotes: '',
-      notes: '',
-      customNotes: [],
+      prepNotes: 'Ask how the research tooling team splits work with the strategy desks.',
+      notes:
+        'Forty minutes, mostly on the market data pipeline. Dana pressed on how I would backfill a day of bad ticks.\n\nFollow up with the paper on columnar storage she mentioned.',
       groupId: 'g1',
       questionsAsked: [],
       prepNote: null,
@@ -345,14 +386,6 @@ const rolePanels: PanelProps = {
   companyName: 'The D. E. Shaw group',
   matchCandidates: [],
   otherAttempts: [],
-  todos: [
-    {
-      id: 't1',
-      body: 'Record a video interview',
-      dueAt: '2026-09-12T00:00:00.000Z',
-      message: null,
-    },
-  ],
   messages: [
     {
       id: 'm1',
@@ -2521,21 +2554,57 @@ export const SURFACES: readonly Surface[] = [
     label: 'Role · Timeline and to-dos',
     module: 'jobs',
     width: 'wide',
-    render: () => <RoleDetailPanels {...rolePanels} defaultTab="timeline" />,
+    // A closed application, which opens on its timeline under the line saying
+    // how far it got, with the role's one to-do list above the tabs.
+    render: () => (
+      <div className="space-y-6">
+        <ClosedSummary
+          text={closedSummary({
+            status: 'rejected',
+            reached: 'in_process',
+            everSubmitted: true,
+            closedOn: '8 Sept 2026',
+            interviewCount: 1,
+          })}
+        />
+        <RoleTodos
+          roleId="role-1"
+          tasks={roleTasks}
+          reminders={roleReminderFixtures}
+          messages={rolePanels.messages}
+          timezone="Europe/London"
+        />
+        <RoleDetailPanels
+          {...rolePanels}
+          status="rejected"
+          defaultTab={defaultRoleTab('rejected')}
+        />
+      </div>
+    ),
   },
   {
     id: 'jobs-role-posting',
     label: 'Role · Posting',
     module: 'jobs',
     width: 'wide',
-    render: () => <RoleDetailPanels {...rolePanels} defaultTab="posting" />,
+    // A lead, which opens on its posting.
+    render: () => (
+      <RoleDetailPanels {...rolePanels} status="lead" defaultTab={defaultRoleTab('lead')} />
+    ),
   },
   {
     id: 'jobs-role-answers',
     label: 'Role · Answers',
     module: 'jobs',
     width: 'wide',
-    render: () => <RoleDetailPanels {...rolePanels} defaultTab="answers" />,
+    // An application being written, which opens on its questions.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
   },
   {
     id: 'jobs-role-interviews',
@@ -2579,7 +2648,7 @@ export const SURFACES: readonly Surface[] = [
             <Property label="Comp band" value="$180k–$220k" />
             <Property label="Outcome" value="—" />
           </dl>
-        <RoleDetailPanels {...rolePanels} defaultTab="interviews" />
+        <RoleDetailPanels {...rolePanels} defaultTab={defaultRoleTab('in_process')} />
       </div>
     ),
   },

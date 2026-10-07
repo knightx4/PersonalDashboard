@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ExternalLink, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { AddTrigger } from '@/components/ui/add-trigger';
+import { Disclosure } from '@/components/ui/disclosure';
 import { GmailAnchor } from '@/components/ui/gmail-anchor';
 
 /**
@@ -29,13 +30,25 @@ export interface InterviewSeed {
  * take you. Handing the rest off to Gmail is the whole point -- the note asked
  * for an actual link, in both places an email is named.
  */
-export function GmailLink({ href, children }: { href: string; children: React.ReactNode }) {
+export function GmailLink({
+  href,
+  children,
+  className,
+}: {
+  href: string;
+  children: React.ReactNode;
+  /** `press-area` for a link that stands on its own line rather than in a sentence. */
+  className?: string;
+}) {
   return (
     <GmailAnchor
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-baseline gap-1 underline decoration-border underline-offset-2 transition-colors duration-quick hover:text-accent hover:decoration-accent"
+      className={cn(
+        'inline-flex items-baseline gap-1 underline decoration-border underline-offset-2 transition-colors duration-quick hover:text-accent hover:decoration-accent',
+        className,
+      )}
     >
       <span>{children}</span>
       <ExternalLink
@@ -138,5 +151,18 @@ export function CollapsibleField({
       </button>
       {open && <div className="mt-1">{children}</div>}
     </div>
+  );
+}
+
+/**
+ * Controls a closed application rarely needs, folded under one line rather
+ * than taken away (plan #1594). A round that turns up after the rejection
+ * still has somewhere to go.
+ */
+export function ClosedFold({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <Disclosure title={label} bodyClassName="mt-2 space-y-3">
+      {children}
+    </Disclosure>
   );
 }
