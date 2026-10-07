@@ -293,6 +293,8 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
   areas: [
     { id: 'a-money', name: 'Money' },
     { id: 'a-career', name: 'Career' },
+    { id: 'a-health', name: 'Health' },
+    { id: 'a-city', name: 'The city and the people in it' },
   ],
   working: [
     {

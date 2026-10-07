@@ -82,6 +82,8 @@ export const MODELS = {
   learnNameMaterial: HAIKU,
   /** lib/learn/feed/write-card.ts */
   learnWriteCard: SONNET,
+  /** lib/learn/feed/clip-note.ts; two sentences about a lecture clip, hourly */
+  learnClipNote: HAIKU,
   /** lib/learn/graph/applied.ts */
   learnApplied: HAIKU,
   /** lib/learn/graph/curriculum.ts */
