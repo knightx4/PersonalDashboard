@@ -5,7 +5,7 @@ import { useLayoutEffect, useRef, useState, useTransition } from 'react';
 import { AlertTriangle, Ban, GripVertical, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
-import { Card, cardVariants } from '@/components/ui/card';
+import { cardVariants } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
@@ -97,18 +97,17 @@ const COLUMNS: Array<{ statuses: ApplicationStatus[]; setStatus: ApplicationStat
 /** How long a live pursuit can go quiet before the card starts saying so. */
 export const STALE_DAYS = 14;
 
-/** Closed pursuits live in one shared column so the live board stays readable. */
-const CLOSED: readonly ApplicationStatus[] = ['rejected', 'withdrawn', 'ghosted', 'role_closed'];
-
-export type PipelineView = 'board' | 'list';
-
+/**
+ * The board is the live applications only (plan #1590). A closed one has no
+ * column: the page leaves it out, and a card rejected here fades and goes.
+ * The closed applications are a status filter on the table, a page at a time,
+ * where they used to be a fold under the board drawing every one as a card.
+ */
 export function PipelineBoard({
   rows,
-  view = 'board',
   working = [],
 }: {
   rows: PipelineRow[];
-  view?: PipelineView;
   /** Refs an open Ask Dash hand-off is about (plan #1568); those cards read "Dash is on it". */
   working?: readonly string[];
 }) {
@@ -215,13 +214,10 @@ export function PipelineBoard({
     void move(row, status);
   }
 
-  const closedRows = shown.filter((row) => CLOSED.includes(row.status));
-
   // The kanban board is a horizontal scroll through one and a half columns
-  // on a phone, whatever view the user picked for desktop — so a phone
-  // always gets the stacked, collapsible layout, and the toggle only
-  // decides what sm-and-up sees.
-  const renderColumns = (mode: PipelineView) =>
+  // on a phone, so a phone gets the stacked, collapsible layout and sm and
+  // up gets the columns side by side.
+  const renderColumns = (mode: 'board' | 'list') =>
     COLUMNS.map((column) => {
       const columnRows = shown.filter((row) => column.statuses.includes(row.status));
 
@@ -327,51 +323,28 @@ export function PipelineBoard({
         * board says what is off to the right (law 2): every stage by name and
         * count on one line above it, each scrolling its column into view, and
         * the last visible column fading at the edge. */}
-      {view === 'board' && (
-        <nav aria-label="Stages" className="hidden flex-wrap items-baseline gap-x-4 gap-y-1 text-small sm:flex">
-          {COLUMNS.map((column) => (
-            <button
-              key={column.setStatus}
-              type="button"
-              onClick={() =>
-                boardRef.current
-                  ?.querySelector(`[data-stage="${column.setStatus}"]`)
-                  ?.scrollIntoView({ block: 'nearest', inline: 'start', behavior: 'smooth' })
-              }
-              className="text-ink-muted transition-colors duration-quick hover:text-accent"
-            >
-              {column.label}{' '}
-              <span className="tabular text-ink">
-                {shown.filter((row) => column.statuses.includes(row.status)).length}
-              </span>
-            </button>
-          ))}
-        </nav>
-      )}
-      <div
-        className={cn(
-          'hidden sm:flex',
-          view === 'board' ? 'scroll-fade-x gap-3 overflow-x-auto pb-2' : 'flex-col gap-2',
-        )}
-      >
-        {renderColumns(view)}
+      <nav aria-label="Stages" className="hidden flex-wrap items-baseline gap-x-4 gap-y-1 text-small sm:flex">
+        {COLUMNS.map((column) => (
+          <button
+            key={column.setStatus}
+            type="button"
+            onClick={() =>
+              boardRef.current
+                ?.querySelector(`[data-stage="${column.setStatus}"]`)
+                ?.scrollIntoView({ block: 'nearest', inline: 'start', behavior: 'smooth' })
+            }
+            className="text-ink-muted transition-colors duration-quick hover:text-accent"
+          >
+            {column.label}{' '}
+            <span className="tabular text-ink">
+              {shown.filter((row) => column.statuses.includes(row.status)).length}
+            </span>
+          </button>
+        ))}
+      </nav>
+      <div className="scroll-fade-x hidden gap-3 overflow-x-auto pb-2 sm:flex">
+        {renderColumns('board')}
       </div>
-
-      {/* The shared fold. It was a hand-rolled `<details>` with its own summary
-        * and no chevron, where every other fold in the app has one, and the
-        * count that makes opening it a choice rather than a check now sits on
-        * the closed line as the primitive's `meta`. Law 10. */}
-      {closedRows.length > 0 && (
-        <Card padding="dense">
-          <Disclosure remember="jobs.fold.pipeline.closed" title="Closed" meta={`${closedRows.length} pursuit${closedRows.length === 1 ? '' : 's'}`}>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {closedRows.map((row) => (
-                <PipelineCard key={row.applicationId} row={row} dragging={false} muted working={working} />
-              ))}
-            </div>
-          </Disclosure>
-        </Card>
-      )}
     </div>
   );
 }

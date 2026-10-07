@@ -253,7 +253,11 @@ export function shortAge(iso: string | null): string {
 export function formatCompBand(minCents: number | null, maxCents: number | null): string | null {
   if (minCents === null && maxCents === null) return null;
   const format = (cents: number): string => `$${Math.round(cents / 100_000)}k`;
-  if (minCents !== null && maxCents !== null) return `${format(minCents)}–${format(maxCents)}`;
+  if (minCents !== null && maxCents !== null) {
+    // One figure when both ends round to the same one: "$210k", not "$210k–$210k".
+    const [low, high] = [format(minCents), format(maxCents)];
+    return low === high ? low : `${low}–${high}`;
+  }
   return format((minCents ?? maxCents)!);
 }
 

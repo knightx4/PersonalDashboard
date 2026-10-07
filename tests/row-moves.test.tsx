@@ -125,7 +125,7 @@ const task: Task = {
 
 describe('moves on Jobs, Todo and Shopping rows', () => {
   it('says a sent application waits on the company, on its pipeline card', () => {
-    const html = renderToStaticMarkup(<PipelineBoard rows={[pursuit({})]} view="board" />);
+    const html = renderToStaticMarkup(<PipelineBoard rows={[pursuit({})]} />);
     expect(html).toContain('Waiting on EliseAI');
     expect(html).toContain('text-caution');
   });
@@ -159,12 +159,12 @@ describe('moves on Jobs, Todo and Shopping rows', () => {
   describe('while an Ask Dash hand-off about the row is open', () => {
     it('says Dash is on it on the pipeline card, by its application or its role', () => {
       for (const working of [['job_search.applications:a1'], ['job_search.roles:r1']]) {
-        const html = renderToStaticMarkup(<PipelineBoard rows={[pursuit({})]} view="board" working={working} />);
+        const html = renderToStaticMarkup(<PipelineBoard rows={[pursuit({})]} working={working} />);
         expect(html).toContain('Dash is on it');
         expect(html).not.toContain('Waiting on EliseAI');
       }
       const other = renderToStaticMarkup(
-        <PipelineBoard rows={[pursuit({})]} view="board" working={['job_search.applications:a2']} />,
+        <PipelineBoard rows={[pursuit({})]} working={['job_search.applications:a2']} />,
       );
       expect(other).toContain('Waiting on EliseAI');
     });
