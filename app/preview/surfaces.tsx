@@ -2273,7 +2273,17 @@ const deckCards: FeedCard[] = [
       },
     ],
     // A section of a lecture, so the bar under the player shows where it starts and ends (note 6c13bd61).
-    video: { videoId: 'ZK3O402wf1c', title: 'Price controls and the shortages they make', start: 724, end: 845 },
+    // "In this video" under it says what the stretch argues and why it is here (note cde86a10).
+    video: {
+      videoId: 'ZK3O402wf1c',
+      title: 'Price controls and the shortages they make',
+      start: 724,
+      end: 845,
+      note: {
+        said: 'A price ceiling below the market price leaves more people wanting the good than there is of it, and the gap is filled by queues and waiting lists.',
+        why: 'It walks through the same supply and demand diagram behind price controls, with rent control as its main example.',
+      },
+    },
   },
   {
     id: '00000000-0000-4000-8000-000000000001',
