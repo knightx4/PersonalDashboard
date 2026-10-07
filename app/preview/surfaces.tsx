@@ -73,6 +73,23 @@ import {
   LearnCoursesEmptyPreview,
   LearnCoursesListPreview,
 } from './learn-course-surfaces';
+import {
+  LearnConceptSurface,
+  LearnListsSurface,
+  LearnNewSurface,
+  LearnOpeningSurface,
+  LearnPieceSurface,
+  LearnProbeSurface,
+  LearnQuizNewSurface,
+  LearnQuizSurface,
+  LearnQuizTakeSurface,
+  LearnReadingSurface,
+  LearnVideoSurface,
+  LearnVideosSurface,
+  LearnYoutubeChannelSurface,
+  LearnYoutubePlaylistSurface,
+  LearnYoutubeVideoSurface,
+} from './learn-page-surfaces';
 import { SchoolCourses } from '@/app/vault/education/course-list';
 import { educationGroups, educationCounts } from './education-fixtures';
 import { ReadingCard } from '@/components/learn/reading-card';
@@ -4218,6 +4235,114 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevUsageSurface />,
+  },
+
+  /* The Learn pages that had no picture (plan #1602). Fixtures in
+   * learn-page-surfaces.tsx. */
+  {
+    id: 'learn-concept',
+    label: 'Idea · One idea, partly known',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnConceptSurface />,
+  },
+  {
+    id: 'learn-lists',
+    label: 'Reading lists · Topics and their branches',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnListsSurface />,
+  },
+  {
+    id: 'learn-new',
+    label: 'Reading lists · Start one',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnNewSurface />,
+  },
+  {
+    id: 'learn-opening',
+    label: 'Before you start · The opening questions, answered',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnOpeningSurface />,
+  },
+  {
+    id: 'learn-quiz',
+    label: 'Quiz · Part answered',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnQuizSurface />,
+  },
+  {
+    id: 'learn-quiz-take',
+    label: 'Quiz · Answering a question',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnQuizTakeSurface />,
+  },
+  {
+    id: 'learn-quiz-new',
+    label: 'Quiz · Start one',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnQuizNewSurface />,
+  },
+  {
+    id: 'learn-reading',
+    label: 'Reading · One reading, in progress',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnReadingSurface />,
+  },
+  {
+    id: 'learn-piece',
+    label: 'Plan · One piece, with its practice',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnPieceSurface />,
+  },
+  {
+    id: 'learn-probe',
+    label: 'Subject · Questions, before the first',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnProbeSurface />,
+  },
+  {
+    id: 'learn-videos',
+    label: 'Videos · Your list and the library',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnVideosSurface />,
+  },
+  {
+    id: 'learn-video',
+    label: 'Videos · One video on your list',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnVideoSurface />,
+  },
+  {
+    id: 'learn-youtube-channel',
+    label: 'YouTube library · One channel',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnYoutubeChannelSurface />,
+  },
+  {
+    id: 'learn-youtube-playlist',
+    label: 'YouTube library · One playlist',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnYoutubePlaylistSurface />,
+  },
+  {
+    id: 'learn-youtube-video',
+    label: 'YouTube library · One video and its transcript',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnYoutubeVideoSurface />,
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on

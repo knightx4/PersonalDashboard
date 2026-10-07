@@ -1,9 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
-import { PageHeader } from '@/components/shell/page-header';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadQuiz } from '@/lib/learn/quiz/load';
-import { nextQuestion, outstandingCount } from '@/lib/learn/quiz/model';
-import { QuestionForm } from './question-form';
+import { nextQuestion } from '@/lib/learn/quiz/model';
+import { TakeQuizView } from './take-view';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,31 +26,5 @@ export default async function TakeQuizPage({ params }: { params: Promise<{ id: s
   const current = nextQuestion(quiz);
   if (!current) redirect(`/learn/quiz/${quiz.id}`);
 
-  const total = quiz.questions.length;
-  const left = outstandingCount(quiz);
-
-  return (
-    <>
-      <PageHeader
-        title={quiz.title}
-        description={
-          quiz.preparingFor
-            ? `For ${quiz.preparingFor}. Answer in your own words — a phrase or a sentence is enough.`
-            : 'Answer in your own words — a phrase or a sentence is enough.'
-        }
-      />
-
-      <div className="max-w-2xl">
-        <QuestionForm
-          key={current.id}
-          quizId={quiz.id}
-          questionId={current.id}
-          question={current.question}
-          position={total - left + 1}
-          total={total}
-          left={left}
-        />
-      </div>
-    </>
-  );
+  return <TakeQuizView quiz={quiz} current={current} />;
 }

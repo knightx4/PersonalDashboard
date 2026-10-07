@@ -181,6 +181,21 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-spec': ['/dev/specs/[slug]'],
   'dev-ui-review': ['/dev/ui/review'],
   'dev-usage': ['/dev/usage'],
+  'learn-concept': ['/learn/c/[id]'],
+  'learn-lists': ['/learn/lists'],
+  'learn-new': ['/learn/new'],
+  'learn-opening': ['/learn/opening/[id]'],
+  'learn-quiz': ['/learn/quiz/[id]'],
+  'learn-quiz-take': ['/learn/quiz/[id]/take'],
+  'learn-quiz-new': ['/learn/quiz/new'],
+  'learn-reading': ['/learn/r/[id]'],
+  'learn-piece': ['/learn/s/[id]/p/[piece]'],
+  'learn-probe': ['/learn/s/[id]/probe'],
+  'learn-videos': ['/learn/videos'],
+  'learn-video': ['/learn/videos/[videoId]'],
+  'learn-youtube-channel': ['/learn/youtube/[slug]'],
+  'learn-youtube-playlist': ['/learn/youtube/p/[id]'],
+  'learn-youtube-video': ['/learn/youtube/v/[videoId]'],
 };
 
 /** A route split into its segments; `/` is no segments. */
