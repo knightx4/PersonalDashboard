@@ -233,6 +233,10 @@ a surface with no routes. A step that changes no surface skips this section.
    Without the two placeholders the preview pages answer 500. The shots are
    `.preview-shots/<id>--{phone,laptop}-{light,dark}.png`: 390 and 1280
    pixels, light and dark. Open them yourself before sending them on.
+   A phone page taller than the screen with a row fixed to its foot also
+   gets `<id>--phone-{light,dark}-end.png`, at the phone's own height and
+   scrolled to the end, since the full-page shot draws that row partway down
+   the content. Send those to the critic as well.
 
    A surface whose gallery entry declares an `interaction` is recorded too,
    with the same server running: `npm run record -- <id>` writes

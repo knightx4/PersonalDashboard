@@ -20,7 +20,12 @@ The session that sends you names, for one surface:
 - **after shots**: the paths of the new photographs, normally four:
   `.preview-shots/<id>--phone-light.png`, `--phone-dark.png`,
   `--laptop-light.png` and `--laptop-dark.png`. Phone is 390 pixels wide and
-  laptop is 1280.
+  laptop is 1280. A full-page phone shot stretches the screen to the page,
+  so a row fixed to the foot of the screen is drawn partway down the
+  content there. When the page has such a row, the builder also sends
+  `--phone-light-end.png` and `--phone-dark-end.png`: the phone at its own
+  844-pixel height, scrolled to the end. Judge where a fixed row sits from
+  those, and name a fault found in one by its phone shot.
 - **before shots**: the same four taken from main, in a separate folder. A new
   surface has none, and then you judge the after shots alone.
 - **round**: 1, 2 or 3.
