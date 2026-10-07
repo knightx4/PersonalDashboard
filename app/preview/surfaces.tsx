@@ -131,6 +131,7 @@ import {
   PlanOpenedSurface,
   PlanFeatureSurface,
   PlanFeatureStepsSurface,
+  PlanFeatureActivitySurface,
   PlanTreeSurface,
   ProjectPlanSurface,
 } from './plan-surfaces';
@@ -3015,6 +3016,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanFeatureSurface />,
+  },
+  {
+    /* The same page on its Activity tab (plan #1667): the feature's history
+     * by day, newest first, each entry linking to its row. */
+    id: 'dev-plan-feature-activity',
+    label: 'Plan · a feature’s activity',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanFeatureActivitySurface />,
   },
   {
     /* The same page on its Steps tab: the steps and substeps grouped by

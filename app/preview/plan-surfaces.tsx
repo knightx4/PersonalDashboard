@@ -596,7 +596,7 @@ const featureItems: PlanItem[] = [
     priority: 1,
     size: 'l',
     comment:
-      'Added by session cse_01V1aoCMYL7Ckkar3cKSLtFf on 2026-10-07.\n\nBlocked 2026-10-06: waiting on the level names.',
+      'Added by session cse_01V1aoCMYL7Ckkar3cKSLtFf on 2026-10-06.\n\nBlocked 2026-10-06: waiting on the level names.',
     thread: [
       {
         id: 't1',
@@ -631,6 +631,9 @@ const featureItems: PlanItem[] = [
     commitSha: '79074ffd',
     startedAt: '2026-10-07T08:00:00Z',
     completedAt: '2026-10-07T09:00:00Z',
+    createdAt: '2026-10-06T15:56:00Z',
+    comment:
+      'Added by session cse_01V1aoCMYL7Ckkar3cKSLtFf on 2026-10-06.\n\nDone 2026-10-07: Added the tabbed detail page pattern: breadcrumbs, a title, tabs that each have their own address, and a column of properties that becomes a grid of facts under the title on a phone.',
   }),
   item({
     id: 'feat-page',
@@ -639,6 +642,9 @@ const featureItems: PlanItem[] = [
     title: 'Open a feature on its own page with Overview',
     status: 'in_progress',
     size: 'm',
+    createdAt: '2026-10-06T15:56:00Z',
+    comment:
+      'Blocked 2026-10-06: Which pattern should the page use? Waiting on the answer to the layout question.\nUnblocked 2026-10-07: the answer came back as the tabbed detail pattern.',
   }),
   item({
     id: 'feat-page-gallery',
@@ -664,6 +670,10 @@ const featureItems: PlanItem[] = [
     blockKind: 'outside',
     blockAsk: 'Which goal page parts go to Overview and which to Activity?',
     size: 'm',
+    createdAt: '2026-10-06T15:56:00Z',
+    startedAt: '2026-10-07T10:30:00Z',
+    comment:
+      'Blocked 2026-10-07: Which goal page parts go to Overview and which to Activity?',
   }),
   item({
     id: 'feat-layout-tabs',
@@ -688,6 +698,9 @@ const featureItems: PlanItem[] = [
     title: 'Open the feature in a side sheet over the plan',
     status: 'dropped',
     size: 's',
+    createdAt: '2026-10-06T15:56:00Z',
+    completedAt: '2026-10-07T08:10:00Z',
+    comment: 'Dropped 2026-10-07: the page replaces it; a sheet over the plan would show the same thing in less room.',
   }),
   item({
     id: 'other',
@@ -697,6 +710,11 @@ const featureItems: PlanItem[] = [
     size: 's',
   }),
 ];
+
+/** Every fixture is created the day the feature was shaped, unless it says otherwise. */
+for (const fixture of featureItems) {
+  if (fixture.createdAt === '2026-09-01T09:00:00Z') fixture.createdAt = '2026-10-06T15:55:00Z';
+}
 
 const featureTree = buildPlanTree({
   items: featureItems,
@@ -721,7 +739,62 @@ const featureUpdates: PlanUpdate[] = [
     session: 'cse_01V1aoCMYL7Ckkar3cKSLtFf',
     createdAt: '2026-10-07T18:00:00Z',
   },
+  {
+    id: 'update-1',
+    featureId: 'feat',
+    health: 'on_track',
+    body: 'The levels have their names and the shared tabbed detail layout is built. The feature page is next.',
+    stepsDoneBefore: 0,
+    stepsDoneAfter: 1,
+    stepsTotal: 7,
+    session: 'cse_01V1aoCMYL7Ckkar3cKSLtFf',
+    createdAt: '2026-10-07T09:05:00Z',
+  },
 ];
+
+/**
+ * What the Activity tab reads beyond the plan (plan #1667): the block on the
+ * goal page step, two runs, one of which did not finish, and what Dash
+ * recorded doing: closing the layout step, which marks that entry as Dash's,
+ * and raising the feature's priority, which is listed on its own.
+ */
+const featureActivitySources = {
+  blockedAt: { 'feat-goal': '2026-10-07T11:40:00Z' },
+  runs: [
+    {
+      id: 'run-1',
+      stepId: 'feat-layout',
+      job: 'step' as const,
+      status: 'finished' as const,
+      error: null,
+      createdAt: '2026-10-07T07:58:00Z',
+    },
+    {
+      id: 'run-2',
+      stepId: 'feat-goal',
+      job: 'step' as const,
+      status: 'failed' as const,
+      error: 'The session ended without closing the step.',
+      createdAt: '2026-10-07T10:29:00Z',
+    },
+  ],
+  actions: [
+    {
+      id: 'act-1',
+      stepId: 'feat-layout',
+      kind: 'close_step',
+      summary: 'Dash closed step #3, "Build the shared tabbed detail layout".',
+      createdAt: '2026-10-07T09:00:02Z',
+    },
+    {
+      id: 'act-2',
+      stepId: 'feat',
+      kind: 'set_priority',
+      summary: 'Dash raised the priority of the feature page to high, since three steps wait on it.',
+      createdAt: '2026-10-07T12:15:00Z',
+    },
+  ],
+};
 
 function FeatureFixture() {
   if (!featureSection || !featureNode) return null;
@@ -734,6 +807,7 @@ function FeatureFixture() {
       canSend
       lastRuns={{}}
       updates={featureUpdates}
+      activity={featureActivitySources}
       commitChecks={{
         '79074ffd': {
           mergeSha: '79074ffd',
@@ -748,6 +822,16 @@ function FeatureFixture() {
 /** The feature page on its Overview tab. */
 export function PlanFeatureSurface() {
   return <FeatureFixture />;
+}
+
+/** The same page on its Activity tab: what happened, newest first (plan #1667). */
+export function PlanFeatureActivitySurface() {
+  return (
+    <>
+      <SetTab tab="activity" />
+      <FeatureFixture />
+    </>
+  );
 }
 
 /** The same page on its Steps tab: the feature's steps grouped by status. */

@@ -30,11 +30,12 @@ export function moduleAnchor(module: PlanScope | null): string {
 }
 
 /**
- * The tabs, in order. Overview is the plain address. Activity joins them
- * with plan #1667, between the two, once there is a history to show.
+ * The tabs, in order. Overview is the plain address. Activity (plan #1667)
+ * is the feature's history, newest first.
  */
 export const FEATURE_TABS: readonly Tab[] = [
   { id: 'overview', label: 'Overview' },
+  { id: 'activity', label: 'Activity' },
   { id: 'steps', label: 'Steps' },
 ];
 

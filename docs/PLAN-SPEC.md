@@ -784,12 +784,13 @@ editor also holds the *not yet specified* box; emptying it clears the column.
 
 A feature's title on the plan opens `/dev/plan/<number>`, a page in the
 tabbed detail pattern (plan #1664). The crumbs read Dev, Plan, the module and
-the feature. Under the title sit two tabs, *Overview* and *Steps*, and beside
+the feature. Under the title sit three tabs, *Overview*, *Activity* and
+*Steps*, and beside
 them the properties: status and priority as menus, health when it says more
 than the status, whose move it is, size, who holds it, the module and the
 dates. The Overview tab holds what the row's opened panel holds: the detail,
 done when, what it needs, the questions with their answer boxes, what it waits
-on, its history and the thread. The row's presses (Mine, Send, send what is
+on and the thread. The row's presses (Mine, Send, send what is
 beneath, re-shape, and the menu) sit above whichever tab is open, so anything
 done to a feature from its row can be done here. The Steps tab lists the
 feature's steps and substeps in status groups (plan #1665): blocked, in
@@ -815,6 +816,18 @@ The health is Dash's judgement of whether the feature will land, written
 with the update, and is separate from the health the row derives from its
 status. Sessions write updates with `plan.ts update`; the page only reads
 them.
+
+The Activity tab (plan #1667) is the feature's history, newest first under a
+heading per day: rows added, started, blocked, closed with their commit and
+close note, dropped, questions answered, comments on any row, runs sent at
+them and how each ended, Dash's updates, and anything else Dash recorded
+doing to them. Each entry links to the row it is about. Nothing is recorded
+for the tab: it reads each row's own dates, the dated lines in its comment
+(which keep the blocks and closes the dates have since forgotten), the
+threads, `plan_runs`, `plan_updates` and `core.dash_actions`. A Dash action
+that says the same as a dated entry marks that entry as Dash's rather than
+being listed twice. The first forty entries show, and the rest behind a
+press.
 
 ## The changelog
 

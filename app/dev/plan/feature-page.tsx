@@ -22,7 +22,6 @@ import { DashCredit } from '@/components/ui/dash-mark';
 import { threadRef } from '@/lib/thread/subjects';
 import { cn } from '@/lib/cn';
 import { PLAN_PRIORITY_LABEL, isClosed } from '@/lib/plan/load';
-import { sessionOrigin } from '@/lib/plan/origin';
 import type { PlanScope } from '@/lib/plan/projects';
 import { flatten, type PlanLiveness, type PlanNode } from '@/lib/plan/tree';
 import type { LastRun } from '@/lib/plan/run-end';
@@ -51,7 +50,13 @@ import { type PlanCatalogEntry } from './plan-catalog';
 import { ASSIGNEE_LABEL, SIZE_LABEL, STATUS_LABEL, scopeLabel } from './step-forms';
 import { when } from './plan-run-status';
 import { FeatureUpdate } from './feature-update';
+import { FeatureActivity } from './feature-activity';
 import type { PlanUpdate } from '@/lib/plan/updates';
+import {
+  featureActivity,
+  type ActivityDashAction,
+  type ActivityRun,
+} from '@/lib/plan/activity';
 
 /**
  * A feature's own page, /dev/plan/<number> (plan #1664), in the tabbed
@@ -66,10 +71,9 @@ import type { PlanUpdate } from '@/lib/plan/updates';
  * delete) sit in the header, and the panel the row opens to is the Overview
  * tab.
  *
- * Seams for the steps after this one: Activity joins `FEATURE_TABS` with
- * #1667 and lists the older entries of `updates`, the latest of which
- * heads Overview (#1666), and the progress split goes at the foot of the
- * properties with #1668.
+ * Activity (#1667) lists what happened to the feature and its rows, every
+ * update among them; the latest update also heads Overview (#1666). The
+ * progress split goes at the foot of the properties with #1668.
  */
 export function FeaturePage({
   feature,
@@ -85,6 +89,7 @@ export function FeaturePage({
   criticStops,
   screenChanges,
   updates = [],
+  activity,
 }: {
   feature: PlanNode;
   module: PlanScope | null;
@@ -100,6 +105,12 @@ export function FeaturePage({
   screenChanges?: Readonly<Record<number, readonly ScreenChangeView[]>>;
   /** Dash's updates on the feature, newest first (plan #1666). */
   updates?: readonly PlanUpdate[];
+  /** What the Activity tab reads beyond the plan (plan #1667). */
+  activity?: {
+    blockedAt: Readonly<Record<string, string>>;
+    runs: readonly ActivityRun[];
+    actions: readonly ActivityDashAction[];
+  };
 }) {
   const router = useRouter();
   const search = useSearchParams();
@@ -184,18 +195,6 @@ export function FeaturePage({
     }
     return item;
   });
-
-  // The step's dated notes, without the stamps the description already
-  // says in words: who added it, and the answer that produced it.
-  const history = (node.comment ?? '')
-    .split('\n')
-    .filter(
-      (line) =>
-        !sessionOrigin(line) &&
-        !(parts.origin && line.includes(`#${parts.origin.number}'s answer:`)),
-    )
-    .join('\n')
-    .trim();
 
   const statusWord = STATUS_LABEL[node.status];
   const properties = (
@@ -304,7 +303,9 @@ export function FeaturePage({
       className="gap-y-2 lg:gap-y-0"
     >
       {notices}
-      {tab === 'steps' ? (
+      {tab === 'activity' ? (
+        <FeatureActivity entries={featureActivity(node, { ...activity, updates })} />
+      ) : tab === 'steps' ? (
         <FeatureSteps
           node={node}
           steps={steps}
@@ -369,13 +370,6 @@ export function FeaturePage({
             actions={PLAN_TREE_ACTIONS}
             closed={parts.closed}
           />
-          {history && (
-            <Section label="History">
-              <p className="whitespace-pre-wrap text-ui text-ink-muted">
-                <LinkedText text={history} />
-              </p>
-            </Section>
-          )}
           {/* On a card of its own: the thread's usual well is the canvas,
               which is the page's own ground here and vanished in dark. */}
           <div className={cardVariants({ padding: 'dense' })}>
