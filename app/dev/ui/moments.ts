@@ -122,7 +122,7 @@ export const MOMENTS: readonly Moment[] = [
     state: {
       built: 'yes',
       where:
-        'playForward in components/jobs/pipeline/moments.ts, on a drag across the board in components/jobs/pipeline/board.tsx, travelling with travelElement in components/motion/travel.ts; lib/jobs/board-moment.ts says which moves count.',
+        'playForward in components/jobs/pipeline/moments.ts, on a drag across the board in components/jobs/pipeline/board.tsx, gliding the board into its new state with glideBoard and naming the column with settle in components/motion/settle.ts; lib/jobs/board-moment.ts says which moves count. Played in the gallery at /preview?s=jobs-moment-forward.',
     },
   },
   {
@@ -133,7 +133,7 @@ export const MOMENTS: readonly Moment[] = [
     reducedMotion: 'The role is in Offer at once, with “Offer · ” and the company beside it.',
     state: {
       built: 'yes',
-      where: 'playOffer in components/jobs/pipeline/moments.ts, played by the board in components/jobs/pipeline/board.tsx.',
+      where: 'playOffer in components/jobs/pipeline/moments.ts, played by the board in components/jobs/pipeline/board.tsx. Played in the gallery at /preview?s=jobs-moment-offer.',
     },
   },
   {
@@ -145,7 +145,7 @@ export const MOMENTS: readonly Moment[] = [
     state: {
       built: 'yes',
       where:
-        'fadeInPlace in components/jobs/pipeline/moments.ts on the card’s reject button, with the line from stillOpenLine in lib/jobs/board-moment.ts above the board.',
+        'fadeInPlace in components/jobs/pipeline/moments.ts on the card’s reject button, the lane closing up with glideBoard, and the line from stillOpenLine in lib/jobs/board-moment.ts in a toast once the write is through. Played in the gallery at /preview?s=jobs-moment-reject.',
     },
   },
   {
