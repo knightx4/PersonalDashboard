@@ -1,8 +1,10 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { BigFiveTest } from '@/app/learn/know/personality/big-five-test';
 import { OtherTests } from '@/app/learn/know/personality/other-tests';
+import { PersonalitySection } from '@/app/learn/know/personality-section';
 import { IPIP_ITEM_COUNT } from '@/lib/learn/personality/ipip';
 import type { BigFiveResult, TypedResult } from '@/lib/learn/personality/model';
+import type { TraitThemes } from '@/lib/learn/personality/trait-themes';
 
 /**
  * The Big Five test (plan #1632) in the surface gallery: the list with the
@@ -117,4 +119,60 @@ export function PersonalityAddTypeSurface() {
       </div>
     </>
   );
+}
+
+/* The result on the Know page (plan #1634). */
+
+const THEMES: TraitThemes = {
+  extraversion: [
+    { id: '00000000-0000-4000-8000-000000000101', name: 'Introversion' },
+    { id: '00000000-0000-4000-8000-000000000102', name: 'Solitude and long walks' },
+    { id: '00000000-0000-4000-8000-000000000103', name: 'Small talk' },
+  ],
+  agreeableness: [
+    { id: '00000000-0000-4000-8000-000000000104', name: 'Friendship' },
+    { id: '00000000-0000-4000-8000-000000000105', name: 'Helping my brother through his first year at university' },
+    { id: '00000000-0000-4000-8000-000000000106', name: 'Trust' },
+  ],
+  conscientiousness: [
+    { id: '00000000-0000-4000-8000-000000000107', name: 'Habits' },
+    { id: '00000000-0000-4000-8000-000000000108', name: 'Weekly review' },
+  ],
+  emotional_stability: [
+    { id: '00000000-0000-4000-8000-000000000109', name: 'Anxiety' },
+    { id: '00000000-0000-4000-8000-000000000110', name: 'Stoicism' },
+    { id: '00000000-0000-4000-8000-000000000111', name: 'Sleep' },
+  ],
+  intellect: [],
+};
+
+const EARLIER: BigFiveResult[] = [
+  {
+    ...RESULT,
+    id: '00000000-0000-4000-8000-000000000002',
+    takenAt: '2026-04-12',
+    createdAt: '2026-04-12T09:00:00Z',
+    scores: {
+      extraversion: 21,
+      agreeableness: 36,
+      conscientiousness: 29,
+      emotional_stability: 22,
+      intellect: 45,
+    },
+  },
+];
+
+export function KnowPersonalitySurface() {
+  return (
+    <PersonalitySection
+      latest={RESULT}
+      earlier={EARLIER}
+      typed={TYPED.slice(0, 2)}
+      themes={THEMES}
+    />
+  );
+}
+
+export function KnowPersonalityEmptySurface() {
+  return <PersonalitySection latest={null} earlier={[]} typed={[]} themes={null} />;
 }

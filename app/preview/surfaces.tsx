@@ -80,6 +80,8 @@ import {
   PersonalityAddTypeSurface,
   PersonalityScoresSurface,
   PersonalityTestSurface,
+  KnowPersonalitySurface,
+  KnowPersonalityEmptySurface,
 } from './personality-surfaces';
 import { AddTranscript } from '@/app/vault/education/add-transcript';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
@@ -3799,6 +3801,24 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <PersonalityAddTypeSurface />,
+  },
+  {
+    /* The Big Five result on the Know page (plan #1634): the five traits,
+     * the vault themes nearest each, two typed-in types and one earlier
+     * result folded. Intellect has no theme near it. */
+    id: 'learn-know-personality',
+    label: 'Learn · Know, personality result',
+    module: 'learn',
+    width: 'page',
+    render: () => <KnowPersonalitySurface />,
+  },
+  {
+    /* The same section before any test is taken: one line offering it. */
+    id: 'learn-know-personality-empty',
+    label: 'Learn · Know, personality not taken',
+    module: 'learn',
+    width: 'page',
+    render: () => <KnowPersonalityEmptySurface />,
   },
   {
     /* Clips before any are cut. */
