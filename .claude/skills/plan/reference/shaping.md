@@ -81,6 +81,21 @@ not held.
    Put migrations and schema first, the page last, and the tests inside the
    step they test rather than as a step of their own.
 
+   **Shape for building side by side.** A feature run builds up to three
+   ready steps at once (`SKILL.md`, Building, step 3), and every step pays
+   the same fixed cost of a brief, design check, gate and merge, about half
+   an hour whatever its size. So:
+
+   - Make a step wait on another only when it reads code or a table the
+     other one creates. Living on the same page is not a reason; two steps
+     on one page that do not touch the same component can be built apart.
+   - Fold a small step into its neighbour when both change the same screen.
+     A progress block in a page's properties column belongs in the step that
+     builds the column, not in an `s` step of its own after it.
+   - Put the shared piece first and keep it small, so the steps that use it
+     are ready sooner. A chain of four steps each waiting on the last is a
+     day of building; four steps waiting on one is an hour and a half.
+
    **Do not pad to a step count.** Three real steps and an honest gap beat
    six, three of which were invented to look complete. What goes in the gap
    is a decision, fog, or an idea, and two tests in order say which.

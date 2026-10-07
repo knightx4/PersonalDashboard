@@ -113,6 +113,14 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    - `npx vitest run <the test files covering what you changed>` — the ones for
      the code you touched, not the whole suite.
 
+   A step that changed a screen or added a page also runs `npm run
+   check:contrast`, `npm run check:ui` and `npm run check:phone`, and
+   a new route runs `npx vitest run lib/usage tests/sources-catalogue.test.ts`
+   for the page list and the catalogue. These are the gate's checks that
+   fail most often, and a failure found here costs a minute where the same
+   failure found at the merge costs a second gate run. Run them before the
+   critic, so the critic's shots are of the screen that will merge.
+
    Then check the done-when line by line. If a line is not met, it is not
    done. A step that changes a screen is not done until the critic has passed
    each of its surfaces. A third failed round blocks it instead (see
@@ -229,6 +237,11 @@ a surface with no routes. A step that changes no surface skips this section.
    npm run preview &          # UI_PREVIEW build and start on port 3400
    npm run shoot -- <id>      # one surface per run
    ```
+
+   When the session that sent you named a port (it does when it is building
+   several steps at once, each in its own worktree), export `PREVIEW_PORT`
+   to it before both commands; `preview` and `shoot` read it, and two
+   builders on 3400 would photograph each other's screens.
 
    Without the two placeholders the preview pages answer 500. The shots are
    `.preview-shots/<id>--{phone,laptop}-{light,dark}.png`: 390 and 1280

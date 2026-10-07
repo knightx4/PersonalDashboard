@@ -179,6 +179,14 @@ done. A fix that is done does not come back reworded. A new fix this round
 must be either something the change made worse, or something you missed and
 can now point to in a shot; say which.
 
+Round 1 is where the whole screen is judged. From round 2 on, a new fix you
+missed on round 1 must break a law, the pattern, the done-when or a craft
+check; a preference (`taste:<id>`) you only notice now goes in `notes`. When
+every earlier fix is done and nothing the change made worse is left, the
+verdict is `pass`. Each extra round re-shoots four pictures and costs the
+builder about ten minutes, so a round is spent only on what the person would
+see and want changed.
+
 Three rounds is the limit the spec sets. After a third failed round the
 builder stops and hands the screen to the person with your last fixes, and
 they accept it or say what to change. That is theirs and the builder's, not
