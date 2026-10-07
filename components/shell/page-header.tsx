@@ -1,3 +1,6 @@
+import { cn } from '@/lib/cn';
+import { Breadcrumb, type Crumb } from './breadcrumb';
+
 /**
  * The page's own heading.
  *
@@ -35,6 +38,10 @@
  * The actions wrap among themselves too. Three buttons are wider than a phone,
  * and without the wrap they squeezed each other until their labels broke onto
  * two lines inside a button one line tall (seen on a newsletter, plan #788).
+ *
+ * `crumbs` is the path down to the page (plan #1622), drawn on one line above
+ * the heading. The header's margin moves out to hold both, so a page without
+ * crumbs is drawn exactly as before.
  */
 export function PageHeader({
   title,
@@ -42,6 +49,7 @@ export function PageHeader({
   actions,
   leading,
   bulk,
+  crumbs,
 }: {
   title: React.ReactNode;
   description?: React.ReactNode;
@@ -49,9 +57,11 @@ export function PageHeader({
   leading?: React.ReactNode;
   /** What can be done to a selection, wrapped in SelectionActionBar. */
   bulk?: React.ReactNode;
+  /** The path from the workspace down to this page, the last part this page. */
+  crumbs?: readonly Crumb[];
 }) {
-  return (
-    <div className="group/header mb-5 grid">
+  const header = (
+    <div className={cn('group/header grid', !crumbs && 'mb-5')}>
       <div className="col-start-1 row-start-1 flex flex-wrap items-start gap-3 group-has-[[data-selection-bar]]/header:invisible">
         {leading}
         <div className="min-w-0">
@@ -63,6 +73,13 @@ export function PageHeader({
         )}
       </div>
       {bulk}
+    </div>
+  );
+  if (!crumbs) return header;
+  return (
+    <div className="mb-5">
+      <Breadcrumb crumbs={crumbs} className="mb-2" />
+      {header}
     </div>
   );
 }

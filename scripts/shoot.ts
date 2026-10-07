@@ -147,6 +147,17 @@ const applyExpression = themeExpression;
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Resolves once every srcdoc frame has an inline height, or after three seconds. */
+const FRAMES_MEASURED = `new Promise((done) => {
+  const start = Date.now();
+  const check = () => {
+    const frames = [...document.querySelectorAll('iframe[srcdoc]')];
+    if (frames.every((f) => f.style.height) || Date.now() - start > 3000) done(true);
+    else setTimeout(check, 100);
+  };
+  check();
+})`;
+
 type Send = (method: string, params?: Record<string, unknown>) => Promise<Record<string, string>>;
 
 /** Starts headless Chromium and opens a CDP session on its one page. */
@@ -276,6 +287,16 @@ async function main() {
           expression: applyExpression(theme) + HIDE_DEV_BADGE,
         });
         await wait(400);
+        // A newsletter frame (app/news/i/[id]/issue-frame.tsx) is 70vh until
+        // it has measured itself, and a full-page capture stretches the
+        // viewport, so a shot taken before the measurement arrives showed a
+        // frame running to the bottom of the page on some takes and not others
+        // (plan #1622). Wait, up to three seconds, for every frame to have its
+        // own height.
+        await send('Runtime.evaluate', {
+          expression: FRAMES_MEASURED,
+          awaitPromise: true,
+        });
 
         // Measure before capturing, and drop to 1x if a 2x shot would exceed
         // what this browser can allocate. See MAX_SIDE / MAX_AREA above: over

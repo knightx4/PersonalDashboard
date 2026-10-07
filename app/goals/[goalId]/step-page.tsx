@@ -1,10 +1,9 @@
 'use client';
 
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { Breadcrumb } from '@/components/shell/breadcrumb';
 import { Card } from '@/components/ui/card';
 import type { LinkedFile } from '@/lib/files/files';
-import { stepHref } from '@/lib/goals/all-goals';
+import { stepCrumbs } from '@/lib/goals/crumbs';
 import type { GoalRowNode } from '@/lib/goals/plan-rows';
 import type { ItemProgress } from '@/lib/goals/progress';
 import type { StepRunView } from '@/lib/goals/shaping';
@@ -13,15 +12,14 @@ import { GoalRow } from './goal-row';
 import type { InformationSeam } from './information-step';
 import { useGoalRows } from './step-tree';
 
-/** The row for a step anywhere in the tree, with the row it sits under. */
+/** The row for a step anywhere in the tree, with the rows beside it. */
 function findRow(
   rows: readonly GoalRowNode[],
   id: string,
-  parent: GoalRowNode | null = null,
-): { row: GoalRowNode; parent: GoalRowNode | null; siblings: readonly GoalRowNode[] } | null {
+): { row: GoalRowNode; siblings: readonly GoalRowNode[] } | null {
   for (const row of rows) {
-    if (row.id === id) return { row, parent, siblings: rows };
-    const found = findRow(row.children, id, row);
+    if (row.id === id) return { row, siblings: rows };
+    const found = findRow(row.children, id);
     if (found) return found;
   }
   return null;
@@ -35,7 +33,8 @@ function findRow(
  * waits on, Dash's draft, its files and its thread, and its sub-steps
  * beneath with the finished ones folded. So everything the row does on the
  * goal page it does here, through the same code. A sub-step opens the same
- * way and says which step it sits under.
+ * way. Above the row, the path from Goals names the area, the goal and every
+ * step this one sits under (plan #1622).
  *
  * The page's caller has already checked the step is under this goal; a step
  * the rows do not hold draws nothing.
@@ -74,29 +73,16 @@ export function StepPage({
   });
   const found = findRow(own.rows, stepId);
   if (!found) return null;
-  const { row, parent, siblings } = found;
+  const { row, siblings } = found;
+  const crumbs = stepCrumbs(map.goal, map.areaName, map.steps, stepId, {
+    open: map.goal.status !== 'done' && map.goal.status !== 'dropped',
+  });
   const substeps = siblings.filter((sibling) => sibling.kind !== 'decision');
 
   return (
     <div className="mx-auto max-w-3xl">
-      {/* Back to the goal. The breadcrumb takes its place (plan #1622). */}
-      <Link
-        href={`/goals/${map.goal.id}`}
-        className="press-area mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> {map.goal.title}
-      </Link>
-      {parent && (
-        <p className="mb-3 text-ui text-ink-muted">
-          A sub-step of{' '}
-          <Link
-            href={stepHref(map.goal.id, parent.id)}
-            className="press-area text-accent underline-offset-2 hover:underline"
-          >
-            {parent.title}
-          </Link>
-        </p>
-      )}
+      {/* The path down to the step, through every step it sits under (plan #1622). */}
+      {crumbs && <Breadcrumb crumbs={crumbs} className="mb-3" />}
       {/* The step's own row is the page's heading: its title, the status
           you press to change and its menu, then the panel and sub-steps. */}
       <Card padding="none">
