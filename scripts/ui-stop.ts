@@ -19,7 +19,13 @@
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { criticStopAsk, criticStopBlockSql, stoppedSurfaces, type StopRound } from '../lib/plan/ui-check-stop';
+import {
+  criticStopAsk,
+  criticStopBlockSql,
+  stoppedSurfaces,
+  surfaceLabels,
+  type StopRound,
+} from '../lib/plan/ui-check-stop';
 import { ownerKey, parseOwner, parseVerdict, type CriticVerdict } from '../lib/preview/ui-checks';
 
 const DIR = '.preview-shots/checks';
@@ -73,7 +79,13 @@ function main(): void {
     fixes: v.fixes,
     shots: uploaded ? ['uploaded'] : [],
   }));
-  const stopped = stoppedSurfaces(rounds);
+  // Each screen is named as the gallery names it, so the ask reads without the step in mind.
+  const gallery = readdirSync('app/preview')
+    .filter((name) => name.endsWith('.tsx'))
+    .map((name) => readFileSync(`app/preview/${name}`, 'utf8'))
+    .join('\n');
+  const labels = surfaceLabels(gallery);
+  const stopped = stoppedSurfaces(rounds).map((s) => ({ ...s, label: labels.get(s.surface) }));
   if (stopped.length === 0) fail(`No surface of ${ownerArg} is stopped on a failed third round.`);
 
   const ask = criticStopAsk({ owner: key, surfaces: stopped, branch });
