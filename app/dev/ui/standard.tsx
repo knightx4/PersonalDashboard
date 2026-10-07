@@ -52,7 +52,7 @@ import { HomeArrivalDemo } from './home-arrival-demo';
 import { ClearDemo } from './clear-demo';
 import { MOMENT_WORKSPACES, MOMENTS, MOMENTS_PER_WORKSPACE, type Moment } from './moments';
 import { LAW_GROUPS } from './laws';
-import { describeSources, TASTE } from './taste';
+import { TasteList } from './taste-list';
 import { PATTERNS } from './patterns';
 import { ANATOMIES } from './anatomy';
 import * as C from './content';
@@ -658,7 +658,14 @@ function AnatomyFrames({ id, label }: { id: string; label: string }) {
  * The page itself, with the one part that reads the record passed in, so
  * the gallery can draw it with fixtures (app/preview/surfaces.tsx).
  */
-export function UiStandard({ corrections }: { corrections: readonly CorrectionWeek[] | null }) {
+export function UiStandard({
+  corrections,
+  removedTaste,
+}: {
+  corrections: readonly CorrectionWeek[] | null;
+  /** Ids of the preferences the person removed (`public.ui_taste_removals`). */
+  removedTaste: readonly string[];
+}) {
   return (
     <div className="mx-auto max-w-3xl space-y-8 pb-16">
       <PageHeader
@@ -748,28 +755,9 @@ export function UiStandard({ corrections }: { corrections: readonly CorrectionWe
       <Section
         id="taste"
         title="Your preferences"
-        lead="Narrower than the laws: things you asked for in your notes that no law states. Each names the note it came from and a gallery surface that gets it right. The design critic reads these with the laws."
+        lead="Narrower than the laws: things you asked for in your notes that no law states. Each names the note it came from and a gallery surface that gets it right. The design critic reads these with the laws, and stops holding screens to one you remove."
       >
-        {/* The same single surface and hairlines as the laws above, so the
-         * two read as one list at two scales. */}
-        <Card padding="none">
-          <ul className="divide-y divide-border">
-            {TASTE.map((taste) => (
-              <li key={taste.id} id={`taste-${taste.id}`} className="card-pad-x row-pad">
-                <p className="text-body text-ink">{taste.sentence}</p>
-                <p className="mt-0.5 text-small text-ink-muted">
-                  From {describeSources(taste.sources)}.{' '}
-                  <a
-                    href={`/preview?s=${taste.example}`}
-                    className="underline hover:text-accent"
-                  >
-                    See it done right
-                  </a>
-                </p>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        <TasteList removed={removedTaste} />
       </Section>
 
       {/* Not in the contents row: every entry there is a press target under

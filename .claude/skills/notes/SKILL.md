@@ -145,7 +145,9 @@ group counts as one note.
    Before claiming anything, do the two checks in *Requests that point at a
    missing rule* below: settle the notes waiting on a spec change that has
    since been decided, and look for a request filed on three pages. A note
-   that goes into a proposed rule leaves the batch. Then group what is left,
+   that goes into a proposed rule leaves the batch. Mark the notes that ask
+   for something everywhere, or that two pages ask for (*Requests that apply
+   everywhere* below): each adds a preference in the batch that fixes it. Then group what is left,
    as *Grouping the batch* says, and state the plan for the batch: each
    group, its notes, and why they are together.
 2. **Claim one.** `start <id>`. Read it with `show <id>`, which prints the
@@ -342,6 +344,56 @@ For a group on three or more pages:
 Report each proposed rule under the closing table (*Proposed rules*). Never
 approve the change; that is the person's press.
 
+## Requests that apply everywhere: add a preference
+
+Some notes ask for a change on every page, not only the one they were filed
+on: "let me collapse the recommended roles and any similar boxes anywhere
+else", or "times should be 12-hour everywhere". The person also means this
+when the same request comes in from two different pages. Fixing only the
+pages named leaves the next new screen to break it again. So a request like
+this is fixed where it applies and also added to the person's preferences in
+`app/dev/ui/taste.ts`, which `/dev/ui` shows and the design critic holds every
+later screen to (docs/UI-QUALITY-SPEC.md, Part 3; plan #1547).
+
+**Find them while grouping.** `notes.ts list` marks the notes whose words ask
+for something everywhere (`lib/feedback/everywhere.ts`); offline, read the
+bodies for the same words. The mark only says where to look: "it crashes
+anywhere I tap" is a bug with no preference in it. For the two-page case, use
+the 30-day query in *Requests that point at a missing rule* above and look
+for one request filed on two pages. A request on three pages is a missing
+rule and goes through that section first; one that leaves the batch for a
+proposed rule adds no preference.
+
+**Before adding, check what is there.**
+
+- An entry in `TASTE` that already says it: add this note to that entry's
+  `sources` and add no new entry.
+- A preference the person removed from `/dev/ui`:
+  `select taste_id from ui_taste_removals where user_id = '…'`. Do not add
+  it back. Fix the pages the note names and say in the close that the
+  preference stays removed.
+- A request about behaviour rather than how a screen looks, such as "ask
+  before deleting": that is a rule for a spec, not a preference.
+
+**Add the entry** in the same batch as the fix, in the note's own commit:
+
+- `id`: a few words in kebab case, which the critic cites as `taste:<id>`.
+- `sentence`: the preference in one sentence, written so it holds on any page.
+- `sources`: one `{ where, on }` per note, where is the page as the person
+  would name it ("Roles", "Company page") and on is the day the note was
+  filed, `YYYY-MM-DD`. An entry with no source fails
+  `tests/dev-ui-taste.test.ts`.
+- `example`: a gallery surface id that shows it done right once the fix is
+  in. The pattern surfaces (`pattern-list`, `pattern-detail`, `pattern-deck`,
+  `pattern-thread`) fit a preference about lists, details, decks or threads.
+
+Then fix it everywhere it applies, the same way a surface note fixes a law:
+grep for the shape, not the page. Run `npx vitest run
+tests/dev-ui-taste.test.ts` with the note's other checks. Close the note with
+a resolution that names the entry: `Added "Times are 12-hour with AM and PM,
+everywhere." to your preferences on /dev/ui, and fixed the calendar and the
+agenda.` The person can take any entry off with Remove on `/dev/ui`.
+
 ## Surface notes: work the law, not the note
 
 A note whose page path is `/preview?s=<id>` was filed from `/dev/surfaces`,
@@ -385,7 +437,8 @@ gallery:
    per run, with the placeholder Supabase variables set).
 2. Give the four after shots, the before shots, the round and the note's text
    as the done-when to the `ui-critic` agent, as a subagent or headless with
-   `claude -p --agent ui-critic`.
+   `claude -p --agent ui-critic`. Name the preferences the person removed
+   (the `ui_taste_removals` query above), or "none", so it cites none of them.
 3. Record the round whatever the verdict: save its `json` block unchanged as
    `.preview-shots/checks/<note-id>--<surface>--r<round>.json`, then run
    `npm run ui-check -- <note-id> <surface> <round>`. That writes the round

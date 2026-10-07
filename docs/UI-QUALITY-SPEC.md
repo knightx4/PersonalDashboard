@@ -134,7 +134,10 @@ last two weeks:
 The notes routine adds an entry when a note says the request applies
 "anywhere" or "everywhere", or when the same request comes in on two
 different pages. It adds the entry and fixes the pages in the same batch. The
-person can remove any entry from `/dev/ui`. An entry that keeps applying
+person can remove any entry from `/dev/ui`. A press cannot edit `taste.ts`, so
+a removal is a row in `public.ui_taste_removals`: the page leaves the entry
+out, the session that runs the critic tells it not to cite the entry, and the
+notes routine does not add it again. An entry that keeps applying
 across workspaces can be promoted to a law by the person.
 
 ## Part 4: Page patterns

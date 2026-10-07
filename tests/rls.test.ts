@@ -211,6 +211,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.ui_checks = uiCheck.id;
 
+  const [tasteRemoval] = await admin<{ id: string }[]>`
+    insert into ui_taste_removals (user_id, taste_id)
+    values (${userId}, 'twelve-hour-times')
+    returning id`;
+  ids.ui_taste_removals = tasteRemoval.id;
+
   const [planItem] = await admin<{ id: string }[]>`
     insert into plan_items (user_id, module, title, detail, status, position)
     values (

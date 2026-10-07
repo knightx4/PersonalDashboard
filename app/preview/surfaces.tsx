@@ -16,6 +16,8 @@ import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
 import { CaptureBoxSurface } from './capture-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
+import { TasteList } from '@/app/dev/ui/taste-list';
+import { TASTE } from '@/app/dev/ui/taste';
 import { CorrectionsChart } from '@/app/dev/ui/corrections';
 import type { CorrectionWeek } from '@/lib/plan/correction-share';
 import { ANATOMIES } from '@/app/dev/ui/anatomy';
@@ -2533,6 +2535,9 @@ const recommendedStats: OriginStats[] = [
   { origin: 'goal', found: 41, saved: 4, applied: 1, interviews: 0, dismissed: 23, expired: 0 },
 ];
 
+/** Two preferences the person took off /dev/ui (plan #1547). */
+const REMOVED_TASTE = ['swipe-shows-next', 'categories-one-line'];
+
 /**
  * Eight weeks of the correction measure on /dev/ui (plan #1543): a week with
  * no notes, a week where none counted, and a high week, so the empty column,
@@ -2980,7 +2985,7 @@ export const SURFACES: readonly Surface[] = [
     label: 'UI · the design language',
     module: 'dev',
     width: 'wide',
-    render: () => <UiStandard corrections={CORRECTION_WEEKS} />,
+    render: () => <UiStandard corrections={CORRECTION_WEEKS} removedTaste={REMOVED_TASTE} />,
   },
   {
     /* The correction measure on /dev/ui alone (plan #1543), since the whole
@@ -2995,6 +3000,22 @@ export const SURFACES: readonly Surface[] = [
         <CorrectionsChart weeks={CORRECTION_WEEKS} />
         <CorrectionsChart weeks={CORRECTION_WEEKS.slice(-2)} />
         <CorrectionsChart weeks={[]} />
+      </div>
+    ),
+  },
+  {
+    /* The preferences on /dev/ui alone (plan #1547), with their Remove and
+     * the fold of removed ones, since the whole page is too tall to read a
+     * row of it. The fold of removed ones is drawn open. Beneath, the state
+     * with every preference removed. */
+    id: 'dev-ui-taste',
+    label: 'UI · your preferences',
+    module: 'dev',
+    width: 'page',
+    render: () => (
+      <div className="space-y-6">
+        <TasteList removed={REMOVED_TASTE} openRemoved />
+        <TasteList removed={TASTE.map((taste) => taste.id)} />
       </div>
     ),
   },

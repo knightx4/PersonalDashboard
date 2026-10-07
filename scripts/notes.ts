@@ -38,6 +38,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
 import { LAWS, RESTRAINT_LAWS, SHAPE_LAWS, SPEND_LAWS, SCAN_LAWS } from '../app/dev/ui/laws';
 import { checkClose, surfaceOf } from '../lib/feedback/surfaces';
+import { asksEverywhere } from '../lib/feedback/everywhere';
 import { NOTES_WORK_KINDS } from '../lib/feedback/load';
 import { feedbackItems } from '../lib/db/schema';
 import { closeRefusal, commitOnMain } from '../lib/plan/github';
@@ -224,6 +225,19 @@ async function main(): Promise<void> {
         console.log(`  ${surface}`);
         for (const row of notes) console.log(`    ${rowLine(row, 64)}`);
       }
+    }
+
+    // A note asking for something on every page is a preference as well as
+    // a fix (plan #1547): the batch that fixes it adds it to /dev/ui. Marked
+    // here so it is seen before the note is claimed; the session decides.
+    const everywhere = rows.filter((row) => row.kind !== 'like' && asksEverywhere(row.body));
+    if (everywhere.length > 0) {
+      console.log(
+        `\n── ${everywhere.length} note(s) ask for something everywhere ──\n` +
+          'Each may be a preference as well as a fix. The notes skill says how\n' +
+          'to add it to app/dev/ui/taste.ts in the same batch.\n',
+      );
+      for (const row of everywhere) console.log(`  ${rowLine(row, 66)}`);
     }
 
     const counts = rows.reduce<Record<string, number>>((acc, row) => {
