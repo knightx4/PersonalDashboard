@@ -129,11 +129,9 @@ type Cover = 'start' | 'tap' | 'sound' | null;
 
 export function ClipStream({
   initial,
-  startedAt,
   fixed = false,
 }: {
   initial: PlayerClip[];
-  startedAt: string;
   /** The surface gallery's: play only the clips given and fetch no more, since it has no session. */
   fixed?: boolean;
 }) {
@@ -307,10 +305,7 @@ export function ClipStream({
     if (upNext) new Image().src = thumbnailUrl(upNext.videoId);
     if (fixed || !shouldRefill(queue.length, index, { loading: loading.current, exhausted })) return;
     loading.current = true;
-    loadMoreClipsAction(
-      startedAt,
-      queue.map((clip) => clip.id),
-    )
+    loadMoreClipsAction(queue.map((clip) => clip.id))
       .then((more) => {
         if (more.length === 0) setExhausted(true);
         setQueue((q) => appendClips(q, more));
@@ -319,7 +314,7 @@ export function ClipStream({
       .finally(() => {
         loading.current = false;
       });
-  }, [queue, index, exhausted, startedAt, upNext, fixed]);
+  }, [queue, index, exhausted, upNext, fixed]);
 
   // -- What the person does ---------------------------------------------------
   const begin = useCallback(() => {
