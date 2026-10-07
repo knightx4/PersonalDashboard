@@ -10,7 +10,6 @@ import { Property } from '@/components/shell/detail-layout';
 import { ChannelPicker } from '@/app/jobs/(app)/roles/[id]/channel-picker';
 import type { ReferrerOption } from '@/lib/jobs/contacts/referrers';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
-import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
@@ -52,8 +51,7 @@ import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
 import type { OriginStats } from '@/lib/jobs/suggest/stats';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import type { ReviewRow, SearchableRole } from '@/lib/jobs/review/load';
-import { RolesTable } from '@/app/jobs/(app)/roles/roles-table';
-import { rolesDisplay } from '@/lib/jobs/roles-display';
+import { PipelinePage } from '@/components/jobs/pipeline/pipeline-page';
 import { RoundsTable, type RoundView } from '@/app/jobs/(app)/interviews/rounds-table';
 import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
 import type { TodayBoard } from '@/lib/jobs/today/load';
@@ -449,9 +447,6 @@ const pipelineRow = (
   coverage: { covered: 0, total: 0, gaps: 0, rate: null },
   ...row,
 });
-
-/** The sort links the roles table draws, with nothing chosen but its default. */
-const rolesSortChoices = listDisplayMenu(rolesDisplay(), {}).sorts;
 
 const pipelineRows: PipelineRow[] = [
   pipelineRow({
@@ -2207,11 +2202,10 @@ const savedStories: SavedViewProps = {
   ],
 };
 
-/** The job search's eleven sections, as its layout lists them. */
+/** The job search's ten sections, as its layout lists them. */
 const shellSections: NavSection[] = [
   { href: '/jobs', label: 'Home', icon: 'jobsHome', exact: true },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
-  { href: '/jobs/roles', label: 'Roles', icon: 'roles' },
   { href: '/jobs/find', label: 'Find', icon: 'find' },
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
   { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
@@ -2778,11 +2772,13 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The whole page on its board view (plan #1590): the live applications
+     * only, with the one rail of filters both views share. */
     id: 'jobs-pipeline-board',
     label: 'Pipeline · Board',
     module: 'jobs',
     width: 'wide',
-    render: () => <PipelineBoard rows={pipelineRows} view="board" />,
+    render: () => <PipelinePage rows={pipelineRows} params={{}} />,
   },
   {
     /* The shopping item page's main panel, which arrived as a form until law
@@ -3210,13 +3206,6 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PipelineDenseList rows={pipelineRows} />,
   },
   {
-    id: 'jobs-pipeline-list',
-    label: 'Pipeline · List',
-    module: 'jobs',
-    width: 'wide',
-    render: () => <PipelineBoard rows={pipelineRows} view="list" />,
-  },
-  {
     id: 'jobs-company',
     label: 'Company · Research, contacts and sends',
     module: 'jobs',
@@ -3332,11 +3321,13 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The same page on its table view, which was the Roles page (plan #1590),
+     * still on the live applications. */
     id: 'jobs-roles-table',
-    label: 'Roles · The table',
+    label: 'Pipeline · Table',
     module: 'jobs',
     width: 'wide',
-    render: () => <RolesTable rows={pipelineRows} sorts={rolesSortChoices} />,
+    render: () => <PipelinePage rows={pipelineRows} params={{ view: 'table' }} />,
   },
   {
     id: 'jobs-today',

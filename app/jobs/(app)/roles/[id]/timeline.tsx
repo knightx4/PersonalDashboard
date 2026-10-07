@@ -51,7 +51,9 @@ export function Timeline({ events, timezone, otherAttempts }: PanelProps) {
                 event.needsReview && 'bg-caution-tint',
               )}
             >
-              <span className="tabular w-28 shrink-0 text-small text-ink-muted">
+              {/* On a phone the date joins the grey line under the entry, so the
+                  entry has the row's width (plan #1590's critic, law 9). */}
+              <span className="tabular w-28 shrink-0 text-small text-ink-muted max-sm:hidden">
                 {formatDate(event.occurredAt, timezone)}
               </span>
               <div className="min-w-0 flex-1">
@@ -65,6 +67,7 @@ export function Timeline({ events, timezone, otherAttempts }: PanelProps) {
                   )}
                 </p>
                 <p className="text-small text-ink-muted">
+                  <span className="tabular sm:hidden">{formatDate(event.occurredAt, timezone)} · </span>
                   {event.kind.replace(/_/g, ' ')} · {event.source}
                 </p>
                 {event.needsReview && (

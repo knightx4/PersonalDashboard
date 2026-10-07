@@ -25,7 +25,7 @@ export type ListWithDisplay = {
 export const LISTS_WITH_DISPLAY: readonly ListWithDisplay[] = [
   { label: 'Inventory', spec: inventoryDisplay<SortableInventoryItem>() },
   { label: 'Orders', spec: ordersDisplay<SortableOrder>() },
-  { label: 'Roles', spec: rolesDisplay() },
+  { label: 'Pipeline', spec: rolesDisplay() },
   { label: 'Companies', spec: companiesDisplay<CompanyLike>() },
 ];
 
