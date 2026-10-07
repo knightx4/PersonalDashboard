@@ -96,7 +96,7 @@ export function RoleDetailPanels(
               }}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-ui font-medium transition-colors duration-quick',
+                'flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-ui font-medium transition-colors duration-quick sm:min-h-0',
                 active
                   ? 'border-accent text-accent'
                   : 'border-transparent text-ink-muted hover:text-ink',

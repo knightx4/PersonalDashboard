@@ -220,6 +220,7 @@ export function InterviewCard({
             ))}
             {draft !== null && (
               <div>
+                {/* ui-ok: composer-always-open -- shown only after "+ Custom" is pressed (draft starts null). */}
                 <Textarea
                   rows={3}
                   value={draft}
