@@ -160,6 +160,15 @@ Things they asked Dash to watch outside the app, such as a resale ticket price, 
 - Name a row by `title`; link it by `id`
 - condition is what they are waiting for: {"below": 200} means they want to hear when the reading drops under 200 (in currency when set); {} means reports only. goal_item_id is the goals.items step it serves, when started from one. status 'running', 'ended' (ends_at passed) or 'stopped' (they stopped it). The readings are in core.watch_readings, joined by watch_id.
 
+### `public.spec_interviews` (Dev)
+
+Interviews Dash held about one workspace of the app, or the app as a whole: what they use it for, what they do there and their routines, in their own answers.
+
+- Search: `summary`
+- Name a row by `module`; link it by `id`
+- Opens at `/dev/specs`
+- module is the workspace's id, or 'app'. The questions and answers are the thread under the row in core.conversations (ref public.spec_interviews:<id>): turns with role 'user' are their answers, quoted as what they said. summary is Dash's few sentences on what they said, written when it drafted; it is null while status is open.
+
 ## What they did or have (read for progress and facts)
 
 ### `job_search.roles` (Job search)

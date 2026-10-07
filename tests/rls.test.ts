@@ -171,6 +171,14 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.spec_changes = specChange.id;
 
+  // One open interview per user and workspace, so seeding A and B each once
+  // stays inside the one-open index.
+  const [specInterview] = await admin<{ id: string }[]>`
+    insert into spec_interviews (user_id, module, vision_review_id, spec_change_id)
+    values (${userId}, 'learn', ${visionReview.id}, ${specChange.id})
+    returning id`;
+  ids.spec_interviews = specInterview.id;
+
   const [specFinding] = await admin<{ id: string }[]>`
     insert into spec_findings (user_id, spec, kind, finding, proposal, spec_change_id)
     values (${userId}, 'spec-layer', 'missing_rule', ${`${tag} notes ask for a rule`}, 'change_spec', ${specChange.id})
