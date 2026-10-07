@@ -3,6 +3,7 @@ import { projectById } from '@/lib/plan/projects';
 import { PlanView } from '@/app/dev/plan/plan-view';
 import { SendScreenBack } from '@/app/dev/plan/send-back';
 import { FeaturePage } from '@/app/dev/plan/feature-page';
+import type { PlanUpdate } from '@/lib/plan/updates';
 import { catalogOf } from '@/app/dev/plan/plan-catalog';
 import { SetTab } from './set-tab';
 import { ScreenChanges } from '@/components/dev/screen-change';
@@ -704,6 +705,24 @@ const featureTree = buildPlanTree({
 const featureSection = featureTree.find((section) => section.module === 'dev');
 const featureNode = featureSection?.nodes.find((node) => node.id === 'feat');
 
+/** Dash's latest update on the feature, which heads Overview (plan #1666). */
+const featureUpdates: PlanUpdate[] = [
+  {
+    id: 'update-2',
+    featureId: 'feat',
+    health: 'at_risk',
+    body:
+      'The tabbed detail layout is built and the feature opens on its own page, with its steps grouped by status. ' +
+      'Moving the goal page onto the same layout is blocked on which of its parts belong on Overview and which on Activity, ' +
+      'and that question is waiting on you.',
+    stepsDoneBefore: 1,
+    stepsDoneAfter: 2,
+    stepsTotal: 7,
+    session: 'cse_01V1aoCMYL7Ckkar3cKSLtFf',
+    createdAt: '2026-10-07T18:00:00Z',
+  },
+];
+
 function FeatureFixture() {
   if (!featureSection || !featureNode) return null;
   return (
@@ -714,6 +733,7 @@ function FeatureFixture() {
       catalog={catalogOf(featureTree)}
       canSend
       lastRuns={{}}
+      updates={featureUpdates}
       commitChecks={{
         '79074ffd': {
           mergeSha: '79074ffd',

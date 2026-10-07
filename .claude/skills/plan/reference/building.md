@@ -165,7 +165,11 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    closes the step once it has merged. Write the note it should close with —
    what changed, in one sentence — and put it in your report. If nobody sent
    you, merge first and then close it yourself: `done <n> --note "…"`, which
-   records the commit from HEAD and names any steps that became ready.
+   records the commit from HEAD and names any steps that became ready. Then
+   write Dash's update on the feature, as step 7 of the Building section in
+   `SKILL.md` describes: `update <the feature> --health … --body "…"`. A
+   builder that was sent leaves the update to the session that sent it, which
+   writes one per feature when its batch ends.
 
 ## What to report back
 
