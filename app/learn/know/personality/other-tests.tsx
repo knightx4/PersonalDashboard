@@ -50,7 +50,6 @@ export function OtherTests({
 }) {
   const toast = useToast();
   const [rows, setRows] = useState<TypedResult[]>(() => [...results].sort(byDay));
-  const [open, setOpen] = useState(initialOpen);
 
   function remove(row: TypedResult) {
     setRows((current) => current.filter((r) => r.id !== row.id));
@@ -74,18 +73,11 @@ export function OtherTests({
 
   const adding = (
     <div className="mt-3">
-      {open ? (
-        <TypedForm
-          today={today}
-          onSaved={(result) => {
-            setRows((current) => [...current, result].sort(byDay));
-            setOpen(false);
-          }}
-          onCancel={() => setOpen(false)}
-        />
-      ) : (
-        <AddTrigger label="Add a type from another test" onClick={() => setOpen(true)} />
-      )}
+      <TypedCompose
+        today={today}
+        initialOpen={initialOpen}
+        onSaved={(result) => setRows((current) => [...current, result].sort(byDay))}
+      />
     </div>
   );
 
@@ -150,6 +142,35 @@ export function OtherTests({
         {adding}
       </SectionFold>
     </section>
+  );
+}
+
+/**
+ * The way to add one: the AddTrigger line until it is pressed, then the
+ * form, which closes again on save or cancel (law 14).
+ */
+function TypedCompose({
+  today,
+  initialOpen,
+  onSaved,
+}: {
+  today: string;
+  initialOpen: boolean;
+  onSaved: (result: TypedResult) => void;
+}) {
+  const [open, setOpen] = useState(initialOpen);
+  if (!open) {
+    return <AddTrigger label="Add a type from another test" onClick={() => setOpen(true)} />;
+  }
+  return (
+    <TypedForm
+      today={today}
+      onSaved={(result) => {
+        onSaved(result);
+        setOpen(false);
+      }}
+      onCancel={() => setOpen(false)}
+    />
   );
 }
 
