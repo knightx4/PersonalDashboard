@@ -382,7 +382,15 @@ function placeFinger(point: { x: number; y: number } | null): string {
     : `(function(){var d=document.getElementById('${FINGER_ID}');if(d)d.style.display='none';})()`;
 }
 
-/** Plays one input event through CDP: touch for a swipe, mouse for a press. */
+/**
+ * Plays one input event through CDP: touch for a swipe, mouse for a press.
+ *
+ * From the third move of a drag on, Chrome held each touchmove back until the
+ * next input arrived, so the page got every move one frame late and the strip
+ * showed the card trailing the finger by a whole step (plan #1566). Each move
+ * is now followed by a copy of itself half a pixel lower: the copy is the one
+ * held, and the real move reaches the page in its own frame.
+ */
 async function dispatch(send: Send, event: InputEvent): Promise<void> {
   if (event.device === 'touch') {
     const type =
@@ -391,6 +399,12 @@ async function dispatch(send: Send, event: InputEvent): Promise<void> {
       type,
       touchPoints: event.phase === 'up' ? [] : [{ x: event.x, y: event.y }],
     });
+    if (event.phase === 'move') {
+      await send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x: event.x, y: event.y + 0.5 }],
+      });
+    }
     return;
   }
   if (event.phase === 'down') {
