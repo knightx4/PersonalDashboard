@@ -665,6 +665,30 @@ const featureItems: PlanItem[] = [
     size: 'm',
   }),
   item({
+    id: 'feat-layout-tabs',
+    module: 'dev',
+    parentId: 'feat-layout',
+    title: 'Add a tabs control whose tabs are links carrying the tab in the address',
+    status: 'done',
+    size: 's',
+    commitSha: '79074ffd',
+  }),
+  item({
+    id: 'feat-table',
+    module: 'dev',
+    parentId: 'feat',
+    title: 'Show the plan as a table of features',
+    size: 'm',
+  }),
+  item({
+    id: 'feat-old',
+    module: 'dev',
+    parentId: 'feat',
+    title: 'Open the feature in a side sheet over the plan',
+    status: 'dropped',
+    size: 's',
+  }),
+  item({
     id: 'other',
     module: 'dev',
     title: 'Name the plan’s levels module, feature, step and substep',
@@ -675,7 +699,7 @@ const featureItems: PlanItem[] = [
 
 const featureTree = buildPlanTree({
   items: featureItems,
-  dependencies: [dep('feat', 'other')],
+  dependencies: [dep('feat', 'other'), dep('feat-table', 'feat-page')],
 });
 const featureSection = featureTree.find((section) => section.module === 'dev');
 const featureNode = featureSection?.nodes.find((node) => node.id === 'feat');
@@ -706,7 +730,7 @@ export function PlanFeatureSurface() {
   return <FeatureFixture />;
 }
 
-/** The same page on its Steps tab: the feature's steps as the plan's tree. */
+/** The same page on its Steps tab: the feature's steps grouped by status. */
 export function PlanFeatureStepsSurface() {
   return (
     <>

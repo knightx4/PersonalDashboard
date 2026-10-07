@@ -1,7 +1,14 @@
 import type { Crumb } from '@/components/shell/breadcrumb';
 import { planRowId } from '@/lib/comments/refs';
 import { isProjectId, type PlanScope } from '@/lib/plan/projects';
-import { flatten, type PlanNode, type PlanSection } from '@/lib/plan/tree';
+import {
+  flatten,
+  healthOf,
+  type PlanHealth,
+  type PlanLiveness,
+  type PlanNode,
+  type PlanSection,
+} from '@/lib/plan/tree';
 import type { Tab } from '@/lib/tabs';
 
 /**
@@ -87,4 +94,114 @@ export function featureCrumbs(
     },
     { label: `#${feature.number}`, href: featureHref(feature.number) },
   ];
+}
+
+/**
+ * How the Steps tab lays the steps out (plan #1665): grouped by status, which
+ * is the plain Steps tab, or as the plan's tree, one press away. Kept in the
+ * address beside the tab so a reload keeps the view.
+ */
+export const STEPS_VIEW_PARAM = 'view';
+export const STEPS_VIEWS = ['status', 'tree'] as const;
+export type StepsView = (typeof STEPS_VIEWS)[number];
+
+/** The view a `?view=` value opens: the tree when it says so, otherwise the groups. */
+export function stepsViewFrom(value: string | null | undefined): StepsView {
+  return value === 'tree' ? 'tree' : 'status';
+}
+
+/** The address of the Steps tab in a given view. */
+export function stepsViewHref(number: number, view: StepsView): string {
+  const base = `${featureHref(number)}?tab=steps`;
+  return view === 'tree' ? `${base}&${STEPS_VIEW_PARAM}=tree` : base;
+}
+
+/** The groups, in the order they are listed. Done and dropped start folded. */
+export const STEP_GROUPS = [
+  { id: 'blocked', label: 'Blocked', folded: false },
+  { id: 'in_progress', label: 'In progress', folded: false },
+  { id: 'ready', label: 'Ready', folded: false },
+  { id: 'not_started', label: 'Not started', folded: false },
+  { id: 'done', label: 'Done', folded: true },
+  { id: 'dropped', label: 'Dropped', folded: true },
+] as const;
+export type StepGroupId = (typeof STEP_GROUPS)[number]['id'];
+
+/**
+ * The group a health word falls in. Read off `healthOf` so a step is listed
+ * under the word its own row shows: a setup job of yours or an unanswered
+ * question holds work up as a block does, a claim is in progress however
+ * lively its run, and a step waiting on another step or still proposed has
+ * not started.
+ */
+export function stepGroupOf(health: PlanHealth): StepGroupId {
+  switch (health) {
+    case 'blocked':
+    case 'setup':
+    case 'unanswered':
+      return 'blocked';
+    case 'in_progress':
+    case 'working':
+    case 'quiet':
+    case 'abandoned':
+      return 'in_progress';
+    case 'ready':
+      return 'ready';
+    case 'done':
+    case 'answered':
+      return 'done';
+    case 'dropped':
+      return 'dropped';
+    default:
+      return 'not_started';
+  }
+}
+
+/** A step in a group, with the step above it when it is a substep. */
+export type GroupedStep = {
+  node: PlanNode;
+  /** Named by its outline, `#925.3`, as its row heads itself. */
+  parent: Pick<PlanNode, 'number' | 'outline' | 'title'> | null;
+};
+
+export type StepGroup = {
+  id: StepGroupId;
+  label: string;
+  folded: boolean;
+  steps: GroupedStep[];
+};
+
+/**
+ * A feature's steps and substeps in status groups, each listed once, in the
+ * tree's own order. A row is grouped by its own status, not by what is open
+ * beneath it: its substeps are listed in their own groups. Questions are not
+ * rows of their own, as in the tree; they stay with the step they were asked
+ * on. Groups with nothing in them are not returned.
+ */
+export function stepGroups(feature: PlanNode, liveness?: PlanLiveness): StepGroup[] {
+  const found: GroupedStep[] = [];
+  const walk = (nodes: readonly PlanNode[], parent: PlanNode | null) => {
+    for (const node of nodes) {
+      if (node.kind === 'decision') continue;
+      found.push({
+        node,
+        parent: parent && { number: parent.number, outline: parent.outline, title: parent.title },
+      });
+      walk(node.children, node);
+    }
+  };
+  walk(feature.children, null);
+  return STEP_GROUPS.map((group) => ({
+    ...group,
+    steps: found.filter(({ node }) => stepGroupOf(healthOf(asListed(node), liveness)) === group.id),
+  })).filter((group) => group.steps.length > 0);
+}
+
+/**
+ * A step as the grouped list draws it: its questions kept, since they are
+ * answered from its panel, and its substeps taken off, since they are listed
+ * in their own groups. Its health is then the word its row shows.
+ */
+export function asListed(node: PlanNode): PlanNode {
+  return { ...node, children: node.children.filter((child) => child.kind === 'decision') };
 }

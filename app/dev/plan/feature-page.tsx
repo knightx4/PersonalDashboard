@@ -1,8 +1,8 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus } from 'lucide-react';
+import { ChevronRight, Plus } from 'lucide-react';
 import { TabbedDetail } from '@/components/patterns/tabbed-detail';
 import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
@@ -13,6 +13,8 @@ import { StateLabel, TONE_TEXT } from '@/components/dev/state-label';
 import { FogNote } from '@/components/dev/fog-note';
 import { Thread } from '@/components/thread/thread';
 import { ColumnHeader } from '@/components/plan-tree/grid';
+import { ViewChips } from '@/components/plan-tree/view-chips';
+import { planRowId } from '@/lib/comments/refs';
 import { Dependencies } from '@/components/plan-tree/dependencies';
 import { Questions } from '@/components/plan-tree/questions';
 import { PLAN_COMMENTS } from '@/components/plan-tree/types';
@@ -29,7 +31,19 @@ import type { CommitCheck } from '@/lib/plan/checks';
 import type { OverhaulProgress } from '@/lib/plan/overhaul-progress';
 import type { CriticStopView } from '@/lib/plan/ui-check-stop';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
-import { FEATURE_TABS, featureCrumbs, featureHref } from '@/lib/plan/feature-page';
+import {
+  FEATURE_TABS,
+  STEPS_VIEWS,
+  STEPS_VIEW_PARAM,
+  asListed,
+  featureCrumbs,
+  featureHref,
+  stepGroups,
+  stepsViewFrom,
+  stepsViewHref,
+  type StepGroup,
+  type StepsView,
+} from '@/lib/plan/feature-page';
 import { TAB_PARAM, tabFrom } from '@/lib/tabs';
 import { dismissPlanFog, deletePlanItem, type PlanActionState } from './actions';
 import { PlanRow, PLAN_TREE_ACTIONS, usePlanRow } from './plan-row';
@@ -50,10 +64,9 @@ import { when } from './plan-run-status';
  * delete) sit in the header, and the panel the row opens to is the Overview
  * tab.
  *
- * Seams for the steps after this one: the Steps tab is the plain tree until
- * #1665 groups it by status, Activity joins `FEATURE_TABS` with #1667, Dash's
- * update goes at the top of Overview with #1666, and the progress split goes
- * at the foot of the properties with #1668.
+ * Seams for the steps after this one: Activity joins `FEATURE_TABS` with
+ * #1667, Dash's update goes at the top of Overview with #1666, and the
+ * progress split goes at the foot of the properties with #1668.
  */
 export function FeaturePage({
   feature,
@@ -83,7 +96,9 @@ export function FeaturePage({
   screenChanges?: Readonly<Record<number, readonly ScreenChangeView[]>>;
 }) {
   const router = useRouter();
-  const tab = tabFrom(useSearchParams().get(TAB_PARAM), FEATURE_TABS);
+  const search = useSearchParams();
+  const tab = tabFrom(search.get(TAB_PARAM), FEATURE_TABS);
+  const stepsView = stepsViewFrom(search.get(STEPS_VIEW_PARAM));
   const parts = usePlanRow({
     node: feature,
     trail: [],
@@ -287,6 +302,8 @@ export function FeaturePage({
         <FeatureSteps
           node={node}
           steps={steps}
+          view={stepsView}
+          liveness={liveness}
           addChildLabel={parts.addChildLabel}
           adding={row.addingChild}
           addForm={parts.addChild}
@@ -380,13 +397,21 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 }
 
 /**
- * The Steps tab: the feature's steps as the plan's tree, every level
- * unfolded, so a step's number lands on its row. #1665 groups these by
- * status and keeps this tree one press away.
+ * The Steps tab. By default the feature's steps and substeps in status groups
+ * (plan #1665), each listed once, in one card with a heading row per group,
+ * after Linear's project page: blocked, in progress, ready and not started
+ * open, done and dropped folded. A substep says which step it sits under on
+ * a line below its title, since no tree is drawn to say it. "Tree" swaps the
+ * groups for the plan's own tree, every level unfolded.
+ *
+ * Every row keeps its `plan-<number>` anchor, so a link to a step lands on
+ * it in either view; a folded group holding the step it names opens itself.
  */
 function FeatureSteps({
   node,
   steps,
+  view,
+  liveness,
   addChildLabel,
   adding,
   addForm,
@@ -395,6 +420,8 @@ function FeatureSteps({
 }: {
   node: PlanNode;
   steps: readonly PlanNode[];
+  view: StepsView;
+  liveness?: PlanLiveness;
   addChildLabel: string;
   adding: boolean;
   addForm: React.ReactNode;
@@ -404,33 +431,55 @@ function FeatureSteps({
     'node' | 'trail' | 'view' | 'searching' | 'unfolded'
   >;
 }) {
+  const groups = stepGroups(node, liveness);
+  const row = (step: PlanNode, extra: Partial<React.ComponentProps<typeof PlanRow>> = {}) => (
+    <PlanRow
+      key={step.id}
+      {...rowProps}
+      node={step}
+      trail={[]}
+      asStep
+      inlinePriority
+      view="open"
+      searching={false}
+      unfolded
+      {...extra}
+    />
+  );
   return (
     <div className="space-y-3">
       {steps.length > 0 ? (
-        <ul
-          className={cn(
-            cardVariants({ padding: 'none' }),
-            // A finished row is not dimmed here: the plan dims one to 70%,
-            // which took its #number below 3:1 on a phone, and on a feature's
-            // own page its Done word already says it is finished.
-            'divide-y divide-border overflow-hidden [&>li]:opacity-100',
-          )}
-        >
-          <ColumnHeader />
-          {steps.map((step) => (
-            <PlanRow
-              key={step.id}
-              {...rowProps}
-              node={step}
-              trail={[]}
-              asStep
-              inlinePriority
-              view="open"
-              searching={false}
-              unfolded
-            />
-          ))}
-        </ul>
+        <>
+          <ViewChips
+            view={view}
+            chips={STEPS_VIEWS}
+            labels={STEPS_VIEW_LABEL}
+            hrefOf={(candidate) => stepsViewHref(node.number, candidate)}
+            scroll={false}
+          />
+          <ul
+            className={cn(
+              cardVariants({ padding: 'none' }),
+              // A finished row is not dimmed here: the plan dims one to 70%,
+              // which took its #number below 3:1 on a phone, and on a feature's
+              // own page its Done word already says it is finished.
+              'divide-y divide-border overflow-hidden [&>li]:opacity-100',
+            )}
+          >
+            <ColumnHeader />
+            {view === 'tree'
+              ? steps.map((step) => row(step))
+              : groups.map((group) => (
+                  <StepGroupRows key={group.id} group={group}>
+                    {group.steps.map(({ node: step, parent }) =>
+                      row(asListed(step), {
+                        source: parent ? `Under #${parent.outline} ${parent.title}` : undefined,
+                      }),
+                    )}
+                  </StepGroupRows>
+                ))}
+          </ul>
+        </>
       ) : (
         !adding && <p className="text-ui text-ink-muted">No steps under this feature yet.</p>
       )}
@@ -445,5 +494,58 @@ function FeatureSteps({
         )
       )}
     </div>
+  );
+}
+
+const STEPS_VIEW_LABEL: Record<StepsView, string> = { status: 'By status', tree: 'Tree' };
+
+/**
+ * One status group: a heading row with its count, then its rows. The
+ * heading folds the group; done and dropped start folded, and a folded group
+ * opens by itself when the address names one of its steps.
+ */
+function StepGroupRows({ group, children }: { group: StepGroup; children: React.ReactNode }) {
+  const [open, setOpen] = useState(!group.folded);
+  const anchors = group.steps.map(({ node }) => planRowId(node.number)).join(' ');
+  useEffect(() => {
+    if (!group.folded) return;
+    const named = () => {
+      const hash = window.location.hash.slice(1);
+      if (!anchors.split(' ').includes(hash)) return;
+      setOpen(true);
+      // The browser looked for the row before the group was open to hold it.
+      requestAnimationFrame(() => document.getElementById(hash)?.scrollIntoView());
+    };
+    named();
+    window.addEventListener('hashchange', named);
+    return () => window.removeEventListener('hashchange', named);
+  }, [group.folded, anchors]);
+  const heading = (
+    <>
+      <span>{group.label}</span>
+      <span className="tabular font-normal text-ink-muted">{group.steps.length}</span>
+    </>
+  );
+  return (
+    <>
+      {/* Every heading folds, so the six names share one edge, after the
+          arrow, in line with the step numbers beneath them. */}
+      <li className="bg-sunken px-3 py-1.5 text-small font-semibold text-ink">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((was) => !was)}
+          className="press press-area inline-flex items-center gap-1.5"
+        >
+          <ChevronRight
+            className={cn('size-3.5 text-ink-muted transition-transform', open && 'rotate-90')}
+            strokeWidth={2}
+            aria-hidden
+          />
+          {heading}
+        </button>
+      </li>
+      {open && children}
+    </>
   );
 }

@@ -3017,7 +3017,8 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PlanFeatureSurface />,
   },
   {
-    /* The same page on its Steps tab: the steps as the plan's tree. */
+    /* The same page on its Steps tab: the steps and substeps grouped by
+     * status (plan #1665), done and dropped folded, the tree one chip away. */
     id: 'dev-plan-feature-steps',
     label: 'Plan · a feature’s steps',
     module: 'dev',
