@@ -17,9 +17,9 @@ export interface SettingsState {
 // are account settings and are written once, in app/account/actions.ts. The
 // two profiles.timezone columns are mirrors kept by a trigger now -- writing
 // one from here would be a second writer of a value this page does not own.
+// Target titles and the industries never to suggest are saved from Find
+// (app/jobs/(app)/find/actions.ts saveAim, plan #1589).
 const profileSchema = z.object({
-  targetTitles: z.string().trim().optional(),
-  excludedIndustries: z.string().trim().optional(),
   searchStartedOn: z.string().optional(),
   ghostThresholdDays: z.coerce.number().int().min(7).max(180).optional(),
   writingStyleNotes: z.string().trim().max(4000).optional(),
@@ -32,8 +32,6 @@ export async function updateProfile(
   formData: FormData,
 ): Promise<SettingsState> {
   const parsed = profileSchema.safeParse({
-    targetTitles: formData.get('targetTitles') ?? '',
-    excludedIndustries: formData.get('excludedIndustries') ?? '',
     searchStartedOn: formData.get('searchStartedOn') ?? '',
     ghostThresholdDays: formData.get('ghostThresholdDays') || undefined,
     writingStyleNotes: formData.get('writingStyleNotes') ?? '',
@@ -50,18 +48,6 @@ export async function updateProfile(
   if (parsed.data.ghostThresholdDays) patch.ghost_threshold_days = parsed.data.ghostThresholdDays;
   if (parsed.data.writingStyleNotes !== undefined) {
     patch.writing_style_notes = parsed.data.writingStyleNotes || null;
-  }
-  if (parsed.data.targetTitles !== undefined) {
-    patch.target_titles = parsed.data.targetTitles
-      .split(/[,\n]/)
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-  }
-  if (parsed.data.excludedIndustries !== undefined) {
-    patch.excluded_industries = parsed.data.excludedIndustries
-      .split(/[,\n]/)
-      .map((entry) => entry.trim())
-      .filter(Boolean);
   }
   if (parsed.data.bannedConstructions !== undefined) {
     patch.banned_constructions = parsed.data.bannedConstructions

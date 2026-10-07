@@ -53,8 +53,8 @@ const CHANNEL_LABELS: Record<string, string> = {
 };
 
 /**
- * Dash's recommendations, each list on the page it belongs to: people to meet
- * at the top of Contacts, roles to apply for at the top of Roles. The daily
+ * Dash's recommendations, both on Find (plan #1589): the roles to apply for,
+ * then the people to meet. The daily
  * run fills them (lib/jobs/suggest), so they are there when the page opens;
  * the search button is for a list that has run dry.
  */
@@ -116,6 +116,40 @@ function RecommendedSection({
   // Folds to its header (note b4a23b56), and stays folded in this browser.
   // The key is the one this section kept its fold under before CardSection
   // could fold, so a fold made then still holds (plan #1432).
+  //
+  // The search button sits in the body, beside the line about the latest
+  // search, rather than as the section's header action: the header keeps
+  // room for an action whether or not the title needs it, which pushed
+  // "Recommended roles 4" onto a second line at 390 (plan #1589).
+  const lines = [
+    (count > 0 ? hint : empty) ? (
+      <p key="hint" className="text-small text-ink-muted">
+        {count > 0 ? hint : empty}
+      </p>
+    ) : null,
+    status ? (
+      <p
+        key="status"
+        role="status"
+        className={cn('text-small', status.tone === 'warn' ? 'text-caution' : 'text-ink-muted')}
+      >
+        {status.text}
+      </p>
+    ) : null,
+    notice ? (
+      <p key="notice" className="text-small text-ink-muted">
+        {notice}
+      </p>
+    ) : null,
+  ].filter(Boolean);
+  const search = (
+    <span className="flex shrink-0 items-center gap-1">
+      <Button type="button" size="sm" variant="secondary" pending={searching} onClick={ask}>
+        {searching ? searchingLabel : button}
+      </Button>
+      {paidHint}
+    </span>
+  );
   return (
     <CardSection
       fold={`jobs.fold.${title}`}
@@ -126,29 +160,20 @@ function RecommendedSection({
         </>
       }
       meta={count > 0 ? count : undefined}
-      action={
-        <>
-          <Button type="button" size="sm" variant="ghost" pending={searching} onClick={ask}>
-            {searching ? searchingLabel : button}
-          </Button>
-          {paidHint}
-        </>
-      }
     >
-      {(count > 0 ? hint : empty) && (
-        <p className="mb-2 text-small text-ink-muted">{count > 0 ? hint : empty}</p>
-      )}
-      {status && (
-        <p
-          role="status"
-          className={cn('mb-2 text-small', status.tone === 'warn' ? 'text-caution' : 'text-ink-muted')}
-        >
-          {status.text}
-        </p>
-      )}
-      {notice && <p className="mb-2 text-small text-ink-muted">{notice}</p>}
+      {lines.length > 0 || count === 0 ? (
+        <div className="mb-2 flex items-start gap-3">
+          <div className="min-w-0 flex-1 space-y-1">{lines}</div>
+          {search}
+        </div>
+      ) : null}
       {count > 0 && toolbar}
       {count > 0 && <ul className="divide-y divide-border">{children}</ul>}
+      {/* With no line to sit beside, the button closes the list instead of
+          taking a row of its own above the first item (plan #1589). */}
+      {lines.length === 0 && count > 0 && (
+        <div className="mt-2 flex justify-end border-t border-border pt-2">{search}</div>
+      )}
       {footer}
     </CardSection>
   );
@@ -158,8 +183,7 @@ export function RecommendedPeople({ suggestions }: { suggestions: OpenSuggestion
   return (
     <RecommendedSection
       title="People to meet"
-      hint="People worth reaching out to, from Dash's searches and anything a goal step turned up, with what to say. Sent adds them to your contacts."
-      empty="Dash looks for new people every few days, from your career goals and CV. The next ones will appear here."
+      empty="Dash looks for new people every few days, from your career goals and CV, with what to say to each. Sent adds them to your contacts."
       button="Search now"
       searching="Searching…"
       paidHint={
@@ -183,7 +207,7 @@ export function RecommendedRoles({
   suggestions,
   view = { sort: 'newest', filter: NO_OPENING_FILTER },
   keep = [],
-  pathname = '/jobs/roles',
+  pathname = '/jobs/find',
   stats = [],
   searchCostMicros = 0,
   searchLine = null,
