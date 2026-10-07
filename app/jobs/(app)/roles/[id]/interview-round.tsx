@@ -6,7 +6,12 @@ import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { RoundPrep } from './prep-note';
-import { deleteInterviewRound, linkRoundMessage, saveInterviewGroup, unlinkRoundMessage } from './interview-actions';
+import {
+  deleteInterviewRound,
+  linkRoundMessage,
+  saveInterviewGroup,
+  unlinkRoundMessage,
+} from './interview-actions';
 import { InlineInput, Select } from '@/components/ui/field';
 import { GmailLink, NoteKindButton, CollapsibleField } from './shared';
 import { InterviewCard } from './interview-card';
@@ -35,6 +40,7 @@ export function InterviewGroupCard({
   timezone,
   companyContacts,
   focusInterviewId,
+  closed = false,
 }: {
   applicationId: string;
   group: PanelProps['interviewGroups'][number];
@@ -46,6 +52,8 @@ export function InterviewGroupCard({
   timezone: string;
   companyContacts: PanelProps['companyContacts'];
   focusInterviewId?: string | null;
+  /** The application has closed: no asking for prep, no adding to the round. */
+  closed?: boolean;
 }) {
   const [label, setLabel] = useState(group.label ?? '');
   const [roundNumber, setRoundNumber] = useState(
@@ -268,8 +276,10 @@ export function InterviewGroupCard({
 
           {/* One note for the occasion. It is stored on the round's earliest
             conversation, so the carrier is whichever of them has one and the
-            lead otherwise -- which is where the action would write it. */}
-          {prepCarrier && (
+            lead otherwise -- which is where the action would write it. A round
+            of one conversation shows it inside that conversation's Prep
+            instead (plan #1594). */}
+          {interviews.length > 1 && prepCarrier && (prepCarrier.prepNote || !closed) && (
             <RoundPrep
               interviewId={prepCarrier.id}
               state={{
@@ -290,20 +300,26 @@ export function InterviewGroupCard({
                 companyContacts={companyContacts}
                 focused={interview.id === focusInterviewId}
                 grouped
+                closed={closed}
+                carriesRoundPrep={interviews.length === 1}
               />
             ))}
 
             {/* The round fills up from here: another conversation in the same
               round is one click, and an invitation that is already in the inbox
               starts from the message rather than from a blank form. */}
-            <AddInterview
-              applicationId={applicationId}
-              groupId={group.id}
-              mailOptions={schedulingMail}
-              triggerLabel={
-                interviews.length === 0 ? 'Add an interview' : 'Add another interview to this round'
-              }
-            />
+            {!closed && (
+              <AddInterview
+                applicationId={applicationId}
+                groupId={group.id}
+                mailOptions={schedulingMail}
+                triggerLabel={
+                  interviews.length === 0
+                    ? 'Add an interview'
+                    : 'Add another interview to this round'
+                }
+              />
+            )}
           </div>
         </>
       )}

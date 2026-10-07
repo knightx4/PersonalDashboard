@@ -8,6 +8,8 @@ import type { DevComment } from '@/lib/comments/load';
 export interface PanelProps {
   roleId: string;
   applicationId: string;
+  /** Where the application is, which decides the controls each tab offers. */
+  status: ApplicationStatus;
   jdText: string;
   /** What the last automated board lookup did, or could not do. */
   jdLookupNote: string | null;
@@ -55,8 +57,6 @@ export interface PanelProps {
     status: string;
     prepNotes: string;
     notes: string;
-    /** Free-form notes written against this round, newest first. */
-    customNotes: Array<{ id: string; body: string; createdAt: string }>;
     /** The round it is in. Every interview is in one. */
     groupId: string | null;
     questionsAsked: string[];
@@ -104,14 +104,6 @@ export interface PanelProps {
     /** The linked mail this round is about — the invite, the reschedule. */
     messageIds: string[];
   }>;
-  /** Open to-dos you set for yourself, not events the inbox produced. */
-  todos: Array<{
-    id: string;
-    body: string;
-    dueAt: string;
-    /** The email that asked for it, where one has been named. */
-    message: { id: string; subject: string | null; gmailHref: string | null } | null;
-  }>;
   messages: Array<{
     id: string;
     subject: string | null;
@@ -141,4 +133,16 @@ export interface PanelProps {
     outcome: string | null;
     rejectionStage: string | null;
   }>;
+}
+
+/**
+ * A to-do from the job module's reminders: raised by the nightly sweep or the
+ * inbox, or written here before new ones went to Todo (plan #1594).
+ */
+export interface RoleReminder {
+  id: string;
+  body: string;
+  dueAt: string;
+  /** The email that asked for it, where one has been named. */
+  message: { id: string; subject: string | null; gmailHref: string | null } | null;
 }

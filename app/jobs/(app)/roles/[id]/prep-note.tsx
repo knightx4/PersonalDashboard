@@ -56,13 +56,7 @@ function Section({ heading, children }: { heading: string; children: React.React
   );
 }
 
-function Points({
-  heading,
-  points,
-}: {
-  heading: string;
-  points: PrepNote['strengths'];
-}) {
+function Points({ heading, points }: { heading: string; points: PrepNote['strengths'] }) {
   if (points.length === 0) return null;
   return (
     <Section heading={heading}>
@@ -95,10 +89,16 @@ export function RoundPrep({
   interviewId,
   state,
   timezone,
+  heading: headingText = 'Prep note',
+  flush = false,
 }: {
   interviewId: string;
   state: PrepNoteState;
   timezone: string;
+  /** What the note is called: "Prep note" on a round, "From Dash" inside an interview's Prep. */
+  heading?: string;
+  /** Inside a section that already spaces it, so no top margin of its own. */
+  flush?: boolean;
 }) {
   const [note, setNote] = useState(state.note);
   const [generatedAt, setGeneratedAt] = useState(state.generatedAt);
@@ -123,7 +123,9 @@ export function RoundPrep({
     });
 
   const heading = (
-    <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">Prep note</h4>
+    <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
+      {headingText}
+    </h4>
   );
 
   const staleLine = stale && (
@@ -134,7 +136,7 @@ export function RoundPrep({
 
   if (!note) {
     return (
-      <div className="mt-3">
+      <div className={flush ? undefined : 'mt-3'}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           {heading}
           <div className="flex items-center gap-2">
@@ -163,7 +165,7 @@ export function RoundPrep({
     // A native <details> so it folds before JavaScript loads (law 6), open to
     // begin with because it was asked for. Regenerate sits beside the summary
     // rather than in it, so pressing it never folds the note as well.
-    <div className="relative mt-3">
+    <div className={cn('relative', !flush && 'mt-3')}>
       <details ref={foldRef} open className="group/prep">
         <summary
           className={cn(
@@ -268,9 +270,7 @@ export function RoundPrep({
               state, and the point is that the note says so rather than
               writing around it. */}
           {note.missing.length > 0 && (
-            <p className="text-small text-ink-muted">
-              Written without: {note.missing.join(' ')}
-            </p>
+            <p className="text-small text-ink-muted">Written without: {note.missing.join(' ')}</p>
           )}
 
           {note.bannedFound.length > 0 && (

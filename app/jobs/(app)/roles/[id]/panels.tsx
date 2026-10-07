@@ -10,7 +10,7 @@
  * one; what they are handed is `PanelProps` in ./types.
  */
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   CalendarClock,
   FileText,
@@ -52,6 +52,21 @@ export function RoleDetailPanels(
   const searchParams = useSearchParams();
   const tab = roleTabFrom(searchParams.get('tab')) ?? props.defaultTab ?? 'timeline';
   const [interviewSeed, setInterviewSeed] = useState<InterviewSeed | null>(null);
+  const navRef = useRef<HTMLElement>(null);
+
+  // At phone width the strip scrolls, and a page that opens on Interviews or
+  // Comments would otherwise have its own tab out of sight. Brought into view
+  // along the strip only, so the page itself does not move.
+  useEffect(() => {
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !active) return;
+    const strip = nav.getBoundingClientRect();
+    const box = active.getBoundingClientRect();
+    if (box.left < strip.left || box.right > strip.right) {
+      nav.scrollLeft += box.left - strip.left - 16;
+    }
+  }, [tab]);
 
   const openTab = (next: RoleTab) => {
     if (next === tab) return;
@@ -68,6 +83,7 @@ export function RoleDetailPanels(
   return (
     <div>
       <nav
+        ref={navRef}
         aria-label="Role"
         className="mb-4 flex gap-1 overflow-x-auto border-b border-border max-lg:scroll-fade-x"
       >
@@ -147,8 +163,10 @@ function NotRealPursuit({ applicationId }: { applicationId: string }) {
       <p className="text-small text-ink-muted">
         An advert the scan mistook for a confirmation, or a role you never went for.
       </p>
+      {/* Pulled back by the ghost button's own padding, so its words start
+          under the sentence's rather than indented from it (law 18). */}
       <ConfirmStep
-        className="mt-1"
+        className="-ml-2.5 mt-1"
         align="start"
         prompt="Remove this pursuit? The role goes with it, and the company too if nothing else is attached to it. Any mail that created it is marked not relevant, so the next sync will not bring it back."
         confirmLabel="Yes, remove it"

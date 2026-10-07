@@ -19,9 +19,21 @@ import {
 import { saveCoverLetter } from './actions';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { LinkedText } from '@/components/ui/linked-text';
+import { roleStage } from '@/lib/jobs/role-stage';
 import type { PanelProps } from './types';
 
-export function Answers({ answers, applicationId, bankSize, roleId, coverLetter }: PanelProps) {
+export function Answers({
+  answers,
+  applicationId,
+  bankSize,
+  roleId,
+  coverLetter,
+  status,
+}: PanelProps) {
+  // A closed application is read, not written: what was sent stays editable
+  // as a record, but adding questions and drafting from the bank are folded
+  // away (plan #1594).
+  const closed = roleStage(status) === 'closed';
   const [paste, setPaste] = useState('');
   const [pasting, setPasting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -80,7 +92,8 @@ export function Answers({ answers, applicationId, bankSize, roleId, coverLetter 
           </div>
         </CardSection>
       ) : (
-        answers.length > 0 && (
+        answers.length > 0 &&
+        !closed && (
           <div className="flex flex-wrap items-center gap-3">
             <AddTrigger label="Add more questions" onClick={() => setPasting(true)} />
             {message && <span className="text-small text-ink-muted">{message}</span>}
@@ -94,7 +107,12 @@ export function Answers({ answers, applicationId, bankSize, roleId, coverLetter 
         // longer standing open above this, so the empty state has to offer it:
         // law 15 puts the teaching here, which is where somebody seeing this
         // panel for the first time is standing.
-        !pasting && (
+        !pasting &&
+        (closed ? (
+          <p className="text-ui text-ink-muted">
+            No application questions were captured before this closed.
+          </p>
+        ) : (
           <EmptyState
             icon={MessageSquareText}
             title="No questions captured yet"
@@ -103,11 +121,11 @@ export function Answers({ answers, applicationId, bankSize, roleId, coverLetter 
           >
             <AddTrigger label="Paste the questions" onClick={() => setPasting(true)} />
           </EmptyState>
-        )
+        ))
       ) : (
         <div className="space-y-3">
           {answers.map((answer) => (
-            <AnswerCard key={answer.id} answer={answer} bankSize={bankSize} />
+            <AnswerCard key={answer.id} answer={answer} bankSize={bankSize} closed={closed} />
           ))}
         </div>
       )}
@@ -203,9 +221,12 @@ function CoverLetter({
 function AnswerCard({
   answer,
   bankSize,
+  closed,
 }: {
   answer: PanelProps['answers'][number];
   bankSize: number;
+  /** The application has closed: no drafting from the bank. */
+  closed: boolean;
 }) {
   const [text, setText] = useState(answer.answer || answer.canonicalAnswer || '');
   const [status, setStatus] = useState(answer.status);
@@ -367,38 +388,42 @@ function AnswerCard({
             Make this my default answer
           </Button>
         )}
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          pending={drafting}
-          disabled={bankSize === 0}
-          title={
-            bankSize === 0
-              ? 'Your evidence bank is empty, so there is nothing to draft from.'
-              : undefined
-          }
-          onClick={() => {
-            setDrafting(true);
-            setDraftError(null);
-            startTransition(async () => {
-              const result = await draftAnswerFromEvidence({ answerId: answer.id });
-              setDrafting(false);
-              if (result.error || !result.draft) {
-                setDraftError(result.error ?? 'Nothing came back.');
-                return;
+        {!closed && (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              pending={drafting}
+              disabled={bankSize === 0}
+              title={
+                bankSize === 0
+                  ? 'Your evidence bank is empty, so there is nothing to draft from.'
+                  : undefined
               }
-              setDraft(result.draft);
-            });
-          }}
-        >
-          {drafting ? 'Drafting…' : 'Draft from my evidence'}
-        </Button>
-        {bankSize > 0 && (
-          <PaidHint
-            action="app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence"
-            what="Cost of drafting"
-          />
+              onClick={() => {
+                setDrafting(true);
+                setDraftError(null);
+                startTransition(async () => {
+                  const result = await draftAnswerFromEvidence({ answerId: answer.id });
+                  setDrafting(false);
+                  if (result.error || !result.draft) {
+                    setDraftError(result.error ?? 'Nothing came back.');
+                    return;
+                  }
+                  setDraft(result.draft);
+                });
+              }}
+            >
+              {drafting ? 'Drafting…' : 'Draft from my evidence'}
+            </Button>
+            {bankSize > 0 && (
+              <PaidHint
+                action="app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence"
+                what="Cost of drafting"
+              />
+            )}
+          </>
         )}
         {saved && <span className="text-small text-ink-muted">{saved}</span>}
         {draftError && <span className="text-small text-danger">{draftError}</span>}

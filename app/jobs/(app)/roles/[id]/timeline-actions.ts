@@ -4,48 +4,6 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 
-const reminderSchema = z.object({
-  applicationId: z.string().uuid(),
-  body: z.string().trim().min(1, 'Say what it is.'),
-  dueAt: z.string().min(1, 'Pick a date.'),
-});
-
-/**
- * A to-do you set for yourself, not one the sweep raised.
- *
- * Same table and the same Nudges section on This week as the automatic
- * ones — `rule_key` stays null, which is what tells the sweep this one is
- * not its to manage, so it will not touch or re-fire it.
- */
-// latency: pending
-export async function addReminder(input: {
-  applicationId: string;
-  body: string;
-  dueAt: string;
-}): Promise<{ error: string | null }> {
-  const parsed = reminderSchema.safeParse(input);
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-
-  const user = await requireUser();
-  const supabase = await createClient();
-
-  const { error } = await supabase.from('reminders').insert({
-    user_id: user.id,
-    application_id: parsed.data.applicationId,
-    kind: 'custom',
-    body: parsed.data.body,
-    due_at: new Date(parsed.data.dueAt).toISOString(),
-  });
-
-  if (error) return { error: error.message };
-
-  revalidatePath('/jobs/roles/[id]', 'page');
-  revalidatePath('/jobs');
-  // And on the company, which rolls up the to-dos of every role it has.
-  revalidatePath('/jobs/companies/[slug]', 'page');
-  return { error: null };
-}
-
 const reminderPatchSchema = z.object({
   reminderId: z.string().uuid(),
   body: z.string().trim().min(1, 'Say what it is.'),
