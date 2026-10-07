@@ -51,7 +51,7 @@ export function ClipStreamSurface() {
           description="Short clips from your videos, one after another. Swipe up, press the down arrow or let one finish for the next."
         />
       </div>
-      <ClipStream initial={CLIPS} startedAt="2026-10-02T12:00:00.000Z" fixed />
+      <ClipStream initial={CLIPS} fixed />
     </>
   );
 }

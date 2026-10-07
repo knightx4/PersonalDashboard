@@ -3,7 +3,7 @@
  *
  * lib/learn/clips/next.ts reads the clips and the person's history from the
  * database and hands them here; nothing in this file touches a client, so the
- * rules are tested with fixture clips (next.test.ts).
+ * rules are tested with fixture clips (rank.test.ts).
  *
  * The order, from the outside in:
  *
@@ -11,22 +11,29 @@
  *      comes back only if it was skipped, and only once two weeks have passed
  *      since it was skipped and since it was last shown. Those returning clips
  *      play after every unseen one, so they fill in rather than crowd out.
- *   2. Scored clips before clips Jev has not scored yet. An unscored clip is
- *      still offered, after the scored ones, so the stream does not run dry
- *      while scoring catches up.
- *   3. Within that, the score Jev gave (1 to 100) with the person's own
- *      filings applied on top: Jev reads no examples, so skips and saves are a
- *      rule here, the way their filings override the video judge. A clip from
- *      the person's own playlist gets PLAYLIST_BONUS points, so the list
- *      leans ahead without holding every channel clip back until it is
- *      watched through. #1396 first answered playlist strictly first; the
- *      person asked for the two mixed.
+ *   2. Clips with a rating or a score before clips that have neither. An
+ *      unranked clip is still offered, after the others, so the stream does
+ *      not run dry while rating and scoring catch up.
+ *   3. Within that, one number for every clip, playlist and channel alike.
+ *      It starts from Jev's rating of the clip (educational value,
+ *      entertainment and quality, averaged by combinedRating), or from the
+ *      relevance score where the clip is not rated yet. A clip from the
+ *      person's own playlist gets PLAYLIST_BONUS points, and their filings
+ *      move it either way: Jev reads no examples, so skips and saves are a
+ *      rule here, the way their filings override the video judge.
  *
- * Then at most two clips from one video in a session, and never two clips of
- * one video within VIDEO_GAP clips of each other, counting the clips played
- * just before (recentVideos). Where the best clip left is too close to its
- * video's last one, the next best that is not takes its place; when none is
- * left, fewer are returned.
+ * #1396 first answered that every playlist clip plays before any channel
+ * clip. The person has since replaced that answer: channel clips are mixed in
+ * by how good they are, so a good channel clip plays before a mediocre
+ * playlist one, and the playlist keeps only the bonus above.
+ *
+ * Then two limits on how often one video comes up. At most MAX_PER_VIDEO
+ * clips of one video in any seven days, counting the clips shown in that time
+ * (shownThisWeek) and the ones queued and not yet shown (queuedVideos). And
+ * never two clips of one video within VIDEO_GAP clips of each other, counting
+ * the clips played just before (recentVideos). Where the best clip left is
+ * too close to its video's last one, the next best that is not takes its
+ * place; when none is left, fewer are returned.
  */
 
 /** A clip as the picker sees it. Times are ISO strings, as supabase-js returns them. */
@@ -34,7 +41,10 @@ export type RankableClip = {
   id: string;
   videoId: string;
   cameFrom: 'playlist' | 'channel';
+  /** The relevance score from the scoring run, 1 to 100; null until scored. */
   score: number | null;
+  /** Jev's three ratings combined (combinedRating), 1 to 100; null until rated. */
+  rating: number | null;
   /** Who made the video: the catalogue item's author. Null when unknown, which gives no channel signal. */
   channel: string | null;
   /** The track it serves (subject_id), or the name the cutter wrote in `serves`. Null when neither. */
@@ -66,8 +76,10 @@ export const EARLY_SKIP_SECONDS = 5;
 /** A skipped clip may come back once this long has passed since it was skipped and last shown. */
 export const SKIP_RETURN_MS = 14 * 24 * 60 * 60 * 1000;
 
-/** The most clips one video contributes to a session. */
+/** The most clips one video contributes in any SHOWN_WINDOW_MS. */
 export const MAX_PER_VIDEO = 2;
+/** The window MAX_PER_VIDEO counts over: clips shown in the last seven days. */
+export const SHOWN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Points off a clip's 1-100 score for each early skip on its channel or theme. */
 export const EARLY_SKIP_PENALTY = 6;
@@ -138,10 +150,29 @@ export function eligibility(clip: RankableClip, now: number): 'unseen' | 'return
   return now - last >= SKIP_RETURN_MS ? 'returning' : null;
 }
 
-/** The score the picker ranks by: Jev's, moved by the filings, a recent Learn now card and the playlist. Null stays null. */
+/**
+ * Jev's three ratings as one number, 1 to 100: their plain average. Each axis
+ * counts the same, since the person named all three without ranking them.
+ */
+export function combinedRating(educational: number, entertainment: number, quality: number): number {
+  const mean = (educational + entertainment + quality) / 3;
+  return Math.min(100, Math.max(1, Math.round(mean)));
+}
+
+/** What a clip is ranked from before any adjustment: its rating, or its score where it has no rating. */
+export function baseScore(clip: Pick<RankableClip, 'rating' | 'score'>): number | null {
+  return clip.rating ?? clip.score;
+}
+
+/**
+ * The number the picker ranks by: the base score, moved by the playlist, the
+ * filings and a recent Learn now card. Null when the clip has neither a
+ * rating nor a score.
+ */
 export function adjustedScore(clip: RankableClip, lean: Lean, recentThemes: ReadonlySet<string>): number | null {
-  if (clip.score === null) return null;
-  let score = clip.score + (clip.cameFrom === 'playlist' ? PLAYLIST_BONUS : 0);
+  const base = baseScore(clip);
+  if (base === null) return null;
+  let score = base + (clip.cameFrom === 'playlist' ? PLAYLIST_BONUS : 0);
   if (clip.channel) score += lean.channel.get(clip.channel) ?? 0;
   if (clip.theme) {
     score += lean.theme.get(clip.theme) ?? 0;
@@ -159,8 +190,14 @@ export type PickOptions = {
   reactions?: readonly ClipReaction[];
   /** Tracks (themes) that came up in a recent Learn now card. */
   recentThemes?: ReadonlySet<string>;
-  /** Clips already played per video this session, counted against MAX_PER_VIDEO. */
-  playedThisSession?: ReadonlyMap<string, number>;
+  /** Clips shown per video in the last SHOWN_WINDOW_MS, counted against MAX_PER_VIDEO. */
+  shownThisWeek?: ReadonlyMap<string, number>;
+  /**
+   * The videos of the clips queued on the phone and not shown yet, one entry
+   * per clip. Each counts against its video's MAX_PER_VIDEO, since it is
+   * about to play.
+   */
+  queuedVideos?: readonly string[];
   /**
    * The videos of the clips played or queued just before these, oldest
    * first, so VIDEO_GAP holds across calls. Only the last VIDEO_GAP - 1 count.
@@ -172,9 +209,9 @@ export type PickOptions = {
 
 type Ranked<T> = { clip: T; tier: number; score: number | null };
 
-/** The rank tier: lower plays first. Returning, then unscored, each push a clip back. */
+/** The rank tier: lower plays first. Returning, then having no rating or score, each push a clip back. */
 function tierOf(clip: RankableClip, kind: 'unseen' | 'returning'): number {
-  return (kind === 'returning' ? 2 : 0) + (clip.score === null ? 1 : 0);
+  return (kind === 'returning' ? 2 : 0) + (baseScore(clip) === null ? 1 : 0);
 }
 
 /** The clips to play next, in order. */
@@ -192,7 +229,8 @@ export function pickNextClips<T extends RankableClip>(clips: readonly T[], optio
   }
   ranked.sort((a, b) => a.tier - b.tier || (b.score ?? 0) - (a.score ?? 0) || a.clip.id.localeCompare(b.clip.id));
 
-  const perVideo = new Map(options.playedThisSession ?? []);
+  const perVideo = new Map(options.shownThisWeek ?? []);
+  for (const videoId of options.queuedVideos ?? []) perVideo.set(videoId, (perVideo.get(videoId) ?? 0) + 1);
   const capped = ranked.filter((r) => {
     const n = perVideo.get(r.clip.videoId) ?? 0;
     if (n >= MAX_PER_VIDEO) return false;

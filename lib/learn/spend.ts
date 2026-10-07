@@ -286,6 +286,10 @@ export const LEARN_OPERATIONS = [
   // per clip, and one Haiku call for up to forty clips Jev could not answer.
   // Both recorded here, one row per model per person per run.
   'score-clips',
+  // Rating a clip on educational value, entertainment and quality: three Jev
+  // score questions in one request per clip, and one Haiku call for up to
+  // forty clips Jev could not rate. One row per model per person per run.
+  'rate-clips',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

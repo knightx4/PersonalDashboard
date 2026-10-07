@@ -224,6 +224,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // Per clip: the learner state and one clip's caption, point and up to
   // ninety seconds of transcript in, a score out. Haiku is the fallback.
   'score-clips': background(unit(JEV, 1_500, 0)),
+  // Per clip: its title, caption and up to ninety seconds of transcript in,
+  // three ratings out, in one Jev request. Haiku is the fallback.
+  'rate-clips': background(unit(JEV, 1_200, 0)),
 
   // Jobs.
   'enrich-company': searching(run(HAIKU, 10_000, 500), 2),

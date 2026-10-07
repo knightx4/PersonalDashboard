@@ -12,6 +12,11 @@
  * learn / score-clips, against the person the clips are for. Run it after
  * `npm run clips:cut` to score a backlog just cut.
  *
+ * Then it rates every unseen clip with no rating on educational value,
+ * entertainment and quality (lib/learn/clips/rate-run.ts), the same way and
+ * with no cap, recorded under learn / rate-clips. The library run does this
+ * 120 clips a person a run; this clears a backlog in one go.
+ *
  * Needs NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, and
  * TYPESAFE_API_KEY, ANTHROPIC_API_KEY or both, from the environment or from
  * .env.local and .env. `--conditions=react-server`, which the npm script
@@ -25,6 +30,7 @@ import { recordSpend } from '../lib/core/spend/record';
 import { jevEnabledFor } from '../lib/jev/enabled';
 import { haikuClient } from '../lib/learn/clips/score-jev';
 import { scoreClips } from '../lib/learn/clips/score-run';
+import { rateClips } from '../lib/learn/clips/rate-run';
 
 for (const file of ['.env.local', '.env']) {
   if (existsSync(file)) loadEnvFile({ path: file, quiet: true });
@@ -63,10 +69,34 @@ async function main(): Promise<void> {
     left -= result.scored;
     if (result.scored === 0 || result.unscored > 0) break;
   }
-  await Promise.all(rows);
   console.log(
     `Scored ${total.scored} clips (${total.byJev} by Jev, ${total.byHaiku} by Haiku; ${total.rescored} scored again). ` +
       `${total.unscored} left unscored, ${total.failed} calls failed.`,
+  );
+
+  // Then rate every unseen clip with no rating, in passes of up to a thousand.
+  const rated = { rated: 0, byJev: 0, byHaiku: 0, unrated: 0, failed: 0 };
+  for (let left = limit; left > 0; ) {
+    const result = await rateClips(learn, {
+      client,
+      jevEnabled: (userId) => jevEnabledFor(core, userId),
+      deadline: Infinity,
+      limit: Math.min(left, 1000),
+      onSpend: (userId, report) =>
+        void rows.push(recordSpend(core, userId, { module: 'learn', operation: 'rate-clips', model: report.model, usage: report.usage })),
+    });
+    rated.rated += result.rated;
+    rated.byJev += result.byJev;
+    rated.byHaiku += result.byHaiku;
+    rated.unrated = result.unrated;
+    rated.failed += result.failed;
+    left -= result.rated;
+    if (result.rated === 0 || result.unrated > 0) break;
+  }
+  await Promise.all(rows);
+  console.log(
+    `Rated ${rated.rated} clips (${rated.byJev} by Jev, ${rated.byHaiku} by Haiku). ` +
+      `${rated.unrated} left unrated, ${rated.failed} calls failed.`,
   );
 }
 
