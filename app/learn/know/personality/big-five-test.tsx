@@ -89,7 +89,11 @@ export function BigFiveTest({
     <div className="max-w-2xl">
       <p className="text-body text-ink">
         Fifty statements about how you usually are now, not how you wish to be. It takes about ten
-        minutes, and nothing is saved until you finish.
+        minutes, and nothing is saved until you finish. Already have a type from another test?{' '}
+        <a href="#other-tests" className="text-accent underline-offset-2 hover:underline">
+          Add it below
+        </a>
+        .
       </p>
 
       <div className="mt-5 flex justify-end">
