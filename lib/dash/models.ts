@@ -24,6 +24,11 @@ export const DASH_MODELS = {
    * Sonnet before.
    */
   maya: MODELS.maya,
+  /**
+   * The interview for a workspace's spec (plan #1639): one question a turn,
+   * built on the last answer. Sonnet, as the threads are.
+   */
+  interview: MODELS.specInterview,
 } as const;
 
 export type DashSurfaceModel = keyof typeof DASH_MODELS;
