@@ -69,10 +69,6 @@
   "jobs-interviews": {
     "targets": 4
   },
-  "jobs-pipeline-board": {
-    "targets": 9,
-    "contrast": 4
-  },
   "jobs-pipeline-dense": {
     "targets": 9
   },

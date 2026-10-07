@@ -42,12 +42,14 @@ export function openApplications(rows: readonly { status: ApplicationStatus }[])
 }
 
 /**
- * The line a rejection leaves on the board: where the role went and how many
- * applications are still open. Plain, so the news is neither hidden nor made
- * much of.
+ * The line a rejection leaves: how many applications are still
+ * open and where the role went. Plain, so the news is neither hidden nor made
+ * much of. The count comes first and the line is short, because it is said in
+ * a toast one line wide on a phone, and a long company name should cut the
+ * name rather than the count.
  */
 export function stillOpenLine(company: string, open: number): string {
-  const filed = company.trim() ? `${company.trim()} is filed under Closed.` : 'Filed under Closed.';
-  if (open === 0) return `${filed} No applications are open right now.`;
-  return `${filed} ${open} application${open === 1 ? ' is' : 's are'} still open.`;
+  const count = open === 0 ? 'None still open' : `${open} still open`;
+  const filed = company.trim() ? `${company.trim()} is in Closed` : 'Moved to Closed';
+  return `${count} · ${filed}`;
 }
