@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useActionState, useState, useTransition } from 'react';
+import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';
 import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
@@ -605,6 +606,7 @@ function Contacts({
   addingPerson?: boolean;
 }) {
   const [adding, setAdding] = useState(addingPerson);
+  const [more, setMore] = useState(false);
   const [state, action, pending] = useActionState(
     async (prev: { error?: string; message?: string }, formData: FormData) => {
       const result = await createContact(prev, formData);
@@ -618,26 +620,28 @@ function Contacts({
     <CardSection title="People">
       {adding ? (
         // Placeholders name the fields rather than labels above them, and the
-        // short fields share rows from sm up, so five short strings do not
-        // fill a screen (law 9).
+        // short fields share rows at every width, with the two links folded
+        // behind More, so the open form is three rows at 390 (law 9).
         <form action={action} className="mt-2 mb-4 space-y-2">
           <input type="hidden" name="companyId" value={companyId} />
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-2">
             <Input name="fullName" aria-label="Name" placeholder="Name" required autoFocus className={phoneTall} />
-            <Input name="title" aria-label="Title" placeholder="Title, e.g. Head of Finance" className={phoneTall} />
+            <Input name="title" aria-label="Title" placeholder="Title" className={phoneTall} />
           </div>
-          <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)]">
-            <Select name="relationship" aria-label="Relationship" defaultValue="cold" className={phoneTall}>
+          {more && (
+            <div className="grid grid-cols-2 gap-2">
+              <Input name="linkedinUrl" type="url" aria-label="LinkedIn" placeholder="LinkedIn URL" className={phoneTall} />
+              <Input name="email" type="email" aria-label="Work email" placeholder="Work email" className={phoneTall} />
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <Select name="relationship" aria-label="Relationship" defaultValue="cold" className={cn(phoneTall, 'w-32')}>
               {RELATIONSHIPS.map((entry) => (
                 <option key={entry} value={entry}>
                   {entry.replace(/_/g, ' ')}
                 </option>
               ))}
             </Select>
-            <Input name="linkedinUrl" type="url" aria-label="LinkedIn" placeholder="LinkedIn URL" className={phoneTall} />
-            <Input name="email" type="email" aria-label="Work email" placeholder="Work email" className={phoneTall} />
-          </div>
-          <div className="flex flex-wrap items-center gap-2 pt-1">
             <Button type="submit" size="sm" pending={pending}>
               Add person
             </Button>
@@ -646,6 +650,15 @@ function Contacts({
             </Button>
             <FieldError>{state.error}</FieldError>
           </div>
+          {!more && (
+            <button
+              type="button"
+              onClick={() => setMore(true)}
+              className="press-area text-small text-ink-muted underline underline-offset-2 hover:text-accent"
+            >
+              More: LinkedIn and work email
+            </button>
+          )}
         </form>
       ) : (
         <AddTrigger label="Add a person" onClick={() => setAdding(true)} className="mt-2" />

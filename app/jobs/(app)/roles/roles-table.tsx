@@ -39,15 +39,31 @@ export function RolesTable({
   hidden?: readonly string[];
 }) {
   const showing = (property: string) => !hidden.includes(property);
+  // Tighter than the table's own padding, so every column fits inside a
+  // laptop's width rather than running off the right edge (law 2).
+  const cell = 'px-2.5 first:pl-4 last:pr-4';
+  // Date applied gives way first below 1536: the last activity beside it
+  // says how fresh the role is, and the role page keeps the date.
+  const narrowHidden = 'max-2xl:hidden';
 
   return (
+    <>
+      {/* A phone gets a short row a role: the title and company, then the
+        * facts that have a value on one line (law 9). The stacked table gave
+        * each role eight labelled lines, most of them empty. */}
+      <ul className="divide-y divide-border md:hidden">
+        {rows.map((row) => (
+          <RoleRow key={row.applicationId} row={row} showing={showing} />
+        ))}
+      </ul>
+      <div className="max-md:hidden">
     <Table>
       <THead>
         <TR>
           {sorts
             .filter((entry) => showing(entry.id))
             .map((entry) => (
-              <TH key={entry.id}>
+              <TH key={entry.id} className={cn(cell, entry.id === 'applied' && narrowHidden)}>
                 <Link
                   href={entry.href}
                   className={cn(
@@ -61,7 +77,7 @@ export function RolesTable({
             ))}
           {/* Comp is a column without a sort, so it is not in the list above
               and gets its own header. */}
-          {showing('comp') && <TH num>Comp</TH>}
+          {showing('comp') && <TH num className={cell}>Comp</TH>}
         </TR>
       </THead>
       <TBody>
@@ -69,7 +85,7 @@ export function RolesTable({
           // The row goes to the role; the company is a second destination
           // and stays a link of its own in its cell.
           <TR key={row.applicationId} href={`/jobs/roles/${row.roleId}`}>
-            <TD primary>
+            <TD primary className={cell}>
               {row.roleTitle}
               {row.attempt > 1 && (
                 <span className="tabular ml-1.5 text-small font-normal text-ink-muted">
@@ -79,7 +95,7 @@ export function RolesTable({
               {(showing('fit') || showing('chance')) && <ScoreReasons note={row.scoreNote} className="mt-0.5" />}
             </TD>
             {showing('company') && (
-            <TD label="Company">
+            <TD label="Company" className={cell}>
               {/* `relative z-over-link`: the primary cell's link stretches over the
                   whole row, so anything that is its own destination has to be
                   lifted out from under it. */}
@@ -97,42 +113,42 @@ export function RolesTable({
                   className="size-5 rounded"
                   imageClassName="size-4"
                 />
-                <span className="truncate">{row.companyName}</span>
+                <span className="max-w-32 truncate">{row.companyName}</span>
               </Link>
             </TD>
             )}
             {showing('status') && (
-            <TD label="Status">
+            <TD label="Status" className={cn(cell, 'whitespace-nowrap')}>
               <StatusBadge status={row.status} everSubmitted={row.submittedAt !== null} />
             </TD>
             )}
             {showing('activity') && (
-            <TD label="Last activity" muted className="tabular">
+            <TD label="Last activity" muted className={cn(cell, 'tabular')}>
               {shortAge(row.lastActivityAt)}
             </TD>
             )}
             {showing('applied') && (
-            <TD label="Date applied" muted className="tabular">
-              {formatDate(row.submittedAt)}
+            <TD label="Date applied" muted className={cn(cell, 'tabular whitespace-nowrap', narrowHidden)}>
+              {shortDate(row.submittedAt)}
             </TD>
             )}
             {showing('excitement') && (
-            <TD label="Excitement" muted className="tabular">
+            <TD label="Excitement" muted className={cn(cell, 'tabular whitespace-nowrap')}>
               {row.excitement ? '★'.repeat(row.excitement) : '—'}
             </TD>
             )}
             {showing('fit') && (
-            <TD label={FIT_SCORE_LABEL} muted className="tabular" title={row.scoreNote?.fit?.unsure ? 'Dash is not sure of this one' : undefined}>
+             <TD label={FIT_SCORE_LABEL} muted className={cn(cell, 'tabular')} title={row.scoreNote?.fit?.unsure ? 'Dash is not sure of this one' : undefined}>
               {row.scoreNote ? (fitText(row.scoreNote) ?? '') : ''}
             </TD>
             )}
             {showing('chance') && (
-            <TD label={CHANCE_LABEL} muted title={row.scoreNote?.chance?.unsure ? 'Dash is not sure of this one' : undefined}>
+            <TD label={CHANCE_LABEL} muted className={cell} title={row.scoreNote?.chance?.unsure ? 'Dash is not sure of this one' : undefined}>
               {row.scoreNote ? (chanceFigureText(row.scoreNote) ?? '') : ''}
             </TD>
             )}
             {showing('comp') && (
-            <TD label="Comp" num muted>
+            <TD label="Comp" num muted className={cell}>
               {formatCompBand(row.compMinCents, row.compMaxCents) ?? '—'}
             </TD>
             )}
@@ -140,5 +156,47 @@ export function RolesTable({
         ))}
       </TBody>
     </Table>
+      </div>
+    </>
+  );
+}
+
+/** "14 Aug", with the year only when it is not this one: one line in the column. */
+function shortDate(iso: string | null): string {
+  const full = formatDate(iso);
+  const year = String(new Date().getFullYear());
+  return full.endsWith(` ${year}`) ? full.slice(0, -year.length - 1) : full;
+}
+
+function RoleRow({ row, showing }: { row: PipelineRow; showing: (property: string) => boolean }) {
+  const fit = showing('fit') && row.scoreNote ? fitText(row.scoreNote) : null;
+  const chance = showing('chance') && row.scoreNote ? chanceFigureText(row.scoreNote) : null;
+  const comp = showing('comp') ? formatCompBand(row.compMinCents, row.compMaxCents) : null;
+  const facts = [
+    showing('activity') && row.lastActivityAt ? shortAge(row.lastActivityAt) : null,
+    showing('excitement') && row.excitement ? '★'.repeat(row.excitement) : null,
+    fit ? `${FIT_SCORE_LABEL} ${fit}` : null,
+    chance ? `${chance} chance` : null,
+    comp,
+  ].filter(Boolean);
+
+  return (
+    <li className="relative row-pad px-4 hover:bg-sunken">
+      <p className="min-w-0 truncate text-ui">
+        <Link
+          href={`/jobs/roles/${row.roleId}`}
+          className="font-medium text-ink after:absolute after:inset-0 after:content-[''] hover:text-accent"
+        >
+          {row.roleTitle}
+        </Link>
+        {showing('company') && <span className="ml-1.5 text-ink-muted">{row.companyName}</span>}
+      </p>
+      <p className="mt-1 flex min-w-0 items-center gap-x-2 text-small text-ink-muted">
+        {showing('status') && (
+          <StatusBadge status={row.status} everSubmitted={row.submittedAt !== null} />
+        )}
+        {facts.length > 0 && <span className="tabular min-w-0 truncate">{facts.join(' · ')}</span>}
+      </p>
+    </li>
   );
 }

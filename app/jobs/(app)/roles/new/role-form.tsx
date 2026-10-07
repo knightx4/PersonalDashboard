@@ -103,11 +103,20 @@ export function RoleForm({
       >
         <input type="hidden" name="jdUrl" value={jdUrl} />
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <Field id="companyName" label="Company">
-              <Input name="companyName" list="known-companies" required placeholder="Ramp" />
-            </Field>
+        {/* Company, role and location carry their names in the placeholder and
+          * the accessible name, not in a label above each box, so each is one
+          * row at 390 (law 9). They fill whole rows together, so the labelled
+          * selects after them pair with each other and line up at a laptop. */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2 sm:col-span-1">
+            <Input
+              id="companyName"
+              name="companyName"
+              list="known-companies"
+              required
+              aria-label="Company"
+              placeholder="Company, such as Ramp"
+            />
             <datalist id="known-companies">
               {companies.map((company) => (
                 <option key={company.name} value={company.name} />
@@ -115,28 +124,26 @@ export function RoleForm({
             </datalist>
           </div>
 
-          <Field id="title" label="Role">
-            <Input
-              name="title"
-              required
-              defaultValue={fetched?.title ?? ''}
-              placeholder="Strategic Finance Analyst"
-            />
-          </Field>
+          <Input
+            id="title"
+            name="title"
+            required
+            aria-label="Role"
+            defaultValue={fetched?.title ?? ''}
+            placeholder="Role, such as Strategic Finance Analyst"
+            className="col-span-2 sm:col-span-1"
+          />
 
-          <Field id="location" label="Location">
-            <Input
-              name="location"
-              defaultValue={fetched?.location ?? ''}
-              placeholder="New York, NY"
-            />
-          </Field>
+          <Input
+            id="location"
+            name="location"
+            aria-label="Location"
+            defaultValue={fetched?.location ?? ''}
+            placeholder="Location, such as New York, NY"
+            className="col-span-2"
+          />
 
-          <Field
-            id="source"
-            label="How you applied"
-            hint="Insights compares how far each channel gets you."
-          >
+          <Field id="source" label="How you applied" className="col-span-2 sm:col-span-1">
             <Select
               name="source"
               value={source}
@@ -155,6 +162,7 @@ export function RoleForm({
               id="referralContactId"
               label="Who referred you"
               hint={contacts.length === 0 ? 'Add them under Contacts to name them here.' : undefined}
+              className="col-span-2 sm:col-span-1"
             >
               <Select name="referralContactId" defaultValue="" className="max-sm:min-h-11">
                 <option value="">Not named</option>
@@ -183,30 +191,33 @@ export function RoleForm({
           </Field>
         </div>
 
-        <Field
-          id="jdText"
-          label="Job description"
-          hint="Kept in full, unlike email. It is public text you fetched from a public page, it is what the requirement map reads, and refetching it later usually fails because the posting is gone."
-        >
+        {/* Kept in full, unlike email: it is public text from a public page,
+          * the requirement map reads it, and refetching later usually fails
+          * because the posting is gone. */}
+        <Field id="jdText" label="Job description">
           {/* ui-ok: composer-always-open -- this whole page is the create.
             * Law 14 permits landing in edit mode for a new thing; there is
             * nothing here to read yet. */}
           <Textarea
             name="jdText"
-            rows={12}
+            rows={8}
             defaultValue={fetched?.text ?? ''}
-            placeholder="Paste the description here if the link could not be read. This is always available and always works."
+            placeholder="Paste the description here if the link could not be read."
           />
         </Field>
 
-        <label className="flex items-center gap-2 text-ui text-ink">
-          <input type="checkbox" name="saveAsLead" className="size-4 rounded border-border" />
-          Save as a lead — I have not applied yet
-        </label>
-
         <FieldError>{createState.error}</FieldError>
 
-        <Submit label="Add role" />
+        {/* Pinned above the dock while the form scrolls on a phone, so Add
+          * role is always in reach (taste:forward-action-in-reach). The lead
+          * box rides with it, since it changes what the press does. */}
+        <div className="card-pad-x sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] -mx-(--card-p) flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border bg-surface py-3 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
+          <Submit label="Add role" />
+          <label className="flex items-center gap-2 text-ui text-ink">
+            <input type="checkbox" name="saveAsLead" className="size-4 rounded border-border" />
+            Save as a lead, not applied yet
+          </label>
+        </div>
       </form>
     </div>
   );

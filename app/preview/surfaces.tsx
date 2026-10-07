@@ -40,6 +40,7 @@ import {
 } from '@/lib/core/spend/estimate';
 import type { OperationName } from '@/lib/core/spend/guesses';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { SettingsView } from '@/app/jobs/(app)/settings/view';
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
@@ -3219,7 +3220,15 @@ export const SURFACES: readonly Surface[] = [
     label: 'Company · Adding a person',
     module: 'jobs',
     width: 'wide',
-    render: () => <CompanyPanels {...companyPanels} addingPerson />,
+    // With the search's estimate, as the jobs layout provides it, so the $
+    // beside Search with AI is drawn (law 16).
+    render: () => (
+      <PaidCostsProvider
+        costs={{ 'app/jobs/(app)/companies/actions.ts#proposeAiCompanyEnrichment': guessedSummary }}
+      >
+        <CompanyPanels {...companyPanels} addingPerson />
+      </PaidCostsProvider>
+    ),
   },
   {
     id: 'jobs-review',
@@ -3279,8 +3288,12 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     // Opened on Referral, so the field naming who referred you is drawn too.
+    // The padding is the room the app shell keeps under a page for the dock,
+    // so Add role, pinned above the dock, sits where it does in the app.
     render: () => (
-      <RoleForm companies={knownCompanies} contacts={referrerFixtures} defaultSource="referral" />
+      <div className="max-sm:pb-[calc(var(--dock-h)+2.125rem)]">
+        <RoleForm companies={knownCompanies} contacts={referrerFixtures} defaultSource="referral" />
+      </div>
     ),
   },
   {
