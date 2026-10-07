@@ -168,7 +168,7 @@ function StartedRow({ track }: { track: StartedTrackView }) {
     <li className="py-2">
       <div className="flex flex-wrap items-baseline gap-2">
         {track.subjectId && !track.gone ? (
-          <Link href={`/learn/s/${track.subjectId}`} className="text-ui font-medium text-accent hover:underline">
+          <Link href={`/learn/s/${track.subjectId}`} className="press-area text-ui font-medium text-accent hover:underline">
             {track.name}
           </Link>
         ) : (

@@ -3,7 +3,7 @@
 import Form from 'next/form';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useId, useMemo, useState, useTransition, type ComponentProps } from 'react';
 import { Copy, ExternalLink, Mail, Search } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';
@@ -334,7 +334,7 @@ function OpeningControls({
         }
       >
         <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1">
-          <ChipSelect
+          <PressChip
             name={OPENING_PARAMS.workplace}
             aria-label="Filter by workplace"
             placeholderValue="any"
@@ -347,8 +347,8 @@ function OpeningControls({
                 {WORKPLACE_LABELS[value]}
               </option>
             ))}
-          </ChipSelect>
-          <ChipSelect
+          </PressChip>
+          <PressChip
             name={OPENING_PARAMS.fit}
             aria-label="Filter by match to your evidence"
             placeholderValue="any"
@@ -358,8 +358,8 @@ function OpeningControls({
             <option value="any">Any match</option>
             <option value="strong">Strong match</option>
             <option value="partial_up">Partial or strong match</option>
-          </ChipSelect>
-          <ChipSelect
+          </PressChip>
+          <PressChip
             name={OPENING_PARAMS.salary}
             aria-label="Filter by salary"
             placeholderValue="any"
@@ -368,8 +368,8 @@ function OpeningControls({
           >
             <option value="any">Any pay</option>
             <option value="shown">Salary shown</option>
-          </ChipSelect>
-          <ChipSelect
+          </PressChip>
+          <PressChip
             name={OPENING_PARAMS.coverLetter}
             aria-label="Filter by cover letter"
             placeholderValue="any"
@@ -379,8 +379,8 @@ function OpeningControls({
             <option value="any">Cover letter or not</option>
             <option value="yes">Asks for a cover letter</option>
             <option value="no">No cover letter</option>
-          </ChipSelect>
-          <ChipSelect
+          </PressChip>
+          <PressChip
             name={OPENING_PARAMS.minFit}
             aria-label="Lowest fit to show"
             placeholderValue="0"
@@ -393,8 +393,8 @@ function OpeningControls({
                 Fit {value} and up
               </option>
             ))}
-          </ChipSelect>
-          <ChipSelect
+          </PressChip>
+          <PressChip
             name={OPENING_PARAMS.minChance}
             aria-label="Lowest chance of an interview to show"
             placeholderValue="any"
@@ -406,8 +406,8 @@ function OpeningControls({
               {CHANCE_BAND_LABELS.medium} chance of an interview or better
             </option>
             <option value="high">{CHANCE_BAND_LABELS.high} chance of an interview</option>
-          </ChipSelect>
-          <ChipSelect
+          </PressChip>
+          <PressChip
             name={OPENING_PARAMS.hideRedFlags}
             aria-label="Red flags"
             placeholderValue="show"
@@ -416,8 +416,8 @@ function OpeningControls({
           >
             <option value="show">With red flags</option>
             <option value="hide">Without red flags</option>
-          </ChipSelect>
-          <ChipSelect
+          </PressChip>
+          <PressChip
             name={OPENING_PARAMS.hideDuplicates}
             aria-label="Roles already on file"
             placeholderValue="show"
@@ -426,7 +426,7 @@ function OpeningControls({
           >
             <option value="show">With ones on file</option>
             <option value="hide">New to you only</option>
-          </ChipSelect>
+          </PressChip>
           {active > 0 && (
             <Link
               href={cleared}
@@ -439,7 +439,7 @@ function OpeningControls({
           )}
         </div>
       </Disclosure>
-      <ChipSelect
+      <PressChip
         name={OPENING_PARAMS.sort}
         aria-label="Sort recommended roles"
         placeholderValue="newest"
@@ -451,7 +451,7 @@ function OpeningControls({
             {OPENING_SORT_LABELS[value]}
           </option>
         ))}
-      </ChipSelect>
+      </PressChip>
       <noscript>
         <button
           type="submit"
@@ -578,7 +578,7 @@ function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
             {suggestion.companySlug ? (
               <Link
                 href={`/jobs/companies/${suggestion.companySlug}`}
-                className="hover:text-accent"
+                className="press-area hover:text-accent"
               >
                 {suggestion.companyName}
               </Link>
@@ -719,6 +719,27 @@ function fitFact(suggestion: OpenSuggestion, fit: NonNullable<ScoreNote['fit']>)
  * separator and does not break inside, so a wrapped line starts on the text
  * edge rather than with a dot (law 18).
  */
+/**
+ * A filter chip with a phone press area. The chip is a line of text, about
+ * 20 pixels tall, and a select cannot draw the ::after a link uses for its
+ * hit area, so a label 44 pixels square sits under it on a phone, and a
+ * press that lands just off the chip still opens it (docs/UI-QUALITY-SPEC.md,
+ * R3). The chip is positioned so it is drawn over its own label.
+ */
+function PressChip(props: ComponentProps<typeof ChipSelect>) {
+  const id = useId();
+  return (
+    <span className="relative inline-flex">
+      <label
+        htmlFor={id}
+        aria-hidden
+        className="absolute top-1/2 left-1/2 hidden h-11 w-full min-w-11 -translate-x-1/2 -translate-y-1/2 max-sm:block" /* ui-ok: a press area, not a control; 44px is the phone floor, as PressLabel's */
+      />
+      <ChipSelect id={id} {...props} className={cn('relative', props.className)} />
+    </span>
+  );
+}
+
 function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
   const note = suggestion.scoreNote;
   const scores = suggestion.scores;
@@ -729,7 +750,6 @@ function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
     text: string;
     title?: string;
     warn?: boolean;
-    faint?: boolean;
     figure?: boolean;
   }[] = [];
   if (suggestion.location) facts.push({ key: 'where', text: suggestion.location });
@@ -738,7 +758,6 @@ function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
       key: 'fit',
       text: fitFact(suggestion, note.fit),
       title: note.fit.reason ?? undefined,
-      faint: note.fit.unsure,
       figure: true,
     });
   }
@@ -749,14 +768,13 @@ function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
       title: note.chance.reason
         ? `Chance of an interview. ${note.chance.reason}`
         : 'Chance of an interview',
-      faint: note.chance.unsure,
     });
   }
   if (scores?.salary?.value && sure(scores.salary)) facts.push({ key: 'pay', text: 'Pay shown' });
   for (const miss of suggestion.misses ?? []) facts.push({ key: miss, text: miss, warn: true });
   if (scores?.red_flags?.value && sure(scores.red_flags))
     facts.push({ key: 'flags', text: 'Red flags', warn: true });
-  if (!scores) facts.push({ key: 'unscored', text: 'Not scored yet', faint: true });
+  if (!scores) facts.push({ key: 'unscored', text: 'Not scored yet' });
   return (
     <p className="text-small text-ink-muted">
       {facts.map((fact, index) => (
@@ -767,7 +785,6 @@ function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
               className={cn(
                 fact.figure && 'tabular',
                 fact.warn && 'text-caution',
-                fact.faint && 'opacity-70',
               )}
             >
               {fact.text}
@@ -818,7 +835,7 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
               href={suggestion.url}
               target="_blank"
               rel="noreferrer"
-              className="group/title hover:text-accent"
+              className="group/title press-area hover:text-accent"
             >
               {title}
               <ExternalLink
