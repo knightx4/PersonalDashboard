@@ -212,6 +212,14 @@ import {
   ShoppingShareSurface,
   ShoppingSharesSurface,
 } from './shopping-page-surfaces';
+import {
+  VaultHomeSurface,
+  VaultMapSurface,
+  VaultMayaSurface,
+  VaultMayaThreadSurface,
+  VaultSettingsSurface,
+  VaultThemeSurface,
+} from './vault-page-surfaces';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -4538,4 +4546,49 @@ export const SURFACES: readonly Surface[] = [
       ...(surface.deck ? { deck: surface.deck } : {}),
     })),
   ),
+
+  /* The Vault pages that had no picture (plan #1605). Fixtures in
+   * vault-page-surfaces.tsx. */
+  {
+    id: 'vault-home',
+    label: 'Vault · Notes by folder',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultHomeSurface />,
+  },
+  {
+    id: 'vault-map',
+    label: 'Vault · Map, themes most written about first',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultMapSurface />,
+  },
+  {
+    id: 'vault-theme',
+    label: 'Vault · One theme on the map',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultThemeSurface />,
+  },
+  {
+    id: 'vault-maya',
+    label: 'Vault · Threads with Maya',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultMayaSurface />,
+  },
+  {
+    id: 'vault-maya-thread',
+    label: 'Vault · One thread with Maya',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultMayaThreadSurface />,
+  },
+  {
+    id: 'vault-settings',
+    label: 'Vault · Settings',
+    module: 'vault',
+    width: 'page',
+    render: () => <VaultSettingsSurface />,
+  },
 ];

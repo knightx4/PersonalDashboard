@@ -1,16 +1,7 @@
-import Link from 'next/link';
-import { FileText, FolderTree } from 'lucide-react';
-import { PageHeader } from '@/components/shell/page-header';
-import { SearchEmpty } from '@/components/shell/search-empty';
-import { SearchField } from '@/components/shell/search-field';
-import { EmptyState } from '@/components/ui/empty-state';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { groupByFolder, loadConnection, loadNotes } from '@/lib/vault/notes/load';
-import { VaultStatusBanner } from '@/components/vault/status-banner';
-import { NoteConnections } from '@/components/vault/note-connections';
 import { loadWeekConnections } from '@/lib/vault/notes/connections-load';
-import { cardVariants } from '@/components/ui/card';
-import { cn } from '@/lib/cn';
+import { VaultHomeView } from './home-view';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,17 +27,7 @@ export default async function VaultPage({
   const connection = await loadConnection(supabase);
 
   if (!connection) {
-    return (
-      <>
-        <PageHeader title="Vault" description="Your Obsidian notes, mirrored here." />
-        <EmptyState
-          icon={FolderTree}
-          title="No vault connected"
-          description="Point this at the GitHub repository your Obsidian vault lives in and it will mirror every markdown file — and nothing else. Images, PDFs and attachments are never fetched."
-          action={{ label: 'Connect a vault', href: '/vault/settings' }}
-        />
-      </>
-    );
+    return <VaultHomeView connection={null} search={search} groups={[]} connections={[]} />;
   }
 
   // This week's connections sit above the list, and only when not searching.
@@ -54,68 +35,13 @@ export default async function VaultPage({
     loadNotes(supabase, search ? { search } : {}),
     search ? Promise.resolve([]) : loadWeekConnections(supabase),
   ]);
-  const groups = groupByFolder(notes);
 
   return (
-    <>
-      <PageHeader
-        title="Vault"
-        description={`${connection.repoOwner}/${connection.repoName} · ${connection.branch}`}
-      />
-
-      <VaultStatusBanner connection={connection} />
-
-      <NoteConnections connections={connections} />
-
-      <div className="mb-5 max-w-md">
-        <SearchField placeholder="Search your notes" />
-      </div>
-
-      {notes.length === 0 && search ? (
-        <SearchEmpty query={search} />
-      ) : notes.length === 0 ? (
-        <EmptyState
-          icon={FileText}
-          title="No notes yet"
-          description="The first sync runs on the daily schedule. You can start one now from settings."
-          secondaryAction={{ label: 'Vault settings', href: '/vault/settings' }}
-        />
-      ) : (
-        <>
-          <p className="mb-3 text-body text-ink-muted">
-            {notes.length} {notes.length === 1 ? 'note' : 'notes'}
-            {search ? ` matching “${search}”` : ''}
-          </p>
-
-          <div className="space-y-6">
-            {groups.map((group) => (
-              <section key={group.folder || '(root)'}>
-                <h2 className="mb-2 flex items-center gap-1.5 text-ui font-semibold text-ink-muted">
-                  <FolderTree className="size-3.5" strokeWidth={2} aria-hidden />
-                  {group.folder || 'Vault root'}
-                </h2>
-                <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-                  {group.notes.map((note) => (
-                    <li key={note.id}>
-                      <Link
-                        href={`/vault/n/${note.path.split('/').map(encodeURIComponent).join('/')}`}
-                        className="block px-4 py-3 transition-colors duration-quick hover:bg-canvas"
-                      >
-                        <span className="block text-body font-medium text-ink">{note.title}</span>
-                        {note.excerpt && (
-                          <span className="mt-0.5 block truncate text-ui text-ink-muted">
-                            {note.excerpt}
-                          </span>
-                        )}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-        </>
-      )}
-    </>
+    <VaultHomeView
+      connection={connection}
+      search={search}
+      groups={groupByFolder(notes)}
+      connections={connections}
+    />
   );
 }
