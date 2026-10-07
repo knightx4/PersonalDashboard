@@ -42,6 +42,7 @@ type PrepInterviewRow = {
   interview_participants: { contacts: { id: string } | null }[] | null;
 };
 import { RoleDetailPanels } from './panels';
+import { defaultRoleTab } from './tabs';
 import { RoleTitle } from './role-title';
 import { RoleCompany } from './role-company';
 import { ExcitementPicker } from './excitement-picker';
@@ -69,7 +70,9 @@ export default async function RoleDetailPage({
   searchParams: Promise<{ tab?: string; interview?: string }>;
 }) {
   const { id } = await params;
-  const { tab, interview: focusInterviewId } = await searchParams;
+  // `tab` is read by the panels from the address itself, so it follows a switch
+  // made in the page without the server loading the role again.
+  const { interview: focusInterviewId } = await searchParams;
   const user = await requireUser();
   const supabase = await createClient();
 
@@ -538,7 +541,7 @@ export default async function RoleDetailPage({
           bankSize={evidence.length}
           coverLetter={(current.cover_letter as string | null) ?? ''}
           timezone={timezone}
-          initialTab={tab}
+          defaultTab={defaultRoleTab(current.status as ApplicationStatus)}
           focusInterviewId={focusInterviewId ?? null}
           events={(events ?? []).map((event) => ({
             id: event.id as string,

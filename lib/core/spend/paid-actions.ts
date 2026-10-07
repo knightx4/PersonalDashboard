@@ -106,8 +106,8 @@ export const PAID_ACTIONS = {
 
   // Jobs
   'app/jobs/(app)/companies/actions.ts#proposeAiCompanyEnrichment': ['enrich-company'],
-  'app/jobs/(app)/roles/[id]/actions.ts#matchRoleRequirements': ['match-evidence'],
-  'app/jobs/(app)/roles/[id]/actions.ts#writeRoundPrepNote': ['write-interview-prep'],
+  'app/jobs/(app)/roles/[id]/posting-actions.ts#matchRoleRequirements': ['match-evidence'],
+  'app/jobs/(app)/roles/[id]/prep-actions.ts#writeRoundPrepNote': ['write-interview-prep'],
   // Dash's reply to a comment on a role that tags it, and the letter it writes
   'app/jobs/(app)/roles/[id]/comment-actions.ts#addRoleComment': ['reply-to-role-comment'],
   'app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence': ['draft-answer'],
