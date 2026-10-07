@@ -130,7 +130,8 @@ you close when they are all done.
 
 **One step, on its own** — "do #12", or one step named in a brief. Read
 `reference/building.md` and follow it yourself, then put the commit on main as
-in step 4 below. A subagent for a single step is pure overhead.
+in step 4 below. A subagent for a single step is pure overhead, except on a
+Sonnet session for a step sized `m` or `l` (step 3 below).
 
 **A feature, or more than one step** — you are the orchestrator, not the
 builder. Send each step to its own subagent and keep your own context for the
@@ -158,20 +159,47 @@ thousand tokens, and gets to the end.
    and what waits on what. List the steps you are going to build, in dependency
    order. Steps that wait on nothing come first; a step whose dependency is
    still open is not in this batch.
-3. **Send each step to a subagent, one at a time.** The prompt is short:
+3. **Send the ready steps to subagents, up to three at once.** Every step
+   that is ready now and does not wait on another step in the batch goes out
+   together, each to its own subagent with `isolation: "worktree"`, so each
+   builds in its own copy of the repository. When one reports, merge it (step
+   4) and send whatever its close made ready, keeping up to three going. One
+   step at a time left a twelve-step feature taking most of a day while steps
+   that waited on nothing sat in the queue.
+
+   Hold a step back from the round when it changes the same screen as
+   another step going out, judged from the two details: two builders editing
+   one page conflict at the merge and the second rebuilds. Send it when the
+   first has merged.
+
+   The prompt is short:
 
    > Build plan step #N. Read `.claude/skills/plan/reference/building.md` and
-   > follow it exactly.
+   > follow it exactly. You are in a worktree: give it a hard-linked copy of
+   > node_modules first (`cp -al <the main checkout>/node_modules .`) and use
+   > `PREVIEW_PORT=<3400 + 1, 2 or 3>` for the preview.
    >
    > What earlier steps in this batch worked out: <the carry-forward, below>
 
+   **Pick the builder's model by the step's size.** A step sized `s` goes to
+   a subagent with `model: "sonnet"`; `m`, `l` and a step with no size go to
+   `model: "opus"`. Name the model every time, because a subagent without one
+   takes this session's, and this session may be running on Sonnet. The
+   `ui-critic` agent names its own model and is not changed by this.
+
    **Do not read the step's source files yourself, and do not make the edit.**
    Every file you open is a file you carry for the rest of the batch. Reading
-   "just to check" is how the batch runs out of room.
+   "just to check" is how the batch runs out of room. The same holds for a
+   single step named on its own when this session is on Sonnet and the step
+   is sized `m` or `l`: send it to an Opus subagent rather than building it
+   here.
 4. **Put the step on main before it closes.** A subagent commits and stops
    there, so the merge is yours, and it runs as soon as the subagent reports
    its commit:
 
+   - Merge the subagent's worktree branch (its result names it) into the
+     working branch. Do this for one step at a time even while others are
+     still building: each step merges and runs the gate on its own.
    - `git fetch origin`, with no refs named. Naming them aborts the whole fetch
      when one of them is missing, which is the normal state of a branch nobody
      has pushed yet, and leaves `origin/main` stale.
@@ -269,7 +297,7 @@ select. A build run needs nothing: closing or blocking its step ends it.
 |---|---|
 | `proposed` | Waiting on the person's approve. Never built. A new feature and the steps shaped under it, or a step that acts outside the repository. |
 | `not_started` | Decided on, not begun. |
-| `in_progress` | Claimed right now. At most one at a time. |
+| `in_progress` | Claimed right now. Up to three at once under one feature run, one per builder. |
 | `blocked` | Needs an answer or something outside the repo. Reason required. |
 | `done` | Shipped, verified against its done-when. Carries the commit. |
 | `dropped` | Decided against. Reason required. |
