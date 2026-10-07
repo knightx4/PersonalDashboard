@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { requireUser } from '@/lib/auth/server';
+import { createClient, requireUser } from '@/lib/auth/server';
 import { confirmChange, declineChange, undoChange, type ChangeDeps, type ChangeOutcome } from '@/lib/ask/changes';
 import { executeProposal } from '@/lib/ask/propose';
 import { executeAskTool } from '@/lib/ask/tools';
@@ -91,6 +91,17 @@ export async function askDashInRequest(input: {
       saveChange: (conversationId, made) => insertMadeChange(core, user.id, conversationId, made),
       attachProposals: (ids, turnId) => attachProposals(core, ids, turnId),
       discardProposals: (ids) => discardProposals(core, ids),
+      noteGap: async (body, conversationRef) => {
+        try {
+          const supabase = await createClient();
+          const { error } = await supabase
+            .from('feedback_items')
+            .insert({ user_id: user.id, kind: 'feature', body, page_path: `/ask/${conversationRef}` });
+          if (error) console.error('the gap note was not filed', error.message);
+        } catch (error) {
+          console.error('the gap note was not filed', error);
+        }
+      },
       ...(canHandOff
         ? {
             saveHandoff: (conversationId: string, request: string, subjectRef: string | null) =>

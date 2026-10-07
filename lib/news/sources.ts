@@ -14,6 +14,7 @@ export const newsSources: ModuleSources = {
       weight: 'record',
       search: ['headline', 'summary', 'text'],
       title: 'headline',
+      newest: 'saved_at',
       href: () => '/news/saved',
     },
     {
@@ -23,6 +24,7 @@ export const newsSources: ModuleSources = {
       weight: 'intent',
       search: ['local_area'],
       title: 'local_area',
+      newest: 'updated_at',
       ref: 'user_id',
       href: () => '/news/settings',
       // One row per person, with no id to name it by.

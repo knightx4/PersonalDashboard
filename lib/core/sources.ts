@@ -49,6 +49,7 @@ export const coreSources: ModuleSources = {
       weight: 'incidental',
       search: ['paragraphs'],
       title: 'year',
+      newest: 'year',
       ref: 'year',
       href: (year) => `/timeline/year/${year}`,
       page: {

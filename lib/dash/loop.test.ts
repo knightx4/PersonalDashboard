@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
-import { dateLine, runDash, type DashContext, type DashVoice } from './loop';
+import { dateLine, LOOK_FIRST, runDash, type DashContext, type DashVoice } from './loop';
 import { dashTool, type DashWriteTool } from './registry';
 
 /**
@@ -185,5 +185,42 @@ describe('the date line (note de8e7fbb)', () => {
 
   it('crosses a month end', () => {
     expect(dateLine('2026-10-31')).toContain('tomorrow is Sunday, 1 November 2026 (2026-11-01)');
+  });
+});
+
+describe('a refusal before looking', () => {
+  const ask = [{ role: 'user' as const, body: 'Give me a good video to watch.' }];
+  const refuse = (id: string) =>
+    call(id, 'answer', { answer: 'I cannot browse YouTube.', cited: [], could_not: 'pick a video: no way to browse YouTube' });
+
+  it('is sent back once to look first, and the answer after the lookup stands', async () => {
+    const { client: stub, sent } = client([
+      refuse('a1'),
+      call('l1', 'todos', {}),
+      call('a2', 'answer', { answer: 'Watch this one.', cited: [] }),
+    ]);
+    const execute = vi.fn(async () => ({ ok: true as const, rows: [] }));
+    const answer = await runDash({ voice, context, turns: ask, today: '2026-10-07', execute, anthropicApiKey: 'k', client: stub });
+    expect(sent).toHaveLength(3);
+    const back = (sent[1] as unknown as { messages: { content: unknown }[] }).messages.at(-1)!.content;
+    expect(back).toEqual([expect.objectContaining({ type: 'tool_result', tool_use_id: 'a1', content: LOOK_FIRST, is_error: true })]);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(answer).toMatchObject({ ok: true, body: 'Watch this one.' });
+    expect(answer.ok && answer.couldNot).toBeFalsy();
+  });
+
+  it('stands the second time, carrying what could not be done', async () => {
+    const { client: stub, sent } = client([refuse('a1'), refuse('a2')]);
+    const answer = await runDash({ voice, context, turns: ask, today: '2026-10-07', execute: vi.fn(), anthropicApiKey: 'k', client: stub });
+    expect(sent).toHaveLength(2);
+    expect(answer).toMatchObject({ ok: true, body: 'I cannot browse YouTube.', couldNot: 'pick a video: no way to browse YouTube' });
+  });
+
+  it('stands at once after a lookup', async () => {
+    const { client: stub, sent } = client([call('l1', 'todos', {}), refuse('a1')]);
+    const execute = vi.fn(async () => ({ ok: true as const, rows: [] }));
+    const answer = await runDash({ voice, context, turns: ask, today: '2026-10-07', execute, anthropicApiKey: 'k', client: stub });
+    expect(sent).toHaveLength(2);
+    expect(answer).toMatchObject({ ok: true, couldNot: 'pick a video: no way to browse YouTube' });
   });
 });

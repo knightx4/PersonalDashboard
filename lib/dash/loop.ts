@@ -83,6 +83,11 @@ const ANSWER: Anthropic.Tool = {
           additionalProperties: false,
         },
       },
+      could_not: {
+        type: 'string',
+        description:
+          'Only when the answer does not do what they asked: what they wanted that you could not do or could not see, in one sentence naming the ability or the data that was missing ("pick a video from the watch list: no lookup reads it"). Leave out when you did it, or handed it on.',
+      },
     },
     required: ['answer', 'cited'],
     additionalProperties: false,
@@ -191,6 +196,15 @@ export function pageLine(page: PageContext | null | undefined): string | null {
   return `${at}, which shows "${shown}" (${table}, ref ${ref}): ${reach}.`;
 }
 
+/**
+ * Said to the model when it answers that it could not do something before
+ * it has looked anything up (the YouTube question, 7 October 2026: Dash said
+ * it had no way to pick a video with 122 on the person's watch list). It is
+ * sent once; a second refusal stands.
+ */
+export const LOOK_FIRST =
+  'Not yet: you have not looked anything up. What they asked about is probably in their own rows, which reach much further than the summary in your rules. Look first: list_rows reads any table of theirs, search finds a thing by name, recall finds what they wrote about a topic. When they ask you to pick or suggest, choose from what you find. When it is something to do that no tool can, hand it on with hand_off. Say you cannot only after that.';
+
 /** Said to the model when a limit is reached, in place of any further lookup. */
 const LIMIT_REACHED = 'No lookups are left for this answer. Answer now with what you have.';
 
@@ -221,6 +235,12 @@ export type DashAnswer =
        * the model cited, which an exact quote can be checked against.
        */
       webCited?: string[];
+      /**
+       * What the person asked for that Dash could not do or see, in the
+       * model's sentence, when the answer says so. Ask files it as a note so
+       * the missing ability gets built (lib/talk/ask-request.ts).
+       */
+      couldNot?: string;
     }
   | { ok: false; detail: string; toolCalls: TalkToolCall[] };
 
@@ -335,9 +355,10 @@ export function answerFromLookups(found: readonly TalkCitation[]): { body: strin
   return { body: body.slice(0, MAX_TURN), citations: listed };
 }
 
-function answerInput(input: unknown): { answer: string; cited: { table: string; ref: string }[] } {
+function answerInput(input: unknown): { answer: string; cited: { table: string; ref: string }[]; couldNot: string | null } {
   const raw = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
   const answer = typeof raw.answer === 'string' ? raw.answer.trim() : '';
+  const couldNot = typeof raw.could_not === 'string' && raw.could_not.trim() ? raw.could_not.trim().slice(0, 500) : null;
   const cited = Array.isArray(raw.cited)
     ? raw.cited.flatMap((c) =>
         c && typeof c === 'object' && typeof (c as { table?: unknown }).table === 'string' &&
@@ -346,7 +367,7 @@ function answerInput(input: unknown): { answer: string; cited: { table: string; 
           : [],
       )
     : [];
-  return { answer, cited };
+  return { answer, cited, couldNot };
 }
 
 /**
@@ -488,6 +509,9 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   let inputTokens = 0;
   // Set when a voice that chooses stopped without its answer: the next round must give it.
   let asked = false;
+  // Set once a refusal made before any lookup has been sent back (LOOK_FIRST).
+  let pushedBack = false;
+  const canLook = voice.tools.some((tool) => tool.kind === 'lookup');
 
   // Each round either answers or makes at least one lookup, and the lookups
   // are capped, so this ends; the bound is a second guard.
@@ -523,6 +547,23 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
 
     const uses = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');
     const answered = uses.find((c) => c.name === finishName);
+    if (
+      answered &&
+      !pushedBack &&
+      !mustAnswer &&
+      canLook &&
+      toolCalls.length === 0 &&
+      uses.length === 1 &&
+      answerInput(answered.input).couldNot
+    ) {
+      // A refusal before any lookup: sent back once to look first.
+      pushedBack = true;
+      messages.push(
+        { role: 'assistant', content: response.content },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: answered.id, content: LOOK_FIRST, is_error: true }] },
+      );
+      continue;
+    }
     if (answered) {
       // Writes made in the same round as the answer are made first (plan
       // #1478): the answer says they are done, and capture files every move
@@ -547,7 +588,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         }
       });
       lookups += writes.length;
-      const { answer, cited } = answerInput(answered.input);
+      const { answer, cited, couldNot } = answerInput(answered.input);
       if (!answer && !voice.finish) return fail('The answer came back empty.');
       const citations: TalkCitation[] = [];
       const seen = new Set<string>();
@@ -569,6 +610,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         stop,
         ...extras(),
         ...(voice.finish ? { report: answered.input } : {}),
+        ...(couldNot && !voice.finish ? { couldNot } : {}),
       };
     }
 
