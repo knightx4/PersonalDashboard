@@ -1,6 +1,4 @@
-import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { allGoalsViewOf } from '@/lib/goals/all-goals';
 import { loadAllGoals } from '../../all/data';
@@ -12,7 +10,8 @@ export const dynamic = 'force-dynamic';
 /**
  * An area's own page (plan #1619): its goals, the goals Dash proposed for it
  * and its rhythms, with the editing All goals offers, since it draws the same
- * section from the same read. The name is the heading and is renamed here.
+ * section from the same read. The name is the heading and is renamed here,
+ * under the path Goals › the area (plan #1622).
  * Open, On you and Everything narrow its goals as they do on All goals.
  *
  * An archived area, or an id that is not one of the person's areas, has no
@@ -35,12 +34,6 @@ export default async function AreaPage({
 
   return (
     <div className="mx-auto max-w-3xl">
-      <Link
-        href="/goals/all"
-        className="press-area mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> All goals
-      </Link>
       <GoalsView {...data} view={view} areaId={areaId} />
     </div>
   );

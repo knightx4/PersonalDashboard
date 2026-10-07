@@ -1,8 +1,9 @@
 /**
  * A step's own page (plan #1620), at /goals/<goal>/s/<step>: the step's row
  * from the goal page, opened, with its title as the page's heading, its
- * sub-steps beneath, and each sub-step reachable on a page of its own. A
- * sub-step's page names the step it sits under. On the page, a date that is
+ * sub-steps beneath, and each sub-step reachable on a page of its own. Above
+ * it, the path from Goals through the area, the goal and every step it sits
+ * under (plan #1622). On the page, a date that is
  * set reads as text and the unset ones wait behind one add control.
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -81,24 +82,32 @@ function text(html: string): string {
 }
 
 describe('StepPage', () => {
-  it('draws the step as the heading, opened, with its sub-steps and a way back to the goal', () => {
+  it('draws the step as the heading, opened, with its sub-steps and the path back up', () => {
     const html = renderToStaticMarkup(<StepPage map={map} stepId="rates" todoOn={false} />);
     expect(text(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)![1]!)).toBe('Get the rates lowered');
     expect(html).toContain(`href="/goals/${GOAL}"`);
     expect(text(html)).toContain('Call each lender.');
     expect(text(html)).toContain('Call the card company');
     expect(text(html)).toContain('Compare the transfer fees');
-    // The page's own step does not link to the page it is on.
-    expect(html).not.toContain(`href="/goals/${GOAL}/s/rates"`);
+    // The page's own step links to the page it is on once: the path's last part.
+    expect(html.split(`href="/goals/${GOAL}/s/rates"`)).toHaveLength(2);
+    expect(html).toMatch(new RegExp(`aria-current="page"[^>]*href="/goals/${GOAL}/s/rates"`));
+    expect(text(html.match(/<nav aria-label="Breadcrumb"[\s\S]*?<\/nav>/)![0])).toBe(
+      'Goals › … › Money › Pay off the credit cards › Get the rates lowered',
+    );
     // A step elsewhere on the goal is not on this page.
     expect(text(html)).not.toContain('Move the balance');
   });
 
-  it("names the step a sub-step sits under, linked to that step's page", () => {
+  it("names every step a sub-step sits under in its path, linked to that step's page", () => {
     const html = renderToStaticMarkup(<StepPage map={map} stepId="call" todoOn={false} />);
     expect(text(html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)![1]!)).toBe('Call the card company');
-    expect(text(html)).toContain('A sub-step of Get the rates lowered');
-    expect(html).toContain(`href="/goals/${GOAL}/s/rates"`);
+    const path = html.match(/<nav aria-label="Breadcrumb"[\s\S]*?<\/nav>/)![0];
+    expect(text(path)).toBe(
+      'Goals › … › Money › Pay off the credit cards › Get the rates lowered › Call the card company',
+    );
+    expect(path).toContain(`href="/goals/${GOAL}/s/rates"`);
+    expect(path).toContain('href="/goals/area/money"');
   });
 
   it('reads a set date as text and keeps the unset ones behind one add control', () => {
