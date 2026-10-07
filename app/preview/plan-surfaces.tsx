@@ -229,6 +229,26 @@ export function PlanTreeSurface() {
 }
 
 /**
+ * The Table view (plan #1669): every open feature as a row, grouped by
+ * module, over the same fixtures as the tree.
+ */
+export function PlanTableSurface() {
+  return (
+    <PlanView
+      sections={applyView(whole, 'table')}
+      finished={[]}
+      summary={summarize(whole)}
+      view="table"
+      catalog={catalog}
+      empty={false}
+      canSend={false}
+      lastRuns={treeRuns}
+      commitChecks={{}}
+    />
+  );
+}
+
+/**
  * Two features with every row opened: the panel behind a row, which is where
  * the detail, the questions, the dependencies and the thread are drawn.
  */
