@@ -7,7 +7,8 @@ import { cardVariants } from '@/components/ui/card';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { createInterviewRound, groupInterviews } from './interview-actions';
 import { groupableDays, sectionInterviews } from '@/lib/jobs/interview-groups';
-import { INTERVIEW_MAIL, type InterviewSeed } from './shared';
+import { ClosedFold, INTERVIEW_MAIL, type InterviewSeed } from './shared';
+import { roleStage } from '@/lib/jobs/role-stage';
 import { InterviewGroupCard } from './interview-round';
 import { InterviewCard } from './interview-card';
 import { AddInterview } from './add-interview';
@@ -23,7 +24,12 @@ export function Interviews({
   companyContacts,
   seed,
   onSeedUsed,
+  status,
 }: PanelProps & { seed?: InterviewSeed | null; onSeedUsed?: () => void }) {
+  // Adding a round and asking Dash for prep are for a live process. On a
+  // closed one they fold away (plan #1594).
+  const closed = roleStage(status) === 'closed';
+
   // Mail that says an interview exists while this tab says none does. The
   // combination is always a miss -- a hand-link that recorded only the event,
   // or a thread the extractor read without finding a date -- so it is stated
@@ -42,6 +48,18 @@ export function Interviews({
   // nothing here rather than resetting the sequence.
   const nextRoundNumber =
     interviewGroups.reduce((top, group) => Math.max(top, group.roundNumber ?? 0), 0) + 1;
+
+  const addControls = (
+    <>
+      <AddRound applicationId={applicationId} nextRound={nextRoundNumber} />
+      <AddInterview
+        applicationId={applicationId}
+        triggerLabel="Add an interview in a round of its own"
+        seed={seed}
+        onSeedUsed={onSeedUsed}
+      />
+    </>
+  );
 
   return (
     <div className="space-y-3">
@@ -64,6 +82,8 @@ export function Interviews({
                 round below, or from the message itself under Linked mail.
               </p>
             </>
+          ) : closed ? (
+            <p>No interviews were recorded before this closed.</p>
           ) : (
             <p>
               No interviews yet. They appear here when a scheduling email arrives, or you can add
@@ -98,6 +118,7 @@ export function Interviews({
                 timezone={timezone}
                 companyContacts={companyContacts}
                 focusInterviewId={focusInterviewId}
+                closed={closed}
               />
             ) : (
               <InterviewCard
@@ -106,6 +127,7 @@ export function Interviews({
                 timezone={timezone}
                 companyContacts={companyContacts}
                 focused={section.interview.id === focusInterviewId}
+                closed={closed}
               />
             ),
           )}
@@ -115,13 +137,11 @@ export function Interviews({
           anything in it is booked, so it is made empty and filled as the
           invitations arrive; a single conversation nobody framed as a round
           gets one made around it, because an interview is always in a round. */}
-      <AddRound applicationId={applicationId} nextRound={nextRoundNumber} />
-      <AddInterview
-        applicationId={applicationId}
-        triggerLabel="Add an interview in a round of its own"
-        seed={seed}
-        onSeedUsed={onSeedUsed}
-      />
+      {closed && !seed ? (
+        <ClosedFold label="Add a round to this closed application">{addControls}</ClosedFold>
+      ) : (
+        addControls
+      )}
     </div>
   );
 }

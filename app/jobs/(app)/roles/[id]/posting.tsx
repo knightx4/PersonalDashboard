@@ -105,7 +105,10 @@ export function Posting({
             : 'Extracted once from the description. Match it against your bank to see which lines you can actually claim.'
         }
         action={
-          <div className="flex items-center gap-1">
+          // At phone width the buttons wrap under the heading; the ghost
+          // button's padding is taken back so its words start on the card's
+          // edge with the heading's (law 18).
+          <div className={cn('flex items-center gap-1', jdText.trim() && '-ml-2.5 sm:ml-0')}>
             {/* Reading the description again is free and is the only way back
                 from an empty map -- a parser that could not read a posting
                 when it was pasted may well read it now. Offered whenever

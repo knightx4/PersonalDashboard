@@ -18,10 +18,18 @@ export function roleTabFrom(value: string | null | undefined): RoleTab | undefin
 
 /**
  * The tab a stage opens on, for the stages that open on something other than
- * the timeline. Empty for now: every role page opens on its timeline until
- * the stage-led page (plan #1594) fills it in.
+ * the timeline (plan #1594). A lead is read for its posting and requirement
+ * map, an application being written for its questions, and one in
+ * interviews for its rounds. Sent and waiting, and closed, open on the
+ * timeline, which is what has happened to it.
  */
-const OPENS_ON: Partial<Record<ApplicationStatus, RoleTab>> = {};
+const OPENS_ON: Partial<Record<ApplicationStatus, RoleTab>> = {
+  lead: 'posting',
+  drafting: 'answers',
+  in_process: 'interviews',
+  final_round: 'interviews',
+  offer: 'interviews',
+};
 
 /** The tab a role page opens on when its address names none. */
 export function defaultRoleTab(status: ApplicationStatus): RoleTab {
