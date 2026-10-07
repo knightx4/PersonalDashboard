@@ -144,6 +144,8 @@ export const MODELS = {
   newsRecommend: OPUS,
   /** lib/recurring/extract.ts */
   recurringExtract: HAIKU_DATED,
+  /** lib/dash/interview.ts, Dash's questions when it interviews you for a workspace's spec (lib/dash/models.ts interview) */
+  specInterview: SONNET,
   /** lib/sell/web-estimate.ts */
   sellWebEstimate: HAIKU,
   /** lib/talk/reply.ts */
