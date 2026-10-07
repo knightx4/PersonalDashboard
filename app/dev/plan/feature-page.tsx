@@ -328,7 +328,7 @@ export function FeaturePage({
       properties={properties}
       tabs={tabs}
       label="Feature"
-      className="gap-y-2 lg:gap-y-0"
+      className="gap-y-2 lg:grid-rows-[auto_1fr] lg:gap-y-0"
     >
       {notices}
       {tab === 'activity' ? (
@@ -486,7 +486,7 @@ function FeatureSteps({
           {held ? (
             <p className="flex flex-wrap items-center gap-x-3 text-ui text-ink-muted">
               <span>
-                Open steps {held === 'me' ? 'yours' : 'Dash’s'}: {heldIds?.size ?? 0}
+                {held === 'me' ? 'Your' : 'Dash’s'} open steps: {heldIds?.size ?? 0}
               </span>
               <Link
                 href={stepsViewHref(node.number, view)}
