@@ -470,6 +470,7 @@ const pipelineRows: PipelineRow[] = [
     daysSinceActivity: 1,
     lastActivityAt: '2026-09-08T16:00:00.000Z',
     coverage: { covered: 4, total: 6, gaps: 1, rate: 0.67 },
+    nextInterview: { at: '2026-09-11T14:00:00.000Z', timeKnown: true },
   }),
   pipelineRow({
     applicationId: 'p2',
@@ -2786,6 +2787,14 @@ export const SURFACES: readonly Surface[] = [
      * only, with the one rail of filters both views share. */
     id: 'jobs-pipeline-board',
     label: 'Pipeline · Board',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <PipelinePage rows={pipelineRows} params={{ view: 'board' }} />,
+  },
+  {
+    /* The page as it opens: what is in process, waiting and to apply. */
+    id: 'jobs-pipeline-focus',
+    label: 'Pipeline · Focus',
     module: 'jobs',
     width: 'wide',
     render: () => <PipelinePage rows={pipelineRows} params={{}} />,

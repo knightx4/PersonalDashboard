@@ -105,6 +105,7 @@ describe('surfacesForFiles, on screen changes that shipped', () => {
   it('follows a component to the page that uses it (20a8a7c7)', () => {
     expect(surfacesForFiles(['components/jobs/pipeline/board.tsx'], using)).toEqual([
       'jobs-pipeline-board',
+      'jobs-pipeline-focus',
       'jobs-pipeline-dense',
       'jobs-roles-table',
       'shell-display-options',

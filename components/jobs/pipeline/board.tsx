@@ -269,6 +269,11 @@ export function PipelineBoard({
         );
       }
 
+      // A stage with nothing in it is a narrow lane: still somewhere to drop
+      // a card, without holding a full column open for nothing. The stages
+      // with cards share the rest, so at a laptop's width the board fits
+      // without scrolling sideways.
+      const empty = columnRows.length === 0;
       return (
         <section
           key={column.setStatus}
@@ -279,7 +284,8 @@ export function PipelineBoard({
           onDragLeave={() => setOver((current) => (current === column.setStatus ? null : current))}
           onDrop={() => drop(column.setStatus)}
           className={cn(
-            'w-72 shrink-0 rounded-card bg-sunken p-2 transition-colors duration-quick',
+            'rounded-card bg-sunken p-2 transition-colors duration-quick',
+            empty ? 'w-36 shrink-0' : 'min-w-60 flex-1',
             over === column.setStatus && 'bg-accent-tint',
           )}
           aria-label={column.label}
@@ -302,8 +308,8 @@ export function PipelineBoard({
                 onReject={() => move(row, 'rejected')}
               />
             ))}
-            {columnRows.length === 0 && (
-              <p className="px-1.5 py-6 text-center text-ui text-ink-muted">{column.empty}</p>
+            {empty && (
+              <p className="px-1.5 py-6 text-center text-small text-ink-muted">{column.empty}</p>
             )}
           </div>
         </section>
