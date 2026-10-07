@@ -21,6 +21,7 @@ import { useClockNow } from '@/lib/use-clock-now';
 import type { CommentAuthor, DevComment } from '@/lib/comments/load';
 import { threadSubject, type ThreadTarget } from '@/lib/thread/subjects';
 import { PaidHint } from '@/components/ui/paid-hint';
+import { cn } from '@/lib/cn';
 
 /**
  * The thread under one row, and the box for adding to it
@@ -184,6 +185,7 @@ function Message({
   remove,
   grouped,
   titles,
+  onCard = false,
 }: {
   comment: DevComment;
   target: ThreadTarget;
@@ -192,6 +194,8 @@ function Message({
   grouped: boolean;
   /** What each step number in the body is called, for the hover text. */
   titles?: PlanRefTitles;
+  /** On the pattern's card: Dash's turns take the recessed ground. See Thread's `onCard`. */
+  onCard?: boolean;
 }) {
   const now = useClockNow();
   // The one thing still read off the pending id. A comment that has not been
@@ -200,7 +204,12 @@ function Message({
   const unsent = comment.id === PENDING;
 
   return (
-    <li className="group flex gap-2">
+    <li
+      className={cn(
+        'group flex gap-2',
+        onCard && comment.author === 'claude' && '-mx-2 rounded-lg bg-canvas px-2 py-1.5',
+      )}
+    >
       {/* The strip the author mark stands in, and where a grouped message says
           when it was written. A run draws one header, so every message under
           the first had no time on it at all until #641; the short form fits
@@ -288,6 +297,7 @@ export function Thread({
   composerOpen = false,
   titles,
   store,
+  onCard = false,
 }: {
   /** The row the thread is under, as `schema.table:id`: `threadRef(target, id)` builds one. */
   subject: string;
@@ -323,6 +333,16 @@ export function Thread({
    * them. Only a goal's flag needs it: a raise whose answer starts a goals run.
    */
   store?: CommentStore;
+  /**
+   * The caller has put the thread on a card of its own with the row's name
+   * above it: the thread pattern, components/patterns/thread.tsx (plan
+   * #1545). The turns then sit on the card's ground rather than in a well,
+   * which would be a second panel inside that card (law 11), and the well's
+   * ground moves to Dash's turns, so his words look different from yours at
+   * a glance (taste `no-bare-text`). Left off, the thread draws as it always
+   * has; a page takes it on when it moves onto the pattern.
+   */
+  onCard?: boolean;
 }) {
   const parsed = threadSubject(subject);
   if (!parsed) throw new Error(`Thread: ${subject} is not a row that has a thread`);
@@ -417,6 +437,7 @@ export function Thread({
               // it has not already said.
               grouped={shown[index - 1]?.author === comment.author}
               titles={titles}
+              onCard={onCard}
             />
           ))}
 
@@ -665,7 +686,7 @@ export function Thread({
   // last turn are the panel's heading instead of a line floating above it.
   return (
     <Disclosure
-      className="mt-1 rounded-lg bg-canvas card-pad-dense"
+      className={onCard ? 'mt-1' : 'mt-1 rounded-lg bg-canvas card-pad-dense'}
       defaultOpen
       title={`${shown.length} ${shown.length === 1 ? 'comment' : 'comments'}`}
       meta={

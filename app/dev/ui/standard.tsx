@@ -53,6 +53,7 @@ import { ClearDemo } from './clear-demo';
 import { MOMENT_WORKSPACES, MOMENTS, MOMENTS_PER_WORKSPACE, type Moment } from './moments';
 import { LAW_GROUPS } from './laws';
 import { describeSources, TASTE } from './taste';
+import { PATTERNS } from './patterns';
 import { ANATOMIES } from './anatomy';
 import * as C from './content';
 import * as M from './measurements';
@@ -1197,6 +1198,30 @@ export function UiStandard({ corrections }: { corrections: readonly CorrectionWe
           >
             <p className="text-body text-ink-muted">{anatomy.note}</p>
             <AnatomyFrames id={anatomy.id} label={anatomy.label} />
+          </Group>
+        ))}
+      </Section>
+
+      <Section
+        id="patterns"
+        title="Page patterns"
+        lead="The shapes a new screen starts from. A step that makes a screen names one of these, and a screen that fits none is a new pattern for you to decide on."
+      >
+        {PATTERNS.map((pattern) => (
+          <Group key={pattern.id} title={pattern.label}>
+            <div className="space-y-1">
+              <p className="text-body text-ink">{pattern.rule}</p>
+              <p className="text-small text-ink-muted">
+                {pattern.when} Starts from{' '}
+                <code className="font-mono">{pattern.component.path}</code>.
+              </p>
+            </div>
+            {pattern.surfaces.map((surface) => (
+              <div key={surface.id} className="space-y-1">
+                <p className="text-ui font-medium text-ink">{surface.label}</p>
+                <AnatomyFrames id={surface.id} label={`${pattern.label}, ${surface.label}`} />
+              </div>
+            ))}
           </Group>
         ))}
       </Section>
