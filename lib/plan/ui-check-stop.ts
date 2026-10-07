@@ -48,7 +48,29 @@ export type StoppedSurface = {
   fixes: number;
   /** True when the round's shots are in the `ui-shots` bucket. */
   uploaded: boolean;
+  /** The gallery's name for it, "Goals · home"; the id stands in without one. */
+  label?: string;
 };
+
+/** Where a surface opens in the gallery on the live site, for the owner. */
+export function surfaceLink(surface: string): string {
+  return `/preview?s=${encodeURIComponent(surface)}`;
+}
+
+/**
+ * The gallery's name for each surface, read from the source of the files in
+ * app/preview, where an entry's `label` follows its `id`. An ask names a
+ * screen the way the person knows it (note d3fc7228), and the gallery is
+ * too large to import into a script.
+ */
+export function surfaceLabels(source: string): Map<string, string> {
+  const labels = new Map<string, string>();
+  const entry = /\bid:\s*'([^']+)',\s*\n\s*label:\s*(?:'((?:[^'\\]|\\.)*)'|"([^"]*)")/g;
+  for (const m of source.matchAll(entry)) {
+    labels.set(m[1], (m[2] ?? m[3] ?? '').replace(/\\'/g, "'"));
+  }
+  return labels;
+}
 
 /**
  * The surfaces whose latest round is a `fix` on a stop round, in the order of
@@ -82,7 +104,8 @@ function describe(s: StoppedSurface, owner: string): string {
   const where = s.uploaded
     ? `shots in ui-shots under ${owner}/${s.surface}/r${s.round}`
     : `shots not uploaded, kept in .preview-shots/checks/ by the session that ran it`;
-  return `${s.surface} after round ${s.round} (${plural(s.fixes, 'fix', 'fixes')} open, ${where})`;
+  const name = s.label ? `${s.label} (${s.surface})` : s.surface;
+  return `${name}, in the gallery at ${surfaceLink(s.surface)}, after round ${s.round} (${plural(s.fixes, 'fix', 'fixes')} open, ${where})`;
 }
 
 /**
@@ -101,7 +124,7 @@ export function criticStopAsk(input: {
   const which = input.surfaces.map((s) => describe(s, owner)).join('; ');
   return (
     `${STOP_ASK_OPENING}${label}'s screen: ${which}. ` +
-    `The work is on branch ${input.branch.trim()}. Look at the shots and the fixes, then ${STOP_ASK_ENDING}`
+    `The work is on branch ${input.branch.trim()}. Look at the shots and the fixes on the step's row in /dev/plan, then ${STOP_ASK_ENDING}`
   );
 }
 

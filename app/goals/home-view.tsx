@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Flag } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
 import { PRESS_AREA } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, cardVariants } from '@/components/ui/card';
 import { DashMark } from '@/components/ui/dash-mark';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -12,11 +12,13 @@ import { formatInstant } from '@/lib/goals/dates';
 import type { DoneSince } from '@/lib/goals/done-since';
 import type { DashOffer } from '@/lib/goals/hand-off';
 import {
+  areaButtons,
   briefParts,
   errandAreaDefault,
   homeLists,
   homeSummary,
   splitErrands,
+  type AreaButton,
   type HomeGoal,
 } from '@/lib/goals/home';
 import type { DashLaneItem, LaterLaneItem } from '@/lib/goals/lanes';
@@ -37,10 +39,11 @@ import { GoalLanes } from './goal-lanes';
  *    (ask-dash.tsx).
  * 2. The week's focus goals by name (`focusLine`) and the card that plans
  *    the week (`planWeek`), both drawn by the page when it has them.
- * 3. Do next: at most five things on you from the week's goals, with Dash's
+ * 3. A button to each area's page (note d79a0005), directly above
+ * 4. Do next: at most five things on you from the week's goals, with Dash's
  *    draft beside the step it is for (goal-lanes.tsx, homeLists in
  *    lib/goals/home.ts).
- * 4. Lines that open in place: what Dash is on, what Dash did since your
+ * 5. Lines that open in place: what Dash is on, what Dash did since your
  *    last visit (done-since-list.tsx), Later, and Other goals.
  *
  * The day you come back after five or more days away (lib/goals/catch-up.ts),
@@ -159,6 +162,8 @@ export function HomeView({
       {focusLine}
       {planWeek}
 
+      <AreaButtons buttons={areaButtons(areas, goals)} />
+
       <GoalLanes
         doNext={doNext}
         rest={rest}
@@ -173,6 +178,41 @@ export function HomeView({
         since={<SinceLine done={done} timeZone={timeZone} open={away !== null} />}
       />
     </div>
+  );
+}
+
+/**
+ * A big button to each area's page, two to a row on a phone, so an area is
+ * one press from the home. Nothing is drawn when the areas could not be read.
+ */
+function AreaButtons({ buttons }: { buttons: AreaButton[] }) {
+  if (buttons.length === 0) return null;
+  return (
+    <nav aria-labelledby="areas-heading" className="space-y-2">
+      <h2 id="areas-heading" className="px-1 text-ui font-semibold text-ink">
+        Areas
+      </h2>
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {buttons.map((button) => (
+          <li key={button.id}>
+            <Link
+              href={button.href}
+              className={cn(
+                cardVariants({ padding: 'standard', interactive: true }),
+                'flex min-h-16 h-full flex-col justify-center gap-0.5',
+              )}
+            >
+              <span className="text-ui font-semibold text-ink">{button.name}</span>
+              <span className="text-small text-ink-muted">
+                {button.goals === 0
+                  ? 'no open goals'
+                  : `${button.goals} open ${button.goals === 1 ? 'goal' : 'goals'}`}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
