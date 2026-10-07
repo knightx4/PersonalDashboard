@@ -314,7 +314,7 @@ export async function addQuestions(
     if (!answerError) added += 1;
   }
 
-  revalidatePath('/jobs/answers');
+  revalidatePath('/jobs/material');
   return { error: null, added };
 }
 
@@ -332,7 +332,7 @@ export async function saveAnswer(
     .eq('id', answerId)
     .eq('user_id', user.id);
   if (error) return { error: error.message };
-  revalidatePath('/jobs/answers');
+  revalidatePath('/jobs/material');
   return { error: null };
 }
 
@@ -358,7 +358,7 @@ export async function promoteToCanonical(
     .eq('id', questionId)
     .eq('user_id', user.id);
   if (error) return { error: error.message };
-  revalidatePath('/jobs/answers');
+  revalidatePath('/jobs/material');
   return { error: null };
 }
 
@@ -632,6 +632,6 @@ export async function saveDraftedAnswer(
     await supabase.rpc('bump_evidence_use', { item_ids: parsed.data.evidenceItemIds });
   }
 
-  revalidatePath('/jobs/answers');
+  revalidatePath('/jobs/material');
   return { error: null };
 }

@@ -232,10 +232,10 @@ export function RoundPrep({
               <ul className="space-y-1.5">
                 {note.stories.map((story) => (
                   <li key={story.evidenceItemId} className="text-ui text-ink">
-                    {/* The bank is edited in Settings, so the story links back
+                    {/* The bank is edited in Material, so the story links back
                         to the item it came from rather than restating it. */}
                     <Link
-                      href={`/jobs/settings#evidence-${story.evidenceItemId}`}
+                      href={`/jobs/material?part=evidence#evidence-${story.evidenceItemId}`}
                       className="font-medium underline underline-offset-2 hover:text-accent"
                     >
                       {story.title}

@@ -71,7 +71,7 @@ export async function addEvidence(
   });
 
   if (error) return { error: error.message };
-  revalidatePath('/jobs/settings');
+  revalidatePath('/jobs/material');
   return { message: 'Added.' };
 }
 
@@ -85,7 +85,7 @@ export async function deleteEvidence(id: string): Promise<{ error: string | null
     .eq('id', id)
     .eq('user_id', user.id);
   if (error) return { error: error.message };
-  revalidatePath('/jobs/settings');
+  revalidatePath('/jobs/material');
   return { error: null };
 }
 
@@ -135,8 +135,8 @@ export async function addResumeVersion(
     };
   }
 
-  revalidatePath('/jobs/settings');
-  return { message: 'Added. Point applications at it so you can see which version gets past resume review.' };
+  revalidatePath('/jobs/material');
+  return { message: 'Added.' };
 }
 
 /**
@@ -180,7 +180,7 @@ export async function attachResumePdf(
     await supabase.storage.from(APP_STORAGE_BUCKET).remove([previous]);
   }
 
-  revalidatePath('/jobs/settings');
+  revalidatePath('/jobs/material');
   return { error: null };
 }
 
@@ -345,6 +345,6 @@ export async function acceptEvidence(
 
   if (error) return { added: 0, error: error.message };
 
-  revalidatePath('/jobs/settings');
+  revalidatePath('/jobs/material');
   return { added: parsed.data.items.length, error: null };
 }

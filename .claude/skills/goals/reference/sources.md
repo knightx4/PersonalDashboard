@@ -232,7 +232,7 @@ Stories of their own work and results, used as evidence in applications.
 
 - Search: `title`, `body`, `context`, `skills`
 - Name a row by `title`; link it by `id`
-- Opens at `/jobs/answers`
+- Opens at `/jobs/material?part=evidence`
 
 ### `job_search.resume_versions` (Job search)
 
@@ -240,6 +240,7 @@ Each version of their résumé, as text.
 
 - Search: `label`, `text_content`, `notes`
 - Name a row by `label`; link it by `id`
+- Opens at `/jobs/material?part=resumes`
 
 ### `job_search.cover_letters` (Job search)
 
@@ -261,6 +262,7 @@ Application questions they have met, with their standing answer.
 
 - Search: `text`, `canonical_answer`
 - Name a row by `text`; link it by `id`
+- Opens at `/jobs/material`
 
 ### `job_search.reminders` (Job search)
 

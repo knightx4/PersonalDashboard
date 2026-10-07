@@ -33,6 +33,7 @@ import type { OperationName } from '@/lib/core/spend/guesses';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { SettingsView } from '@/app/jobs/(app)/settings/view';
+import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
 import { RoleForm } from '@/app/jobs/(app)/roles/new/role-form';
@@ -718,8 +719,6 @@ const settings = {
     excludedIndustries: 'Crypto, Healthcare, Defense',
     searchStartedOn: '2026-07-06',
     ghostThresholdDays: 21,
-    writingStyleNotes: 'Plain sentences. No "passionate", no "excited to".',
-    bannedConstructions: 'leverage, synergy, reach out',
     preferences: {
       homeLocation: 'London',
       workplaces: ['hybrid', 'remote'] as const,
@@ -743,6 +742,61 @@ const settings = {
       },
     },
   ],
+  excludedSenders: [
+    { id: 'x1', domain: 'jobalerts.linkedin.com' },
+    { id: 'x2', domain: 'hi.wellfound.com' },
+  ],
+};
+
+
+/**
+ * Material for the same person: a question bank with long and unanswered
+ * questions across kinds, the two resumes and the evidence bank Settings used
+ * to hold, and a writing voice with its own banned phrases.
+ */
+const material: MaterialProps = {
+  part: 'answers',
+  kind: null,
+  questions: [
+    {
+      id: 'q1',
+      text: 'Why do you want to work at Fieldline, and why this team in particular rather than the wider platform organisation?',
+      kind: 'motivation',
+      canonicalAnswer:
+        'I have spent four years making slow batch systems incremental, and your settlement platform is the same problem at ten times the volume. The platform team owns the part I am best at.',
+      timesSeen: 7,
+      usedIn: 5,
+      approvedAnswer: null,
+    },
+    {
+      id: 'q2',
+      text: 'Describe a time you disagreed with a technical decision.',
+      kind: 'behavioral',
+      canonicalAnswer: null,
+      timesSeen: 4,
+      usedIn: 2,
+      approvedAnswer:
+        'We were about to shard the reconciliation tables. I argued for moving the joins into the warehouse first; we did, and sharding was never needed.',
+    },
+    {
+      id: 'q3',
+      text: 'Are you authorised to work in the UK?',
+      kind: 'logistics',
+      canonicalAnswer: 'Yes, without sponsorship.',
+      timesSeen: 12,
+      usedIn: 11,
+      approvedAnswer: null,
+    },
+    {
+      id: 'q4',
+      text: 'What is your notice period?',
+      kind: 'logistics',
+      canonicalAnswer: null,
+      timesSeen: 1,
+      usedIn: 0,
+      approvedAnswer: null,
+    },
+  ],
   resumes: [
     {
       id: 'cv1',
@@ -753,10 +807,6 @@ const settings = {
       hasPdf: true,
     },
     { id: 'cv2', label: 'Quant', isDefault: false, notes: null, hasText: false, hasPdf: false },
-  ],
-  excludedSenders: [
-    { id: 'x1', domain: 'jobalerts.linkedin.com' },
-    { id: 'x2', domain: 'hi.wellfound.com' },
   ],
   evidence: [
     {
@@ -780,6 +830,10 @@ const settings = {
       usedCount: 0,
     },
   ],
+  voice: {
+    writingStyleNotes: 'Plain sentences. No "passionate", no "excited to".',
+    bannedConstructions: 'leverage\nsynergy\nreach out',
+  },
 };
 
 /** Nine people on file, in every state a send to somebody can be in. */
@@ -2168,7 +2222,7 @@ const shellSections: NavSection[] = [
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
   { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
   { href: '/jobs/interviews', label: 'Interviews', icon: 'interviews' },
-  { href: '/jobs/answers', label: 'Answers', icon: 'answers' },
+  { href: '/jobs/material', label: 'Material', icon: 'answers' },
   { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
   { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
   { href: '/jobs/review', label: 'Review', icon: 'review', badge: 4 },
@@ -3123,6 +3177,27 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <SettingsView {...settings} />,
+  },
+  {
+    id: 'jobs-material',
+    label: 'Material · Answers',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <MaterialView {...material} />,
+  },
+  {
+    id: 'jobs-material-evidence',
+    label: 'Material · Evidence',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <MaterialView {...material} part="evidence" />,
+  },
+  {
+    id: 'jobs-material-voice',
+    label: 'Material · Voice',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <MaterialView {...material} part="voice" />,
   },
   {
     id: 'jobs-contacts',
