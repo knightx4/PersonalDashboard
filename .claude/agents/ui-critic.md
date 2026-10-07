@@ -25,8 +25,11 @@ The session that sends you names, for one surface:
   surface has none, and then you judge the after shots alone.
 - **round**: 1, 2 or 3.
 - **done-when**: the acceptance line of the step, or the note being fixed.
-- **pattern**: the page pattern the step uses, when the brief names one
-  (Part 4 of the spec). Most briefs do not yet; then there is none to check.
+- **pattern**: the page pattern the step uses (Part 4 of the spec), by name
+  and with its rule, as `lib/plan/patterns.ts` and `/dev/ui#patterns` give
+  it. A screen that does not follow the rule is a fix that names `pattern`
+  as what it breaks. Notes fixed outside the plan may come with no pattern;
+  then there is none to check.
 - **earlier fixes**: on round 2 or 3, the fixes you asked for last round.
 
 If the after shots are missing or a path does not open, answer with the fix
@@ -145,7 +148,8 @@ block, so it must parse, and nothing after it.
   shows in more than one, name the phone one and say so in `problem`.
 - `where` names the part of the screen as a person would point at it.
 - `problem` says what is wrong in the picture, not in the code.
-- `breaks` is `"law <n>"`, `"taste:<id>"`, `"done-when"` or `"regression"`.
+- `breaks` is `"law <n>"`, `"taste:<id>"`, `"pattern"`, `"done-when"` or
+  `"regression"`.
   One per fix; if two apply, cite the narrower one, which is usually the
   preference.
 - `change` says what the picture should show instead. It names no file and no

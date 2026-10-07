@@ -498,3 +498,51 @@ describe('the gallery surfaces in a brief', () => {
     expect(planBrief(sections, findNode(sections, 'ask')!)).not.toContain('Gallery surfaces');
   });
 });
+
+describe('the page pattern in a brief', () => {
+  const sections = buildPlanTree({
+    items: [
+      item({
+        id: 'named',
+        title: 'List saved stories on /news/saved',
+        module: 'news',
+        detail: 'Each saved story is a row that opens it.\n\nPattern: List and detail.',
+      }),
+      item({
+        id: 'unnamed',
+        title: 'Say when a story was saved',
+        module: 'news',
+        detail: 'On /news/saved, each story shows the day it was saved.',
+      }),
+      item({
+        id: 'new',
+        title: 'Lay out /news/saved as a map',
+        module: 'news',
+        detail: 'Pattern: map',
+      }),
+      item({ id: 'plain', title: 'Store the saved day', module: 'news' }),
+    ],
+    dependencies: [],
+  });
+
+  it("prints the named pattern's rule for the critic", () => {
+    const brief = planBrief(sections, findNode(sections, 'named')!);
+    expect(brief).toContain('## Pattern\n\nList and detail, from components/patterns/list-detail.tsx.');
+    expect(brief).toContain('Both pages are one column at every width.');
+    expect(brief.indexOf('## Gallery surfaces')).toBeLessThan(brief.indexOf('## Pattern'));
+  });
+
+  it('asks for one when a step with surfaces names none', () => {
+    const brief = planBrief(sections, findNode(sections, 'unnamed')!);
+    expect(brief).toContain('## Pattern\n\nNone named.');
+  });
+
+  it('sends a pattern that is not one of the three to the person', () => {
+    const brief = planBrief(sections, findNode(sections, 'new')!);
+    expect(brief).toContain('The step names "map" rather than one of list and detail, deck, thread,');
+  });
+
+  it('says nothing for a step that makes no screen', () => {
+    expect(planBrief(sections, findNode(sections, 'plain')!)).not.toContain('## Pattern');
+  });
+});

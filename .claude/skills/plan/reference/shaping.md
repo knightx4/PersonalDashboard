@@ -132,6 +132,36 @@ not held.
    has at most one: the other is a decision, or it is a follow-on and belongs
    on the ideas page.
 
+   **A step that adds or changes a screen names its pattern.** The patterns
+   are listed on `/dev/ui` under "Page patterns" (Part 4 of
+   `docs/UI-QUALITY-SPEC.md`), by the names in `lib/plan/patterns.ts`:
+   `list and detail`, `deck` and `thread`. End the step's `--detail` with
+   the name on a line of its own:
+
+   ```
+   Pattern: list and detail
+   ```
+
+   The step's brief prints that pattern's rule, and the building session
+   gives the rule to the design critic, which judges the screen against it.
+   A step that changes no screen has no pattern line.
+
+   **A screen that fits none of them is a decision for the person.** Every
+   later screen of that kind would follow it, so do not invent the layout in
+   a step's detail. Write the decision under the feature and make the step
+   `depends` on it:
+
+   ```
+   npx tsx scripts/plan.ts add "Which layout for <the screen>?" --parent <n> \
+     --kind decision --detail "A — Use <the closest pattern>. <what it would not show well>.
+   B — Make <the new pattern> a pattern of its own. <its rule in one or two sentences, and its component and gallery entry as part of this feature>.
+   Recommend <A or B>: <why>."
+   ```
+
+   Until it is answered, the step's detail says `Pattern: none fits, see
+   #<the decision>`. The brief reads any name that is not one of the three
+   as waiting on the person.
+
    **A feature whose screens have a moment ends with a moments step.** The
    moments are the catalogue in `app/dev/ui/moments.ts`, listed on `/dev/ui`
    (Part 8 of `docs/UI-QUALITY-SPEC.md`). When the feature builds or changes

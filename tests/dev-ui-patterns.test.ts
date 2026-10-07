@@ -8,6 +8,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { PATTERN_RULES, patternNamed, patternRule } from '@/lib/plan/patterns';
 import { SURFACE_ROUTES } from '@/lib/preview/routes';
 
 const root = process.cwd();
@@ -52,5 +53,24 @@ describe('the page patterns on /dev/ui', () => {
     const deck = readFileSync(join(root, 'components/patterns/deck.tsx'), 'utf8');
     expect(deck).toContain('data-deck-next');
     expect(deck).toContain('data-deck-item');
+  });
+});
+
+describe('the pattern rules the plan reads', () => {
+  it('match the patterns on /dev/ui, name, rule and component', () => {
+    expect(PATTERN_RULES.map((p) => p.name)).toEqual(entries.map((e) => e.name));
+    for (const pattern of PATTERN_RULES) {
+      const entry = entries.find((e) => e.name === pattern.name)!;
+      expect(entry.path, pattern.name).toBe(pattern.component);
+      expect(list, `${pattern.name}'s rule`).toContain(pattern.rule);
+    }
+  });
+
+  it('reads the pattern line of a step', () => {
+    expect(patternNamed('Some detail.\n\nPattern: List and detail.')).toBe('list and detail');
+    expect(patternNamed('- **Pattern:** deck')).toBe('deck');
+    expect(patternNamed('No line here, though the word pattern appears.')).toBeNull();
+    expect(patternRule('Thread')?.component).toBe('components/patterns/thread.tsx');
+    expect(patternRule('map')).toBeNull();
   });
 });
