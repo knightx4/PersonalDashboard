@@ -172,6 +172,7 @@ import {
   TermsSurface,
 } from './public-surfaces';
 import { WeekReviewNoneSurface, WeekReviewSurface } from './week-surfaces';
+import { JobsInsightsSurface } from './jobs-insights-surface';
 import {
   AccountSurface,
   DevBugsSurface,
@@ -3178,6 +3179,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <TodayLists board={todayBoard} timezone="Europe/London" />,
+  },
+  {
+    /* Analytics: how far each channel's applications got (plan #1595). */
+    id: 'jobs-insights',
+    label: 'Analytics · By channel',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <JobsInsightsSurface />,
   },
   {
     /* The month grid, which is the todo module's densest surface and the one
