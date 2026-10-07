@@ -63,6 +63,7 @@ export const devSources: ModuleSources = {
     'public.plan_main_checks',
     'public.plan_overnight_runs',
     'public.plan_seed_imports',
+    'public.plan_updates',
     'public.dev_comments',
     'public.dev_comment_reads',
     'public.dev_digests',

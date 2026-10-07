@@ -117,6 +117,31 @@ set status = 'done', commit_sha = '…',
     comment = coalesce(comment || E'\n\n', '') || 'Done <date>: …'
 where id = '…';
 
+-- update: Dash's update on a feature, at the end of a build or re-shape run
+-- (plan #1666; SKILL.md, Building step 7). The counts are the feature's steps
+-- and substeps, decisions, setup jobs and dropped steps left out: done now,
+-- done when its last update was written (or a day ago, for its first), and
+-- the total. lib/plan/updates.ts `updateCounts` is the rule; this is it in SQL.
+with recursive beneath as (
+  select id, kind, status, completed_at from plan_items
+  where parent_id = '<the feature id>' and user_id = '…'
+  union all
+  select p.id, p.kind, p.status, p.completed_at from plan_items p
+  join beneath b on p.parent_id = b.id where p.user_id = '…'
+), since as (
+  select coalesce(max(created_at), now() - interval '1 day') as at
+  from plan_updates where feature_id = '<the feature id>' and user_id = '…'
+), counted as (
+  select * from beneath where kind = 'build' and status <> 'dropped'
+)
+insert into plan_updates (user_id, feature_id, health, body, steps_done_before,
+                          steps_done_after, steps_total, session)
+select '…', '<the feature id>', 'on_track', $u$<two or three sentences>$u$,
+  (select count(*) from counted, since where status = 'done' and completed_at <= since.at),
+  (select count(*) from counted where status = 'done'),
+  (select count(*) from counted),
+  'cse_…';
+
 -- answer: the person's move, never a session's. Here to be recognised, not run.
 update plan_items
 set status = 'done', resolution = '<their words>', commit_sha = null,

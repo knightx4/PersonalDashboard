@@ -55,6 +55,10 @@
  *   npx tsx scripts/plan.ts reopen <n>
  *   npx tsx scripts/plan.ts fog <n> --note "what cannot be seen yet" | --clear
  *                                # one patch per feature, about finishing it
+ *   npx tsx scripts/plan.ts update <feature> --health on_track|at_risk|blocked --body "…"
+ *                                [--run <plan_runs id>]   # Dash's update on a feature, at
+ *                                # the end of a build or re-shape run; the step counts
+ *                                # are worked out from the plan
  *   npx tsx scripts/plan.ts assign <n> me|none
  *   npx tsx scripts/plan.ts priority <n> 1|2|3
  *   npx tsx scripts/plan.ts depends <n> --on <m>
@@ -106,6 +110,14 @@ import {
   type CheckBack,
 } from '../lib/plan/check-backs';
 import { CLAIM_WORD, type ClaimRun } from '../lib/plan/liveness';
+import {
+  isPlanUpdateHealth,
+  PLAN_UPDATE_BODY_MAX,
+  PLAN_UPDATE_HEALTH,
+  PLAN_UPDATE_HEALTHS,
+  progressSince,
+  updateCounts,
+} from '../lib/plan/updates';
 import { storedReading } from '../lib/plan/run-end';
 import { CONSEQUENCE_SHAPE, consequenceFrom, parseConsequenceArg } from '../lib/raised/consequence';
 import type { SpendReport } from '../lib/core/spend/pricing';
@@ -1437,6 +1449,53 @@ async function main(): Promise<void> {
           console.log(`Now ready: ${freed.map((ref) => `#${ref.number} ${ref.title}`).join(', ')}`);
         }
       }
+      return;
+    }
+
+    // Dash's update on a feature (plan #1666): what a build or re-shape run
+    // says about the feature it worked, at the end of the run. The counts are
+    // worked out here, from the plan as it now stands, so the run only says
+    // the health and what moved.
+    if (command === 'update') {
+      const health = arg('--health')?.trim();
+      const body = arg('--body')?.trim();
+      if (!isPlanUpdateHealth(health) || !body) {
+        fail(
+          `update ${item.number} --health ${PLAN_UPDATE_HEALTHS.join('|')} --body "two or three ` +
+            `sentences on what moved". Name the feature, not the step the run closed.`,
+        );
+      }
+      if (body.length > PLAN_UPDATE_BODY_MAX) {
+        fail(`The body is ${body.length} characters; keep it under ${PLAN_UPDATE_BODY_MAX}.`);
+      }
+      if (item.parentId !== null) {
+        fail(
+          `#${item.number} is a step. An update is on a feature: name the top-level row ` +
+            `the step sits under.`,
+        );
+      }
+      const sections = await loadTree(sql, userId);
+      const feature = findNode(sections, item.id);
+      if (!feature) fail(`#${item.number} is not on the plan as it is read.`);
+      const [last] = await sql<{ created_at: Date }[]>`
+        select created_at from plan_updates
+        where user_id = ${userId} and feature_id = ${item.id}
+        order by created_at desc limit 1`;
+      const counts = updateCounts(feature, last ? last.created_at.toISOString() : null, Date.now());
+      const runId = arg('--run')?.trim() || null;
+      await sql`
+        insert into plan_updates (user_id, feature_id, health, body, steps_done_before,
+                                  steps_done_after, steps_total, run_id, session)
+        values (${userId}, ${item.id}, ${health}, ${body}, ${counts.before}, ${counts.after},
+                ${counts.total}, ${runId}, ${currentSession(process.env) ?? null})`;
+      console.log(
+        `#${item.number} ${PLAN_UPDATE_HEALTH[health].word.toLowerCase()}: ${progressSince({
+          stepsDoneBefore: counts.before,
+          stepsDoneAfter: counts.after,
+          stepsTotal: counts.total,
+        })}`,
+      );
+      await checkRowWriting(sql, userId, item, { note: body });
       return;
     }
 

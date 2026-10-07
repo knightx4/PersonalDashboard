@@ -7,6 +7,7 @@ import { loadCommitChecks } from '@/lib/plan/ci';
 import { loadOverhaulProgress } from '@/lib/plan/overhaul-progress-load';
 import { loadCriticStops } from '@/lib/plan/critic-stop-load';
 import { loadScreenChanges } from '@/lib/plan/screen-change-load';
+import { loadFeatureUpdates } from '@/lib/plan/updates-load';
 import { buildPlanTree, flatten, planLiveness } from '@/lib/plan/tree';
 import { findFeature, stepRedirect } from '@/lib/plan/feature-page';
 import { projectById } from '@/lib/plan/projects';
@@ -75,13 +76,14 @@ export default async function FeatureRoute({ params }: { params: Params }) {
 
   const { feature, module, moduleLabel } = found;
   const beneath = flatten([feature]);
-  const [overhaulProgress, criticStops] = await Promise.all([
+  const [overhaulProgress, criticStops, updates] = await Promise.all([
     loadOverhaulProgress(
       supabase,
       user.id,
       beneath.filter((node) => node.track === 'overhaul'),
     ),
     loadCriticStops(supabase, user.id, beneath),
+    loadFeatureUpdates(supabase, user.id, feature.id),
   ]);
 
   // A project's feature sends to the project's routine, and only once it is
@@ -105,6 +107,7 @@ export default async function FeatureRoute({ params }: { params: Params }) {
       overhaulProgress={overhaulProgress}
       criticStops={criticStops}
       screenChanges={screenChanges}
+      updates={updates}
     />
   );
 }

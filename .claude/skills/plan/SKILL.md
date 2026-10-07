@@ -248,7 +248,25 @@ thousand tokens, and gets to the end.
    written a decision and blocked its step. Do not build around it and do not
    send a later step that depends on it. Other steps in the batch that do not
    depend on it are still yours to send.
-7. **Report when the batch ends**: every step closed **by number and title**,
+7. **Write Dash's update on each feature the batch worked**, once its steps
+   are closed or blocked and before the report (plan #1666):
+
+   ```
+   npx tsx scripts/plan.ts update <the feature> --health on_track|at_risk|blocked \
+     --body "<two or three sentences on what moved>"
+   ```
+
+   The feature's page shows the latest one at the top of its Overview, with
+   the health and a line saying how many of its steps are done now and how
+   many were done at the update before; the command works out those counts
+   from the plan. `on_track` when the feature is moving and nothing open
+   threatens it, `at_risk` when something might stop it landing as written (a
+   critic stop, a failing merge, a step that keeps growing), `blocked` when it
+   cannot move until the person answers or sets something up. The body is
+   for the person: what closed, what is next, and what is waiting on them,
+   by number and title, in the writing guide's terms. One update per feature
+   per batch, not one per step.
+8. **Report when the batch ends**: every step closed **by number and title**,
    what became ready, what is blocked and on what, and anything raised on
    `/dev/raised`, by title. A report that says "closed four steps" makes the
    person go and look. Say which steps reached main and which did not: a closed

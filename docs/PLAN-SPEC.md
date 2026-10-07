@@ -803,6 +803,19 @@ that step's row, opening a folded group to show it, so every number on the
 plan has an address. The row on the plan itself is unchanged; only its title
 became a link.
 
+At the end of each build or re-shape run, Dash writes an update on each
+feature it worked (plan #1666), kept in `plan_updates`: a health (on track,
+at risk or blocked), two or three sentences on what moved, and how many of
+the feature's steps were done before the run and after it. The count covers
+steps and substeps, leaving out decisions, setup jobs and dropped steps;
+"before" is the count when the last update was written, or a day earlier for
+the first. The latest update is a card at the top of Overview: the health,
+the date, the sentences and a line such as "5 of 9 steps done, up from 3".
+The health is Dash's judgement of whether the feature will land, written
+with the update, and is separate from the health the row derives from its
+status. Sessions write updates with `plan.ts update`; the page only reads
+them.
+
 ## The changelog
 
 `/dev/changelog` is the fourth page in the workspace and the only one that
