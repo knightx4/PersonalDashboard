@@ -173,6 +173,15 @@ export const learnSources: ModuleSources = {
       title: 'video_id',
       note: 'item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist. came_from is playlist, takeout or channel search; a channel search row names the subject it was found for in subject_id.',
     },
+    {
+      table: 'learn.personality_results',
+      module: 'Learn',
+      holds: 'Personality tests they took or typed in, each with its date: Big Five scores, or a type such as INTJ or 5w4.',
+      weight: 'record',
+      search: ['test_name', 'typed_value', 'read_points'],
+      title: 'test_name',
+      note: 'kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value. A retake is a new row, so read the latest by taken_at. read_points is Dash\'s read of the result against their notes, once written.',
+    },
   ],
   notSources: [
     { table: 'learn.area_check_articles', reason: 'Reference data for placing subjects.' },
