@@ -3,6 +3,7 @@ import {
   BarChart3,
   BookOpen,
   BookOpenCheck,
+  Blocks,
   Bookmark,
   Boxes,
   Briefcase,
@@ -105,6 +106,8 @@ export const NAV_ICONS = {
   surfaces: Frame,
   // Which pages are opened and what each workspace spends (plan #1482).
   usage: Gauge,
+  // One page per workspace (the module pages): the app's parts, side by side.
+  modules: Blocks,
   // A project Dev builds outside this app (lib/plan/projects): a site.
   project: Globe,
   // A specification is a document you read and argue with, so it gets the
