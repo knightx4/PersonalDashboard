@@ -43,6 +43,7 @@ import {
   stepsViewHref,
   type StepGroup,
   type StepsView,
+  featureStatus,
 } from '@/lib/plan/feature-page';
 import {
   HELD_PARAM,
@@ -153,7 +154,9 @@ export function FeaturePage({
 
   const crumbs = featureCrumbs(node, module, moduleLabel);
   const steps = node.children.filter((child) => child.kind !== 'decision');
-  const tabs = FEATURE_TABS.map((t) => (t.id === 'steps' ? { ...t, count: steps.length } : t));
+  const tabs = FEATURE_TABS.map((t) =>
+    t.id === 'steps' ? { ...t, count: progressSplit(node).open, countNoun: 'open' } : t,
+  );
   // Where the page's own address is, for the presses that need a tab.
   const overview = featureHref(node.number);
   const stepsTab = `${overview}?${TAB_PARAM}=steps`;
@@ -210,7 +213,7 @@ export function FeaturePage({
     return item;
   });
 
-  const statusWord = STATUS_LABEL[node.status];
+  const statusWord = STATUS_LABEL[featureStatus(node)];
   const split = progressSplit(node);
   const properties = (
     <PropertyList>
@@ -242,7 +245,7 @@ export function FeaturePage({
           }
         />
       )}
-      {parts.move && <Property label="Next" value={parts.move} />}
+      {parts.move && <Property label="Waiting on" value={parts.move} />}
       <Property
         label="Priority"
         value={

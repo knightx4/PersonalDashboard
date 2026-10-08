@@ -54,6 +54,21 @@ export const FEATURE_TABS: readonly Tab[] = [
 ];
 
 /**
+ * The status a feature's page states. A feature rolls up from its steps: one
+ * that has not started reads as in progress once any step beneath it has. A
+ * feature the person has moved past not started keeps the status it holds.
+ */
+export function featureStatus(node: PlanNode): PlanNode['status'] {
+  if (node.status !== 'not_started') return node.status;
+  const started = (nodes: readonly PlanNode[]): boolean =>
+    nodes.some(
+      (child) =>
+        child.kind !== 'decision' && (child.status === 'in_progress' || started(child.children)),
+    );
+  return started(node.children) ? 'in_progress' : node.status;
+}
+
+/**
  * The feature a number belongs to, and the row it names.
  *
  * A feature is a row at the top of its module. A step's or substep's number
