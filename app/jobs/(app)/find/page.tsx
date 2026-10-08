@@ -86,7 +86,7 @@ export default async function FindPage({
       return null;
     }),
     // A failed read shows the section empty rather than failing the page.
-    loadDiscoveredCompanies(supabase, user.id).catch((error) => {
+    loadJobPreferences(supabase, user.id).then((prefs) => loadDiscoveredCompanies(supabase, user.id, prefs)).catch((error) => {
       console.error('[jobs find] discovered companies', error);
       return [];
     }),
