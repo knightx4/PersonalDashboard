@@ -556,7 +556,7 @@ interchangeable:
 - **A plan decision** — a `decision` step under one feature, in
   `.claude/skills/plan`. A question about that feature, answered before it is
   built.
-- **A raise** — `raised_items`, read on `/dev/raised`. What a session ran into
+- **A raise** — `raised_items`, read on `/dev/inbox`. What a session ran into
   that belongs to no note and no one feature: a risk found in code it was only
   passing through, a question of taste, a thing it will not decide alone.
 
@@ -581,7 +581,7 @@ npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
 answer in one line. The detail is the evidence for it, not the ask itself.
 
 **A session never answers or dismisses a raise.** That is the user's move on
-`/dev/raised`, the same rule as never answering its own decision. A session
+`/dev/inbox`, the same rule as never answering its own decision. A session
 that answers its own question has no questions, only guesses with a paper
 trail. Replying to an answer the user has written is the exception, and it is
 a `claude` comment on the thread, not a close.
@@ -629,7 +629,7 @@ Then, below the table:
 
 - **Blocked** — one line each: the question, phrased so a one-line answer
   unblocks it.
-- **Raised** — anything written to `/dev/raised` during the run, by title, so
+- **Raised** — anything written to `/dev/inbox` during the run, by title, so
   the user knows a question is waiting there.
 - **Critic rounds** — for each surface a fix touched, how many rounds it
   took and the last verdict; after a third failed round, its fixes in full.

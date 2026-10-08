@@ -23,7 +23,7 @@ const PAGES: Record<string, Page> = {
   },
   'public.ideas': { title: 'body', href: (row) => `/dev/ideas#idea-${row.id}` },
   'public.feedback_items': { title: 'body', href: (row) => `/dev/bugs#note-${row.id}` },
-  'public.raised_items': { title: 'title', href: (row) => `/dev/raised#raise-${row.id}` },
+  'public.raised_items': { title: 'title', href: (row) => `/dev/inbox#raise-${row.id}` },
 };
 
 export const devSources: ModuleSources = {

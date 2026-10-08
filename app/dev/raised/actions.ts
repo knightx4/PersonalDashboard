@@ -111,6 +111,8 @@ export async function decideRaise(
     if (error) return { error: error.message };
 
     revalidatePath('/dev/raised');
+
+    revalidatePath('/dev/inbox');
     return { message: 'Closed.' };
   }
 
@@ -160,6 +162,8 @@ export async function decideRaise(
   if (asked?.ok && asked.redraw) revalidatePath(asked.redraw);
 
   revalidatePath('/dev/raised');
+
+  revalidatePath('/dev/inbox');
   if (!outcome.ok) return { error: outcome.why };
   if (asked && !asked.ok) return { error: asked.error };
   return { message: asked ? `Done. ${asked.message}` : 'Done.' };
@@ -212,6 +216,8 @@ export async function closeRaise(
   if (error) return { error: error.message };
 
   revalidatePath('/dev/raised');
+
+  revalidatePath('/dev/inbox');
   return { message: 'Closed.' };
 }
 
@@ -241,6 +247,8 @@ export async function dismissRaise(
   if (error) return { error: error.message };
 
   revalidatePath('/dev/raised');
+
+  revalidatePath('/dev/inbox');
   return { message: 'Dismissed.' };
 }
 
@@ -264,6 +272,8 @@ export async function reopenRaise(
   if (error) return { error: error.message };
 
   revalidatePath('/dev/raised');
+
+  revalidatePath('/dev/inbox');
   return { message: 'Reopened.' };
 }
 

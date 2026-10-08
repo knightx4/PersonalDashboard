@@ -698,7 +698,7 @@ async function main(): Promise<void> {
      * step: a risk it found in code it was only passing through, a question of
      * taste, a thing it will not decide alone. A decision belongs to one
      * feature and the notes queue is what you report as wrong; this is the
-     * third home, and it is read on /dev/raised.
+     * third home, and it is read on /dev/inbox.
      *
      * A session never answers or dismisses its own raise, the same rule as
      * never answering its own decision, so there is no command for either.
@@ -763,7 +763,7 @@ async function main(): Promise<void> {
         returning id`;
       console.log(`${row.id.slice(0, 8)}  raised: ${title}`);
       console.log(`a yes: ${consequence.said}`);
-      console.log('It is on /dev/raised, and in the bell until it is answered or dismissed.');
+      console.log('It is on /dev/inbox, and in the bell until it is answered or dismissed.');
       return;
     }
 

@@ -92,6 +92,7 @@ type Db = SupabaseClient<any, 'public'>;
 function revalidatePlan(): void {
   revalidatePath('/dev/plan');
   revalidatePath('/dev/raised');
+  revalidatePath('/dev/inbox');
 }
 
 /** Empty string means "the app as a whole", the same as the ideas list. */

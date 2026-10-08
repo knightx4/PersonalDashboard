@@ -51,7 +51,7 @@ export const TARGET_COLUMN: Record<
 export const TARGET_PATH: Record<CommentTarget, string> = {
   idea: '/dev/ideas',
   step: '/dev/plan',
-  raise: '/dev/raised',
+  raise: '/dev/inbox',
   note: '/dev/bugs',
   // The list, not the document. A comment is written on one spec's page, and
   // that page's own path is not knowable from the target alone -- the write

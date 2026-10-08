@@ -210,6 +210,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-ideas': ['/dev/ideas'],
   'dev-project-plan': ['/dev/projects/[id]'],
   'dev-raised': ['/dev/raised'],
+  'dev-inbox': ['/dev/inbox'],
   'dev-raised-status': ['/dev/raised'],
   'dev-specs': ['/dev/specs'],
   'dev-specs-interview-empty': ['/dev/specs'],

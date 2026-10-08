@@ -204,6 +204,7 @@ import {
   DevChangelogScreensSurface,
   DevIdeasSurface,
   DevRaisedSurface,
+  DevInboxSurface,
   DevRaisedStatusSurface,
   DevSpecSurface,
   DevSpecsSurface,
@@ -4833,10 +4834,18 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'dev-raised',
-    label: "Dev · Home, what is waiting on you",
+    label: 'Dev · Home',
     module: 'dev',
     width: 'page',
     render: () => <DevRaisedSurface />,
+  },
+  {
+    /* Everything waiting on you, moved off Home into its own tab. */
+    id: 'dev-inbox',
+    label: 'Dev · Inbox',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevInboxSurface />,
   },
   {
     /* The Status panel at the top of Home in Dev, with Dash's mark under

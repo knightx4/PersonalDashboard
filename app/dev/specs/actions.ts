@@ -142,6 +142,7 @@ async function decide(formData: FormData, accept: boolean): Promise<Decided> {
   revalidatePath('/dev/specs');
   // The Dash tab counts the edits waiting.
   revalidatePath('/dev/raised');
+  revalidatePath('/dev/inbox');
   const state = { message: accept ? 'Vision replaced.' : 'Edit dismissed.' };
   return edit ? { state, edit, userId: user.id, supabase } : { state };
 }
@@ -236,6 +237,7 @@ async function decideChange(
   revalidatePath('/dev/specs');
   // Home lists the changes waiting on you and its tab counts them.
   revalidatePath('/dev/raised');
+  revalidatePath('/dev/inbox');
   if ('error' in result) return { state: { error: result.error } };
   return { state: { message: decision === 'approved' ? 'Approved.' : 'Declined.' }, change: result.change };
 }
@@ -305,6 +307,7 @@ export async function approveSpecChange(
     await reopenSpecChange(supabase, user.id, current.id);
     revalidatePath('/dev/specs');
     revalidatePath('/dev/raised');
+    revalidatePath('/dev/inbox');
     return { error: `Not approved: Dash could not start writing it into the spec. ${result.error}` };
   }
   revalidatePath('/dev/plan');
