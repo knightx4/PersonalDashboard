@@ -230,6 +230,11 @@ select core.add_thread_turn('…', 'public.raised_items:<the raise>', 'claude', 
 -- `public.ideas:<id>` an idea, `public.raised_items:<id>` a raise. Read a
 -- thread from core.thread_turns by the same ref.
 select core.add_thread_turn('…', 'public.plan_items:<the step>', 'claude', $c$…$c$);
+
+-- a comment that asks nothing and wants nothing done (and that you changed
+-- nothing for) may be marked seen instead; see comments.md. The turn id is
+-- on core.thread_turns for the ref.
+select core.acknowledge_thread_turn('…', 'public.plan_items:<the step>', '<turn id>');
 ```
 
 `started_at` and `completed_at` are kept by a trigger from the status; do not
