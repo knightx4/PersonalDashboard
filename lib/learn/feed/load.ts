@@ -36,6 +36,12 @@ const CARD_SELECT =
   'source_item:catalogue_items!feed_cards_source_item_id_fkey(title, canonical_url, licence), ' +
   'source_segment:catalogue_segments!feed_cards_source_segment_id_fkey(heading, text, section_anchor)';
 
+/**
+ * Which cards a page of the deck is dealt from: how many, as of when, and
+ * only one subject's when `subjectId` is set (plan #1698).
+ */
+export type FeedScope = { limit?: number; now?: number; subjectId?: string | null };
+
 /** The most card ids a request excludes. Past this, the oldest shown come back. */
 const MAX_EXCLUDED = 300;
 
@@ -64,12 +70,14 @@ function returnCutoff(status: 'review' | 'skipped', now: number): string {
  * for one theme are not back to back where another will do (spread.ts). The
  * cards the page already holds are the last ids in `exclude`, in deck order,
  * so a later page carries on the spacing.
+ *
+ * With `subjectId`, only that subject's cards are dealt (plan #1698): the
+ * Now feed opened from a subject's page. The same order and spacing apply.
  */
 export async function loadFeedPage(
   supabase: LearnSupabaseClient,
   exclude: string[],
-  limit: number = FEED_PAGE,
-  now: number = Date.now(),
+  { limit = FEED_PAGE, now = Date.now(), subjectId = null }: FeedScope = {},
 ): Promise<FeedCard[]> {
   const skip = exclude.slice(-MAX_EXCLUDED);
   // A goal's lessons are on its plan (plan #1143). A failed read deals them
@@ -99,6 +107,7 @@ export async function loadFeedPage(
         .order('acted_at', { ascending: true });
     }
     if (planLessons) query = query.or(planLessons);
+    if (subjectId) query = query.eq('subject_id', subjectId);
     const leaveOut = [...skip, ...taken];
     if (leaveOut.length > 0) query = query.not('id', 'in', `(${leaveOut.join(',')})`);
     const { data, error } = await query.order('id').limit(count);
@@ -339,8 +348,11 @@ async function recentInDeck(supabase: LearnSupabaseClient, ids: string[]): Promi
   });
 }
 
-/** How many cards are ready, for the foot of the feed. */
-export async function countReadyCards(supabase: LearnSupabaseClient): Promise<number> {
+/** How many cards are ready, for the foot of the feed: one subject's with `subjectId`. */
+export async function countReadyCards(
+  supabase: LearnSupabaseClient,
+  subjectId: string | null = null,
+): Promise<number> {
   const planLessons = notPlanLessons(await goalTrackIds(supabase).catch(() => []));
   let query = supabase
     .from('feed_cards')
@@ -350,6 +362,7 @@ export async function countReadyCards(supabase: LearnSupabaseClient): Promise<nu
     .not('context', 'is', null);
   // A goal's lessons are on its plan, not in the deck (plan #1143).
   if (planLessons) query = query.or(planLessons);
+  if (subjectId) query = query.eq('subject_id', subjectId);
   const { count, error } = await query;
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) return 0;

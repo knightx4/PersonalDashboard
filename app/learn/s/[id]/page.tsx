@@ -11,7 +11,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { weightReason } from '@/lib/learn/flow/interest';
 import { loadTrackInterest } from '@/lib/learn/flow/interest-load';
-import { practiceHref } from '@/lib/learn/flow/href';
+import { nowHref, practiceHref } from '@/lib/learn/flow/href';
 import { GoalForm } from '@/app/learn/know/goal-form';
 import { ConceptList } from '@/components/learn/concept-list';
 import { ConfirmStep } from '@/components/ui/confirm-step';
@@ -321,6 +321,11 @@ export default async function SubjectPage({
         }
         actions={
           <>
+            {/* Now with only this subject's cards (plan #1698). Its empty
+                state says when there are none, so it shows on every subject. */}
+            <Link href={nowHref(id)} className={buttonVariants({ variant: 'secondary' })}>
+              Now
+            </Link>
             {counts.total > 0 && (
               <>
                 <Link
