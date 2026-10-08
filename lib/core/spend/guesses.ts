@@ -225,6 +225,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // One video's transcript as numbered sentences in, most of them half an
   // hour or less (about 8,000 tokens), and up to fifteen clips out.
   'cut-clips': background(unit(HAIKU, 9_000, 1_500)),
+  // Per fifty clips: the subject names and each clip's caption and point in,
+  // a list of subject names per clip out.
+  'tag-clips': background(unit(HAIKU, 4_000, 1_200)),
   // Per clip: the learner state and one clip's caption, point and up to
   // ninety seconds of transcript in, a score out. Haiku is the fallback.
   'score-clips': background(unit(JEV, 1_500, 0)),
