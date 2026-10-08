@@ -18,6 +18,7 @@ import {
 } from '@/lib/talk/talk';
 import { useClockNow } from '@/lib/use-clock-now';
 import { LinkedText } from '@/components/ui/linked-text';
+import { ReplyCharts } from '@/components/talk/reply-chart';
 
 /**
  * A saved conversation with Dash about a card or a story, and the box to add
@@ -164,6 +165,9 @@ function Turn({
             <LinkedText text={turn.body} />
           </p>
         )}
+        {/* A chart Dash drew (plan #1655) belongs to the answer, so it sits
+            under the words and above the rows they rest on. */}
+        {turn.role === 'assistant' && <ReplyCharts calls={turn.toolCalls} />}
         {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} />}
         {below}
       </div>

@@ -5,6 +5,7 @@ import type { ChangeDeps } from '@/lib/ask/changes';
 import type { AskContext, AskRow } from '@/lib/ask/db';
 import type { DashAction, DashActionOp } from '@/lib/core/dash-actions';
 import { HAND_OFF_TOOL } from '@/lib/talk/handoff';
+import { CHART_TOOL } from '@/lib/talk/chart';
 import { CAPTURE_TABLE, CAPTURE_TOOLS } from './capture-tools';
 import { THREAD_TOOLS } from './thread-tools';
 import { WRITE_TOOLS } from './writes';
@@ -218,12 +219,14 @@ export const ASK_DASH_TOOLS: readonly DashTool[] = DASH_TOOLS.filter((tool) => o
  * The tools a thread on a row of `table` offers (plan #1465): every lookup,
  * every write, and the row's own tools. Not the watch proposal or Ask's
  * hand-off, which keep what they start in an Ask conversation a thread does
- * not have.
+ * not have, and not the chart (plan #1655), which is drawn from the tool
+ * calls an Ask answer keeps and a thread's reply does not.
  */
 export function threadDashTools(table: string): DashTool[] {
   return DASH_TOOLS.filter(
     (tool) =>
       (tool.kind === 'lookup' || tool.kind === 'write' || (tool.kind === 'handoff' && tool.subjects)) &&
+      tool.name !== CHART_TOOL &&
       offeredOn(tool, table),
   );
 }
