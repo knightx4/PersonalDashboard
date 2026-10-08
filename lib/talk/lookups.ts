@@ -53,6 +53,7 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
   'add_role_note',
   'add_job_lead',
   'add_idea',
+  'change_items',
 ];
 
 /**

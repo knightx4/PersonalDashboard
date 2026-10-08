@@ -36,6 +36,7 @@ export const DASH_CHANGE_KINDS = [
   'add_role_note',
   'add_job_lead',
   'add_idea',
+  'change_items',
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -70,6 +71,11 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  *                  the app as a whole).
  * add_job_lead     the role saved as a lead, its company, and the posting
  *                  link it came from when there was one.
+ * change_items     many owned items changed at once (plan #1656): which of
+ *                  the bulk bar's changes, how many items it moved, the
+ *                  first few of their names, and how many it left alone.
+ *                  Every item it moved is kept in `undo.rows`
+ *                  (lib/dash/bulk-items.ts).
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -102,6 +108,12 @@ export type DashChangeInput = {
   add_role_note: { roleId: string; roleTitle: string; body: string };
   add_idea: { body: string; module: string | null };
   add_job_lead: { roleId: string; roleTitle: string; companyName: string; url: string | null };
+  change_items: {
+    change: 'for_sale' | 'not_for_sale' | 'to_return' | 'not_returning' | 'group';
+    count: number;
+    titles: string[];
+    left: number;
+  };
 };
 
 /** The kinds Dash proposed for a Confirm before plan #1440, which keep their own undo in lib/ask/changes.ts. */
