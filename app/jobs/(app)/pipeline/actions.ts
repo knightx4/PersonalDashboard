@@ -9,6 +9,7 @@ import {
   type ApplicationSource,
   type ApplicationStatus,
 } from '@/lib/jobs/pipeline';
+import { stageMoveEvent } from '@/lib/jobs/move';
 
 /**
  * Moving a card writes a status_override EVENT and sets the override column.
@@ -39,15 +40,9 @@ export async function moveApplication(
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error: eventError } = await supabase.from('application_events').insert({
-    user_id: user.id,
-    application_id: parsed.data.applicationId,
-    kind: 'status_override',
-    occurred_at: new Date().toISOString(),
-    source: 'manual',
-    summary: `Moved to ${parsed.data.status.replace(/_/g, ' ')} by hand`,
-    payload: { status: parsed.data.status },
-  });
+  const { error: eventError } = await supabase
+    .from('application_events')
+    .insert(stageMoveEvent(user.id, parsed.data.applicationId, parsed.data.status, 'hand', new Date().toISOString()));
   if (eventError) return { error: eventError.message };
 
   const { error } = await supabase

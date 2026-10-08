@@ -3,6 +3,8 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { parseRef } from '@/lib/core/refs';
+import type { RoleStage } from '@/lib/dash/bulk-roles';
+import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 
 /**
  * The changes Dash proposes in an Ask Dash answer (feature #1186), kept in
@@ -37,6 +39,7 @@ export const DASH_CHANGE_KINDS = [
   'add_job_lead',
   'add_idea',
   'change_items',
+  'move_roles',
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -76,6 +79,12 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  *                  first few of their names, and how many it left alone.
  *                  Every item it moved is kept in `undo.rows`
  *                  (lib/dash/bulk-items.ts).
+ * move_roles       many roles moved to one stage or archived at once (plan
+ *                  #1657): the stage asked for, the status it wrote, how
+ *                  many roles it moved, the first few of their names, and
+ *                  how many it left alone. Every application it moved is
+ *                  kept in `undo.rows` with the event Dash wrote
+ *                  (lib/dash/bulk-roles.ts).
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -110,6 +119,13 @@ export type DashChangeInput = {
   add_job_lead: { roleId: string; roleTitle: string; companyName: string; url: string | null };
   change_items: {
     change: 'for_sale' | 'not_for_sale' | 'to_return' | 'not_returning' | 'group';
+    count: number;
+    titles: string[];
+    left: number;
+  };
+  move_roles: {
+    stage: RoleStage;
+    status: ApplicationStatus;
     count: number;
     titles: string[];
     left: number;

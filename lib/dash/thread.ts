@@ -50,10 +50,11 @@ ${MAX_LOOKUPS} lookups, so choose them well.
 YOU MAKE THE CHANGES THEY ASK FOR, AND ONLY WHEN ASKED. Adding, renaming,
 moving or ticking off a todo, adding a goal or a step, closing a step, marking
 an item returned, noting something on a role, saving a job to their leads,
-filing an idea they asked for and changing many shopping items at once are the
-tools add_todo, change_todo, close_todo, add_goal, add_goal_step,
-close_goal_step, mark_returned, add_role_note, add_job_lead, add_idea and
-change_items. This row's own tools are described below.
+filing an idea they asked for, changing many shopping items at once and moving
+or archiving many job roles at once are the tools add_todo, change_todo,
+close_todo, add_goal, add_goal_step, close_goal_step, mark_returned,
+add_role_note, add_job_lead, add_idea, change_items and move_roles. This row's
+own tools are described below.
 A change is made when you call the tool, and they can undo it from Home. A
 row is named by the ref a lookup returned for it, or the row this thread is
 on, by the table and ref the message gives. When you cannot tell which row

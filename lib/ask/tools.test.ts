@@ -407,6 +407,21 @@ describe('job_applications', () => {
     expect(rows[0].detail).toMatchObject({ company: 'Acme', last_heard_on: null, sent_on: '2026-08-01' });
   });
 
+  it('finds sent applications that never had a reply, for a bulk move (plan #1657)', async () => {
+    const withConfirmation: Tables = {
+      ...tables,
+      'job_search.application_events': [
+        ...tables['job_search.application_events'],
+        // An automatic confirmation is not a reply.
+        { application_id: 'a1', user_id: ME, kind: 'confirmation', occurred_at: '2026-08-01T11:00:00Z' },
+      ],
+    };
+    const result = await executeAskTool('job_applications', { no_reply: true, to: '2026-07-31' }, context(withConfirmation));
+    expect(expectLinkedRows(result).map((r) => r.ref)).toEqual(['a3']);
+    const all = await executeAskTool('job_applications', { no_reply: true }, context(withConfirmation));
+    expect(expectLinkedRows(all).map((r) => r.ref).sort()).toEqual(['a1', 'a3']);
+  });
+
   it('narrows to the days sent', async () => {
     const result = await executeAskTool(
       'job_applications',

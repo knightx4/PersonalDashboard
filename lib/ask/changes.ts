@@ -5,6 +5,7 @@ import { markReturned, unmarkReturned } from '@/lib/returns/mark';
 import type { TaskInput } from '@/lib/todo/tasks/input';
 import { readSubject, undoDashAction } from '@/lib/core/dash-actions';
 import { undoItemChange } from '@/lib/dash/bulk-items';
+import { undoRoleMove } from '@/lib/dash/bulk-roles';
 import { toRef } from '@/lib/core/refs';
 import {
   DASH_ACTIONS,
@@ -130,6 +131,15 @@ export function changePaths(change: DashChange): string[] {
         ...rows.flatMap((row) => (typeof row.id === 'string' ? [`/shopping/inventory/${row.id}`] : [])),
       ];
     }
+    case 'move_roles': {
+      const rows = Array.isArray(change.undo?.rows) ? (change.undo.rows as { role_id?: unknown }[]) : [];
+      return [
+        '/jobs',
+        '/jobs/pipeline',
+        '/jobs/roles',
+        ...rows.flatMap((row) => (typeof row.role_id === 'string' ? [`/jobs/roles/${row.role_id}`] : [])),
+      ];
+    }
   }
 }
 
@@ -147,6 +157,7 @@ const WORKSPACE: Record<DashChangeKind, { module: ModuleId; label: string } | nu
   add_idea: null,
   add_job_lead: { module: 'jobs', label: 'Jobs' },
   change_items: { module: 'shopping', label: 'Shopping' },
+  move_roles: { module: 'jobs', label: 'Jobs' },
 };
 
 const WRITTEN_TABLE: Record<DashChangeKind, string> = {
@@ -162,6 +173,7 @@ const WRITTEN_TABLE: Record<DashChangeKind, string> = {
   add_idea: 'public.ideas',
   add_job_lead: 'job_search.roles',
   change_items: 'public.inventory_items',
+  move_roles: 'job_search.applications',
 };
 
 /** What each kind does to that row: a return changes the item, the rest add one. */
@@ -178,6 +190,7 @@ const WRITTEN_OP: Record<DashChangeKind, 'insert' | 'update'> = {
   add_idea: 'insert',
   add_job_lead: 'insert',
   change_items: 'update',
+  move_roles: 'update',
 };
 
 /** A refusal the person reads: the sentence is theirs, the class only marks it as one. */
@@ -723,7 +736,8 @@ export async function writeChange(
  * where they are still ticked. The record is marked undone by the rule.
  */
 async function undoWrite(deps: ChangeDeps, change: DashChange, surface: 'ask' | 'thread'): Promise<ChangeOutcome> {
-  if (change.kind === 'change_items') return undoItems(deps, change, surface);
+  if (change.kind === 'change_items') return undoMany(deps, change, surface, undoItemChange);
+  if (change.kind === 'move_roles') return undoMany(deps, change, surface, undoRoleMove);
   const result = await undoDashAction(
     { userId: deps.userId, core: deps.core, db: deps.db, now: deps.now },
     change.id,
@@ -749,12 +763,21 @@ async function undoWrite(deps: ChangeDeps, change: DashChange, surface: 'ask' | 
 }
 
 /**
- * Undo many items changed at once (change_items, plan #1656): every item the
- * record keeps goes back where it still holds what Dash left, then the one
- * record is marked undone, so one press takes the whole change back.
+ * Undo many rows changed at once: items (change_items, plan #1656) or roles
+ * (move_roles, plan #1657). Every row the record keeps goes back where it
+ * still holds what Dash left, then the one record is marked undone, so one
+ * press takes the whole change back.
  */
-async function undoItems(deps: ChangeDeps, change: DashChange, surface: 'ask' | 'thread'): Promise<ChangeOutcome> {
-  const put = await undoItemChange({ userId: deps.userId, db: deps.db }, change.undo);
+async function undoMany(
+  deps: ChangeDeps,
+  change: DashChange,
+  surface: 'ask' | 'thread',
+  putBack: (
+    deps: { userId: string; db: AskDb },
+    recorded: Record<string, unknown> | null,
+  ) => Promise<{ ok: true } | { ok: false; error: string }>,
+): Promise<ChangeOutcome> {
+  const put = await putBack({ userId: deps.userId, db: deps.db }, change.undo);
   if (!put.ok) return { ok: false, error: put.error, change };
   const { data, error } = await deps.core
     .from(DASH_ACTIONS)

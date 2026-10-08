@@ -465,6 +465,7 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
     typeof input.quiet_for_days === 'number' && input.quiet_for_days > 0
       ? Math.floor(input.quiet_for_days)
       : null;
+  const noReply = input.no_reply === true;
 
   const db = await ctx.db('job_search');
   const query = db
@@ -507,8 +508,10 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
   const roleById = new Map(roles.map((r) => [r.id, r]));
   const companyById = new Map(companies.map((c) => [c.id, c]));
   const lastHeard = new Map<string, string>();
+  const replied = new Set<string>();
   for (const event of events) {
     if (!HEARD_KINDS.has(event.kind)) continue;
+    if (event.kind !== 'confirmation') replied.add(event.application_id);
     const held = lastHeard.get(event.application_id);
     if (!held || event.occurred_at > held) lastHeard.set(event.application_id, event.occurred_at);
   }
@@ -523,6 +526,8 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
     });
   }
   if (statuses.length > 0) applications = applications.filter((a) => statuses.includes(statusOf(a)));
+  // Sent, and nothing from a person since: an automatic confirmation is not a reply.
+  if (noReply) applications = applications.filter((a) => a.submitted_at !== null && !replied.has(a.id));
   if (quietDays !== null) {
     const since = daysBefore(ctx.today, quietDays);
     applications = applications.filter(
@@ -572,6 +577,9 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
     rows,
     totals: { count: applications.length, by_status: byStatus, rejected_at_stage: rejectedAt },
     note:
+      (noReply
+        ? 'Sent applications with no reply from the company: no reply, screen, assessment, interview, offer or rejection, an automatic confirmation aside. '
+        : '') +
       (quietDays !== null
         ? `Open applications with nothing heard from the company in the ${quietDays} days before ${ctx.today}; last heard is the newest reply, screen, interview, offer or rejection, or the day it was sent when nothing came back. `
         : '') + (applications.length > MAX_ROWS ? `Only the newest ${MAX_ROWS} are listed.` : ''),

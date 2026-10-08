@@ -18,6 +18,7 @@ import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { detectPosting } from '@/lib/jobs/ats/detect';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { BULK_MAX, changeItems, ITEM_CHANGES } from './bulk-items';
+import { moveRoles, ROLE_STAGES } from './bulk-roles';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -41,6 +42,9 @@ import { BULK_MAX, changeItems, ITEM_CHANGES } from './bulk-items';
  *   change_items     many owned items marked for sale or to return, taken
  *                    off either, or grouped as one item, with one Undo
  *                    (lib/dash/bulk-items.ts, plan #1656).
+ *   move_roles       many job roles moved to one stage or archived, each
+ *                    through the board's own move, with one Undo
+ *                    (lib/dash/bulk-roles.ts, plan #1657).
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)
@@ -902,6 +906,31 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
       additionalProperties: false,
     },
     changeItems,
+  ),
+  tool(
+    'move_roles',
+    `Move many of their job roles to one stage at once, or archive them, when they ask ("archive every role I applied to before August with no reply", "move these three to in process"). Name the roles by the job_search.applications refs job_applications returned, or the job_search.roles refs search returned; find them with a lookup first, and for "no reply" use job_applications with no_reply. A lookup lists 50 at most: when it says more matched, narrow by date and look again so every one is named. At most ${BULK_MAX} roles. stage is one of: lead, drafting, submitted, in_process, final_round, offer, rejected, withdrawn, role_closed, or archive (takes them off the board as withdrawn; a role already closed is left as it is). Ghosted cannot be set: it is worked out from silence. Deleting roles is not something you can do: say it is done on the pipeline. Each move goes into the role's history as the board's would. One Undo puts the whole move back. Say how many roles it moved.`,
+    {
+      type: 'object',
+      properties: {
+        stage: { type: 'string', enum: [...ROLE_STAGES], description: 'The stage to move every role to, or archive.' },
+        application_refs: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: BULK_MAX,
+          description: 'The job_search.applications refs job_applications returned.',
+        },
+        role_refs: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: BULK_MAX,
+          description: 'The job_search.roles refs search returned; each moves by its latest application.',
+        },
+      },
+      required: ['stage'],
+      additionalProperties: false,
+    },
+    moveRoles,
   ),
 ];
 

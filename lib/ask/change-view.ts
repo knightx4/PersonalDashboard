@@ -1,6 +1,7 @@
 import type { DashChange, DashChangeStatus } from '@/lib/talk/changes';
 import { watchPlan } from '@/lib/watch/start';
 import { stepHref } from '@/lib/goals/all-goals';
+import { statusLabel } from '@/lib/jobs/status-label';
 
 /**
  * How a change Dash proposed reads on a card (plan #1190) and in the Ask
@@ -36,6 +37,8 @@ export function changeHref(change: DashChange): string {
       return `/jobs/roles/${change.input.roleId}`;
     case 'change_items':
       return change.input.change === 'for_sale' ? '/shopping/sell' : '/shopping/inventory';
+    case 'move_roles':
+      return '/jobs/pipeline';
   }
 }
 
@@ -46,6 +49,15 @@ export function namedItems(titles: readonly string[], count: number): string {
   if (more > 0) return `${shown.join(', ')} and ${more} more`;
   if (shown.length <= 1) return shown.join('');
   return `${shown.slice(0, -1).join(', ')} and ${shown[shown.length - 1]}`;
+}
+
+/** Many roles moved or archived at once, as the card's three parts. */
+function roleWords(input: Extract<DashChange, { kind: 'move_roles' }>['input'], done: boolean): ChangeWords {
+  const { count } = input;
+  const roles = `${count} ${count === 1 ? 'role' : 'roles'}`;
+  const list = input.titles.length > 0 ? `: ${namedItems(input.titles, count)}` : '';
+  if (input.stage === 'archive') return { verb: done ? 'Archived' : 'Archive', what: roles, rest: list };
+  return { verb: done ? 'Moved' : 'Move', what: roles, rest: ` to ${statusLabel(input.status)}${list}` };
 }
 
 /** Many items changed at once, as the card's three parts. */
@@ -186,6 +198,8 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
       };
     case 'change_items':
       return itemWords(change.input, done);
+    case 'move_roles':
+      return roleWords(change.input, done);
   }
 }
 
@@ -229,5 +243,7 @@ export function changeWhere(change: DashChange): string {
       return 'Open the role';
     case 'change_items':
       return change.input.change === 'for_sale' ? 'Open the sell page' : 'Open the inventory';
+    case 'move_roles':
+      return 'Open the pipeline';
   }
 }
