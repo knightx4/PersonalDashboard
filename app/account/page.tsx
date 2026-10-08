@@ -16,6 +16,8 @@ import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadMainCheck } from '@/lib/shell/main-check';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { vapidPublicKey } from '@/lib/push/web-push';
+import { tabFrom } from '@/lib/tabs';
+import { ACCOUNT_TAB_ADDRESS, ACCOUNT_TABS, type AccountTab } from './tabs';
 import { AccountView } from './view';
 
 export const metadata = { title: 'Account' };
@@ -64,7 +66,14 @@ async function loadConnectedApps(
   return { apps: connectedApps(grants ?? [], calls ?? []), failed };
 }
 
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string | string[] }>;
+}) {
+  // One section at a time behind tabs (plan #1628), and only the open tab's
+  // data is read: the connected apps and their calls are Activity's alone.
+  const tab = tabFrom((await searchParams).tab, ACCOUNT_TABS, ACCOUNT_TAB_ADDRESS) as AccountTab;
   const user = await requireUser();
   const [settings, counts, raised, mainCheck, owner, connected, origin] = await Promise.all([
     loadAccountSettings(user.id),
@@ -72,7 +81,7 @@ export default async function AccountPage() {
     loadRaisedNotifications(user.id),
     loadMainCheck(),
     isOwner({ user }),
-    loadConnectedApps(user.id),
+    tab === 'activity' ? loadConnectedApps(user.id) : null,
     requestOrigin(),
   ]);
 
@@ -98,6 +107,7 @@ export default async function AccountPage() {
 
           <div className="mt-5">
           <AccountView
+            tab={tab}
             email={user.email ?? ''}
             settings={{
               displayName: settings.displayName ?? '',
@@ -107,11 +117,13 @@ export default async function AccountPage() {
             }}
             isOwner={owner}
             vapidPublicKey={vapidPublicKey()}
-            connected={{
-              apps: connected.apps,
-              failed: connected.failed,
-              connectorAddress: `${origin}/api/mcp`,
-            }}
+            connected={
+              connected && {
+                apps: connected.apps,
+                failed: connected.failed,
+                connectorAddress: `${origin}/api/mcp`,
+              }
+            }
             />
           </div>
         </div>
