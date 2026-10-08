@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 import { MainRail } from '@/components/patterns/main-rail';
 import { DaySigil, HomeArrival } from '@/app/home/arrival';
 import { ARRIVE_LAST_STEP, arriveAt } from '@/lib/home/first-visit';
@@ -76,27 +76,35 @@ export function HomeArrivalDemo({ finished: startFinished = false }: { finished?
                   : 'Two things are due today, and the dentist closes at five.'}
               </p>
               <div data-arrive="" style={arriveAt(ARRIVE_LAST_STEP)}>
-                {!finished && (
-                  <Card padding="standard" className="mt-4">
-                    <p className="text-ui font-semibold text-ink">Today</p>
-                    <ul className="mt-2 divide-y divide-border">
-                      {DUE.map((title) => (
-                        <li key={title} className="row-pad text-ui text-ink">
-                          {title}
-                        </li>
-                      ))}
-                    </ul>
-                  </Card>
-                )}
+                <div
+                  aria-hidden={finished}
+                  className={cn(
+                    'grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none',
+                    finished ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100',
+                  )}
+                >
+                  <div className="overflow-hidden">
+                    <div className="mt-4">
+                      <p className="text-ui font-semibold text-ink">Today</p>
+                      <ul className="mt-2 divide-y divide-border">
+                        {DUE.map((title) => (
+                          <li key={title} className="row-pad text-ui text-ink">
+                            {title}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
               </div>
             </>
           }
           rail={
             <div data-arrive="" style={arriveAt(ARRIVE_LAST_STEP)}>
-              <Card padding="standard">
+              <div className="mt-4 lg:mt-0">
                 <p className="text-ui font-semibold text-ink">Watching</p>
                 <p className="mt-2 text-ui text-ink-muted">The boiler quote, due Friday</p>
-              </Card>
+              </div>
             </div>
           }
         />
