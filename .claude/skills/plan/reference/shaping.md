@@ -150,7 +150,7 @@ not held.
    **A step that adds or changes a screen names its pattern.** The patterns
    are listed on `/dev/ui` under "Page patterns" (Part 4 of
    `docs/UI-QUALITY-SPEC.md`), by the names in `lib/plan/patterns.ts`:
-   `list and detail`, `deck`, `thread`, `tabbed detail` and `main plus rail`. End the step's `--detail` with
+   `list and detail`, `deck`, `thread`, `tabbed detail`, `main plus rail` and `tabbed sections`. End the step's `--detail` with
    the name on a line of its own:
 
    ```
