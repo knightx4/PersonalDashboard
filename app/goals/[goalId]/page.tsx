@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
+import { goalCrumbs } from '@/lib/goals/crumbs';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { noLinks, weekInstants, type GoalLinks } from '@/lib/goals/links';
 import { loadAimChoices, loadGoalLinks } from '@/lib/goals/links-store';
@@ -12,7 +12,7 @@ import { loadCollectionsForGoal } from '@/lib/goals/collections-store';
 import { shownContext, type ContextItem } from '@/lib/goals/context';
 import { loadContext } from '@/lib/goals/context-store';
 import { loadGoalFlags } from '@/lib/goals/flags-store';
-import { summariseProgress, type ProgressEntry } from '@/lib/goals/progress';
+import { lastProgressOn, summariseProgress, type ProgressEntry } from '@/lib/goals/progress';
 import { loadProgressEntries } from '@/lib/goals/progress-store';
 import { loadNumberFrom, loadReadings } from '@/lib/goals/readings-store';
 import { goalRunRows, type RunListing } from '@/lib/goals/runs';
@@ -49,24 +49,24 @@ import { loadBrief } from '@/lib/goals/briefs-store';
 import { loadFilesOf } from '@/lib/goals/files-store';
 import { flagsWaiting } from '@/lib/goals/flags';
 import { formatDay } from '@/lib/goals/dates';
-import { goalStatus } from '@/lib/goals/goal-status';
+import { goalStatus, statusLine } from '@/lib/goals/goal-status';
 import { goalGlyph, goalProgress } from '@/lib/goals/status';
 import { isCurrent, type GoalReview } from '@/lib/goals/reviews';
 import { loadLatestReviews } from '@/lib/goals/reviews-store';
-import { goalFindings, goalStages, rhythmSteps } from '@/lib/goals/goal-page';
+import { goalStages, rhythmSteps } from '@/lib/goals/goal-page';
 import { SectionFold } from '@/components/ui/disclosure';
 import { goalMatchText } from '@/lib/goals/related-notes';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { relatedNotes, toLink } from '@/lib/vault/notes/related';
 import { RelatedNotes } from '@/components/vault/related-notes';
 import { GoalStatusCard } from './goal-status';
-import { GoalFindings, GoalRhythms } from './goal-found';
+import { GoalRhythms } from './goal-found';
 import { GoalAddRow } from './goal-add-row';
 import { GoalAreaMenu } from './goal-area-menu';
 import { GoalGlyph, GoalStepsFold } from './goal-close';
 import type { Place } from '../move-goal';
 import { GoalContext } from './goal-context';
-import { GoalFlags } from './goal-flags';
+import { WaitingOnYou } from './goal-flags';
 import { GoalHeadingField } from './goal-heading';
 import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
@@ -74,9 +74,8 @@ import { GoalHelp } from './goal-help';
 import { GoalLearn } from './goal-learn';
 import { GoalLinksSection } from './goal-links';
 import { GoalNumber } from './goal-number';
-import { GoalFog, GoalShaping } from './goal-shaping';
+import { GoalFog, GoalShaping, RunHistory } from './goal-shaping';
 import { StepTree } from './step-tree';
-import { goalViewOf } from '@/lib/goals/plan-rows';
 import { DashWork } from './dash-work';
 import { dashWork } from '@/lib/goals/dash-work';
 
@@ -84,16 +83,18 @@ export const metadata = { title: 'Goal' };
 export const dynamic = 'force-dynamic';
 
 /**
- * One goal (docs/GOALS-SPEC.md, "The daily view"; plans #925 and #1078), read
- * top to bottom: its done-when, Dash's status with a track of the stages, the
- * current stage open and the others folded, its rhythms, what Dash found, and
- * everything that feeds the goal (context, links, help, files, runs,
- * comments) under one Details fold.
+ * One goal (docs/GOALS-SPEC.md, "The goal page"; plans #925 and #1078), in
+ * four parts read top to bottom:
  *
- * Up to two of your vault notes on the goal's subject stream in under what
- * Dash found (plan #1114), outside the Details fold, matched on the title and
- * the done-when (lib/goals/related-notes.ts). The lookup is started and not
- * awaited.
+ *  - the header: the title and done-when, one status line with Dash's
+ *    verdict and its next move, the goal's number, and Waiting on you;
+ *  - Now: the stages in hand, open, and the goal's rhythms under them;
+ *  - Other stages: every other stage as one line that opens in place;
+ *  - More, closed: what feeds the goal rather than being its work.
+ *
+ * Up to two of your vault notes on the goal's subject stream in under More
+ * (plan #1114), matched on the title and the done-when
+ * (lib/goals/related-notes.ts). The lookup is started and not awaited.
  */
 /**
  * What the Claude panel says. Outside the component because it reads the
@@ -170,6 +171,19 @@ function dashWorkOn(map: GoalMap, runs: Record<string, GoalRun>) {
   return dashWork(runs, titles, Date.now());
 }
 
+/** Each question waiting on you, by id, for its answer box in Waiting on you. */
+function questionsOn(map: GoalMap, ids: ReadonlySet<string>): Record<string, StepNode> {
+  const out: Record<string, StepNode> = {};
+  const walk = (nodes: StepNode[]) => {
+    for (const node of nodes) {
+      if (node.kind === 'decision' && ids.has(node.id)) out[node.id] = { ...node, children: [] };
+      walk(node.children);
+    }
+  };
+  walk(map.steps);
+  return out;
+}
+
 /** Whether the status is today's. Outside the component because it reads the clock. */
 function reviewCurrent(review: GoalReview): boolean {
   return isCurrent(review, Date.now());
@@ -227,17 +241,8 @@ async function loadGoalLearn(learn: LearnSupabaseClient | null, userId: string, 
   };
 }
 
-export default async function GoalMapPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ goalId: string }>;
-  searchParams: Promise<{ view?: string | string[] }>;
-}) {
+export default async function GoalMapPage({ params }: { params: Promise<{ goalId: string }> }) {
   const { goalId } = await params;
-  // Which of the step views is showing (plan #1157): in the address, so it
-  // survives a reload. Open when none is named.
-  const view = goalViewOf((await searchParams).view);
   if (!/^[0-9a-f-]{36}$/i.test(goalId)) notFound();
 
   const user = await requireUser();
@@ -356,9 +361,9 @@ export default async function GoalMapPage({
   const shapingView = shapeable
     ? shapingLines(map.goal.status, map.steps, shaping.approvedAt, history, account.timezone)
     : null;
-  // Dash's panel stands above the stages while it has something to approve, a
-  // run is going, or every step is finished and the goal needs its next ones;
-  // otherwise it is a run line and a button, under Details.
+  // Dash's panel stands under the status while it has something to approve,
+  // a run is going, or every step is finished and the goal needs its next
+  // ones; otherwise it is Ask Dash alone, in the status card.
   const shapingUp = Boolean(
     shapingView &&
       (shapingView.approval.approve ||
@@ -366,31 +371,44 @@ export default async function GoalMapPage({
         (map.goal.status === 'open' && nothingOpen(map.steps))),
   );
   const shapingPanel = shapingView && (
-    <GoalShaping goalId={map.goal.id} {...shapingView} canRun={owner} />
+    <GoalShaping goalId={map.goal.id} {...shapingView} canRun={owner} quiet />
   );
   const shownItems = shownContext(context);
+  // What Dash found in the other modules stands above More while some of it
+  // waits for Keep or Not relevant, since Waiting on you links to it.
+  const contextWaiting = shownItems.some((item) => item.status === 'proposed');
   const thread = map.threads[map.goal.id] ?? [];
-  const detailsHint = [
-    shownItems.length > 0 && `${shownItems.length} from your other modules`,
+  const work = dashWorkOn(map, stepRuns);
+  const stepProgress = summariseProgress(progressEntries);
+  const line = statusLine(status, {
+    running: work.filter((item) => item.state === 'running').length,
+    // An errand's date is already beside its title.
+    dueOn: errand ? null : (map.goal.dueOn ?? null),
+    lastProgressOn: lastProgressOn(stepProgress),
+  });
+  const questions = questionsOn(
+    map,
+    new Set(status.yourMove.filter((row) => row.kind === 'question').map((row) => row.id)),
+  );
+  const runs = shapingView?.runs ?? [];
+  const moreHint = [
+    !contextWaiting && shownItems.length > 0 && `${shownItems.length} from your other modules`,
     files.length > 0 && plural(files.length, 'file'),
+    runs.length > 0 && plural(runs.length, 'run'),
     thread.length > 0 && plural(thread.length, 'comment'),
-    !shapingUp && history.runs.length > 0 && plural(history.runs.length, 'run'),
   ]
     .filter(Boolean)
     .join(' · ');
 
-  // As wide as the dev plan (app/dev/plan/page.tsx), which draws the same
-  // six-column grid: at max-w-3xl the fixed columns left a step's name about
-  // nine rem, and its description wrapped after a few words (note 68fd31b5).
+  // One column (plan #1078). The page was max-w-5xl while its steps drew the
+  // dev plan's six columns (note 68fd31b5); a step's row is a title and a
+  // date now, and a long line of it read worse on a laptop than a wrapped one.
   return (
-    <div className="mx-auto max-w-5xl">
-      <Link
-        href="/goals"
-        className="mb-3 inline-flex items-center gap-1.5 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> {map.areaName}
-      </Link>
+    <div className="mx-auto max-w-3xl">
       <PageHeader
+        crumbs={goalCrumbs(map.goal, map.areaName, {
+          open: !closed && map.goal.status !== 'dropped',
+        })}
         title={
           <span className="flex items-center gap-2.5">
             <GoalGlyph glyph={hexagon.glyph} label={hexagon.label} closed={closed} />
@@ -434,54 +452,66 @@ export default async function GoalMapPage({
         />
       )}
       <div className="space-y-6">
-        <GoalStatusCard
-          status={status}
-          brief={brief}
-          briefWhen={brief ? noteWhen(brief, account.timezone) : null}
-          review={review}
-          current={review ? reviewCurrent(review) : false}
-          stages={stages}
-        />
-        <DashWork items={dashWorkOn(map, stepRuns)} />
-        {flags.length > 0 && <GoalFlags flags={flags} />}
-        {shapingUp && shapingPanel}
-        {!numberEmpty && <GoalNumber {...number} />}
-        {learnGoal && <GoalLearn {...learnGoal} />}
+        <div className="space-y-4">
+          <GoalStatusCard
+            line={line}
+            review={review}
+            current={review ? reviewCurrent(review) : false}
+            brief={brief}
+            briefWhen={brief ? noteWhen(brief, account.timezone) : null}
+            work={<DashWork items={work} />}
+            ask={!shapingUp && shapingPanel}
+          />
+          {shapingUp && shapingPanel}
+          {!numberEmpty && <GoalNumber {...number} />}
+          <WaitingOnYou rows={status.yourMove} flags={flags} questions={questions} />
+        </div>
         <GoalStepsFold closed={closed} meta={stepsMeta}>
           <StepTree
             map={map}
-            view={view}
+            stages={stages}
             todoOn={moduleEnabled(account, 'todo')}
             runs={stepRunLines(stepRuns)}
             files={filesOf}
-            progress={summariseProgress(progressEntries)}
+            progress={stepProgress}
             arrivals={arrivals}
+            canRun={owner}
+            belowNow={<GoalRhythms steps={rhythmSteps(map.steps)} records={map.rhythms} />}
           />
         </GoalStepsFold>
-        <GoalRhythms steps={rhythmSteps(map.steps)} records={map.rhythms} />
-        <GoalFindings findings={goalFindings(map.steps)} />
-        <RelatedNotes notes={related} className="px-1" />
+        {contextWaiting && <GoalContext items={shownItems} />}
         {/* Everything that feeds the goal rather than being its work: one
-            fold, closed on arrival (plan #1078). */}
-        <SectionFold title="Details" hint={detailsHint || undefined} defaultOpen={false}>
+            fold, closed on arrival (plans #1078). */}
+        <SectionFold title="More" hint={moreHint || undefined} defaultOpen={false}>
           <div className="space-y-6">
-            {!shapingUp && shapingPanel}
-            <GoalContext items={shownItems} />
+            {!contextWaiting && <GoalContext items={shownItems} />}
             {!errand && !helpEmpty && <GoalHelp {...help} />}
             {!linksEmpty && <GoalLinksSection {...linked} />}
+            {learnGoal && <GoalLearn {...learnGoal} />}
             {files.length > 0 && (
               <section aria-labelledby="files-heading" className="space-y-2">
-                <h2 id="files-heading" className="px-1 text-ui font-semibold text-ink">
-                  Files
-                </h2>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 px-1">
+                  <h2 id="files-heading" className="text-ui font-semibold text-ink">
+                    Files
+                  </h2>
+                  <Link href="/goals/files" className="press-area text-small text-accent underline-offset-2 hover:underline">
+                    Files for every goal
+                  </Link>
+                </div>
                 <FileLinks files={files} />
               </section>
             )}
+            <RelatedNotes notes={related} className="px-1" />
             <GoalAddRow
               number={numberEmpty ? number : null}
               help={!errand && helpEmpty ? help : null}
               links={linksEmpty && canLink ? linked : null}
             />
+            {runs.length > 0 && (
+              <section aria-label="Runs" className="px-1">
+                <RunHistory runs={runs} more={shapingView?.moreRuns ?? false} />
+              </section>
+            )}
             {/* The goal's own thread (plan #957). Each step has its own, under its details. */}
             <Card padding="dense">
               <Thread

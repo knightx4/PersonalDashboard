@@ -12,6 +12,7 @@ import {
 import { loadCommitChecks } from '@/lib/plan/ci';
 import { loadOverhaulProgress } from '@/lib/plan/overhaul-progress-load';
 import { loadCriticStops } from '@/lib/plan/critic-stop-load';
+import { loadScreenChanges } from '@/lib/plan/screen-change-load';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
 import { keyRefusal } from '@/lib/plan/work';
@@ -29,7 +30,8 @@ import {
   type PlanView,
 } from '@/lib/plan/tree';
 import { OvernightControl } from './overnight-control';
-import { PlanView as PlanViewComponent, type PlanCatalogEntry } from './plan-view';
+import { PlanView as PlanViewComponent } from './plan-view';
+import { catalogOf } from './plan-catalog';
 
 /**
  * The claims on these steps, read against the last run on each.
@@ -206,20 +208,13 @@ export async function renderPlanPage({
   // Nothing is read when no step is stopped.
   const criticStops = await loadCriticStops(supabase, user.id, flattenSections(whole));
 
+  // Each step's changed screens, before and after, for its opened row (plan
+  // #1541). One small read; the pictures themselves load when a row opens.
+  const screenChanges = await loadScreenChanges(supabase, user.id);
+
   // Every step, for the pickers: a parent to move under, a step to wait on.
   // Light on purpose -- the tree is already on the page once.
-  const catalog: PlanCatalogEntry[] = flattenSections(everything).map((node) => ({
-    id: node.id,
-    number: node.number,
-    outline: node.outline,
-    title: node.title,
-    module: node.module,
-    parentId: node.parentId,
-    depth: node.depth,
-    status: node.status,
-    completedAt: node.completedAt,
-    closed: node.status === 'done' || node.status === 'dropped',
-  }));
+  const catalog = catalogOf(everything);
 
   // Wider than the other dev pages, which are prose and lists at max-w-3xl.
   // This one is a table with six columns and a tree indenting the first of
@@ -240,7 +235,7 @@ export async function renderPlanPage({
         description={
           project
             ? `${project.description}, built from this plan in ${project.repo.owner}/${project.repo.repo}. Send a step to Dash and it is built there, pushed to ${project.repo.branch} and closed here with the commit.`
-            : 'Features, the steps that get you there, and the steps beneath those. Seeded from the docs once; edited here after, and read from here by whoever builds next.'
+            : 'Features, the steps that get you there, and the substeps beneath those. Seeded from the docs once; edited here after, and read from here by whoever builds next.'
         }
       />
       {sync.added > 0 && (
@@ -281,6 +276,7 @@ export async function renderPlanPage({
         commitChecks={commitChecks}
         overhaulProgress={overhaulProgress}
         criticStops={criticStops}
+        screenChanges={screenChanges}
         empty={project ? flattenSections(whole).length === 0 : data.items.length === 0}
         canSend={canSend}
       />

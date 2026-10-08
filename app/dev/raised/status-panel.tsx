@@ -59,23 +59,7 @@ export function StatusPanel({
 }) {
   return (
     <Card padding="dense">
-      {/* Dash's own mark beside the heading (note 414ead16), working while
-          the plan runner is firing and resting otherwise, so the answer to
-          "is anything going" is there before the rows are read -- and on the
-          closed line too, since the card folds like the rest of the page
-          (note 16a5d186). */}
-      <SectionFold
-        title={
-          <span className="inline-flex items-center gap-1.5">
-            <DashMark
-              size="icon"
-              state={overnightStanding(run) === 'running' ? 'working' : 'idle'}
-              className="text-accent"
-            />
-            Status
-          </span>
-        }
-      >
+      <SectionFold title="Status">
         <div className="space-y-3">
           <OvernightControl
             run={run}
@@ -91,6 +75,17 @@ export function StatusPanel({
             next={card.next}
             fresh
             label="Plan"
+            // Dash's own mark (note 414ead16), working while the plan runner
+            // is firing and resting otherwise, so "is anything going" is
+            // answered before the rows are read. Under Plan on the left, and
+            // larger than the icon it was beside the heading (note 076e7744).
+            mark={
+              <DashMark
+                size="md"
+                state={overnightStanding(run) === 'running' ? 'working' : 'idle'}
+                className="text-accent"
+              />
+            }
             bare
             showBlocked={false}
           />

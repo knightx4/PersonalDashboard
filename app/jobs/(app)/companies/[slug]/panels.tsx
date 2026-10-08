@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useTransition } from 'react';
+import { useActionState, useState, useTransition } from 'react';
+import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';
 import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
@@ -11,6 +12,8 @@ import { FoldingMarkdown } from '@/components/ui/folding-markdown';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { addNote } from '@/app/jobs/(app)/roles/[id]/actions';
+import { createContact } from '@/app/jobs/(app)/contacts/actions';
+import { RELATIONSHIPS } from '@/app/jobs/(app)/contacts/view';
 import {
   applyAiCompanyEnrichment,
   applyCompanyEnrichment,
@@ -53,6 +56,8 @@ export function CompanyPanels(props: {
     contactName: string;
   }>;
   notes: Array<{ id: string; body: string; createdAt: string }>;
+  /** The surface gallery's: draw People with its add form open. */
+  addingPerson?: boolean;
 }) {
   return (
     // One column at every width: the details first, then the long text, then
@@ -187,7 +192,7 @@ function Details({
                   href={form.website}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-accent underline underline-offset-2"
+                  className="press-area text-accent underline underline-offset-2"
                 >
                   {form.website}
                 </a>
@@ -202,7 +207,7 @@ function Details({
                   href={form.careersUrl}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-accent underline underline-offset-2"
+                  className="press-area text-accent underline underline-offset-2"
                 >
                   {form.careersUrl}
                 </a>
@@ -217,7 +222,7 @@ function Details({
                   href={form.linkedinUrl}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-accent underline underline-offset-2"
+                  className="press-area text-accent underline underline-offset-2"
                 >
                   {form.linkedinUrl}
                 </a>
@@ -586,20 +591,87 @@ function AiEnrichment({ companyId }: { companyId: string }) {
   );
 }
 
-function Contacts({ contacts }: { contacts: CompanyContact[] }) {
+/**
+ * The people at this company, and a way to add one without going over to
+ * Contacts (note 4323ee10). The form opens from a line, as Notes' does
+ * (law 14), and the person it adds is attached to this company.
+ */
+function Contacts({
+  companyId,
+  contacts,
+  addingPerson = false,
+}: {
+  companyId: string;
+  contacts: CompanyContact[];
+  addingPerson?: boolean;
+}) {
+  const [adding, setAdding] = useState(addingPerson);
+  const [more, setMore] = useState(false);
+  const [state, action, pending] = useActionState(
+    async (prev: { error?: string; message?: string }, formData: FormData) => {
+      const result = await createContact(prev, formData);
+      if (!result.error) setAdding(false);
+      return result;
+    },
+    {},
+  );
+
   return (
     <CardSection title="People">
+      {adding ? (
+        // Placeholders name the fields rather than labels above them, and the
+        // short fields share rows at every width, with the two links folded
+        // behind More, so the open form is three rows at 390 (law 9).
+        <form action={action} className="mt-2 mb-4 space-y-2">
+          <input type="hidden" name="companyId" value={companyId} />
+          <div className="grid grid-cols-2 gap-2">
+            <Input name="fullName" aria-label="Name" placeholder="Name" required autoFocus className={phoneTall} />
+            <Input name="title" aria-label="Title" placeholder="Title" className={phoneTall} />
+          </div>
+          {more && (
+            <div className="grid grid-cols-2 gap-2">
+              <Input name="linkedinUrl" type="url" aria-label="LinkedIn" placeholder="LinkedIn URL" className={phoneTall} />
+              <Input name="email" type="email" aria-label="Work email" placeholder="Work email" className={phoneTall} />
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <Select name="relationship" aria-label="Relationship" defaultValue="cold" className={cn(phoneTall, 'w-32')}>
+              {RELATIONSHIPS.map((entry) => (
+                <option key={entry} value={entry}>
+                  {entry.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </Select>
+            <Button type="submit" size="sm" pending={pending}>
+              Add person
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setAdding(false)}>
+              Cancel
+            </Button>
+            <FieldError>{state.error}</FieldError>
+          </div>
+          {!more && (
+            <button
+              type="button"
+              onClick={() => setMore(true)}
+              className="press-area text-small text-ink-muted underline underline-offset-2 hover:text-accent"
+            >
+              More: LinkedIn and work email
+            </button>
+          )}
+        </form>
+      ) : (
+        <AddTrigger label="Add a person" onClick={() => setAdding(true)} className="mt-2" />
+      )}
       {contacts.length === 0 ? (
-        <p className="mt-2 text-ui text-ink-muted">
-          Nobody recorded here yet. Add people from the contacts page.
-        </p>
+        !adding && <p className="mt-2 text-ui text-ink-muted">Nobody recorded here yet.</p>
       ) : (
         <ul className="mt-2 divide-y divide-border">
           {contacts.map((contact) => (
             <li key={contact.id} className="row-pad flex flex-wrap items-baseline gap-2">
               <Link
                 href={`/jobs/contacts/${contact.id}`}
-                className="text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
+                className="press-area text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
                 title="See details, notes and logged sends"
               >
                 {contact.fullName}
@@ -614,7 +686,7 @@ function Contacts({ contacts }: { contacts: CompanyContact[] }) {
                   href={contact.linkedinUrl}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-small text-accent underline underline-offset-2"
+                  className="press-area text-small text-accent underline underline-offset-2"
                 >
                   LinkedIn
                 </a>
@@ -630,6 +702,9 @@ function Contacts({ contacts }: { contacts: CompanyContact[] }) {
     </CardSection>
   );
 }
+
+/** A field drawn at a phone's 44px press height below sm, at the control height above. */
+const phoneTall = 'min-h-11 sm:min-h-0';
 
 type CompanyContact = {
   id: string;

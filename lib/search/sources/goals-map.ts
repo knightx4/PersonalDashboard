@@ -1,10 +1,12 @@
 import type { SearchHit } from '@/lib/search/sources';
+import { areaHref, stepHref } from '@/lib/goals/all-goals';
 
 /**
- * Goals and their steps into hits, apart from the read so the hrefs can be
+ * Areas, goals and their steps into hits, apart from the read so the hrefs can be
  * tested without a database -- the same split as dev-map.ts.
  *
- * A goal has a page, /goals/<id>. A step does not: it is a row on its goal's
+ * An area has a page, /goals/area/<id> (areaHref), and so does a goal,
+ * /goals/<id>. A step does not: it is a row on its goal's
  * page, anchored as `step-<id>` (the same href the done-since list and the
  * files page write). A step can sit under another step, so its goal is found
  * by walking `parent_id` up to the item whose level is `goal`; a step whose
@@ -41,7 +43,7 @@ export function goalOf(
 }
 
 /**
- * Where an item opens: a goal on its own page, a step as a row on its goal's.
+ * Where an item opens: a goal on its own page, a step on its own under its goal.
  * A step whose goal is not among the rows read falls back to its parent's
  * page, which is the goal for every step that is not a sub-step.
  */
@@ -51,7 +53,7 @@ export function goalItemHref(
 ): string {
   if (item.level === 'goal') return `/goals/${item.id}`;
   const goalId = goalOf(item, byId)?.id ?? item.parent_id;
-  return goalId ? `/goals/${goalId}#step-${item.id}` : `/goals/${item.id}`;
+  return goalId ? stepHref(goalId, item.id) : `/goals/${item.id}`;
 }
 
 const FINISHED = new Set(['done']);
@@ -106,4 +108,26 @@ export function goalHits(
     .sort((a, b) => Number(a.finished) - Number(b.finished))
     .slice(0, limit)
     .map(({ hit }) => hit);
+}
+
+export type AreaRow = { id: string; name: string };
+
+/** Areas whose name holds the query, each opening its own page. */
+export function areaHits(
+  areas: readonly AreaRow[],
+  { query, limit }: { query?: string; limit: number },
+): SearchHit[] {
+  const needle = query?.trim().toLowerCase();
+  return areas
+    .filter((area) => !needle || area.name.toLowerCase().includes(needle))
+    .slice(0, limit)
+    .map((area) => ({
+      module: 'goals',
+      kind: 'area',
+      id: area.id,
+      ref: `goals.areas:${area.id}`,
+      title: area.name,
+      subtitle: 'Area',
+      href: areaHref(area.id),
+    }));
 }

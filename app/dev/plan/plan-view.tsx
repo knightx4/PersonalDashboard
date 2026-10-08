@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/field';
 import { VIEW_LABEL } from '@/lib/core/move';
 import type { CriticStopView } from '@/lib/plan/ui-check-stop';
+import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import {
   PLAN_VIEW_CHIPS,
   PLAN_VIEW_MENU,
@@ -45,8 +46,11 @@ import { cn } from '@/lib/cn';
 import { PlanRow } from './plan-row';
 import { AddStep } from './step-forms';
 import { ColumnHeader } from '@/components/plan-tree/grid';
+import { moduleAnchor } from '@/lib/plan/feature-page';
 import { Progress, SectionTally } from '@/components/plan-tree/counts';
 import { ViewChips } from '@/components/plan-tree/view-chips';
+import { featureTable } from '@/lib/plan/feature-table';
+import { FeatureTable } from './feature-table';
 
 /**
  * A step as the pickers know it: enough to name it and to place it.
@@ -99,12 +103,24 @@ const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> 
     description:
       'A step appears here once you approve it and leave it unmarked as yours, with nothing blocking it. You can also send one straight to the routine.',
   },
+  table: {
+    title: 'No open features',
+    description:
+      'Every feature on the plan is finished. Shape an idea from the ideas page to start the next one.',
+  },
   you: {
     title: 'Nothing waiting on you',
     description:
       'Every question has been answered, every proposal decided on, and nothing is blocked. The plan can move without you.',
   },
 };
+
+/** The view names on the chip row: the shared ones, with the whole plan as "All". */
+const PLAN_CHIP_LABEL = { ...VIEW_LABEL, all: 'All', table: 'Table' };
+
+/** The chips at phone width: every one but Table, which leads the menu there. */
+const PHONE_VIEW_CHIPS: readonly View[] = PLAN_VIEW_CHIPS.filter((chip) => chip !== 'table');
+const PHONE_VIEW_MENU: readonly View[] = ['table', ...PLAN_VIEW_MENU];
 
 /**
  * The numbers across the plan, and the views over it.
@@ -122,7 +138,7 @@ function SummaryStrip({
   view: View;
   basePath: string;
 }) {
-  const facts: Array<{ view: View | null; value: number; noun: string }> = [
+  const counts: Array<{ view: View | null; value: number; noun: string }> = [
     { view: 'open', value: summary.open, noun: 'open' },
     // Second, because it is the one number on this line that is a request.
     { view: 'you', value: summary.onYou, noun: 'on you' },
@@ -138,7 +154,11 @@ function SummaryStrip({
     { view: null, value: summary.inProgress, noun: 'underway' },
     { view: 'claude', value: summary.claude, noun: "Dash's" },
     { view: null, value: summary.done, noun: 'done' },
+    // A zero says nothing is there, which the missing count says as well and
+    // in less room (law 1): at 390 the three zeros took a line of their own.
+    // Open stays, since "0 open" is the answer to the page's first question.
   ];
+  const facts = counts.filter((fact) => fact.value > 0 || fact.noun === 'open');
 
   return (
     <div className={cn(cardVariants({ padding: 'dense' }), 'flex flex-wrap items-center gap-x-4 gap-y-2')}>
@@ -160,11 +180,31 @@ function SummaryStrip({
         )}
       </p>
       <ViewChips
-        className="ml-auto"
+        // Pushed right only beside the counts. From sm up, where the row has
+        // the room, Table is a chip beside the other views. `w-auto` lets
+        // More grow to the view it names when one of its own is on: the menu
+        // trigger is an icon button's fixed square, which cut "Proposed" off.
+        className="-ml-2.5 sm:ml-auto [&>*:last-child]:ml-1.5 [&_button]:w-auto max-sm:hidden"
         view={view}
         chips={PLAN_VIEW_CHIPS}
         menu={PLAN_VIEW_MENU}
-        labels={VIEW_LABEL}
+        // "All" rather than "Everything" on this row, so the chips and More
+        // stay on one line at 390 (taste: categories-one-line).
+        labels={PLAN_CHIP_LABEL}
+        hrefOf={(chip) => viewHref(chip, basePath)}
+      />
+      {/* On a phone the row has a line of its own and starts at the edge, and
+          a sixth chip would push More onto a second line, so Table is the
+          first entry in More there. The phone table keeps only the title,
+          health and percent, which makes it the less used view at that width.
+          The chips are a little narrower here so that More still fits on
+          the line when it names the view you are on. */}
+      <ViewChips
+        className="-ml-2 [&>*:last-child]:ml-1 [&_a]:px-2 [&_button]:w-auto [&_button]:px-2 sm:hidden"
+        view={view}
+        chips={PHONE_VIEW_CHIPS}
+        menu={PHONE_VIEW_MENU}
+        labels={PLAN_CHIP_LABEL}
         hrefOf={(chip) => viewHref(chip, basePath)}
       />
     </div>
@@ -388,6 +428,7 @@ export function PlanView({
   commitChecks,
   overhaulProgress = {},
   criticStops = {},
+  screenChanges = {},
   empty,
   canSend,
   unfolded = false,
@@ -425,6 +466,8 @@ export function PlanView({
   overhaulProgress?: Readonly<Record<string, OverhaulProgress>>;
   /** What the design critic last asked of each step it stopped, by step id (plan #1610). */
   criticStops?: Readonly<Record<string, CriticStopView>>;
+  /** Each step's changed screens with their pictures, by step number (plan #1541). */
+  screenChanges?: Readonly<Record<number, readonly ScreenChangeView[]>>;
   empty: boolean;
   canSend: boolean;
   /**
@@ -482,10 +525,25 @@ export function PlanView({
     [shown, found, searching],
   );
 
+  // The table view's rows: every open feature, read off the whole tree so a
+  // feature's health and counts are its own, then narrowed to what the search
+  // kept, as the tree's sections are.
+  const tableGroups = useMemo(() => {
+    if (view !== 'table') return [];
+    const groups = featureTable(sections, liveness);
+    if (!searching) return groups;
+    const kept = new Set(shown.flatMap((section) => section.nodes.map((node) => node.id)));
+    return groups
+      .map((group) => ({ ...group, rows: group.rows.filter((row) => kept.has(row.node.id)) }))
+      .filter((group) => group.rows.length > 0);
+  }, [view, sections, liveness, searching, shown]);
+
   if (empty) return <ImportTheBuildOrder />;
 
   const nothingToShow =
-    shown.every((section) => section.nodes.length === 0) && found.length === 0;
+    view === 'table'
+      ? tableGroups.length === 0
+      : shown.every((section) => section.nodes.length === 0) && found.length === 0;
 
   return (
     <div className="space-y-6">
@@ -527,8 +585,10 @@ export function PlanView({
           collapsed module marooned between two large gaps. Between sections
           the right distance is smaller than that, and now that each one is a
           card it is the gap between cards rather than between headings. */}
-      <div className="space-y-3">
-        {shown.map((section) => {
+      {view === 'table' && tableGroups.length > 0 && <FeatureTable groups={tableGroups} />}
+
+      <div className={cn('space-y-3', view === 'table' && 'hidden')}>
+        {view !== 'table' && shown.map((section) => {
           // What is finished is consulted, not read -- the same call the rows
           // make about a closed step's children. The progress stays on the
           // summary line either way, so a folded module still says how far it
@@ -555,10 +615,12 @@ export function PlanView({
               // prop below cannot push it back: React writes that attribute on
               // a change of value, not on every render.
               key={`${section.module ?? 'app'}${searching ? ':found' : ''}`}
+              // What a feature page's module crumb lands on (plan #1664).
+              id={moduleAnchor(section.module)}
               // A search opens every module it kept, because it only kept the
               // ones with something in them.
               open={searching || !finished}
-              className={cn(cardVariants({ padding: 'none' }), 'group/section overflow-hidden')}
+              className={cn(cardVariants({ padding: 'none' }), 'group/section scroll-mt-24 overflow-hidden')}
             >
               <summary
                 className={cn(
@@ -606,6 +668,7 @@ export function PlanView({
                       commitChecks={ci.checks}
                       overhaulProgress={overhaulProgress}
                       criticStops={criticStops}
+                      screenChanges={screenChanges}
                       view={view}
                       searching={searching}
                       unfolded={unfolded}
@@ -690,6 +753,7 @@ export function PlanView({
                 commitChecks={ci.checks}
                 overhaulProgress={overhaulProgress}
                 criticStops={criticStops}
+                screenChanges={screenChanges}
                 view={view}
                 searching={searching}
                 unfolded={unfolded}

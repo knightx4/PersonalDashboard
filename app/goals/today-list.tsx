@@ -2,21 +2,25 @@
 
 import Link from 'next/link';
 import { useActionState, useState } from 'react';
-import { ChevronDown, ExternalLink } from 'lucide-react';
+import { ChevronDown, Copy, ExternalLink } from 'lucide-react';
+import { FileBody } from '@/components/files/file-body';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { DashMark } from '@/components/ui/dash-mark';
 import { Input } from '@/components/ui/field';
+import { LinkedText } from '@/components/ui/linked-text';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
+import { areaHref, stepHref } from '@/lib/goals/all-goals';
+import { preparedExcerpt } from '@/lib/goals/home';
 import {
   SET_ASIDE_CHOICES,
   SET_ASIDE_LABELS,
   canSetAside,
 } from '@/lib/goals/set-aside';
 import type { TodayItem, TodayKind } from '@/lib/goals/today';
-import { prepareStepAction } from './[goalId]/shaping-actions';
+import { askDashStepAction } from './[goalId]/shaping-actions';
 import { restoreAsideAction, setAsideAction } from './home-actions';
 import { countRhythmAction, setStepStatusAction } from './[goalId]/actions';
 import { addGoalComment } from './[goalId]/comment-actions';
@@ -28,12 +32,16 @@ import { reactToSuggestionAction, recordAttendedAction } from './suggestion-acti
 /**
  * A row of what is on you on the Goals home (plan #1077): everything worth doing,
  * ranked by lib/goals/today.ts, each with one button that does it here or
- * opens where it is done. The rows are the On you lane (goal-lanes.tsx).
+ * opens where it is done. The rows are Do next and Later (goal-lanes.tsx).
+ *
+ * A step of yours that Dash prepared something for shows it under the title
+ * (withPrepared in lib/goals/today.ts): the first lines, Open for the rest in
+ * place, and Copy. The row's one button stays what it was.
  *
  * Anything that is a step can be put aside with Not now (Tomorrow, This
  * weekend, Next week, Next month; lib/goals/set-aside.ts). The row leaves at
  * once, the toast offers Undo, and the step comes back on the day chosen. A
- * step of yours that Dash could prepare also offers Dash preps it, which
+ * step of yours that Dash could prepare also offers Ask Dash, which
  * writes a draft, a script or a checklist onto the step and leaves it yours.
  *
  * Each kind's button is the write that already exists for it:
@@ -117,14 +125,14 @@ function act(kind: TodayKind, form: FormData): Promise<State> {
 function hrefFor(item: TodayItem): string {
   switch (item.kind) {
     case 'plan':
-      return `/goals/all#area-${item.id}`;
+      return areaHref(item.id);
     case 'flag':
       return `/goals/${item.goalId}#flag-${item.id}`;
     case 'question':
     case 'ask':
     case 'step':
     case 'rhythm':
-      return `/goals/${item.goalId}#step-${item.id}`;
+      return stepHref(item.goalId, item.id);
     default:
       return `/goals/${item.goalId}`;
   }
@@ -194,6 +202,7 @@ export function TodayRow({
             <span className="text-ink-muted"> · frees {item.unblocks} steps</span>
           )}
         </p>
+        {item.prepared && <PreparedDraft text={item.prepared.text} title={item.title} />}
         {answered ? (
           <p className="text-small text-positive" role="status">
             {DONE_WORDS[item.kind] ?? state.message ?? 'Done.'}
@@ -245,6 +254,63 @@ export function TodayRow({
         )}
       </div>
     </li>
+  );
+}
+
+/**
+ * What Dash prepared for the step, under its title: the first lines as plain
+ * text, Open to read the whole of it here, and Copy, so a draft can be sent
+ * from the row without opening the goal.
+ */
+function PreparedDraft({ text, title }: { text: string; title: string }) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const excerpt = preparedExcerpt(text);
+  return (
+    <div className="space-y-1.5 rounded-control bg-sunken px-3 py-2">
+      <p className="inline-flex items-center gap-1.5 text-small font-semibold text-ink">
+        <DashMark size="2xs" tone="brand" decorative />
+        Dash’s draft is ready
+      </p>
+      {open ? (
+        <div className="max-w-prose">
+          <FileBody markdown={text} compact />
+        </div>
+      ) : (
+        <p className="line-clamp-3 text-small break-words whitespace-pre-line text-ink-muted">
+          <LinkedText text={excerpt} />
+        </p>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          aria-expanded={open}
+          aria-label={open ? `Close Dash’s draft for ${title}` : `Open Dash’s draft for ${title}`}
+          onClick={() => setOpen(!open)}
+        >
+          {open ? 'Close' : 'Open'}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          aria-label={`Copy Dash’s draft for ${title}`}
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(text);
+              toast({ text: 'Copied.' });
+            } catch {
+              toast({ text: 'It could not be copied. Open it and copy it by hand.' });
+            }
+          }}
+        >
+          <Copy className="size-3.5" strokeWidth={1.75} aria-hidden />
+          Copy
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -302,9 +368,9 @@ function NotNow({ item, onAside }: { item: TodayItem; onAside: (hidden: boolean)
 }
 
 /**
- * Dash prepares it: a prepare run on one step of yours (plan #1001). It is a
- * button of its own, outside the row's form, so its press never posts the
- * row's answer.
+ * Ask Dash on one step of yours: askDash picks a prepare run for it (plan
+ * #1001). It is a button of its own, outside the row's form, so its press
+ * never posts the row's answer.
  */
 function PrepareButton({ item, onHanded }: { item: TodayItem; onHanded?: () => void }) {
   const toast = useToast();
@@ -314,7 +380,7 @@ function PrepareButton({ item, onHanded }: { item: TodayItem; onHanded?: () => v
     return (
       <span className="inline-flex items-center gap-1 text-small text-ink-muted" role="status">
         <DashMark state="working" activity="writing" size="2xs" tone="brand" decorative />
-        Dash is preparing it
+        Dash is on it
       </span>
     );
   }
@@ -329,7 +395,7 @@ function PrepareButton({ item, onHanded }: { item: TodayItem; onHanded?: () => v
         setPending(true);
         const form = new FormData();
         form.set('id', item.id);
-        const result = await prepareStepAction({}, form);
+        const result = await askDashStepAction({}, form);
         setPending(false);
         if (result.error) {
           toast({ text: result.error });
@@ -340,7 +406,7 @@ function PrepareButton({ item, onHanded }: { item: TodayItem; onHanded?: () => v
       }}
     >
       <DashMark size="2xs" tone="brand" decorative />
-      {pending ? 'Asking…' : 'Dash preps it'}
+      {pending ? 'Asking…' : 'Ask Dash'}
     </Button>
   );
 }

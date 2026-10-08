@@ -1,7 +1,8 @@
 /**
  * Home's "What Dash did today" section (plan #1461): grouped by workspace,
  * Undo on every change still standing (or the sentence saying why it has
- * none), long groups folded, and nothing at all on a day Dash changed nothing.
+ * none), long groups folded, a thread's change linked to the row it came
+ * from (plan #1518), and nothing at all on a day Dash changed nothing.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -25,6 +26,7 @@ function entry(n: number, over: Partial<DashTodayEntry> = {}): DashTodayEntry {
     at: `2026-10-03T${String(10 + n).padStart(2, '0')}:00:00Z`,
     workspace: 'dev',
     noUndo: null,
+    from: null,
     ...over,
   };
 }
@@ -53,6 +55,21 @@ describe('DashTodaySection', () => {
     expect(html).toContain('Added the todo Buy stamps.');
     expect(html.match(/>Undo</g)).toHaveLength(3);
     expect(html).not.toMatch(/Claude/);
+  });
+
+  it('links a change made in a thread to the row whose thread asked for it', () => {
+    const html = render([
+      {
+        workspace: 'todo',
+        label: 'Todo',
+        entries: [
+          entry(1, { surface: 'thread', workspace: 'todo', sentence: 'Added the todo Follow up.', from: '/jobs/roles/r1' }),
+          entry(2, { surface: 'thread', workspace: 'todo', sentence: 'Added the todo Buy stamps.' }),
+        ],
+      },
+    ]);
+    expect(html).toContain('href="/jobs/roles/r1"');
+    expect(html.match(/From your comment/g)).toHaveLength(1);
   });
 
   it('says an undone change was undone, with no button', () => {

@@ -38,6 +38,7 @@ export function LinkedTasks({
   compact = false,
   addLabel = 'Add',
   extra,
+  extraCount = 0,
 }: {
   target: LinkTarget;
   targetId: string;
@@ -56,6 +57,8 @@ export function LinkedTasks({
    * and asking it twice on one page is what it looks like when it is two.
    */
   extra?: ReactNode;
+  /** How many rows `extra` holds, counted in the heading with the tasks. */
+  extraCount?: number;
 }) {
   const [adding, setAdding] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -78,8 +81,10 @@ export function LinkedTasks({
         <h3 className="flex items-center gap-1.5 text-ui font-semibold text-ink">
           <ListChecks className="size-3.5 text-ink-muted" strokeWidth={1.75} aria-hidden />
           {title}
-          {tasks.length > 0 && (
-            <span className="tabular text-small font-normal text-ink-muted">{tasks.length}</span>
+          {tasks.length + extraCount > 0 && (
+            <span className="tabular text-small font-normal text-ink-muted">
+              {tasks.length + extraCount}
+            </span>
           )}
         </h3>
         <Button type="button" variant="ghost" size="sm" onClick={() => setAdding((open) => !open)}>
@@ -102,7 +107,7 @@ export function LinkedTasks({
           />
           <div className="flex items-center gap-2">
             <Input name="dueOn" type="date" aria-label="Due" className="w-40" />
-            <Button type="submit" size="sm" disabled={pending}>
+            <Button type="submit" size="sm" pending={pending}>
               Add
             </Button>
           </div>

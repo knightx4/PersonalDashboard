@@ -12,8 +12,8 @@
  *
  * A comment on a step telling Claude to take it ("@dash draft this for me")
  * hands that step over (plan #1003) through the same hand-over as the row's
- * Send and Prepare, lib/goals/handover-store.ts, so it refuses what they
- * refuse and the thread says why. A phase with nothing of Claude's in it goes
+ * Ask Dash, lib/goals/handover-store.ts, with the job askDash picks, so it
+ * refuses what the row refuses and the thread says why. A phase with nothing of Claude's in it goes
  * to the goals routine instead, which adds the step the comment asks for.
  *
  * The same shape as lib/comments/ask.ts for the dev pages, and the same rule:
@@ -317,7 +317,9 @@ async function takeStep(
           map.steps,
           input.itemId,
         );
-  // On the goal itself there is no one step to take: that is Work on this.
+  // On the goal itself there is no one step to take: that is a goal run, as
+  // Ask Dash on the goal starts. commentMode reads askDash for a step, so a
+  // comment and the row's Ask Dash choose the same job.
   if (!located) return handToRoutine(input, history, 'You asked Dash to work on the goal.');
   const mode = commentMode(located.step);
   // A phase of only your own steps gives a phase run nothing to do, so

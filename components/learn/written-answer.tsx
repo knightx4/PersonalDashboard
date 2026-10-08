@@ -22,7 +22,7 @@ import { Field, Textarea } from '@/components/ui/field';
 function GradeButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" pending={pending}>
       {pending ? 'Marking…' : 'Answer'}
     </Button>
   );

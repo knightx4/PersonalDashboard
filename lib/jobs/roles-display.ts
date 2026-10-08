@@ -42,7 +42,8 @@ export function rolesDisplay(): ListDisplaySpec<PipelineRow> {
     (b.lastActivityAt ?? '').localeCompare(a.lastActivityAt ?? '');
 
   return {
-    pathname: '/jobs/roles',
+    // The table is Pipeline's second view now (plan #1590).
+    pathname: '/jobs/pipeline',
     sorts: [
       { id: 'title', label: 'Role', compare: (a, b) => a.roleTitle.localeCompare(b.roleTitle) },
       {

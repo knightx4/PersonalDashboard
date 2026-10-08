@@ -19,6 +19,8 @@ import {
   type ChangelogModuleFilter,
 } from '@/lib/changelog/entries';
 import { cn } from '@/lib/cn';
+import { ScreenAfters } from '@/components/dev/screen-change';
+import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import { sourceProblems } from '@/lib/dev/post-check';
 import { moduleById } from '@/lib/modules';
 import { PostAbout } from './post-about';
@@ -32,11 +34,14 @@ export function ChangelogView({
   grouping,
   query,
   workspace,
+  screens = {},
 }: {
   entries: ChangelogEntry[];
   grouping: ChangelogGrouping;
   query: string;
   workspace: ChangelogModuleFilter | null;
+  /** Each plan step's changed screens, by step number (plan #1541). Most steps have none. */
+  screens?: Readonly<Record<number, readonly ScreenChangeView[]>>;
 }) {
   // The options are built from everything that shipped, not from what is on
   // screen: a filter that removed every other workspace from the row would
@@ -149,7 +154,7 @@ export function ChangelogView({
                heading -- a note, a feature that shipped by itself -- has
                nothing to open and stays a plain line. */
             group.kind === 'issue' && !isItsOwnHeading(group) ? (
-              <IssueSummary key={group.key} group={group} />
+              <IssueSummary key={group.key} group={group} screens={screens} />
             ) : (
               <section key={group.key}>
                 {/* A group of one whose heading is its own entry -- a note, or a
@@ -158,7 +163,12 @@ export function ChangelogView({
                 {!isItsOwnHeading(group) && <GroupHeading group={group} />}
                 <ul className="divide-y divide-border">
                   {group.entries.map((entry) => (
-                    <Entry key={entry.key} entry={entry} inGroup={group.kind} />
+                    <Entry
+                      key={entry.key}
+                      entry={entry}
+                      inGroup={group.kind}
+                      screens={screensOf(screens, entry)}
+                    />
                   ))}
                 </ul>
               </section>
@@ -250,7 +260,13 @@ function splitIssue(group: ChangelogGroup): { self: ChangelogEntry | null; steps
  * `details` rather than state, so the page still opens and reads with no
  * JavaScript at all, which is the rest of this page's bargain (law 5).
  */
-function IssueSummary({ group }: { group: ChangelogGroup }) {
+function IssueSummary({
+  group,
+  screens,
+}: {
+  group: ChangelogGroup;
+  screens: Readonly<Record<number, readonly ScreenChangeView[]>>;
+}) {
   const newest = group.entries.reduce((at, entry) => (entry.at > at ? entry.at : at), '');
   const { self, steps } = splitIssue(group);
 
@@ -284,7 +300,12 @@ function IssueSummary({ group }: { group: ChangelogGroup }) {
         )}
         <ul className="divide-y divide-border">
           {steps.map((entry) => (
-            <Entry key={entry.key} entry={entry} inGroup={group.kind} />
+            <Entry
+              key={entry.key}
+              entry={entry}
+              inGroup={group.kind}
+              screens={screensOf(screens, entry)}
+            />
           ))}
         </ul>
       </div>
@@ -322,10 +343,13 @@ function GroupHeading({ group }: { group: ChangelogGroup }) {
 function Entry({
   entry,
   inGroup,
+  screens,
 }: {
   entry: ChangelogEntry;
   /** What the heading above already said, so the line does not repeat it. */
   inGroup: ChangelogGroup['kind'];
+  /** The screens this step changed, drawn under the line as they look now. */
+  screens: readonly ScreenChangeView[];
 }) {
   const workspace = moduleById(entry.module)?.label ?? 'The app as a whole';
 
@@ -377,8 +401,25 @@ function Entry({
           {postable(entry) && entry.number !== null && <PostAbout number={entry.number} />}
         </div>
       </details>
+      {/* Outside the fold, so a line that changed a screen shows the screen
+          without being opened: the picture is what you came to see (plan
+          #1541). Only the after; the before is on the step's plan row. */}
+      {screens.length > 0 && (
+        <div className="pb-2 pl-9">
+          <ScreenAfters changes={screens} />
+        </div>
+      )}
     </li>
   );
+}
+
+/** A plan line's changed screens; a note's line has none. */
+function screensOf(
+  screens: Readonly<Record<number, readonly ScreenChangeView[]>>,
+  entry: ChangelogEntry,
+): readonly ScreenChangeView[] {
+  if (entry.source !== 'plan' || entry.number === null) return [];
+  return screens[entry.number] ?? [];
 }
 
 /**

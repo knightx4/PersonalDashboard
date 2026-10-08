@@ -93,7 +93,7 @@ export type QuickSignals = {
 
 export type StoryGroupRow = { issueId: string; storyIndex: number; groupId: string };
 
-type Slot = {
+export type Slot = {
   storyIndex: number;
   /** The story's place among the readable stories, or null for an essay. */
   readIndex: number | null;
@@ -109,7 +109,7 @@ type Slot = {
  * its summary; that covers the empty list an essay is stored with, and keeps a
  * newsletter whose every story is malformed from vanishing from Quick read.
  */
-function slots(issue: QuickIssue): Slot[] {
+export function slots(issue: QuickIssue): Slot[] {
   if (!issue.summary?.trim() || !Array.isArray(issue.stories)) return [];
   const found: Slot[] = [];
   issue.stories.forEach((entry, storyIndex) => {
@@ -195,13 +195,17 @@ function candidates(
 }
 
 /**
- * Which of a group's cards stands for it: the one with an article link, then
- * a picture, then the email's own text, then the newest.
+ * How full a telling of a story is, for choosing which of a group's stories
+ * stands for it: one with an article link, then a picture, then the email's
+ * own text. The daily review (lib/news/review/choose.ts) chooses the same way.
  */
-function fullness(c: Candidate): number {
-  if (c.slot.body.kind !== 'story') return 0;
-  const { story } = c.slot.body;
+export function storyFullness(story: NewsStory): number {
   return (story.link ? 4 : 0) + (story.image ? 2 : 0) + (story.text ? 1 : 0);
+}
+
+/** Which of a group's cards stands for it: the fullest (storyFullness), then the newest. */
+function fullness(c: Candidate): number {
+  return c.slot.body.kind === 'story' ? storyFullness(c.slot.body.story) : 0;
 }
 
 /**
@@ -331,6 +335,12 @@ function rankedCards(
  * newsletters that have not been summarised. `filter` narrows it further;
  * `remainingInIssue` then counts only the cards that fit it. The order is
  * rankedCards': #846's newest-first without `signals`, ranked with them.
+ *
+ * `ahead` is the story the phone already drew behind the last card and has
+ * slid in on Next (note a0fc267e). A pass changes the ranking, since passing
+ * counts a story as seen, so the page asked again could choose another and
+ * replace the card being read. While that story is still unread and fits the
+ * filter it is the card; anything ranked higher comes after it.
  */
 export function nextCard(
   issues: readonly QuickIssue[],
@@ -338,8 +348,31 @@ export function nextCard(
   passes: readonly StoryPass[],
   filter: QuickFilter = {},
   signals?: QuickSignals,
+  ahead?: StoryPass | null,
 ): QuickCard | null {
-  return rankedCards(issues, senders, passes, filter, signals)[0] ?? null;
+  const ranked = rankedCards(issues, senders, passes, filter, signals);
+  const kept = ahead
+    ? ranked.find((card) =>
+        cardPasses(card).some(
+          (p) => p.issueId === ahead.issueId && p.storyIndex === ahead.storyIndex,
+        ),
+      )
+    : undefined;
+  return kept ?? ranked[0] ?? null;
+}
+
+/** The cookie Next leaves the story it slid in under, for the page drawn after the pass. */
+export const QUICK_AHEAD_COOKIE = 'news-quick-ahead';
+
+/** A story as the ahead cookie holds it: `issueId:storyIndex`. */
+export function aheadValue(story: StoryPass): string {
+  return `${story.issueId}:${story.storyIndex}`;
+}
+
+/** The ahead cookie read back, or null for anything that is not one story. */
+export function readAhead(value: string | undefined | null): StoryPass | null {
+  const match = /^([0-9a-f-]{36}):(\d{1,4})$/i.exec(value ?? '');
+  return match ? { issueId: match[1]!, storyIndex: Number(match[2]) } : null;
 }
 
 /**

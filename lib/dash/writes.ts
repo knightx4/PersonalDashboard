@@ -4,7 +4,7 @@ import { checkChange, type ProposalToolName } from '@/lib/ask/propose';
 import { isUuid, type AskRow } from '@/lib/ask/db';
 import { readSubject } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
-import { insertGoal } from '@/lib/goals/store';
+import { insertArea, insertGoal } from '@/lib/goals/store';
 import { parseGoalFields } from '@/lib/goals/tree';
 import { setStepStatus } from '@/lib/goals/steps-store';
 import type { ModuleId } from '@/lib/modules';
@@ -13,6 +13,7 @@ import { taskInput } from '@/lib/todo/tasks/input';
 import { wallClockToInstant } from '@/lib/todo/time';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 import { addThreadTurn } from '@/lib/thread/store';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -192,7 +193,7 @@ async function addGoalStep(ctx: DashWriteContext, input: unknown): Promise<DashW
     const step = change.input as DashChangeInput['add_goal_step'];
     return {
       summary: `Dash added the step "${step.title}" under the goal "${step.goalTitle}".`,
-      row: { table: TABLE.goalItem, ref: id, title: step.title, href: `/goals/${step.parentId}#step-${id}` },
+      row: { table: TABLE.goalItem, ref: id, title: step.title, href: stepHref(step.parentId, id) },
     };
   });
 }
@@ -368,32 +369,38 @@ async function addGoal(ctx: DashWriteContext, args: Args): Promise<DashWriteResu
   if (error) throw new Error(error.message);
   const areas = (data ?? []) as { id: string; name: string }[];
   const key = wanted.toLowerCase();
-  const area = areas.find((a) => a.id === wanted) ?? areas.find((a) => a.name.trim().toLowerCase() === key);
-  if (!area) {
+  const found = areas.find((a) => a.id === wanted) ?? areas.find((a) => a.name.trim().toLowerCase() === key);
+  if (!found && args.new_area !== true) {
     const names = areas.map((a) => `"${a.name}"`).join(', ');
     throw new Refused(
       areas.length > 0
-        ? `They have no area called "${wanted}". Their areas are ${names}: use one of those, or ask which they meant.`
-        : 'They have no areas yet, so a goal has nowhere to go. Say so.',
+        ? `They have no area called "${wanted}". Their areas are ${names}: use the one that fits, or call add_goal again with new_area true to make "${wanted}".`
+        : `They have no areas yet. Call add_goal again with new_area true to make "${wanted}".`,
     );
   }
 
   // Written on their session, not as Dash's: they asked for this goal, so it
   // goes in approved, as one they add on the page does (goals 0042). A goal
-  // written as Dash's could only be a proposal.
+  // written as Dash's could only be a proposal. A new area is made the same
+  // way when none of theirs fits; Undo takes the goal back and leaves the
+  // area, which they archive on /goals if they do not want it.
   const client = await ctx.goals({});
+  const areaMade = !found;
+  const area = found ?? { id: await insertArea(client, ctx.userId, wanted), name: wanted };
   const id = await insertGoal(client, ctx.userId, area.id, { title, dueOn });
   if (!id) throw new Refused('That area has just been archived.');
   const ref = toRef(TABLE.goalItem, id);
   return made(
     'add_goal',
-    { areaId: area.id, areaName: area.name, title, dueOn },
+    { areaId: area.id, areaName: area.name, areaMade, title, dueOn },
     {
       subjectRef: ref,
       op: 'insert',
       before: null,
       after: await readSubject(ctx.db, ref),
-      summary: `Dash added the goal "${title}" under ${area.name}.`,
+      summary: areaMade
+        ? `Dash added the area ${area.name} and the goal "${title}" under it.`
+        : `Dash added the goal "${title}" under ${area.name}.`,
       row: { table: TABLE.goalItem, ref: id, title, href: `/goals/${id}` },
     },
   );
@@ -455,7 +462,7 @@ async function closeGoalStep(ctx: DashWriteContext, args: Args): Promise<DashWri
       before,
       after,
       summary: `Dash marked the step "${step.title}" done, under the goal "${goal.title}".`,
-      row: { table: TABLE.goalItem, ref: id, title: step.title, href: `/goals/${goal.id}#step-${id}` },
+      row: { table: TABLE.goalItem, ref: id, title: step.title, href: stepHref(goal.id, id) },
     },
   );
 }
@@ -624,11 +631,12 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_goal',
-    'Add a new goal under one of their areas, when they ask for one. Name the area by its name as they have it; if no area fits, ask which they mean instead of guessing. Only when they asked for a goal: a step under an existing goal is add_goal_step.',
+    'Add a new goal under one of their areas, when they ask for one. Name the area by its name as they have it. When none of their areas fits the goal, make one: pass new_area true with a short name for it ("Music"), rather than asking. Only when they asked for a goal: a step under an existing goal is add_goal_step.',
     {
       type: 'object',
       properties: {
         area: { type: 'string', description: 'The name of the area the goal goes under.' },
+        new_area: { type: 'boolean', description: 'True to make a new area by that name, when none of theirs fits.' },
         title: { type: 'string', description: 'The goal, in a short line, as an outcome ("Run a half marathon").' },
         due_on: { ...DAY_PROP, description: 'The day it is due by, YYYY-MM-DD, only when they named one.' },
       },

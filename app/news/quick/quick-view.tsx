@@ -15,7 +15,7 @@ import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { RelatedNotes } from '@/components/vault/related-notes';
 import { cn } from '@/lib/cn';
-import { cardPasses, type QuickCard } from '@/lib/news/quick/next';
+import { cardPasses, type QuickCard, type StoryPass } from '@/lib/news/quick/next';
 import type { Reaction } from '@/lib/news/quick/reactions';
 import type { StorySent } from '@/lib/news/saved/sent';
 import type { RelatedNoteLink } from '@/lib/vault/notes/related';
@@ -238,7 +238,10 @@ export function QuickReadView({
 
       <QueueCleared key={topic ?? ''} cleared={false}>
         {/* One card below md and the grid from md up, chosen by CSS so the server never needs the screen size. */}
-        <div className={grid ? 'md:hidden' : undefined}>
+        {/* The bottom padding is the room the Next row takes over the foot
+            of the card while it is held above the tab bar, and the row reads
+            its width from this box as a container. */}
+        <div className={cn('@container pb-16 lg:pb-0', grid && 'md:hidden')}>
           <QuickDeck
             key={`${card.issueId}:${card.storyIndex}`}
             current={
@@ -254,6 +257,13 @@ export function QuickReadView({
                 topic={topic}
               />
             }
+            row={
+              <PhoneNextRow
+                card={card}
+                ahead={upNext ? { issueId: upNext.card.issueId, storyIndex: upNext.card.storyIndex } : null}
+              />
+            }
+            nextRow={upNext && <PhoneNextRow card={upNext.card} />}
             next={
               upNext && (
                 <PhoneCard
@@ -316,8 +326,37 @@ function gridPage(stories: readonly QuickPageStory[], pictures: boolean) {
 }
 
 /**
+ * Back and Next on a row of their own, held just above the tab bar on a phone
+ * so Next is in the same place on every card and never needs a scroll to
+ * reach (note 1736597c). Only these two: the whole row of buttons on the card
+ * would cover half a phone screen.
+ *
+ * Fixed to the window rather than sticky inside the card (plan #1636): sticky
+ * left it under a short card, halfway up the screen, and drawn inside the
+ * card it was dragged off with it and the next card's arrived late. QuickDeck
+ * draws it outside the swipe, so it holds still while the cards change under
+ * it. From lg there is no tab bar, and it sits under the card.
+ */
+function PhoneNextRow({ card, ahead = null }: { card: QuickCard; ahead?: StoryPass | null }) {
+  return (
+    // No left or right, so it keeps the card's left edge where it would have
+    // stood in the page, and 100cqw is the card's width.
+    <div className="fixed bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] z-over-link w-[100cqw] lg:static lg:mt-3 lg:w-auto">
+      {/* A hairline round it on a phone, where the story passes under it;
+          from lg it sits on the page with no panel of its own. */}
+      <Card
+        padding="none"
+        className="flex items-center justify-end gap-2 border border-border px-3 py-2 lg:border-0 lg:bg-transparent lg:px-0"
+      >
+        <QuickNextForm stories={cardPasses(card)} ahead={ahead} />
+      </Card>
+    </div>
+  );
+}
+
+/**
  * One story as the phone card draws it: the current one, or the one drawn
- * ahead of it for Next.
+ * ahead of it for Next. Its Next row is PhoneNextRow, drawn by QuickDeck.
  */
 function PhoneCard({
   card,
@@ -347,9 +386,7 @@ function PhoneCard({
   const left = card.remainingInIssue - 1;
   return (
     <QuickSwipe key={`${card.issueId}:${card.storyIndex}`}>
-      {/* Clip rather than hidden: hidden makes the card a scroll container,
-          and the row of buttons below could not stick to the window. */}
-      <Card padding="none" className="overflow-clip">
+      <Card padding="none" className="overflow-hidden">
         <article>
           {pictures && image && (
             // A plain img for the reason given on the issue page: the address
@@ -428,15 +465,6 @@ function PhoneCard({
                 reaction={reaction}
               />
             </div>
-          </div>
-          {/* Back and Next on a row of their own, held just above the tab bar
-              while a long story is read, so Next is in the same place on
-              every card and never needs a scroll to reach (note 1736597c).
-              Only these two: the whole row of buttons above would cover half
-              a phone screen. From lg there is no tab bar, and the status line
-              has the foot of the window. */}
-          <div className="card-pad-x sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] flex items-center justify-end gap-2 border-t border-border bg-surface py-2.5 lg:static">
-            <QuickNextForm stories={cardPasses(card)} />
           </div>
         </article>
       </Card>

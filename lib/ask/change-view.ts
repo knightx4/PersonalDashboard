@@ -1,5 +1,6 @@
 import type { DashChange, DashChangeStatus } from '@/lib/talk/changes';
 import { watchPlan } from '@/lib/watch/start';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
  * How a change Dash proposed reads on a card (plan #1190) and in the Ask
@@ -14,7 +15,7 @@ export function changeHref(change: DashChange): string {
       return change.writtenRef ? `/todo/all?status=all&focus=${change.writtenRef}` : '/todo';
     case 'add_goal_step':
       return change.writtenRef
-        ? `/goals/${change.input.parentId}#step-${change.writtenRef}`
+        ? stepHref(change.input.parentId, change.writtenRef)
         : `/goals/${change.input.parentId}`;
     case 'mark_returned':
       return `/shopping/inventory/${change.input.id}`;
@@ -26,7 +27,7 @@ export function changeHref(change: DashChange): string {
     case 'close_todo':
       return `/todo/all?status=all&focus=${change.input.id}`;
     case 'close_goal_step':
-      return `/goals/${change.input.goalId}#step-${change.input.id}`;
+      return stepHref(change.input.goalId, change.input.id);
     case 'add_role_note':
       return `/jobs/roles/${change.input.roleId}`;
   }
@@ -99,7 +100,7 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
       return {
         verb: done ? 'Added the goal' : 'Add the goal',
         what: change.input.title,
-        rest: ` under ${change.input.areaName}${change.input.dueOn ? `, due ${dueDay(change.input.dueOn, today)}` : ''}`,
+        rest: ` under ${change.input.areaName}${change.input.areaMade ? ', a new area' : ''}${change.input.dueOn ? `, due ${dueDay(change.input.dueOn, today)}` : ''}`,
       };
     case 'change_todo': {
       const { renamedFrom, moved, dueOn, dueTime } = change.input;

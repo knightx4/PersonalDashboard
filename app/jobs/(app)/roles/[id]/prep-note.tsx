@@ -21,14 +21,14 @@ import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Markdown } from '@/components/ui/markdown';
 import { formatDateTime } from '@/lib/jobs/applications/load';
-import type { MatchVerdict } from '@/lib/jobs/evidence/match-payload';
 import type { PrepNote } from '@/lib/jobs/interview/prep-payload';
 
-import { writeRoundPrepNote } from './actions';
+import { writeRoundPrepNote } from './prep-actions';
+import { VERDICT_STYLE } from './verdict';
 import { PaidHint } from '@/components/ui/paid-hint';
 
 const PREP_HINT = {
-  action: 'app/jobs/(app)/roles/[id]/actions.ts#writeRoundPrepNote',
+  action: 'app/jobs/(app)/roles/[id]/prep-actions.ts#writeRoundPrepNote',
   what: 'Cost of writing the prep note',
 } as const;
 
@@ -38,18 +38,6 @@ export type PrepNoteState = {
   generatedAt: string | null;
   /** The facts it was written against have changed since. */
   stale: boolean;
-};
-
-const VERDICT_LABEL: Record<MatchVerdict, string> = {
-  strong: 'Strong',
-  partial: 'Partial',
-  gap: 'Gap',
-};
-
-const VERDICT_TEXT: Record<MatchVerdict, string> = {
-  strong: 'text-positive',
-  partial: 'text-caution',
-  gap: 'text-danger',
 };
 
 /** A sentence or two of the note's own prose, through the shared renderer. */
@@ -68,13 +56,7 @@ function Section({ heading, children }: { heading: string; children: React.React
   );
 }
 
-function Points({
-  heading,
-  points,
-}: {
-  heading: string;
-  points: PrepNote['strengths'];
-}) {
+function Points({ heading, points }: { heading: string; points: PrepNote['strengths'] }) {
   if (points.length === 0) return null;
   return (
     <Section heading={heading}>
@@ -82,8 +64,8 @@ function Points({
         {points.map((point, index) => (
           <li key={`${point.requirement}-${index}`} className="text-ui text-ink">
             {point.requirement}
-            <span className={cn('ml-2 text-small font-medium', VERDICT_TEXT[point.verdict])}>
-              {VERDICT_LABEL[point.verdict]}
+            <span className={cn('ml-2 text-small font-medium', VERDICT_STYLE[point.verdict].text)}>
+              {VERDICT_STYLE[point.verdict].label}
             </span>
             <div className="mt-0.5 text-small text-ink-muted">
               <Prose>{point.note}</Prose>
@@ -107,10 +89,16 @@ export function RoundPrep({
   interviewId,
   state,
   timezone,
+  heading: headingText = 'Prep note',
+  flush = false,
 }: {
   interviewId: string;
   state: PrepNoteState;
   timezone: string;
+  /** What the note is called: "Prep note" on a round, "From Dash" inside an interview's Prep. */
+  heading?: string;
+  /** Inside a section that already spaces it, so no top margin of its own. */
+  flush?: boolean;
 }) {
   const [note, setNote] = useState(state.note);
   const [generatedAt, setGeneratedAt] = useState(state.generatedAt);
@@ -135,7 +123,9 @@ export function RoundPrep({
     });
 
   const heading = (
-    <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">Prep note</h4>
+    <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
+      {headingText}
+    </h4>
   );
 
   const staleLine = stale && (
@@ -146,12 +136,12 @@ export function RoundPrep({
 
   if (!note) {
     return (
-      <div className="mt-3">
+      <div className={flush ? undefined : 'mt-3'}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           {heading}
           <div className="flex items-center gap-2">
             <PaidHint {...PREP_HINT} align="end" />
-            <Button type="button" size="sm" disabled={pending} onClick={() => prepare(false)}>
+            <Button type="button" size="sm" pending={pending} onClick={() => prepare(false)}>
               {pending ? 'Preparing…' : 'Prepare me'}
             </Button>
           </div>
@@ -175,7 +165,7 @@ export function RoundPrep({
     // A native <details> so it folds before JavaScript loads (law 6), open to
     // begin with because it was asked for. Regenerate sits beside the summary
     // rather than in it, so pressing it never folds the note as well.
-    <div className="relative mt-3">
+    <div className={cn('relative', !flush && 'mt-3')}>
       <details ref={foldRef} open className="group/prep">
         <summary
           className={cn(
@@ -280,9 +270,7 @@ export function RoundPrep({
               state, and the point is that the note says so rather than
               writing around it. */}
           {note.missing.length > 0 && (
-            <p className="text-small text-ink-muted">
-              Written without: {note.missing.join(' ')}
-            </p>
+            <p className="text-small text-ink-muted">Written without: {note.missing.join(' ')}</p>
           )}
 
           {note.bannedFound.length > 0 && (

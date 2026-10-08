@@ -29,8 +29,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
  */
 
 function revalidatePaths() {
-  revalidatePath('/jobs/roles');
-  revalidatePath('/jobs/contacts');
+  revalidatePath('/jobs/find');
 }
 
 export type SuggestState = { error: string | null; message?: string };
@@ -140,7 +139,7 @@ export async function suggestOpenings(): Promise<SuggestState> {
   return { error: null };
 }
 
-/** How long the run after the response may take, inside the Roles page's maxDuration of 300 seconds. */
+/** How long the run after the response may take, inside the Find page's maxDuration of 300 seconds. */
 const AFTER_BUDGET_MS = 270_000;
 /** The part of it the board reads and the web search may use; the rest stores what they found. */
 const SEARCH_BUDGET_MS = 255_000;

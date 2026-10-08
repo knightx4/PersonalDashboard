@@ -1,22 +1,24 @@
 'use client';
 
+import Link from 'next/link';
 import { formatDay } from '@/lib/goals/dates';
-import { useActionState, useRef, useState, useTransition } from 'react';
+import { stepHref } from '@/lib/goals/all-goals';
+import { useActionState, useId, useRef, useState, useTransition } from 'react';
 import { CircleUser, Repeat, Target } from 'lucide-react';
 import { AnswerBox, TheAnswered, TheOptions, useAnswerDraft } from '@/components/dev/question';
-import { FileBody } from '@/components/files/file-body';
 import { FileLinks } from '@/components/files/file-links';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EditableProse } from '@/components/ui/editable-prose';
-import { ChipInput, ChipSelect, ComposeTitle, InlineInput } from '@/components/ui/field';
+import { ChipInput, ChipSelect, ComposeTitle, InlineInput, Select } from '@/components/ui/field';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import type { LinkedFile } from '@/lib/files/files';
 import type { StepPrep } from '@/lib/goals/goal-page';
 import { PROGRESS_UNIT_MAX } from '@/lib/goals/progress';
+import { COUNT_MATCH_MAX, COUNT_SOURCE_CHOICES, COUNT_SOURCES } from '@/lib/goals/rhythm-sources';
 import { countProposed } from '@/lib/goals/shaping';
 import {
   RHYTHM_COUNT_MAX,
@@ -38,12 +40,10 @@ import {
 } from './actions';
 import {
   answerQuestionAction,
-  reviewResultAction,
   setQuestionAsideAction,
   settleProposalAction,
   type ShapingActionState,
 } from './shaping-actions';
-import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
  * What a goal step has that a plan step does not (plan #982): the answer box
@@ -156,81 +156,36 @@ export function Question({ node }: { node: StepNode }) {
 }
 
 /**
- * What the morning run produced for a Claude step (plan #933): the note or
- * draft, its link when it has one, and while it is unread a button to mark it
- * read, which takes it off the home. Once read it moves into the details.
- *
- * On a step of yours it is what Claude prepared for you to do it (plan
- * #1001). That waits on the step itself, which is still yours to tick, so it
- * has no Mark read.
- *
- * The text is markdown. A longer piece is kept as a file (core.files) and the
- * result is its summary, with the file linked under it.
+ * The files a step links to, in its opened panel, on a step whose row has no
+ * fold of what Dash wrote to list them under (dash-draft.tsx): a question or a
+ * rhythm a run filed something against.
  */
-export function ClaudeResult({ node, files = [] }: { node: StepNode; files?: LinkedFile[] }) {
-  const [state, review, reviewing] = useActionState(reviewResultAction, answerInitial);
-  const prepared = node.kind !== 'claude';
-  const unread = !prepared && node.reviewedAt === null;
+export function StepFiles({ files }: { files: LinkedFile[] }) {
   return (
     <div className="mt-1 space-y-1 px-1">
-      <p className="text-small text-ink-muted">
-        <DashCredit />
-        {prepared
-          ? 'What Dash prepared for this'
-          : unread
-            ? 'Dash’s result, to read'
-            : 'Dash’s result'}
-      </p>
-      {node.result && <FileBody markdown={node.result} compact />}
-      {files.length > 0 && <FileLinks files={files} />}
-      {node.resultUrl && (
-        <a
-          href={node.resultUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="block text-small break-all text-ink underline"
-        >
-          {node.resultUrl}
-        </a>
-      )}
-      {unread && (
-        <form action={review} className="flex items-center gap-2">
-          <input type="hidden" name="id" value={node.id} />
-          <Button type="submit" size="sm" variant="secondary" pending={reviewing}>
-            Mark read
-          </Button>
-          {state.error && <span className="text-small text-danger">{state.error}</span>}
-        </form>
-      )}
+      <p className="text-small text-ink-muted">Files</p>
+      <FileLinks files={files} />
     </div>
   );
 }
 
 /**
- * The Dash step that prepares one of yours, said on your step (plan #1218):
- * "Dash is preparing" with the prep step's title while it is open, "Dash
- * prepared" with the first sentence of its result once done. Either links to
- * the prep step's row, which opens on the link and holds the whole result.
- * Prepare (the button) writes onto the step itself and shows in ClaudeResult;
- * this is what Dash does unasked, as a step of its own.
+ * The Dash step that prepares one of yours, said on your step (plan #1218)
+ * while it is open: "Dash is preparing" with the prep step's title, linked to
+ * its own page. Once it is done, its result is Dash's draft on your step's row
+ * (dash-draft.tsx), as is what Prepare (the button) writes onto the step
+ * itself.
  */
-export function PrepNote({ prep }: { prep: StepPrep }) {
-  const href = `#step-${prep.id}`;
+export function PrepNote({ goalId, prep }: { goalId: string; prep: StepPrep }) {
   return (
     <p className="mt-1 px-1 text-small text-ink-muted">
-      {prep.done ? 'Dash prepared: ' : 'Dash is preparing: '}
-      {prep.done && prep.line ? (
-        <>
-          <span className="text-ink">{prep.line}</span>{' '}
-          <a href={href} className="underline underline-offset-2">
-            Read it
-          </a>
-        </>
-      ) : (
-        <a href={href} className="text-ink underline underline-offset-2">
-          {prep.title}
-        </a>
-      )}
+      Dash is preparing:{' '}
+      <Link
+        href={stepHref(goalId, prep.id)}
+        className="press-area text-ink underline underline-offset-2"
+      >
+        {prep.title}
+      </Link>
     </p>
   );
 }
@@ -311,6 +266,8 @@ function onlyChanged(form: FormData, node: StepNode): FormData {
     startsOn: node.startsOn ?? '',
     estimatedTotal: node.estimatedTotal ? String(node.estimatedTotal) : '',
     totalUnit: node.totalUnit ?? '',
+    countSource: node.countSource ?? '',
+    countMatch: node.countMatch ?? '',
   };
   // The two dates go together when either changed, so the start can be
   // checked against the due date the form shows.
@@ -322,9 +279,14 @@ function onlyChanged(form: FormData, node: StepNode): FormData {
   const totalChanged = ['estimatedTotal', 'totalUnit'].some(
     (key) => String(form.get(key) ?? '').trim() !== before[key],
   );
+  // So do a rhythm's source and its match text (goals migration 0069).
+  const sourceChanged = ['countSource', 'countMatch'].some(
+    (key) => form.has(key) && String(form.get(key) ?? '').trim() !== before[key],
+  );
   for (const [key, value] of Object.entries(before)) {
     if (datesChanged && (key === 'dueOn' || key === 'startsOn')) continue;
     if (totalChanged && (key === 'estimatedTotal' || key === 'totalUnit')) continue;
+    if (sourceChanged && (key === 'countSource' || key === 'countMatch')) continue;
     if (String(form.get(key) ?? '').trim() === value) form.delete(key);
   }
   if (form.get('kind') === node.kind) {
@@ -416,19 +378,77 @@ export function StepText({ node, field }: { node: StepNode; field: 'detail' | 'a
  * many in all. Then the other goals it counts towards. These were the foot of
  * a form with a Save button; each now saves on its own.
  */
+type QuietFact = 'start' | 'due' | 'total';
+
+/**
+ * A fact on the step's own page that is set, read as text: "Due 3 Oct".
+ * Pressing it puts its editor in its place. Unset, it keeps the value in the
+ * form and draws nothing, so saving another fact leaves it as it was.
+ */
+function QuietFactText({
+  name,
+  value,
+  label,
+  onOpen,
+  'aria-label': ariaLabel,
+}: {
+  name: string;
+  value: string | null | undefined;
+  label: string | null;
+  onOpen: () => void;
+  'aria-label': string;
+}) {
+  return (
+    <>
+      <input type="hidden" name={name} value={value ?? ''} />
+      {label && (
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label={ariaLabel}
+          className="press-area rounded-control px-1.5 py-0.5 text-ui text-ink hover:bg-sunken"
+        >
+          {label}
+        </button>
+      )}
+    </>
+  );
+}
+
 export function StepFacts({
   node,
   links,
   otherGoals,
+  quiet = false,
 }: {
   node: StepNode;
   links: { linkId: string; goalId: string; title: string }[];
   otherGoals: OtherGoals;
+  /**
+   * The step's own page (plan #1620): a date or amount that is set reads as
+   * text and turns into its editor when pressed, and the unset ones wait
+   * behind one quiet add control rather than standing open.
+   */
+  quiet?: boolean;
 }) {
   const menuAction = useMenuAction();
   const linkable = otherGoals.filter((goal) => !links.some((link) => link.goalId === goal.id));
   const [kind, setKind] = useState<StepKind>(node.kind);
   const formRef = useRef<HTMLFormElement>(null);
+  const [opened, setOpened] = useState<ReadonlySet<QuietFact>>(new Set());
+  const [adding, setAdding] = useState(false);
+  const linkPickerId = useId();
+  const open = (fact: QuietFact) => setOpened((now) => new Set(now).add(fact));
+  const hasTotal = Boolean(node.estimatedTotal || node.totalUnit);
+  // Whether each fact is drawn as its editor. Off the step page, always.
+  const editing = (fact: QuietFact) => !quiet || adding || opened.has(fact);
+  const showsTotal = kind === 'mine' || kind === 'claude';
+  const unsetLeft =
+    quiet &&
+    !adding &&
+    ((!node.startsOn && !opened.has('start')) ||
+      (!node.dueOn && !opened.has('due')) ||
+      (showsTotal && !hasTotal && !opened.has('total')));
   const [state, save, saving] = useActionState(async (prev: StepActionState, form: FormData) => {
     // A step turned into a rhythm before its count is drawn comes round
     // once a week until it is told otherwise.
@@ -448,6 +468,8 @@ export function StepFacts({
     const total = String(data.get('estimatedTotal') ?? '').trim();
     const unit = String(data.get('totalUnit') ?? '').trim();
     if (data.has('estimatedTotal') && Boolean(total) !== Boolean(unit)) return;
+    // A calendar source waits for the text its events are matched on.
+    if (data.get('countSource') === 'calendar' && !String(data.get('countMatch') ?? '').trim()) return;
     form.requestSubmit();
   };
 
@@ -460,23 +482,45 @@ export function StepFacts({
         aria-busy={saving}
       >
         <input type="hidden" name="id" value={node.id} />
-        <ChipInput
-          type="date"
-          name="startsOn"
-          icon="Start"
-          defaultValue={node.startsOn ?? ''}
-          onChange={commit}
-          aria-label={`The first day ${node.title} can be done`}
-          title="Until this day the step stays off your list and out of Dash's runs"
-        />
-        <ChipInput
-          type="date"
-          name="dueOn"
-          icon="Due"
-          defaultValue={node.dueOn ?? ''}
-          onChange={commit}
-          aria-label={`When ${node.title} is due`}
-        />
+        {editing('start') ? (
+          <ChipInput
+            type="date"
+            name="startsOn"
+            icon="Start"
+            defaultValue={node.startsOn ?? ''}
+            onChange={commit}
+            autoFocus={quiet && opened.has('start')}
+            aria-label={`The first day ${node.title} can be done`}
+            title="Until this day the step stays off your list and out of Dash's runs"
+          />
+        ) : (
+          <QuietFactText
+            name="startsOn"
+            value={node.startsOn}
+            label={node.startsOn ? `Starts ${formatDay(node.startsOn)}` : null}
+            onOpen={() => open('start')}
+            aria-label={`Change the first day ${node.title} can be done`}
+          />
+        )}
+        {editing('due') ? (
+          <ChipInput
+            type="date"
+            name="dueOn"
+            icon="Due"
+            defaultValue={node.dueOn ?? ''}
+            onChange={commit}
+            autoFocus={quiet && opened.has('due')}
+            aria-label={`When ${node.title} is due`}
+          />
+        ) : (
+          <QuietFactText
+            name="dueOn"
+            value={node.dueOn}
+            label={node.dueOn ? `Due ${formatDay(node.dueOn)}` : null}
+            onOpen={() => open('due')}
+            aria-label={`Change when ${node.title} is due`}
+          />
+        )}
         <KindChip
           value={kind}
           onChange={(next) => {
@@ -488,7 +532,29 @@ export function StepFacts({
         {kind === 'rhythm' && (
           <RhythmFields count={node.rhythmCount} period={node.rhythmPeriod} onCommit={commit} />
         )}
-        {(kind === 'mine' || kind === 'claude') && (
+        {kind === 'rhythm' && <CountSourceFields node={node} onCommit={commit} />}
+        {showsTotal && !editing('total') && (
+          <>
+            <input type="hidden" name="estimatedTotal" value={node.estimatedTotal ?? ''} />
+            <QuietFactText
+              name="totalUnit"
+              value={node.totalUnit}
+              label={
+                hasTotal ? `About ${node.estimatedTotal ?? ''} ${node.totalUnit ?? ''}`.trim() : null
+              }
+              onOpen={() => open('total')}
+              aria-label={`Change about how many in all for ${node.title}`}
+            />
+          </>
+        )}
+        {unsetLeft && (
+          <AddTrigger
+            label="Dates and amount"
+            onClick={() => setAdding(true)}
+            className="press-area ml-0"
+          />
+        )}
+        {showsTotal && editing('total') && (
           <span className="inline-flex items-center">
             <ChipInput
               type="text"
@@ -507,7 +573,7 @@ export function StepFacts({
               name="totalUnit"
               maxLength={PROGRESS_UNIT_MAX}
               defaultValue={node.totalUnit ?? ''}
-              placeholder="bags"
+              placeholder="of what"
               size={8}
               onBlur={commit}
               aria-label={`What the total for ${node.title} counts`}
@@ -518,7 +584,7 @@ export function StepFacts({
       </form>
       {state.error && <p className="px-1 text-small text-danger">{state.error}</p>}
       {(links.length > 0 || linkable.length > 0) && (
-        <div className="space-y-1 px-1 text-small">
+        <div className="space-y-1 text-small">
           {links.map((link) => (
             <form
               key={link.linkId}
@@ -534,19 +600,33 @@ export function StepFacts({
             </form>
           ))}
           {linkable.length > 0 && (
-            <form action={menuAction(linkStepAction)} className="flex flex-wrap items-center gap-2">
+            <form
+              action={menuAction(linkStepAction)}
+              className="-ml-1.5 flex flex-wrap items-center gap-2"
+            >
               <input type="hidden" name="id" value={node.id} />
-              <ChipSelect
-                name="goalId"
-                aria-label="Another goal this counts towards"
-                icon={<Target className="size-3.5" strokeWidth={2} />}
-              >
-                {linkable.map((goal) => (
-                  <option key={goal.id} value={goal.id}>
-                    {goal.title}
+              <ChipTarget htmlFor={linkPickerId}>
+                <ChipSelect
+                  id={linkPickerId}
+                  name="goalId"
+                  aria-label="Another goal this counts towards"
+                  icon={<Target className="size-3.5" strokeWidth={2} />}
+                  // Unset until picked: with the first goal chosen, the chip
+                  // read as a link the step already had (note 4a2c79b9).
+                  defaultValue=""
+                  placeholderValue=""
+                  required
+                >
+                  <option value="" disabled>
+                    Another goal
                   </option>
-                ))}
-              </ChipSelect>
+                  {linkable.map((goal) => (
+                    <option key={goal.id} value={goal.id}>
+                      {goal.title}
+                    </option>
+                  ))}
+                </ChipSelect>
+              </ChipTarget>
               <Button type="submit" size="sm" variant="ghost">
                 Count towards it too
               </Button>
@@ -563,6 +643,26 @@ export function StepFacts({
  * plan's composer sets priority and assignee (app/dev/plan/step-forms.tsx).
  * It was a boxed select, the one bordered control in a row of words.
  */
+/**
+ * A chip select's 44px press target on a phone. The chip is drawn about 25px
+ * tall in a dense row, so a label for it sits behind it, 44px tall and as
+ * wide as the chip, placed absolutely so the row keeps its height: a press
+ * on the chip reaches the select, and a press just above or below it reaches
+ * the label, which focuses the select.
+ */
+function ChipTarget({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) {
+  return (
+    <span className="relative isolate inline-flex">
+      <label
+        htmlFor={htmlFor}
+        aria-hidden
+        className="absolute inset-x-0 top-1/2 -z-10 hidden min-h-11 -translate-y-1/2 max-sm:block"
+      />
+      {children}
+    </span>
+  );
+}
+
 function KindChip({
   value,
   onChange,
@@ -572,20 +672,24 @@ function KindChip({
   onChange: (kind: StepKind) => void;
   label: string;
 }) {
+  const id = useId();
   return (
-    <ChipSelect
-      name="kind"
-      value={value}
-      onChange={(event) => onChange(event.target.value as StepKind)}
-      aria-label={label}
-      icon={<CircleUser className="size-3.5" strokeWidth={2} />}
-    >
-      {STEP_KINDS.map((option) => (
-        <option key={option} value={option}>
-          {STEP_KIND_LABELS[option]}
-        </option>
-      ))}
-    </ChipSelect>
+    <ChipTarget htmlFor={id}>
+      <ChipSelect
+        id={id}
+        name="kind"
+        value={value}
+        onChange={(event) => onChange(event.target.value as StepKind)}
+        aria-label={label}
+        icon={<CircleUser className="size-3.5" strokeWidth={2} />}
+      >
+        {STEP_KINDS.map((option) => (
+          <option key={option} value={option}>
+            {STEP_KIND_LABELS[option]}
+          </option>
+        ))}
+      </ChipSelect>
+    </ChipTarget>
   );
 }
 
@@ -632,6 +736,52 @@ function RhythmFields({
         <Button type="submit" size="sm" variant="ghost">
           {submitLabel}
         </Button>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Where a rhythm's count is read from, so the period is kept without logging
+ * anything (lib/goals/rhythm-sources.ts): nothing, applications sent in Jobs,
+ * or calendar events whose title contains the match text.
+ */
+function CountSourceFields({ node, onCommit }: { node: StepNode; onCommit: () => void }) {
+  const [source, setSource] = useState(node.countSource ?? '');
+  return (
+    <span className="inline-flex flex-wrap items-center gap-0.5">
+      <span className="text-ui text-ink-muted">Counts itself from</span>
+      {/* A full-size select, so a thumb can reach it on a phone. */}
+      <Select
+        name="countSource"
+        value={source}
+        className="w-auto max-sm:min-h-11"
+        onChange={(event) => {
+          setSource(event.target.value);
+          // The form reads the select after React has drawn the match box.
+          requestAnimationFrame(onCommit);
+        }}
+        aria-label={`Where the count for ${node.title} comes from`}
+      >
+        <option value="">nothing, counted by hand</option>
+        {COUNT_SOURCES.map((option) => (
+          <option key={option} value={option}>
+            {COUNT_SOURCE_CHOICES[option]}
+          </option>
+        ))}
+      </Select>
+      {source === 'calendar' && (
+        <ChipInput
+          type="text"
+          name="countMatch"
+          maxLength={COUNT_MATCH_MAX}
+          defaultValue={node.countMatch ?? ''}
+          placeholder="urbanism|community board"
+          size={20}
+          onBlur={onCommit}
+          aria-label={`What a calendar event for ${node.title} is called`}
+          title="An event counts when its title contains this. Separate alternatives with |."
+        />
       )}
     </span>
   );

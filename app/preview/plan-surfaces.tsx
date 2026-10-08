@@ -1,15 +1,17 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { projectById } from '@/lib/plan/projects';
-import { PlanView, type PlanCatalogEntry } from '@/app/dev/plan/plan-view';
+import { PlanView } from '@/app/dev/plan/plan-view';
+import { SendScreenBack } from '@/app/dev/plan/send-back';
+import { FeaturePage } from '@/app/dev/plan/feature-page';
+import type { PlanUpdate } from '@/lib/plan/updates';
+import { catalogOf } from '@/app/dev/plan/plan-catalog';
+import { SetTab } from './set-tab';
+import { ScreenChanges } from '@/components/dev/screen-change';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import type { CriticStopView } from '@/lib/plan/ui-check-stop';
-import {
-  applyView,
-  buildPlanTree,
-  flattenSections,
-  summarize,
-  type PlanSection,
-} from '@/lib/plan/tree';
+import type { ScreenChangeView } from '@/lib/plan/screen-change';
+import type { LastRun } from '@/lib/plan/run-end';
+import { applyView, buildPlanTree, summarize } from '@/lib/plan/tree';
 
 /**
  * The dev plan, drawn from fixtures for the gallery (plan #993).
@@ -124,6 +126,38 @@ const items: PlanItem[] = [
     assignee: 'me',
   }),
   item({
+    id: 'overhaul',
+    module: 'dev',
+    track: 'overhaul',
+    title: 'Draw every list row with one shared component',
+    detail:
+      'An overhaul (plan #1510): built by its own routine in phases, started with “Work this overhaul”.',
+    acceptance: 'Every list row in the app is drawn by the shared row.',
+    size: 'l',
+  }),
+  item({
+    id: 'overhaul-design',
+    module: 'dev',
+    parentId: 'overhaul',
+    title: 'Design the shared row on the Learn page',
+    size: 'm',
+  }),
+  item({
+    id: 'overhaul-running',
+    module: 'dev',
+    track: 'overhaul',
+    title: 'Move every page to the shared header',
+    detail: 'An overhaul with its routine running: the row says Dash is on it.',
+    size: 'l',
+  }),
+  item({
+    id: 'overhaul-running-step',
+    module: 'dev',
+    parentId: 'overhaul-running',
+    title: 'Build the shared header beside the old one',
+    size: 'm',
+  }),
+  item({
     id: 'fog-feature',
     title: 'Plan a week around the goals',
     fog: 'Which goals get a slot each week is not settled.',
@@ -160,22 +194,22 @@ const whole = buildPlanTree({
   dependencies: [dep('render', 'shared'), dep('blocked-steps', 'shared')],
 });
 
-function catalogOf(tree: PlanSection[]): PlanCatalogEntry[] {
-  return flattenSections(tree).map((node) => ({
-    id: node.id,
-    number: node.number,
-    outline: node.outline,
-    title: node.title,
-    module: node.module,
-    parentId: node.parentId,
-    depth: node.depth,
-    status: node.status,
-    completedAt: node.completedAt,
-    closed: node.status === 'done' || node.status === 'dropped',
-  }));
-}
-
 const catalog = catalogOf(whole);
+
+/**
+ * The overhaul routine working one overhaul (plan #1514). Dated, but the tree
+ * draws no time for it: a started run on an overhaul reads "Dash is on it" in
+ * the Status column, and only the opened panel says how long it has gone.
+ */
+const treeRuns: Record<string, LastRun> = {
+  'overhaul-running': {
+    status: 'started',
+    createdAt: '2026-09-01T09:00:00Z',
+    error: null,
+    job: 'overhaul',
+    reading: null,
+  },
+};
 
 /** The open view, every feature unfolded: the page as a list. */
 export function PlanTreeSurface() {
@@ -188,9 +222,29 @@ export function PlanTreeSurface() {
       catalog={catalog}
       empty={false}
       canSend={false}
-      lastRuns={{}}
+      lastRuns={treeRuns}
       commitChecks={{}}
       unfolded
+    />
+  );
+}
+
+/**
+ * The Table view (plan #1669): every open feature as a row, grouped by
+ * module, over the same fixtures as the tree.
+ */
+export function PlanTableSurface() {
+  return (
+    <PlanView
+      sections={applyView(whole, 'table')}
+      finished={[]}
+      summary={summarize(whole)}
+      view="table"
+      catalog={catalog}
+      empty={false}
+      canSend={false}
+      lastRuns={treeRuns}
+      commitChecks={{}}
     />
   );
 }
@@ -203,7 +257,9 @@ export function PlanOpenedSurface() {
   const sections = applyView(whole, 'open')
     .map((section) => ({
       ...section,
-      nodes: section.nodes.filter((node) => node.id === 'stuck' || node.id === 'goal-tree'),
+      nodes: section.nodes.filter(
+        (node) => node.id === 'stuck' || node.id === 'goal-tree' || node.id === 'overhaul',
+      ),
     }))
     .filter((section) => section.nodes.length > 0);
 
@@ -352,7 +408,8 @@ const criticStops: Record<string, CriticStopView> = {
             problem:
               'The company, the role and the last conversation wrap to three lines each at 390, so the card is a screen and a half tall before the first message.',
             breaks: 'taste:fits-one-screen',
-            change: 'Put the company and role on one line and fold the conversation to its first line.',
+            change:
+              'Put the company and role on one line and fold the conversation to its first line.',
           },
           {
             shot: 'laptop-dark',
@@ -403,5 +460,418 @@ export function PlanCriticStopSurface() {
       unfolded
       opened
     />
+  );
+}
+
+/**
+ * A step that changed screens, opened (plan #1541): each surface's phone
+ * picture before and after, side by side. One surface has both, one is new
+ * and has no before, and one passed with its pictures never uploaded, which
+ * is how a round recorded from the web arrives.
+ */
+const changedItems: PlanItem[] = [
+  item({
+    id: 'pictures',
+    module: 'dev',
+    title: 'See each screen change as before and after pictures',
+    size: 'm',
+  }),
+  item({
+    id: 'pictures-row',
+    module: 'dev',
+    parentId: 'pictures',
+    title: 'Draw the contact card with the last conversation under the name',
+    detail: 'The contact page leads with the person and the last thing said between you.',
+    acceptance: 'A contact reads as one card at 390, with the last conversation under the name.',
+    status: 'done',
+    size: 's',
+    commitSha: 'c0ffee1',
+    startedAt: '2026-10-05T09:00:00Z',
+    completedAt: '2026-10-05T11:00:00Z',
+  }),
+  item({
+    id: 'pictures-next',
+    module: 'dev',
+    parentId: 'pictures',
+    title: 'Send a screen back from its pictures',
+    size: 's',
+  }),
+];
+
+const changedTree = buildPlanTree({ items: changedItems, dependencies: [] });
+
+/**
+ * A phone screen in miniature, so the gallery needs no bucket. `crowded` is
+ * the before: three stacked cards where the after has one.
+ * ui-ok-file: raw-hex -- the colours are a picture of a page, not the page's own theme.
+ */
+export function phoneShot(crowded: boolean): string {
+  const bg = '#f7f6f3';
+  const card = '#ffffff';
+  const ink = '#c9c6bf';
+  const accent = '#8a7fd6';
+  const cards = crowded
+    ? [20, 150, 280, 410, 540]
+        .map(
+          (y) =>
+            `<rect x="14" y="${y}" width="362" height="116" rx="10" fill="${card}"/><rect x="28" y="${y + 16}" width="200" height="14" rx="4" fill="${ink}"/><rect x="28" y="${y + 40}" width="300" height="10" rx="4" fill="${ink}"/><rect x="28" y="${y + 58}" width="320" height="10" rx="4" fill="${ink}"/><rect x="28" y="${y + 76}" width="260" height="10" rx="4" fill="${ink}"/>`,
+        )
+        .join('')
+    : `<rect x="14" y="20" width="362" height="260" rx="12" fill="${card}"/><circle cx="58" cy="70" r="26" fill="${accent}"/><rect x="98" y="54" width="180" height="16" rx="4" fill="${ink}"/><rect x="98" y="78" width="120" height="10" rx="4" fill="${ink}"/><rect x="30" y="120" width="320" height="10" rx="4" fill="${ink}"/><rect x="30" y="140" width="280" height="10" rx="4" fill="${ink}"/><rect x="30" y="200" width="120" height="40" rx="20" fill="${accent}"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 390 693"><rect width="390" height="693" fill="${bg}"/>${cards}</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+const changedNumber = changedItems[1].number;
+
+export const screenChangeFixtures: Record<number, ScreenChangeView[]> = {
+  [changedNumber]: [
+    {
+      surface: 'jobs-contact',
+      round: 2,
+      verdict: 'pass',
+      checkedAt: '2026-10-05T10:40:00Z',
+      before: phoneShot(true),
+      after: phoneShot(false),
+    },
+    {
+      surface: 'jobs-contact-empty',
+      round: 1,
+      verdict: 'pass',
+      checkedAt: '2026-10-05T10:45:00Z',
+      before: null,
+      after: phoneShot(false),
+    },
+    {
+      surface: 'jobs-contacts',
+      round: 4,
+      verdict: 'accepted',
+      checkedAt: '2026-10-05T10:50:00Z',
+      before: null,
+      after: null,
+    },
+  ],
+};
+
+export function PlanScreenChangeSurface() {
+  return (
+    <PlanView
+      sections={applyView(changedTree, 'all').filter((section) => section.nodes.length > 0)}
+      finished={[]}
+      summary={summarize(changedTree)}
+      view="all"
+      catalog={catalogOf(changedTree)}
+      empty={false}
+      canSend={false}
+      lastRuns={{}}
+      // CI passed on the merge, which is the usual state of a step whose
+      // screens passed, and the row carries no mark for it.
+      commitChecks={{
+        c0ffee1: { mergeSha: 'facade1', conclusion: 'passed', checkedAt: '2026-10-05T11:30:00Z' },
+      }}
+      screenChanges={screenChangeFixtures}
+      unfolded
+      opened
+    />
+  );
+}
+
+/**
+ * The thumbs-down under a finished step's pictures, opened on the first
+ * surface to show what it asks, and closed under the second (plan #1542).
+ */
+export function PlanSendBackSurface() {
+  const changes = screenChangeFixtures[changedNumber].slice(0, 2);
+  return (
+    <div className="max-w-2xl p-4">
+      <ScreenChanges
+        changes={changes}
+        footer={(change) => (
+          <SendScreenBack
+            id="pictures-shipped"
+            surface={change.surface}
+            open={change.surface === changes[0].surface}
+          />
+        )}
+      />
+    </div>
+  );
+}
+
+/**
+ * A feature's own page (plan #1664), from fixtures: a feature partway
+ * through, with a long title, a question still open, a step it waits on in
+ * another feature, a note from Dash on its thread, and steps in every state
+ * on the Steps tab, one of them with a substep.
+ */
+const featureItems: PlanItem[] = [
+  item({
+    id: 'feat',
+    module: 'dev',
+    title: 'Give each feature its own page with tabs, breadcrumbs and a column of its properties',
+    detail:
+      'Each feature on the plan opens to its own page: breadcrumbs at the top, then Overview, Activity and Steps tabs, with a column of its properties beside them. The goal page moves onto the same layout so the two stay alike.',
+    acceptance:
+      'Opening a feature from /dev/plan or a goal from /goals shows the same layout: breadcrumbs, Overview, Activity and Steps tabs, and a properties column with progress split between you and Dash.',
+    priority: 1,
+    size: 'l',
+    comment:
+      'Added by session cse_01V1aoCMYL7Ckkar3cKSLtFf on 2026-10-06.\n\nBlocked 2026-10-06: waiting on the level names.',
+    thread: [
+      {
+        id: 't1',
+        author: 'me',
+        body: 'Keep the row on /dev/plan as it is; only the title should open this.',
+        createdAt: '2026-10-07T10:00:00Z',
+      },
+      {
+        id: 't2',
+        author: 'claude',
+        body: 'Done that way: the row is unchanged and its title links here.',
+        createdAt: '2026-10-07T10:05:00Z',
+      },
+    ],
+  }),
+  item({
+    id: 'feat-question',
+    module: 'dev',
+    parentId: 'feat',
+    kind: 'decision',
+    title: 'Should the Steps tab open folded or unfolded?',
+    detail:
+      'A — Unfolded. Every step and substep shows at once.\nB — Folded. Only the steps show until you open one.\nRecommend A: a feature has a dozen steps at most.',
+  }),
+  item({
+    id: 'feat-layout',
+    module: 'dev',
+    parentId: 'feat',
+    title: 'Build the shared tabbed detail layout',
+    status: 'done',
+    size: 'm',
+    commitSha: '79074ffd',
+    startedAt: '2026-10-07T08:00:00Z',
+    completedAt: '2026-10-07T09:00:00Z',
+    createdAt: '2026-10-06T15:56:00Z',
+    comment:
+      'Added by session cse_01V1aoCMYL7Ckkar3cKSLtFf on 2026-10-06.\n\nDone 2026-10-07: Added the tabbed detail page pattern: breadcrumbs, a title, tabs that each have their own address, and a column of properties that becomes a grid of facts under the title on a phone.',
+  }),
+  item({
+    id: 'feat-page',
+    module: 'dev',
+    parentId: 'feat',
+    title: 'Open a feature on its own page with Overview',
+    status: 'in_progress',
+    size: 'm',
+    createdAt: '2026-10-06T15:56:00Z',
+    comment:
+      'Blocked 2026-10-06: Which pattern should the page use? Waiting on the answer to the layout question.\nUnblocked 2026-10-07: the answer came back as the tabbed detail pattern.',
+  }),
+  item({
+    id: 'feat-page-gallery',
+    module: 'dev',
+    parentId: 'feat-page',
+    title: 'Draw the page in the gallery',
+    size: 's',
+  }),
+  item({
+    id: 'feat-update',
+    module: 'dev',
+    parentId: 'feat',
+    title: 'Store Dash’s update on a feature, with a health',
+    size: 'm',
+    assignee: 'me',
+  }),
+  item({
+    id: 'feat-goal',
+    module: 'dev',
+    parentId: 'feat',
+    title: 'Move the goal page onto the shared layout',
+    status: 'blocked',
+    blockKind: 'outside',
+    blockAsk: 'Which goal page parts go to Overview and which to Activity?',
+    size: 'm',
+    createdAt: '2026-10-06T15:56:00Z',
+    startedAt: '2026-10-07T10:30:00Z',
+    comment:
+      'Blocked 2026-10-07: Which goal page parts go to Overview and which to Activity?',
+  }),
+  item({
+    id: 'feat-layout-tabs',
+    module: 'dev',
+    parentId: 'feat-layout',
+    title: 'Add a tabs control whose tabs are links carrying the tab in the address',
+    status: 'done',
+    size: 's',
+    commitSha: '79074ffd',
+  }),
+  item({
+    id: 'feat-table',
+    module: 'dev',
+    parentId: 'feat',
+    title: 'Show the plan as a table of features',
+    size: 'm',
+  }),
+  item({
+    id: 'feat-old',
+    module: 'dev',
+    parentId: 'feat',
+    title: 'Open the feature in a side sheet over the plan',
+    status: 'dropped',
+    size: 's',
+    createdAt: '2026-10-06T15:56:00Z',
+    completedAt: '2026-10-07T08:10:00Z',
+    comment: 'Dropped 2026-10-07: the page replaces it; a sheet over the plan would show the same thing in less room.',
+  }),
+  item({
+    id: 'other',
+    module: 'dev',
+    title: 'Name the plan’s levels module, feature, step and substep',
+    status: 'in_progress',
+    size: 's',
+  }),
+];
+
+/** Every fixture is created the day the feature was shaped, unless it says otherwise. */
+for (const fixture of featureItems) {
+  if (fixture.createdAt === '2026-09-01T09:00:00Z') fixture.createdAt = '2026-10-06T15:55:00Z';
+}
+
+const featureTree = buildPlanTree({
+  items: featureItems,
+  dependencies: [dep('feat', 'other'), dep('feat-table', 'feat-page')],
+});
+const featureSection = featureTree.find((section) => section.module === 'dev');
+const featureNode = featureSection?.nodes.find((node) => node.id === 'feat');
+
+/** Dash's latest update on the feature, which heads Overview (plan #1666). */
+const featureUpdates: PlanUpdate[] = [
+  {
+    id: 'update-2',
+    featureId: 'feat',
+    health: 'at_risk',
+    body:
+      'The tabbed detail layout is built and the feature opens on its own page, with its steps grouped by status. ' +
+      'Moving the goal page onto the same layout is blocked on which of its parts belong on Overview and which on Activity, ' +
+      'and that question is waiting on you.',
+    stepsDoneBefore: 1,
+    stepsDoneAfter: 2,
+    stepsTotal: 7,
+    session: 'cse_01V1aoCMYL7Ckkar3cKSLtFf',
+    createdAt: '2026-10-07T18:00:00Z',
+  },
+  {
+    id: 'update-1',
+    featureId: 'feat',
+    health: 'on_track',
+    body: 'The levels have their names and the shared tabbed detail layout is built. The feature page is next.',
+    stepsDoneBefore: 0,
+    stepsDoneAfter: 1,
+    stepsTotal: 7,
+    session: 'cse_01V1aoCMYL7Ckkar3cKSLtFf',
+    createdAt: '2026-10-07T09:05:00Z',
+  },
+];
+
+/**
+ * What the Activity tab reads beyond the plan (plan #1667): the block on the
+ * goal page step, two runs, one of which did not finish, and what Dash
+ * recorded doing: closing the layout step, which marks that entry as Dash's,
+ * and raising the feature's priority, which is listed on its own.
+ */
+const featureActivitySources = {
+  blockedAt: { 'feat-goal': '2026-10-07T11:40:00Z' },
+  runs: [
+    {
+      id: 'run-1',
+      stepId: 'feat-layout',
+      job: 'step' as const,
+      status: 'finished' as const,
+      error: null,
+      createdAt: '2026-10-07T07:58:00Z',
+    },
+    {
+      id: 'run-2',
+      stepId: 'feat-goal',
+      job: 'step' as const,
+      status: 'failed' as const,
+      error: 'The session ended without closing the step.',
+      createdAt: '2026-10-07T10:29:00Z',
+    },
+  ],
+  actions: [
+    {
+      id: 'act-1',
+      stepId: 'feat-layout',
+      kind: 'close_step',
+      summary: 'Dash closed step #3, "Build the shared tabbed detail layout".',
+      createdAt: '2026-10-07T09:00:02Z',
+    },
+    {
+      id: 'act-2',
+      stepId: 'feat',
+      kind: 'set_priority',
+      summary: 'Dash raised the priority of the feature page to high, since three steps wait on it.',
+      createdAt: '2026-10-07T12:15:00Z',
+    },
+  ],
+};
+
+function FeatureFixture() {
+  if (!featureSection || !featureNode) return null;
+  return (
+    <FeaturePage
+      feature={featureNode}
+      module="dev"
+      moduleLabel={featureSection.label}
+      catalog={catalogOf(featureTree)}
+      canSend
+      lastRuns={{}}
+      updates={featureUpdates}
+      activity={featureActivitySources}
+      commitChecks={{
+        '79074ffd': {
+          mergeSha: '79074ffd',
+          conclusion: 'passed',
+          checkedAt: '2026-10-07T09:30:00Z',
+        },
+      }}
+    />
+  );
+}
+
+/** The feature page on its Overview tab. */
+export function PlanFeatureSurface() {
+  return <FeatureFixture />;
+}
+
+/** The same page on its Activity tab: what happened, newest first (plan #1667). */
+export function PlanFeatureActivitySurface() {
+  return (
+    <>
+      <SetTab tab="activity" />
+      <FeatureFixture />
+    </>
+  );
+}
+
+/** The same page on its Steps tab: the feature's steps grouped by status. */
+export function PlanFeatureStepsSurface() {
+  return (
+    <>
+      <SetTab tab="steps" />
+      <FeatureFixture />
+    </>
+  );
+}
+
+const HELD_YOURS = { held: 'me' };
+
+/** The Steps tab after a press on "Yours" in the properties (plan #1668). */
+export function PlanFeatureStepsYoursSurface() {
+  return (
+    <>
+      <SetTab tab="steps" params={HELD_YOURS} />
+      <FeatureFixture />
+    </>
   );
 }

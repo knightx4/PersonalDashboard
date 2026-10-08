@@ -1,9 +1,11 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useOptimistic, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { Archive, CloudFog, Flag, ListFilter, ListTree } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Archive, ChevronRight, CloudFog, Flag, ListFilter, ListTree, Repeat, Target } from 'lucide-react';
 import { ViewChips } from '@/components/plan-tree/view-chips';
+import { PageHeader } from '@/components/shell/page-header';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
@@ -14,6 +16,7 @@ import { ComposeBody, ComposeTitle, InlineInput, InlineTextarea } from '@/compon
 import { useToast } from '@/components/ui/toast';
 import {
   ALL_GOALS_VIEWS,
+  areaInView,
   areasInView,
   countAllGoalsView,
   type AllGoalsView,
@@ -32,7 +35,9 @@ import {
   type AreaWithGoals,
   type Goal,
 } from '@/lib/goals/tree';
+import { cn } from '@/lib/cn';
 import { approveGoalAction } from './[goalId]/shaping-actions';
+import { setGoalFocusAction } from './focus-actions';
 import {
   addArea,
   addGoal,
@@ -51,18 +56,27 @@ import { AreaPlanner } from './area-planner';
 import { GoalProgress } from './goal-progress';
 import { useMoveToItems, type Place } from './move-goal';
 import { DashCredit } from '@/components/ui/dash-mark';
+import { stepHref } from '@/lib/goals/all-goals';
+import { areaCrumbs } from '@/lib/goals/crumbs';
 
 /**
  * Areas and the goals under them (plan #924).
  *
  * Each area is a heading, a line saying what you want from it, and its goals
- * in a card beneath, with Plan this area asking Claude to propose the goals
- * it needs. Everything but a goal's title is
- * edited where it stands (law 12): a name, a done-when or a note of fog is an
- * inline input saved on blur. A goal's title opens its tree, where it is
- * renamed. Reordering and archiving sit in each
+ * in a card beneath, then the rhythms inside those goals with this period's
+ * progress, and Plan this area asking Dash to propose the goals it needs.
+ * An area's name opens its own page (plan #1619), which draws the same
+ * section alone with the area's name as its heading, and is where the area
+ * is renamed, as a goal's title opens its tree, where it is renamed.
+ * Everything else is edited where it stands (law 12): a note, a done-when or
+ * a note of fog is an inline input saved on blur. Reordering and archiving sit in each
  * row's menu, which works the same with a thumb as with a mouse. Archiving
  * offers an undo, and the record of it stays in the history either way.
+ *
+ * Each open goal that is not an errand has a target button beside its menu
+ * that makes it one of this week's focus goals or takes that away
+ * (docs/GOALS-SPEC.md, "The week's focus"). A focus goal's title carries the
+ * same target, so the week's choice can be read down the page.
  *
  * Open, On you and Everything narrow the goals (plan #1158), with the chips a
  * goal's steps have. Everything is the one view with finished and archived
@@ -147,7 +161,9 @@ export function GoalsView({
   onYou: onYouCounts,
   progress,
   areaRuns,
+  rhythms = {},
   canRun,
+  areaId,
 }: {
   areas: AreaWithGoals[];
   /** Which goals show (plan #1158); in the address as `?view=`. */
@@ -157,31 +173,62 @@ export function GoalsView({
   progress: Progress;
   /** Each area's latest Plan this area run, keyed by area id. */
   areaRuns: Record<string, AreaRunView>;
+  /** Each area's rhythms, keyed by area id; an area with none is absent. */
+  rhythms?: Record<string, AreaRhythm[]>;
   /** Whether this account can start a Claude run (the owner's only). */
   canRun: boolean;
+  /** Draw this one area as its own page (plan #1619) rather than every area. */
+  areaId?: string;
 }) {
   const onYou = new Map(Object.entries(onYouCounts));
-  const areas = areasInView(allAreas, view, onYou);
   // Where a goal can be moved to: every live area, shown in this view or not.
   const places = allAreas.map((area) => ({ id: area.id, name: area.name }));
+  const pageIndex = areaId ? allAreas.findIndex((area) => area.id === areaId) : -1;
+  const pageArea = pageIndex >= 0 ? allAreas[pageIndex] : null;
+  const counted = pageArea ? [pageArea] : allAreas;
+  const chips = counted.length > 0 && (
+    <div className="flex items-center gap-2">
+      <ListFilter className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+      <ViewChips
+        view={view}
+        chips={ALL_GOALS_VIEWS}
+        labels={VIEW_LABEL}
+        hrefOf={(candidate) =>
+          goalViewHref(pageArea ? `/goals/area/${pageArea.id}` : '/goals/all', candidate)
+        }
+        counts={{
+          open: countAllGoalsView(counted, 'open', onYou),
+          you: countAllGoalsView(counted, 'you', onYou),
+        }}
+        scroll={false}
+      />
+    </div>
+  );
+
+  if (pageArea) {
+    const area = areaInView(pageArea, view, onYou);
+    return (
+      <AreaSection
+        area={area}
+        index={pageIndex}
+        count={allAreas.length}
+        progress={progress}
+        run={areaRuns[area.id] ?? null}
+        rhythms={rhythms[area.id] ?? []}
+        canRun={canRun}
+        places={places}
+        page={{
+          chips,
+          empty: area.goals.length === 0 && pageArea.goals.length > 0 ? EMPTY_VIEW[view] : null,
+        }}
+      />
+    );
+  }
+
+  const areas = areasInView(allAreas, view, onYou);
   return (
     <div className="space-y-6">
-      {allAreas.length > 0 && (
-        <div className="flex items-center gap-2">
-          <ListFilter className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
-          <ViewChips
-            view={view}
-            chips={ALL_GOALS_VIEWS}
-            labels={VIEW_LABEL}
-            hrefOf={(candidate) => goalViewHref('/goals/all', candidate)}
-            counts={{
-              open: countAllGoalsView(allAreas, 'open', onYou),
-              you: countAllGoalsView(allAreas, 'you', onYou),
-            }}
-            scroll={false}
-          />
-        </div>
-      )}
+      {chips}
       {allAreas.length === 0 ? (
         <EmptyState
           icon={Flag}
@@ -199,8 +246,10 @@ export function GoalsView({
             count={areas.length}
             progress={progress}
             run={areaRuns[area.id] ?? null}
+            rhythms={rhythms[area.id] ?? []}
             canRun={canRun}
             places={places}
+            view={view}
           />
         ))
       )}
@@ -215,21 +264,37 @@ function AreaSection({
   count,
   progress,
   run,
+  rhythms,
   canRun,
   places,
+  view = 'open',
+  page,
 }: {
   area: AreaInView;
   index: number;
   count: number;
   progress: Progress;
   run: AreaRunView | null;
+  rhythms: AreaRhythm[];
   canRun: boolean;
   places: Place[];
+  /** The view All goals is on, which the area's link keeps. */
+  view?: AllGoalsView;
+  /**
+   * Drawn as the area's own page: the name is the page's heading and is
+   * renamed there, the view chips sit under the note, and a view that leaves
+   * none of its goals says so.
+   */
+  page?: { chips: React.ReactNode; empty: { title: string; description: string } | null };
 }) {
+  const router = useRouter();
   const [renameState, rename, renaming] = useActionState(renameAreaAction, initial);
   const [noteState, saveNote, savingNote] = useActionState(setAreaNoteAction, initial);
   const menuAction = useMenuAction();
   const toast = useToast();
+  // On All goals an area folds under its name (note 24a2055c); its own page does not.
+  const [open, setOpen] = useState(true);
+  const folded = !page && !open;
 
   async function archive(form: FormData) {
     const result = await archiveAreaAction(form);
@@ -237,6 +302,8 @@ function AreaSection({
       toast({ text: result.error });
       return;
     }
+    // An archived area has no page, so its own page goes back to All goals.
+    if (page) router.push('/goals/all');
     toast({
       text: `Archived ${area.name}.`,
       undo: async () => {
@@ -253,7 +320,6 @@ function AreaSection({
   // The confirm counts every live goal the archive takes, shown in this view or not.
   const liveCount = area.liveCount;
   const items: ActionMenuItem[] = [
-    { id: 'open', label: 'Open the area', href: `/goals/area/${area.id}` },
     ...moveItems(menuAction(moveAreaAction), area.id, index, count),
     {
       id: 'archive',
@@ -269,64 +335,108 @@ function AreaSection({
   ];
 
   const proposedCount = area.goals.filter((goal) => goal.status === 'proposed').length;
+  // The rhythms of the goals this view shows, so On you does not list the rest.
+  const shownGoals = new Set(area.goals.map((goal) => goal.id));
+  const shownRhythms = rhythms.filter((rhythm) => shownGoals.has(rhythm.goalId));
 
   return (
     <section id={`area-${area.id}`} aria-label={area.name} className="scroll-mt-bar space-y-2">
-      <div className="flex items-center gap-2">
-        <form action={rename} className="min-w-0 flex-1">
+      {page ? (
+        <PageHeader
+          crumbs={areaCrumbs(area)}
+          title={
+            <form action={rename}>
+              <input type="hidden" name="id" value={area.id} />
+              <InlineInput
+                name="name"
+                required
+                maxLength={AREA_NAME_MAX}
+                defaultValue={area.name}
+                key={`name-${area.name}`}
+                aria-label={`Rename ${area.name}`}
+                disabled={renaming}
+                onBlur={commitOnBlur(area.name, { required: true })}
+                onKeyDown={revertOnEscape(area.name)}
+                className="font-display text-title tracking-tight max-sm:min-h-11 sm:text-title"
+              />
+            </form>
+          }
+          actions={<ActionMenu label={`${area.name} actions`} items={items} />}
+        />
+      ) : (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            aria-controls={`area-body-${area.id}`}
+            aria-label={open ? `Fold ${area.name}` : `Open ${area.name}`}
+            className="press -mr-1 flex size-7 shrink-0 items-center justify-center rounded-control text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink-muted max-sm:size-11"
+          >
+            <ChevronRight
+              className={cn('size-4 transition-transform duration-quick', open && 'rotate-90')}
+              strokeWidth={1.75}
+              aria-hidden
+            />
+          </button>
+          <Link
+            href={goalViewHref(`/goals/area/${area.id}`, view)}
+            // The size the rename field had here (InlineInput), so the area still heads its goals.
+            // eslint-disable-next-line no-restricted-syntax -- text-base matches InlineInput's phone size.
+            className="press-area min-w-0 flex-1 border border-transparent px-1 py-0.5 text-base font-semibold text-ink underline-offset-2 [overflow-wrap:anywhere] hover:underline sm:text-ui"
+          >
+            {area.name}
+          </Link>
+          {folded && (
+            <span className="shrink-0 text-small text-ink-muted">
+              {goalCount === 1 ? '1 goal' : `${goalCount} goals`}
+            </span>
+          )}
+          <ActionMenu label={`${area.name} actions`} items={items} />
+        </div>
+      )}
+      {renameState.error && <p className="px-1 text-small text-danger">{renameState.error}</p>}
+      <div id={`area-body-${area.id}`} hidden={folded} className="space-y-2">
+        <form action={saveNote}>
           <input type="hidden" name="id" value={area.id} />
-          <InlineInput
-            name="name"
-            required
-            maxLength={AREA_NAME_MAX}
-            defaultValue={area.name}
-            key={`name-${area.name}`}
-            aria-label={`Rename ${area.name}`}
-            disabled={renaming}
-            onBlur={commitOnBlur(area.name, { required: true })}
-            onKeyDown={revertOnEscape(area.name)}
-            className="font-semibold"
+          <InlineTextarea
+            name="note"
+            maxLength={AREA_NOTE_MAX}
+            defaultValue={area.note ?? ''}
+            key={`note-${area.note ?? ''}`}
+            placeholder="What you want from this area, in a sentence"
+            aria-label={`What you want from ${area.name}`}
+            disabled={savingNote}
+            onBlur={commitOnBlur(area.note ?? '')}
+            onKeyDown={revertOnEscape(area.note ?? '')}
+            className="text-ink-muted"
           />
         </form>
-        <ActionMenu label={`${area.name} actions`} items={items} />
-      </div>
-      {renameState.error && <p className="px-1 text-small text-danger">{renameState.error}</p>}
-      <form action={saveNote}>
-        <input type="hidden" name="id" value={area.id} />
-        <InlineInput
-          name="note"
-          maxLength={AREA_NOTE_MAX}
-          defaultValue={area.note ?? ''}
-          key={`note-${area.note ?? ''}`}
-          placeholder="What you want from this area, in a sentence"
-          aria-label={`What you want from ${area.name}`}
-          disabled={savingNote}
-          onBlur={commitOnBlur(area.note ?? '')}
-          onKeyDown={revertOnEscape(area.note ?? '')}
-          className="text-ink-muted"
-        />
-      </form>
-      {noteState.error && <p className="px-1 text-small text-danger">{noteState.error}</p>}
+        {noteState.error && <p className="px-1 text-small text-danger">{noteState.error}</p>}
+        {page?.chips && <div className="pt-2 pb-1">{page.chips}</div>}
+        {page?.empty && <EmptyState icon={Flag} {...page.empty} />}
 
-      {proposedCount > 1 && <ApproveArea areaId={area.id} count={proposedCount} />}
-      {goalCount > 0 && (
-        <Card>
-          <ul className="divide-y divide-border">
-            {area.goals.map((goal, i) => (
-              <GoalRow
-                key={goal.id}
-                goal={goal}
-                index={i}
-                count={goalCount}
-                steps={progress[goal.id]}
-                places={places}
-              />
-            ))}
-          </ul>
-        </Card>
-      )}
-      <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} />
-      <GoalComposer areaId={area.id} areaName={area.name} learn={area.learn ?? false} />
+        {proposedCount > 1 && <ApproveArea areaId={area.id} count={proposedCount} />}
+        {goalCount > 0 && (
+          <Card>
+            <ul className="divide-y divide-border">
+              {area.goals.map((goal, i) => (
+                <GoalRow
+                  key={goal.id}
+                  goal={goal}
+                  index={i}
+                  count={goalCount}
+                  steps={progress[goal.id]}
+                  places={places}
+                />
+              ))}
+            </ul>
+          </Card>
+        )}
+        {shownRhythms.length > 0 && <AreaRhythms areaId={area.id} rhythms={shownRhythms} />}
+        <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} />
+        <GoalComposer areaId={area.id} areaName={area.name} learn={area.learn ?? false} />
+      </div>
     </section>
   );
 }
@@ -398,6 +508,8 @@ function GoalRow({
         },
       ];
 
+  const canFocus = !archived && goal.status === 'open' && !goal.errand;
+
   return (
     <li className="card-pad-x row-pad flex items-start gap-2">
       <div className="min-w-0 flex-1">
@@ -405,8 +517,14 @@ function GoalRow({
             took the click meant for opening the goal. */}
         <Link
           href={`/goals/${goal.id}`}
-          className="block px-1 py-0.5 font-medium text-ink underline-offset-2 hover:underline"
+          className="press-area flex items-center gap-1.5 px-1 py-0.5 font-medium text-ink underline-offset-2 hover:underline"
         >
+          {goal.focus && canFocus && (
+            <>
+              <Target className="size-3.5 shrink-0 text-accent" strokeWidth={2} aria-hidden />
+              <span className="sr-only">Focus this week: </span>
+            </>
+          )}
           {goal.title}
         </Link>
         {/* The done-when opens the tree too, where it is edited beside the
@@ -415,7 +533,7 @@ function GoalRow({
           <Link
             href={`/goals/${goal.id}`}
             // ui-ok: the done-when is itself the link to the goal, and a link cannot hold links.
-            className="block px-1 py-0.5 whitespace-pre-line text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+            className="press-area block px-1 py-0.5 whitespace-pre-line text-ink-muted underline-offset-2 hover:text-ink hover:underline"
           >
             {goal.acceptance}
           </Link>
@@ -449,10 +567,12 @@ function GoalRow({
         {/* The bar first and the way into the tree after it, on one line
             that wraps, rather than a line for each. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 pt-0.5">
-          {steps && <GoalProgress progress={steps} label={goal.title} />}
+          {/* `contents`, so its parts wrap in this line beside Full tree rather than
+              as a block of their own: at 390 a goal's meta then takes two lines. */}
+          {steps && <GoalProgress progress={steps} label={goal.title} className="contents" />}
           <Link
             href={`/goals/${goal.id}`}
-            className="inline-flex items-center gap-1 text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+            className="press-area inline-flex items-center gap-1 text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline"
           >
             <ListTree className="size-3" strokeWidth={1.75} aria-hidden />
             {goal.status === 'proposed'
@@ -476,8 +596,48 @@ function GoalRow({
         )}
         {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
       </div>
+      {canFocus && <FocusToggle goalId={goal.id} title={goal.title} focus={goal.focus ?? false} />}
       <ActionMenu label={`${goal.title} actions`} items={items} />
     </li>
+  );
+}
+
+/**
+ * Make a goal one of this week's focus goals, or take that away. It shows the
+ * new state at once and goes back with a toast if the save is refused.
+ */
+function FocusToggle({ goalId, title, focus }: { goalId: string; title: string; focus: boolean }) {
+  const [shown, setShown] = useOptimistic(focus);
+  const [, startTransition] = useTransition();
+  const toast = useToast();
+
+  function toggle() {
+    const next = !shown;
+    startTransition(async () => {
+      setShown(next);
+      const form = new FormData();
+      form.set('id', goalId);
+      form.set('focus', String(next));
+      const result = await setGoalFocusAction(form);
+      if (result.error) toast({ text: result.error });
+    });
+  }
+
+  return (
+    <button
+      type="button"
+      aria-pressed={shown}
+      aria-label={`Focus on ${title} this week`}
+      title={shown ? 'A focus goal this week' : 'Make it a focus goal this week'}
+      onClick={toggle}
+      className={cn(
+        'press inline-flex size-7 shrink-0 items-center justify-center rounded-control transition-colors duration-quick',
+        'max-sm:min-h-11 max-sm:min-w-11',
+        shown ? 'text-accent hover:bg-accent-tint' : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
+      )}
+    >
+      <Target className="size-4" strokeWidth={shown ? 2.25 : 1.75} aria-hidden />
+    </button>
   );
 }
 
@@ -536,6 +696,43 @@ function TakeBackUp({ goalId, status }: { goalId: string; status: 'parked' | 'do
       </Button>
       {state.error && <span className="text-small text-danger">{state.error}</span>}
     </form>
+  );
+}
+
+/** A rhythm as an area lists it: its name, the goal it serves, and this period's progress in one line. */
+export type AreaRhythm = { id: string; title: string; goalId: string; line: string };
+
+/**
+ * The rhythms inside the area's goals, with this period's progress and the
+ * periods missed behind it. Each opens the goal it lives in, where it is
+ * edited and counted.
+ */
+function AreaRhythms({ areaId, rhythms }: { areaId: string; rhythms: AreaRhythm[] }) {
+  const headingId = `area-${areaId}-rhythms`;
+  return (
+    <section aria-labelledby={headingId} className="space-y-1 pt-1">
+      <h3 id={headingId} className="px-1 text-small font-semibold text-ink-muted">
+        Rhythms
+      </h3>
+      <Card>
+        <ul className="divide-y divide-border">
+          {rhythms.map((rhythm) => (
+            <li key={rhythm.id}>
+              <Link
+                href={stepHref(rhythm.goalId, rhythm.id)}
+                className="card-pad-x row-pad flex items-start gap-2 transition-colors duration-quick hover:bg-sunken"
+              >
+                <Repeat className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-ui break-words text-ink">{rhythm.title}</span>
+                  <span className="block text-small break-words text-ink-muted">{rhythm.line}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </section>
   );
 }
 

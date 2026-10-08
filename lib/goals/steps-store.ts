@@ -36,9 +36,11 @@ import {
   type RhythmRecord,
 } from '@/lib/goals/rhythms';
 import { loadLatestReviews } from '@/lib/goals/reviews-store';
+import { isCountSource } from '@/lib/goals/rhythm-sources';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
 import { goalProgress, type GoalProgress } from '@/lib/goals/status';
 import {
+  focusRhythms,
   goalsForTodo,
   unreadDashResults,
   type TodoQuestion,
@@ -77,6 +79,8 @@ type ItemRow = {
   position: number;
   rhythm_count: number | null;
   rhythm_period: RhythmPeriod | null;
+  count_source?: string | null;
+  count_match?: string | null;
   on_todo: boolean;
   result: string | null;
   result_url: string | null;
@@ -95,6 +99,7 @@ type ItemRow = {
   prepares_id?: string | null;
   prep_checked_at?: string | null;
   errand?: boolean;
+  focus?: boolean;
   created_at?: string | null;
   estimated_total?: number | string | null;
   total_unit?: string | null;
@@ -125,9 +130,9 @@ async function loadDependencies(
 const ITEM_COLUMNS =
   'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, fog_dismissed_at, ' +
   'resolution, ' +
-  'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
-  'unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
-  'kept_open_at, prepares_id, prep_checked_at, errand, created_at, estimated_total, total_unit';
+  'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, count_source, count_match, on_todo, result, ' +
+  'result_url, reviewed_at, unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
+  'kept_open_at, prepares_id, prep_checked_at, errand, focus, created_at, estimated_total, total_unit';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -145,6 +150,8 @@ const toStep = (row: ItemRow): Step => ({
   position: row.position,
   rhythmCount: row.rhythm_count,
   rhythmPeriod: row.rhythm_period,
+  countSource: isCountSource(row.count_source) ? row.count_source : null,
+  countMatch: row.count_match ?? null,
   onTodo: row.on_todo,
   result: row.result,
   resultUrl: row.result_url,
@@ -182,6 +189,7 @@ const toGoal = (row: ItemRow): Goal => ({
   proposedHelpKinds: readHelpKinds(row.proposed_help_kinds),
   keptOpenAt: row.kept_open_at ?? null,
   errand: row.errand ?? false,
+  focus: row.focus ?? false,
 });
 
 export type GoalMap = {
@@ -691,6 +699,8 @@ export type TodoRhythm = LiveRhythm & { startsOn: string; count: number };
  * dailyView (goalsForTodo). And every live
  * rhythm until its current period's count is met (plan #928). Rhythms need no
  * flag, as the spec says; "Not this one" on Todo hides only this period.
+ * While the week's focus is chosen, only the rhythms of goals in focus
+ * (focusRhythms); every period is still brought up to date.
  */
 export async function loadTodoGoals(
   client: GoalsSupabaseClient,
@@ -709,7 +719,7 @@ export async function loadTodoGoals(
       { ...rhythm, target: current.target, startsOn: current.startsOn, count: current.count },
     ];
   });
-  return { ...goalsForTodo(goals, byGoal, today), rhythms };
+  return { ...goalsForTodo(goals, byGoal, today), rhythms: focusRhythms(rhythms, goalList, today) };
 }
 
 /**

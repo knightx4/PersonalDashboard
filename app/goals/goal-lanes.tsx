@@ -3,64 +3,66 @@
 import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Card, cardVariants } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { DashMark } from '@/components/ui/dash-mark';
-import { Bands } from '@/components/ui/meter';
 import { MoveLabel } from '@/components/ui/move-label';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
+import { areaHref } from '@/lib/goals/all-goals';
 import { formatDay } from '@/lib/goals/dates';
-import type { DashOffer, GoalHolders } from '@/lib/goals/hand-off';
+import type { DashOffer } from '@/lib/goals/hand-off';
 import { nextMove, type HomeGoal } from '@/lib/goals/home';
 import type { DashLaneItem, LaterLaneItem } from '@/lib/goals/lanes';
 import { VERDICT_LABELS } from '@/lib/goals/reviews';
 import type { RunListing } from '@/lib/goals/runs';
-import { PROGRESS_BANDS, PROGRESS_BAND_FILL, PROGRESS_BAND_WORD } from '@/lib/goals/status';
 import type { TodayItem } from '@/lib/goals/today';
 import { workOnGoalAction } from './[goalId]/shaping-actions';
+import { FoldLine } from './fold-line';
 import { VERDICT_TONES } from './goal-line';
 import { bringBackAction } from './home-actions';
 import { TodayRow } from './today-list';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
- * Your goals and the three lanes on the Goals home.
+ * What is next on the Goals home, in the order you act on it.
  *
- * The goals are small tiles, every one on the page at once: errands first,
- * then page order, so a goal is in the same place from day to day. A tile
- * says its status, a bar of its steps by who holds them, and how much is on
- * you. Pressing one filters the lanes to that goal; pressing it again, or
- * Show every goal, clears the filter.
+ * - Do next: at most five things on you from the week's goals, ranked
+ *   (homeLists in lib/goals/home.ts), each with its one button, Not now, and
+ *   Ask Dash where Dash can prepare it. A step Dash prepared something for
+ *   shows the first lines of it, with Open and Copy (today-list.tsx).
+ * - Dash is on N things: one line that opens to the runs going now, Dash's
+ *   open steps, and goals Dash has left alone, offered with Ask Dash. Ask
+ *   Dash shows only to the account that owns the app, as on a goal's page,
+ *   because only that account can start a run.
+ * - What Dash did since your last visit, passed in as `since`.
+ * - Later: the rest of what is on you in the week's goals, and what is set
+ *   aside until a later day, with Bring back now.
+ * - Other goals: the goals that are not this week's, one line each, under
+ *   their areas.
  *
- * The lanes sort what is next by who holds it:
- *
- * - On you: everything ranked as on you (lib/goals/today.ts), each with its
- *   one button, Not now, and Dash preps it where Dash can.
- * - Dash has it: the runs going now, Dash's open steps (working, queued, or
- *   waiting on an answer from you), and goals Dash has left alone, offered
- *   with Work on it.
- * - Later: what is set aside until a later day, with Bring back now.
- *
- * Moves between lanes show at once: a step set aside leaves On you, a step
- * handed to Dash appears in Dash's lane, and one brought back leaves Later.
- * The server's redraw then puts each where it really is.
+ * Moves show at once: a step set aside leaves Do next, a step handed to Dash
+ * joins Dash's line, and one brought back leaves Later. The server's redraw
+ * then puts each where it really is.
  */
 
-/** How many rows a lane shows before Show more. */
-const LANE_ROWS = 6;
-
 export type GoalLanesProps = {
-  /** Errands first, then the rest, as splitErrands orders them. */
-  goals: HomeGoal[];
-  holders: Record<string, GoalHolders>;
+  /** Do next, ranked. */
+  doNext: TodayItem[];
+  /** The rest of what is on you in the week's goals, ranked. */
+  rest: TodayItem[];
+  /** The goals Do next leaves out, errands first. */
+  otherGoals: HomeGoal[];
   /** YYYY-MM-DD in the account's zone. */
   todayOn?: string;
-  /** Everything on you, ranked. */
-  onYou: TodayItem[];
   preparable: string[];
   dash: DashLaneItem[];
   laterOn: LaterLaneItem[];
   working: RunListing[];
   offers: DashOffer[];
+  /** Whether this account can start a run (the owner's only), which Ask Dash needs. */
+  canRun?: boolean;
+  /** The line for what Dash did since your last visit, drawn between Dash's line and Later. */
+  since?: React.ReactNode;
 };
 
 /** "today", "tomorrow", "in 6 days" or "3 days late", from today to a due date. */
@@ -76,18 +78,21 @@ export function dueIn(dueOn: string, today: string): string {
 
 const keyOf = (item: TodayItem) => `${item.kind}:${item.id}`;
 
+const things = (n: number) => (n === 1 ? '1 thing' : `${n} things`);
+
 export function GoalLanes({
-  goals,
-  holders,
+  doNext,
+  rest,
+  otherGoals,
   todayOn,
-  onYou,
   preparable,
   dash,
   laterOn,
   working,
   offers,
+  canRun = false,
+  since,
 }: GoalLanesProps) {
-  const [filter, setFilter] = useState<string | null>(null);
   // Moves made on this page, shown before the server's redraw arrives.
   const [aside, setAside] = useState<ReadonlySet<string>>(new Set());
   const [handed, setHanded] = useState<TodayItem[]>([]);
@@ -99,11 +104,10 @@ export function GoalLanes({
     return next;
   };
 
-  const inFilter = (goalId: string) => filter === null || goalId === filter;
   const handedKeys = new Set(handed.map(keyOf));
-  const mine = onYou.filter(
-    (item) => inFilter(item.goalId) && !aside.has(keyOf(item)) && !handedKeys.has(keyOf(item)),
-  );
+  const shown = (item: TodayItem) => !aside.has(keyOf(item)) && !handedKeys.has(keyOf(item));
+  const mine = doNext.filter(shown);
+  const more = rest.filter(shown);
   const listed = new Set(dash.map((item) => item.id));
   const dashRows: DashLaneItem[] = [
     ...handed
@@ -118,266 +122,237 @@ export function GoalLanes({
         needs: null,
       })),
     ...dash,
-  ].filter((item) => inFilter(item.goalId));
-  const runs = working.filter(
-    (run) => !run.item || (run.item.level === 'goal' ? inFilter(run.item.id) : filter === null),
-  );
+  ];
   const quiet = offers.filter(
-    (offer): offer is Extract<DashOffer, { kind: 'goal' }> =>
-      offer.kind === 'goal' && inFilter(offer.goalId),
+    (offer): offer is Extract<DashOffer, { kind: 'goal' }> => offer.kind === 'goal',
   );
-  const later = laterOn.filter((item) => inFilter(item.goalId) && !back.has(item.id));
-  const canPrepare = new Set(preparable);
-  const chosen = goals.find((line) => line.goal.id === filter) ?? null;
+  const later = laterOn.filter((item) => !back.has(item.id));
+  const canPrepare = new Set(canRun ? preparable : []);
+  const dashCount = dashRows.length + working.length;
+  const needsYou = dashRows.filter((item) => item.needs).length;
+
+  const row = (item: TodayItem) => (
+    <TodayRow
+      key={keyOf(item)}
+      item={item}
+      rank={null}
+      preparable={canPrepare.has(item.id)}
+      onAside={(hidden) => setAside((current) => toggle(current, keyOf(item), hidden))}
+      onHanded={() => setHanded((current) => [...current, item])}
+    />
+  );
 
   return (
     <div className="space-y-6">
-      <section aria-labelledby="tiles-heading" className="space-y-2">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-1">
-          <h2 id="tiles-heading" className="text-ui font-semibold text-ink">
-            Your goals
-          </h2>
-          <span className="flex flex-wrap items-center gap-x-3 text-small text-ink-muted">
-            {PROGRESS_BANDS.filter((band) => band !== 'waiting').map((band) => (
-              <span key={band} className="inline-flex items-center gap-1.5">
-                <span className={cn('size-2 rounded-full', PROGRESS_BAND_FILL[band])} aria-hidden />
-                {PROGRESS_BAND_WORD[band]}
-              </span>
-            ))}
-            <Link href="/goals/all" className="text-accent underline-offset-2 hover:underline">
-              All goals
-            </Link>
-          </span>
-        </div>
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          {goals.map((line) => (
-            <GoalTile
-              key={line.goal.id}
-              line={line}
-              holders={holders[line.goal.id]}
-              today={todayOn}
-              pressed={filter === line.goal.id}
-              onPress={() => setFilter(filter === line.goal.id ? null : line.goal.id)}
-            />
-          ))}
-        </ul>
-        {chosen && (
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-small text-ink-muted" role="status">
-            <span>
-              Showing <span className="font-semibold text-ink">{chosen.goal.title}</span>
-            </span>
-            <Link href={`/goals/${chosen.goal.id}`} className="text-accent underline-offset-2 hover:underline">
-              Open the goal
-            </Link>
-            <button
-              type="button"
-              className="text-accent underline-offset-2 hover:underline"
-              onClick={() => setFilter(null)}
-            >
-              Show every goal
-            </button>
-          </p>
-        )}
+      <section aria-labelledby="do-next-heading" className="space-y-2">
+        <h2 id="do-next-heading" className="px-1 text-ui font-semibold text-ink">
+          Do next
+        </h2>
+        <Card>
+          {mine.length === 0 ? (
+            <p className="card-pad-x row-pad text-small text-ink-muted">
+              Nothing is waiting on you in this week’s goals.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border">{mine.map(row)}</ul>
+          )}
+        </Card>
       </section>
 
-      <div className="grid items-start gap-4 lg:grid-cols-3">
-        <Lane
-          id="lane-you"
-          title="On you"
-          dot="bg-caution"
-          count={mine.length}
-          empty="Nothing is waiting on you."
-          rows={mine.map((item) => (
-            <TodayRow
-              key={keyOf(item)}
-              item={item}
-              rank={null}
-              preparable={canPrepare.has(item.id)}
-              onAside={(hidden) => setAside((current) => toggle(current, keyOf(item), hidden))}
-              onHanded={() => setHanded((current) => [...current, item])}
-            />
-          ))}
-        />
-        <Lane
-          id="lane-dash"
-          title="Dash has it"
-          dot="bg-status-submitted"
-          count={dashRows.length + runs.length}
-          empty="Nothing with Dash. Press Dash preps it on a step of yours, or ask Dash above."
-          rows={[
-            ...runs.map((run) => <WorkingRow key={`run:${run.id}`} run={run} />),
-            ...dashRows.map((item) => <DashRow key={`dash:${item.id}`} item={item} />),
-          ]}
-          footer={
-            quiet.length > 0 ? (
-              <>
+      <div className="space-y-1">
+        <FoldLine
+          title={
+            <span className="inline-flex items-center gap-1.5">
+              <DashMark
+                state={working.length > 0 ? 'working' : undefined}
+                activity={working.length > 0 ? 'thinking' : undefined}
+                size="2xs"
+                tone="brand"
+                decorative
+              />
+              {dashCount > 0 ? `Dash is on ${things(dashCount)}` : 'Nothing with Dash'}
+            </span>
+          }
+          meta={
+            needsYou > 0
+              ? `${needsYou} ${needsYou === 1 ? 'needs' : 'need'} an answer from you`
+              : quiet.length > 0
+                ? `it could take ${quiet.length === 1 ? '1 goal' : `${quiet.length} goals`}`
+                : undefined
+          }
+        >
+          <Card>
+            {dashCount === 0 ? (
+              <p className="card-pad-x row-pad text-small text-ink-muted">
+                {canRun
+                  ? 'Press Ask Dash on a step of yours, or ask Dash above.'
+                  : 'Dash has nothing open.'}
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {working.map((run) => (
+                  <WorkingRow key={`run:${run.id}`} run={run} />
+                ))}
+                {dashRows.map((item) => (
+                  <DashRow key={`dash:${item.id}`} item={item} />
+                ))}
+              </ul>
+            )}
+            {quiet.length > 0 && (
+              <div className="border-t border-border">
                 <p className="card-pad-x pt-3 text-small font-semibold text-ink-muted">
                   Dash could take these
                 </p>
                 <ul className="divide-y divide-border">
                   {quiet.map((offer) => (
-                    <QuietGoalRow key={offer.goalId} offer={offer} />
+                    <QuietGoalRow key={offer.goalId} offer={offer} canRun={canRun} />
                   ))}
                 </ul>
-              </>
-            ) : null
-          }
-        />
-        <Lane
-          id="lane-later"
-          title="Later"
-          dot="bg-ink-ghost"
-          count={later.length}
-          empty="Nothing set aside. Not now on a step puts it here until the day you pick."
-          rows={later.map((item) => (
-            <LaterRow
-              key={`later:${item.id}`}
-              item={item}
-              onBack={(gone) => setBack((current) => toggle(current, item.id, gone))}
-            />
-          ))}
-        />
+              </div>
+            )}
+          </Card>
+        </FoldLine>
+
+        {since}
+
+        {more.length + later.length > 0 && (
+          <FoldLine
+            title="Later"
+            meta={[
+              more.length > 0 ? `${more.length} more on you` : null,
+              later.length > 0 ? `${later.length} set aside` : null,
+            ]
+              .filter(Boolean)
+              .join(', ')}
+          >
+            <Card>
+              {more.length > 0 && <ul className="divide-y divide-border">{more.map(row)}</ul>}
+              {later.length > 0 && (
+                <div className={cn(more.length > 0 && 'border-t border-border')}>
+                  <p className="card-pad-x pt-3 text-small font-semibold text-ink-muted">
+                    Set aside
+                  </p>
+                  <ul className="divide-y divide-border">
+                    {later.map((item) => (
+                      <LaterRow
+                        key={`later:${item.id}`}
+                        item={item}
+                        onBack={(gone) => setBack((current) => toggle(current, item.id, gone))}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </Card>
+          </FoldLine>
+        )}
+
+        {otherGoals.length > 0 && (
+          <FoldLine title="Other goals" meta={String(otherGoals.length)}>
+            {/* By area, each area's name opening its page (note b4595cb6). */}
+            {byArea(otherGoals).map((group) => (
+              <section key={group.areaId} aria-label={group.areaName} className="space-y-1">
+                <Link
+                  href={areaHref(group.areaId)}
+                  className={cn(
+                    'inline-flex items-baseline gap-2 px-1 text-small font-medium text-ink-muted',
+                    'underline-offset-2 hover:text-ink hover:underline max-sm:min-h-11 max-sm:items-center',
+                  )}
+                >
+                  {group.areaName}
+                  <span className="font-normal text-ink-ghost">{group.goals.length}</span>
+                </Link>
+                <Card>
+                  <ul className="divide-y divide-border">
+                    {group.goals.map((line) => (
+                      <OtherGoalRow key={line.goal.id} line={line} today={todayOn} />
+                    ))}
+                  </ul>
+                </Card>
+              </section>
+            ))}
+            <Link
+              href="/goals/all"
+              className="inline-flex items-center px-1 text-small text-accent underline-offset-2 hover:underline max-sm:min-h-11"
+            >
+              All goals
+            </Link>
+          </FoldLine>
+        )}
       </div>
     </div>
   );
 }
 
-function GoalTile({
-  line,
-  holders,
-  today,
-  pressed,
-  onPress,
-}: {
-  line: HomeGoal;
-  holders: GoalHolders | undefined;
-  today?: string;
-  pressed: boolean;
-  onPress: () => void;
-}) {
-  const { goal, progress, review } = line;
-  const late = Boolean(goal.errand && goal.dueOn && today && goal.dueOn < today);
-  const tone = review ? VERDICT_TONES[review.verdict] : null;
-  const move = nextMove(line);
-  return (
-    <li className="min-w-0">
-      <button
-        type="button"
-        aria-pressed={pressed}
-        title={move ? `Next: ${move.text}${move.on ? `, ${formatDay(move.on)}` : ''}` : undefined}
-        onClick={onPress}
-        className={cn(
-          cardVariants({ padding: 'dense', interactive: true }),
-          'flex h-full w-full flex-col gap-1.5 text-left',
-          pressed && 'ring-2 ring-accent',
-        )}
-      >
-        <span className="flex items-baseline justify-between gap-2 text-small">
-          <span className={cn('min-w-0 truncate text-ink-muted', late && 'font-semibold text-danger')}>
-            {goal.errand && goal.dueOn
-              ? `Due ${formatDay(goal.dueOn)}${today ? `, ${dueIn(goal.dueOn, today)}` : ''}`
-              : line.areaName}
-          </span>
-          {review && (
-            <span
-              className={cn(
-                'shrink-0 font-semibold whitespace-nowrap',
-                !line.current && 'text-ink-ghost',
-                line.current && tone === 'positive' && 'text-positive',
-                line.current && tone === 'caution' && 'text-caution',
-                line.current && tone === 'quiet' && 'text-ink-muted',
-              )}
-            >
-              {VERDICT_LABELS[review.verdict]}
-              {/* A status from a missed morning run is greyed, and says its day to a screen reader. */}
-              {!line.current && <span className="sr-only"> as of {formatDay(review.createdAt.slice(0, 10))}</span>}
-            </span>
-          )}
-        </span>
-        <span className="line-clamp-2 text-ui leading-snug font-semibold break-words text-ink">
-          {goal.title}
-        </span>
-        <span className="mt-auto flex items-center gap-2 pt-0.5">
-          {progress.live > 0 ? (
-            <Bands
-              bands={PROGRESS_BANDS.map((band) => ({
-                key: band,
-                value: progress.bands[band],
-                fill: PROGRESS_BAND_FILL[band],
-                label: `${progress.bands[band]} ${PROGRESS_BAND_WORD[band]}`,
-              }))}
-              track="sunken"
-              label={goal.title}
-              className="flex-1"
-            />
-          ) : (
-            <span className="flex-1 text-small text-ink-ghost">No steps yet</span>
-          )}
-          {holders?.working ? (
-            <DashMark state="working" activity="thinking" size="2xs" tone="brand" label="Dash is on it now" />
-          ) : null}
-          {progress.live > 0 && (
-            <span className="tabular shrink-0 text-small text-ink-muted">
-              {progress.done}/{progress.live}
-            </span>
-          )}
-          {(holders?.onYou ?? 0) > 0 && (
-            <span className="tabular shrink-0 text-small text-caution">{holders!.onYou} on you</span>
-          )}
-        </span>
-      </button>
-    </li>
-  );
+/**
+ * The other goals under their areas, each area where its first goal falls in
+ * the order given, so the errands that lead the list still lead it.
+ */
+export function byArea(lines: HomeGoal[]): { areaId: string; areaName: string; goals: HomeGoal[] }[] {
+  const groups = new Map<string, { areaId: string; areaName: string; goals: HomeGoal[] }>();
+  for (const line of lines) {
+    const group = groups.get(line.goal.areaId);
+    if (group) group.goals.push(line);
+    else groups.set(line.goal.areaId, { areaId: line.goal.areaId, areaName: line.areaName, goals: [line] });
+  }
+  return [...groups.values()];
 }
 
-function Lane({
-  id,
-  title,
-  dot,
-  count,
-  rows,
-  empty,
-  footer,
-}: {
-  id: string;
-  title: string;
-  /** The background utility of the lane's dot. */
-  dot: string;
-  count: number;
-  rows: React.ReactNode[];
-  empty: string;
-  footer?: React.ReactNode;
-}) {
-  const [all, setAll] = useState(false);
-  const shown = all ? rows : rows.slice(0, LANE_ROWS);
-  const hidden = rows.length - shown.length;
+/**
+ * A goal that is not this week's, on one line: its title, its status word
+ * (or, for an errand, when it is due), and its next move. Pressing it opens
+ * the goal.
+ */
+function OtherGoalRow({ line, today }: { line: HomeGoal; today?: string }) {
+  const { goal, review } = line;
+  const move = nextMove(line);
+  const late = Boolean(goal.errand && goal.dueOn && today && goal.dueOn < today);
+  const tone = review ? VERDICT_TONES[review.verdict] : null;
+  const word =
+    goal.errand && goal.dueOn
+      ? `Due ${formatDay(goal.dueOn)}${today ? `, ${dueIn(goal.dueOn, today)}` : ''}`
+      : review
+        ? VERDICT_LABELS[review.verdict]
+        : null;
   return (
-    <section aria-labelledby={id} className="min-w-0 space-y-2">
-      <div className="flex items-baseline justify-between gap-3 px-1">
-        <h2 id={id} className="inline-flex items-center gap-1.5 text-ui font-semibold text-ink">
-          <span className={cn('size-2 rounded-full', dot)} aria-hidden />
-          {title}
-        </h2>
-        <span className="tabular text-small text-ink-muted">{count}</span>
-      </div>
-      <Card>
-        {rows.length === 0 ? (
-          <p className="card-pad-x row-pad text-small text-ink-muted">{empty}</p>
-        ) : (
-          <ul className="divide-y divide-border">{shown}</ul>
-        )}
-        {(hidden > 0 || all) && rows.length > LANE_ROWS && (
-          <button
-            type="button"
-            onClick={() => setAll(!all)}
-            className="card-pad-x row-pad w-full border-t border-border text-left text-small text-accent hover:underline"
+    <li>
+      <Link
+        href={`/goals/${goal.id}`}
+        className="card-pad-x row-pad flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-small hover:bg-sunken max-sm:min-h-11"
+      >
+        <span className="min-w-0 text-ui font-semibold break-words text-ink">{goal.title}</span>
+        {word && (
+          <span
+            className={cn(
+              'whitespace-nowrap',
+              late
+                ? 'font-semibold text-danger'
+                : goal.errand
+                  ? 'text-ink-muted'
+                  : !line.current
+                    ? 'text-ink-ghost'
+                    : tone === 'positive'
+                      ? 'text-positive'
+                      : tone === 'caution'
+                        ? 'text-caution'
+                        : 'text-ink-muted',
+            )}
           >
-            {all ? 'Show fewer' : `Show ${hidden} more`}
-          </button>
+            {word}
+            {/* A status from a missed morning run is greyed, and says its day to a screen reader. */}
+            {review && !goal.errand && !line.current && (
+              <span className="sr-only"> as of {formatDay(review.createdAt.slice(0, 10))}</span>
+            )}
+          </span>
         )}
-        {footer && <div className="border-t border-border">{footer}</div>}
-      </Card>
-    </section>
+        {move && (
+          <span className="min-w-0 break-words text-ink-muted">
+            Next: {move.text}
+            {move.on ? `, ${formatDay(move.on)}` : ''}
+          </span>
+        )}
+      </Link>
+    </li>
   );
 }
 
@@ -391,7 +366,7 @@ function WorkingRow({ run }: { run: RunListing }) {
       </span>
       <Link
         href={`/goals/runs/${run.id}`}
-        className="shrink-0 text-small text-accent underline-offset-2 hover:underline"
+        className="press-area shrink-0 text-small text-accent underline-offset-2 hover:underline"
       >
         Watch
       </Link>
@@ -403,7 +378,7 @@ function DashRow({ item }: { item: DashLaneItem }) {
   return (
     <li className="card-pad-x row-pad space-y-1">
       <Link
-        href={`/goals/${item.goalId}#step-${item.id}`}
+        href={stepHref(item.goalId, item.id)}
         className="block text-ui font-semibold break-words text-ink underline-offset-2 hover:underline"
       >
         {item.title}
@@ -434,7 +409,13 @@ function DashRow({ item }: { item: DashLaneItem }) {
 
 type RunState = { error?: string; message?: string; done?: number };
 
-function QuietGoalRow({ offer }: { offer: Extract<DashOffer, { kind: 'goal' }> }) {
+function QuietGoalRow({
+  offer,
+  canRun,
+}: {
+  offer: Extract<DashOffer, { kind: 'goal' }>;
+  canRun: boolean;
+}) {
   const [state, action, pending] = useActionState(
     (prev: RunState, form: FormData) => workOnGoalAction(prev, form),
     {} as RunState,
@@ -455,12 +436,14 @@ function QuietGoalRow({ offer }: { offer: Extract<DashOffer, { kind: 'goal' }> }
           <MoveLabel move={{ state: 'dash_working' }} />
         </p>
       ) : (
-        <form action={action} className="pt-1">
-          <input type="hidden" name="goalId" value={offer.goalId} />
-          <Button type="submit" size="sm" variant="secondary" pending={pending}>
-            {pending ? 'Starting…' : 'Work on it'}
-          </Button>
-        </form>
+        canRun && (
+          <form action={action} className="pt-1">
+            <input type="hidden" name="goalId" value={offer.goalId} />
+            <Button type="submit" size="sm" variant="secondary" pending={pending}>
+              {pending ? 'Asking…' : 'Ask Dash'}
+            </Button>
+          </form>
+        )
       )}
     </li>
   );
@@ -471,7 +454,7 @@ function LaterRow({ item, onBack }: { item: LaterLaneItem; onBack: (gone: boolea
   return (
     <li className="card-pad-x row-pad space-y-1">
       <Link
-        href={`/goals/${item.goalId}#step-${item.id}`}
+        href={stepHref(item.goalId, item.id)}
         className="block text-ui font-semibold break-words text-ink underline-offset-2 hover:underline"
       >
         {item.title}

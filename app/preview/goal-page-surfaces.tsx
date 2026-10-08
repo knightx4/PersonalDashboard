@@ -1,5 +1,6 @@
 import type { ComponentProps } from 'react';
 import { PageHeader } from '@/components/shell/page-header';
+import { allGoalsCrumbs, goalCrumbs } from '@/lib/goals/crumbs';
 import { Card } from '@/components/ui/card';
 import { HomeView } from '@/app/goals/home-view';
 import { GoalsView } from '@/app/goals/goals-view';
@@ -9,7 +10,8 @@ import { GoalStatusCard } from '@/app/goals/[goalId]/goal-status';
 import { FileBody } from '@/components/files/file-body';
 import { FileLinks } from '@/components/files/file-links';
 import { GoalNumber } from '@/app/goals/[goalId]/goal-number';
-import { GoalFog, GoalShaping } from '@/app/goals/[goalId]/goal-shaping';
+import { WaitingOnYou } from '@/app/goals/[goalId]/goal-flags';
+import { GoalFog, GoalShaping, RunHistory } from '@/app/goals/[goalId]/goal-shaping';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
 import type { InformationSeam } from '@/app/goals/[goalId]/information-step';
 import type { StepAnswer } from '@/lib/goals/answers';
@@ -110,7 +112,7 @@ function review(
 }
 
 const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
-  today: [
+  onYou: [
     {
       kind: 'question',
       id: 'which',
@@ -132,6 +134,17 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       action: 'Done',
       unblocks: 0,
       on: '2026-10-01',
+      prepared: {
+        text: [
+          '**Standing order** from the current account to the savings account.',
+          '',
+          '- Amount: $200',
+          '- Day: the 28th, the day after payday',
+          '- Reference: Emergency fund',
+          '',
+          'In the app: Payments, then Standing orders, then New.',
+        ].join('\n'),
+      },
     },
     {
       kind: 'rhythm',
@@ -168,8 +181,6 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       on: '2026-10-01',
       url: 'https://example.com/meetup',
     },
-  ],
-  later: [
     {
       kind: 'plan',
       id: 'a-health',
@@ -243,6 +254,22 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       next: null,
       hasSteps: false,
     },
+    {
+      goal: goal('g-boiler', 'a-money', 'Book the boiler service', {
+        errand: true,
+        dueOn: '2026-10-20',
+        position: 30,
+      }),
+      areaName: 'Money',
+      progress: progress({
+        bands: { on_you: 0, waiting: 0, with_dash: 1, done: 0 },
+        move: 'with_dash',
+      }),
+      review: null,
+      current: false,
+      next: null,
+      hasSteps: true,
+    },
   ],
   done: {
     since: '2026-09-24T19:30:00Z',
@@ -253,7 +280,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
         title: 'Draft what to say on the call',
         goalId: cards.id,
         goalTitle: cards.title,
-        href: `/goals/${cards.id}#step-script`,
+        href: `/goals/${cards.id}/s/script`,
         unread: true,
         runId: 'run-1',
         undo: null,
@@ -262,33 +289,13 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
     ],
     more: 0,
   },
-  health: { dashFinished: 4, waitingOnYou: 3, stuck: 1, daysVisited: 2 },
   todayOn: TODAY,
   areas: [
     { id: 'a-money', name: 'Money' },
     { id: 'a-career', name: 'Career' },
+    { id: 'a-health', name: 'Health' },
+    { id: 'a-city', name: 'The city and the people in it' },
   ],
-  holders: {
-    [cards.id]: { onYou: 2, dashOpen: 1, working: null, lastDashAt: `${TODAY}T06:00:00Z` },
-    [fund.id]: { onYou: 1, dashOpen: 0, working: null, lastDashAt: null },
-    [job.id]: {
-      onYou: 1,
-      dashOpen: 0,
-      working: {
-        id: 'run-live',
-        job: 'goal',
-        status: 'started',
-        createdAt: `${TODAY}T09:10:00Z`,
-        endedAt: null,
-        summary: null,
-        error: null,
-        lastSeenAt: `${TODAY}T09:14:00Z`,
-        nowOn: 'Find quant research openings in London',
-        item: { id: job.id, title: job.title, level: 'goal' },
-      },
-      lastDashAt: `${TODAY}T09:10:00Z`,
-    },
-  },
   working: [
     {
       id: 'run-live',
@@ -350,7 +357,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
     },
   ],
   brief: {
-    body: 'The card balance is down to **$6,980**, $730 lower than August. The one thing waiting on you is *Which card first?* on **Pay off the credit cards**: it decides the next three steps.',
+    body: 'The card balance is down to **$6,980**, $730 lower than August. The one thing waiting on you is *Which card first?* on **Pay off the credit cards**: it decides the next three steps.\n\nThe job search is quiet until the recruiters reply, which they said would be by Monday. The half marathon has no steps yet; ask me to map it when you want to start.',
     when: 'today',
   },
 };
@@ -359,7 +366,7 @@ export function GoalsHomeSurface() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Goals" />
-      <HomeView {...home} timeZone="Europe/London" />
+      <HomeView {...home} timeZone="Europe/London" canRun />
     </div>
   );
 }
@@ -388,7 +395,7 @@ const areas: AreaWithGoals[] = [
 export function GoalsAllSurface() {
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title="All goals" />
+      <PageHeader title="All goals" crumbs={allGoalsCrumbs()} />
       <GoalsView
         areas={areas}
         view="open"
@@ -399,6 +406,65 @@ export function GoalsAllSurface() {
           [job.id]: home.goals[2].progress!,
         }}
         areaRuns={{}}
+        rhythms={{
+          'a-money': [
+            {
+              id: 'r-budget',
+              title: 'Check the budget every week',
+              goalId: cards.id,
+              line: '0 of 1 this week · For Pay off the credit cards',
+            },
+          ],
+        }}
+        canRun
+      />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------- area page */
+
+const moneyArea: AreaWithGoals = {
+  id: 'a-money',
+  name: 'Money',
+  note: 'Out of card debt by spring, with three months of rent put by and nothing left to chance.',
+  position: 10,
+  goals: [
+    cards,
+    fund,
+    goal('g-pension', 'a-money', 'Move the old workplace pension into one account', {
+      status: 'proposed',
+      position: 30,
+      acceptance: 'Both old pensions are in the one account, with the transfer letters filed.',
+    }),
+    goal('g-insurance', 'a-money', 'Get contents insurance for the flat', {
+      status: 'proposed',
+      position: 40,
+    }),
+  ],
+};
+
+/** An area's own page (plan #1619): the Money area alone, two goals open and two Dash proposed. */
+export function GoalsAreaSurface() {
+  return (
+    <div className="mx-auto max-w-3xl">
+      <GoalsView
+        areas={[moneyArea, ...areas.slice(1)]}
+        areaId="a-money"
+        view="open"
+        onYou={{ [cards.id]: 1 }}
+        progress={{ [cards.id]: cardsProgress, [fund.id]: home.goals[1].progress! }}
+        areaRuns={{}}
+        rhythms={{
+          'a-money': [
+            {
+              id: 'r-budget',
+              title: 'Check the budget every week',
+              goalId: cards.id,
+              line: '0 of 1 this week · For Pay off the credit cards',
+            },
+          ],
+        }}
         canRun
       />
     </div>
@@ -539,19 +605,75 @@ export function FileSurface() {
 }
 
 /**
- * The top of a goal page that has something in each section: the Claude
- * line, the number with four monthly readings, and one Learn goal linked. The
- * page header is the real one; the back link above it is the page's own and
- * is left out.
+ * The top of a goal page that has something in each part of its header
+ * (plan #1078): Dash's verdict and the status line, the next move, Dash's
+ * note folded, Ask Dash, the number with four monthly readings, and Waiting
+ * on you with a question to answer in place and a result to read. Under it,
+ * one Learn goal linked and a file, as More holds them. The page header is
+ * the real one, with the path above it (plan #1622).
  */
 export function GoalTopSurface() {
+  const which = {
+    ...step('which', {
+      title: 'Which card first?',
+      kind: 'decision',
+      detail:
+        'A — The 27% card. Saves the most interest.\nB — The smaller balance. Closes one card soonest.\nRecommend A.',
+    }),
+    children: [],
+  };
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader title={cards.title} description={cards.acceptance ?? undefined} />
+      <PageHeader
+        title={cards.title}
+        description={cards.acceptance ?? undefined}
+        crumbs={goalCrumbs(cards, 'Money')}
+      />
       <div className="space-y-6">
-        <GoalStatusCard
-          status={{
-            yourMove: [
+        <div className="space-y-4">
+          <GoalStatusCard
+            line="3 on you · 1 step ready for Dash · due 30 Jun"
+            brief={{
+              id: 'brief-1',
+              itemId: cards.id,
+              runId: null,
+              body: 'Down to **$6,980** from $8,420 in June, about $480 a month, which clears both cards by next June. I compared the two rates ([the file](#)): paying the 27% card first saves about $310. Answering *Which card first?* settles the next three steps.',
+              createdAt: '2026-09-25T08:00:00Z',
+            }}
+            briefWhen="today"
+            current
+            review={{
+              id: 'rev-1',
+              goalId: cards.id,
+              verdict: 'waiting_on_you',
+              reason: 'Two steps closed this week and the next one is yours.',
+              nextMove: 'Answer “Which card first?” so Dash can plan the payments.',
+              nextOn: null,
+              stepId: null,
+              waitsOnId: null,
+              runId: null,
+              createdAt: '2026-09-21T08:00:00Z',
+            }}
+            ask={
+              <GoalShaping
+                goalId={cards.id}
+                approval={approvalLine({
+                  goalStatus: 'open',
+                  approvedAt: '2026-09-01T09:00:00Z',
+                  proposed: 0,
+                  questions: 1,
+                })}
+                runs={cardRuns}
+                moreRuns={false}
+                running={null}
+                canRun
+                quiet
+              />
+            }
+          />
+          <GoalNumber goalId={cards.id} unit="$" target={0} readings={readings} today={TODAY} />
+          <WaitingOnYou
+            rows={[
               {
                 id: 'which',
                 kind: 'question',
@@ -573,85 +695,20 @@ export function GoalTopSurface() {
                 title: 'Call the card company',
                 href: '#step-call',
               },
-            ],
-            moreSteps: 2,
-            claudeReady: 1,
-            claudeHeld: 0,
-          }}
-          brief={{
-            id: 'brief-1',
-            itemId: cards.id,
-            runId: null,
-            body: 'Down to **$6,980** from $8,420 in June, about $480 a month, which clears both cards by next June. I compared the two rates ([the file](#)): paying the 27% card first saves about $310. Answering *Which card first?* settles the next three steps.',
-            createdAt: '2026-09-25T08:00:00Z',
-          }}
-          briefWhen="today"
-          current
-          stages={[
-            {
-              id: 's1',
-              title: 'Know what you owe',
-              index: 1,
-              state: 'done',
-              done: 3,
-              live: 3,
-              waitsOn: [],
-              waitsElsewhere: false,
-            },
-            {
-              id: 's2',
-              title: 'Pay the dearest card first',
-              index: 2,
-              state: 'current',
-              done: 1,
-              live: 4,
-              waitsOn: [],
-              waitsElsewhere: false,
-            },
-            {
-              id: 's3',
-              title: 'Both cards at zero',
-              index: 3,
-              state: 'waiting',
-              done: 0,
-              live: 2,
-              waitsOn: [2],
-              waitsElsewhere: false,
-            },
-          ]}
-          review={{
-            id: 'rev-1',
-            goalId: cards.id,
-            verdict: 'waiting_on_you',
-            reason: 'Two steps closed this week and the next one is yours.',
-            nextMove: 'Answer “Which card first?” on the goal.',
-            nextOn: null,
-            stepId: null,
-            waitsOnId: null,
-            runId: null,
-            createdAt: '2026-09-21T08:00:00Z',
-          }}
-        />
-        <GoalShaping
-          goalId={cards.id}
-          approval={approvalLine({
-            goalStatus: 'open',
-            approvedAt: '2026-09-01T09:00:00Z',
-            proposed: 0,
-            questions: 1,
-          })}
-          runs={cardRuns}
-          moreRuns={false}
-          running={null}
-          canRun
-        />
-        <GoalNumber goalId={cards.id} unit="$" target={0} readings={readings} today={TODAY} />
+            ]}
+            flags={[]}
+            questions={{ which }}
+          />
+        </div>
         <GoalLinksSection goalId={cards.id} links={links} aimChoices={aimChoices} jobsOn />
         <section aria-labelledby="files-heading" className="space-y-2">
           <h2 id="files-heading" className="px-1 text-ui font-semibold text-ink">
             Files
           </h2>
           <FileLinks files={cardFiles} />
+        </section>
+        <section aria-label="Runs" className="px-1">
+          <RunHistory runs={cardRuns} more={false} />
         </section>
       </div>
     </div>
@@ -682,6 +739,7 @@ export function GoalBareSurface() {
           moreRuns={false}
           running={null}
           canRun
+          quiet
         />
         <GoalAddRow
           number={number}

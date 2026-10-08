@@ -18,6 +18,7 @@ import {
 } from './lookups';
 import type { AskSchema } from './db';
 import { coursesLookup } from './courses';
+import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, sourceWorkspace } from './list-rows';
 import { notePositionsLookup } from './positions';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
 
@@ -41,6 +42,7 @@ export const ASK_TOOL_NAMES = [
   'search',
   'recall',
   'open_row',
+  'list_rows',
   'spend_by_merchant',
   'job_applications',
   'todos',
@@ -80,7 +82,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'search',
     description:
-      'Find the person\'s own things by the words in their title or name, across every workspace that is switched on: job search companies, roles and contacts; shopping orders, owned items and saved items; todos; vault notes (by title and path) and courses from saved transcripts (by title, code, term and school); Learn readings and tracks; build plan steps, ideas and feedback; newsletter stories; goals and goal steps. Returns up to 20 matches, each with a table, a ref and a link. Use it to find a named thing; it does not look inside the text of a row. For a word inside the text of an idea, note, plan step, raise, comment or spec, use find_dev_text. For what the person has said, written or thought about a topic, use recall. Pass a row\'s table and ref to open_row to read it in full; a plan step, idea, feedback note or raise is read with read_dev_row instead.',
+      'Find the person\'s own things by the words in their title or name, across every workspace that is switched on: job search companies, roles and contacts; shopping orders, owned items and saved items; todos; vault notes (by title and path) and courses from saved transcripts (by title, code, term and school); Learn readings and tracks; build plan steps, ideas and feedback; newsletter stories; goals, goal steps and files (what Dash wrote for a goal, and what the person gave it). Returns up to 20 matches, each with a table, a ref and a link. Use it to find a named thing; it does not look inside the text of a row. For a word inside the text of an idea, note, plan step, raise, comment or spec, use find_dev_text. For what the person has said, written or thought about a topic, use recall. Pass a row\'s table and ref to open_row to read it in full; a plan step, idea, feedback note or raise is read with read_dev_row instead.',
     input_schema: {
       type: 'object',
       properties: {
@@ -101,7 +103,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
   {
     name: 'recall',
     description:
-      'Find what the person has written about a topic by meaning, across every workspace that is switched on: vault notes, the courses on saved transcripts, job search thoughts, notes and profile, goals and steps, goal captures, files, Learn aims, notes and cards, purchases, and for the owner with Dev on, the ideas, notes, plan steps, raises, the comments under them, and spec sections. Finds passages that are about the question even when they share none of its words. Returns up to 12 rows, closest first, each with its best one or two passages, who wrote each (the person or Dash), a closeness score and a link. Use it for questions like "what did I say I want from my next job?" or "what have I written about land value tax?", then open_row to read a vault note, file or thoughts entry in full, read_dev_row for a Dev row with its comments, or read_spec for a spec section.',
+      'Find what the person has written about a topic by meaning, across every workspace that is switched on: vault notes, the courses on saved transcripts, job search thoughts, notes, interview notes and profile, goals and steps, goal captures, files, Learn aims, notes and cards, purchases, and for the owner with Dev on, the ideas, notes, plan steps, raises, the comments under them, and spec sections. Finds passages that are about the question even when they share none of its words. Returns up to 12 rows, closest first, each with its best one or two passages, who wrote each (the person or Dash), a closeness score and a link. Use it for questions like "what did I say I want from my next job?" or "what have I written about land value tax?", then open_row to read a vault note, file or thoughts entry in full, read_dev_row for a Dev row with its comments, or read_spec for a spec section.',
     input_schema: {
       type: 'object',
       properties: {
@@ -128,6 +130,23 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
         ref: { type: 'string', description: 'The ref another tool returned for the row.' },
       },
       required: ['table', 'ref'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'list_rows',
+    description: `List the person's own rows in any table that holds what they wrote, saved, did or have, newest first, with each row's text, a ref and a link. It reaches tables no other lookup does, such as the videos on their watch list, Learn cards, saved stories, interview notes and personality results, so use it whenever the other lookups do not cover what they asked about, and before saying you cannot see something. Pass contains to keep only rows holding every one of those words. Use it to choose for them as well as to find: "give me a good video to watch" is list_rows on learn.watch_list, then a pick from what the rows say. Open one row in full with open_row where it takes the table. The tables: ${listableList()}.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        table: { type: 'string', enum: LISTABLE.map((s) => s.table) },
+        contains: {
+          type: 'string',
+          description: 'Words every row returned must hold, in its title or text. Leave out to list the newest rows.',
+        },
+        limit: { type: 'integer', minimum: 1, maximum: LIST_ROWS_MAX, description: `How many rows to return, up to ${LIST_ROWS_MAX}; 20 when left out.` },
+      },
+      required: ['table'],
       additionalProperties: false,
     },
   },
@@ -351,6 +370,8 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   // Leaves out the switched-off workspaces itself; files belong to none.
   recall: { run: recallLookup, module: null },
   open_row: { run: openLookup, module: null },
+  // Checks the workspace of the table it is given, below.
+  list_rows: { run: listRowsLookup, module: null },
   spend_by_merchant: { run: spendLookup, module: 'shopping' },
   job_applications: { run: applicationsLookup, module: 'jobs' },
   todos: { run: todosLookup, module: 'todo' },
@@ -400,7 +421,12 @@ export async function executeAskTool(
     module ??
     (name === 'open_row' && typeof args.table === 'string'
       ? (SCHEMA_MODULES[args.table.split('.')[0] as AskSchema] ?? null)
-      : null);
+      : name === 'list_rows' && typeof args.table === 'string'
+        ? (() => {
+            const source = listableSource(args.table);
+            return source ? sourceWorkspace(source) : null;
+          })()
+        : null);
   if (needs && !ctx.enabledModules.includes(needs)) {
     return { ok: false, error: `The ${MODULE_LABELS[needs]} workspace is switched off, so it cannot be read.` };
   }

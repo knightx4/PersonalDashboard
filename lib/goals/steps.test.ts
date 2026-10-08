@@ -154,8 +154,35 @@ describe('parseStepFields', () => {
     });
     expect(parseStepFields(form({ kind: 'claude', rhythmCount: '3' }))).toEqual({
       ok: true,
-      value: { kind: 'claude', rhythm_count: null, rhythm_period: null },
+      value: {
+        kind: 'claude',
+        rhythm_count: null,
+        rhythm_period: null,
+        count_source: null,
+        count_match: null,
+      },
     });
+  });
+
+  it('reads where a rhythm counts itself from, with a match text for the calendar only', () => {
+    expect(parseStepFields(form({ countSource: 'applications', countMatch: 'x' }))).toEqual({
+      ok: true,
+      value: { count_source: 'applications', count_match: null },
+    });
+    expect(parseStepFields(form({ countSource: 'calendar', countMatch: ' urbanism|board ' }))).toEqual({
+      ok: true,
+      value: { count_source: 'calendar', count_match: 'urbanism|board' },
+    });
+    expect(parseStepFields(form({ countSource: '' }))).toEqual({
+      ok: true,
+      value: { count_source: null, count_match: null },
+    });
+    expect(parseStepFields(form({ countSource: 'calendar', countMatch: ' | ' })).ok).toBe(false);
+    expect(parseStepFields(form({ countSource: 'posts' })).ok).toBe(false);
+    // A step turned into another kind loses its source with its count.
+    expect(
+      parseStepFields(form({ kind: 'mine', countSource: 'applications' })),
+    ).toMatchObject({ ok: true, value: { kind: 'mine', count_source: null, count_match: null } });
   });
 
   it('refuses an unknown kind, a count out of range, and an unknown period', () => {

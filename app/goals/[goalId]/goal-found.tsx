@@ -1,18 +1,14 @@
-import { Card } from '@/components/ui/card';
 import { Meter } from '@/components/ui/meter';
-import type { Finding } from '@/lib/goals/goal-page';
 import { missedLine, progressLine, type RhythmRecord } from '@/lib/goals/rhythms';
 import type { StepNode } from '@/lib/goals/steps';
-import { FindingRow } from './finding-row';
-import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
- * Two sections of the goal page (plan #1078): the rhythms the goal keeps,
- * each with this period against its target and the one before, and what Dash
- * found, each as one sentence beside the step it came from, which opens to
- * the whole result (finding-row.tsx).
+ * The rhythms the goal keeps, as a strip under Now (plan #1078): each one's
+ * name, this period's count against its target, where the count comes from
+ * when it is not kept by hand, and any periods missed in a row ("Applications
+ * 2 of 5 this week from Jobs"). The name goes to the rhythm's row, where it is
+ * counted and its past periods are.
  */
-
 export function GoalRhythms({
   steps,
   records,
@@ -22,66 +18,41 @@ export function GoalRhythms({
 }) {
   if (steps.length === 0) return null;
   return (
-    <section aria-labelledby="rhythm-heading" className="space-y-2">
-      <h2 id="rhythm-heading" className="px-1 text-ui font-semibold text-ink">
-        Rhythm
-      </h2>
-      <Card padding="none">
-        <ul className="divide-y divide-border">
-          {steps.map((step) => {
-            const period = step.rhythmPeriod!;
-            const record = records[step.id];
-            const now = record?.current ?? null;
-            const last = record?.past.at(-1) ?? null;
-            const facts = [
-              now ? progressLine(period, now) : null,
-              last ? `${last.count} last ${period}` : null,
-              record && record.missed > 0 ? missedLine(period, record.missed) : null,
-            ].filter(Boolean);
-            return (
-              <li key={step.id} className="card-pad-x row-pad flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                <div className="min-w-0 space-y-0.5">
-                  <a href={`#step-${step.id}`} className="text-ui font-medium break-words text-ink underline-offset-2 hover:underline">
-                    {step.title}
-                  </a>
-                  <p className="tabular text-small text-ink-muted">
-                    {facts.length > 0 ? facts.join(' · ') : `${step.rhythmCount} a ${period}, nothing counted yet`}
-                  </p>
-                </div>
-                {now && (
-                  <Meter
-                    value={now.count}
-                    max={now.target}
-                    fill="bg-positive"
-                    minFraction={0.04}
-                    label={`${step.title}: ${progressLine(period, now)}`}
-                    className="w-24"
-                  />
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </Card>
-    </section>
-  );
-}
-
-export function GoalFindings({ findings }: { findings: Finding[] }) {
-  if (findings.length === 0) return null;
-  return (
-    <section aria-labelledby="found-heading" className="space-y-2">
-      <h2 id="found-heading" className="px-1 text-ui font-semibold text-ink">
-        <DashCredit className="text-ink-muted" />
-        What Dash found
-      </h2>
-      <Card padding="none">
-        <ul className="divide-y divide-border">
-          {findings.map((finding) => (
-            <FindingRow key={finding.stepId} finding={finding} />
-          ))}
-        </ul>
-      </Card>
-    </section>
+    <ul aria-label="Rhythms" className="flex flex-wrap gap-x-5 gap-y-1.5 px-1">
+      {steps.map((step) => {
+        const period = step.rhythmPeriod!;
+        const record = records[step.id];
+        const now = record?.current ?? null;
+        const facts = [
+          now
+            ? progressLine(period, now, step.countSource)
+            : `${step.rhythmCount} a ${period}, nothing counted yet`,
+          record && record.missed > 0 ? missedLine(period, record.missed) : null,
+        ].filter(Boolean);
+        return (
+          <li key={step.id} className="flex min-w-0 items-center gap-2 text-small">
+            {now && (
+              <Meter
+                value={now.count}
+                max={now.target}
+                fill="bg-positive"
+                minFraction={0.04}
+                label={`${step.title}: ${progressLine(period, now)}`}
+                className="w-10 shrink-0"
+              />
+            )}
+            <span className="min-w-0 break-words">
+              <a
+                href={`#step-${step.id}`}
+                className="font-medium text-ink underline-offset-2 hover:underline"
+              >
+                {step.title}
+              </a>
+              <span className="tabular text-ink-muted"> {facts.join(' · ')}</span>
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

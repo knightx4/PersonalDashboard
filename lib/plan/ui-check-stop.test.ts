@@ -13,6 +13,8 @@ import {
   shotName,
   stopBranch,
   type StopRound,
+  surfaceLabels,
+  surfaceLink,
 } from './ui-check-stop';
 
 const fix = (surface: string, round: number, fixes = 2, shots: string[] = []): StopRound => ({
@@ -55,15 +57,19 @@ describe('criticStopAsk', () => {
     owner: 1609,
     branch: 'claude/x',
     surfaces: [
-      { surface: 'jobs-contact', round: 3, fixes: 1, uploaded: true },
+      { surface: 'jobs-contact', round: 3, fixes: 1, uploaded: true, label: 'Jobs · a contact' },
       { surface: 'plan-row', round: 3, fixes: 3, uploaded: false },
     ],
   });
 
-  it('names each surface, its fixes, where its shots are and the branch', () => {
+  it('names each surface as the gallery does, with its link, its fixes, where its shots are and the branch', () => {
     expect(ask).toContain('#1609');
-    expect(ask).toContain('jobs-contact after round 3 (1 fix open, shots in ui-shots under 1609/jobs-contact/r3)');
-    expect(ask).toContain('plan-row after round 3 (3 fixes open, shots not uploaded');
+    expect(ask).toContain(
+      'Jobs · a contact (jobs-contact), in the gallery at /preview?s=jobs-contact, after round 3 (1 fix open, shots in ui-shots under 1609/jobs-contact/r3)',
+    );
+    expect(ask).toContain(
+      'plan-row, in the gallery at /preview?s=plan-row, after round 3 (3 fixes open, shots not uploaded',
+    );
     expect(ask).toContain('branch claude/x');
     expect(ask.endsWith(STOP_ASK_ENDING)).toBe(true);
   });
@@ -154,5 +160,29 @@ describe('accepting a stopped screen (plan #1610)', () => {
     ).toEqual([{ shot: 'phone-light', where: 'top', problem: 'Crowded', breaks: 'law 9', change: 'Fold it' }]);
     expect(readStopFixes(null)).toEqual([]);
     expect(shotName('u/1612/jobs-contact/r3/laptop-dark.png')).toBe('laptop-dark');
+  });
+});
+
+describe('surfaceLabels', () => {
+  it("reads each entry's label after its id, in either quote", () => {
+    const source = [
+      '  {',
+      "    id: 'goals-home',",
+      "    label: 'Goals · home',",
+      '  },',
+      '  {',
+      "    id: 'learn-now-deck',",
+      '    label: "Learn now · the deck",',
+      '  },',
+      "  { id: 'g2', name: 'not a surface' },",
+    ].join('\n');
+    const labels = surfaceLabels(source);
+    expect(labels.get('goals-home')).toBe('Goals · home');
+    expect(labels.get('learn-now-deck')).toBe('Learn now · the deck');
+    expect(labels.has('g2')).toBe(false);
+  });
+
+  it('links a surface in the gallery', () => {
+    expect(surfaceLink('goals-home')).toBe('/preview?s=goals-home');
   });
 });

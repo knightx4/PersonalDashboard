@@ -134,7 +134,10 @@ last two weeks:
 The notes routine adds an entry when a note says the request applies
 "anywhere" or "everywhere", or when the same request comes in on two
 different pages. It adds the entry and fixes the pages in the same batch. The
-person can remove any entry from `/dev/ui`. An entry that keeps applying
+person can remove any entry from `/dev/ui`. A press cannot edit `taste.ts`, so
+a removal is a row in `public.ui_taste_removals`: the page leaves the entry
+out, the session that runs the critic tells it not to cite the entry, and the
+notes routine does not add it again. An entry that keeps applying
 across workspaces can be promoted to a law by the person.
 
 ## Part 4: Page patterns
@@ -142,13 +145,25 @@ across workspaces can be promoted to a law by the person.
 Most layout problems come from a page being arranged from scratch. A small set
 of patterns, each a layout component in `components/patterns/` with a gallery
 entry and a short rule on `/dev/ui`, gives a step a shape to start from. The
-first three are the shapes the gallery shows most:
+first three are the shapes the gallery shows most, the fourth was added for
+pages that hold several views of one thing, and the fifth for overview pages
+on a wide screen:
 
 - **List and detail**: a list you work through, and one item's page, one
   column.
 - **Deck**: one item at a time with a fixed forward action and the next item
   loaded, as Quick read and Learn now work.
 - **Thread**: a row's comments and Dash's replies.
+- **Tabbed detail**: one thing's page with breadcrumbs, a title, tabs that
+  each have their own address, and its properties in a column on the right
+  that becomes a grid of facts under the title on a phone. The feature page
+  on the plan and the goal page use it (decision 1661, answered B, after
+  Linear's project page).
+- **Main plus rail**: an overview page such as Home, with the column you work
+  in and, from laptop width, a narrow column on the right holding what you
+  glance at (counts, what is running, what Dash did, what is due soon). On a
+  phone the rail follows the main column. Never on a detail page, which stays
+  one column (feature 1624).
 
 A step's detail names its pattern ("Pattern: list and detail"), and shaping
 writes it. A screen that fits none of them is a new pattern, which the person

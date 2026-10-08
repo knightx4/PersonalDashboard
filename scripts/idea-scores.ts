@@ -9,7 +9,8 @@
  *
  * With --sql it also writes one update per idea scored, for a session to run
  * through the Supabase connector: the catch-up (plan #1327) done by hand. Each
- * sets `ideas.score` only where it is still null, as the app's catch-up does.
+ * sets `ideas.score` only where it is still due (null, or asked under an older
+ * wording of the question), as the app's catch-up does.
  *
  * The file is an export, for a session without DATABASE_URL:
  *
@@ -23,7 +24,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { costMicrosFor, sumByModel, type SpendReport } from '../lib/core/spend/pricing';
 import { triageFrom } from '../lib/feedback/triage';
 import { scoreIdea } from '../lib/ideas/score-ask';
-import { ideaScoreView, visionForIdea } from '../lib/ideas/score';
+import { IDEA_SCORE_VERSION, ideaScoreView, visionForIdea } from '../lib/ideas/score';
 import { isModuleId } from '../lib/modules';
 
 const argv = process.argv.slice(2);
@@ -66,7 +67,9 @@ async function main(): Promise<void> {
     }
     const json = JSON.stringify(result.score).replaceAll("'", "''");
     const id = idea.id.replaceAll("'", "''");
-    updates.push(`update ideas set score = '${json}'::jsonb where id = '${id}' and score is null;`);
+    updates.push(
+      `update ideas set score = '${json}'::jsonb where id = '${id}' and (score is null or score->>'question' is distinct from '${IDEA_SCORE_VERSION}');`,
+    );
     const view = ideaScoreView(result.score);
     console.log(
       `${idea.id}  score ${result.score.value}  confidence ${result.score.confidence}  shown "${view.text}" (${view.state})  [${workspace ?? 'app'}] ${line}`,

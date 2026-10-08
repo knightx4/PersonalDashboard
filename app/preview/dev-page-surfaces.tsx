@@ -5,10 +5,16 @@ import { IdeasView } from '@/app/dev/ideas/ideas-view';
 import { UsageScreen } from '@/app/dev/usage/usage-view';
 import { ReviewView, type Standing } from '@/app/dev/ui/review/review-view';
 import { SpecsView } from '@/app/dev/specs/specs-view';
+import type { InterviewCardView } from '@/lib/specs/interview-view';
+import type { VisionReview } from '@/lib/specs/vision-review';
+import type { DevComment } from '@/lib/comments/load';
 import { SpecDocView } from '@/app/dev/specs/[slug]/spec-doc-view';
 import { ChangelogView } from '@/app/dev/changelog/changelog-view';
+import type { ScreenChangeView } from '@/lib/plan/screen-change';
+import { phoneShot } from './plan-surfaces';
 import { RaisedView } from '@/app/dev/raised/raised-view';
 import { ConversationsView } from '@/app/dev/raised/conversations-view';
+import { StatusPanel } from '@/app/dev/raised/status-panel';
 import { AccountView } from '@/app/account/view';
 import {
   isOutstanding,
@@ -289,6 +295,122 @@ export function DevSpecsSurface() {
   );
 }
 
+// ---- Specs: Dash's interview (plan #1641) --------------------------------
+
+const SPECS_VISIONS = {
+  app: {
+    module: 'app' as const,
+    body: 'It should make working with an AI builder easy, and the app it builds should be one I use every day.',
+    updatedAt: '2026-09-20T09:00:00Z',
+  },
+  jobs: {
+    module: 'jobs' as const,
+    body: 'Every application from first lead to offer in one place, so nothing falls through between an email and an interview.',
+    updatedAt: '2026-09-18T09:00:00Z',
+  },
+};
+
+function turn(id: string, author: 'me' | 'claude', body: string, createdAt: string): DevComment {
+  return { id, author, body, createdAt };
+}
+
+const JOBS_TURNS: DevComment[] = [
+  turn('q1', 'claude', 'When an application goes quiet for two weeks, what do you want the app to do about it?', '2026-10-07T09:00:00Z'),
+  turn('a1', 'me', 'Tell me on Home that it has gone quiet and offer a follow-up email I can send in one press. Nothing automatic: I want to choose who gets chased.', '2026-10-07T09:02:00Z'),
+  turn('q2', 'claude', 'You keep the cover letters in the vault today. Should a role page show the letter you sent for it, or only link to the vault?', '2026-10-07T09:02:30Z'),
+  turn('a2', 'me', 'Show it on the role. I never open the vault while I am looking at a role.', '2026-10-07T09:04:00Z'),
+  turn('q3', 'claude', 'Which matters more on the pipeline board: the stage each role is at, or how long it has been since you last heard back?', '2026-10-07T09:04:30Z'),
+];
+
+function interviewView(over: Partial<InterviewCardView>): InterviewCardView {
+  return {
+    id: 'i1',
+    module: 'jobs',
+    status: 'open',
+    move: 'answer',
+    questionLimit: 12,
+    asked: 1,
+    answered: 0,
+    turns: JOBS_TURNS.slice(0, 1),
+    summary: null,
+    finishedAt: null,
+    visionHref: null,
+    specChangeHref: null,
+    ...over,
+  };
+}
+
+function SpecsWithInterview({
+  view,
+  edits = {},
+}: {
+  view: InterviewCardView;
+  edits?: Partial<Record<'jobs', VisionReview>>;
+}) {
+  return (
+    <SpecsView
+      counts={{ 'ui-quality': 4, plan: 1 }}
+      visions={SPECS_VISIONS}
+      edits={edits}
+      changes={[]}
+      audit={{ auditAt: null, findings: [] }}
+      interviews={{ jobs: view }}
+      openInterviews
+    />
+  );
+}
+
+/** Just started: Dash's first question, and nothing answered yet. */
+export function DevSpecsInterviewEmptySurface() {
+  return <SpecsWithInterview view={interviewView({})} />;
+}
+
+/** Halfway: two answers in and the third question waiting. */
+export function DevSpecsInterviewHalfSurface() {
+  return <SpecsWithInterview view={interviewView({ asked: 3, answered: 2, turns: JOBS_TURNS })} />;
+}
+
+const DRAFTED_EDIT: VisionReview = {
+  id: 'v1',
+  module: 'jobs',
+  reviewId: 'i1',
+  sessionId: null,
+  outcome: 'edit',
+  visionBody: SPECS_VISIONS.jobs.body,
+  proposedBody:
+    'Every application from first lead to offer in one place. When one goes quiet the app says so on Home and offers a follow-up to send, and each role shows the letter that went with it.',
+  note: 'From your interview about Job search on 7 October. You want quiet applications raised, not chased for you.',
+  evidenceIds: [],
+  evidence: [],
+  status: 'pending',
+  decidedAt: null,
+  createdAt: '2026-10-07T09:20:00Z',
+};
+
+/** Drafted: the vision edit waits above, and the spec change has been decided. */
+export function DevSpecsInterviewDraftedSurface() {
+  return (
+    <SpecsWithInterview
+      edits={{ jobs: DRAFTED_EDIT }}
+      view={interviewView({
+        status: 'drafted',
+        move: null,
+        asked: 3,
+        answered: 3,
+        turns: [
+          ...JOBS_TURNS,
+          turn('a3', 'me', 'How long since I heard back. The stage I already know.', '2026-10-07T09:06:00Z'),
+        ],
+        summary:
+          'You want the app to notice when an application goes quiet and offer a follow-up, to keep each letter on its role, and to sort the board by how long since you heard back.',
+        finishedAt: '2026-10-07T09:20:00Z',
+        visionHref: '/dev/specs#vision-jobs',
+        specChangeHref: null,
+      })}
+    />
+  );
+}
+
 const SPEC_MARKDOWN = `# UI quality
 
 ## Part 5: Checks a picture cannot do
@@ -411,6 +533,54 @@ export function DevChangelogSurface() {
   return <ChangelogView entries={changelog} grouping="issue" query="" workspace={null} />;
 }
 
+/**
+ * The changelog by day with the screens two steps changed (plan #1541): the
+ * after picture under each line, without opening it. One step changed two
+ * surfaces, one changed one, and the note changed none.
+ */
+const changelogScreens: Record<number, ScreenChangeView[]> = {
+  1539: [
+    {
+      surface: 'dev-surfaces',
+      round: 2,
+      verdict: 'pass',
+      checkedAt: '2026-10-04T01:00:00Z',
+      before: phoneShot(true),
+      after: phoneShot(false),
+    },
+    {
+      surface: 'dev-surfaces-a-very-long-surface-name-empty',
+      round: 1,
+      verdict: 'pass',
+      checkedAt: '2026-10-04T01:05:00Z',
+      before: null,
+      after: phoneShot(false),
+    },
+  ],
+  1440: [
+    {
+      surface: 'todo-day-close',
+      round: 4,
+      verdict: 'accepted',
+      checkedAt: '2026-10-02T10:30:00Z',
+      before: phoneShot(true),
+      after: phoneShot(false),
+    },
+  ],
+};
+
+export function DevChangelogScreensSurface() {
+  return (
+    <ChangelogView
+      entries={changelog}
+      grouping="day"
+      query=""
+      workspace={null}
+      screens={changelogScreens}
+    />
+  );
+}
+
 // ---- Dev home: what is waiting on you --------------------------------------
 
 function waiting(over: Partial<WaitingRow> & Pick<WaitingRow, 'id' | 'number' | 'title' | 'health'>): WaitingRow {
@@ -516,6 +686,26 @@ export function DevRaisedSurface() {
       <RaisedView queue={raisedQueue} groups={groups} />
       <ConversationsView conversations={conversations} />
     </>,
+  );
+}
+
+/**
+ * The Status panel at the top of Home in Dev: the plan runner resting with
+ * three features ready, and the notes routine with twelve notes open. Dash's
+ * mark sits under Plan (note 076e7744).
+ */
+export function DevRaisedStatusSurface() {
+  return column(
+    <StatusPanel
+      run={null}
+      canSend
+      card={{ night: null, on: [], progress: null, push: null, ready: 3, readySteps: 9, next: [] }}
+      goals={null}
+      openNotes={12}
+      notesLastRun={null}
+      vision={null}
+      now={Date.parse('2026-10-06T08:00:00Z')}
+    />,
   );
 }
 

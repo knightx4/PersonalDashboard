@@ -4,6 +4,7 @@ import type { RoutineTarget } from '@/lib/feedback/routine';
 import { loadCollectionsForGoal } from '@/lib/goals/collections-store';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
+  commentMode,
   jobFor,
   locateStep,
   sendRefusal,
@@ -18,7 +19,7 @@ import { recordAndFire } from '@/lib/goals/shaping-store';
 import { loadLiveTree } from '@/lib/goals/steps-store';
 
 /**
- * The reads and the fire behind Send on a goal step or phase (plan #1000).
+ * The reads and the fire behind Ask Dash on a goal step or phase (plan #1000).
  * The rules are in lib/goals/handover.ts; this reads what they need, asks
  * them, and fires through recordAndFire so the run row is written first and
  * its id is in the brief.
@@ -92,9 +93,12 @@ export async function sendGoalStep(input: {
   userId: string;
   stepId: string;
   routine: RoutineTarget;
-  mode?: SendMode;
-  /** The @dash comment that asked for it (plan #1003), passed into the brief. */
+  /** `ask` lets askDash pick send or prepare from the step, as the row's Ask Dash does. */
+  mode?: SendMode | 'ask';
+  /** What they wrote when they asked (an @dash comment, plan #1003), passed into the brief. */
   asked?: string;
+  /** Where `asked` was written: a comment, or the box beside Ask Dash on the row. */
+  askedOn?: 'comment' | 'row';
   /** What was said on the row before that comment, passed in with it. */
   thread?: readonly { author: string; body: string }[];
   /** Where the run was started, for the record of each step it holds (plan #1573). */
@@ -112,7 +116,7 @@ export async function sendGoalStep(input: {
   const target = await loadTarget(client, userId, stepId);
   if (!target) return { ok: false, error: 'That step is no longer on the page.', refused: true };
 
-  const mode = input.mode ?? 'send';
+  const mode = input.mode === 'ask' ? commentMode(target.step) : (input.mode ?? 'send');
   const refused = sendRefusal(target, await loadLiveRuns(client, userId), now, mode);
   if (refused) return { ok: false, error: refused, refused: true };
   // sendRefusal has already turned away a step with no job.
@@ -131,7 +135,17 @@ export async function sendGoalStep(input: {
     itemId: target.step.id,
     routine: input.routine,
     fetch: input.fetch,
-    text: (runId) => sendRunText({ target, job, collections, userId, runId, asked: input.asked, thread: input.thread }),
+    text: (runId) =>
+      sendRunText({
+        target,
+        job,
+        collections,
+        userId,
+        runId,
+        asked: input.asked,
+        askedOn: input.askedOn,
+        thread: input.thread,
+      }),
   });
   if (!fired.ok) return { ok: false, error: fired.error };
   return { ok: true, job, title: target.step.title, runId: fired.runId };

@@ -7,7 +7,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createGoalsClient } from '@/lib/goals/auth/server';
-import { loadRunChanges } from '@/lib/goals/run-changes-store';
+import { loadItemHrefs, loadRunChanges } from '@/lib/goals/run-changes-store';
+import { areaHref } from '@/lib/goals/all-goals';
 import { JOB_LABELS, runMeta, type RunListing } from '@/lib/goals/runs';
 import { loadRun } from '@/lib/goals/runs-store';
 import { RunChanges } from './run-changes';
@@ -19,6 +20,8 @@ export const dynamic = 'force-dynamic';
 /**
  * One goal run and what it changed (plan #1013): each change as a sentence,
  * read from goals.history by the run's id, with Undo on each of Claude's.
+ * A change to a goal or step opens it, and so does the step the run was on
+ * (note 55e9d14c).
  */
 
 /** Outside the component because it reads the clock. */
@@ -34,6 +37,21 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
   const run = await loadRun(client, runId);
   if (!run) notFound();
   const lines = await loadRunChanges(client, runId);
+  // The goal or step each change was made to: its first target in items.
+  const itemOf = (line: (typeof lines)[number]) =>
+    line.targets.find((target) => target.table === 'items')?.rowId ?? null;
+  const itemIds = [
+    ...lines.map(itemOf).filter((id): id is string => id !== null),
+    ...(run.item ? [run.item.id] : []),
+  ];
+  const itemHrefs = await loadItemHrefs(client, itemIds).catch(() => new Map<string, string>());
+  const hrefs: Record<string, string> = {};
+  for (const line of lines) {
+    const id = itemOf(line);
+    const href = id ? itemHrefs.get(id) : undefined;
+    if (href) hrefs[line.key] = href;
+  }
+  const runItemHref = run.item ? itemHrefs.get(run.item.id) : undefined;
   const { outcome, meta } = headerLine(run, account.timezone);
   const failed = outcome === 'failed';
 
@@ -55,13 +73,21 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
                   </Link>
                   {' · '}
                 </>
+              ) : runItemHref ? (
+                <>
+                  {'On the step '}
+                  <Link href={runItemHref} className="underline-offset-2 hover:underline">
+                    {run.item.title}
+                  </Link>
+                  {' · '}
+                </>
               ) : (
                 <>{`On the step ${run.item.title} · `}</>
               )
             ) : run.area ? (
               <>
                 {'On '}
-                <Link href="/goals/all" className="underline-offset-2 hover:underline">
+                <Link href={areaHref(run.area.id)} className="underline-offset-2 hover:underline">
                   {run.area.name}
                 </Link>
                 {' · '}
@@ -98,7 +124,7 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
         />
       ) : (
         <Card>
-          <RunChanges runId={run.id} lines={lines} />
+          <RunChanges runId={run.id} lines={lines} hrefs={hrefs} />
         </Card>
       )}
     </div>

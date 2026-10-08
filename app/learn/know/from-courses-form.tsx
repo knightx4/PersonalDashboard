@@ -45,7 +45,7 @@ type Track = { id: string; name: string };
 function ReadButton({ again }: { again: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" size="sm" disabled={pending}>
+    <Button type="submit" variant="secondary" size="sm" pending={pending}>
       {pending ? 'Reading…' : again ? 'Read again' : 'Read'}
     </Button>
   );
@@ -54,7 +54,7 @@ function ReadButton({ again }: { again: boolean }) {
 function RetrackButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="ghost" disabled={pending}>
+    <Button type="submit" size="sm" variant="ghost" pending={pending}>
       {pending ? 'Reading…' : 'Read for this subject'}
     </Button>
   );
@@ -168,12 +168,22 @@ function IdeaRow({
   ticked,
   unplaced,
   onToggle,
+  courseLabel,
 }: {
   node: ChainNode;
   ticked: boolean;
   unplaced: boolean;
   onToggle: () => void;
+  /**
+   * The course the header names. Each basis opens "From <course>." so the
+   * concept says where it came from once saved; on this screen the header
+   * already says it, so the row leaves that sentence out (plan #1635's
+   * design check).
+   */
+  courseLabel: string;
 }) {
+  const from = `From ${courseLabel}.`;
+  const basis = node.basis?.startsWith(from) ? node.basis.slice(from.length).trim() : node.basis;
   if (node.existingId) {
     return (
       <li className="px-4 py-3">
@@ -212,8 +222,9 @@ function IdeaRow({
           )}
         </span>
         {node.claim && <span className="mt-0.5 block text-ui text-ink">{node.claim}</span>}
-        {node.basis && <span className="mt-0.5 block text-small text-ink-muted">{node.basis}</span>}
-        <MasteryChecks checks={node.mastery} className="mt-1" />
+        {basis && <span className="mt-0.5 block text-small text-ink-muted">{basis}</span>}
+        {/* A concept with no checks shows none, rather than a line saying so on every row. */}
+        {node.mastery.length > 0 && <MasteryChecks checks={node.mastery} className="mt-1" />}
       </span>
     </li>
   );
@@ -252,6 +263,11 @@ export function CourseCheck({
       <Card padding="standard">
         <p className="text-small text-ink-muted">Checking</p>
         <p className="text-body font-medium text-ink">{course.label}</p>
+        <p className="mt-2 text-ui text-ink-muted">
+          {`What a course by this name usually teaches, for ${chain.subject}${
+            already > 0 ? `, beside ${already} the subject already holds` : ''
+          }. Untick any you do not really know. The rest are marked known on your word, and nothing is saved until you approve.`}
+        </p>
 
         {/* Another track means asking again: the ideas a track already holds
             are matched when the list is made, so the same list cannot simply
@@ -287,11 +303,6 @@ export function CourseCheck({
         <input type="hidden" name="chain" value={JSON.stringify(chain)} />
         <input type="hidden" name="courseId" value={course.id} />
 
-        <p className="mb-2 text-body text-ink-muted">
-          {`What a course by this name usually teaches, for ${chain.subject}${
-            already > 0 ? `, beside ${already} the subject already holds` : ''
-          }. Untick any you do not really know. The rest are marked known on your word, and nothing is saved until you approve.`}
-        </p>
 
         <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
           {chain.nodes.map((node) => (
@@ -300,6 +311,7 @@ export function CourseCheck({
               node={node}
               ticked={ticked.has(key(node.name))}
               unplaced={unplacedNames.has(key(node.name))}
+              courseLabel={course.label}
               onToggle={() =>
                 setTicked((current) => {
                   const next = new Set(current);

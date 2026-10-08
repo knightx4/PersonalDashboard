@@ -1,5 +1,6 @@
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadChangelog } from '@/lib/changelog/load';
+import { loadScreenChanges } from '@/lib/plan/screen-change-load';
 import {
   CHANGELOG_DEFAULT_GROUPING,
   isChangelogGrouping,
@@ -66,6 +67,17 @@ export default async function DevChangelogPage({
   const workspace: ChangelogModuleFilter | null =
     askedModule && isChangelogModuleFilter(askedModule) ? askedModule : null;
 
-  const entries = await loadChangelog(supabase, user.id);
-  return <ChangelogView entries={entries} grouping={grouping} query={query} workspace={workspace} />;
+  const [entries, screens] = await Promise.all([
+    loadChangelog(supabase, user.id),
+    loadScreenChanges(supabase, user.id),
+  ]);
+  return (
+    <ChangelogView
+      entries={entries}
+      grouping={grouping}
+      query={query}
+      workspace={workspace}
+      screens={screens}
+    />
+  );
 }

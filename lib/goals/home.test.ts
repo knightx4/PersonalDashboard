@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
+  areaButtons,
+  briefParts,
   errandAreaDefault,
   homeAreas,
+  homeLists,
   homeSummary,
   nextMove,
   nextVisitDays,
+  preparedExcerpt,
   splitErrands,
-  stuckSteps,
-  weekHealth,
   type HomeGoal,
 } from '@/lib/goals/home';
 import type { GoalReview, Verdict } from '@/lib/goals/reviews';
+import type { TodayItem, TodayKind } from '@/lib/goals/today';
 
 function review(verdict: Verdict, extra: Partial<GoalReview> = {}): GoalReview {
   return {
@@ -97,6 +100,24 @@ describe('homeAreas', () => {
   });
 });
 
+describe('areaButtons', () => {
+  it('lists every area in its own order, with its page and its open goals', () => {
+    const buttons = areaButtons(
+      [
+        { id: 'y', name: 'Y' },
+        { id: 'x', name: 'X' },
+        { id: 'z', name: 'Z' },
+      ],
+      [line('a', 'x'), line('b', 'y'), line('c', 'x')],
+    );
+    expect(buttons).toEqual([
+      { id: 'y', name: 'Y', href: '/goals/area/y', goals: 1 },
+      { id: 'x', name: 'X', href: '/goals/area/x', goals: 2 },
+      { id: 'z', name: 'Z', href: '/goals/area/z', goals: 0 },
+    ]);
+  });
+});
+
 function errand(id: string, areaId: string, dueOn: string): HomeGoal {
   const base = line(id, areaId);
   return { ...base, goal: { ...base.goal, errand: true, dueOn } };
@@ -167,85 +188,87 @@ describe('nextVisitDays', () => {
   });
 });
 
-describe('stuckSteps', () => {
-  const now = Date.parse('2026-09-26T12:00:00Z');
-  const old = '2026-09-18T12:00:00Z';
-  const recent = '2026-09-22T12:00:00Z';
-  type Node =
-    Parameters<typeof stuckSteps>[1] extends ReadonlyMap<string, readonly (infer N)[]> ? N : never;
-  const step = (id: string, extra: Partial<Node> = {}): Node => ({
+function focused(id: string, areaId: string, focus: boolean): HomeGoal {
+  const base = line(id, areaId);
+  return { ...base, goal: { ...base.goal, focus } as HomeGoal['goal'] };
+}
+
+function onYou(id: string, goalId: string, kind: TodayKind = 'step'): TodayItem {
+  return {
+    kind,
     id,
-    kind: 'mine',
-    status: 'open',
-    children: [],
-    ...extra,
-  });
+    title: id,
+    detail: null,
+    goalId,
+    goalTitle: goalId,
+    action: 'Done',
+    unblocks: 0,
+    on: null,
+  };
+}
 
-  it('counts open steps of yours unchanged for a week', () => {
-    const goals = [{ goal: { id: 'g', status: 'open' } }];
-    const byGoal = new Map([
-      [
-        'g',
-        [
-          step('old'),
-          step('recent'),
-          step('claude', { kind: 'claude' }),
-          step('done', { status: 'done' }),
-          step('waiting', { waitingOn: [{}] }),
-          step('later', { waitsUntil: '2026-10-01' }),
-          step('phase', { children: [step('child'), step('closed', { status: 'done' })] }),
-          step('dropped', { status: 'dropped', children: [step('under-dropped')] }),
-        ],
-      ],
+describe('homeLists', () => {
+  const today = '2026-10-06';
+  const goals = [
+    focused('a', 'x', true),
+    focused('b', 'x', false),
+    errand('soon', 'x', '2026-10-08'),
+    errand('far', 'x', '2026-11-30'),
+  ];
+
+  it('keeps the focus goals and questions, flags and approvals from any goal, capped', () => {
+    const ranked = [
+      onYou('b-step', 'b'),
+      onYou('b-question', 'b', 'question'),
+      onYou('a1', 'a'),
+      onYou('b-flag', 'b', 'flag'),
+      onYou('soon-step', 'soon'),
+      onYou('b-breakdown', 'b', 'breakdown'),
+      onYou('a2', 'a'),
+      onYou('far-step', 'far'),
+    ];
+    const { doNext, rest } = homeLists(ranked, goals, today, 5);
+    expect(doNext.map((item) => item.id)).toEqual([
+      'b-question',
+      'a1',
+      'b-flag',
+      'soon-step',
+      'b-breakdown',
     ]);
-    const updatedAt = new Map(
-      [
-        'old',
-        'claude',
-        'done',
-        'waiting',
-        'later',
-        'phase',
-        'child',
-        'closed',
-        'dropped',
-        'under-dropped',
-      ].map((id) => [id, old]),
-    );
-    updatedAt.set('recent', recent);
-    // old, and child under the phase; the phase itself has an open step beneath it.
-    expect(stuckSteps(goals, byGoal, updatedAt, now)).toBe(2);
+    expect(rest.map((item) => item.id)).toEqual(['a2']);
   });
 
-  it('leaves out goals that are not open', () => {
-    const byGoal = new Map([['g', [step('old')]]]);
-    const updatedAt = new Map([['old', old]]);
-    expect(stuckSteps([{ goal: { id: 'g', status: 'proposed' } }], byGoal, updatedAt, now)).toBe(0);
+  it('lists the goals out of focus, errands first, and an errand with no row in Do next', () => {
+    expect(homeLists([], goals, today, 5).otherGoals.map((l) => l.goal.id)).toEqual([
+      'soon',
+      'far',
+      'b',
+    ]);
+    const listed = homeLists([onYou('soon-step', 'soon')], goals, today, 5);
+    expect(listed.otherGoals.map((l) => l.goal.id)).toEqual(['far', 'b']);
+  });
+
+  it('keeps everything while no goal is a focus goal', () => {
+    const plain = [line('a', 'x'), line('b', 'x')];
+    const { doNext, otherGoals } = homeLists([onYou('1', 'a'), onYou('2', 'b')], plain, today, 5);
+    expect(doNext).toHaveLength(2);
+    expect(otherGoals).toEqual([]);
   });
 });
 
-describe('weekHealth', () => {
-  const week = {
-    startsOn: '2026-09-21',
-    endsOn: '2026-09-28',
-    from: '2026-09-21T04:00:00.000Z',
-    to: '2026-09-28T04:00:00.000Z',
-  };
+describe('briefParts', () => {
+  it('splits the note after its first paragraph', () => {
+    expect(briefParts('One.\nStill one.\n\nTwo.\n\nThree.')).toEqual({
+      lead: 'One.\nStill one.',
+      rest: 'Two.\n\nThree.',
+    });
+    expect(briefParts('  Only this.  ')).toEqual({ lead: 'Only this.', rest: null });
+  });
+});
 
-  it('counts only what falls in the week', () => {
-    expect(
-      weekHealth({
-        week,
-        dashClosedAt: [
-          '2026-09-21T03:59:59Z',
-          '2026-09-21T04:00:00Z',
-          '2026-09-26T10:00:00Z',
-          '2026-09-28T04:00:00Z',
-        ],
-        waitingOnYou: 7,
-        stuck: 2,
-        visitDays: ['2026-09-19', '2026-09-21', '2026-09-24', '2026-09-26', '2026-09-28'],
-      }),
-    ).toEqual({ dashFinished: 2, waitingOnYou: 7, stuck: 2, daysVisited: 3 });
+describe('preparedExcerpt', () => {
+  it('gives the first lines as plain text', () => {
+    const text = '## Script\n\n- **Say** who you are\n- [ ] Ask for the \x60fee\x60\n1. Thank them\n> Last';
+    expect(preparedExcerpt(text)).toBe('Script\nSay who you are\nAsk for the fee');
   });
 });

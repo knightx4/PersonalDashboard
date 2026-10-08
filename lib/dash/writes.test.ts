@@ -158,6 +158,22 @@ describe('add_goal', () => {
   it('names their areas when the one asked for is not there', async () => {
     const result = await apply('add_goal', { area: 'Money', title: 'Save for a car' });
     expect(!result.ok && result.error).toContain('Their areas are "Health"');
+    expect(!result.ok && result.error).toContain('new_area true');
+  });
+
+  it('makes a new area when asked to, and puts the goal under it', async () => {
+    const result = ok(await apply('add_goal', { area: 'Music', new_area: true, title: 'Publish a song on Spotify' }));
+    const area = tables['goals.areas'].find((row) => row.name === 'Music');
+    expect(area).toMatchObject({ user_id: ME });
+    const goal = tables['goals.items'].find((row) => row.title === 'Publish a song on Spotify');
+    expect(goal).toMatchObject({ level: 'goal', area_id: area!.id });
+    expect(result).toMatchObject({ input: { areaName: 'Music', areaMade: true } });
+  });
+
+  it('uses the area they have when new_area names one that exists', async () => {
+    const result = ok(await apply('add_goal', { area: 'Health', new_area: true, title: 'Sleep eight hours' }));
+    expect(tables['goals.areas']).toHaveLength(1);
+    expect(result).toMatchObject({ input: { areaId: AREA, areaMade: false } });
   });
 });
 
@@ -169,7 +185,7 @@ describe('close_goal_step', () => {
     expect(result).toMatchObject({
       kind: 'close_goal_step',
       input: { id: STEP, goalId: GOAL, goalTitle: 'Run a half marathon' },
-      row: { href: `/goals/${GOAL}#step-${STEP}` },
+      row: { href: `/goals/${GOAL}/s/${STEP}` },
     });
 
     const { undone } = await keepAndUndo(result);

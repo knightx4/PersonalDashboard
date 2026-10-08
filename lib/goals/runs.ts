@@ -1,9 +1,9 @@
 /**
  * Every goal run, for the Runs page under Goals (plan #1012).
  *
- * One goals.runs row per run: "Work on this" or a comment on a goal (job
+ * One goals.runs row per run: Ask Dash or a comment on a goal (job
  * `goal`), the morning run (`daily`), the weekly run (`weekly`), or answers
- * to questions on a goal (`reshape`, plan #1017), or one step or phase sent
+ * to questions on a goal (`reshape`, plan #1017), or one step or phase asked for
  * from its row (`step`, `phase`, plan #1000), or one step of yours Claude was
  * asked to prepare (`prepare`, plan #1001), or Plan this area on an area
  * (`area`), or your answer to something Claude flagged on a goal (`raise`,
@@ -49,7 +49,7 @@ export type RunListing = {
 
 /** What started each kind of run, as the page names it. */
 export const JOB_LABELS: Record<RunJob, string> = {
-  goal: 'Work on this',
+  goal: 'Asked Dash about the goal',
   daily: 'Morning run',
   weekly: 'Weekly run',
   reshape: 'After your answers',

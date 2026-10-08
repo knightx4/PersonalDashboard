@@ -171,6 +171,14 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.spec_changes = specChange.id;
 
+  // One open interview per user and workspace, so seeding A and B each once
+  // stays inside the one-open index.
+  const [specInterview] = await admin<{ id: string }[]>`
+    insert into spec_interviews (user_id, module, vision_review_id, spec_change_id)
+    values (${userId}, 'learn', ${visionReview.id}, ${specChange.id})
+    returning id`;
+  ids.spec_interviews = specInterview.id;
+
   const [specFinding] = await admin<{ id: string }[]>`
     insert into spec_findings (user_id, spec, kind, finding, proposal, spec_change_id)
     values (${userId}, 'spec-layer', 'missing_rule', ${`${tag} notes ask for a rule`}, 'change_spec', ${specChange.id})
@@ -211,6 +219,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.ui_checks = uiCheck.id;
 
+  const [tasteRemoval] = await admin<{ id: string }[]>`
+    insert into ui_taste_removals (user_id, taste_id)
+    values (${userId}, 'twelve-hour-times')
+    returning id`;
+  ids.ui_taste_removals = tasteRemoval.id;
+
   const [planItem] = await admin<{ id: string }[]>`
     insert into plan_items (user_id, module, title, detail, status, position)
     values (
@@ -239,6 +253,14 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     )
     returning id`;
   ids.plan_runs = planRun.id;
+
+  const [planUpdate] = await admin<{ id: string }[]>`
+    insert into plan_updates (user_id, feature_id, health, body, steps_done_before,
+                              steps_done_after, steps_total, run_id)
+    values (${userId}, ${planItem.id}, 'on_track', ${`${tag} moved a step along`}, 0, 1, 1,
+            ${planRun.id})
+    returning id`;
+  ids.plan_updates = planUpdate.id;
 
   const [checkBack] = await admin<{ id: string }[]>`
     insert into check_backs (user_id, title, detail, due_at, plan_item_id, source, woke_run_id)

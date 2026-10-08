@@ -154,6 +154,8 @@ const FIELD_WORDS: Record<string, string> = {
   resolution: 'the answer',
   rhythm_count: 'the rhythm',
   rhythm_period: 'the rhythm',
+  count_source: 'where the rhythm is counted from',
+  count_match: 'where the rhythm is counted from',
   on_todo: 'Todo',
   help_kinds: 'the weekly help',
   proposed_help_kinds: 'the proposed weekly help',

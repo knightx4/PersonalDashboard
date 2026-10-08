@@ -44,6 +44,13 @@ A quick check before writing the row: read your first sentence back and ask
 whether somebody who has never opened this repository would know what they
 are getting. If not, it is not written yet.
 
+**A step that adds or changes a screen ends its detail with its pattern**, on
+a line of its own: `Pattern: list and detail`, `Pattern: deck`, `Pattern:
+thread`, `Pattern: tabbed detail` or `Pattern: main plus rail`, the names in `lib/plan/patterns.ts`. The brief prints that pattern's
+rule for the design critic. When none fits, the line is `Pattern: none fits,
+see #<n>`, naming the decision written for the person (`shaping.md`). A step
+that changes no screen has no pattern line.
+
 **Do not write:**
 
 - Stock phrases and slogans. "the source of truth", "in one breath", "the

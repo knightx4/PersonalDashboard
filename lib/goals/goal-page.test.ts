@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   firstSentence,
-  goalFindings,
   goalStages,
+  nowLabel,
+  nowStages,
   rhythmSteps,
   stageMeta,
   stagesLabel,
@@ -176,49 +177,62 @@ describe('firstSentence', () => {
   });
 });
 
-describe('goalFindings', () => {
-  it('lists each step with a result in map order, naming the step', () => {
-    const findings = goalFindings([
-      node('a', {
-        title: 'Know the job',
-        children: [
-          node('a1', { title: 'Work out the pay floor', kind: 'claude', status: 'done', result: 'Floor: $120k. Detail.' }),
-          node('a2', { title: 'Dropped', status: 'dropped', result: 'Gone.' }),
-        ],
-      }),
-      node('b', { title: 'List people', result: 'A starter list. Ten names.', resultUrl: 'https://x' }),
-    ]);
-    expect(findings).toEqual([
-      {
-        stepId: 'a1',
-        from: 'Work out the pay floor',
-        fact: 'Floor: $120k.',
-        result: 'Floor: $120k. Detail.',
-        url: null,
-        unread: true,
-      },
-      {
-        stepId: 'b',
-        from: 'List people',
-        fact: 'A starter list.',
-        result: 'A starter list. Ten names.',
-        url: 'https://x',
-        unread: false,
-      },
-    ]);
+describe('nowStages', () => {
+  const stage = (id: string, children: StepNode[], extra: Partial<StepNode> = {}) =>
+    node(id, { children: children.map((child) => ({ ...child, parentId: id })), ...extra });
+  const open = (steps: StepNode[]) => [...nowStages(goalStages(steps), steps)];
+
+  it('is empty for a goal that is one list', () => {
+    expect(open([node('a'), node('b')])).toEqual([]);
   });
 
-  it('links a finding to the first place its result points to, and knows when it is read', () => {
-    const [finding] = goalFindings([
-      node('c', {
-        kind: 'claude',
-        status: 'done',
-        reviewedAt: '2026-09-27T09:00:00Z',
-        result: 'Transportation Alternatives is the easiest start. Sign up at transalt.org/volunteer.',
-      }),
-    ]);
-    expect(finding.url).toBe('https://transalt.org/volunteer');
-    expect(finding.unread).toBe(false);
+  it('opens the first stage neither finished nor held, and no other with nothing on you', () => {
+    const steps = [
+      stage('done', [node('d1', { status: 'done' })]),
+      stage('target', [node('t1', { kind: 'claude' })]),
+      // Under way, with Dash's work started, but nothing waiting on you.
+      stage('network', [node('n1', { kind: 'claude', status: 'done', reviewedAt: '2026-10-01' }), node('n2', { kind: 'claude' })]),
+    ];
+    expect(open(steps)).toEqual(['target']);
+  });
+
+  it('opens a later stage with a step of yours that is ready', () => {
+    const steps = [
+      stage('target', [node('t1', { kind: 'claude' })]),
+      stage('resume', [node('r1', { kind: 'claude' })]),
+      stage('apply', [node('a1')]),
+    ];
+    expect(open(steps)).toEqual(['target', 'apply']);
+  });
+
+  it('opens a stage holding a question, a proposal or a result to read', () => {
+    const steps = [
+      stage('target', [node('t1', { kind: 'claude' })]),
+      stage('ask', [node('q1', { kind: 'decision' })]),
+      stage('proposed', [node('p1', { kind: 'claude', status: 'proposed' })]),
+      stage('read', [node('x1', { kind: 'claude', status: 'done', result: 'Found it.' })], { status: 'done' }),
+      stage('aside', [node('q2', { kind: 'decision', dismissedAt: '2026-10-01' }), node('c2', { kind: 'claude' })]),
+    ];
+    expect(open(steps)).toEqual(['target', 'ask', 'proposed', 'read']);
+  });
+
+  it('leaves a stage whose step of yours is waiting on another step on the map', () => {
+    const steps = [
+      stage('target', [node('t1', { kind: 'claude' })]),
+      stage('apply', [node('a1', { waitingOn: [{ id: 't1', title: 't1', status: 'open' }] })]),
+    ];
+    expect(open(steps)).toEqual(['target']);
+  });
+
+  it('names the stages it opened', () => {
+    const stages = [
+      { id: 'a', index: 1 },
+      { id: 'b', index: 2 },
+      { id: 'c', index: 3 },
+    ];
+    expect(nowLabel(stages, new Set(['b']))).toBe('Stage 2 of 3');
+    expect(nowLabel(stages, new Set(['a', 'c']))).toBe('Stages 1 and 3 of 3');
+    expect(nowLabel(stages, new Set())).toBeNull();
   });
 });
 
@@ -229,7 +243,15 @@ describe('stepPreps', () => {
 
   it('says an open prep step is preparing, by its title, and names the step it is for', () => {
     const { prepFor, targetOf } = stepPreps([[prep(), apply]]);
-    expect(prepFor.apply).toEqual({ id: 'prep', title: 'Draft the Kroll cover letter', done: false, line: null });
+    expect(prepFor.apply).toEqual({
+      id: 'prep',
+      title: 'Draft the Kroll cover letter',
+      done: false,
+      line: null,
+      result: null,
+      resultUrl: null,
+      unread: false,
+    });
     expect(targetOf.prep).toEqual({ id: 'apply', title: 'Apply to Kroll' });
   });
 
@@ -237,7 +259,12 @@ describe('stepPreps', () => {
     const { prepFor } = stepPreps([
       [prep({ status: 'done', result: '## Draft\n\nA letter leading on the fraud work. Second sentence.' }), apply],
     ]);
-    expect(prepFor.apply).toMatchObject({ done: true, line: 'A letter leading on the fraud work.' });
+    expect(prepFor.apply).toMatchObject({
+      done: true,
+      line: 'A letter leading on the fraud work.',
+      result: '## Draft\n\nA letter leading on the fraud work. Second sentence.',
+      unread: true,
+    });
   });
 
   it('shows nothing for a dropped prep step, or on a step with none', () => {

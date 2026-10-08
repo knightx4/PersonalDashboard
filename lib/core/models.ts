@@ -82,6 +82,8 @@ export const MODELS = {
   learnNameMaterial: HAIKU,
   /** lib/learn/feed/write-card.ts */
   learnWriteCard: SONNET,
+  /** lib/learn/feed/clip-note.ts; two sentences about a lecture clip, hourly */
+  learnClipNote: HAIKU,
   /** lib/learn/graph/applied.ts */
   learnApplied: HAIKU,
   /** lib/learn/graph/curriculum.ts */
@@ -92,6 +94,8 @@ export const MODELS = {
   learnGraphFromBrief: SONNET,
   /** lib/learn/graph/from-course.ts */
   learnGraphFromCourse: SONNET,
+  /** lib/learn/personality/read-run.ts, Dash's read of a personality result; Sonnet as #1630 settled */
+  learnPersonalityRead: SONNET,
   /** lib/learn/graph/from-note.ts */
   learnGraphFromNote: HAIKU,
   /** lib/learn/graph/from-prior.ts */
@@ -138,10 +142,16 @@ export const MODELS = {
   newsDigest: HAIKU,
   /** lib/news/issues/importance.ts */
   newsImportance: HAIKU,
+  /** lib/news/review/write.ts */
+  newsDailyReview: SONNET,
   /** lib/news/recommend/make.ts */
   newsRecommend: OPUS,
   /** lib/recurring/extract.ts */
   recurringExtract: HAIKU_DATED,
+  /** lib/dash/interview.ts, Dash's questions when it interviews you for a workspace's spec (lib/dash/models.ts interview) */
+  specInterview: SONNET,
+  /** lib/dash/interview-draft.ts, the vision and spec Dash drafts when an interview ends (lib/dash/models.ts interviewDraft) */
+  specInterviewDraft: SONNET,
   /** lib/sell/web-estimate.ts */
   sellWebEstimate: HAIKU,
   /** lib/talk/reply.ts */

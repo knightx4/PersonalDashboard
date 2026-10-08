@@ -41,12 +41,16 @@ export NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL:-http://localhost:3000}"
 LOGS="$(mktemp -d)"
 trap 'rm -rf "$LOGS"' EXIT
 
+# Output goes to a log and is shown only when the step fails. Loading the
+# migrations prints about 800 lines of notices on a passing run, and every
+# session that ran the gate carried them in its context for the rest of the run.
 step() {
   local name="$1"
   shift
   echo "==> gate: $name"
-  if ! "$@"; then
+  if ! "$@" >"$LOGS/setup.log" 2>&1; then
     echo "gate: FAILED at $name" >&2
+    tail -n 60 "$LOGS/setup.log" >&2
     exit 1
   fi
 }

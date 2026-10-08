@@ -17,7 +17,8 @@ import type { AskSchema, SchemaClient } from '@/lib/ask/db';
  * The shared thread store (lib/thread/store.ts) is there too: `schema(name)`
  * hands back that schema's client, core.thread_turns is the same list as
  * core.conversation_turns (a thread's turns carry `ref` and `author`), `like`
- * matches a trailing `%`, and `rpc('add_thread_turn', ...)` adds a turn.
+ * matches a trailing `%`, and `rpc('add_thread_turn', ...)` adds a turn,
+ * starting the row's conversation in core.conversations when it has none.
  */
 
 type Row = Record<string, unknown>;
@@ -39,8 +40,18 @@ export function fakeSchemaDb(tables: FakeTables, now = '2026-10-03T08:00:00Z') {
         if (schema !== 'core' || name !== 'add_thread_turn') {
           return Promise.resolve({ data: null, error: { message: `no function ${schema}.${name}` } });
         }
+        // One conversation per account and row, as core.conversations keeps.
+        const conversations = (tables['core.conversations'] ??= []);
+        let conversation = conversations.find(
+          (c) => c.user_id === args.p_user_id && c.subject_kind === 'row' && c.subject_ref === args.p_ref,
+        );
+        if (!conversation) {
+          conversation = { id: fakeId(), user_id: args.p_user_id, subject_kind: 'row', subject_ref: args.p_ref, created_at: now };
+          conversations.push(conversation);
+        }
         const row = {
           id: fakeId(),
+          conversation_id: conversation.id,
           user_id: args.p_user_id,
           ref: args.p_ref,
           author: args.p_author,

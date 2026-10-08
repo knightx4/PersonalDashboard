@@ -1,7 +1,7 @@
 /**
  * "Dash is on it" on a goal step while its run is going (plan #1455).
  *
- * Send on a step writes one started row in goals.runs (goals-send-step.test.ts
+ * Ask Dash on a step writes one started row in goals.runs (goals-send-step.test.ts
  * covers that write). Here the run is stubbed: a stand-in client answers the
  * page's read of the steps' runs with the row the press wrote, and then with
  * the same row once the run has ended. The step says "Dash is on it" between
@@ -121,10 +121,10 @@ function rowOf(html: string, id: string, next: string | null): string {
   return html.slice(start, end);
 }
 
-describe('a goal step sent to Dash from its button', () => {
-  it('offers Send and says nothing of a run before the press', async () => {
+describe('a goal step handed to Dash from Ask Dash', () => {
+  it('offers Ask Dash and says nothing of a run before the press', async () => {
     const row = rowOf(await pageWith([]), 'draft', 'other');
-    expect(row).toContain('Send to Dash');
+    expect(row).toContain('Ask Dash');
     expect(row).not.toContain('Dash is on it');
   });
 
@@ -134,8 +134,8 @@ describe('a goal step sent to Dash from its button', () => {
     expect(row).toContain('Dash is on it');
     expect(row).toContain('on Reading the loan statements');
     expect(row).toContain('/goals/runs/run-draft');
-    // The Who column stays: who the step is on is a different fact.
-    expect(row).toContain('>Dash<');
+    // Dash's mark stays: whose the step is is a different fact.
+    expect(row).toContain('aria-label="Dash&#x27;s"');
     // Only the step the run is on.
     expect(rowOf(html, 'other', null)).not.toContain('Dash is on it');
   });

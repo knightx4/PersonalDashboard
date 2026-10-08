@@ -1,16 +1,26 @@
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
+import type { RoleReminder } from '@/app/jobs/(app)/roles/[id]/types';
+import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
+import type { Task } from '@/lib/todo/tasks/model';
+import { ClosedSummary } from '@/app/jobs/(app)/roles/[id]/closed-summary';
+import { defaultRoleTab } from '@/app/jobs/(app)/roles/[id]/tabs';
+import { closedSummary } from '@/lib/jobs/role-stage';
 import { ExcitementPicker } from '@/app/jobs/(app)/roles/[id]/excitement-picker';
 import { Property } from '@/components/shell/detail-layout';
 import { ChannelPicker } from '@/app/jobs/(app)/roles/[id]/channel-picker';
 import type { ReferrerOption } from '@/lib/jobs/contacts/referrers';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
-import { PipelineBoard } from '@/components/jobs/pipeline/board';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
 import { CaptureBoxSurface } from './capture-surfaces';
-import DevUiPage from '@/app/dev/ui/page';
+import { UiStandard } from '@/app/dev/ui/standard';
+import { TasteList } from '@/app/dev/ui/taste-list';
+import { TASTE } from '@/app/dev/ui/taste';
+import { CorrectionsChart } from '@/app/dev/ui/corrections';
+import type { CorrectionWeek } from '@/lib/plan/correction-share';
 import { ANATOMIES } from '@/app/dev/ui/anatomy';
+import { PATTERNS } from '@/app/dev/ui/patterns';
 import { TravelDemo } from '@/app/dev/ui/travel-demo';
 import { SettleDemo } from '@/app/dev/ui/settle-demo';
 import { ClearDemo } from '@/app/dev/ui/clear-demo';
@@ -29,18 +39,19 @@ import {
 } from '@/lib/core/spend/estimate';
 import type { OperationName } from '@/lib/core/spend/guesses';
 import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { SettingsView } from '@/app/jobs/(app)/settings/view';
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
 import { RoleForm } from '@/app/jobs/(app)/roles/new/role-form';
 import { RecommendedRoles } from '@/app/jobs/(app)/recommend/sections';
+import { FindView } from '@/app/jobs/(app)/find/view';
 import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
 import type { OriginStats } from '@/lib/jobs/suggest/stats';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import type { ReviewRow, SearchableRole } from '@/lib/jobs/review/load';
-import { RolesTable } from '@/app/jobs/(app)/roles/roles-table';
-import { rolesDisplay } from '@/lib/jobs/roles-display';
+import { PipelinePage } from '@/components/jobs/pipeline/pipeline-page';
 import { RoundsTable, type RoundView } from '@/app/jobs/(app)/interviews/rounds-table';
 import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
 import type { TodayBoard } from '@/lib/jobs/today/load';
@@ -63,6 +74,14 @@ import { buildAttachmentIndex, type AttachmentEntry } from '@/lib/vault/markdown
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
 import { noteHref } from '@/lib/vault/paths';
 import { PageHeader } from '@/components/shell/page-header';
+import {
+  PersonalityAddTypeSurface,
+  PersonalityScoresSurface,
+  PersonalityTestSurface,
+  KnowPersonalitySurface,
+  KnowPersonalityEmptySurface,
+  KnowPersonalityReadingSurface,
+} from './personality-surfaces';
 import { AddTranscript } from '@/app/vault/education/add-transcript';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
 import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
@@ -102,15 +121,31 @@ import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
 import { QuickReadView, type QuickReadViewProps } from '@/app/news/quick/quick-view';
 import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
+import { ReviewView, type ReviewViewProps } from '@/app/news/review/review-view';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
 import {
   PlanCriticStopSurface,
+  PlanScreenChangeSurface,
+  PlanSendBackSurface,
   PlanOpenedSurface,
+  PlanFeatureSurface,
+  PlanFeatureStepsSurface,
+  PlanFeatureStepsYoursSurface,
+  PlanFeatureActivitySurface,
   PlanTreeSurface,
+  PlanTableSurface,
   ProjectPlanSurface,
 } from './plan-surfaces';
-import { GoalOpenedSurface, GoalTreeSurface } from './goal-surfaces';
+import {
+  GoalOpenedSurface,
+  GoalStepSurface,
+  GoalSubStepSurface,
+  GoalTreeSurface,
+} from './goal-surfaces';
+import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
+import { BoardMomentDemo } from './jobs-moment-demos';
+import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
   AskChangesSurface,
   AskDashSurface,
@@ -121,6 +156,7 @@ import {
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { WatchingSurface } from './watching-surfaces';
+import { DashTodaySurface } from './dash-today-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface } from './clip-surfaces';
 import {
   InspirationByVideoSurface,
@@ -134,6 +170,7 @@ import {
   GoalTopSurface,
   FileSurface,
   GoalsAllSurface,
+  GoalsAreaSurface,
   GoalsHomeSurface,
   InformationListSurface,
   InformationOneSurface,
@@ -153,14 +190,20 @@ import {
   TermsSurface,
 } from './public-surfaces';
 import { WeekReviewNoneSurface, WeekReviewSurface } from './week-surfaces';
+import { JobsInsightsSurface } from './jobs-insights-surface';
 import {
   AccountSurface,
   DevBugsSurface,
   DevChangelogSurface,
+  DevChangelogScreensSurface,
   DevIdeasSurface,
   DevRaisedSurface,
+  DevRaisedStatusSurface,
   DevSpecSurface,
   DevSpecsSurface,
+  DevSpecsInterviewEmptySurface,
+  DevSpecsInterviewHalfSurface,
+  DevSpecsInterviewDraftedSurface,
   DevUiReviewSurface,
   DevUsageSurface,
 } from './dev-page-surfaces';
@@ -223,9 +266,44 @@ export type Surface = {
  * empty surface hides every density problem, and a maximal one hides which
  * problems are real.
  */
+/**
+ * The role's one to-do list (plan #1594): a task from Todo with a long title
+ * and a reminder from the job module linked to its email, drawn together.
+ */
+const roleTasks: Task[] = [
+  {
+    id: 'task-1',
+    title: 'Send Dana the paper on columnar storage she asked about in the screen',
+    body: null,
+    status: 'open',
+    dueOn: '2026-09-16',
+    dueAt: null,
+    pinned: false,
+    snoozedUntil: null,
+    completedAt: null,
+    createdAt: '2026-09-15T16:00:00.000Z',
+    position: null,
+    parentId: null,
+  },
+];
+
+const roleReminderFixtures: RoleReminder[] = [
+  {
+    id: 't1',
+    body: 'Record a video interview',
+    dueAt: '2026-09-12T00:00:00.000Z',
+    message: {
+      id: 'm1',
+      subject: 'Next steps with the D. E. Shaw group',
+      gmailHref: 'https://mail.google.com/mail/u/0/#inbox/1',
+    },
+  },
+];
+
 const rolePanels: PanelProps = {
   roleId: 'role-1',
   applicationId: 'app-1',
+  status: 'in_process',
   jdText:
     'We are looking for a quantitative developer to work alongside our systematic trading teams. You will build and maintain the research tooling that turns an idea into a backtest and a backtest into a live strategy.',
   jdLookupNote: null,
@@ -281,12 +359,14 @@ const rolePanels: PanelProps = {
       kind: 'phone_screen',
       scheduledAt: '2026-09-15T14:00:00.000Z',
       timeKnown: true,
+      meetingUrl: 'https://meet.google.com/abc-defg-hij',
+      calendarHref: 'https://calendar.google.com/calendar/event?eid=YWJjMTIzIG1lQGV4YW1wbGUuY29t',
       debriefDue: false,
       format: 'video',
       status: 'scheduled',
-      prepNotes: '',
-      notes: '',
-      customNotes: [],
+      prepNotes: 'Ask how the research tooling team splits work with the strategy desks.',
+      notes:
+        'Forty minutes, mostly on the market data pipeline. Dana pressed on how I would backfill a day of bad ticks.\n\nFollow up with the paper on columnar storage she mentioned.',
       groupId: 'g1',
       questionsAsked: [],
       prepNote: null,
@@ -327,14 +407,6 @@ const rolePanels: PanelProps = {
   companyName: 'The D. E. Shaw group',
   matchCandidates: [],
   otherAttempts: [],
-  todos: [
-    {
-      id: 't1',
-      body: 'Record a video interview',
-      dueAt: '2026-09-12T00:00:00.000Z',
-      message: null,
-    },
-  ],
   messages: [
     {
       id: 'm1',
@@ -393,9 +465,6 @@ const pipelineRow = (
   ...row,
 });
 
-/** The sort links the roles table draws, with nothing chosen but its default. */
-const rolesSortChoices = listDisplayMenu(rolesDisplay(), {}).sorts;
-
 const pipelineRows: PipelineRow[] = [
   pipelineRow({
     applicationId: 'p1',
@@ -408,6 +477,7 @@ const pipelineRows: PipelineRow[] = [
     daysSinceActivity: 1,
     lastActivityAt: '2026-09-08T16:00:00.000Z',
     coverage: { covered: 4, total: 6, gaps: 1, rate: 0.67 },
+    nextInterview: { at: '2026-09-11T14:00:00.000Z', timeKnown: true },
   }),
   pipelineRow({
     applicationId: 'p2',
@@ -523,6 +593,9 @@ const pipelineRows: PipelineRow[] = [
   }),
 ];
 
+/** The sent applications still open, which is all the moment demos draw. */
+const momentRows = pipelineRows.filter((row) => OPEN_STATUSES.includes(row.status));
+
 /**
  * A company you have done the reading on: research written, three people on
  * file at different stages of being contacted, one send still unanswered.
@@ -613,6 +686,7 @@ const reviewRows: ReviewRow[] = [
     fromAddress: 'no-reply@greenhouse.io',
     threadId: 'thread-monzo-payments',
     replyToAddress: 'careers@monzo.example',
+    roleHint: null,
     receivedAt: '2026-09-09T07:41:00.000Z',
     classification: 'confirmation',
     reason: 'Sent by an ATS, and no pursuit on file matches the job id.',
@@ -641,6 +715,7 @@ const reviewRows: ReviewRow[] = [
     // The unplaceable one has neither, which is why the matcher has nothing.
     threadId: null,
     replyToAddress: null,
+    roleHint: null,
     receivedAt: '2026-09-08T16:03:00.000Z',
     classification: 'other',
     reason: 'A person wrote it, and nothing in it names a role.',
@@ -1745,7 +1820,7 @@ function SharedDisplayOptions() {
 const issueBase: IssueViewProps = {
   issueId: 'issue-1',
   subject: 'The Week in Infrastructure #212: queues, caches and one bad deploy',
-  byline: 'Infra Weekly · Tue 22 Sep, 07:14',
+  byline: 'Infra Weekly · Tue 22 Sep, 7:14\u00a0AM',
   back: { href: '/news/all', label: 'Newsletters' },
   digest: {
     summary:
@@ -1800,7 +1875,7 @@ const issueEssay: IssueViewProps = {
   ...issueBase,
   issueId: 'issue-2',
   subject: 'On leaving things unfinished',
-  byline: 'Slow Letters · Sun 20 Sep, 09:02',
+  byline: 'Slow Letters · Sun 20 Sep, 9:02\u00a0AM',
   digest: {
     summary:
       "An essay about the half-built projects that pile up in any maker's life, and the argument that abandoning one on purpose is a skill. The writer keeps a list of what they stopped and why, and rereads it before starting anything new. Their point is that the list is less about guilt than about noticing which kinds of project they never finish.",
@@ -1814,7 +1889,7 @@ const issueFailed: IssueViewProps = {
   ...issueBase,
   issueId: 'issue-3',
   subject: 'Market notes for Monday',
-  byline: 'Morning Tape · Mon 21 Sep, 06:30',
+  byline: 'Morning Tape · Mon 21 Sep, 6:30\u00a0AM',
   digest: null,
   digestError: 'model returned no summary',
   showDigest: false,
@@ -1843,6 +1918,14 @@ const previewRelatedNotes = [
   },
 ];
 
+/**
+ * The bottom padding AppShell's main keeps for the tab bar below lg, for the
+ * Quick read entries drawn without the shell: the Next row is fixed above
+ * where the tab bar would be, and this lets the card's foot scroll clear of
+ * it as it does in the app.
+ */
+const SHELL_FOOT = 'pb-[calc(var(--dock-h)+2.125rem)] lg:pb-0';
+
 const quickStory: QuickReadViewProps = {
   card: {
     kind: 'story',
@@ -1867,7 +1950,7 @@ const quickStory: QuickReadViewProps = {
     reason: 'Ran in 3 of your newsletters',
     rating: 81,
   },
-  arrived: '22 Sep, 07:14',
+  arrived: '22 Sep, 7:14\u00a0AM',
   nothingYet: false,
   related: previewRelatedNotes,
   pictures: true,
@@ -1905,7 +1988,7 @@ const quickEssay: QuickReadViewProps = {
     repeats: [],
     reason: null,
   },
-  arrived: '20 Sep, 09:02',
+  arrived: '20 Sep, 9:02\u00a0AM',
   issueHref: '/news/i/issue-2',
 };
 
@@ -1918,14 +2001,14 @@ const quickPageView: QuickReadViewProps = {
   page: [
     {
       card: quickStory.card!,
-      arrived: '22 Sep, 07:14',
+      arrived: '22 Sep, 7:14\u00a0AM',
       saved: false,
       related: previewRelatedNotes,
       issueHref: '/news/i/issue-1',
     },
     {
       card: quickEssay.card!,
-      arrived: '20 Sep, 09:02',
+      arrived: '20 Sep, 9:02\u00a0AM',
       saved: false,
       issueHref: '/news/i/issue-2',
     },
@@ -2033,7 +2116,7 @@ const quickFullPage: QuickReadViewProps = {
         repeats: [],
         reason: null,
       },
-      arrived: '22 Sep, 07:14',
+      arrived: '22 Sep, 7:14\u00a0AM',
       saved: false,
       issueHref: `/news/i/issue-${index + 1}`,
     };
@@ -2045,6 +2128,55 @@ const quickFullPage: QuickReadViewProps = {
  * its picture, full text and link; the second's newsletter has been deleted,
  * so its sender is not a link; the third has no link or text of its own.
  */
+
+/**
+ * A full evening's review (plan #1616): the overview, ten stories and the
+ * local one, with the longest line the model is allowed and events several
+ * newsletters ran. Earlier days exist, so the back arrow is live and the
+ * forward one, on the latest day, is not.
+ */
+const reviewLines: [string, number][] = [
+  ['The rail strike planned for Thursday was called off at midnight after the union accepted a revised pay offer worth 5% over two years.', 4],
+  ['The Bank of England held rates at 4.75% and signalled one cut before the end of the year.', 3],
+  ['Wildfires north of Athens forced 12,000 people from their homes as winds picked up overnight.', 2],
+  ['A new study finds four-day-week trials kept output steady at 61 firms.', 1],
+  ['Apple delayed its smart-home display to next spring.', 2],
+  ['EU ministers agreed a common line on asylum returns after a nine-hour meeting.', 1],
+  ['The Met Office warned of the wettest October week in a decade for the south west.', 1],
+  ['Chip shares fell after export rules on advanced processors were tightened again.', 1],
+  ['A transfer window record: three clubs each spent over £200m.', 1],
+  ['NASA set a new date in March for the next crewed Moon flyby.', 1],
+];
+
+const reviewFull: ReviewViewProps = {
+  review: {
+    dayLabel: 'Tuesday 6 October',
+    writtenAt: '8:04\u00a0PM',
+    overview:
+      'A quieter day for markets and a busy one for transport. The rail strike that would have shut most lines on Thursday is off, the Bank of England held rates, and wildfires in Greece were the main story abroad. Closer to home, the council approved the new cycle lanes on Mill Road.',
+    lines: [
+      ...reviewLines.map(([line, sources], i) => ({
+        issueId: `issue-${i + 1}`,
+        storyIndex: i % 3,
+        href: `/news/i/issue-${i + 1}/s/${i % 3}?from=review`,
+        line,
+        sources,
+      })),
+      {
+        issueId: 'issue-local',
+        storyIndex: 2,
+        href: '/news/i/issue-local/s/2?from=review',
+        line: 'The council approved protected cycle lanes on Mill Road, with work starting in January.',
+        sources: 1,
+        local: true,
+      },
+    ],
+  },
+  earlier: { href: '/news/review?day=2026-10-05', label: 'Mon 5 Oct' },
+  later: null,
+  todayAt: null,
+};
+
 const savedStories: SavedViewProps = {
   stories: [
     {
@@ -2059,7 +2191,7 @@ const savedStories: SavedViewProps = {
       receivedAt: '2026-09-22T07:14:00Z',
       savedAt: '2026-09-23T08:02:00Z',
       discussedIndex: 0,
-      arrived: '22 Sep, 07:14',
+      arrived: '22 Sep, 7:14\u00a0AM',
       related: previewRelatedNotes.slice(0, 1),
     },
     {
@@ -2073,7 +2205,7 @@ const savedStories: SavedViewProps = {
       senderName: 'Infra Weekly',
       receivedAt: '2026-09-15T07:10:00Z',
       savedAt: '2026-09-16T21:40:00Z',
-      arrived: '15 Sep, 07:10',
+      arrived: '15 Sep, 7:10\u00a0AM',
     },
     {
       id: 'saved-3',
@@ -2086,17 +2218,16 @@ const savedStories: SavedViewProps = {
       senderName: 'Slow Letters',
       receivedAt: '2026-09-20T09:02:00Z',
       savedAt: '2026-09-20T12:30:00Z',
-      arrived: '20 Sep, 09:02',
+      arrived: '20 Sep, 9:02\u00a0AM',
     },
   ],
 };
 
-/** The job search's eleven sections, as its layout lists them. */
+/** The job search's ten sections, as its layout lists them. */
 const shellSections: NavSection[] = [
   { href: '/jobs', label: 'Home', icon: 'jobsHome', exact: true },
-  { href: '/jobs/thoughts', label: 'Career goals', icon: 'careerGoals' },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
-  { href: '/jobs/roles', label: 'Roles', icon: 'roles' },
+  { href: '/jobs/find', label: 'Find', icon: 'find' },
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
   { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
   { href: '/jobs/interviews', label: 'Interviews', icon: 'interviews' },
@@ -2151,6 +2282,18 @@ const deckCards: FeedCard[] = [
         href: '/vault/n/Housing/Rent%20control%20in%20my%20city.md',
       },
     ],
+    // A section of a lecture, so the bar under the player shows where it starts and ends (note 6c13bd61).
+    // "In this video" under it says what the stretch argues and why it is here (note cde86a10).
+    video: {
+      videoId: 'ZK3O402wf1c',
+      title: 'Price controls and the shortages they make',
+      start: 724,
+      end: 845,
+      note: {
+        said: 'A price ceiling below the market price leaves more people wanting the good than there is of it, and the gap is filled by queues and waiting lists.',
+        why: 'It walks through the same supply and demand diagram behind price controls, with rent control as its main example.',
+      },
+    },
   },
   {
     id: '00000000-0000-4000-8000-000000000001',
@@ -2430,27 +2573,188 @@ const recommendedStats: OriginStats[] = [
   { origin: 'goal', found: 41, saved: 4, applied: 1, interviews: 0, dismissed: 23, expired: 0 },
 ];
 
+/** Two preferences the person took off /dev/ui (plan #1547). */
+const REMOVED_TASTE = ['swipe-shows-next', 'categories-one-line'];
+
+/**
+ * Eight weeks of the correction measure on /dev/ui (plan #1543): a week with
+ * no notes, a week where none counted, and a high week, so the empty column,
+ * the zero and the tallest column are all drawn.
+ */
+const CORRECTION_WEEKS: CorrectionWeek[] = [
+  { week: '2026-08-17', notes: 12, corrections: 5 },
+  { week: '2026-08-24', notes: 4, corrections: 0 },
+  { week: '2026-08-31', notes: 43, corrections: 19 },
+  { week: '2026-09-07', notes: 29, corrections: 9 },
+  { week: '2026-09-14', notes: 0, corrections: 0 },
+  { week: '2026-09-21', notes: 26, corrections: 6 },
+  { week: '2026-09-28', notes: 34, corrections: 4 },
+  { week: '2026-10-05', notes: 7, corrections: 2 },
+];
+
+/** People to meet: one with a drafted message and a long title, one with only a move. */
+const recommendedPeople: OpenSuggestion[] = [
+  recommendedOpening({
+    id: 'pe-1',
+    kind: 'reach_out',
+    headline: 'Ask Priya Raghunathan for a referral to the deployment team at Mosaic',
+    why: 'She moved from EY Transaction Services to Mosaic last year and now runs deployment for the private equity accounts, the team behind the role you saved.',
+    move: 'Message her on LinkedIn, name the take-private work you did together on, and ask for twenty minutes.',
+    channel: 'linkedin',
+    message: 'Hi Priya, it has been a while since the take-private at EY. I saw the Deployment Strategist opening on your team and would value twenty minutes on what the work is really like.',
+    url: null,
+    location: null,
+    personName: 'Priya Raghunathan',
+    personTitle: 'Head of Deployment, Private Equity and Strategic Accounts',
+    foundIn: null,
+    scores: null,
+    scoreNote: null,
+    origin: 'search',
+  }),
+  recommendedOpening({
+    id: 'pe-2',
+    kind: 'reach_out',
+    headline: 'Introduce yourself to the strategic finance lead at Clay',
+    why: 'Clay is hiring into strategic finance and the lead posts about the FP&A-to-strategy move you wrote about.',
+    move: 'Comment on the latest post first, then send a short note.',
+    channel: null,
+    message: null,
+    url: null,
+    location: null,
+    companyName: 'Clay',
+    companySlug: 'clay',
+    personName: 'Sam Okafor',
+    personTitle: 'Strategic Finance Lead',
+    foundIn: 'From the step "Find people in strategic finance" on your career goal',
+    scores: null,
+    scoreNote: null,
+    origin: 'goal',
+  }),
+];
+
+/** Find for somebody a month in: three career goals entries, one track started and two suggested. */
+const findView = {
+  aim: {
+    targetTitles: 'Deployment Strategist, Strategic Finance, Forward Deployed Engineer, FP&A Manager',
+    excludedIndustries: 'Crypto, Defense',
+  },
+  roles: {
+    suggestions: recommendedRoles,
+    stats: recommendedStats,
+    searchCostMicros: 4_200_000,
+    searchLine: { running: false, tone: 'plain' as const, text: 'The search 2 hours ago found 3 new roles. Read 58 job boards, 12 postings worth a look.' },
+    pathname: '/jobs/find',
+  },
+  people: recommendedPeople,
+  tracks: {
+    suggested: [
+      {
+        id: 'tr-2',
+        name: 'SQL for finance analysts',
+        about: 'Window functions, cohort tables and the joins a finance team asks for.',
+        depth: 'solid' as const,
+        why: 'Most of the strategic finance postings you saved ask for SQL, and none of your entries mention it.',
+      },
+      {
+        id: 'tr-3',
+        name: 'How AI deployment teams run a pilot',
+        about: null,
+        depth: 'familiar' as const,
+        why: 'The deployment roles describe scoping and running pilots with customers, which your latest entry says you want to do.',
+      },
+    ],
+    started: [
+      {
+        id: 'tr-1',
+        name: 'Three-statement modelling',
+        about: 'Linking the income statement, balance sheet and cash flow in one model.',
+        depth: 'deep' as const,
+        why: 'Every FP&A role asks for it.',
+        subjectId: 'sub-1',
+        units: 6,
+        gone: false,
+      },
+    ],
+  },
+  thoughts: [
+    {
+      id: 'th-3',
+      body: 'I want the strategy side of deployment work: sitting with customers, working out what they need, and owning the result. A growth-stage company in New York, hybrid at most three days in. Not crypto.',
+      written: '28 Sep 2026',
+      edited: '2 Oct 2026',
+    },
+    {
+      id: 'th-2',
+      body: 'Strategic finance or FP&A at a company that is still small enough that finance sits near the founders.',
+      written: '30 Aug 2026',
+      edited: null,
+    },
+    {
+      id: 'th-1',
+      body: 'Leaving EY. Not sure yet whether to stay in finance.',
+      written: '6 Jul 2026',
+      edited: null,
+    },
+  ],
+};
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
     label: 'Role · Timeline and to-dos',
     module: 'jobs',
     width: 'wide',
-    render: () => <RoleDetailPanels {...rolePanels} initialTab="timeline" />,
+    // A closed application, which opens on its timeline under the line saying
+    // how far it got, with the role's one to-do list above the tabs.
+    render: () => (
+      <div className="space-y-6">
+        <ClosedSummary
+          text={closedSummary({
+            status: 'rejected',
+            reached: 'in_process',
+            everSubmitted: true,
+            closedOn: '8 Sept 2026',
+            interviewCount: 1,
+          })}
+        />
+        <RoleTodos
+          roleId="role-1"
+          tasks={roleTasks}
+          reminders={roleReminderFixtures}
+          messages={rolePanels.messages}
+          timezone="Europe/London"
+        />
+        <RoleDetailPanels
+          {...rolePanels}
+          status="rejected"
+          defaultTab={defaultRoleTab('rejected')}
+        />
+      </div>
+    ),
   },
   {
     id: 'jobs-role-posting',
     label: 'Role · Posting',
     module: 'jobs',
     width: 'wide',
-    render: () => <RoleDetailPanels {...rolePanels} initialTab="posting" />,
+    // A lead, which opens on its posting.
+    render: () => (
+      <RoleDetailPanels {...rolePanels} status="lead" defaultTab={defaultRoleTab('lead')} />
+    ),
   },
   {
     id: 'jobs-role-answers',
     label: 'Role · Answers',
     module: 'jobs',
     width: 'wide',
-    render: () => <RoleDetailPanels {...rolePanels} initialTab="answers" />,
+    // An application being written, which opens on its questions.
+    render: () => (
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        defaultTab={defaultRoleTab('drafting')}
+      />
+    ),
   },
   {
     id: 'jobs-role-interviews',
@@ -2494,16 +2798,90 @@ export const SURFACES: readonly Surface[] = [
             <Property label="Comp band" value="$180k–$220k" />
             <Property label="Outcome" value="—" />
           </dl>
-        <RoleDetailPanels {...rolePanels} initialTab="interviews" />
+        <RoleDetailPanels {...rolePanels} defaultTab={defaultRoleTab('in_process')} />
       </div>
     ),
   },
   {
+    /* The whole page on its board view (plan #1590): the live applications
+     * only, with the one rail of filters both views share. */
     id: 'jobs-pipeline-board',
     label: 'Pipeline · Board',
     module: 'jobs',
     width: 'wide',
-    render: () => <PipelineBoard rows={pipelineRows} view="board" />,
+    render: () => <PipelinePage rows={pipelineRows} params={{ view: 'board' }} />,
+  },
+  {
+    /* The page as it opens: what is in process, waiting and to apply. */
+    id: 'jobs-pipeline-focus',
+    label: 'Pipeline · Focus',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <PipelinePage rows={pipelineRows} params={{}} />,
+  },
+  {
+    /* The three Jobs moments on the Pipeline board (plan #1596), each played
+     * by the button above it through the board's own move. Only the sent
+     * applications, so at phone width the stage a card leaves and the one it
+     * lands in are both on the screen. */
+    id: 'jobs-moment-forward',
+    label: 'Pipeline · a role moving forward',
+    module: 'jobs',
+    width: 'wide',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="board-move"]',
+      shows:
+        'Monzo’s Backend Engineer card glides from Submitted down into In process while the cards and lanes around it glide to their new places, then “In process” is named across the foot of Monzo’s card.',
+    },
+    render: () => (
+      <BoardMomentDemo
+        rows={momentRows}
+        applicationId="p3"
+        to="in_process"
+        label="Move Monzo to In process"
+      />
+    ),
+  },
+  {
+    id: 'jobs-moment-offer',
+    label: 'Pipeline · an offer',
+    module: 'jobs',
+    width: 'wide',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="board-move"]',
+      shows:
+        'Marshall Wace’s card glides from In process down into Offer while the D. E. Shaw card slides up and the lanes resize with it, then “Offer · Marshall Wace” is named across the card’s foot and one accent ring leaves the card and fades.',
+    },
+    render: () => (
+      <BoardMomentDemo
+        rows={momentRows}
+        applicationId="p1"
+        to="offer"
+        label="Move Marshall Wace to Offer"
+      />
+    ),
+  },
+  {
+    id: 'jobs-moment-reject',
+    label: 'Pipeline · a rejection',
+    module: 'jobs',
+    width: 'wide',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="board-move"]',
+      shows:
+        'Starling Bank’s card fades where it stands with nothing moving, Submitted then closes up over the space it left, and a toast reads “5 still open · Starling Bank is in Closed”.',
+    },
+    render: () => (
+      <BoardMomentDemo
+        rows={momentRows}
+        applicationId="p4"
+        to="rejected"
+        label="Reject Starling Bank"
+      />
+    ),
   },
   {
     /* The shopping item page's main panel, which arrived as a form until law
@@ -2623,6 +3001,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PlanTreeSurface />,
   },
   {
+    /* The plan's Table view (plan #1669): one row per open feature, grouped
+     * by module, each opening the feature's page. */
+    id: 'dev-plan-table',
+    label: 'Plan · features as a table',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanTableSurface />,
+  },
+  {
     /* The same plan with its rows opened, for the panel behind a row: the
      * detail, the questions, what it waits on and the thread. */
     id: 'dev-plan-opened',
@@ -2630,6 +3017,43 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanOpenedSurface />,
+  },
+  {
+    /* A feature's own page (plan #1664): breadcrumbs, the Overview tab with
+     * Dash's latest update (plan #1666), the detail, a question, what it
+     * waits on and the thread, and the properties column. */
+    id: 'dev-plan-feature',
+    label: 'Plan · a feature’s page',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanFeatureSurface />,
+  },
+  {
+    /* The same page on its Activity tab (plan #1667): the feature's history
+     * by day, newest first, each entry linking to its row. */
+    id: 'dev-plan-feature-activity',
+    label: 'Plan · a feature’s activity',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanFeatureActivitySurface />,
+  },
+  {
+    /* The same page on its Steps tab: the steps and substeps grouped by
+     * status (plan #1665), done and dropped folded, the tree one chip away. */
+    id: 'dev-plan-feature-steps',
+    label: 'Plan · a feature’s steps',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanFeatureStepsSurface />,
+  },
+  {
+    /* The Steps tab after pressing "Yours" in the properties (plan #1668):
+     * only the open steps you hold, questions and setup jobs included. */
+    id: 'dev-plan-feature-steps-yours',
+    label: 'Plan · a feature’s steps, yours only',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanFeatureStepsYoursSurface />,
   },
   {
     /* A step the design critic stopped after round 3 (plan #1610): the last
@@ -2640,6 +3064,26 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanCriticStopSurface />,
+  },
+  {
+    /* A finished step opened on the screens it changed (plan #1541): before
+     * and after on a phone, side by side, for a surface with both, a new
+     * surface with no before, and one whose pictures were not uploaded. */
+    id: 'dev-plan-screen-change',
+    label: 'Plan · a step’s screens before and after',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanScreenChangeSurface />,
+  },
+  {
+    /* The thumbs-down under a finished step's pictures (plan #1542): opened
+     * under the first surface, with the box that says what is wrong, and
+     * closed under the second. */
+    id: 'dev-plan-send-back',
+    label: 'Plan · sending a screen back',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanSendBackSurface />,
   },
   {
     /* A goal's steps, drawn with the plan's shared row (plan #982), beside
@@ -2660,9 +3104,57 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalOpenedSurface />,
   },
   {
-    /* The Goals home on an ordinary week (plans #1043, #1077): five things
-     * today and one folded under them, four goals with their statuses (one
-     * checked days ago, one with no steps), and a result Dash wrote. */
+    /* A step on its own page (plan #1620): the row from the goal page,
+     * opened, with its sub-steps beneath. */
+    id: 'goals-step',
+    label: 'Goal · a step on its own page',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalStepSurface />,
+  },
+  {
+    /* A sub-step on its own page, naming the step it sits under. */
+    id: 'goals-substep',
+    label: 'Goal · a sub-step on its own page',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalSubStepSurface />,
+  },
+  {
+    /* Closing a step on its own page (plan #1623): the goal's close ring
+     * grows out of the step's glyph. Played by the button above it. */
+    id: 'goals-step-close',
+    label: 'Goal · closing a step on its page',
+    module: 'goals',
+    width: 'page',
+    interaction: {
+      kind: 'completion',
+      target: '[data-motion-demo="step-close"]',
+      shows:
+        'Call the card company turns done, and one accent hexagon ring grows out of its glyph and fades, settled by about two thirds of a second.',
+    },
+    render: () => <StepCloseDemo />,
+  },
+  {
+    /* A step Dash finished, opened on its own page (plan #1623): the row
+     * settles in and Dash's mark beside the title flashes once. */
+    id: 'goals-step-arrival',
+    label: 'Goal · a step Dash finished, on its page',
+    module: 'goals',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="step-arrival"]',
+      shows:
+        'Draft what to say on the call opens again as just finished by Dash: its heading row rises into place and Dash’s mark beside the title swells once, all settled within the second.',
+    },
+    render: () => <StepArrivalDemo />,
+  },
+  {
+    /* The Goals home on an ordinary week (plans #1043, #1077): Dash's card
+     * with a two-paragraph note, five things in Do next (one with Dash's
+     * draft beside it) and one folded under Later, Dash's line, a result
+     * Dash wrote, and an errand due later under Other goals. */
     id: 'goals-home',
     label: 'Goals · home',
     module: 'goals',
@@ -2676,6 +3168,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalsAllSurface />,
+  },
+  {
+    /* An area's own page (plan #1619): one area, its goals and proposals. */
+    id: 'goals-area',
+    label: 'Goals · an area',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsAreaSurface />,
   },
   {
     /* The top of a goal page with every section holding something: the
@@ -2749,7 +3249,39 @@ export const SURFACES: readonly Surface[] = [
     label: 'UI · the design language',
     module: 'dev',
     width: 'wide',
-    render: () => <DevUiPage />,
+    render: () => <UiStandard corrections={CORRECTION_WEEKS} removedTaste={REMOVED_TASTE} />,
+  },
+  {
+    /* The correction measure on /dev/ui alone (plan #1543), since the whole
+     * page photographs at sixty thousand pixels tall and a chart is lost in
+     * it. The empty and unread states are one sentence each, drawn beneath. */
+    id: 'dev-ui-corrections',
+    label: 'UI · how often you correct a new screen',
+    module: 'dev',
+    width: 'page',
+    render: () => (
+      <div className="space-y-6">
+        <CorrectionsChart weeks={CORRECTION_WEEKS} />
+        <CorrectionsChart weeks={CORRECTION_WEEKS.slice(-2)} />
+        <CorrectionsChart weeks={[]} />
+      </div>
+    ),
+  },
+  {
+    /* The preferences on /dev/ui alone (plan #1547), with their Remove and
+     * the fold of removed ones, since the whole page is too tall to read a
+     * row of it. The fold of removed ones is drawn open. Beneath, the state
+     * with every preference removed. */
+    id: 'dev-ui-taste',
+    label: 'UI · your preferences',
+    module: 'dev',
+    width: 'page',
+    render: () => (
+      <div className="space-y-6">
+        <TasteList removed={REMOVED_TASTE} openRemoved />
+        <TasteList removed={TASTE.map((taste) => taste.id)} />
+      </div>
+    ),
   },
   {
     /* The review tool, reviewed by itself. Circular on purpose: the frames it
@@ -2766,6 +3298,7 @@ export const SURFACES: readonly Surface[] = [
             id: 'jobs-pipeline-dense',
             label: 'Pipeline · Dense list (experiment)',
             module: 'jobs',
+            changed: { step: 1541, checkedAt: '2026-10-05T10:40:00Z' },
             notes: [
               {
                 id: 'n1',
@@ -2786,6 +3319,34 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The same tool filtered to "Changed this week" (plan #1542): only the
+     * surface a step changed in the last seven days, with the step named. */
+    id: 'dev-surfaces-changed',
+    label: 'Surfaces · changed this week',
+    module: 'dev',
+    width: 'wide',
+    render: () => (
+      <SurfaceReview
+        show="changed"
+        surfaces={[
+          {
+            id: 'jobs-pipeline-dense',
+            label: 'Pipeline · Dense list (experiment)',
+            module: 'jobs',
+            changed: { step: 1541, checkedAt: '2026-10-05T10:40:00Z' },
+            notes: [],
+          },
+          {
+            id: 'jobs-role-timeline',
+            label: 'Role · Timeline and to-dos',
+            module: 'jobs',
+            notes: [],
+          },
+        ]}
+      />
+    ),
+  },
+  {
     /* The experiment. Same rows, same width, beside the thing it questions. */
     id: 'jobs-pipeline-dense',
     label: 'Pipeline · Dense list (experiment)',
@@ -2794,18 +3355,27 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PipelineDenseList rows={pipelineRows} />,
   },
   {
-    id: 'jobs-pipeline-list',
-    label: 'Pipeline · List',
-    module: 'jobs',
-    width: 'wide',
-    render: () => <PipelineBoard rows={pipelineRows} view="list" />,
-  },
-  {
     id: 'jobs-company',
     label: 'Company · Research, contacts and sends',
     module: 'jobs',
     width: 'wide',
     render: () => <CompanyPanels {...companyPanels} />,
+  },
+  {
+    /* People with its add form open (note 4323ee10). */
+    id: 'jobs-company-add-person',
+    label: 'Company · Adding a person',
+    module: 'jobs',
+    width: 'wide',
+    // With the search's estimate, as the jobs layout provides it, so the $
+    // beside Search with AI is drawn (law 16).
+    render: () => (
+      <PaidCostsProvider
+        costs={{ 'app/jobs/(app)/companies/actions.ts#proposeAiCompanyEnrichment': guessedSummary }}
+      >
+        <CompanyPanels {...companyPanels} addingPerson />
+      </PaidCostsProvider>
+    ),
   },
   {
     id: 'jobs-review',
@@ -2865,13 +3435,29 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     // Opened on Referral, so the field naming who referred you is drawn too.
+    // The padding is the room the app shell keeps under a page for the dock,
+    // so Add role, pinned above the dock, sits where it does in the app.
     render: () => (
-      <RoleForm companies={knownCompanies} contacts={referrerFixtures} defaultSource="referral" />
+      <div className="max-sm:pb-[calc(var(--dock-h)+2.125rem)]">
+        <RoleForm companies={knownCompanies} contacts={referrerFixtures} defaultSource="referral" />
+      </div>
+    ),
+  },
+  {
+    id: 'jobs-find',
+    label: 'Find',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <>
+        <PageHeader title="Find" />
+        <FindView {...findView} />
+      </>
     ),
   },
   {
     id: 'jobs-recommended-roles',
-    label: 'Roles · Recommended roles',
+    label: 'Find · Recommended roles',
     module: 'jobs',
     width: 'wide',
     render: () => (
@@ -2884,11 +3470,13 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The same page on its table view, which was the Roles page (plan #1590),
+     * still on the live applications. */
     id: 'jobs-roles-table',
-    label: 'Roles · The table',
+    label: 'Pipeline · Table',
     module: 'jobs',
     width: 'wide',
-    render: () => <RolesTable rows={pipelineRows} sorts={rolesSortChoices} />,
+    render: () => <PipelinePage rows={pipelineRows} params={{ view: 'table' }} />,
   },
   {
     id: 'jobs-today',
@@ -2896,6 +3484,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <TodayLists board={todayBoard} timezone="Europe/London" />,
+  },
+  {
+    /* Analytics: how far each channel's applications got (plan #1595). */
+    id: 'jobs-insights',
+    label: 'Analytics · By channel',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <JobsInsightsSurface />,
   },
   {
     /* The month grid, which is the todo module's densest surface and the one
@@ -3306,13 +3902,68 @@ export const SURFACES: readonly Surface[] = [
 
   {
     /* Learn's clip player (plan #1400): three clips queued, before the first
-     * tap. Full screen below lg, in the page pane above. Fixtures in
+     * tap. A card in the page at every width. Fixtures in
      * clip-surfaces.tsx. */
     id: 'learn-clips',
     label: 'Learn · Clips',
     module: 'learn',
     width: 'page',
     render: () => <ClipStreamSurface />,
+  },
+  {
+    /* The Big Five test (plan #1632): fifty statements, the first seven
+     * answered. Fixtures in personality-surfaces.tsx. */
+    id: 'learn-personality-test',
+    label: 'Learn · Personality test',
+    module: 'learn',
+    width: 'page',
+    render: () => <PersonalityTestSurface />,
+  },
+  {
+    /* The same page opened with a result kept: the five scores. */
+    id: 'learn-personality-scores',
+    label: 'Learn · Personality scores',
+    module: 'learn',
+    width: 'page',
+    render: () => <PersonalityScoresSurface />,
+  },
+  {
+    /* Typing in a type from another test (plan #1633): the compose form
+     * open beneath the scores, one type already kept. */
+    id: 'learn-personality-add-type',
+    label: 'Learn · Personality, adding a type',
+    module: 'learn',
+    width: 'page',
+    render: () => <PersonalityAddTypeSurface />,
+  },
+  {
+    /* The Big Five result on the Know page (plan #1634): the five traits,
+     * the vault themes nearest each, Dash's read against the notes (#1635)
+     * with two clashes and two agreements, two typed-in types with their
+     * reads folded, and one earlier result folded. Intellect has no theme
+     * near it. */
+    id: 'learn-know-personality',
+    label: 'Learn · Know, personality result',
+    module: 'learn',
+    width: 'page',
+    render: () => <KnowPersonalitySurface />,
+  },
+  {
+    /* Straight after a save (plan #1635): Dash's read of the result is
+     * still running, so the section says so where the read will be. */
+    id: 'learn-know-personality-reading',
+    label: 'Learn · Know, personality being read',
+    module: 'learn',
+    width: 'page',
+    render: () => <KnowPersonalityReadingSurface />,
+  },
+  {
+    /* The same section before any test is taken: one line offering it. */
+    id: 'learn-know-personality-empty',
+    label: 'Learn · Know, personality not taken',
+    module: 'learn',
+    width: 'page',
+    render: () => <KnowPersonalityEmptySurface />,
   },
   {
     /* Clips before any are cut. */
@@ -3375,6 +4026,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'wide',
     render: () => <WatchingSurface />,
+  },
+  {
+    /* Home's list of what Dash did today (plan #1461), with a thread's
+     * change linked back to the role whose comment asked for it (plan
+     * #1518). Fixtures in dash-today-surfaces.tsx. */
+    id: 'home-dash-today',
+    label: 'Home · What Dash did today',
+    module: 'goals',
+    width: 'wide',
+    render: () => <DashTodaySurface />,
   },
   {
     /* The timeline (plan #1118): the months newest first, the newest open,
@@ -3488,16 +4149,20 @@ export const SURFACES: readonly Surface[] = [
     },
     deck: { next: '#quick-read-next button[type="submit"]', item: '[data-quick-swipe]' },
     // The essay drawn behind it, so Next shows it at once (note 452a90d9).
+    // Under the room AppShell's main keeps for the tab bar, so the foot of
+    // the card scrolls clear of the Next row as it does in the app.
     render: () => (
-      <QuickReadView
-        {...quickStory}
-        upNext={{
-          card: quickEssay.card!,
-          arrived: '20 Sep, 09:02',
-          saved: false,
-          issueHref: '/news/i/issue-2',
-        }}
-      />
+      <div className={SHELL_FOOT}>
+        <QuickReadView
+          {...quickStory}
+          upNext={{
+            card: quickEssay.card!,
+            arrived: '20 Sep, 9:02\u00a0AM',
+            saved: false,
+            issueHref: '/news/i/issue-2',
+          }}
+        />
+      </div>
     ),
   },
   {
@@ -3515,6 +4180,7 @@ export const SURFACES: readonly Surface[] = [
           module="news"
           sections={[
             { href: '/news', label: 'Quick read', icon: 'quickRead', exact: true },
+            { href: '/news/review', label: 'Daily review', icon: 'dailyReview', exact: true },
             { href: '/news/all', label: 'Newsletters', icon: 'newsletters', exact: true },
             { href: '/news/saved', label: 'Saved', icon: 'saved', exact: true },
           ]}
@@ -3537,21 +4203,33 @@ export const SURFACES: readonly Surface[] = [
     label: 'News · Quick read single-essay card',
     module: 'news',
     width: 'page',
-    render: () => <QuickReadView {...quickEssay} />,
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <QuickReadView {...quickEssay} />
+      </div>
+    ),
   },
   {
     id: 'news-quick-page',
     label: 'News · Quick read page on a laptop',
     module: 'news',
     width: 'page',
-    render: () => <QuickReadView {...quickPageView} />,
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <QuickReadView {...quickPageView} />
+      </div>
+    ),
   },
   {
     id: 'news-quick-page-full',
     label: 'News · A full Quick read page, every story with a picture',
     module: 'news',
     width: 'page',
-    render: () => <QuickReadView {...quickFullPage} />,
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <QuickReadView {...quickFullPage} />
+      </div>
+    ),
   },
   {
     id: 'news-quick-caught-up',
@@ -3598,6 +4276,36 @@ export const SURFACES: readonly Surface[] = [
     module: 'news',
     width: 'page',
     render: () => <SavedView {...savedStories} />,
+  },
+  {
+    id: 'news-review',
+    label: 'News · Daily review',
+    module: 'news',
+    width: 'page',
+    render: () => <ReviewView {...reviewFull} />,
+  },
+  {
+    id: 'news-review-empty',
+    label: 'News · Daily review before the first one',
+    module: 'news',
+    width: 'page',
+    render: () => <ReviewView review={null} earlier={null} later={null} todayAt={'8:00\u00a0PM'} />,
+  },
+  {
+    /* Tonight's run failed and is tried again on the hour until midnight;
+     * earlier days are still there behind the back arrow. */
+    id: 'news-review-failed',
+    label: 'News · Daily review that could not be written',
+    module: 'news',
+    width: 'page',
+    render: () => (
+      <ReviewView
+        review={{ dayLabel: 'Tuesday 6 October', writtenAt: '9:00\u00a0PM', overview: null, lines: [], retrying: true }}
+        earlier={{ href: '/news/review?day=2026-10-05', label: 'Mon 5 Oct' }}
+        later={null}
+        todayAt={null}
+      />
+    ),
   },
   {
     id: 'news-saved-empty',
@@ -3930,6 +4638,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DevChangelogSurface />,
   },
   {
+    /* By day, with the after picture under each line that changed a screen
+     * (plan #1541). */
+    id: 'dev-changelog-screens',
+    label: 'Dev · Changelog with changed screens',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevChangelogScreensSurface />,
+  },
+  {
     id: 'dev-ideas',
     label: "Dev · Ideas",
     module: 'dev',
@@ -3951,11 +4668,43 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DevRaisedSurface />,
   },
   {
+    /* The Status panel at the top of Home in Dev, with Dash's mark under
+     * Plan (note 076e7744). */
+    id: 'dev-raised-status',
+    label: 'Dev · Home, the Status panel',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevRaisedStatusSurface />,
+  },
+  {
     id: 'dev-specs',
     label: "Dev · Specs",
     module: 'dev',
     width: 'page',
     render: () => <DevSpecsSurface />,
+  },
+  {
+    /* Dash's interview under a workspace's vision (plan #1641): just
+     * started, halfway, and drafted with its links. */
+    id: 'dev-specs-interview-empty',
+    label: 'Dev · Specs, an interview just started',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevSpecsInterviewEmptySurface />,
+  },
+  {
+    id: 'dev-specs-interview-half',
+    label: 'Dev · Specs, an interview halfway',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevSpecsInterviewHalfSurface />,
+  },
+  {
+    id: 'dev-specs-interview-drafted',
+    label: 'Dev · Specs, an interview drafted',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevSpecsInterviewDraftedSurface />,
   },
   {
     id: 'dev-spec',
@@ -3990,4 +4739,18 @@ export const SURFACES: readonly Surface[] = [
     width: 'page' as const,
     render: anatomy.render,
   })),
+
+  /* The page patterns (plan #1545), framed by the patterns section on
+   * /dev/ui. Registered from the same list for the same reason as the
+   * anatomies: a pattern on /dev/ui cannot be without its picture. */
+  ...PATTERNS.flatMap((pattern) =>
+    pattern.surfaces.map((surface) => ({
+      id: surface.id,
+      label: `Pattern · ${pattern.label} · ${surface.label}`,
+      module: 'dev' as const,
+      width: 'page' as const,
+      render: surface.render,
+      ...(surface.deck ? { deck: surface.deck } : {}),
+    })),
+  ),
 ];

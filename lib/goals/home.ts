@@ -1,17 +1,21 @@
 /**
- * The Goals home (plan #1077, under #1072): a one-sentence summary, Today,
- * every open goal on one line under its area, and what Dash did since your
- * last visit.
+ * The Goals home (plan #1077, under #1072): a one-sentence summary, Do next
+ * from the week's focus goals, the other goals one line each, and what Dash
+ * did since your last visit.
  *
- * This file is the goal lines and the summary. Today is lib/goals/today.ts
- * and what Dash did is lib/goals/done-since.ts; the reads for all three are
- * in lib/goals/home-store.ts.
+ * This file is the goal lines, the summary, which goals are in focus, and
+ * the split of what is on you into Do next and the rest. The ranking is
+ * lib/goals/today.ts and what Dash did is lib/goals/done-since.ts; the reads
+ * are in lib/goals/home-store.ts.
  *
  * Pure, so the wording is tested without a database.
  */
+import { areaHref } from '@/lib/goals/all-goals';
+import { inFocus } from '@/lib/goals/focus';
 import type { NextItem } from '@/lib/goals/daily';
 import type { GoalReview, Verdict } from '@/lib/goals/reviews';
 import type { GoalProgress } from '@/lib/goals/status';
+import type { TodayItem, TodayKind } from '@/lib/goals/today';
 import type { Goal } from '@/lib/goals/tree';
 
 /** One open goal as its line on the home reads it. */
@@ -44,6 +48,25 @@ export function homeAreas(goals: readonly HomeGoal[]): HomeArea[] {
     groups.set(line.goal.areaId, group);
   }
   return [...groups.values()];
+}
+
+/** One of the buttons above Do next: an area, its page and how many open goals it holds. */
+export type AreaButton = { id: string; name: string; href: string; goals: number };
+
+/**
+ * The buttons to each area's page, above Do next (note d79a0005): every live
+ * area in the order the areas are kept, with the count of its open goals.
+ */
+export function areaButtons(
+  areas: readonly { id: string; name: string }[],
+  goals: readonly { goal: { areaId: string } }[],
+): AreaButton[] {
+  return areas.map((area) => ({
+    id: area.id,
+    name: area.name,
+    href: areaHref(area.id),
+    goals: goals.filter((line) => line.goal.areaId === area.id).length,
+  }));
 }
 
 /**
@@ -146,30 +169,12 @@ export function homeSummary(goals: readonly Pick<HomeGoal, 'review'>[]): string 
 }
 
 // ---------------------------------------------------------------------------
-// This week (plan #1079): four numbers at the bottom of the home that say
-// whether Goals is working.
+// Visit days. goals.visits keeps the days you opened the home (plan #1079);
+// nothing on the home counts them now, but each visit still records them.
 // ---------------------------------------------------------------------------
-
-/** How long a step of yours goes without a change before it counts as stuck. */
-export const STUCK_DAYS = 7;
 
 /** How many days of visits goals.visits.visit_days keeps (migrations-goals/0047). */
 export const VISIT_DAYS_KEPT = 28;
-
-/** The four numbers, for the week holding today. */
-export type WeekHealth = {
-  /** Dash's steps closed as done this week. */
-  dashFinished: number;
-  /** Everything on you now: Today and what is folded under it. */
-  waitingOnYou: number;
-  /** Your open steps that nothing has changed for STUCK_DAYS. */
-  stuck: number;
-  /** The days this week you opened the Goals home. */
-  daysVisited: number;
-};
-
-/** A week as days (YYYY-MM-DD, `endsOn` excluded) and as instants (`to` excluded). */
-export type WeekSpan = { startsOn: string; endsOn: string; from: string; to: string };
 
 /**
  * The visit days after a visit today: today added once, oldest first, and
@@ -182,71 +187,93 @@ export function nextVisitDays(days: readonly string[], today: string): string[] 
   return [...new Set([...days, today])].filter((day) => day >= oldest && day <= today).sort();
 }
 
-/** The step shape stuckSteps reads: a node of the live tree. */
-type StuckNode = {
-  id: string;
-  kind: string;
-  status: string;
-  children: StuckNode[];
-  waitingOn?: unknown[];
-  waitsUntil?: string;
+// ---------------------------------------------------------------------------
+// Do next and Other goals: what the home lists from the week's focus goals.
+// ---------------------------------------------------------------------------
+
+// Which goals are in focus is lib/goals/focus.ts's inFocus, the rule Todo and
+// Dash's runs read too.
+
+/**
+ * The kinds of thing on you that Do next takes from any goal. A question, a
+ * flag, or proposed steps or goals waiting on your approval hold up work
+ * wherever they are, so they are not left out because their goal is not one
+ * of this week's.
+ */
+export const ANY_GOAL_KINDS: ReadonlySet<TodayKind> = new Set<TodayKind>([
+  'question',
+  'ask',
+  'flag',
+  'breakdown',
+  'plan',
+]);
+
+export type HomeLists = {
+  /** The first `cap` of what is on you in the week's goals, ranked. */
+  doNext: TodayItem[];
+  /** The rest of it, in the same order, folded under Later. */
+  rest: TodayItem[];
+  /** The goals Do next leaves out, errands first, each shown as one line. */
+  otherGoals: HomeGoal[];
 };
 
 /**
- * How many of your steps are stuck: open steps of yours under an open goal,
- * with no open step beneath them (their sub-steps are the thing to do), not
- * waiting on another step or a later start date, and unchanged for
- * STUCK_DAYS. `updatedAt` holds each step's last change; a step missing from
- * it is not counted. A step under one that is closed, dropped or blocked is
- * not counted either, since the step above it settles it.
+ * Splits everything ranked as on you (todayRanked) into Do next, the first
+ * `cap` (TODAY_CAP, passed in so this file stays free of the ranking's
+ * imports in the browser), and the rest, keeping what belongs to a goal in focus and anything of
+ * ANY_GOAL_KINDS. Other goals is every goal out of focus, plus an errand
+ * with no row in Do next, so a dated errand always shows somewhere.
  */
-export function stuckSteps(
-  goals: readonly { goal: { id: string; status: string } }[],
-  byGoal: ReadonlyMap<string, readonly StuckNode[]>,
-  updatedAt: ReadonlyMap<string, string>,
-  now: number,
-): number {
-  const cutoff = now - STUCK_DAYS * 86_400_000;
-  let count = 0;
-  const visit = (node: StuckNode) => {
-    if (node.status !== 'open') return;
-    const openChildren = node.children.filter((child) => child.status === 'open');
-    if (openChildren.length > 0) {
-      openChildren.forEach(visit);
-      return;
-    }
-    if (node.kind !== 'mine') return;
-    if ((node.waitingOn?.length ?? 0) > 0 || node.waitsUntil) return;
-    const changed = updatedAt.get(node.id);
-    if (changed !== undefined && Date.parse(changed) < cutoff) count += 1;
-  };
-  for (const { goal } of goals) {
-    if (goal.status !== 'open') continue;
-    (byGoal.get(goal.id) ?? []).forEach(visit);
-  }
-  return count;
+export function homeLists(
+  ranked: readonly TodayItem[],
+  goals: readonly HomeGoal[],
+  today: string | undefined,
+  cap: number,
+): HomeLists {
+  const all = goals.map((line) => line.goal);
+  const focused = new Set(
+    all.filter((goal) => inFocus(goal, all, today)).map((goal) => goal.id),
+  );
+  const kept = ranked.filter((item) => ANY_GOAL_KINDS.has(item.kind) || focused.has(item.goalId));
+  const doNext = kept.slice(0, cap);
+  const listed = new Set(doNext.map((item) => item.goalId));
+  const { errands, others } = splitErrands(goals);
+  const otherGoals = [...errands, ...others].filter(
+    (line) => !focused.has(line.goal.id) || (line.goal.errand && !listed.has(line.goal.id)),
+  );
+  return { doNext, rest: kept.slice(cap), otherGoals };
 }
 
-/** The four numbers from what the store read. */
-export function weekHealth(input: {
-  week: WeekSpan;
-  /** When each of Dash's done steps was closed. */
-  dashClosedAt: readonly string[];
-  waitingOnYou: number;
-  stuck: number;
-  visitDays: readonly string[];
-}): WeekHealth {
-  const from = Date.parse(input.week.from);
-  const to = Date.parse(input.week.to);
-  return {
-    dashFinished: input.dashClosedAt.filter((at) => {
-      const t = Date.parse(at);
-      return t >= from && t < to;
-    }).length,
-    waitingOnYou: input.waitingOnYou,
-    stuck: input.stuck,
-    daysVisited: new Set(
-      input.visitDays.filter((day) => day >= input.week.startsOn && day < input.week.endsOn),
-    ).size,
-  };
+/**
+ * Dash's morning note cut for the home: its first paragraph, and the rest
+ * for More, or null when there is no more.
+ */
+export function briefParts(body: string): { lead: string; rest: string | null } {
+  const trimmed = body.trim();
+  const split = trimmed.search(/\n\s*\n/);
+  if (split < 0) return { lead: trimmed, rest: null };
+  return { lead: trimmed.slice(0, split).trim(), rest: trimmed.slice(split).trim() || null };
 }
+
+/** How many lines of Dash's prepared text a Do next row shows before Open. */
+export const EXCERPT_LINES = 3;
+
+/**
+ * The first lines of what Dash prepared, as plain text: blank lines dropped,
+ * and the markdown marks at the start of a line (headings, bullets, check
+ * boxes, quotes, numbers) and around words (bold, italics, code) taken off.
+ */
+export function preparedExcerpt(text: string, lines = EXCERPT_LINES): string {
+  return text
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(/^\s*(#{1,6}\s+|>\s?|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/, '')
+        .replace(/(\*\*|__|\*|_|`)(.+?)\1/g, '$2')
+        .trim(),
+    )
+    .filter(Boolean)
+    .slice(0, lines)
+    .join('\n');
+}
+

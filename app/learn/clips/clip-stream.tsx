@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Bookmark, BookmarkCheck, ChevronDown, ExternalLink, Play, ThumbsDown, Volume2, X } from 'lucide-react';
+import { Bookmark, BookmarkCheck, ChevronDown, ExternalLink, Play, RotateCcw, ThumbsDown, Volume2 } from 'lucide-react';
+import { buttonVariants } from '@/components/ui/button';
+import { cardVariants } from '@/components/ui/card';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { clockTime, thumbnailUrl, watchAt } from '@/lib/learn/youtube/format';
@@ -13,6 +15,7 @@ import {
   leaveWrite,
   reachedEnd,
   shouldRefill,
+  watchedSeconds,
   type Leave,
   type PlayerClip,
 } from '@/lib/learn/clips/stream';
@@ -41,9 +44,13 @@ import {
  * does not start it, the cover steps aside so the tap lands on YouTube's own
  * play button inside the frame.
  *
- * Below lg it covers the whole screen, shell included, with a close button
- * back to Videos, whose Clips section it plays in (plan #1488). From lg up it
- * sits in the page pane.
+ * It is a card in Videos' Clips section (plan #1488) at every width, with
+ * the shell and its top bar still showing (note 2f0f3ace). Only the frame the
+ * video plays in is black. A time bar under it says how far into the clip
+ * the player is and how long the clip runs (note 5868fbef). It can be
+ * dragged to any point in the clip, and a button beside it goes back ten
+ * seconds; the left and right arrow keys move five. Seeking stays inside the
+ * clip's own start and end.
  */
 
 // -- The parts of the YouTube IFrame API this uses ---------------------------
@@ -52,6 +59,7 @@ type YTPlayer = {
   cueVideoById(options: { videoId: string; startSeconds?: number; endSeconds?: number }): void;
   playVideo(): void;
   pauseVideo(): void;
+  seekTo(seconds: number, allowSeekAhead: boolean): void;
   getCurrentTime(): number;
   getPlayerState(): number;
   isMuted(): boolean;
@@ -83,6 +91,10 @@ declare global {
     onYouTubeIframeAPIReady?: () => void;
   }
 }
+
+/** How far the back button goes, and how far an arrow key moves. */
+const BACK_SECONDS = 10;
+const ARROW_SECONDS = 5;
 
 const STATE = { UNSTARTED: -1, ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 } as const;
 
@@ -117,11 +129,9 @@ type Cover = 'start' | 'tap' | 'sound' | null;
 
 export function ClipStream({
   initial,
-  startedAt,
   fixed = false,
 }: {
   initial: PlayerClip[];
-  startedAt: string;
   /** The surface gallery's: play only the clips given and fetch no more, since it has no session. */
   fixed?: boolean;
 }) {
@@ -132,6 +142,10 @@ export function ClipStream({
   const [letThrough, setLetThrough] = useState(false);
   const [paused, setPaused] = useState(false);
   const [exhausted, setExhausted] = useState(false);
+  /** Seconds into the clip the player holds, for the time bar. */
+  const [elapsed, setElapsed] = useState(0);
+  /** True while the time bar is held, so the player's clock does not pull it back under the finger. */
+  const scrubbing = useRef(false);
 
   const mount = useRef<HTMLDivElement>(null);
   const player = useRef<YTPlayer | null>(null);
@@ -170,6 +184,7 @@ export function ClipStream({
       if (write?.kind === 'finished') quietly(clipFinishedAction(clip.id, write.watched), () => undefined);
       if (write?.kind === 'skipped') quietly(clipSkippedAction(clip.id, write.watched), () => undefined);
       live.current = { clip: null, shown: false, done: true };
+      setElapsed(0);
       setIndex((i) => i + 1);
     },
     [],
@@ -189,6 +204,7 @@ export function ClipStream({
       if (!player.current || !ready.current) return;
       live.current = { clip, shown: false, done: false };
       setPaused(false);
+      setElapsed(0);
       player.current.loadVideoById({ videoId: clip.videoId, startSeconds: clip.startSeconds, endSeconds: clip.endSeconds });
       armGrace();
     },
@@ -267,18 +283,20 @@ export function ClipStream({
     play(current);
   }, [begun, current, play]);
 
-  // A clip whose end the player stops short of still moves on.
+  // Move the time bar on, and move on from a clip whose end the player stops short of.
   useEffect(() => {
     const timer = setInterval(() => {
       const { clip, shown, done } = live.current;
       if (!clip || !shown || done || !player.current) return;
+      const time = player.current.getCurrentTime();
+      if (!scrubbing.current) setElapsed(watchedSeconds(clip, time));
       if (player.current.getPlayerState() !== STATE.PLAYING) return;
-      if (reachedEnd(clip, player.current.getCurrentTime())) {
+      if (reachedEnd(clip, time)) {
         live.current.done = true;
         player.current.pauseVideo();
         leave('ended');
       }
-    }, 500);
+    }, 250);
     return () => clearInterval(timer);
   }, [leave]);
 
@@ -287,10 +305,7 @@ export function ClipStream({
     if (upNext) new Image().src = thumbnailUrl(upNext.videoId);
     if (fixed || !shouldRefill(queue.length, index, { loading: loading.current, exhausted })) return;
     loading.current = true;
-    loadMoreClipsAction(
-      startedAt,
-      queue.map((clip) => clip.id),
-    )
+    loadMoreClipsAction(queue.map((clip) => clip.id))
       .then((more) => {
         if (more.length === 0) setExhausted(true);
         setQueue((q) => appendClips(q, more));
@@ -299,7 +314,7 @@ export function ClipStream({
       .finally(() => {
         loading.current = false;
       });
-  }, [queue, index, exhausted, startedAt, upNext, fixed]);
+  }, [queue, index, exhausted, upNext, fixed]);
 
   // -- What the person does ---------------------------------------------------
   const begin = useCallback(() => {
@@ -355,12 +370,30 @@ export function ClipStream({
     });
   }, [current, failed]);
 
+  /** Move to `seconds` into the clip, kept inside it. Only once the clip has started playing. */
+  const seek = useCallback((seconds: number) => {
+    const { clip, shown, done } = live.current;
+    if (!clip || !shown || done || !player.current) return;
+    const at = Math.min(clip.endSeconds - clip.startSeconds, Math.max(0, seconds));
+    setElapsed(at);
+    player.current.seekTo(clip.startSeconds + at, true);
+  }, []);
+
+  const nudge = useCallback(
+    (by: number) => {
+      const { clip } = live.current;
+      if (!clip || !player.current) return;
+      seek(watchedSeconds(clip, player.current.getCurrentTime()) + by);
+    },
+    [seek],
+  );
+
   const unmute = useCallback(() => {
     player.current?.unMute();
     setCover(null);
   }, []);
 
-  // ArrowDown or j for the next clip, space or k to pause.
+  // ArrowDown or j for the next clip, space or k to pause, ArrowLeft and ArrowRight to move back and on.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target;
@@ -372,11 +405,14 @@ export function ClipStream({
       } else if (event.key === ' ' || event.key === 'k') {
         event.preventDefault();
         togglePause();
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault();
+        nudge(event.key === 'ArrowLeft' ? -ARROW_SECONDS : ARROW_SECONDS);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [next, togglePause]);
+  }, [next, togglePause, nudge]);
 
   // Swipe up anywhere on the stage.
   const touch = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -392,30 +428,13 @@ export function ClipStream({
     if (isSwipeUp(point.clientX - start.x, point.clientY - start.y, Date.now() - start.t)) next();
   };
 
-  return (
-    <div
-      className={cn(
-        'fixed inset-0 z-overlay flex flex-col bg-black text-white',
-        'lg:static lg:h-[calc(100dvh-10rem)] lg:min-h-[32rem] lg:overflow-hidden lg:rounded-card',
-      )}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
-    >
-      {/* Top: the way out, on a phone where the shell is covered. */}
-      <div className="flex items-center gap-2 px-3 pt-[calc(env(safe-area-inset-top)+0.5rem)] pb-2 lg:hidden">
-        <Link
-          href="/learn/videos"
-          className="press flex size-9 items-center justify-center rounded-full text-white/80 hover:bg-white/10 hover:text-white"
-        >
-          <X className="size-5" strokeWidth={2} aria-hidden />
-          <span className="sr-only">Close clips</span>
-        </Link>
-        <span className="text-ui font-semibold">Clips</span>
-      </div>
+  const length = current ? Math.max(0, current.endSeconds - current.startSeconds) : 0;
 
-      {/* The stage: the video letterboxed in whatever height is left. */}
-      <div className="relative flex min-h-0 flex-1 items-center justify-center">
-        <div className="relative aspect-video max-h-full w-full">
+  return (
+    <div className={cn(cardVariants(), 'flex flex-col overflow-hidden text-ink')}>
+      {/* The stage: the video in a black frame, a reading column wide from lg up. */}
+      <div className="relative touch-none bg-black text-white" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <div className="relative mx-auto aspect-video w-full lg:max-w-3xl">
           <div ref={mount} className="absolute inset-0 [&>iframe]:size-full" />
           {current && !letThrough && (
             // The layer that takes taps and swipes over the frame, which would
@@ -464,7 +483,7 @@ export function ClipStream({
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center">
             <p className="text-body font-semibold">{exhausted || fixed ? 'That is every clip for now' : 'Finding the next clip…'}</p>
             {(exhausted || fixed) && (
-              <p className="max-w-sm text-ui text-white/70">
+              <p className="max-w-sm text-ui text-white/80">
                 Dash cuts more from your videos a few times a day.{' '}
                 <Link href="/learn/now" className="underline underline-offset-2 hover:text-white">
                   Go to Now
@@ -475,12 +494,54 @@ export function ClipStream({
         )}
       </div>
 
-      {/* What the clip says, where it is from, and what you can do with it. */}
+      {/* How far into the clip, how long it runs, what it says, where it is from, and what you can do with it. */}
       {current && (
-        <div className="space-y-3 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+1rem)] lg:px-6 lg:pb-5">
+        <div className="space-y-3 card-pad-x pt-3 pb-4 lg:pb-5">
+          <div className="flex items-center gap-2 text-small tabular-nums text-ink-muted">
+            <button
+              type="button"
+              onClick={() => nudge(-BACK_SECONDS)}
+              disabled={!begun}
+              aria-label={`Back ${BACK_SECONDS} seconds`}
+              title={`Back ${BACK_SECONDS} seconds`}
+              className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), '-ml-2.5 size-11 shrink-0 px-0')}
+            >
+              <RotateCcw className="size-4" strokeWidth={2} aria-hidden />
+            </button>
+            <span>{clockTime(elapsed)}</span>
+            <input
+              type="range"
+              min={0}
+              max={length}
+              step={1}
+              value={Math.round(elapsed)}
+              disabled={!begun}
+              aria-label="Time in clip"
+              aria-valuetext={`${clockTime(elapsed)} of ${clockTime(length)}`}
+              onPointerDown={() => {
+                scrubbing.current = true;
+              }}
+              onChange={(event) => {
+                const at = Number(event.target.value);
+                // A drag shows where it is going and seeks when let go; a key or a tap seeks at once.
+                if (scrubbing.current) setElapsed(at);
+                else seek(at);
+              }}
+              onPointerUp={(event) => {
+                scrubbing.current = false;
+                seek(Number(event.currentTarget.value));
+              }}
+              onPointerCancel={() => {
+                scrubbing.current = false;
+              }}
+              // ui-ok: the hit area is the 44px touch minimum, not a control height
+              className="h-11 min-w-0 flex-1 cursor-pointer accent-accent disabled:cursor-default"
+            />
+            <span>{clockTime(length)}</span>
+          </div>
           <div className="min-w-0">
             <p className="text-body font-semibold text-pretty">{current.caption}</p>
-            <p className="mt-1 truncate text-small text-white/70">
+            <p className="mt-1 truncate text-small text-ink-muted">
               {[current.title, current.channel].filter(Boolean).join(' · ') || 'YouTube'}
               <span className="tabular-nums"> · {clockTime(current.startSeconds)}–{clockTime(current.endSeconds)}</span>
             </p>
@@ -518,7 +579,8 @@ export function ClipStream({
   );
 }
 
-/** A button on the black stage: no frame, a light wash, white ink. */
-const stageButton =
-  'press inline-flex h-(--control-h) items-center gap-1.5 rounded-control bg-white/10 px-3 text-ui font-medium text-white ' +
-  'transition-colors duration-quick hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 aria-pressed:bg-white/25';
+/** A button under the stage: the ordinary secondary button, tinted while pressed. */
+const stageButton = cn(
+  buttonVariants({ variant: 'secondary' }),
+  'aria-pressed:bg-accent-tint aria-pressed:text-accent',
+);

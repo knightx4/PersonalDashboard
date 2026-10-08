@@ -29,6 +29,12 @@ function idsIn(file: string, after: string): string[] {
 const GALLERY = [
   ...idsIn('app/preview/surfaces.tsx', 'export const SURFACES'),
   ...idsIn('app/dev/ui/anatomy.tsx', 'export const ANATOMIES'),
+  // The page patterns' surfaces, one per line inside each pattern's list.
+  ...[
+    ...readFileSync(join(root, 'app/dev/ui/patterns.tsx'), 'utf8').matchAll(
+      /\bid: '(pattern-[\w-]+)'/g,
+    ),
+  ].map((m) => m[1]),
 ];
 
 function pages(dir: string, out: string[] = []): string[] {
@@ -99,8 +105,13 @@ describe('surfacesForFiles, on screen changes that shipped', () => {
   it('follows a component to the page that uses it (20a8a7c7)', () => {
     expect(surfacesForFiles(['components/jobs/pipeline/board.tsx'], using)).toEqual([
       'jobs-pipeline-board',
+      'jobs-moment-forward',
+      'jobs-moment-offer',
+      'jobs-moment-reject',
+      'jobs-pipeline-focus',
       'jobs-pipeline-dense',
-      'jobs-pipeline-list',
+      'jobs-roles-table',
+      'shell-display-options',
     ]);
     expect(surfacesForFiles(['components/jobs/pipeline/board.tsx'])).toEqual([]);
   });

@@ -34,8 +34,10 @@ export const HIT_KINDS = {
   raise: 'Raise',
   vision: 'Vision',
   story: 'Story',
+  area: 'Area',
   goal: 'Goal',
   step: 'Step',
+  file: 'File',
 } as const;
 
 export type HitKind = keyof typeof HIT_KINDS;
