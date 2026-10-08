@@ -181,7 +181,12 @@ can now point to in a shot; say which.
 
 Round 1 is where the whole screen is judged. From round 2 on, a new fix you
 missed on round 1 must break a law, the pattern, the done-when or a craft
-check; a preference (`taste:<id>`) you only notice now goes in `notes`. When
+check; a preference (`taste:<id>`) you only notice now goes in `notes`.
+One preference is the exception and fails a screen on any round:
+`taste:no-bare-text`. Body text, a paragraph, a done-when, a list of facts
+or a properties column sitting straight on the page background, with no
+card or panel under it, is always a fix. Headings, breadcrumbs, tab labels
+and a one-line count under a list may sit on the background. When
 every earlier fix is done and nothing the change made worse is left, the
 verdict is `pass`. Each extra round re-shoots four pictures and costs the
 builder about ten minutes, so a round is spent only on what the person would
