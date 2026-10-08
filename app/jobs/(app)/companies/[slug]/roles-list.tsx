@@ -114,36 +114,49 @@ export function RolesList({
 
       <ul className="divide-y divide-border">
         {roles.map((role) => (
-          <li key={role.id} className="row-pad flex flex-wrap items-center gap-2">
-            {picking && (
-              <input
-                type="checkbox"
-                checked={selected.has(role.id)}
-                onChange={() => toggle(role.id)}
-                aria-label={`Select ${role.title} to merge`}
-                className="size-4 shrink-0"
-              />
-            )}
-            <Link
-              href={`/jobs/roles/${role.id}`}
-              className="flex-1 text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
-            >
-              {role.title}
-            </Link>
-            {role.location && <span className="text-small text-ink-muted">{role.location}</span>}
-            {role.applications.map((application) => (
-              <span key={application.id} className="flex items-center gap-1.5">
-                <StatusPicker
-                  applicationId={application.id}
-                  status={application.status}
-                  submittedAt={application.submittedAt}
+          <li
+            key={role.id}
+            // On a phone every row is the same two lines: the title across
+            // the width, then where, the status and when on a quiet line
+            // under it. From sm the two sit side by side.
+            className="row-pad flex flex-col gap-y-0.5 sm:flex-row sm:items-center sm:gap-x-2"
+          >
+            <span className="flex min-w-0 items-center gap-2 sm:flex-1">
+              {picking && (
+                <input
+                  type="checkbox"
+                  checked={selected.has(role.id)}
+                  onChange={() => toggle(role.id)}
+                  aria-label={`Select ${role.title} to merge`}
+                  className="size-4 shrink-0"
                 />
-                <span className="tabular text-small text-ink-muted">
-                  {application.attempt > 1 && `#${application.attempt} `}
-                  {formatDate(application.submittedAt, timezone)}
+              )}
+              <Link
+                href={`/jobs/roles/${role.id}`}
+                className="press-area min-w-0 flex-1 text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
+              >
+                {role.title}
+              </Link>
+            </span>
+            <span className="flex flex-wrap items-center gap-x-2">
+              {role.location && <span className="text-small text-ink-muted">{role.location}</span>}
+              {role.applications.map((application) => (
+                <span key={application.id} className="flex items-center gap-1.5">
+                  <StatusPicker
+                    applicationId={application.id}
+                    status={application.status}
+                    submittedAt={application.submittedAt}
+                    // Words that open the menu rather than a bordered box, so
+                    // the status sits on the quiet line beside its date.
+                    className="[&_select]:border-transparent [&_select]:bg-transparent [&_select]:pl-0 [&_select]:text-ink-muted [&_select]:shadow-none [&_select:hover]:text-ink"
+                  />
+                  <span className="tabular text-small text-ink-muted">
+                    {application.attempt > 1 && `#${application.attempt} `}
+                    {formatDate(application.submittedAt, timezone)}
+                  </span>
                 </span>
-              </span>
-            ))}
+              ))}
+            </span>
           </li>
         ))}
       </ul>
