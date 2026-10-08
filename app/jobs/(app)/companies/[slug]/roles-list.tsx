@@ -148,7 +148,7 @@ export function RolesList({
                     submittedAt={application.submittedAt}
                     // Words that open the menu rather than a bordered box, so
                     // the status sits on the quiet line beside its date.
-                    className="[&_select]:border-transparent [&_select]:bg-transparent [&_select]:pl-0 [&_select]:text-ink-muted [&_select]:shadow-none [&_select:hover]:text-ink"
+                    className="[&_select]:border-transparent [&_select]:bg-transparent [&_select]:pl-0 [&_select]:text-ink-muted [&_select:hover]:text-ink"
                   />
                   <span className="tabular text-small text-ink-muted">
                     {application.attempt > 1 && `#${application.attempt} `}
