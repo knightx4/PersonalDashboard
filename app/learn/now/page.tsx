@@ -109,7 +109,7 @@ export default async function NowPage({
       loadFeedPage(supabase, [], { subjectId: subject.id }),
       countReadyCards(supabase, subject.id),
     ]);
-    after(() => topUpFeedAfterResponse(user.id));
+    after(() => topUpFeedAfterResponse(user.id, subject.id));
     const related = relatedNotesForCards(supabase, user.id, cards);
     return (
       <div className="mx-auto max-w-3xl">
