@@ -411,7 +411,7 @@ describe('job_applications', () => {
     const withConfirmation: Tables = {
       ...tables,
       'job_search.application_events': [
-        ...tables['job_search.application_events'],
+        ...(tables['job_search.application_events'] ?? []),
         // An automatic confirmation is not a reply.
         { application_id: 'a1', user_id: ME, kind: 'confirmation', occurred_at: '2026-08-01T11:00:00Z' },
       ],
