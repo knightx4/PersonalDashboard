@@ -1,7 +1,5 @@
-import { GoalRhythms } from '@/app/goals/[goalId]/goal-found';
 import { StepPage } from '@/app/goals/[goalId]/step-page';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
-import { rhythmSteps } from '@/lib/goals/goal-page';
 import { attachDependencies, type DependencyRow } from '@/lib/goals/dependencies';
 import { buildForest, type Step } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
@@ -261,7 +259,6 @@ export function GoalTreeSurface() {
     <StepTree
       map={map}
       todoOn={false}
-      belowNow={<GoalRhythms steps={rhythmSteps(map.steps)} records={map.rhythms} />}
     />
   );
 }

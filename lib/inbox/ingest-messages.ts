@@ -15,8 +15,10 @@ import { recordLifecycleChange, recordOrderImport } from '@/lib/orders/record';
 import { applyLifecycleToOrder } from '@/lib/orders/apply-lifecycle';
 import { findOrderForLifecycleEmail } from '@/lib/orders/find-for-lifecycle';
 import {
+  DISMISSED_REVIEW_ERROR,
   EXCLUDED_SENDER_ERROR,
   isExcludedMessage,
+  isSkippedByPerson,
   type MerchantExclusionRow,
 } from '@/lib/inbox/merchant-exclusions';
 import { isPlatformMerchantSlug } from '@/lib/merchants/platform';
@@ -565,14 +567,14 @@ export async function linkEnvelopes(
   for (const item of work) {
     counters.messagesSeen += 1;
 
-    // A muted email stays skipped. Restoring the sender stops future mail
-    // being skipped; it does not bring back what was already muted.
+    // A muted or dismissed email stays skipped. Restoring the sender stops
+    // future mail being skipped; it does not bring back what was already muted.
     const retryLifecycle =
       item.existing &&
       LIFECYCLE.has(item.existing.classification as MessageClassification) &&
       (item.existing.parse_status === 'skipped' ||
         item.existing.parse_status === 'needs_review') &&
-      item.existing.error !== EXCLUDED_SENDER_ERROR;
+      !isSkippedByPerson(item.existing.error);
 
     // A message judged not relevant is judged again whenever its subject comes
     // back through, which a backfill arranges by re-reading scrubbed envelopes.
@@ -751,8 +753,11 @@ export async function reprocessPendingLifecycleMessages(
     .eq('email_account_id', opts.accountId)
     .in('classification', ['shipping', 'delivery', 'return', 'cancellation'])
     .in('parse_status', ['skipped', 'needs_review'])
-    // Muted rows are never retried, so they must not take up this page either.
-    .or(`error.is.null,error.neq."${EXCLUDED_SENDER_ERROR}"`)
+    // Muted and dismissed rows are never retried, so they must not take up
+    // this page either.
+    .or(
+      `error.is.null,error.not.in.("${EXCLUDED_SENDER_ERROR}","${DISMISSED_REVIEW_ERROR}")`,
+    )
     .order('received_at', { ascending: true })
     .limit(limit);
 

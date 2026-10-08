@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  closedSteps,
   firstSentence,
+  isStepAnchor,
+  stepAnchor,
   goalStages,
   nowLabel,
   nowStages,
@@ -280,5 +283,32 @@ describe('stepPreps', () => {
 
   it('ignores prepares_id on a step that is not Dash\'s', () => {
     expect(stepPreps([[node('x', { preparesId: 'apply' }), apply]]).prepFor).toEqual({});
+  });
+});
+
+describe('the goal page tabs', () => {
+  it('sends a link to a step to its row on the Steps tab', () => {
+    expect(stepAnchor('s1')).toBe('?tab=steps#step-s1');
+    expect(isStepAnchor(stepAnchor('s1'))).toBe(true);
+    expect(isStepAnchor('#step-s1')).toBe(true);
+    expect(isStepAnchor('#flag-f1')).toBe(false);
+  });
+
+  it('lists closed steps at any depth, newest first, leaving out the untimed', () => {
+    const steps = [
+      node('a', { status: 'done', closedAt: '2026-10-01T09:00:00Z' }),
+      node('b', {
+        children: [
+          node('b1', { status: 'dropped', closedAt: '2026-10-03T09:00:00Z' }),
+          node('b2', { status: 'done', kind: 'claude', closedAt: '2026-10-02T09:00:00Z' }),
+        ],
+      }),
+      node('c', { status: 'done', closedAt: null }),
+    ];
+    expect(closedSteps(steps).map((s) => [s.id, s.status, s.dash])).toEqual([
+      ['b1', 'dropped', false],
+      ['b2', 'done', true],
+      ['a', 'done', false],
+    ]);
   });
 });

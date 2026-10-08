@@ -337,8 +337,7 @@ handled differently:
   search, and what bears on a goal is kept on it as **context**: a row in
   `goals.context` naming the table and row, one sentence on why it matters
   here, and the words that do. The goal page shows it under "From your other
-  modules", each linking back to where it lives: under More, or above More
-  while some of it waits for Keep or Not relevant. Facts from it fill the
+  modules" on its Overview tab, each linking back to where it lives. Facts from it fill the
   goal's collections as drafts, with `source = 'app'`.
 
 **Where to look is a catalogue, not a rule per goal.** Each module declares
@@ -927,13 +926,29 @@ and the reads in `lib/goals/done-since-store.ts`.
 
 ## The goal page
 
-A goal's page (`app/goals/[goalId]/page.tsx`, plan #1078) is one column in
-four parts, so the next thing to do is near the top rather than under a
-dozen sections.
+A goal's page (`app/goals/[goalId]/page.tsx`, plans #1078 and #1671) has
+the same layout as a feature's page on /dev/plan: the tabbed detail
+pattern (`components/patterns/tabbed-detail.tsx`, decision #1661). The path
+runs Goals, the area, the goal. Under it are the goal's hexagon, its title
+and its done-when, each edited where it is read, and the menu that moves it to
+another area, makes it an errand or closes it. Then three tabs, **Overview**, **Steps** and
+**Activity**, each with its own address (`?tab=steps`), so a reload or a
+pasted link opens the same tab. The frame is `GoalDetail` in
+`app/goals/[goalId]/goal-detail.tsx`.
 
-**The header** is the title and done-when, each edited where it is read,
-then one card: Dash's verdict, one line of counts ("3 on you · Dash on 1 ·
-due 31 Oct · last progress 3 Oct", `statusLine` in
+**The properties** sit in a column on the right from laptop width and as a
+grid of facts under the title on a phone (`goal-properties.tsx`): the area,
+the status, Dash's verdict with its reason on hover, the due date, when the
+goal was added and when it finished, and the progress split. Progress is
+"N of M done" over the steps that count, with the open ones split under it
+as "3 yours · 1 Dash's · 1 waiting", a share of none left out: yours is your
+move (steps of yours, questions, results to read), Dash's is what Dash is on
+or can take, and waiting is held by another step or a date. The counts are
+the same bands as the goal's bar on Goals (`goalProgress` in
+`lib/goals/status.ts`).
+
+**Overview** opens first. It holds one card: Dash's verdict, one line of
+counts ("3 on you · Dash on 1 · last progress 3 Oct", `statusLine` in
 `lib/goals/goal-status.ts`), the verdict's next move as a sentence, Dash's
 latest note folded, what Dash is on or finished in the last day, and **Ask
 Dash** for the whole goal. While Dash has something to approve, a run is
@@ -941,28 +956,38 @@ going, or every step is finished, Ask Dash is instead the panel with the
 approval line and **Approve**. The goal's number and chart follow when it
 has one. **Waiting on you** lists, one line each, what Dash flagged, the
 questions, the proposals and the results to read. A flag or a question opens
-in place to be answered; a proposal or a result is a link to its row under
-Now. Your own ready steps are not listed there, since they are the open rows
-under Now and the status line counts them.
+in place to be answered; a proposal or a result is a link to its row on the
+Steps tab (`stepAnchor` in `lib/goals/goal-page.ts`). Your own ready steps
+are not listed there, since they are the open rows on Steps and the status
+line counts them. Below that is what feeds the goal rather than being its
+work: context from the other modules, the kinds of weekly help, links to
+Learn and the job search, the Learn section, files, related vault notes, and
+the add lines for whatever is still empty.
 
-**Now** is the stages in hand (under "Stages" above), each a row with its
-open steps beneath it, and any open step outside the stages. A goal that is
-one list is Now alone. The goal's rhythms sit under it as a strip,
-"Applications 2 of 5 this week from Jobs", each name going to its row.
+**Steps** holds the step tree, its tab counting the open steps. **Now** is
+the stages in hand (under "Stages" above), each a row with its open steps
+beneath it, and any open step outside the stages. A goal that is one list is
+Now alone. A rhythm is a row like any other, its count at the end
+("0 of 1 this week") and its past periods, kept or missed, in its panel; the
+strip of rhythms that sat under Now went with #1671, since it repeated those
+rows outside any card. **Other stages** is the
+rest of the map, one line per stage. On a closed goal the whole tree folds
+into one line, "8 of 9 done".
 
-**Other stages** is the rest of the map, one line per stage.
-
-**More**, closed on arrival, holds what feeds the goal rather than being
-its work: context from the other modules, the kinds of weekly help, links
-to Learn and the job search, the Learn section, files, related vault notes,
-the add lines for whatever is still empty, the goal's last ten runs and its
-comments.
+**Activity** is what happened to the goal (`goal-activity.tsx`): the steps
+closed, done or dropped, newest first with the day each closed and Dash's
+mark on Dash's own, each going to the step's page; the goal's last ten runs;
+and its comments.
 
 A step's row is its status glyph, its title, Dash's mark on Dash's steps
 and, at the end, its date or a rhythm's count; on a stage, how far along it
 is. The glyph is the status menu. Finished steps fold under **Finished** at
 every level. Pressing the title opens the panel with the detail, done-when,
 questions, dependencies, thread and the row's actions, as on the dev plan.
+A date or amount that is set reads as text and turns into its editor when
+pressed; the unset ones wait behind one **Dates and amount** line. **Ask
+Dash** opens a box for what you want on its first press and sends on the
+second, the box left empty when the step says it all.
 
 What Dash wrote for a step is a fold on that step's row, shown as its first
 sentence and opening to the whole text with **Copy** and the place it

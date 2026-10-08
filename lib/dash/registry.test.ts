@@ -38,6 +38,8 @@ describe('DASH_TOOLS', () => {
       'close_goal_step',
       'mark_returned',
       'add_role_note',
+      'add_job_lead',
+      'add_idea',
     ]);
     expect(dashToolsOf('write').map((t) => t.name)).toEqual([
       ...WRITE_TOOL_NAMES,

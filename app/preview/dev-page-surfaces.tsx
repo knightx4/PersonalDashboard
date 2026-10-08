@@ -1,4 +1,5 @@
 import { PageHeader } from '@/components/shell/page-header';
+import type { AccountTab } from '@/app/account/tabs';
 import { FeedbackQueueView } from '@/components/feedback/feedback-queue';
 import { OtherUsersFeedback } from '@/components/feedback/other-users';
 import { IdeasView } from '@/app/dev/ideas/ideas-view';
@@ -739,11 +740,19 @@ const apps: ConnectedApp[] = [
   },
 ];
 
-export function AccountSurface() {
+/**
+ * Account on one of its tabs (plan #1628). The tab is chosen here rather than
+ * from the address, since the page reads it on the server; `account` is the
+ * page as it opens, and `account-notifications` where Dash's link sends you
+ * when push is off.
+ */
+export function AccountSurface({ tab = 'you' }: { tab?: AccountTab }) {
   return column(
     <>
       <p className="text-body text-ink-muted">Settings that hold across every workspace.</p>
       <AccountView
+        tab={tab}
+        opensOn={tab}
         email="christopher.kloughton@example.com"
         settings={{
           displayName: 'Chris',

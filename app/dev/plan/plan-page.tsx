@@ -1,5 +1,8 @@
 import { createClient, requireUser } from '@/lib/auth/server';
+import Link from 'next/link';
+import { Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { buttonVariants } from '@/components/ui/button';
 import { loadPlan } from '@/lib/plan/load';
 import { syncPlanFromSeed } from '@/lib/plan/sync';
 import {
@@ -19,6 +22,7 @@ import { keyRefusal } from '@/lib/plan/work';
 import type { LastRun } from '@/lib/plan/run-end';
 import { planRoutine, projectRoutine } from '@/lib/feedback/routine';
 import type { DevProject } from '@/lib/plan/projects';
+import { NEW_FEATURE_PARAM, NEW_FEATURE_VALUE, newFeatureHref } from '@/lib/plan/feature-page';
 import {
   applyView,
   buildPlanTree,
@@ -106,7 +110,11 @@ export async function renderPlanPage({
   searchParams,
   project,
 }: {
-  searchParams: Promise<{ view?: string | string[]; q?: string | string[] }>;
+  searchParams: Promise<{
+    view?: string | string[];
+    q?: string | string[];
+    new?: string | string[];
+  }>;
   project: DevProject | null;
 }) {
   const user = await requireUser();
@@ -118,6 +126,8 @@ export async function renderPlanPage({
   // What to put in the plan's own search box on arrival. The app-wide search
   // sends a step here as `q=#612`, which unfolds the feature it sits under.
   const query = (Array.isArray(params.q) ? params.q[0] : params.q) ?? '';
+  // The "New feature" surface, open from the header's link (plan #1670).
+  const newFeatureOpen = params[NEW_FEATURE_PARAM] === NEW_FEATURE_VALUE;
 
   // Before the load, so anything new appears on this render rather than the
   // next one. It carries its failure back instead of throwing: a plan that
@@ -228,10 +238,24 @@ export async function renderPlanPage({
     ? Boolean(projectRoutine(project).id && projectRoutine(project).token)
     : Boolean(planRoutine().token);
 
+  // "New feature" is a link to this page with the surface open (plan #1670),
+  // keeping the view it was pressed from.
+  const basePath = project ? `/dev/projects/${project.id}` : '/dev/plan';
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title={project ? project.label : 'Plan'}
+        actions={
+          <Link
+            href={newFeatureHref(basePath, requested)}
+            scroll={false}
+            className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+          >
+            <Plus className="size-3.5" strokeWidth={2} aria-hidden />
+            New feature
+          </Link>
+        }
         description={
           project
             ? `${project.description}, built from this plan in ${project.repo.owner}/${project.repo.repo}. Send a step to Dash and it is built there, pushed to ${project.repo.branch} and closed here with the commit.`
@@ -259,7 +283,11 @@ export async function renderPlanPage({
         />
       )}
       <PlanViewComponent
-        basePath={project ? `/dev/projects/${project.id}` : '/dev/plan'}
+        basePath={basePath}
+        newFeature={{
+          open: newFeatureOpen,
+          ...(project ? { module: project.id, scopes: [project.id] } : {}),
+        }}
         sections={sections}
         finished={finished}
         summary={summary}

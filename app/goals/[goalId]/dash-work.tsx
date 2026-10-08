@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { DashWorkItem } from '@/lib/goals/dash-work';
 import { cn } from '@/lib/cn';
+import { stepAnchor } from '@/lib/goals/goal-page';
 
 /**
  * What Dash is on under this goal, and what it finished in the last day
@@ -26,7 +27,7 @@ export function DashWork({ items }: { items: DashWorkItem[] }) {
             <span className={item.state === 'running' ? 'text-accent' : 'text-positive'}>
               {item.state === 'running' ? 'Dash is on ' : 'Dash finished '}
             </span>
-            <a href={`#step-${item.stepId}`} className="font-medium text-ink hover:text-accent">
+            <a href={stepAnchor(item.stepId)} className="font-medium text-ink hover:text-accent">
               {item.title}
             </a>
             {item.line && <span className="text-ink-muted"> · {item.line}</span>}

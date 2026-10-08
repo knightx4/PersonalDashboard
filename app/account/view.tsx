@@ -17,14 +17,31 @@ import { NotificationsSection } from './notifications';
 import { FeelSection } from './haptics';
 import { ConnectedAppsSection } from './connected-apps';
 import type { ConnectedApp } from '@/lib/connector/apps';
+import { TabbedSections } from '@/components/patterns/tabbed-sections';
+import { ACCOUNT_TAB_ADDRESS, ACCOUNT_TABS, type AccountTab } from './tabs';
 
+/**
+ * Account, one section at a time behind tabs (the tabbed sections pattern,
+ * plan #1628). The page reads the open tab from the address and passes it
+ * in, and only that tab's sections are drawn; app/account/tabs.ts says which
+ * sections each tab holds.
+ */
 export function AccountView({
+  tab,
+  opensOn,
   email,
   settings,
   isOwner,
   vapidPublicKey,
   connected,
 }: {
+  /** The open tab, read from the address by the page. */
+  tab: AccountTab;
+  /**
+   * The gallery's: the tab the row marks when the address names none. The
+   * page leaves it out, since its address and `tab` always agree.
+   */
+  opensOn?: AccountTab;
   email: string;
   settings: {
     displayName: string;
@@ -36,22 +53,47 @@ export function AccountView({
   isOwner: boolean;
   /** The key browsers subscribe to push with; null when the server has none. */
   vapidPublicKey: string | null;
-  /** The Connected apps section's data, read on the server (plan #1258). */
-  connected: { apps: ConnectedApp[]; failed: string | null; connectorAddress: string };
+  /**
+   * The Connected apps section's data, read on the server (plan #1258), and
+   * only when Activity is the open tab; null on the others.
+   */
+  connected: { apps: ConnectedApp[]; failed: string | null; connectorAddress: string } | null;
 }) {
   return (
-    <div className="space-y-6">
-      <YouSection email={email} settings={settings} />
-      <ModulesSection enabled={settings.enabledModules} isOwner={isOwner} />
-      <NotificationsSection publicKey={vapidPublicKey} />
-      <FeelSection />
-      <ConnectedAppsSection {...connected} timezone={settings.timezone} />
-      <ModuleSettingsSection enabled={settings.enabledModules} />
-      <TimelineSection />
-      <SpendSection />
-      <SessionSection />
-      <DangerSection vaultEnabled={settings.enabledModules.includes('vault')} />
-    </div>
+    <TabbedSections
+      tabs={ACCOUNT_TABS}
+      label="Account"
+      address={opensOn ? { ...ACCOUNT_TAB_ADDRESS, opensOn } : ACCOUNT_TAB_ADDRESS}
+    >
+      <div className="space-y-6">
+        {tab === 'you' && <YouSection email={email} settings={settings} />}
+        {tab === 'workspaces' && (
+          <>
+            <ModulesSection enabled={settings.enabledModules} isOwner={isOwner} />
+            <ModuleSettingsSection enabled={settings.enabledModules} />
+          </>
+        )}
+        {tab === 'notifications' && (
+          <>
+            <NotificationsSection publicKey={vapidPublicKey} />
+            <FeelSection />
+          </>
+        )}
+        {tab === 'activity' && (
+          <>
+            {connected && <ConnectedAppsSection {...connected} timezone={settings.timezone} />}
+            <SpendSection />
+            <TimelineSection />
+          </>
+        )}
+        {tab === 'session' && (
+          <>
+            <SessionSection />
+            <DangerSection vaultEnabled={settings.enabledModules.includes('vault')} />
+          </>
+        )}
+      </div>
+    </TabbedSections>
   );
 }
 
@@ -73,8 +115,8 @@ function YouSection({
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">You</h2>
-      <p className="mt-0.5 text-ui text-ink-muted">{email}</p>
+      {/* No "You" heading: the tab above already says it (law 9). */}
+      <p className="text-ui text-ink-muted">{email}</p>
 
       <form action={action} className="mt-4 space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -129,8 +171,8 @@ function ModulesSection({ enabled, isOwner }: { enabled: ModuleId[]; isOwner: bo
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">Workspaces</h2>
-      <p className="mt-0.5 text-ui text-ink-muted">
+      {/* No "Workspaces" heading: the tab above already says it (law 9). */}
+      <p className="text-ui text-ink-muted">
         Which of these appear in the switcher. Turning one off hides it — nothing is deleted, and
         turning it back on restores exactly what was there.
       </p>
@@ -285,14 +327,14 @@ function SpendSection() {
  * Signing out is an account action, so it lives on the account page.
  *
  * It used to exist in exactly one place -- Shopping settings -- which meant a
- * person who switched Shopping off under Workspaces above had no way to sign
+ * person who switched Shopping off under Workspaces had no way to sign
  * out of their own account. An account-level action can never live inside a
  * module.
  */
 function SessionSection() {
   return (
     <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">Session</h2>
+      <h2 className="text-body font-semibold text-ink">Sign out</h2>
       <p className="mt-0.5 text-ui text-ink-muted">
         Signing out ends this session on this device. Nothing is deleted.
       </p>
@@ -310,7 +352,7 @@ function SessionSection() {
  *
  * It used to live on the job search settings page, which made the whole
  * account deletable only from inside one workspace -- switch that workspace
- * off under Workspaces above and there was no way to leave. Signing out moved
+ * off under Workspaces and there was no way to leave. Signing out moved
  * here for exactly the same reason; deleting is the same kind of action, one
  * step further.
  */

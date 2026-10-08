@@ -21,7 +21,7 @@ export const MAX_REPORT_TIMES = 6;
 export const MAX_WATCH_DAYS = 180;
 
 /** Where push is switched on, for the line that says it is off. */
-export const PUSH_SETTINGS_HREF = '/account#notifications';
+export const PUSH_SETTINGS_HREF = '/account?tab=notifications';
 
 type Parsed = { ok: true; value: Omit<StartWatch, 'goalItemId' | 'goalTitle' | 'pushOn'> } | { ok: false; error: string };
 

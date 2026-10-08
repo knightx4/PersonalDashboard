@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { isExcludedMessage, isExcludedSender } from '@/lib/inbox/merchant-exclusion-match';
+import {
+  DISMISSED_REVIEW_ERROR,
+  EXCLUDED_SENDER_ERROR,
+  isExcludedMessage,
+  isExcludedSender,
+  isSkippedByPerson,
+} from '@/lib/inbox/merchant-exclusion-match';
 
 describe('isExcludedSender', () => {
   const exclusions = [
@@ -92,5 +98,17 @@ describe('isExcludedMessage', () => {
         fromAddress: 'ship@nike.com',
       }),
     ).toBe(false);
+  });
+});
+
+describe('isSkippedByPerson', () => {
+  it('keeps a muted or dismissed email out of the lifecycle retry', () => {
+    expect(isSkippedByPerson(EXCLUDED_SENDER_ERROR)).toBe(true);
+    expect(isSkippedByPerson(DISMISSED_REVIEW_ERROR)).toBe(true);
+  });
+
+  it('lets an email the sync skipped on its own be retried', () => {
+    expect(isSkippedByPerson(null)).toBe(false);
+    expect(isSkippedByPerson('No matching order yet')).toBe(false);
   });
 });

@@ -115,6 +115,10 @@ export function changePaths(change: DashChange): string[] {
       return ['/goals', `/goals/${change.input.goalId}`];
     case 'add_role_note':
       return [`/jobs/roles/${change.input.roleId}`];
+    case 'add_idea':
+      return ['/dev/ideas'];
+    case 'add_job_lead':
+      return ['/jobs/roles', '/jobs/pipeline', `/jobs/roles/${change.input.roleId}`];
   }
 }
 
@@ -129,6 +133,8 @@ const WORKSPACE: Record<DashChangeKind, { module: ModuleId; label: string } | nu
   close_todo: { module: 'todo', label: 'Todo' },
   close_goal_step: { module: 'goals', label: 'Goals' },
   add_role_note: { module: 'jobs', label: 'Jobs' },
+  add_idea: null,
+  add_job_lead: { module: 'jobs', label: 'Jobs' },
 };
 
 const WRITTEN_TABLE: Record<DashChangeKind, string> = {
@@ -141,6 +147,8 @@ const WRITTEN_TABLE: Record<DashChangeKind, string> = {
   close_todo: 'todo.tasks',
   close_goal_step: 'goals.items',
   add_role_note: 'core.conversation_turns',
+  add_idea: 'public.ideas',
+  add_job_lead: 'job_search.roles',
 };
 
 /** What each kind does to that row: a return changes the item, the rest add one. */
@@ -154,6 +162,8 @@ const WRITTEN_OP: Record<DashChangeKind, 'insert' | 'update'> = {
   close_todo: 'update',
   close_goal_step: 'update',
   add_role_note: 'insert',
+  add_idea: 'insert',
+  add_job_lead: 'insert',
 };
 
 /** A refusal the person reads: the sentence is theirs, the class only marks it as one. */

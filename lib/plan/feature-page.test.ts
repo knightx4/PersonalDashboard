@@ -4,6 +4,7 @@ import { buildPlanTree } from '@/lib/plan/tree';
 import {
   featureCrumbs,
   findFeature,
+  newFeatureHref,
   stepGroups,
   stepRedirect,
   stepsViewFrom,
@@ -158,5 +159,15 @@ describe("the Steps tab's status groups", () => {
     expect(stepsViewFrom('nonsense')).toBe('status');
     expect(stepsViewHref(100, 'status')).toBe('/dev/plan/100?tab=steps');
     expect(stepsViewHref(100, 'tree')).toBe('/dev/plan/100?tab=steps&view=tree');
+  });
+});
+
+describe('newFeatureHref', () => {
+  it('opens the New feature surface on the page it was pressed from, keeping the view', () => {
+    expect(newFeatureHref('/dev/plan')).toBe('/dev/plan?new=feature');
+    expect(newFeatureHref('/dev/plan', 'all')).toBe('/dev/plan?view=all&new=feature');
+    expect(newFeatureHref('/dev/projects/website', null)).toBe(
+      '/dev/projects/website?new=feature',
+    );
   });
 });

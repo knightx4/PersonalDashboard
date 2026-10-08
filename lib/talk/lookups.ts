@@ -51,6 +51,8 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
   'close_goal_step',
   'mark_returned',
   'add_role_note',
+  'add_job_lead',
+  'add_idea',
 ];
 
 /**

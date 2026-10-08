@@ -1,4 +1,5 @@
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
+import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
 import type { RoleReminder } from '@/app/jobs/(app)/roles/[id]/types';
 import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
 import type { Task } from '@/lib/todo/tasks/model';
@@ -130,6 +131,8 @@ import {
   PlanSendBackSurface,
   PlanOpenedSurface,
   PlanFeatureSurface,
+  PlanFeatureEditSurface,
+  PlanNewFeatureSurface,
   PlanFeatureStepsSurface,
   PlanFeatureStepsYoursSurface,
   PlanFeatureActivitySurface,
@@ -157,6 +160,7 @@ import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { WatchingSurface } from './watching-surfaces';
 import { DashTodaySurface } from './dash-today-surfaces';
+import { HomePageSurface } from './home-page-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface } from './clip-surfaces';
 import {
   InspirationByVideoSurface,
@@ -168,6 +172,8 @@ import {
   GoalBareSurface,
   GoalLinkingSurface,
   GoalTopSurface,
+  GoalStepsTabSurface,
+  GoalActivitySurface,
   FileSurface,
   GoalsAllSurface,
   GoalsAreaSurface,
@@ -601,6 +607,43 @@ const momentRows = pipelineRows.filter((row) => OPEN_STATUSES.includes(row.statu
  * file at different stages of being contacted, one send still unanswered.
  */
 const companyPanels = {
+  roleCount: 2,
+  roles: (
+    <CompanyRoles
+      companyId="co-1"
+      slug="d-e-shaw"
+      timezone="Europe/London"
+      tasks={[]}
+      todos={[
+        {
+          id: 'rm1',
+          body: 'Send Dana the follow-up on the backtester question',
+          dueAt: '2026-09-12T09:00:00.000Z',
+          role: { id: 'r1', title: 'Senior Software Engineer, Research Platform' },
+        },
+      ]}
+      roles={[
+        {
+          id: 'r1',
+          title: 'Senior Software Engineer, Research Platform',
+          location: 'London',
+          firstSeenAt: '2026-08-04T09:00:00.000Z',
+          applications: [
+            { id: 'a1', attempt: 1, status: 'in_process', submittedAt: '2026-08-06T09:00:00.000Z', outcome: null },
+          ],
+        },
+        {
+          id: 'r2',
+          title: 'Software Engineer, Market Data',
+          location: 'New York, NY',
+          firstSeenAt: '2025-03-11T09:00:00.000Z',
+          applications: [
+            { id: 'a2', attempt: 1, status: 'rejected', submittedAt: '2025-03-14T09:00:00.000Z', outcome: 'rejected' },
+          ],
+        },
+      ]}
+    />
+  ),
   companyId: 'co-1',
   research:
     'Systematic manager, roughly 500 people in London. The research platform team owns the backtester and the data pipeline; the posting is on that team.\n\nThey moved off a vendor risk system in 2024, which is what the "market data at scale" line in the posting is about.',
@@ -3058,6 +3101,25 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PlanFeatureSurface />,
   },
   {
+    /* The same page with Edit pressed (plan #1670): the feature's compose
+     * surface, filled in, in place of the Overview. */
+    id: 'dev-plan-feature-edit',
+    label: 'Plan · editing a feature',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanFeatureEditSurface />,
+  },
+  {
+    /* "New feature" pressed on the plan (plan #1670): one compose surface
+     * with the title, a summary, chips for module, priority, size and who
+     * holds it, then the description. */
+    id: 'dev-plan-new-feature',
+    label: 'Plan · writing a new feature',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanNewFeatureSurface />,
+  },
+  {
     /* The same page on its Activity tab (plan #1667): the feature's history
      * by day, newest first, each entry linking to its row. */
     id: 'dev-plan-feature-activity',
@@ -3207,13 +3269,32 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsAreaSurface />,
   },
   {
-    /* The top of a goal page with every section holding something: the
-     * Claude line, the number and its readings, one Learn goal linked. */
+    /* A goal's page on its Overview tab (plan #1671), in the tabbed detail
+     * pattern: the path, title and done-when, the properties column, then
+     * Dash's status card, the number and its readings, Waiting on you, one
+     * Learn goal linked and a file. */
     id: 'goals-page-top',
-    label: 'Goal · the top of the page',
+    label: 'Goal · the Overview tab',
     module: 'goals',
     width: 'page',
     render: () => <GoalTopSurface />,
+  },
+  {
+    /* The same frame on its Steps tab: the step tree and its stages. */
+    id: 'goals-page-steps',
+    label: 'Goal · the Steps tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalStepsTabSurface />,
+  },
+  {
+    /* The same frame on its Activity tab: the steps closed, the runs and
+     * the goal's comments. */
+    id: 'goals-page-activity',
+    label: 'Goal · the Activity tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalActivitySurface />,
   },
   {
     /* A file Claude wrote (core.files): the summary, then a table, a list
@@ -3391,6 +3472,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <CompanyPanels {...companyPanels} />,
   },
   {
+    /* The About tab: details, then what you know about the place (plan #1628). */
+    id: 'jobs-company-about',
+    label: 'Company · About the place',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <CompanyPanels {...companyPanels} opensOn="about" />,
+  },
+  {
     /* People with its add form open (note 4323ee10). */
     id: 'jobs-company-add-person',
     label: 'Company · Adding a person',
@@ -3402,7 +3491,7 @@ export const SURFACES: readonly Surface[] = [
       <PaidCostsProvider
         costs={{ 'app/jobs/(app)/companies/actions.ts#proposeAiCompanyEnrichment': guessedSummary }}
       >
-        <CompanyPanels {...companyPanels} addingPerson />
+        <CompanyPanels {...companyPanels} opensOn="people" addingPerson />
       </PaidCostsProvider>
     ),
   },
@@ -4047,6 +4136,18 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PostsDraftingSurface />,
   },
   {
+    /* Home as a whole page on the main-plus-rail pattern (plan #1627): the
+     * header, briefs, Today and Updates in the main column, and Watching,
+     * what Dash did, the week and the workspaces in the rail. Inside the
+     * shell, so the widths are the ones the page gets. Fixtures in
+     * home-page-surfaces.tsx. */
+    id: 'home-page',
+    label: 'Home · The whole page',
+    module: 'goals',
+    width: 'page',
+    render: () => <HomePageSurface />,
+  },
+  {
     /* The home page's Watching section (plan #1295): a watch that fired, one
      * reporting only, and one whose page stopped reading. Fixtures in
      * watching-surfaces.tsx. */
@@ -4506,7 +4607,7 @@ export const SURFACES: readonly Surface[] = [
       kind: 'press',
       target: '[data-motion-demo="home-arrival"]',
       shows:
-        'The greeting, the date, the brief line and the Today card each rise in a beat after the one before, all settled by about three quarters of a second.',
+        'The greeting, the date, the brief line, each rise in a beat after the one before, the Today card and the Watching rail together on the last, all settled by about three quarters of a second.',
     },
     render: () => (
       <div className={cardVariants({ padding: 'standard' })}>
@@ -4637,6 +4738,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <AccountSurface />,
+  },
+  {
+    /* The tab Dash's link opens when a watch would reach no phone (plan #1628). */
+    id: 'account-notifications',
+    label: 'Account · Notifications on this device',
+    module: 'dev',
+    width: 'page',
+    render: () => <AccountSurface tab="notifications" />,
   },
   {
     id: 'home-week',

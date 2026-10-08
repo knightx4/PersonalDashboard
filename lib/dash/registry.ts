@@ -8,6 +8,7 @@ import { HAND_OFF_TOOL } from '@/lib/talk/handoff';
 import { CAPTURE_TABLE, CAPTURE_TOOLS } from './capture-tools';
 import { THREAD_TOOLS } from './thread-tools';
 import { WRITE_TOOLS } from './writes';
+import type { FetchOutcome } from '@/lib/jobs/ats';
 
 /**
  * Every tool Dash can call, on any surface (plan #1463, feature #1462;
@@ -93,6 +94,11 @@ export type DashWriteContext = AskContext & {
    * refused.
    */
   thread?: DashThreadActs;
+  /**
+   * Reads a job posting from its link, for add_job_lead: fetchPostingFromUrl
+   * from lib/jobs/ats when absent, a fake in tests.
+   */
+  readPosting?: (url: string) => Promise<FetchOutcome>;
 };
 
 /** Runs one of a thread's own write tools by name, against the row the thread hangs from. Never throws. */

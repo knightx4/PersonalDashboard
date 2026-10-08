@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useActionState, useState, useTransition } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useActionState, useState, useTransition, type ReactNode } from 'react';
+import { Briefcase, Building2, MessagesSquare, Send, Users } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
-import { CardSection } from '@/components/ui/card';
+import { Card, CardSection } from '@/components/ui/card';
 import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { EditableProse } from '@/components/ui/editable-prose';
@@ -24,8 +26,31 @@ import {
 } from '../actions';
 import { updateCompany } from '../actions';
 import { PaidHint } from '@/components/ui/paid-hint';
+import { TabbedSections } from '@/components/patterns/tabbed-sections';
+import type { Tab } from '@/lib/tabs';
+import { companyTabFrom, type CompanyTab } from './tabs';
 
+const TABS: readonly (Tab & { id: CompanyTab })[] = [
+  { id: 'roles', label: 'Roles', icon: Briefcase },
+  { id: 'about', label: 'About', icon: Building2 },
+  { id: 'people', label: 'People', icon: Users },
+  { id: 'outreach', label: 'Outreach', icon: Send },
+  { id: 'notes', label: 'Notes', icon: MessagesSquare },
+];
+
+/**
+ * A company's page below its header, one section at a time behind tabs (the
+ * tabbed sections pattern, plan #1628), in the role page's shape since the
+ * two are reached from each other. Roles holds the roles pursued here and
+ * what is outstanding on them; About what you know about the place and its
+ * details; then People, Outreach and Notes.
+ */
 export function CompanyPanels(props: {
+  /** The Roles tab, drawn on the server: the roles here and what is outstanding. */
+  roles: ReactNode;
+  roleCount: number;
+  /** The gallery's: the tab to open on when the address names none. */
+  opensOn?: CompanyTab;
   companyId: string;
   research: string;
   domains: string;
@@ -59,17 +84,32 @@ export function CompanyPanels(props: {
   /** The surface gallery's: draw People with its add form open. */
   addingPerson?: boolean;
 }) {
+  const tab = companyTabFrom(useSearchParams().get('tab'), props.opensOn);
+  const counts: Partial<Record<CompanyTab, number>> = {
+    roles: props.roleCount,
+    people: props.contacts.length,
+    outreach: props.touches.length,
+    notes: props.notes.length,
+  };
+  const tabs = TABS.map((entry) => ({ ...entry, count: counts[entry.id] }));
+
   return (
-    // One column at every width: the details first, then the long text, then
-    // the rest (taste one-column-detail). Details used to be a side column
-    // on a laptop and the fourth card on a phone.
-    <div className="space-y-4">
-      <Details {...props} />
-      <Research {...props} />
-      <Contacts {...props} />
-      <Touches {...props} />
-      <Notes {...props} />
-    </div>
+    // Shallow: the page reads every tab's data at once for the counts, so a
+    // switch writes the address without loading the company again.
+    <TabbedSections tabs={tabs} label="Company" address={{ opensOn: props.opensOn }} shallow>
+      {tab === 'roles' && props.roles}
+      {tab === 'about' && (
+        // One column at every width: the details first, then the long text
+        // (taste one-column-detail).
+        <div className="space-y-4">
+          <Details {...props} />
+          <Research {...props} />
+        </div>
+      )}
+      {tab === 'people' && <Contacts {...props} />}
+      {tab === 'outreach' && <Touches {...props} />}
+      {tab === 'notes' && <Notes {...props} />}
+    </TabbedSections>
   );
 }
 
@@ -617,12 +657,13 @@ function Contacts({
   );
 
   return (
-    <CardSection title="People">
+    // No heading of its own: the People tab above already names it (law 9).
+    <Card padding="dense" data-slot="section">
       {adding ? (
         // Placeholders name the fields rather than labels above them, and the
         // short fields share rows at every width, with the two links folded
         // behind More, so the open form is three rows at 390 (law 9).
-        <form action={action} className="mt-2 mb-4 space-y-2">
+        <form action={action} className="mb-4 space-y-2">
           <input type="hidden" name="companyId" value={companyId} />
           <div className="grid grid-cols-2 gap-2">
             <Input name="fullName" aria-label="Name" placeholder="Name" required autoFocus className={phoneTall} />
@@ -661,7 +702,7 @@ function Contacts({
           )}
         </form>
       ) : (
-        <AddTrigger label="Add a person" onClick={() => setAdding(true)} className="mt-2" />
+        <AddTrigger label="Add a person" onClick={() => setAdding(true)} />
       )}
       {contacts.length === 0 ? (
         !adding && <p className="mt-2 text-ui text-ink-muted">Nobody recorded here yet.</p>
@@ -699,7 +740,7 @@ function Contacts({
         Name, title, public professional URL and work email only. This is other people&rsquo;s data,
         and it has no product value beyond contacting them.
       </p>
-    </CardSection>
+    </Card>
   );
 }
 
@@ -736,18 +777,15 @@ function Touches({
   const answered = outbound.filter((t) => t.respondedAt !== null);
 
   return (
-    <CardSection
-      title="Outreach"
-      action={
-        outbound.length > 0 ? (
-          <span className="tabular text-small text-ink-muted">
-            {answered.length} of {outbound.length} answered
-          </span>
-        ) : undefined
-      }
-    >
+    // No heading of its own: the Outreach tab above already names it (law 9).
+    <Card padding="dense" data-slot="section">
+      {outbound.length > 0 && (
+        <p className="tabular text-small text-ink-muted">
+          {answered.length} of {outbound.length} answered
+        </p>
+      )}
       {touches.length === 0 ? (
-        <p className="mt-2 text-ui text-ink-muted">
+        <p className="text-ui text-ink-muted">
           No sends recorded. Response rate is only computable if the sends are recorded from the
           start, which is why logging them is in the MVP and drafting them is not.
         </p>
@@ -774,7 +812,7 @@ function Touches({
           ))}
         </ul>
       )}
-    </CardSection>
+    </Card>
   );
 }
 
@@ -796,9 +834,10 @@ function Notes({
   // arrival above them, so a panel whose job is to show what you have written
   // led with an empty box (law 14). It opens when there is something to add.
   return (
-    <CardSection title="Notes">
+    // No heading of its own: the Notes tab above already names it (law 9).
+    <Card padding="dense" data-slot="section">
       {adding ? (
-        <div className="mt-2 space-y-2">
+        <div className="space-y-2">
           <Textarea
             rows={3}
             autoFocus
@@ -841,7 +880,7 @@ function Notes({
           </div>
         </div>
       ) : (
-        <AddTrigger label="Add a note" onClick={() => setAdding(true)} className="mt-2" />
+        <AddTrigger label="Add a note" onClick={() => setAdding(true)} />
       )}
 
       <ul className="mt-3 space-y-2">
@@ -854,6 +893,6 @@ function Notes({
           </li>
         ))}
       </ul>
-    </CardSection>
+    </Card>
   );
 }

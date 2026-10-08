@@ -433,6 +433,9 @@ export function GoalRow({
     return () => window.removeEventListener('hashchange', unfoldIfNamed);
   }, [node, setShowChildren]);
   const [blocking, setBlocking] = useState(false);
+  // The box for what you want from Dash opens on the first press of Ask Dash
+  // (plan #1671), rather than standing open and empty on every step.
+  const [asking, setAsking] = useState(false);
   // A step Dash finished lately settles in with its mark flashing, the first
   // time you see it (plan #1561).
   const arrived = step.status === 'done' && (context.arrivals?.has(step.id) ?? false);
@@ -804,7 +807,9 @@ export function GoalRow({
               node={step}
               links={links}
               otherGoals={context.otherGoals}
-              quiet={page}
+              // Quiet everywhere (plan #1671): an unset date or amount is one
+              // add control, not an empty editor, on the goal page too.
+              quiet
             />
           )}
           {isDecision &&
@@ -879,8 +884,21 @@ export function GoalRow({
         <>
           {proposed && <ProposalButtons node={step} />}
           {/* Ask Dash, with room to say what you want: the words go into the
-              run's brief as a comment's would. Left empty, the step says it. */}
-          {askable && (
+              run's brief as a comment's would. Left empty, the step says it.
+              The first press opens the box; the second sends. */}
+          {askable && !asking && (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => setAsking(true)}
+              className="shrink-0"
+            >
+              <DashMark size="2xs" decorative />
+              {askLabel}
+            </Button>
+          )}
+          {askable && asking && (
             <form
               action={askAction}
               className="flex min-w-0 flex-[1_1_18rem] items-center gap-2 max-sm:flex-wrap"
@@ -890,6 +908,7 @@ export function GoalRow({
                 name="asked"
                 maxLength={4000}
                 placeholder="What you want, if anything"
+                autoFocus
                 className="max-sm:min-h-11 max-sm:basis-full"
                 aria-label={`What you want Dash to do with ${step.title}`}
               />

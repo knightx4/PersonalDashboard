@@ -29,7 +29,7 @@ export function WatchingSection({
   timezone: string;
 }) {
   return (
-    <Card id="watching" padding="standard" className="mt-4 scroll-mt-bar">
+    <Card id="watching" padding="standard" className="scroll-mt-bar">
       <h2 className="flex items-center gap-2 text-ui font-semibold text-ink">
         <Eye className="size-4 text-accent" strokeWidth={1.75} aria-hidden />
         Watching
@@ -71,7 +71,7 @@ function WatchRow({ row, now, timezone }: { row: WatchingRow; now: Date; timezon
             href={row.url}
             target="_blank"
             rel="noreferrer"
-            className="block text-ui font-medium text-ink hover:text-accent"
+            className="press-area block text-ui font-medium text-ink hover:text-accent"
           >
             {row.title}
           </a>

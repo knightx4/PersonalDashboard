@@ -76,6 +76,9 @@ export type Goal = {
    * 0070). While any goal has it, Home and Todo show only focus goals' steps.
    */
   focus?: boolean;
+  /** When it was added, and when it was last closed. Read on the goal page's properties (plan #1671). */
+  createdAt?: string | null;
+  closedAt?: string | null;
 };
 
 export type AreaWithGoals = Area & { goals: Goal[] };
