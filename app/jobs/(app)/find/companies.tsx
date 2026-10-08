@@ -156,7 +156,7 @@ function CompanyRow({ company }: { company: DiscoveredCompany }) {
       {company.reason && <p className="text-small text-ink-muted">{company.reason}</p>}
       <div className="flex flex-wrap items-center gap-2 pt-0.5">
         {company.companySlug ? (
-          <Link href={`/jobs/companies/${company.companySlug}`} className="text-small text-accent hover:underline">
+          <Link href={`/jobs/companies/${company.companySlug}`} className="press-area text-small text-accent hover:underline">
             On your companies list
           </Link>
         ) : (
