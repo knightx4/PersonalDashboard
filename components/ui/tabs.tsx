@@ -129,7 +129,10 @@ export function Tabs({
             {Icon && <Icon className="size-4" strokeWidth={1.75} aria-hidden />}
             {tab.label}
             {tab.count !== undefined && tab.count > 0 && (
-              <span className="tabular font-normal text-ink-muted">{tab.count}</span>
+              <span className="tabular font-normal text-ink-muted">
+                {tab.count}
+                {tab.countNoun && ` ${tab.countNoun}`}
+              </span>
             )}
           </Link>
         );
