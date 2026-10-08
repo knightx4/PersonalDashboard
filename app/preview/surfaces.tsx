@@ -213,6 +213,7 @@ import {
   DevUiReviewSurface,
   DevUsageSurface,
 } from './dev-page-surfaces';
+import { DevModuleSurface, DevModulesSurface } from './module-surfaces';
 
 /**
  * The surfaces worth looking at, rendered from the real components.
@@ -4897,6 +4898,20 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevUsageSurface />,
+  },
+  {
+    id: 'dev-modules',
+    label: "Dev · Modules",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevModulesSurface />,
+  },
+  {
+    id: 'dev-module',
+    label: "Dev · Module",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevModuleSurface />,
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on

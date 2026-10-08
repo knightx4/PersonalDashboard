@@ -22,6 +22,7 @@ import { PLAN_COMMENTS } from '@/components/plan-tree/types';
 import { DashCredit } from '@/components/ui/dash-mark';
 import { threadRef } from '@/lib/thread/subjects';
 import { cn } from '@/lib/cn';
+import { isModuleId } from '@/lib/modules';
 import { PLAN_PRIORITY_LABEL, isClosed } from '@/lib/plan/load';
 import type { PlanScope } from '@/lib/plan/projects';
 import { flatten, type PlanLiveness, type PlanNode } from '@/lib/plan/tree';
@@ -265,7 +266,20 @@ export function FeaturePage({
         }
         value={node.assignee ? ASSIGNEE_LABEL[node.assignee] : 'Dash'}
       />
-      <Property label="Module" value={moduleLabel || scopeLabel(node.module)} />
+      <Property
+        label="Module"
+        value={
+          // A workspace has a page of its own in Dev (/dev/modules); a
+          // project's page is the crumb above the title.
+          module && isModuleId(module) ? (
+            <Link href={`/dev/modules/${module}`} className="press-area hover:underline">
+              {moduleLabel || scopeLabel(node.module)}
+            </Link>
+          ) : (
+            moduleLabel || scopeLabel(node.module)
+          )
+        }
+      />
       {when(node.startedAt) && <Property label="Started" value={when(node.startedAt)} />}
       {when(node.completedAt) && (
         <Property

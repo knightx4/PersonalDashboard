@@ -13,6 +13,8 @@ export const PAGE_ROUTES: readonly string[] = [
   '/dev/changelog',
   '/dev/ideas',
   '/dev/inspiration',
+  '/dev/modules',
+  '/dev/modules/[id]',
   '/dev/plan',
   '/dev/plan/[number]',
   '/dev/posts',

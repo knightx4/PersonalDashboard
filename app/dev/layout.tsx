@@ -131,6 +131,10 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     // Ideas because a takeaway is an idea someone else had.
     { href: '/dev/inspiration', label: 'Inspiration', icon: 'inspiration' },
     { href: '/dev/specs', label: 'Specs', icon: 'specs' },
+    // One page per workspace, gathering its rows from the lists above and
+    // below. A single entry rather than one per module: a tab for each would
+    // be the plan's sections again (note 4308875b).
+    { href: '/dev/modules', label: 'Modules', icon: 'modules' },
     { href: '/dev/ui', label: 'UI', icon: 'ui' },
     { href: '/dev/surfaces', label: 'Surfaces', icon: 'surfaces' },
     // Which pages are opened, and the model spend of each workspace (plan
