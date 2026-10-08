@@ -141,7 +141,7 @@ describe('LINK_QUESTION and readLinkAnswer', () => {
 describe('judgeWithJev', () => {
   const haikuVerdicts = (batch: unknown[]): JudgeOutcome => ({
     ok: true,
-    model: 'claude-haiku-4-5',
+    model: 'claude-haiku-5-5',
     verdicts: batch.map((_, index) => ({
       pair: index,
       same: false,
@@ -165,7 +165,7 @@ describe('judgeWithJev', () => {
     const spend: SpendReport[] = [];
     const haiku = vi.fn(async (batch: typeof pairs, onSpend: (r: SpendReport) => void) => {
       onSpend({
-        model: 'claude-haiku-4-5',
+        model: 'claude-haiku-5-5',
         usage: { ...EMPTY_USAGE, inputTokens: 600, outputTokens: 90 },
       });
       return (opts.haiku ?? haikuVerdicts)(batch);
@@ -216,7 +216,7 @@ describe('judgeWithJev', () => {
     expect(byName.Down).toMatchObject({
       same: false,
       reason: 'Two subjects.',
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-5-5',
     });
 
     // The proposal keeps the side whose name Jev chose.
@@ -225,7 +225,7 @@ describe('judgeWithJev', () => {
 
     expect(sumByModel(spend)).toEqual([
       { model: 'jev-1.13.0', usage: { ...EMPTY_USAGE, inputTokens: 800 } },
-      { model: 'claude-haiku-4-5', usage: { ...EMPTY_USAGE, inputTokens: 600, outputTokens: 90 } },
+      { model: 'claude-haiku-5-5', usage: { ...EMPTY_USAGE, inputTokens: 600, outputTokens: 90 } },
     ]);
   });
 
@@ -289,7 +289,7 @@ describe('judgeLinksWithJev', () => {
     const haiku = vi.fn(
       async (batch: LinkPair[]): Promise<LinkJudgeOutcome> => ({
         ok: true,
-        model: 'claude-haiku-4-5',
+        model: 'claude-haiku-5-5',
         verdicts: batch.map((_, index) => ({
           pair: index,
           relation: 'none',
@@ -326,6 +326,6 @@ describe('judgeLinksWithJev', () => {
       reason: null,
       model: 'jev-1.13.0',
     });
-    expect(second).toMatchObject({ pair: 1, relation: 'none', model: 'claude-haiku-4-5' });
+    expect(second).toMatchObject({ pair: 1, relation: 'none', model: 'claude-haiku-5-5' });
   });
 });

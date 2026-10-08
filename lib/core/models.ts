@@ -3,31 +3,33 @@
  *
  * Changing which model a part of the app uses is a one-line change here: each
  * call site reads its entry in `MODELS` by name, and no other file spells a
- * model id (lib/core/models.test.ts checks that). The four tiers below are the
- * only strings; the entries name a tier.
+ * model id (lib/core/models.test.ts checks that). The three tiers below are the
+ * only strings the entries name.
  *
- * The dated Haiku id is the same model as the Haiku alias. The call sites
- * that were pinned to it keep it, so the ids recorded in the spend ledger
- * stay as they were.
+ * The two Haiku 4.5 ids are no longer called. They stay so that the rows the
+ * spend ledger recorded under them can still be priced (lib/core/spend/pricing.ts).
  */
 
 export const OPUS = 'claude-opus-5';
 export const SONNET = 'claude-sonnet-5';
-export const HAIKU = 'claude-haiku-4-5';
-export const HAIKU_DATED = 'claude-haiku-4-5-20251001';
+export const HAIKU = 'claude-haiku-5-5';
+
+/** Retired: Haiku 4.5, as the ledger recorded it before the move to Haiku 5.5. */
+export const HAIKU_4_5 = 'claude-haiku-4-5';
+export const HAIKU_4_5_DATED = 'claude-haiku-4-5-20251001';
 
 /** The model each call site uses, keyed by what the call does. Grouped by the file that makes it. */
 export const MODELS = {
   /** lib/dash/ask.ts, Ask Dash; the same model as `talk` today */
   dashAsk: SONNET,
   /** app/shopping/inventory/add/photo-actions.ts */
-  shoppingBookPhoto: HAIKU_DATED,
+  shoppingBookPhoto: HAIKU,
   /** inngest/dev/suggest.ts */
   devDigestSuggest: HAIKU,
   /** lib/books/paste-list.ts */
-  booksPasteList: HAIKU_DATED,
+  booksPasteList: HAIKU,
   /** lib/books/receipt-photo.ts */
-  booksReceiptPhoto: HAIKU_DATED,
+  booksReceiptPhoto: HAIKU,
   /** lib/comments/ask.ts, Dash's reply on a dev row (lib/dash/models.ts devThread) */
   devCommentReply: SONNET,
   /** lib/day-brief/model.ts */
@@ -41,7 +43,7 @@ export const MODELS = {
   /** lib/drafts/model.ts */
   drafts: SONNET,
   /** lib/email/extract/extract-order.ts */
-  emailOrderExtract: HAIKU_DATED,
+  emailOrderExtract: HAIKU,
   /** lib/games/shelf-photo.ts */
   gamesShelfPhoto: OPUS,
   /** lib/capture/sort-model.ts, where a typed capture belongs */
@@ -63,7 +65,7 @@ export const MODELS = {
   /** lib/jobs/evidence/propose.ts */
   jobsEvidencePropose: OPUS,
   /** lib/jobs/inbox/tier-b.ts */
-  jobsInboxTierB: HAIKU_DATED,
+  jobsInboxTierB: HAIKU,
   /** lib/jobs/interview/prep.ts */
   jobsInterviewPrep: OPUS,
   /** lib/jobs/learning/suggest.ts */
@@ -113,7 +115,7 @@ export const MODELS = {
   /** lib/learn/import/areas.ts */
   learnImportAreas: SONNET,
   /** lib/learn/import/parse.ts */
-  learnImportParse: HAIKU_DATED,
+  learnImportParse: HAIKU,
   /** lib/learn/import/plan-topic.ts */
   learnImportPlanTopic: OPUS,
   /** lib/learn/import/resolve.ts */
@@ -123,7 +125,7 @@ export const MODELS = {
   /** lib/learn/lessons/write-lesson.ts */
   learnWriteLesson: SONNET,
   /** lib/learn/locate/locate.ts */
-  learnLocate: HAIKU_DATED,
+  learnLocate: HAIKU,
   /** lib/learn/quiz/generate.ts */
   learnQuiz: HAIKU,
   /** lib/learn/survey/goal-idea.ts */
@@ -147,7 +149,7 @@ export const MODELS = {
   /** lib/news/recommend/make.ts */
   newsRecommend: OPUS,
   /** lib/recurring/extract.ts */
-  recurringExtract: HAIKU_DATED,
+  recurringExtract: HAIKU,
   /** lib/dash/interview.ts, Dash's questions when it interviews you for a workspace's spec (lib/dash/models.ts interview) */
   specInterview: SONNET,
   /** lib/dash/interview-draft.ts, the vision and spec Dash drafts when an interview ends (lib/dash/models.ts interviewDraft) */
@@ -161,7 +163,7 @@ export const MODELS = {
   /** lib/timeline/year-review-model.ts */
   timelineYearReview: SONNET,
   /** lib/todo/appointments/extract.ts */
-  appointmentsExtract: HAIKU_DATED,
+  appointmentsExtract: HAIKU,
   /** lib/vault/map/classify.ts */
   vaultMapClassify: HAIKU,
   /** lib/vault/map/extract.ts */

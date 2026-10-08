@@ -21,7 +21,7 @@
  * be priced.
  */
 
-import { HAIKU, HAIKU_DATED, OPUS, SONNET } from '@/lib/core/models';
+import { HAIKU, HAIKU_4_5, HAIKU_4_5_DATED, OPUS, SONNET } from '@/lib/core/models';
 
 /** Dollars per million tokens, which is also micro-dollars per token. */
 export type ModelPrice = {
@@ -31,6 +31,12 @@ export type ModelPrice = {
   /** Writing one. A quarter again more than input, for the 5-minute TTL. */
   cacheWrite: number;
   output: number;
+  /**
+   * A second rate card for a long prompt: the rates that apply instead when
+   * the prompt (input, cache reads and cache writes together) is over
+   * `aboveTokens`. Haiku 5.5 is the one model priced this way.
+   */
+  longPrompt?: { aboveTokens: number } & Omit<ModelPrice, 'longPrompt'>;
 };
 
 /**
@@ -44,9 +50,17 @@ export type ModelPrice = {
 export const MODEL_PRICES: Record<string, ModelPrice> = {
   [OPUS]: { input: 5, cachedInput: 0.5, cacheWrite: 6.25, output: 25 },
   [SONNET]: { input: 2, cachedInput: 0.2, cacheWrite: 2.5, output: 10 },
-  [HAIKU]: { input: 1, cachedInput: 0.1, cacheWrite: 1.25, output: 5 },
-  // The dated id is the same model, and both spellings are in lib/core/models.ts.
-  [HAIKU_DATED]: { input: 1, cachedInput: 0.1, cacheWrite: 1.25, output: 5 },
+  [HAIKU]: {
+    input: 0.1,
+    cachedInput: 0.01,
+    cacheWrite: 0.125,
+    output: 0.5,
+    longPrompt: { aboveTokens: 100_000, input: 0.5, cachedInput: 0.05, cacheWrite: 0.625, output: 2.5 },
+  },
+  // Haiku 4.5 under both its spellings. Nothing calls it now; the rows the
+  // ledger recorded under it keep their price.
+  [HAIKU_4_5]: { input: 1, cachedInput: 0.1, cacheWrite: 1.25, output: 5 },
+  [HAIKU_4_5_DATED]: { input: 1, cachedInput: 0.1, cacheWrite: 1.25, output: 5 },
 
   // Voyage, the embedding provider chosen in #724. An embedding call has no
   // output tokens and no prompt cache, so three of the four rates are zero as
@@ -99,8 +113,10 @@ export const EMPTY_USAGE: TokenUsage = {
  * cent, and the point of this table is that its total can be trusted.
  */
 export function costMicrosFor(model: string, usage: TokenUsage): number | null {
-  const price = MODEL_PRICES[model];
-  if (!price) return null;
+  const card = MODEL_PRICES[model];
+  if (!card) return null;
+  const promptTokens = usage.inputTokens + usage.cachedInputTokens + usage.cacheWriteTokens;
+  const price = card.longPrompt && promptTokens > card.longPrompt.aboveTokens ? card.longPrompt : card;
 
   const micros =
     usage.inputTokens * price.input +

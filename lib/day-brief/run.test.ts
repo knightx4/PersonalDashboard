@@ -7,7 +7,7 @@ import { runDayBriefFor, type DayBriefPorts, type DayBriefRow } from './run';
 const PERSON = { userId: 'u1', timezone: 'America/New_York' };
 const MORNING = new Date('2026-09-28T10:05:00Z'); // 06:05 in New York
 const REPORT: SpendReport = {
-  model: 'claude-haiku-4-5',
+  model: 'claude-haiku-5-5',
   usage: { inputTokens: 900, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 120 },
 } as SpendReport;
 
@@ -56,7 +56,7 @@ function ports(overrides: Partial<DayBriefPorts> = {}) {
     candidates: vi.fn(async () => [REPLY]),
     write: vi.fn(async (_day, _picks, onSpend) => {
       onSpend(REPORT);
-      return { model: 'claude-haiku-4-5', reply: DASH_NOTE };
+      return { model: 'claude-haiku-5-5', reply: DASH_NOTE };
     }),
     ledger: vi.fn(async () => undefined),
     save: vi.fn(async (row) => {
@@ -91,7 +91,7 @@ describe('runDayBriefFor', () => {
       status: 'written',
       day: '2026-09-28',
       quiet: false,
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-5-5',
       facts: 2,
       candidates: 1,
       picks: 1,
@@ -103,7 +103,7 @@ describe('runDayBriefFor', () => {
         title: 'Reply to Maya about the offer',
         body: 'Maya has waited 2 days for your reply on the offer.',
         facts: BUSY,
-        model: 'claude-haiku-4-5',
+        model: 'claude-haiku-5-5',
         picks: [
           {
             key: 'task:t1',
@@ -158,7 +158,7 @@ describe('runDayBriefFor', () => {
       { title: 'Reply to Maya', body: 'Maya has waited 2 days, and the dentist is at 16:00.' },
     ];
     for (const reply of replies) {
-      const { ports: p, saved } = ports({ write: vi.fn(async () => ({ model: 'claude-haiku-4-5', reply })) });
+      const { ports: p, saved } = ports({ write: vi.fn(async () => ({ model: 'claude-haiku-5-5', reply })) });
       await runDayBriefFor(p, PERSON, MORNING);
       expect(saved[0]).toMatchObject({ title: 'Reply to Maya: Offer', model: null });
     }
@@ -200,7 +200,7 @@ describe('runDayBriefFor', () => {
   it("stores Dash's picks from the shortlist, in its order, and records what the choice cost", async () => {
     const choose = vi.fn(async (_day: string, _list: unknown, onSpend: (report: SpendReport) => void) => {
       onSpend(REPORT);
-      return { model: 'claude-haiku-4-5', keys: ['dash-result:d1', 'nope', 'task:t1', 'dash-result:d1'] };
+      return { model: 'claude-haiku-5-5', keys: ['dash-result:d1', 'nope', 'task:t1', 'dash-result:d1'] };
     });
     const { ports: p, saved } = ports({ candidates: vi.fn(async () => [REPLY, RESULT, TODO]), choose });
     expect(await runDayBriefFor(p, PERSON, MORNING)).toMatchObject({ status: 'written', candidates: 3, picks: 2 });

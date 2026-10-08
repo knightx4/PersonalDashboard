@@ -34,7 +34,7 @@ export async function extractOrderFromReceiptPhoto(input: {
 
   const response = await client.messages.create({
     model: RECEIPT_MODEL,
-    max_tokens: 2048,
+    max_tokens: 8_000, // room for Haiku 5.5's thinking as well as the answer
     system: `You extract a purchase receipt into structured JSON matching this shape:
 {
   "merchantName": string|null,

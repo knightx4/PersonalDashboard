@@ -29,7 +29,7 @@ const jevDown = vi.fn(async () => new Response('overloaded', { status: 529 })) a
 
 function haikuSays(answer: MapHaikuAnswer | null) {
   return vi.fn<MapHaiku>(async ({ onSpend }) => {
-    onSpend?.({ model: 'claude-haiku-4-5', usage: { ...EMPTY_USAGE, inputTokens: 500, outputTokens: 40 } });
+    onSpend?.({ model: 'claude-haiku-5-5', usage: { ...EMPTY_USAGE, inputTokens: 500, outputTokens: 40 } });
     return answer;
   });
 }
@@ -77,7 +77,7 @@ describe('classifyForMap on Jev', () => {
     const spend: SpendReport[] = [];
     const verdict = await classify({ jev: jevDown, haiku: haikuSays(operational), spend });
     expect(verdict.reason).toBe('A packing list.');
-    expect(spend.map((r) => r.model)).toEqual(['claude-haiku-4-5']);
+    expect(spend.map((r) => r.model)).toEqual(['claude-haiku-5-5']);
   });
 
   it('uses Haiku when Jev is sure of the class but the evidence call fails', async () => {

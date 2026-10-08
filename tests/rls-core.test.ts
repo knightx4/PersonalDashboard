@@ -275,7 +275,7 @@ describe('day briefs', () => {
     const [row] = await admin<{ id: string }[]>`
       insert into core.day_briefs (user_id, day, body, facts, model)
       values (${userId}, ${day}, 'You have the Acme interview at 09:30.',
-              ${admin.json([{ kind: 'booked', text: '09:30: Interview with Acme' }])}, 'claude-haiku-4-5')
+              ${admin.json([{ kind: 'booked', text: '09:30: Interview with Acme' }])}, 'claude-haiku-5-5')
       returning id`;
     return row.id;
   }

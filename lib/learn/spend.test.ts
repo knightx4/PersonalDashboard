@@ -18,9 +18,9 @@ describe('collecting what was spent', () => {
     expect(reports).toEqual([]);
 
     sink({ model: 'claude-opus-5', usage: { ...EMPTY_USAGE, inputTokens: 10 } });
-    sink({ model: 'claude-haiku-4-5', usage: { ...EMPTY_USAGE, outputTokens: 3 } });
+    sink({ model: 'claude-haiku-5-5', usage: { ...EMPTY_USAGE, outputTokens: 3 } });
 
-    expect(reports.map((report) => report.model)).toEqual(['claude-opus-5', 'claude-haiku-4-5']);
+    expect(reports.map((report) => report.model)).toEqual(['claude-opus-5', 'claude-haiku-5-5']);
   });
 });
 

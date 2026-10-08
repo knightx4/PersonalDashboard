@@ -124,7 +124,7 @@ describe('cutVideo', () => {
     const result = await cutVideo({ profile: PROFILE, video, anthropicApiKey: 'k', client, onSpend });
     expect(result.outcome === 'cut' && result.clips.map((clip) => clip.startSeconds)).toEqual([21, 65]);
     expect(create).toHaveBeenCalledTimes(1);
-    expect(onSpend).toHaveBeenCalledWith(expect.objectContaining({ model: 'claude-haiku-4-5' }));
+    expect(onSpend).toHaveBeenCalledWith(expect.objectContaining({ model: 'claude-haiku-5-5' }));
   });
 
   it('tells a failed call from an unreadable reply', async () => {

@@ -114,7 +114,7 @@ describe('recording straight off a response', () => {
     await recordSpendFromResponse(client, 'user-1', {
       module: 'learn',
       operation: 'parse-references',
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-5-5',
       usage: undefined,
     });
 
@@ -150,7 +150,7 @@ describe('recordSpendReports', () => {
     const failing = clientThatFails('throws');
     await expect(
       recordSpendReports(failing.client, 'user-1', { module: 'core', operation: 'reply-to-comment' }, [
-        { model: 'claude-haiku-4-5', usage: EMPTY_USAGE },
+        { model: 'claude-haiku-5-5', usage: EMPTY_USAGE },
       ]),
     ).resolves.toBeUndefined();
   });
