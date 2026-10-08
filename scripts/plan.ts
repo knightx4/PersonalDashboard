@@ -109,6 +109,7 @@ import {
   parseDelay,
   type CheckBack,
 } from '../lib/plan/check-backs';
+import { blockAskRefusal } from '../lib/plan/block-ask';
 import { CLAIM_WORD, type ClaimRun } from '../lib/plan/liveness';
 import {
   isPlanUpdateHealth,
@@ -1360,6 +1361,10 @@ async function main(): Promise<void> {
       // to be wrong: #499 read as ready for a day because a block about a
       // GitHub token cleared itself off unrelated steps closing.
       const onSteps = command === 'block' && has('--on-steps');
+      if (command === 'block' && ask) {
+        const refusal = blockAskRefusal(ask, onSteps);
+        if (refusal) fail(refusal);
+      }
       const note = arg('--note') ?? ask;
       if (!note) fail(`--note is required for ${command}: say what happened.`);
 
