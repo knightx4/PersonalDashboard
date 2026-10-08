@@ -285,6 +285,9 @@ export const LEARN_OPERATIONS = [
   // #1398): one Haiku call per video, from the library run, reading the
   // transcript as numbered sentences and naming the clips in it.
   'cut-clips',
+  // Tagging the clips cut before #1695 with every subject they serve (plan
+  // #1696): one Haiku call per fifty clips, reading captions and ideas only.
+  'tag-clips',
   // Scoring a clip for the clip stream (plan #1401): one Jev score question
   // per clip, and one Haiku call for up to forty clips Jev could not answer.
   // Both recorded here, one row per model per person per run.
