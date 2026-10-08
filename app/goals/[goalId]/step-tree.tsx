@@ -169,7 +169,10 @@ export function StepTree({
         scroll={false}
       />
       <Card padding="none" className="overflow-hidden">
-        <ul className="divide-y divide-border">
+        {/* A finished row is not dimmed here, as on a feature's Steps tab:
+            its status word already says it is finished, and dimmed, its
+            number and Needs line fell under the contrast floor. */}
+        <ul className="divide-y divide-border [&>li]:opacity-100">
           <ColumnHeader priority="When" />
           {view === 'tree'
             ? openTop.map(topRow)
@@ -199,7 +202,11 @@ export function StepTree({
         {view === 'tree' && finishedTop.length > 0 && (
           <div className="border-t border-border px-3 py-1.5">
             <FinishedFold count={finishedTop.length}>
-              {() => <ul className="-ml-5.5 divide-y divide-border">{finishedTop.map(topRow)}</ul>}
+              {() => (
+                <ul className="-ml-5.5 divide-y divide-border [&>li]:opacity-100">
+                  {finishedTop.map(topRow)}
+                </ul>
+              )}
             </FinishedFold>
           </div>
         )}
@@ -230,7 +237,7 @@ export function StepTree({
             Also counts towards this goal
           </h2>
           <Card padding="none" className="overflow-hidden">
-            <ul className="divide-y divide-border">
+            <ul className="divide-y divide-border [&>li]:opacity-100">
               <ColumnHeader priority="When" />
               {linked.map(({ entry, row }) => (
                 <GoalRow
