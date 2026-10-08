@@ -24,6 +24,7 @@ import {
   History,
   Hourglass,
   House,
+  Inbox,
   KanbanSquare,
   LayoutDashboard,
   Lightbulb,
@@ -34,7 +35,6 @@ import {
   Megaphone,
   Map,
   Network,
-  MessageCircleQuestion,
   MessageSquareText,
   MonitorPlay,
   Receipt,
@@ -94,7 +94,9 @@ export const NAV_ICONS = {
   find: Compass,
   // Dev
   bugs: Bug,
-  raised: MessageCircleQuestion,
+  devHome: House,
+  // What is waiting on you, the way an inbox holds what is addressed to you.
+  inbox: Inbox,
   ideas: Lightbulb,
   // Looking outward for ideas, as Ideas is the ones you had yourself.
   inspiration: Telescope,

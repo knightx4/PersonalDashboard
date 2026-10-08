@@ -270,7 +270,7 @@ thousand tokens, and gets to the end.
    per batch, not one per step.
 8. **Report when the batch ends**: every step closed **by number and title**,
    what became ready, what is blocked and on what, and anything raised on
-   `/dev/raised`, by title. A report that says "closed four steps" makes the
+   `/dev/inbox`, by title. A report that says "closed four steps" makes the
    person go and look. Say which steps reached main and which did not: a closed
    step is on main already, and a step blocked on a failed merge is on the
    branch the block names, which the report names too.

@@ -196,7 +196,7 @@ where id = '…';
 -- raise: what you need from the person, when it belongs to no step. `source`
 -- says which run raised it and what it was doing; `module` is null for the app
 -- as a whole. Never answer or dismiss one -- that is the person's move on
--- /dev/raised, the same as a decision.
+-- /dev/inbox, the same as a decision.
 -- `ask` is the move you want back, in one sentence answerable in one line;
 -- the CLI refuses a raise without one and doing the insert by hand does not
 -- make it optional.

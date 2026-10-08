@@ -162,6 +162,8 @@ function hrefFor(target: CommentTarget, rowId: string, parent: Record<string, un
   }
   // The change's own card, which is where its thread is drawn (plan #1507).
   if (target === 'change') return `${TARGET_PATH.change}#spec-change-${rowId}`;
+  // The raise's own card in the inbox, the anchor search lands on too.
+  if (target === 'raise') return `${TARGET_PATH.raise}#raise-${rowId}`;
   return TARGET_PATH[target];
 }
 

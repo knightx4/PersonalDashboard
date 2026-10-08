@@ -4,12 +4,7 @@ import { loadRaised } from '@/lib/raised/load';
 import { planRefTitles } from '@/lib/plan/load';
 import { loadPlanForRequest } from '@/lib/plan/request-plan';
 import { buildPlanTree, flattenSections } from '@/lib/plan/tree';
-import { sortAsksWithJev, waitingGroups, waitingOnYou } from '@/lib/plan/waiting';
-import { createCoreClient } from '@/lib/core/auth/server';
-import type { SpendReport } from '@/lib/core/spend/pricing';
-import { recordSpendReports } from '@/lib/core/spend/record';
-import { jevEnabledFor } from '@/lib/jev/enabled';
-import type { PlanSection } from '@/lib/plan/tree';
+import { waitingOnYou } from '@/lib/plan/waiting';
 import { loadDigest } from '@/lib/digest/load';
 import { loadConversations } from '@/lib/comments/recent';
 import { loadFeatureFires, loadLastRuns, loadStartedRuns } from '@/lib/plan/runs';
@@ -18,14 +13,14 @@ import { runnerCard } from '@/lib/plan/runner-card';
 import { planRoutine } from '@/lib/feedback/routine';
 import { loadNotesLastRun } from '@/lib/feedback/last-worked';
 import { loadVisionReviewStatus } from '@/lib/specs/vision-review-run';
-import { loadOpenSpecChanges } from '@/lib/specs/changes';
-import { specBySlug } from '@/lib/specs/registry';
+import { countProposedSpecChanges } from '@/lib/specs/changes';
 import { NOTES_WORK_KINDS } from '@/lib/feedback/load';
 import { CHECK_BACK_COLUMNS, checkBackFrom } from '@/lib/plan/check-backs';
 import { CheckBacksPanel } from './check-backs-panel';
 import { ConversationsView } from './conversations-view';
 import { DigestPanel } from './digest-panel';
-import { RaisedView } from './raised-view';
+import { InboxLine } from './inbox-line';
+import { InboxRedirect } from './inbox-redirect';
 import { StatusPanel } from './status-panel';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { loadStartedGoalRuns } from '@/lib/goals/runs-store';
@@ -55,38 +50,12 @@ async function readGoals(userId: string) {
 }
 
 /**
- * The plan's rows waiting on you, with each blocked step's ask sorted into a
- * job or a question by Jev (plan #1176). Falls back to the regex's guess, row
- * by row inside sortAsksWithJev and wholesale here if the account setting or
- * the ledger cannot be reached.
- */
-async function readWaitingRows(sections: readonly PlanSection[], userId: string) {
-  const rows = waitingOnYou(sections);
-  try {
-    const core = await createCoreClient();
-    const spend: SpendReport[] = [];
-    const sorted = await sortAsksWithJev(rows, {
-      enabled: await jevEnabledFor(core, userId),
-      onSpend: (report) => spend.push(report),
-    });
-    await recordSpendReports(core, userId, { module: 'core', operation: 'sort-waiting' }, spend);
-    return sorted;
-  } catch (error) {
-    console.error(`Dash could not sort the asks with Jev: ${(error as Error).message}`);
-    return rows;
-  }
-}
-
-/**
  * The page you open in the morning: your day, and your conversations.
  *
- * Three sections, in the order you want them. The summary of the last 24 hours
- * is written once a day by the cron rather than built here, so opening the page
- * never costs a model call. Then what sessions have raised: a session that runs
- * into something outside the step it is building would otherwise say it in the
- * transcript, where you find it by opening Claude. Not the notes queue next
- * door, which is what you report as wrong, and not a plan decision, which
- * belongs to one feature.
+ * The summary of the last 24 hours is written once a day by the cron rather
+ * than built here, so opening the page never costs a model call. What is
+ * waiting on you was the middle of this page and is the Inbox tab now; Home
+ * keeps one line saying how much, so the count is still the first thing read.
  *
  * Then every conversation you have had, wherever it was started. A thread used
  * to be visible only from the row it was written on, which meant finding an
@@ -149,28 +118,18 @@ export default async function DevRaisedPage() {
       .eq('status', 'waiting')
       .order('due_at'),
     loadVisionReviewStatus(supabase, user.id),
-    // Changes Dash proposed to a spec, which wait under To approve (plan #1506).
-    loadOpenSpecChanges(supabase, user.id),
+    // Counted for the inbox line, the same as the tab's badge.
+    countProposedSpecChanges(supabase, user.id),
   ]);
   const comingBack = (checkBacks.data ?? []).map((row) => checkBackFrom(row as Record<string, unknown>));
   const now = readClock();
 
-  // Everything waiting on you, in the three groups the section is drawn in:
-  // what you have to go and do, what you have to answer, what you only have to
-  // say yes to. Both halves in one call -- the plan's own (a blocked step, an
-  // unanswered decision, a proposal nobody approved, all derived here rather
-  // than filed by a session, so a step blocked on a credential reaches this
-  // page without anybody remembering to raise it as well) and the raises the
-  // queue is holding open.
-  // The tree once, for the two things below that read it: what is waiting, and
-  // how many features the runner could pick up.
+  // The tree once, for the two things below that read it: how much is
+  // waiting on you, and how many features the runner could pick up.
   const sections = buildPlanTree(plan);
-  const groups = waitingGroups(
-    sections,
-    queue,
-    await readWaitingRows(sections, user.id),
-    specChanges.map((change) => ({ change, specTitle: specBySlug(change.spec)?.title ?? null })),
-  );
+  // Counted the way the tab's badge is (app/dev/layout.tsx), so the line and
+  // the badge never disagree.
+  const onYou = queue.open.length + waitingOnYou(sections).length + specChanges;
 
   // The runner's card, read by the same function the plan page reads it with.
   const card = runnerCard({
@@ -201,8 +160,10 @@ export default async function DevRaisedPage() {
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
         title="Home"
-        description="What happened in the last day, the questions waiting on you, and every conversation you have had with Dash. Answer a question and the next run reads it; reply to a conversation and it goes back on the row it was started on."
+        description="What is running, what happened in the last day, and every conversation you have had with Dash. Reply to a conversation and it goes back on the row it was started on."
       />
+      <InboxRedirect />
+      <InboxLine count={onYou} />
       <StatusPanel
         run={overnight}
         canSend={Boolean(planRoutine().token)}
@@ -215,7 +176,6 @@ export default async function DevRaisedPage() {
       />
       <CheckBacksPanel rows={comingBack} now={now} />
       <DigestPanel digest={digest} />
-      <RaisedView queue={queue} groups={groups} titles={titles} />
       <ConversationsView conversations={conversations} titles={titles} />
     </div>
   );

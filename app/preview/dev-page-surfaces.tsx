@@ -16,6 +16,7 @@ import { phoneShot } from './plan-surfaces';
 import { RaisedView } from '@/app/dev/raised/raised-view';
 import { ConversationsView } from '@/app/dev/raised/conversations-view';
 import { StatusPanel } from '@/app/dev/raised/status-panel';
+import { InboxLine } from '@/app/dev/raised/inbox-line';
 import { AccountView } from '@/app/account/view';
 import {
   isOutstanding,
@@ -682,10 +683,23 @@ export function DevRaisedSurface() {
     <>
       <PageHeader
         title="Home"
-        description="What happened in the last day, the questions waiting on you, and every conversation you have had with Dash. Answer a question and the next run reads it; reply to a conversation and it goes back on the row it was started on."
+        description="What is running, what happened in the last day, and every conversation you have had with Dash. Reply to a conversation and it goes back on the row it was started on."
+      />
+      <InboxLine count={3} />
+      <ConversationsView conversations={conversations} />
+    </>,
+  );
+}
+
+/** The Inbox tab in Dev: the overview, then a job, a question and a raise. */
+export function DevInboxSurface() {
+  return column(
+    <>
+      <PageHeader
+        title="Inbox"
+        description="Everything waiting on you: jobs to go and do, questions to answer, and proposals to say yes to. Answer one and the next run reads it."
       />
       <RaisedView queue={raisedQueue} groups={groups} />
-      <ConversationsView conversations={conversations} />
     </>,
   );
 }

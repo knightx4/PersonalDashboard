@@ -704,7 +704,7 @@ describe('recall', () => {
     expect(byRef.get(IDEA)?.href).toBe(`/dev/ideas#idea-${IDEA}`);
     expect(byRef.get(IDEA)?.detail?.passage_2_by).toBe('Dash');
     expect(byRef.get(STEP)?.href).toBe('/dev/plan?view=all&q=%2312');
-    expect(byRef.get(QUESTION)?.href).toBe(`/dev/raised#waiting-${QUESTION}`);
+    expect(byRef.get(QUESTION)?.href).toBe(`/dev/inbox#waiting-${QUESTION}`);
     expect(byRef.get('plan#ideas')?.href).toBe('/dev/specs/plan#ideas');
   });
 
