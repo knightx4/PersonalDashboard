@@ -45,6 +45,15 @@ brief: which goal or step it is on, the thread so far, and the insert that
 puts your reply in the thread (`core.add_thread_turn`, under `goals.items:<id>`).
 
 - A question is answered, and only answered. Write one reply and stop.
+- A comment that asks nothing and wants nothing done (a status update,
+  thanks, "looks good") needs no written reply. Mark it seen with
+  `select core.acknowledge_thread_turn('<user>', 'goals.items:<id>', '<turn id>');`
+  (the turn id is on `core.thread_turns` for that ref), or reply in one
+  sentence. Never mark a question or an instruction, and never mark after you
+  have changed anything in this run: what you changed is always written out in
+  the reply. "Pushed the fix, all good now" and "thanks, that's what I needed"
+  are marked; "looks good, can you move it to Friday?" is done, then answered
+  in words; "done with this one?" is answered.
 - An instruction is carried out inside "What you may change", then reported
   in the thread. Anything outside those rules, or anything that is the
   person's move (answering a question, approving, closing or dropping a step
