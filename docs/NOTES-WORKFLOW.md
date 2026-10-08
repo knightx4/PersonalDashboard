@@ -11,9 +11,9 @@ priority by hand.
 
 ### Triage on filing
 
-Once a bug, request or idea has saved, the panel asks Jev four questions
+Once a bug, request or idea has saved, the panel asks Jev five questions
 about it in one call: bug or request, which workspace, how soon (next,
-normal, someday), and which open note or idea, if any, asks for the same
+normal, someday), fix or plan, and which open note or idea, if any, asks for the same
 thing. The duplicate question lists the first line of every open note and
 every idea neither dismissed nor shaped. The answers and their confidences go
 in the row's `triage` column (migration 0121) and show under "saved" in the
@@ -32,6 +32,15 @@ A trial of twelve hand-written notes against 36 open items on 29 September
 at 0.8 or more; priority right 9 of 12, with two of the three misses under
 0.8; duplicate right 11 of 12, and the miss was at 0.69, so it showed as a
 maybe. Each call took 130 to 420 ms and read about 2,000 tokens.
+
+The fifth question, fix or plan (plan #1674), is stored as `route` in the same
+`triage` value and shown as "Fix" or "Plan", with a "?" under 0.8. A row
+filed before it existed has no `route` and shows nothing for it. Its score on
+the twelve trial notes is pending: the twelve were hand-written for the trial
+and not kept, so they cannot be run again, and a score on a different twelve
+would not be comparable with the other four. It is measured the first time
+twelve notes are put through it and written here as a count out of twelve,
+with how many were under 0.8.
 
 ## Working them
 

@@ -75,6 +75,7 @@ describe('readTriage', () => {
         kind: choice('feature', 1),
         module: choice('news', 0.88),
         priority: choice('someday', 0.4),
+        route: choice('plan', 0.9),
         duplicate: choice('item2', 0.97),
       },
       keys,
@@ -85,6 +86,7 @@ describe('readTriage', () => {
       kind: { value: 'feature', confidence: 1 },
       module: { value: 'news', confidence: 0.88 },
       priority: { value: 3, confidence: 0.4 },
+      route: { value: 'plan', confidence: 0.9 },
       duplicate: {
         value: {
           table: 'ideas',
@@ -140,10 +142,11 @@ describe('triageView', () => {
       kind: { value: 'bug', confidence: 1 },
       module: { value: 'learn', confidence: 0.6 },
       priority: { value: 1, confidence: 0.97 },
+      route: { value: 'fix', confidence: 0.6 },
       duplicate: { value: { table: 'ideas', id: 'i1', line: 'Same' }, confidence: 0.95 },
     });
     expect(view).toEqual({
-      parts: ['Bug', 'Learn?', 'Priority: Next'],
+      parts: ['Bug', 'Learn?', 'Priority: Next', 'Fix?'],
       match: { table: 'ideas', id: 'i1', line: 'Same' },
       maybeMatch: null,
     });
@@ -160,6 +163,12 @@ describe('triageView', () => {
     expect(view?.parts).toEqual(['Whole app']);
     expect(view?.match).toBeNull();
     expect(view?.maybeMatch?.id).toBe('n1');
+  });
+
+  it('reads a row stored before the route question existed', () => {
+    const old = { at: 'x', kind: { value: 'bug', confidence: 1 }, module: null };
+    expect(triageFrom(old)?.route).toBeNull();
+    expect(triageView(triageFrom(old))?.parts).toEqual(['Bug']);
   });
 
   it('is nothing when nothing was answered', () => {
