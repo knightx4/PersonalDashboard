@@ -79,7 +79,7 @@ export function HomeArrivalDemo({ finished: startFinished = false }: { finished?
                 <div
                   aria-hidden={finished}
                   className={cn(
-                    'grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none',
+                    'grid transition-[grid-template-rows,opacity] duration-move ease-out-soft motion-reduce:transition-none',
                     finished ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100',
                   )}
                 >
