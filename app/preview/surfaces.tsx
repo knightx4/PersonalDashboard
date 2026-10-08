@@ -1,4 +1,5 @@
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
+import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
 import type { RoleReminder } from '@/app/jobs/(app)/roles/[id]/types';
 import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
 import type { Task } from '@/lib/todo/tasks/model';
@@ -602,6 +603,43 @@ const momentRows = pipelineRows.filter((row) => OPEN_STATUSES.includes(row.statu
  * file at different stages of being contacted, one send still unanswered.
  */
 const companyPanels = {
+  roleCount: 2,
+  roles: (
+    <CompanyRoles
+      companyId="co-1"
+      slug="d-e-shaw"
+      timezone="Europe/London"
+      tasks={[]}
+      todos={[
+        {
+          id: 'rm1',
+          body: 'Send Dana the follow-up on the backtester question',
+          dueAt: '2026-09-12T09:00:00.000Z',
+          role: { id: 'r1', title: 'Senior Software Engineer, Research Platform' },
+        },
+      ]}
+      roles={[
+        {
+          id: 'r1',
+          title: 'Senior Software Engineer, Research Platform',
+          location: 'London',
+          firstSeenAt: '2026-08-04T09:00:00.000Z',
+          applications: [
+            { id: 'a1', attempt: 1, status: 'in_process', submittedAt: '2026-08-06T09:00:00.000Z', outcome: null },
+          ],
+        },
+        {
+          id: 'r2',
+          title: 'Software Engineer, Market Data',
+          location: 'New York, NY',
+          firstSeenAt: '2025-03-11T09:00:00.000Z',
+          applications: [
+            { id: 'a2', attempt: 1, status: 'rejected', submittedAt: '2025-03-14T09:00:00.000Z', outcome: 'rejected' },
+          ],
+        },
+      ]}
+    />
+  ),
   companyId: 'co-1',
   research:
     'Systematic manager, roughly 500 people in London. The research platform team owns the backtester and the data pipeline; the posting is on that team.\n\nThey moved off a vendor risk system in 2024, which is what the "market data at scale" line in the posting is about.',
@@ -3392,6 +3430,14 @@ export const SURFACES: readonly Surface[] = [
     render: () => <CompanyPanels {...companyPanels} />,
   },
   {
+    /* The About tab: details, then what you know about the place (plan #1628). */
+    id: 'jobs-company-about',
+    label: 'Company · About the place',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <CompanyPanels {...companyPanels} opensOn="about" />,
+  },
+  {
     /* People with its add form open (note 4323ee10). */
     id: 'jobs-company-add-person',
     label: 'Company · Adding a person',
@@ -3403,7 +3449,7 @@ export const SURFACES: readonly Surface[] = [
       <PaidCostsProvider
         costs={{ 'app/jobs/(app)/companies/actions.ts#proposeAiCompanyEnrichment': guessedSummary }}
       >
-        <CompanyPanels {...companyPanels} addingPerson />
+        <CompanyPanels {...companyPanels} opensOn="people" addingPerson />
       </PaidCostsProvider>
     ),
   },
@@ -4650,6 +4696,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <AccountSurface />,
+  },
+  {
+    /* The tab Dash's link opens when a watch would reach no phone (plan #1628). */
+    id: 'account-notifications',
+    label: 'Account · Notifications on this device',
+    module: 'dev',
+    width: 'page',
+    render: () => <AccountSurface tab="notifications" />,
   },
   {
     id: 'home-week',
