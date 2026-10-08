@@ -357,6 +357,122 @@ export async function updatePlanItem(
   return { message: 'Saved.' };
 }
 
+/** What writing a feature hands back: the number, for the line saying where it went. */
+export type FeatureActionState = PlanActionState & { number?: number };
+
+/** One line: a summary is what the feature page shows under its title. */
+const summaryField = z
+  .string()
+  .transform((value) => value.replace(/\s+/g, ' ').trim())
+  .pipe(z.string().max(200, 'A summary is one line, 200 characters at most.'));
+
+const featureSchema = z.object({
+  module: moduleField,
+  title: titleField,
+  summary: summaryField,
+  detail: text(4000),
+  acceptance: text(4000),
+  priority: priorityField,
+  size: sizeField,
+  assignee: assigneeField,
+});
+
+function featureFields(formData: FormData) {
+  return {
+    module: field(formData, 'module'),
+    title: field(formData, 'title'),
+    summary: field(formData, 'summary'),
+    detail: field(formData, 'detail'),
+    acceptance: field(formData, 'acceptance'),
+    priority: field(formData, 'priority', '2'),
+    size: field(formData, 'size'),
+    assignee: field(formData, 'assignee'),
+  };
+}
+
+/**
+ * A feature of your own, from the compose surface on /dev/plan (plan #1670):
+ * a not-started row at the top of its module, with no session stamp, so it
+ * reads as yours. It lands last in its module's section, ready for steps.
+ */
+// latency: pending
+export async function addFeature(
+  _prev: FeatureActionState,
+  formData: FormData,
+): Promise<FeatureActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const parsed = featureSchema.safeParse(featureFields(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const scope = parsed.data.module;
+  const position = await nextPlanPosition(supabase, user.id, scope, null);
+
+  const { data, error } = await supabase
+    .from('plan_items')
+    .insert({
+      user_id: user.id,
+      module: scope,
+      parent_id: null,
+      title: parsed.data.title,
+      summary: parsed.data.summary || null,
+      detail: parsed.data.detail || null,
+      acceptance: parsed.data.acceptance || null,
+      status: 'not_started',
+      kind: 'build',
+      priority: parsed.data.priority,
+      size: parsed.data.size,
+      assignee: parsed.data.assignee,
+      position,
+    })
+    .select('number')
+    .single();
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  return { message: 'Added.', number: Number(data.number) };
+}
+
+/**
+ * A feature's title, summary, properties and description, from the same
+ * compose surface opened on its page. Only those: its status, fog, note and
+ * place keep their own controls, so a save here never rewrites them.
+ */
+// latency: pending
+export async function updateFeature(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing feature.' };
+  const parsed = featureSchema.omit({ module: true }).safeParse(featureFields(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const { data, error } = await supabase
+    .from('plan_items')
+    .update({
+      title: parsed.data.title,
+      summary: parsed.data.summary || null,
+      detail: parsed.data.detail || null,
+      acceptance: parsed.data.acceptance || null,
+      priority: parsed.data.priority,
+      size: parsed.data.size,
+      assignee: parsed.data.assignee,
+    })
+    .eq('id', id.data)
+    .eq('user_id', user.id)
+    .select('id');
+  if (error) return { error: friendly(error.message) };
+  if (!data || data.length === 0) return { error: 'That feature no longer exists.' };
+
+  revalidatePlan();
+  return { message: 'Saved.' };
+}
+
 /**
  * Move a step between states without opening it.
  *

@@ -24,6 +24,20 @@ export function featureHref(number: number): string {
   return `/dev/plan/${number}`;
 }
 
+/**
+ * The query that opens the "New feature" surface at the top of /dev/plan
+ * (plan #1670), so the header's press is a link.
+ */
+export const NEW_FEATURE_PARAM = 'new';
+export const NEW_FEATURE_VALUE = 'feature';
+
+/** The plan page with the "New feature" surface open, keeping the view it was pressed from. */
+export function newFeatureHref(basePath: string, view?: string | null): string {
+  const query = new URLSearchParams(view ? { view } : {});
+  query.set(NEW_FEATURE_PARAM, NEW_FEATURE_VALUE);
+  return `${basePath}?${query}`;
+}
+
 /** The anchor of a module's section on /dev/plan, which its crumb lands on. */
 export function moduleAnchor(module: PlanScope | null): string {
   return `plan-module-${module ?? 'app'}`;
