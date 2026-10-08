@@ -38,43 +38,50 @@ export function GoalActivity({
           <h2 id="closed-heading" className="px-1 text-ui font-semibold text-ink">
             Steps closed
           </h2>
-          <ul className="divide-y divide-border px-1">
-            {closed.map((step) => (
-              <li
-                key={step.id}
-                className="flex items-baseline gap-3 py-1.5 text-small max-sm:min-h-11 max-sm:items-center"
-              >
-                <span className="min-w-0 flex-1 break-words">
-                  {step.dash && <DashCredit />}
-                  <Link
-                    href={stepHref(goalId, step.id)}
-                    className={
-                      step.status === 'dropped'
-                        ? 'press-area text-ink-muted line-through decoration-ink-muted/60 hover:text-ink'
-                        : 'press-area text-ink hover:text-accent'
-                    }
-                  >
-                    {step.title}
-                  </Link>
-                </span>
-                <span className="tabular shrink-0 text-ink-muted">
-                  {step.status === 'dropped' ? 'Dropped' : 'Done'}{' '}
-                  {formatDay(dayIn(step.closedAt, timeZone))}
-                </span>
-              </li>
-            ))}
-          </ul>
+          {/* On a card, as every list on the tabbed page is (plan #1686). */}
+          <Card padding="dense" className="py-1">
+            <ul className="divide-y divide-border">
+              {closed.map((step) => (
+                <li
+                  key={step.id}
+                  className="flex items-baseline gap-3 py-1.5 text-small max-sm:min-h-11 max-sm:items-center"
+                >
+                  <span className="min-w-0 flex-1 break-words">
+                    {step.dash && <DashCredit />}
+                    <Link
+                      href={stepHref(goalId, step.id)}
+                      className={
+                        step.status === 'dropped'
+                          ? 'press-area text-ink-muted line-through decoration-ink-muted/60 hover:text-ink'
+                          : 'press-area text-ink hover:text-accent'
+                      }
+                    >
+                      {step.title}
+                    </Link>
+                  </span>
+                  <span className="tabular shrink-0 text-ink-muted">
+                    {step.status === 'dropped' ? 'Dropped' : 'Done'}{' '}
+                    {formatDay(dayIn(step.closedAt, timeZone))}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Card>
         </section>
       )}
       {runs.length > 0 && (
-        <section aria-label="Runs" className="px-1">
-          <RunHistory runs={runs} more={moreRuns} />
+        <section aria-label="Runs">
+          <Card padding="dense">
+            <RunHistory runs={runs} more={moreRuns} />
+          </Card>
         </section>
       )}
       {closed.length === 0 && runs.length === 0 && (
-        <p className="px-1 text-small text-ink-muted">
-          No step has closed and Dash has not run on this goal yet.
-        </p>
+        <Card padding="dense">
+          <p className="text-small text-ink-muted">
+            No step has closed and Dash has not run on this goal yet.
+          </p>
+        </Card>
       )}
       {/* The goal's own thread (plan #957). Each step has its own, on its
           page. One frame: `onCard` drops the thread's own well. */}

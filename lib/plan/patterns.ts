@@ -45,7 +45,7 @@ export const PATTERN_RULES: readonly PatternRule[] = [
   {
     name: 'tabbed detail',
     label: 'Tabbed detail',
-    rule: 'Breadcrumbs first, then the title, then the tabs, then the open tab. Each tab is a link that puts the tab in the address, so a reload, the back button and a pasted link open the same tab, and the first tab is the plain address. The properties sit in a column on the right from laptop width and stay in view while the tab scrolls; on a phone they are a grid of facts between the title and the tabs. The row of tabs stays on one line at every width.',
+    rule: 'Breadcrumbs first, then the title, then the tabs, then the open tab. Each tab is a link that puts the tab in the address, so a reload, the back button and a pasted link open the same tab, and the first tab is the plain address. The properties sit in a column on the right from laptop width and stay in view while the tab scrolls; on a phone they are a grid of facts between the title and the tabs. The row of tabs stays on one line at every width. Every paragraph, done-when, list of facts and the properties sit on a card; only headings, breadcrumbs, tab labels and a one-line count sit on the page background.',
     component: 'components/patterns/tabbed-detail.tsx',
   },
   {

@@ -22,6 +22,7 @@ import {
   MessagesSquare,
 } from 'lucide-react';
 import { TabbedSections } from '@/components/patterns/tabbed-sections';
+import { Card } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { dismissPursuit } from '@/app/jobs/(app)/pipeline/actions';
 import type { InterviewSeed } from './shared';
@@ -113,7 +114,9 @@ function NotRealPursuit({ applicationId }: { applicationId: string }) {
   const router = useRouter();
 
   return (
-    <div className="mt-8 border-t border-border pt-4">
+    // On a quiet card of its own rather than under a rule: the sentence is
+    // body text, and none sits bare on the page (plan #1686).
+    <Card padding="dense" className="mt-8">
       {/* A sentence, because the button on its own was a grey line floating
        * under the page with nothing to say when it applied. "Remove it" is
        * unanswerable without knowing what *it* is -- and the confirm's own
@@ -139,6 +142,6 @@ function NotRealPursuit({ applicationId }: { applicationId: string }) {
       >
         This was not a real pursuit — remove it
       </ConfirmStep>
-    </div>
+    </Card>
   );
 }

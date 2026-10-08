@@ -39,6 +39,9 @@ export function ClearDemo({ items = ITEMS }: { items?: readonly string[] }) {
                   variant="ghost"
                   size="sm"
                   data-motion-demo="clear"
+                  // Held down, Done fills before the row leaves, so the press
+                  // is answered in the first frame (the critic's craft check).
+                  className="active:bg-accent-tint active:text-accent"
                   onClick={(event) => {
                     void puffAt(event.currentTarget.closest('li') ?? event.currentTarget);
                     setLeft((now) => now.filter((entry) => entry !== item));

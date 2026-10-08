@@ -5,6 +5,7 @@ import { cn } from '@/lib/cn';
 import { Banner } from '@/components/ui/banner';
 import { PageHeader } from '@/components/shell/page-header';
 import { Property } from '@/components/shell/detail-layout';
+import { DetailFacts } from '@/components/patterns/list-detail';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { MoveLabel } from '@/components/ui/move-label';
@@ -480,7 +481,7 @@ export default async function RoleDetailPage({
             </Banner>
           )}
         </>
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+        <DetailFacts>
           <Property
             label="Applied"
             value={formatDate(current.submitted_at as string | null, timezone)}
@@ -529,7 +530,7 @@ export default async function RoleDetailPage({
                 : '—'
             }
           />
-        </dl>
+        </DetailFacts>
       <div className="space-y-6">
         {closedLine && <ClosedSummary text={closedLine} />}
 

@@ -1,3 +1,4 @@
+import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 
 /**
@@ -43,7 +44,12 @@ export function DetailLayout({
         // Sticky from lg, the same offset the filter rail uses: the facts are
         // what a long timeline is read against, so they should not scroll away
         // from it.
-        className="lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start"
+        // On a card, as the grid on a phone and the column from lg: a list
+        // of facts never sits bare on the page (plan #1686).
+        className={cn(
+          cardVariants({ padding: 'dense' }),
+          'lg:sticky lg:top-20 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start',
+        )}
       >
         {properties}
       </aside>
@@ -55,9 +61,10 @@ export function DetailLayout({
 /**
  * The facts, two across on a phone and a column in the rail from lg up.
  *
- * No card. A property is a label and a value, and eight of them in a bordered
- * grid is law 11's hand-rolled box with a `dl` inside it -- which is what both
- * pages had.
+ * No card of its own. A property is a label and a value, and eight of them in
+ * a bordered grid is law 11's hand-rolled box with a `dl` inside it -- which
+ * is what both pages had. `DetailLayout` lays the whole list on one card
+ * (plan #1686), a surface under it rather than a box per fact.
  */
 export function PropertyList({ children }: { children: React.ReactNode }) {
   return (
@@ -72,14 +79,20 @@ export function Property({
   label,
   value,
   hint,
+  wide = false,
 }: {
   label: string;
   value: React.ReactNode;
   /** The `title` on the value, for a fact that needs a sentence of context. */
   hint?: string;
+  /**
+   * Takes both columns of the phone's grid, for a fact with a line under its
+   * value that would otherwise wrap in half the width. One column in the rail.
+   */
+  wide?: boolean;
 }) {
   return (
-    <div className="min-w-0">
+    <div className={cn('min-w-0', wide && 'col-span-2 lg:col-span-1')}>
       <dt className="text-micro uppercase tracking-wider text-ink-muted">{label}</dt>
       <dd className="tabular mt-0.5 truncate text-ui text-ink" title={hint}>
         {value}
