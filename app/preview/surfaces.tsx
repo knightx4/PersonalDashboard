@@ -4565,7 +4565,7 @@ export const SURFACES: readonly Surface[] = [
       kind: 'press',
       target: '[data-motion-demo="home-arrival"]',
       shows:
-        'The greeting, the date, the brief line, the Today card and the Watching rail each rise in a beat after the one before, all settled by about three quarters of a second.',
+        'The greeting, the date, the brief line, each rise in a beat after the one before, the Today card and the Watching rail together on the last, all settled by about three quarters of a second.',
     },
     render: () => (
       <div className={cardVariants({ padding: 'standard' })}>
