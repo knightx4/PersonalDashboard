@@ -13,6 +13,11 @@ describe('how long Dash replies', () => {
     expect(rules).not.toContain('a few sentences');
   });
 
+  it('lets a thread mark a comment seen in place of a short reply, and never Ask Dash (plan #1649)', () => {
+    expect(THREAD_RULES).toMatch(/or\s+no\s+reply\s+at\s+all:\s+call\s+acknowledge\s+instead/);
+    expect(ASK_VOICE.system).not.toContain('acknowledge');
+  });
+
   it('keeps reporting changes in words, and citing rows', () => {
     expect(THREAD_RULES).toContain('a change you made is said in words');
     expect(THREAD_RULES).toContain('cited');

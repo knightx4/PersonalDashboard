@@ -50,6 +50,7 @@ import {
   type ReplyCollection,
 } from '@/lib/goals/comments';
 import { loadThreads, writeComment } from '@/lib/goals/comments-store';
+import { acknowledgeThreadTurn } from '@/lib/thread/store';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { commentMode, hasClaudeWork, jobFor, locateStep } from '@/lib/goals/handover';
 import { sendGoalStep } from '@/lib/goals/handover-store';
@@ -266,6 +267,8 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
           ? schedule(args)
           : { ok: false, error: 'That cannot be done on a goal.' },
     handOff,
+    acknowledge: () =>
+      acknowledgeThreadTurn(input.claude, { userId: input.userId, ref: subjectRef, turnId: input.commentId }),
     anthropicApiKey: input.apiKey,
     client: input.anthropic,
     onSpend: (report) => spend.push(report),
@@ -286,6 +289,7 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
   if (reply.passedOn && reply.made.length === 0) {
     return { ok: true, message: 'Dash is working on this goal. Its reply lands in this thread.' };
   }
+  if (reply.acknowledged) return { ok: true, message: 'Dash marked your comment as seen.' };
 
   await say(input, reply.body);
   return {

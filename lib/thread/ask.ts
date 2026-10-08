@@ -26,7 +26,7 @@ import { DASH_MODELS } from '@/lib/dash/models';
 import { replyInThread, subjectLine, threadVoice, type ThreadDash } from '@/lib/dash/thread';
 import { pageFor } from '@/lib/sources/catalogue';
 import { whyNotRead } from '@/lib/vault/map/rules';
-import { addThreadTurn, loadThread, type AnyClient } from './store';
+import { acknowledgeThreadTurn, addThreadTurn, loadThread, type AnyClient } from './store';
 import { rowText } from './row-text';
 
 /** The model a reply under any other row is written with. */
@@ -117,6 +117,8 @@ async function produceReply(input: RowAskInput): Promise<RowAskOutcome> {
     message: `${subjectLine(input.ref)}\n\n${message}`,
     dash: input.dashThread,
     acts: async () => ({ ok: false, error: 'This row has no tools of its own. Use the shared ones.' }),
+    acknowledge: () =>
+      acknowledgeThreadTurn(input.client, { userId: input.userId, ref: input.ref, turnId: input.commentId }),
     anthropicApiKey: input.apiKey,
     client: input.anthropic,
     onSpend: (report) => spend.push(report),
@@ -124,6 +126,7 @@ async function produceReply(input: RowAskInput): Promise<RowAskOutcome> {
   await recordSessionSpend(input.userId, { module: 'core', operation: 'reply-to-comment' }, spend);
   if (!reply.ok) return refuse(`I could not produce a reply: ${reply.detail} Your comment is saved.`);
 
+  if (reply.acknowledged) return { ok: true, message: 'Dash marked your comment as seen.' };
   await say(input, reply.body);
   return { ok: true, message: reply.made.length > 0 ? 'Done, and said in the thread.' : 'Answered in the thread.' };
 }

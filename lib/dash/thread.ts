@@ -61,12 +61,26 @@ about.
 ANSWER THROUGH THE answer TOOL. That is your reply in the thread, in plain
 words, as you would say it to them on their phone. Match its length to the
 comment. A comment that needs nothing back (a status update, a thanks, "looks
-good") gets one short sentence, such as "Glad it works." A simple question
-gets its answer in a sentence or two. Keep several sentences for when there is
-a lot to say. Do not restate the row back to them or pad the reply. Whatever
-the length, a change you made is said in words and the rows you used or
-changed are cited. When a tool says its words are added under your reply, do
-not repeat them.
+good") gets one short sentence, such as "Glad it works.", or no reply at all:
+call acknowledge instead, which marks their comment as seen and writes
+nothing. Choose each time; the mark is for a comment where a sentence back
+would only be noise. A simple question gets its answer in a sentence or two.
+Keep several sentences for when there is a lot to say. Do not restate the row
+back to them or pad the reply. Whatever the length,
+a change you made is said in words and the rows you used or changed are
+cited. When a tool says its words are added under your reply, do not repeat
+them.
+
+WHEN A MARK IS ENOUGH. acknowledge is for a comment that asks nothing and
+wants nothing done. A question is never only marked seen, however short, and
+neither is a request: once you have changed anything or handed it on, you
+answer in words. For example:
+- "pushed the fix, all good now": acknowledge.
+- "thanks, that's what I needed": acknowledge, or "Glad it helped."
+- "looks good": acknowledge.
+- "looks good, can you move it to Friday?": move it, then answer saying so.
+- "done with this one?": answer; it is a question.
+- "fixed it, but is the old row still there?": answer the question.
 
 Write plainly: no dashes as punctuation, and do not open by agreeing with them
 ("You're right").`;
@@ -76,8 +90,12 @@ Write plainly: no dashes as punctuation, and do not open by agreeing with them
  * rules then the thread's own, and the tools that thread offers.
  */
 export function threadVoice(model: string, rules: string, table: string): DashVoice {
-  return { model, system: `${THREAD_RULES}\n\n${rules.trim()}`, tools: threadDashTools(table) };
+  return { model, system: `${THREAD_RULES}\n\n${rules.trim()}`, tools: threadDashTools(table), acknowledge: true };
 }
+
+/** Said to the model when it tries to mark the comment seen after changing something. */
+export const CHANGED_SO_ANSWER =
+  'You changed something in this turn, so it is said in words. Nothing was marked. Answer saying what you did.';
 
 /**
  * The person's own Dash, bound to a request (lib/talk/ask-request.ts,
@@ -132,6 +150,11 @@ export type ThreadReply =
       made: string[];
       /** Whether the comment was passed to a session or routine that replies itself. */
       passedOn: boolean;
+      /**
+       * The comment was marked seen and needs no reply (plan #1649): `body`
+       * is empty and the caller writes nothing into the thread.
+       */
+      acknowledged: boolean;
     }
   | { ok: false; detail: string };
 
@@ -170,6 +193,12 @@ export async function replyInThread(input: {
   cause?: ThreadCause | null;
   /** The thread's own hand-offs, by tool name. Absent: every hand-off is refused. */
   handOff?: (name: string, input: unknown) => Promise<ThreadHandOff>;
+  /**
+   * Marks the comment being answered as seen (acknowledgeThreadTurn, bound to
+   * it), for a comment that needs nothing back (plan #1649). Absent: Dash
+   * always answers in words.
+   */
+  acknowledge?: () => Promise<unknown>;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
@@ -179,6 +208,8 @@ export async function replyInThread(input: {
   const made: string[] = [];
   const said: string[] = [];
   let passedOn = false;
+  // Hand-offs that started something: a change too, so said in words.
+  let started = 0;
 
   const write: DashWriter = async (tool, args, seen) => {
     const result = await dash.apply(tool, args, seen, acts);
@@ -207,7 +238,7 @@ export async function replyInThread(input: {
     return { ok: true, rows: [result.row], note: madeNote(result.summary, kept) };
   };
 
-  const handOff = input.handOff;
+  const { handOff, acknowledge } = input;
   const answer = await runDash({
     voice: input.voice,
     context: { surface: 'thread', subject: input.subject, page: null },
@@ -219,9 +250,19 @@ export async function replyInThread(input: {
       ? async (args, _seen, tool) => {
           const outcome = await handOff(tool.name, args);
           if (!outcome.ok) return { ok: false, error: outcome.error };
+          started += 1;
           if (outcome.said) said.push(outcome.said);
           if (outcome.passedOn) passedOn = true;
           return { ok: true, rows: [], note: outcome.said ? `${outcome.note} ${saidNote(outcome.said)}` : outcome.note };
+        }
+      : undefined,
+    acknowledge: acknowledge
+      ? async () => {
+          // A change is always reported in words, so the mark is refused once
+          // one is made; the database cannot tell (plan #1648).
+          if (made.length > 0 || started > 0) return { ok: false, error: CHANGED_SO_ANSWER };
+          await acknowledge();
+          return { ok: true };
         }
       : undefined,
     anthropicApiKey: input.anthropicApiKey,
@@ -233,11 +274,19 @@ export async function replyInThread(input: {
     // Whatever was made stands, and the thread still says so.
     if (made.length > 0) {
       const body = said.length > 0 ? said.join('\n\n') : UNFINISHED;
-      return { ok: true, body, citations: [], made, passedOn };
+      return { ok: true, body, citations: [], made, passedOn, acknowledged: false };
     }
     return { ok: false, detail: answer.detail };
   }
-  return { ok: true, body: [answer.body, ...said].join('\n\n'), citations: answer.citations, made, passedOn };
+  if (answer.acknowledged) return { ok: true, body: '', citations: [], made, passedOn, acknowledged: true };
+  return {
+    ok: true,
+    body: [answer.body, ...said].join('\n\n'),
+    citations: answer.citations,
+    made,
+    passedOn,
+    acknowledged: false,
+  };
 }
 
 /** The row a thread hangs from, as the message names it so a tool can take its ref. */

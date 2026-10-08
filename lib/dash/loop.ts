@@ -94,18 +94,42 @@ const ANSWER: Anthropic.Tool = {
   },
 };
 
+export const ACKNOWLEDGE_TOOL = 'acknowledge';
+
 /**
- * The tools sent on every call: the voice's registry tools, then `answer`.
- * The same list in the same order every time, with the cache breakpoint on
- * the last, so the prefix is cached across rounds and across questions.
+ * The other way a thread's turn can end (plan #1649): the comment is marked
+ * seen and no reply is written. Only a voice with `acknowledge` is sent it,
+ * and only a thread run with an `acknowledge` handler can carry it out, so
+ * Ask Dash always answers in words.
  */
-export function modelTools(tools: readonly DashTool[], finish: Anthropic.Tool = ANSWER): Anthropic.Tool[] {
-  return [...tools.map((tool) => tool.definition), { ...finish, cache_control: { type: 'ephemeral' } }];
+const ACKNOWLEDGE: Anthropic.Tool = {
+  name: ACKNOWLEDGE_TOOL,
+  description:
+    'Mark their comment as seen and write no reply, when it needs nothing back: a status update, a thanks, "looks good". Never for a question or a request, and never once you have changed anything, since a change is always said through answer. Call it on its own. It ends your turn.',
+  input_schema: { type: 'object', properties: {}, additionalProperties: false },
+};
+
+/**
+ * The tools sent on every call: the voice's registry tools, then
+ * `acknowledge` when the voice may end that way, then `answer`. The same list
+ * in the same order every time, with the cache breakpoint on the last, so the
+ * prefix is cached across rounds and across questions.
+ */
+export function modelTools(
+  tools: readonly DashTool[],
+  finish: Anthropic.Tool = ANSWER,
+  acknowledge = false,
+): Anthropic.Tool[] {
+  return [
+    ...tools.map((tool) => tool.definition),
+    ...(acknowledge ? [ACKNOWLEDGE] : []),
+    { ...finish, cache_control: { type: 'ephemeral' } },
+  ];
 }
 
 /** Every tool a voice is sent: its server tools first, then modelTools. */
 function voiceTools(voice: DashVoice): Anthropic.ToolUnion[] {
-  return [...(voice.serverTools ?? []), ...modelTools(voice.tools, voice.finish)];
+  return [...(voice.serverTools ?? []), ...modelTools(voice.tools, voice.finish, voice.acknowledge === true)];
 }
 
 /** The surfaces Dash talks on, as core.dash_actions names them. */
@@ -131,6 +155,11 @@ export type DashVoice = {
    * the answer's `report`, and its `answer` field, when it has one, as the body.
    */
   finish?: Anthropic.Tool;
+  /**
+   * Whether the turn may end by marking the comment seen with no reply
+   * (plan #1649). Threads only: Ask Dash's voice never sets it.
+   */
+  acknowledge?: boolean;
   /** Output tokens for one call; ANSWER_MAX_TOKENS when absent. */
   maxTokens?: number;
 };
@@ -241,6 +270,11 @@ export type DashAnswer =
        * the missing ability gets built (lib/talk/ask-request.ts).
        */
       couldNot?: string;
+      /**
+       * The comment was marked seen in place of a reply (plan #1649): the
+       * body is empty and nothing is to be written into the thread.
+       */
+      acknowledged?: true;
     }
   | { ok: false; detail: string; toolCalls: TalkToolCall[] };
 
@@ -280,6 +314,11 @@ export type DashWriter = (tool: DashWriteTool, input: unknown, seen: DashSeen) =
 const NO_PROPOSALS = 'Changes cannot be proposed here. Answer in words.';
 /** Said to the model when a write is called where none can be made. */
 const NO_WRITES = 'Changes cannot be made here. Answer in words.';
+/** Said to the model when it tries to end with only a seen mark where there is no comment to mark. */
+export const NO_ACKNOWLEDGE = 'There is no comment to mark seen here. Answer in words.';
+/** Said to the model when it marks a comment seen in the same round as other calls. */
+export const ACKNOWLEDGE_ALONE =
+  'Marking the comment seen ends your turn, so it is called on its own. Nothing was marked. Finish what you are doing, then answer in words or call acknowledge alone.';
 
 /** A proposal tool, or a name the model made up in their shape: both go to the proposer, which refuses any but the four. */
 const isProposal = (name: string) => name.startsWith('propose_');
@@ -408,6 +447,12 @@ export type DashRun = {
   handOff?: (input: unknown, seen: DashSeen, tool: DashHandoffTool) => Promise<AskToolResult>;
   /** Absent: every write is refused. */
   write?: DashWriter;
+  /**
+   * Marks the comment being answered as seen, in place of a reply (plan
+   * #1649), or says why it will not. Absent, or on any surface but a
+   * thread: refused, and the model is told to answer in words.
+   */
+  acknowledge?: () => Promise<{ ok: true } | { ok: false; error: string }>;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
@@ -614,6 +659,33 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       };
     }
 
+    // The comment needs nothing back, so it is marked seen and no reply is
+    // written (plan #1649). Only a thread run can do that, and only with the
+    // call on its own; refused, the model is told why and carries on.
+    const acked = !mustAnswer && uses.length === 1 && uses[0].name === ACKNOWLEDGE_TOOL ? uses[0] : null;
+    if (acked) {
+      let outcome: { ok: true } | { ok: false; error: string };
+      if (context.surface !== 'thread' || !input.acknowledge) {
+        outcome = { ok: false, error: NO_ACKNOWLEDGE };
+      } else {
+        try {
+          outcome = await input.acknowledge();
+        } catch (error) {
+          outcome = { ok: false, error: `It could not be marked seen: ${error instanceof Error ? error.message : 'no reason given'}. Answer in words.` };
+        }
+      }
+      toolCalls.push({ name: ACKNOWLEDGE_TOOL, input: acked.input, result: outcome });
+      if (outcome.ok) {
+        return { ok: true, body: '', toolCalls, citations: [], stop: 'answered', acknowledged: true };
+      }
+      lookups += 1;
+      messages.push(
+        { role: 'assistant', content: response.content },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: acked.id, content: outcome.error, is_error: true }] },
+      );
+      continue;
+    }
+
     // Server tools paused the turn (a long search): send it back as it is.
     // Widened: the installed SDK's type may predate the reason.
     const stopped: string | null = response.stop_reason;
@@ -690,6 +762,9 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       uses.map(async (use, i): Promise<AskToolResult> => {
         if (lookups + i >= MAX_LOOKUPS) return { ok: false, error: LIMIT_REACHED };
         hear({ phase: 'started', id: use.id, index: lookups + i, name: use.name, input: use.input });
+        if (use.name === ACKNOWLEDGE_TOOL) {
+          return { ok: false, error: context.surface === 'thread' && input.acknowledge ? ACKNOWLEDGE_ALONE : NO_ACKNOWLEDGE };
+        }
         return run(use.name, use.input);
       }),
     );
