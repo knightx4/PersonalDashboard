@@ -51,7 +51,8 @@ function one<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null;
 }
 
-async function loadSeeker(supabase: AppSupabaseClient, userId: string): Promise<SeekerContext> {
+/** What the searches know about the person; also read by startup discovery's shortlist. */
+export async function loadSeeker(supabase: AppSupabaseClient, userId: string): Promise<SeekerContext> {
   const [profile, thoughts, resume] = await Promise.all([
     supabase
       .from('profiles')

@@ -103,15 +103,15 @@ export async function loadDiscoveryRules(supabase: AppSupabaseClient, userId: st
   };
 }
 
-/** Both lists, read and filtered for one person. */
+/** Both lists, read and filtered for one person, with the rules they were filtered by. */
 export async function readHiringLists(
   supabase: AppSupabaseClient,
   userId: string,
-): Promise<FilteredHiringLists & { thread: HnThread | null }> {
+): Promise<FilteredHiringLists & { thread: HnThread | null; rules: DiscoveryRules }> {
   const [rules, yc, hn] = await Promise.all([
     loadDiscoveryRules(supabase, userId),
     fetchYcHiring(),
     fetchLatestWhoIsHiring(),
   ]);
-  return { ...filterHiringLists({ yc, hn: hn.posts }, rules), thread: hn.thread };
+  return { ...filterHiringLists({ yc, hn: hn.posts }, rules), thread: hn.thread, rules };
 }

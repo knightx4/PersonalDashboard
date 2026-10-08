@@ -78,6 +78,8 @@ export const MODELS = {
   rowCommentReply: SONNET,
   /** lib/jobs/suggest/model.ts */
   jobsSuggest: SONNET,
+  /** lib/jobs/discover/shortlist-run.ts; one call a week over about 1,400 startups */
+  jobsDiscoverShortlist: SONNET,
   /** lib/learn/areas/place.ts; Sonnet since theme placement runs hourly */
   learnAreaPlace: SONNET,
   /** lib/learn/catalogue/judge.ts */
