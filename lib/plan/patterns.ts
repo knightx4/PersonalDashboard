@@ -54,6 +54,12 @@ export const PATTERN_RULES: readonly PatternRule[] = [
     rule: 'From laptop width a narrow column on the right holds what you glance at: counts, what is running, what Dash did, what is due soon. The column you work in sits on the left at its reading width. On a phone the rail follows the main column, and each is drawn once. The rail never holds the thing you came to act on, and never sits on a detail page, which stays one column.',
     component: 'components/patterns/main-rail.tsx',
   },
+  {
+    name: 'tabbed sections',
+    label: 'Tabbed sections',
+    rule: 'The tabs sit under the page header, in one column, and only the open tab is drawn. Each tab is a link that puts it in the address, so a reload, the back button and a pasted link return to it, and old links and anchors land on the tab that holds them. A tab with something waiting in it carries the count. The row stays on one line, scrolling sideways on a phone with every tab a full press target. Folds may sit inside a tab.',
+    component: 'components/patterns/tabbed-sections.tsx',
+  },
 ];
 
 /**

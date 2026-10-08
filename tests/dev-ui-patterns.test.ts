@@ -31,13 +31,14 @@ const entries = list
   }));
 
 describe('the page patterns on /dev/ui', () => {
-  it('holds the five from the spec', () => {
+  it('holds the six from the spec', () => {
     expect(entries.map((e) => e.name)).toEqual([
       'list and detail',
       'deck',
       'thread',
       'tabbed detail',
       'main plus rail',
+      'tabbed sections',
     ]);
   });
 
@@ -78,5 +79,7 @@ describe('the pattern rules the plan reads', () => {
     expect(patternNamed('No line here, though the word pattern appears.')).toBeNull();
     expect(patternRule('Thread')?.component).toBe('components/patterns/thread.tsx');
     expect(patternRule('map')).toBeNull();
+    expect(patternNamed('Account stops being a stack.\n\nPattern: tabbed sections.')).toBe('tabbed sections');
+    expect(patternRule('tabbed sections')?.component).toBe('components/patterns/tabbed-sections.tsx');
   });
 });
