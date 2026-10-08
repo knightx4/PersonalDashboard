@@ -46,7 +46,7 @@ are getting. If not, it is not written yet.
 
 **A step that adds or changes a screen ends its detail with its pattern**, on
 a line of its own: `Pattern: list and detail`, `Pattern: deck`, `Pattern:
-thread` or `Pattern: tabbed detail`, the names in `lib/plan/patterns.ts`. The brief prints that pattern's
+thread`, `Pattern: tabbed detail` or `Pattern: main plus rail`, the names in `lib/plan/patterns.ts`. The brief prints that pattern's
 rule for the design critic. When none fits, the line is `Pattern: none fits,
 see #<n>`, naming the decision written for the person (`shaping.md`). A step
 that changes no screen has no pattern line.
