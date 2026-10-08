@@ -9,6 +9,7 @@ import {
   TRIAGE_MAX_CANDIDATES,
   TRIAGE_MODULE_QUESTION,
   TRIAGE_PRIORITY_QUESTION,
+  TRIAGE_ROUTE_QUESTION,
   TRIAGE_TIMEOUT_MS,
   duplicateQuestion,
   isSure,
@@ -23,7 +24,7 @@ import {
 type Client = SupabaseClient<any, 'public'>;
 
 /**
- * Ask Jev the four triage questions about one note or idea that was just
+ * Ask Jev the five triage questions about one note or idea that was just
  * filed, and store the answers on its row (plan #1179). The caller has
  * already checked the account agreed to send text to Jev.
  *
@@ -52,6 +53,7 @@ export async function triageRow(
       kind: TRIAGE_KIND_QUESTION,
       module: TRIAGE_MODULE_QUESTION,
       priority: TRIAGE_PRIORITY_QUESTION,
+      route: TRIAGE_ROUTE_QUESTION,
       duplicate,
     },
     onSpend: (report) => input.spend.push(report),
@@ -63,7 +65,9 @@ export async function triageRow(
   }
 
   const triage = readTriage(result.answers, keys);
-  if (!triage.kind && !triage.module && !triage.priority && !triage.duplicate) return null;
+  if (!triage.kind && !triage.module && !triage.priority && !triage.route && !triage.duplicate) {
+    return null;
+  }
 
   const update: Record<string, unknown> = { triage };
   if (table === 'feedback_items' && triage.priority && isSure(triage.priority)) {
