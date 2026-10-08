@@ -50,6 +50,9 @@ export const SPEND_OPERATIONS = {
     // after the job suggestion cron. One request per application not yet
     // scored or whose role changed.
     'score-applications',
+    // Dash's weekly shortlist of startups from the YC and Hacker News hiring
+    // lists (plan #1682), from the startup discovery cron. One request.
+    'shortlist-startups',
   ],
   shopping: [
     // Reading an order confirmation email into an order: from inbox ingest,

@@ -240,6 +240,13 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.watchlist_startups = startup.id;
 
+  // A week of startup discovery (job_search 0049).
+  const [discovery] = await admin<{ id: string }[]>`
+    insert into discovery_runs (user_id, week_start, stage, finished_at)
+    values (${userId}, '2026-10-05', 'done', now())
+    returning id`;
+  ids.discovery_runs = discovery.id;
+
   return ids;
 }
 
