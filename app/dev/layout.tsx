@@ -72,13 +72,12 @@ export default async function DevLayout({ children }: { children: React.ReactNod
       // Changes to specs waiting on a yes, which Home lists under To approve
       // (plan #1506).
       countProposedSpecChanges(supabase, user.id),
-      // The photo on the assignee circles of the plan's rows.
-      supabase
-        .from('profiles')
-        .select('avatar_url')
-        .eq('id', user.id)
-        .maybeSingle()
-        .then(({ data }) => (data?.avatar_url as string | null) ?? null),
+      // The photo on the assignee circles of the plan's rows. Without one
+      // the circle shows an initial, so a failed read costs nothing more.
+      Promise.resolve()
+        .then(() => supabase.from('profiles').select('avatar_url').eq('id', user.id).maybeSingle())
+        .then(({ data }) => (data?.avatar_url as string | null) ?? null)
+        .catch(() => null),
     ]);
 
   /**

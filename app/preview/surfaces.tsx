@@ -3313,7 +3313,7 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalTopSurface />,
   },
   {
-    /* The same frame on its Steps tab: the step tree and its stages. */
+    /* The same frame on its Steps tab: the steps by status, as a feature's. */
     id: 'goals-page-steps',
     label: 'Goal · the Steps tab',
     module: 'goals',
