@@ -145,8 +145,9 @@ across workspaces can be promoted to a law by the person.
 Most layout problems come from a page being arranged from scratch. A small set
 of patterns, each a layout component in `components/patterns/` with a gallery
 entry and a short rule on `/dev/ui`, gives a step a shape to start from. The
-first three are the shapes the gallery shows most, and the fourth was added
-for pages that hold several views of one thing:
+first three are the shapes the gallery shows most, the fourth was added for
+pages that hold several views of one thing, and the fifth for overview pages
+on a wide screen:
 
 - **List and detail**: a list you work through, and one item's page, one
   column.
@@ -158,6 +159,11 @@ for pages that hold several views of one thing:
   that becomes a grid of facts under the title on a phone. The feature page
   on the plan and the goal page use it (decision 1661, answered B, after
   Linear's project page).
+- **Main plus rail**: an overview page such as Home, with the column you work
+  in and, from laptop width, a narrow column on the right holding what you
+  glance at (counts, what is running, what Dash did, what is due soon). On a
+  phone the rail follows the main column. Never on a detail page, which stays
+  one column (feature 1624).
 
 A step's detail names its pattern ("Pattern: list and detail"), and shaping
 writes it. A screen that fits none of them is a new pattern, which the person
