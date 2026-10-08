@@ -119,6 +119,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-page': ['/goals', '/ask'],
   'ask-dash-proposal': ['/ask', '/ask/[ref]'],
   'ask-dash-changes': ['/ask', '/ask/[ref]'],
+  'ask-dash-chart': ['/ask', '/ask/[ref]'],
   'ask-made-changes': ['/ask', '/ask/[ref]'],
   'learn-clips': ['/learn/clips'],
   'learn-clips-empty': ['/learn/clips'],

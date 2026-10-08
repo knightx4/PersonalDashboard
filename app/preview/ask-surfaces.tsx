@@ -316,6 +316,105 @@ export function AskChangesSurface() {
 }
 
 /**
+ * Answers that drew a chart (plan #1655), reopened as /ask/<ref> draws them:
+ * spending by shop as bars, twelve rows with the longest shop name and the
+ * rest added together, then where applications are waiting as a table. The
+ * charts come from the turns' kept tool calls, as a saved answer has them.
+ */
+export function AskChartSurface() {
+  const at = (hour: number) => `2026-09-28T${String(hour).padStart(2, '0')}:00:00Z`;
+  const spend = [
+    ['Amazon', 1843.2],
+    ['eBay', 412.6],
+    ['The Very Long Named Independent Bookshop & Coffee House', 286.45],
+    ['Uniqlo', 214],
+    ['Apple', 199],
+    ['Steam', 96.37],
+    ['IKEA', 89.99],
+    ['Etsy', 64.5],
+    ['Target', 52.18],
+    ['Best Buy', 49.99],
+    ['Patagonia', 39],
+    ['Everything else', 118.74],
+  ] as const;
+  const turns: TalkTurn[] = [
+    { id: 'qs', role: 'user', body: 'Where did my money go this year?', createdAt: at(9) },
+    {
+      id: 'as',
+      role: 'assistant',
+      body:
+        'You spent $3,466.02 across 41 orders this year. Amazon is over half of it at $1,843.20, and eBay is a distant second at $412.60.',
+      createdAt: at(9),
+      toolCalls: [
+        { name: 'spend_by_merchant', input: { from: '2026-01-01' }, result: { ok: true, rows: [] } },
+        {
+          name: 'show_chart',
+          input: {},
+          result: {
+            ok: true,
+            chart: {
+              kind: 'bar',
+              title: 'Spending by shop, 2026',
+              rows: spend.map(([label, value]) => ({ label, value })),
+              currency: 'USD',
+              unit: null,
+              columns: null,
+            },
+          },
+        },
+      ],
+    },
+    { id: 'qa', role: 'user', body: 'Where are my applications stuck?', createdAt: at(10) },
+    {
+      id: 'aa',
+      role: 'assistant',
+      body:
+        'Most of the wait is after the first interview: roles at that stage have gone a median of 23 days without word, against 9 for the ones still at applied.',
+      createdAt: at(10),
+      citations: [
+        { table: 'job_search.applications', ref: 'a1', title: 'Senior Product Designer at Northwind', href: '/jobs/roles/r1' },
+      ],
+      toolCalls: [
+        { name: 'job_applications', input: {}, result: { ok: true, rows: [] } },
+        {
+          name: 'show_chart',
+          input: {},
+          result: {
+            ok: true,
+            chart: {
+              kind: 'table',
+              title: 'Days without word, by stage',
+              rows: [
+                { label: 'Applied', value: 9 },
+                { label: 'Recruiter screen', value: 14 },
+                { label: 'First interview', value: 23 },
+                { label: 'Final round', value: 6 },
+              ],
+              currency: null,
+              unit: 'days',
+              columns: ['Stage', 'Median days'],
+            },
+          },
+        },
+      ],
+    },
+  ];
+  return (
+    <AskDashProvider source={FIXTURES}>
+      <div className="mx-auto max-w-3xl py-4">
+        <AskThread
+          id="ask-chart-preview"
+          conversationRef="00000000-0000-4000-8000-000000000009"
+          turns={turns}
+          label="Ask a follow-up"
+          placeholder="Ask more about this"
+        />
+      </div>
+    </AskDashProvider>
+  );
+}
+
+/**
  * The Ask page's list of the changes Dash made (plan #1191): one of each
  * kind, newest first, with one already undone. Undo on the todo or the
  * return puts it back; Undo on the step is refused, since it was worked on

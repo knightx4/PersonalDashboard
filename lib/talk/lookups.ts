@@ -1,5 +1,6 @@
 import type { AskDashResult, AskLookupEvent } from '@/lib/dash/ask';
 import type { TalkToolCall } from './talk';
+import { CHART_TOOL } from './chart';
 
 /**
  * What Dash is looking up, in words (plan #1438).
@@ -54,11 +55,17 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
 ];
 
 /**
- * Writes and proposals have their cards under the answer and a hand-off says
- * so in the answer, so the lines are the reads alone.
+ * Writes and proposals have their cards under the answer, a hand-off says so
+ * in the answer and a chart is drawn in it (plan #1655), so the lines are the
+ * reads alone.
  */
 export function isShownLookup(name: string): boolean {
-  return !name.startsWith('propose_') && name !== 'hand_off' && !WRITE_TOOL_NAMES_SHOWN_AS_CARDS.includes(name);
+  return (
+    !name.startsWith('propose_') &&
+    name !== 'hand_off' &&
+    name !== CHART_TOOL &&
+    !WRITE_TOOL_NAMES_SHOWN_AS_CARDS.includes(name)
+  );
 }
 
 const MAX_QUOTED = 60;

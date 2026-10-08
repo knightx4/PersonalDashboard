@@ -148,6 +148,7 @@ import { BoardMomentDemo } from './jobs-moment-demos';
 import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
   AskChangesSurface,
+  AskChartSurface,
   AskDashSurface,
   AskMadeChangesSurface,
   FAILING_QUESTION,
@@ -3918,6 +3919,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <AskChangesSurface />,
+  },
+  {
+    /* A chart in Dash's reply (plan #1655): a breakdown question answered
+     * with bars, then one answered with a table, reopened from the turns'
+     * kept tool calls. */
+    id: 'ask-dash-chart',
+    label: 'Ask Dash · A chart in the reply',
+    module: 'shopping',
+    width: 'page',
+    render: () => <AskChartSurface />,
   },
   {
     /* The Ask page's list of changes Dash made (plan #1191): one of each kind
