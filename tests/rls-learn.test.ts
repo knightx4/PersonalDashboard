@@ -149,6 +149,7 @@ describe('RLS coverage', () => {
       'tracks',
       'transcript_calls',
       'video_clip_cuts',
+      'video_clip_subjects',
       'video_clips',
       'video_transcripts',
       'watch_list',

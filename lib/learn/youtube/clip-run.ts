@@ -22,8 +22,8 @@ import { loadTranscript } from './transcripts';
  * sent again; a video on both lists is cut once, as playlist.
  *
  * Each video is one Haiku call (clips.ts). Its clips are upserted on (person,
- * video, start second), and a row goes in video_clip_cuts even when it gave
- * none. A call that failed or ran out of time writes nothing, so the next run
+ * video, start second), each tagged in video_clip_subjects with every track it
+ * serves, and a row goes in video_clip_cuts even when it gave none. A call that failed or ran out of time writes nothing, so the next run
  * tries it again; a reply that could not be read is recorded with its error
  * and not sent again.
  *
@@ -198,9 +198,30 @@ export async function videosToClip(learn: LearnSupabaseClient, owner: string | n
   });
 }
 
+/**
+ * One learn.video_clip_subjects row for every track each stored clip serves
+ * (plan #1695). The stored rows come back from the upsert with their ids, and
+ * are matched to the clips by the second they start at, which is unique per
+ * person and video.
+ */
+export function clipSubjectRows(
+  userId: string,
+  stored: readonly { id: string; start_seconds: number }[],
+  clips: readonly Pick<Clip, 'startSeconds' | 'subjectIds'>[],
+): { user_id: string; clip_id: string; subject_id: string }[] {
+  const idAt = new Map(stored.map((row) => [row.start_seconds, row.id]));
+  const rows: { user_id: string; clip_id: string; subject_id: string }[] = [];
+  for (const clip of clips) {
+    const clipId = idAt.get(clip.startSeconds);
+    if (!clipId) continue;
+    for (const subjectId of new Set(clip.subjectIds)) rows.push({ user_id: userId, clip_id: clipId, subject_id: subjectId });
+  }
+  return rows;
+}
+
 async function storeClips(learn: LearnSupabaseClient, video: VideoToClip, clips: Clip[], stamp: string): Promise<void> {
   if (clips.length > 0) {
-    const { error } = await learn.from('video_clips').upsert(
+    const { data, error } = await learn.from('video_clips').upsert(
       clips.map((clip) => ({
         user_id: video.userId,
         video_id: video.videoId,
@@ -216,8 +237,16 @@ async function storeClips(learn: LearnSupabaseClient, video: VideoToClip, clips:
         cut_at: stamp,
       })),
       { onConflict: 'user_id,video_id,start_seconds' },
-    );
+    ).select('id, start_seconds');
     if (error) throw new Error(`Storing the clips failed: ${error.message}`);
+    // A re-cut adds tags and never removes one.
+    const tags = clipSubjectRows(video.userId, (data ?? []) as { id: string; start_seconds: number }[], clips);
+    if (tags.length > 0) {
+      const { error: tagError } = await learn
+        .from('video_clip_subjects')
+        .upsert(tags, { onConflict: 'clip_id,subject_id', ignoreDuplicates: true });
+      if (tagError) throw new Error(`Tagging the clips with their subjects failed: ${tagError.message}`);
+    }
   }
   await recordCut(learn, video, clips.length, null, stamp);
 }
