@@ -167,3 +167,5 @@ export function openedText(iso: string | null, now: Date = new Date()): string {
   if (days === 1) return 'yesterday';
   return `${days} days ago`;
 }
+
+export { readFunctionSpend, type FunctionSpend } from '@/lib/usage/function-spend';
