@@ -6,7 +6,7 @@ import { markConversationRead } from './actions';
 import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
 import { cardVariants } from '@/components/ui/card';
-import { Disclosure, SectionFold } from '@/components/ui/disclosure';
+import { Disclosure, Group, SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import type { CommentTarget } from '@/lib/comments/load';
 import type { Conversation } from '@/lib/comments/recent';
@@ -25,8 +25,9 @@ import { DashCredit } from '@/components/ui/dash-mark';
  * page -- the box is the same `Thread`, given the ref of the row it sits under
  * everywhere else, so `@dash` behaves the same too.
  *
- * Under the raises rather than above them: a raise is waiting on you and a
- * conversation usually is not.
+ * In three parts (Home, October 2026): the ones Dash has written in since you
+ * last opened them first, since those are the ones with something new to
+ * read; then the rest of the week; then everything older, folded shut.
  *
  * A conversation Dash has written in since you last opened it carries a mark.
  * Opening it is what clears it -- #432 -- so the line drops its own mark on the
@@ -52,7 +53,11 @@ const ELSEWHERE: Partial<Record<CommentTarget, string>> = {
   idea: 'Open it on the ideas page',
   step: 'Open it on the plan',
   note: 'Open it on the bugs page',
+  raise: 'Open it in the inbox',
 };
+
+/** A conversation quiet for longer than this goes under Older. */
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 function Line({ conversation, titles }: { conversation: Conversation; titles?: PlanRefTitles }) {
   const now = useClockNow();
@@ -131,18 +136,47 @@ function Line({ conversation, titles }: { conversation: Conversation; titles?: P
   );
 }
 
+/** One part of the list, drawn only when it holds something. */
+function Part({
+  conversations,
+  titles,
+}: {
+  conversations: readonly Conversation[];
+  titles?: PlanRefTitles;
+}) {
+  return (
+    <ul className={cn(cardVariants(), 'divide-y divide-border')}>
+      {conversations.map((conversation) => (
+        <Line
+          key={`${conversation.target}:${conversation.rowId}`}
+          conversation={conversation}
+          titles={titles}
+        />
+      ))}
+    </ul>
+  );
+}
+
 export function ConversationsView({
   conversations,
   titles,
+  now,
 }: {
   conversations: Conversation[];
   /** What each step number in a comment is called, for the hover text. */
   titles?: PlanRefTitles;
+  /** The page's clock, read once on the server, which the week is measured from. */
+  now: number;
 }) {
   const shown = conversations.slice(0, CONVERSATIONS_SHOWN);
+  const replied = shown.filter((conversation) => conversation.unread);
+  const read = shown.filter((conversation) => !conversation.unread);
+  const thisWeek = read.filter((conversation) => now - Date.parse(conversation.lastAt) < WEEK_MS);
+  const older = read.filter((conversation) => now - Date.parse(conversation.lastAt) >= WEEK_MS);
 
   return (
     <SectionFold
+      remember="dev.fold.conversations"
       title="Conversations"
       count={conversations.length > 0 ? conversations.length : undefined}
     >
@@ -152,23 +186,29 @@ export function ConversationsView({
           here.
         </p>
       ) : (
-        <>
-          <ul className={cn(cardVariants(), 'divide-y divide-border')}>
-            {shown.map((conversation) => (
-              <Line
-                key={`${conversation.target}:${conversation.rowId}`}
-                conversation={conversation}
-                titles={titles}
-              />
-            ))}
-          </ul>
+        <div className="space-y-4">
+          {replied.length > 0 && (
+            <Group title={`Dash replied · ${replied.length}`}>
+              <Part conversations={replied} titles={titles} />
+            </Group>
+          )}
+          {thisWeek.length > 0 && (
+            <Group title="This week">
+              <Part conversations={thisWeek} titles={titles} />
+            </Group>
+          )}
+          {older.length > 0 && (
+            <Disclosure remember="dev.fold.conversations.older" title="Older" meta={older.length}>
+              <Part conversations={older} titles={titles} />
+            </Disclosure>
+          )}
           {conversations.length > shown.length && (
             <p className="text-small text-ink-muted">
               The {CONVERSATIONS_SHOWN} most recently active. The rest are on the rows they were
               written on.
             </p>
           )}
-        </>
+        </div>
       )}
     </SectionFold>
   );
