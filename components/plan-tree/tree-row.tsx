@@ -47,7 +47,7 @@ import { DashCredit } from '@/components/ui/dash-mark';
  * a session, the run behind a claim, commit checks, priority and size --
  * passed in by the page rather than written here. What is left is what any
  * page of steps shares: the tree guides and the fold, the number and title,
- * the health word you press to change, whose move it is, the count of what
+ * the health word you press to change, who holds it, the count of what
  * is beneath, the fog, and the opened panel with the detail, Done when,
  * Needs, the note, the questions, what it waits on and the thread.
  *
@@ -195,7 +195,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
   trail,
   row,
   health,
-  move,
+  assignee,
   statusMenu,
   menu,
   actions,
@@ -241,7 +241,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
   heading?: boolean;
   /**
    * `grid` is the dev plan's row: the shared columns under a header, with the
-   * outline number, health word, move, priority and count of what is beneath.
+   * outline number, status word, assignee circle, priority and count beneath.
    * `list` is a goal's row (plan #1078): the status control before the title
    * as a glyph, the title with its marks, the `priority` cell at the end
    * (under the title on a phone), and the menu. The panel is the same.
@@ -253,12 +253,17 @@ export function TreeRow<E extends TreeCatalogEntry>({
   /** One entry per level above: whether that level's line carries on below this row. */
   trail: readonly boolean[];
   row: TreeRowState;
+  /**
+   * The status column: the health word, which the page words to say who or
+   * what the step waits on where that is more than the word alone.
+   */
   health: TreeHealth;
   /**
-   * The cell beside health: on the plan, whose move it is, drawn with
-   * `MoveLabel` (components/ui/move-label.tsx); on a goal, who the step is on.
+   * The circle after the status, in the grid: who holds the step, drawn with
+   * `AssigneeAvatar` (components/ui/assignee-avatar.tsx). A page may wrap it
+   * in the press that hands the step over.
    */
-  move: React.ReactNode;
+  assignee?: ReactNode;
   /** What pressing the health word offers. */
   statusMenu: ActionMenuItem[];
   /** The row's own menu, at the end of the line. */
@@ -431,11 +436,11 @@ export function TreeRow<E extends TreeCatalogEntry>({
       label={`Status of #${node.outline} ${node.title}`}
       items={statusMenu}
       align="start"
-      className={list ? 'shrink-0' : 'justify-self-start'}
+      className={list ? 'shrink-0' : 'min-w-0 max-w-full justify-self-start'}
       triggerClassName={cn(
         list
           ? 'size-7 px-0 text-small font-medium'
-          : 'h-7 w-auto gap-1.5 px-1.5 text-small font-medium',
+          : 'h-7 w-auto max-w-full gap-1.5 px-1.5 text-small font-medium',
         TONE_TEXT[health.tone],
       )}
       trigger={
@@ -443,7 +448,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
           // Inherits the trigger's own text size and tone, which is what
           // makes the health a word you click rather than a badge inside a
           // button.
-          className="text-inherit"
+          className="min-w-0 text-inherit"
           tone={health.tone}
           title={health.title}
           word={health.word}
@@ -461,7 +466,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
           // screen readers, so a dropped row gets its slash back there.
           // In the list layout the glyph is the control at every width,
           // and the word is its accessible name and tooltip.
-          wordClassName={list ? 'sr-only' : 'max-sm:sr-only'}
+          wordClassName={list ? 'sr-only' : 'truncate max-sm:sr-only'}
         >
           {health.name === 'dropped' && !list && (
             <StatusGlyph glyph={health.glyph} className="sm:hidden" />
@@ -706,19 +711,10 @@ export function TreeRow<E extends TreeCatalogEntry>({
 
         {!list && healthMenu}
 
-        {/* Whose move it is, beside how far along it is.
-
-            A word and a tone, and deliberately no hexagon: the hexagons belong
-            to health, they are a scale from empty to full, and a second column
-            of them beside it would read as a second position on the same scale
-            rather than as an answer to a different question. The one shape is
-            Dash's working mark, which MoveLabel puts beside "Dash is on it".
-
-            Not a menu, where health is one. Health is set by hand; this is
-            derived from what is already true of the row -- who it is assigned
-            to, what it waits on, whether it is a question -- so there is
-            nothing here to pick. Changing it means handing the step over or
-            answering what it asks, which are the buttons already on the row. */}
+        {/* Who holds it, as a circle after how far along it is: your photo
+            or Dash's visor. The move it used to say in words ("On you",
+            "Waiting on #1650") is folded into the status word where it adds
+            to it, so the row asks "where is this, and whose is it" once. */}
         {list ? (
           priority &&
           !heading && (
@@ -728,13 +724,10 @@ export function TreeRow<E extends TreeCatalogEntry>({
           )
         ) : (
           <>
-            <span className="hidden min-w-0 truncate text-small sm:block">{move}</span>
+            <span className="flex items-center">{assignee}</span>
 
             <span className="hidden truncate text-small sm:block">{priority}</span>
 
-            {/* No "Who" column. It was a column of dashes with the occasional
-                name in it -- one fact, on a plan whose every approved step the
-                runner takes unless you keep it, and keeping it is a button. */}
             <span className="hidden sm:block">
               <Breakdown rollup={node.rollup} />
             </span>

@@ -1,9 +1,9 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ChevronRight, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { TabbedDetail } from '@/components/patterns/tabbed-detail';
 import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
@@ -15,6 +15,7 @@ import { FogNote } from '@/components/dev/fog-note';
 import { Thread } from '@/components/thread/thread';
 import { ColumnHeader } from '@/components/plan-tree/grid';
 import { ViewChips } from '@/components/plan-tree/view-chips';
+import { StepGroupRows } from '@/components/plan-tree/step-group-rows';
 import { planRowId } from '@/lib/comments/refs';
 import { Dependencies } from '@/components/plan-tree/dependencies';
 import { Questions } from '@/components/plan-tree/questions';
@@ -41,7 +42,6 @@ import {
   stepGroups,
   stepsViewFrom,
   stepsViewHref,
-  type StepGroup,
   type StepsView,
 } from '@/lib/plan/feature-page';
 import {
@@ -548,7 +548,13 @@ function FeatureSteps({
             {view === 'tree' && !held
               ? steps.map((step) => row(step))
               : groups.map((group) => (
-                  <StepGroupRows key={group.id} group={group}>
+                  <StepGroupRows
+                    key={group.id}
+                    label={group.label}
+                    count={group.steps.length}
+                    folded={group.folded}
+                    anchors={group.steps.map(({ node: step }) => planRowId(step.number))}
+                  >
                     {group.steps.map(({ node: step, parent }) =>
                       row(asListed(step), {
                         source: parent ? `Under #${parent.outline} ${parent.title}` : undefined,
@@ -590,54 +596,3 @@ function SplitLink({ href, count, who }: { href: string; count: number; who: Hel
 }
 
 const STEPS_VIEW_LABEL: Record<StepsView, string> = { status: 'By status', tree: 'Tree' };
-
-/**
- * One status group: a heading row with its count, then its rows. The
- * heading folds the group; done and dropped start folded, and a folded group
- * opens by itself when the address names one of its steps.
- */
-function StepGroupRows({ group, children }: { group: StepGroup; children: React.ReactNode }) {
-  const [open, setOpen] = useState(!group.folded);
-  const anchors = group.steps.map(({ node }) => planRowId(node.number)).join(' ');
-  useEffect(() => {
-    if (!group.folded) return;
-    const named = () => {
-      const hash = window.location.hash.slice(1);
-      if (!anchors.split(' ').includes(hash)) return;
-      setOpen(true);
-      // The browser looked for the row before the group was open to hold it.
-      requestAnimationFrame(() => document.getElementById(hash)?.scrollIntoView());
-    };
-    named();
-    window.addEventListener('hashchange', named);
-    return () => window.removeEventListener('hashchange', named);
-  }, [group.folded, anchors]);
-  const heading = (
-    <>
-      <span>{group.label}</span>
-      <span className="tabular font-normal text-ink-muted">{group.steps.length}</span>
-    </>
-  );
-  return (
-    <>
-      {/* Every heading folds, so the six names share one edge, after the
-          arrow, in line with the step numbers beneath them. */}
-      <li className="bg-sunken px-3 py-1.5 text-small font-semibold text-ink">
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen((was) => !was)}
-          className="press press-area inline-flex items-center gap-1.5"
-        >
-          <ChevronRight
-            className={cn('size-3.5 text-ink-muted transition-transform', open && 'rotate-90')}
-            strokeWidth={2}
-            aria-hidden
-          />
-          {heading}
-        </button>
-      </li>
-      {open && children}
-    </>
-  );
-}

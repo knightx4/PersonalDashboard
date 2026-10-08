@@ -4,35 +4,34 @@ import { cn } from '@/lib/cn';
  * The columns every row shares.
  *
  * One template, used by the header and by every row at every depth, is what
- * makes the page scan: the health of a sub-sub-step sits under the health of
+ * makes the page scan: the status of a sub-sub-step sits under the status of
  * the feature above it, because the indent lives inside the name cell rather
- * than around the row. On a phone the three middle columns go and the name,
- * the health and the menu stay, and the name wraps rather than truncating
- * (tree-row.tsx). The health there is its glyph alone, with the word kept for
- * screen readers: at 390 pixels the word's column left a title three lines
- * tall.
+ * than around the row. On a phone the priority and step count go and the
+ * name, the status, the assignee circle and the menu stay, and the name wraps
+ * rather than truncating (tree-row.tsx). The status there is its glyph alone,
+ * with the word kept for screen readers.
+ *
+ * Status is one column: the health word, saying who or what it waits on when
+ * that is more than the word alone. Who holds the step is the circle after it,
+ * your photo or Dash's visor, so "how far along, and who has it" reads as one
+ * glance across two cells rather than two words that often repeated each
+ * other ("Waiting on you", "On you").
  */
 // The last column holds the row's quick actions as well as its menu, so it is
 // wide enough for them from sm up -- reserved rather than grown on hover,
 // because a column that widens under the pointer moves every row beside it.
-// Status sits directly after Health, because the two are read together -- "how
-// far along, and who has it" is one question asked twice -- and a column
-// between them would make that a comparison across the row.
 export const ROW_GRID =
-  'grid grid-cols-[minmax(0,1fr)_2rem_2rem] items-center gap-x-2 ' +
-  'sm:grid-cols-[minmax(0,1fr)_7.25rem_6rem_5.5rem_6rem_8rem]';
+  'grid grid-cols-[minmax(0,1fr)_2rem_1.75rem_2rem] items-center gap-x-2 ' +
+  'sm:grid-cols-[minmax(0,1fr)_9.5rem_2.25rem_5.5rem_6rem_8rem]';
 
 /** The width of one level of the tree, in the name cell. */
 export const LEVEL = 'w-5';
 
 /**
- * The labels over the columns. `status` and `priority` name the third and
- * fourth, which a page other than the plan may fill with something of its own.
+ * The labels over the columns. `priority` names the fourth, which a page
+ * other than the plan may fill with something of its own: a goal's dates.
  */
-export function ColumnHeader({
-  priority = 'Priority',
-  status = 'Status',
-}: { priority?: string; status?: string } = {}) {
+export function ColumnHeader({ priority = 'Priority' }: { priority?: string } = {}) {
   return (
     <li
       aria-hidden
@@ -42,9 +41,9 @@ export function ColumnHeader({
       )}
     >
       <span>Step</span>
-      <span className="hidden sm:block">Health</span>
+      <span className="hidden sm:block">Status</span>
       <span className="sm:hidden" />
-      <span className="hidden sm:block">{status}</span>
+      <span />
       <span className="hidden sm:block">{priority}</span>
       <span className="hidden sm:block">Steps</span>
       <span />

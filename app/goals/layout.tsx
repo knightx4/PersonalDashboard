@@ -34,7 +34,7 @@ export default async function GoalsLayout({ children }: { children: React.ReactN
   const core = await createCoreClient();
   const [{ data: profile }, settings, counts, activity, raised, mainCheck, owner, costs] =
     await Promise.all([
-      supabase.from('profiles').select('display_name').eq('id', user.id).single(),
+      supabase.from('profiles').select('display_name, avatar_url').eq('id', user.id).single(),
       loadAccountSettings(user.id),
       loadModuleCounts(user.id),
       loadActivity(),
@@ -58,6 +58,7 @@ export default async function GoalsLayout({ children }: { children: React.ReactN
         module="goals"
         sections={sections}
         displayName={profile?.display_name ?? null}
+        avatarUrl={profile?.avatar_url ?? null}
         email={user.email ?? ''}
         enabledModules={settings.enabledModules}
         isOwner={owner}

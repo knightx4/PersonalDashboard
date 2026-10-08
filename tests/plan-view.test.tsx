@@ -490,7 +490,7 @@ describe('PlanView', () => {
 
   it('lays every depth out on the same columns, with the tree drawn in the name cell', () => {
     const html = render('open');
-    expect(html).toContain('>Health<');
+    expect(html).toContain('>Status<');
     expect(html).toContain('>Steps<');
     // The sub-steps carry a guide line; the feature at the top does not.
     expect((html.match(/bg-border-strong/g) ?? []).length).toBeGreaterThan(0);
@@ -858,11 +858,11 @@ describe('PlanView', () => {
  * assert the page draws both, and that the words come out of the fixture the
  * way the rules say they should.
  */
-describe('health and status, as two columns', () => {
-  it('heads both columns', () => {
+describe('one status column, and who holds the step', () => {
+  it('heads one Status column and no Health column', () => {
     const html = render('all');
-    expect(html).toContain('>Health<');
     expect(html).toContain('>Status<');
+    expect(html).not.toContain('>Health<');
   });
 
   // The complaint the note was filed about: a feature whose first step is done
@@ -870,8 +870,6 @@ describe('health and status, as two columns', () => {
   // otherwise on the same line.
   it('calls a feature with a finished step in progress, not not-started', () => {
     const html = render('all');
-    // The row's own two cells: the health menu carries the row's name in its
-    // label, and the health word and the status word follow it in order.
     const from = html.indexOf('Status of #1 Share links');
     expect(from).toBeGreaterThan(-1);
     const row = html.slice(from, from + 1200);
@@ -879,30 +877,24 @@ describe('health and status, as two columns', () => {
     expect(row).not.toContain('Not started');
   });
 
-  // The words are lib/core/move.ts's. "On you" is a view chip too, so the
-  // tooltip is what places the word in a row's Status cell.
-  it('says a blocked step and a proposal are on you', () => {
+  // The move's words are folded into the status, so "On you" beside "Waiting
+  // on you" is no longer said twice on a row.
+  it('no longer writes the move as a column of its own', () => {
     const html = render('all');
-    expect(html).toContain('On you');
-    expect(html).toContain('Stopped on you');
-  });
-
-  it('says a step held up by another is waiting', () => {
-    const html = render('all');
+    expect(html).not.toContain('Stopped on you');
+    expect(html).not.toContain('Waiting on another step that has not closed.');
     expect(html).toContain('Waiting');
-    expect(html).toContain('Waiting on another step that has not closed.');
   });
 
   // #694. The runner takes anything approved that is not yours, so "handed
-  // over" is no longer a state a row can be in and the word for it is gone
-  // from the page in both places it was written.
+  // over" is no longer a state a row can be in.
   it('says nothing about an approved step waiting its turn', () => {
     const html = render('all');
     expect(html).not.toContain('For Dash');
     expect(html).not.toContain('Handed to Dash');
   });
 
-  it('says On you for a step you marked, underway or not', () => {
+  it('draws your circle on a step you marked and Dash’s on the rest, pressing it to hand over', () => {
     const marked = buildPlanTree({
       items: [
         item({ id: 'resting', title: 'Outlook ingestion', assignee: 'me' }),
@@ -913,7 +905,6 @@ describe('health and status, as two columns', () => {
           status: 'in_progress',
           startedAt: '2026-02-01T09:30:00Z',
         }),
-        // The runner's own step, in the same render, saying nothing.
         item({ id: 'queued', title: 'Receipts by photo' }),
       ],
       dependencies: [],
@@ -932,42 +923,10 @@ describe('health and status, as two columns', () => {
         unfolded
       />,
     );
-    // Both marked rows say it, and the underway one is not read as a
-    // session's: marking a step is what holds the runner off it, whoever
-    // started it. The word is the shared On you (lib/core/move.ts); the
-    // tooltip is what tells a kept step from one stopped on you.
-    expect((html.match(/You kept this one, so the runner will not take it\./g) ?? []).length).toBe(2);
+    expect((html.match(/title="Yours\. Not mine"/g) ?? []).length).toBe(2);
+    expect((html.match(/title="Dash’s\. Mine"/g) ?? []).length).toBe(1);
+    expect(html).toContain('role="img" aria-label="Dash"');
     expect(html).not.toContain('With Dash');
-  });
-
-  it('says With Dash for an underway step you did not mark', () => {
-    const running = buildPlanTree({
-      items: [
-        item({
-          id: 'session',
-          title: 'Outlook ingestion',
-          status: 'in_progress',
-          startedAt: '2026-02-01T09:30:00Z',
-        }),
-      ],
-      dependencies: [],
-    });
-    const html = renderToStaticMarkup(
-      <PlanView
-        sections={applyView(running, 'open')}
-        finished={[]}
-        summary={summarize(running)}
-        view="open"
-        catalog={catalogOf(running)}
-        empty={false}
-        canSend={false}
-        lastRuns={{}}
-        commitChecks={{}}
-        unfolded
-      />,
-    );
-    expect(html).toContain('With Dash');
-    expect(html).not.toContain('>Yours<');
   });
 });
 

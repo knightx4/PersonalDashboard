@@ -115,14 +115,17 @@ describe('the Needs line on a goal step', () => {
 });
 
 describe('whose a goal step is (plan #1159)', () => {
-  it('marks Dash’s steps and leaves yours unmarked (plan #1078)', () => {
+  it('draws whose each step is as its assignee circle', () => {
     const html = render([
       step('a', { title: 'Turn on autopay' }),
       step('b', { title: 'Log each loan balance', kind: 'rhythm', rhythmCount: 1, rhythmPeriod: 'month', position: 20 }),
       step('c', { title: 'List balances', kind: 'claude', position: 30 }),
     ]);
     expect(html).not.toContain('sr-only">Yours<');
-    // Dash's is the mark itself (plan #1338), named for a screen reader.
-    expect(html.match(/role="img" aria-label="Dash&#x27;s"/g)).toHaveLength(1);
+    // The circle is named for a screen reader: Dash's visor, or you.
+    expect(html.match(/role="img" aria-label="Dash"/g)).toHaveLength(1);
+    expect(html.match(/role="img" aria-label="You"/g)).toHaveLength(2);
+    // The title carries no second mark beside the circle.
+    expect(html).not.toContain('aria-label="Dash&#x27;s"');
   });
 });

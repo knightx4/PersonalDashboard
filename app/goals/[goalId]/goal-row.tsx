@@ -72,18 +72,20 @@ import {
 import { answerGoalQuestion, askGoalQuestion, dismissGoalQuestion } from './tree-actions';
 import { DashMark } from '@/components/ui/dash-mark';
 import { MoveLabel } from '@/components/ui/move-label';
+import { AssigneeAvatar } from '@/components/ui/assignee-avatar';
+import { withMove } from '@/lib/plan/health-words';
 
 /**
- * One goal step, drawn through the dev plan's shared row (plan #982) in its
- * list layout (plan #1078).
+ * One goal step, drawn through the dev plan's shared row (plan #982).
  *
- * The same fold, guides, status menu and opened panel as /dev/plan, with a
- * goal's writes behind them, but none of the plan's columns: a row is its
- * status glyph, its title with Dash's mark on Dash's steps, and at the end
- * its date, a rhythm's count or, on a stage, how far along it is. What only
- * a goal has goes in the row's slots: Dash's draft or result as a fold under
- * the row, a question's answer box, a rhythm's periods and an information
- * step's form in the panel body. Finished sub-steps fold under the open ones.
+ * On the Steps tab it is the plan's grid row: the status word you press to
+ * change, the assignee circle (your photo or Dash's visor), its date, a
+ * rhythm's count or, on a stage, how far along it is, then how much is done
+ * beneath. On a step's own page it is the list layout, where the row is the
+ * page's heading. What only a goal has goes in the row's slots: Dash's draft
+ * or result as a fold under the row, a question's answer box, a rhythm's
+ * periods and an information step's form in the panel body. Finished
+ * sub-steps fold under the open ones.
  */
 
 /** The goal's writes, for the shared tree components. */
@@ -385,6 +387,7 @@ export function GoalRow({
   fromGoal,
   unfolded,
   summary,
+  under,
   page = false,
 }: {
   node: GoalRowNode;
@@ -401,6 +404,8 @@ export function GoalRow({
   unfolded?: boolean;
   /** What the row says at its end in place of a date: on a stage, how far along it is. */
   summary?: string;
+  /** Where a sub-step listed away from its tree sits, in the By status view: "Under #3 …". */
+  under?: string;
   /**
    * The row is the step its own page is about (plan #1620): it starts opened,
    * and its panel does not link to the page it is already on.
@@ -691,14 +696,19 @@ export function GoalRow({
       node={node}
       trail={trail}
       row={row}
-      health={node.health}
-      // Who the step is on, where the plan says whose move it is (note
-      // 6d242e62). That is a different fact from the move, so it keeps its own
-      // words rather than MoveLabel's; the goal's move is on GoalProgress.
-      move={
-        <StateLabel glyph={null} word={node.who.word} tone={node.who.tone} title={node.who.title} />
+      // One status word, saying what the step waits on where its move names
+      // it; who it is on is the circle after it.
+      health={withMove(node.health, node.move)}
+      assignee={
+        <AssigneeAvatar
+          who={node.who.word === 'Dash' ? 'dash' : node.who.word === 'You' ? 'me' : 'both'}
+          working={Boolean(run?.running)}
+          title={node.who.title}
+        />
       }
-      layout="list"
+      // The plan's grid on the goal's Steps tab; the step's own page keeps
+      // the list, where the row is the heading.
+      layout={page ? 'list' : 'grid'}
       heading={page}
       statusMenu={statusMenu}
       menu={menu}
@@ -707,7 +717,7 @@ export function GoalRow({
       // The title opens the step's own page (plan #1621); the chevron still
       // opens the row in place, for editing here.
       titleHref={page ? undefined : stepHref(fromGoal?.id ?? context.goalId, step.id)}
-      source={fromGoal ? `From ${fromGoal.title}` : undefined}
+      source={fromGoal ? `From ${fromGoal.title}` : under}
       // What a step waiting on you is waiting for (note 5aa7216c), or the
       // steps and questions it waits on (plan #1159), as the dev plan's Needs
       // line says it.
@@ -717,7 +727,7 @@ export function GoalRow({
       dependencies={{ catalog: context.catalog, groupOf: () => context.goalTitle }}
       marks={
         <>
-          {dashes && (
+          {dashes && (page || arrived) && (
             <span
               ref={markRef}
               title={

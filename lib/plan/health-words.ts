@@ -264,3 +264,20 @@ export const TONE_DOT: Record<DevTone, string> = {
   positive: 'bg-positive',
   caution: 'bg-caution',
 };
+
+/**
+ * The one status word a row shows, with its move folded in where the move
+ * says more (the Status column, plan grid). Most moves repeat the health in
+ * other words ("Waiting on you" beside "On you"), and who holds the step is
+ * the assignee circle beside it, so only a wait that names what it waits on
+ * replaces the word: "Waiting" becomes "Waiting on #1650".
+ */
+export function withMove<H extends { word: string; title?: string }>(
+  health: H,
+  { move }: { move: Move | null },
+): H {
+  if (move?.state !== 'waiting' || !move.waitingOn) return health;
+  const word = moveWord(move);
+  if (!word.startsWith(health.word) || word === health.word) return health;
+  return { ...health, word };
+}

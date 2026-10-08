@@ -69,6 +69,7 @@ import { GoalLinksSection } from './goal-links';
 import { GoalNumber } from './goal-number';
 import { GoalFog, GoalShaping } from './goal-shaping';
 import { StepTree } from './step-tree';
+import { goalStepsViewFrom } from '@/lib/goals/step-groups';
 import { DashWork } from './dash-work';
 import { dashWork } from '@/lib/goals/dash-work';
 
@@ -243,10 +244,12 @@ export default async function GoalMapPage({
   searchParams,
 }: {
   params: Promise<{ goalId: string }>;
-  searchParams: Promise<{ tab?: string | string[] }>;
+  searchParams: Promise<{ tab?: string | string[]; view?: string | string[] }>;
 }) {
   const { goalId } = await params;
-  const tab = tabFrom((await searchParams).tab, GOAL_TABS);
+  const query = await searchParams;
+  const tab = tabFrom(query.tab, GOAL_TABS);
+  const stepsView = goalStepsViewFrom(query.view);
   if (!/^[0-9a-f-]{36}$/i.test(goalId)) notFound();
 
   const user = await requireUser();
@@ -469,6 +472,7 @@ export default async function GoalMapPage({
           <StepTree
             map={map}
             stages={stages}
+            view={stepsView}
             todoOn={moduleEnabled(account, 'todo')}
             runs={stepRunLines(stepRuns)}
             files={filesOf}

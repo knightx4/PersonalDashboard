@@ -56,7 +56,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     return <NoPermission what="The Dev workspace" />;
   }
 
-  const [settings, counts, activity, raised, plan, mainCheck, costs, specChanges] =
+  const [settings, counts, activity, raised, plan, mainCheck, costs, specChanges, avatarUrl] =
     await Promise.all([
       loadAccountSettings(user.id),
       loadModuleCounts(user.id),
@@ -72,6 +72,13 @@ export default async function DevLayout({ children }: { children: React.ReactNod
       // Changes to specs waiting on a yes, which Home lists under To approve
       // (plan #1506).
       countProposedSpecChanges(supabase, user.id),
+      // The photo on the assignee circles of the plan's rows.
+      supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', user.id)
+        .maybeSingle()
+        .then(({ data }) => (data?.avatar_url as string | null) ?? null),
     ]);
 
   /**
@@ -152,6 +159,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
         sections={sections}
         feedbackHref="/dev/bugs"
         displayName={settings.displayName}
+        avatarUrl={avatarUrl}
         email={user.email ?? ''}
         enabledModules={settings.enabledModules}
         // Proved above: a non-owner never reaches this line.

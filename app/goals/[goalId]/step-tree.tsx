@@ -1,9 +1,12 @@
 'use client';
 
 import type { LinkedFile } from '@/lib/files/files';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ListTree } from 'lucide-react';
+import { ColumnHeader } from '@/components/plan-tree/grid';
+import { StepGroupRows } from '@/components/plan-tree/step-group-rows';
+import { ViewChips } from '@/components/plan-tree/view-chips';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -15,14 +18,13 @@ import {
   staysOpen,
   type GoalRowNode,
 } from '@/lib/goals/plan-rows';
+import { goalStages, stageMeta, stepPreps, type Stage } from '@/lib/goals/goal-page';
 import {
-  goalStages,
-  nowLabel,
-  nowStages,
-  stageMeta,
-  stepPreps,
-  type Stage,
-} from '@/lib/goals/goal-page';
+  GOAL_STEPS_VIEWS,
+  goalStepGroups,
+  goalStepsViewHref,
+  type GoalStepsView,
+} from '@/lib/goals/step-groups';
 import { latestBeneath, type ItemProgress } from '@/lib/goals/progress';
 import { countAside, type StepRunView } from '@/lib/goals/shaping';
 import type { GoalMap } from '@/lib/goals/steps-store';
@@ -39,24 +41,22 @@ const NO_FILES: Record<string, LinkedFile[]> = {};
 const NO_PROGRESS: Record<string, ItemProgress> = {};
 const NO_ARRIVALS: readonly string[] = [];
 
-type Placed = { row: GoalRowNode; stage?: Stage };
+const VIEW_LABEL: Record<GoalStepsView, string> = { status: 'By status', tree: 'Tree' };
 
 /**
- * A goal's steps (plan #925), in two parts (plan #1078).
+ * A goal's steps, laid out as a feature's Steps tab on /dev/plan is: view
+ * chips, then one card of the plan's grid rows under a column header.
  *
- * **Now** is the work in hand. On a goal in stages it is the stages
- * `nowStages` opens, each a row with its open steps beneath it, and any open
- * step outside the stages; on a goal that is one list, every open step.
- * **Other stages** is the rest of the map: each stage one row, folded, saying
- * whether it is done, how far along it is or what it waits on, and opening in
- * place when pressed. Finished steps fold under Finished at every level, and
- * what Dash wrote for a step is a fold on that step's row.
+ * **By status**, the default, lists every step and sub-step once in status
+ * groups (lib/goals/step-groups.ts): Blocked, In progress, Ready and Not
+ * started open, Done and Dropped folded. A sub-step says which step it sits
+ * under on a line below its title. **Tree** is the goal's own tree, its
+ * finished top-level steps folded under Finished.
  *
- * Each step is the dev plan's shared row in its list layout (goal-row.tsx):
- * no column header, tally or banded bar, and no view chips. Open, On you and
- * Everything were a way to cut the one long list; Now and the map cut it by
- * stage instead, Waiting on you at the top of the page lists what is on you,
- * and Finished is a fold rather than a view.
+ * Each row is the shared row in its grid layout (goal-row.tsx): the status
+ * word, the assignee circle, the date or rhythm count where the plan has
+ * priority, and how much is done beneath. A stage's row says how far along
+ * the stage is in that cell.
  *
  * Steps from other goals that count towards this one follow in a card of
  * their own, each naming the goal it comes from.
@@ -65,6 +65,7 @@ export function StepTree({
   map,
   todoOn,
   stages: given,
+  view = 'status',
   unfolded = true,
   opened = false,
   informationSeam,
@@ -73,16 +74,16 @@ export function StepTree({
   progress = NO_PROGRESS,
   arrivals = NO_ARRIVALS,
   canRun = true,
-  belowNow,
 }: {
   map: GoalMap;
   todoOn: boolean;
   /**
-   * The goal's stages, as the page read them with `goalStages`. Null draws
-   * the goal as one list, which an errand always is; left out, they are read
-   * here.
+   * The goal's stages, as the page read them with `goalStages`, for what a
+   * stage's row says about how far along it is. Left out, they are read here.
    */
   stages?: Stage[] | null;
+  /** By status, or the tree. From the address, `?view=tree`. */
+  view?: GoalStepsView;
   /** The latest run on each step sent or prepared from its row, by step id (plan #1044). */
   runs?: Record<string, StepRunView>;
   /** The files each step links to, by step id. */
@@ -102,8 +103,6 @@ export function StepTree({
   informationSeam?: InformationSeam;
   /** Whether this account can start a goals run, which Ask Dash on each row needs. */
   canRun?: boolean;
-  /** Drawn under Now, before the other stages: the page's strip of rhythms. */
-  belowNow?: ReactNode;
 }) {
   const [showAside, setShowAside] = useState(false);
   const aside = countAside(map.steps);
@@ -124,21 +123,17 @@ export function StepTree({
     () => (given === undefined ? goalStages(map.steps) : given),
     [given, map.steps],
   );
-
-  const now = useMemo(() => nowStages(stages, map.steps), [stages, map.steps]);
+  const groups = useMemo(() => goalStepGroups(own.rows), [own.rows]);
   const stageOf = new Map((stages ?? []).map((stage) => [stage.id, stage]));
   const readElsewhere = context.readElsewhere ?? new Set<string>();
-  const inNow: Placed[] = [];
-  const onMap: Placed[] = [];
-  const finished: GoalRowNode[] = [];
-  for (const row of own.rows) {
-    const stage = stageOf.get(row.id);
-    if (stage) (now.has(row.id) ? inNow : onMap).push({ row, stage });
-    else if (staysOpen(row.step, readElsewhere)) inNow.push({ row });
-    else finished.push(row);
-  }
   const substeps = own.rows.filter((row) => row.kind !== 'decision');
-  const rowOf = ({ row, stage }: Placed, folded = false) => (
+  const openTop = own.rows.filter((row) => staysOpen(row.step, readElsewhere));
+  const finishedTop = own.rows.filter((row) => !staysOpen(row.step, readElsewhere));
+  const summaryOf = (row: GoalRowNode) => {
+    const stage = stageOf.get(row.id);
+    return stage ? stageMeta(stage) : undefined;
+  };
+  const topRow = (row: GoalRowNode) => (
     <GoalRow
       key={row.id}
       node={row}
@@ -146,29 +141,9 @@ export function StepTree({
       context={context}
       index={substeps.findIndex((step) => step.id === row.id)}
       count={substeps.length}
-      unfolded={folded ? false : undefined}
-      summary={stage ? stageMeta(stage) : undefined}
+      summary={summaryOf(row)}
     />
   );
-  const finishedFold = finished.length > 0 && (
-    <div className="border-t border-border px-3 py-1.5">
-      <FinishedFold count={finished.length}>
-        {() => (
-          <ul className="-ml-5.5 divide-y divide-border">
-            {finished.map((row) => rowOf({ row }))}
-          </ul>
-        )}
-      </FinishedFold>
-    </div>
-  );
-  // Inside the last card, under a rule, as the plan's "Add a step" sits at
-  // the foot of a module (plan #983).
-  const composer = (
-    <div className="border-t border-border px-3 py-1.5">
-      <StepComposer parentId={map.goal.id} label="Add a step" bare />
-    </div>
-  );
-  const nowMeta = stages ? nowLabel(stages, now) : null;
 
   if (map.steps.length === 0) {
     return (
@@ -184,50 +159,56 @@ export function StepTree({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <StepFinder goalId={map.goal.id} steps={map.steps} />
-      <section aria-labelledby="now-heading" className="space-y-2">
-        <h2
-          id="now-heading"
-          className="flex items-baseline gap-2 px-1 text-ui font-semibold text-ink"
-        >
-          Now
-          {nowMeta && <span className="text-small font-normal text-ink-muted">{nowMeta}</span>}
-        </h2>
-        <Card padding="none">
-          {inNow.length > 0 ? (
-            <ul className="divide-y divide-border">{inNow.map((placed) => rowOf(placed))}</ul>
-          ) : (
-            <p className="px-3 py-2.5 text-ui text-ink-muted">
-              {stages ? 'Every stage is done.' : 'Every step is done or dropped.'}
-            </p>
-          )}
-          {!stages && finishedFold}
-          {!stages && composer}
-        </Card>
-        {belowNow}
-      </section>
-
-      {stages && (
-        <section aria-labelledby="map-heading" className="space-y-2">
-          <h2
-            id="map-heading"
-            className="flex items-baseline gap-2 px-1 text-ui font-semibold text-ink"
-          >
-            Other stages
-            <span className="tabular text-small font-normal text-ink-muted">{onMap.length}</span>
-          </h2>
-          <Card padding="none">
-            {onMap.length > 0 && (
-              <ul className="divide-y divide-border">
-                {onMap.map((placed) => rowOf(placed, true))}
-              </ul>
-            )}
-            {finishedFold}
-            {composer}
-          </Card>
-        </section>
-      )}
+      <ViewChips
+        view={view}
+        chips={GOAL_STEPS_VIEWS}
+        labels={VIEW_LABEL}
+        hrefOf={(candidate) => goalStepsViewHref(map.goal.id, candidate)}
+        scroll={false}
+      />
+      <Card padding="none" className="overflow-hidden">
+        <ul className="divide-y divide-border">
+          <ColumnHeader priority="When" />
+          {view === 'tree'
+            ? openTop.map(topRow)
+            : groups.map((group) => (
+                <StepGroupRows
+                  key={group.id}
+                  label={group.label}
+                  count={group.steps.length}
+                  folded={group.folded}
+                  anchors={group.steps.map(({ row }) => `step-${row.id}`)}
+                >
+                  {group.steps.map(({ row, parent, index, count }) => (
+                    <GoalRow
+                      key={row.id}
+                      node={row}
+                      trail={[]}
+                      context={context}
+                      index={index}
+                      count={count}
+                      summary={summaryOf(row)}
+                      under={parent ? `Under #${parent.outline} ${parent.title}` : undefined}
+                    />
+                  ))}
+                </StepGroupRows>
+              ))}
+        </ul>
+        {view === 'tree' && finishedTop.length > 0 && (
+          <div className="border-t border-border px-3 py-1.5">
+            <FinishedFold count={finishedTop.length}>
+              {() => <ul className="-ml-5.5 divide-y divide-border">{finishedTop.map(topRow)}</ul>}
+            </FinishedFold>
+          </div>
+        )}
+        {/* Inside the card, under a rule, as the plan's "Add a step" sits at
+            the foot of a module (plan #983). */}
+        <div className="border-t border-border px-3 py-1.5">
+          <StepComposer parentId={map.goal.id} label="Add a step" bare />
+        </div>
+      </Card>
 
       {aside > 0 && (
         <Button
@@ -248,8 +229,9 @@ export function StepTree({
           <h2 id="linked-heading" className="px-1 text-ui font-semibold text-ink">
             Also counts towards this goal
           </h2>
-          <Card padding="none">
+          <Card padding="none" className="overflow-hidden">
             <ul className="divide-y divide-border">
+              <ColumnHeader priority="When" />
               {linked.map(({ entry, row }) => (
                 <GoalRow
                   key={entry.linkId}

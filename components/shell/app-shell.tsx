@@ -38,6 +38,7 @@ import type { Theme } from '@/lib/theme';
 import type { ActivityLine } from '@/lib/shell/activity';
 import type { MainCheck } from '@/lib/plan/main-check';
 import type { Brief } from '@/lib/shell/brief';
+import { PersonProvider } from '@/components/shell/person';
 
 const NAV_COLLAPSED_KEY = 'pt_nav_collapsed';
 
@@ -91,6 +92,7 @@ export function AppShell({
   settingsLabel,
   feedbackHref,
   displayName,
+  avatarUrl = null,
   email,
   enabledModules,
   isOwner = false,
@@ -111,6 +113,8 @@ export function AppShell({
   settingsLabel?: string;
   feedbackHref?: string;
   displayName: string | null;
+  /** The person's photo from their sign-in, for the assignee circles on step rows. */
+  avatarUrl?: string | null;
   email: string;
   enabledModules?: readonly ModuleId[];
   /**
@@ -550,6 +554,7 @@ export function AppShell({
   const dock = [...dockTabs.slice(0, side), dockSwitcher, ...right];
 
   return (
+    <PersonProvider person={{ name: displayName || email || 'You', avatarUrl }}>
     <ToastProvider>
       <KeyHintsProvider />
       <CaptureProvider modules={workspaces}>
@@ -891,5 +896,6 @@ export function AppShell({
       </AskDashProvider>
       </CaptureProvider>
     </ToastProvider>
+    </PersonProvider>
   );
 }

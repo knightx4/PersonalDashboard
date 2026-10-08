@@ -40,6 +40,7 @@ import {
 import {
   healthOf as healthWordsOf,
   moveFor as moveWordsFor,
+  withMove,
   type HealthFacts,
 } from '@/lib/plan/health-words';
 import { reshapeOrigin, sessionOrigin } from '@/lib/plan/origin';
@@ -69,6 +70,7 @@ import { cn } from '@/lib/cn';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
 import { RowIconButton } from '@/components/plan-tree/row-icon-button';
 import { MoveLabel } from '@/components/ui/move-label';
+import { AssigneeAvatar } from '@/components/ui/assignee-avatar';
 import {
   ASSIGNEE_LABEL,
   AddStep,
@@ -706,7 +708,7 @@ export function usePlanRow({
     () => (runNow === 0 ? serverLiveness : planLiveness(flatten([node]), lastRuns, runNow)),
     [node, lastRuns, runNow, serverLiveness],
   );
-  const health = healthOf(node, liveness);
+  const ownHealth = healthOf(node, liveness);
   const claim = liveness[node.id];
   // The run behind this row, where there is one to account for. Typed as
   // possibly missing because most rows have no run at all -- the index
@@ -746,6 +748,8 @@ export function usePlanRow({
         title: 'The overhaul routine is working this now.',
       }
     : moveFor(node, resolving);
+  // One status word, saying what it waits on where the move names it.
+  const health = withMove(ownHealth, move);
   // Whether this row itself is the one being re-read. The rollup above would
   // also be true of a feature whose child is being re-shaped, and it is the
   // child's buttons that should be shut, not this one's.
@@ -824,6 +828,7 @@ export function usePlanRow({
   // press was Hand to Dash, from when the runner could only see a step somebody
   // had handed it, and setting a step to Me meant opening Edit.
   const mine = node.assignee === 'me';
+  const yoursByKind = (node.kind === 'decision' || node.kind === 'setup') && !closed;
   const assignLabel = mine ? `Not mine${beneath}` : `Mine${beneath}`;
   const assignValue = mine ? '' : 'me';
 
@@ -1270,6 +1275,28 @@ export function usePlanRow({
     node: criticStop ? { ...node, blockAsk: criticStopNeeds(criticStop.branch) } : node,
     health,
     move: move.move ? <MoveLabel move={move.move} title={move.title} /> : null,
+    assignee: (
+      // Who holds the step, as a circle you press to keep it or give it back:
+      // the same press as Mine in the menu. A question or a setup job is
+      // yours whoever it is assigned to, since only you can close it.
+      <form action={assignAction}>
+        <input type="hidden" name="id" value={node.id} />
+        <input type="hidden" name="assignee" value={assignValue} />
+        <button
+          type="submit"
+          title={`${mine || yoursByKind ? 'Yours' : 'Dash’s'}. ${assignLabel}`}
+          aria-label={assignLabel}
+          disabled={assignPending || closed}
+          className="press flex rounded-full disabled:cursor-default"
+        >
+          <AssigneeAvatar
+            who={mine || yoursByKind ? 'me' : 'dash'}
+            working={move.move?.state === 'dash_working'}
+            title=""
+          />
+        </button>
+      </form>
+    ),
     statusMenu,
     priorityMenu,
     menu,
@@ -1311,7 +1338,7 @@ export function PlanRow(props: PlanRowProps) {
       trail={trail}
       row={parts.row}
       health={parts.health}
-      move={parts.move}
+      assignee={parts.assignee}
       statusMenu={parts.statusMenu}
       menu={parts.menu}
       actions={PLAN_TREE_ACTIONS}

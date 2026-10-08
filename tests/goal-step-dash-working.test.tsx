@@ -134,8 +134,8 @@ describe('a goal step handed to Dash from Ask Dash', () => {
     expect(row).toContain('Dash is on it');
     expect(row).toContain('on Reading the loan statements');
     expect(row).toContain('/goals/runs/run-draft');
-    // Dash's mark stays: whose the step is is a different fact.
-    expect(row).toContain('aria-label="Dash&#x27;s"');
+    // Its assignee circle is Dash's, racing while the run goes.
+    expect(row).toContain('aria-label="Dash, Dash is on it"');
     // Only the step the run is on.
     expect(rowOf(html, 'other', null)).not.toContain('Dash is on it');
   });

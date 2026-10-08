@@ -1,9 +1,8 @@
 /**
- * The goal page opens on the work in hand (plan #1078). A goal in stages
- * draws the stages `nowStages` opens under Now, unfolded, and every other
- * stage under Other stages as one folded line saying how far along it is. A
- * goal that is one list is Now alone, its finished steps folded under the
- * open ones. There are no view chips, column header or tally.
+ * A goal's Steps tab is laid out as a feature's on /dev/plan: view chips,
+ * then one card of grid rows under a column header. By status, the default,
+ * lists every step and sub-step once in status groups, Done folded; Tree is
+ * the goal's own tree with its finished top-level steps under Finished.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -79,87 +78,77 @@ function folds(html: string): { open: boolean; text: string }[] {
   }));
 }
 
-/** The text of the section with this heading id, tags stripped. */
-function section(html: string, id: string): string {
-  const start = html.indexOf(`id="${id}"`);
-  if (start < 0) return '';
-  const end = html.indexOf('</section>', start);
-  return html
-    .slice(start, end)
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ');
+/** The text of the markup, tags stripped. */
+function text(html: string): string {
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 }
 
-describe('a goal in stages', () => {
-  const html = renderToStaticMarkup(
-    <StepTree
-      map={mapOf([
-        step('interviews', { title: 'Walk into interviews ready', status: 'done', position: 5 }),
-        step('answers', { title: 'Draft five answers', parentId: 'interviews', status: 'done' }),
-        step('target', { title: 'Know the job you are aiming for', position: 10 }),
-        step('traction', {
-          title: 'See where your search got traction',
-          parentId: 'target',
-          status: 'done',
-        }),
-        step('floor', { title: 'Settle your pay floor', parentId: 'target', position: 20 }),
-        step('resume', { title: 'Resume ready to send', position: 20 }),
-        step('update', { title: 'Update your resume', parentId: 'resume', kind: 'claude' }),
-        step('network', { title: 'Build the network', position: 30 }),
-        step('coffee', { title: 'Book three coffees', parentId: 'network' }),
-      ])}
-      todoOn={false}
-    />,
+/** Each status group's heading, with its count and whether it starts open. */
+function groups(html: string): { label: string; open: boolean }[] {
+  return [...html.matchAll(/<button type="button" aria-expanded="(true|false)"[^>]*press press-area inline-flex[^>]*>([\s\S]*?)<\/button>/g)].map(
+    (m) => ({ open: m[1] === 'true', label: text(m[2]!).trim() }),
   );
-  const now = section(html, 'now-heading');
-  const map = section(html, 'map-heading');
+}
 
-  it('opens the first stage in hand and any stage with a step of yours ready under Now', () => {
-    expect(now).toContain('Stages 2 and 4 of 4');
-    expect(now).toContain('Know the job you are aiming for');
-    expect(now).toContain('Settle your pay floor');
-    expect(now).toContain('Build the network');
-    expect(now).toContain('Book three coffees');
-    expect(now).not.toContain('Resume ready to send');
+const STAGED = [
+  step('interviews', { title: 'Walk into interviews ready', status: 'done', position: 5 }),
+  step('answers', { title: 'Draft five answers', parentId: 'interviews', status: 'done' }),
+  step('target', { title: 'Know the job you are aiming for', position: 10 }),
+  step('traction', {
+    title: 'See where your search got traction',
+    parentId: 'target',
+    status: 'done',
+  }),
+  step('floor', { title: 'Settle your pay floor', parentId: 'target', position: 20 }),
+  step('resume', { title: 'Resume ready to send', position: 20 }),
+  step('update', { title: 'Update your resume', parentId: 'resume', kind: 'claude' }),
+];
+
+describe('a goal’s steps by status', () => {
+  const html = renderToStaticMarkup(<StepTree map={mapOf(STAGED)} todoOn={false} />);
+
+  it('offers By status and Tree as view chips, By status the one shown', () => {
+    expect(html).toMatch(/aria-current="page"[^>]*>By status</);
+    expect(html).toContain('href="/goals/goal-role?tab=steps&amp;view=tree"');
   });
 
-  it('folds a finished step in an open stage under Finished', () => {
-    expect(folds(html)).toContainEqual({ open: false, text: 'Finished 1' });
-    // Its rows are drawn once the fold is opened.
-    expect(now).not.toContain('See where your search got traction');
+  it('heads the card with the plan’s columns', () => {
+    expect(html).toContain('>Status<');
+    expect(html).toContain('>When<');
+    expect(html).toContain('>Steps<');
+    expect(html).not.toContain('>Health<');
   });
 
-  it('draws every other stage on the map as one line, folded, saying how far along it is', () => {
-    expect(map).toContain('Walk into interviews ready');
-    expect(map).toContain('done');
-    expect(map).toContain('Resume ready to send');
-    expect(map).toContain('1 step');
-    expect(map).not.toContain('Update your resume');
-    expect(map).not.toContain('Draft five answers');
+  it('lists every open step once, done folded with its count', () => {
+    const heads = groups(html);
+    expect(heads).toContainEqual({ label: 'Done 3', open: false });
+    expect(heads.filter((head) => head.open).length).toBeGreaterThan(0);
+    expect(html).toContain('Settle your pay floor');
+    expect(html).toContain('Update your resume');
+    expect(html).not.toContain('Draft five answers');
+    expect((html.match(/>Settle your pay floor</g) ?? []).length).toBe(1);
   });
 
-  it('has no view chips, column header or tally', () => {
-    expect(html).not.toContain('aria-current="page"');
-    expect(html).not.toMatch(/>Who</);
-    expect(html).not.toContain('Everything');
+  it('says which step a sub-step sits under', () => {
+    expect(html).toContain('Under #2 Know the job you are aiming for');
+  });
+
+  it('draws an assignee circle on every row', () => {
+    expect(html).toContain('role="img" aria-label="Dash"');
+    expect(html).toContain('role="img" aria-label="You"');
   });
 });
 
-describe('a goal that is one list', () => {
-  it('is Now alone, its finished steps folded under the open ones', () => {
+describe('a goal’s steps as a tree', () => {
+  it('draws the open steps with what is beneath, and folds the finished ones', () => {
     const html = renderToStaticMarkup(
-      <StepTree
-        map={mapOf([
-          step('list', { title: 'List every balance', status: 'done', position: 10 }),
-          step('call', { title: 'Call the card company', position: 20 }),
-        ])}
-        todoOn={false}
-      />,
+      <StepTree map={mapOf(STAGED)} todoOn={false} view="tree" />,
     );
-    expect(html).not.toContain('map-heading');
+    expect(html).toMatch(/aria-current="page"[^>]*>Tree</);
+    expect(html).toContain('Know the job you are aiming for');
+    expect(html).toContain('Settle your pay floor');
+    expect(html).not.toContain('Walk into interviews ready');
     expect(folds(html)).toContainEqual({ open: false, text: 'Finished 1' });
-    expect(html).toContain('Call the card company');
-    expect(html).not.toContain('List every balance');
   });
 
   it('keeps an unread result of Dash’s among the open steps, as a fold on its row', () => {
@@ -176,10 +165,10 @@ describe('a goal that is one list', () => {
           step('call', { title: 'Call the card company', position: 20 }),
         ])}
         todoOn={false}
+        view="tree"
       />,
     );
-    const now = section(html, 'now-heading');
-    expect(now).toContain('Find the repayment plans');
+    expect(html).toContain('Find the repayment plans');
     expect(folds(html)).toContainEqual({
       open: false,
       text: 'Dash found · new : Three plans fit.',
