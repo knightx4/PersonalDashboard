@@ -157,6 +157,7 @@ import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { WatchingSurface } from './watching-surfaces';
 import { DashTodaySurface } from './dash-today-surfaces';
+import { HomePageSurface } from './home-page-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface } from './clip-surfaces';
 import {
   InspirationByVideoSurface,
@@ -4045,6 +4046,18 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PostsDraftingSurface />,
+  },
+  {
+    /* Home as a whole page on the main-plus-rail pattern (plan #1627): the
+     * header, briefs, Today and Updates in the main column, and Watching,
+     * what Dash did, the week and the workspaces in the rail. Inside the
+     * shell, so the widths are the ones the page gets. Fixtures in
+     * home-page-surfaces.tsx. */
+    id: 'home-page',
+    label: 'Home · The whole page',
+    module: 'goals',
+    width: 'page',
+    render: () => <HomePageSurface />,
   },
   {
     /* The home page's Watching section (plan #1295): a watch that fired, one
