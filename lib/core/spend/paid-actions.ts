@@ -211,6 +211,10 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'The sync calling itself to carry on past one invocation, authenticated by a token rather than a session. The press that started it is "Sync now", whose hint is under app/api/inbox/sync/route.ts#POST and prices each email.',
   'app/api/review/reread-confirmations/route.ts#GET':
     'A diagnostic opened by URL on the deployed site to count what the order reader gets from waiting confirmations (plan #830). Nothing links to it.',
+  'app/api/cron/startup-discovery/route.ts#GET':
+    'Fired on Mondays by pg_cron to shortlist startups for the job search; the Find startups button on Find makes the same call under app/jobs/(app)/find/actions.ts#findStartups.',
+  'app/api/cron/startup-discovery/route.ts#POST':
+    'Fired on Mondays by pg_cron to shortlist startups for the job search; the Find startups button on Find makes the same call under app/jobs/(app)/find/actions.ts#findStartups.',
   'app/api/cron/maya-gate/route.ts#GET':
     'Fired every hour by pg_cron to ask Jev about new vault notes and have Maya write on a few; no press starts it.',
   'app/api/cron/maya-gate/route.ts#POST':
