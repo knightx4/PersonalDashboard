@@ -29,6 +29,7 @@
     "news:digest": "tsx --conditions=react-server scripts/news-digest.ts",
     "news:repeats": "tsx --conditions=react-server scripts/news-repeats.ts",
     "clips:cut": "tsx --conditions=react-server scripts/cut-clips.ts",
+    "clips:tag": "tsx --conditions=react-server scripts/tag-clips.ts",
     "clips:score": "tsx --conditions=react-server scripts/score-clips.ts",
     "inspiration:sync": "tsx --conditions=react-server scripts/inspiration-sync.ts",
     "inspiration:read": "tsx --conditions=react-server scripts/inspiration-read.ts",
