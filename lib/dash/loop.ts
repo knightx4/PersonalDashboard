@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { citationsOf, toolResultText, type AskToolResult } from '@/lib/ask/db';
 import type { PageContext } from '@/lib/ask/page';
-import { whyNoReport } from '@/lib/learn/graph/tool-call';
+import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { NO_HANDOFF } from '@/lib/talk/handoff';
 import { MAX_TURN, toModelMessages, type TalkCitation, type TalkToolCall, type TalkTurn } from '@/lib/talk/talk';
 import { parseRef } from '@/lib/core/refs';
@@ -474,6 +474,10 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   const maxTokens = voice.maxTokens ?? ANSWER_MAX_TOKENS;
   // A voice with server tools chooses each round; one without must call a tool.
   const choose = (voice.serverTools?.length ?? 0) > 0;
+  // A model that rejects a forced tool (Opus 5.5, Sonnet 5.5) chooses too, and
+  // is asked once more for its answer if it stops without one, as a voice with
+  // server tools is.
+  const chooses = choose || forceTool(finishName, model).type !== 'tool';
   const webCited: string[] = [];
   const extras = (): { report?: unknown; webCited?: string[] } => ({
     ...(choose ? { webCited } : {}),
@@ -578,7 +582,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         max_tokens: maxTokens,
         system,
         tools,
-        tool_choice: mustAnswer ? { type: 'tool', name: finishName } : choose ? { type: 'auto' } : { type: 'any' },
+        tool_choice: mustAnswer ? forceTool(finishName, model) : chooses ? { type: 'auto' } : { type: 'any' },
         messages: withRollingBreakpoint(messages),
       });
     } catch (error) {
@@ -695,7 +699,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     }
     // A voice that chooses stopped without its answer: ask for it once, keeping
     // what it searched and wrote.
-    if (choose && uses.length === 0 && !mustAnswer && stopped !== 'max_tokens' && stopped !== 'refusal') {
+    if (chooses && uses.length === 0 && !mustAnswer && stopped !== 'max_tokens' && stopped !== 'refusal') {
       messages.push(
         { role: 'assistant', content: response.content },
         { role: 'user', content: `Now give it through ${finishName}.` },
