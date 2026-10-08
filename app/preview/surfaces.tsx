@@ -147,6 +147,7 @@ import {
   GoalTreeSurface,
 } from './goal-surfaces';
 import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
+import { GoalPageArrivalDemo, GoalPageCloseDemo } from './goal-page-moments';
 import { BoardMomentDemo } from './jobs-moment-demos';
 import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
@@ -3286,6 +3287,35 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalStepsTabSurface />,
+  },
+  {
+    /* A goal closing with the Steps tab open (plan #1672): the hexagon in the
+     * title completes with its ring, then the steps fold into one line. */
+    id: 'goals-page-close',
+    label: 'Goal · closing it on the Steps tab',
+    module: 'goals',
+    width: 'page',
+    interaction: {
+      kind: 'completion',
+      target: '[data-motion-demo="goal-page-close"]',
+      shows:
+        'Close the goal: one accent hexagon ring grows out of the hexagon beside the title and fades, then the steps fold into one Steps line, all settled by about two thirds of a second.',
+    },
+    render: () => <GoalPageCloseDemo />,
+  },
+  {
+    /* A step Dash finished, on the Steps tab (plan #1672). */
+    id: 'goals-page-arrival',
+    label: 'Goal · a step Dash finished, on the Steps tab',
+    module: 'goals',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="goal-page-arrival"]',
+      shows:
+        'Draft what to say on the call settles into place in the step list and Dash’s mark beside it swells and takes the accent once, settled within the second.',
+    },
+    render: () => <GoalPageArrivalDemo />,
   },
   {
     /* The same frame on its Activity tab: the steps closed, the runs and

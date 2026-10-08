@@ -1050,7 +1050,7 @@ export function GoalLinkingSurface() {
  * the times its closed steps were closed, for the Steps and Activity tabs
  * (plan #1671).
  */
-const tabbedMap = goalMapWith({
+export const tabbedMap = goalMapWith({
   list: { closedAt: '2026-09-18T10:00:00Z' },
   script: { closedAt: '2026-09-23T07:15:00Z' },
   overdraft: { closedAt: '2026-09-10T16:40:00Z' },
@@ -1061,10 +1061,17 @@ const tabbedGoal: Goal = {
   dueOn: '2027-06-30',
 };
 
-function TabbedGoal({ children }: { children: React.ReactNode }) {
+/** The goal's page frame, open or closed, for the Steps tab and its moments. */
+export function TabbedGoal({
+  children,
+  closed = false,
+}: {
+  children: React.ReactNode;
+  closed?: boolean;
+}) {
   return (
     <GoalDetail
-      goal={tabbedGoal}
+      goal={closed ? { ...tabbedGoal, status: 'done' } : tabbedGoal}
       areaName={tabbedMap.areaName}
       places={PLACES}
       review={cardsReview}

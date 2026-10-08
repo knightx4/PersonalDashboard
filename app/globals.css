@@ -2336,18 +2336,20 @@ button[aria-busy='true'] {
 
 @keyframes goal-fold {
   from {
+    grid-template-rows: 1fr;
     transform: none;
     opacity: 1;
   }
   to {
-    transform: translateY(-0.5rem) scaleY(0.94);
+    grid-template-rows: 0fr;
+    transform: translateY(-0.5rem);
     opacity: 0;
   }
 }
 
 @utility goal-fold {
   transform-origin: top;
-  animation: goal-fold var(--motion-move) var(--ease-out-soft)
+  animation: goal-fold var(--motion-move) var(--ease-sway)
     calc(var(--motion-moment) - var(--motion-quick)) both;
 }
 

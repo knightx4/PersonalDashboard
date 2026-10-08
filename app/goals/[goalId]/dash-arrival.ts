@@ -47,10 +47,14 @@ export function rememberArrived(id: string): void {
   }
 }
 
-/** The mark's one flash, the same as the done mark's dash-mark-flash in app/globals.css. */
+/**
+ * The mark's one flash. The mark is 12 pixels across, so the done mark's
+ * 1.06 swell (dash-mark-flash in app/globals.css) cannot be seen on a phone:
+ * this one swells to half again its size and takes the accent at the peak.
+ */
 const FLASH_KEYFRAMES: Keyframe[] = [
-  { opacity: 0.4, transform: 'scale(0.9)' },
-  { opacity: 1, transform: 'scale(1.06)', offset: 0.6 },
+  { opacity: 0.4, transform: 'scale(0.7)' },
+  { opacity: 1, transform: 'scale(1.5)', color: 'var(--color-accent)', offset: 0.5 },
   { opacity: 1, transform: 'scale(1)' },
 ];
 
