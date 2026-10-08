@@ -237,5 +237,6 @@ export const learnSources: ModuleSources = {
       reason: "Dash's clips cut from someone else's video, with their scores and whether they were watched.",
     },
     { table: 'learn.video_clip_cuts', reason: 'Which videos have been cut into clips.' },
+    { table: 'learn.video_clip_subjects', reason: 'Join rows tagging a clip with each subject it serves.' },
   ],
 };
