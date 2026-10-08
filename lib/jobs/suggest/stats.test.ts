@@ -11,11 +11,13 @@ describe('openingStats', () => {
       { origin: 'search', status: 'done', application: app('lead') },
       { origin: 'search', status: 'dismissed', application: null },
       { origin: 'board', status: 'expired', application: null },
+      { origin: 'discovered', status: 'done', application: app('lead') },
       { origin: null, status: 'open', application: null },
     ];
     expect(openingStats(rows)).toEqual([
       { origin: 'search', found: 4, saved: 3, applied: 2, interviews: 1, dismissed: 1, expired: 0 },
       { origin: 'board', found: 1, saved: 0, applied: 0, interviews: 0, dismissed: 0, expired: 1 },
+      { origin: 'discovered', found: 1, saved: 1, applied: 0, interviews: 0, dismissed: 0, expired: 0 },
       { origin: 'goal', found: 1, saved: 0, applied: 0, interviews: 0, dismissed: 0, expired: 0 },
     ]);
   });

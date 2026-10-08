@@ -254,7 +254,7 @@ export async function saveOpening(id: string): Promise<{ error: string | null }>
 
   const { data: row, error: readError } = await supabase
     .from('suggestions')
-    .select('headline, company_name, url, location')
+    .select('headline, company_name, url, location, watchlist_startup_id')
     .eq('id', parsed.data)
     .eq('user_id', user.id)
     .eq('kind', 'apply')
@@ -269,6 +269,16 @@ export async function saveOpening(id: string): Promise<{ error: string | null }>
     ats: detected?.vendor === 'other' || detected?.vendor === 'unknown' ? null : detected?.vendor,
   });
   if (company.error) return { error: company.error };
+  // A role at a startup weekly discovery found: the startup is now one of
+  // their companies, so its watchlist row points there and is read no more.
+  if (row.watchlist_startup_id) {
+    const { error: linkError } = await supabase
+      .from('watchlist_startups')
+      .update({ company_id: company.id })
+      .eq('id', row.watchlist_startup_id as string)
+      .eq('user_id', user.id);
+    if (linkError) console.error('[jobs suggestions] watchlist link', linkError.message);
+  }
 
   const { data: role, error: roleError } = await supabase
     .from('roles')
