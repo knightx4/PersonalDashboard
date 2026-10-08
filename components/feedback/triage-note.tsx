@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { matchHref, type TriageView } from '@/lib/feedback/triage';
 
 /**
- * Jev's triage of a note or an idea, as filed (plan #1179): type, workspace
- * and priority on one line, a "?" on any it was not sure of, and the open item
+ * Jev's triage of a note or an idea, as filed (plan #1179): type, workspace,
+ * priority and fix or plan on one line, a "?" on any it was not sure of, and the open item
  * it reads as a repeat of. A match is named, never merged. Nothing when the
  * row was never triaged. Drawn under a queue row, an idea, and in the header
  * panel once a note has saved.
