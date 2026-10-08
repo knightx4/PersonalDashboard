@@ -38,7 +38,7 @@ export function DashTodaySection({
   const count = groups.reduce((sum, group) => sum + group.entries.length, 0);
   if (count === 0) return null;
   return (
-    <Card id="dash-today" padding="standard" className="mt-4 scroll-mt-bar">
+    <Card id="dash-today" padding="standard" className="scroll-mt-bar">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-ui font-semibold text-ink">What Dash did today</h2>
         <span className="tabular text-small text-ink-muted">
@@ -122,7 +122,6 @@ function DashTodayRow({
   return (
     <li className="py-2">
       <div className="flex items-baseline gap-3">
-        <span className="tabular hidden w-16 shrink-0 text-small text-ink-muted sm:block">{time}</span>
         <div className="min-w-0 flex-1">
           <p className={undone ? 'text-ui text-ink-muted' : 'text-ui text-ink'}>
             {entry.href && !undone ? (
@@ -139,15 +138,14 @@ function DashTodayRow({
               entry.sentence
             )}
           </p>
-          {/* On a phone the time sits on this quiet line, so the sentence
-              has the row's width; from sm up it has its own column. */}
-          <p className={entry.from ? 'text-small text-ink-muted' : 'text-small text-ink-muted sm:hidden'}>
-            <span className="tabular sm:hidden">{time}</span>
+          {/* The time sits on this quiet line, so the sentence has the row's
+              width: in Home's rail (plan #1627) the row is narrow at every
+              screen size. */}
+          <p className="text-small text-ink-muted">
+            <span className="tabular">{time}</span>
             {entry.from && (
               <>
-                <span className="sm:hidden" aria-hidden>
-                  {' · '}
-                </span>
+                <span aria-hidden>{' · '}</span>
                 <Link href={entry.from} className="hover:text-accent">
                   From your comment
                 </Link>

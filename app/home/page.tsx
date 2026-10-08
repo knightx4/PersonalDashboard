@@ -1,7 +1,6 @@
 import { Suspense } from 'react';
 import { cookies } from 'next/headers';
 import Link from '@/components/ui/link';
-import { CalendarClock } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { createClient as createShoppingClient } from '@/lib/auth/server';
 import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
@@ -9,7 +8,7 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { modulesFor, type ModuleId } from '@/lib/modules';
 import { AppShell } from '@/components/shell/app-shell';
 import { ModuleMark } from '@/components/ui/module-mark';
-import { Card, cardVariants } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Banner } from '@/components/ui/banner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -24,13 +23,11 @@ import { todaySlice } from '@/lib/todo/agenda/today';
 import { dayClosed, doneToday, type DoneTodayTask } from '@/lib/todo/agenda/day-close';
 import { loadDoneSinceMidnight } from '@/lib/todo/tasks/load';
 import {
-  ARRIVE_LAST_STEP,
-  arriveAt,
   firstToday,
   HOME_ARRIVED_COOKIE,
   HOME_SIGIL_COOKIE,
 } from '@/lib/home/first-visit';
-import { BUCKET_LABELS, dueDay } from '@/lib/todo/tasks/model';
+import { dueDay } from '@/lib/todo/tasks/model';
 import { countReviewItems as countShoppingReview } from '@/lib/review/load';
 import { countReviewItems as countJobsReview } from '@/lib/jobs/review/load';
 import {
@@ -45,18 +42,28 @@ import {
 } from '@/lib/shell/brief';
 import { loadUpdates } from '@/lib/shell/updates';
 import { loadWatching } from '@/lib/shell/watching';
-import { mergeUpdates, whenLabel } from '@/lib/shell/home-model';
+import { mergeUpdates } from '@/lib/shell/home-model';
 import { cn } from '@/lib/cn';
 import { observationWeek } from '@/lib/timeline/observations';
 import { readObservations } from '@/lib/timeline/observations-load';
 import type { ShownObservation } from '@/lib/timeline/observations-view';
 import { ObservationList } from '@/app/timeline/observations';
-import { formatClock } from '@/lib/clock';
 import { BRIEF_ANCHOR, shownBrief, type ShownBrief } from '@/lib/day-brief/shown';
 import { briefDaysOpened, openedFromPush } from '@/lib/day-brief/opens';
 import { DayBrief } from './day-brief';
-import { DaySigil, HomeArrival } from './arrival';
-import { WatchingSection, WatchMark } from './watching';
+import { DaySigil } from './arrival';
+import { WatchingSection } from './watching';
+import {
+  BriefLine,
+  HomeColumns,
+  HomeHeader,
+  TodayCard,
+  UpdatesCard,
+  WeekCard,
+  WorkspaceList,
+  WorkspaceMarks,
+  type WeekRow,
+} from './home-view';
 import { loadDashToday, type DashTodayGroup } from '@/lib/shell/dash-today';
 import { DashTodaySection } from './dash-today';
 import { undoDashToday } from './actions';
@@ -100,13 +107,15 @@ function greeting(timezone: string, now: Date): string {
  *
  * A quiet day looks quiet. When no workspace has anything to say, the column
  * is the day's sigil and one line, not five rows of "nothing". The agenda's
- * overdue and due-today entries follow, capped, with a count of the rest.
- * Then the next seven days from the same agenda (interviews, events, return
- * deadlines, tasks), what Dash changed today with Undo on each, and then
- * what changed in the last three days: replies
- * from companies, new orders, newsletters that arrived. Each of those cards
- * is left out when it has nothing in it. The tiles come last and are small,
- * because they are only there to get you into a workspace.
+ * overdue and due-today entries follow, capped, with a count of the rest,
+ * and then what changed in the last three days: replies from companies, new
+ * orders, newsletters that arrived.
+ *
+ * Since plan #1627 the page is main plus rail (components/patterns/main-rail.tsx).
+ * Beside that column from laptop width, and under it on a phone, is what you
+ * glance at: what Dash is watching, what it changed today with Undo on each,
+ * the next seven days from the same agenda, and the workspaces with what is
+ * waiting in each. Each card is left out when it has nothing in it.
  *
  * A module switched off under Account is not listed anywhere here. That is
  * what the switch means.
@@ -143,8 +152,8 @@ export default async function HomePage({
     day: '2-digit',
   }).format(now);
 
-  // The tiles are the third list of workspaces, after the switcher and the
-  // account page, and they go through the same rule: a workspace this account
+  // The rail's list is the third list of workspaces, after the switcher and
+  // the account page, and it goes through the same rule: a workspace this account
   // may not see is not a door with a locked room behind it, it is not a door.
   const enabled = modulesFor(owner).filter((module) => moduleEnabled(settings, module.id));
   const on = (id: ModuleId) => enabled.some((module) => module.id === id);
@@ -250,6 +259,12 @@ export default async function HomePage({
     month: 'long',
     timeZone: settings.timezone,
   }).format(now);
+  const workspaces = enabled.map((module) => ({
+    id: module.id,
+    label: module.label,
+    href: module.home,
+    description: module.description,
+  }));
 
   return (
     <div className="min-h-full">
@@ -266,145 +281,110 @@ export default async function HomePage({
         notifications={raised}
         mainCheck={mainCheck}
       >
-        {/* The first visit of the day arrives in order (plan #1558): each
-            part marked data-arrive rises a beat after the one before. The
-            brief and the rest of the column are marked outside their
-            Suspense boundaries, so they rise on time and their content lands
-            inside them whenever it is ready. */}
-        <HomeArrival
+        {/* Home on the main-plus-rail pattern (plan #1627): what you work
+            through on the left, what you glance at on the right from laptop
+            width and under it on a phone. The first visit of the day arrives
+            in order (plan #1558): each part marked data-arrive rises a beat
+            after the one before. The brief, the rest of the column and the
+            rail are marked outside their Suspense boundaries, so they rise on
+            time and their content lands inside them whenever it is ready. */}
+        <HomeColumns
           arrive={firstToday(jar.get(HOME_ARRIVED_COOKIE)?.value, today)}
           day={today}
-          className="mx-auto max-w-3xl"
-        >
-          <header className="border-b border-border-strong pb-6 pt-2">
-            <p data-arrive="" style={arriveAt(0)} className="text-ui text-ink-muted">
-              {greeting(settings.timezone, now)}
-              {settings.displayName ? `, ${settings.displayName.split(' ')[0]}` : ''}
-            </p>
-            <div
-              data-arrive=""
-              style={arriveAt(1)}
-              className="mt-1 flex items-center justify-between gap-4"
-            >
-              <h1 className="font-display text-figure-lg font-semibold tracking-[-0.04em] text-ink sm:text-figure-xl">
-                {date}
-              </h1>
-              <Suspense fallback={null}>
-                <FinishedDay
-                  agenda={agenda}
-                  done={done}
-                  seed={`${user.id}:${today}:todo`}
-                  draw={firstToday(jar.get(HOME_SIGIL_COOKIE)?.value, today)}
-                  day={today}
-                />
-              </Suspense>
-            </div>
-            {/* The fallback carries the brief's anchor, so the morning
-                notification's #brief has somewhere to land before the brief
-                itself does. */}
-            <div data-arrive="" style={arriveAt(2)}>
-              <Suspense
-                fallback={
-                  <div id={BRIEF_ANCHOR} className="mt-4 scroll-mt-bar space-y-2.5" aria-hidden>
-                    <Skeleton className="h-4 w-72 max-w-full" />
-                    <Skeleton className="h-3 w-56 max-w-full" />
-                  </div>
-                }
-              >
-                <DayBriefSection brief={dayBrief} opened={opened} day={today} />
-              </Suspense>
-            </div>
-          </header>
-
-          <div data-arrive="" style={arriveAt(ARRIVE_LAST_STEP)}>
-            {/* The doors, as marks, right under the date.
-                The tiles at the foot of the page are the considered version --
-                each with its name and what is waiting in it -- and they stay,
-                because that is what you read when you are deciding where to go.
-                This row is for when you are not deciding: you came here to get
-                to one particular workspace, and it should not be a scroll away.
-                Marks only, named for a screen reader and on hover. */}
-            {enabled.length > 0 && (
-              <nav aria-label="Jump to a workspace" className="mt-4 flex flex-wrap items-center gap-2">
-                {enabled.map((module) => (
-                  <Link
-                    key={module.id}
-                    href={module.home}
-                    title={module.label}
-                    className="press rounded-[8px] transition-opacity duration-quick hover:opacity-75"
-                  >
-                    <ModuleMark module={module.id} size="md" />
-                    <span className="sr-only">{module.label}</span>
-                  </Link>
-                ))}
-              </nav>
-            )}
-
-            <Suspense fallback={null}>
-              <AgendaBanner agenda={agenda} />
-            </Suspense>
-
-            {/* One line per workspace, each landing when its own brief does. A
-                workspace with nothing to say takes its placeholder away. */}
-            <ul className="mt-2 divide-y divide-border">
-              {briefs.map(([module, brief]) => (
-                <Suspense key={module} fallback={<BriefRowSkeleton module={module} />}>
-                  <BriefRow module={module} brief={brief} />
+          header={
+            <HomeHeader
+              greeting={`${greeting(settings.timezone, now)}${settings.displayName ? `, ${settings.displayName.split(' ')[0]}` : ''}`}
+              date={date}
+              sigil={
+                <Suspense fallback={null}>
+                  <FinishedDay
+                    agenda={agenda}
+                    done={done}
+                    seed={`${user.id}:${today}:todo`}
+                    draw={firstToday(jar.get(HOME_SIGIL_COOKIE)?.value, today)}
+                    day={today}
+                  />
                 </Suspense>
-              ))}
-            </ul>
-            <Suspense fallback={null}>
-              <QuietDay
-                briefs={briefs.map(([, brief]) => brief)}
-                seed={`${user.id}:${today}:home`}
+              }
+              brief={
+                // The fallback carries the brief's anchor, so the morning
+                // notification's #brief has somewhere to land before the
+                // brief itself does.
+                <Suspense
+                  fallback={
+                    <div id={BRIEF_ANCHOR} className="mt-4 scroll-mt-bar space-y-2.5" aria-hidden>
+                      <Skeleton className="h-4 w-72 max-w-full" />
+                      <Skeleton className="h-3 w-56 max-w-full" />
+                    </div>
+                  }
+                >
+                  <DayBriefSection brief={dayBrief} opened={opened} day={today} />
+                </Suspense>
+              }
+            />
+          }
+          main={
+            <>
+              <WorkspaceMarks workspaces={workspaces} />
+
+              <Suspense fallback={null}>
+                <AgendaBanner agenda={agenda} />
+              </Suspense>
+
+              {/* One line per workspace, each landing when its own brief does. A
+                  workspace with nothing to say takes its placeholder away. */}
+              <ul className="mt-2 divide-y divide-border">
+                {briefs.map(([module, brief]) => (
+                  <Suspense key={module} fallback={<BriefRowSkeleton module={module} />}>
+                    <BriefRow module={module} brief={brief} />
+                  </Suspense>
+                ))}
+              </ul>
+              <Suspense fallback={null}>
+                <QuietDay briefs={briefs.map(([, brief]) => brief)} seed={`${user.id}:${today}:home`} />
+              </Suspense>
+
+              <Suspense fallback={<SectionSkeleton rows={2} className="mt-4" />}>
+                <ObservationsSection observations={observations} timezone={settings.timezone} />
+              </Suspense>
+
+              <Suspense fallback={<SectionSkeleton rows={3} className="mt-4" />}>
+                <TodaySection agenda={agenda} timezone={settings.timezone} />
+              </Suspense>
+
+              <Suspense fallback={<SectionSkeleton rows={4} className="mt-4" />}>
+                <UpdatesSection feed={feed} watching={watching} now={now} timezone={settings.timezone} />
+              </Suspense>
+
+              <Suspense fallback={null}>
+                <ReviewLinks observations={observations} />
+              </Suspense>
+            </>
+          }
+          rail={
+            <>
+              {/* The fallback carries #watching, where every watch push opens. */}
+              <Suspense fallback={<SectionSkeleton rows={1} id="watching" />}>
+                <WatchingBlock watching={watching} now={now} timezone={settings.timezone} />
+              </Suspense>
+
+              <Suspense fallback={null}>
+                <DashTodayBlock groups={dashToday} timezone={settings.timezone} />
+              </Suspense>
+
+              <Suspense fallback={<SectionSkeleton rows={3} />}>
+                <WeekSection agenda={agenda} timezone={settings.timezone} />
+              </Suspense>
+
+              <WorkspaceList
+                workspaces={workspaces.map((workspace) => ({
+                  ...workspace,
+                  stat: describeCount(counts[workspace.id]) || workspace.description,
+                }))}
               />
-            </Suspense>
-
-            <Suspense fallback={<SectionSkeleton rows={2} />}>
-              <ObservationsSection observations={observations} timezone={settings.timezone} />
-            </Suspense>
-
-            <Suspense fallback={<SectionSkeleton rows={3} />}>
-              <TodaySection agenda={agenda} timezone={settings.timezone} />
-            </Suspense>
-
-            <Suspense fallback={<SectionSkeleton rows={3} />}>
-              <WeekSection agenda={agenda} timezone={settings.timezone} />
-            </Suspense>
-
-            {/* The fallback carries #watching, where every watch push opens. */}
-            <Suspense fallback={<SectionSkeleton rows={1} id="watching" />}>
-              <WatchingBlock watching={watching} now={now} timezone={settings.timezone} />
-            </Suspense>
-
-            <Suspense fallback={null}>
-              <DashTodayBlock groups={dashToday} timezone={settings.timezone} />
-            </Suspense>
-
-            <Suspense fallback={<SectionSkeleton rows={4} />}>
-              <UpdatesSection feed={feed} watching={watching} now={now} timezone={settings.timezone} />
-            </Suspense>
-
-            <nav
-              aria-label="Workspaces in full"
-              className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
-            >
-              {enabled.map((module) => (
-                <ModuleCard
-                  key={module.id}
-                  href={module.home}
-                  module={module.id}
-                  title={module.label}
-                  stat={describeCount(counts[module.id]) || module.description}
-                />
-              ))}
-            </nav>
-
-            <Suspense fallback={null}>
-              <ReviewLinks observations={observations} />
-            </Suspense>
-          </div>
-        </HomeArrival>
+            </>
+          }
+        />
       </AppShell>
     </div>
   );
@@ -470,22 +450,7 @@ function BriefRowSkeleton({ module }: { module: ModuleId }) {
 
 async function BriefRow({ module, brief }: { module: ModuleId; brief: Promise<Brief | null> }) {
   const shown = await brief;
-  if (!shown) return null;
-  return (
-    <li className="flex items-center gap-3 py-3.5">
-      <ModuleMark module={module} size="sm" />
-      {shown.href ? (
-        <Link href={shown.href} className="min-w-0 flex-1 truncate text-body text-ink hover:text-accent">
-          {shown.text}
-        </Link>
-      ) : (
-        <span className="min-w-0 flex-1 truncate text-body text-ink">{shown.text}</span>
-      )}
-      {shown.tone === 'caution' && (
-        <span className="size-2 shrink-0 rounded-full bg-caution-fill" aria-hidden />
-      )}
-    </li>
-  );
+  return shown ? <BriefLine module={module} brief={shown} /> : null;
 }
 
 /**
@@ -516,9 +481,9 @@ async function QuietDay({
  * The shape of a card section while its data is on its way: a heading and a
  * few rows, so the page does not jump when the card lands.
  */
-function SectionSkeleton({ rows, id }: { rows: number; id?: string }) {
+function SectionSkeleton({ rows, id, className }: { rows: number; id?: string; className?: string }) {
   return (
-    <Card id={id} padding="standard" className="mt-4 scroll-mt-bar" aria-hidden>
+    <Card id={id} padding="standard" className={cn('scroll-mt-bar', className)} aria-hidden>
       <Skeleton className="h-4 w-32" />
       <div className="mt-2 divide-y divide-border">
         {Array.from({ length: rows }).map((_, index) => (
@@ -595,66 +560,23 @@ async function TodaySection({
 
   if (due.length === 0 && happening.length === 0) return null;
   return (
-    <Card padding="standard" className="mt-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-ui font-semibold text-ink">Today</h2>
-        <Link href="/todo" className="text-small font-medium text-accent underline underline-offset-2">
-          The agenda
-        </Link>
-      </div>
-      {happening.length > 0 && (
-        <ul className="mt-2 space-y-1">
-          {happening.map((entry) => (
-            <li
-              key={entry.key}
-              className="flex flex-wrap items-baseline gap-x-2 rounded-lg bg-accent-tint px-3 py-1.5 text-small text-ink"
-            >
-              <CalendarClock className="size-3.5 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
-              {entry.at && (
-                <span className="tabular font-medium">{formatClock(entry.at, { timeZone: timezone })}</span>
-              )}
-              {entry.link ? (
-                <Link href={entry.link.href} className="font-medium hover:text-accent">
-                  {entry.label}
-                </Link>
-              ) : (
-                <span className="font-medium">{entry.label}</span>
-              )}
-              {entry.detail && <span className="text-ink-muted">{entry.detail}</span>}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {due.length > 0 && (
-        <ul className="mt-2 divide-y divide-border">
-          {due.map(({ bucket, entry }) => (
-            <li key={entry.key} className="flex items-baseline gap-2 py-1.5">
-              {bucket === 'overdue' && (
-                <span className="shrink-0 text-micro font-medium text-danger">
-                  {BUCKET_LABELS.overdue}
-                </span>
-              )}
-              {/* Each line goes where the thing itself lives: a task to its own
-                  row on the agenda, a source item to whatever it is about. They
-                  were plain text, which made the list something to read and
-                  then go and find by hand. */}
-              <Link
-                href={agendaHref(entry)}
-                className="min-w-0 flex-1 truncate text-ui text-ink hover:text-accent"
-              >
-                {entry.task?.title ?? entry.item?.title}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-      {dueMore > 0 && (
-        <Link href="/todo" className="mt-2 block text-small text-ink-muted hover:text-accent">
-          {dueMore} more on the agenda
-        </Link>
-      )}
-    </Card>
+    <TodayCard
+      timezone={timezone}
+      more={dueMore}
+      happening={happening.map((entry) => ({
+        key: entry.key,
+        at: entry.at,
+        label: entry.label,
+        detail: entry.detail,
+        href: entry.link?.href ?? null,
+      }))}
+      due={due.map(({ bucket, entry }) => ({
+        key: entry.key,
+        overdue: bucket === 'overdue',
+        title: entry.task?.title ?? entry.item?.title ?? '',
+        href: agendaHref(entry),
+      }))}
+    />
   );
 }
 
@@ -673,7 +595,7 @@ async function WeekSection({
   timezone: string;
 }) {
   const soonPile = ((await agenda)?.piles ?? []).find((pile) => pile.bucket === 'soon');
-  const week = [
+  const week: WeekRow[] = [
     ...(soonPile?.context ?? []).map((entry) => ({
       key: `context-${entry.key}`,
       day: entry.day,
@@ -697,37 +619,7 @@ async function WeekSection({
     .slice(0, 6);
 
   if (week.length === 0) return null;
-  return (
-    <Card padding="standard" className="mt-4">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-ui font-semibold text-ink">This week</h2>
-        <Link href="/todo" className="text-small font-medium text-accent underline underline-offset-2">
-          The agenda
-        </Link>
-      </div>
-      <ul className="mt-2 divide-y divide-border">
-        {week.map((row) => (
-          <li key={row.key} className="flex items-baseline gap-3 py-1.5">
-            <span className="tabular w-20 shrink-0 text-small text-ink-muted">
-              {row.day ? dayLabel(row.day) : ''}
-              {row.booked && row.at ? ` ${timeLabel(row.at, timezone)}` : ''}
-            </span>
-            {row.booked && (
-              <CalendarClock
-                className="size-3.5 shrink-0 self-center text-accent"
-                strokeWidth={1.75}
-                aria-hidden
-              />
-            )}
-            <Link href={row.href} className="min-w-0 flex-1 truncate text-ui text-ink hover:text-accent">
-              {row.label}
-              {row.detail && <span className="text-ink-muted"> · {row.detail}</span>}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
+  return <WeekCard rows={week} timezone={timezone} />;
 }
 
 type Watching = Awaited<ReturnType<typeof loadWatching>>;
@@ -785,38 +677,7 @@ async function UpdatesSection({
   const [lines, watched] = await Promise.all([feed, watching]);
   const updates = mergeUpdates([lines, watched.ended]);
   if (updates.length === 0) return null;
-  return (
-    <Card padding="standard" className="mt-4">
-      <h2 className="text-ui font-semibold text-ink">Updates</h2>
-      <ul className="mt-2 divide-y divide-border">
-        {updates.map((update) => {
-          const body = (
-            <>
-              <span className="block truncate text-ui text-ink">{update.text}</span>
-              {update.detail && (
-                <span className="block truncate text-small text-ink-muted">{update.detail}</span>
-              )}
-            </>
-          );
-          return (
-            <li key={update.key} className="flex items-center gap-3 py-2">
-              {update.module ? <ModuleMark module={update.module} size="sm" /> : <WatchMark />}
-              {update.href ? (
-                <Link href={update.href} className="min-w-0 flex-1 hover:opacity-80">
-                  {body}
-                </Link>
-              ) : (
-                <span className="min-w-0 flex-1">{body}</span>
-              )}
-              <span className="tabular shrink-0 text-small text-ink-muted">
-                {whenLabel(update.at, now, timezone)}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
-  );
+  return <UpdatesCard updates={updates} now={now} timezone={timezone} />;
 }
 
 /**
@@ -844,19 +705,6 @@ async function ReviewLinks({ observations }: { observations: Promise<ShownObserv
   );
 }
 
-/** "Tue 29", for a day in the coming week. The day is already the reader's. */
-function dayLabel(day: string): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date(`${day}T00:00:00Z`));
-}
-
-function timeLabel(at: string, timezone: string): string {
-  return formatClock(at, { timeZone: timezone });
-}
-
 /**
  * Where one line of "Today" goes when you click it.
  *
@@ -870,30 +718,4 @@ function timeLabel(at: string, timezone: string): string {
 function agendaHref(entry: { task?: { id: string }; item?: { link: { href: string } | null } }): string {
   if (entry.task) return `/todo#task-${entry.task.id}`;
   return entry.item?.link?.href ?? '/todo';
-}
-
-/**
- * The same mark the switcher and Account use -- module glyph on the module's
- * own hue. Three lists of these is two too many.
- */
-function ModuleCard({
-  href,
-  module,
-  title,
-  stat,
-}: {
-  href: string;
-  module: ModuleId;
-  title: string;
-  stat: string;
-}) {
-  return (
-    <Link href={href} className={cn(cardVariants({ interactive: true }), 'flex items-center gap-3 p-4')}>
-      <ModuleMark module={module} size="md" />
-      <span className="min-w-0">
-        <span className="block text-ui font-semibold text-ink">{title}</span>
-        <span className="tabular block truncate text-small text-ink-muted">{stat}</span>
-      </span>
-    </Link>
-  );
 }
