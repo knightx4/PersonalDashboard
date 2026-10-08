@@ -13,6 +13,7 @@ import { admin, asUser, closeDb, createUser, truncateAll } from './helpers/db-co
 let me = '';
 let them = '';
 let idea = '';
+let ackIdea = '';
 let goal = '';
 let role = '';
 let company = '';
@@ -25,6 +26,8 @@ beforeAll(async () => {
 
   [{ id: idea }] = await admin<{ id: string }[]>`
     insert into public.ideas (user_id, body) values (${me}, 'Group the ideas') returning id`;
+  [{ id: ackIdea }] = await admin<{ id: string }[]>`
+    insert into public.ideas (user_id, body) values (${me}, 'Mark it seen') returning id`;
   const [area] = await admin<{ id: string }[]>`
     insert into goals.areas (user_id, name) values (${me}, 'Career') returning id`;
   [{ id: goal }] = await admin<{ id: string }[]>`
@@ -46,7 +49,7 @@ afterAll(async () => {
 
 describe('core.acknowledge_thread_turn', () => {
   it('marks your own comment, keeps the first time, and reads back through the view', async () => {
-    const ref = `public.ideas:${idea}`;
+    const ref = `public.ideas:${ackIdea}`;
     const [{ id }] = await asUser(me, (tx) =>
       tx<{ id: string }[]>`select core.add_thread_turn(${me}, ${ref}, 'me', 'Done, thanks @dash') as id`,
     );
@@ -64,7 +67,7 @@ describe('core.acknowledge_thread_turn', () => {
   });
 
   it('refuses Dash\'s own turn, another account\'s comment, and a comment under another row', async () => {
-    const ref = `public.ideas:${idea}`;
+    const ref = `public.ideas:${ackIdea}`;
     const [{ id: dashTurn }] = await asUser(me, (tx) =>
       tx<{ id: string }[]>`select core.add_thread_turn(${me}, ${ref}, 'claude', 'Noted.') as id`,
     );
