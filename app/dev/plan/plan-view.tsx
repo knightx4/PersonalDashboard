@@ -19,6 +19,7 @@ import {
 import { VIEW_LABEL } from '@/lib/core/move';
 import type { CriticStopView } from '@/lib/plan/ui-check-stop';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
+import type { PlanPicture } from '@/lib/plan/pictures';
 import {
   PLAN_VIEW_CHIPS,
   PLAN_VIEW_MENU,
@@ -430,6 +431,7 @@ export function PlanView({
   overhaulProgress = {},
   criticStops = {},
   screenChanges = {},
+  pictures = {},
   empty,
   canSend,
   unfolded = false,
@@ -470,6 +472,8 @@ export function PlanView({
   criticStops?: Readonly<Record<string, CriticStopView>>;
   /** Each step's changed screens with their pictures, by step number (plan #1541). */
   screenChanges?: Readonly<Record<number, readonly ScreenChangeView[]>>;
+  /** The drawn options on each row, by plan item id (migration 0189). */
+  pictures?: Readonly<Record<string, readonly PlanPicture[]>>;
   empty: boolean;
   canSend: boolean;
   /**
@@ -683,6 +687,7 @@ export function PlanView({
                       overhaulProgress={overhaulProgress}
                       criticStops={criticStops}
                       screenChanges={screenChanges}
+                      pictures={pictures}
                       view={view}
                       searching={searching}
                       unfolded={unfolded}
@@ -768,6 +773,7 @@ export function PlanView({
                 overhaulProgress={overhaulProgress}
                 criticStops={criticStops}
                 screenChanges={screenChanges}
+                pictures={pictures}
                 view={view}
                 searching={searching}
                 unfolded={unfolded}

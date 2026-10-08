@@ -245,6 +245,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.plan_dependencies = planDependency.id;
 
+  const [planPicture] = await admin<{ id: string }[]>`
+    insert into plan_item_pictures (user_id, item_id, caption, svg)
+    values (${userId}, ${planItem.id}, ${`${tag} option A`}, '<svg viewBox="0 0 24 24"></svg>')
+    returning id`;
+  ids.plan_item_pictures = planPicture.id;
+
   const [planRun] = await admin<{ id: string }[]>`
     insert into plan_runs (user_id, plan_item_id, job, routine_id, external_id, http_status, response)
     values (

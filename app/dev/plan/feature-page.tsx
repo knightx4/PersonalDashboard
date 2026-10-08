@@ -32,6 +32,7 @@ import type { CommitCheck } from '@/lib/plan/checks';
 import type { OverhaulProgress } from '@/lib/plan/overhaul-progress';
 import type { CriticStopView } from '@/lib/plan/ui-check-stop';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
+import type { PlanPicture } from '@/lib/plan/pictures';
 import {
   FEATURE_TABS,
   STEPS_VIEWS,
@@ -95,6 +96,7 @@ export function FeaturePage({
   overhaulProgress,
   criticStops,
   screenChanges,
+  pictures,
   updates = [],
   activity,
   startEditing = false,
@@ -111,6 +113,8 @@ export function FeaturePage({
   overhaulProgress?: Readonly<Record<string, OverhaulProgress>>;
   criticStops?: Readonly<Record<string, CriticStopView>>;
   screenChanges?: Readonly<Record<number, readonly ScreenChangeView[]>>;
+  /** The drawn options on each row, by plan item id (migration 0189). */
+  pictures?: Readonly<Record<string, readonly PlanPicture[]>>;
   /** Dash's updates on the feature, newest first (plan #1666). */
   updates?: readonly PlanUpdate[];
   /** What the Activity tab reads beyond the plan (plan #1667). */
@@ -139,6 +143,7 @@ export function FeaturePage({
     overhaulProgress,
     criticStops,
     screenChanges,
+    pictures,
     view: 'open',
     searching: false,
     unfolded: false,
@@ -395,6 +400,7 @@ export function FeaturePage({
             overhaulProgress,
             criticStops,
             screenChanges,
+            pictures,
           }}
         />
       ) : row.editing ? (

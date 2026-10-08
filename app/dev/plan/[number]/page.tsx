@@ -7,6 +7,7 @@ import { loadCommitChecks } from '@/lib/plan/ci';
 import { loadOverhaulProgress } from '@/lib/plan/overhaul-progress-load';
 import { loadCriticStops } from '@/lib/plan/critic-stop-load';
 import { loadScreenChanges } from '@/lib/plan/screen-change-load';
+import { loadPlanPictures } from '@/lib/plan/pictures-load';
 import { loadFeatureUpdates } from '@/lib/plan/updates-load';
 import { loadActivitySources } from '@/lib/plan/activity-load';
 import { buildPlanTree, flatten, planLiveness } from '@/lib/plan/tree';
@@ -60,12 +61,13 @@ export default async function FeatureRoute({ params }: { params: Params }) {
   const supabase = await createClient();
   await endQuietRuns({ supabase, userId: user.id });
 
-  const [data, lastRuns, runRaises, commitChecks, screenChanges] = await Promise.all([
+  const [data, lastRuns, runRaises, commitChecks, screenChanges, pictures] = await Promise.all([
     loadPlan(supabase, user.id),
     loadLastRuns(supabase, user.id),
     loadRunRaises(supabase, user.id),
     loadCommitChecks(supabase, user.id),
     loadScreenChanges(supabase, user.id),
+    loadPlanPictures(supabase, user.id),
   ]);
 
   const liveness = claimsAsOfNow(data.items, lastRuns);
@@ -113,6 +115,7 @@ export default async function FeatureRoute({ params }: { params: Params }) {
       overhaulProgress={overhaulProgress}
       criticStops={criticStops}
       screenChanges={screenChanges}
+      pictures={pictures}
       updates={updates}
       activity={activity}
     />

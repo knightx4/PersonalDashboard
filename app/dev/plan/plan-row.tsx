@@ -85,6 +85,8 @@ import { SendScreenBack } from './send-back';
 import { ScreenChanges } from '@/components/dev/screen-change';
 import { featureHref } from '@/lib/plan/feature-page';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
+import type { PlanPicture } from '@/lib/plan/pictures';
+import { PlanPictures } from '@/components/dev/plan-pictures';
 
 /**
  * One row of the dev plan, drawn through the shared tree row.
@@ -541,6 +543,7 @@ export function usePlanRow({
   overhaulProgress = {},
   criticStops = {},
   screenChanges = {},
+  pictures = {},
   view,
   searching,
   unfolded,
@@ -581,6 +584,8 @@ export function usePlanRow({
   criticStops?: Readonly<Record<string, CriticStopView>>;
   /** Each step's changed screens with their pictures, by step number (plan #1541). */
   screenChanges?: Readonly<Record<number, readonly ScreenChangeView[]>>;
+  /** The drawn options on each row, by plan item id (migration 0189). */
+  pictures?: Readonly<Record<string, readonly PlanPicture[]>>;
   /** Which view is on. Only Dismissed shows what has been put aside. */
   view: View;
   /** Whether a search is narrowing the page. Unfolds closed rows that hold a hit. */
@@ -1126,6 +1131,10 @@ export function usePlanRow({
             />
           )}
 
+          {/* The drawn options on a proposal or decision, before anything
+              is built: what the person is being asked to approve or choose. */}
+          <PlanPictures pictures={pictures[node.id] ?? []} />
+
           {/* A screen the critic stopped after its last round: its fixes and
               shots, and the two ways on (plan #1610). */}
           {criticStop && <CriticStop id={node.id} view={criticStop} />}
@@ -1357,6 +1366,7 @@ export function PlanRow(props: PlanRowProps) {
           overhaulProgress={props.overhaulProgress}
           criticStops={props.criticStops}
           screenChanges={props.screenChanges}
+          pictures={props.pictures}
           view={view}
           searching={searching}
           unfolded={unfolded}
