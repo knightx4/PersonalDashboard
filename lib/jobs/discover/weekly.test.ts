@@ -27,6 +27,13 @@ describe('planFor', () => {
     expect(planFor({ stage: 'boards', started_at: at(30), shortlisted_at: at(31) }, NOW)).toBe('boards');
     expect(planFor({ stage: 'failed', started_at: at(1), shortlisted_at: at(2) }, NOW)).toBe('boards');
   });
+
+  it('runs a finished week again when the person asks, but never joins a working run', () => {
+    expect(planFor({ stage: 'done', started_at: at(5000), shortlisted_at: at(5000) }, NOW, true)).toBe('shortlist');
+    expect(planFor({ stage: 'failed', started_at: at(1), shortlisted_at: at(2) }, NOW, true)).toBe('shortlist');
+    expect(planFor({ stage: 'boards', started_at: at(2), shortlisted_at: at(2) }, NOW, true)).toBe('skip');
+    expect(planFor(null, NOW, true)).toBe('shortlist');
+  });
 });
 
 /** A one-table fake: remembers the row, answers the three calls the run makes. */

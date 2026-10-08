@@ -3,6 +3,7 @@ import type { OpenSuggestion } from '@/lib/jobs/suggest/load';
 import type { StartedTrackView, SuggestedTrackView } from '@/lib/jobs/learning/payload';
 import { RecommendedPeople, RecommendedRoles } from '../recommend/sections';
 import { SearchAim } from './aim';
+import { DiscoveredCompanies } from './companies';
 import { ThoughtList, type ThoughtView } from './thoughts';
 import { LearningTracks } from './tracks';
 
@@ -10,8 +11,8 @@ import { LearningTracks } from './tracks';
  * The Find tab below its header, drawn from what the page loaded so the
  * gallery can draw it from fixtures (surface `jobs-find`).
  *
- * In reading order: what the search aims at, the roles and the people Dash
- * found against it, the career goals entries the searches read, and the
+ * In reading order: what the search aims at, the roles Dash found against
+ * it and the startups behind some of them, the people to meet, the career goals entries the searches read, and the
  * learning tracks suggested from them. Every panel takes the page's full
  * width, so their right edges line up (law 18). The anchors are where the phone
  * notification for a search opens (lib/jobs/suggest/notify.ts).
@@ -19,12 +20,14 @@ import { LearningTracks } from './tracks';
 export function FindView({
   aim,
   roles,
+  companies,
   people,
   tracks,
   thoughts,
 }: {
   aim: ComponentProps<typeof SearchAim>;
   roles: ComponentProps<typeof RecommendedRoles>;
+  companies: ComponentProps<typeof DiscoveredCompanies>;
   people: OpenSuggestion[];
   /** Null when the tracks could not be read, which hides them. */
   tracks: { suggested: SuggestedTrackView[]; started: StartedTrackView[] } | null;
@@ -36,6 +39,10 @@ export function FindView({
 
       <div id="roles" className="scroll-mt-4">
         <RecommendedRoles {...roles} />
+      </div>
+
+      <div id="companies" className="scroll-mt-4">
+        <DiscoveredCompanies {...companies} />
       </div>
 
       <div id="people" className="scroll-mt-4">

@@ -1,4 +1,5 @@
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
+import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
 import type { RoleReminder } from '@/app/jobs/(app)/roles/[id]/types';
 import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
@@ -2710,6 +2711,54 @@ const recommendedPeople: OpenSuggestion[] = [
 ];
 
 /** Find for somebody a month in: three career goals entries, one track started and two suggested. */
+const discoveredCompanies: DiscoveredCompany[] = [
+  {
+    id: 'wl-1',
+    name: 'LiveFlow',
+    website: 'https://liveflow.io',
+    source: 'yc',
+    description: 'AI-ERP and FP&A platform for finance teams.',
+    reason: 'Your modeling and CPA background fit finance teams as users, with real AI product work.',
+    score: 92,
+    stage: 'Early',
+    locations: ['New York, NY, USA'],
+    postingRoles: [],
+    board: { vendor: 'ashby' },
+    noBoard: false,
+    companySlug: null,
+  },
+  {
+    id: 'wl-2',
+    name: 'Column',
+    website: 'https://column.com',
+    source: 'hn',
+    description: 'Column | Payment Ops, Deployment | San Francisco or Remote (US)',
+    reason: 'Banking infrastructure hiring payment operations, which fits your finance and operations interest.',
+    score: 81,
+    stage: null,
+    locations: ['San Francisco or Remote (US)'],
+    postingRoles: ['Payment Operations', 'Deployment Lead'],
+    board: { vendor: 'ashby' },
+    noBoard: false,
+    companySlug: 'column',
+  },
+  {
+    id: 'wl-3',
+    name: 'Arpari',
+    website: 'https://arpari.com',
+    source: 'yc',
+    description: 'Multibank treasury management for corporate finance teams.',
+    reason: 'Your cash forecasting project is directly related.',
+    score: 68,
+    stage: 'Early',
+    locations: ['New York, NY, USA'],
+    postingRoles: [],
+    board: null,
+    noBoard: true,
+    companySlug: null,
+  },
+];
+
 const findView = {
   aim: {
     targetTitles: 'Deployment Strategist, Strategic Finance, Forward Deployed Engineer, FP&A Manager',
@@ -2721,6 +2770,14 @@ const findView = {
     searchCostMicros: 4_200_000,
     searchLine: { running: false, tone: 'plain' as const, text: 'The search 2 hours ago found 3 new roles. Read 58 job boards, 12 postings worth a look.' },
     pathname: '/jobs/find',
+  },
+  companies: {
+    companies: discoveredCompanies,
+    status: {
+      running: false,
+      tone: 'plain' as const,
+      text: 'The startup search 3 hours ago read 812 hiring startups that fit your preferences, kept 40 and found 12 more job boards.',
+    },
   },
   people: recommendedPeople,
   tracks: {

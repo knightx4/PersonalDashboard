@@ -12,6 +12,8 @@ import {
   withPreferenceMisses,
 } from '@/lib/jobs/suggest/load';
 import { describeRun, loadLatestRun } from '@/lib/jobs/suggest/search-runs';
+import { loadDiscoveredCompanies, loadLatestDiscoveryRun } from '@/lib/jobs/discover/watchlist-load';
+import { describeDiscovery } from '@/lib/jobs/discover/watchlist-view';
 import { otherParams, parseOpeningView } from '@/lib/jobs/suggest/opening-view';
 import { historyFromPipeline, withOpeningNotes } from '@/lib/jobs/suggest/score-notes-load';
 import { FindView } from './view';
@@ -28,7 +30,8 @@ export const maxDuration = 300;
  *
  * The target titles and the industries never to suggest, which were in
  * Settings, lead the page. The recommended roles, which were above the Roles
- * table, and the people to meet, which were above Contacts, follow. Career
+ * table, the startups discovery found (feature #1679), and the people to
+ * meet, which were above Contacts, follow. Career
  * goals, which was its own tab, closes it (decision #1585): the dated
  * entries (job_search.thoughts, 0026) and the learning tracks suggested from
  * them (job_search.learning_tracks, 0027). Goals reads the entries through
@@ -57,6 +60,8 @@ export default async function FindPage({
     { data: profile },
     { data: thoughts },
     tracks,
+    discovered,
+    discoveryRun,
   ] = await Promise.all([
     loadPipeline(supabase, user.id),
     loadOpenSuggestions(supabase, user.id, 'apply'),
@@ -80,6 +85,12 @@ export default async function FindPage({
       console.error('[jobs find] learning tracks', error);
       return null;
     }),
+    // A failed read shows the section empty rather than failing the page.
+    loadDiscoveredCompanies(supabase, user.id).catch((error) => {
+      console.error('[jobs find] discovered companies', error);
+      return [];
+    }),
+    loadLatestDiscoveryRun(supabase, user.id),
   ]);
 
   const recommended = withPreferenceMisses(
@@ -111,6 +122,7 @@ export default async function FindPage({
           keep: otherParams(params),
           pathname: '/jobs/find',
         }}
+        companies={{ companies: discovered, status: describeDiscovery(discoveryRun) }}
         people={people}
         tracks={tracks}
         thoughts={entries.map((row) => ({
