@@ -130,6 +130,11 @@ Each entry needs `table`, `ref`, `title` and an `href` that is a path in the
 app; leave the column null when there is nothing to link. Keep the body to a
 few sentences and under 8000 characters.
 
+Reply in words every time. A hand-off is a request, and a request carried out
+is reported, so the seen mark (`core.acknowledge_thread_turn`) is not for this
+routine. Where a hand-off turns out to be only a thanks or a status update with
+nothing to do, a one-sentence reply is enough.
+
 ## 5. File the note
 
 Every hand-off files one note, so the ability is added to Dash itself and the

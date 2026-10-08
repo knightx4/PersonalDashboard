@@ -2950,6 +2950,35 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* A comment Dash read and chose not to answer (plan #1650): the seen mark
+     * under it where "replying…" would have been, and nothing from Dash after.
+     * The same component serves goals, roles and every other row's thread. */
+    id: 'dev-comment-thread-seen',
+    label: 'Comments · a comment Dash marked seen',
+    module: 'dev',
+    width: 'narrow',
+    render: () => (
+      <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+        <p className="text-body text-ink">
+          The filter and the count disagree on who a step is handed to.
+        </p>
+        <Thread
+          subject={threadRef('step', '00000000-0000-4000-8000-000000000415')}
+          onCard
+          turns={[
+            {
+              id: 'seen-1',
+              author: 'me',
+              body: '@dash thanks, that settles it. I will hand #412 back myself.',
+              createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000 - 5 * 60 * 1000).toISOString(),
+              acknowledgedAt: new Date(Date.now() - 3 * 60 * 60 * 1000 - 5 * 60 * 1000 + 40_000).toISOString(),
+            },
+          ]}
+        />
+      </div>
+    ),
+  },
+  {
     /* The same component on a row nobody has written on, which is the state
      * that draws no panel at all: a ground round a single Add a comment button
      * is a section announcing it has nothing in it -- law 1. Worth its own

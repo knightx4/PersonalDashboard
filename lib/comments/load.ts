@@ -83,6 +83,11 @@ export type DevComment = {
   author: CommentAuthor;
   body: string;
   createdAt: string;
+  /**
+   * When Dash saw this comment and chose not to reply (plan #1648). Only ever
+   * set on the person's own comments; absent or null on all others.
+   */
+  acknowledgedAt?: string | null;
 };
 
 /**
@@ -99,6 +104,7 @@ export function threadFrom(value: unknown): DevComment[] {
       author: row.author === 'claude' ? ('claude' as const) : ('me' as const),
       body: row.body as string,
       createdAt: String(row.created_at ?? ''),
+      acknowledgedAt: row.acknowledged_at ? String(row.acknowledged_at) : null,
     }))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }

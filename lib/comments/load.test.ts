@@ -14,8 +14,28 @@ describe('threadFrom', () => {
     ]);
 
     expect(thread).toEqual([
-      { id: 'c1', author: 'me', body: 'Why two columns here?', createdAt: '2026-09-13T09:00:00Z' },
+      {
+        id: 'c1',
+        author: 'me',
+        body: 'Why two columns here?',
+        createdAt: '2026-09-13T09:00:00Z',
+        acknowledgedAt: null,
+      },
     ]);
+  });
+
+  it('carries the seen mark on a comment Dash acknowledged', () => {
+    const thread = threadFrom([
+      {
+        id: 'c1',
+        author: 'me',
+        body: 'Pushed the fix',
+        created_at: '2026-09-13T09:00:00Z',
+        acknowledged_at: '2026-09-13T09:01:00Z',
+      },
+    ]);
+
+    expect(thread[0].acknowledgedAt).toBe('2026-09-13T09:01:00Z');
   });
 
   it('puts the thread in the order it was written', () => {

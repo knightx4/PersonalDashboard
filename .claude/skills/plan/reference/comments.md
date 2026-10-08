@@ -35,3 +35,29 @@ or delete anything. Asked for one of those, change nothing and say in the thread
 that it was not done and why. Do not commit either way — these are rows, not
 code.
 
+## A comment that needs no answer
+
+A tagged comment that asks nothing and wants nothing done (a status update,
+thanks, "looks good") does not need a written reply. Answer it with the seen
+mark, which shows beside the comment as "Seen by Dash", or with one sentence.
+The turn id is on `core.thread_turns` for the ref:
+
+```sql
+select id, author, body from core.thread_turns where ref = 'public.plan_items:<the step>' order by created_at;
+select core.acknowledge_thread_turn('…', 'public.plan_items:<the step>', '<turn id>');
+```
+
+The mark is only for a comment you have changed nothing for. The database
+does not stop you marking after a change, so keep the rule yourself: a
+question gets its full reply, an instruction is carried out and reported in
+words, and anything you did in this session, however small, is written into
+the thread, never marked. The same limits as the in-app Dash
+(`THREAD_RULES` in `lib/dash/thread.ts`):
+
+- "pushed the fix, all good now": mark it seen.
+- "thanks, that's what I needed": mark it seen, or reply "Glad it helped."
+- "looks good": mark it seen.
+- "looks good, can you reword the done-when?": reword it, then reply saying so.
+- "done with this one?": reply; it is a question.
+- "fixed it, but is the old row still there?": reply to the question.
+

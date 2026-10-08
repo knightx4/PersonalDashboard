@@ -13,6 +13,7 @@ import { admin, asUser, closeDb, createUser, truncateAll } from './helpers/db-co
 let me = '';
 let them = '';
 let idea = '';
+let ackIdea = '';
 let goal = '';
 let role = '';
 let company = '';
@@ -25,6 +26,8 @@ beforeAll(async () => {
 
   [{ id: idea }] = await admin<{ id: string }[]>`
     insert into public.ideas (user_id, body) values (${me}, 'Group the ideas') returning id`;
+  [{ id: ackIdea }] = await admin<{ id: string }[]>`
+    insert into public.ideas (user_id, body) values (${me}, 'Mark it seen') returning id`;
   const [area] = await admin<{ id: string }[]>`
     insert into goals.areas (user_id, name) values (${me}, 'Career') returning id`;
   [{ id: goal }] = await admin<{ id: string }[]>`
@@ -42,6 +45,45 @@ beforeAll(async () => {
 afterAll(async () => {
   await truncateAll();
   await closeDb();
+});
+
+describe('core.acknowledge_thread_turn', () => {
+  it('marks your own comment, keeps the first time, and reads back through the view', async () => {
+    const ref = `public.ideas:${ackIdea}`;
+    const [{ id }] = await asUser(me, (tx) =>
+      tx<{ id: string }[]>`select core.add_thread_turn(${me}, ${ref}, 'me', 'Done, thanks @dash') as id`,
+    );
+    const [first] = await asUser(me, (tx) =>
+      tx<{ at: Date }[]>`select core.acknowledge_thread_turn(${me}, ${ref}, ${id}) as at`,
+    );
+    const [again] = await asUser(me, (tx) =>
+      tx<{ at: Date }[]>`select core.acknowledge_thread_turn(${me}, ${ref}, ${id}) as at`,
+    );
+    expect(again.at).toEqual(first.at);
+    const [row] = await asUser(me, (tx) =>
+      tx<{ acknowledged_at: Date | null }[]>`select acknowledged_at from core.thread_turns where id = ${id}`,
+    );
+    expect(row.acknowledged_at).toEqual(first.at);
+  });
+
+  it('refuses Dash\'s own turn, another account\'s comment, and a comment under another row', async () => {
+    const ref = `public.ideas:${ackIdea}`;
+    const [{ id: dashTurn }] = await asUser(me, (tx) =>
+      tx<{ id: string }[]>`select core.add_thread_turn(${me}, ${ref}, 'claude', 'Noted.') as id`,
+    );
+    const [{ id: mine }] = await asUser(me, (tx) =>
+      tx<{ id: string }[]>`select core.add_thread_turn(${me}, ${ref}, 'me', 'Another @dash') as id`,
+    );
+    await expect(
+      asUser(me, (tx) => tx`select core.acknowledge_thread_turn(${me}, ${ref}, ${dashTurn})`),
+    ).rejects.toThrow(/not a comment of yours/);
+    await expect(
+      asUser(them, (tx) => tx`select core.acknowledge_thread_turn(${them}, ${ref}, ${mine})`),
+    ).rejects.toThrow(/not a comment of yours/);
+    await expect(
+      asUser(me, (tx) => tx`select core.acknowledge_thread_turn(${me}, ${`goals.items:${goal}`}, ${mine})`),
+    ).rejects.toThrow(/not a comment of yours/);
+  });
 });
 
 describe('core.add_thread_turn', () => {
