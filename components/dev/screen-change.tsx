@@ -122,3 +122,38 @@ export function ScreenAfters({ changes }: { changes: readonly ScreenChangeView[]
     </div>
   );
 }
+
+/** One step's after picture, with the step it belongs to, for the strip on Home. */
+export type ShippedScreen = {
+  step: number;
+  title: string;
+  href: string;
+  change: ScreenChangeView;
+};
+
+/**
+ * What shipped lately, as the after pictures of the screens it changed. A row
+ * that scrolls sideways rather than wraps: the pictures are a glance, and a
+ * second row of them would push the rest of Home down a phone's height.
+ */
+export function ShippedScreens({ screens }: { screens: readonly ShippedScreen[] }) {
+  const shown = screens.filter((screen) => screen.change.after);
+  if (shown.length === 0) return null;
+  return (
+    <div className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-1">
+      {shown.map((screen) => (
+        <figure key={`${screen.step}:${screen.change.surface}`} className="w-28 shrink-0 snap-start space-y-1">
+          <Picture
+            src={screen.change.after!}
+            alt={`${screen.change.surface} after #${screen.step}, on a phone`}
+          />
+          <figcaption className="text-micro text-ink-muted">
+            <a href={screen.href} className="press-area line-clamp-2 hover:text-ink hover:underline">
+              #{screen.step} {screen.title}
+            </a>
+          </figcaption>
+        </figure>
+      ))}
+    </div>
+  );
+}

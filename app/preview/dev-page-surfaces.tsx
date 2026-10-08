@@ -16,7 +16,9 @@ import { phoneShot } from './plan-surfaces';
 import { RaisedView } from '@/app/dev/raised/raised-view';
 import { ConversationsView } from '@/app/dev/raised/conversations-view';
 import { StatusPanel } from '@/app/dev/raised/status-panel';
-import { InboxLine } from '@/app/dev/raised/inbox-line';
+import { NowStrip } from '@/app/dev/raised/now-strip';
+import { AskBox } from '@/app/dev/raised/ask-box';
+import { CheckBacksPanel } from '@/app/dev/raised/check-backs-panel';
 import { AccountView } from '@/app/account/view';
 import {
   isOutstanding,
@@ -678,15 +680,55 @@ const conversations: Conversation[] = [
   },
 ];
 
+const NOW = Date.parse('2026-10-06T08:00:00Z');
+
 export function DevRaisedSurface() {
   return column(
     <>
-      <PageHeader
-        title="Home"
-        description="What is running, what happened in the last day, and every conversation you have had with Dash. Reply to a conversation and it goes back on the row it was started on."
+      <PageHeader title="Home" />
+      <div className="space-y-3">
+        <NowStrip
+          run={null}
+          ready={3}
+          openNotes={12}
+          mainCheck={{
+            sha: 'abc1234',
+            conclusion: 'passed',
+            checkedAt: '2026-10-06T07:55:00Z',
+            error: null,
+            reason: null,
+            runUrl: null,
+            deployState: null,
+            deployUrl: null,
+            deployError: null,
+            unapplied: [],
+            migrationsError: null,
+          }}
+          inbox={3}
+        />
+        <AskBox />
+      </div>
+      <CheckBacksPanel
+        now={NOW}
+        rows={[
+          {
+            id: 'cb1',
+            userId: 'u1',
+            planItemId: null,
+            outcome: null,
+            closedAt: null,
+            createdAt: '2026-10-05T09:00:00Z',
+            title: 'Check the weekly digest email went out',
+            detail: 'Plan #611 sends it on Monday mornings; look for the send in Resend.',
+            dueAt: '2026-10-07T09:00:00Z',
+            status: 'waiting',
+            source: 'plan #611',
+            wake: true,
+            wokeAt: null,
+          },
+        ]}
       />
-      <InboxLine count={3} />
-      <ConversationsView conversations={conversations} />
+      <ConversationsView conversations={conversations} now={NOW} />
     </>,
   );
 }
