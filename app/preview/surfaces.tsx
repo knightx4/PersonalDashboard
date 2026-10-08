@@ -10,6 +10,7 @@ import { defaultRoleTab } from '@/app/jobs/(app)/roles/[id]/tabs';
 import { closedSummary } from '@/lib/jobs/role-stage';
 import { ExcitementPicker } from '@/app/jobs/(app)/roles/[id]/excitement-picker';
 import { Property } from '@/components/shell/detail-layout';
+import { DetailFacts } from '@/components/patterns/list-detail';
 import { ChannelPicker } from '@/app/jobs/(app)/roles/[id]/channel-picker';
 import type { ReferrerOption } from '@/lib/jobs/contacts/referrers';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
@@ -3009,7 +3010,7 @@ export const SURFACES: readonly Surface[] = [
               </div>
             }
           />
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+          <DetailFacts>
             <Property label="Applied" value="31 Jul 2026" />
             <Property label="Confirmed" value="31 Jul 2026" />
             <Property label="First human reply" value="6 Aug 2026" />
@@ -3026,7 +3027,7 @@ export const SURFACES: readonly Surface[] = [
             />
             <Property label="Comp band" value="$180k–$220k" />
             <Property label="Outcome" value="—" />
-          </dl>
+          </DetailFacts>
         <RoleDetailPanels {...rolePanels} defaultTab={defaultRoleTab('in_process')} />
       </div>
     ),
