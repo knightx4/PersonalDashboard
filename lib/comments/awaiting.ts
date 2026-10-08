@@ -23,6 +23,9 @@ import { mentionsDash } from './mention';
 import type { CommentAuthor } from './load';
 import type { ThreadTarget } from '@/lib/thread/subjects';
 
+/** What an ask returns when Dash marked the comment seen and wrote no reply. */
+export const SEEN_MESSAGE = 'Dash marked your comment as seen.';
+
 /** How long a thread goes on expecting an answer before it stops saying so. */
 export const REPLY_EXPECTED_MINUTES = 120;
 
