@@ -172,6 +172,8 @@ import {
   GoalBareSurface,
   GoalLinkingSurface,
   GoalTopSurface,
+  GoalStepsTabSurface,
+  GoalActivitySurface,
   FileSurface,
   GoalsAllSurface,
   GoalsAreaSurface,
@@ -3267,13 +3269,32 @@ export const SURFACES: readonly Surface[] = [
     render: () => <GoalsAreaSurface />,
   },
   {
-    /* The top of a goal page with every section holding something: the
-     * Claude line, the number and its readings, one Learn goal linked. */
+    /* A goal's page on its Overview tab (plan #1671), in the tabbed detail
+     * pattern: the path, title and done-when, the properties column, then
+     * Dash's status card, the number and its readings, Waiting on you, one
+     * Learn goal linked and a file. */
     id: 'goals-page-top',
-    label: 'Goal · the top of the page',
+    label: 'Goal · the Overview tab',
     module: 'goals',
     width: 'page',
     render: () => <GoalTopSurface />,
+  },
+  {
+    /* The same frame on its Steps tab: the step tree and its stages. */
+    id: 'goals-page-steps',
+    label: 'Goal · the Steps tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalStepsTabSurface />,
+  },
+  {
+    /* The same frame on its Activity tab: the steps closed, the runs and
+     * the goal's comments. */
+    id: 'goals-page-activity',
+    label: 'Goal · the Activity tab',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalActivitySurface />,
   },
   {
     /* A file Claude wrote (core.files): the summary, then a table, a list

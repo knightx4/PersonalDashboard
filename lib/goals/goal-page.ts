@@ -355,3 +355,66 @@ export function stepPreps(trees: readonly (readonly StepNode[])[]): {
   }
   return { prepFor, targetOf };
 }
+
+/* ------------------------------------------------------------ the tabs */
+
+/**
+ * The goal page's tabs (plan #1671), the feature page's three in the same
+ * order: Overview holds the status card and what feeds the goal, Steps the
+ * step tree, Activity the runs, the finished steps and the comments.
+ */
+export const GOAL_TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'steps', label: 'Steps' },
+  { id: 'activity', label: 'Activity' },
+] as const;
+
+export type GoalTab = (typeof GOAL_TABS)[number]['id'];
+
+/**
+ * A link from elsewhere on the goal page to a step's row. The rows are on the
+ * Steps tab, so the link opens that tab and scrolls to the row; from the
+ * Steps tab itself it lands on the same row.
+ */
+export function stepAnchor(stepId: string): string {
+  return `?tab=steps#step-${stepId}`;
+}
+
+/** Whether a link on the page goes to a step's row. */
+export function isStepAnchor(href: string): boolean {
+  return href.startsWith('?tab=steps#step-') || href.startsWith('#step-');
+}
+
+/** One finished or dropped step, as the Activity tab lists it. */
+export type ClosedStep = {
+  id: string;
+  title: string;
+  status: 'done' | 'dropped';
+  /** Whether it is Dash's step, of kind `claude`. */
+  dash: boolean;
+  closedAt: string;
+};
+
+/**
+ * Every step at any depth that was closed, done or dropped, newest first. A
+ * step with no closing time is left out, since the list is read by when.
+ */
+export function closedSteps(steps: readonly StepNode[]): ClosedStep[] {
+  const out: ClosedStep[] = [];
+  const walk = (nodes: readonly StepNode[]) => {
+    for (const node of nodes) {
+      if ((node.status === 'done' || node.status === 'dropped') && node.closedAt) {
+        out.push({
+          id: node.id,
+          title: node.title,
+          status: node.status,
+          dash: node.kind === 'claude',
+          closedAt: node.closedAt,
+        });
+      }
+      walk(node.children);
+    }
+  };
+  walk(steps);
+  return out.sort((a, b) => b.closedAt.localeCompare(a.closedAt));
+}

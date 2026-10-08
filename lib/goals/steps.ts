@@ -123,6 +123,8 @@ export type Step = {
   prepCheckedAt?: string | null;
   /** When the step was added; the morning brief lists unjudged steps newest first (plan #1217). */
   createdAt?: string | null;
+  /** When it was last closed as done or dropped; null while open. The goal page's Activity tab lists it (plan #1671). */
+  closedAt?: string | null;
   /**
    * How many in all its progress entries count towards, as an estimate
    * (plan #1277), and what it counts. Both or neither.
