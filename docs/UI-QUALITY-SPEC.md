@@ -15,7 +15,8 @@ the building follow it the first time.
 > **Status:** shaped 3 October 2026 into proposed features #1528 (the critic),
 > #1536 (phone checks), #1540 (before and after pictures) and #1544 (patterns).
 > Part 8, added the same day, is #1548 (motion), #1555 and #1559 (moments)
-> and #1564 (judging craft).
+> and #1564 (judging craft). Part 9, added 8 October 2026, is feature #1653
+> (which jobs get a list, a chart or Dash).
 
 ## What happens today
 
@@ -307,6 +308,60 @@ A feature whose screens have a catalogue moment gets a last step from
 shaping, "Build its moments and pass the craft check", and is not done until
 that step is.
 
+## Part 9: Which jobs get a list, a chart or Dash
+
+Part 1 to 8 say how a screen is checked. This part says which screen a job
+needs in the first place. A workspace has three kinds of interface for a job,
+and each job gets the one that suits it.
+
+**A plain list, with a detail page, is for browsing and for acting on one row.**
+Finding an item, reading it, editing a field, marking one thing done, or
+checking what a single order or role says. The person is looking at the rows
+and decides as they go, so the list is the interface and nothing replaces it.
+
+**A chart in Dash's reply is for a one-off question about totals or trends.**
+"What did I spend by month this year?" "How many applications went out each
+week?" The answer is read once and does not need to stay on a page. Dash
+reads the person's rows, picks the chart that fits the question, and draws it
+in the reply. The chart is not saved to a workspace page. Keeping one on a
+page is a separate idea and not part of this rule.
+
+**Handing the job to Dash is for changing many rows by a rule.** "Tag
+everything from this order as gift." "Mark every role I have not heard from in
+a month as stale." The person states the rule and Dash finds the rows. A
+change of this kind is one Dash action with one Undo that reverses all of it,
+and the reply says how many rows it touched. Selecting rows by hand on the
+list stays for a handful of rows the person can see. The line is a rule that
+the person would otherwise apply row by row.
+
+**What never goes to Dash.** Deleting rows stays on the list's own bulk bar,
+because a delete cannot be undone from a reply. Anything outside the app, such
+as sending an email, placing an order or posting, stays a step the person
+takes.
+
+### Shopping
+
+- List and detail: inventory and each item, orders and each order, saved
+  items, returns, recurring payments, the review queue, selling an item.
+- Chart in Dash's reply: spending by month, category or shop; how many items
+  of each kind are owned; what returns saved or cost over a period.
+- Handed to Dash: tag, categorize or mark for sale every item matching a rule
+  such as an order, a shop or an age; set the same field on many items.
+- Stays on the list's bulk bar: deleting items or orders.
+
+### Jobs
+
+- List and detail: roles and each role, the pipeline, companies, contacts,
+  interviews, the review queue, answers.
+- Chart in Dash's reply: applications per week, how long roles sit in each
+  stage, where offers and rejections come from.
+- Handed to Dash: move, tag or close every role matching a rule such as stage,
+  company or days since the last contact; set the same field on many roles.
+- Stays on the list's bulk bar: deleting roles.
+
+Other workspaces follow the same rule when a step next changes them. A step
+that adds a job to a workspace names which of the three it is.
+
 ## Rules
 
 Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. A rule
@@ -339,6 +394,16 @@ Checked by: count `raw-motion-values`, baseline 234, target 0.
 
 **R8.** No workspace has more than three moments.
 Checked by: test `tests/dev-ui-moments.test.ts`.
+
+**R9.** A list job that changes many rows by a rule is also offered to Dash,
+and the change is one Dash action with one Undo.
+Checked by: audit.
+
+**R10.** Deleting rows is not offered to Dash in any workspace.
+Checked by: audit.
+
+**R11.** A workspace page does not keep a chart that Dash made in a reply.
+Checked by: audit.
 
 ## Decisions
 
