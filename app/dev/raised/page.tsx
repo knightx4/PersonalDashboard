@@ -14,12 +14,18 @@ import { planRoutine } from '@/lib/feedback/routine';
 import { loadNotesLastRun } from '@/lib/feedback/last-worked';
 import { loadVisionReviewStatus } from '@/lib/specs/vision-review-run';
 import { countProposedSpecChanges } from '@/lib/specs/changes';
+import { loadMainCheck } from '@/lib/shell/main-check';
+import { loadRecentScreenChanges } from '@/lib/plan/screen-change-load';
+import { planRefHref } from '@/lib/comments/refs';
+import { ShippedScreens, type ShippedScreen } from '@/components/dev/screen-change';
+import { Group } from '@/components/ui/disclosure';
 import { NOTES_WORK_KINDS } from '@/lib/feedback/load';
 import { CHECK_BACK_COLUMNS, checkBackFrom } from '@/lib/plan/check-backs';
 import { CheckBacksPanel } from './check-backs-panel';
 import { ConversationsView } from './conversations-view';
 import { DigestPanel } from './digest-panel';
-import { InboxLine } from './inbox-line';
+import { AskBox } from './ask-box';
+import { NowStrip } from './now-strip';
 import { InboxRedirect } from './inbox-redirect';
 import { StatusPanel } from './status-panel';
 import { createGoalsClient } from '@/lib/goals/auth/server';
@@ -28,6 +34,12 @@ import { goalsStatus } from '@/lib/goals/runner-status';
 import { loadGoalsNight } from '@/inngest/goals/overnight';
 
 export const metadata = { title: 'Dash' };
+
+/** How far back the pictures under the strip reach. */
+const SHIPPED_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+/** Enough pictures to fill a laptop's row; the rest are on the changelog. */
+const SHIPPED_SHOWN = 8;
 
 /** The time the check-backs are measured against. Outside the component because it reads the clock. */
 function readClock(): number {
@@ -50,20 +62,19 @@ async function readGoals(userId: string) {
 }
 
 /**
- * The page you open in the morning: your day, and your conversations.
+ * The page you open in the morning, read top to bottom: what is going right
+ * now, what changed, what Dash is due to come back to, then the conversations.
  *
- * The summary of the last 24 hours is written once a day by the cron rather
- * than built here, so opening the page never costs a model call. What is
- * waiting on you was the middle of this page and is the Inbox tab now; Home
- * keeps one line saying how much, so the count is still the first thing read.
+ * The strip of chips answers "is anything running, is main green, is anything
+ * waiting on me" before anything is scrolled, each chip a link to the page
+ * that holds the detail. The runner's controls are folded under it. What is
+ * waiting on you is the Inbox tab, and Home carries only its count.
  *
- * Then every conversation you have had, wherever it was started. A thread used
- * to be visible only from the row it was written on, which meant finding an
- * answer by remembering where the question was asked.
- *
- * Above all three, what is running. The two routines' states were on two other
- * pages, so the first question of the morning was the one this page could not
- * answer -- see `StatusPanel`.
+ * The pictures are the after shots of the screens changed in the last two
+ * days, because a changed screen is read faster from a picture than from its
+ * changelog line. The summary of the last 24 hours is written once a day by
+ * the cron rather than built here, so opening the page never costs a model
+ * call.
  *
  * The route stays /dev/raised though the tab is called Home -- #431, note a0897727 -- because
  * every notification, comment and old summary already links to it.
@@ -74,6 +85,7 @@ export default async function DevRaisedPage() {
   // The goals half of the same runner, read alongside the rest. A goals read
   // that fails leaves the Plan row as it was rather than taking the page down.
   const goalsRead = readGoals(user.id);
+  const now = readClock();
   const [
     queue,
     digest,
@@ -88,6 +100,8 @@ export default async function DevRaisedPage() {
     checkBacks,
     vision,
     specChanges,
+    mainCheck,
+    recentScreens,
   ] = await Promise.all([
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
@@ -118,16 +132,20 @@ export default async function DevRaisedPage() {
       .eq('status', 'waiting')
       .order('due_at'),
     loadVisionReviewStatus(supabase, user.id),
-    // Counted for the inbox line, the same as the tab's badge.
+    // Counted for the Inbox chip, the same as the tab's badge.
     countProposedSpecChanges(supabase, user.id),
+    // The row the status line reads, for the Main chip.
+    loadMainCheck(),
+    // The screens changed in the last two days, for the pictures. Two days
+    // rather than one, so a morning after a quiet day still has something.
+    loadRecentScreenChanges(supabase, user.id, new Date(now - SHIPPED_WINDOW_MS).toISOString()),
   ]);
   const comingBack = (checkBacks.data ?? []).map((row) => checkBackFrom(row as Record<string, unknown>));
-  const now = readClock();
 
   // The tree once, for the two things below that read it: how much is
   // waiting on you, and how many features the runner could pick up.
   const sections = buildPlanTree(plan);
-  // Counted the way the tab's badge is (app/dev/layout.tsx), so the line and
+  // Counted the way the tab's badge is (app/dev/layout.tsx), so the chip and
   // the badge never disagree.
   const onYou = queue.open.length + waitingOnYou(sections).length + specChanges;
 
@@ -156,14 +174,36 @@ export default async function DevRaisedPage() {
   // would otherwise be nine lookups inside a render.
   const titles = planRefTitles(plan, flattenSections(sections));
 
+  // Newest step first, each with the title it shipped under.
+  const stepTitles = new Map(plan.items.map((item) => [item.number, item.title]));
+  const shipped: ShippedScreen[] = Object.entries(recentScreens)
+    .map(([step, changes]) => ({ step: Number(step), changes }))
+    .sort((a, b) => b.step - a.step)
+    .flatMap(({ step, changes }) =>
+      changes.map((change) => ({
+        step,
+        title: stepTitles.get(step) ?? '',
+        href: planRefHref(step),
+        change,
+      })),
+    )
+    .slice(0, SHIPPED_SHOWN);
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader
-        title="Home"
-        description="What is running, what happened in the last day, and every conversation you have had with Dash. Reply to a conversation and it goes back on the row it was started on."
-      />
+      {/* No description: the page is the day, and says so by what is on it. */}
+      <PageHeader title="Home" />
       <InboxRedirect />
-      <InboxLine count={onYou} />
+      <div className="space-y-3">
+        <NowStrip
+          run={overnight}
+          ready={card.ready}
+          openNotes={openNotes.count ?? 0}
+          mainCheck={mainCheck}
+          inbox={onYou}
+        />
+        <AskBox />
+      </div>
       <StatusPanel
         run={overnight}
         canSend={Boolean(planRoutine().token)}
@@ -174,9 +214,14 @@ export default async function DevRaisedPage() {
         vision={vision}
         now={now}
       />
-      <CheckBacksPanel rows={comingBack} now={now} />
+      {shipped.some((screen) => screen.change.after) && (
+        <Group title="Shipped lately">
+          <ShippedScreens screens={shipped} />
+        </Group>
+      )}
       <DigestPanel digest={digest} />
-      <ConversationsView conversations={conversations} titles={titles} />
+      <CheckBacksPanel rows={comingBack} now={now} />
+      <ConversationsView conversations={conversations} titles={titles} now={now} />
     </div>
   );
 }

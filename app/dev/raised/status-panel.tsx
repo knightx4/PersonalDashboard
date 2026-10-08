@@ -19,7 +19,11 @@ import { VisionReviewLine } from './vision-review-line';
  * /dev/bugs -- so the first question of the morning, "is anything going", was
  * two pages away from the page written to answer the morning's questions.
  *
- * Called Status rather than Overnight. The runner's card has said "Overnight"
+ * Its heading is Controls now, folded shut under the strip of chips at the
+ * top of Home (now-strip.tsx), which says what this card used to say first.
+ * The card keeps the presses: start, hold, run the notes.
+ *
+ * Called Status rather than Overnight, before that. The runner's card has said "Overnight"
  * since it was a thing you set going before bed, and the name stayed accurate
  * only while nobody started one at eleven in the morning. Here it is one row of
  * two, so each row is named for the queue it works and the panel is named for
@@ -59,7 +63,9 @@ export function StatusPanel({
 }) {
   return (
     <Card padding="dense">
-      <SectionFold title="Status">
+      {/* Shut to begin with: the strip above says what is running, and this
+          card is where it is started, held or run by hand. */}
+      <SectionFold remember="dev.fold.controls" title="Controls" defaultOpen={false}>
         <div className="space-y-3">
           <OvernightControl
             run={run}
