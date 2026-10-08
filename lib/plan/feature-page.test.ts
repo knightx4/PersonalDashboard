@@ -3,6 +3,7 @@ import type { PlanItem } from '@/lib/plan/load';
 import { buildPlanTree } from '@/lib/plan/tree';
 import {
   featureCrumbs,
+  featureStatus,
   findFeature,
   newFeatureHref,
   stepGroups,
@@ -162,12 +163,41 @@ describe("the Steps tab's status groups", () => {
   });
 });
 
+describe("a feature's status", () => {
+  const status = (steps: Partial<PlanItem>[], own: Partial<PlanItem> = {}) => {
+    const tree = buildPlanTree({
+      items: [
+        item({ id: 'f', title: 'Feature', number: 200, ...own }),
+        ...steps.map((s, i) =>
+          item({ id: `s${i}`, title: `Step ${i}`, parentId: 'f', number: 201 + i, ...s }),
+        ),
+      ],
+      dependencies: [],
+    });
+    return featureStatus(findFeature(tree, 200)!.feature);
+  };
+
+  it('reads in progress once any step has started', () => {
+    expect(status([{ status: 'in_progress' }])).toBe('in_progress');
+  });
+  it('stays not started when no step has', () => {
+    expect(status([{ status: 'not_started' }])).toBe('not_started');
+  });
+  it('keeps a status the feature already holds', () => {
+    expect(
+      status([{ status: 'in_progress' }], {
+        status: 'blocked',
+        blockKind: 'outside',
+        blockAsk: 'x',
+      }),
+    ).toBe('blocked');
+  });
+});
+
 describe('newFeatureHref', () => {
   it('opens the New feature surface on the page it was pressed from, keeping the view', () => {
     expect(newFeatureHref('/dev/plan')).toBe('/dev/plan?new=feature');
     expect(newFeatureHref('/dev/plan', 'all')).toBe('/dev/plan?view=all&new=feature');
-    expect(newFeatureHref('/dev/projects/website', null)).toBe(
-      '/dev/projects/website?new=feature',
-    );
+    expect(newFeatureHref('/dev/projects/website', null)).toBe('/dev/projects/website?new=feature');
   });
 });

@@ -260,7 +260,7 @@ function ThreadSurface() {
 const FEATURE_TABS: readonly Tab[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'activity', label: 'Activity' },
-  { id: 'steps', label: 'Steps', count: 10 },
+  { id: 'steps', label: 'Steps', count: 6, countNoun: 'open' },
 ];
 
 const FEATURE_STEPS: readonly { number: number; title: string; state: string }[] = [
