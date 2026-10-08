@@ -5,9 +5,11 @@ import type { MerchantExclusionRow } from '@/lib/inbox/merchant-exclusion-match'
 
 export type { MerchantExclusionRow } from '@/lib/inbox/merchant-exclusion-match';
 export {
+  DISMISSED_REVIEW_ERROR,
   EXCLUDED_SENDER_ERROR,
   isExcludedMessage,
   isExcludedSender,
+  isSkippedByPerson,
 } from '@/lib/inbox/merchant-exclusion-match';
 
 export async function loadMerchantExclusions(

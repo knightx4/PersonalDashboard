@@ -34,6 +34,8 @@ export const DASH_CHANGE_KINDS = [
   'close_todo',
   'close_goal_step',
   'add_role_note',
+  'add_job_lead',
+  'add_idea',
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -64,6 +66,10 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  * close_todo       the todo ticked off.
  * close_goal_step  the step marked done and the goal it sits under.
  * add_role_note    the note and the role it went on.
+ * add_idea         the idea as filed, and the workspace it is about (null:
+ *                  the app as a whole).
+ * add_job_lead     the role saved as a lead, its company, and the posting
+ *                  link it came from when there was one.
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -94,6 +100,8 @@ export type DashChangeInput = {
   close_todo: { id: string; title: string; items: number };
   close_goal_step: { id: string; title: string; goalId: string; goalTitle: string };
   add_role_note: { roleId: string; roleTitle: string; body: string };
+  add_idea: { body: string; module: string | null };
+  add_job_lead: { roleId: string; roleTitle: string; companyName: string; url: string | null };
 };
 
 /** The kinds Dash proposed for a Confirm before plan #1440, which keep their own undo in lib/ask/changes.ts. */

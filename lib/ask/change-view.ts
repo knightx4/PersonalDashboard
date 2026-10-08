@@ -30,6 +30,10 @@ export function changeHref(change: DashChange): string {
       return stepHref(change.input.goalId, change.input.id);
     case 'add_role_note':
       return `/jobs/roles/${change.input.roleId}`;
+    case 'add_idea':
+      return '/dev/ideas';
+    case 'add_job_lead':
+      return `/jobs/roles/${change.input.roleId}`;
   }
 }
 
@@ -138,6 +142,18 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
         what: change.input.roleTitle,
         rest: `: ${quoted(change.input.body)}`,
       };
+    case 'add_idea':
+      return {
+        verb: done ? 'Filed the idea' : 'File the idea',
+        what: quoted(change.input.body),
+        rest: ' on the ideas page',
+      };
+    case 'add_job_lead':
+      return {
+        verb: done ? 'Saved the lead' : 'Save the lead',
+        what: change.input.roleTitle,
+        rest: ` at ${change.input.companyName}`,
+      };
   }
 }
 
@@ -174,6 +190,10 @@ export function changeWhere(change: DashChange): string {
     case 'close_goal_step':
       return 'Open the goal';
     case 'add_role_note':
+      return 'Open the role';
+    case 'add_idea':
+      return 'Open the ideas';
+    case 'add_job_lead':
       return 'Open the role';
   }
 }

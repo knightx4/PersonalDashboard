@@ -10,6 +10,19 @@ export type MerchantExclusionRow = {
 /** The error an excluded email is skipped with, and how the sync recognises it later. */
 export const EXCLUDED_SENDER_ERROR = 'Excluded by user merchant mute';
 
+/** The error an email the person called "Not an order" in Review is skipped with. */
+export const DISMISSED_REVIEW_ERROR = 'Dismissed from review queue';
+
+/**
+ * Whether a skipped email was skipped by the person, by muting its sender or
+ * dismissing it from Review. The sync retries waiting shipping and return
+ * mail on every pass, and must never retry these: a dismissed email that the
+ * retry put back in Review is the person's "Not an order" undone.
+ */
+export function isSkippedByPerson(error: string | null | undefined): boolean {
+  return error === EXCLUDED_SENDER_ERROR || error === DISMISSED_REVIEW_ERROR;
+}
+
 /**
  * The kinds of email an exclusion applies to: order confirmations, and the
  * shipping, delivery, return and cancellation mail that follows an order.

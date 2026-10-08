@@ -228,6 +228,84 @@ describe('add_role_note', () => {
   });
 });
 
+describe('add_job_lead', () => {
+  const POSTING = 'https://boards.greenhouse.io/acme/jobs/123';
+  const reading = (title: string): DashWriteContext => ({
+    ...context(),
+    readPosting: async () => ({
+      ok: true,
+      tier: 1,
+      posting: { vendor: 'greenhouse', title, text: '', url: POSTING, location: 'London', atsJobId: '123', boardToken: 'acme', questions: [] },
+    }),
+  });
+
+  beforeEach(() => {
+    tables['job_search.companies'] = [];
+  });
+
+  it('saves a posting link as a lead, reading its title, and Undo takes the role and application back', async () => {
+    const result = ok(await apply('add_job_lead', { url: POSTING, company: 'Acme' }, reading('Data analyst')));
+    const role = tables['job_search.roles'].find((r) => r.jd_url === POSTING);
+    expect(role).toMatchObject({ user_id: ME, title: 'Data analyst', location: 'London', ats_job_id: '123' });
+    expect(tables['job_search.companies']).toEqual([expect.objectContaining({ name: 'Acme', user_id: ME })]);
+    expect(tables['job_search.applications']).toContainEqual(expect.objectContaining({ role_id: role!.id, created_by: 'manual' }));
+    expect(result).toMatchObject({
+      kind: 'add_job_lead',
+      op: 'insert',
+      input: { roleId: role!.id, roleTitle: 'Data analyst', companyName: 'Acme', url: POSTING },
+      row: { table: 'job_search.roles', href: `/jobs/roles/${role!.id}` },
+      summary: 'Dash saved Data analyst at Acme to your leads.',
+    });
+
+    const { undone } = await keepAndUndo(result);
+    expect(undone.ok).toBe(true);
+    expect(tables['job_search.roles'].some((r) => r.jd_url === POSTING)).toBe(false);
+  });
+
+  it('asks for the title when the link cannot be read, and saves nothing', async () => {
+    const ctx = { ...context(), readPosting: async () => ({ ok: false as const, tier: 3 as const, reason: 'no', detected: {} as never }) };
+    const result = await apply('add_job_lead', { url: 'https://jobs.example.com/351766', company: 'UBS' }, ctx);
+    expect(!result.ok && result.error).toContain('Ask them for the role title');
+    expect(tables['job_search.roles']).toHaveLength(1);
+  });
+
+  it('asks for a link or a title and company when given neither', async () => {
+    const result = await apply('add_job_lead', {});
+    expect(!result.ok && result.error).toContain('Give the posting link, or the role title and the company');
+  });
+
+  it('refuses a posting already saved', async () => {
+    tables['job_search.roles'][0].jd_url = POSTING;
+    const result = await apply('add_job_lead', { url: POSTING, title: 'x', company: 'Acme' });
+    expect(!result.ok && result.error).toContain('saved already');
+  });
+});
+
+describe('add_idea', () => {
+  it('files the idea as theirs, and Undo deletes it', async () => {
+    tables['public.ideas'] = [];
+    const result = ok(await apply('add_idea', { text: 'Save a job lead from a posting link', module: 'jobs' }));
+    expect(tables['public.ideas']).toEqual([
+      expect.objectContaining({ user_id: ME, body: 'Save a job lead from a posting link', module: 'jobs' }),
+    ]);
+    expect(result).toMatchObject({
+      kind: 'add_idea',
+      op: 'insert',
+      input: { body: 'Save a job lead from a posting link', module: 'jobs' },
+      row: { table: 'public.ideas', href: '/dev/ideas' },
+    });
+
+    const { undone } = await keepAndUndo(result);
+    expect(undone.ok).toBe(true);
+    expect(tables['public.ideas']).toEqual([]);
+  });
+
+  it('refuses a workspace that does not exist', async () => {
+    const result = await apply('add_idea', { text: 'Something good', module: 'cooking' });
+    expect(!result.ok && result.error).toContain('is not a workspace');
+  });
+});
+
 describe('add_todo', () => {
   it('adds the todo as Confirm did, in the shape Ask has always kept', async () => {
     const result = ok(await apply('add_todo', { title: 'Call the bank', due_on: '2026-10-06' }));
@@ -264,5 +342,12 @@ describe('the card under the answer', () => {
     const note = card('add_role_note', { roleId: ROLE, roleTitle: 'Product designer', body: 'Recruiter is Sam.\nMore.' });
     expect(changeSentence(note, true)).toBe('Added a note to Product designer: Recruiter is Sam.');
     expect(changeHref(note)).toBe(`/jobs/roles/${ROLE}`);
+
+    const lead = card('add_job_lead', { roleId: ROLE, roleTitle: 'Data analyst', companyName: 'Acme', url: null });
+    expect(changeSentence(lead, true)).toBe('Saved the lead Data analyst at Acme');
+    expect(changeHref(lead)).toBe(`/jobs/roles/${ROLE}`);
+
+    const idea = card('add_idea', { body: 'Save leads from links', module: null });
+    expect(changeSentence(idea, true)).toBe('Filed the idea Save leads from links on the ideas page');
   });
 });

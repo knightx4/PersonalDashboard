@@ -7,13 +7,16 @@ import { toRef } from '@/lib/core/refs';
 import { insertArea, insertGoal } from '@/lib/goals/store';
 import { parseGoalFields } from '@/lib/goals/tree';
 import { setStepStatus } from '@/lib/goals/steps-store';
-import type { ModuleId } from '@/lib/modules';
+import { MODULE_IDS, type ModuleId } from '@/lib/modules';
 import type { DashChangeInput, DashChangeKind, NewDashChange } from '@/lib/talk/changes';
 import { taskInput } from '@/lib/todo/tasks/input';
 import { wallClockToInstant } from '@/lib/todo/time';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 import { addThreadTurn } from '@/lib/thread/store';
 import { stepHref } from '@/lib/goals/all-goals';
+import { ensureCompany } from '@/lib/jobs/companies/ensure';
+import { detectPosting } from '@/lib/jobs/ats/detect';
+import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -31,6 +34,9 @@ import { stepHref } from '@/lib/goals/all-goals';
  *   close_goal_step  a step marked done.
  *   mark_returned    an owned item marked returned, with a full refund.
  *   add_role_note    a note on a role in Jobs.
+ *   add_idea         an idea on the ideas page in Dev.
+ *   add_job_lead     a role saved as a lead in Jobs, from a posting link or
+ *                    a title and company.
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)
@@ -53,6 +59,7 @@ const TABLE = {
   item: 'public.inventory_items',
   role: 'job_search.roles',
   application: 'job_search.applications',
+  idea: 'public.ideas',
   // A note on a role is a turn in the role's thread (plan #1470).
   note: 'core.conversation_turns',
 } as const;
@@ -552,6 +559,145 @@ async function noteOnRole(
   );
 }
 
+/** Longest title a lead is saved with; a posting's own title is far shorter. */
+const LEAD_TITLE_MAX = 300;
+
+/**
+ * Save a job as a lead: a role, its company (found or made, as every other
+ * path does it), and an application in the lead state with nothing
+ * submitted, the shape "Save as lead" on the roles page writes. The posting
+ * is read from its link where a board or the page allows it, which fills
+ * whatever title Dash was not given; the role's page fetches the
+ * description later, as it does for a saved recommendation. Undo takes the
+ * role back, and the application with it, while nothing has been added to
+ * either; the company stays.
+ */
+async function addJobLead(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
+  requireWorkspace(ctx, 'jobs');
+  const url = text(args, 'url') || null;
+  let title = text(args, 'title');
+  const companyName = text(args, 'company');
+  if (url && !/^https?:\/\/\S+$/i.test(url)) throw new Refused('url is not a web link starting http:// or https://.');
+  if (!url && (!title || !companyName)) {
+    throw new Refused('Give the posting link, or the role title and the company. Ask them for whichever is missing.');
+  }
+
+  const jobs = await ctx.db('job_search');
+  if (url) {
+    const saved = await one<{ id: string; title: string }>(
+      jobs.from('roles').select('id, title').eq('user_id', ctx.userId).eq('jd_url', url).limit(1),
+    );
+    if (saved) throw new Refused(`That posting is saved already, as the role "${saved.title}" (job_search.roles ${saved.id}).`);
+  }
+
+  let location: string | null = null;
+  let atsJobId: string | null = null;
+  if (url && !title) {
+    const read = ctx.readPosting ?? (await import('@/lib/jobs/ats')).fetchPostingFromUrl;
+    const outcome = await read(url).catch(() => null);
+    if (outcome?.ok) {
+      title = outcome.posting.title.trim();
+      location = outcome.posting.location;
+      atsJobId = outcome.posting.atsJobId;
+    }
+  }
+  if (!title) {
+    throw new Refused(
+      'The posting at that link could not be read for its title. Ask them for the role title (and the company, if you do not know it), then call add_job_lead again with the link.',
+    );
+  }
+  if (!companyName) {
+    throw new Refused(`The company is missing. Ask them which company "${title}" is at, then call add_job_lead again with the link.`);
+  }
+  if (title.length > LEAD_TITLE_MAX) title = title.slice(0, LEAD_TITLE_MAX).trimEnd();
+
+  const detected = url ? detectPosting(url) : null;
+  const vendor = detected?.vendor;
+  const company = await ensureCompany(jobs as unknown as AppSupabaseClient, ctx.userId, companyName, {
+    careersUrl: url,
+    boardToken: detected?.boardToken ?? null,
+    ats: !vendor || vendor === 'other' || vendor === 'unknown' ? null : vendor,
+  });
+  if (company.error) throw new Error(company.error);
+
+  const role = await one<{ id: string }>(
+    jobs
+      .from('roles')
+      .insert({
+        user_id: ctx.userId,
+        company_id: company.id,
+        title,
+        jd_url: url,
+        ats_job_id: atsJobId ?? detected?.jobId ?? null,
+        location,
+      })
+      .select('id'),
+  );
+  if (!role) throw new Error('The role was not saved.');
+  const { error } = await jobs.from('applications').insert({ user_id: ctx.userId, role_id: role.id, created_by: 'manual' });
+  if (error) {
+    await jobs.from('roles').delete().eq('id', role.id).eq('user_id', ctx.userId);
+    throw new Error(error.message);
+  }
+
+  const ref = toRef(TABLE.role, role.id);
+  const roleTitle = `${title} at ${companyName}`;
+  return made(
+    'add_job_lead',
+    { roleId: role.id, roleTitle: title, companyName, url },
+    {
+      subjectRef: ref,
+      op: 'insert',
+      before: null,
+      after: await readSubject(ctx.db, ref),
+      summary: `Dash saved ${roleTitle} to your leads.`,
+      row: { table: TABLE.role, ref: role.id, title: roleTitle, href: `/jobs/roles/${role.id}` },
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Dev
+// ---------------------------------------------------------------------------
+
+/** Longest idea Dash files, the ideas page's own limit. */
+const IDEA_MAX = 4000;
+
+/**
+ * File an idea on the ideas page, as the person's own: they asked for it, so
+ * it reads as one they typed into the box there, the way a goal they ask for
+ * goes in approved. Undo deletes it while nothing hangs from it.
+ */
+async function addIdea(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
+  const body = text(args, 'text');
+  if (body.length < 3) throw new Refused('text is missing: write the idea in a sentence.');
+  if (body.length > IDEA_MAX) throw new Refused(`Keep the idea under ${IDEA_MAX} characters.`);
+  const workspace = text(args, 'module') || null;
+  if (workspace && !(MODULE_IDS as readonly string[]).includes(workspace)) {
+    throw new Refused(`"${workspace}" is not a workspace. Use one of ${MODULE_IDS.join(', ')}, or leave it out for the app as a whole.`);
+  }
+
+  const idea = await one<{ id: string }>(
+    (await ctx.db('public')).from('ideas').insert({ user_id: ctx.userId, body, module: workspace }).select('id'),
+  );
+  if (!idea) throw new Error('The idea was not saved.');
+  const ref = toRef(TABLE.idea, idea.id);
+  const line = body.split('\n')[0].trim();
+  const short = line.length > 120 ? `${line.slice(0, 119).trimEnd()}…` : line;
+  return made(
+    'add_idea',
+    { body, module: workspace },
+    {
+      subjectRef: ref,
+      op: 'insert',
+      before: null,
+      after: await readSubject(ctx.db, ref),
+      summary: `Dash filed your idea "${short}" on the ideas page.`,
+      row: { table: TABLE.idea, ref: idea.id, title: short, href: '/dev/ideas' },
+    },
+  );
+}
+
 // ---------------------------------------------------------------------------
 // The tools
 // ---------------------------------------------------------------------------
@@ -696,6 +842,37 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
       additionalProperties: false,
     },
     addRoleNote,
+  ),
+  tool(
+    'add_job_lead',
+    'Save a job to their leads in Jobs, when they ask you to ("add this job to my leads", a pasted posting link). Pass the posting link when there is one; the title is read from the posting when it can be. Pass the title and company when they named them, and always the company, from the link\'s site or their words. When the role is on the page they are on, use its title, company and link. When there is no link and no role you can name, ask them for the link rather than calling this.',
+    {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The job posting link, when there is one.' },
+        title: { type: 'string', description: 'The role title, when they gave it or you know it.' },
+        company: { type: 'string', description: 'The company the role is at.' },
+      },
+      additionalProperties: false,
+    },
+    addJobLead,
+  ),
+  tool(
+    'add_idea',
+    'File an idea on the ideas page in Dev, when they ask you to note an idea for the app ("add an idea to Dev", "file that as an idea"). Write it as they said it, readable among other ideas.',
+    {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: "The idea in the person's own terms, a sentence or two." },
+        module: {
+          type: 'string',
+          description: 'The workspace it is about, by id (jobs, goals, learn, dev and so on); leave it out for the app as a whole.',
+        },
+      },
+      required: ['text'],
+      additionalProperties: false,
+    },
+    addIdea,
   ),
 ];
 
