@@ -24,6 +24,7 @@ export function lastTurnEvent(kindsNewestFirst: readonly string[]): ApplicationE
 }
 
 const OFFER = 'There is an offer to answer.';
+const ASKED = 'They asked you something by mail, and the answer is yours.';
 
 /** After these, the next thing has to come from you. */
 const YOURS_AFTER: Partial<Record<ApplicationEventKind, string>> = {
@@ -39,6 +40,13 @@ export type ApplicationMoveInput = {
   /** The newest event that counts (`lastTurnEvent`), or null when there is none. */
   lastEvent: ApplicationEventKind | null;
   companyName: string;
+  /**
+   * Mail on it asked you something and has not been answered or put aside
+   * (This week's "Waiting on you"). Whatever the last event was, a question
+   * waiting on you makes the move yours. Today passes it; the board does not
+   * read the mail, and leaves it out.
+   */
+  asked?: boolean;
 };
 
 /**
@@ -49,6 +57,7 @@ export function applicationMove({
   status,
   lastEvent,
   companyName,
+  asked = false,
 }: ApplicationMoveInput): { move: Move; title: string } | null {
   if (isTerminal(status)) return null;
 
@@ -61,6 +70,7 @@ export function applicationMove({
 
   const yours = lastEvent ? YOURS_AFTER[lastEvent] : undefined;
   if (yours) return { move: { state: 'on_you' }, title: yours };
+  if (asked) return { move: { state: 'on_you' }, title: ASKED };
 
   const company = companyName.trim();
   return {

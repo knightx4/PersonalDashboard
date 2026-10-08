@@ -1,5 +1,10 @@
 import type { PipelineRow } from '@/lib/jobs/applications/load';
-import { APPLICATION_SOURCES, isLive, type ApplicationSource } from '@/lib/jobs/pipeline';
+import {
+  APPLICATION_SOURCES,
+  isLive,
+  type ApplicationSource,
+  type ApplicationStatus,
+} from '@/lib/jobs/pipeline';
 import { matchesSearch, searchTerms } from '@/lib/jobs/search';
 import { parseScoreMinimum, passesMinimum, type ScoreMinimum } from '@/lib/jobs/suggest/score-notes';
 
@@ -27,6 +32,30 @@ export type PipelineViewName = 'focus' | 'board' | 'table';
 /** Which applications are in play: the live ones, the closed ones or every one. */
 export type PipelineScope = 'live' | 'closed' | 'all';
 
+/**
+ * The stages Today counts and Pipeline can be narrowed to (plan #1591): the
+ * board's columns, folded the way the board folds them. `submitted` and
+ * `acknowledged` are one column, and so are `in_process` and `final_round`.
+ * Together they are every live status, so the stage counts add up to the
+ * live count.
+ */
+export const PIPELINE_STAGES = [
+  { key: 'unsent', label: 'Not sent yet', statuses: ['lead', 'drafting'] },
+  { key: 'submitted', label: 'Submitted', statuses: ['submitted', 'acknowledged'] },
+  { key: 'in_process', label: 'In process', statuses: ['in_process', 'final_round'] },
+  { key: 'offer', label: 'Offer', statuses: ['offer'] },
+] as const satisfies ReadonlyArray<{
+  key: string;
+  label: string;
+  statuses: readonly ApplicationStatus[];
+}>;
+
+export type PipelineStage = (typeof PIPELINE_STAGES)[number];
+export type PipelineStageKey = PipelineStage['key'];
+
+/** The longest look-back `sent` takes, in days. */
+export const SENT_MAX_DAYS = 90;
+
 /** How many rows the table draws at once. */
 export const PIPELINE_PAGE_SIZE = 50;
 
@@ -39,6 +68,10 @@ export type PipelineParams = {
   minfit?: string;
   minchance?: string;
   q?: string;
+  /** A stage key from PIPELINE_STAGES: only the live applications at that stage. */
+  stage?: string;
+  /** A number of days: only what was sent within that many days, live or closed. */
+  sent?: string;
   page?: string;
   sort?: string;
   group?: string;
@@ -53,6 +86,9 @@ export type PipelineState = {
   excitement: number | null;
   minimum: ScoreMinimum;
   terms: string[];
+  stage: PipelineStage | null;
+  /** Sent within this many days, or null for any time. */
+  sentDays: number | null;
   /** One-based. */
   page: number;
 };
@@ -68,7 +104,10 @@ export function parsePipeline(params: PipelineParams): PipelineState {
     params.view === 'table' || scope !== 'live' ? 'table' : params.view === 'board' ? 'board' : 'focus';
   const excitement = Number(params.excitement);
   const page = Number(params.page);
+  const sent = Number(params.sent);
   return {
+    stage: PIPELINE_STAGES.find((stage) => stage.key === params.stage) ?? null,
+    sentDays: Number.isInteger(sent) && sent >= 1 && sent <= SENT_MAX_DAYS ? sent : null,
     view,
     scope,
     source: APPLICATION_SOURCES.find((s) => s === params.source) ?? null,
@@ -93,17 +132,39 @@ export function inScope(row: Pick<PipelineRow, 'status'>, scope: PipelineScope):
 export function filterPipeline(
   rows: readonly PipelineRow[],
   state: PipelineState,
+  now: Date = new Date(),
 ): { scoped: PipelineRow[]; filtered: PipelineRow[] } {
   const scoped = rows.filter((row) => inScope(row, state.scope));
   const filtered = scoped.filter(
     (row) =>
       (!state.source || row.source === state.source) &&
+      (!state.stage || (state.stage.statuses as readonly ApplicationStatus[]).includes(row.status)) &&
+      (state.sentDays === null || sentWithin(row, state.sentDays, now)) &&
       (!state.excitement || (row.excitement ?? 0) >= state.excitement) &&
       // A row not scored passes, as an unscored opening passes the openings' filters.
       passesMinimum(row.scoreNote, state.minimum) &&
       (state.terms.length === 0 || matchesSearch([row.companyName, row.roleTitle], state.terms)),
   );
   return { scoped, filtered };
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Whether it was sent within `days` of `now`. An application created from its
+ * confirmation email can carry the confirmation's time and no separate send
+ * time; that is when it was sent. The same rule as Today's "Sent in the last
+ * 7 days" (lib/jobs/home/summary.ts), so the number and the list agree.
+ */
+export function sentWithin(
+  row: Pick<PipelineRow, 'submittedAt' | 'confirmationReceivedAt'>,
+  days: number,
+  now: Date,
+): boolean {
+  const sent = row.submittedAt ?? row.confirmationReceivedAt;
+  if (!sent) return false;
+  const at = new Date(sent).getTime();
+  return Number.isFinite(at) && at >= now.getTime() - days * DAY_MS && at <= now.getTime();
 }
 
 /** The page of `rows` to draw, with where it starts and how many pages there are. */

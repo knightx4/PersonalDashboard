@@ -1,12 +1,13 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
-import { loadPipeline } from '@/lib/jobs/applications/load';
+import { loadPipeline, type PipelineRow } from '@/lib/jobs/applications/load';
 import {
   addressOnly,
   composeFollowUp,
   displayName,
   gmailComposeUrl,
 } from '@/lib/jobs/followup/compose';
-import { TERMINAL_STATUSES } from '@/lib/jobs/pipeline';
+import { DEBRIEF_NUDGE_WINDOW_DAYS, TERMINAL_STATUSES } from '@/lib/jobs/pipeline';
+import { debriefsDue, type DebriefDue } from './debrief';
 import { lastCorrespondents } from '@/lib/jobs/followup/recipients';
 
 /**
@@ -95,6 +96,8 @@ export interface TodayBoard {
   interviews: UpcomingInterview[];
   reminders: DueReminder[];
   waiting: WaitingOnYou[];
+  /** Rounds just over with nothing written about them (lib/jobs/today/debrief.ts). */
+  debriefs: DebriefDue[];
   /** True when every section is empty, so the page can say so once. */
   clear: boolean;
 }
@@ -118,7 +121,12 @@ export function isPrepped(row: { prep_notes: string | null; prep_note: unknown }
 export async function loadToday(
   supabase: AppSupabaseClient,
   userId: string,
-  opts: { now?: Date; senderName?: string | null } = {},
+  opts: {
+    now?: Date;
+    senderName?: string | null;
+    /** The pipeline, when the caller has already read it for something else. */
+    pipeline?: readonly PipelineRow[];
+  } = {},
 ): Promise<TodayBoard> {
   const now = opts.now ?? new Date();
 
@@ -128,6 +136,7 @@ export async function loadToday(
     eventRows,
     pipelineRows,
     waitingDismissedRows,
+    pastRows,
   ] = await Promise.all([
     supabase
       .from('interviews')
@@ -172,7 +181,7 @@ export async function loadToday(
     // Through the pipeline loader rather than a query of its own: it is where
     // the date a pursuit was submitted comes from, which is what a follow-up
     // draft opens with.
-    loadPipeline(supabase, userId),
+    opts.pipeline ?? loadPipeline(supabase, userId),
 
     // Dismissed "waiting" items. A row with no dismissed_until is dismissed
     // for good; one with a future dismissed_until is snoozed and filtered the
@@ -182,6 +191,19 @@ export async function loadToday(
       .select('application_event_id, dismissed_until')
       .eq('user_id', userId)
       .or(`dismissed_until.is.null,dismissed_until.gt.${now.toISOString()}`),
+
+    // The rounds just over, for the debrief nudge the Interviews tab used to
+    // carry. A day further back than the window, because a day-only round is
+    // stored at its midnight and is over only when the day is.
+    supabase
+      .from('interviews')
+      .select(
+        'id, scheduled_at, time_known, notes, group_id, interview_groups ( id, label, notes ), applications!inner ( roles!inner ( id, title, companies!inner ( name ) ) )',
+      )
+      .eq('user_id', userId)
+      .gte('scheduled_at', new Date(now.getTime() - (DEBRIEF_NUDGE_WINDOW_DAYS + 1) * DAY_MS).toISOString())
+      .lte('scheduled_at', now.toISOString())
+      .limit(50),
   ]);
 
   type InterviewRaw = {
@@ -291,6 +313,34 @@ export async function loadToday(
       occurredAt: row.occurred_at,
     }));
 
+  type PastRaw = {
+    id: string;
+    scheduled_at: string;
+    time_known: boolean | null;
+    notes: string | null;
+    group_id: string | null;
+    interview_groups: { id: string; label: string | null; notes: string | null } | null;
+    applications: { roles: RoleJoin };
+  };
+  const past = (pastRows.data ?? []) as unknown as PastRaw[];
+  const debriefs = debriefsDue(
+    past.map((row) => ({
+      id: row.id,
+      scheduledAt: row.scheduled_at,
+      timeKnown: row.time_known !== false,
+      groupId: row.group_id,
+      notes: row.notes,
+      roleId: row.applications.roles.id,
+      companyName: row.applications.roles.companies.name,
+      roleTitle: row.applications.roles.title,
+    })),
+    past
+      .map((row) => row.interview_groups)
+      .filter((group): group is NonNullable<PastRaw['interview_groups']> => group !== null)
+      .map((group) => ({ id: group.id, label: group.label, notes: group.notes ?? '' })),
+    now,
+  );
+
   // Who to write to, for everything on the page that could be followed up.
   // One query for all of them rather than one each: this page is opened every
   // morning and a round trip per row would be felt.
@@ -336,7 +386,12 @@ export async function loadToday(
     interviews,
     reminders,
     waiting,
-    clear: interviews.length === 0 && reminders.length === 0 && waiting.length === 0,
+    debriefs,
+    clear:
+      interviews.length === 0 &&
+      reminders.length === 0 &&
+      waiting.length === 0 &&
+      debriefs.length === 0,
   };
 }
 

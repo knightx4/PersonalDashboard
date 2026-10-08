@@ -69,22 +69,19 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const brief = await loadJobsBrief(user.id, reviewCount);
 
   /**
-   * Ten sections is over the eight the design language allows, and grouping
-   * them is a routing change rather than a nav one -- so for now the strip
-   * scrolls, fades at the edge, and brings the active tab into view. See
-   * docs/DESIGN-UPDATE-PLAN.md.
+   * Seven sections, within the eight the design language allows. Today took
+   * in Interviews, Activity and Review (plan #1591): their pages keep their
+   * addresses and are reached from Today, and the review count is on Today's
+   * strip and in the brief rather than on a tab.
    */
   const sections: NavSection[] = [
-    { href: '/jobs', label: 'Home', icon: 'jobsHome', exact: true },
+    { href: '/jobs', label: 'Today', icon: 'jobsHome', exact: true },
     { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
     { href: '/jobs/find', label: 'Find', icon: 'find' },
     { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
     { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
-    { href: '/jobs/interviews', label: 'Interviews', icon: 'interviews' },
     { href: '/jobs/answers', label: 'Answers', icon: 'answers' },
     { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
-    { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
-    { href: '/jobs/review', label: 'Review', icon: 'review', badge: reviewCount },
   ];
 
   const { accountIds, initialJob } = inbox;

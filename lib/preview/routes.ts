@@ -89,6 +89,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-find': ['/jobs/find'],
   'jobs-recommended-roles': ['/jobs/find'],
   'jobs-roles-table': ['/jobs/pipeline'],
+  'jobs-pipeline-filtered': ['/jobs/pipeline'],
   'jobs-today': ['/jobs'],
   'jobs-insights': ['/jobs/analytics'],
   'todo-calendar-month': ['/todo/calendar'],
