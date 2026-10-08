@@ -31,7 +31,7 @@ export const LEVEL = 'w-5';
  */
 export function ColumnHeader({
   priority = 'Priority',
-  status = 'Waiting on',
+  status = 'Whose move',
 }: { priority?: string; status?: string } = {}) {
   return (
     <li
