@@ -213,6 +213,7 @@ import {
   DevSpecsInterviewHalfSurface,
   DevSpecsInterviewDraftedSurface,
   DevUiReviewSurface,
+  DevUsageEmptySurface,
   DevUsageSurface,
 } from './dev-page-surfaces';
 import { DevModuleSurface, DevModulesSurface } from './module-surfaces';
@@ -4964,6 +4965,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevUsageSurface />,
+  },
+  {
+    id: 'dev-usage-empty',
+    label: "Dev · Usage, nothing yet",
+    module: 'dev',
+    width: 'page',
+    render: () => <DevUsageEmptySurface />,
   },
   {
     id: 'dev-modules',

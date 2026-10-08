@@ -92,16 +92,19 @@ export function formatMoneyOrBlank(
  * it is not, so a single call reads as $0.0184 and a month reads as $2.41.
  * An unknown cost is blank rather than $0.00, on the `formatMoneyOrBlank`
  * argument: zero is a claim, and "we have no rate for that model" is not it.
+ *
+ * `fromCent` keeps the four places for amounts under a cent only, so a list
+ * of totals reads $0.96 rather than $0.9600 (the Usage tab, plan #1693).
  */
 export function formatMicroDollars(
   micros: number | null | undefined,
-  options: { locale?: string; blank?: string } = {},
+  options: { locale?: string; blank?: string; fromCent?: boolean } = {},
 ): string {
-  const { locale = 'en-US', blank = '' } = options;
+  const { locale = 'en-US', blank = '', fromCent = false } = options;
   if (micros == null || !Number.isFinite(micros)) return blank;
 
   const dollars = micros / 1_000_000;
-  const smallEnoughToNeedThem = Math.abs(dollars) < 1;
+  const smallEnoughToNeedThem = Math.abs(dollars) < (fromCent ? 0.01 : 1);
 
   return new Intl.NumberFormat(locale, {
     style: 'currency',
