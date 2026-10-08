@@ -163,6 +163,7 @@ export const jobsSources: ModuleSources = {
     { table: 'job_search.jev_trial_answers', reason: 'A classifier trial\'s answers on mail already labelled; the labels are in ingested_messages.' },
     { table: 'job_search.message_link_dismissals', reason: 'Dismissed suggestions in the inbox.' },
     { table: 'job_search.search_runs', reason: 'When Dash searched for roles and people, and how each run ended; what it found is in suggestions.' },
+    { table: 'job_search.discovery_runs', reason: 'When the weekly startup discovery ran for the person and how far it got.' },
     { table: 'job_search.watchlist_startups', reason: 'Startups the weekly discovery found on YC and Hacker News, with the board found for each; the person sees them only through their roles, and a saved role makes a companies row.' },
     { table: 'job_search.quiet_dismissals', reason: 'Dismissed quiet-application nudges.' },
     { table: 'job_search.waiting_dismissals', reason: 'Dismissed waiting-on-reply nudges.' },

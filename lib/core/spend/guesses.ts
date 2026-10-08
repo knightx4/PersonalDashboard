@@ -257,6 +257,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // One role's requirements with their verdicts, 2,000 characters of the
   // description, the evidence titles and the history in; two answers out.
   'score-applications': unit(JEV, 3_000, 0),
+  // The person, then a few hundred hiring startups a line each in; 30 to 50
+  // picks with a reason out, plus thinking.
+  'shortlist-startups': background(run(SONNET, 45_000, 9_000)),
 
   // Shopping. Reading order emails is per email: inbox sync does it in the
   // background, and the reparse and review buttons know how many they send.
