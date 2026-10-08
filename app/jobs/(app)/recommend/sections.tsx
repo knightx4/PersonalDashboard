@@ -155,7 +155,16 @@ function RecommendedSection({
       fold={`jobs.fold.${title}`}
       title={
         <>
-          <DashMark size="icon" decorative className="self-center text-accent" />
+          {/* Searches while a search runs, here or in the background, so the
+              heading shows it even with the section folded. At xs it matches
+              a module mark and still sits inside the heading's line. */}
+          <DashMark
+            state={searching ? 'working' : 'idle'}
+            activity="searching"
+            size="xs"
+            decorative
+            className="self-center text-accent"
+          />
           {title}
         </>
       }
