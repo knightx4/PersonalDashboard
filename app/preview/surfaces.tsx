@@ -163,7 +163,7 @@ import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { WatchingSurface } from './watching-surfaces';
 import { DashTodaySurface } from './dash-today-surfaces';
 import { HomePageSurface } from './home-page-surfaces';
-import { ClipStreamSurface, ClipsEmptySurface } from './clip-surfaces';
+import { ClipStreamSurface, ClipsEmptySurface, SubjectClipsEmptySurface, SubjectClipsSurface } from './clip-surfaces';
 import {
   InspirationByVideoSurface,
   InspirationListSurface,
@@ -4143,6 +4143,23 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <ClipStreamSurface />,
+  },
+  {
+    /* One subject's Clips (plan #1697): the player under a long subject
+     * name, with the counts in the rail from laptop width. */
+    id: 'learn-subject-clips',
+    label: 'Learn · Subject clips',
+    module: 'learn',
+    width: 'page',
+    render: () => <SubjectClipsSurface />,
+  },
+  {
+    /* The same page for a subject no clip serves yet. */
+    id: 'learn-subject-clips-empty',
+    label: 'Learn · Subject clips, none yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <SubjectClipsEmptySurface />,
   },
   {
     /* The Big Five test (plan #1632): fifty statements, the first seven

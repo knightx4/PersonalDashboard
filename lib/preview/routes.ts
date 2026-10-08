@@ -128,6 +128,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-made-changes': ['/ask', '/ask/[ref]'],
   'learn-clips': ['/learn/clips'],
   'learn-clips-empty': ['/learn/clips'],
+  'learn-subject-clips': ['/learn/s/[id]/clips'],
+  'learn-subject-clips-empty': ['/learn/s/[id]/clips'],
   'learn-personality-test': ['/learn/know/personality'],
   'learn-personality-scores': ['/learn/know/personality'],
   'learn-personality-add-type': ['/learn/know/personality'],

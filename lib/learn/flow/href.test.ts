@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { firstParam, nowHref, practiceHref, wantsPractice } from './href';
+import { firstParam, nowHref, practiceHref, subjectClipsHref, wantsPractice } from './href';
+
+describe('subjectClipsHref', () => {
+  it('opens the player under the subject', () => {
+    expect(subjectClipsHref('abc')).toBe('/learn/s/abc/clips');
+  });
+});
 
 describe('practiceHref', () => {
   it('opens Now with the Practice only switch on', () => {

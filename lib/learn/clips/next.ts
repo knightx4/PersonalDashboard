@@ -24,6 +24,10 @@ import {
  * plays twice within VIDEO_GAP clips, across calls and across sessions. The
  * two-a-video cap is read from the clips shown in the last seven days, plus
  * the queued ones, so it also holds across calls and visits.
+ *
+ * A subject's player (plan #1697) passes subjectId, which narrows the
+ * candidates to the clips tagged to that subject and leaves every rule above
+ * as it is.
  */
 
 /**
@@ -66,9 +70,26 @@ export type NextClipsOptions = {
   limit?: number;
   /** Clips already queued on the phone, left out. */
   excludeIds?: readonly string[];
+  /**
+   * Only the clips that serve this subject (plan #1697): those with a row in
+   * learn.video_clip_subjects for it, whichever video they came from. Every
+   * candidate read is narrowed; what was shown lately is still read across
+   * all clips, so the video gap and the two-a-video cap hold as before.
+   */
+  subjectId?: string;
   /** Milliseconds since the epoch; for tests. */
   now?: number;
 };
+
+/**
+ * What a candidate read adds for a subject: an inner embed of the join table,
+ * filtered to the subject, so only clips tagged to it come back. Not
+ * video_clips.subject_id, which holds only the first subject a clip matched.
+ * A join in the read rather than a list of ids, so a subject with hundreds of
+ * clips does not make the request too long.
+ */
+const SUBJECT_EMBED = 'video_clip_subjects!inner(subject_id)';
+const SUBJECT_FILTER = 'video_clip_subjects.subject_id';
 
 type ItemEmbed = { title: string | null; author: string | null } | null;
 
@@ -159,11 +180,17 @@ export async function loadNextClips(
   const now = options.now ?? Date.now();
   const returnBefore = new Date(now - SKIP_RETURN_MS).toISOString();
 
-  const unseen = (cameFrom: 'playlist' | 'channel', rated: boolean) => {
+  const subjectId = options.subjectId;
+  const candidates = () => {
     const query = learn
       .from('video_clips')
-      .select(CLIP_COLUMNS)
-      .eq('user_id', userId)
+      .select(subjectId ? `${CLIP_COLUMNS}, ${SUBJECT_EMBED}` : CLIP_COLUMNS)
+      .eq('user_id', userId);
+    return subjectId ? query.eq(SUBJECT_FILTER, subjectId) : query;
+  };
+
+  const unseen = (cameFrom: 'playlist' | 'channel', rated: boolean) => {
+    const query = candidates()
       .eq('came_from', cameFrom)
       .is('shown_at', null)
       .is('not_interested_at', null);
@@ -182,10 +209,7 @@ export async function loadNextClips(
       unseen('playlist', false),
       unseen('channel', true),
       unseen('channel', false),
-      learn
-        .from('video_clips')
-        .select(CLIP_COLUMNS)
-        .eq('user_id', userId)
+      candidates()
         .is('not_interested_at', null)
         .lt('skipped_at', returnBefore)
         .lt('shown_at', returnBefore)
