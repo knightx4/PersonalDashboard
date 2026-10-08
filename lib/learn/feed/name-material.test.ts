@@ -126,7 +126,7 @@ describe('the call', () => {
       onSpend: (report) => spent.push(report.model),
     });
     expect(result).toMatchObject({ ok: true, named: [{ article: 'Inflation' }] });
-    expect(spent).toEqual(['claude-haiku-4-5']);
+    expect(spent).toEqual(['claude-haiku-5-5']);
     expect(calls[0]).toMatchObject({ tool_choice: { type: 'tool', name: 'report_reading' } });
     expect(JSON.stringify(calls[0])).toContain('- Money');
     // The swipes reach the call: what they know is gone past, what they want

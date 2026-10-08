@@ -425,6 +425,10 @@ Haiku 4.5 pricing, $1.00 and $5.00 per million tokens, at 3.6 characters per
 token. The vault is 1,288 notes and 5,724,185 characters, of which 1,039
 clear the classify threshold.
 
+The map now runs on Haiku 5.5: a tenth of those rates for prompts of up to
+100K tokens, with the same text counting as about 30% more tokens. Each figure
+below comes to roughly an eighth on it.
+
 | stage | cost |
 |---|---|
 | classify every note over the threshold | $0.78 |

@@ -103,7 +103,7 @@ describe('what it reports spending', () => {
     });
 
     expect(reports).toHaveLength(1);
-    expect(reports[0].model).toBe('claude-opus-5');
+    expect(reports[0].model).toBe('claude-opus-5-5');
     expect(reports[0].usage.inputTokens).toBe(900);
   });
 

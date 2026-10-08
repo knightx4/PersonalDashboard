@@ -526,7 +526,7 @@ export async function writeDigest(
     max_tokens: MAX_TOKENS,
     system: SYSTEM,
     tools: [TOOL],
-    tool_choice: forceTool(TOOL_NAME),
+    tool_choice: forceTool(TOOL_NAME, DIGEST_MODEL),
     messages: [
       {
         role: 'user',

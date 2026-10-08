@@ -153,7 +153,7 @@ async function writeOne(
           },
         },
       ],
-      tool_choice: forceTool(WRITE_TOOL),
+      tool_choice: forceTool(WRITE_TOOL, OPENING_MODEL),
       messages: [
         {
           role: 'user',
@@ -284,7 +284,7 @@ export async function gradeWrittenAnswer(input: {
           },
         },
       ],
-      tool_choice: forceTool(GRADE_TOOL),
+      tool_choice: forceTool(GRADE_TOOL, OPENING_MODEL),
       messages: [
         {
           role: 'user',

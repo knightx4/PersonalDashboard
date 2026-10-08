@@ -108,7 +108,7 @@ export async function writeClipNote(
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, CLIP_NOTE_MODEL),
       messages: [{ role: 'user', content: clipNotePrompt(input) }],
     });
   } catch (error) {

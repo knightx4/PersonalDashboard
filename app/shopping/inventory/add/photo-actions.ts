@@ -77,7 +77,7 @@ One object per visible spine. Skip unreadable spines. Max 40.`;
 
   const response = await client.messages.create({
     model: PHOTO_MODEL,
-    max_tokens: 2048,
+    max_tokens: 8_000, // room for Haiku 5.5's thinking as well as the answer
     system,
     messages: [
       {

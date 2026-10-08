@@ -232,7 +232,7 @@ async function haikuRatings(
       max_tokens: 3_000,
       system: SYSTEM,
       tools: [TOOL],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, CLIP_SCORE_MODEL),
       messages: [{ role: 'user', content: haikuPrompt(clips) }],
     },
     timeoutMs !== undefined ? { timeout: Math.max(1_000, timeoutMs), maxRetries: 0 } : undefined,

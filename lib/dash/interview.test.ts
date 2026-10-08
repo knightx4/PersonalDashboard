@@ -114,7 +114,7 @@ describe('the first question', () => {
     });
     expect(model.sent).toHaveLength(1);
     expect(model.sent[0].tools.map((t) => t.name)).toEqual([ASK_QUESTION_TOOL]);
-    expect(model.sent[0].tool_choice).toEqual({ type: 'any' });
+    expect(model.sent[0].tool_choice).toEqual({ type: 'auto' });
     const text = brief(model.sent[0]);
     expect(text).toContain('Shopping keeps what I own and what I bought');
     expect(text).toContain('Every order with a return window gets a reminder');

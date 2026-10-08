@@ -158,7 +158,7 @@ describe('a voice with server tools and its own ending (plan #1479, Maya)', () =
     expect(sent.map((s) => (s as unknown as { tool_choice: unknown }).tool_choice)).toEqual([
       { type: 'auto' },
       { type: 'auto' },
-      { type: 'tool', name: 'report_thought' },
+      { type: 'auto' },
     ]);
     expect(sent[0]!.tools.map((t) => t.name)).toEqual(['web_search', 'report_thought']);
     expect(answer).toMatchObject({ ok: true, body: '', report: { question: 'Who are you?' }, webCited: ['Each man is a road.'] });

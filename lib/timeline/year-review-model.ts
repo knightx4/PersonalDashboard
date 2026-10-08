@@ -2,14 +2,14 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
 import { MAX_PARAGRAPH_EVIDENCE, YEAR_TOPICS, type RawParagraph } from './year-review';
 import { MODELS } from '@/lib/core/models';
 
 /**
  * The model call behind the year in review (plan #1121). Sonnet reads the
  * summary from summariseYear and writes up to one paragraph per topic through
- * a forced tool, each with the short ids of the events it is about. What
+ * a tool, each with the short ids of the events it is about. What
  * comes back is checked by checkParagraphs before anything is stored, the
  * same way as the weekly observations (observations-model.ts).
  */
@@ -71,7 +71,7 @@ export async function writeYearParagraphs(
 
   const response = await client.messages.create({
     model: YEAR_REVIEW_MODEL,
-    max_tokens: 4000,
+    max_tokens: 4000 + THINKING_ROOM,
     system: SYSTEM,
     tools: [
       {
@@ -97,8 +97,8 @@ export async function writeYearParagraphs(
         },
       },
     ],
-    tool_choice: forceTool(TOOL_NAME),
-    messages: [{ role: 'user', content: summary }],
+    tool_choice: forceTool(TOOL_NAME, YEAR_REVIEW_MODEL),
+    messages: [{ role: 'user', content: `${summary}\n\nReport through ${TOOL_NAME}.` }],
   });
   options.onSpend?.({ model: YEAR_REVIEW_MODEL, usage: usageFrom(response.usage) });
 
