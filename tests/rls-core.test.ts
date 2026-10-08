@@ -162,7 +162,7 @@ describe('observations', () => {
       insert into core.observations (user_id, week, position, sentence, evidence, modules, model)
       values (${userId}, ${week}, 1, 'You placed 2 orders in the 3 days after a rejection.',
               ${evidence}, ${['shopping', 'jobs']},
-              'claude-sonnet-5')
+              'claude-sonnet-5-5')
       returning id`;
     return row.id;
   }
@@ -223,7 +223,7 @@ describe('year reviews', () => {
       (tx) => tx`insert into core.year_reviews (user_id, year, timezone, through, complete, events, totals, paragraphs, model)
                  values (${userId}, ${year}, 'UTC', now(), ${complete}, 25, '{}'::jsonb,
                          ${paragraphs}::text::jsonb,
-                         'claude-sonnet-5')
+                         'claude-sonnet-5-5')
                  returning id`,
     );
   }

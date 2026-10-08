@@ -106,7 +106,7 @@ describe('an observation’s evidence', () => {
   const insert = (userId: string, evidence: string[], position: number) =>
     admin`insert into core.observations (user_id, week, position, sentence, evidence, modules, model)
           values (${userId}, '2026-09-28', ${position}, 'You closed 2 tasks the week of a goal step.',
-                  ${evidence}, ${['todo', 'goals']}, 'claude-sonnet-5')`;
+                  ${evidence}, ${['todo', 'goals']}, 'claude-sonnet-5-5')`;
 
   it('accepts rows of the person’s own', async () => {
     await expect(insert(userA, [`todo.tasks:${taskA}`, `goals.items:${goalA}`], 1)).resolves.toBeDefined();
@@ -143,7 +143,7 @@ describe('a review’s evidence', () => {
       asUser(
         userA,
         (tx) => tx`insert into core.year_reviews (user_id, year, timezone, through, totals, paragraphs, model)
-                   values (${userA}, ${year}, 'UTC', now(), '{}'::jsonb, ${paragraphs(ref)}::text::jsonb, 'claude-sonnet-5')`,
+                   values (${userA}, ${year}, 'UTC', now(), '{}'::jsonb, ${paragraphs(ref)}::text::jsonb, 'claude-sonnet-5-5')`,
       );
     await expect(write(2024, `todo.tasks:${taskA}`)).resolves.toBeDefined();
     await expect(write(2025, `todo.tasks:${taskB}`)).rejects.toThrow(/not a row of yours/);
@@ -152,7 +152,7 @@ describe('a review’s evidence', () => {
   it('accepts a week review citing the person’s own rows and refuses one citing another’s', async () => {
     const write = (week: string, ref: string) =>
       admin`insert into core.week_reviews (user_id, week, facts, observations, source, model)
-            values (${userA}, ${week}, '{}'::jsonb, ${observations(ref)}::text::jsonb, 'model', 'claude-sonnet-5')`;
+            values (${userA}, ${week}, '{}'::jsonb, ${observations(ref)}::text::jsonb, 'model', 'claude-sonnet-5-5')`;
     await expect(write('2026-09-20', `todo.tasks:${taskA}`)).resolves.toBeDefined();
     await expect(write('2026-09-27', `todo.tasks:${taskB}`)).rejects.toThrow(/not a row of yours/);
   });

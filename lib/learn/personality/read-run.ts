@@ -7,7 +7,7 @@ import { MODELS } from '@/lib/core/models';
 import { usageFrom } from '@/lib/core/spend/pricing';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
@@ -168,7 +168,7 @@ async function read(
   try {
     response = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 4096,
+      max_tokens: 4096 + THINKING_ROOM,
       system: READ_SYSTEM,
       tools: [
         {
@@ -177,8 +177,13 @@ async function read(
           input_schema: READ_TOOL_SCHEMA,
         },
       ],
-      tool_choice: forceTool(READ_TOOL),
-      messages: [{ role: 'user', content: readPrompt(describeResult(result, results, themes), notes) }],
+      tool_choice: forceTool(READ_TOOL, MODEL),
+      messages: [
+        {
+          role: 'user',
+          content: `${readPrompt(describeResult(result, results, themes), notes)}\n\nReport through ${READ_TOOL}.`,
+        },
+      ],
     });
     spend.sink({ model: MODEL, usage: usageFrom(response.usage) });
   } finally {

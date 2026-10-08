@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { IdeaCard } from '@/lib/learn/feed/write-card';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import type { LessonSource } from './closest-source';
 import { MODELS } from '@/lib/core/models';
 
@@ -328,7 +328,7 @@ export async function writeLesson(input: {
   try {
     response = await client.messages.create({
       model: WRITE_LESSON_MODEL,
-      max_tokens: 3072,
+      max_tokens: 3072 + THINKING_ROOM,
       system: SYSTEM,
       tools: [
         {
@@ -372,7 +372,7 @@ export async function writeLesson(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, WRITE_LESSON_MODEL),
       messages: [{ role: 'user', content: lessonPrompt(prepared) }],
     });
   } catch (error) {

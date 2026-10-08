@@ -6,15 +6,17 @@
  * model id (lib/core/models.test.ts checks that). The three tiers below are the
  * only strings the entries name.
  *
- * The two Haiku 4.5 ids are no longer called. They stay so that the rows the
+ * The retired ids below are no longer called. They stay so that the rows the
  * spend ledger recorded under them can still be priced (lib/core/spend/pricing.ts).
  */
 
-export const OPUS = 'claude-opus-5';
-export const SONNET = 'claude-sonnet-5';
+export const OPUS = 'claude-opus-5-5';
+export const SONNET = 'claude-sonnet-5-5';
 export const HAIKU = 'claude-haiku-5-5';
 
-/** Retired: Haiku 4.5, as the ledger recorded it before the move to Haiku 5.5. */
+/** Retired: the models the ledger recorded before the move to the 5.5 models. */
+export const OPUS_5 = 'claude-opus-5';
+export const SONNET_5 = 'claude-sonnet-5';
 export const HAIKU_4_5 = 'claude-haiku-4-5';
 export const HAIKU_4_5_DATED = 'claude-haiku-4-5-20251001';
 

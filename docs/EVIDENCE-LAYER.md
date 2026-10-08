@@ -133,11 +133,11 @@ decide when you get there; nothing earlier depends on the answer.
   already does this for shelf photos and receipts. Same rule here.
 - **Split the parser from the network call**, as `ai-company-payload.ts` does,
   so the interesting half is unit-testable.
-- **Model.** Write `claude-opus-5` for the matching call — it is a judgment
+- **Model.** Write `claude-opus-5-5` for the matching call — it is a judgment
   task and the volume is low. The repo currently uses `claude-haiku-5-5` for
   company lookup, where the job is retrieval, not judgment. Rough cost for a
-  match: ~8K in / ~1.5K out per role is about $0.08 on Opus 5, under $0.02 on
-  Haiku 4.5, and less again on Haiku 5.5. Downgrading is a fine call to make later, on evidence; it is
+  match: ~8K in / ~1.5K out per role is about $0.06 on Opus 5.5, under $0.01 on
+  Haiku 5.5. Downgrading is a fine call to make later, on evidence; it is
   yours, not the implementation's.
 - **Cache the bank, not the role.** The evidence bank is identical across every
   role you match. Put it in the system block with `cache_control`, put the

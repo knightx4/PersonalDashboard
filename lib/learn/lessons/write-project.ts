@@ -2,7 +2,7 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { WRITE_LESSON_MODEL } from './write-lesson';
 import { markAgainstPoints, type MarkedPoints } from './mark-points';
 import type { HandIn } from './point-marks';
@@ -82,7 +82,7 @@ export async function writeProject(input: {
   try {
     response = await client.messages.create({
       model: WRITE_PROJECT_MODEL,
-      max_tokens: 4000,
+      max_tokens: 4000 + THINKING_ROOM,
       system: WRITE_SYSTEM,
       tools: [
         {
@@ -111,7 +111,7 @@ export async function writeProject(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL),
+      tool_choice: forceTool(TOOL, WRITE_PROJECT_MODEL),
       messages: [{ role: 'user', content: projectPrompt(input.plan, TOOL) }],
     });
   } catch (error) {

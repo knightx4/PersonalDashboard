@@ -29,7 +29,7 @@ function clientThatFails(mode: 'error' | 'throws') {
 const CALL = {
   module: 'learn' as const,
   operation: 'plan-topic',
-  model: 'claude-opus-5',
+  model: 'claude-opus-5-5',
   usage: { ...EMPTY_USAGE, inputTokens: 1000, outputTokens: 500 },
 };
 
@@ -44,11 +44,11 @@ describe('recording a call', () => {
         user_id: 'user-1',
         module: 'learn',
         operation: 'plan-topic',
-        model: 'claude-opus-5',
+        model: 'claude-opus-5-5',
         input_tokens: 1000,
         output_tokens: 500,
-        // 1000×$5/MTok + 500×$25/MTok, in micro-dollars.
-        cost_micros: 17_500,
+        // 1000×$4/MTok + 500×$20/MTok, in micro-dollars.
+        cost_micros: 14_000,
       }),
     );
   });
@@ -89,7 +89,7 @@ describe('recording straight off a response', () => {
     await recordSpendFromResponse(client, 'user-1', {
       module: 'learn',
       operation: 'suggest-sources',
-      model: 'claude-opus-5',
+      model: 'claude-opus-5-5',
       usage: {
         input_tokens: 200,
         output_tokens: 100,
@@ -128,8 +128,8 @@ describe('recordSpendReports', () => {
   it('writes one row per report under the named operation', async () => {
     const { client, insert } = clientRecording();
     await recordSpendReports(client, 'user-1', { module: 'jobs', operation: 'draft-answer' }, [
-      { model: 'claude-opus-5', usage: { ...EMPTY_USAGE, inputTokens: 1000, outputTokens: 100 } },
-      { model: 'claude-opus-5', usage: EMPTY_USAGE },
+      { model: 'claude-opus-5-5', usage: { ...EMPTY_USAGE, inputTokens: 1000, outputTokens: 100 } },
+      { model: 'claude-opus-5-5', usage: EMPTY_USAGE },
     ]);
 
     expect(insert).toHaveBeenCalledTimes(2);
@@ -137,8 +137,8 @@ describe('recordSpendReports', () => {
       user_id: 'user-1',
       module: 'jobs',
       operation: 'draft-answer',
-      model: 'claude-opus-5',
-      cost_micros: 1000 * 5 + 100 * 25,
+      model: 'claude-opus-5-5',
+      cost_micros: 1000 * 4 + 100 * 20,
     });
   });
 

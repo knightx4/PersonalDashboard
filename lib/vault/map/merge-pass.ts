@@ -433,7 +433,7 @@ export async function judgePairs(input: {
           },
         },
       ],
-      tool_choice: forceTool(input.toolName),
+      tool_choice: forceTool(input.toolName, MERGE_MODEL),
       messages: [{ role: 'user', content: input.rendered }],
     });
 

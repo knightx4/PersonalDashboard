@@ -204,7 +204,7 @@ async function pickVideos(input: {
           },
         },
       ],
-      tool_choice: forceTool(PICK_TOOL),
+      tool_choice: forceTool(PICK_TOOL, CHANNEL_JUDGE_MODEL),
       messages: [{ role: 'user', content: input.prompt }],
     });
   } catch (error) {
@@ -302,7 +302,7 @@ async function decideChannel(input: {
           },
         },
       ],
-      tool_choice: forceTool(VERDICT_TOOL),
+      tool_choice: forceTool(VERDICT_TOOL, CHANNEL_JUDGE_MODEL),
       messages: [{ role: 'user', content: input.prompt }],
     });
   } catch (error) {

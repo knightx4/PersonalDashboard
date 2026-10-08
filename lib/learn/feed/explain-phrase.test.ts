@@ -85,7 +85,7 @@ describe('reading the explanation', () => {
 });
 
 describe('the call', () => {
-  it('sends the phrase and the card, forces the tool, and reports the spend', async () => {
+  it('sends the phrase and the card, asks for the tool, and reports the spend', async () => {
     const { client, sent } = stubClient([
       {
         type: 'tool_use',
@@ -112,7 +112,7 @@ describe('the call', () => {
       section: null,
     });
     expect(sent[0]!.model).toBe(EXPLAIN_MODEL);
-    expect(sent[0]!.tool_choice).toMatchObject({ type: 'tool', name: 'explain_phrase' });
+    expect(sent[0]!.tool_choice).toEqual({ type: 'auto' });
     expect(sent[0]!.messages[0]!.content).toBe(explainPrompt('tree search', card));
     expect(sent[0]!.messages[0]!.content).toContain('"tree search"');
     expect(sent[0]!.messages[0]!.content).toContain('AlphaGo beat Lee Sedol');

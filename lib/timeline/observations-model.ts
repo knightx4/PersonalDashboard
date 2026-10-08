@@ -2,14 +2,14 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
 import { MAX_EVIDENCE, MAX_OBSERVATIONS, type RawObservation } from './observations';
 import { MODELS } from '@/lib/core/models';
 
 /**
  * The model call behind the weekly observations (plan #1119). Sonnet reads
  * the summary from summariseTimeline and returns up to three observations
- * through a forced tool, each with the short ids of the events behind it.
+ * through a tool, each with the short ids of the events behind it.
  * What comes back is checked by checkObservations before anything is stored.
  */
 
@@ -90,7 +90,7 @@ export async function writeObservations(
 
   const response = await client.messages.create({
     model: OBSERVATIONS_MODEL,
-    max_tokens: 2000,
+    max_tokens: 2000 + THINKING_ROOM,
     system: SYSTEM,
     tools: [
       {
@@ -115,8 +115,8 @@ export async function writeObservations(
         },
       },
     ],
-    tool_choice: forceTool(TOOL_NAME),
-    messages: [{ role: 'user', content: observationsPrompt(input) }],
+    tool_choice: forceTool(TOOL_NAME, OBSERVATIONS_MODEL),
+    messages: [{ role: 'user', content: `${observationsPrompt(input)}\n\nReport through ${TOOL_NAME}.` }],
   });
   options.onSpend?.({ model: OBSERVATIONS_MODEL, usage: usageFrom(response.usage) });
 

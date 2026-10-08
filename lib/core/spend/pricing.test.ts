@@ -85,10 +85,23 @@ describe('what a call cost', () => {
     );
   });
 
-  it('has a rate for every model this app calls, and for Haiku 4.5 rows already in the ledger', () => {
-    for (const model of ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-5-5', 'claude-haiku-4-5', 'claude-haiku-4-5-20251001']) {
+  it('has a rate for every model this app calls, and for the older ones already in the ledger', () => {
+    for (const model of [
+      'claude-opus-5-5',
+      'claude-sonnet-5-5',
+      'claude-haiku-5-5',
+      'claude-opus-5',
+      'claude-sonnet-5',
+      'claude-haiku-4-5',
+      'claude-haiku-4-5-20251001',
+    ]) {
       expect(MODEL_PRICES[model]).toBeDefined();
     }
+  });
+
+  it('reads the Opus 5.5 cache at a twentieth of input', () => {
+    // 10,000×4 + 10,000×0.2 = 40,000 + 2,000
+    expect(costMicrosFor('claude-opus-5-5', usage({ inputTokens: 10_000, cachedInputTokens: 10_000 }))).toBe(42_000);
   });
 
   it('prices a Haiku 5.5 prompt of up to 100K tokens on the short-prompt card', () => {

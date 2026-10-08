@@ -92,7 +92,7 @@ describe('when it lays out a chain', () => {
     await ask(client);
     const create = (client as unknown as { messages: { create: ReturnType<typeof vi.fn> } })
       .messages.create;
-    expect(create.mock.calls[0][0].model).toBe('claude-sonnet-5');
+    expect(create.mock.calls[0][0].model).toBe('claude-sonnet-5-5');
   });
 
   it('tells the subject what it already holds, by name and nothing else', async () => {
@@ -152,7 +152,7 @@ describe('when it lays out a chain', () => {
     });
 
     expect(reports).toEqual([
-      { model: 'claude-sonnet-5', usage: { inputTokens: 800, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 400 } },
+      { model: 'claude-sonnet-5-5', usage: { inputTokens: 800, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 400 } },
     ]);
   });
 });

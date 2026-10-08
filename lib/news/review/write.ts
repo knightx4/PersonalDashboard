@@ -2,7 +2,7 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
 import { MODELS } from '@/lib/core/models';
 import { reviewPrompt, readReviewReply, type ReviewReply } from './reply';
 import type { ReviewPick } from './choose';
@@ -12,7 +12,7 @@ import type { ReviewPick } from './choose';
  *
  * The day's picks (choose.ts) go in as their headlines and summaries; Dash
  * writes two or three sentences on the day and one line for each story,
- * through a forced tool. The reply is read by readReviewReply (reply.ts)
+ * through a tool. The reply is read by readReviewReply (reply.ts)
  * before anything is stored.
  */
 
@@ -77,11 +77,11 @@ export async function writeReview(
   const client = options.client ?? new Anthropic({ apiKey: options.apiKey });
   const response = await client.messages.create({
     model: REVIEW_MODEL,
-    max_tokens: 1_500,
+    max_tokens: 1_500 + THINKING_ROOM,
     system: SYSTEM,
     tools: [TOOL],
-    tool_choice: forceTool(TOOL_NAME),
-    messages: [{ role: 'user', content: reviewPrompt(picks) }],
+    tool_choice: forceTool(TOOL_NAME, REVIEW_MODEL),
+    messages: [{ role: 'user', content: `${reviewPrompt(picks)}\n\nReport through ${TOOL_NAME}.` }],
   });
   options.onSpend?.({ model: REVIEW_MODEL, usage: usageFrom(response.usage) });
 

@@ -215,7 +215,7 @@ describe('writing a lesson', () => {
     usage,
   });
 
-  it('forces the report, records the spend, titles it with the concept and cites a supporting source', async () => {
+  it('asks for the report, records the spend, titles it with the concept and cites a supporting source', async () => {
     const { client, calls } = stubClient(replyWith({ ...reported, name: 'Something else' }));
     const spent: string[] = [];
     const result = await writeLesson({
@@ -229,8 +229,8 @@ describe('writing a lesson', () => {
       card: stored,
       source: { segmentId: 'seg-1', itemTitle: 'CHIPS and Science Act', heading: 'Manufacturing' },
     });
-    expect(spent).toEqual(['claude-sonnet-5']);
-    expect(calls[0]).toMatchObject({ model: 'claude-sonnet-5', tool_choice: { type: 'tool', name: 'report_lesson' } });
+    expect(spent).toEqual(['claude-sonnet-5-5']);
+    expect(calls[0]).toMatchObject({ model: 'claude-sonnet-5-5', tool_choice: { type: 'auto' } });
   });
 
   it('leaves an unrelated source off the lesson', async () => {

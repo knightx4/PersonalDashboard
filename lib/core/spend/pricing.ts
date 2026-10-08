@@ -21,12 +21,12 @@
  * be priced.
  */
 
-import { HAIKU, HAIKU_4_5, HAIKU_4_5_DATED, OPUS, SONNET } from '@/lib/core/models';
+import { HAIKU, HAIKU_4_5, HAIKU_4_5_DATED, OPUS, OPUS_5, SONNET, SONNET_5 } from '@/lib/core/models';
 
 /** Dollars per million tokens, which is also micro-dollars per token. */
 export type ModelPrice = {
   input: number;
-  /** Reading a cached prefix. A tenth of input on every current model. */
+  /** Reading a cached prefix. A tenth of input, except on Opus 5.5. */
   cachedInput: number;
   /** Writing one. A quarter again more than input, for the 5-minute TTL. */
   cacheWrite: number;
@@ -48,7 +48,8 @@ export type ModelPrice = {
  * -- so nothing is guessed here from a family resemblance.
  */
 export const MODEL_PRICES: Record<string, ModelPrice> = {
-  [OPUS]: { input: 5, cachedInput: 0.5, cacheWrite: 6.25, output: 25 },
+  // Opus 5.5 reads its cache at a twentieth of input, not the usual tenth.
+  [OPUS]: { input: 4, cachedInput: 0.2, cacheWrite: 5, output: 20 },
   [SONNET]: { input: 2, cachedInput: 0.2, cacheWrite: 2.5, output: 10 },
   [HAIKU]: {
     input: 0.1,
@@ -57,8 +58,10 @@ export const MODEL_PRICES: Record<string, ModelPrice> = {
     output: 0.5,
     longPrompt: { aboveTokens: 100_000, input: 0.5, cachedInput: 0.05, cacheWrite: 0.625, output: 2.5 },
   },
-  // Haiku 4.5 under both its spellings. Nothing calls it now; the rows the
-  // ledger recorded under it keep their price.
+  // The models before the 5.5 ones. Nothing calls them now; the rows the
+  // ledger recorded under them keep their price.
+  [OPUS_5]: { input: 5, cachedInput: 0.5, cacheWrite: 6.25, output: 25 },
+  [SONNET_5]: { input: 2, cachedInput: 0.2, cacheWrite: 2.5, output: 10 },
   [HAIKU_4_5]: { input: 1, cachedInput: 0.1, cacheWrite: 1.25, output: 5 },
   [HAIKU_4_5_DATED]: { input: 1, cachedInput: 0.1, cacheWrite: 1.25, output: 5 },
 

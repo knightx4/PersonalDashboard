@@ -50,7 +50,7 @@ describe('placing a track', () => {
       runner_up_id: 'field-transport',
       confidence: 'close',
       basis: 'Street layout is studied in urban planning.',
-      model: 'claude-opus-5',
+      model: 'claude-opus-5-5',
     });
 
     const outcome = await placeTrack(supabase, 'user-1', TRACK, { id: 'theme-1', about: 'Streets.' });
@@ -65,7 +65,7 @@ describe('placing a track', () => {
       runner_up_field_id: 'field-transport',
       placement_confidence: 'close',
       placement_basis: 'Street layout is studied in urban planning.',
-      placement_model: 'claude-opus-5',
+      placement_model: 'claude-opus-5-5',
     });
     expect(updates[0].columns.placed_at).toEqual(expect.any(String));
   });

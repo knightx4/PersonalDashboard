@@ -256,7 +256,7 @@ describe('the model call', () => {
     return { create, client: { messages: { create } } as never };
   }
 
-  it('forces the tool, sends the lists to avoid, and returns what it reported', async () => {
+  it('asks for the tool, sends the lists to avoid, and returns what it reported', async () => {
     const { create, client } = stubClient({ observations: [{ sentence: 'x 1', evidence: ['E1'] }] });
     const onSpend = vi.fn();
     const result = await writeObservations(
@@ -265,10 +265,10 @@ describe('the model call', () => {
     );
     expect(result).toEqual([{ sentence: 'x 1', evidence: ['E1'] }]);
     const request = (create.mock.calls[0] as unknown as [Record<string, unknown>])[0];
-    expect(request.model).toBe('claude-sonnet-5');
-    expect(request.tool_choice).toEqual({ type: 'tool', name: 'report_observations' });
+    expect(request.model).toBe('claude-sonnet-5-5');
+    expect(request.tool_choice).toEqual({ type: 'auto' });
     expect(JSON.stringify(request.messages)).toContain('Marked not useful:\\n- Old one.');
-    expect(onSpend).toHaveBeenCalledWith(expect.objectContaining({ model: 'claude-sonnet-5' }));
+    expect(onSpend).toHaveBeenCalledWith(expect.objectContaining({ model: 'claude-sonnet-5-5' }));
   });
 
   it('reads an empty list as a quiet week', async () => {
@@ -287,9 +287,9 @@ describe('one person’s run', () => {
     const written: ObservationRow[] = [];
     const ledger = vi.fn(async () => {});
     const observe = vi.fn<ObservationRunPorts['observe']>(async (_input, onSpend) => {
-      onSpend({ model: 'claude-sonnet-5', usage: { inputTokens: 1, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 1 } });
+      onSpend({ model: 'claude-sonnet-5-5', usage: { inputTokens: 1, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 1 } });
       return {
-        model: 'claude-sonnet-5',
+        model: 'claude-sonnet-5-5',
         observations: [
           { sentence: 'You placed 2 orders worth GBP 114.99 in the 3 days after the Acme rejection.', evidence: ['E2', 'E3', 'E4'] },
           { sentence: 'You placed 2 orders in 1 week.', evidence: ['E3', 'E4'] },
@@ -324,7 +324,7 @@ describe('one person’s run', () => {
         sentence: 'You placed 2 orders worth GBP 114.99 in the 3 days after the Acme rejection.',
         evidence: [eventRef(rejection), eventRef(order), eventRef(secondOrder)],
         modules: ['shopping', 'jobs'],
-        model: 'claude-sonnet-5',
+        model: 'claude-sonnet-5-5',
       },
     ]);
     expect(ledger).toHaveBeenCalledTimes(1);
@@ -348,7 +348,7 @@ describe('one person’s run', () => {
   });
 
   it('writes nothing when the model finds nothing', async () => {
-    const { ports: p, written } = ports({ observe: vi.fn(async () => ({ model: 'claude-sonnet-5', observations: [] })) });
+    const { ports: p, written } = ports({ observe: vi.fn(async () => ({ model: 'claude-sonnet-5-5', observations: [] })) });
     expect(await runObservationsFor(p, 'user-1', MONDAY)).toMatchObject({ status: 'written', observations: 0 });
     expect(written).toEqual([]);
     expect(p.write).not.toHaveBeenCalled();

@@ -13,6 +13,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { z } from 'zod';
 import { MODELS } from '@/lib/core/models';
+import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
 
 /** Vision over a crowded shelf is the hard part; do not skimp on the model. */
 const SHELF_MODEL = MODELS.gamesShelfPhoto;
@@ -72,7 +73,7 @@ export async function readGameShelfPhoto(input: {
       model: SHELF_MODEL,
       // Forty entries is ~1,500 tokens; a high ceiling only buys a slower
       // worst case, and the whole read has to fit a serverless time limit.
-      max_tokens: 4096,
+      max_tokens: 4096 + THINKING_ROOM,
       system: SYSTEM,
       tools: [
         {
@@ -102,7 +103,7 @@ export async function readGameShelfPhoto(input: {
           },
         },
       ],
-      tool_choice: { type: 'tool', name: TOOL_NAME },
+      tool_choice: forceTool(TOOL_NAME, SHELF_MODEL),
       messages: [
         {
           role: 'user',
@@ -117,7 +118,7 @@ export async function readGameShelfPhoto(input: {
             },
             {
               type: 'text',
-              text: 'Catalogue every board game box in this photo, and count the ones you cannot identify.',
+              text: `Catalogue every board game box in this photo, and count the ones you cannot identify. Report through ${TOOL_NAME}.`,
             },
           ],
         },

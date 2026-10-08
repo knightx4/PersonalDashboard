@@ -87,7 +87,7 @@ describe('the time a search is given', () => {
       input,
     );
     expect(none).not.toHaveBeenCalled();
-    expect(early).toMatchObject({ ok: false, queue: { model: 'claude-sonnet-5' } });
+    expect(early).toMatchObject({ ok: false, queue: { model: 'claude-sonnet-5-5' } });
 
     let clock = Date.now();
     const spy = vi.spyOn(Date, 'now').mockImplementation(() => clock);

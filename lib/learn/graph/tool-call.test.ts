@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { HAIKU, OPUS, SONNET } from '@/lib/core/models';
 import { forceTool, toolBlockIn, whyNoReport } from '@/lib/learn/graph/tool-call';
 
 describe('forceTool', () => {
-  it('names the tool the model has to report through', () => {
-    expect(forceTool('report_claims')).toEqual({ type: 'tool', name: 'report_claims' });
+  it('names the tool Haiku has to report through', () => {
+    expect(forceTool('report_claims', HAIKU)).toEqual({ type: 'tool', name: 'report_claims' });
+  });
+
+  it('leaves the choice to Opus and Sonnet, which reject a forced tool', () => {
+    expect(forceTool('report_claims', OPUS)).toEqual({ type: 'auto' });
+    expect(forceTool('report_claims', SONNET)).toEqual({ type: 'auto' });
   });
 });
 
