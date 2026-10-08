@@ -118,6 +118,7 @@ export const PAID_ACTIONS = {
   'app/jobs/(app)/roles/actions.ts#draftAnswerFromEvidence': ['draft-answer'],
   'app/jobs/(app)/settings/evidence-actions.ts#proposeEvidence': ['propose-evidence'],
   'app/jobs/(app)/find/actions.ts#suggestTracks': ['suggest-learning-tracks'],
+  'app/jobs/(app)/find/actions.ts#findStartups': ['shortlist-startups'],
   // Starting a suggested track adds a Learn goal, as the Learn Goals page does.
   'app/jobs/(app)/find/actions.ts#startTrack': ['place-aim', 'write-curriculum'],
   'app/jobs/(app)/recommend/actions.ts#suggestPeople': ['suggest-outreach'],

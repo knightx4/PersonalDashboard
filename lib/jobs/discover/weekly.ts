@@ -42,13 +42,18 @@ export type Plan = 'skip' | 'shortlist' | 'boards';
 /**
  * What this call should do about the week's existing row, if any.
  * `skip` when the week is done or another call is working on it.
+ *
+ * `fresh` is the Find startups button: the person asked for a new shortlist,
+ * so a finished or failed week is run again from the start. A run still
+ * working is never joined, whoever started it.
  */
-export function planFor(row: DiscoveryRunRow | null, now: Date): Plan {
+export function planFor(row: DiscoveryRunRow | null, now: Date, fresh = false): Plan {
   if (!row) return 'shortlist';
-  if (row.stage === 'done') return 'skip';
-  const working = row.stage !== 'failed';
+  const working = row.stage !== 'failed' && row.stage !== 'done';
   const age = now.getTime() - new Date(row.started_at).getTime();
   if (working && age < STOPPED_AFTER_MINUTES * 60_000) return 'skip';
+  if (fresh) return 'shortlist';
+  if (row.stage === 'done') return 'skip';
   return row.shortlisted_at ? 'boards' : 'shortlist';
 }
 
@@ -70,6 +75,8 @@ export type WeeklyOptions = {
   now?: Date;
   /** Epoch milliseconds by which everything must be done. */
   deadline: number;
+  /** Ask Dash for a new shortlist even when this week's run has finished. */
+  fresh?: boolean;
   /** Overridable for tests. */
   boards?: typeof findStartupBoards;
   shortlist?: typeof shortlistStartups;
@@ -100,7 +107,7 @@ export async function runWeeklyDiscovery(
     .maybeSingle();
   if (found.error) throw new Error(`Reading the discovery run failed: ${found.error.message}`);
   const row = found.data as (DiscoveryRunRow & { id: string }) | null;
-  const plan = planFor(row, now);
+  const plan = planFor(row, now, options.fresh);
   if (plan === 'skip') return { ...outcome, state: 'skipped' };
 
   let runId: string;
@@ -111,6 +118,7 @@ export async function runWeeklyDiscovery(
       started_at: now.toISOString(),
       finished_at: null,
       error: null,
+      ...(plan === 'shortlist' ? { shortlisted_at: null } : {}),
     });
   } else {
     const inserted = await supabase

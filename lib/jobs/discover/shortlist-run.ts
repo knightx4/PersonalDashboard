@@ -62,6 +62,11 @@ For each pick give:
 - reason: one line to them, as "you", saying why this company: what it does
   that fits what they want, or the role it is hiring for. Under 25 words, no
   em dashes, no hype.
+- score: a whole number from 1 to 100 for how well the company fits what
+  they want next. 90 and above: the role they want is open or plainly will
+  be, in their field. 70 to 89: a strong fit worth applying to. 50 to 69: a
+  reasonable fit with something missing. Below 50: a long shot. Score each
+  pick on its own; do not spread the scores to fill the range.
 - For a line with a Hacker News post, also: company (the company's name as
   the post gives it, without "(YC S24)" and the like), roles (the roles the
   post names, as written), location (where the post says, as written, or
@@ -84,12 +89,13 @@ const TOOL: Anthropic.Tool = {
           properties: {
             id: { type: 'string' },
             reason: { type: 'string' },
+            score: { type: 'integer', minimum: 1, maximum: 100 },
             company: { type: ['string', 'null'] },
             roles: { type: 'array', items: { type: 'string' } },
             location: { type: ['string', 'null'] },
             link: { type: ['string', 'null'] },
           },
-          required: ['id', 'reason'],
+          required: ['id', 'reason', 'score'],
         },
       },
     },
