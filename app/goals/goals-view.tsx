@@ -9,7 +9,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { ComposeBody, ComposeTitle, InlineInput, InlineTextarea } from '@/components/ui/field';
@@ -397,22 +397,38 @@ function AreaSection({
       )}
       {renameState.error && <p className="px-1 text-small text-danger">{renameState.error}</p>}
       <div id={`area-body-${area.id}`} hidden={folded} className="space-y-2">
-        <form action={saveNote}>
-          <input type="hidden" name="id" value={area.id} />
-          <InlineTextarea
-            name="note"
-            maxLength={AREA_NOTE_MAX}
-            defaultValue={area.note ?? ''}
-            key={`note-${area.note ?? ''}`}
-            placeholder="What you want from this area, in a sentence"
-            aria-label={`What you want from ${area.name}`}
-            disabled={savingNote}
-            onBlur={commitOnBlur(area.note ?? '')}
-            onKeyDown={revertOnEscape(area.note ?? '')}
-            className="text-ink-muted"
-          />
-        </form>
-        {noteState.error && <p className="px-1 text-small text-danger">{noteState.error}</p>}
+        {/* The area's sentence on a card rather than bare on the page (plan
+            #1686). An area with no goals yet also holds the line offering to
+            plan it, so the two share the card. An empty sentence beside goals
+            stays one quiet prompt line with no card, which would otherwise
+            read as an empty box above every area. */}
+        <div
+          className={
+            goalCount === 0 || area.note
+              ? cn(cardVariants({ padding: 'dense' }), 'space-y-2')
+              : 'contents'
+          }
+        >
+          <form action={saveNote}>
+            <input type="hidden" name="id" value={area.id} />
+            <InlineTextarea
+              name="note"
+              maxLength={AREA_NOTE_MAX}
+              defaultValue={area.note ?? ''}
+              key={`note-${area.note ?? ''}`}
+              placeholder="What you want from this area, in a sentence"
+              aria-label={`What you want from ${area.name}`}
+              disabled={savingNote}
+              onBlur={commitOnBlur(area.note ?? '')}
+              onKeyDown={revertOnEscape(area.note ?? '')}
+              className="text-ink-muted"
+            />
+          </form>
+          {noteState.error && <p className="px-1 text-small text-danger">{noteState.error}</p>}
+          {goalCount === 0 && (
+            <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} />
+          )}
+        </div>
         {page?.chips && <div className="pt-2 pb-1">{page.chips}</div>}
         {page?.empty && <EmptyState icon={Flag} {...page.empty} />}
 
@@ -434,7 +450,9 @@ function AreaSection({
           </Card>
         )}
         {shownRhythms.length > 0 && <AreaRhythms areaId={area.id} rhythms={shownRhythms} />}
-        <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} />
+        {goalCount > 0 && (
+          <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} />
+        )}
         <GoalComposer areaId={area.id} areaName={area.name} learn={area.learn ?? false} />
       </div>
     </section>
@@ -740,7 +758,12 @@ function AreaRhythms({ areaId, rhythms }: { areaId: string; rhythms: AreaRhythm[
 export function ApproveArea({ areaId, count }: { areaId: string; count: number }) {
   const [state, approve, approving] = useActionState(approveAreaAction, initial);
   return (
-    <form action={approve} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1">
+    // On a card of its own, apart from the goals below it: Dash's sentence is
+    // body text, and none sits bare on the page (plan #1686).
+    <form
+      action={approve}
+      className={cn(cardVariants({ padding: 'dense' }), 'flex flex-wrap items-center gap-x-3 gap-y-1')}
+    >
       <input type="hidden" name="id" value={areaId} />
       <p className="min-w-0 flex-1 text-small text-ink-muted">
         <DashCredit />

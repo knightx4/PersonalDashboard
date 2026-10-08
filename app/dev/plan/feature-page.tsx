@@ -4,7 +4,7 @@ import { useActionState, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRight, Plus } from 'lucide-react';
-import { TabbedDetail } from '@/components/patterns/tabbed-detail';
+import { DetailCard, DetailPart, TabbedDetail } from '@/components/patterns/tabbed-detail';
 import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
@@ -338,15 +338,10 @@ export function FeaturePage({
       description={
         editingHere ? undefined : (
           <>
-            {/* The one line it was written with (plan #1670), above the facts
-                about where it came from. */}
-            {node.summary && <span className="mt-1 block text-ink">{node.summary}</span>}
-            <span
-              className={cn(
-                'inline-flex flex-wrap items-center gap-x-2 text-small',
-                node.summary && 'mt-1',
-              )}
-            >
+            {/* The facts about where it came from. The one line it was written
+                with (plan #1670) opens the Overview's card instead, since a
+                sentence on the page background is bare text (plan #1686). */}
+            <span className="inline-flex flex-wrap items-center gap-x-2 text-small">
               <span>Feature #{node.number}</span>
               {parts.addedBy && (
                 <span
@@ -411,44 +406,58 @@ export function FeaturePage({
       ) : (
         <div className="max-w-2xl space-y-5">
           {updates[0] && <FeatureUpdate update={updates[0]} />}
-          {node.fog && node.fogDismissedAt === null && (
-            <FogNote
-              id={node.id}
-              fog={node.fog}
-              aside={false}
-              action={fogAction}
-              pending={fogPending}
-              error={fogState.error}
+          {/* The summary, the fog, the feature's own words, what it is done
+              when, what it needs and what it waits on, on one card (plan
+              #1686): none of it sits bare on the page. */}
+          <DetailCard>
+            {node.summary && <p className="text-body font-medium text-ink">{node.summary}</p>}
+            {node.fog && node.fogDismissedAt === null && (
+              <FogNote
+                id={node.id}
+                fog={node.fog}
+                aside={false}
+                action={fogAction}
+                pending={fogPending}
+                error={fogState.error}
+              />
+            )}
+            {node.detail && node.kind !== 'decision' && (
+              <DetailPart>
+                <p className="whitespace-pre-wrap text-body text-ink">
+                  <LinkedText text={node.detail} />
+                </p>
+              </DetailPart>
+            )}
+            {node.acceptance && (
+              <DetailPart label="Done when">
+                <p className="whitespace-pre-wrap text-ui text-ink">
+                  <LinkedText text={node.acceptance} />
+                </p>
+              </DetailPart>
+            )}
+            {node.blockAsk && (
+              <DetailPart label="Needs">
+                <p className="whitespace-pre-wrap text-ui text-ink">
+                  <LinkedText text={node.blockAsk} />
+                </p>
+              </DetailPart>
+            )}
+            <Dependencies
+              node={node}
+              catalog={catalog}
+              groupOf={(entry) => scopeLabel(entry.module)}
+              actions={PLAN_TREE_ACTIONS}
+              closed={parts.closed}
             />
-          )}
-          {node.detail && node.kind !== 'decision' && (
-            <p className="whitespace-pre-wrap text-body text-ink">
-              <LinkedText text={node.detail} />
-            </p>
-          )}
-          {node.acceptance && (
-            <Section label="Done when">
-              <p className="whitespace-pre-wrap text-ui text-ink">
-                <LinkedText text={node.acceptance} />
-              </p>
-            </Section>
-          )}
-          {node.blockAsk && (
-            <Section label="Needs">
-              <p className="whitespace-pre-wrap text-ui text-ink">
-                <LinkedText text={node.blockAsk} />
-              </p>
-            </Section>
-          )}
+          </DetailCard>
           {parts.body}
-          <Questions node={node} titles={parts.refTitles} actions={PLAN_TREE_ACTIONS} />
-          <Dependencies
-            node={node}
-            catalog={catalog}
-            groupOf={(entry) => scopeLabel(entry.module)}
-            actions={PLAN_TREE_ACTIONS}
-            closed={parts.closed}
-          />
+          {/* Questions draws nothing for a closed feature that never asked
+              one, and then neither does its card. */}
+          {(!parts.closed || node.children.some((child) => child.kind === 'decision')) && (
+            <div className={cardVariants({ padding: 'standard' })}>
+              <Questions node={node} titles={parts.refTitles} actions={PLAN_TREE_ACTIONS} />
+            </div>
+          )}
           {/* On a card of its own: the thread's usual well is the canvas,
               which is the page's own ground here and vanished in dark. */}
           <div className={cardVariants({ padding: 'dense' })}>
@@ -463,16 +472,6 @@ export function FeaturePage({
         </div>
       )}
     </TabbedDetail>
-  );
-}
-
-/** A labelled part of the Overview, headed the way the row's panel heads its parts. */
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <h2 className="text-small font-semibold uppercase tracking-wide text-ink-muted">{label}</h2>
-      {children}
-    </section>
   );
 }
 

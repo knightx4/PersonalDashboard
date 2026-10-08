@@ -123,8 +123,13 @@ export function DetailPage({
 
 /**
  * The details as a grid of facts: two across on a phone, four from sm. Takes
- * the `Property` rows from components/shell/detail-layout.tsx.
+ * the `Property` rows from components/shell/detail-layout.tsx. On a card, so
+ * the facts do not sit bare on the page (plan #1686).
  */
 export function DetailFacts({ children }: { children: React.ReactNode }) {
-  return <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">{children}</dl>;
+  return (
+    <Card padding="dense">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">{children}</dl>
+    </Card>
+  );
 }

@@ -1,4 +1,4 @@
-import { TabbedDetail } from '@/components/patterns/tabbed-detail';
+import { DetailCard, DetailPart, TabbedDetail } from '@/components/patterns/tabbed-detail';
 import { goalCrumbs } from '@/lib/goals/crumbs';
 import { GOAL_TABS } from '@/lib/goals/goal-page';
 import type { GoalReview } from '@/lib/goals/reviews';
@@ -13,7 +13,7 @@ import { GoalProperties } from './goal-properties';
 /**
  * A goal's page frame (plan #1671): the tabbed detail pattern the feature
  * page on /dev/plan is built from. The path, the goal's hexagon and title,
- * its done-when, the menu that moves or closes it, the Overview, Steps and
+ * the menu that moves or closes it, the Overview, Steps and
  * Activity tabs, and the properties column. The page passes the open tab's
  * content as `children`; the gallery draws the same frame from fixtures.
  */
@@ -62,15 +62,6 @@ export function GoalDetail({
           places={places}
         />
       }
-      description={
-        <span className="block space-y-0.5">
-          {/* Named only once there is one: the empty prompt already says it. */}
-          {goal.acceptance && (
-            <span className="block text-small font-semibold text-ink-muted">Done when</span>
-          )}
-          <GoalHeadingField goalId={goal.id} field="acceptance" value={goal.acceptance} />
-        </span>
-      }
       properties={
         <GoalProperties
           goal={goal}
@@ -86,5 +77,29 @@ export function GoalDetail({
     >
       {children}
     </TabbedDetail>
+  );
+}
+
+/**
+ * The goal's done-when, at the top of its Overview on a card of its own (plan
+ * #1686). It sat under the title on the page's background, which is bare text
+ * the tabbed detail pattern no longer allows, and it is the Overview's to say
+ * what the goal is for. Editable where it stands, as it was in the header.
+ */
+export function GoalDoneWhen({
+  goal,
+  children,
+}: {
+  goal: Pick<Goal, 'id' | 'acceptance'>;
+  /** What is not settled yet about the goal, its fog, on the same card. */
+  children?: React.ReactNode;
+}) {
+  return (
+    <DetailCard>
+      <DetailPart label="Done when">
+        <GoalHeadingField goalId={goal.id} field="acceptance" value={goal.acceptance} />
+      </DetailPart>
+      {children}
+    </DetailCard>
   );
 }

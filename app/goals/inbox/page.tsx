@@ -29,10 +29,7 @@ export default async function GoalsInboxPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader
-        title="Inbox"
-        description="Everything on you across your goals: steps to do, questions to answer, and proposals to say yes to."
-      />
+      <PageHeader title="Inbox" />
       <GoalsInboxView
         groups={goalInboxGroups(home.onYou, home.dash)}
         laterOn={home.laterOn}
