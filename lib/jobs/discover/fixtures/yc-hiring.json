@@ -1,0 +1,444 @@
+[
+ {
+  "id": 5,
+  "name": "CircuitHub",
+  "slug": "circuithub",
+  "former_names": [],
+  "small_logo_thumb_url": "https://bookface-images.s3.amazonaws.com/small_logos/5967d06c7b101af8570dc47b6eea5cd8567dd32b.png",
+  "website": "https://circuithub.com",
+  "all_locations": "London, England, United Kingdom",
+  "long_description": "CircuitHub offers on-demand electronics manufacturing powered by our factory-scale robotics platform, The Grid. This platform delivers a 10x improvement in the speed and cost of small-batch electronics production. Leading customers like Tesla, NASA, and Zipline rely on CircuitHub to cut their time to market in half.",
+  "one_liner": "On-Demand Electronics Manufacturing",
+  "team_size": 58,
+  "industry": "Industrials",
+  "subindustry": "Industrials -> Manufacturing and Robotics",
+  "launched_at": 1322045523,
+  "tags": [
+   "Hard Tech",
+   "Hardware",
+   "Robotics",
+   "Manufacturing",
+   "Automation"
+  ],
+  "tags_highlighted": [],
+  "top_company": false,
+  "isHiring": true,
+  "nonprofit": false,
+  "batch": "Winter 2012",
+  "status": "Active",
+  "industries": [
+   "Industrials",
+   "Manufacturing and Robotics"
+  ],
+  "regions": [
+   "United Kingdom",
+   "Europe",
+   "Remote",
+   "Partly Remote"
+  ],
+  "stage": "Early",
+  "app_video_public": false,
+  "demo_day_video_public": false,
+  "app_answers": null,
+  "question_answers": false,
+  "url": "https://www.ycombinator.com/companies/circuithub",
+  "api": "https://yc-oss.github.io/api/batches/winter-2012/circuithub.json"
+ },
+ {
+  "id": 488,
+  "name": "Etleap",
+  "slug": "etleap",
+  "former_names": [],
+  "small_logo_thumb_url": "https://bookface-images.s3.amazonaws.com/small_logos/07c9b19241da3d7897596f5f34b6c9baa7c7518e.png",
+  "website": "https://etleap.com",
+  "all_locations": "San Francisco, CA, USA",
+  "long_description": "Etleap is an ETL solution for creating perfect data pipelines from day one. Unlike other enterprise solutions, Etleap doesn’t require extensive engineering work to set up, maintain, and scale. It automates most ETL setup and maintenance work, and simplifies the rest into 10-minute tasks that analysts can own.",
+  "one_liner": "Etleap is an ETL solution for creating perfect data pipelines. ",
+  "team_size": 11,
+  "industry": "B2B",
+  "subindustry": "B2B -> Infrastructure",
+  "launched_at": 1354492752,
+  "tags": [
+   "Data Engineering"
+  ],
+  "tags_highlighted": [],
+  "top_company": false,
+  "isHiring": true,
+  "nonprofit": false,
+  "batch": "Winter 2013",
+  "status": "Active",
+  "industries": [
+   "B2B",
+   "Infrastructure"
+  ],
+  "regions": [
+   "United States of America",
+   "America / Canada"
+  ],
+  "stage": "Early",
+  "app_video_public": false,
+  "demo_day_video_public": false,
+  "app_answers": null,
+  "question_answers": false,
+  "url": "https://www.ycombinator.com/companies/etleap",
+  "api": "https://yc-oss.github.io/api/batches/winter-2013/etleap.json"
+ },
+ {
+  "id": 72,
+  "name": "Apollo",
+  "slug": "apollo",
+  "former_names": [
+   "Meteor",
+   "Apollo",
+   "Apollo M"
+  ],
+  "small_logo_thumb_url": "https://bookface-images.s3.amazonaws.com/small_logos/3d684926422fe826a03f5d68cd83bdb413d1c454.png",
+  "website": "http://apollographql.com/",
+  "all_locations": "San Francisco, CA, USA; Remote",
+  "long_description": "Apollo GraphQL is the leader in open source and commercial GraphQL technologies. Apollo’s open-source GraphQL client, server, and gateway are downloaded more than 17M times per month and used in production by over 30% of the Fortune 500. Customers like Walmart, Expedia, Glassdoor, Audi, and PayPal, use the Apollo Graph Platform to unify their GraphQL efforts, collaborate on graph development, and safely iterate on their graphs. Based in San Francisco, Apollo is backed by Insight Partners, Andreessen Horowitz, Matrix Partners, Trinity Ventures, Y Combinator and individual investors.",
+  "one_liner": "Apollo helps engineering teams accelerate delivery",
+  "team_size": 200,
+  "industry": "B2B",
+  "subindustry": "B2B -> Infrastructure",
+  "launched_at": 1326788979,
+  "tags": [
+   "Developer Tools",
+   "Open Source",
+   "GraphQL"
+  ],
+  "tags_highlighted": [],
+  "top_company": false,
+  "isHiring": true,
+  "nonprofit": false,
+  "batch": "Summer 2011",
+  "status": "Active",
+  "industries": [
+   "B2B",
+   "Infrastructure"
+  ],
+  "regions": [
+   "United States of America",
+   "America / Canada",
+   "Remote",
+   "Fully Remote"
+  ],
+  "stage": "Growth",
+  "app_video_public": false,
+  "demo_day_video_public": false,
+  "app_answers": null,
+  "question_answers": false,
+  "url": "https://www.ycombinator.com/companies/apollo",
+  "api": "https://yc-oss.github.io/api/batches/summer-2011/apollo.json"
+ },
+ {
+  "id": 40,
+  "name": "Amplitude",
+  "slug": "amplitude",
+  "former_names": [],
+  "small_logo_thumb_url": "https://bookface-images.s3.amazonaws.com/small_logos/fa98c8a53255b3fd2e9d4a65dbb47eec293729f1.png",
+  "website": "https://amplitude.com",
+  "all_locations": "San Francisco, CA, USA",
+  "long_description": "Since graduating from YC, Amplitude (W12) has made it to IPO and beyond by helping cutting edge startups become category leaders. We’ve pioneered the digital analytics category to become the go-to solution for AI pioneers (Cruise, Midjourney), apps that touch millions of consumers (Doordash, Coinbase), and the best in B2B (Atlassian, Rippling, Canva).  \r\n\r\nWith product analytics, experiment, CDP, session replay, and more, Amplitude’s digital analytics platform shows you what your users love, where they’re getting stuck, and what keeps them coming back. You want to build a generational business, and we have the capabilities and pricing plans to guide you every step of the way. Check out our special deal for YC companies and get started on your analytics journey. ",
+  "one_liner": "Digital Analytics Platform",
+  "team_size": 750,
+  "industry": "B2B",
+  "subindustry": "B2B -> Analytics",
+  "launched_at": 1322045852,
+  "tags": [
+   "Developer Tools",
+   "B2B",
+   "Analytics",
+   "Marketing",
+   "Data Visualization"
+  ],
+  "tags_highlighted": [],
+  "top_company": true,
+  "isHiring": true,
+  "nonprofit": false,
+  "batch": "Winter 2012",
+  "status": "Public",
+  "industries": [
+   "B2B",
+   "Analytics"
+  ],
+  "regions": [
+   "United States of America",
+   "America / Canada",
+   "Remote",
+   "Partly Remote"
+  ],
+  "stage": "Growth",
+  "app_video_public": false,
+  "demo_day_video_public": false,
+  "app_answers": null,
+  "question_answers": false,
+  "url": "https://www.ycombinator.com/companies/amplitude",
+  "api": "https://yc-oss.github.io/api/batches/winter-2012/amplitude.json"
+ },
+ {
+  "id": 85,
+  "name": "Quartzy",
+  "slug": "quartzy",
+  "former_names": [],
+  "small_logo_thumb_url": "https://bookface-images.s3.amazonaws.com/small_logos/4040613ddc6090974d404ee7a77c5ebad60a1e10.png",
+  "website": "https://www.quartzy.com",
+  "all_locations": "San Francisco, CA, USA; Hayward, CA, USA",
+  "long_description": "The world’s No. 1 lab management platform. We help scientists easily organize orders, manage inventory, and save money.",
+  "one_liner": "Marketplace for life science supplies.",
+  "team_size": 100,
+  "industry": "Healthcare",
+  "subindustry": "Healthcare -> Healthcare IT",
+  "launched_at": 1326789155,
+  "tags": [
+   "SaaS",
+   "B2B",
+   "E-commerce"
+  ],
+  "tags_highlighted": [],
+  "top_company": false,
+  "isHiring": true,
+  "nonprofit": false,
+  "batch": "Summer 2011",
+  "status": "Active",
+  "industries": [
+   "Healthcare",
+   "Healthcare IT"
+  ],
+  "regions": [
+   "United States of America",
+   "America / Canada",
+   "Remote",
+   "Partly Remote"
+  ],
+  "stage": "Growth",
+  "app_video_public": false,
+  "demo_day_video_public": false,
+  "app_answers": null,
+  "question_answers": false,
+  "url": "https://www.ycombinator.com/companies/quartzy",
+  "api": "https://yc-oss.github.io/api/batches/summer-2011/quartzy.json"
+ },
+ {
+  "id": 1749,
+  "name": "CoinTracker",
+  "slug": "cointracker",
+  "former_names": [
+   "Nino Finance",
+   "Inc.",
+   "Nino Finance"
+  ],
+  "small_logo_thumb_url": "https://bookface-images.s3.amazonaws.com/small_logos/097c28935ffe6f2c55f615c50f2a9e6af69ae9d4.png",
+  "website": "https://cointracker.com",
+  "all_locations": "San Francisco, CA, USA",
+  "long_description": "[CoinTracker](https://www.cointracker.io) makes cryptocurrency portfolio tracking and tax compliance simple. CoinTracker enables consumers and businesses to seamlessly track their cryptocurrency portfolio, investment performance, taxes, and more. We are a globally distributed team on a mission to enable everyone in the world to use crypto with peace of mind. [Learn more](https://www.notion.so/cointracker/CoinTracker-is-Hiring-7308c712493940a3b6e62257d283dad8) about our mission, culture, and hiring process.",
+  "one_liner": "The gold standard in cryptocurrency portfolio tracking and taxes",
+  "team_size": 70,
+  "industry": "Fintech",
+  "subindustry": "Fintech",
+  "launched_at": 1509591796,
+  "tags": [
+   "Fintech",
+   "SaaS",
+   "Crypto / Web3",
+   "Consumer"
+  ],
+  "tags_highlighted": [
+   "Crypto / Web3"
+  ],
+  "top_company": false,
+  "isHiring": true,
+  "nonprofit": false,
+  "batch": "Winter 2018",
+  "status": "Active",
+  "industries": [
+   "Fintech"
+  ],
+  "regions": [
+   "United States of America",
+   "America / Canada",
+   "Remote",
+   "Partly Remote"
+  ],
+  "stage": "Growth",
+  "app_video_public": false,
+  "demo_day_video_public": false,
+  "app_answers": null,
+  "question_answers": false,
+  "url": "https://www.ycombinator.com/companies/cointracker",
+  "api": "https://yc-oss.github.io/api/batches/winter-2018/cointracker.json"
+ },
+ {
+  "id": 27766,
+  "name": "Glass Health",
+  "slug": "glass-health",
+  "former_names": [],
+  "small_logo_thumb_url": "https://bookface-images.s3.amazonaws.com/small_logos/a4bfc350809e1c4f0b4e0ccc1e6449d3a68998b6.png",
+  "website": "https://glass.health",
+  "all_locations": "",
+  "long_description": "We empower clinicians with our AI platform for developing differential diagnoses and drafting clinical plans.",
+  "one_liner": "AI-Powered Clinical Decision Support & Ambient Scribing",
+  "team_size": 7,
+  "industry": "Healthcare",
+  "subindustry": "Healthcare -> Healthcare IT",
+  "launched_at": 1671385379,
+  "tags": [
+   "Artificial Intelligence",
+   "SaaS",
+   "Health Tech",
+   "Digital Health",
+   "Healthcare"
+  ],
+  "tags_highlighted": [],
+  "top_company": false,
+  "isHiring": true,
+  "nonprofit": false,
+  "batch": "Winter 2023",
+  "status": "Active",
+  "industries": [
+   "Healthcare",
+   "Healthcare IT"
+  ],
+  "regions": [
+   "Unspecified"
+  ],
+  "stage": "Early",
+  "app_video_public": false,
+  "demo_day_video_public": false,
+  "app_answers": null,
+  "question_answers": false,
+  "url": "https://www.ycombinator.com/companies/glass-health",
+  "api": "https://yc-oss.github.io/api/batches/winter-2023/glass-health.json"
+ },
+ {
+  "id": 827,
+  "name": "Razorpay",
+  "slug": "razorpay",
+  "former_names": [],
+  "small_logo_thumb_url": "https://bookface-images.s3.amazonaws.com/small_logos/b6a6aaf9a84fa4b7ddb53cabda7443c142a5a154.png",
+  "website": "https://razorpay.com",
+  "all_locations": "Bengaluru, KA, India",
+  "long_description": "The journey of building Razorpay started in 2014, when Harshil Mathur (CEO & Co-Founder) and Shashank Kumar (MD & Co-Founder) witnessed the dismal state of the online payments industry in India then and understood that they have a larger and more important issue to solve. And That was democratizing online payments for Indian businesses, particularly the underserved market, Startups and SMEs. Over the last 9 years, Razorpay has evolved from a single-product company to a multi-product company, from an online payment gateway to India’s only full-stack financial solutions company, offering payments and banking solutions to businesses.  Razorpay today is transforming age-old complexities and changing every known paradigm of money movement for disruptive businesses.\r\n\r\nOver the last couple of years, Razorpay’s growth has evolved to be an index of India’s digital economy. From a kirana shop in Kashmir collecting payments on our POS device to a textile exporter in Kanyakumari accepting dollars through our International Payments product, Razorpay has revolutionised how businesses have traditionally transacted and interacted with money. \r\n\r\nRazorpay became the first and only Indian fintech to build a full-stack international Payment Gateway ‘Curlec by Razorpay’ and evolved into a comprehensive provider of payment solutions, leveraging the synergy between cutting-edge technological capabilities and a profound understanding of the local payment ecosystem. The introduction of the new Curlec Payment Gateway aims to cater to a wide spectrum of businesses, expanding its reach to over 5,000 establishments. \r\n\r\nBe it for international expansion or solving for Indian businesses, for Razorpay, the customer has always been at the core of all disruption, from addressing evolving needs to delivering new solutions. This hyperfocus helped bring Razorpay’s several industry-first innovations into the market since 2014. Razorpay became the first to launch a completely digital on-boarding process for startups, first to launch support for UPI, first to launch support for Bharath QR, first to introduce recurring payments for businesses through Razorpay Route, automating payment receipts and later automate payouts and making the entire process seamless and optimized and many more were introduced aling the way. Other firsts include: - First to launch India’s Multi-Network Tokenisation solution, TokenHQ - Razorpay became India’s first payment gateway to support credit cards on UPI - Razorpay also became India’s largest omnichannel payment gateway for businesses post acquiring Ezetap which is India’s leading offline POS company that was founded with the aim to simplify the in-person offline payments experience.\r\n\r\nOver the years, Razorpay’s valuation has jumped from $1 billion to $7.5 billion and has added a host of marquee investors to its captable. Razorpay is also the second Indian company to be a part of Silicon Valley’s largest tech accelerator, Y Combinator. Marquee investors such as Lone Pine Capital, Alkeon Capital, TCV, GIC, Tiger Global, Sequoia Capital India, Ribbit Capital, Matrix Partners, Salesforce Ventures, Y Combinator, and MasterCard have invested a total of $741.5 Mn through Series A, B, C, D, E and F funding. The last financing round of Series F led the company’s valuation to $7.5 Billion signaling one of the fastest increases in valuation for an Indian Unicorn. \r\n\r\nRazorpay has also made acquisitions with like-minded companies over the last 9 years. In total, till date, Razorpay has made eight acquisitions, Billme in 2023 - A Digital invoice and customer Engagement, Ezetap in 2022 - India’s leading offline POS company, PoshVine in 2022 - India’s leading loyalty and reward management platform, IZealiant in 2022 - A mobile-first, API-enabled, and cloud-ready payment solution and made its first international foray in South-East Asia by announcing its acquisition of Curlec in 2022 - A recurring payments platform. TeraFin Labs in 2021 - the AI-based SaaS platform that facilitates digital financing solutions, Opfin (Now RazorpayX Payroll) in 2019 -  The payroll management solution and Thirdwatch in 2019, the first acquisition - The AI-powered fraud detection platform.\r\n\r\nAll these efforts are being done in collaboration with banks, regulators, and stakeholders so that India can build a better place for small and big businesses. Today, Razorpay powers online payments for 76 Of 100 startup unicorns and millions of businesses in India. The core premise of what Razorpay was founded in 2014 and what it is today hasn’t changed. It is to make money movement simpler and easier, whether it is for businesses to receive money, send money, or manage money. \r\n\r\n",
+  "one_liner": "India's only full-stack financial solutions company for businesses.",
+  "team_size": 2700,
+  "industry": "Fintech",
+  "subindustry": "Fintech -> Payments",
+  "launched_at": 1416309883,
+  "tags": [
+   "Banking as a Service",
+   "Fintech",
+   "Payments",
+   "India"
+  ],
+  "tags_highlighted": [],
+  "top_company": true,
+  "isHiring": true,
+  "nonprofit": false,
+  "batch": "Winter 2015",
+  "status": "Active",
+  "industries": [
+   "Fintech",
+   "Payments"
+  ],
+  "regions": [
+   "India",
+   "South Asia",
+   "Remote",
+   "Partly Remote"
+  ],
+  "stage": "Growth",
+  "app_video_public": false,
+  "demo_day_video_public": false,
+  "app_answers": null,
+  "question_answers": true,
+  "url": "https://www.ycombinator.com/companies/razorpay",
+  "api": "https://yc-oss.github.io/api/batches/winter-2015/razorpay.json"
+ },
+ {
+  "id": 22124,
+  "name": "Taktile",
+  "slug": "taktile",
+  "former_names": [
+   "Taktile",
+   "Inc."
+  ],
+  "small_logo_thumb_url": "https://bookface-images.s3.amazonaws.com/small_logos/fda6209e5ce1deac3dd962c779d7c375cd750a5a.png",
+  "website": "http://www.taktile.com",
+  "all_locations": "Berlin, Berlin, Germany",
+  "long_description": "Taktile empowers financial institutions to quickly unlock AI-driven efficiencies across the customer lifecycle, reducing manual work while optimizing decisions and enabling seamless end-user experiences.\r\n\r\nBuilt for highly regulated environments, our agentic decision platform combines the speed of AI automation with the oversight of human judgement—so you can safely approve customers, catch more fraud, and stay compliant.\r\n\r\nWe power AI transformation from offices in NYC, London, Berlin, and Iasi, and have raised $80M in capital from top investors including Index Ventures, Tiger Global, Balderton Capital and Y Combinator.\r\n\r\nJoin over 200 leading financial institutions who rely on Taktile to enable faster, more intelligent decisions from onboarding to credit, AML, compliance, and fraud.",
+  "one_liner": "Transform your decision-making with reliable AI agents in weeks, not…",
+  "team_size": 150,
+  "industry": "B2B",
+  "subindustry": "B2B",
+  "launched_at": 1638102391,
+  "tags": [
+   "Artificial Intelligence",
+   "Fintech",
+   "Machine Learning",
+   "Enterprise Software"
+  ],
+  "tags_highlighted": [],
+  "top_company": false,
+  "isHiring": true,
+  "nonprofit": false,
+  "batch": "Summer 2020",
+  "status": "Active",
+  "industries": [
+   "B2B"
+  ],
+  "regions": [
+   "Germany",
+   "Europe",
+   "Remote",
+   "Partly Remote"
+  ],
+  "stage": "Early",
+  "app_video_public": false,
+  "demo_day_video_public": false,
+  "app_answers": null,
+  "question_answers": false,
+  "url": "https://www.ycombinator.com/companies/taktile",
+  "api": "https://yc-oss.github.io/api/batches/summer-2020/taktile.json"
+ },
+ {
+  "id": 164,
+  "name": "Mino Games",
+  "slug": "mino-games",
+  "former_names": [
+   "Minomonsters"
+  ],
+  "small_logo_thumb_url": "https://bookface-images.s3.amazonaws.com/small_logos/573373ab6401e76024bab0260b4ba1cd64b7a1fe.png",
+  "website": "http://minomonsters.com",
+  "all_locations": "San Francisco, CA, USA; Montreal, QC, Canada",
+  "long_description": "Top-25 grossing mobile gaming studio. Backed by Andreessen Horowitz and Y Combinator. ",
+  "one_liner": "Mobile games company",
+  "team_size": 11,
+  "industry": "Consumer",
+  "subindustry": "Consumer -> Gaming",
+  "launched_at": 1326789959,
+  "tags": [
+   "Gaming"
+  ],
+  "tags_highlighted": [],
+  "top_company": false,
+  "isHiring": true,
+  "nonprofit": false,
+  "batch": "Winter 2011",
+  "status": "Active",
+  "industries": [
+   "Consumer",
+   "Gaming"
+  ],
+  "regions": [
+   "United States of America",
+   "Canada",
+   "America / Canada"
+  ],
+  "stage": "Growth",
+  "app_video_public": false,
+  "demo_day_video_public": false,
+  "app_answers": null,
+  "question_answers": false,
+  "url": "https://www.ycombinator.com/companies/mino-games",
+  "api": "https://yc-oss.github.io/api/batches/winter-2011/mino-games.json"
+ }
+]
