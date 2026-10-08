@@ -8,6 +8,7 @@ import {
   SHORTLIST_MAX,
   buildCandidates,
   candidateLine,
+  fitScore,
   interestTerms,
   parseShortlist,
   precut,
@@ -152,6 +153,26 @@ describe('parseShortlist', () => {
     const all = parseShortlist({ picks: many.map((c) => ({ id: c.id, reason: 'Fits.' })) }, many);
     expect(all).toHaveLength(SHORTLIST_MAX);
     expect(parseShortlist({ nope: [] }, many)).toEqual([]);
+  });
+});
+
+describe('fitScore', () => {
+  it('reads a whole number from 1 to 100 and nothing else', () => {
+    expect(fitScore(87)).toBe(87);
+    expect(fitScore(72.6)).toBe(73);
+    expect(fitScore('64')).toBe(64);
+    expect(fitScore(0)).toBeNull();
+    expect(fitScore(101)).toBeNull();
+    expect(fitScore('high')).toBeNull();
+    expect(fitScore(undefined)).toBeNull();
+  });
+
+  it('carries the score onto the pick and the watchlist row', () => {
+    const shown = buildCandidates({ yc: [yc('Ramp')], hn: [] });
+    const [pick] = parseShortlist({ picks: [{ id: 'Y1', reason: 'Fits.', score: 91 }] }, shown);
+    expect(pick.score).toBe(91);
+    const [row] = watchlistRows('u1', [pick], [], new Date('2026-10-08T00:00:00Z'));
+    expect(row.fit_score).toBe(91);
   });
 });
 

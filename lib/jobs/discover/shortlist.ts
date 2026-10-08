@@ -237,6 +237,8 @@ export type ShortlistPick = {
   name: string;
   nameKey: string;
   reason: string;
+  /** Dash's fit score from 1 to 100, or null when it gave none that reads. */
+  score: number | null;
   /** From a post: the roles it names, where they are, and the link it gives. */
   roles: string[];
   location: string | null;
@@ -257,6 +259,14 @@ function reasonText(value: unknown): string | null {
   const text = str(value, REASON_MAX * 2);
   if (!text) return null;
   return clip(text.replace(/\s*[—–]\s*/g, ', '), REASON_MAX);
+}
+
+/** A fit score as Dash gave it: a whole number from 1 to 100, or null. */
+export function fitScore(value: unknown): number | null {
+  const n = typeof value === 'string' ? Number(value.trim()) : value;
+  if (typeof n !== 'number' || !Number.isFinite(n)) return null;
+  const rounded = Math.round(n);
+  return rounded >= 1 && rounded <= 100 ? rounded : null;
 }
 
 function sameLink(a: string, b: string): boolean {
@@ -309,6 +319,7 @@ export function parseShortlist(
       name,
       nameKey,
       reason,
+      score: fitScore(pick.score),
       roles,
       location: hn ? str(pick.location, FIELD_MAX) : null,
       link,
@@ -327,6 +338,7 @@ export type WatchlistWrite = {
   source_ref: string | null;
   description: string | null;
   reason: string;
+  fit_score: number | null;
   stage: CompanyStage | null;
   locations: string[];
   posting_roles: string[];
@@ -336,7 +348,7 @@ export type WatchlistWrite = {
 };
 
 /** What is already on the watchlist, as far as the shortlist reads it. */
-export type WatchlistExisting = Omit<WatchlistWrite, 'user_id' | 'reason' | 'last_seen_at' | 'stage'> & {
+export type WatchlistExisting = Omit<WatchlistWrite, 'user_id' | 'reason' | 'fit_score' | 'last_seen_at' | 'stage'> & {
   stage: string | null;
 };
 
@@ -386,6 +398,7 @@ export function watchlistRows(
       source_ref: old?.source_ref ?? sourceRef,
       description: (yc ? clip(yc.oneLiner ?? yc.description, 500) || null : null) ?? old?.description ?? (hn ? clip(hn.header, 300) : null),
       reason: pick.reason,
+      fit_score: pick.score,
       stage: yc?.stage ?? ((old?.stage as CompanyStage | null | undefined) ?? null),
       locations: locations.length > 0 ? locations : (old?.locations ?? []),
       posting_roles: pick.roles.length > 0 ? pick.roles : (old?.posting_roles ?? []),

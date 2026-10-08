@@ -219,6 +219,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-spec': ['/dev/specs/[slug]'],
   'dev-ui-review': ['/dev/ui/review'],
   'dev-usage': ['/dev/usage'],
+  'dev-modules': ['/dev/modules'],
+  'dev-module': ['/dev/modules/[id]'],
 };
 
 /** A route split into its segments; `/` is no segments. */
