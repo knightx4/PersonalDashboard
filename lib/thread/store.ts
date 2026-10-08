@@ -28,12 +28,19 @@ export type AnyClient = SupabaseClient<any, any, any>;
 export const THREAD_ROW_NOT_YOURS = 'That row is not one of yours, or it is no longer there.';
 
 /** The columns a thread is read with: core.thread_turns. */
-const TURN_COLUMNS = 'id, ref, author, body, created_at';
+const TURN_COLUMNS = 'id, ref, author, body, created_at, acknowledged_at';
 
 /** Refs per request; a longer list would overflow the URL. */
 const REFS_PER_READ = 100;
 
-type TurnRow = { id: string; ref: string; author: string; body: string; created_at: string };
+type TurnRow = {
+  id: string;
+  ref: string;
+  author: string;
+  body: string;
+  created_at: string;
+  acknowledged_at?: string | null;
+};
 
 function toComment(row: TurnRow): DevComment {
   return {
@@ -41,6 +48,7 @@ function toComment(row: TurnRow): DevComment {
     author: row.author === 'claude' ? 'claude' : 'me',
     body: row.body,
     createdAt: String(row.created_at ?? ''),
+    acknowledgedAt: row.acknowledged_at ? String(row.acknowledged_at) : null,
   };
 }
 
@@ -129,6 +137,27 @@ export async function addThreadTurn(
   if (error && /is not a row of yours|no thread under/.test(error.message)) throw new Error(THREAD_ROW_NOT_YOURS);
   if (error) throw new Error(`Keeping that failed: ${error.message}`);
   if (typeof data !== 'string') throw new Error('Keeping that failed: no id came back.');
+  return data;
+}
+
+/**
+ * Marks one of the person's comments as seen by Dash, which chose not to reply
+ * (plan #1648), and returns when. Marking an already marked comment keeps the
+ * first time. Throws THREAD_ROW_NOT_YOURS when the comment is not the
+ * account's, is not under that row, or was written by Dash.
+ */
+export async function acknowledgeThreadTurn(
+  client: AnyClient,
+  input: { userId: string; ref: string; turnId: string },
+): Promise<string> {
+  const { data, error } = await client.schema('core').rpc('acknowledge_thread_turn', {
+    p_user_id: input.userId,
+    p_ref: input.ref,
+    p_turn: input.turnId,
+  });
+  if (error && /not a comment of yours/.test(error.message)) throw new Error(THREAD_ROW_NOT_YOURS);
+  if (error) throw new Error(`Marking that seen failed: ${error.message}`);
+  if (typeof data !== 'string') throw new Error('Marking that seen failed: no time came back.');
   return data;
 }
 

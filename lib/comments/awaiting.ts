@@ -26,7 +26,7 @@ import type { ThreadTarget } from '@/lib/thread/subjects';
 /** How long a thread goes on expecting an answer before it stops saying so. */
 export const REPLY_EXPECTED_MINUTES = 120;
 
-type Turn = { author: CommentAuthor; body: string; createdAt: string };
+type Turn = { author: CommentAuthor; body: string; createdAt: string; acknowledgedAt?: string | null };
 
 export function awaitingDash(
   thread: readonly Turn[],
@@ -38,6 +38,8 @@ export function awaitingDash(
   // Dash having already replied is the whole of the answer: its turn is the
   // last one, so nothing is outstanding.
   if (!last || last.author !== 'me') return false;
+  // Dash saw it and chose to write nothing (plan #1648): that is its answer.
+  if (last.acknowledgedAt) return false;
 
   // A raise is a question put to you, so anything written on one reaches Dash
   // whether or not it carries the tag -- #541. Everywhere else the tag is what
