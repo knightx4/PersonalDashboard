@@ -101,6 +101,7 @@ type ItemRow = {
   errand?: boolean;
   focus?: boolean;
   created_at?: string | null;
+  closed_at?: string | null;
   estimated_total?: number | string | null;
   total_unit?: string | null;
 };
@@ -132,7 +133,7 @@ const ITEM_COLUMNS =
   'resolution, ' +
   'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, count_source, count_match, on_todo, result, ' +
   'result_url, reviewed_at, unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
-  'kept_open_at, prepares_id, prep_checked_at, errand, focus, created_at, estimated_total, total_unit';
+  'kept_open_at, prepares_id, prep_checked_at, errand, focus, created_at, closed_at, estimated_total, total_unit';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -165,6 +166,7 @@ const toStep = (row: ItemRow): Step => ({
   preparesId: row.prepares_id ?? null,
   prepCheckedAt: row.prep_checked_at ?? null,
   createdAt: row.created_at ?? null,
+  closedAt: row.closed_at ?? null,
   estimatedTotal:
     row.estimated_total === null || row.estimated_total === undefined
       ? null
@@ -190,6 +192,8 @@ const toGoal = (row: ItemRow): Goal => ({
   keptOpenAt: row.kept_open_at ?? null,
   errand: row.errand ?? false,
   focus: row.focus ?? false,
+  createdAt: row.created_at ?? null,
+  closedAt: row.closed_at ?? null,
 });
 
 export type GoalMap = {

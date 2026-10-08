@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 import { PageHeader } from '@/components/shell/page-header';
-import { allGoalsCrumbs, goalCrumbs } from '@/lib/goals/crumbs';
+import { allGoalsCrumbs } from '@/lib/goals/crumbs';
 import { Card } from '@/components/ui/card';
 import { HomeView } from '@/app/goals/home-view';
 import { GoalsView } from '@/app/goals/goals-view';
@@ -11,7 +11,7 @@ import { FileBody } from '@/components/files/file-body';
 import { FileLinks } from '@/components/files/file-links';
 import { GoalNumber } from '@/app/goals/[goalId]/goal-number';
 import { WaitingOnYou } from '@/app/goals/[goalId]/goal-flags';
-import { GoalFog, GoalShaping, RunHistory } from '@/app/goals/[goalId]/goal-shaping';
+import { GoalFog, GoalShaping } from '@/app/goals/[goalId]/goal-shaping';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
 import type { InformationSeam } from '@/app/goals/[goalId]/information-step';
 import type { StepAnswer } from '@/lib/goals/answers';
@@ -27,6 +27,12 @@ import { buildForest, type Step } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import type { AreaWithGoals, Goal } from '@/lib/goals/tree';
 import { DashCredit } from '@/components/ui/dash-mark';
+import { GoalDetail } from '@/app/goals/[goalId]/goal-detail';
+import { GoalActivity } from '@/app/goals/[goalId]/goal-activity';
+import { closedSteps, goalStages } from '@/lib/goals/goal-page';
+import { goalProgress } from '@/lib/goals/status';
+import { goalMapWith } from './goal-surfaces';
+import { SetTab } from './set-tab';
 
 /**
  * The Goals home, All goals, the top of a goal page and an information step,
@@ -73,6 +79,7 @@ const cards = goal('g-cards', 'a-money', 'Pay off the credit cards', {
   acceptance: 'Every card at a zero balance.',
   unit: '$',
   target: 0,
+  createdAt: '2026-06-02T09:00:00Z',
 });
 const fund = goal('g-fund', 'a-money', 'Build an emergency fund', {
   acceptance: 'Three months of spending in the savings account.',
@@ -83,13 +90,34 @@ const job = goal('g-job', 'a-career', 'Move into a quant research role', {
 });
 const marathon = goal('g-run', 'a-health', 'Run a half marathon', {
   fog: 'Whether to aim for a time or just to finish.',
+  createdAt: '2026-09-25T07:30:00Z',
 });
+
+/** The areas a goal can be moved to, for the menu in the page's header. */
+const PLACES = [
+  { id: 'a-money', name: 'Money' },
+  { id: 'a-career', name: 'Career' },
+  { id: 'a-health', name: 'Health' },
+];
 
 const cardsProgress = progress({
   bands: { on_you: 3, waiting: 1, with_dash: 1, done: 2 },
   move: 'on_you',
   questions: 1,
 });
+
+const cardsReview: GoalReview = {
+  id: 'rev-1',
+  goalId: cards.id,
+  verdict: 'waiting_on_you',
+  reason: 'Two steps closed this week and the next one is yours.',
+  nextMove: 'Answer “Which card first?” so Dash can plan the payments.',
+  nextOn: null,
+  stepId: null,
+  waitsOnId: null,
+  runId: null,
+  createdAt: '2026-09-21T08:00:00Z',
+};
 
 /* ------------------------------------------------------------------ home */
 
@@ -623,16 +651,18 @@ export function GoalTopSurface() {
     children: [],
   };
   return (
-    <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title={cards.title}
-        description={cards.acceptance ?? undefined}
-        crumbs={goalCrumbs(cards, 'Money')}
-      />
+    <GoalDetail
+      goal={cards}
+      areaName="Money"
+      places={PLACES}
+      review={cardsReview}
+      progress={cardsProgress}
+      timeZone="UTC"
+    >
       <div className="space-y-6">
         <div className="space-y-4">
           <GoalStatusCard
-            line="3 on you · 1 step ready for Dash · due 30 Jun"
+            line="3 on you · 1 step ready for Dash"
             brief={{
               id: 'brief-1',
               itemId: cards.id,
@@ -642,18 +672,7 @@ export function GoalTopSurface() {
             }}
             briefWhen="today"
             current
-            review={{
-              id: 'rev-1',
-              goalId: cards.id,
-              verdict: 'waiting_on_you',
-              reason: 'Two steps closed this week and the next one is yours.',
-              nextMove: 'Answer “Which card first?” so Dash can plan the payments.',
-              nextOn: null,
-              stepId: null,
-              waitsOnId: null,
-              runId: null,
-              createdAt: '2026-09-21T08:00:00Z',
-            }}
+            review={cardsReview}
             ask={
               <GoalShaping
                 goalId={cards.id}
@@ -707,11 +726,8 @@ export function GoalTopSurface() {
           </h2>
           <FileLinks files={cardFiles} />
         </section>
-        <section aria-label="Runs" className="px-1">
-          <RunHistory runs={cardRuns} more={false} />
-        </section>
       </div>
-    </div>
+    </GoalDetail>
   );
 }
 
@@ -723,10 +739,19 @@ export function GoalTopSurface() {
 export function GoalBareSurface() {
   const number = { goalId: marathon.id, unit: null, target: null, readings: [], today: TODAY };
   return (
-    <div className="mx-auto max-w-3xl">
-      <PageHeader title={marathon.title} />
-      <GoalFog goalId={marathon.id} fog={marathon.fog!} aside={false} />
+    <GoalDetail
+      goal={marathon}
+      areaName="Health"
+      places={PLACES}
+      review={null}
+      progress={progress({
+        bands: { on_you: 0, waiting: 0, with_dash: 0, done: 0 },
+        move: 'settled',
+      })}
+      timeZone="UTC"
+    >
       <div className="space-y-6">
+        <GoalFog goalId={marathon.id} fog={marathon.fog!} aside={false} />
         <GoalShaping
           goalId={marathon.id}
           approval={approvalLine({
@@ -752,7 +777,7 @@ export function GoalBareSurface() {
           }}
         />
       </div>
-    </div>
+    </GoalDetail>
   );
 }
 
@@ -1015,5 +1040,85 @@ export function GoalLinkingSurface() {
         startAdding
       />
     </div>
+  );
+}
+
+/* ------------------------------------------------ the goal page's tabs */
+
+/**
+ * The credit-card goal from the steps' fixtures (goal-surfaces.tsx), with
+ * the times its closed steps were closed, for the Steps and Activity tabs
+ * (plan #1671).
+ */
+const tabbedMap = goalMapWith({
+  list: { closedAt: '2026-09-18T10:00:00Z' },
+  script: { closedAt: '2026-09-23T07:15:00Z' },
+  overdraft: { closedAt: '2026-09-10T16:40:00Z' },
+});
+const tabbedGoal: Goal = {
+  ...tabbedMap.goal,
+  createdAt: '2026-09-02T09:00:00Z',
+  dueOn: '2027-06-30',
+};
+
+function TabbedGoal({ children }: { children: React.ReactNode }) {
+  return (
+    <GoalDetail
+      goal={tabbedGoal}
+      areaName={tabbedMap.areaName}
+      places={PLACES}
+      review={cardsReview}
+      progress={goalProgress(tabbedMap.steps)}
+      timeZone="UTC"
+    >
+      {children}
+    </GoalDetail>
+  );
+}
+
+/** A goal's page on its Steps tab: the step tree with its stages and rhythm. */
+export function GoalStepsTabSurface() {
+  return (
+    <>
+      <SetTab tab="steps" />
+      <TabbedGoal>
+        <StepTree map={tabbedMap} stages={goalStages(tabbedMap.steps)} todoOn={false} />
+      </TabbedGoal>
+    </>
+  );
+}
+
+/**
+ * The same goal on its Activity tab: the steps closed, newest first, one of
+ * them Dash's and one dropped, the goal's runs, and its comments.
+ */
+export function GoalActivitySurface() {
+  return (
+    <>
+      <SetTab tab="activity" />
+      <TabbedGoal>
+        <GoalActivity
+          goalId={tabbedGoal.id}
+          closed={closedSteps(tabbedMap.steps)}
+          runs={cardRuns}
+          moreRuns
+          thread={[
+            {
+              id: 'turn-1',
+              author: 'me',
+              body: 'The card company said to call back after the statement on the 3rd.',
+              createdAt: '2026-09-24T17:20:00Z',
+            },
+            {
+              id: 'turn-2',
+              author: 'claude',
+              body: 'Noted. I have moved the call to after 3 Oct and kept the script as it is.',
+              createdAt: '2026-09-24T17:22:00Z',
+            },
+          ]}
+          timeZone="UTC"
+        />
+      </TabbedGoal>
+    </>
   );
 }
