@@ -44,6 +44,45 @@ afterAll(async () => {
   await closeDb();
 });
 
+describe('core.acknowledge_thread_turn', () => {
+  it('marks your own comment, keeps the first time, and reads back through the view', async () => {
+    const ref = `public.ideas:${idea}`;
+    const [{ id }] = await asUser(me, (tx) =>
+      tx<{ id: string }[]>`select core.add_thread_turn(${me}, ${ref}, 'me', 'Done, thanks @dash') as id`,
+    );
+    const [first] = await asUser(me, (tx) =>
+      tx<{ at: Date }[]>`select core.acknowledge_thread_turn(${me}, ${ref}, ${id}) as at`,
+    );
+    const [again] = await asUser(me, (tx) =>
+      tx<{ at: Date }[]>`select core.acknowledge_thread_turn(${me}, ${ref}, ${id}) as at`,
+    );
+    expect(again.at).toEqual(first.at);
+    const [row] = await asUser(me, (tx) =>
+      tx<{ acknowledged_at: Date | null }[]>`select acknowledged_at from core.thread_turns where id = ${id}`,
+    );
+    expect(row.acknowledged_at).toEqual(first.at);
+  });
+
+  it('refuses Dash\'s own turn, another account\'s comment, and a comment under another row', async () => {
+    const ref = `public.ideas:${idea}`;
+    const [{ id: dashTurn }] = await asUser(me, (tx) =>
+      tx<{ id: string }[]>`select core.add_thread_turn(${me}, ${ref}, 'claude', 'Noted.') as id`,
+    );
+    const [{ id: mine }] = await asUser(me, (tx) =>
+      tx<{ id: string }[]>`select core.add_thread_turn(${me}, ${ref}, 'me', 'Another @dash') as id`,
+    );
+    await expect(
+      asUser(me, (tx) => tx`select core.acknowledge_thread_turn(${me}, ${ref}, ${dashTurn})`),
+    ).rejects.toThrow(/not a comment of yours/);
+    await expect(
+      asUser(them, (tx) => tx`select core.acknowledge_thread_turn(${them}, ${ref}, ${mine})`),
+    ).rejects.toThrow(/not a comment of yours/);
+    await expect(
+      asUser(me, (tx) => tx`select core.acknowledge_thread_turn(${me}, ${`goals.items:${goal}`}, ${mine})`),
+    ).rejects.toThrow(/not a comment of yours/);
+  });
+});
+
 describe('core.add_thread_turn', () => {
   it('starts the thread under a row of yours and reads back in order, with its author', async () => {
     const ref = `public.ideas:${idea}`;

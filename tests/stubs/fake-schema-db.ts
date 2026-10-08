@@ -37,6 +37,28 @@ export function fakeSchemaDb(tables: FakeTables, now = '2026-10-03T08:00:00Z') {
     return {
       schema: (name: string) => client(name),
       rpc(name: string, args: Row) {
+        if (schema === 'core' && name === 'acknowledge_thread_turn') {
+          // Only the person's own comment under that row takes the mark.
+          const conversation = (tables['core.conversations'] ?? []).find(
+            (c) => c.user_id === args.p_user_id && c.subject_kind === 'row' && c.subject_ref === args.p_ref,
+          );
+          const turn = (tables['core.conversation_turns'] ?? []).find(
+            (t) =>
+              t.id === args.p_turn &&
+              t.user_id === args.p_user_id &&
+              t.role === 'user' &&
+              conversation !== undefined &&
+              t.conversation_id === conversation.id,
+          );
+          if (!turn) {
+            return Promise.resolve({
+              data: null,
+              error: { message: `acknowledge_thread_turn: ${String(args.p_turn)} is not a comment of yours under ${String(args.p_ref)}` },
+            });
+          }
+          turn.acknowledged_at ??= now;
+          return Promise.resolve({ data: turn.acknowledged_at, error: null });
+        }
         if (schema !== 'core' || name !== 'add_thread_turn') {
           return Promise.resolve({ data: null, error: { message: `no function ${schema}.${name}` } });
         }
