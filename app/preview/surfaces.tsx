@@ -130,6 +130,8 @@ import {
   PlanSendBackSurface,
   PlanOpenedSurface,
   PlanFeatureSurface,
+  PlanFeatureEditSurface,
+  PlanNewFeatureSurface,
   PlanFeatureStepsSurface,
   PlanFeatureStepsYoursSurface,
   PlanFeatureActivitySurface,
@@ -3027,6 +3029,25 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanFeatureSurface />,
+  },
+  {
+    /* The same page with Edit pressed (plan #1670): the feature's compose
+     * surface, filled in, in place of the Overview. */
+    id: 'dev-plan-feature-edit',
+    label: 'Plan · editing a feature',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanFeatureEditSurface />,
+  },
+  {
+    /* "New feature" pressed on the plan (plan #1670): one compose surface
+     * with the title, a summary, chips for module, priority, size and who
+     * holds it, then the description. */
+    id: 'dev-plan-new-feature',
+    label: 'Plan · writing a new feature',
+    module: 'dev',
+    width: 'page',
+    render: () => <PlanNewFeatureSurface />,
   },
   {
     /* The same page on its Activity tab (plan #1667): the feature's history

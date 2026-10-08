@@ -609,6 +609,7 @@ const featureItems: PlanItem[] = [
     id: 'feat',
     module: 'dev',
     title: 'Give each feature its own page with tabs, breadcrumbs and a column of its properties',
+    summary: 'One page per feature that says how it stands, what moved and who has what left.',
     detail:
       'Each feature on the plan opens to its own page: breadcrumbs at the top, then Overview, Activity and Steps tabs, with a column of its properties beside them. The goal page moves onto the same layout so the two stay alike.',
     acceptance:
@@ -816,10 +817,11 @@ const featureActivitySources = {
   ],
 };
 
-function FeatureFixture() {
+function FeatureFixture({ editing = false }: { editing?: boolean }) {
   if (!featureSection || !featureNode) return null;
   return (
     <FeaturePage
+      startEditing={editing}
       feature={featureNode}
       module="dev"
       moduleLabel={featureSection.label}
@@ -873,5 +875,31 @@ export function PlanFeatureStepsYoursSurface() {
       <SetTab tab="steps" params={HELD_YOURS} />
       <FeatureFixture />
     </>
+  );
+}
+
+/** The feature page's Edit: the compose surface it was written in, filled in (plan #1670). */
+export function PlanFeatureEditSurface() {
+  return <FeatureFixture editing />;
+}
+
+/**
+ * The "New feature" surface open at the top of the plan (plan #1670): title,
+ * summary, the module and property chips, then the description.
+ */
+export function PlanNewFeatureSurface() {
+  return (
+    <PlanView
+      sections={applyView(whole, 'open')}
+      finished={[]}
+      summary={summarize(whole)}
+      view="open"
+      catalog={catalog}
+      empty={false}
+      canSend={false}
+      lastRuns={treeRuns}
+      commitChecks={{}}
+      newFeature={{ open: true }}
+    />
   );
 }
