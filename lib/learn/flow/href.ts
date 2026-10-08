@@ -51,6 +51,14 @@ export function wantsPractice(params: {
   return params.goal !== undefined || params.only !== undefined;
 }
 
+/**
+ * A subject's Clips player (plan #1697): only the clips that serve it. A page
+ * of its own under the subject, since the player is the page.
+ */
+export function subjectClipsHref(subjectId: string): string {
+  return `/learn/s/${encodeURIComponent(subjectId)}/clips`;
+}
+
 /** The first value of a search parameter, when it was given once or more. */
 export function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;

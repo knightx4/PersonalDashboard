@@ -7,6 +7,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
+import { nowHref } from '@/lib/learn/flow/href';
 import { clockTime, thumbnailUrl, watchAt } from '@/lib/learn/youtube/format';
 import {
   appendClips,
@@ -130,10 +131,13 @@ type Cover = 'start' | 'tap' | 'sound' | null;
 export function ClipStream({
   initial,
   fixed = false,
+  subjectId = null,
 }: {
   initial: PlayerClip[];
   /** The surface gallery's: play only the clips given and fetch no more, since it has no session. */
   fixed?: boolean;
+  /** A subject's player (plan #1697): fetch more of that subject's clips only. */
+  subjectId?: string | null;
 }) {
   const toast = useToast();
   const [queue, setQueue] = useState(initial);
@@ -305,7 +309,10 @@ export function ClipStream({
     if (upNext) new Image().src = thumbnailUrl(upNext.videoId);
     if (fixed || !shouldRefill(queue.length, index, { loading: loading.current, exhausted })) return;
     loading.current = true;
-    loadMoreClipsAction(queue.map((clip) => clip.id))
+    loadMoreClipsAction(
+      queue.map((clip) => clip.id),
+      subjectId,
+    )
       .then((more) => {
         if (more.length === 0) setExhausted(true);
         setQueue((q) => appendClips(q, more));
@@ -314,7 +321,7 @@ export function ClipStream({
       .finally(() => {
         loading.current = false;
       });
-  }, [queue, index, exhausted, upNext, fixed]);
+  }, [queue, index, exhausted, upNext, fixed, subjectId]);
 
   // -- What the person does ---------------------------------------------------
   const begin = useCallback(() => {
@@ -485,7 +492,7 @@ export function ClipStream({
             {(exhausted || fixed) && (
               <p className="max-w-sm text-ui text-white/80">
                 Dash cuts more from your videos a few times a day.{' '}
-                <Link href="/learn/now" className="underline underline-offset-2 hover:text-white">
+                <Link href={nowHref(subjectId)} className="underline underline-offset-2 hover:text-white">
                   Go to Now
                 </Link>
               </p>
