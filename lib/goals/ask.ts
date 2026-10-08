@@ -25,6 +25,7 @@
  * core.dash_actions alongside the write (plan #1459), so it can be undone
  * while nobody has changed the row since.
  */
+import { SEEN_MESSAGE } from '@/lib/comments/awaiting';
 import 'server-only';
 
 import type Anthropic from '@anthropic-ai/sdk';
@@ -289,7 +290,7 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
   if (reply.passedOn && reply.made.length === 0) {
     return { ok: true, message: 'Dash is working on this goal. Its reply lands in this thread.' };
   }
-  if (reply.acknowledged) return { ok: true, message: 'Dash marked your comment as seen.' };
+  if (reply.acknowledged) return { ok: true, message: SEEN_MESSAGE };
 
   await say(input, reply.body);
   return {

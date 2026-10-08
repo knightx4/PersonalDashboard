@@ -18,6 +18,7 @@
  * recorded under the comment that asked for it (plan #1518), so Home's list
  * of what Dash did links back to the role.
  */
+import { SEEN_MESSAGE } from '@/lib/comments/awaiting';
 import 'server-only';
 
 import { readSubjectOrNull, recordDashAction, type DashActionDeps } from '@/lib/core/dash-actions';
@@ -270,7 +271,7 @@ async function produceReply(input: RoleAskInput): Promise<RoleAskOutcome> {
   });
   await recordSessionSpend(userId, { module: 'jobs', operation: 'reply-to-role-comment' }, spend);
   if (!reply.ok) return refuse(`I could not produce a reply: ${reply.detail} Your comment is saved.`);
-  if (reply.acknowledged) return { ok: true, message: 'Dash marked your comment as seen.' };
+  if (reply.acknowledged) return { ok: true, message: SEEN_MESSAGE };
 
   await say(input, reply.body);
   return {

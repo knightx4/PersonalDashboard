@@ -17,6 +17,7 @@
  * here approves, answers, starts, assigns or dismisses anything. Asking is not
  * deciding, and those moves are made on the page.
  */
+import { SEEN_MESSAGE } from '@/lib/comments/awaiting';
 import 'server-only';
 
 import type Anthropic from '@anthropic-ai/sdk';
@@ -517,7 +518,7 @@ async function produceReply(input: AskInput): Promise<AskOutcome> {
   // route a question took is not part of the conversation, so Dash's sentence
   // saying so is only written when it changed something as well.
   if (session && reply.made.length === 0) return { ok: true, message: session };
-  if (reply.acknowledged) return { ok: true, message: 'Dash marked your comment as seen.' };
+  if (reply.acknowledged) return { ok: true, message: SEEN_MESSAGE };
 
   await say(input, reply.body);
   checkReplyAfterResponse(input.userId, reply.body, `${input.target} ${input.id}`);

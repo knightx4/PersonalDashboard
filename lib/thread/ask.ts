@@ -14,6 +14,7 @@
  * The same rule as the other three: every outcome is written into the
  * thread, including the ones where nothing could be done.
  */
+import { SEEN_MESSAGE } from '@/lib/comments/awaiting';
 import 'server-only';
 
 import type Anthropic from '@anthropic-ai/sdk';
@@ -126,7 +127,7 @@ async function produceReply(input: RowAskInput): Promise<RowAskOutcome> {
   await recordSessionSpend(input.userId, { module: 'core', operation: 'reply-to-comment' }, spend);
   if (!reply.ok) return refuse(`I could not produce a reply: ${reply.detail} Your comment is saved.`);
 
-  if (reply.acknowledged) return { ok: true, message: 'Dash marked your comment as seen.' };
+  if (reply.acknowledged) return { ok: true, message: SEEN_MESSAGE };
   await say(input, reply.body);
   return { ok: true, message: reply.made.length > 0 ? 'Done, and said in the thread.' : 'Answered in the thread.' };
 }

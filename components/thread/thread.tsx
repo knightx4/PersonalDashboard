@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useOptimistic, useRef, useState } from 'react';
-import { ArrowUp, CircleUser, X } from 'lucide-react';
+import { ArrowUp, Check, CircleUser, X } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
 import { addComment, deleteComment, type CommentActionState } from '@/app/dev/comment-actions';
 import { addGoalComment, deleteGoalComment } from '@/app/goals/[goalId]/comment-actions';
@@ -13,7 +13,7 @@ import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
-import { awaitingDash } from '@/lib/comments/awaiting';
+import { awaitingDash, SEEN_MESSAGE } from '@/lib/comments/awaiting';
 import { MENTION, mentionsDash, withoutMention } from '@/lib/comments/mention';
 import { commentWhen, exactTime, shortWhen } from '@/lib/comments/when';
 import type { PlanRefTitles } from '@/lib/comments/refs';
@@ -246,6 +246,22 @@ function Message({
         <div className="text-body text-ink">
           <CommentBody body={comment.body} titles={titles} />
         </div>
+        {/* Dash read it and had nothing to add (plan #1650). One mark for it,
+            in the muted text the thread uses for times, under the comment it
+            is about. It stands where "replying…" would have stood. */}
+        {comment.acknowledgedAt && (
+          <p className="flex items-center gap-1 text-small text-ink-muted">
+            <Check className="size-4 shrink-0" strokeWidth={2} aria-hidden />
+            <span>Seen by Dash</span>
+            <time
+              dateTime={comment.acknowledgedAt}
+              title={exactTime(comment.acknowledgedAt)}
+              className="tabular"
+            >
+              {commentWhen(comment.acknowledgedAt, now)}
+            </time>
+          </p>
+        )}
       </div>
 
       {!unsent && (
@@ -414,8 +430,13 @@ export function Thread({
   // to `pending` had it up for the wrong one of the two -- and gone entirely
   // after a reload. `awaitingDash` holds it until Dash answers or until the
   // wait has gone on longer than an answer ever takes.
+  //
+  // The line is also held back when the action's own answer is that Dash
+  // marked the comment seen: the refreshed thread carries the mark, and the
+  // message would otherwise be read as a reply.
+  const seen = !sending && !state.error && state.message === SEEN_MESSAGE;
   const asking =
-    awaitingReply || (!submit && awaitingDash(shown, target, now));
+    !seen && (awaitingReply || (!submit && awaitingDash(shown, target, now)));
   /** Whether what is in the box right now would reach Dash. */
   const tagged = reaches(draft);
 
