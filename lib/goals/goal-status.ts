@@ -13,6 +13,7 @@
  */
 import { dailyView, type WaitingItem } from '@/lib/goals/daily';
 import { formatDay } from '@/lib/goals/dates';
+import { stepAnchor } from '@/lib/goals/goal-page';
 import type { StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 
@@ -60,7 +61,7 @@ function plural(n: number, one: string, many: string): string {
 function waitingRow(item: WaitingItem, steps: readonly StepNode[]): StatusRow | null {
   switch (item.kind) {
     case 'question':
-      return { id: item.id, kind: 'question', label: 'Answer', title: item.title, href: `#step-${item.id}` };
+      return { id: item.id, kind: 'question', label: 'Answer', title: item.title, href: stepAnchor(item.id) };
     case 'flag':
       return { id: item.id, kind: 'flag', label: 'Dash flagged', title: item.title, href: `#flag-${item.id}` };
     case 'breakdown': {
@@ -70,13 +71,13 @@ function waitingRow(item: WaitingItem, steps: readonly StepNode[]): StatusRow | 
         kind: 'approve',
         label: 'Approve',
         title: plural(item.count, 'proposed step', 'proposed steps'),
-        href: first ? `#step-${first}` : '#claude-heading',
+        href: first ? stepAnchor(first) : '#claude-heading',
       };
     }
     case 'plan':
       return { id: item.id, kind: 'approve', label: 'Approve', title: 'This goal, which Dash proposed', href: '#claude-heading' };
     case 'review':
-      return { id: item.id, kind: 'read', label: 'Read Dash’s result', title: item.title, href: `#step-${item.id}` };
+      return { id: item.id, kind: 'read', label: 'Read Dash’s result', title: item.title, href: stepAnchor(item.id) };
     case 'context':
       return {
         id: item.id,
@@ -115,7 +116,7 @@ export function goalStatus(
     kind: 'do',
     label: item.dueOn ? `Do by ${formatDay(item.dueOn)}` : 'Do',
     title: item.title,
-    href: `#step-${item.id}`,
+    href: stepAnchor(item.id),
   }));
   return {
     yourMove: [...waiting, ...doRows],

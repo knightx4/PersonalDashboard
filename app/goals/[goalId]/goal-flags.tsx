@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { FieldError } from '@/components/ui/field';
 import type { GoalFlag } from '@/lib/goals/flags';
+import { isStepAnchor } from '@/lib/goals/goal-page';
 import type { StatusRow } from '@/lib/goals/goal-status';
 import type { StepNode } from '@/lib/goals/steps';
 import {
@@ -57,7 +58,7 @@ export function WaitingOnYou({
   questions: Record<string, StepNode>;
 }) {
   const flagOf = new Map(flags.map((flag) => [flag.id, flag]));
-  const reads = rows.filter((row) => row.kind === 'read' && row.href.startsWith('#step-'));
+  const reads = rows.filter((row) => row.kind === 'read' && isStepAnchor(row.href));
   const shown = rows.filter((row) => row.kind !== 'do' && !reads.includes(row));
   // A flag you answered waits on Dash's reply, not on you: it is listed apart
   // until the run closes it, and is not counted here.
@@ -145,7 +146,7 @@ const ICONS = { approve: Flag, read: Sparkles, question: CircleHelp } as const;
 /** A row that is done elsewhere on the page: a link to where. */
 function LinkItem({ row }: { row: StatusRow }) {
   const Icon =
-    row.kind === 'approve' && row.href.startsWith('#step-')
+    row.kind === 'approve' && isStepAnchor(row.href)
       ? ListChecks
       : (ICONS[row.kind as keyof typeof ICONS] ?? Sparkles);
   return (
