@@ -154,6 +154,8 @@ export const WRITE_TOOL_KINDS: readonly string[] = [
   'close_goal_step',
   'mark_returned',
   'add_role_note',
+  'add_job_lead',
+  'add_idea',
 ];
 
 /** Whether Ask's own undo puts this change back, rather than the generic rule here. */
