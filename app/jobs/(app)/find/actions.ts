@@ -8,6 +8,7 @@ import { recordSessionSpend } from '@/lib/core/spend/session';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { runWeeklyDiscovery, type WeeklyOutcome } from '@/lib/jobs/discover/weekly';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { SUGGEST_MODEL, suggestLearningTracks } from '@/lib/jobs/learning/suggest';
 import { THOUGHT_MAX } from '@/lib/jobs/thoughts';
 import { insertAim } from '@/lib/learn/aims-store';
@@ -300,4 +301,44 @@ export async function findStartups(): Promise<DiscoveryActionState> {
     error: null,
     message: `Dash kept ${kept} ${kept === 1 ? 'startup' : 'startups'}, ${result.added} of them new, and found ${result.boardsFound} more job ${result.boardsFound === 1 ? 'board' : 'boards'}.`,
   };
+}
+
+/**
+ * Add to my companies, on a discovered company: it becomes a companies row
+ * with its website and job board, so the roles search reads its board every
+ * day as it does for any company followed, and the watchlist row points at it.
+ */
+// latency: pending
+export async function addDiscoveredCompany(watchlistId: string): Promise<{ error: string | null }> {
+  const id = z.string().uuid().safeParse(watchlistId);
+  if (!id.success) return { error: 'That company could not be found.' };
+
+  const user = await requireUser();
+  const supabase = await createClient();
+  const { data: row, error: readError } = await supabase
+    .from('watchlist_startups')
+    .select('name, website, board_vendor, board_token, company_id')
+    .eq('id', id.data)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (readError || !row) return { error: readError?.message ?? 'That company is gone.' };
+  if (row.company_id) return { error: null };
+
+  const company = await ensureCompany(supabase, user.id, row.name as string, {
+    website: (row.website as string | null) ?? null,
+    boardToken: (row.board_token as string | null) ?? null,
+    ats: (row.board_vendor as string | null) ?? null,
+  });
+  if (company.error) return { error: company.error };
+
+  const { error } = await supabase
+    .from('watchlist_startups')
+    .update({ company_id: company.id })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePath('/jobs/find');
+  revalidatePath('/jobs/companies');
+  return { error: null };
 }

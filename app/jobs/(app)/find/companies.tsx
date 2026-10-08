@@ -11,7 +11,7 @@ import { PaidHint } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
 import { FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
 import { companyFacts, type DiscoveredCompany, type DiscoveryLine } from '@/lib/jobs/discover/watchlist-view';
-import { findStartups } from './actions';
+import { addDiscoveredCompany, findStartups } from './actions';
 
 /** Rows shown before "Show all": the best matches. */
 const TOP = 10;
@@ -113,6 +113,13 @@ export function DiscoveredCompanies({
 
 function CompanyRow({ company }: { company: DiscoveredCompany }) {
   const facts = companyFacts(company);
+  const [adding, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const add = () =>
+    start(async () => {
+      const result = await addDiscoveredCompany(company.id);
+      setError(result.error);
+    });
   return (
     <li className="row-pad space-y-1">
       <div className="flex items-baseline gap-2">
@@ -147,11 +154,18 @@ function CompanyRow({ company }: { company: DiscoveredCompany }) {
         <p className="text-small text-ink-muted">Hiring for {company.postingRoles.join(', ')}</p>
       )}
       {company.reason && <p className="text-small text-ink-muted">{company.reason}</p>}
-      {company.companySlug && (
-        <Link href={`/jobs/companies/${company.companySlug}`} className="text-small text-accent hover:underline">
-          On your companies list
-        </Link>
-      )}
+      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+        {company.companySlug ? (
+          <Link href={`/jobs/companies/${company.companySlug}`} className="press-area text-small text-accent hover:underline">
+            On your companies list
+          </Link>
+        ) : (
+          <Button type="button" size="sm" variant="secondary" pending={adding} onClick={add}>
+            {adding ? 'Adding…' : 'Add to my companies'}
+          </Button>
+        )}
+        {error && <p className="text-small text-caution">{error}</p>}
+      </div>
     </li>
   );
 }
