@@ -456,6 +456,12 @@ B — Ship it as JSON. Keeps everything, needs something to read it.
 Recommend A: the nesting is one column and nobody has asked for it."
 ```
 
+A block is for something the person does. `block` refuses an ask that says
+nothing is needed from them (without `--on-steps`), because a blocked step is
+listed under what they have to do. A step that only waits on time or a
+scheduled run stays `in_progress` with `check-back "<what to look at>" --after
+2h --from <n>`, which shows it as waiting on.
+
 A step that should not be done is `drop <n> --note "why"`; say "out of scope:
 …" when that is the reason, since there is no status for it. Never delete a
 step; deleting is the user's.
