@@ -2609,10 +2609,43 @@ const recommendedRoles: OpenSuggestion[] = [
     scores: null,
     scoreNote: null,
   }),
+  /* Two from startups weekly discovery found (plan #1685): companies not on
+   * file, so no link to a company page, each saying where it was found. */
+  recommendedOpening({
+    id: 'op-5',
+    companyName: 'Ledgerline',
+    companySlug: null,
+    headline: 'Strategic Finance Lead, Planning and Forecasting',
+    location: 'Remote (US)',
+    workMode: 'remote',
+    url: 'https://jobs.ashbyhq.com/ledgerline/2',
+    why: 'You want strategic finance close to the founders, and Ledgerline is building its first planning team after its seed round.',
+    move: "1. Read the posting at the link. 2. Save it here if it fits, which adds Ledgerline to your companies. 3. Apply on their own site.",
+    foundIn: 'Found on YC',
+    origin: 'discovered',
+    scores: null,
+    scoreNote: null,
+  }),
+  recommendedOpening({
+    id: 'op-6',
+    companyName: 'Northwind Analytics',
+    companySlug: null,
+    headline: 'Senior FP&A Manager',
+    location: 'New York or remote',
+    workMode: null,
+    url: 'https://northwind.example/careers',
+    why: "Their post asks for an FP&A lead to build the board pack and pricing model, the two things your EY work covered.",
+    move: "1. Read the posting at the link. 2. Save it here if it fits, which adds Northwind Analytics to your companies. 3. Apply on their own site.",
+    foundIn: 'Found on Hacker News',
+    origin: 'discovered',
+    scores: null,
+    scoreNote: null,
+  }),
 ];
 
 const recommendedStats: OriginStats[] = [
   { origin: 'search', found: 8, saved: 5, applied: 2, interviews: 0, dismissed: 3, expired: 0 },
+  { origin: 'discovered', found: 10, saved: 2, applied: 1, interviews: 0, dismissed: 4, expired: 0 },
   { origin: 'goal', found: 41, saved: 4, applied: 1, interviews: 0, dismissed: 23, expired: 0 },
 ];
 

@@ -21,6 +21,7 @@ import { exclusionWords, personKey, roleKey } from './payload';
 import { openingFeedback } from './feedback';
 import { pickBoardCandidates } from './board-pick';
 import { loadFollowedBoardPostings } from './boards';
+import { suggestDiscoveredRoles } from '@/lib/jobs/discover/roles-run';
 import { readPreferences } from './preferences';
 import type { SearchProgress } from './search-runs';
 import { queueSearch } from './search-batch';
@@ -248,13 +249,31 @@ async function runApply(
     companies: feedback.companies,
   };
   const responded = applications.filter((app) => app.respondedAt);
+  const likedTitles = [
+    ...pastOpenings.filter((row) => row.status === 'done' && row.headline).map((row) => row.headline as string),
+    ...responded.map((app) => app.roleTitle),
+  ];
+  // Roles at the startups weekly discovery found (plan #1685): up to ten a
+  // week on top of what this search finds, stored first so the search
+  // leaves their links alone.
+  const discovered = await suggestDiscoveredRoles(supabase, userId, {
+    targetTitles: seeker.targetTitles,
+    likedTitles,
+    taken,
+  }).catch((err: unknown) => {
+    console.error('[jobs suggestions] discovered roles', err instanceof Error ? err.message : err);
+    return { headlines: [] as string[], urls: [] as string[], startupsRead: 0 };
+  });
+  for (const url of discovered.urls) taken.urls.add(url);
+  const withDiscovered = (outcome: KindOutcome): KindOutcome => ({
+    ...outcome,
+    written: outcome.written + discovered.headlines.length,
+    headlines: [...outcome.headlines, ...discovered.headlines],
+  });
   const boards = await loadFollowedBoardPostings(supabase, userId);
   const boardOpenings = pickBoardCandidates(boards.postings, {
     targetTitles: seeker.targetTitles,
-    likedTitles: [
-      ...pastOpenings.filter((row) => row.status === 'done' && row.headline).map((row) => row.headline as string),
-      ...responded.map((app) => app.roleTitle),
-    ],
+    likedTitles,
     taken,
     excludedWords: exclusionWords(seeker.excludedIndustries),
   });
@@ -278,13 +297,15 @@ async function runApply(
     },
   );
   if (!result.ok) {
-    if (result.queue) return queueOutcome(supabase, apiKey, 'apply', result.queue, boardOrigins, spend, progress);
-    return { ran: true, written: 0, headlines: [], spend, error: result.error };
+    if (result.queue) {
+      return withDiscovered(await queueOutcome(supabase, apiKey, 'apply', result.queue, boardOrigins, spend, progress));
+    }
+    return withDiscovered({ ran: true, written: 0, headlines: [], spend, error: result.error });
   }
 
   await progress?.stage('apply', 'saving');
   const headlines = await storeOpenings(supabase, userId, result.suggestions, boardOrigins);
-  return { ran: true, written: headlines.length, headlines, spend, error: null };
+  return withDiscovered({ ran: true, written: headlines.length, headlines, spend, error: null });
 }
 
 /**
