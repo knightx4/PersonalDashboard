@@ -10,6 +10,7 @@ import {
   READY_LOW,
   READY_TARGET,
   runTopUpFor,
+  subjectLessonsWanted,
   type TopUpPorts,
   type TopUpSummary,
 } from '@/lib/learn/feed/top-up';
@@ -30,6 +31,7 @@ import { writeClipCards, type ClipCardPassResult } from '@/lib/learn/clips/clip-
 import { loadTranscript } from '@/lib/learn/youtube/transcripts';
 import { writeClipNotes } from '@/lib/learn/feed/clip-note-run';
 import { createFeedPicker, loadFeedFields, peopleToPickFor } from './feed-picks';
+import { chooseLessonsFor } from '@/lib/learn/lessons/choose-load';
 import { createLessonPorts } from './lesson-top-up';
 
 /**
@@ -127,7 +129,7 @@ type PickedRow = {
   field: { name: string; scope: string } | null;
 };
 
-async function countReady(learn: LearnSupabaseClient, userId: string): Promise<number> {
+async function countReady(learn: LearnSupabaseClient, userId: string, subjectId: string | null = null): Promise<number> {
   // A goal's lessons are on its plan and not dealt (plan #1143), so they do
   // not count towards the twenty.
   const planLessons = notPlanLessons(await goalTrackIds(learn, userId));
@@ -141,6 +143,8 @@ async function countReady(learn: LearnSupabaseClient, userId: string): Promise<n
     // "Cards after the first week").
     .not('context', 'is', null);
   if (planLessons) query = query.or(planLessons);
+  // The service role is not narrowed, so a subject's count names the person too.
+  if (subjectId) query = query.eq('subject_id', subjectId);
   const { count, error } = await query;
   if (error) throw new Error(`Counting your ready cards failed: ${error.message}`);
   return count ?? 0;
@@ -550,7 +554,11 @@ export async function runFeedTopUp(): Promise<FeedTopUpResult> {
  * Never throws: it runs after the response has gone, where an error has
  * nobody to reach, so a failure is logged and the hourly tick tries again.
  */
-export async function topUpFeedAfterResponse(userId: string): Promise<TopUpSummary | null> {
+export async function topUpFeedAfterResponse(
+  userId: string,
+  subjectId: string | null = null,
+): Promise<TopUpSummary | null> {
+  if (subjectId) return topUpSubjectAfterResponse(userId, subjectId);
   try {
     // One count first, so a response with plenty of cards ready costs no more.
     const ready = await countReady(createLearnServiceSupabase(), userId);
@@ -561,6 +569,53 @@ export async function topUpFeedAfterResponse(userId: string): Promise<TopUpSumma
       target: ready + READY_BATCH,
       deadline: Date.now() + FEED_TOP_UP_AFTER_RESPONSE_MS,
     });
+  } catch (error) {
+    console.error('[learn feed top-up]', error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
+/**
+ * Top up one subject's Now (plan #1699): when fewer than `READY_LOW` of its
+ * cards are ready, write lessons for that subject's track, and nothing else.
+ * Only lessons carry a subject, so there are no section cards, no other
+ * track's lessons, no outlines or plans and no teach-back; the hourly tick
+ * does those. The batch is the lesson share of `READY_BATCH`, the spend a main
+ * top-up puts on lessons, at the lesson writer's model. Never throws.
+ */
+async function topUpSubjectAfterResponse(userId: string, subjectId: string): Promise<TopUpSummary | null> {
+  try {
+    const learn = createLearnServiceSupabase();
+    const goalTracks = await goalTrackIds(learn, userId);
+    const ready = await countReady(learn, userId, subjectId);
+    const wanted = subjectLessonsWanted(ready, goalTracks.includes(subjectId));
+    if (wanted === null) return null;
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) throw new Error('The Learn now top-up needs ANTHROPIC_API_KEY to be set.');
+    const ports = createLessonPorts({ learn, core: createCoreServiceSupabase(), apiKey });
+    const lessons = await writeLessonsFor(
+      {
+        ...ports,
+        choose: (id, slots) => chooseLessonsFor(learn, id, slots, new Date(), subjectId),
+        // Concepts rated too hard are across every track; the hourly tick adds their floors.
+        floorsDue: async () => [],
+      },
+      { userId, wanted, deadline: Date.now() + FEED_TOP_UP_AFTER_RESPONSE_MS },
+    );
+    const readyAfter = lessons.written > 0 ? await countReady(learn, userId, subjectId) : ready;
+    return {
+      userId,
+      readyBefore: ready,
+      readyAfter,
+      skipped: false,
+      written: lessons.written,
+      dropped: [],
+      failed: lessons.failed,
+      pickRounds: 0,
+      picked: 0,
+      stopped: lessons.stopped,
+      lessons,
+    };
   } catch (error) {
     console.error('[learn feed top-up]', error instanceof Error ? error.message : error);
     return null;

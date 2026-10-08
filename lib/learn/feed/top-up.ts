@@ -1,4 +1,4 @@
-import type { LessonTopUpSummary } from '@/lib/learn/lessons/top-up';
+import { lessonsWanted, type LessonTopUpSummary } from '@/lib/learn/lessons/top-up';
 import type { CardToWrite, WriteResult } from './write-card';
 
 /**
@@ -29,6 +29,20 @@ export const READY_TARGET = 20;
  * too long a stretch with nothing new.
  */
 export const READY_LOW = 8;
+
+/**
+ * How many lessons to write when a subject's Now is opened with `ready` of its
+ * cards waiting (plan #1699), or null for none. The same threshold as the
+ * main page (`READY_LOW`) and the same batch (`READY_BATCH`) with the lesson
+ * share of it, which is what a main top-up spends on lessons. Only lessons
+ * carry a subject, so none of the batch goes to section cards. A goal's track
+ * is left alone: its lessons are on its plan and never in the deck, so
+ * writing them here would be paid for and not shown.
+ */
+export function subjectLessonsWanted(ready: number, isGoalTrack: boolean): number | null {
+  if (isGoalTrack || ready >= READY_LOW) return null;
+  return lessonsWanted(READY_BATCH);
+}
 
 /** Cards a top-up after a response writes, on top of those still ready (note 832dd774). */
 export const READY_BATCH = 15;

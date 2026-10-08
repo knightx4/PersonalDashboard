@@ -120,6 +120,7 @@ describe('the operation names', () => {
       'find-channels',
       'judge-channel',
       'cut-clips',
+      'tag-clips',
       'score-clips',
       'rate-clips',
       'read-personality',

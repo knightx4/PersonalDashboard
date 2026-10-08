@@ -235,6 +235,9 @@ async function storeClips(learn: LearnSupabaseClient, video: VideoToClip, clips:
         subject_id: clip.subjectId,
         goal_id: clip.goalId,
         cut_at: stamp,
+        // Tagged below with every track it serves, so the one-off pass
+        // (clip-tag-run.ts, plan #1696) does not read it again.
+        tagged_at: stamp,
       })),
       { onConflict: 'user_id,video_id,start_seconds' },
     ).select('id, start_seconds');
