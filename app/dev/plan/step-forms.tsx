@@ -70,7 +70,7 @@ function StatusOptions() {
  * of vertical space to repeat something the value already said. Three labelled
  * full-width selects are three rows; three chips are part of one.
  */
-function PrioritySelect({ defaultValue, id }: { defaultValue: PlanPriority; id?: string }) {
+export function PrioritySelect({ defaultValue, id }: { defaultValue: PlanPriority; id?: string }) {
   return (
     <ChipSelect
       id={id}
@@ -88,7 +88,7 @@ function PrioritySelect({ defaultValue, id }: { defaultValue: PlanPriority; id?:
   );
 }
 
-function SizeSelect({ defaultValue, id }: { defaultValue: PlanSize | null; id?: string }) {
+export function SizeSelect({ defaultValue, id }: { defaultValue: PlanSize | null; id?: string }) {
   return (
     <ChipSelect
       id={id}
@@ -108,7 +108,7 @@ function SizeSelect({ defaultValue, id }: { defaultValue: PlanSize | null; id?: 
   );
 }
 
-function AssigneeSelect({ defaultValue, id }: { defaultValue: PlanAssignee | null; id?: string }) {
+export function AssigneeSelect({ defaultValue, id }: { defaultValue: PlanAssignee | null; id?: string }) {
   return (
     <ChipSelect
       id={id}

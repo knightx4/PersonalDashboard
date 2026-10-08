@@ -60,6 +60,7 @@ import { ASSIGNEE_LABEL, SIZE_LABEL, STATUS_LABEL, scopeLabel } from './step-for
 import { when } from './plan-run-status';
 import { FeatureUpdate } from './feature-update';
 import { FeatureActivity } from './feature-activity';
+import { FeatureCompose } from './feature-compose';
 import type { PlanUpdate } from '@/lib/plan/updates';
 import { featureActivity, type ActivityDashAction, type ActivityRun } from '@/lib/plan/activity';
 
@@ -95,6 +96,7 @@ export function FeaturePage({
   screenChanges,
   updates = [],
   activity,
+  startEditing = false,
 }: {
   feature: PlanNode;
   module: PlanScope | null;
@@ -116,6 +118,8 @@ export function FeaturePage({
     runs: readonly ActivityRun[];
     actions: readonly ActivityDashAction[];
   };
+  /** Open with the compose surface already showing, for the gallery. The page leaves it off. */
+  startEditing?: boolean;
 }) {
   const router = useRouter();
   const search = useSearchParams();
@@ -140,6 +144,10 @@ export function FeaturePage({
     opened: true,
   });
   const { row, health } = parts;
+  const { setEditing } = row;
+  useEffect(() => {
+    if (startEditing) setEditing(true);
+  }, [startEditing, setEditing]);
   const node = parts.node as PlanNode;
   const [fogState, fogAction, fogPending] = useActionState(dismissPlanFog, {} as PlanActionState);
 
@@ -292,6 +300,8 @@ export function FeaturePage({
     </PropertyList>
   );
 
+  const editingHere = row.editing && tab === 'overview';
+
   const notices = (parts.confirmNotice || parts.resultNotice) && (
     <div role="status" className="mb-4 space-y-1.5 text-small">
       {parts.confirmNotice}
@@ -302,22 +312,39 @@ export function FeaturePage({
   return (
     <TabbedDetail
       crumbs={crumbs}
-      title={node.title}
+      // While the compose surface is open the title and summary are its
+      // first two fields, so the header names what is being edited instead
+      // of showing them twice.
+      title={editingHere ? `Editing #${node.number}` : node.title}
       description={
-        <span className="inline-flex flex-wrap items-center gap-x-2 text-small">
-          <span>Feature #{node.number}</span>
-          {parts.addedBy && (
-            <span title={parts.addedBy.session ? `Session ${parts.addedBy.session}` : undefined}>
-              <DashCredit />
-              Added by Dash on {parts.addedBy.date}
+        editingHere ? undefined : (
+          <>
+            {/* The one line it was written with (plan #1670), above the facts
+                about where it came from. */}
+            {node.summary && <span className="mt-1 block text-ink">{node.summary}</span>}
+            <span
+              className={cn(
+                'inline-flex flex-wrap items-center gap-x-2 text-small',
+                node.summary && 'mt-1',
+              )}
+            >
+              <span>Feature #{node.number}</span>
+              {parts.addedBy && (
+                <span
+                  title={parts.addedBy.session ? `Session ${parts.addedBy.session}` : undefined}
+                >
+                  <DashCredit />
+                  Added by Dash on {parts.addedBy.date}
+                </span>
+              )}
+              {parts.origin && (
+                <span>
+                  From #{parts.origin.number}&apos;s answer: {parts.origin.gist}
+                </span>
+              )}
             </span>
-          )}
-          {parts.origin && (
-            <span>
-              From #{parts.origin.number}&apos;s answer: {parts.origin.gist}
-            </span>
-          )}
-        </span>
+          </>
+        )
       }
       actions={
         <>
@@ -357,7 +384,10 @@ export function FeaturePage({
           }}
         />
       ) : row.editing ? (
-        <div className="max-w-2xl">{parts.edit}</div>
+        // The compose surface it can be written in from /dev/plan, filled in
+        // (plan #1670). Fog, the note and the commit stay on the row's own
+        // Edit on /dev/plan, which is the whole row at once.
+        <FeatureCompose node={node} onDone={() => row.setEditing(false)} className="max-w-2xl" />
       ) : (
         <div className="max-w-2xl space-y-5">
           {updates[0] && <FeatureUpdate update={updates[0]} />}
@@ -491,7 +521,7 @@ function FeatureSteps({
               <Link
                 href={stepsViewHref(node.number, view)}
                 scroll={false}
-                className="text-ink underline underline-offset-2"
+                className="press-area text-ink underline underline-offset-2"
               >
                 Show all steps
               </Link>
@@ -552,7 +582,7 @@ function SplitLink({ href, count, who }: { href: string; count: number; who: Hel
       href={href}
       scroll={false}
       aria-label={`${count} open ${count === 1 ? 'step' : 'steps'} ${who === 'me' ? 'yours' : 'Dash’s'}, show them`}
-      className="-mx-1.5 inline-flex min-h-7 items-center rounded-sm px-1.5 underline underline-offset-2 hover:bg-sunken"
+      className="press-area -mx-1.5 inline-flex min-h-7 items-center rounded-sm px-1.5 underline underline-offset-2 hover:bg-sunken"
     >
       {count} open
     </Link>
