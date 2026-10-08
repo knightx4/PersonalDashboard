@@ -108,12 +108,16 @@ function ycRemote(c: YcCandidate): Remote {
   return known.length === 0 && !c.locations ? 'unknown' : 'none';
 }
 
-/** What an HN header says about remote work: "part remote" is partly, "no remote" none. */
+/** What a line of text says about remote work: "part remote" is partly, "no remote" none. */
+function textRemote(text: string): Remote {
+  const lower = text.toLowerCase();
+  if (/\b(no|not)\s+remote\b/.test(lower)) return 'none';
+  if (/\b(part|partly|partial|partially)[\s-]+remote\b/.test(lower)) return 'partly';
+  return /\bremote\b/.test(lower) ? 'full' : 'none';
+}
+
 function hnRemote(c: HnCandidate): Remote {
-  const header = c.header.toLowerCase();
-  if (/\b(no|not)\s+remote\b/.test(header)) return 'none';
-  if (/\b(part|partly|partial|partially)[\s-]+remote\b/.test(header)) return 'partly';
-  return /\bremote\b/.test(header) ? 'full' : 'none';
+  return textRemote(c.header);
 }
 
 function placeReason(remote: Remote, place: string, prefs: JobPreferences, homeWords: readonly string[]): DropReason | null {
@@ -149,6 +153,16 @@ function hnReason(c: HnCandidate, rules: DiscoveryRules, words: readonly string[
   if (key && rules.passedCompanies.has(key)) return 'passed';
   if (isExcluded(words, c.header)) return 'industry';
   return placeReason(hnRemote(c), c.header, rules.preferences, homeWords);
+}
+
+/**
+ * Whether a single posting's location suits the preferences, by the same
+ * workplace and home-location rules the lists were filtered by. A posting
+ * that names no location is kept.
+ */
+export function postingPlaceFits(location: string | null, prefs: JobPreferences): boolean {
+  if (!location || !location.trim()) return true;
+  return placeReason(textRemote(location), location, prefs, homePlaceWords(prefs.homeLocation)) === null;
 }
 
 /** The YC companies and HN posts that pass the rules above, and why each of the rest did not. */

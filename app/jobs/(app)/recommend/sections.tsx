@@ -753,6 +753,11 @@ function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
     figure?: boolean;
   }[] = [];
   if (suggestion.location) facts.push({ key: 'where', text: suggestion.location });
+  // A startup weekly discovery found is a company they have not heard of, so
+  // where it was found is on the row rather than under Details (plan #1685).
+  if (suggestion.origin === 'discovered' && suggestion.foundIn) {
+    facts.push({ key: 'found', text: suggestion.foundIn });
+  }
   if (note?.fit) {
     facts.push({
       key: 'fit',
@@ -879,7 +884,7 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
         <LinkedText text={suggestion.move} />
       </p>
             )}
-            {suggestion.foundIn && (
+            {suggestion.foundIn && suggestion.origin !== 'discovered' && (
               <p className="text-small text-ink-muted">{suggestion.foundIn}</p>
             )}
         </Disclosure>
