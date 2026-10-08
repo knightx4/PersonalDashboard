@@ -3,6 +3,7 @@ import { DetailFacts, DetailPage, ListPage, ListRow } from '@/components/pattern
 import { Deck, type DeckItem } from '@/components/patterns/deck';
 import { ThreadPanel } from '@/components/patterns/thread';
 import { TabbedDetail } from '@/components/patterns/tabbed-detail';
+import { MainRail } from '@/components/patterns/main-rail';
 import { Thread } from '@/components/thread/thread';
 import { PageHeader } from '@/components/shell/page-header';
 import { Property, PropertyList } from '@/components/shell/detail-layout';
@@ -44,7 +45,7 @@ export type PatternSurface = {
 
 export type PagePattern = {
   /** The fragment on /dev/ui. */
-  id: 'list-detail' | 'deck' | 'thread' | 'tabbed-detail';
+  id: 'list-detail' | 'deck' | 'thread' | 'tabbed-detail' | 'main-rail';
   /** What a step's "Pattern:" line says, lower case. */
   name: string;
   /** The heading on /dev/ui. */
@@ -371,6 +372,127 @@ function TabbedSurface() {
   );
 }
 
+const DAY_ROWS: readonly { title: string; meta: string; end: string }[] = [
+  {
+    title: 'Return the take-home for the Senior Quantitative Developer role at Jane Street',
+    meta: 'Jobs · due tomorrow',
+    end: '2h',
+  },
+  { title: 'Book the boiler service before the first cold week', meta: 'Home · from your notes', end: '15m' },
+  { title: 'Read the two chapters before the reading group tonight', meta: 'Learn · Designing Data-Intensive Applications', end: '1h' },
+  { title: 'Reply to Priya about the flat viewing', meta: 'Mail · waiting since Monday', end: '5m' },
+];
+
+const UPDATES: readonly { what: string; when: string }[] = [
+  { what: 'Monzo moved your Platform Engineer application to a second interview', when: '9:12 AM' },
+  { what: 'The council confirmed the bin collection moves to Wednesdays from November', when: '8:40 AM' },
+  { what: 'Your Ocado order was delivered with one substitution', when: '7:55 AM' },
+];
+
+const WATCHING: readonly { what: string; state: string }[] = [
+  { what: 'Wise, Backend Engineer, Payments', state: 'No reply in 9 days' },
+  { what: 'Refund from the airline for the cancelled Lisbon flight', state: 'Promised by 10 Oct' },
+  { what: 'Price of the standing desk you saved', state: 'Down £40' },
+];
+
+const DASH_TODAY: readonly string[] = [
+  'Filed three receipts from your inbox under Spend',
+  'Drafted the follow-up to Wise for you to read',
+  'Closed two steps on the plan',
+];
+
+const WEEK: readonly { day: string; what: string }[] = [
+  { day: 'Thu', what: 'Reading group, 7:00 PM' },
+  { day: 'Fri', what: 'Take-home due' },
+  { day: 'Sat', what: 'Dentist, 9:30 AM' },
+  { day: 'Sun', what: 'Council tax' },
+];
+
+const WORKSPACES: readonly { name: string; count: string }[] = [
+  { name: 'Jobs', count: '3 waiting' },
+  { name: 'Learn', count: '2 due' },
+  { name: 'Shopping', count: '1 to sell' },
+  { name: 'News', count: '14 unread' },
+];
+
+function RailSurface() {
+  return (
+    <MainRail
+      main={
+        <>
+          <PageHeader title="Thursday 8 October" description="Four things are yours today." />
+          <div className="space-y-6">
+            <Group title="Today">
+              <Card padding="none">
+                <ul className="divide-y divide-border">
+                  {DAY_ROWS.map((row) => (
+                    <ListRow key={row.title} href="#" title={row.title} meta={row.meta} end={row.end} />
+                  ))}
+                </ul>
+              </Card>
+            </Group>
+            <Group title="Updates">
+              <Card padding="none">
+                <ul className="divide-y divide-border">
+                  {UPDATES.map((update) => (
+                    <li key={update.what} className="card-pad-x row-pad flex gap-3">
+                      <span className="min-w-0 flex-1 text-ui text-ink">{update.what}</span>
+                      <span className="tabular shrink-0 text-small text-ink-muted">{update.when}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </Group>
+          </div>
+        </>
+      }
+      rail={
+        <>
+          <CardSection id="watching" title="Watching" meta={WATCHING.length} className="scroll-mt-bar">
+            <ul className="space-y-2">
+              {WATCHING.map((item) => (
+                <li key={item.what}>
+                  <p className="text-ui text-ink">{item.what}</p>
+                  <p className="text-small text-ink-muted">{item.state}</p>
+                </li>
+              ))}
+            </ul>
+          </CardSection>
+          <CardSection title="Dash today" meta={DASH_TODAY.length}>
+            <ul className="space-y-1.5">
+              {DASH_TODAY.map((line) => (
+                <li key={line} className="text-ui text-ink">
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </CardSection>
+          <CardSection title="This week">
+            <dl className="space-y-1.5">
+              {WEEK.map((day) => (
+                <div key={day.day} className="flex gap-3">
+                  <dt className="w-9 shrink-0 text-small text-ink-muted">{day.day}</dt>
+                  <dd className="min-w-0 text-ui text-ink">{day.what}</dd>
+                </div>
+              ))}
+            </dl>
+          </CardSection>
+          <CardSection title="Workspaces">
+            <ul className="space-y-1.5">
+              {WORKSPACES.map((workspace) => (
+                <li key={workspace.name} className="flex justify-between gap-3">
+                  <span className="text-ui text-ink">{workspace.name}</span>
+                  <span className="tabular text-small text-ink-muted">{workspace.count}</span>
+                </li>
+              ))}
+            </ul>
+          </CardSection>
+        </>
+      }
+    />
+  );
+}
+
 export const PATTERNS: readonly PagePattern[] = [
   {
     id: 'list-detail',
@@ -423,5 +545,14 @@ export const PATTERNS: readonly PagePattern[] = [
       exports: ['TabbedDetail'],
     },
     surfaces: [{ id: 'pattern-tabbed', label: 'A feature', render: () => <TabbedSurface /> }],
+  },
+  {
+    id: 'main-rail',
+    name: 'main plus rail',
+    label: 'Main plus rail',
+    when: 'An overview page with status worth keeping beside the work, such as Home.',
+    rule: 'From laptop width a narrow column on the right holds what you glance at: counts, what is running, what Dash did, what is due soon. The column you work in sits on the left at its reading width. On a phone the rail follows the main column, and each is drawn once. The rail never holds the thing you came to act on, and never sits on a detail page, which stays one column.',
+    component: { path: 'components/patterns/main-rail.tsx', exports: ['MainRail'] },
+    surfaces: [{ id: 'pattern-rail', label: 'An overview', render: () => <RailSurface /> }],
   },
 ];

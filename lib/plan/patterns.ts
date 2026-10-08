@@ -48,6 +48,12 @@ export const PATTERN_RULES: readonly PatternRule[] = [
     rule: 'Breadcrumbs first, then the title, then the tabs, then the open tab. Each tab is a link that puts the tab in the address, so a reload, the back button and a pasted link open the same tab, and the first tab is the plain address. The properties sit in a column on the right from laptop width and stay in view while the tab scrolls; on a phone they are a grid of facts between the title and the tabs. The row of tabs stays on one line at every width.',
     component: 'components/patterns/tabbed-detail.tsx',
   },
+  {
+    name: 'main plus rail',
+    label: 'Main plus rail',
+    rule: 'From laptop width a narrow column on the right holds what you glance at: counts, what is running, what Dash did, what is due soon. The column you work in sits on the left at its reading width. On a phone the rail follows the main column, and each is drawn once. The rail never holds the thing you came to act on, and never sits on a detail page, which stays one column.',
+    component: 'components/patterns/main-rail.tsx',
+  },
 ];
 
 /**

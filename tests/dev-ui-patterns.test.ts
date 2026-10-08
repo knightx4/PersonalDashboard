@@ -31,8 +31,14 @@ const entries = list
   }));
 
 describe('the page patterns on /dev/ui', () => {
-  it('holds the four from the spec', () => {
-    expect(entries.map((e) => e.name)).toEqual(['list and detail', 'deck', 'thread', 'tabbed detail']);
+  it('holds the five from the spec', () => {
+    expect(entries.map((e) => e.name)).toEqual([
+      'list and detail',
+      'deck',
+      'thread',
+      'tabbed detail',
+      'main plus rail',
+    ]);
   });
 
   it.each(entries)('gives $id a rule, a component and a gallery entry', (entry) => {
