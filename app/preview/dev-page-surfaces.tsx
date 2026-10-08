@@ -28,6 +28,7 @@ import {
   type OtherFeedbackRow,
 } from '@/lib/feedback/load';
 import type { IdeaList, IdeaRow } from '@/lib/ideas/load';
+import { functionSpendRows } from '@/lib/usage/function-spend';
 import { usageReport } from '@/lib/usage/report';
 import type { UiReview } from '@/lib/ui-review/load';
 import { specBySlug } from '@/lib/specs/registry';
@@ -219,15 +220,35 @@ const report = usageReport(
     { route: '/vault/map', workspace: 'vault', opens7: 0, opens30: 0, lastOpened: '2026-08-12T10:00:00Z' },
     { route: '/shopping/returns', workspace: 'shopping', opens7: 0, opens30: 0, lastOpened: null },
   ],
-  [
-    { module: 'news', spend7: 1_840_000, spend30: 7_310_000, calls30: 412, unpriced30: 0 },
-    { module: 'learn', spend7: 960_000, spend30: 5_020_000, calls30: 230, unpriced30: 3 },
-    { module: 'core', spend7: 410_000, spend30: 1_900_000, calls30: 96, unpriced30: 0 },
-  ],
 );
 
+// Raw ledger rows, put through the loader's own rule so the labels and the
+// order are what the page gets: a workspace, `core`, a module that is no
+// workspace, an operation no list declares, and unpriced calls.
+const functions = functionSpendRows([
+  { module: 'news', operation: 'digest-issue', spend_7: 1_840_000, spend_30: 7_310_000, calls_30: 412, unpriced_30: 0 },
+  { module: 'jobs', operation: 'write-interview-prep', spend_7: 1_120_000, spend_30: 5_960_000, calls_30: 38, unpriced_30: 0 },
+  { module: 'learn', operation: 'plan-topic', spend_7: 960_000, spend_30: 5_020_000, calls_30: 230, unpriced_30: 3 },
+  { module: 'core', operation: 'ask-dash', spend_7: 410_000, spend_30: 1_900_000, calls_30: 96, unpriced_30: 0 },
+  { module: 'jobs', operation: 'suggest-outreach', spend_7: 0, spend_30: 840_000, calls_30: 4, unpriced_30: 0 },
+  { module: 'jobs', operation: 'classify-job-email', spend_7: 12_000, spend_30: 61_000, calls_30: 1, unpriced_30: 0 },
+  {
+    module: 'website',
+    operation: 'draft-weekly-changelog-summary-for-the-public-site',
+    spend_7: 0,
+    spend_30: 0,
+    calls_30: 2,
+    unpriced_30: 2,
+  },
+]);
+
 export function DevUsageSurface() {
-  return <UsageScreen report={report} now={new Date('2026-10-04T12:00:00Z')} />;
+  return <UsageScreen report={report} functions={functions} now={new Date('2026-10-04T12:00:00Z')} />;
+}
+
+/** The tab before any model call has been made and before any page was opened. */
+export function DevUsageEmptySurface() {
+  return <UsageScreen report={usageReport([])} functions={[]} now={new Date('2026-10-04T12:00:00Z')} />;
 }
 
 // ---- UI review ------------------------------------------------------------
