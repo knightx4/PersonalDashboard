@@ -179,6 +179,14 @@ values ('…', 'dev', '<the feature id>', '…', '…', 's', 'proposed', 30,
 -- person to answer or decide something. A key or an account is not a block at
 -- all now; it is a setup step, above. Use 'steps' only with the
 -- dependency rows to match; 'outside' otherwise. Cleared with the ask.
+-- Never write a block whose ask says nothing is needed from the person
+-- ("nothing needed from you", "just waiting on the run"): a block is listed
+-- under what they have to do. A step that only waits on time or a scheduled
+-- run stays in progress and gets a check_backs row instead, so it shows as
+-- waiting on:
+--   insert into check_backs (user_id, title, detail, due_at, plan_item_id, source)
+--   values ('…', '<what to look at>', '<what to check>', now() + interval '2 hours',
+--           '<the step id>', 'plan #<n>');
 update plan_items
 set status = 'blocked', block_ask = '<what it needs, in one sentence>',
     block_kind = 'outside',

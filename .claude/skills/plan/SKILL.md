@@ -28,6 +28,8 @@ npx tsx scripts/plan.ts start <n>              # claim it (in_progress); refuses
 npx tsx scripts/plan.ts done <n> --note "…"    # close it; records HEAD commit
 npx tsx scripts/plan.ts answer <n> --note "…"  # the person's move. Never yours.
 npx tsx scripts/plan.ts block <n> --ask "…" [--on-steps] [--note "…"]
+              # the ask names what the person does; "nothing needed from you" is refused.
+              # A step that only waits on time or a run stays in progress with a check-back.
                                                # cannot proceed; the ask is the one sentence
                                                # saying what it needs, rewritten each time.
                                                # --on-steps: it clears itself when the steps it
