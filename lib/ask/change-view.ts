@@ -34,6 +34,36 @@ export function changeHref(change: DashChange): string {
       return '/dev/ideas';
     case 'add_job_lead':
       return `/jobs/roles/${change.input.roleId}`;
+    case 'change_items':
+      return change.input.change === 'for_sale' ? '/shopping/sell' : '/shopping/inventory';
+  }
+}
+
+/** "Kindle, Lamp and Mug", or "Kindle, Lamp, Mug and 9 more". */
+export function namedItems(titles: readonly string[], count: number): string {
+  const shown = titles.slice(0, 3);
+  const more = count - shown.length;
+  if (more > 0) return `${shown.join(', ')} and ${more} more`;
+  if (shown.length <= 1) return shown.join('');
+  return `${shown.slice(0, -1).join(', ')} and ${shown[shown.length - 1]}`;
+}
+
+/** Many items changed at once, as the card's three parts. */
+function itemWords(input: Extract<DashChange, { kind: 'change_items' }>['input'], done: boolean): ChangeWords {
+  const { count } = input;
+  const items = `${count} ${count === 1 ? 'item' : 'items'}`;
+  const list = input.titles.length > 0 ? `: ${namedItems(input.titles, count)}` : '';
+  switch (input.change) {
+    case 'for_sale':
+      return { verb: done ? 'Marked' : 'Mark', what: items, rest: ` for sale${list}` };
+    case 'not_for_sale':
+      return { verb: done ? 'Took' : 'Take', what: items, rest: ` off the sell page${list}` };
+    case 'to_return':
+      return { verb: done ? 'Marked' : 'Mark', what: items, rest: ` to return${list}` };
+    case 'not_returning':
+      return { verb: done ? 'Took' : 'Take', what: items, rest: ` off the to-return list${list}` };
+    case 'group':
+      return { verb: done ? 'Grouped' : 'Group', what: `${count} copies`, rest: ` as one item${list}` };
   }
 }
 
@@ -154,6 +184,8 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
         what: change.input.roleTitle,
         rest: ` at ${change.input.companyName}`,
       };
+    case 'change_items':
+      return itemWords(change.input, done);
   }
 }
 
@@ -195,5 +227,7 @@ export function changeWhere(change: DashChange): string {
       return 'Open the ideas';
     case 'add_job_lead':
       return 'Open the role';
+    case 'change_items':
+      return change.input.change === 'for_sale' ? 'Open the sell page' : 'Open the inventory';
   }
 }

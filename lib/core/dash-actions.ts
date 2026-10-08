@@ -156,6 +156,7 @@ export const WRITE_TOOL_KINDS: readonly string[] = [
   'add_role_note',
   'add_job_lead',
   'add_idea',
+  'change_items',
 ];
 
 /** Whether Ask's own undo puts this change back, rather than the generic rule here. */

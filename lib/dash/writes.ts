@@ -17,6 +17,7 @@ import { stepHref } from '@/lib/goals/all-goals';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
 import { detectPosting } from '@/lib/jobs/ats/detect';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
+import { BULK_MAX, changeItems, ITEM_CHANGES } from './bulk-items';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -37,6 +38,9 @@ import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
  *   add_idea         an idea on the ideas page in Dev.
  *   add_job_lead     a role saved as a lead in Jobs, from a posting link or
  *                    a title and company.
+ *   change_items     many owned items marked for sale or to return, taken
+ *                    off either, or grouped as one item, with one Undo
+ *                    (lib/dash/bulk-items.ts, plan #1656).
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)
@@ -873,6 +877,31 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
       additionalProperties: false,
     },
     addIdea,
+  ),
+  tool(
+    'change_items',
+    `Change many of the items they own in Shopping at once, when they ask ("mark everything from the March Amazon order for sale", "put these on the to-return list"). Name the items by the public.inventory_items refs lookups returned, or name whole orders by the public.orders refs search or spend_by_merchant returned, and every item from those orders is changed. At most ${BULK_MAX} items. change is one of: for_sale (mark for sale), not_for_sale (take off the sell page), to_return (mark to return), not_returning (take off the to-return list), group (group copies of one thing as one item, two or more). Only items they still own are changed. Deleting items is not something you can do: say it is done from the inventory list. One Undo puts the whole change back. Say how many items it changed.`,
+    {
+      type: 'object',
+      properties: {
+        change: { type: 'string', enum: [...ITEM_CHANGES], description: 'Which change to make to every item.' },
+        item_refs: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: BULK_MAX,
+          description: 'The public.inventory_items refs lookups returned for the items.',
+        },
+        order_refs: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: 20,
+          description: 'The public.orders refs lookups returned, to change every item from those orders.',
+        },
+      },
+      required: ['change'],
+      additionalProperties: false,
+    },
+    changeItems,
   ),
 ];
 
