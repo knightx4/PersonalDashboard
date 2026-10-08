@@ -28,7 +28,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { DASH_MODELS } from '@/lib/dash/models';
 import { replyInThread, subjectLine, threadVoice, type ThreadDash } from '@/lib/dash/thread';
 import { ROLE_THREAD_TABLE } from '@/lib/dash/thread-tools';
-import { addThreadTurn, loadThread, threadCause } from '@/lib/thread/store';
+import { acknowledgeThreadTurn, addThreadTurn, loadThread, threadCause } from '@/lib/thread/store';
 import type { DashThreadActs } from '@/lib/dash/registry';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { RequirementMatch } from '@/lib/jobs/evidence/match-payload';
@@ -263,12 +263,14 @@ async function produceReply(input: RoleAskInput): Promise<RoleAskOutcome> {
     acts: async (name, args) =>
       name === 'write_cover_letter' ? writeLetter(args) : { ok: false, error: 'That cannot be done on a role.' },
     cause,
+    acknowledge: () => acknowledgeThreadTurn(client, { userId, ref: subjectRef, turnId: input.commentId }),
     anthropicApiKey: input.apiKey,
     client: input.anthropic,
     onSpend: (report) => spend.push(report),
   });
   await recordSessionSpend(userId, { module: 'jobs', operation: 'reply-to-role-comment' }, spend);
   if (!reply.ok) return refuse(`I could not produce a reply: ${reply.detail} Your comment is saved.`);
+  if (reply.acknowledged) return { ok: true, message: 'Dash marked your comment as seen.' };
 
   await say(input, reply.body);
   return {
