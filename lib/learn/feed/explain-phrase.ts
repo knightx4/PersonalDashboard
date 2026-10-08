@@ -3,7 +3,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { MAX_SELECTION, normaliseSelection } from '@/lib/learn/graph/branch';
 import { MAX_MATERIAL, TALK_MODEL } from '@/lib/talk/reply';
 
@@ -131,7 +131,7 @@ export async function explainPhraseOnCard(input: {
   try {
     response = await client.messages.create({
       model: EXPLAIN_MODEL,
-      max_tokens: 1000,
+      max_tokens: 1000 + THINKING_ROOM,
       system: SYSTEM,
       tools: [
         {
@@ -154,7 +154,7 @@ export async function explainPhraseOnCard(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, EXPLAIN_MODEL),
       messages: [{ role: 'user', content: explainPrompt(input.phrase, input.card) }],
     });
   } catch (error) {

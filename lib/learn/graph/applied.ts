@@ -151,7 +151,7 @@ export async function writeAppliedCase(input: {
           },
         },
       ],
-      tool_choice: forceTool(WRITE_TOOL),
+      tool_choice: forceTool(WRITE_TOOL, APPLIED_MODEL),
       messages: [
         {
           role: 'user',

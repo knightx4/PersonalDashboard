@@ -15,7 +15,7 @@ let userB = '';
 async function spend(userId: string, operation: string, cost: number | null, secondsAgo: number) {
   await admin`
     insert into model_spend (user_id, module, operation, model, cost_micros, created_at)
-    values (${userId}, 'learn', ${operation}, 'claude-haiku-4-5', ${cost},
+    values (${userId}, 'learn', ${operation}, 'claude-haiku-5-5', ${cost},
             now() - make_interval(secs => ${secondsAgo}))`;
 }
 

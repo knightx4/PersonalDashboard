@@ -22,7 +22,7 @@ const row = (partial: Partial<SpendRow> = {}): SpendRow => ({
   id: `row-${(n += 1)}`,
   module: 'learn',
   operation: 'plan-topic',
-  model: 'claude-opus-5',
+  model: 'claude-opus-5-5',
   inputTokens: 100,
   cachedInputTokens: 0,
   cacheWriteTokens: 0,

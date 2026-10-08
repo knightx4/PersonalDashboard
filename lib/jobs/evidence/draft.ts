@@ -21,6 +21,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { parseDraftPayload, type DraftResult } from './draft-payload';
 import type { ShortlistItem } from './shortlist';
 import { MODELS } from '@/lib/core/models';
+import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
 
 /** Writing in someone else's voice off their own material. Judgment again. */
 const MODEL = MODELS.jobsEvidenceDraft;
@@ -134,7 +135,7 @@ export async function draftAnswer(
   try {
     response = await client.messages.create({
       model: MODEL,
-      max_tokens: 4096,
+      max_tokens: 4096 + THINKING_ROOM,
       // Same prefix as the match: the bank is identical across every question
       // and every role, so it is cached and the question goes last.
       system: [
@@ -160,7 +161,7 @@ export async function draftAnswer(
           },
         },
       ],
-      tool_choice: { type: 'tool', name: TOOL_NAME },
+      tool_choice: forceTool(TOOL_NAME, MODEL),
       messages: [{ role: 'user', content: `${context}\n\nCall ${TOOL_NAME}.` }],
     });
   } catch (error) {

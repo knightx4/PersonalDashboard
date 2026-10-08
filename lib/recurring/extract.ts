@@ -83,7 +83,7 @@ export async function readRecurringWithHaiku(
     const client = new Anthropic({ apiKey });
     const message = await client.messages.create({
       model: EXTRACT_MODEL,
-      max_tokens: 400,
+      max_tokens: 4_000, // room for Haiku 5.5's thinking as well as the answer
       system: SYSTEM,
       messages: [
         {

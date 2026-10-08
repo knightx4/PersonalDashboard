@@ -93,7 +93,7 @@ function ports(
     },
     async judge({ onSpend }) {
       state.judged += 1;
-      onSpend({ model: 'claude-haiku-4-5', usage: { ...EMPTY_USAGE, inputTokens: 900 } });
+      onSpend({ model: 'claude-haiku-5-5', usage: { ...EMPTY_USAGE, inputTokens: 900 } });
       return typeof judge === 'function' ? judge() : judge;
     },
   };
@@ -128,7 +128,7 @@ describe('runCatalogueSearch', () => {
     const { result } = await search(found([segment('segment-1')]), pass({ written: [LINK], judged: 1 }));
 
     expect(result.embedSpend.map((report) => report.model)).toEqual(['voyage-4-lite']);
-    expect(result.judgeSpend.map((report) => report.model)).toEqual(['claude-haiku-4-5']);
+    expect(result.judgeSpend.map((report) => report.model)).toEqual(['claude-haiku-5-5']);
   });
 
   it('counts a claim whose links were already there as covered', async () => {

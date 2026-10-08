@@ -79,7 +79,7 @@ describe('when the account states claims', () => {
   it('runs on Sonnet, because the work is refusing to invent rather than extracting', async () => {
     const client = clientReturning(CHAIN);
     await ask(client);
-    expect(createOf(client).mock.calls[0][0].model).toBe('claude-sonnet-5');
+    expect(createOf(client).mock.calls[0][0].model).toBe('claude-sonnet-5-5');
   });
 
   it('names the subject when there is one, and leaves it to the model when there is not', async () => {
@@ -117,7 +117,7 @@ describe('when the account states claims', () => {
     });
 
     expect(spend).toHaveBeenCalledTimes(1);
-    expect(spend.mock.calls[0][0].model).toBe('claude-sonnet-5');
+    expect(spend.mock.calls[0][0].model).toBe('claude-sonnet-5-5');
   });
 });
 

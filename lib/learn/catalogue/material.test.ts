@@ -48,7 +48,7 @@ function section(overrides: Partial<ClaimMaterial> = {}): ClaimMaterial {
     ordinal: 2,
     basis: 'Lays out how a reserve requirement caps the multiplier.',
     confidence: 'verified',
-    model: 'claude-haiku-4-5',
+    model: 'claude-haiku-5-5',
     shape: 'section',
     where: 'Money creation',
     lengthChars: 5500,
@@ -65,7 +65,7 @@ function clip(overrides: Partial<ClaimMaterial> = {}): ClaimMaterial {
     ordinal: 3,
     basis: 'Works the deposit multiplier through on the board.',
     confidence: 'verified',
-    model: 'claude-haiku-4-5',
+    model: 'claude-haiku-5-5',
     shape: 'clip',
     where: '12:04–18:30',
     lengthChars: 4200,
@@ -82,7 +82,7 @@ function whole(overrides: Partial<ClaimMaterial> = {}): ClaimMaterial {
     ordinal: 0,
     basis: 'The lecture is about how banks create deposits.',
     confidence: 'verified',
-    model: 'claude-haiku-4-5',
+    model: 'claude-haiku-5-5',
     shape: 'whole',
     where: null,
     // What an uncut video has instead of a transcript: its title and blurb.
@@ -309,7 +309,7 @@ describe('the live store', () => {
           {
             basis: 'Derives the multiplier from the reserve requirement.',
             confidence: 'verified',
-            model: 'claude-haiku-4-5',
+            model: 'claude-haiku-5-5',
             // An array, which is the shape PostgREST sometimes answers with.
             catalogue_segments: [
               {
@@ -348,7 +348,7 @@ describe('the live store', () => {
       shape: 'clip',
       where: '12:04–18:30',
       confidence: 'verified',
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-5-5',
       item: { id: 'item-lecture', title: LECTURE.title, durationSeconds: 4800 },
     });
   });

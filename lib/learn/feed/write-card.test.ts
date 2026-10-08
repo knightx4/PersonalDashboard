@@ -426,7 +426,7 @@ describe('the call', () => {
 
   const usage = { input_tokens: 900, output_tokens: 150 };
 
-  it('forces the report, records what it spent, and returns the ideas with the why line', async () => {
+  it('asks for the report, records what it spent, and returns the ideas with the why line', async () => {
     const { client, calls } = stubClient({
       content: [
         {
@@ -450,8 +450,8 @@ describe('the call', () => {
       ideas: [stored],
       why: 'You write about machine learning architecture (Computing).',
     });
-    expect(spent).toEqual(['claude-sonnet-5']);
-    expect(calls[0]).toMatchObject({ tool_choice: { type: 'tool', name: 'report_ideas' } });
+    expect(spent).toEqual(['claude-sonnet-5-5']);
+    expect(calls[0]).toMatchObject({ tool_choice: { type: 'auto' } });
   });
 
   it('drops the pick, and still records the spend, when there is no report', async () => {

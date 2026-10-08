@@ -2,7 +2,7 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { Level3Article } from '@/lib/learn/areas/level3';
 import { MODELS } from '@/lib/core/models';
@@ -230,7 +230,7 @@ async function placeItems(
   try {
     response = await client.messages.create({
       model: PLACE_MODEL,
-      max_tokens: 8192,
+      max_tokens: 8192 + THINKING_ROOM,
       system: `${input.intro}\n\n${SHARED_RULES}`,
       tools: [
         {
@@ -259,7 +259,7 @@ async function placeItems(
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, PLACE_MODEL),
       messages: [
         {
           role: 'user',

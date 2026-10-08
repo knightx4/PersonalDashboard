@@ -112,7 +112,7 @@ describe('scoreIssueImportance with Jev', () => {
     expect(sent.messages[0].content).toBe('2. (Business) Chip maker results: Sales rose.');
     expect(spend.rows.map((row) => [row.model, row.operation, row.input_tokens])).toEqual([
       ['jev-1.13.0', 'score-importance', 200],
-      ['claude-haiku-4-5', 'score-importance', 400],
+      ['claude-haiku-5-5', 'score-importance', 400],
     ]);
   });
 

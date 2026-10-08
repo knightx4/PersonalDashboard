@@ -152,7 +152,7 @@ export async function conceptsFromNote(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, MODEL),
       messages: [{ role: 'user', content: lines.join('\n') }],
     });
   } catch (error) {

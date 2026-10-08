@@ -156,7 +156,7 @@ export async function writeProbe(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, MODEL),
       messages: [
         {
           role: 'user',

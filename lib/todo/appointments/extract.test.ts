@@ -37,7 +37,7 @@ const cleaning: AppointmentExtraction = {
 
 function haikuSays(reading: AppointmentHaikuReading) {
   return vi.fn(async (input: AppointmentHaikuInput) => {
-    input.onSpend?.({ model: 'claude-haiku-4-5-20251001', usage: { inputTokens: 2500, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 150 } });
+    input.onSpend?.({ model: 'claude-haiku-5-5', usage: { inputTokens: 2500, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 150 } });
     return reading;
   });
 }
@@ -71,7 +71,7 @@ describe('extractAppointmentFromEmail with Jev', () => {
 
     expect(result).toMatchObject({ ok: true, source: 'llm', value: { event: 'reminder', date: '2026-10-07', time: '15:30' } });
     expect(haiku).toHaveBeenCalledTimes(1);
-    expect(spend.map((r) => r.model)).toEqual(['jev-1.13.0', 'claude-haiku-4-5-20251001']);
+    expect(spend.map((r) => r.model)).toEqual(['jev-1.13.0', 'claude-haiku-5-5']);
   });
 
   it('files nothing and skips Haiku when Jev is sure it is not an appointment', async () => {
@@ -96,7 +96,7 @@ describe('extractAppointmentFromEmail with Jev', () => {
     const spend: SpendReport[] = [];
     const result = await read({ jev: jevDown, haiku: haikuSays({ ok: true, value: cleaning }), spend });
     expect(result).toMatchObject({ ok: true, source: 'llm', value: { event: 'booked' } });
-    expect(spend.map((r) => r.model)).toEqual(['claude-haiku-4-5-20251001']);
+    expect(spend.map((r) => r.model)).toEqual(['claude-haiku-5-5']);
   });
 
   it('never calls Jev for an account that has not opted in', async () => {

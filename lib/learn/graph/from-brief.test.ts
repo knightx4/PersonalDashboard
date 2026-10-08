@@ -298,7 +298,7 @@ describe('when the briefing states claims', () => {
     });
 
     expect(spend).toHaveBeenCalledTimes(2);
-    expect(spend.mock.calls[0][0].model).toBe('claude-sonnet-5');
+    expect(spend.mock.calls[0][0].model).toBe('claude-sonnet-5-5');
   });
 
   it('stops after a fixed number of passes and says which were not read', async () => {

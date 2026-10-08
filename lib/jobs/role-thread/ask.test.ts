@@ -148,7 +148,7 @@ describe('Dash on a role', () => {
     const state = setup(null);
     const { client, sent } = model([call('a', 'answer', { answer: 'It asks for Go.', cited: [] })]);
     await ask(state, client, 'what do they want?');
-    expect(sent[0].model).toBe('claude-sonnet-5');
+    expect(sent[0].model).toBe('claude-sonnet-5-5');
     const names = sent[0].tools.map((t) => t.name);
     expect(names).toEqual(expect.arrayContaining(['search', 'todos', 'add_todo', 'add_role_note', 'write_cover_letter', 'answer']));
     expect(names).not.toContain('hand_off');

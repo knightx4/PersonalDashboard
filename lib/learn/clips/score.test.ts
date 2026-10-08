@@ -147,7 +147,7 @@ describe('scoreClipsFor', () => {
       { id: 'b', score: scoreFromLevel(9), by: 'haiku', confidence: null },
       { id: 'c', score: scoreFromLevel(3), by: 'haiku', confidence: null },
     ]);
-    expect(spent).toEqual(['jev-1.13.0', 'claude-haiku-4-5']);
+    expect(spent).toEqual(['jev-1.13.0', 'claude-haiku-5-5']);
   });
 
   it('asks Jev nothing for an account that has not opted in', async () => {

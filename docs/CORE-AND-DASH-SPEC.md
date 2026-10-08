@@ -312,7 +312,7 @@ The counters count these things:
   what the person typed, which are the ones named `ask-`, `reply-` or
   `discuss-`, and capture's `file-capture`.
 - `model-id-files`: files under `app`, `components`, `inngest`, `lib` and
-  `scripts`, tests aside, that contain a model id such as `'claude-sonnet-5'`.
+  `scripts`, tests aside, that contain a model id such as `'claude-sonnet-5-5'`.
 - `link-tables-per-target-column`: tables with a check that exactly one of
   three or more `_id` columns is set.
 

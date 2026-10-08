@@ -332,7 +332,7 @@ export async function cutVideo(input: {
             },
           },
         ],
-        tool_choice: forceTool(CUT_TOOL),
+        tool_choice: forceTool(CUT_TOOL, CLIP_MODEL),
         messages: [{ role: 'user', content: cutPrompt(input.profile, input.video) }],
       },
       input.timeoutMs !== undefined ? { timeout: Math.max(1_000, input.timeoutMs), maxRetries: 0 } : undefined,

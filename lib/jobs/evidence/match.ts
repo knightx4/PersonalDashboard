@@ -20,6 +20,7 @@ import type { Requirement } from '../jd/requirements';
 import { parseMatchPayload, type MatchResult } from './match-payload';
 import type { ShortlistItem } from './shortlist';
 import { MODELS } from '@/lib/core/models';
+import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
 
 /**
  * Judgment, and low volume: a few dozen roles you are actually deciding about,
@@ -123,7 +124,7 @@ export async function matchRequirements(
   try {
     response = await client.messages.create({
       model: MODEL,
-      max_tokens: 8192,
+      max_tokens: 8192 + THINKING_ROOM,
       // The bank is identical across every role matched, so it goes in the
       // system block behind a cache breakpoint and the role's requirements go
       // last in `messages`. Repeat matches then read the bank from cache at
@@ -162,7 +163,7 @@ export async function matchRequirements(
           },
         },
       ],
-      tool_choice: { type: 'tool', name: TOOL_NAME },
+      tool_choice: forceTool(TOOL_NAME, MODEL),
       messages: [
         {
           role: 'user',
