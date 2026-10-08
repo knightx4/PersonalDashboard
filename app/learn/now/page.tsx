@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { after } from 'next/server';
+import { z } from 'zod';
 import { ExternalLink } from 'lucide-react';
-import { PageHeader } from '@/components/shell/page-header';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
@@ -17,14 +17,15 @@ import { loadDueReviews } from '@/lib/learn/lessons/review-store';
 import { loadActiveAims } from '@/lib/learn/aims-store';
 import { loadPlannedGoals } from '@/lib/learn/lessons/plan-store';
 import { countGoalsWithoutPlan, WAITING_ANCHORS, waitingEmpty, waitingLines } from '@/lib/learn/feed/waiting';
-import { wantsPractice } from '@/lib/learn/flow/href';
+import { firstParam, wantsPractice } from '@/lib/learn/flow/href';
+import { loadSubject } from '@/lib/learn/graph/load';
 import { PracticeFlow } from '../flow/practice';
 import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { ReviewList } from '../review/review-list';
 import { openReading } from '../r/[id]/actions';
 import { LearnNowFeed } from './feed';
 import { FinishButton } from './finish-button';
-import { PracticeSwitch } from './switch';
+import { NowHeader } from './header';
 import { WaitingStrip } from './waiting-strip';
 
 export const dynamic = 'force-dynamic';
@@ -71,6 +72,11 @@ export const maxDuration = 300;
  * Above the deck, the ideas of passed pieces that are due for review (plan
  * #1145), up to five, most overdue first.
  *
+ * `?track=<subject>` without the switch is one subject's Now (plan #1698),
+ * opened from the subject's page: only its cards, a link back to it above the
+ * title, and none of the strip, the shelf or the reviews, which are about
+ * everything you are learning rather than this one subject.
+ *
  * A card shows up to two of your own notes on its idea (plan #1113). For the
  * first cards the lookup is started here and passed down unawaited, one
  * promise a card, so the deck paints first and the notes stream in under the
@@ -90,6 +96,36 @@ export default async function NowPage({
   const practice = wantsPractice(params);
   const user = await requireUser();
   const supabase = await createLearnClient();
+  // The subject both sides of the switch keep. An id that is not a subject of
+  // yours, or cannot be read, opens Now as it is without one.
+  const track = z.string().uuid().safeParse(firstParam(params.track));
+  const subject = track.success ? await loadSubject(supabase, track.data).catch(() => null) : null;
+  const header = (description?: string) => (
+    <NowHeader description={description} practice={practice} subject={subject} />
+  );
+
+  if (subject && !practice) {
+    const [cards, ready] = await Promise.all([
+      loadFeedPage(supabase, [], { subjectId: subject.id }),
+      countReadyCards(supabase, subject.id),
+    ]);
+    after(() => topUpFeedAfterResponse(user.id));
+    const related = relatedNotesForCards(supabase, user.id, cards);
+    return (
+      <div className="mx-auto max-w-3xl">
+        {header()}
+        <LearnNowFeed
+          first={cards}
+          firstRelated={Object.fromEntries(
+            cards.map((card) => [card.id, related.then((found) => found.get(card.id) ?? [])]),
+          )}
+          ready={ready}
+          low={READY_LOW}
+          subjectId={subject.id}
+        />
+      </div>
+    );
+  }
 
   // Each read that feeds the strip fails on its own: a count that cannot be
   // read is null and drops its line, and the lists below fall back to empty.
@@ -113,9 +149,6 @@ export default async function NowPage({
   const goalsHref = goals ? await loadLearnAreaHref() : undefined;
   const strip = (
     <WaitingStrip lines={waitingLines(counts, { goalsHref })} empty={waitingEmpty(counts)} />
-  );
-  const header = (description: string) => (
-    <PageHeader title="Now" description={description} actions={<PracticeSwitch practice={practice} />} />
   );
 
   if (practice) {
