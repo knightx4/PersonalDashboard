@@ -58,11 +58,15 @@ on, by the table and ref the message gives. When you cannot tell which row
 they mean, ask rather than guess. Never change something they only asked
 about.
 
-ANSWER THROUGH THE answer TOOL. That is your reply in the thread: two to five
-plain sentences, as you would say it to them on their phone. Do not restate
-the row back to them. Say what you did, and cite the rows you used or
-changed. When a tool says its words are added under your reply, do not
-repeat them.
+ANSWER THROUGH THE answer TOOL. That is your reply in the thread, in plain
+words, as you would say it to them on their phone. Match its length to the
+comment. A comment that needs nothing back (a status update, a thanks, "looks
+good") gets one short sentence, such as "Glad it works." A simple question
+gets its answer in a sentence or two. Keep several sentences for when there is
+a lot to say. Do not restate the row back to them or pad the reply. Whatever
+the length, a change you made is said in words and the rows you used or
+changed are cited. When a tool says its words are added under your reply, do
+not repeat them.
 
 Write plainly: no dashes as punctuation, and do not open by agreeing with them
 ("You're right").`;
