@@ -13,10 +13,13 @@ import { TAB_PARAM, tabFrom, type Tab } from '@/lib/tabs';
 export function OpenTab({
   tabs,
   panels,
+  param = TAB_PARAM,
 }: {
   tabs: readonly Tab[];
   panels: Readonly<Record<string, React.ReactNode>>;
+  /** The parameter, for a fixture that shares /dev/ui with another row of tabs. */
+  param?: string;
 }) {
-  const active = tabFrom(useSearchParams().get(TAB_PARAM), tabs);
+  const active = tabFrom(useSearchParams().get(param), tabs);
   return <>{panels[active]}</>;
 }

@@ -4,12 +4,13 @@ import { Deck, type DeckItem } from '@/components/patterns/deck';
 import { ThreadPanel } from '@/components/patterns/thread';
 import { TabbedDetail } from '@/components/patterns/tabbed-detail';
 import { MainRail } from '@/components/patterns/main-rail';
+import { TabbedSections } from '@/components/patterns/tabbed-sections';
 import { Thread } from '@/components/thread/thread';
 import { PageHeader } from '@/components/shell/page-header';
 import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
-import { Group } from '@/components/ui/disclosure';
+import { Group, SectionFold } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/field';
 import { LinkedText } from '@/components/ui/linked-text';
@@ -45,7 +46,7 @@ export type PatternSurface = {
 
 export type PagePattern = {
   /** The fragment on /dev/ui. */
-  id: 'list-detail' | 'deck' | 'thread' | 'tabbed-detail' | 'main-rail';
+  id: 'list-detail' | 'deck' | 'thread' | 'tabbed-detail' | 'main-rail' | 'tabbed-sections';
   /** What a step's "Pattern:" line says, lower case. */
   name: string;
   /** The heading on /dev/ui. */
@@ -493,6 +494,105 @@ function RailSurface() {
   );
 }
 
+/**
+ * Account's sections as #1628 may group them, five so the row is wider than
+ * a phone. The fixture keeps its tab in `?section=` rather than `?tab=`,
+ * because /dev/ui also draws the tabbed detail fixture and the two rows would
+ * otherwise open each other's tabs.
+ */
+const SECTION_PARAM = 'section';
+
+const ACCOUNT_TABS: readonly Tab[] = [
+  { id: 'you', label: 'You' },
+  { id: 'workspaces', label: 'Workspaces' },
+  { id: 'notifications', label: 'Notifications and spend', count: 2 },
+  { id: 'history', label: 'History' },
+  { id: 'session', label: 'Session' },
+];
+
+const CONNECTED: readonly { name: string; state: string }[] = [
+  { name: 'Gmail, sam.okafor.personal@example.com', state: 'Read every morning at 6:00 AM' },
+  { name: 'Google Calendar', state: 'Read every hour' },
+  { name: 'GitHub', state: 'Token expires 2 Dec' },
+];
+
+const ALERTS: readonly { what: string; when: string }[] = [
+  { what: 'Spend this month passed £30 of your £40 limit', when: '7 Oct' },
+  { what: 'Push to this phone stopped after the browser was updated', when: '5 Oct' },
+];
+
+function AccountYou() {
+  return (
+    <div className="space-y-6">
+      <CardSection title="Your details">
+        {/* Side by side from sm, the email last so it takes what is left. */}
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-[repeat(3,auto)_minmax(0,1fr)] sm:gap-x-8">
+          <Property label="Name" value="Sam Okafor" />
+          <Property label="Time zone" value="Europe/London" />
+          <Property label="Joined" value="14 Mar 2026" />
+          <Property label="Email" value="sam.okafor.personal@example.com" />
+        </dl>
+      </CardSection>
+      <SectionFold title="Connected accounts" count={CONNECTED.length}>
+        <Card padding="none">
+          <ul className="divide-y divide-border">
+            {CONNECTED.map((account) => (
+              <li key={account.name} className="card-pad-x row-pad">
+                <p className="text-ui text-ink">{account.name}</p>
+                <p className="text-small text-ink-muted">{account.state}</p>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </SectionFold>
+    </div>
+  );
+}
+
+function AccountNotifications() {
+  return (
+    <Card padding="none">
+      <ul className="divide-y divide-border">
+        {ALERTS.map((alert) => (
+          <li key={alert.what} className="card-pad-x row-pad flex gap-3">
+            <span className="min-w-0 flex-1 text-ui text-ink">{alert.what}</span>
+            <span className="tabular shrink-0 text-small text-ink-muted">{alert.when}</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+function AccountQuiet({ line }: { line: string }) {
+  return (
+    <Card>
+      <p className="text-ui text-ink-muted">{line}</p>
+    </Card>
+  );
+}
+
+function SectionsSurface() {
+  return (
+    <div className="mx-auto w-full max-w-3xl">
+      <PageHeader title="Account" description="Sam Okafor" />
+      <TabbedSections tabs={ACCOUNT_TABS} label="Account" address={{ param: SECTION_PARAM }}>
+        <OpenTab
+          tabs={ACCOUNT_TABS}
+          param={SECTION_PARAM}
+          panels={{
+            you: <AccountYou />,
+            workspaces: <AccountQuiet line="Nine workspaces are on." />,
+            notifications: <AccountNotifications />,
+            history: <AccountQuiet line="Nothing changed this week." />,
+            session: <AccountQuiet line="Signed in on this phone since 2 Oct." />,
+          }}
+        />
+      </TabbedSections>
+    </div>
+  );
+}
+
 export const PATTERNS: readonly PagePattern[] = [
   {
     id: 'list-detail',
@@ -554,5 +654,14 @@ export const PATTERNS: readonly PagePattern[] = [
     rule: 'From laptop width a narrow column on the right holds what you glance at: counts, what is running, what Dash did, what is due soon. The column you work in sits on the left at its reading width. On a phone the rail follows the main column, and each is drawn once. The rail never holds the thing you came to act on, and never sits on a detail page, which stays one column.',
     component: { path: 'components/patterns/main-rail.tsx', exports: ['MainRail'] },
     surfaces: [{ id: 'pattern-rail', label: 'An overview', render: () => <RailSurface /> }],
+  },
+  {
+    id: 'tabbed-sections',
+    name: 'tabbed sections',
+    label: 'Tabbed sections',
+    when: 'A page of peer sections looked at one at a time, such as Account or a company. A page read top to bottom stays stacked, and two or three modes of one view, such as a board and a list, are a segmented control.',
+    rule: 'The tabs sit under the page header, in one column, and only the open tab is drawn. Each tab is a link that puts it in the address, so a reload, the back button and a pasted link return to it, and old links and anchors land on the tab that holds them. A tab with something waiting in it carries the count. The row stays on one line, scrolling sideways on a phone with every tab a full press target. Folds may sit inside a tab.',
+    component: { path: 'components/patterns/tabbed-sections.tsx', exports: ['TabbedSections'] },
+    surfaces: [{ id: 'pattern-sections', label: 'Account', render: () => <SectionsSurface /> }],
   },
 ];

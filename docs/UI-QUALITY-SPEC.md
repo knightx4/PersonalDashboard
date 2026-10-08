@@ -146,8 +146,8 @@ Most layout problems come from a page being arranged from scratch. A small set
 of patterns, each a layout component in `components/patterns/` with a gallery
 entry and a short rule on `/dev/ui`, gives a step a shape to start from. The
 first three are the shapes the gallery shows most, the fourth was added for
-pages that hold several views of one thing, and the fifth for overview pages
-on a wide screen:
+pages that hold several views of one thing, the fifth for overview pages on a
+wide screen, and the sixth for pages of peer sections:
 
 - **List and detail**: a list you work through, and one item's page, one
   column.
@@ -164,6 +164,12 @@ on a wide screen:
   glance at (counts, what is running, what Dash did, what is due soon). On a
   phone the rail follows the main column. Never on a detail page, which stays
   one column (feature 1624).
+- **Tabbed sections**: a page of peer sections looked at one at a time, such
+  as Account or a company, shows one behind a row of tabs kept in the
+  address, so a refresh and a pasted link return to it. Only the open tab is
+  drawn, and folds may sit inside it. A page read top to bottom stays
+  stacked, and two or three modes of one view are a segmented control. The
+  role page uses it (feature 1624).
 
 A step's detail names its pattern ("Pattern: list and detail"), and shaping
 writes it. A screen that fits none of them is a new pattern, which the person

@@ -6,11 +6,13 @@
  * The tab is part of the URL (`?tab=`), so a link, a refresh or the back
  * button lands where you were. Switching writes the address with the history
  * API rather than navigating, so the server does not load the role again for
- * a change only this component draws. Each tab is its own file beside this
- * one; what they are handed is `PanelProps` in ./types.
+ * a change only this component draws. The row is the tabbed sections
+ * pattern's (components/patterns/tabbed-sections.tsx, plan #1626). Each tab
+ * is its own file beside this one; what they are handed is `PanelProps` in
+ * ./types.
  */
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   CalendarClock,
   FileText,
@@ -19,11 +21,11 @@ import {
   MessageSquareText,
   MessagesSquare,
 } from 'lucide-react';
-import { cn } from '@/lib/cn';
+import { TabbedSections } from '@/components/patterns/tabbed-sections';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import { dismissPursuit } from '@/app/jobs/(app)/pipeline/actions';
 import type { InterviewSeed } from './shared';
-import { roleTabFrom, roleTabSearch, type RoleTab } from './tabs';
+import { ROLE_TAB_ADDRESS, roleTabFrom, roleTabSearch, type RoleTab } from './tabs';
 import type { PanelProps } from './types';
 import { Timeline } from './timeline';
 import { Posting } from './posting';
@@ -52,21 +54,6 @@ export function RoleDetailPanels(
   const searchParams = useSearchParams();
   const tab = roleTabFrom(searchParams.get('tab')) ?? props.defaultTab ?? 'timeline';
   const [interviewSeed, setInterviewSeed] = useState<InterviewSeed | null>(null);
-  const navRef = useRef<HTMLElement>(null);
-
-  // At phone width the strip scrolls, and a page that opens on Interviews or
-  // Comments would otherwise have its own tab out of sight. Brought into view
-  // along the strip only, so the page itself does not move.
-  useEffect(() => {
-    const nav = navRef.current;
-    const active = nav?.querySelector<HTMLElement>('[aria-current="page"]');
-    if (!nav || !active) return;
-    const strip = nav.getBoundingClientRect();
-    const box = active.getBoundingClientRect();
-    if (box.left < strip.left || box.right > strip.right) {
-      nav.scrollLeft += box.left - strip.left - 16;
-    }
-  }, [tab]);
 
   const openTab = (next: RoleTab) => {
     if (next === tab) return;
@@ -80,62 +67,34 @@ export function RoleDetailPanels(
     openTab('interviews');
   };
 
+  const counts: Partial<Record<RoleTab, number>> = {
+    answers: props.answers.length,
+    interviews: props.interviews.length,
+    notes: props.thread.length,
+    mail: props.messages.length,
+  };
+  const tabs = TABS.map((entry) => ({ ...entry, count: counts[entry.id] }));
+
   return (
     <div>
-      <nav
-        ref={navRef}
-        aria-label="Role"
-        className="mb-4 flex gap-1 overflow-x-auto border-b border-border max-lg:scroll-fade-x"
+      {/* Shallow: the page already holds every tab's data for the counts, so
+       * a switch writes the address without loading the role again, and a
+       * seeded interview form survives the move to its tab. */}
+      <TabbedSections
+        tabs={tabs}
+        label="Role"
+        address={{ ...ROLE_TAB_ADDRESS, opensOn: props.defaultTab ?? 'timeline' }}
+        shallow
       >
-        {TABS.map((entry) => {
-          const active = tab === entry.id;
-          const count =
-            entry.id === 'answers'
-              ? props.answers.length
-              : entry.id === 'interviews'
-                ? props.interviews.length
-                : entry.id === 'notes'
-                  ? props.thread.length
-                  : entry.id === 'mail'
-                    ? props.messages.length
-                    : undefined;
-          return (
-            // A real address, so a tab can be opened in a new window or
-            // copied; a plain press switches in place.
-            <a
-              key={entry.id}
-              href={roleTabSearch(searchParams.toString(), entry.id)}
-              onClick={(event) => {
-                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                event.preventDefault();
-                openTab(entry.id);
-              }}
-              aria-current={active ? 'page' : undefined}
-              className={cn(
-                'flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-ui font-medium transition-colors duration-quick sm:min-h-0',
-                active
-                  ? 'border-accent text-accent'
-                  : 'border-transparent text-ink-muted hover:text-ink',
-              )}
-            >
-              <entry.icon className="size-4" strokeWidth={1.75} aria-hidden />
-              {entry.label}
-              {count !== undefined && count > 0 && (
-                <span className="tabular text-ink-muted">{count}</span>
-              )}
-            </a>
-          );
-        })}
-      </nav>
-
-      {tab === 'timeline' && <Timeline {...props} />}
-      {tab === 'posting' && <Posting {...props} />}
-      {tab === 'answers' && <Answers {...props} />}
-      {tab === 'interviews' && (
-        <Interviews {...props} seed={interviewSeed} onSeedUsed={() => setInterviewSeed(null)} />
-      )}
-      {tab === 'notes' && <RoleComments roleId={props.roleId} thread={props.thread} />}
-      {tab === 'mail' && <LinkedMail {...props} onAddInterview={startInterviewFrom} />}
+        {tab === 'timeline' && <Timeline {...props} />}
+        {tab === 'posting' && <Posting {...props} />}
+        {tab === 'answers' && <Answers {...props} />}
+        {tab === 'interviews' && (
+          <Interviews {...props} seed={interviewSeed} onSeedUsed={() => setInterviewSeed(null)} />
+        )}
+        {tab === 'notes' && <RoleComments roleId={props.roleId} thread={props.thread} />}
+        {tab === 'mail' && <LinkedMail {...props} onAddInterview={startInterviewFrom} />}
+      </TabbedSections>
 
       <NotRealPursuit applicationId={props.applicationId} />
     </div>

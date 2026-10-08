@@ -1,4 +1,5 @@
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
+import { tabNamed, tabSearch, type TabAddress } from '@/lib/tabs';
 
 /**
  * The role page's tabs, as the values its `?tab=` address takes.
@@ -11,9 +12,22 @@ export const ROLE_TABS = ['timeline', 'posting', 'answers', 'interviews', 'notes
 
 export type RoleTab = (typeof ROLE_TABS)[number];
 
+const IDS = ROLE_TABS.map((id) => ({ id }));
+
+/**
+ * How the role page keeps its tab in the address (the tabbed sections
+ * pattern, lib/tabs.ts). Every tab is written, since the tab it opens on
+ * changes with the stage; and the interview to scroll to belongs to the
+ * Interviews tab and means nothing once you have left it.
+ */
+export const ROLE_TAB_ADDRESS = {
+  alwaysWrite: true,
+  belongsTo: { interview: 'interviews' },
+} as const satisfies TabAddress;
+
 /** The tab a `?tab=` value names, or none when it names no tab here. */
 export function roleTabFrom(value: string | null | undefined): RoleTab | undefined {
-  return ROLE_TABS.find((tab) => tab === value);
+  return tabNamed(value, IDS, ROLE_TAB_ADDRESS) as RoleTab | undefined;
 }
 
 /**
@@ -43,8 +57,5 @@ export function defaultRoleTab(status: ApplicationStatus): RoleTab {
  * belongs to the Interviews tab and means nothing once you have left it.
  */
 export function roleTabSearch(current: string, tab: RoleTab): string {
-  const params = new URLSearchParams(current);
-  params.set('tab', tab);
-  if (tab !== 'interviews') params.delete('interview');
-  return `?${params.toString()}`;
+  return tabSearch(current, tab, IDS, ROLE_TAB_ADDRESS);
 }
