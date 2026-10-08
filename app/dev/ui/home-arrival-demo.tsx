@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
+import { MainRail } from '@/components/patterns/main-rail';
 import { DaySigil, HomeArrival } from '@/app/home/arrival';
 import { ARRIVE_LAST_STEP, arriveAt } from '@/lib/home/first-visit';
 
@@ -45,46 +46,68 @@ export function HomeArrivalDemo({ finished: startFinished = false }: { finished?
         </Button>
       </div>
       <HomeArrival key={visit} arrive={visit > 0} day={`demo-${visit}`} remember={false}>
-        <p data-arrive="" style={arriveAt(0)} className="text-ui text-ink-muted">
-          Good morning, Sam
-        </p>
-        <div
-          data-arrive=""
-          style={arriveAt(1)}
-          className="mt-1 flex items-center justify-between gap-4"
-        >
-          <p className="font-display text-figure-lg font-semibold tracking-[-0.04em] text-ink">
-            Saturday 3 October
-          </p>
-          {finished && (
-            <DaySigil
-              key={drawn}
-              seed="dev-ui:home-day"
-              draw={drawn > 0}
-              day={`demo-${drawn}`}
-              remember={false}
-            />
-          )}
-        </div>
-        <p data-arrive="" style={arriveAt(2)} className="mt-3 text-ui text-ink-muted">
-          {finished
-            ? 'Everything due today is done.'
-            : 'Two things are due today, and the dentist closes at five.'}
-        </p>
-        <div data-arrive="" style={arriveAt(ARRIVE_LAST_STEP)}>
-          {!finished && (
-            <Card padding="standard" className="mt-4">
-              <p className="text-ui font-semibold text-ink">Today</p>
-              <ul className="mt-2 divide-y divide-border">
-                {DUE.map((title) => (
-                  <li key={title} className="row-pad text-ui text-ink">
-                    {title}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-        </div>
+        <MainRail
+          main={
+            <>
+              <p data-arrive="" style={arriveAt(0)} className="text-ui text-ink-muted">
+                Good morning, Sam
+              </p>
+              <div
+                data-arrive=""
+                style={arriveAt(1)}
+                className="mt-1 flex items-center justify-between gap-4"
+              >
+                <p className="font-display text-figure-lg font-semibold tracking-[-0.04em] text-ink">
+                  Saturday 3 October
+                </p>
+                {finished && (
+                  <DaySigil
+                    key={drawn}
+                    seed="dev-ui:home-day"
+                    draw={drawn > 0}
+                    day={`demo-${drawn}`}
+                    remember={false}
+                  />
+                )}
+              </div>
+              <p data-arrive="" style={arriveAt(2)} className="mt-3 text-ui text-ink-muted">
+                {finished
+                  ? 'Everything due today is done.'
+                  : 'Two things are due today, and the dentist closes at five.'}
+              </p>
+              <div data-arrive="" style={arriveAt(ARRIVE_LAST_STEP)}>
+                <div
+                  aria-hidden={finished}
+                  className={cn(
+                    'grid transition-[grid-template-rows,opacity] duration-move ease-out-soft motion-reduce:transition-none',
+                    finished ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100',
+                  )}
+                >
+                  <div className="overflow-hidden">
+                    <div className="mt-4">
+                      <p className="text-ui font-semibold text-ink">Today</p>
+                      <ul className="mt-2 divide-y divide-border">
+                        {DUE.map((title) => (
+                          <li key={title} className="row-pad text-ui text-ink">
+                            {title}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          }
+          rail={
+            <div data-arrive="" style={arriveAt(ARRIVE_LAST_STEP)}>
+              <div className="mt-4 lg:mt-0">
+                <p className="text-ui font-semibold text-ink">Watching</p>
+                <p className="mt-2 text-ui text-ink-muted">The boiler quote, due Friday</p>
+              </div>
+            </div>
+          }
+        />
       </HomeArrival>
     </div>
   );
