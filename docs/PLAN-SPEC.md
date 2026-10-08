@@ -842,6 +842,22 @@ that says the same as a dated entry marks that entry as Dash's rather than
 being listed twice. The first forty entries show, and the rest behind a
 press.
 
+### Writing a feature
+
+*New feature* in the plan's header opens one compose surface at the top of
+the plan (plan #1670), and *Add a feature* at the foot of a module's section
+opens the same surface with the module set. It holds the title, a one-line
+summary, chips for the module, priority, size and who holds it, then the
+description and what the feature is done when. Saving writes a not-started
+feature with no session stamp, so it reads as yours, last in its module's
+section, and a line under the header links to its page for adding steps. The
+header's press is a link to `?new=feature`, so it works before the page's
+script has loaded. The summary is kept in `plan_items.summary`, one line of
+at most 200 characters, and shows under the title on the feature's page.
+*Edit* on that page opens the same surface filled in, without the module
+chip; the status, fog, note and commit stay on the row's own Edit on the
+plan.
+
 ## The changelog
 
 `/dev/changelog` is the fourth page in the workspace and the only one that
