@@ -91,7 +91,7 @@ export async function loadMoreCards(shown: string[], subjectId?: string | null):
     loadFeedPage(supabase, exclude.success ? exclude.data : [], { subjectId: only }),
     countReadyCards(supabase, only),
   ]);
-  after(() => topUpFeedAfterResponse(user.id));
+  after(() => topUpFeedAfterResponse(user.id, only));
   // These cards load behind the one on screen, so waiting for their related
   // notes here is not waiting in front of anybody (plan #1113).
   const related = await relatedNotesForCards(supabase, user.id, cards);
