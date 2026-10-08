@@ -96,6 +96,7 @@ import { SchoolCourses } from '@/app/vault/education/course-list';
 import { educationGroups, educationCounts } from './education-fixtures';
 import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
+import { NowHeader } from '@/app/learn/now/header';
 import type { FeedCard } from '@/lib/learn/feed/card';
 import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
@@ -2410,6 +2411,12 @@ const deckCards: FeedCard[] = [
   },
 ];
 
+/** The subject a subject's Now is drawn for (plan #1698), with the longest name. */
+const nowSubjectLong = {
+  id: '00000000-0000-4000-8000-0000000000ab',
+  name: 'Comparative constitutional law and the separation of powers',
+};
+
 const measuredDraft: CostEstimate = {
   lowMicros: 300_000,
   medianMicros: 400_000,
@@ -3914,6 +3921,22 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnNowFeed first={deckCards} ready={20} low={10} />,
+  },
+  {
+    /* Now opened from a subject's page (plan #1698), with nothing of it
+     * ready, under the longest subject name: the link back naming the
+     * subject, the switch, and the empty state. Its cards are drawn by the
+     * deck above, which is the same component. */
+    id: 'learn-now-subject-empty',
+    label: 'Now · One subject, nothing ready',
+    module: 'learn',
+    width: 'narrow',
+    render: () => (
+      <>
+        <NowHeader practice={false} subject={nowSubjectLong} />
+        <LearnNowFeed first={[]} ready={0} low={10} subjectId={nowSubjectLong.id} />
+      </>
+    ),
   },
   {
     /* The courses fold on Learn's Tracks page with no transcript saved: it

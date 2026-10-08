@@ -75,14 +75,21 @@ const CardIds = z.array(z.string().uuid()).max(1000);
 
 export type MoreCards = { cards: FeedCard[]; ready: number };
 
+/**
+ * The next page of the deck, leaving out what it already holds. On a
+ * subject's Now (plan #1698) `subjectId` keeps the page to that subject; an
+ * id that is not one deals the whole deck, as the page itself does.
+ */
 // latency: pending
-export async function loadMoreCards(shown: string[]): Promise<MoreCards> {
+export async function loadMoreCards(shown: string[], subjectId?: string | null): Promise<MoreCards> {
   const user = await requireUser();
   const exclude = CardIds.safeParse(shown);
+  const subject = CardId.safeParse(subjectId);
+  const only = subject.success ? subject.data : null;
   const supabase = await createLearnClient();
   const [cards, ready] = await Promise.all([
-    loadFeedPage(supabase, exclude.success ? exclude.data : []),
-    countReadyCards(supabase),
+    loadFeedPage(supabase, exclude.success ? exclude.data : [], { subjectId: only }),
+    countReadyCards(supabase, only),
   ]);
   after(() => topUpFeedAfterResponse(user.id));
   // These cards load behind the one on screen, so waiting for their related

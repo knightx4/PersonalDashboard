@@ -98,11 +98,24 @@ const SWIPE_LABEL: Record<SwipeAction, string> = {
 
 type MadeTrack = NonNullable<NewTrackResult['track']>;
 
+/**
+ * What a subject's deck says once nothing of it is left to show (plan #1698).
+ * The header above already names the subject, so this does not. Its cards are
+ * its lessons, which are written as you work through the subject rather than
+ * from what you write about, so it promises no new ones.
+ */
+function subjectEmpty(passed: number): string {
+  return passed === 0
+    ? 'Nothing here is ready. Cards you skipped come back in three days, and ones you want to work on in two.'
+    : 'You are through every card here. Cards you skipped come back in three days, and ones you want to work on in two.';
+}
+
 export function LearnNowFeed({
   first,
   firstRelated,
   ready: firstReady,
   low,
+  subjectId = null,
 }: {
   first: FeedCard[];
   /**
@@ -114,6 +127,11 @@ export function LearnNowFeed({
   ready: number;
   /** Below this many ready cards, loading more starts a top-up. */
   low: number;
+  /**
+   * The subject this deck is narrowed to (plan #1698), whose cards alone it
+   * loads. Null for the whole deck.
+   */
+  subjectId?: string | null;
 }) {
   const [deck, setDeck] = useState(first);
   const [ready, setReady] = useState(firstReady);
@@ -131,7 +149,7 @@ export function LearnNowFeed({
     busy.current = true;
     setLoading(true);
     try {
-      const more = await loadMoreCards(loaded.current);
+      const more = await loadMoreCards(loaded.current, subjectId);
       loaded.current = [...loaded.current, ...more.cards.map((card) => card.id)];
       setDeck((current) => appendCards(current, more.cards));
       setReady(more.ready);
@@ -143,7 +161,7 @@ export function LearnNowFeed({
       busy.current = false;
       setLoading(false);
     }
-  }, []);
+  }, [subjectId]);
 
   // Keep the deck stocked: ask for more while a few cards are still ahead.
   useEffect(() => {
@@ -314,7 +332,9 @@ export function LearnNowFeed({
           ) : (
             <div className="space-y-3">
               <p className="text-ui text-ink-muted">
-                {end === 'writing'
+                {subjectId
+                  ? subjectEmpty(passed)
+                  : end === 'writing'
                   ? passed === 0
                     ? 'No cards are ready yet. New ones are being written from what you write about, a few minutes each.'
                     : 'You are through every card ready now. More are being written, a few minutes each.'
