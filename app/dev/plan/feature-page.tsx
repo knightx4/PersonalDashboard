@@ -251,7 +251,7 @@ export function FeaturePage({
           }
         />
       )}
-      {parts.move && <Property label="Waiting on" value={parts.move} />}
+      {parts.move && <Property label="Whose move" value={parts.move} />}
       <Property
         label="Priority"
         value={
