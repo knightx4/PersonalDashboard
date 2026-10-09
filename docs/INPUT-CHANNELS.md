@@ -41,22 +41,34 @@ write. Every channel below that is not email needs that first.
 
 ## The shared piece: a capture endpoint
 
-One route, `POST /api/capture`, that takes `{ text, url?, place? }` and runs
-the same sort-and-file the capture box does. With `place` set it files
-straight there and skips the model.
+One route, `POST /api/capture` (plan #1706, `lib/capture/address.ts`), takes
+`{ text, url?, place? }` and runs the same sort-and-file the capture box
+does. With `place` set (`todo`, `goals`, `jobs` or `vault`) it files straight
+there and skips the sorter; a job still has one sorter call to find which
+role. Without a place, a sentence the sorter is not sure about is kept as a
+todo for today, since a Shortcut cannot show the chips the box would.
 
-It would be authenticated by a personal capture token:
+It is authenticated by a personal capture token (plan #1705), sent as
+`Authorization: Bearer dash_…`:
 
 - made on the account page, shown once, stored only as a hash;
 - able to file a capture and nothing else, so a leaked token can add rows
   but cannot read any;
 - listed with when it was last used, and revocable;
-- rate-limited, because each unsorted capture is one paid model call.
+- rate-limited to 10 captures a minute and 100 a day, because each unsorted
+  capture is one paid model call.
 
-This is about one sitting of work: a table, the route, the account-page
-section, and tests. Siri, the Watch, the iPhone share sheet, Zapier, IFTTT
-and a browser extension would all call it, so it is the first thing to build
-whichever of those is chosen.
+Every reply is JSON with a `spoken` sentence for the caller to say. A filing
+answers 200 with `filed`, one entry per place it went. A missing, malformed,
+unknown or revoked token answers 401; the limit answers 429 with
+`Retry-After`; a body over 24,000 bytes or text over 4,000 characters
+answers 413; a body that is not JSON, or has nothing to add, a link that is
+not http or https, or an unknown place answers 400; a place whose workspace
+is off, or a capture nothing could be filed from, answers 422; a database
+that cannot be reached answers 503 or 500.
+
+Siri, the Watch, the iPhone share sheet, Zapier, IFTTT and a browser
+extension would all call it.
 
 ## The channels
 
