@@ -44,6 +44,7 @@ export function WritePost({ defaultOpen = false }: { defaultOpen?: boolean }) {
       <ComposeBox className="space-y-2">
         <ComposeTitle
           name="angle"
+          className="min-h-11"
           maxLength={MAX_ANGLE}
           aria-label="What the post is about"
           placeholder="What it is about, in a line (optional)"
@@ -58,6 +59,7 @@ export function WritePost({ defaultOpen = false }: { defaultOpen?: boolean }) {
                 required={index === 0}
                 autoFocus={index === posts.length - 1}
                 rows={3}
+                className="min-h-11"
                 value={text}
                 onChange={(event) =>
                   setPosts((current) => current.map((p, i) => (i === index ? event.target.value : p)))
