@@ -1,6 +1,7 @@
 /**
  * How each source of recommended roles has done (job_search 0039): the weekly
- * web search, the followed companies' boards and the goals runs.
+ * web search, the followed companies' boards, the startups weekly discovery
+ * found on YC and Hacker News, and the goals runs.
  *
  * For each: how many roles it found, how many the person saved, how many of
  * those they applied to, and how many reached an interview; how many they
@@ -11,12 +12,13 @@
  */
 import { reachedInterview, wasSent } from './history';
 
-export const OPENING_ORIGINS = ['search', 'board', 'goal'] as const;
+export const OPENING_ORIGINS = ['search', 'board', 'discovered', 'goal'] as const;
 export type OpeningOrigin = (typeof OPENING_ORIGINS)[number];
 
 export const OPENING_ORIGIN_LABELS: Record<OpeningOrigin, string> = {
   search: "Dash's web search",
   board: 'Boards you follow',
+  discovered: 'Startups found on YC and Hacker News',
   goal: 'Goal steps',
 };
 

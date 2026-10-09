@@ -5,7 +5,11 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { EXCLUDED_SENDER_ERROR, isExcludedSender } from '@/lib/inbox/merchant-exclusion-match';
+import {
+  DISMISSED_REVIEW_ERROR,
+  EXCLUDED_SENDER_ERROR,
+  isExcludedSender,
+} from '@/lib/inbox/merchant-exclusion-match';
 import { chooseExclusionDomain } from '@/lib/review/exclude-sender';
 import {
   attachedMessage,
@@ -154,7 +158,7 @@ export async function dismissEmailReview(
     .from('ingested_messages')
     .update({
       parse_status: 'skipped',
-      error: 'Dismissed from review queue',
+      error: DISMISSED_REVIEW_ERROR,
     })
     .eq('id', messageId);
 
@@ -675,7 +679,7 @@ export async function dismissEmailsReview(
 
   const { error } = await supabase
     .from('ingested_messages')
-    .update({ parse_status: 'skipped', error: 'Dismissed from review queue' })
+    .update({ parse_status: 'skipped', error: DISMISSED_REVIEW_ERROR })
     .in(
       'id',
       restore.map((row) => row.id),

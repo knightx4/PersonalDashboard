@@ -19,7 +19,11 @@ import { VisionReviewLine } from './vision-review-line';
  * /dev/bugs -- so the first question of the morning, "is anything going", was
  * two pages away from the page written to answer the morning's questions.
  *
- * Called Status rather than Overnight. The runner's card has said "Overnight"
+ * Its heading is Controls now, folded shut under the strip of chips at the
+ * top of Home (now-strip.tsx), which says what this card used to say first.
+ * The card keeps the presses: start, hold, run the notes.
+ *
+ * Called Status rather than Overnight, before that. The runner's card has said "Overnight"
  * since it was a thing you set going before bed, and the name stayed accurate
  * only while nobody started one at eleven in the morning. Here it is one row of
  * two, so each row is named for the queue it works and the panel is named for
@@ -40,6 +44,7 @@ export function StatusPanel({
   openNotes,
   notesLastRun,
   vision,
+  autoApprove,
   now,
 }: {
   run: OvernightRun | null;
@@ -55,27 +60,15 @@ export function StatusPanel({
   notesLastRun: NotesLastRun | null;
   /** The weekly vision review's last run, or null when it could not be read. */
   vision: VisionReviewStatus | null;
+  /** Whether auto approve is on, for its switch on the Plan row. */
+  autoApprove: boolean;
   now: number;
 }) {
   return (
     <Card padding="dense">
-      {/* Dash's own mark beside the heading (note 414ead16), working while
-          the plan runner is firing and resting otherwise, so the answer to
-          "is anything going" is there before the rows are read -- and on the
-          closed line too, since the card folds like the rest of the page
-          (note 16a5d186). */}
-      <SectionFold
-        title={
-          <span className="inline-flex items-center gap-1.5">
-            <DashMark
-              size="icon"
-              state={overnightStanding(run) === 'running' ? 'working' : 'idle'}
-              className="text-accent"
-            />
-            Status
-          </span>
-        }
-      >
+      {/* Shut to begin with: the strip above says what is running, and this
+          card is where it is started, held or run by hand. */}
+      <SectionFold remember="dev.fold.controls" title="Controls" defaultOpen={false}>
         <div className="space-y-3">
           <OvernightControl
             run={run}
@@ -91,8 +84,20 @@ export function StatusPanel({
             next={card.next}
             fresh
             label="Plan"
+            // Dash's own mark (note 414ead16), working while the plan runner
+            // is firing and resting otherwise, so "is anything going" is
+            // answered before the rows are read. Under Plan on the left, and
+            // larger than the icon it was beside the heading (note 076e7744).
+            mark={
+              <DashMark
+                size="md"
+                state={overnightStanding(run) === 'running' ? 'working' : 'idle'}
+                className="text-accent"
+              />
+            }
             bare
             showBlocked={false}
+            autoApprove={autoApprove}
           />
           <div className="border-t border-border pt-3">
             <RunRoutineButton

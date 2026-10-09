@@ -69,7 +69,11 @@ feature and every feature is theirs to approve.
    a follow-on: file it with `idea "…"` and leave the feature alone. Same two
    tests as shaping, the same one patch of fog, and the same three parts to a
    decision — see **How a decision must be written**.
-5. **Stop.** Do not `approve`, do not `answer` a decision, do not `start` or
+5. **Write Dash's update on the feature** (plan #1666): `update <n> --health
+   on_track|at_risk|blocked --body "…"`, two or three sentences on what the
+   re-shape changed: what it added, dropped and asked, by number. The health
+   rules are in step 7 of the Building section in `SKILL.md`.
+6. **Stop.** Do not `approve`, do not `answer` a decision, do not `start` or
    build anything, and do not add again what the feature already holds —
    read the existing steps first, including ones an earlier re-shape added,
    and everything under *Already dismissed*, which is what the person has

@@ -50,7 +50,7 @@ const ACCESS_NOTE: Record<string, string | null> = {
 function PlanButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" disabled={pending}>
+    <Button type="submit" variant="secondary" pending={pending}>
       <Sparkles className="size-4" strokeWidth={2} aria-hidden />
       {pending ? 'Working it out…' : 'Plan this topic'}
     </Button>
@@ -60,7 +60,7 @@ function PlanButton() {
 function SaveButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" pending={pending}>
       {pending ? 'Saving…' : 'Add these to the reading list'}
     </Button>
   );
@@ -69,7 +69,7 @@ function SaveButton() {
 function KeepButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" pending={pending}>
       {pending ? 'Keeping…' : 'Keep these'}
     </Button>
   );

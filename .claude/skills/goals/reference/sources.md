@@ -18,7 +18,7 @@ What the person is looking for in the next job and where they are now, in their 
 
 - Search: `body`
 - Name a row by `body`; link it by `id`
-- Opens at `/jobs/thoughts`
+- Opens at `/jobs/find`
 - A newer entry supersedes an older one where they disagree; read them newest first.
 
 ### `job_search.profiles` (Job search)
@@ -124,8 +124,9 @@ Notes they wrote on Learn cards and on ideas, in their own words.
 
 YouTube videos they chose to watch, saved to their playlist, or kept from a channel Dash judged for one of their subjects, with a verdict on each once judged.
 
-- Search: `why`, `summary`
-- Name a row by `video_id`; link it by `id`
+- Search: `why`, `summary`, `key_points`, `verdict`
+- Name a row by `video_id`; link it by `video_id`
+- Opens at `/learn/videos/<video_id>`
 - item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist. came_from is playlist, takeout or channel search; a channel search row names the subject it was found for in subject_id.
 
 ### `news.preferences` (News)
@@ -159,6 +160,15 @@ Things they asked Dash to watch outside the app, such as a resale ticket price, 
 - Search: `title`, `url`
 - Name a row by `title`; link it by `id`
 - condition is what they are waiting for: {"below": 200} means they want to hear when the reading drops under 200 (in currency when set); {} means reports only. goal_item_id is the goals.items step it serves, when started from one. status 'running', 'ended' (ends_at passed) or 'stopped' (they stopped it). The readings are in core.watch_readings, joined by watch_id.
+
+### `public.spec_interviews` (Dev)
+
+Interviews Dash held about one workspace of the app, or the app as a whole: what they use it for, what they do there and their routines, in their own answers.
+
+- Search: `summary`
+- Name a row by `module`; link it by `id`
+- Opens at `/dev/specs`
+- module is the workspace's id, or 'app'. The questions and answers are the thread under the row in core.conversations (ref public.spec_interviews:<id>): turns with role 'user' are their answers, quoted as what they said. summary is Dash's few sentences on what they said, written when it drafted; it is null while status is open.
 
 ## What they did or have (read for progress and facts)
 
@@ -378,6 +388,15 @@ Lists they pasted in to learn from, as pasted.
 
 - Search: `raw_text`, `source_hint`
 - Name a row by `source_hint`; link it by `id`
+
+### `learn.personality_results` (Learn)
+
+Personality tests they took or typed in, each with its date: Big Five scores, or a type such as INTJ or 5w4.
+
+- Search: `test_name`, `typed_value`, `note`, `read_points`
+- Name a row by `test_name`; link it by `id`
+- Opens at `/learn/know#personality`
+- kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. A retake is a new row, so read the latest by taken_at. read_points is Dash's read of the result against their notes, once written.
 
 ### `todo.tasks` (Todo)
 

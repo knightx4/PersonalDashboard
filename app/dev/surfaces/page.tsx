@@ -3,6 +3,8 @@ import { PageHeader } from '@/components/shell/page-header';
 import { loadFeedbackQueue } from '@/lib/feedback/load';
 import { SURFACES } from '@/app/preview/surfaces';
 import { surfaceOf } from '@/lib/feedback/surfaces';
+import { loadScreenChanges } from '@/lib/plan/screen-change-load';
+import { surfacesChangedWithin } from '@/lib/plan/screen-change';
 import { SurfaceReview } from './review';
 
 export const metadata = { title: 'Surfaces' };
@@ -33,7 +35,13 @@ export const metadata = { title: 'Surfaces' };
 export default async function DevSurfacesPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const queue = await loadFeedbackQueue(supabase, user.id);
+  const [queue, screenChanges] = await Promise.all([
+    loadFeedbackQueue(supabase, user.id),
+    loadScreenChanges(supabase, user.id),
+  ]);
+  // The surfaces a step changed in the last seven days, for the "Changed
+  // this week" filter (plan #1542). A request-time read, so "now" is now.
+  const changed = surfacesChangedWithin(screenChanges, new Date());
 
   /** Notes filed against a surface, by surface id. */
   const notesBySurface = new Map<string, typeof queue.rows>();
@@ -47,6 +55,7 @@ export default async function DevSurfacesPage() {
     id: surface.id,
     label: surface.label,
     module: surface.module,
+    changed: changed.get(surface.id) ?? null,
     notes: (notesBySurface.get(surface.id) ?? []).map((note) => ({
       id: note.id,
       body: note.body,

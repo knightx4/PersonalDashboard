@@ -52,7 +52,7 @@ import {
 } from '@/lib/plan/tree';
 
 /** What the health tooltip and the Needs line say about a Claude result waiting to be read. */
-export const REVIEW_ASK = 'Read what Dash found and mark it read.';
+export const REVIEW_ASK = 'Open what Dash found, under this step, to read it.';
 
 /**
  * The health word for a Claude result waiting to be read. The plan's word for
@@ -493,6 +493,18 @@ export function goalViewOf(param: string | string[] | undefined): GoalView {
 /** Where a view of the page at `path` lives. Open keeps the bare path, as /dev/plan's does. */
 export function goalViewHref(path: string, view: GoalView): string {
   return view === DEFAULT_GOAL_VIEW ? path : `${path}?view=${view}`;
+}
+
+/**
+ * Whether the goal page shows a step among the open ones rather than folding
+ * it under Finished: any step not done or dropped, and a finished Dash step
+ * whose result you have not read, since a result folded away would go
+ * unread. A finished prep step is the exception, because its result is read
+ * as Dash's draft on the step it prepares: `readElsewhere` holds those.
+ */
+export function staysOpen(step: StepNode, readElsewhere: ReadonlySet<string> = new Set()): boolean {
+  if (step.status !== 'done' && step.status !== 'dropped') return true;
+  return awaitsReview(step) && !readElsewhere.has(step.id);
 }
 
 /** The healths the dev plan's "On you" view is made of (`needsThePerson` in lib/plan/tree.ts). */

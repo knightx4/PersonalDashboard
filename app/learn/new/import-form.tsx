@@ -52,7 +52,7 @@ type Slot = { state: 'pending'; row: PendingRow } | { state: 'done'; row: Previe
 function SubmitButton({ idle, busy }: { idle: string; busy: string }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" pending={pending}>
       {pending ? busy : idle}
     </Button>
   );

@@ -71,3 +71,31 @@ export function applicationMove({
         : 'The last move was yours; the next one is theirs.',
   };
 }
+
+/** Who moved an application to a stage: the person on the board, or Dash when asked. */
+export type StageMoveBy = 'hand' | 'Dash';
+
+/**
+ * The event a stage move writes, the same from the board's drag, the role
+ * page's picker and Dash's move_roles (plan #1657). The status column is
+ * never written: public.sync_application_state() derives it from this event
+ * and the override column, so a move is this row plus
+ * `status_manual_override` set to the same status.
+ */
+export function stageMoveEvent(
+  userId: string,
+  applicationId: string,
+  status: ApplicationStatus,
+  by: StageMoveBy,
+  occurredAt: string,
+) {
+  return {
+    user_id: userId,
+    application_id: applicationId,
+    kind: 'status_override' as const,
+    occurred_at: occurredAt,
+    source: 'manual' as const,
+    summary: `Moved to ${status.replace(/_/g, ' ')} by ${by === 'hand' ? 'hand' : 'Dash'}`,
+    payload: { status },
+  };
+}

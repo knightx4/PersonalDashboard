@@ -11,6 +11,9 @@ import { loadRaisedNotifications } from '@/lib/raised/notifications';
 import { loadActivity } from '@/lib/shell/activity';
 import { loadMainCheck } from '@/lib/shell/main-check';
 import { switcherCounts } from '@/lib/modules/switcher-counts';
+import { loadHomeForRequest } from '@/lib/goals/home-request';
+import { goalInboxCount } from '@/lib/goals/inbox';
+import { todayIn } from '@/lib/todo/tasks/model';
 
 /**
  * Shell for the goals workspace (docs/GOALS-SPEC.md, plan #923).
@@ -19,11 +22,12 @@ import { switcherCounts } from '@/lib/modules/switcher-counts';
  * second line, not the first. No onboarding gate: nothing here needs a Gmail
  * grant.
  *
- * Four tabs: the home, which is the daily view (#926); All goals, where
- * areas and goals are added and arranged (#924); Files, the longer pieces
- * Claude wrote for them (core.files); and Runs, every run Claude made on them
- * (#1012). The full tree of a goal
- * opens from either (#925), so it is a deeper view rather than a tab.
+ * Two tabs: the home, which is the daily view (#926), and All goals, where
+ * areas and goals are added and arranged (#924). The full tree of a goal
+ * opens from either (#925), so it is a deeper view rather than a tab. Files
+ * (core.files) and Runs (#1012) are pages without a tab: Files is linked
+ * from All goals and from a goal's Details, Runs from What Dash did on the
+ * home.
  */
 export default async function GoalsLayout({ children }: { children: React.ReactNode }) {
   const user = await getUser();
@@ -45,11 +49,18 @@ export default async function GoalsLayout({ children }: { children: React.ReactN
       estimatePaidActions(core, user.id, paidActionsUnder('app/goals/')).catch(() => ({})),
     ]);
 
+  // The Inbox badge, from the same read the Home and Inbox pages draw from
+  // (cached for the request). A failed read leaves the badge off, not the page.
+  const inbox = await loadHomeForRequest(user.id, todayIn(settings.timezone))
+    .then((home) => goalInboxCount(home.onYou, home.dash))
+    .catch(() => undefined);
+
   const sections: NavSection[] = [
     { href: '/goals', label: 'Home', icon: 'goalsHome', exact: true },
+    // Everything on you across the goals, as the Inbox in Dev holds what is
+    // waiting on you there.
+    { href: '/goals/inbox', label: 'Inbox', icon: 'inbox', badge: inbox },
     { href: '/goals/all', label: 'All goals', icon: 'goalsAll' },
-    { href: '/goals/files', label: 'Files', icon: 'goalsFiles' },
-    { href: '/goals/runs', label: 'Runs', icon: 'goalsRuns' },
   ];
 
   return (

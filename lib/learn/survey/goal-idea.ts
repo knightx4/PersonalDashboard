@@ -204,7 +204,7 @@ export async function ideaForGoal(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, MODEL),
       messages: [{ role: 'user', content: describeGoalIdea(source, input.existing) }],
     });
   } catch (error) {

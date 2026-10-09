@@ -8,6 +8,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
+import Link from 'next/link';
 import { ChevronDown, HelpCircle, Wrench } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
@@ -81,7 +82,6 @@ export type TreeHealth = {
   glyph: GlyphName;
   name: string;
 };
-
 
 /**
  * The row's own state, held by the page's row so its menus can open the panel,
@@ -166,6 +166,25 @@ export function useTreeRow(
 
 export type TreeRowState = ReturnType<typeof useTreeRow>;
 
+/**
+ * A heading title's last word, which the count and marks after it are kept
+ * on a line with. A word too long to keep whole is not glued, so a long
+ * address or name still wraps anywhere rather than running off a phone.
+ */
+const GLUED_WORD_MAX = 24;
+
+export function titleTail(title: string): string {
+  const at = title.trimEnd().lastIndexOf(' ');
+  const tail = title.trimEnd().slice(at + 1);
+  return tail.length > GLUED_WORD_MAX ? '' : tail;
+}
+
+/** Everything before `titleTail`, with the space that ends it. */
+export function titleHead(title: string): string {
+  const trimmed = title.trimEnd();
+  return trimmed.slice(0, trimmed.length - titleTail(title).length);
+}
+
 /** Everything under a row sits in from the tree by the same amount the title does. */
 export function rowInset(trail: readonly boolean[]): CSSProperties {
   return { paddingLeft: `${0.75 + trail.length * 1.25 + 1.25}rem` };
@@ -202,7 +221,34 @@ export function TreeRow<E extends TreeCatalogEntry>({
   titles,
   threadPlaceholder = 'A note on this step. Tag @dash to ask something, or to tell it to reword the step, file an idea or build it.',
   renderChild,
+  layout = 'grid',
+  after,
+  heading = false,
+  titleHref,
 }: {
+  /**
+   * Where the title goes, when the row has a page of its own (a goal step's,
+   * plan #1621). The title is then a link to it, and the chevron in the fold
+   * slot opens the panel in place, on a leaf as well. The dev plan passes
+   * none, so its titles stay the fold.
+   */
+  titleHref?: string;
+  /**
+   * The row is what its page is about (a goal step's own page, plan #1620):
+   * the title is the page's heading rather than a fold, since the page is the
+   * step opened, and the status control and menu stay beside it.
+   */
+  heading?: boolean;
+  /**
+   * `grid` is the dev plan's row: the shared columns under a header, with the
+   * outline number, health word, move, priority and count of what is beneath.
+   * `list` is a goal's row (plan #1078): the status control before the title
+   * as a glyph, the title with its marks, the `priority` cell at the end
+   * (under the title on a phone), and the menu. The panel is the same.
+   */
+  layout?: 'grid' | 'list';
+  /** Drawn under the sub-steps while they show: on a goal, the fold of the finished ones. */
+  after?: ReactNode;
   node: TreeRowNode;
   /** One entry per level above: whether that level's line carries on below this row. */
   trail: readonly boolean[];
@@ -325,6 +371,16 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // panel condenses the panel and leaves the sub-steps.
   const foldable = hasChildren || foldableFog;
   const expanded = open || (foldable && showChildren);
+  // A leaf has nothing to fold, so its chevron (drawn when the title links
+  // away) opens and closes the panel, and says so.
+  const foldLabel = foldable
+    ? `${expanded ? 'Fold' : 'Unfold'} #${handle}`
+    : `${expanded ? 'Close' : 'Open'} #${handle}`;
+  const titleClass = cn(
+    'min-w-0',
+    open ? 'break-words' : 'break-words sm:truncate',
+    node.status === 'dropped' && 'text-ink-muted line-through',
+  );
   const toggle = () => {
     const next = !expanded;
     setOpen(next);
@@ -338,7 +394,15 @@ export function TreeRow<E extends TreeCatalogEntry>({
   // opens straight to its panel. A row that starts open, or is opened by a
   // link to it, shows its details, since that is what was asked for.
   const [detailsShown, setDetailsShown] = useState(open);
-  const condensable = hasChildren && showChildren;
+  // On the step's own page the details are what the page is for, so they
+  // do not fold.
+  const condensable = hasChildren && showChildren && !heading;
+  // The first line of the detail, or of the done-when, without markdown's
+  // link brackets: what a folded panel shows beside Show details.
+  const foldedPreview = (node.detail ?? node.acceptance ?? '')
+    .split('\n')
+    .map((line) => line.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/[*_#>`]/g, '').trim())
+    .find((line) => line.length > 0);
 
   // A link to this row by its own id (a goal step from the Goals home, or
   // from Go to the step under a finding) opens its panel as well as scrolling
@@ -357,6 +421,159 @@ export function TreeRow<E extends TreeCatalogEntry>({
     return () => window.removeEventListener('hashchange', openIfNamed);
   }, [anchorId, setOpen]);
 
+  const list = layout === 'list';
+  // Health is a word you click to change, not a badge you have to open the
+  // step to change: "where is this" is the question the page exists for, and
+  // answering it differently should not be a form. The grid draws it after
+  // the title; the list draws it before, where a checkbox would be.
+  const healthMenu = (
+    <ActionMenu
+      label={`Status of #${node.outline} ${node.title}`}
+      items={statusMenu}
+      align="start"
+      className={list ? 'shrink-0' : 'justify-self-start'}
+      triggerClassName={cn(
+        list
+          ? 'size-7 px-0 text-small font-medium'
+          : 'h-7 w-auto gap-1.5 px-1.5 text-small font-medium',
+        TONE_TEXT[health.tone],
+      )}
+      trigger={
+        <StateLabel
+          // Inherits the trigger's own text size and tone, which is what
+          // makes the health a word you click rather than a badge inside a
+          // button.
+          className="text-inherit"
+          tone={health.tone}
+          title={health.title}
+          word={health.word}
+          // No glyph on a dropped row. The slash was a third way of
+          // saying what the ghost tone and the struck-through title
+          // already say, on the one state nobody is scanning for -- so it
+          // read as clutter beside the rows that are still live, which is
+          // where the eye is actually going (law 15). Every other state
+          // keeps its shape: those are the ones being scanned, and the
+          // glyph is how they are told apart at a glance. The count
+          // beside the module heading keeps its slash too, because there
+          // a bare number would say nothing at all.
+          glyph={health.name === 'dropped' && !list ? null : health.glyph}
+          // On a phone the glyph stands for the word, which stays for
+          // screen readers, so a dropped row gets its slash back there.
+          // In the list layout the glyph is the control at every width,
+          // and the word is its accessible name and tooltip.
+          wordClassName={list ? 'sr-only' : 'max-sm:sr-only'}
+        >
+          {health.name === 'dropped' && !list && (
+            <StatusGlyph glyph={health.glyph} className="sm:hidden" />
+          )}
+        </StateLabel>
+      }
+    />
+  );
+
+  // What the title cell says: the title and the lines under it. A button
+  // that folds the row, or, where the title links to the step's own page, a
+  // plain cell beside the chevron that folds it.
+  const rowLines = (
+    <>
+      <span
+        className={cn(
+          'flex min-w-0 items-baseline gap-1.5 text-ui',
+          trail.length === 0 ? 'font-medium text-ink' : 'text-ink',
+        )}
+      >
+        {/* Where the row sits, not just what it is called: a feature
+              reads #595 and its second step reads #595.2, so a step says
+              which feature it belongs to and how far through it is
+              without the tree guides having to be traced up by eye.
+              `number` is still the handle -- it is what the commits, the
+              comments and the CLI say, it is the anchor a `#597` link
+              lands on, and the button around this says "Open #597" -- and
+              the search box takes either. */}
+        {!list && (
+          <span className="tabular shrink-0 text-small text-ink-ghost">#{node.outline}</span>
+        )}
+        {/* Truncated closed, whole open. A row is a line and a long title
+         * has to give way to keep it one; but opening the step is the
+         * gesture that means "show me this one", and a name still cut
+         * off after it leaves no way to read it at all. On a phone it
+         * wraps closed as well: the name cell there is what is left
+         * after the health and the menu, which cut titles to two words
+         * (plan #1041). */}
+        {titleHref ? (
+          <Link
+            href={titleHref}
+            className={cn(
+              titleClass,
+              'press-area underline-offset-2 hover:text-accent hover:underline',
+            )}
+          >
+            {node.title}
+          </Link>
+        ) : (
+          <span className={titleClass}>{node.title}</span>
+        )}
+        {/* A question waiting on this step, said on the row. The section
+         * that answers it is behind the fold, and a question nobody
+         * knows is there is the thing this whole section exists to
+         * stop. */}
+        {unanswered > 0 && !open && (
+          <span
+            title={`${unanswered} unanswered ${unanswered === 1 ? 'question' : 'questions'}`}
+            className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution"
+          >
+            <HelpCircle className="size-3" strokeWidth={2} aria-hidden />
+            {unanswered}
+            <span className="sr-only">
+              unanswered {unanswered === 1 ? 'question' : 'questions'}
+            </span>
+          </span>
+        )}
+        {/* And whether anything has been said about it. */}
+        <CommentCount count={node.thread.length} />
+        {marks}
+      </span>
+      {/* Where it came from, when it did not come from you. On the row
+            and not behind the fold, because a step that appeared under a
+            feature you approved last week is exactly the one you would
+            never think to open. */}
+      {origin && (
+        <span className="block truncate text-small text-ink-ghost">
+          From #{origin.number}&apos;s answer: {origin.gist}
+        </span>
+      )}
+      {/* The same, for a step a session wrote ready to build. Approval
+            stops at the feature, so this row never asked you; saying so
+            is what the Drop at the top of its menu is for. */}
+      {addedBy && (
+        <span
+          title={addedBy.session ? `Session ${addedBy.session}` : undefined}
+          className="block truncate text-small text-ink-ghost"
+        >
+          <DashCredit />
+          Added by Dash on {addedBy.date}
+        </span>
+      )}
+      {source && <span className="block truncate text-small text-ink-ghost">{source}</span>}
+      {need && !open && (
+        <span className="block truncate text-small text-ink">
+          <span className="font-medium text-caution">Needs: </span>
+          {need}
+        </span>
+      )}
+      {gloss && !open && !need && (
+        <span className="block truncate text-small text-ink-muted">
+          {!node.detail && 'Note: '}
+          {gloss}
+        </span>
+      )}
+      {/* On a phone the list layout's last cell goes under the title. */}
+      {list && priority && (
+        <span className="block text-small text-ink-muted sm:hidden">{priority}</span>
+      )}
+    </>
+  );
+
   return (
     <>
       {/* The anchor a `#494` written in a comment lands on. `scroll-mt` keeps
@@ -364,29 +581,36 @@ export function TreeRow<E extends TreeCatalogEntry>({
       <li
         id={anchorId ?? planRowId(node.number)}
         className={cn(
-          ROW_GRID,
+          list ? 'flex items-start gap-x-1' : ROW_GRID,
           'group scroll-mt-24 px-3',
           (gloss || need) && !open ? 'py-1.5' : 'py-2',
           !node.matches && 'opacity-60',
-          closed && 'opacity-70',
+          // A goal's finished rows sit under their own Finished fold, which
+          // says they are finished; dimmed as well, their muted text fell
+          // under the contrast floor.
+          // Opened, a finished step is being read, as its title already is
+          // in full: dimmed, its #number fell to 2.3:1 (plan #1541).
+          closed && !list && !open && 'opacity-70',
         )}
       >
-        <div className="flex min-w-0 items-stretch">
+        <div className={cn('flex min-w-0 items-stretch', list && 'flex-1')}>
           <TreeGuides trail={trail} />
 
           {/* The fold, where there is something beneath to fold. A spacer
               where there is not, so the titles at one depth line up. */}
-          {hasChildren || foldableFog ? (
+          {heading ? null : foldable || (titleHref && !isDecision && !setupOpen) ? (
             <button
               type="button"
               onClick={toggle}
               aria-expanded={expanded}
-              title={expanded ? `Fold #${handle}` : `Unfold #${handle}`}
-              aria-label={expanded ? `Fold #${handle}` : `Unfold #${handle}`}
+              title={foldLabel}
+              aria-label={foldLabel}
               className={cn(
                 LEVEL,
-                'press flex shrink-0 items-center justify-center self-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
-                'h-5',
+                'press flex shrink-0 items-center justify-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
+                // In the list the row can run to several lines (the title,
+                // Needs, a date), so the fold sits on the title's line.
+                list ? 'mt-1 h-5 self-start' : 'h-5 self-center',
               )}
             >
               <ChevronDown
@@ -430,149 +654,57 @@ export function TreeRow<E extends TreeCatalogEntry>({
             <span className={cn(LEVEL, 'shrink-0')} aria-hidden />
           )}
 
+          {list && healthMenu}
+
           {/* The title and the chevron beside it are one fold: either opens
               the step's panel and its sub-steps together. Renamed in place
               where the page gives the title an editor. */}
           {row.editing && titleEditor ? (
             <div className="min-w-0 flex-1 self-center">{titleEditor}</div>
+          ) : heading ? (
+            <h1 className="min-w-0 flex-1 self-center pl-1 font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
+              {/* The count and the marks run on after the title's last word
+                  and wrap with it, so a title that fits on one line keeps
+                  them on that line (plan #1623). */}
+              <span className={cn(node.status === 'dropped' && 'text-ink-muted line-through')}>
+                {titleHead(node.title)}
+              </span>
+              <span className="whitespace-nowrap">
+                <span className={cn(node.status === 'dropped' && 'text-ink-muted line-through')}>
+                  {titleTail(node.title)}
+                </span>
+                <span className="ml-2 inline-flex items-center gap-1.5 align-middle font-sans text-ui font-normal tracking-normal">
+                  <CommentCount count={node.thread.length} />
+                  {marks}
+                </span>
+              </span>
+            </h1>
+          ) : titleHref ? (
+            <div
+              className={cn(
+                'min-w-0 flex-1 text-left',
+                list ? 'self-start py-1 pl-1' : 'self-center',
+              )}
+            >
+              {rowLines}
+            </div>
           ) : (
             <button
               type="button"
               onClick={toggle}
               aria-expanded={expanded}
               title={expanded ? `Close #${handle}` : `Open #${handle}`}
-              className="min-w-0 flex-1 self-center text-left hover:text-accent"
+              className={cn(
+                'min-w-0 flex-1 text-left hover:text-accent',
+                list ? 'self-start py-1 pl-1' : 'self-center',
+              )}
             >
-              <span
-                className={cn(
-                  'flex min-w-0 items-baseline gap-1.5 text-ui',
-                  trail.length === 0 ? 'font-medium text-ink' : 'text-ink',
-                )}
-              >
-                {/* Where the row sits, not just what it is called: a feature
-                  reads #595 and its second step reads #595.2, so a step says
-                  which feature it belongs to and how far through it is
-                  without the tree guides having to be traced up by eye.
-                  `number` is still the handle -- it is what the commits, the
-                  comments and the CLI say, it is the anchor a `#597` link
-                  lands on, and the button around this says "Open #597" -- and
-                  the search box takes either. */}
-                <span className="tabular shrink-0 text-small text-ink-ghost">#{node.outline}</span>
-                {/* Truncated closed, whole open. A row is a line and a long title
-                 * has to give way to keep it one; but opening the step is the
-                 * gesture that means "show me this one", and a name still cut
-                 * off after it leaves no way to read it at all. On a phone it
-                 * wraps closed as well: the name cell there is what is left
-                 * after the health and the menu, which cut titles to two words
-                 * (plan #1041). */}
-                <span
-                  className={cn(
-                    'min-w-0',
-                    open ? 'break-words' : 'break-words sm:truncate',
-                    node.status === 'dropped' && 'text-ink-muted line-through',
-                  )}
-                >
-                  {node.title}
-                </span>
-                {/* A question waiting on this step, said on the row. The section
-                 * that answers it is behind the fold, and a question nobody
-                 * knows is there is the thing this whole section exists to
-                 * stop. */}
-                {unanswered > 0 && !open && (
-                  <span
-                    title={`${unanswered} unanswered ${unanswered === 1 ? 'question' : 'questions'}`}
-                    className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution"
-                  >
-                    <HelpCircle className="size-3" strokeWidth={2} aria-hidden />
-                    {unanswered}
-                    <span className="sr-only">
-                      unanswered {unanswered === 1 ? 'question' : 'questions'}
-                    </span>
-                  </span>
-                )}
-                {/* And whether anything has been said about it. */}
-                <CommentCount count={node.thread.length} />
-                {marks}
-              </span>
-              {/* Where it came from, when it did not come from you. On the row
-                and not behind the fold, because a step that appeared under a
-                feature you approved last week is exactly the one you would
-                never think to open. */}
-              {origin && (
-                <span className="block truncate text-small text-ink-ghost">
-                  From #{origin.number}&apos;s answer: {origin.gist}
-                </span>
-              )}
-              {/* The same, for a step a session wrote ready to build. Approval
-                stops at the feature, so this row never asked you; saying so
-                is what the Drop at the top of its menu is for. */}
-              {addedBy && (
-                <span
-                  title={addedBy.session ? `Session ${addedBy.session}` : undefined}
-                  className="block truncate text-small text-ink-ghost"
-                >
-                  <DashCredit />
-                  Added by Dash on {addedBy.date}
-                </span>
-              )}
-              {source && <span className="block truncate text-small text-ink-ghost">{source}</span>}
-              {need && !open && (
-                <span className="block truncate text-small text-ink">
-                  <span className="font-medium text-caution">Needs: </span>
-                  {need}
-                </span>
-              )}
-              {gloss && !open && !need && (
-                <span className="block truncate text-small text-ink-muted">
-                  {!node.detail && 'Note: '}
-                  {gloss}
-                </span>
-              )}
+              {rowLines}
             </button>
           )}
         </div>
 
-        {/* Health is a word you click to change, not a badge you have to open
-            the step to change: "where is this" is the question the page exists
-            for, and answering it differently should not be a form. */}
-        <ActionMenu
-          label={`Status of #${node.outline} ${node.title}`}
-          items={statusMenu}
-          align="start"
-          className="justify-self-start"
-          triggerClassName={cn(
-            'h-7 w-auto gap-1.5 px-1.5 text-small font-medium',
-            TONE_TEXT[health.tone],
-          )}
-          trigger={
-            <StateLabel
-              // Inherits the trigger's own text size and tone, which is what
-              // makes the health a word you click rather than a badge inside a
-              // button.
-              className="text-inherit"
-              tone={health.tone}
-              title={health.title}
-              word={health.word}
-              // No glyph on a dropped row. The slash was a third way of
-              // saying what the ghost tone and the struck-through title
-              // already say, on the one state nobody is scanning for -- so it
-              // read as clutter beside the rows that are still live, which is
-              // where the eye is actually going (law 15). Every other state
-              // keeps its shape: those are the ones being scanned, and the
-              // glyph is how they are told apart at a glance. The count
-              // beside the module heading keeps its slash too, because there
-              // a bare number would say nothing at all.
-              glyph={health.name === 'dropped' ? null : health.glyph}
-              // On a phone the glyph stands for the word, which stays for
-              // screen readers, so a dropped row gets its slash back there.
-              wordClassName="max-sm:sr-only"
-            >
-              {health.name === 'dropped' && (
-                <StatusGlyph glyph={health.glyph} className="sm:hidden" />
-              )}
-            </StateLabel>
-          }
-        />
+        {!list && healthMenu}
 
         {/* Whose move it is, beside how far along it is.
 
@@ -587,22 +719,33 @@ export function TreeRow<E extends TreeCatalogEntry>({
             to, what it waits on, whether it is a question -- so there is
             nothing here to pick. Changing it means handing the step over or
             answering what it asks, which are the buttons already on the row. */}
-        <span className="hidden min-w-0 truncate text-small sm:block">{move}</span>
+        {list ? (
+          priority &&
+          !heading && (
+            <span className="hidden max-w-48 shrink-0 pt-1.5 text-right text-small sm:block">
+              {priority}
+            </span>
+          )
+        ) : (
+          <>
+            <span className="hidden min-w-0 truncate text-small sm:block">{move}</span>
 
-        <span className="hidden truncate text-small sm:block">{priority}</span>
+            <span className="hidden truncate text-small sm:block">{priority}</span>
 
-        {/* No "Who" column. It was a column of dashes with the occasional
-            name in it -- one fact, on a plan whose every approved step the
-            runner takes unless you keep it, and keeping it is a button. */}
-        <span className="hidden sm:block">
-          <Breakdown rollup={node.rollup} />
-        </span>
+            {/* No "Who" column. It was a column of dashes with the occasional
+                name in it -- one fact, on a plan whose every approved step the
+                runner takes unless you keep it, and keeping it is a button. */}
+            <span className="hidden sm:block">
+              <Breakdown rollup={node.rollup} />
+            </span>
+          </>
+        )}
 
         {/* The things done to a step without reading it first, then the menu
             for everything else. Under the pointer or under focus, so a plan at
             rest is a plan rather than a wall of icons; the same actions are in
             the menu, which is how a phone reaches them. */}
-        <div className="flex items-center justify-self-end">
+        <div className={cn('flex items-center justify-self-end', list && 'shrink-0')}>
           {quickActions && (
             <div className="hidden items-center opacity-0 transition-opacity duration-quick group-focus-within:opacity-100 group-hover:opacity-100 sm:flex">
               {quickActions}
@@ -652,14 +795,21 @@ export function TreeRow<E extends TreeCatalogEntry>({
           // rows at the next indent, which made opening a step look like
           // unfolding one more level of the tree -- the same gesture and the
           // same shape for two different meanings.
-          <li style={inset} className="pb-3 pr-3">
-            <div className="space-y-3 border-l-2 border-accent bg-canvas px-3 py-2.5">
+          // On the step's own page the panel is the page, so it has no edge of
+          // its own and lines up with the heading (plan #1620).
+          <li style={heading ? { paddingLeft: '0.75rem' } : inset} className="pb-3 pr-3">
+            <div
+              className={cn(
+                'space-y-3',
+                heading ? 'py-1' : 'border-l-2 border-accent bg-canvas px-3 py-2.5',
+              )}
+            >
               {condensable && (
                 <button
                   type="button"
                   onClick={() => setDetailsShown(!detailsShown)}
                   aria-expanded={detailsShown}
-                  className="press -mx-1 flex items-center gap-1 rounded px-1 text-small font-semibold text-ink-muted hover:bg-accent-tint hover:text-accent"
+                  className="press -mx-1 flex w-full min-w-0 items-center gap-1 rounded px-1 text-small font-semibold text-ink-muted hover:bg-accent-tint hover:text-accent"
                 >
                   <ChevronDown
                     className={cn(
@@ -670,6 +820,13 @@ export function TreeRow<E extends TreeCatalogEntry>({
                     aria-hidden
                   />
                   {detailsShown ? 'Hide details' : 'Show details'}
+                  {/* Folded, the line carries the first of what the details
+                  say, so the space is worth having (note 886d6e4f). */}
+                  {!detailsShown && foldedPreview && (
+                    <span className="min-w-0 flex-1 truncate text-left font-normal text-ink-muted">
+                      {foldedPreview}
+                    </span>
+                  )}
                 </button>
               )}
               {(!condensable || detailsShown) && (
@@ -743,6 +900,8 @@ export function TreeRow<E extends TreeCatalogEntry>({
                       type="button"
                       size="sm"
                       variant="ghost"
+                      // On the step's own page its words line up with the text above.
+                      className={heading ? '-ml-2.5' : undefined}
                       onClick={() => row.setEditing(true)}
                     >
                       {titleEditor ? 'Rename' : 'Edit'}
@@ -766,6 +925,8 @@ export function TreeRow<E extends TreeCatalogEntry>({
             {renderChild(child, [...trail, index < substeps.length - 1])}
           </Fragment>
         ))}
+
+      {showChildren && after}
 
       {row.addingChild && addChild && (
         <li style={inset} className="py-2 pr-3">

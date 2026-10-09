@@ -1,17 +1,18 @@
 import 'server-only';
 
+import { areaHref } from '@/lib/goals/all-goals';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 
 /**
  * Where the learning goals are on /goals (plan #1491): the person's Learn
- * area, which goals 0066 makes the first time they have a learning goal. Its
- * page is /goals/area/<id>. Without one, or when it cannot be read, /goals,
- * where adding a goal to a new Learn area starts.
+ * area, which goals 0066 makes the first time they have a learning goal. It
+ * has its own page, /goals/area/<id>. Without one, or when it
+ * cannot be read, /goals, where adding a goal to a new Learn area starts.
  */
 export const GOALS_HOME = '/goals';
 
 export function learnAreaPath(areaId: string | null): string {
-  return areaId ? `/goals/area/${areaId}` : GOALS_HOME;
+  return areaId ? areaHref(areaId) : GOALS_HOME;
 }
 
 /** The Learn area's page for the signed-in person. Never throws. */

@@ -256,7 +256,7 @@ and for now says so. Paste with no question works fine and is the common case.
 Free text to candidate references. Same shape as `lib/books/paste-list.ts`,
 which already does exactly this job for a pasted list of owned books and is
 the pattern to copy rather than reinvent: Haiku
-(`claude-haiku-4-5-20251001`), a tool call, a `zod` schema, and a
+(`claude-haiku-5-5`), a tool call, a `zod` schema, and a
 line-heuristic fallback when `ANTHROPIC_API_KEY` is unset so the module is
 developable without one.
 

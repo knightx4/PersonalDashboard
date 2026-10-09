@@ -85,7 +85,7 @@ describe('refTitles', () => {
       href: '/dev/plan?view=all&q=%231449#plan-1449',
     });
     expect(out.get(refs[1])).toMatchObject({ title: 'Run a marathon', href: `/goals/${ID}` });
-    expect(out.get(refs[2])).toMatchObject({ title: 'Buy shoes', href: `/goals/${ID}#step-${OTHER}` });
+    expect(out.get(refs[2])).toMatchObject({ title: 'Buy shoes', href: `/goals/${ID}/s/${OTHER}` });
   });
 
   it('answers a gone row, an unknown table and a non-ref as no longer there', async () => {

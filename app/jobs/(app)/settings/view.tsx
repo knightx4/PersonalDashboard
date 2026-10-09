@@ -36,6 +36,7 @@ import {
   WORKPLACE_PREFERENCES,
   type JobPreferences,
 } from '@/lib/jobs/suggest/preferences';
+import { DEFAULT_MIN_FIT_SCORE } from '@/lib/jobs/suggest/fit-gate';
 
 /** The page's own three tones, in the four the Banner primitive names. */
 const BANNER_TONE = { ok: 'info', warn: 'warn', err: 'bad' } as const;
@@ -46,13 +47,13 @@ export function SettingsView(props: {
   gmailConfigured: boolean;
   appOrigin: string;
   profile: {
-    targetTitles: string;
-    excludedIndustries: string;
     searchStartedOn: string;
     ghostThresholdDays: number;
     writingStyleNotes: string;
     bannedConstructions: string;
     preferences: JobPreferences;
+    /** The lowest Jev fit score a recommended role may have (fit-gate.ts). */
+    minFitScore?: number;
   };
   accounts: InboxAccount[];
   resumes: Array<{
@@ -126,13 +127,13 @@ function ProfileSection({
   email,
 }: {
   profile: {
-    targetTitles: string;
-    excludedIndustries: string;
     searchStartedOn: string;
     ghostThresholdDays: number;
     writingStyleNotes: string;
     bannedConstructions: string;
     preferences: JobPreferences;
+    /** The lowest Jev fit score a recommended role may have (fit-gate.ts). */
+    minFitScore?: number;
   };
   email: string;
 }) {
@@ -152,6 +153,13 @@ function ProfileSection({
         </a>
         , and so does deleting the account, which was never the job search&rsquo;s to offer.
       </p>
+      <p className="mt-2 text-small text-ink-muted">
+        The titles you are aiming for and the industries never to suggest are on{' '}
+        <a href="/jobs/find" className="font-medium text-accent underline underline-offset-2">
+          Find
+        </a>
+        , beside the roles and people they shape.
+      </p>
 
       {/* Read first. This was five labelled fields, three of them with a
           caption underneath, standing open every time the page loaded -- so a
@@ -166,9 +174,7 @@ function ProfileSection({
           <ValueList>
             <ValueRow label="Search started" value={profile.searchStartedOn} />
             <ValueRow label="Ghost after" value={`${profile.ghostThresholdDays} days of silence`} />
-            <ValueRow label="Target titles" value={profile.targetTitles} />
-            <ValueRow label="Never suggest" value={profile.excludedIndustries} />
-            <PreferenceRows prefs={prefs} />
+            <PreferenceRows prefs={prefs} minFitScore={profile.minFitScore ?? DEFAULT_MIN_FIT_SCORE} />
             <ValueRow label="How you want to sound" value={profile.writingStyleNotes} />
             <ValueRow
               label="Never write these"
@@ -209,32 +215,6 @@ function ProfileSection({
                 abandoned pursuits as live ones.
               </p>
             </div>
-          </div>
-
-          <div>
-            <Label htmlFor="targetTitles">Target titles</Label>
-            <Input
-              id="targetTitles"
-              name="targetTitles"
-              defaultValue={profile.targetTitles}
-              placeholder="Strategic Finance Analyst, FP&A Manager"
-            />
-            <p className="mt-1 text-small text-ink-muted">
-              Seeds relevance scoring when mail is classified.
-            </p>
-          </div>
-
-          <div>
-            <Label htmlFor="excludedIndustries">Never suggest</Label>
-            <Input
-              id="excludedIndustries"
-              name="excludedIndustries"
-              defaultValue={profile.excludedIndustries}
-              placeholder="Crypto, Healthcare, Defense"
-            />
-            <p className="mt-1 text-small text-ink-muted">
-              Industries Dash leaves out of the roles and people it recommends, whatever the role.
-            </p>
           </div>
 
           <div>
@@ -289,13 +269,14 @@ function ProfileSection({
 }
 
 /**
- * The four job preferences, each edited where it is read (law 12): where you
- * live and the pay floor are inline fields that save on leaving them, and the
- * workplaces and company stages are choices that save when pressed. Rules for
- * the roles Dash recommends: a posting that states pay below the floor, or a
- * workplace not chosen, is left out; none chosen means any.
+ * The job preferences, each edited where it is read (law 12): where you
+ * live, the pay floor and the lowest fit score are inline fields that save on
+ * leaving them, and the workplaces and company stages are choices that save
+ * when pressed. Rules for the roles Dash recommends: a posting that states pay
+ * below the floor, a workplace not chosen, or a fit Jev scores below the
+ * minimum is left out; none chosen means any.
  */
-function PreferenceRows({ prefs }: { prefs: JobPreferences }) {
+function PreferenceRows({ prefs, minFitScore }: { prefs: JobPreferences; minFitScore: number }) {
   return (
     <>
       <PreferenceText
@@ -309,6 +290,13 @@ function PreferenceRows({ prefs }: { prefs: JobPreferences }) {
         label="Lowest base pay"
         value={prefs.salaryFloorCents ? formatPay(prefs.salaryFloorCents) : ''}
         placeholder="120,000 a year"
+        inputMode="numeric"
+      />
+      <PreferenceText
+        field="minFit"
+        label="Lowest fit score"
+        value={String(minFitScore)}
+        placeholder="25 out of 100; 0 shows every role"
         inputMode="numeric"
       />
       <PreferenceChoices
@@ -338,7 +326,7 @@ function PreferenceText({
   placeholder,
   inputMode,
 }: {
-  field: 'homeLocation' | 'salaryFloor';
+  field: 'homeLocation' | 'salaryFloor' | 'minFit';
   label: string;
   value: string;
   placeholder: string;
@@ -354,6 +342,7 @@ function PreferenceText({
           <input type="hidden" name="field" value={field} />
           <InlineInput
             name="value"
+            className="max-sm:min-h-11"
             aria-label={label}
             defaultValue={value}
             placeholder={placeholder}

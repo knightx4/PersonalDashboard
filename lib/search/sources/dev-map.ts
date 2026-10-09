@@ -135,7 +135,7 @@ export function devHits(rows: DevRows): SearchHit[] {
       // The number, as a step is quoted, and the options beneath the title:
       // the word you remember from a question is as often in an option.
       match: `#${row.number} ${row.detail ?? ''}`.trim(),
-      href: `/dev/raised#${waitingAnchor(row.id)}`,
+      href: `/dev/inbox#${waitingAnchor(row.id)}`,
     });
   }
 
@@ -148,7 +148,7 @@ export function devHits(rows: DevRows): SearchHit[] {
       title: row.title,
       subtitle: `Raised · ${row.status}`,
       match: `${row.ask ?? ''} ${row.detail ?? ''}`.trim() || undefined,
-      href: `/dev/raised#${raiseAnchor(row.id)}`,
+      href: `/dev/inbox#${raiseAnchor(row.id)}`,
     });
   }
 

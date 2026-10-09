@@ -112,7 +112,7 @@ describe('proposalRow', () => {
     const row = proposalRow(
       pair('z', 'm', { aNotes: 1, bNotes: 5, trigram: 0.6 }),
       { pair: 0, same: true, name: null, reason: 'One subject.', confidence: 0.8 },
-      'claude-haiku-4-5',
+      'claude-haiku-5-5',
     );
     expect(row).toMatchObject({
       a_id: 'm',
@@ -131,7 +131,7 @@ describe('proposalRow', () => {
     const row = proposalRow(
       pair('a', 'b', { similarity: null, trigram: 0.7 }),
       { pair: 0, same: false, name: null, reason: 'Two fields.', confidence: 0.6 },
-      'claude-haiku-4-5',
+      'claude-haiku-5-5',
     );
     expect(row).toMatchObject({
       verdict: 'different',
@@ -151,7 +151,7 @@ describe('runThemeMerges', () => {
     pairs: ThemePair[],
     judge: (batch: ThemePair[]) => JudgeOutcome = (batch) => ({
       ok: true,
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-5-5',
       verdicts: batch.map((_, index) => ({
         pair: index,
         same: index % 2 === 0,
@@ -173,7 +173,7 @@ describe('runThemeMerges', () => {
       },
       async judge(batch, onSpend) {
         batches.push(batch.map((p) => `${p.userId}:${p.a.id}-${p.b.id}`));
-        onSpend({ model: 'claude-haiku-4-5', usage: EMPTY_USAGE });
+        onSpend({ model: 'claude-haiku-5-5', usage: EMPTY_USAGE });
         return judge(batch);
       },
       async store(rows) {

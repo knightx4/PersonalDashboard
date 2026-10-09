@@ -5,7 +5,6 @@ import { cn } from '@/lib/cn';
 import { Banner } from '@/components/ui/banner';
 import { PageHeader } from '@/components/shell/page-header';
 import { Property } from '@/components/shell/detail-layout';
-import { LinkedTasks } from '@/components/todo/linked-tasks';
 import { loadTasksFor } from '@/lib/todo/links/load';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { MoveLabel } from '@/components/ui/move-label';
@@ -20,12 +19,16 @@ import {
   DEBRIEF_NUDGE_WINDOW_DAYS,
   formatCoverage,
   requirementCoverage,
+  highWaterFromRejectionStage,
   type ApplicationSource,
   type ApplicationStatus,
+  type RejectionStage,
 } from '@/lib/jobs/pipeline';
+import { closedSummary, roleStage } from '@/lib/jobs/role-stage';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
 import { matchKey, type RequirementMatch } from '@/lib/jobs/evidence/match-payload';
 import { prepKey, type PrepNote } from '@/lib/jobs/interview/prep-payload';
+import { interviewCalendarHref } from '@/lib/jobs/interview/calendar-link';
 import { pursuitMatchText } from '@/lib/jobs/related-notes';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
@@ -41,6 +44,10 @@ type PrepInterviewRow = {
   interview_participants: { contacts: { id: string } | null }[] | null;
 };
 import { RoleDetailPanels } from './panels';
+import { defaultRoleTab } from './tabs';
+import { RoleTodos } from './todos';
+import { ClosedSummary } from './closed-summary';
+import type { RoleReminder } from './types';
 import { RoleTitle } from './role-title';
 import { RoleCompany } from './role-company';
 import { ExcitementPicker } from './excitement-picker';
@@ -68,7 +75,9 @@ export default async function RoleDetailPage({
   searchParams: Promise<{ tab?: string; interview?: string }>;
 }) {
   const { id } = await params;
-  const { tab, interview: focusInterviewId } = await searchParams;
+  // `tab` is read by the panels from the address itself, so it follows a switch
+  // made in the page without the server loading the role again.
+  const { interview: focusInterviewId } = await searchParams;
   const user = await requireUser();
   const supabase = await createClient();
 
@@ -159,7 +168,7 @@ export default async function RoleDetailPage({
       // that make the name worth clicking.
       .select(
         `id, round, kind, scheduled_at, time_known, duration_minutes, format, status, prep_notes, notes,
-           questions_asked, group_id, prep_note, prep_note_at, prep_note_key,
+           questions_asked, group_id, prep_note, prep_note_at, prep_note_key, ics_uid, meeting_url,
            interview_participants ( role, contacts ( id, full_name, title ) )`,
       )
       .eq('application_id', current.id)
@@ -223,6 +232,10 @@ export default async function RoleDetailPage({
   ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
+  // The mailbox this role's mail arrives in, which is the calendar its
+  // invites land on (note 7b1975cb).
+  const calendarEmail =
+    ((messages ?? []).find((message) => message.email_address)?.email_address as string | undefined) ?? null;
 
   /**
    * Which emails each round is about.
@@ -243,38 +256,6 @@ export default async function RoleDetailPage({
   for (const link of (groupMessageLinks ?? []) as Array<Record<string, unknown>>) {
     const key = link.group_id as string;
     messageIdsByGroup.set(key, [...(messageIdsByGroup.get(key) ?? []), link.message_id as string]);
-  }
-
-  /**
-   * Loose notes written against a round.
-   *
-   * A second round trip rather than part of the batch above, because the
-   * interview ids it filters on come out of that batch. Skipped entirely when
-   * there are no rounds, which is most pursuits.
-   */
-  const interviewIds = (interviews ?? []).map((interview) => interview.id as string);
-  const { data: interviewNotes } = interviewIds.length
-    ? await supabase
-        .from('notes')
-        .select('id, body, created_at, interview_id')
-        .in('interview_id', interviewIds)
-        .order('created_at', { ascending: false })
-    : { data: [] };
-
-  const notesByInterview = new Map<
-    string,
-    Array<{ id: string; body: string; createdAt: string }>
-  >();
-  for (const note of (interviewNotes ?? []) as Array<Record<string, unknown>>) {
-    const key = note.interview_id as string;
-    notesByInterview.set(key, [
-      ...(notesByInterview.get(key) ?? []),
-      {
-        id: note.id as string,
-        body: note.body as string,
-        createdAt: note.created_at as string,
-      },
-    ]);
   }
 
   const linkedTasks = await loadTasksFor(user.id, 'role', role.id as string);
@@ -339,6 +320,59 @@ export default async function RoleDetailPage({
       }),
     ]),
   );
+
+  const roleReminders: RoleReminder[] = (reminders ?? []).map((reminder) => {
+    // The mail a to-do points at is already loaded for the Linked mail
+    // tab, so the subject and the deep link come from there rather than
+    // from a second query.
+    const messageId = (reminder.ingested_message_id as string) ?? null;
+    const linked = messageId
+      ? ((messages ?? []).find((message) => message.id === messageId) ?? null)
+      : null;
+    return {
+      id: reminder.id as string,
+      body: reminder.body as string,
+      dueAt: reminder.due_at as string,
+      message: linked
+        ? {
+            id: linked.id as string,
+            subject: (linked.subject as string) ?? null,
+            gmailHref: gmailHrefByMessage.get(linked.id as string) ?? null,
+          }
+        : messageId
+          ? // Linked to mail this pursuit no longer carries. Saying so is
+            // better than the link silently not being there.
+            { id: messageId, subject: null, gmailHref: null }
+          : null,
+    };
+  });
+
+  // A closed application leads with how far it got and when it closed
+  // (plan #1594), read from the furthest rung it reached rather than the
+  // status it ended on.
+  const status = current.status as ApplicationStatus;
+  const closedLine =
+    roleStage(status) === 'closed'
+      ? closedSummary({
+          status,
+          reached: highWaterFromRejectionStage(
+            status,
+            ((current.rejection_stage_override ?? current.rejection_stage) as RejectionStage) ??
+              null,
+            current.submitted_at ? new Date(current.submitted_at as string) : null,
+            current.confirmation_received_at
+              ? new Date(current.confirmation_received_at as string)
+              : null,
+            current.first_human_response_at
+              ? new Date(current.first_human_response_at as string)
+              : null,
+            (interviews ?? []).map((interview) => interview.kind as string),
+          ),
+          everSubmitted: current.submitted_at !== null,
+          closedOn: current.closed_at ? formatDate(current.closed_at as string, timezone) : null,
+          interviewCount: (interviews ?? []).length,
+        })
+      : null;
 
   // Whose move the pursuit is (plan #1454), from its stage and the newest
   // event that says whose turn it is. Null once it has closed.
@@ -497,15 +531,21 @@ export default async function RoleDetailPage({
           />
         </dl>
       <div className="space-y-6">
-        {/* What has to happen about this role, from the todo module. Here rather
-            than inside the panels because it is not one of the tabs: it is the
-            thing you write down while reading the page, and a note you have to
-            go looking for a tab to write is a note that does not get written. */}
-        <LinkedTasks
-          target="role"
-          targetId={role.id as string}
-          returnTo={`/jobs/roles/${role.id as string}`}
+        {closedLine && <ClosedSummary text={closedLine} />}
+
+        {/* What has to happen about this role. Here rather than inside the
+            panels because it is not one of the tabs: it is the thing you write
+            down while reading the page, and a note you have to go looking for
+            a tab to write is a note that does not get written. */}
+        <RoleTodos
+          roleId={role.id as string}
           tasks={linkedTasks}
+          reminders={roleReminders}
+          messages={(messages ?? []).map((message) => ({
+            id: message.id as string,
+            subject: (message.subject as string) ?? null,
+            receivedAt: (message.received_at as string) ?? null,
+          }))}
           timezone={timezone}
         />
 
@@ -514,6 +554,7 @@ export default async function RoleDetailPage({
         <RoleDetailPanels
           roleId={role.id as string}
           applicationId={current.id as string}
+          status={status}
           jdText={(role.jd_text as string) ?? ''}
           jdLookupNote={(role.jd_lookup_note as string) ?? null}
           jdUrl={(role.jd_url as string) ?? null}
@@ -533,7 +574,7 @@ export default async function RoleDetailPage({
           bankSize={evidence.length}
           coverLetter={(current.cover_letter as string | null) ?? ''}
           timezone={timezone}
-          initialTab={tab}
+          defaultTab={defaultRoleTab(status)}
           focusInterviewId={focusInterviewId ?? null}
           events={(events ?? []).map((event) => ({
             id: event.id as string,
@@ -549,12 +590,18 @@ export default async function RoleDetailPage({
             kind: interview.kind as string,
             scheduledAt: interview.scheduled_at as string | null,
             timeKnown: (interview.time_known as boolean | null) ?? true,
+            meetingUrl: (interview.meeting_url as string | null) ?? null,
+            calendarHref: interviewCalendarHref({
+              icsUid: (interview.ics_uid as string | null) ?? null,
+              scheduledAt: interview.scheduled_at as string | null,
+              calendarEmail,
+              timezone,
+            }),
             debriefDue: debriefDue(interview.scheduled_at as string | null),
             format: interview.format as string | null,
             status: interview.status as string,
             prepNotes: (interview.prep_notes as string) ?? '',
             notes: (interview.notes as string) ?? '',
-            customNotes: notesByInterview.get(interview.id as string) ?? [],
             groupId: (interview.group_id as string | null) ?? null,
             questionsAsked: (interview.questions_asked as string[]) ?? [],
             prepNote: (interview.prep_note as PrepNote | null) ?? null,
@@ -621,31 +668,6 @@ export default async function RoleDetailPage({
             notes: (group.notes as string | null) ?? '',
             messageIds: messageIdsByGroup.get(group.id as string) ?? [],
           }))}
-          todos={(reminders ?? []).map((reminder) => {
-            // The mail a to-do points at is already loaded for the Linked mail
-            // tab, so the subject and the deep link come from there rather than
-            // from a second query.
-            const messageId = (reminder.ingested_message_id as string) ?? null;
-            const linked = messageId
-              ? ((messages ?? []).find((message) => message.id === messageId) ?? null)
-              : null;
-            return {
-              id: reminder.id as string,
-              body: reminder.body as string,
-              dueAt: reminder.due_at as string,
-              message: linked
-                ? {
-                    id: linked.id as string,
-                    subject: (linked.subject as string) ?? null,
-                    gmailHref: gmailHrefByMessage.get(linked.id as string) ?? null,
-                  }
-                : messageId
-                  ? // Linked to mail this pursuit no longer carries. Saying so is
-                    // better than the link silently not being there.
-                    { id: messageId, subject: null, gmailHref: null }
-                  : null,
-            };
-          })}
           messages={(messages ?? []).map((message) => ({
             id: message.id as string,
             subject: (message.subject as string) ?? null,

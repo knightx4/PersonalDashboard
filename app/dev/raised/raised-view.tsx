@@ -31,6 +31,7 @@ import { raisedHealth, type RaisedHealth } from '@/lib/dev/health';
 import { RAISED_HEALTH_WORD } from '@/lib/dev/words';
 import { RAISED_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { PaidHint } from '@/components/ui/paid-hint';
+import { InboxOverview, inboxAnchor, type InboxCell } from '@/components/inbox/overview';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -327,17 +328,29 @@ function RaiseCard({ row, titles }: { row: RaisedRow; titles?: PlanRefTitles }) 
   );
 }
 
+/** What finishes each group, said under its count in the overview. */
+const GROUP_HINT: Record<WaitingGroup['key'], string> = {
+  actions: 'To go and do',
+  questions: 'Need your answer',
+  approve: 'Need your yes',
+};
+
 /**
- * What sessions have asked you, open ones first.
+ * Everything waiting on you, the Inbox tab in Dev.
  *
- * Under them, the ones that were answered and produced nothing. They are not
- * waiting on you — you already answered — and they are not finished either, so
- * they are listed rather than filed with the history.
+ * It was the middle of Home, between the morning summary and the
+ * conversations, and on a busy day the summary pushed it below the fold. It is
+ * its own tab now so that the list of things to clear is the whole page and
+ * the badge on the tab is the length of that list.
  *
- * Answered and dismissed rows go under a disclosure rather than in the list:
- * the reason to open this page is what is still waiting, and a closed raise is
- * kept so that a session can read the answer back rather than so you can read
- * it again.
+ * The overview first, then one section per kind of work, then the raises that
+ * were answered and produced nothing. They are not waiting on you, since you
+ * already answered, and they are not finished either, so they are listed
+ * rather than filed with the history.
+ *
+ * Answered and dismissed rows go under a shut fold at the bottom: a closed
+ * raise is kept so that a session can read the answer back rather than so you
+ * can read it again.
  */
 export function RaisedView({
   queue,
@@ -355,88 +368,94 @@ export function RaisedView({
   /** What each step number in a raise is called, for the hover text. */
   titles?: PlanRefTitles;
 }) {
-  const onYou = groups.reduce((total, group) => total + group.entries.length, 0);
+  const filled = groups.filter((group) => group.entries.length > 0);
+  const cells: InboxCell[] = filled.map((group) => ({
+    key: group.key,
+    title: group.title,
+    count: group.entries.length,
+    hint: GROUP_HINT[group.key],
+  }));
+  if (queue.unfinished.length > 0) {
+    cells.push({
+      key: 'unfinished',
+      title: 'Answered, nothing done',
+      count: queue.unfinished.length,
+      hint: 'Run it or close it',
+    });
+  }
 
   return (
     <div className="space-y-6">
-      {onYou === 0 && (
+      {cells.length === 0 ? (
         <EmptyState
           icon={MessageCircleQuestion}
           title="Nothing waiting on you"
-          description="A session writes here when it needs something you have to decide — a risk it found while building something else, or a question of taste it will not answer on its own."
+          description="A session writes here when it needs something you have to decide: a risk it found while building something else, or a question of taste it will not answer on its own."
         />
+      ) : (
+        <InboxOverview cells={cells} />
       )}
 
-      {onYou > 0 && (
-        <SectionFold title="Waiting on you" count={onYou}>
-          {/* One heading and three groups under it, rather than one list sorted
-              by how pressing each row is. That list asked you to work out, row
-              by row, whether the thing in front of you was a job, a question or
-              a yes -- and the three want different amounts of you, so they are
-              worth telling apart before you start. */}
-          {groups
-            .filter((group) => group.entries.length > 0)
-            .map((group) => (
-              <Group
-                key={group.key}
-                fold
-                title={
-                  <>
-                    {group.title}
-                    <span className="tabular ml-2 font-normal text-ink-muted">
-                      {group.entries.length}
-                    </span>
-                  </>
-                }
-                /* Opposite the heading rather than on a row of its own: it
-                   acts on the whole group, and a button sitting inside the
-                   list would read as belonging to whichever row it landed
-                   next to. Only this group has one -- the other two are
-                   finished a row at a time, in words. */
-                action={
-                  group.key === 'approve' ? <ApproveAll entries={group.entries} /> : undefined
-                }
-              >
-                <ul className={cn(cardVariants(), 'divide-y divide-border')}>
-                  {/* A plan row and a raise sit in the same group when the same
-                      thing finishes them, so which card is drawn comes off the
-                      entry rather than off which list it arrived in. */}
-                  {group.entries.map((entry) =>
-                    entry.kind === 'plan' ? (
-                      <WaitingCard key={entry.id} row={entry.row} titles={titles} />
-                    ) : entry.kind === 'spec' ? (
-                      <SpecChangeCard
-                        key={entry.id}
-                        change={entry.spec.change}
-                        specTitle={entry.spec.specTitle}
-                        foldDiff
-                      />
-                    ) : (
-                      <RaiseCard key={entry.id} row={entry.raise} titles={titles} />
-                    ),
-                  )}
-                </ul>
-              </Group>
-            ))}
-        </SectionFold>
-      )}
+      {/* One section per kind rather than one list sorted by how pressing each
+          row is. That list asked you to work out, row by row, whether the
+          thing in front of you was a job, a question or a yes, and the three
+          want different amounts of you. */}
+      {filled.map((group) => (
+        <div key={group.key} id={inboxAnchor(group.key)} className="scroll-mt-bar">
+          <Group
+            fold
+            title={
+              <>
+                {group.title}
+                <span className="tabular ml-2 font-normal text-ink-muted">{group.entries.length}</span>
+              </>
+            }
+            /* Opposite the heading rather than on a row of its own: it acts on
+               the whole group, and a button inside the list would read as
+               belonging to whichever row it landed next to. Only this group
+               has one; the other two are finished a row at a time, in words. */
+            action={group.key === 'approve' ? <ApproveAll entries={group.entries} /> : undefined}
+          >
+            <ul className={cn(cardVariants(), 'divide-y divide-border')}>
+              {/* A plan row and a raise sit in the same group when the same
+                  thing finishes them, so which card is drawn comes off the
+                  entry rather than off which list it arrived in. */}
+              {group.entries.map((entry) =>
+                entry.kind === 'plan' ? (
+                  <WaitingCard key={entry.id} row={entry.row} titles={titles} />
+                ) : entry.kind === 'spec' ? (
+                  <SpecChangeCard
+                    key={entry.id}
+                    change={entry.spec.change}
+                    specTitle={entry.spec.specTitle}
+                    foldDiff
+                  />
+                ) : (
+                  <RaiseCard key={entry.id} row={entry.raise} titles={titles} />
+                ),
+              )}
+            </ul>
+          </Group>
+        </div>
+      ))}
 
       {queue.unfinished.length > 0 && (
-        <SectionFold title="Answered, nothing done" count={queue.unfinished.length}>
-          <p className="text-small text-ink-muted">
-            These closed without anything coming of them. Run what they asked for, or close one with
-            the reason nothing was needed.
-          </p>
-          <ul className={cn(cardVariants(), 'divide-y divide-border')}>
-            {queue.unfinished.map((row) => (
-              <RaiseCard key={row.id} row={row} titles={titles} />
-            ))}
-          </ul>
-        </SectionFold>
+        <div id={inboxAnchor('unfinished')} className="scroll-mt-bar">
+          <SectionFold title="Answered, nothing done" count={queue.unfinished.length}>
+            <p className="text-small text-ink-muted">
+              These closed without anything coming of them. Run what they asked for, or close one
+              with the reason nothing was needed.
+            </p>
+            <ul className={cn(cardVariants(), 'divide-y divide-border')}>
+              {queue.unfinished.map((row) => (
+                <RaiseCard key={row.id} row={row} titles={titles} />
+              ))}
+            </ul>
+          </SectionFold>
+        </div>
       )}
 
-      {/* Shut, where the other two open: this one is history rather than work,
-          and it is the section the hand-rolled fold was written for. */}
+      {/* Shut, where the others open: this one is history rather than work. */}
       {queue.closed.length > 0 && (
         <SectionFold title="Closed" count={queue.closed.length} defaultOpen={false}>
           <ul className={cn(cardVariants(), 'divide-y divide-border')}>

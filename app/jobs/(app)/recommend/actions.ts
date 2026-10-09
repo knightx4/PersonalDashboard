@@ -29,8 +29,7 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
  */
 
 function revalidatePaths() {
-  revalidatePath('/jobs/roles');
-  revalidatePath('/jobs/contacts');
+  revalidatePath('/jobs/find');
 }
 
 export type SuggestState = { error: string | null; message?: string };
@@ -86,6 +85,12 @@ export async function suggestOpenings(): Promise<SuggestState> {
 
   after(async () => {
     let result;
+    // Roles at discovered startups are scored before they are written when
+    // Jev is on, and what that costs is recorded as scoring.
+    const discoveredSpend: SpendReport[] = [];
+    const jev = (await jevEnabledFor(await createCoreClient(), user.id))
+      ? { onSpend: (report: SpendReport) => discoveredSpend.push(report) }
+      : null;
     try {
       result = await runSuggestionsFor(supabase, user.id, {
         apiKey,
@@ -95,6 +100,7 @@ export async function suggestOpenings(): Promise<SuggestState> {
         // The search gets what is left of the page's five minutes; past this
         // it goes on as a Message Batch (lib/jobs/suggest/search-batch.ts).
         deadline: began + SEARCH_BUDGET_MS,
+        jev,
       });
     } catch (error) {
       await progress.finish('apply', {
@@ -105,6 +111,7 @@ export async function suggestOpenings(): Promise<SuggestState> {
     }
     const outcome = result.apply;
     await recordSessionSpend(user.id, { module: 'jobs', operation: 'find-openings' }, outcome.spend);
+    await recordSessionSpend(user.id, { module: 'jobs', operation: 'score-openings' }, discoveredSpend);
     if (!outcome.ran) {
       await progress.finish('apply', { written: 0, error: 'Write a career goals entry or add a role first.' });
       return;
@@ -140,7 +147,7 @@ export async function suggestOpenings(): Promise<SuggestState> {
   return { error: null };
 }
 
-/** How long the run after the response may take, inside the Roles page's maxDuration of 300 seconds. */
+/** How long the run after the response may take, inside the Find page's maxDuration of 300 seconds. */
 const AFTER_BUDGET_MS = 270_000;
 /** The part of it the board reads and the web search may use; the rest stores what they found. */
 const SEARCH_BUDGET_MS = 255_000;
@@ -255,7 +262,7 @@ export async function saveOpening(id: string): Promise<{ error: string | null }>
 
   const { data: row, error: readError } = await supabase
     .from('suggestions')
-    .select('headline, company_name, url, location')
+    .select('headline, company_name, url, location, watchlist_startup_id')
     .eq('id', parsed.data)
     .eq('user_id', user.id)
     .eq('kind', 'apply')
@@ -270,6 +277,16 @@ export async function saveOpening(id: string): Promise<{ error: string | null }>
     ats: detected?.vendor === 'other' || detected?.vendor === 'unknown' ? null : detected?.vendor,
   });
   if (company.error) return { error: company.error };
+  // A role at a startup weekly discovery found: the startup is now one of
+  // their companies, so its watchlist row points there and is read no more.
+  if (row.watchlist_startup_id) {
+    const { error: linkError } = await supabase
+      .from('watchlist_startups')
+      .update({ company_id: company.id })
+      .eq('id', row.watchlist_startup_id as string)
+      .eq('user_id', user.id);
+    if (linkError) console.error('[jobs suggestions] watchlist link', linkError.message);
+  }
 
   const { data: role, error: roleError } = await supabase
     .from('roles')

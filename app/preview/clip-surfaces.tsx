@@ -2,6 +2,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { ClipStream } from '@/app/learn/clips/clip-stream';
 import { ClipsEmpty } from '@/app/learn/clips/empty';
 import type { PlayerClip } from '@/lib/learn/clips/stream';
+import { SubjectClipsView } from '@/app/learn/s/[id]/clips/view';
 
 /**
  * Learn's clip player (plan #1400) in the surface gallery: a queue of three
@@ -46,16 +47,57 @@ export function ClipStreamSurface() {
   return (
     <>
       <div className="hidden lg:block">
-        <PageHeader
-          title="Clips"
-          description="Short clips from your videos, one after another. Swipe up, press the down arrow or let one finish for the next."
-        />
+        <PageHeader title="Clips" />
       </div>
-      <ClipStream initial={CLIPS} startedAt="2026-10-02T12:00:00.000Z" fixed />
+      <ClipStream initial={CLIPS} fixed />
     </>
   );
 }
 
 export function ClipsEmptySurface() {
   return <ClipsEmpty />;
+}
+
+/**
+ * One subject's Clips (plan #1697): the same queue under a long subject name,
+ * with the counts in the rail, and the page for a subject no clip serves yet.
+ */
+const SUBJECT = { id: '00000000-0000-4000-8000-0000000000a1', name: 'Startup finance and FP&A for operators and early-stage founders' };
+
+const SUBJECT_CLIPS: PlayerClip[] = [
+  {
+    id: '00000000-0000-4000-8000-000000000011',
+    videoId: 'LBC16jhiwak',
+    startSeconds: 312,
+    endSeconds: 402,
+    caption: 'Using default alive to find the path to profitability',
+    title: 'Kirsty Nathoo - Managing Startup Finances',
+    channel: 'Y Combinator',
+    saved: false,
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000012',
+    videoId: 'LBC16jhiwak',
+    startSeconds: 537,
+    endSeconds: 617,
+    caption: 'Account for all employee costs, not just salary',
+    title: 'Kirsty Nathoo - Managing Startup Finances',
+    channel: 'Y Combinator',
+    saved: true,
+  },
+];
+
+export function SubjectClipsSurface() {
+  return (
+    <SubjectClipsView
+      subject={SUBJECT}
+      clips={SUBJECT_CLIPS}
+      counts={{ watchLater: 18, channels: 10, unplayed: 23 }}
+      fixed
+    />
+  );
+}
+
+export function SubjectClipsEmptySurface() {
+  return <SubjectClipsView subject={SUBJECT} clips={[]} counts={{ watchLater: 0, channels: 0, unplayed: 0 }} fixed />;
 }

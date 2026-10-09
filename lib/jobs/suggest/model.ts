@@ -98,7 +98,8 @@ function goalsText(goals: SeekerContext['goals']): string {
   return parts.join('\n\n');
 }
 
-function seekerText(seeker: SeekerContext): string {
+/** The person as every job search call describes them; startup discovery's shortlist reads it too. */
+export function seekerText(seeker: SeekerContext): string {
   const lines: string[] = [];
   if (seeker.name) lines.push(`Their name: ${seeker.name}`);
   if (seeker.targetTitles.length > 0) lines.push(`Titles they are targeting: ${seeker.targetTitles.join(', ')}`);

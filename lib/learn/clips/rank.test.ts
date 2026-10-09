@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  baseScore,
+  combinedRating,
   EARLY_SKIP_SECONDS,
   FILING_CAP,
   isEarlySkip,
   leanFrom,
   MAX_PER_VIDEO,
   pickNextClips,
+  PLAYLIST_BONUS,
+  VIDEO_GAP,
   type ClipReaction,
   type RankableClip,
 } from './rank';
@@ -22,6 +26,7 @@ function clip(id: string, over: Partial<RankableClip> = {}): RankableClip {
     videoId: `vid-${id}`,
     cameFrom: 'playlist',
     score: 50,
+    rating: null,
     channel: 'channel a',
     theme: 'track:t1',
     shownAt: null,
@@ -70,25 +75,64 @@ describe('pickNextClips', () => {
 
   it('never returns more than two from one video in a run', () => {
     const library = Array.from({ length: 6 }, (_, i) => clip(`same-${i}`, { videoId: 'talk', score: 90 - i }));
-    library.push(clip('other', { videoId: 'other', score: 10 }));
-    const picked = pickNextClips(library, { limit: 10, now: NOW });
+    for (let i = 0; i < 20; i++) library.push(clip(`other-${i}`, { score: 10 }));
+    const picked = pickNextClips(library, { limit: 30, now: NOW });
     expect(picked.filter((c) => c.videoId === 'talk')).toHaveLength(MAX_PER_VIDEO);
-    expect(ids(picked)).toContain('other');
   });
 
-  it('counts clips already played this session against the cap', () => {
-    const library = [clip('a', { videoId: 'talk' }), clip('b', { videoId: 'talk' }), clip('c', { videoId: 'x' })];
-    const picked = pickNextClips(library, { limit: 10, now: NOW, playedThisSession: new Map([['talk', 1]]) });
-    expect(picked.filter((c) => c.videoId === 'talk')).toHaveLength(1);
+  /** Two clips of `talk` and twenty other videos, so the ten-clip gap alone would let both play. */
+  const talkAndOthers = () => {
+    const library = [clip('talk-1', { videoId: 'talk', score: 90 }), clip('talk-2', { videoId: 'talk', score: 89 })];
+    for (let i = 0; i < 20; i++) library.push(clip(`other-${String(i).padStart(2, '0')}`, { score: 40 }));
+    return library;
+  };
+  const talks = (picked: RankableClip[]) => picked.filter((c) => c.videoId === 'talk').length;
+
+  it('lets both clips of a video play when the gap is kept and none was shown this week', () => {
+    expect(talks(pickNextClips(talkAndOthers(), { limit: 30, now: NOW }))).toBe(MAX_PER_VIDEO);
   });
 
-  it('puts another video between two clips of the same one where it can', () => {
-    const library = [
-      clip('talk-1', { videoId: 'talk', score: 90 }),
-      clip('talk-2', { videoId: 'talk', score: 89 }),
-      clip('other', { videoId: 'other', score: 60 }),
-    ];
-    expect(ids(pickNextClips(library, { limit: 3, now: NOW }))).toEqual(['talk-1', 'other', 'talk-2']);
+  it('counts clips shown in the last week against the cap', () => {
+    const picked = pickNextClips(talkAndOthers(), { limit: 30, now: NOW, shownThisWeek: new Map([['talk', 1]]) });
+    expect(talks(picked)).toBe(1);
+  });
+
+  it('plays nothing more from a video shown twice this week, however good it is', () => {
+    const library = talkAndOthers().map((c) => (c.videoId === 'talk' ? { ...c, rating: 99 } : c));
+    const picked = pickNextClips(library, { limit: 30, now: NOW, shownThisWeek: new Map([['talk', MAX_PER_VIDEO]]) });
+    expect(talks(picked)).toBe(0);
+  });
+
+  it('counts a queued clip not shown yet against its video', () => {
+    const picked = pickNextClips(talkAndOthers(), { limit: 30, now: NOW, queuedVideos: ['talk'] });
+    expect(talks(picked)).toBe(1);
+  });
+
+  it('plays one video at most once in any ten clips', () => {
+    const library = [clip('talk-1', { videoId: 'talk', score: 90 }), clip('talk-2', { videoId: 'talk', score: 89 })];
+    for (let i = 0; i < 12; i++) library.push(clip(`other-${String(i).padStart(2, '0')}`, { score: 60 - i }));
+    const picked = pickNextClips(library, { limit: 14, now: NOW });
+    expect(picked[0].id).toBe('talk-1');
+    // The second clip of the talk waits until nine others have played.
+    expect(picked.findIndex((c) => c.id === 'talk-2')).toBe(VIDEO_GAP);
+    expect(picked).toHaveLength(14);
+  });
+
+  it('returns fewer rather than play a video again too soon', () => {
+    const library = [clip('talk-1', { videoId: 'talk' }), clip('talk-2', { videoId: 'talk' }), clip('x', { videoId: 'x' })];
+    expect(ids(pickNextClips(library, { limit: 5, now: NOW }))).toEqual(['talk-1', 'x']);
+  });
+
+  it('counts the clips played before this call against the gap', () => {
+    const library = [clip('talk-2', { videoId: 'talk', score: 99 }), clip('x', { videoId: 'x', score: 10 })];
+    const recent = ['talk', ...Array.from({ length: VIDEO_GAP - 2 }, (_, i) => `seen-${i}`)];
+    // talk played nine clips back: still too soon, so x plays and then talk may.
+    expect(ids(pickNextClips(library, { limit: 2, now: NOW, recentVideos: recent }))).toEqual(['x', 'talk-2']);
+    // Ten back: it plays first.
+    expect(ids(pickNextClips(library, { limit: 2, now: NOW, recentVideos: [...recent, 'one-more'] }))).toEqual([
+      'talk-2',
+      'x',
+    ]);
   });
 
   it('ranks a higher Jev score above a lower one', () => {
@@ -127,33 +171,78 @@ describe('pickNextClips', () => {
     expect(ids(picked)).toEqual(['b', 'a']);
   });
 
-  it('plays playlist clips before channel clips, whatever the score', () => {
+  it('mixes playlist and channel clips by score, with the playlist leaning ahead', () => {
     const library = [
-      clip('channel-high', { cameFrom: 'channel', score: 99 }),
-      clip('playlist-low', { cameFrom: 'playlist', score: 5 }),
-      clip('playlist-unscored', { cameFrom: 'playlist', score: null }),
-      clip('channel-unscored', { cameFrom: 'channel', score: null }),
+      clip('channel-high', { cameFrom: 'channel', score: 90 }),
+      clip('playlist-mid', { cameFrom: 'playlist', score: 70 }),
+      clip('channel-close', { cameFrom: 'channel', score: 70 + PLAYLIST_BONUS - 1 }),
+      clip('channel-low', { cameFrom: 'channel', score: 20 }),
     ];
     expect(ids(pickNextClips(library, { limit: 10, now: NOW }))).toEqual([
-      'playlist-low',
-      'playlist-unscored',
       'channel-high',
-      'channel-unscored',
+      'playlist-mid',
+      'channel-close',
+      'channel-low',
     ]);
   });
 
-  it('does not let the spread reach past playlist into channel clips', () => {
+  it('plays a good channel clip before a mediocre playlist one, by rating', () => {
     const library = [
-      clip('p1', { videoId: 'talk', score: 90 }),
-      clip('p2', { videoId: 'talk', score: 80 }),
-      clip('c1', { videoId: 'chan', cameFrom: 'channel', score: 99 }),
+      clip('channel-good', { cameFrom: 'channel', rating: 80 }),
+      clip('playlist-mediocre', { cameFrom: 'playlist', rating: 50 }),
+      clip('channel-poor', { cameFrom: 'channel', rating: 30 }),
+      clip('playlist-good', { cameFrom: 'playlist', rating: 85 }),
     ];
-    expect(ids(pickNextClips(library, { limit: 3, now: NOW }))).toEqual(['p1', 'p2', 'c1']);
+    expect(ids(pickNextClips(library, { limit: 10, now: NOW }))).toEqual([
+      'playlist-good',
+      'channel-good',
+      'playlist-mediocre',
+      'channel-poor',
+    ]);
+  });
+
+  it('ranks by the rating over the relevance score', () => {
+    const library = [
+      clip('relevant-but-dull', { score: 95, rating: 30 }),
+      clip('good', { score: 40, rating: 85 }),
+      clip('fine', { score: 70, rating: 60 }),
+    ];
+    expect(ids(pickNextClips(library, { limit: 3, now: NOW }))).toEqual(['good', 'fine', 'relevant-but-dull']);
+  });
+
+  it('ranks a clip not rated yet by its score, among the rated ones', () => {
+    const library = [
+      clip('rated-high', { rating: 80 }),
+      clip('unrated', { score: 65, rating: null }),
+      clip('rated-low', { rating: 40 }),
+      clip('neither', { score: null, rating: null }),
+    ];
+    expect(ids(pickNextClips(library, { limit: 10, now: NOW }))).toEqual([
+      'rated-high',
+      'unrated',
+      'rated-low',
+      'neither',
+    ]);
   });
 
   it('leaves out excluded clips and stops at the limit', () => {
     const library = [clip('a', { score: 90 }), clip('b', { score: 80 }), clip('c', { score: 70 })];
     expect(ids(pickNextClips(library, { limit: 1, now: NOW, excludeIds: new Set(['a']) }))).toEqual(['b']);
+  });
+});
+
+describe('the rating', () => {
+  it('averages the three axes evenly, within 1 to 100', () => {
+    expect(combinedRating(90, 60, 30)).toBe(60);
+    expect(combinedRating(100, 100, 100)).toBe(100);
+    expect(combinedRating(1, 1, 2)).toBe(1);
+    expect(combinedRating(50, 51, 51)).toBe(51);
+  });
+
+  it('falls back to the score when a clip has no rating', () => {
+    expect(baseScore({ rating: 70, score: 20 })).toBe(70);
+    expect(baseScore({ rating: null, score: 20 })).toBe(20);
+    expect(baseScore({ rating: null, score: null })).toBeNull();
   });
 });
 

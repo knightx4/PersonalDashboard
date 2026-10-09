@@ -169,9 +169,30 @@ export const learnSources: ModuleSources = {
       module: 'Learn',
       holds: 'YouTube videos they chose to watch, saved to their playlist, or kept from a channel Dash judged for one of their subjects, with a verdict on each once judged.',
       weight: 'intent',
-      search: ['why', 'summary'],
+      search: ['why', 'summary', 'key_points', 'verdict'],
+      facts: ['watched_at', 'left_playlist_at'],
       title: 'video_id',
+      titleVia: { embed: 'item:catalogue_items!watch_list_item_id_fkey', column: 'title' },
+      ref: 'video_id',
+      href: (videoId) => `/learn/videos/${encodeURIComponent(videoId)}`,
+      newest: 'added_at',
+      // The title is on catalogue_items, which a ref's page cannot join to.
+      page: {
+        title: { reads: ['video_id'], of: (row) => (typeof row.video_id === 'string' ? `YouTube video ${row.video_id}` : null) },
+        href: (row) => (typeof row.video_id === 'string' ? `/learn/videos/${encodeURIComponent(row.video_id)}` : null),
+        reads: ['video_id'],
+      },
       note: 'item_id is the catalogue_items row of kind video, which has the title and description. verdict is watch, card or skip, with why; watched_at is set when they watched it; left_playlist_at when they took it off the playlist. came_from is playlist, takeout or channel search; a channel search row names the subject it was found for in subject_id.',
+    },
+    {
+      table: 'learn.personality_results',
+      module: 'Learn',
+      holds: 'Personality tests they took or typed in, each with its date: Big Five scores, or a type such as INTJ or 5w4.',
+      weight: 'record',
+      search: ['test_name', 'typed_value', 'note', 'read_points'],
+      title: 'test_name',
+      href: () => '/learn/know#personality',
+      note: 'kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. A retake is a new row, so read the latest by taken_at. read_points is Dash\'s read of the result against their notes, once written.',
     },
   ],
   notSources: [
@@ -216,5 +237,6 @@ export const learnSources: ModuleSources = {
       reason: "Dash's clips cut from someone else's video, with their scores and whether they were watched.",
     },
     { table: 'learn.video_clip_cuts', reason: 'Which videos have been cut into clips.' },
+    { table: 'learn.video_clip_subjects', reason: 'Join rows tagging a clip with each subject it serves.' },
   ],
 };

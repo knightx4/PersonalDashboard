@@ -4,15 +4,21 @@ import { checkChange, type ProposalToolName } from '@/lib/ask/propose';
 import { isUuid, type AskRow } from '@/lib/ask/db';
 import { readSubject } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
-import { insertGoal } from '@/lib/goals/store';
+import { insertArea, insertGoal, updateGoal } from '@/lib/goals/store';
 import { parseGoalFields } from '@/lib/goals/tree';
 import { setStepStatus } from '@/lib/goals/steps-store';
-import type { ModuleId } from '@/lib/modules';
+import { MODULE_IDS, type ModuleId } from '@/lib/modules';
 import type { DashChangeInput, DashChangeKind, NewDashChange } from '@/lib/talk/changes';
 import { taskInput } from '@/lib/todo/tasks/input';
 import { wallClockToInstant } from '@/lib/todo/time';
 import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registry';
 import { addThreadTurn } from '@/lib/thread/store';
+import { stepHref } from '@/lib/goals/all-goals';
+import { ensureCompany } from '@/lib/jobs/companies/ensure';
+import { detectPosting } from '@/lib/jobs/ats/detect';
+import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
+import { BULK_MAX, changeItems, ITEM_CHANGES } from './bulk-items';
+import { moveRoles, ROLE_STAGES } from './bulk-roles';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -28,8 +34,18 @@ import { addThreadTurn } from '@/lib/thread/store';
  *   add_goal         a goal under one of their areas.
  *   add_goal_step    a step at the end of a goal.
  *   close_goal_step  a step marked done.
+ *   set_goal_done_when  a goal's done-when written, changed or cleared.
  *   mark_returned    an owned item marked returned, with a full refund.
  *   add_role_note    a note on a role in Jobs.
+ *   add_idea         an idea on the ideas page in Dev.
+ *   add_job_lead     a role saved as a lead in Jobs, from a posting link or
+ *                    a title and company.
+ *   change_items     many owned items marked for sale or to return, taken
+ *                    off either, or grouped as one item, with one Undo
+ *                    (lib/dash/bulk-items.ts, plan #1656).
+ *   move_roles       many job roles moved to one stage or archived, each
+ *                    through the board's own move, with one Undo
+ *                    (lib/dash/bulk-roles.ts, plan #1657).
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)
@@ -52,6 +68,7 @@ const TABLE = {
   item: 'public.inventory_items',
   role: 'job_search.roles',
   application: 'job_search.applications',
+  idea: 'public.ideas',
   // A note on a role is a turn in the role's thread (plan #1470).
   note: 'core.conversation_turns',
 } as const;
@@ -192,7 +209,7 @@ async function addGoalStep(ctx: DashWriteContext, input: unknown): Promise<DashW
     const step = change.input as DashChangeInput['add_goal_step'];
     return {
       summary: `Dash added the step "${step.title}" under the goal "${step.goalTitle}".`,
-      row: { table: TABLE.goalItem, ref: id, title: step.title, href: `/goals/${step.parentId}#step-${id}` },
+      row: { table: TABLE.goalItem, ref: id, title: step.title, href: stepHref(step.parentId, id) },
     };
   });
 }
@@ -368,32 +385,38 @@ async function addGoal(ctx: DashWriteContext, args: Args): Promise<DashWriteResu
   if (error) throw new Error(error.message);
   const areas = (data ?? []) as { id: string; name: string }[];
   const key = wanted.toLowerCase();
-  const area = areas.find((a) => a.id === wanted) ?? areas.find((a) => a.name.trim().toLowerCase() === key);
-  if (!area) {
+  const found = areas.find((a) => a.id === wanted) ?? areas.find((a) => a.name.trim().toLowerCase() === key);
+  if (!found && args.new_area !== true) {
     const names = areas.map((a) => `"${a.name}"`).join(', ');
     throw new Refused(
       areas.length > 0
-        ? `They have no area called "${wanted}". Their areas are ${names}: use one of those, or ask which they meant.`
-        : 'They have no areas yet, so a goal has nowhere to go. Say so.',
+        ? `They have no area called "${wanted}". Their areas are ${names}: use the one that fits, or call add_goal again with new_area true to make "${wanted}".`
+        : `They have no areas yet. Call add_goal again with new_area true to make "${wanted}".`,
     );
   }
 
   // Written on their session, not as Dash's: they asked for this goal, so it
   // goes in approved, as one they add on the page does (goals 0042). A goal
-  // written as Dash's could only be a proposal.
+  // written as Dash's could only be a proposal. A new area is made the same
+  // way when none of theirs fits; Undo takes the goal back and leaves the
+  // area, which they archive on /goals if they do not want it.
   const client = await ctx.goals({});
+  const areaMade = !found;
+  const area = found ?? { id: await insertArea(client, ctx.userId, wanted), name: wanted };
   const id = await insertGoal(client, ctx.userId, area.id, { title, dueOn });
   if (!id) throw new Refused('That area has just been archived.');
   const ref = toRef(TABLE.goalItem, id);
   return made(
     'add_goal',
-    { areaId: area.id, areaName: area.name, title, dueOn },
+    { areaId: area.id, areaName: area.name, areaMade, title, dueOn },
     {
       subjectRef: ref,
       op: 'insert',
       before: null,
       after: await readSubject(ctx.db, ref),
-      summary: `Dash added the goal "${title}" under ${area.name}.`,
+      summary: areaMade
+        ? `Dash added the area ${area.name} and the goal "${title}" under it.`
+        : `Dash added the goal "${title}" under ${area.name}.`,
       row: { table: TABLE.goalItem, ref: id, title, href: `/goals/${id}` },
     },
   );
@@ -455,7 +478,54 @@ async function closeGoalStep(ctx: DashWriteContext, args: Args): Promise<DashWri
       before,
       after,
       summary: `Dash marked the step "${step.title}" done, under the goal "${goal.title}".`,
-      row: { table: TABLE.goalItem, ref: id, title: step.title, href: `/goals/${goal.id}#step-${id}` },
+      row: { table: TABLE.goalItem, ref: id, title: step.title, href: stepHref(goal.id, id) },
+    },
+  );
+}
+
+/**
+ * A goal's done-when, set when they ask for it by name (notes 06d36ab2,
+ * fa2ac6fe). Written on their session, as add_goal is: goals.items_claude_guard
+ * refuses a done-when change made as Dash's, which is right for a run deciding
+ * on its own and wrong for the person asking in their own words.
+ */
+async function setGoalDoneWhen(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
+  requireWorkspace(ctx, 'goals');
+  const { id } = seenRef(ctx, args, 'goal_ref', [TABLE.goalItem]);
+  const parsed = parseGoalFields((key) => (key === 'acceptance' ? text(args, 'done_when') : undefined));
+  if (!parsed.ok) throw new Refused(parsed.error);
+  const doneWhen = parsed.value.acceptance ?? null;
+
+  const goals = await ctx.db('goals');
+  const goal = await one<{ id: string; level: string; title: string; acceptance: string | null; archived_at: string | null }>(
+    goals
+      .from('items')
+      .select('id, level, title, acceptance, archived_at')
+      .eq('id', id)
+      .eq('user_id', ctx.userId)
+      .limit(1),
+  );
+  if (!goal || goal.archived_at) throw new Refused('That goal is not one of theirs, or it has been archived.');
+  if (goal.level !== 'goal') throw new Refused('That is a step, not a goal. Only a goal has a done-when.');
+  if ((goal.acceptance ?? null) === doneWhen) throw new Refused('That goal already has that done-when.');
+
+  const ref = toRef(TABLE.goalItem, id);
+  const before = await readSubject(ctx.db, ref);
+  if (!(await updateGoal(await ctx.goals({}), id, { acceptance: doneWhen }))) {
+    throw new Refused('That goal changed while Dash was writing its done-when.');
+  }
+  return made(
+    'set_goal_done_when',
+    { id, title: goal.title, doneWhen, previous: goal.acceptance ?? null },
+    {
+      subjectRef: ref,
+      op: 'update',
+      before,
+      after: await readSubject(ctx.db, ref),
+      summary: doneWhen
+        ? `Dash set the done-when of "${goal.title}" to "${doneWhen}".`
+        : `Dash cleared the done-when of "${goal.title}".`,
+      row: { table: TABLE.goalItem, ref: id, title: goal.title, href: `/goals/${id}` },
     },
   );
 }
@@ -545,6 +615,145 @@ async function noteOnRole(
   );
 }
 
+/** Longest title a lead is saved with; a posting's own title is far shorter. */
+const LEAD_TITLE_MAX = 300;
+
+/**
+ * Save a job as a lead: a role, its company (found or made, as every other
+ * path does it), and an application in the lead state with nothing
+ * submitted, the shape "Save as lead" on the roles page writes. The posting
+ * is read from its link where a board or the page allows it, which fills
+ * whatever title Dash was not given; the role's page fetches the
+ * description later, as it does for a saved recommendation. Undo takes the
+ * role back, and the application with it, while nothing has been added to
+ * either; the company stays.
+ */
+async function addJobLead(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
+  requireWorkspace(ctx, 'jobs');
+  const url = text(args, 'url') || null;
+  let title = text(args, 'title');
+  const companyName = text(args, 'company');
+  if (url && !/^https?:\/\/\S+$/i.test(url)) throw new Refused('url is not a web link starting http:// or https://.');
+  if (!url && (!title || !companyName)) {
+    throw new Refused('Give the posting link, or the role title and the company. Ask them for whichever is missing.');
+  }
+
+  const jobs = await ctx.db('job_search');
+  if (url) {
+    const saved = await one<{ id: string; title: string }>(
+      jobs.from('roles').select('id, title').eq('user_id', ctx.userId).eq('jd_url', url).limit(1),
+    );
+    if (saved) throw new Refused(`That posting is saved already, as the role "${saved.title}" (job_search.roles ${saved.id}).`);
+  }
+
+  let location: string | null = null;
+  let atsJobId: string | null = null;
+  if (url && !title) {
+    const read = ctx.readPosting ?? (await import('@/lib/jobs/ats')).fetchPostingFromUrl;
+    const outcome = await read(url).catch(() => null);
+    if (outcome?.ok) {
+      title = outcome.posting.title.trim();
+      location = outcome.posting.location;
+      atsJobId = outcome.posting.atsJobId;
+    }
+  }
+  if (!title) {
+    throw new Refused(
+      'The posting at that link could not be read for its title. Ask them for the role title (and the company, if you do not know it), then call add_job_lead again with the link.',
+    );
+  }
+  if (!companyName) {
+    throw new Refused(`The company is missing. Ask them which company "${title}" is at, then call add_job_lead again with the link.`);
+  }
+  if (title.length > LEAD_TITLE_MAX) title = title.slice(0, LEAD_TITLE_MAX).trimEnd();
+
+  const detected = url ? detectPosting(url) : null;
+  const vendor = detected?.vendor;
+  const company = await ensureCompany(jobs as unknown as AppSupabaseClient, ctx.userId, companyName, {
+    careersUrl: url,
+    boardToken: detected?.boardToken ?? null,
+    ats: !vendor || vendor === 'other' || vendor === 'unknown' ? null : vendor,
+  });
+  if (company.error) throw new Error(company.error);
+
+  const role = await one<{ id: string }>(
+    jobs
+      .from('roles')
+      .insert({
+        user_id: ctx.userId,
+        company_id: company.id,
+        title,
+        jd_url: url,
+        ats_job_id: atsJobId ?? detected?.jobId ?? null,
+        location,
+      })
+      .select('id'),
+  );
+  if (!role) throw new Error('The role was not saved.');
+  const { error } = await jobs.from('applications').insert({ user_id: ctx.userId, role_id: role.id, created_by: 'manual' });
+  if (error) {
+    await jobs.from('roles').delete().eq('id', role.id).eq('user_id', ctx.userId);
+    throw new Error(error.message);
+  }
+
+  const ref = toRef(TABLE.role, role.id);
+  const roleTitle = `${title} at ${companyName}`;
+  return made(
+    'add_job_lead',
+    { roleId: role.id, roleTitle: title, companyName, url },
+    {
+      subjectRef: ref,
+      op: 'insert',
+      before: null,
+      after: await readSubject(ctx.db, ref),
+      summary: `Dash saved ${roleTitle} to your leads.`,
+      row: { table: TABLE.role, ref: role.id, title: roleTitle, href: `/jobs/roles/${role.id}` },
+    },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Dev
+// ---------------------------------------------------------------------------
+
+/** Longest idea Dash files, the ideas page's own limit. */
+const IDEA_MAX = 4000;
+
+/**
+ * File an idea on the ideas page, as the person's own: they asked for it, so
+ * it reads as one they typed into the box there, the way a goal they ask for
+ * goes in approved. Undo deletes it while nothing hangs from it.
+ */
+async function addIdea(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
+  const body = text(args, 'text');
+  if (body.length < 3) throw new Refused('text is missing: write the idea in a sentence.');
+  if (body.length > IDEA_MAX) throw new Refused(`Keep the idea under ${IDEA_MAX} characters.`);
+  const workspace = text(args, 'module') || null;
+  if (workspace && !(MODULE_IDS as readonly string[]).includes(workspace)) {
+    throw new Refused(`"${workspace}" is not a workspace. Use one of ${MODULE_IDS.join(', ')}, or leave it out for the app as a whole.`);
+  }
+
+  const idea = await one<{ id: string }>(
+    (await ctx.db('public')).from('ideas').insert({ user_id: ctx.userId, body, module: workspace }).select('id'),
+  );
+  if (!idea) throw new Error('The idea was not saved.');
+  const ref = toRef(TABLE.idea, idea.id);
+  const line = body.split('\n')[0].trim();
+  const short = line.length > 120 ? `${line.slice(0, 119).trimEnd()}…` : line;
+  return made(
+    'add_idea',
+    { body, module: workspace },
+    {
+      subjectRef: ref,
+      op: 'insert',
+      before: null,
+      after: await readSubject(ctx.db, ref),
+      summary: `Dash filed your idea "${short}" on the ideas page.`,
+      row: { table: TABLE.idea, ref: idea.id, title: short, href: '/dev/ideas' },
+    },
+  );
+}
+
 // ---------------------------------------------------------------------------
 // The tools
 // ---------------------------------------------------------------------------
@@ -624,11 +833,12 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_goal',
-    'Add a new goal under one of their areas, when they ask for one. Name the area by its name as they have it; if no area fits, ask which they mean instead of guessing. Only when they asked for a goal: a step under an existing goal is add_goal_step.',
+    'Add a new goal under one of their areas, when they ask for one. Name the area by its name as they have it. When none of their areas fits the goal, make one: pass new_area true with a short name for it ("Music"), rather than asking. Only when they asked for a goal: a step under an existing goal is add_goal_step.',
     {
       type: 'object',
       properties: {
         area: { type: 'string', description: 'The name of the area the goal goes under.' },
+        new_area: { type: 'boolean', description: 'True to make a new area by that name, when none of theirs fits.' },
         title: { type: 'string', description: 'The goal, in a short line, as an outcome ("Run a half marathon").' },
         due_on: { ...DAY_PROP, description: 'The day it is due by, YYYY-MM-DD, only when they named one.' },
       },
@@ -663,6 +873,20 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
     closeGoalStep,
   ),
   tool(
+    'set_goal_done_when',
+    "Write, change or clear the done-when of one of their goals, when they ask for it: the line that says when the goal is finished (\"the song is live on Spotify\"). Name the goal by the goals.items ref search (kinds [\"goal\"]) or goal_status returned for it; look it up first. Write it in their words. An empty done_when clears it.",
+    {
+      type: 'object',
+      properties: {
+        goal_ref: { type: 'string', description: 'The goals.items ref a lookup returned for the goal.' },
+        done_when: { type: 'string', description: 'The done-when, as they said it; empty to clear it.' },
+      },
+      required: ['goal_ref', 'done_when'],
+      additionalProperties: false,
+    },
+    setGoalDoneWhen,
+  ),
+  tool(
     'mark_returned',
     'Mark an item the person owns as returned, when they say they sent it back. Name it by the ref search returned for it in the public.inventory_items table; look it up first. It records a full refund at what the item cost.',
     {
@@ -688,6 +912,87 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
       additionalProperties: false,
     },
     addRoleNote,
+  ),
+  tool(
+    'add_job_lead',
+    'Save a job to their leads in Jobs, when they ask you to ("add this job to my leads", a pasted posting link). Pass the posting link when there is one; the title is read from the posting when it can be. Pass the title and company when they named them, and always the company, from the link\'s site or their words. When the role is on the page they are on, use its title, company and link. When there is no link and no role you can name, ask them for the link rather than calling this.',
+    {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The job posting link, when there is one.' },
+        title: { type: 'string', description: 'The role title, when they gave it or you know it.' },
+        company: { type: 'string', description: 'The company the role is at.' },
+      },
+      additionalProperties: false,
+    },
+    addJobLead,
+  ),
+  tool(
+    'add_idea',
+    'File an idea on the ideas page in Dev, when they ask you to note an idea for the app ("add an idea to Dev", "file that as an idea"). Write it as they said it, readable among other ideas.',
+    {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: "The idea in the person's own terms, a sentence or two." },
+        module: {
+          type: 'string',
+          description: 'The workspace it is about, by id (jobs, goals, learn, dev and so on); leave it out for the app as a whole.',
+        },
+      },
+      required: ['text'],
+      additionalProperties: false,
+    },
+    addIdea,
+  ),
+  tool(
+    'change_items',
+    `Change many of the items they own in Shopping at once, when they ask ("mark everything from the March Amazon order for sale", "put these on the to-return list"). Name the items by the public.inventory_items refs lookups returned, or name whole orders by the public.orders refs search or spend_by_merchant returned, and every item from those orders is changed. At most ${BULK_MAX} items. change is one of: for_sale (mark for sale), not_for_sale (take off the sell page), to_return (mark to return), not_returning (take off the to-return list), group (group copies of one thing as one item, two or more). Only items they still own are changed. Deleting items is not something you can do: say it is done from the inventory list. One Undo puts the whole change back. Say how many items it changed.`,
+    {
+      type: 'object',
+      properties: {
+        change: { type: 'string', enum: [...ITEM_CHANGES], description: 'Which change to make to every item.' },
+        item_refs: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: BULK_MAX,
+          description: 'The public.inventory_items refs lookups returned for the items.',
+        },
+        order_refs: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: 20,
+          description: 'The public.orders refs lookups returned, to change every item from those orders.',
+        },
+      },
+      required: ['change'],
+      additionalProperties: false,
+    },
+    changeItems,
+  ),
+  tool(
+    'move_roles',
+    `Move many of their job roles to one stage at once, or archive them, when they ask ("archive every role I applied to before August with no reply", "move these three to in process"). Name the roles by the job_search.applications refs job_applications returned, or the job_search.roles refs search returned; find them with a lookup first, and for "no reply" use job_applications with no_reply. A lookup lists 50 at most: when it says more matched, narrow by date and look again so every one is named. At most ${BULK_MAX} roles. stage is one of: lead, drafting, submitted, in_process, final_round, offer, rejected, withdrawn, role_closed, or archive (takes them off the board as withdrawn; a role already closed is left as it is). Ghosted cannot be set: it is worked out from silence. Deleting roles is not something you can do: say it is done on the pipeline. Each move goes into the role's history as the board's would. One Undo puts the whole move back. Say how many roles it moved.`,
+    {
+      type: 'object',
+      properties: {
+        stage: { type: 'string', enum: [...ROLE_STAGES], description: 'The stage to move every role to, or archive.' },
+        application_refs: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: BULK_MAX,
+          description: 'The job_search.applications refs job_applications returned.',
+        },
+        role_refs: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: BULK_MAX,
+          description: 'The job_search.roles refs search returned; each moves by its latest application.',
+        },
+      },
+      required: ['stage'],
+      additionalProperties: false,
+    },
+    moveRoles,
   ),
 ];
 

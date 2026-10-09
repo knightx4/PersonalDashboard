@@ -1,10 +1,10 @@
 # The spec audit routine
 
 The standing prompt for the Claude Code routine that runs the weekly spec
-audit. Scheduling it is plan #1524: a tick on Mondays fires the routine
-through the API and records the fire in `plan_runs`. Until that is built the
-audit is run by hand, by a session told to audit the specs, and this prompt
-is what to paste into the routine once it exists.
+audit. A tick on Mondays at 14:47 UTC (`/api/cron/spec-audit`, scheduled by
+`supabase/migrations/0178_spec_audit_weekly.sql`) fires the routine through
+the API and records the fire in `plan_runs` with job `audit`. It fires
+nothing when an audit wrote findings or was started in the last six days.
 
 The app appends a turn naming the account's `user_id`. The prompt and the
 connectors are stored on claude.ai, not read from here, so a change to
@@ -16,8 +16,9 @@ either takes effect only once it is made on the routine itself.
    connector attached. It needs no schedule of its own: the weekly tick fires
    it through the API.
 2. Paste the prompt below as its instructions.
-3. Copy the routine's id (`trig_…`) and create a token for it. Where they go
-   in Vercel is set by plan #1524.
+3. Copy the routine's id (`trig_…`) and create a token for it. Set them in
+   Vercel as `CLAUDE_SPEC_AUDIT_ROUTINE_ID` and
+   `CLAUDE_SPEC_AUDIT_ROUTINE_TOKEN`.
 
 ## The prompt
 

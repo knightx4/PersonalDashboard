@@ -51,7 +51,7 @@ export const TARGET_COLUMN: Record<
 export const TARGET_PATH: Record<CommentTarget, string> = {
   idea: '/dev/ideas',
   step: '/dev/plan',
-  raise: '/dev/raised',
+  raise: '/dev/inbox',
   note: '/dev/bugs',
   // The list, not the document. A comment is written on one spec's page, and
   // that page's own path is not knowable from the target alone -- the write
@@ -83,6 +83,11 @@ export type DevComment = {
   author: CommentAuthor;
   body: string;
   createdAt: string;
+  /**
+   * When Dash saw this comment and chose not to reply (plan #1648). Only ever
+   * set on the person's own comments; absent or null on all others.
+   */
+  acknowledgedAt?: string | null;
 };
 
 /**
@@ -98,7 +103,12 @@ export function threadFrom(value: unknown): DevComment[] {
       id: row.id as string,
       author: row.author === 'claude' ? ('claude' as const) : ('me' as const),
       body: row.body as string,
-      createdAt: String(row.created_at ?? ''),
+      // The loaders built on the shared store hand over turns already in the
+      // app shape, so read either name: a blank time throws where it is drawn.
+      createdAt: String(row.created_at ?? row.createdAt ?? ''),
+      acknowledgedAt: (row.acknowledged_at ?? row.acknowledgedAt)
+        ? String(row.acknowledged_at ?? row.acknowledgedAt)
+        : null,
     }))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }

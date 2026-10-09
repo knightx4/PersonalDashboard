@@ -607,9 +607,13 @@ Same machinery, longer output, plus a structure derived from the requirement map
 
 **Auth and onboarding.** Sign up, then a separate step to connect Gmail with the explanation screen. Skippable. Then a short setup: target titles, search start date, upload a resume, and add three to five companies so linking has something to match against on the first backfill.
 
-**Pipeline board.** Kanban by status, cards showing company, title, days since last activity, next action, excitement. Drag to change status, which writes a manual override event. Filters in the left rail: source, priority, excitement, stale-only.
+**Pipeline.** One page with three views, focus, a board and a table, chosen in the address, focus by default. All open on the live applications: not closed, leads included, the same count Today shows. One line of filters above every view narrows by status, source, excitement, fit and chance; the closed applications are the status filter, shown in the table a page at a time. `/jobs/roles` was the table on its own and now redirects to it (plan #1590).
 
-**Roles table.** The same data as a sortable table, because a board is bad above about forty items and you will pass forty items. Columns are configurable, sorted by last activity by default.
+**Pipeline focus.** One line per live application in three sections: In process, with whose move it is and the next interview booked; Waiting on a reply, with those quiet for over two weeks listed apart; and To apply, drafts before leads. A last line counts the closed applications by how each ended and opens them in the table.
+
+**Pipeline board.** Kanban by status, cards showing company, title, days since last activity, next action, excitement. Drag to change status, which writes a manual override event. A stage with no cards is a narrow lane, so the others fit a laptop's width.
+
+**Pipeline table.** The same data as a sortable table, because a board is bad above about forty items and you will pass forty items. Columns are configurable, sorted by last activity by default.
 
 **Role detail.** JD, requirement map, application status and timeline, answers, cover letter, interviews, notes, attachments, linked emails. The page you actually live in.
 

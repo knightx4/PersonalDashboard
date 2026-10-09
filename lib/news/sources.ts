@@ -14,6 +14,7 @@ export const newsSources: ModuleSources = {
       weight: 'record',
       search: ['headline', 'summary', 'text'],
       title: 'headline',
+      newest: 'saved_at',
       href: () => '/news/saved',
     },
     {
@@ -23,6 +24,7 @@ export const newsSources: ModuleSources = {
       weight: 'intent',
       search: ['local_area'],
       title: 'local_area',
+      newest: 'updated_at',
       ref: 'user_id',
       href: () => '/news/settings',
       // One row per person, with no id to name it by.
@@ -41,6 +43,10 @@ export const newsSources: ModuleSources = {
   ],
   notSources: [
     { table: 'news.addresses', reason: 'Inbound mail addresses.' },
+    {
+      table: 'news.daily_reviews',
+      reason: 'The evening review, restating stories news.issues already holds.',
+    },
     { table: 'news.hidden_topics', reason: 'Topics hidden from the digest.' },
     { table: 'news.recommendations', reason: 'The digest’s own picks.' },
     { table: 'news.senders', reason: 'Newsletter senders.' },

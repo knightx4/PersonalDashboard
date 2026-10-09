@@ -288,7 +288,7 @@ describe('checkParagraphs', () => {
 });
 
 describe('writeYearParagraphs', () => {
-  it('forces the tool, records the spend and returns what came back', async () => {
+  it('asks for the tool, records the spend and returns what came back', async () => {
     const create = vi.fn(async () => ({
       usage: { input_tokens: 100, output_tokens: 20 },
       content: [
@@ -307,9 +307,9 @@ describe('writeYearParagraphs', () => {
     });
     expect(paragraphs).toEqual([{ topic: 'shopping', text: 'You placed 3 orders.', evidence: ['E1'] }]);
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'claude-sonnet-5', tool_choice: { type: 'tool', name: 'write_year_review' } }),
+      expect.objectContaining({ model: 'claude-sonnet-5-5', tool_choice: { type: 'auto' } }),
     );
-    expect(onSpend).toHaveBeenCalledWith(expect.objectContaining({ model: 'claude-sonnet-5' }));
+    expect(onSpend).toHaveBeenCalledWith(expect.objectContaining({ model: 'claude-sonnet-5-5' }));
   });
 });
 
@@ -321,9 +321,9 @@ describe('writeYearReviewFor', () => {
       stored: async () => null,
       timeline: async (_user, from, to) => YEAR_EVENTS.filter((row) => row.occurred_at >= from && row.occurred_at < to),
       write: async (summary, onSpend) => {
-        onSpend({ model: 'claude-sonnet-5', usage: { input_tokens: 1, output_tokens: 1 } } as never);
+        onSpend({ model: 'claude-sonnet-5-5', usage: { input_tokens: 1, output_tokens: 1 } } as never);
         const id = [...summary.matchAll(/^(E\d+) \| .*shopping order/gm)].map((match) => match[1]!);
-        return { model: 'claude-sonnet-5', paragraphs: [{ topic: 'shopping', text: 'You placed 3 orders for $310.00.', evidence: id }] };
+        return { model: 'claude-sonnet-5-5', paragraphs: [{ topic: 'shopping', text: 'You placed 3 orders for $310.00.', evidence: id }] };
       },
       ledger,
       save: async (row) => {
@@ -373,8 +373,8 @@ describe('writeYearReviewFor', () => {
   it('stores nothing when no paragraph passes, and still records the spend', async () => {
     const { port, saved, ledger } = ports({
       write: async (_summary, onSpend) => {
-        onSpend({ model: 'claude-sonnet-5', usage: { input_tokens: 1, output_tokens: 1 } } as never);
-        return { model: 'claude-sonnet-5', paragraphs: [{ topic: 'shopping', text: 'You spent a lot.', evidence: ['E1'] }] };
+        onSpend({ model: 'claude-sonnet-5-5', usage: { input_tokens: 1, output_tokens: 1 } } as never);
+        return { model: 'claude-sonnet-5-5', paragraphs: [{ topic: 'shopping', text: 'You spent a lot.', evidence: ['E1'] }] };
       },
     });
     const result = await writeYearReviewFor(port, { ...input, now: new Date('2027-01-02T15:23:00Z') });
@@ -411,7 +411,7 @@ describe('showYearReview', () => {
       paragraphs: [
         { topic: 'shopping', text: 'You placed 3 orders.', evidence: [eventRef(orderMarch), 'public.orders:gone'] },
       ],
-      model: 'claude-sonnet-5',
+      model: 'claude-sonnet-5-5',
       written_at: '2026-06-01T00:00:00.000Z',
     };
     const shown = showYearReview(stored, live, YEAR_EVENTS);

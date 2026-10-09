@@ -1,264 +1,54 @@
-import { KanbanSquare } from 'lucide-react';
+import { redirect } from 'next/navigation';
 import { countConnectedInboxes } from '@/lib/core/inbox/accounts';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { loadWorkingRefs } from '@/lib/talk/handoffs';
-import Link from 'next/link';
-import { PipelineBoard, type PipelineView } from '@/components/jobs/pipeline/board';
-import { PipelineViewToggle } from '@/components/jobs/pipeline/view-toggle';
-import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
-import { PageHeader } from '@/components/shell/page-header';
-import { SearchField } from '@/components/shell/search-field';
-import { SearchEmpty } from '@/components/shell/search-empty';
-import { buttonVariants } from '@/components/ui/button';
-import { EmptyState } from '@/components/ui/empty-state';
-import { loadPipeline, type PipelineRow } from '@/lib/jobs/applications/load';
-import { matchesSearch, searchTerms } from '@/lib/jobs/search';
+import { PipelinePage } from '@/components/jobs/pipeline/pipeline-page';
+import { loadPipeline } from '@/lib/jobs/applications/load';
+import type { PipelineParams } from '@/lib/jobs/pipeline-view';
+import { rolesDisplay } from '@/lib/jobs/roles-display';
 import { withApplicationNotes } from '@/lib/jobs/suggest/score-notes-load';
-import {
-  APPLICATION_SOURCES,
-  SOURCE_LABELS,
-  isTerminal,
-  type ApplicationSource,
-} from '@/lib/jobs/pipeline';
+import { defaultViewHref, savedViewsFor } from '@/lib/saved-views/store';
 
 export const metadata = { title: 'Pipeline' };
 
-
-
-function hrefFor(params: Record<string, string | undefined>): string {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value) search.set(key, value);
-  }
-  const query = search.toString();
-  return query ? `/jobs/pipeline?${query}` : '/jobs/pipeline';
-}
-
-/** Not rejected, withdrawn, ghosted, or closed -- still actually in play. */
-function isAlive(row: PipelineRow): boolean {
-  return !isTerminal(row.status);
-}
-
-export default async function PipelinePage({
-  searchParams,
-}: {
-  searchParams: Promise<{
-    source?: string;
-    excitement?: string;
-    coverage?: string;
-    company?: string;
-    q?: string;
-  }>;
-}) {
+/**
+ * Every application, as a board or a table (plan #1590). Pipeline and Roles
+ * were two pages over the same rows; /jobs/roles now redirects here. Both
+ * views open on the live applications, and the closed ones are a filter.
+ * What is drawn, and how the address is read, is in PipelinePage and
+ * lib/jobs/pipeline-view.ts.
+ */
+export default async function Page({ searchParams }: { searchParams: Promise<PipelineParams> }) {
   const user = await requireUser();
   const supabase = await createClient();
   const core = await createCoreClient();
   const params = await searchParams;
 
-  const [pipeline, inboxCount, { data: profile }, working] = await Promise.all([
+  const [pipeline, inboxCount, working, savedViews, { data: profile }] = await Promise.all([
     loadPipeline(supabase, user.id),
     countConnectedInboxes(core, user.id),
-    supabase.from('profiles').select('pipeline_view').eq('id', user.id).maybeSingle(),
     // What an Ask Dash hand-off is working on (plan #1568).
     loadWorkingRefs(core, user.id),
+    savedViewsFor(core, rolesDisplay().pathname),
+    supabase.from('profiles').select('timezone').eq('id', user.id).maybeSingle(),
   ]);
 
-  // Fit and chance on each card (plan #1206).
+  // A saved view marked as the default opens when the bare page is asked for.
+  const openOn = defaultViewHref(savedViews, params);
+  if (openOn) redirect(openOn);
+
+  // Fit and chance on each row (plan #1206).
   const rows = await withApplicationNotes(supabase, user.id, pipeline);
 
-  const view: PipelineView = profile?.pipeline_view === 'list' ? 'list' : 'board';
-
-  const source = APPLICATION_SOURCES.find((s) => s === params.source);
-  const excitement = params.excitement ? Number(params.excitement) : null;
-  const coverage = params.coverage === 'gaps' || params.coverage === 'covered' ? params.coverage : null;
-
-  const terms = searchTerms(params.q);
-
-  let filtered = rows;
-  if (source) filtered = filtered.filter((row) => row.source === source);
-  if (excitement) filtered = filtered.filter((row) => (row.excitement ?? 0) >= excitement);
-  // Unmatched roles are in neither bucket. A role you have not matched is not a
-  // role without gaps, and putting it in "no gaps" would be the flattery this
-  // whole layer exists to remove.
-  if (coverage === 'gaps') filtered = filtered.filter((row) => row.coverage.gaps > 0);
-  if (coverage === 'covered')
-    filtered = filtered.filter((row) => row.coverage.total > 0 && row.coverage.gaps === 0);
-  if (terms.length)
-    filtered = filtered.filter((row) => matchesSearch([row.companyName, row.roleTitle], terms));
-
-  const matchedCount = rows.filter((row) => row.coverage.total > 0).length;
-
-  const countsBySource = new Map<ApplicationSource, number>();
-  for (const row of rows) {
-    countsBySource.set(row.source, (countsBySource.get(row.source) ?? 0) + 1);
-  }
-
-  if (rows.length === 0) {
-    return (
-      <>
-        <PageHeader
-          title="Pipeline"
-          description="Where every pursuit stands, and what needs attention today."
-        />
-        <EmptyState
-          icon={KanbanSquare}
-          title="Nothing in the pipeline yet"
-          description={
-            (inboxCount ?? 0) > 0
-              ? 'Add a role by pasting a job link, or wait for the next inbox scan to find your confirmations.'
-              : 'Add a role by pasting a job link, or capture one with the bookmarklet.'
-          }
-          action={{ label: 'Add a role', href: '/jobs/roles/new' }}
-          secondaryAction={
-            (inboxCount ?? 0) > 0
-              ? { label: 'Inbox settings', href: '/jobs/settings' }
-              : { label: 'Settings', href: '/jobs/settings' }
-          }
-        />
-      </>
-    );
-  }
-
   return (
-    /* The board scrolls, not the page. A pipeline is a thing you look through
-       while filtering it, and a layout where the search field, the filters and
-       the count all slide off the top is one where finding a pursuit means
-       scrolling back up to change the filter and back down to read the result.
-       From lg up -- where the shell is a sidebar and a content column and the
-       viewport is a fixed frame -- the chrome is pinned and only the columns
-       move. Below that the document scrolls as before: pinning a header on a
-       phone spends the screen the results need. */
-    <div className="lg:flex lg:h-[calc(100dvh-6.5rem)] lg:flex-col lg:overflow-hidden">
-      <PageHeader
-        title="Pipeline"
-        description={
-          terms.length
-            ? `${filtered.length} of ${rows.length} match “${params.q}”.`
-            : `${rows.length} ${rows.length === 1 ? 'pursuit' : 'pursuits'}, ${rows.filter(isAlive).length} still alive.`
-        }
-        actions={
-          <>
-            <PipelineViewToggle view={view} />
-            <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
-              Add a role
-            </Link>
-          </>
-        }
-      />
-
-      <div className="flex flex-col gap-4 lg:min-h-0 lg:flex-1 xl:flex-row xl:gap-6">
-        <LeftRail fill>
-          <RailGroup label="Source">
-            <RailItem
-              label="All sources"
-              href={hrefFor({ excitement: params.excitement, coverage: params.coverage, q: params.q })}
-              active={!source}
-              count={rows.length}
-            />
-            {APPLICATION_SOURCES.filter((s) => countsBySource.has(s)).map((entry) => (
-              <RailItem
-                key={entry}
-                label={SOURCE_LABELS[entry]}
-                href={hrefFor({
-                  source: entry,
-                  excitement: params.excitement,
-                  coverage: params.coverage,
-                  q: params.q,
-                })}
-                active={source === entry}
-                count={countsBySource.get(entry)}
-              />
-            ))}
-          </RailGroup>
-
-          <RailGroup label="Excitement">
-            <RailItem
-              label="Any"
-              href={hrefFor({ source: params.source, coverage: params.coverage, q: params.q })}
-              active={!excitement}
-            />
-            {[5, 4, 3].map((level) => (
-              <RailItem
-                key={level}
-                label={`${'★'.repeat(level)} and up`}
-                href={hrefFor({
-                  source: params.source,
-                  excitement: String(level),
-                  coverage: params.coverage,
-                  q: params.q,
-                })}
-                active={excitement === level}
-              />
-            ))}
-          </RailGroup>
-
-          {matchedCount > 0 && (
-            <RailGroup label="Evidence">
-              <RailItem
-                label="Any"
-                href={hrefFor({
-                  source: params.source,
-                  excitement: params.excitement,
-                  q: params.q,
-                })}
-                active={!coverage}
-              />
-              <RailItem
-                label="Has gaps"
-                href={hrefFor({
-                  source: params.source,
-                  excitement: params.excitement,
-                  coverage: 'gaps',
-                  q: params.q,
-                })}
-                active={coverage === 'gaps'}
-                count={rows.filter((row) => row.coverage.gaps > 0).length}
-              />
-              <RailItem
-                label="Fully covered"
-                href={hrefFor({
-                  source: params.source,
-                  excitement: params.excitement,
-                  coverage: 'covered',
-                  q: params.q,
-                })}
-                active={coverage === 'covered'}
-                count={rows.filter((row) => row.coverage.total > 0 && row.coverage.gaps === 0).length}
-              />
-            </RailGroup>
-          )}
-
-          <p className="px-1 text-small leading-relaxed text-ink-muted">
-            Priority lives on the company, not the pursuit —{' '}
-            <Link href="/jobs/companies" className="underline underline-offset-2">
-              set it there
-            </Link>
-            .
-          </p>
-        </LeftRail>
-
-        <div className="flex min-w-0 flex-1 flex-col lg:min-h-0">
-          {/* Directly above the board it narrows, like every other list in the
-              app. It sat in the header row beside Add a role until now, which
-              was the last placement out of line. Outside the scroller on
-              purpose: the whole point of pinning the chrome is that changing
-              the search does not mean scrolling back up to it. */}
-          <div className="mb-4">
-            <SearchField placeholder="Search company or role" />
-          </div>
-
-          <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
-            {filtered.length === 0 && terms.length > 0 ? (
-              /* Clearing the search leaves the source, the excitement and the
-                 coverage rails where they were. */
-              <SearchEmpty query={params.q ?? ''} />
-            ) : (
-              <PipelineBoard rows={filtered} view={view} working={working} />
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+    <PipelinePage
+      rows={rows}
+      params={params}
+      savedViews={savedViews}
+      working={working}
+      hasInbox={(inboxCount ?? 0) > 0}
+      timezone={(profile?.timezone as string | null) ?? 'UTC'}
+    />
   );
 }

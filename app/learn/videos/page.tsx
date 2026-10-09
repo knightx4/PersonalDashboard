@@ -58,7 +58,7 @@ export default async function VideosPage({
   const playing = open === 'clips';
 
   const learn = await createLearnClient();
-  const startedAt = new Date().toISOString();
+  const now = new Date();
   const [all, cards, clipProgress, channels, usage, list, clips] = await Promise.all([
     loadListVideos(learn, user.id),
     loadVideoCards(learn, user.id),
@@ -66,17 +66,16 @@ export default async function VideosPage({
     loadChannelSummaries(learn),
     loadUsage(learn),
     loadWatchListSettings(learn, user.id),
-    playing ? loadPlayerClips(learn, user.id, { sessionStartedAt: startedAt }) : Promise.resolve(null),
+    playing ? loadPlayerClips(learn, user.id, { now: now.getTime() }) : Promise.resolve(null),
   ]);
   const videos = filterVideos(all, { q, verdict: pile });
   const cardCounts = new Map([...cards].map(([videoId, list]) => [videoId, list.length]));
-  const now = new Date(startedAt);
 
   const sections = (
     <>
       <ClipsSection
         progress={clipProgressLine(clipProgress, now)}
-        player={clips === null ? null : { clips, startedAt }}
+        player={clips === null ? null : { clips }}
       />
       <LibrarySection channels={channels} usage={usage} list={list} now={now.getTime()} open={open === 'youtube'} />
     </>

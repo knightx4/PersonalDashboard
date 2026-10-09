@@ -3,7 +3,7 @@
 import Form from 'next/form';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useId, useMemo, useState, useTransition, type ComponentProps } from 'react';
 import { Copy, ExternalLink, Mail, Search } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';
@@ -12,7 +12,7 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { ScoreReasons } from '@/components/jobs/ui/score-figures';
-import { CHANCE_BAND_LABELS } from '@/lib/jobs/suggest/chance-check';
+import { CHANCE_FILTER_EDGES } from '@/lib/jobs/suggest/chance-check';
 import { FIT_MINIMUMS, type ScoreNote } from '@/lib/jobs/suggest/score-notes';
 import { activeFilters, OPENING_PARAMS, type OpeningView } from '@/lib/jobs/suggest/opening-view';
 import { gmailComposeUrl } from '@/lib/jobs/followup/compose';
@@ -53,8 +53,8 @@ const CHANNEL_LABELS: Record<string, string> = {
 };
 
 /**
- * Dash's recommendations, each list on the page it belongs to: people to meet
- * at the top of Contacts, roles to apply for at the top of Roles. The daily
+ * Dash's recommendations, both on Find (plan #1589): the roles to apply for,
+ * then the people to meet. The daily
  * run fills them (lib/jobs/suggest), so they are there when the page opens;
  * the search button is for a list that has run dry.
  */
@@ -116,39 +116,73 @@ function RecommendedSection({
   // Folds to its header (note b4a23b56), and stays folded in this browser.
   // The key is the one this section kept its fold under before CardSection
   // could fold, so a fold made then still holds (plan #1432).
+  //
+  // The search button sits in the body, beside the line about the latest
+  // search, rather than as the section's header action: the header keeps
+  // room for an action whether or not the title needs it, which pushed
+  // "Recommended roles 4" onto a second line at 390 (plan #1589).
+  const lines = [
+    (count > 0 ? hint : empty) ? (
+      <p key="hint" className="text-small text-ink-muted">
+        {count > 0 ? hint : empty}
+      </p>
+    ) : null,
+    status ? (
+      <p
+        key="status"
+        role="status"
+        className={cn('text-small', status.tone === 'warn' ? 'text-caution' : 'text-ink-muted')}
+      >
+        {status.text}
+      </p>
+    ) : null,
+    notice ? (
+      <p key="notice" className="text-small text-ink-muted">
+        {notice}
+      </p>
+    ) : null,
+  ].filter(Boolean);
+  const search = (
+    <span className="flex shrink-0 items-center gap-1">
+      <Button type="button" size="sm" variant="secondary" pending={searching} onClick={ask}>
+        {searching ? searchingLabel : button}
+      </Button>
+      {paidHint}
+    </span>
+  );
   return (
     <CardSection
       fold={`jobs.fold.${title}`}
       title={
         <>
-          <DashMark size="icon" decorative className="self-center text-accent" />
+          {/* Searches while a search runs, here or in the background, so the
+              heading shows it even with the section folded. At xs it matches
+              a module mark and still sits inside the heading's line. */}
+          <DashMark
+            state={searching ? 'working' : 'idle'}
+            activity="searching"
+            size="xs"
+            decorative
+            className="self-center text-accent"
+          />
           {title}
         </>
       }
       meta={count > 0 ? count : undefined}
-      action={
-        <>
-          <Button type="button" size="sm" variant="ghost" pending={searching} onClick={ask}>
-            {searching ? searchingLabel : button}
-          </Button>
-          {paidHint}
-        </>
-      }
     >
-      {(count > 0 ? hint : empty) && (
-        <p className="mb-2 text-small text-ink-muted">{count > 0 ? hint : empty}</p>
-      )}
-      {status && (
-        <p
-          role="status"
-          className={cn('mb-2 text-small', status.tone === 'warn' ? 'text-caution' : 'text-ink-muted')}
-        >
-          {status.text}
-        </p>
-      )}
-      {notice && <p className="mb-2 text-small text-ink-muted">{notice}</p>}
+      {lines.length > 0 || count === 0 ? (
+        <div className="mb-2 flex items-start gap-3">
+          <div className="min-w-0 flex-1 space-y-1">{lines}</div>
+          {search}
+        </div>
+      ) : null}
       {count > 0 && toolbar}
       {count > 0 && <ul className="divide-y divide-border">{children}</ul>}
+      {/* With no line to sit beside, the button closes the list instead of
+          taking a row of its own above the first item (plan #1589). */}
+      {lines.length === 0 && count > 0 && (
+        <div className="mt-2 flex justify-end border-t border-border pt-2">{search}</div>
+      )}
       {footer}
     </CardSection>
   );
@@ -158,8 +192,7 @@ export function RecommendedPeople({ suggestions }: { suggestions: OpenSuggestion
   return (
     <RecommendedSection
       title="People to meet"
-      hint="People worth reaching out to, from Dash's searches and anything a goal step turned up, with what to say. Sent adds them to your contacts."
-      empty="Dash looks for new people every few days, from your career goals and CV. The next ones will appear here."
+      empty="Dash looks for new people every few days, from your career goals and CV, with what to say to each. Sent adds them to your contacts."
       button="Search now"
       searching="Searching…"
       paidHint={
@@ -183,7 +216,7 @@ export function RecommendedRoles({
   suggestions,
   view = { sort: 'newest', filter: NO_OPENING_FILTER },
   keep = [],
-  pathname = '/jobs/roles',
+  pathname = '/jobs/find',
   stats = [],
   searchCostMicros = 0,
   searchLine = null,
@@ -310,7 +343,7 @@ function OpeningControls({
         }
       >
         <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1">
-          <ChipSelect
+          <PressChip
             name={OPENING_PARAMS.workplace}
             aria-label="Filter by workplace"
             placeholderValue="any"
@@ -323,8 +356,8 @@ function OpeningControls({
                 {WORKPLACE_LABELS[value]}
               </option>
             ))}
-          </ChipSelect>
-          <ChipSelect
+          </PressChip>
+          <PressChip
             name={OPENING_PARAMS.fit}
             aria-label="Filter by match to your evidence"
             placeholderValue="any"
@@ -334,8 +367,8 @@ function OpeningControls({
             <option value="any">Any match</option>
             <option value="strong">Strong match</option>
             <option value="partial_up">Partial or strong match</option>
-          </ChipSelect>
-          <ChipSelect
+          </PressChip>
+          <PressChip
             name={OPENING_PARAMS.salary}
             aria-label="Filter by salary"
             placeholderValue="any"
@@ -344,8 +377,8 @@ function OpeningControls({
           >
             <option value="any">Any pay</option>
             <option value="shown">Salary shown</option>
-          </ChipSelect>
-          <ChipSelect
+          </PressChip>
+          <PressChip
             name={OPENING_PARAMS.coverLetter}
             aria-label="Filter by cover letter"
             placeholderValue="any"
@@ -355,8 +388,8 @@ function OpeningControls({
             <option value="any">Cover letter or not</option>
             <option value="yes">Asks for a cover letter</option>
             <option value="no">No cover letter</option>
-          </ChipSelect>
-          <ChipSelect
+          </PressChip>
+          <PressChip
             name={OPENING_PARAMS.minFit}
             aria-label="Lowest fit to show"
             placeholderValue="0"
@@ -369,8 +402,8 @@ function OpeningControls({
                 Fit {value} and up
               </option>
             ))}
-          </ChipSelect>
-          <ChipSelect
+          </PressChip>
+          <PressChip
             name={OPENING_PARAMS.minChance}
             aria-label="Lowest chance of an interview to show"
             placeholderValue="any"
@@ -378,12 +411,10 @@ function OpeningControls({
             onChange={submit}
           >
             <option value="any">Any chance of an interview</option>
-            <option value="medium">
-              {CHANCE_BAND_LABELS.medium} chance of an interview or better
-            </option>
-            <option value="high">{CHANCE_BAND_LABELS.high} chance of an interview</option>
-          </ChipSelect>
-          <ChipSelect
+            <option value="medium">Chance {CHANCE_FILTER_EDGES.medium} and up</option>
+            <option value="high">Chance {CHANCE_FILTER_EDGES.high} and up</option>
+          </PressChip>
+          <PressChip
             name={OPENING_PARAMS.hideRedFlags}
             aria-label="Red flags"
             placeholderValue="show"
@@ -392,8 +423,8 @@ function OpeningControls({
           >
             <option value="show">With red flags</option>
             <option value="hide">Without red flags</option>
-          </ChipSelect>
-          <ChipSelect
+          </PressChip>
+          <PressChip
             name={OPENING_PARAMS.hideDuplicates}
             aria-label="Roles already on file"
             placeholderValue="show"
@@ -402,7 +433,7 @@ function OpeningControls({
           >
             <option value="show">With ones on file</option>
             <option value="hide">New to you only</option>
-          </ChipSelect>
+          </PressChip>
           {active > 0 && (
             <Link
               href={cleared}
@@ -415,7 +446,7 @@ function OpeningControls({
           )}
         </div>
       </Disclosure>
-      <ChipSelect
+      <PressChip
         name={OPENING_PARAMS.sort}
         aria-label="Sort recommended roles"
         placeholderValue="newest"
@@ -427,7 +458,7 @@ function OpeningControls({
             {OPENING_SORT_LABELS[value]}
           </option>
         ))}
-      </ChipSelect>
+      </PressChip>
       <noscript>
         <button
           type="submit"
@@ -554,7 +585,7 @@ function PersonRow({ suggestion }: { suggestion: OpenSuggestion }) {
             {suggestion.companySlug ? (
               <Link
                 href={`/jobs/companies/${suggestion.companySlug}`}
-                className="hover:text-accent"
+                className="press-area hover:text-accent"
               >
                 {suggestion.companyName}
               </Link>
@@ -672,20 +703,18 @@ function moveSteps(move: string): string[] | null {
   return steps.length >= 2 ? steps : null;
 }
 
-const FIT_WORDS = { strong: 'Strong', partial: 'Partial', weak: 'Weak' } as const;
-
 /**
- * Fit as the facts line shows it. The figure only when Jev was sure and read
- * the posting itself; otherwise a word, since a two-digit number read from
- * Dash's two-sentence summary claims a precision it does not have (law 3),
- * which is why chance already shows as a band.
+ * Fit and chance as the facts line shows them: Jev's figure out of 100,
+ * always the number. A question mark follows it when Jev was unsure, or for
+ * fit when the posting itself was not read and Jev judged from Dash's
+ * summary alone; the tooltip gives the reason.
  */
 function fitFact(suggestion: OpenSuggestion, fit: NonNullable<ScoreNote['fit']>): string {
-  if (!fit.unsure && suggestion.postingRead) return `Fit ${fit.value}`;
-  const word =
-    suggestion.scores?.fit?.value ??
-    (fit.value >= 67 ? 'strong' : fit.value >= 34 ? 'partial' : 'weak');
-  return `${FIT_WORDS[word]} fit${fit.unsure ? '?' : ''}`;
+  return `Fit ${fit.value}${fit.unsure || !suggestion.postingRead ? '?' : ''}`;
+}
+
+function chanceFact(chance: NonNullable<ScoreNote['chance']>): string {
+  return `Chance ${chance.value}${chance.unsure ? '?' : ''}`;
 }
 
 /**
@@ -695,6 +724,27 @@ function fitFact(suggestion: OpenSuggestion, fit: NonNullable<ScoreNote['fit']>)
  * separator and does not break inside, so a wrapped line starts on the text
  * edge rather than with a dot (law 18).
  */
+/**
+ * A filter chip with a phone press area. The chip is a line of text, about
+ * 20 pixels tall, and a select cannot draw the ::after a link uses for its
+ * hit area, so a label 44 pixels square sits under it on a phone, and a
+ * press that lands just off the chip still opens it (docs/UI-QUALITY-SPEC.md,
+ * R3). The chip is positioned so it is drawn over its own label.
+ */
+function PressChip(props: ComponentProps<typeof ChipSelect>) {
+  const id = useId();
+  return (
+    <span className="relative inline-flex">
+      <label
+        htmlFor={id}
+        aria-hidden
+        className="absolute top-1/2 left-1/2 hidden h-11 w-full min-w-11 -translate-x-1/2 -translate-y-1/2 max-sm:block" /* ui-ok: a press area, not a control; 44px is the phone floor, as PressLabel's */
+      />
+      <ChipSelect id={id} {...props} className={cn('relative', props.className)} />
+    </span>
+  );
+}
+
 function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
   const note = suggestion.scoreNote;
   const scores = suggestion.scores;
@@ -705,34 +755,36 @@ function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
     text: string;
     title?: string;
     warn?: boolean;
-    faint?: boolean;
     figure?: boolean;
   }[] = [];
   if (suggestion.location) facts.push({ key: 'where', text: suggestion.location });
+  // A startup weekly discovery found is a company they have not heard of, so
+  // where it was found is on the row rather than under Details (plan #1685).
+  if (suggestion.origin === 'discovered' && suggestion.foundIn) {
+    facts.push({ key: 'found', text: suggestion.foundIn });
+  }
   if (note?.fit) {
     facts.push({
       key: 'fit',
       text: fitFact(suggestion, note.fit),
       title: note.fit.reason ?? undefined,
-      faint: note.fit.unsure,
       figure: true,
     });
   }
   if (note?.chance) {
     facts.push({
       key: 'chance',
-      text: `${CHANCE_BAND_LABELS[note.chance.band]} chance${note.chance.unsure ? '?' : ''}`,
+      text: chanceFact(note.chance),
       title: note.chance.reason
         ? `Chance of an interview. ${note.chance.reason}`
         : 'Chance of an interview',
-      faint: note.chance.unsure,
     });
   }
   if (scores?.salary?.value && sure(scores.salary)) facts.push({ key: 'pay', text: 'Pay shown' });
   for (const miss of suggestion.misses ?? []) facts.push({ key: miss, text: miss, warn: true });
   if (scores?.red_flags?.value && sure(scores.red_flags))
     facts.push({ key: 'flags', text: 'Red flags', warn: true });
-  if (!scores) facts.push({ key: 'unscored', text: 'Not scored yet', faint: true });
+  if (!scores) facts.push({ key: 'unscored', text: 'Not scored yet' });
   return (
     <p className="text-small text-ink-muted">
       {facts.map((fact, index) => (
@@ -743,7 +795,6 @@ function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
               className={cn(
                 fact.figure && 'tabular',
                 fact.warn && 'text-caution',
-                fact.faint && 'opacity-70',
               )}
             >
               {fact.text}
@@ -794,7 +845,7 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
               href={suggestion.url}
               target="_blank"
               rel="noreferrer"
-              className="group/title hover:text-accent"
+              className="group/title press-area hover:text-accent"
             >
               {title}
               <ExternalLink
@@ -838,7 +889,7 @@ function RoleRow({ suggestion }: { suggestion: OpenSuggestion }) {
         <LinkedText text={suggestion.move} />
       </p>
             )}
-            {suggestion.foundIn && (
+            {suggestion.foundIn && suggestion.origin !== 'discovered' && (
               <p className="text-small text-ink-muted">{suggestion.foundIn}</p>
             )}
         </Disclosure>

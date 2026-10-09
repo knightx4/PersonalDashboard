@@ -2,7 +2,7 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import {
   FIRST_UNITS_MAX,
   FIRST_UNITS_MIN,
@@ -80,7 +80,7 @@ export async function writeCurriculum(input: {
   try {
     response = await client.messages.create({
       model: CURRICULUM_MODEL,
-      max_tokens: 3000,
+      max_tokens: 3000 + THINKING_ROOM,
       system: SYSTEM,
       tools: [
         {
@@ -107,7 +107,7 @@ export async function writeCurriculum(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, CURRICULUM_MODEL),
       messages: [
         {
           role: 'user',
@@ -218,7 +218,7 @@ export async function writeOutline(input: {
   try {
     response = await client.messages.create({
       model: CURRICULUM_MODEL,
-      max_tokens: 6000,
+      max_tokens: 6000 + THINKING_ROOM,
       system: OUTLINE_SYSTEM,
       tools: [
         {
@@ -245,7 +245,7 @@ export async function writeOutline(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, CURRICULUM_MODEL),
       messages: [{ role: 'user', content: outlinePrompt(input) }],
     });
   } catch (error) {
@@ -338,7 +338,7 @@ export async function writeNextUnit(input: {
   try {
     response = await client.messages.create({
       model: CURRICULUM_MODEL,
-      max_tokens: 800,
+      max_tokens: 800 + THINKING_ROOM,
       system: NEXT_SYSTEM,
       tools: [
         {
@@ -355,7 +355,7 @@ export async function writeNextUnit(input: {
           },
         },
       ],
-      tool_choice: forceTool(NEXT_TOOL_NAME),
+      tool_choice: forceTool(NEXT_TOOL_NAME, CURRICULUM_MODEL),
       messages: [{ role: 'user', content: nextUnitPrompt(input) }],
     });
   } catch (error) {
@@ -429,7 +429,7 @@ export async function describeUnit(input: {
   try {
     response = await client.messages.create({
       model: CURRICULUM_MODEL,
-      max_tokens: 600,
+      max_tokens: 600 + THINKING_ROOM,
       system: DESCRIBE_SYSTEM,
       tools: [
         {
@@ -445,7 +445,7 @@ export async function describeUnit(input: {
           },
         },
       ],
-      tool_choice: forceTool(DESCRIBE_TOOL_NAME),
+      tool_choice: forceTool(DESCRIBE_TOOL_NAME, CURRICULUM_MODEL),
       messages: [{ role: 'user', content: describeUnitPrompt(input) }],
     });
   } catch (error) {

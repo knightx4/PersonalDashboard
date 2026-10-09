@@ -198,6 +198,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'reply-about-card': run(SONNET, 4_000, 400),
   // The card and its passage in; a few sentences and an article's name out.
   'explain-phrase': run(SONNET, 4_000, 300),
+  // A card's idea and up to 6,000 characters of lecture transcript in; two
+  // sentences out. Written by the hourly top-up, a few cards a run.
+  'describe-card-clip': background(unit(HAIKU, 2_000, 120)),
+  'read-personality': run(SONNET, 7_000, 1_200),
   // One Wikipedia section in, a card for each of up to three ideas out.
   'write-asked-card': run(SONNET, 4_000, 2_000),
   // One idea's claim and basis and what was written in; the marks and a
@@ -221,9 +225,15 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // One video's transcript as numbered sentences in, most of them half an
   // hour or less (about 8,000 tokens), and up to fifteen clips out.
   'cut-clips': background(unit(HAIKU, 9_000, 1_500)),
+  // Per fifty clips: the subject names and each clip's caption and point in,
+  // a list of subject names per clip out.
+  'tag-clips': background(unit(HAIKU, 4_000, 1_200)),
   // Per clip: the learner state and one clip's caption, point and up to
   // ninety seconds of transcript in, a score out. Haiku is the fallback.
   'score-clips': background(unit(JEV, 1_500, 0)),
+  // Per clip: its title, caption and up to ninety seconds of transcript in,
+  // three ratings out, in one Jev request. Haiku is the fallback.
+  'rate-clips': background(unit(JEV, 1_200, 0)),
 
   // Jobs.
   'enrich-company': searching(run(HAIKU, 10_000, 500), 2),
@@ -250,6 +260,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // One role's requirements with their verdicts, 2,000 characters of the
   // description, the evidence titles and the history in; two answers out.
   'score-applications': unit(JEV, 3_000, 0),
+  // The person, then a few hundred hiring startups a line each in; 30 to 50
+  // picks with a reason and a score out, plus thinking. The Monday run and
+  // the Find startups button both make it.
+  'shortlist-startups': run(SONNET, 45_000, 9_500),
 
   // Shopping. Reading order emails is per email: inbox sync does it in the
   // background, and the reparse and review buttons know how many they send.
@@ -320,7 +334,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // five-level score out, as score-idea.
   'score-inspiration-takeaway': background(unit(JEV, 600, 0)),
 
-  // News. All but the last two from the digest cron or a script.
+  // News. All but discuss-story and recommend-newsletters run on a cron or a script.
   'digest-issue': background(unit(HAIKU, 3_000, 300)),
   'group-stories': background(unit(VOYAGE_LITE, 2_000, 0)),
   // About twenty stories a newsletter, each put to Jev on its own.
@@ -331,6 +345,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The story's summary and text, the discussion so far and the view in; a
   // counterpoint or a question out.
   'discuss-story': run(SONNET, 3_000, 300),
+  // Up to eleven stories' headlines and summaries in; a short overview and a
+  // line for each story out.
+  'daily-review': background(run(SONNET, 3_000, 700)),
 
   // Goals: one sentence filed against open goals and steps, which are
   // listed in the prompt. Grows with the size of the tree.

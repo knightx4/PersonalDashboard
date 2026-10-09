@@ -35,7 +35,7 @@ export async function loadRaisedNotifications(userId: string): Promise<Notificat
       headline: row.title as string,
       detail: (row.detail as string | null) ?? null,
       // A flag on a goal (plan #1015) is answered on the goal's page.
-      href: row.goal_id ? `/goals/${row.goal_id as string}#flag-${row.id as string}` : '/dev/raised',
+      href: row.goal_id ? `/goals/${row.goal_id as string}#flag-${row.id as string}` : '/dev/inbox',
       at: row.created_at as string,
     }));
   } catch {

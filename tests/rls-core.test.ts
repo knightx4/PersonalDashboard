@@ -162,7 +162,7 @@ describe('observations', () => {
       insert into core.observations (user_id, week, position, sentence, evidence, modules, model)
       values (${userId}, ${week}, 1, 'You placed 2 orders in the 3 days after a rejection.',
               ${evidence}, ${['shopping', 'jobs']},
-              'claude-sonnet-5')
+              'claude-sonnet-5-5')
       returning id`;
     return row.id;
   }
@@ -223,7 +223,7 @@ describe('year reviews', () => {
       (tx) => tx`insert into core.year_reviews (user_id, year, timezone, through, complete, events, totals, paragraphs, model)
                  values (${userId}, ${year}, 'UTC', now(), ${complete}, 25, '{}'::jsonb,
                          ${paragraphs}::text::jsonb,
-                         'claude-sonnet-5')
+                         'claude-sonnet-5-5')
                  returning id`,
     );
   }
@@ -275,7 +275,7 @@ describe('day briefs', () => {
     const [row] = await admin<{ id: string }[]>`
       insert into core.day_briefs (user_id, day, body, facts, model)
       values (${userId}, ${day}, 'You have the Acme interview at 09:30.',
-              ${admin.json([{ kind: 'booked', text: '09:30: Interview with Acme' }])}, 'claude-haiku-4-5')
+              ${admin.json([{ kind: 'booked', text: '09:30: Interview with Acme' }])}, 'claude-haiku-5-5')
       returning id`;
     return row.id;
   }

@@ -113,6 +113,14 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    - `npx vitest run <the test files covering what you changed>` — the ones for
      the code you touched, not the whole suite.
 
+   A step that changed a screen or added a page also runs `npm run
+   check:contrast`, `npm run check:ui` and `npm run check:phone`, and
+   a new route runs `npx vitest run lib/usage tests/sources-catalogue.test.ts`
+   for the page list and the catalogue. These are the gate's checks that
+   fail most often, and a failure found here costs a minute where the same
+   failure found at the merge costs a second gate run. Run them before the
+   critic, so the critic's shots are of the screen that will merge.
+
    Then check the done-when line by line. If a line is not met, it is not
    done. A step that changes a screen is not done until the critic has passed
    each of its surfaces. A third failed round blocks it instead (see
@@ -157,7 +165,11 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    closes the step once it has merged. Write the note it should close with —
    what changed, in one sentence — and put it in your report. If nobody sent
    you, merge first and then close it yourself: `done <n> --note "…"`, which
-   records the commit from HEAD and names any steps that became ready.
+   records the commit from HEAD and names any steps that became ready. Then
+   write Dash's update on the feature, as step 7 of the Building section in
+   `SKILL.md` describes: `update <the feature> --health … --body "…"`. A
+   builder that was sent leaves the update to the session that sent it, which
+   writes one per feature when its batch ends.
 
 ## What to report back
 
@@ -210,7 +222,12 @@ a surface with no routes. A step that changes no surface skips this section.
    checkout's `node_modules`), shooting it as in 3 below, so the shots land
    in that worktree's `.preview-shots/`. Stop its preview server before
    starting your own, since both use port 3400. A new surface has no before
-   shots; the critic is told "none".
+   shots; the critic is told "none". Copy the worktree's
+   `.preview-shots/<id>--*.png` into this checkout's `.preview-shots/before/`:
+   the recorder uploads them beside each round as `before-<shot>`, and the
+   step's plan row shows them next to the after (plan #1541). Turbopack
+   refuses a `node_modules` symlink that points outside the worktree, so
+   give the worktree a hard-linked copy (`cp -al`) instead.
 2. **Draw it in the gallery.** Add or update the surface's entry in
    `app/preview/surfaces.tsx` with typed fixtures and the real components.
    Fixtures as long and as empty as real data gets: the longest name, the
@@ -225,9 +242,23 @@ a surface with no routes. A step that changes no surface skips this section.
    npm run shoot -- <id>      # one surface per run
    ```
 
+   When the session that sent you named a port (it does when it is building
+   several steps at once, each in its own worktree), export `PREVIEW_PORT`
+   to it before both commands; `preview` and `shoot` read it, and two
+   builders on 3400 would photograph each other's screens.
+
    Without the two placeholders the preview pages answer 500. The shots are
    `.preview-shots/<id>--{phone,laptop}-{light,dark}.png`: 390 and 1280
    pixels, light and dark. Open them yourself before sending them on.
+   A phone page taller than the screen with a row fixed to its foot also
+   gets `<id>--phone-{light,dark}-end.png`, at the phone's own height and
+   scrolled to the end, since the full-page shot draws that row partway down
+   the content. Send those to the critic as well.
+
+   A surface whose gallery entry declares an `interaction` is recorded too,
+   with the same server running: `npm run record -- <id>` writes
+   `.preview-shots/strips/<id>--phone-light.png` and its `.json`, a second
+   of frames 50ms apart. The critic judges craft from it.
 4. **Hand them to the critic.** The `ui-critic` agent
    (`.claude/agents/ui-critic.md`) judges the pictures and nothing else. Run
    it as the subagent `ui-critic`, or, where you cannot start a subagent,
@@ -238,12 +269,21 @@ a surface with no routes. A step that changes no surface skips this section.
    ```
 
    The prompt names the surface id, the round (1, 2 or 3), the four after
-   shots, the before shots or "none", the step's done-when, the page pattern
-   when the brief names one, and on rounds 2 and 3 the fixes from the round
-   before. It answers with a paragraph and a fenced `json` verdict:
+   shots, the before shots or "none", the strip and its JSON or "none", the
+   moment from `app/dev/ui/moments.ts` the surface plays (its name and
+   `sees` line) or "none", the step's done-when, the page pattern, and on
+   rounds 2 and 3 the fixes from the round before. The
+   pattern is the name and rule under the brief's `## Pattern` section.
+   Working offline, take the name from the `Pattern:` line of the step's
+   detail and its rule from `lib/plan/patterns.ts`. A step that names none
+   uses the pattern that fits and says which in its close note. One whose
+   screen fits none blocks on a decision for the person (`shaping.md`).
+   The prompt also names the preferences the person has removed from
+   `/dev/ui`, which the critic must not cite: `select taste_id from
+   ui_taste_removals where user_id = '…'`, or "none". It answers with a paragraph and a fenced `json` verdict:
    `verdict` is `pass` or `fix`, and each fix names the shot, where, the
-   problem, what it breaks (`law <n>`, `taste:<id>`, `done-when` or
-   `regression`) and the change.
+   problem, what it breaks (`law <n>`, `taste:<id>`, `pattern`, `done-when`
+   or `regression`) and the change.
 5. **Record the round** (below), whatever the verdict.
 6. **On `fix`, make every change it asks for**, shoot again and start the next
    round. Most surfaces fail round 1. A fix you think is wrong is still the
@@ -416,6 +456,12 @@ B — Ship it as JSON. Keeps everything, needs something to read it.
 Recommend A: the nesting is one column and nobody has asked for it."
 ```
 
+A block is for something the person does. `block` refuses an ask that says
+nothing is needed from them (without `--on-steps`), because a blocked step is
+listed under what they have to do. A step that only waits on time or a
+scheduled run stays `in_progress` with `check-back "<what to look at>" --after
+2h --from <n>`, which shows it as waiting on.
+
 A step that should not be done is `drop <n> --note "why"`; say "out of scope:
 …" when that is the reason, since there is no status for it. Never delete a
 step; deleting is the user's.
@@ -504,6 +550,35 @@ involves, it is a setup step; if what you need is their opinion, it is a block.
 The ask is rewritten on every block, so it is what the step needs now; `--note`
 is for anything else worth recording, and that is appended to the history in
 the comment.
+
+### Write the ask for someone with no context
+
+The person reads an ask days later, on a phone, between other things, and
+does not remember what the step drew or which commit holds it. On #1600 and
+#1603 they were asked to accept "them as drawn" and could not tell which
+screens were meant, and the screens were on a branch they had no way to open
+(notes d3fc7228 and 6d61486b). So every ask, and above all one that asks them
+to look at screens:
+
+- **Names the screens as the app names them**, page by page: "the account
+  page, and these Dev pages: bugs, changelog, ideas". A surface id, a step
+  number or a commit hash is never the only name for anything; when one is
+  given, the sentence also says what it covers.
+- **Says where to look, with a link for each screen**: `/preview?s=<id>`,
+  which opens that drawing in the gallery on the live site.
+- **Puts what it asks them to look at on main first.** A link only opens what
+  main has, and branch deployments are switched off (`vercel.json`). A
+  gallery drawing is safe to merge before it is accepted: `/preview` is the
+  owner's alone, and an entry changes no page anyone uses. So merge the
+  drawings, as the batch merge does, before writing the ask. Where the work
+  cannot reach main (the gate will not pass, or the drawing needs a page
+  change that is not ready), the ask says so and says where the shots are,
+  rather than offering a link to something they cannot open.
+- **Ends with the move wanted** in words they can answer in one line, such as
+  "accept these as drawn, or say what to change on which one".
+
+The critic stop (`npm run ui-stop`) writes its ask with the links already in
+it. A hand-written ask is held to the same.
 
 ## The other two files you may need
 

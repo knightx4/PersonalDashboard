@@ -1,15 +1,26 @@
 import { PageHeader } from '@/components/shell/page-header';
+import type { AccountTab } from '@/app/account/tabs';
 import { FeedbackQueueView } from '@/components/feedback/feedback-queue';
 import { OtherUsersFeedback } from '@/components/feedback/other-users';
 import { IdeasView } from '@/app/dev/ideas/ideas-view';
 import { UsageScreen } from '@/app/dev/usage/usage-view';
 import { ReviewView, type Standing } from '@/app/dev/ui/review/review-view';
 import { SpecsView } from '@/app/dev/specs/specs-view';
+import type { InterviewCardView } from '@/lib/specs/interview-view';
+import type { VisionReview } from '@/lib/specs/vision-review';
+import type { DevComment } from '@/lib/comments/load';
 import { SpecDocView } from '@/app/dev/specs/[slug]/spec-doc-view';
 import { ChangelogView } from '@/app/dev/changelog/changelog-view';
+import type { ScreenChangeView } from '@/lib/plan/screen-change';
+import { phoneShot } from './plan-surfaces';
 import { RaisedView } from '@/app/dev/raised/raised-view';
 import { ConversationsView } from '@/app/dev/raised/conversations-view';
+import { StatusPanel } from '@/app/dev/raised/status-panel';
+import { NowStrip } from '@/app/dev/raised/now-strip';
+import { AskBox } from '@/app/dev/raised/ask-box';
+import { CheckBacksPanel } from '@/app/dev/raised/check-backs-panel';
 import { AccountView } from '@/app/account/view';
+import type { CaptureTokenListing } from '@/lib/capture/tokens';
 import {
   isOutstanding,
   sortOutstanding,
@@ -18,6 +29,7 @@ import {
   type OtherFeedbackRow,
 } from '@/lib/feedback/load';
 import type { IdeaList, IdeaRow } from '@/lib/ideas/load';
+import { functionSpendRows } from '@/lib/usage/function-spend';
 import { usageReport } from '@/lib/usage/report';
 import type { UiReview } from '@/lib/ui-review/load';
 import { specBySlug } from '@/lib/specs/registry';
@@ -209,15 +221,35 @@ const report = usageReport(
     { route: '/vault/map', workspace: 'vault', opens7: 0, opens30: 0, lastOpened: '2026-08-12T10:00:00Z' },
     { route: '/shopping/returns', workspace: 'shopping', opens7: 0, opens30: 0, lastOpened: null },
   ],
-  [
-    { module: 'news', spend7: 1_840_000, spend30: 7_310_000, calls30: 412, unpriced30: 0 },
-    { module: 'learn', spend7: 960_000, spend30: 5_020_000, calls30: 230, unpriced30: 3 },
-    { module: 'core', spend7: 410_000, spend30: 1_900_000, calls30: 96, unpriced30: 0 },
-  ],
 );
 
+// Raw ledger rows, put through the loader's own rule so the labels and the
+// order are what the page gets: a workspace, `core`, a module that is no
+// workspace, an operation no list declares, and unpriced calls.
+const functions = functionSpendRows([
+  { module: 'news', operation: 'digest-issue', spend_7: 1_840_000, spend_30: 7_310_000, calls_30: 412, unpriced_30: 0 },
+  { module: 'jobs', operation: 'write-interview-prep', spend_7: 1_120_000, spend_30: 5_960_000, calls_30: 38, unpriced_30: 0 },
+  { module: 'learn', operation: 'plan-topic', spend_7: 960_000, spend_30: 5_020_000, calls_30: 230, unpriced_30: 3 },
+  { module: 'core', operation: 'ask-dash', spend_7: 410_000, spend_30: 1_900_000, calls_30: 96, unpriced_30: 0 },
+  { module: 'jobs', operation: 'suggest-outreach', spend_7: 0, spend_30: 840_000, calls_30: 4, unpriced_30: 0 },
+  { module: 'jobs', operation: 'classify-job-email', spend_7: 12_000, spend_30: 61_000, calls_30: 1, unpriced_30: 0 },
+  {
+    module: 'website',
+    operation: 'draft-weekly-changelog-summary-for-the-public-site',
+    spend_7: 0,
+    spend_30: 0,
+    calls_30: 2,
+    unpriced_30: 2,
+  },
+]);
+
 export function DevUsageSurface() {
-  return <UsageScreen report={report} now={new Date('2026-10-04T12:00:00Z')} />;
+  return <UsageScreen report={report} functions={functions} now={new Date('2026-10-04T12:00:00Z')} />;
+}
+
+/** The tab before any model call has been made and before any page was opened. */
+export function DevUsageEmptySurface() {
+  return <UsageScreen report={usageReport([])} functions={[]} now={new Date('2026-10-04T12:00:00Z')} />;
 }
 
 // ---- UI review ------------------------------------------------------------
@@ -285,6 +317,122 @@ export function DevSpecsSurface() {
       edits={{}}
       changes={[]}
       audit={{ auditAt: null, findings: [] }}
+    />
+  );
+}
+
+// ---- Specs: Dash's interview (plan #1641) --------------------------------
+
+const SPECS_VISIONS = {
+  app: {
+    module: 'app' as const,
+    body: 'It should make working with an AI builder easy, and the app it builds should be one I use every day.',
+    updatedAt: '2026-09-20T09:00:00Z',
+  },
+  jobs: {
+    module: 'jobs' as const,
+    body: 'Every application from first lead to offer in one place, so nothing falls through between an email and an interview.',
+    updatedAt: '2026-09-18T09:00:00Z',
+  },
+};
+
+function turn(id: string, author: 'me' | 'claude', body: string, createdAt: string): DevComment {
+  return { id, author, body, createdAt };
+}
+
+const JOBS_TURNS: DevComment[] = [
+  turn('q1', 'claude', 'When an application goes quiet for two weeks, what do you want the app to do about it?', '2026-10-07T09:00:00Z'),
+  turn('a1', 'me', 'Tell me on Home that it has gone quiet and offer a follow-up email I can send in one press. Nothing automatic: I want to choose who gets chased.', '2026-10-07T09:02:00Z'),
+  turn('q2', 'claude', 'You keep the cover letters in the vault today. Should a role page show the letter you sent for it, or only link to the vault?', '2026-10-07T09:02:30Z'),
+  turn('a2', 'me', 'Show it on the role. I never open the vault while I am looking at a role.', '2026-10-07T09:04:00Z'),
+  turn('q3', 'claude', 'Which matters more on the pipeline board: the stage each role is at, or how long it has been since you last heard back?', '2026-10-07T09:04:30Z'),
+];
+
+function interviewView(over: Partial<InterviewCardView>): InterviewCardView {
+  return {
+    id: 'i1',
+    module: 'jobs',
+    status: 'open',
+    move: 'answer',
+    questionLimit: 12,
+    asked: 1,
+    answered: 0,
+    turns: JOBS_TURNS.slice(0, 1),
+    summary: null,
+    finishedAt: null,
+    visionHref: null,
+    specChangeHref: null,
+    ...over,
+  };
+}
+
+function SpecsWithInterview({
+  view,
+  edits = {},
+}: {
+  view: InterviewCardView;
+  edits?: Partial<Record<'jobs', VisionReview>>;
+}) {
+  return (
+    <SpecsView
+      counts={{ 'ui-quality': 4, plan: 1 }}
+      visions={SPECS_VISIONS}
+      edits={edits}
+      changes={[]}
+      audit={{ auditAt: null, findings: [] }}
+      interviews={{ jobs: view }}
+      openInterviews
+    />
+  );
+}
+
+/** Just started: Dash's first question, and nothing answered yet. */
+export function DevSpecsInterviewEmptySurface() {
+  return <SpecsWithInterview view={interviewView({})} />;
+}
+
+/** Halfway: two answers in and the third question waiting. */
+export function DevSpecsInterviewHalfSurface() {
+  return <SpecsWithInterview view={interviewView({ asked: 3, answered: 2, turns: JOBS_TURNS })} />;
+}
+
+const DRAFTED_EDIT: VisionReview = {
+  id: 'v1',
+  module: 'jobs',
+  reviewId: 'i1',
+  sessionId: null,
+  outcome: 'edit',
+  visionBody: SPECS_VISIONS.jobs.body,
+  proposedBody:
+    'Every application from first lead to offer in one place. When one goes quiet the app says so on Home and offers a follow-up to send, and each role shows the letter that went with it.',
+  note: 'From your interview about Job search on 7 October. You want quiet applications raised, not chased for you.',
+  evidenceIds: [],
+  evidence: [],
+  status: 'pending',
+  decidedAt: null,
+  createdAt: '2026-10-07T09:20:00Z',
+};
+
+/** Drafted: the vision edit waits above, and the spec change has been decided. */
+export function DevSpecsInterviewDraftedSurface() {
+  return (
+    <SpecsWithInterview
+      edits={{ jobs: DRAFTED_EDIT }}
+      view={interviewView({
+        status: 'drafted',
+        move: null,
+        asked: 3,
+        answered: 3,
+        turns: [
+          ...JOBS_TURNS,
+          turn('a3', 'me', 'How long since I heard back. The stage I already know.', '2026-10-07T09:06:00Z'),
+        ],
+        summary:
+          'You want the app to notice when an application goes quiet and offer a follow-up, to keep each letter on its role, and to sort the board by how long since you heard back.',
+        finishedAt: '2026-10-07T09:20:00Z',
+        visionHref: '/dev/specs#vision-jobs',
+        specChangeHref: null,
+      })}
     />
   );
 }
@@ -411,6 +559,54 @@ export function DevChangelogSurface() {
   return <ChangelogView entries={changelog} grouping="issue" query="" workspace={null} />;
 }
 
+/**
+ * The changelog by day with the screens two steps changed (plan #1541): the
+ * after picture under each line, without opening it. One step changed two
+ * surfaces, one changed one, and the note changed none.
+ */
+const changelogScreens: Record<number, ScreenChangeView[]> = {
+  1539: [
+    {
+      surface: 'dev-surfaces',
+      round: 2,
+      verdict: 'pass',
+      checkedAt: '2026-10-04T01:00:00Z',
+      before: phoneShot(true),
+      after: phoneShot(false),
+    },
+    {
+      surface: 'dev-surfaces-a-very-long-surface-name-empty',
+      round: 1,
+      verdict: 'pass',
+      checkedAt: '2026-10-04T01:05:00Z',
+      before: null,
+      after: phoneShot(false),
+    },
+  ],
+  1440: [
+    {
+      surface: 'todo-day-close',
+      round: 4,
+      verdict: 'accepted',
+      checkedAt: '2026-10-02T10:30:00Z',
+      before: phoneShot(true),
+      after: phoneShot(false),
+    },
+  ],
+};
+
+export function DevChangelogScreensSurface() {
+  return (
+    <ChangelogView
+      entries={changelog}
+      grouping="day"
+      query=""
+      workspace={null}
+      screens={changelogScreens}
+    />
+  );
+}
+
 // ---- Dev home: what is waiting on you --------------------------------------
 
 function waiting(over: Partial<WaitingRow> & Pick<WaitingRow, 'id' | 'number' | 'title' | 'health'>): WaitingRow {
@@ -506,16 +702,90 @@ const conversations: Conversation[] = [
   },
 ];
 
+const NOW = Date.parse('2026-10-06T08:00:00Z');
+
 export function DevRaisedSurface() {
   return column(
     <>
+      <PageHeader title="Home" />
+      <div className="space-y-3">
+        <NowStrip
+          run={null}
+          ready={3}
+          openNotes={12}
+          mainCheck={{
+            sha: 'abc1234',
+            conclusion: 'passed',
+            checkedAt: '2026-10-06T07:55:00Z',
+            error: null,
+            reason: null,
+            runUrl: null,
+            deployState: null,
+            deployUrl: null,
+            deployError: null,
+            unapplied: [],
+            migrationsError: null,
+          }}
+          inbox={3}
+        />
+        <AskBox />
+      </div>
+      <CheckBacksPanel
+        now={NOW}
+        rows={[
+          {
+            id: 'cb1',
+            userId: 'u1',
+            planItemId: null,
+            outcome: null,
+            closedAt: null,
+            createdAt: '2026-10-05T09:00:00Z',
+            title: 'Check the weekly digest email went out',
+            detail: 'Plan #611 sends it on Monday mornings; look for the send in Resend.',
+            dueAt: '2026-10-07T09:00:00Z',
+            status: 'waiting',
+            source: 'plan #611',
+            wake: true,
+            wokeAt: null,
+          },
+        ]}
+      />
+      <ConversationsView conversations={conversations} now={NOW} />
+    </>,
+  );
+}
+
+/** The Inbox tab in Dev: the overview, then a job, a question and a raise. */
+export function DevInboxSurface() {
+  return column(
+    <>
       <PageHeader
-        title="Home"
-        description="What happened in the last day, the questions waiting on you, and every conversation you have had with Dash. Answer a question and the next run reads it; reply to a conversation and it goes back on the row it was started on."
+        title="Inbox"
+        description="Everything waiting on you: jobs to go and do, questions to answer, and proposals to say yes to. Answer one and the next run reads it."
       />
       <RaisedView queue={raisedQueue} groups={groups} />
-      <ConversationsView conversations={conversations} />
     </>,
+  );
+}
+
+/**
+ * The Status panel at the top of Home in Dev: the plan runner resting with
+ * three features ready, and the notes routine with twelve notes open. Dash's
+ * mark sits under Plan (note 076e7744).
+ */
+export function DevRaisedStatusSurface() {
+  return column(
+    <StatusPanel
+      run={null}
+      canSend
+      card={{ night: null, on: [], progress: null, push: null, ready: 3, readySteps: 9, next: [] }}
+      goals={null}
+      openNotes={12}
+      notesLastRun={null}
+      vision={null}
+      autoApprove={false}
+      now={Date.parse('2026-10-06T08:00:00Z')}
+    />,
   );
 }
 
@@ -549,11 +819,54 @@ const apps: ConnectedApp[] = [
   },
 ];
 
-export function AccountSurface() {
+/** Capture tokens (plan #1705): one in use, one never used with the longest name, one revoked. */
+const captureTokens: CaptureTokenListing[] = [
+  {
+    id: 'ct1',
+    label: 'iPhone Shortcut',
+    createdAt: '2026-10-01T09:00:00Z',
+    lastUsedAt: '2026-10-08T07:42:00Z',
+    revokedAt: null,
+  },
+  {
+    id: 'ct2',
+    label: 'Zapier: starred Gmail messages to the vault reading list',
+    createdAt: '2026-10-05T18:30:00Z',
+    lastUsedAt: null,
+    revokedAt: null,
+  },
+  {
+    id: 'ct3',
+    label: 'Old iPad',
+    createdAt: '2026-09-02T12:00:00Z',
+    lastUsedAt: '2026-09-20T21:10:00Z',
+    revokedAt: '2026-10-01T09:01:00Z',
+  },
+];
+
+/**
+ * Account on one of its tabs (plan #1628). The tab is chosen here rather than
+ * from the address, since the page reads it on the server; `account` is the
+ * page as it opens, and `account-notifications` where Dash's link sends you
+ * when push is off.
+ */
+export function AccountSurface({
+  tab = 'you',
+  justMade,
+  onlyFirstToken,
+}: {
+  tab?: AccountTab;
+  /** A capture token as it shows straight after it is made (plan #1705). */
+  justMade?: { label: string; token: string };
+  /** Only the newest capture token, as the list reads once the first is made. */
+  onlyFirstToken?: boolean;
+}) {
   return column(
     <>
       <p className="text-body text-ink-muted">Settings that hold across every workspace.</p>
       <AccountView
+        tab={tab}
+        opensOn={tab}
         email="christopher.kloughton@example.com"
         settings={{
           displayName: 'Chris',
@@ -564,6 +877,7 @@ export function AccountSurface() {
         isOwner
         vapidPublicKey={null}
         connected={{ apps, failed: null, connectorAddress: 'https://dash.example.com/api/mcp' }}
+        capture={{ tokens: onlyFirstToken ? [{ ...captureTokens[0], createdAt: '2026-10-09T15:30:00Z', lastUsedAt: null }] : captureTokens, failed: null, justMade, address: 'https://dash.example.com/api/capture' }}
       />
     </>,
   );

@@ -94,9 +94,10 @@ function later(a: string | null, b: string | null): string | null {
  * 30 days, otherwise under its workspace. Workspaces come in the order the
  * switcher lists them, the pages outside one last. A workspace that is only
  * spend, with no page of its own (a ledger module that is not a workspace),
- * is still shown so no spend goes missing.
+ * is still shown so no spend goes missing. The Usage tab leaves the spend out
+ * and lists it per function instead (plan #1693); the module pages keep it.
  */
-export function usageReport(opened: readonly PageOpens[], spend: readonly WorkspaceSpend[]): UsageReport {
+export function usageReport(opened: readonly PageOpens[], spend: readonly WorkspaceSpend[] = []): UsageReport {
   const pages = pageUsage(opened);
   const notOpened = pages.filter((page) => page.opens30 === 0);
 
@@ -167,3 +168,5 @@ export function openedText(iso: string | null, now: Date = new Date()): string {
   if (days === 1) return 'yesterday';
   return `${days} days ago`;
 }
+
+export { readFunctionSpend, type FunctionSpend } from '@/lib/usage/function-spend';

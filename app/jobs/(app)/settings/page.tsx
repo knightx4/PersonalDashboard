@@ -1,5 +1,6 @@
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { readPreferences } from '@/lib/jobs/suggest/preferences';
+import { readMinFitScore } from '@/lib/jobs/suggest/fit-gate';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
@@ -56,7 +57,7 @@ export default async function SettingsPage({
       supabase
         .from('profiles')
         .select(
-          'target_titles, excluded_industries, search_started_on, ghost_threshold_days, writing_style_notes, banned_constructions, home_location, workplace_preferences, salary_floor_cents, company_stages',
+          'search_started_on, ghost_threshold_days, writing_style_notes, banned_constructions, home_location, workplace_preferences, salary_floor_cents, company_stages, min_fit_score',
         )
         .eq('id', user.id)
         .single(),
@@ -124,13 +125,12 @@ export default async function SettingsPage({
         gmailConfigured={isGmailOAuthConfigured()}
         appOrigin={publicEnv().NEXT_PUBLIC_APP_URL}
         profile={{
-          targetTitles: ((profile?.target_titles as string[]) ?? []).join(', '),
-          excludedIndustries: ((profile?.excluded_industries as string[]) ?? []).join(', '),
           searchStartedOn: (profile?.search_started_on as string) ?? '',
           ghostThresholdDays: (profile?.ghost_threshold_days as number) ?? 30,
           writingStyleNotes: (profile?.writing_style_notes as string) ?? '',
           bannedConstructions: ((profile?.banned_constructions as string[]) ?? []).join('\n'),
           preferences: readPreferences(profile as Record<string, unknown> | null),
+          minFitScore: readMinFitScore(profile?.min_fit_score),
         }}
         accounts={(accounts ?? []).map((account) => {
           const job = latestBackfill.get(account.id as string);

@@ -2224,6 +2224,25 @@ tr:has([data-link-pending]) {
   animation: link-pending var(--motion-moment) var(--ease-sway) var(--motion-instant) infinite alternate;
 }
 
+/* A button whose action is in flight glows softly in the accent while it works
+ * (note 01f7a4ee), so a long run reads as working rather than as a dead,
+ * disabled button. Button's `pending` marks it aria-busy, which is the hook. */
+@keyframes working-glow {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 0%, transparent);
+  }
+  to {
+    box-shadow:
+      0 0 0 3px color-mix(in oklab, var(--color-accent) 25%, transparent),
+      0 0 12px 2px color-mix(in oklab, var(--color-accent) 35%, transparent);
+  }
+}
+
+button[aria-busy='true'] {
+  cursor: progress;
+  animation: working-glow calc(var(--motion-moment) * 2) var(--ease-sway) infinite alternate;
+}
+
 @keyframes toast-in {
   from {
     transform: translateY(6px);
@@ -2654,6 +2673,23 @@ tr:has([data-link-pending]) {
   animation: dash-mark-flash var(--motion-move) var(--ease-out-soft) both;
 }
 
+/* The seen mark arriving once Dash has only acknowledged a comment: it grows
+ * in from a little smaller as the mark beside it settles. */
+@keyframes dash-seen-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility dash-seen-in {
+  animation: dash-seen-in var(--motion-move) var(--ease-out-soft) both;
+}
+
 @keyframes dash-mark-wave {
   0% {
     transform: skewY(-6deg) scaleX(0.94);
@@ -2735,6 +2771,7 @@ tr:has([data-link-pending]) {
     transform: none;
   }
 
+  button[aria-busy='true'],
   a:has([data-link-pending]),
   tr:has([data-link-pending]) {
     animation: none;
@@ -2787,7 +2824,8 @@ tr:has([data-link-pending]) {
   .dash-mark-caret,
   .dash-mark-ponder,
   .dash-mark-flash,
-  .dash-mark-wave {
+  .dash-mark-wave,
+  .dash-seen-in {
     animation: none;
   }
 

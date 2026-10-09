@@ -14,8 +14,28 @@ describe('threadFrom', () => {
     ]);
 
     expect(thread).toEqual([
-      { id: 'c1', author: 'me', body: 'Why two columns here?', createdAt: '2026-09-13T09:00:00Z' },
+      {
+        id: 'c1',
+        author: 'me',
+        body: 'Why two columns here?',
+        createdAt: '2026-09-13T09:00:00Z',
+        acknowledgedAt: null,
+      },
     ]);
+  });
+
+  it('carries the seen mark on a comment Dash acknowledged', () => {
+    const thread = threadFrom([
+      {
+        id: 'c1',
+        author: 'me',
+        body: 'Pushed the fix',
+        created_at: '2026-09-13T09:00:00Z',
+        acknowledged_at: '2026-09-13T09:01:00Z',
+      },
+    ]);
+
+    expect(thread[0].acknowledgedAt).toBe('2026-09-13T09:01:00Z');
   });
 
   it('puts the thread in the order it was written', () => {
@@ -25,6 +45,23 @@ describe('threadFrom', () => {
     ]);
 
     expect(thread.map((comment) => comment.id)).toEqual(['c1', 'c2']);
+  });
+
+  // The plan and the other loaders on the shared store pass turns already read
+  // into the app shape; their times were coming back blank (note 8aa4a071).
+  it('keeps the time on a turn already in the app shape', () => {
+    const [comment] = threadFrom([
+      {
+        id: 'c1',
+        author: 'me',
+        body: 'Hello',
+        createdAt: '2026-09-13T09:00:00Z',
+        acknowledgedAt: '2026-09-13T09:01:00Z',
+      },
+    ]);
+
+    expect(comment.createdAt).toBe('2026-09-13T09:00:00Z');
+    expect(comment.acknowledgedAt).toBe('2026-09-13T09:01:00Z');
   });
 
   // The CLI reads plan rows over a direct connection and asks for no thread.

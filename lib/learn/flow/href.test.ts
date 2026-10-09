@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { firstParam, practiceHref, wantsPractice } from './href';
+import { firstParam, nowHref, practiceHref, subjectClipsHref, wantsPractice } from './href';
+
+describe('subjectClipsHref', () => {
+  it('opens the player under the subject', () => {
+    expect(subjectClipsHref('abc')).toBe('/learn/s/abc/clips');
+  });
+});
 
 describe('practiceHref', () => {
   it('opens Now with the Practice only switch on', () => {
@@ -22,8 +28,7 @@ describe('wantsPractice', () => {
     expect(wantsPractice({ practice: '1' })).toBe(true);
   });
 
-  it('is on for an old Practice Flow link with a focus or filter', () => {
-    expect(wantsPractice({ track: 'abc' })).toBe(true);
+  it('is on for an old Practice Flow link with a goal or filter', () => {
     expect(wantsPractice({ goal: 'g1' })).toBe(true);
     expect(wantsPractice({ only: 'tracks' })).toBe(true);
   });
@@ -31,6 +36,19 @@ describe('wantsPractice', () => {
   it('is off for the feed', () => {
     expect(wantsPractice({})).toBe(false);
     expect(wantsPractice({ practice: '0' })).toBe(false);
+  });
+
+  it('is off for one subject\'s feed, and on when the switch keeps the subject', () => {
+    expect(wantsPractice({ track: 'abc' })).toBe(false);
+    expect(wantsPractice({ practice: '1', track: 'abc' })).toBe(true);
+  });
+});
+
+describe('nowHref', () => {
+  it('opens the feed, narrowed to a subject when one is given', () => {
+    expect(nowHref()).toBe('/learn/now');
+    expect(nowHref(null)).toBe('/learn/now');
+    expect(nowHref('abc')).toBe('/learn/now?track=abc');
   });
 });
 

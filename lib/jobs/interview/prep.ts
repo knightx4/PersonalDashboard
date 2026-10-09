@@ -28,6 +28,7 @@ import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { PREP_MISSING_LABEL, type PrepContext } from './prep-context';
 import { parsePrepPayload, type PrepResult } from './prep-payload';
 import { MODELS } from '@/lib/core/models';
+import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
 
 /** Reading a room off a handful of rows is judgment, not retrieval. */
 const MODEL = MODELS.jobsInterviewPrep;
@@ -259,7 +260,7 @@ export async function writePrepNote(
   try {
     response = await client.messages.create({
       model: MODEL,
-      max_tokens: 8192,
+      max_tokens: 8192 + THINKING_ROOM,
       // The bank is the same on every prep note the person ever generates, so
       // it sits behind a cache breakpoint and the round goes last, exactly as
       // in the match and the draft.
@@ -322,7 +323,7 @@ export async function writePrepNote(
           },
         },
       ],
-      tool_choice: { type: 'tool', name: TOOL_NAME },
+      tool_choice: forceTool(TOOL_NAME, MODEL),
       messages: [
         {
           role: 'user',

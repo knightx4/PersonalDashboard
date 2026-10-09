@@ -82,7 +82,7 @@ describe('Dash on a dev row', () => {
     model = scriptedModel([answerCall('It would sit under Today.')]);
     const outcome = await ask('where would this go?');
     expect(outcome).toEqual({ ok: true, message: 'Answered in the thread.' });
-    expect(model.sent[0].model).toBe('claude-sonnet-5');
+    expect(model.sent[0].model).toBe('claude-sonnet-5-5');
     const names = model.sent[0].tools.map((t) => t.name);
     expect(names).toEqual(
       expect.arrayContaining(['search', 'read_dev_row', 'add_todo', 'file_idea', 'file_note', 'add_step', 'reword', 'build_step', 'pass_to_session']),

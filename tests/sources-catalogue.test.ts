@@ -57,7 +57,9 @@ describe('the catalogue of sources against the database', () => {
     const wrong: string[] = [];
     for (const s of SOURCES) {
       if (!tablesPresent.has(s.table)) continue;
-      const named = [...s.search, s.title, s.ref ?? 'id'];
+      // facts and newest are read by Dash's list_rows (lib/ask/list-rows.ts).
+      const named = [...s.search, ...(s.facts ?? []), s.title, s.ref ?? 'id'];
+      if (s.newest) named.push(s.newest);
       if (s.owner && /^\w+$/.test(s.owner)) named.push(s.owner);
       if (!s.owner) named.push('user_id');
       for (const column of named) {

@@ -4,28 +4,30 @@ import { loadRaised } from '@/lib/raised/load';
 import { planRefTitles } from '@/lib/plan/load';
 import { loadPlanForRequest } from '@/lib/plan/request-plan';
 import { buildPlanTree, flattenSections } from '@/lib/plan/tree';
-import { sortAsksWithJev, waitingGroups, waitingOnYou } from '@/lib/plan/waiting';
-import { createCoreClient } from '@/lib/core/auth/server';
-import type { SpendReport } from '@/lib/core/spend/pricing';
-import { recordSpendReports } from '@/lib/core/spend/record';
-import { jevEnabledFor } from '@/lib/jev/enabled';
-import type { PlanSection } from '@/lib/plan/tree';
+import { waitingOnYou } from '@/lib/plan/waiting';
 import { loadDigest } from '@/lib/digest/load';
 import { loadConversations } from '@/lib/comments/recent';
 import { loadFeatureFires, loadLastRuns, loadStartedRuns } from '@/lib/plan/runs';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
+import { loadAutoApprove } from '@/lib/plan/auto-approve';
 import { planRoutine } from '@/lib/feedback/routine';
 import { loadNotesLastRun } from '@/lib/feedback/last-worked';
 import { loadVisionReviewStatus } from '@/lib/specs/vision-review-run';
-import { loadOpenSpecChanges } from '@/lib/specs/changes';
-import { specBySlug } from '@/lib/specs/registry';
+import { countProposedSpecChanges } from '@/lib/specs/changes';
+import { loadMainCheck } from '@/lib/shell/main-check';
+import { loadRecentScreenChanges } from '@/lib/plan/screen-change-load';
+import { planRefHref } from '@/lib/comments/refs';
+import { ShippedScreens, type ShippedScreen } from '@/components/dev/screen-change';
+import { Group } from '@/components/ui/disclosure';
 import { NOTES_WORK_KINDS } from '@/lib/feedback/load';
 import { CHECK_BACK_COLUMNS, checkBackFrom } from '@/lib/plan/check-backs';
 import { CheckBacksPanel } from './check-backs-panel';
 import { ConversationsView } from './conversations-view';
 import { DigestPanel } from './digest-panel';
-import { RaisedView } from './raised-view';
+import { AskBox } from './ask-box';
+import { NowStrip } from './now-strip';
+import { InboxRedirect } from './inbox-redirect';
 import { StatusPanel } from './status-panel';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { loadStartedGoalRuns } from '@/lib/goals/runs-store';
@@ -33,6 +35,12 @@ import { goalsStatus } from '@/lib/goals/runner-status';
 import { loadGoalsNight } from '@/inngest/goals/overnight';
 
 export const metadata = { title: 'Dash' };
+
+/** How far back the pictures under the strip reach. */
+const SHIPPED_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+/** Enough pictures to fill a laptop's row; the rest are on the changelog. */
+const SHIPPED_SHOWN = 8;
 
 /** The time the check-backs are measured against. Outside the component because it reads the clock. */
 function readClock(): number {
@@ -55,46 +63,19 @@ async function readGoals(userId: string) {
 }
 
 /**
- * The plan's rows waiting on you, with each blocked step's ask sorted into a
- * job or a question by Jev (plan #1176). Falls back to the regex's guess, row
- * by row inside sortAsksWithJev and wholesale here if the account setting or
- * the ledger cannot be reached.
- */
-async function readWaitingRows(sections: readonly PlanSection[], userId: string) {
-  const rows = waitingOnYou(sections);
-  try {
-    const core = await createCoreClient();
-    const spend: SpendReport[] = [];
-    const sorted = await sortAsksWithJev(rows, {
-      enabled: await jevEnabledFor(core, userId),
-      onSpend: (report) => spend.push(report),
-    });
-    await recordSpendReports(core, userId, { module: 'core', operation: 'sort-waiting' }, spend);
-    return sorted;
-  } catch (error) {
-    console.error(`Dash could not sort the asks with Jev: ${(error as Error).message}`);
-    return rows;
-  }
-}
-
-/**
- * The page you open in the morning: your day, and your conversations.
+ * The page you open in the morning, read top to bottom: what is going right
+ * now, what changed, what Dash is due to come back to, then the conversations.
  *
- * Three sections, in the order you want them. The summary of the last 24 hours
- * is written once a day by the cron rather than built here, so opening the page
- * never costs a model call. Then what sessions have raised: a session that runs
- * into something outside the step it is building would otherwise say it in the
- * transcript, where you find it by opening Claude. Not the notes queue next
- * door, which is what you report as wrong, and not a plan decision, which
- * belongs to one feature.
+ * The strip of chips answers "is anything running, is main green, is anything
+ * waiting on me" before anything is scrolled, each chip a link to the page
+ * that holds the detail. The runner's controls are folded under it. What is
+ * waiting on you is the Inbox tab, and Home carries only its count.
  *
- * Then every conversation you have had, wherever it was started. A thread used
- * to be visible only from the row it was written on, which meant finding an
- * answer by remembering where the question was asked.
- *
- * Above all three, what is running. The two routines' states were on two other
- * pages, so the first question of the morning was the one this page could not
- * answer -- see `StatusPanel`.
+ * The pictures are the after shots of the screens changed in the last two
+ * days, because a changed screen is read faster from a picture than from its
+ * changelog line. The summary of the last 24 hours is written once a day by
+ * the cron rather than built here, so opening the page never costs a model
+ * call.
  *
  * The route stays /dev/raised though the tab is called Home -- #431, note a0897727 -- because
  * every notification, comment and old summary already links to it.
@@ -105,6 +86,7 @@ export default async function DevRaisedPage() {
   // The goals half of the same runner, read alongside the rest. A goals read
   // that fails leaves the Plan row as it was rather than taking the page down.
   const goalsRead = readGoals(user.id);
+  const now = readClock();
   const [
     queue,
     digest,
@@ -119,6 +101,9 @@ export default async function DevRaisedPage() {
     checkBacks,
     vision,
     specChanges,
+    mainCheck,
+    recentScreens,
+    autoApprove,
   ] = await Promise.all([
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
@@ -149,28 +134,24 @@ export default async function DevRaisedPage() {
       .eq('status', 'waiting')
       .order('due_at'),
     loadVisionReviewStatus(supabase, user.id),
-    // Changes Dash proposed to a spec, which wait under To approve (plan #1506).
-    loadOpenSpecChanges(supabase, user.id),
+    // Counted for the Inbox chip, the same as the tab's badge.
+    countProposedSpecChanges(supabase, user.id),
+    // The row the status line reads, for the Main chip.
+    loadMainCheck(),
+    // The screens changed in the last two days, for the pictures. Two days
+    // rather than one, so a morning after a quiet day still has something.
+    loadRecentScreenChanges(supabase, user.id, new Date(now - SHIPPED_WINDOW_MS).toISOString()),
+    // The runner's auto approve switch, drawn on its row.
+    loadAutoApprove(supabase, user.id),
   ]);
   const comingBack = (checkBacks.data ?? []).map((row) => checkBackFrom(row as Record<string, unknown>));
-  const now = readClock();
 
-  // Everything waiting on you, in the three groups the section is drawn in:
-  // what you have to go and do, what you have to answer, what you only have to
-  // say yes to. Both halves in one call -- the plan's own (a blocked step, an
-  // unanswered decision, a proposal nobody approved, all derived here rather
-  // than filed by a session, so a step blocked on a credential reaches this
-  // page without anybody remembering to raise it as well) and the raises the
-  // queue is holding open.
-  // The tree once, for the two things below that read it: what is waiting, and
-  // how many features the runner could pick up.
+  // The tree once, for the two things below that read it: how much is
+  // waiting on you, and how many features the runner could pick up.
   const sections = buildPlanTree(plan);
-  const groups = waitingGroups(
-    sections,
-    queue,
-    await readWaitingRows(sections, user.id),
-    specChanges.map((change) => ({ change, specTitle: specBySlug(change.spec)?.title ?? null })),
-  );
+  // Counted the way the tab's badge is (app/dev/layout.tsx), so the chip and
+  // the badge never disagree.
+  const onYou = queue.open.length + waitingOnYou(sections).length + specChanges;
 
   // The runner's card, read by the same function the plan page reads it with.
   const card = runnerCard({
@@ -197,12 +178,36 @@ export default async function DevRaisedPage() {
   // would otherwise be nine lookups inside a render.
   const titles = planRefTitles(plan, flattenSections(sections));
 
+  // Newest step first, each with the title it shipped under.
+  const stepTitles = new Map(plan.items.map((item) => [item.number, item.title]));
+  const shipped: ShippedScreen[] = Object.entries(recentScreens)
+    .map(([step, changes]) => ({ step: Number(step), changes }))
+    .sort((a, b) => b.step - a.step)
+    .flatMap(({ step, changes }) =>
+      changes.map((change) => ({
+        step,
+        title: stepTitles.get(step) ?? '',
+        href: planRefHref(step),
+        change,
+      })),
+    )
+    .slice(0, SHIPPED_SHOWN);
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader
-        title="Home"
-        description="What happened in the last day, the questions waiting on you, and every conversation you have had with Dash. Answer a question and the next run reads it; reply to a conversation and it goes back on the row it was started on."
-      />
+      {/* No description: the page is the day, and says so by what is on it. */}
+      <PageHeader title="Home" />
+      <InboxRedirect />
+      <div className="space-y-3">
+        <NowStrip
+          run={overnight}
+          ready={card.ready}
+          openNotes={openNotes.count ?? 0}
+          mainCheck={mainCheck}
+          inbox={onYou}
+        />
+        <AskBox />
+      </div>
       <StatusPanel
         run={overnight}
         canSend={Boolean(planRoutine().token)}
@@ -211,12 +216,17 @@ export default async function DevRaisedPage() {
         openNotes={openNotes.count ?? 0}
         notesLastRun={notesLastRun}
         vision={vision}
+        autoApprove={autoApprove}
         now={now}
       />
-      <CheckBacksPanel rows={comingBack} now={now} />
+      {shipped.some((screen) => screen.change.after) && (
+        <Group title="Shipped lately">
+          <ShippedScreens screens={shipped} />
+        </Group>
+      )}
       <DigestPanel digest={digest} />
-      <RaisedView queue={queue} groups={groups} titles={titles} />
-      <ConversationsView conversations={conversations} titles={titles} />
+      <CheckBacksPanel rows={comingBack} now={now} />
+      <ConversationsView conversations={conversations} titles={titles} now={now} />
     </div>
   );
 }

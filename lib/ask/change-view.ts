@@ -1,5 +1,7 @@
 import type { DashChange, DashChangeStatus } from '@/lib/talk/changes';
 import { watchPlan } from '@/lib/watch/start';
+import { stepHref } from '@/lib/goals/all-goals';
+import { statusLabel } from '@/lib/jobs/status-label';
 
 /**
  * How a change Dash proposed reads on a card (plan #1190) and in the Ask
@@ -14,7 +16,7 @@ export function changeHref(change: DashChange): string {
       return change.writtenRef ? `/todo/all?status=all&focus=${change.writtenRef}` : '/todo';
     case 'add_goal_step':
       return change.writtenRef
-        ? `/goals/${change.input.parentId}#step-${change.writtenRef}`
+        ? stepHref(change.input.parentId, change.writtenRef)
         : `/goals/${change.input.parentId}`;
     case 'mark_returned':
       return `/shopping/inventory/${change.input.id}`;
@@ -26,9 +28,56 @@ export function changeHref(change: DashChange): string {
     case 'close_todo':
       return `/todo/all?status=all&focus=${change.input.id}`;
     case 'close_goal_step':
-      return `/goals/${change.input.goalId}#step-${change.input.id}`;
+      return stepHref(change.input.goalId, change.input.id);
+    case 'set_goal_done_when':
+      return `/goals/${change.input.id}`;
     case 'add_role_note':
       return `/jobs/roles/${change.input.roleId}`;
+    case 'add_idea':
+      return '/dev/ideas';
+    case 'add_job_lead':
+      return `/jobs/roles/${change.input.roleId}`;
+    case 'change_items':
+      return change.input.change === 'for_sale' ? '/shopping/sell' : '/shopping/inventory';
+    case 'move_roles':
+      return '/jobs/pipeline';
+  }
+}
+
+/** "Kindle, Lamp and Mug", or "Kindle, Lamp, Mug and 9 more". */
+export function namedItems(titles: readonly string[], count: number): string {
+  const shown = titles.slice(0, 3);
+  const more = count - shown.length;
+  if (more > 0) return `${shown.join(', ')} and ${more} more`;
+  if (shown.length <= 1) return shown.join('');
+  return `${shown.slice(0, -1).join(', ')} and ${shown[shown.length - 1]}`;
+}
+
+/** Many roles moved or archived at once, as the card's three parts. */
+function roleWords(input: Extract<DashChange, { kind: 'move_roles' }>['input'], done: boolean): ChangeWords {
+  const { count } = input;
+  const roles = `${count} ${count === 1 ? 'role' : 'roles'}`;
+  const list = input.titles.length > 0 ? `: ${namedItems(input.titles, count)}` : '';
+  if (input.stage === 'archive') return { verb: done ? 'Archived' : 'Archive', what: roles, rest: list };
+  return { verb: done ? 'Moved' : 'Move', what: roles, rest: ` to ${statusLabel(input.status)}${list}` };
+}
+
+/** Many items changed at once, as the card's three parts. */
+function itemWords(input: Extract<DashChange, { kind: 'change_items' }>['input'], done: boolean): ChangeWords {
+  const { count } = input;
+  const items = `${count} ${count === 1 ? 'item' : 'items'}`;
+  const list = input.titles.length > 0 ? `: ${namedItems(input.titles, count)}` : '';
+  switch (input.change) {
+    case 'for_sale':
+      return { verb: done ? 'Marked' : 'Mark', what: items, rest: ` for sale${list}` };
+    case 'not_for_sale':
+      return { verb: done ? 'Took' : 'Take', what: items, rest: ` off the sell page${list}` };
+    case 'to_return':
+      return { verb: done ? 'Marked' : 'Mark', what: items, rest: ` to return${list}` };
+    case 'not_returning':
+      return { verb: done ? 'Took' : 'Take', what: items, rest: ` off the to-return list${list}` };
+    case 'group':
+      return { verb: done ? 'Grouped' : 'Group', what: `${count} copies`, rest: ` as one item${list}` };
   }
 }
 
@@ -99,7 +148,7 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
       return {
         verb: done ? 'Added the goal' : 'Add the goal',
         what: change.input.title,
-        rest: ` under ${change.input.areaName}${change.input.dueOn ? `, due ${dueDay(change.input.dueOn, today)}` : ''}`,
+        rest: ` under ${change.input.areaName}${change.input.areaMade ? ', a new area' : ''}${change.input.dueOn ? `, due ${dueDay(change.input.dueOn, today)}` : ''}`,
       };
     case 'change_todo': {
       const { renamedFrom, moved, dueOn, dueTime } = change.input;
@@ -131,12 +180,36 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
         what: change.input.title,
         rest: ` under ${change.input.goalTitle}`,
       };
+    case 'set_goal_done_when':
+      return change.input.doneWhen
+        ? {
+            verb: 'Set the done-when of',
+            what: change.input.title,
+            rest: `: ${quoted(change.input.doneWhen)}`,
+          }
+        : { verb: done ? 'Cleared the done-when of' : 'Clear the done-when of', what: change.input.title, rest: '' };
     case 'add_role_note':
       return {
         verb: done ? 'Added a note to' : 'Add a note to',
         what: change.input.roleTitle,
         rest: `: ${quoted(change.input.body)}`,
       };
+    case 'add_idea':
+      return {
+        verb: done ? 'Filed the idea' : 'File the idea',
+        what: quoted(change.input.body),
+        rest: ' on the ideas page',
+      };
+    case 'add_job_lead':
+      return {
+        verb: done ? 'Saved the lead' : 'Save the lead',
+        what: change.input.roleTitle,
+        rest: ` at ${change.input.companyName}`,
+      };
+    case 'change_items':
+      return itemWords(change.input, done);
+    case 'move_roles':
+      return roleWords(change.input, done);
   }
 }
 
@@ -171,8 +244,17 @@ export function changeWhere(change: DashChange): string {
     case 'close_todo':
       return 'Open in Todo';
     case 'close_goal_step':
+    case 'set_goal_done_when':
       return 'Open the goal';
     case 'add_role_note':
       return 'Open the role';
+    case 'add_idea':
+      return 'Open the ideas';
+    case 'add_job_lead':
+      return 'Open the role';
+    case 'change_items':
+      return change.input.change === 'for_sale' ? 'Open the sell page' : 'Open the inventory';
+    case 'move_roles':
+      return 'Open the pipeline';
   }
 }

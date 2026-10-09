@@ -9,6 +9,7 @@ import {
   type ApplicationSource,
   type ApplicationStatus,
 } from '@/lib/jobs/pipeline';
+import { stageMoveEvent } from '@/lib/jobs/move';
 
 /**
  * Moving a card writes a status_override EVENT and sets the override column.
@@ -39,15 +40,9 @@ export async function moveApplication(
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error: eventError } = await supabase.from('application_events').insert({
-    user_id: user.id,
-    application_id: parsed.data.applicationId,
-    kind: 'status_override',
-    occurred_at: new Date().toISOString(),
-    source: 'manual',
-    summary: `Moved to ${parsed.data.status.replace(/_/g, ' ')} by hand`,
-    payload: { status: parsed.data.status },
-  });
+  const { error: eventError } = await supabase
+    .from('application_events')
+    .insert(stageMoveEvent(user.id, parsed.data.applicationId, parsed.data.status, 'hand', new Date().toISOString()));
   if (eventError) return { error: eventError.message };
 
   const { error } = await supabase
@@ -245,30 +240,4 @@ async function deleteCompanyIfOrphaned(
   if (company?.priority && company.priority !== 'interested') return;
 
   await supabase.from('companies').delete().eq('id', companyId).eq('user_id', userId);
-}
-
-/**
- * Which shape to draw the pipeline in.
- *
- * Stored on the profile rather than in the URL: the board is reached by a link
- * from another page, so a query parameter would forget the choice every time,
- * and this is a standing preference rather than a filter.
- */
-// latency: optimistic -- the segment presses at once, the write returns by revalidation
-export async function setPipelineView(
-  view: 'board' | 'list',
-): Promise<{ error: string | null }> {
-  if (view !== 'board' && view !== 'list') return { error: 'Unknown view.' };
-
-  const user = await requireUser();
-  const supabase = await createClient();
-
-  const { error } = await supabase
-    .from('profiles')
-    .update({ pipeline_view: view })
-    .eq('id', user.id);
-
-  if (error) return { error: error.message };
-  revalidatePath('/jobs/pipeline');
-  return { error: null };
 }

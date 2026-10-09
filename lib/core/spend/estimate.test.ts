@@ -57,6 +57,7 @@ describe('one operation', () => {
       runs: 5,
       basis: 'measured',
       per: 'run',
+      models: ['claude-opus-5-5'],
     });
   });
 
@@ -66,11 +67,11 @@ describe('one operation', () => {
     expect(estimateFor('plan-topic', undefined)).toEqual(guess);
     expect(guess.basis).toBe('guess');
     expect(guess.runs).toBe(0);
-    // Opus at 40k in and 8k out: 40,000×$5 + 8,000×$25 per million, plus six
+    // Opus at 40k in and 8k out: 40,000×$4 + 8,000×$20 per million, plus six
     // web searches at a cent each.
-    expect(guess.medianMicros).toBe(460_000);
-    expect(guess.lowMicros).toBe(230_000);
-    expect(guess.highMicros).toBe(920_000);
+    expect(guess.medianMicros).toBe(380_000);
+    expect(guess.lowMicros).toBe(190_000);
+    expect(guess.highMicros).toBe(760_000);
   });
 
   it('is per unit where the cost grows with a count, measured or guessed', () => {
@@ -100,6 +101,7 @@ describe('a press that runs several operations', () => {
       runs: 5,
       basis: 'measured',
       per: 'run',
+      models: ['claude-haiku-5-5', 'claude-opus-5-5'],
     });
   });
 

@@ -1,5 +1,8 @@
 import { createClient, requireUser } from '@/lib/auth/server';
+import Link from 'next/link';
+import { Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
+import { buttonVariants } from '@/components/ui/button';
 import { loadPlan } from '@/lib/plan/load';
 import { syncPlanFromSeed } from '@/lib/plan/sync';
 import {
@@ -12,12 +15,15 @@ import {
 import { loadCommitChecks } from '@/lib/plan/ci';
 import { loadOverhaulProgress } from '@/lib/plan/overhaul-progress-load';
 import { loadCriticStops } from '@/lib/plan/critic-stop-load';
+import { loadScreenChanges } from '@/lib/plan/screen-change-load';
+import { loadPlanPictures } from '@/lib/plan/pictures-load';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
 import { keyRefusal } from '@/lib/plan/work';
 import type { LastRun } from '@/lib/plan/run-end';
 import { planRoutine, projectRoutine } from '@/lib/feedback/routine';
 import type { DevProject } from '@/lib/plan/projects';
+import { NEW_FEATURE_PARAM, NEW_FEATURE_VALUE, newFeatureHref } from '@/lib/plan/feature-page';
 import {
   applyView,
   buildPlanTree,
@@ -29,7 +35,8 @@ import {
   type PlanView,
 } from '@/lib/plan/tree';
 import { OvernightControl } from './overnight-control';
-import { PlanView as PlanViewComponent, type PlanCatalogEntry } from './plan-view';
+import { PlanView as PlanViewComponent } from './plan-view';
+import { catalogOf } from './plan-catalog';
 
 /**
  * The claims on these steps, read against the last run on each.
@@ -104,7 +111,11 @@ export async function renderPlanPage({
   searchParams,
   project,
 }: {
-  searchParams: Promise<{ view?: string | string[]; q?: string | string[] }>;
+  searchParams: Promise<{
+    view?: string | string[];
+    q?: string | string[];
+    new?: string | string[];
+  }>;
   project: DevProject | null;
 }) {
   const user = await requireUser();
@@ -116,6 +127,8 @@ export async function renderPlanPage({
   // What to put in the plan's own search box on arrival. The app-wide search
   // sends a step here as `q=#612`, which unfolds the feature it sits under.
   const query = (Array.isArray(params.q) ? params.q[0] : params.q) ?? '';
+  // The "New feature" surface, open from the header's link (plan #1670).
+  const newFeatureOpen = params[NEW_FEATURE_PARAM] === NEW_FEATURE_VALUE;
 
   // Before the load, so anything new appears on this render rather than the
   // next one. It carries its failure back instead of throwing: a plan that
@@ -206,20 +219,16 @@ export async function renderPlanPage({
   // Nothing is read when no step is stopped.
   const criticStops = await loadCriticStops(supabase, user.id, flattenSections(whole));
 
+  // Each step's changed screens, before and after, for its opened row (plan
+  // #1541). One small read; the pictures themselves load when a row opens.
+  const screenChanges = await loadScreenChanges(supabase, user.id);
+  // The drawn options on a proposal or decision, by row id; each drawing
+  // loads when its row opens.
+  const pictures = await loadPlanPictures(supabase, user.id);
+
   // Every step, for the pickers: a parent to move under, a step to wait on.
   // Light on purpose -- the tree is already on the page once.
-  const catalog: PlanCatalogEntry[] = flattenSections(everything).map((node) => ({
-    id: node.id,
-    number: node.number,
-    outline: node.outline,
-    title: node.title,
-    module: node.module,
-    parentId: node.parentId,
-    depth: node.depth,
-    status: node.status,
-    completedAt: node.completedAt,
-    closed: node.status === 'done' || node.status === 'dropped',
-  }));
+  const catalog = catalogOf(everything);
 
   // Wider than the other dev pages, which are prose and lists at max-w-3xl.
   // This one is a table with six columns and a tree indenting the first of
@@ -233,14 +242,28 @@ export async function renderPlanPage({
     ? Boolean(projectRoutine(project).id && projectRoutine(project).token)
     : Boolean(planRoutine().token);
 
+  // "New feature" is a link to this page with the surface open (plan #1670),
+  // keeping the view it was pressed from.
+  const basePath = project ? `/dev/projects/${project.id}` : '/dev/plan';
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title={project ? project.label : 'Plan'}
+        actions={
+          <Link
+            href={newFeatureHref(basePath, requested)}
+            scroll={false}
+            className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+          >
+            <Plus className="size-3.5" strokeWidth={2} aria-hidden />
+            New feature
+          </Link>
+        }
         description={
           project
             ? `${project.description}, built from this plan in ${project.repo.owner}/${project.repo.repo}. Send a step to Dash and it is built there, pushed to ${project.repo.branch} and closed here with the commit.`
-            : 'Features, the steps that get you there, and the steps beneath those. Seeded from the docs once; edited here after, and read from here by whoever builds next.'
+            : 'Features, the steps that get you there, and the substeps beneath those. Seeded from the docs once; edited here after, and read from here by whoever builds next.'
         }
       />
       {sync.added > 0 && (
@@ -264,7 +287,11 @@ export async function renderPlanPage({
         />
       )}
       <PlanViewComponent
-        basePath={project ? `/dev/projects/${project.id}` : '/dev/plan'}
+        basePath={basePath}
+        newFeature={{
+          open: newFeatureOpen,
+          ...(project ? { module: project.id, scopes: [project.id] } : {}),
+        }}
         sections={sections}
         finished={finished}
         summary={summary}
@@ -281,6 +308,8 @@ export async function renderPlanPage({
         commitChecks={commitChecks}
         overhaulProgress={overhaulProgress}
         criticStops={criticStops}
+        screenChanges={screenChanges}
+        pictures={pictures}
         empty={project ? flattenSections(whole).length === 0 : data.items.length === 0}
         canSend={canSend}
       />

@@ -38,6 +38,20 @@ export type Source = {
   search: readonly string[];
   /** The column that names a row in a list. */
   title: string;
+  /**
+   * Where a better name for a row is kept on another table, when `title` is
+   * only a key: a PostgREST embed of a foreign key and the column read from
+   * it. A watch list row is named by its video's title on catalogue_items.
+   * Dash's list_rows reads it (lib/ask/list-rows.ts).
+   */
+  titleVia?: { embed: string; column: string };
+  /**
+   * Columns read beside `search` that are not text to search: dates, flags,
+   * numbers that say what happened to a row, such as when a video was watched.
+   */
+  facts?: readonly string[];
+  /** The column that orders rows newest first; `created_at` when absent. */
+  newest?: string;
   /** The column a link to one row stores; `id` unless the table says otherwise. */
   ref?: string;
   /**

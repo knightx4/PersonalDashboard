@@ -35,7 +35,7 @@ describe('raisedItems', () => {
       detail: 'Say yes to keep it.',
       day: null,
       onYouSince: '2026-10-01T09:00:00.000Z',
-      link: { href: '/dev/raised#raise-r1', label: 'Dash' },
+      link: { href: '/dev/inbox#raise-r1', label: 'Dash' },
       completable: false,
     });
     expect(parseRef(item.ref)).not.toBeNull();

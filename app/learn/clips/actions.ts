@@ -23,7 +23,6 @@ import type { PlayerClip } from '@/lib/learn/clips/stream';
  */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const STAMP = /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/;
 
 function clipId(value: unknown): string {
   const id = String(value ?? '');
@@ -41,15 +40,19 @@ async function owner() {
 }
 
 /**
- * More clips for the queue, leaving out the ones already in it. `startedAt`
- * is when the page opened, so the two-a-video cap holds across fetches.
+ * More clips for the queue, leaving out the ones already in it. The queued
+ * ones still count against their video's two a week and the ten-clip gap.
+ * A subject's player (plan #1697) passes its subject, and gets only clips
+ * that serve it.
  */
 // latency: pending
-export async function loadMoreClipsAction(startedAt: string, queued: string[]): Promise<PlayerClip[]> {
+export async function loadMoreClipsAction(queued: string[], subjectId?: string | null): Promise<PlayerClip[]> {
   const { user, learn } = await owner();
+  if (subjectId != null && !UUID.test(String(subjectId))) throw new Error('That is not a subject.');
   return loadPlayerClips(learn, user.id, {
-    sessionStartedAt: STAMP.test(startedAt) ? startedAt : null,
-    excludeIds: queued.filter((id) => UUID.test(id)).slice(0, 200),
+    // The newest 200, in queue order: the end of the queue is what the ten-clip gap reads.
+    excludeIds: queued.filter((id) => UUID.test(id)).slice(-200),
+    subjectId: subjectId ?? undefined,
   });
 }
 

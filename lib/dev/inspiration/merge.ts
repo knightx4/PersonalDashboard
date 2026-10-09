@@ -258,7 +258,7 @@ async function judge(
         },
       },
     ],
-    tool_choice: forceTool(TOOL),
+    tool_choice: forceTool(TOOL, MERGE_MODEL),
     messages: [{ role: 'user', content: matchPrompt(fresh, earlier, cover) }],
   });
   onSpend({ model: MERGE_MODEL, usage: usageFrom(response.usage) });

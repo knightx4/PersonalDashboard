@@ -61,6 +61,12 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
       if (!moduleEnabled(await loadAccountSettings(userId, core), 'jobs')) continue;
       summary.people += 1;
       const progress = recordRuns(jobs, userId, 'daily');
+      // Roles at discovered startups are scored before they are written
+      // when Jev is on; that cost is recorded as scoring.
+      const discoveredSpend: SpendReport[] = [];
+      const jev = (await jevEnabledFor(core, userId))
+        ? { onSpend: (report: SpendReport) => discoveredSpend.push(report) }
+        : null;
       const result = await runSuggestionsFor(jobs, userId, {
         apiKey,
         kinds: ['reach_out', 'apply'],
@@ -69,6 +75,7 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
         // Past this the searches go on as Message Batches (search-batch.ts),
         // so one slow search cannot take the route's five minutes with it.
         deadline: Date.now() + DAILY_SEARCH_BUDGET_MS,
+        jev,
       });
       for (const kind of ['reach_out', 'apply'] as const) {
         const outcome = result[kind];
@@ -76,6 +83,7 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
       }
       await recordSpendReports(core, userId, { module: 'jobs', operation: 'suggest-outreach' }, result.reach_out.spend);
       await recordSpendReports(core, userId, { module: 'jobs', operation: 'find-openings' }, result.apply.spend);
+      await recordSpendReports(core, userId, { module: 'jobs', operation: 'score-openings' }, discoveredSpend);
       summary.reachOut += result.reach_out.written;
       summary.apply += result.apply.written;
       for (const outcome of [result.reach_out, result.apply]) {

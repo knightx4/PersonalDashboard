@@ -15,7 +15,7 @@ describe('scoreNote', () => {
     expect(note.fit).toMatchObject({ value: 64, unsure: true });
     expect(note.fit?.reason).toBeTruthy();
     expect(note.chance).toMatchObject({ value: 30, band: 'medium', unsure: false });
-    expect(chanceText(note.chance!)).toBe('Medium');
+    expect(chanceText(note.chance!)).toBe('30');
     expect(note.chance?.reason).toBe('No past applications to compare against yet');
   });
 

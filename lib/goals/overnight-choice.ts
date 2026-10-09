@@ -6,7 +6,10 @@
  * tree; this picks goal steps from the ones `readyClaudeSteps` already found
  * ready, so it never re-derives readiness. It only orders and skips:
  *
- * - soonest due first, and a step with no due date after every one with one;
+ * - a step under one of this week's focus goals first (ReadyStep.focus, set
+ *   only while the person has chosen a focus), so other goals' steps take
+ *   only the turns the focus goals leave;
+ * - then soonest due, and a step with no due date after every one with one;
  * - then the goal that has gone longest without progress, a goal that has
  *   never made any counting as the longest;
  * - then the order the steps came in, which is page order.
@@ -85,6 +88,8 @@ export function chooseNightSteps(input: {
   const ordered = steps
     .map((step, index) => ({ step, index }))
     .sort((a, b) => {
+      const focus = Number(Boolean(b.step.focus)) - Number(Boolean(a.step.focus));
+      if (focus !== 0) return focus;
       const dueA = a.step.dueOn;
       const dueB = b.step.dueOn;
       if (dueA !== dueB) {

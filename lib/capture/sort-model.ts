@@ -99,7 +99,7 @@ export async function requestCaptureSort(
         max_tokens: 400,
         system: SYSTEM,
         tools: [sortTool(context)],
-        tool_choice: forceTool(CAPTURE_SORT_TOOL),
+        tool_choice: forceTool(CAPTURE_SORT_TOOL, CAPTURE_SORT_MODEL),
         messages: [{ role: 'user', content: captureSortMessage(sentence, context) }],
       },
       options.signal ? { signal: options.signal } : undefined,

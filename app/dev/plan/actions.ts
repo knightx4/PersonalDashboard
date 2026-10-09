@@ -6,7 +6,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { loadVisionBodies } from '@/lib/specs/vision';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
-import { planRoutine, type FireRoutineResult } from '@/lib/feedback/routine';
+import {
+  overhaulRoutine,
+  planRoutine,
+  type FireRoutineResult,
+} from '@/lib/feedback/routine';
+import { overhaulRefusal, overhaulTurn } from '@/lib/plan/overhaul-run';
 import {
   DISMISSAL_RULE,
   FOG_RULE,
@@ -30,6 +35,7 @@ import {
   loadPlan,
   type PlanStatus,
 } from '@/lib/plan/load';
+import { setAutoApprove } from '@/lib/plan/auto-approve';
 import { handFeatureToClaude, handStepToClaude } from '@/lib/plan/handover';
 import {
   OVERNIGHT_FEATURE_CAP,
@@ -63,6 +69,8 @@ import {
   stopBranch,
   stoppedSurfaces,
 } from '@/lib/plan/ui-check-stop';
+import { PASSING_VERDICTS } from '@/lib/plan/ui-check-guard';
+import { appendCommentLine, sentBackLine } from '@/lib/plan/screen-change';
 
 export type PlanActionState = {
   error?: string;
@@ -85,6 +93,7 @@ type Db = SupabaseClient<any, 'public'>;
 function revalidatePlan(): void {
   revalidatePath('/dev/plan');
   revalidatePath('/dev/raised');
+  revalidatePath('/dev/inbox');
 }
 
 /** Empty string means "the app as a whole", the same as the ideas list. */
@@ -345,6 +354,122 @@ export async function updatePlanItem(
     .eq('id', parsed.data.id)
     .eq('user_id', user.id);
   if (error) return { error: friendly(error.message) };
+
+  revalidatePlan();
+  return { message: 'Saved.' };
+}
+
+/** What writing a feature hands back: the number, for the line saying where it went. */
+export type FeatureActionState = PlanActionState & { number?: number };
+
+/** One line: a summary is what the feature page shows under its title. */
+const summaryField = z
+  .string()
+  .transform((value) => value.replace(/\s+/g, ' ').trim())
+  .pipe(z.string().max(200, 'A summary is one line, 200 characters at most.'));
+
+const featureSchema = z.object({
+  module: moduleField,
+  title: titleField,
+  summary: summaryField,
+  detail: text(4000),
+  acceptance: text(4000),
+  priority: priorityField,
+  size: sizeField,
+  assignee: assigneeField,
+});
+
+function featureFields(formData: FormData) {
+  return {
+    module: field(formData, 'module'),
+    title: field(formData, 'title'),
+    summary: field(formData, 'summary'),
+    detail: field(formData, 'detail'),
+    acceptance: field(formData, 'acceptance'),
+    priority: field(formData, 'priority', '2'),
+    size: field(formData, 'size'),
+    assignee: field(formData, 'assignee'),
+  };
+}
+
+/**
+ * A feature of your own, from the compose surface on /dev/plan (plan #1670):
+ * a not-started row at the top of its module, with no session stamp, so it
+ * reads as yours. It lands last in its module's section, ready for steps.
+ */
+// latency: pending
+export async function addFeature(
+  _prev: FeatureActionState,
+  formData: FormData,
+): Promise<FeatureActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const parsed = featureSchema.safeParse(featureFields(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const scope = parsed.data.module;
+  const position = await nextPlanPosition(supabase, user.id, scope, null);
+
+  const { data, error } = await supabase
+    .from('plan_items')
+    .insert({
+      user_id: user.id,
+      module: scope,
+      parent_id: null,
+      title: parsed.data.title,
+      summary: parsed.data.summary || null,
+      detail: parsed.data.detail || null,
+      acceptance: parsed.data.acceptance || null,
+      status: 'not_started',
+      kind: 'build',
+      priority: parsed.data.priority,
+      size: parsed.data.size,
+      assignee: parsed.data.assignee,
+      position,
+    })
+    .select('number')
+    .single();
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  return { message: 'Added.', number: Number(data.number) };
+}
+
+/**
+ * A feature's title, summary, properties and description, from the same
+ * compose surface opened on its page. Only those: its status, fog, note and
+ * place keep their own controls, so a save here never rewrites them.
+ */
+// latency: pending
+export async function updateFeature(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing feature.' };
+  const parsed = featureSchema.omit({ module: true }).safeParse(featureFields(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const { data, error } = await supabase
+    .from('plan_items')
+    .update({
+      title: parsed.data.title,
+      summary: parsed.data.summary || null,
+      detail: parsed.data.detail || null,
+      acceptance: parsed.data.acceptance || null,
+      priority: parsed.data.priority,
+      size: parsed.data.size,
+      assignee: parsed.data.assignee,
+    })
+    .eq('id', id.data)
+    .eq('user_id', user.id)
+    .select('id');
+  if (error) return { error: friendly(error.message) };
+  if (!data || data.length === 0) return { error: 'That feature no longer exists.' };
 
   revalidatePlan();
   return { message: 'Saved.' };
@@ -1066,6 +1191,95 @@ export async function acceptCriticStop(
   return { message: 'Accepted. The step is ready for a session to merge and close.' };
 }
 
+/**
+ * Send a changed screen back from its pictures (plan #1542,
+ * docs/UI-QUALITY-SPEC.md Part 6).
+ *
+ * The thumbs-down under a surface's before and after on a finished step. Your
+ * words go on the step's thread as yours, a dated line naming the surface
+ * goes on its comment, and the step goes back to not started with nobody's
+ * mark on it, so the next session that picks it up builds against what you
+ * said. The correction reaches the step that made the screen rather than the
+ * general notes queue.
+ *
+ * Only on a finished step, and only for a surface the step has a passing
+ * round for: the press is about a screen that step changed. The commit stays
+ * on the row, since it is still the commit that changed the screen.
+ */
+// latency: pending
+export async function sendScreenBack(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  const surface = z
+    .string()
+    .regex(/^[\w-]+$/)
+    .max(80)
+    .safeParse(formData.get('surface'));
+  if (!id.success || !surface.success) return { error: 'Missing step or screen.' };
+
+  const words = text(4000).safeParse(field(formData, 'words'));
+  if (!words.success) return { error: 'That is too long.' };
+  if (!words.data) return { error: 'Say what is wrong with the screen.' };
+
+  const { data: current } = await supabase
+    .from('plan_items')
+    .select('number, status, comment')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .maybeSingle();
+  if (!current) return { error: 'That step no longer exists.' };
+  if (current.status !== 'done') return { error: 'That step is already open.' };
+
+  const { data: passed, error: readError } = await supabase
+    .from('ui_checks')
+    .select('round')
+    .eq('user_id', user.id)
+    .eq('step', current.number)
+    .eq('surface', surface.data)
+    .in('verdict', [...PASSING_VERDICTS])
+    .limit(1);
+  if (readError) return { error: readError.message };
+  if (!passed || passed.length === 0) {
+    return { error: 'This step has no passed screen by that name.' };
+  }
+
+  try {
+    await addThreadTurn(supabase, {
+      userId: user.id,
+      ref: `public.plan_items:${id.data}`,
+      author: 'me',
+      body: words.data,
+    });
+  } catch (unsaid) {
+    return { error: unsaid instanceof Error ? unsaid.message : 'Your words could not be saved.' };
+  }
+
+  const comment = appendCommentLine(
+    current.comment,
+    sentBackLine({
+      date: new Date().toISOString().slice(0, 10),
+      surface: surface.data,
+      words: words.data,
+    }),
+  );
+  const { error } = await supabase
+    .from('plan_items')
+    .update({ status: 'not_started', ...blockPatch('not_started'), assignee: null, comment })
+    .eq('id', id.data)
+    .eq('user_id', user.id);
+  if (error) return { error: error.message };
+
+  revalidatePlan();
+  revalidatePath('/dev/changelog');
+  revalidatePath('/dev/surfaces');
+  return { message: `Sent back. #${current.number} is open again with your words on it.` };
+}
+
 /** Deleting a step takes its sub-steps with it; the confirm says how many. */
 // latency: pending
 export async function deletePlanItem(
@@ -1383,6 +1597,60 @@ export async function reshapePlanFeature(
 }
 
 /**
+ * Start the overhaul routine on one overhaul (plan #1514).
+ *
+ * An overhaul is built in its own order, which the overnight runner and the
+ * plan routine do not know, so it has its own routine and its own press. The
+ * run is recorded against the overhaul's row under the job `overhaul`, and the
+ * row then says a run is going, the same as after any other press.
+ */
+// latency: pending
+export async function workPlanOverhaul(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = z.string().uuid().safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing step.' };
+
+  const data = await loadPlan(supabase, user.id);
+  const sections = buildPlanTree(data);
+  const node = findNode(sections, id.data);
+  if (!node) return { error: 'That step no longer exists.' };
+
+  const { data: runs } = await supabase
+    .from('plan_runs')
+    .select('status, job')
+    .eq('user_id', user.id)
+    .eq('plan_item_id', node.id)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  const latest = (runs?.[0] ?? null) as { status: string; job: string } | null;
+
+  const routine = overhaulRoutine();
+  const refused = overhaulRefusal(node, { id: !!routine.id, token: !!routine.token }, latest);
+  if (refused) return { error: refused };
+
+  const brief = planBrief(sections, node, {
+    thread: true,
+    visions: await loadVisionBodies(supabase, user.id),
+  });
+  const result = await startRoutineRun({
+    supabase,
+    userId: user.id,
+    job: 'overhaul',
+    routine,
+    planItemId: node.id,
+    text: overhaulTurn(node, user.id, brief),
+  });
+  revalidatePlan();
+  if (!result.ok) return { error: result.error };
+  return { message: `Started the overhaul routine on #${node.number}. ${result.detail}` };
+}
+
+/**
  * Write the build order in, once.
  *
  * Deliberately a button rather than something that happens on first render.
@@ -1638,6 +1906,36 @@ export async function stopOvernightRunner(
             } unspent`
       }. Anything already building ` +
       'finishes on its own; nothing follows it.',
+  };
+}
+
+/**
+ * Flip auto approve, from the runner's row on Home.
+ *
+ * The form sends the state it wants rather than "toggle", so a double press
+ * or a stale tab lands where the button said it would.
+ */
+// latency: pending
+export async function setAutoApproveAction(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const on = field(formData, 'on') === 'true';
+  const { approved, error } = await setAutoApprove({ supabase, userId: user.id, on });
+  if (error) return { error };
+
+  revalidatePlan();
+  if (!on) return { message: 'Auto approve is off. New proposals wait for you again.' };
+  return {
+    message:
+      approved === 0
+        ? 'Auto approve is on. New features and steps are approved as they are written.'
+        : `Auto approve is on. Approved ${approved} waiting ${
+            approved === 1 ? 'proposal' : 'proposals'
+          }, and new ones are approved as they are written.`,
   };
 }
 

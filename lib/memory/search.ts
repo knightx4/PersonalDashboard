@@ -73,6 +73,8 @@ export const MEMORY_SOURCE_MODULES: Readonly<Record<string, ModuleId | null>> = 
   'obsidian.transcripts': 'vault',
   'job_search.thoughts': 'jobs',
   'job_search.notes': 'jobs',
+  // Each interview round's notes, prep and questions (note 3d0b5fd8).
+  'job_search.interviews': 'jobs',
   'job_search.profiles': 'jobs',
   'goals.items': 'goals',
   'goals.captures': 'goals',

@@ -3,6 +3,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
+import { forceTool } from '@/lib/learn/graph/tool-call';
 
 /**
  * The sentence above each weekly connection (plan #1115): what a week's notes
@@ -122,7 +123,7 @@ export async function writeConnectionSentences(
           },
         },
       ],
-      tool_choice: { type: 'tool', name: TOOL_NAME },
+      tool_choice: forceTool(TOOL_NAME, CONNECTIONS_MODEL),
       messages: [{ role: 'user', content: prompt(groups) }],
     });
   } catch (error) {

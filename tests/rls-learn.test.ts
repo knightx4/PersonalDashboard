@@ -126,6 +126,7 @@ describe('RLS coverage', () => {
       'next_outcomes',
       'opening_questions',
       'opening_sweeps',
+      'personality_results',
       'phrase_explanations',
       'piece_checks',
       'piece_practice',
@@ -148,6 +149,7 @@ describe('RLS coverage', () => {
       'tracks',
       'transcript_calls',
       'video_clip_cuts',
+      'video_clip_subjects',
       'video_clips',
       'video_transcripts',
       'watch_list',
@@ -2195,6 +2197,75 @@ describe('clips cut from video transcripts', () => {
         (tx) => tx`insert into video_clip_cuts (user_id, video_id, came_from)
                    values (${userA}, 'abcdefghijk', 'channel')`,
       ),
+    ).rejects.toThrow();
+  });
+});
+
+describe('personality test results', () => {
+  // 0092_personality_results.sql (plan #1631). One row per test taken or
+  // typed in; a retake is a second row, and Dash's read sits on the result.
+  const answers = admin.json(Array.from({ length: 50 }, (_, i) => (i % 5) + 1));
+
+  it('saves a result and reads it back, to its owner only', async () => {
+    await asUser(
+      userA,
+      (tx) => tx`insert into personality_results (user_id, kind, test_name, answers, extraversion,
+                   agreeableness, conscientiousness, emotional_stability, intellect, taken_at)
+                 values (${userA}, 'big_five', 'Big Five', ${answers}, 22, 38, 31, 27, 44,
+                         '2026-10-01')`,
+    );
+    await asUser(
+      userA,
+      (tx) => tx`insert into personality_results (user_id, kind, test_name, typed_value, taken_at)
+                 values (${userA}, 'enneagram', 'Enneagram', '5w4', '2023-05-12')`,
+    );
+    const own = await asUser(
+      userA,
+      (tx) => tx`select kind, extraversion, intellect, typed_value, taken_at::text as taken_at,
+                        jsonb_array_length(answers) as n
+                 from personality_results order by taken_at desc`,
+    );
+    expect(own).toEqual([
+      { kind: 'big_five', extraversion: 22, intellect: 44, typed_value: null, taken_at: '2026-10-01', n: 50 },
+      { kind: 'enneagram', extraversion: null, intellect: null, typed_value: '5w4', taken_at: '2023-05-12', n: null },
+    ]);
+    expect(await asUser(userB, (tx) => tx`select id from personality_results`)).toHaveLength(0);
+  });
+
+  it("does not let a user write or change another account's result", async () => {
+    await expect(
+      asUser(
+        userB,
+        (tx) => tx`insert into personality_results (user_id, kind, test_name, typed_value)
+                   values (${userA}, 'mbti', 'Myers-Briggs', 'ESTP')`,
+      ),
+    ).rejects.toThrow();
+    await asUser(userB, (tx) => tx`update personality_results set typed_value = 'ESTP'`);
+    await asUser(userB, (tx) => tx`delete from personality_results`);
+    const left = await admin`select id from personality_results where user_id = ${userA}`;
+    expect(left).toHaveLength(2);
+  });
+
+  it('refuses a result of the wrong shape, and a half-written read', async () => {
+    await expect(
+      admin`insert into personality_results (user_id, kind, test_name, typed_value)
+            values (${userA}, 'big_five', 'Big Five', 'high')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into personality_results (user_id, kind, test_name, answers, extraversion,
+              agreeableness, conscientiousness, emotional_stability, intellect)
+            values (${userA}, 'big_five', 'Big Five', ${answers}, 9, 38, 31, 27, 44)`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into personality_results (user_id, kind, test_name)
+            values (${userA}, 'mbti', 'Myers-Briggs')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`insert into personality_results (user_id, kind, test_name, typed_value)
+            values (${userA}, 'astrology', 'Stars', 'Leo')`,
+    ).rejects.toThrow();
+    await expect(
+      admin`update personality_results set read_points = '[]'::jsonb where user_id = ${userA}`,
     ).rejects.toThrow();
   });
 });

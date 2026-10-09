@@ -80,8 +80,8 @@ describe('dev search: questions and raises', () => {
 
     const hits = await devSearchSource.find({ userId: 'u', query: 'token', limit: 10 });
     expect(hits.map((hit) => hit.href)).toEqual([
-      '/dev/raised#waiting-q1',
-      '/dev/raised#raise-r1',
+      '/dev/inbox#waiting-q1',
+      '/dev/inbox#raise-r1',
     ]);
   });
 

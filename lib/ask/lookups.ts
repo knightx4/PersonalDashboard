@@ -42,6 +42,7 @@ import {
   type AskToolResult,
 } from './db';
 import { devAccess, devRecallHrefs } from './dev';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
  * Each of Dash's read tools (plan #1088), as a function of its input and the
@@ -86,8 +87,10 @@ export const HIT_TABLES: Record<HitKind, string> = {
   vision: 'public.module_visions',
   // A story is one entry in an issue's list; its ref is `<issue id>:<index>`.
   story: 'news.issues',
+  area: 'goals.areas',
   goal: 'goals.items',
   step: 'goals.items',
+  file: 'core.files',
 };
 
 export const HIT_KIND_IDS = Object.keys(HIT_KINDS) as HitKind[];
@@ -462,6 +465,7 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
     typeof input.quiet_for_days === 'number' && input.quiet_for_days > 0
       ? Math.floor(input.quiet_for_days)
       : null;
+  const noReply = input.no_reply === true;
 
   const db = await ctx.db('job_search');
   const query = db
@@ -504,8 +508,10 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
   const roleById = new Map(roles.map((r) => [r.id, r]));
   const companyById = new Map(companies.map((c) => [c.id, c]));
   const lastHeard = new Map<string, string>();
+  const replied = new Set<string>();
   for (const event of events) {
     if (!HEARD_KINDS.has(event.kind)) continue;
+    if (event.kind !== 'confirmation') replied.add(event.application_id);
     const held = lastHeard.get(event.application_id);
     if (!held || event.occurred_at > held) lastHeard.set(event.application_id, event.occurred_at);
   }
@@ -520,6 +526,8 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
     });
   }
   if (statuses.length > 0) applications = applications.filter((a) => statuses.includes(statusOf(a)));
+  // Sent, and nothing from a person since: an automatic confirmation is not a reply.
+  if (noReply) applications = applications.filter((a) => a.submitted_at !== null && !replied.has(a.id));
   if (quietDays !== null) {
     const since = daysBefore(ctx.today, quietDays);
     applications = applications.filter(
@@ -569,6 +577,9 @@ export async function applicationsLookup(ctx: AskContext, input: Input): Promise
     rows,
     totals: { count: applications.length, by_status: byStatus, rejected_at_stage: rejectedAt },
     note:
+      (noReply
+        ? 'Sent applications with no reply from the company: no reply, screen, assessment, interview, offer or rejection, an automatic confirmation aside. '
+        : '') +
       (quietDays !== null
         ? `Open applications with nothing heard from the company in the ${quietDays} days before ${ctx.today}; last heard is the newest reply, screen, interview, offer or rejection, or the day it was sent when nothing came back. `
         : '') + (applications.length > MAX_ROWS ? `Only the newest ${MAX_ROWS} are listed.` : ''),
@@ -778,9 +789,10 @@ const RECALL_PASSAGE_CHARS = 700;
 
 /** Where a row with no page of its own, or one whose page could not be read, opens. */
 const RECALL_LANDING: Record<string, string> = {
-  'job_search.thoughts': '/jobs/thoughts',
+  'job_search.thoughts': '/jobs/find',
   'job_search.profiles': '/jobs/settings',
   'job_search.notes': '/jobs',
+  'job_search.interviews': '/jobs',
   'goals.items': '/goals',
   'goals.captures': '/goals',
   'learn.aims': '/goals',
@@ -796,6 +808,7 @@ const RECALL_KINDS: Record<string, string> = {
   'obsidian.transcripts': 'Transcript (courses taken)',
   'job_search.thoughts': 'Job search thoughts',
   'job_search.notes': 'Job search note',
+  'job_search.interviews': 'Interview notes',
   'job_search.profiles': 'Job search profile',
   'goals.items': 'Goal or step',
   'goals.captures': 'Goals capture',
@@ -881,6 +894,26 @@ async function recallHrefs(ctx: AskContext, hits: readonly MemoryRowHit[]): Prom
     });
   }
 
+  // An interview opens on its role's page, by way of its application.
+  const interviews = refs('job_search.interviews').filter(isUuid);
+  if (interviews.length > 0) {
+    attempt('job_search.interviews', async () => {
+      const client = await ctx.db('job_search');
+      type InterviewLink = { id: string; application_id: string | null };
+      const rows = await readIn<InterviewLink>(client, 'interviews', 'id, application_id', 'id', interviews, ctx.userId);
+      const applicationIds = rows.map((r) => r.application_id).filter((id): id is string => Boolean(id));
+      const applications =
+        applicationIds.length > 0
+          ? await readIn<{ id: string; role_id: string | null }>(client, 'applications', 'id, role_id', 'id', applicationIds, ctx.userId)
+          : [];
+      const roles = new Map(applications.map((a) => [a.id, a.role_id]));
+      for (const row of rows) {
+        const roleId = row.application_id ? roles.get(row.application_id) : null;
+        if (roleId) out.set(key('job_search.interviews', row.id), `/jobs/roles/${roleId}`);
+      }
+    });
+  }
+
   const goalItems = refs('goals.items').filter(isUuid);
   if (goalItems.length > 0) {
     attempt('goals.items', async () => {
@@ -903,7 +936,7 @@ async function recallHrefs(ctx: AskContext, hits: readonly MemoryRowHit[]): Prom
         for (let depth = 0; goal && goal.level !== 'goal' && depth < 7; depth += 1) {
           goal = goal.parent_id ? seen.get(goal.parent_id) : undefined;
         }
-        if (goal) out.set(key('goals.items', id), goal.id === id ? `/goals/${id}` : `/goals/${goal.id}#step-${id}`);
+        if (goal) out.set(key('goals.items', id), goal.id === id ? `/goals/${id}` : stepHref(goal.id, id));
       }
     });
   }
