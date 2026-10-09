@@ -22,7 +22,10 @@ to look tidy, and not marked `done` because the session is ending.
 npx tsx scripts/notes.ts list                 # the queue, in work order
 npx tsx scripts/notes.ts list --all           # including closed, and likes
 npx tsx scripts/notes.ts next                 # the open note to claim next
-npx tsx scripts/notes.ts show <id>            # the note, and the thread under it
+npx tsx scripts/notes.ts show <id>            # the note, its files, and the thread under it
+npx tsx scripts/notes.ts files <id>           # download its files to .notes-files/<id>/;
+                                              # also needs NEXT_PUBLIC_SUPABASE_URL and
+                                              # SUPABASE_SERVICE_ROLE_KEY
 npx tsx scripts/notes.ts start <id>           # claim it (in_progress)
 npx tsx scripts/notes.ts done <id> --note "…" [--commit <sha>]
                                               # close it; refused unless the
@@ -72,6 +75,12 @@ order by (kind = 'bug') desc, priority asc, created_at asc;
 -- as an 'me' comment rather than on the end of the body, and so does anything
 -- else written on the card afterwards.
 select author, body, created_at from core.thread_turns
+where ref = 'public.feedback_items:…' order by created_at;
+
+-- the files filed with a note from the note button (plan #1713), oldest
+-- first. The bucket is private and SQL cannot read it: see "Open a note's
+-- files" under The loop for how to get at the files themselves.
+select id, name, content_type, size_bytes, path from core.attachments
 where ref = 'public.feedback_items:…' order by created_at;
 
 -- start (a like is never claimed, so the update refuses one)
@@ -155,6 +164,27 @@ group counts as one note.
    says where the user was standing. Read the thread before starting: an
    answer to a note that came back blocked is in there, and so is anything
    the user added after filing it.
+
+   **Open a note's files before working it.** A note can carry up to five
+   files from "Add a file" in the note button, most often a screenshot of
+   what went wrong. `show` lists them, as does the `core.attachments` select
+   above. Open every one before deciding what the note means: a screenshot
+   usually settles which screen, which state and which width the note is
+   about, and the text alone often does not. Get each one in whichever of
+   these ways the session allows:
+
+   - With the service role key in the environment: `files <id>` downloads
+     them to `.notes-files/<id>/`. Open each with Read, which shows a
+     picture or a PDF.
+   - A run started from "Run Feature Routine" is sent a signed link to each
+     file on the outstanding notes, listed under the note's first eight
+     characters. Download each with `curl -sSL -o <file> "<link>"` into the
+     scratchpad and open it with Read. The links work for 12 hours after
+     the run was started.
+   - With neither, the files cannot be opened from the session. Work the
+     note from its text if that is enough, and say in the resolution note
+     that its files were not read. If the text is not enough, block it,
+     saying the screenshot could not be opened.
 3. **Reproduce first, for bugs.** Find the actual cause in the code before
    changing anything. A fix for a guessed cause is how a note gets closed
    twice. If it cannot be reproduced, that is a `block`, with what you tried.

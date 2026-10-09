@@ -17,6 +17,7 @@ import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
 import { DashMarkLooks } from './dash-mark-surface';
 import { CaptureBoxSurface } from './capture-surfaces';
+import { NoteButtonSurface } from './note-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
 import { TASTE } from '@/app/dev/ui/taste';
@@ -4117,6 +4118,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'todo',
     width: 'narrow',
     render: () => <CaptureBoxSurface />,
+  },
+
+  {
+    /* The note button in the top bar, open on a note with a screenshot and
+     * a PDF added (plan #1713). */
+    id: 'shell-note',
+    label: 'Top bar · File a note with a screenshot',
+    module: 'dev',
+    width: 'page',
+    render: () => <NoteButtonSurface />,
   },
 
   {
