@@ -14,9 +14,9 @@ import 'server-only';
 
 import { fetchBoard, isBoardVendor } from '@/lib/jobs/ats/board';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
-import { DEFAULT_MIN_FIT_SCORE } from '@/lib/jobs/suggest/fit-gate';
+import { admitOpenings, scoredColumns, type Admission, type Admitter } from '@/lib/jobs/suggest/admit';
 import { exclusionWords } from '@/lib/jobs/suggest/payload';
-import type { OpeningScores } from '@/lib/jobs/suggest/scores';
+import type { OpeningText } from '@/lib/jobs/suggest/scores';
 import { JEV_MODEL } from '@/lib/jev/wire';
 import { loadDiscoveryRules } from './read';
 import {
@@ -72,29 +72,10 @@ export type DiscoveredOutcome = {
 
 const NOTHING: DiscoveredOutcome = { headlines: [], urls: [], startupsRead: 0 };
 
-/** Candidates scored at once, and how long the scoring may take in all. */
-const SCORE_PARALLEL = 6;
-const SCORE_BUDGET_MS = 25_000;
-
-/**
- * Jev scores the pool, a few at a time within the budget, and what clears the
- * gate comes back best first. A candidate not reached in time is not written;
- * it is still on its board for the next run.
- */
-async function scorePool(
-  pool: readonly DiscoveredPosting[],
-  score: (posting: DiscoveredPosting) => Promise<OpeningScores | null>,
-  room: number,
-  minimum: number,
-): Promise<{ posting: DiscoveredPosting; scores: OpeningScores | null }[]> {
-  const scored: { posting: DiscoveredPosting; scores: OpeningScores | null }[] = [];
-  const began = Date.now();
-  for (let i = 0; i < pool.length && Date.now() - began < SCORE_BUDGET_MS; i += SCORE_PARALLEL) {
-    const batch = pool.slice(i, i + SCORE_PARALLEL);
-    const results = await Promise.all(batch.map((posting) => score(posting).catch(() => null)));
-    batch.forEach((posting, index) => scored.push({ posting, scores: results[index] }));
-  }
-  return passScored(scored, room, minimum);
+/** A discovered role as Jev reads it: its title, company, place and the text it is written with. */
+function openingOf(posting: DiscoveredPosting): OpeningText {
+  const { why, move } = discoveredText(posting);
+  return { title: posting.title, company: posting.company, location: posting.location, why, move };
 }
 
 export async function suggestDiscoveredRoles(
@@ -106,12 +87,12 @@ export async function suggestDiscoveredRoles(
     taken: { urls: ReadonlySet<string>; roles: ReadonlySet<string>; companies?: ReadonlySet<string> };
     now?: Date;
     /**
-     * Jev's scores for one candidate, or null when it could not score it.
-     * Given when the person has Jev on: a wider pool is scored and only
-     * what clears `minFitScore` is written (fit-gate.ts).
+     * Given when the person has Jev on: a wider pool is scored, what clears
+     * the lowest fit score is written best first up to the week's room, and
+     * what falls below it is written as expired so it is not scored again
+     * (admit.ts).
      */
-    score?: (posting: DiscoveredPosting) => Promise<OpeningScores | null>;
-    minFitScore?: number;
+    admitter?: Admitter | null;
   },
 ): Promise<DiscoveredOutcome> {
   // With no titles to match nothing can fit, and counting that as an empty
@@ -137,6 +118,8 @@ export async function suggestDiscoveredRoles(
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .eq('origin', 'discovered')
+      // A role kept off the list for its fit takes none of the week's room.
+      .or('expired_reason.is.null,expired_reason.neq.low_fit')
       .gte('created_at', weekAgo),
     loadDiscoveryRules(supabase, userId),
   ]);
@@ -177,7 +160,7 @@ export async function suggestDiscoveredRoles(
   }
 
   const room = weekRoom(thisWeek.count ?? 0);
-  const scoring = !!context.score;
+  const admitter = context.admitter ?? null;
   const { picks: pool, fitted } = pickDiscovered(postings, {
     targetTitles: context.targetTitles,
     likedTitles: context.likedTitles,
@@ -189,16 +172,25 @@ export async function suggestDiscoveredRoles(
     excludedWords: exclusionWords(rules.excludedIndustries),
     preferences: rules.preferences,
     knownCompanies: rules.knownCompanies,
-    room: scoring ? scoredPool(room) : room,
-    scored: scoring,
+    room: admitter ? scoredPool(room) : room,
+    scored: !!admitter,
   });
-  const picks = scoring
-    ? await scorePool(pool, context.score!, room, context.minFitScore ?? DEFAULT_MIN_FIT_SCORE)
-    : pool.map((posting) => ({ posting, scores: null }));
+  let picks: Admission<DiscoveredPosting>[];
+  if (admitter) {
+    const scored = await admitOpenings(pool, openingOf, admitter);
+    // A candidate Jev could not score in time is left on its board for the
+    // next run rather than shown unjudged; one below the gate is written as
+    // expired, so it is not scored again.
+    const passed = passScored(scored, room, admitter.minFitScore);
+    picks = [...passed, ...scored.filter((entry) => entry.belowGate)];
+  } else {
+    picks = pool.map((item) => ({ item, scores: null, belowGate: false }));
+  }
 
   const headlines: string[] = [];
   const urls: string[] = [];
-  for (const { posting, scores } of picks) {
+  for (const admission of picks) {
+    const posting = admission.item;
     const { why, move } = discoveredText(posting);
     const { error } = await supabase.from('suggestions').insert({
       user_id: userId,
@@ -213,9 +205,10 @@ export async function suggestDiscoveredRoles(
       location: posting.location,
       watchlist_startup_id: posting.startup.id,
       // Scored already, so the daily scoring run leaves it alone.
-      ...(scores ? { scores, scored_at: new Date().toISOString(), score_model: JEV_MODEL } : {}),
+      ...scoredColumns(admission, JEV_MODEL),
     });
-    if (!error) {
+    if (!error && admission.belowGate) urls.push(posting.url);
+    else if (!error) {
       headlines.push(`${posting.title} at ${posting.company}`);
       urls.push(posting.url);
     } else if (error.code !== '23505') console.error('[jobs discovery] suggestion insert', error.message);
