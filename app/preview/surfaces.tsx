@@ -2790,6 +2790,13 @@ const findView = {
   aim: {
     targetTitles: 'Deployment Strategist, Strategic Finance, Forward Deployed Engineer, FP&A Manager',
     excludedIndustries: 'Crypto, Defense',
+    gaps: [
+      {
+        key: 'home' as const,
+        text: 'No home location is set, so roles and startups from anywhere are shown.',
+        href: '/jobs/settings',
+      },
+    ],
   },
   roles: {
     suggestions: recommendedRoles,
