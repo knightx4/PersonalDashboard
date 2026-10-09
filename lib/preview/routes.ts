@@ -207,6 +207,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'open-missing': ['/open/[ref]'],
   'account': ['/account'],
   'account-notifications': ['/account'],
+  'account-activity': ['/account'],
+  'account-capture-token-made': ['/account'],
   'home-week': ['/home/week', '/home/week/[week]'],
   'home-week-none': ['/home/week', '/home/week/[week]'],
   'dev-bugs': ['/dev/bugs'],

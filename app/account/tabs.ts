@@ -9,7 +9,8 @@ import type { Tab, TabAddress } from '@/lib/tabs';
  * - Notifications: the morning brief on this device, and how the app feels
  *   in the hand. Both are set per device.
  * - Activity: the apps connected through Dash's connector and what they
- *   called, the model spend, and the timeline of everything you did.
+ *   called, the capture tokens that let a Shortcut add things, the model
+ *   spend, and the timeline of everything you did.
  * - Session: signing out, and deleting the account at the foot.
  */
 export const ACCOUNT_TABS = [

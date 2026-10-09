@@ -16,6 +16,8 @@ import { cardVariants } from '@/components/ui/card';
 import { NotificationsSection } from './notifications';
 import { FeelSection } from './haptics';
 import { ConnectedAppsSection } from './connected-apps';
+import { CaptureTokensSection } from './capture-tokens';
+import type { CaptureTokenListing } from '@/lib/capture/tokens';
 import type { ConnectedApp } from '@/lib/connector/apps';
 import { TabbedSections } from '@/components/patterns/tabbed-sections';
 import { ACCOUNT_TAB_ADDRESS, ACCOUNT_TABS, type AccountTab } from './tabs';
@@ -34,6 +36,7 @@ export function AccountView({
   isOwner,
   vapidPublicKey,
   connected,
+  capture,
 }: {
   /** The open tab, read from the address by the page. */
   tab: AccountTab;
@@ -58,6 +61,16 @@ export function AccountView({
    * only when Activity is the open tab; null on the others.
    */
   connected: { apps: ConnectedApp[]; failed: string | null; connectorAddress: string } | null;
+  /**
+   * The Capture tokens section's data (plan #1705), read with the connected
+   * apps and only on Activity; null on the other tabs. `justMade` is the
+   * gallery's, for a token as it shows straight after it is made.
+   */
+  capture: {
+    tokens: CaptureTokenListing[];
+    failed: string | null;
+    justMade?: { label: string; token: string };
+  } | null;
 }) {
   return (
     <TabbedSections
@@ -82,6 +95,7 @@ export function AccountView({
         {tab === 'activity' && (
           <>
             {connected && <ConnectedAppsSection {...connected} timezone={settings.timezone} />}
+            {capture && <CaptureTokensSection {...capture} timezone={settings.timezone} />}
             <SpendSection />
             <TimelineSection />
           </>

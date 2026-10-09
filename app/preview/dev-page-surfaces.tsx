@@ -20,6 +20,7 @@ import { NowStrip } from '@/app/dev/raised/now-strip';
 import { AskBox } from '@/app/dev/raised/ask-box';
 import { CheckBacksPanel } from '@/app/dev/raised/check-backs-panel';
 import { AccountView } from '@/app/account/view';
+import type { CaptureTokenListing } from '@/lib/capture/tokens';
 import {
   isOutstanding,
   sortOutstanding,
@@ -817,13 +818,48 @@ const apps: ConnectedApp[] = [
   },
 ];
 
+/** Capture tokens (plan #1705): one in use, one never used with the longest name, one revoked. */
+const captureTokens: CaptureTokenListing[] = [
+  {
+    id: 'ct1',
+    label: 'iPhone Shortcut',
+    createdAt: '2026-10-01T09:00:00Z',
+    lastUsedAt: '2026-10-08T07:42:00Z',
+    revokedAt: null,
+  },
+  {
+    id: 'ct2',
+    label: 'Zapier: starred Gmail messages to the vault reading list',
+    createdAt: '2026-10-05T18:30:00Z',
+    lastUsedAt: null,
+    revokedAt: null,
+  },
+  {
+    id: 'ct3',
+    label: 'Old iPad',
+    createdAt: '2026-09-02T12:00:00Z',
+    lastUsedAt: '2026-09-20T21:10:00Z',
+    revokedAt: '2026-10-01T09:01:00Z',
+  },
+];
+
 /**
  * Account on one of its tabs (plan #1628). The tab is chosen here rather than
  * from the address, since the page reads it on the server; `account` is the
  * page as it opens, and `account-notifications` where Dash's link sends you
  * when push is off.
  */
-export function AccountSurface({ tab = 'you' }: { tab?: AccountTab }) {
+export function AccountSurface({
+  tab = 'you',
+  justMade,
+  onlyFirstToken,
+}: {
+  tab?: AccountTab;
+  /** A capture token as it shows straight after it is made (plan #1705). */
+  justMade?: { label: string; token: string };
+  /** Only the newest capture token, as the list reads once the first is made. */
+  onlyFirstToken?: boolean;
+}) {
   return column(
     <>
       <p className="text-body text-ink-muted">Settings that hold across every workspace.</p>
@@ -840,6 +876,7 @@ export function AccountSurface({ tab = 'you' }: { tab?: AccountTab }) {
         isOwner
         vapidPublicKey={null}
         connected={{ apps, failed: null, connectorAddress: 'https://dash.example.com/api/mcp' }}
+        capture={{ tokens: onlyFirstToken ? [{ ...captureTokens[0], createdAt: '2026-10-09T15:30:00Z', lastUsedAt: null }] : captureTokens, failed: null, justMade }}
       />
     </>,
   );

@@ -18,6 +18,7 @@ import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { vapidPublicKey } from '@/lib/push/web-push';
 import { tabFrom } from '@/lib/tabs';
 import { ACCOUNT_TAB_ADDRESS, ACCOUNT_TABS, type AccountTab } from './tabs';
+import { loadCaptureTokens, type CaptureTokenListing } from '@/lib/capture/tokens';
 import { AccountView } from './view';
 
 export const metadata = { title: 'Account' };
@@ -66,6 +67,20 @@ async function loadConnectedApps(
   return { apps: connectedApps(grants ?? [], calls ?? []), failed };
 }
 
+/**
+ * The person's capture tokens (plan #1705). A failure to read them is said on
+ * the section, as with the connected apps.
+ */
+async function loadCapture(
+  userId: string,
+): Promise<{ tokens: CaptureTokenListing[]; failed: string | null }> {
+  try {
+    return { tokens: await loadCaptureTokens(await createCoreClient(), userId), failed: null };
+  } catch {
+    return { tokens: [], failed: 'Could not read your capture tokens. Reload to try again.' };
+  }
+}
+
 export default async function AccountPage({
   searchParams,
 }: {
@@ -75,13 +90,14 @@ export default async function AccountPage({
   // data is read: the connected apps and their calls are Activity's alone.
   const tab = tabFrom((await searchParams).tab, ACCOUNT_TABS, ACCOUNT_TAB_ADDRESS) as AccountTab;
   const user = await requireUser();
-  const [settings, counts, raised, mainCheck, owner, connected, origin] = await Promise.all([
+  const [settings, counts, raised, mainCheck, owner, connected, capture, origin] = await Promise.all([
     loadAccountSettings(user.id),
     loadModuleCounts(user.id),
     loadRaisedNotifications(user.id),
     loadMainCheck(),
     isOwner({ user }),
     tab === 'activity' ? loadConnectedApps(user.id) : null,
+    tab === 'activity' ? loadCapture(user.id) : null,
     requestOrigin(),
   ]);
 
@@ -124,6 +140,7 @@ export default async function AccountPage({
                 connectorAddress: `${origin}/api/mcp`,
               }
             }
+            capture={capture}
             />
           </div>
         </div>
