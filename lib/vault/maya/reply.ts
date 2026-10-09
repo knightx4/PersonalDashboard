@@ -6,6 +6,7 @@ import type { SpendSink } from '@/lib/core/spend/pricing';
 import type { LearnOperation } from '@/lib/learn/spend';
 import { runDash, type DashExecutor } from '@/lib/dash/loop';
 import { dashToolsOf } from '@/lib/dash/registry';
+import { CHART_TOOL } from '@/lib/talk/chart';
 import { MAX_TURN, type TalkCitation } from '@/lib/talk/talk';
 import { MAYA_MODEL, mayaVoice } from './voice';
 
@@ -186,7 +187,12 @@ export async function replyInThread(
   }
 
   const answer = await runDash({
-    voice: mayaVoice({ system: replySystem(input), tools: dashToolsOf('lookup'), finish: ANSWER_TOOL }),
+    // Not the chart (plan #1655): it is drawn only under an Ask answer.
+    voice: mayaVoice({
+      system: replySystem(input),
+      tools: dashToolsOf('lookup').filter((tool) => tool.name !== CHART_TOOL),
+      finish: ANSWER_TOOL,
+    }),
     context: {
       surface: 'thread',
       subject: input.subjectRef ? { ref: input.subjectRef, title: input.question } : null,
