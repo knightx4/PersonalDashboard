@@ -112,7 +112,7 @@ describe('a request without a usable token', () => {
 });
 
 describe('the tool list', () => {
-  it('offers every Ask Dash lookup but mail search, with their own descriptions and schemas, read only', async () => {
+  it('offers every Ask Dash lookup but mail search and the chart, with their own descriptions and schemas, read only', async () => {
     await call('initialize', {
       protocolVersion: '2025-06-18',
       capabilities: {},
@@ -122,7 +122,7 @@ describe('the tool list', () => {
       tools: { name: string; description: string; inputSchema: Record<string, unknown>; annotations: Record<string, unknown> }[];
     };
 
-    expect(tools.map((t) => t.name)).toEqual(ASK_TOOL_NAMES.filter((name) => name !== 'search_mail' && name !== 'read_mail'));
+    expect(tools.map((t) => t.name)).toEqual(ASK_TOOL_NAMES.filter((name) => name !== 'search_mail' && name !== 'read_mail' && name !== 'show_chart'));
     for (const tool of tools) {
       const ask = ASK_TOOLS.find((t) => t.name === tool.name)!;
       expect(tool.description).toBe(ask.description);
@@ -189,7 +189,7 @@ describe('a subscription request', () => {
     expect(response.status).toBe(200);
     const { tools } = (await rpcResult(response)) as { tools: { name: string }[] };
     expect(tools.map((tool) => tool.name)).toEqual(
-      ASK_TOOL_NAMES.filter((name) => name !== 'search_mail' && name !== 'read_mail'),
+      ASK_TOOL_NAMES.filter((name) => name !== 'search_mail' && name !== 'read_mail' && name !== 'show_chart'),
     );
   });
 });

@@ -19,6 +19,7 @@ import { loadScreenChanges } from '@/lib/plan/screen-change-load';
 import { loadPlanPictures } from '@/lib/plan/pictures-load';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
+import { loadRunnerGoals } from '@/lib/goals/runner-status-load';
 import { keyRefusal } from '@/lib/plan/work';
 import type { LastRun } from '@/lib/plan/run-end';
 import { planRoutine, projectRoutine } from '@/lib/feedback/routine';
@@ -198,6 +199,15 @@ export async function renderPlanPage({
     started,
     lastRuns: Object.values(lastRuns),
   });
+  // The goals half, for the Goals Dash on the card (plan #1704). Skipped on a
+  // project's page, which draws no card.
+  const goals = project
+    ? null
+    : await loadRunnerGoals({
+        userId: user.id,
+        nightStartedAt: overnight?.running ? overnight.startedAt : null,
+        now: Date.now(),
+      });
 
   // Only on Everything, which is the one view a finished feature reaches at
   // all: it goes into the fold at the foot of the page rather than sitting in
@@ -280,6 +290,8 @@ export async function renderPlanPage({
           canSend={Boolean(planRoutine().token)}
           night={card.night}
           on={card.on}
+          sessions={card.sessions}
+          goals={goals}
           progress={card.progress}
           push={card.push}
           ready={card.ready}

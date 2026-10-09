@@ -75,6 +75,7 @@ export function StatusPanel({
             canSend={canSend}
             night={card.night}
             on={card.on}
+            sessions={card.sessions}
             progress={card.progress}
             refreshReadings
             push={card.push}

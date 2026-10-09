@@ -102,6 +102,16 @@ const PUSH: StoredPush = {
   subject: 'Store what GitHub last said about a run (plan #568)',
 };
 
+// A feature session going since 04:04, as `runnerCard` hands it to the card.
+const SESSION = {
+  id: 's1',
+  firedAt: '2026-09-17T04:04:00Z',
+  endedAt: null,
+  step: { number: 494, title: 'The dev pages say what is actually happening' },
+  module: 'Dev',
+  doing: null,
+};
+
 function draw(props: Partial<Parameters<typeof OvernightControl>[0]> = {}): string {
   return renderToStaticMarkup(
     <OvernightControl run={run()} canSend night={night()} push={PUSH} ready={3} {...props} />,
@@ -119,7 +129,7 @@ describe('the Overnight card while a night is running', () => {
   });
 
   it('names the feature it is on, and how long it has been on it', () => {
-    const html = draw();
+    const html = draw({ sessions: [SESSION] });
     expect(html).toContain('#494');
     expect(html).toContain('The dev pages say what is actually happening');
     expect(html).toContain('26m');
@@ -180,38 +190,51 @@ describe('the Overnight card while a night is running', () => {
     expect(draw()).toContain('stops in 5h 10m');
   });
 
-  // Note 39576272: sessions running in parallel each get an On line.
-  it('names every row a session is on when several are running', () => {
+  // Note 39576272 and plan #1704: sessions running in parallel each get a
+  // Dash of their own, in the order they were fired.
+  it('gives every session going a working Dash of its own', () => {
     const html = draw({
-      on: [
-        { ref: '#723', title: 'Newest session', at: '2026-09-17T04:20:00Z', step: null },
+      sessions: [
         {
-          ref: '#494',
-          title: 'The dev pages say what is actually happening',
-          at: '2026-09-17T04:04:00Z',
-          step: null,
+          ...SESSION,
+          id: 's2',
+          firedAt: '2026-09-17T04:20:00Z',
+          step: { number: 723, title: 'Newest session' },
         },
+        SESSION,
       ],
     });
 
-    expect((html.match(/On <span/g) ?? []).length).toBe(2);
-    expect(html.indexOf('#723')).toBeLessThan(html.indexOf('#494'));
+    expect((html.match(/Working on <\/span>/g) ?? []).length).toBe(2);
+    expect(html.indexOf('#494')).toBeLessThan(html.indexOf('#723'));
     expect(html).toContain('Newest session');
+    expect((html.match(/data-dash-state="working"/g) ?? []).length).toBe(2);
   });
 
   it('gives each session its own progress through its feature', () => {
     const html = draw({
+      sessions: [{ ...SESSION, step: { number: 723, title: 'Newest session' } }],
       on: [
         {
           ref: '#723',
           title: 'Newest session',
-          at: '2026-09-17T04:20:00Z',
+          at: '2026-09-17T04:04:00Z',
           step: null,
           progress: { done: 2, total: 5 },
         },
       ],
     });
     expect(html).toContain('2 of 5 steps done');
+  });
+
+  it('draws four Dashes in their four hats', () => {
+    const html = draw({ sessions: [SESSION] });
+    for (const look of ['top-hat', 'ball-cap', 'cowboy-hat', 'newsboy-cap']) {
+      expect(html).toContain(`data-dash-look="${look}"`);
+    }
+    for (const label of ['Feature 1', 'Feature 2', 'Feature 3', 'Goals']) {
+      expect(html).toContain(label);
+    }
   });
 
   it('says how long the night has been going and that it has no stop time', () => {
@@ -226,28 +249,36 @@ describe('the Overnight card while a night is running', () => {
     expect(html).toContain('Add a payment method');
   });
 
-  it('falls back to the last fire when no run is going', () => {
-    const html = draw({ on: [] });
-    expect((html.match(/On <span/g) ?? []).length).toBe(1);
-    expect(html).toContain('#494');
+  it('puts every slot with nothing going to sleep, with the tick’s reason', () => {
+    const html = draw({
+      run: run({
+        lastTickAt: '2026-09-17T04:28:00Z',
+        lastTickNote: 'Waiting until something is ready. Nothing is handed to Dash.',
+      }),
+      sessions: [],
+    });
+    expect((html.match(/Asleep: nothing to work on/g) ?? []).length).toBe(4);
+    expect(html).toContain('Waiting until something is ready. Nothing is handed to Dash.');
+    expect(html).toContain('No goal step is ready.');
+    expect((html.match(/data-dash-state="asleep"/g) ?? []).length).toBe(4);
+  });
+
+  it('leaves all four idle when the runner is off', () => {
+    const html = draw({ run: null, night: null, push: null });
+    expect((html.match(/Not running/g) ?? []).length).toBe(4);
+    expect((html.match(/data-dash-state="idle"/g) ?? []).length).toBe(4);
   });
 
   // Note 84482e92: the claimed step hangs under the feature it belongs to.
   it('names the step being worked under the feature it is on', () => {
     const html = draw({
-      run: run(),
-      night: night({
-        lastFire: {
-          ref: '#494',
-          title: 'The dev pages say what is actually happening',
-          at: '2026-09-17T04:04:00Z',
-          step: { ref: '#494.3', title: 'Say what the runner is on' },
-        },
-      }),
+      sessions: [
+        { ...SESSION, step: { number: 494, title: 'Say what the runner is on', ref: '#494.3' } },
+      ],
       push: null,
     });
 
-    expect(html).toContain('Working on</span>');
+    expect(html).toContain('Working on </span>');
     expect(html).toContain('#494.3');
     expect(html).toContain('Say what the runner is on');
   });
@@ -262,7 +293,7 @@ describe('the Overnight card while a night is running', () => {
     expect(html).toContain('0 of 4 features spent');
     expect(html).toContain('no steps closed');
     expect(html).toContain('Nothing has been fired yet');
-    expect(html).not.toContain('On <');
+    expect(html).not.toContain('Working on');
     expect(html).not.toContain('Which steps');
   });
 
@@ -270,6 +301,7 @@ describe('the Overnight card while a night is running', () => {
     const html = draw({
       run: run({ paused: true }),
       night: night({ standing: 'paused' }),
+      sessions: [SESSION],
     });
 
     expect(html).toContain('#494');
@@ -296,7 +328,7 @@ describe('the Overnight card before the browser clock arrives', () => {
     const { OvernightControl: AtZero } = await import('@/app/dev/plan/overnight-control');
 
     const html = renderToStaticMarkup(
-      <AtZero run={run()} canSend night={night()} push={PUSH} ready={3} />,
+      <AtZero run={run()} canSend night={night()} push={PUSH} ready={3} sessions={[SESSION]} />,
     );
 
     // The facts that do not come off a clock are all still there.

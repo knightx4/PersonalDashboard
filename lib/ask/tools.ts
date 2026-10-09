@@ -21,6 +21,7 @@ import { coursesLookup } from './courses';
 import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, sourceWorkspace } from './list-rows';
 import { notePositionsLookup } from './positions';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
+import { CHART_DRAWN, CHART_TOOL_DEFINITION, parseChart } from '@/lib/talk/chart';
 
 /**
  * Dash's read tools (plan #1088): what the model is told it can call, and
@@ -55,14 +56,16 @@ export const ASK_TOOL_NAMES = [
   'find_dev_text',
   'search_mail',
   'read_mail',
+  'show_chart',
 ] as const;
 
 /**
  * Tools the connector (lib/connector/mcp.ts) does not offer. Mail is searched
  * and read in Gmail as the person, which a connector token cannot do, and
- * what it holds is not to leave the app for another client.
+ * what it holds is not to leave the app for another client. A chart is drawn
+ * in the app's own reply (plan #1655), which another client does not have.
  */
-export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail', 'read_mail'];
+export const IN_APP_ONLY_TOOLS: readonly AskToolName[] = ['search_mail', 'read_mail', 'show_chart'];
 
 export type AskToolName = (typeof ASK_TOOL_NAMES)[number];
 
@@ -364,6 +367,7 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
       additionalProperties: false,
     },
   },
+  CHART_TOOL_DEFINITION,
 ];
 
 type Lookup = (ctx: AskContext, input: Record<string, unknown>) => Promise<AskToolResult>;
@@ -390,7 +394,20 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   // The mailbox belongs to the whole app, so no workspace has to be on.
   search_mail: { run: mailLookup, module: null },
   read_mail: { run: readMailLookup, module: null },
+  // Reads nothing: it checks the figures Dash sends and keeps them as the chart.
+  show_chart: { run: chartLookup, module: null },
 };
+
+/**
+ * Draws a chart under the answer (plan #1655; lib/talk/chart.ts). The turn
+ * keeps the chart as this call's result, which is what a reopened answer
+ * draws from.
+ */
+async function chartLookup(_ctx: AskContext, input: Record<string, unknown>): Promise<AskToolResult> {
+  const parsed = parseChart(input);
+  if (!parsed.ok) return parsed;
+  return { ok: true, rows: [], note: CHART_DRAWN, kept: { chart: parsed.chart } };
+}
 
 export function isAskToolName(name: string): name is AskToolName {
   return (ASK_TOOL_NAMES as readonly string[]).includes(name);

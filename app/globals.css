@@ -2508,6 +2508,25 @@ button[aria-busy='true'] {
   animation: dash-mark-snooze calc(var(--motion-moment) * 6) var(--ease-sway) infinite;
 }
 
+/* A hat on a sleeping Dash (plan #1702) is already tipped over in its still
+ * shape, and slips a little further with each breath. --dash-tip carries the
+ * way it leans, so the newsboy cap slips forward and the others back. */
+@keyframes dash-mark-tip {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(var(--dash-tip, -4deg));
+  }
+}
+
+@utility dash-mark-tip {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: dash-mark-tip calc(var(--motion-moment) * 6) var(--ease-sway) infinite;
+}
+
 @keyframes dash-mark-streak {
   0% {
     transform: translateX(2px);
@@ -2815,6 +2834,7 @@ button[aria-busy='true'] {
   .dash-mark-blink,
   .dash-mark-breathe,
   .dash-mark-snooze,
+  .dash-mark-tip,
   .dash-mark-streak,
   .dash-mark-rattle,
   .dash-mark-read,

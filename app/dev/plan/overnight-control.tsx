@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCheck, CornerDownRight, Moon, Pause, Play, Square } from 'lucide-react';
+import { CheckCheck, Moon, Pause, Play, Square } from 'lucide-react';
 
 import {
   pauseOvernightRunner,
@@ -29,10 +29,12 @@ import {
   type FeatureProgress,
   type OnNow,
 } from '@/lib/digest/night';
-import { goalsReadyLine, type GoalOnLine, type GoalsStatus } from '@/lib/goals/runner-status';
+import { goalsReadyLine, type GoalsStatus } from '@/lib/goals/runner-status';
 import { elapsedSince, remainingUntil } from '@/lib/plan/elapsed';
 import { commitSubject, type StoredPush } from '@/lib/plan/liveness';
 import { readyFeaturesLine } from '@/lib/plan/overnight-choice';
+import { runnerSlots, type SlotSession } from '@/lib/plan/overnight-slots';
+import { RunnerCrew } from './runner-crew';
 import {
   OVERNIGHT_DEFAULT_FEATURES,
   OVERNIGHT_DEFAULT_HOURS,
@@ -97,98 +99,6 @@ function Totals({ night }: { night: DigestNight }) {
   );
 }
 
-/**
- * The feature being built, and how long it has been on it.
- *
- * `lastFire` rather than the last of `features`: a runner that came back to an
- * earlier feature is working that feature, and the deduplicated list is in the
- * order the night first reached each one. See the field's note in `night.ts`.
- */
-function OnFeature({
-  fire,
-  now,
-  progress,
-}: {
-  fire: NonNullable<DigestNight['lastFire']>;
-  now: number;
-  progress: FeatureProgress | null;
-}) {
-  return (
-    <>
-      <p className="text-small text-ink-muted">
-        On <span className="tabular text-ink">{fire.ref}</span>{' '}
-        <span className="text-ink">{fire.title}</span>
-        {now > 0 && (
-          <>
-            {' · '}
-            <span className="tabular">{elapsedSince(fire.at, now)}</span>
-          </>
-        )}
-        {progress && (
-          <>
-            {' · '}
-            <span className="tabular">
-              {progress.done} of {progress.total} steps done
-            </span>
-          </>
-        )}
-      </p>
-      {/* The step under it that a session has claimed, hung off the feature
-          as a branch the way the plan page draws a child -- note 84482e92.
-          Nothing is drawn between a fire and the session's first claim. */}
-      {fire.step && (
-        <p className="flex min-w-0 items-baseline gap-1.5 pl-2 text-small text-ink-muted">
-          <CornerDownRight
-            className="size-3 shrink-0 translate-y-0.5 text-ink-ghost"
-            strokeWidth={1.75}
-            aria-hidden
-          />
-          <span className="sr-only">Working on</span>
-          <span className="tabular text-ink">{fire.step.ref}</span>
-          <span className="min-w-0 truncate text-ink">{fire.step.title}</span>
-        </p>
-      )}
-    </>
-  );
-}
-
-/**
- * A goal run going now, drawn the way `OnFeature` draws a plan feature, with
- * what the session last said it was on hung beneath it.
- */
-function OnGoal({ run, now }: { run: GoalOnLine; now: number }) {
-  return (
-    <>
-      <p className="text-small text-ink-muted">
-        {run.doing}
-        {run.title && (
-          <>
-            {' '}
-            <span className="text-ink">{run.title}</span>
-          </>
-        )}
-        {now > 0 && (
-          <>
-            {' · '}
-            <span className="tabular">{elapsedSince(run.at, now)}</span>
-          </>
-        )}
-      </p>
-      {run.nowOn && (
-        <p className="flex min-w-0 items-baseline gap-1.5 pl-2 text-small text-ink-muted">
-          <CornerDownRight
-            className="size-3 shrink-0 translate-y-0.5 text-ink-ghost"
-            strokeWidth={1.75}
-            aria-hidden
-          />
-          <span className="sr-only">Now on</span>
-          <span className="min-w-0 truncate text-ink">{run.nowOn}</span>
-        </p>
-      )}
-    </>
-  );
-}
-
 /** How long the runner may go without a tick before the page says so. */
 const TICK_SILENT_AFTER_MINUTES = 15;
 
@@ -215,17 +125,8 @@ function TickNote({ run, now }: { run: OvernightRun; now: number }) {
       </p>
     );
   }
-  // A fire is already on the line above, as the feature it is on.
-  if (run.lastTickNote.startsWith('Started #')) return null;
-
-  return (
-    <p className="text-small text-ink-muted">
-      {run.lastTickNote}{' '}
-      <span className="tabular">
-        {ago === 'just now' ? 'Checked just now.' : `Checked ${ago} ago.`}
-      </span>
-    </p>
-  );
+  // Otherwise the note is what each sleeping Dash says beside it (plan #1704).
+  return null;
 }
 
 /**
@@ -402,9 +303,9 @@ export function OvernightControl({
   bare = false,
   mark = null,
   showBlocked = true,
-  progress = null,
   refreshReadings = false,
   on = [],
+  sessions = [],
   next = [],
   autoApprove,
 }: {
@@ -482,6 +383,11 @@ export function OvernightControl({
    */
   on?: readonly (OnNow & { progress?: FeatureProgress | null })[];
   /**
+   * The night's feature sessions, ended ones too, as `runnerCard` reads them,
+   * for the four Dashes (plan #1704).
+   */
+  sessions?: readonly SlotSession[];
+  /**
    * The features the next ticks would fire, as `runnerCard` reads them. Named
    * under the ready count so it says which ones.
    */
@@ -523,6 +429,22 @@ export function OvernightControl({
   // A stopped run on a fresh card reads as one that was never started.
   const resting = fresh && !live;
   const goalsReady = goals ? goalsReadyLine(goals) : null;
+  const goalOn = goals?.on[0] ?? null;
+  const slots = runnerSlots({
+    run,
+    sessions,
+    goalRun: goalOn
+      ? {
+          startedAt: goalOn.at,
+          // "Working the goal step: Find three courses", so the line says the
+          // kind of run as well as what it is on.
+          title: goalOn.title ? `${goalOn.doing}: ${goalOn.title}` : goalOn.doing,
+          doing: goalOn.nowOn,
+        }
+      : null,
+    goalsReason: goalsReady ?? 'No goal step is ready.',
+    now,
+  });
 
   const router = useRouter();
   useEffect(() => {
@@ -729,7 +651,17 @@ export function OvernightControl({
                     </option>
                   ))}
                 </Select>
-                <Button type="submit" size="sm" pending={starting} disabled={!canSend}>
+                {/* On a phone the select beside it has to stay 44px with 16px
+                    text (a smaller one fails the press check, and iOS zooms on
+                    focus), so Start grows to match rather than sitting short
+                    beside it (critic, #1704 round 1). */}
+                <Button
+                  type="submit"
+                  size="sm"
+                  pending={starting}
+                  disabled={!canSend}
+                  className="max-sm:min-h-11 max-sm:px-4 max-sm:text-body"
+                >
                   {starting ? 'Starting…' : 'Start'}
                 </Button>
               </form>
@@ -738,31 +670,31 @@ export function OvernightControl({
         </div>
       </div>
 
-      {/* What the night has actually been doing, under the totals: the feature
-          it is on, the last thing it pushed, and then the clock. A night that
-          has fired nothing says so in the runner's own sentence rather than
-          leaving the block empty and reading like one that is working. */}
+      {/* One Dash for each thing the runner can run at once, on or off
+          (plan #1704): working on its step, asleep with nothing ready, or
+          idle while the runner is off. */}
+      <RunnerCrew
+        slots={slots}
+        held={standing === 'paused'}
+        progress={Object.fromEntries(
+          on.flatMap((line) => (line.progress ? [[line.ref, line.progress]] : [])),
+        )}
+      />
+
+      {/* What the night has done around the Dashes: held or not, the last
+          thing it pushed, and then the clock. */}
       {live && run && night && (
         <div className="space-y-0.5">
-          {on.length > 0 ? (
-            on.map((fire) => (
-              <OnFeature
-                key={fire.ref}
-                fire={fire}
-                now={now}
-                progress={fire.progress ?? (fire.ref === night.lastFire?.ref ? progress : null)}
-              />
-            ))
-          ) : night.lastFire ? (
-            <OnFeature fire={night.lastFire} now={now} progress={progress} />
-          ) : (
+          {/* A night that has fired nothing says so in the runner's own
+              sentence, so four sleeping Dashes do not read as a stuck one. */}
+          {!night.lastFire && standing !== 'paused' && (
             <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
           )}
 
           {/* The held sentence is worth saying even when a feature is named,
               because "on #494" and "nothing new is being fired" are both true
               of a night somebody paused mid-feature. */}
-          {standing === 'paused' && night.lastFire && (
+          {standing === 'paused' && (
             <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
           )}
 
@@ -792,16 +724,6 @@ export function OvernightControl({
           />
           {showBlocked && night.blocked.length > 0 && <BlockedSteps night={night} />}
           {night.closed.length > 0 && <WhichSteps night={night} />}
-        </div>
-      )}
-
-      {/* Goal runs, whoever started them: a step sent by hand is still the
-          thing Dash is working on, and it is on no plan row. */}
-      {goals && goals.on.length > 0 && (
-        <div className="space-y-0.5">
-          {goals.on.map((run) => (
-            <OnGoal key={run.id} run={run} now={now} />
-          ))}
         </div>
       )}
 
