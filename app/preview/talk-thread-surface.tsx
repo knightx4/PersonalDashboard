@@ -2,6 +2,11 @@
 
 import { TalkThread, type TalkSend } from '@/components/talk/talk-thread';
 import { Card } from '@/components/ui/card';
+import { CostHint } from '@/components/ui/cost-hint';
+import type { UploadedAttachment } from '@/lib/attachments/rules';
+import { sumEstimates, type CostEstimate } from '@/lib/core/spend/estimate-types';
+import { filesEstimate } from '@/lib/dash/file-cost';
+import { DASH_MODELS } from '@/lib/dash/models';
 import type { TalkToolCall, TalkTurn } from '@/lib/talk/talk';
 
 /**
@@ -191,6 +196,73 @@ export function TalkThreadSurface() {
           placeholder="Ask more about this"
           onCard
           withFiles
+        />
+      </Card>
+    </div>
+  );
+}
+
+/** A bill photographed and its PDF, added to a question before it is sent. */
+const BILL_FILES: UploadedAttachment[] = [
+  {
+    path: 'preview/electricity-bill-october.jpg',
+    name: 'electricity-bill-october.jpg',
+    contentType: 'image/jpeg',
+    size: 2_100_000,
+  },
+  {
+    path: 'preview/Octopus Energy statement 2026-10.pdf',
+    name: 'Octopus Energy statement 2026-10.pdf',
+    contentType: 'application/pdf',
+    size: 380_000,
+  },
+];
+
+/** What an answer costs before any file, as the Ask Dash sheet's fixture has it. */
+const ANSWER_COST: CostEstimate = {
+  lowMicros: 20_000,
+  medianMicros: 45_000,
+  highMicros: 110_000,
+  runs: 0,
+  basis: 'guess',
+  per: 'run',
+  models: [DASH_MODELS.ask],
+};
+
+/**
+ * A question with files added, before it is sent (plan #1716): the $ beside
+ * Send is open and includes reading the two files, which is what rises as
+ * files are added. The live hint finds the answer's figure by its action
+ * (PaidHint); the gallery has no ledger, so the same sum is drawn from a
+ * fixture.
+ */
+export function TalkThreadFilesSurface() {
+  return (
+    <div className="mx-auto max-w-3xl py-4">
+      <Card padding="standard">
+        <TalkThread
+          id="talk-thread-files-preview"
+          turns={[]}
+          send={send}
+          label="Ask a question"
+          placeholder="What did I spend on eBay this month?"
+          onCard
+          withFiles
+          startWriting
+          initialDraft="What is the due date on this bill, and how much is it?"
+          initialFiles={BILL_FILES}
+          sendHint={(files) => {
+            const reading = filesEstimate(files, DASH_MODELS.ask);
+            const estimate = sumEstimates(reading ? [ANSWER_COST, reading] : [ANSWER_COST]);
+            return estimate ? (
+              <CostHint
+                estimate={estimate}
+                what="Cost of this answer from Dash, reading the files"
+                align="end"
+                defaultOpen
+              />
+            ) : null;
+          }}
         />
       </Card>
     </div>

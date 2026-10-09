@@ -70,6 +70,9 @@ function Line({ conversation, titles }: { conversation: Conversation; titles?: P
   return (
     <li className="px-4 py-3">
       <Disclosure
+        // The meta keeps its width and the title wraps instead, so "Dash 6d
+        // ago" ends inside the card at 390.
+        summaryClassName="[&>span:last-child]:shrink-0"
         onToggle={(open) => {
           if (!open) return;
           setOpened(true);

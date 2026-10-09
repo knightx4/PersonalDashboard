@@ -244,6 +244,9 @@ export function TalkThread({
   working,
   onCard = false,
   withFiles = false,
+  sendHint,
+  initialDraft = '',
+  initialFiles = [],
 }: {
   /** Unique on the page: the textarea's id is built from it. */
   id: string;
@@ -309,6 +312,15 @@ export function TalkThread({
   onCard?: boolean;
   /** Offer "Add a file" beside Send; the files go to `send` as its second argument (plan #1715). */
   withFiles?: boolean;
+  /**
+   * Beside Send: the $ hint for this reply, given the files added so far, so
+   * the figure rises as files are added (plan #1716).
+   */
+  sendHint?: (files: readonly UploadedAttachment[]) => React.ReactNode;
+  /** For the preview gallery: the box opens with these words in it. */
+  initialDraft?: string;
+  /** For the preview gallery: the box opens with these files added. */
+  initialFiles?: UploadedAttachment[];
 }) {
   const [own, setTurns] = useState<TalkTurn[]>([...initial]);
   // The thread's own turns, with any written elsewhere slotted in by time.
@@ -320,8 +332,8 @@ export function TalkThread({
     return [...own, ...added].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }, [own, incoming]);
   const [writing, setWriting] = useState(startWriting && !ask);
-  const [draft, setDraft] = useState('');
-  const [files, setFiles] = useState<UploadedAttachment[]>([]);
+  const [draft, setDraft] = useState(initialDraft);
+  const [files, setFiles] = useState<UploadedAttachment[]>(initialFiles);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Why the last answer did not come: drawn in the thread with the failed
@@ -491,16 +503,19 @@ export function TalkThread({
               ) : (
                 <span />
               )}
-              <Button
-                type="submit"
-                size="sm"
-                className="size-7 shrink-0 px-0"
-                disabled={!draft.trim() || sending || uploading}
-                title="Send"
-              >
-                <ArrowUp className="size-4" strokeWidth={2} aria-hidden />
-                <span className="sr-only">Send</span>
-              </Button>
+              <div className="flex shrink-0 items-center gap-1">
+                {sendHint?.(files)}
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="size-7 shrink-0 px-0"
+                  disabled={!draft.trim() || sending || uploading}
+                  title="Send"
+                >
+                  <ArrowUp className="size-4" strokeWidth={2} aria-hidden />
+                  <span className="sr-only">Send</span>
+                </Button>
+              </div>
             </div>
           </ComposeBox>
         </form>

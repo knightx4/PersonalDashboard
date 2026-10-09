@@ -165,7 +165,7 @@ import {
   FAILING_QUESTION,
   TRIP_GOAL,
 } from './ask-surfaces';
-import { TalkThreadSurface } from './talk-thread-surface';
+import { TalkThreadFilesSurface, TalkThreadSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { WatchingSurface } from './watching-surfaces';
@@ -4238,6 +4238,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <TalkThreadSurface />,
+  },
+  {
+    /* A question with a bill's photo and PDF added (plan #1716): Dash reads
+     * them with the question, and the $ beside Send, open, counts reading
+     * them. */
+    id: 'ask-dash-files',
+    label: 'Ask Dash · A question with files',
+    module: 'jobs',
+    width: 'page',
+    render: () => <TalkThreadFilesSurface />,
   },
 
   {
