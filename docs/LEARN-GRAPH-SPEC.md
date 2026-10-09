@@ -11,6 +11,13 @@ authored orphan is allowed where an extracted one is not, and the per-note
 extraction budget is dropped. Each is marked there with its reason. Everything
 else below stands.
 
+**[LEARN-LEVELS-SPEC.md](LEARN-LEVELS-SPEC.md) replaces the unit this
+document builds on.** What you know is recorded on topics, each with ten fixed
+levels, in one map shared across subjects, and a right answer also counts for
+everything its level rests on. The states, rungs, subjects and bar below give
+way to what that spec describes, and its section "What this revises" lists what
+stands.
+
 **[KNOWLEDGE-SPEC.md](KNOWLEDGE-SPEC.md) now sits above both this document and
 the map spec,** and settles one thing that changes how this graph is seeded.
 The probe ladder, the six states, the bar and the cost model below are
