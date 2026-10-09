@@ -3641,26 +3641,10 @@ form[data-auto-submit] [data-fallback-submit] {
   display: none;
 }
 
-/* The workspace takes the sky's largest pool, top left, in the vivid end of
- * its own mark (lib/modules.ts). The sky keeps the other three, so Jobs in
- * Polar is still Polar, with violet coming up behind it. This replaces the
- * glass rooms' corner pool, which in Aurora would be a fifth pool on top. */
-[data-theme='aurora'] [data-workspace='shopping'],
-[data-theme='dawn'] [data-workspace='shopping'] { --c-wash-near: #fb7185; }
-[data-theme='aurora'] [data-workspace='jobs'],
-[data-theme='dawn'] [data-workspace='jobs'] { --c-wash-near: #a78bfa; }
-[data-theme='aurora'] [data-workspace='todo'],
-[data-theme='dawn'] [data-workspace='todo'] { --c-wash-near: #38bdf8; }
-[data-theme='aurora'] [data-workspace='vault'],
-[data-theme='dawn'] [data-workspace='vault'] { --c-wash-near: #e879f9; }
-[data-theme='aurora'] [data-workspace='learn'],
-[data-theme='dawn'] [data-workspace='learn'] { --c-wash-near: #34d399; }
-[data-theme='aurora'] [data-workspace='news'],
-[data-theme='dawn'] [data-workspace='news'] { --c-wash-near: #e8c760; }
-[data-theme='aurora'] [data-workspace='goals'],
-[data-theme='dawn'] [data-workspace='goals'] { --c-wash-near: #a3e635; }
-[data-theme='aurora'] [data-workspace='dev'],
-[data-theme='dawn'] [data-workspace='dev'] { --c-wash-near: #94a3b8; }
+/* The sky is the same in every workspace. Each one used to take the largest
+ * ribbon in its own hue, and Goals' lime clashed with every sky, so the
+ * ribbons now stay the sky's own wherever you are. The workspace still shows
+ * in its accent: links, the current place in the sidebar, its mark. */
 
 [data-theme='aurora'] .shell-ground,
 [data-theme='dawn'] .shell-ground {
