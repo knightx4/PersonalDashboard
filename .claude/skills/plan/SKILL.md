@@ -84,6 +84,12 @@ writes are not recorded yet.
   person. `next` never lists one, `start` refuses one, and nothing in this
   skill moves one out of `proposed` — that is the person's move, on the page.
 
+  **Auto approve.** When the person has turned on auto approve (the switch on
+  the Plan row on Home, `plan_overnight_runs.auto_approve`), a trigger writes
+  every proposed row as `not_started`. A row you insert as proposed then comes
+  back approved and ready. That is the person's standing yes, not a session
+  approving: write proposals exactly as you would otherwise.
+
   **Approval is per feature.** The person approves a feature once, and that
   approves every step beneath it. A step a session adds under an approved
   feature later, while building or re-shaping, goes in ready to build and

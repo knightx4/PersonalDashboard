@@ -782,6 +782,7 @@ export function DevRaisedStatusSurface() {
       openNotes={12}
       notesLastRun={null}
       vision={null}
+      autoApprove={false}
       now={Date.parse('2026-10-06T08:00:00Z')}
     />,
   );
