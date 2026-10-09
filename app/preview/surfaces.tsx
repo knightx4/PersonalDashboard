@@ -4914,6 +4914,28 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AccountSurface tab="notifications" />,
   },
   {
+    /* Connected apps, capture tokens, spend and history (plan #1705). */
+    id: 'account-activity',
+    label: 'Account · Activity and capture tokens',
+    module: 'dev',
+    width: 'page',
+    render: () => <AccountSurface tab="activity" />,
+  },
+  {
+    /* A capture token straight after it is made, shown the once (plan #1705). */
+    id: 'account-capture-token-made',
+    label: 'Account · A capture token just made',
+    module: 'dev',
+    width: 'page',
+    render: () => (
+      <AccountSurface
+        tab="activity"
+        onlyFirstToken
+        justMade={{ label: 'iPhone Shortcut', token: 'dash_Zq3vN8kXo2Lr5TfWb9YcHs1PmAe7JuGd4KiVn0QxR6w' }}
+      />
+    ),
+  },
+  {
     id: 'home-week',
     label: "Home · The week in review",
     module: 'goals',

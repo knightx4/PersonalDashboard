@@ -87,6 +87,7 @@ export const coreSources: ModuleSources = {
   ],
   notSources: [
     { table: 'core.account_settings', reason: 'Settings.' },
+    { table: 'core.capture_tokens', reason: 'Personal tokens a Shortcut or other tool adds things with, kept as hashes, with when each was last used and its rate-limit counts; what they add is a source in its own module.' },
     { table: 'core.connector_calls', reason: 'Each call a connected Claude app made through the connector and the rows it returned, for the account page and the rate cap; the rows it points at are sources in their own modules.' },
     { table: 'core.connector_revocations', reason: 'When a connected app\'s access was removed, so its tokens stop working.' },
     { table: 'core.dash_handoffs', reason: 'Requests Ask Dash handed to the backup routine and whether it replied; the rows the routine wrote are sources in their own modules.' },
