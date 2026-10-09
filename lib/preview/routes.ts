@@ -126,6 +126,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-answer': ['/ask', '/ask/[ref]'],
   'ask-dash-failed': ['/ask', '/ask/[ref]'],
   'ask-dash-page': ['/goals', '/ask'],
+  'ask-dash-rows': ['/shopping/inventory', '/jobs/pipeline'],
+  'jobs-pipeline-filtered': ['/jobs/pipeline'],
   'ask-dash-proposal': ['/ask', '/ask/[ref]'],
   'ask-dash-changes': ['/ask', '/ask/[ref]'],
   'ask-made-changes': ['/ask', '/ask/[ref]'],
@@ -246,11 +248,16 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
  * here (lib/preview/importers.ts), so a file only it imports, such as a piece
  * of the reply, stops there too.
  *
- * A file that imports one of these is not covered by it: a change to the
- * Ask Dash sheet (components/shell/ask-dash.tsx) still reaches its pages.
+ * A file that imports one of these is not covered by it. The Ask Dash sheet
+ * (components/shell/ask-dash.tsx) is the shell's too, and reached every
+ * surface in the gallery the same way (plan #1658); its surfaces are the
+ * ask-dash-* ones, and a change to the sheet is looked at in
+ * ask-dash-rows, which draws it open over a page with the newest thing it
+ * does.
  */
 export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-thread': ['components/talk/talk-thread.tsx'],
+  'ask-dash-rows': ['components/shell/ask-dash.tsx'],
 };
 
 /** The surface that stands for a shared component, or null for any other file. */

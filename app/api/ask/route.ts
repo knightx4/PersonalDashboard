@@ -19,7 +19,8 @@ export const dynamic = 'force-dynamic';
  * lib/talk/lookups.ts writes and reads both.
  *
  * The person comes from the session and nowhere else; the body names only the
- * question, the conversation it continues and the page it was asked on, all
+ * question, the conversation it continues, the page it was asked on and the filter
+ * of a list sent with it (plan #1658), all
  * checked by parseAskInput. JSON only, so a form on another site cannot post
  * here without the browser asking first.
  *
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
   } catch {
     body = {};
   }
-  const checked = parseAskInput(body.question, body.conversationRef, body.page);
+  const checked = parseAskInput(body.question, body.conversationRef, body.page, body.list);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({

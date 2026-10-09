@@ -4,6 +4,7 @@ import { clip, isUuid, type AskContext } from './db';
 import { OPENABLE } from './lookups';
 import { pathOf } from './page-name';
 import { executeAskTool } from './tools';
+import type { ListContext } from './filtered-list';
 
 export { pathOf };
 
@@ -217,6 +218,11 @@ export type PageContext = {
    * that is on. Its `table` and `ref` are what open_row takes.
    */
   row: { table: string; ref: string; title: string; href: string } | null;
+  /**
+   * The rows of a filtered list the person sent with the question (plan
+   * #1658), read again from the filter they were under. Absent otherwise.
+   */
+  list?: ListContext | null;
 };
 
 /**

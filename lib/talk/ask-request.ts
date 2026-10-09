@@ -6,6 +6,8 @@ import { executeProposal } from '@/lib/ask/propose';
 import { executeAskTool } from '@/lib/ask/tools';
 import { requestAskDb } from '@/lib/ask/clients';
 import { resolvePage, type PageContext } from '@/lib/ask/page';
+import { resolveFilteredList } from '@/lib/ask/filtered-list';
+import { ASK_LISTS, type AskListFilter } from '@/lib/ask/list-filter';
 import { isAskPath } from '@/lib/ask/page-name';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -53,6 +55,12 @@ export async function askDashInRequest(input: {
   conversationRef?: string | null;
   /** The app address it was asked from, already checked; null when dropped. */
   page?: string | null;
+  /**
+   * The filter a list was under when the person sent it with the question
+   * (plan #1658), already checked. Its rows are read again here and told to
+   * Dash as the ones "these" means.
+   */
+  list?: AskListFilter | null;
   /** Hears each lookup as it starts and finishes (plan #1438): the streaming route listens. */
   onLookup?: (event: AskLookupEvent) => void;
 }): Promise<AskDashResult> {
@@ -61,7 +69,12 @@ export async function askDashInRequest(input: {
   const today = todayInTimezone(settings.timezone);
   const ctx = askContext(user.id, settings);
 
-  const page = input.page ? await pageFor(ctx, input.page) : null;
+  const list = input.list ? await resolveFilteredList(ctx, input.list) : null;
+  // The sent list is on a page of its own, which Dash is told even when the
+  // person left the page out of the question.
+  const where = input.page ?? (list ? ASK_LISTS[list.list].path : null);
+  const asked = where ? await pageFor(ctx, where) : null;
+  const page = asked && list ? { ...asked, list } : asked;
   // Dash is offered the hand-off only when the backup routine can be started.
   const backup = dashBackupRoutine();
   const canHandOff = Boolean(backup.id && backup.token);

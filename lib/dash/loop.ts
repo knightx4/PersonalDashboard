@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { citationsOf, toolResultText, type AskToolResult } from '@/lib/ask/db';
 import type { PageContext } from '@/lib/ask/page';
+import type { ListContext } from '@/lib/ask/filtered-list';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { NO_HANDOFF } from '@/lib/talk/handoff';
 import { MAX_TURN, toModelMessages, type TalkCitation, type TalkToolCall, type TalkTurn } from '@/lib/talk/talk';
@@ -213,6 +214,34 @@ export function dateLine(today: string): string {
  */
 export function pageLine(page: PageContext | null | undefined): string | null {
   if (!page) return null;
+  const listed = page.list ? listLine(page.list) : null;
+  const shown = pageRowLine(page);
+  return listed ? `${shown} ${listed}` : shown;
+}
+
+/**
+ * The filtered list they sent with the question (plan #1658): which rows
+ * "these" are, with the refs the change tools take and enough of each row
+ * to count, total or chart them without a lookup apiece.
+ */
+export function listLine(list: ListContext): string {
+  if (list.total === 0) {
+    return `They sent the filtered ${list.path} list with the question, and nothing matches the filter: say so, and change nothing.`;
+  }
+  const rows = list.rows.map((row) => `${row.ref} | ${row.title.replace(/\s+/g, ' ').trim()} | ${row.facts}`);
+  const cut =
+    list.total > list.rows.length
+      ? ` Only the first ${list.rows.length} of ${list.total} are listed, which is the most one change can touch: for a change to all of them, say so and ask them to narrow the filter; for a count or a chart, say it covers the first ${list.rows.length}.`
+      : '';
+  return (
+    `They sent the list they are looking at, filtered: ${list.label}. "These", "them" and "the ones here" mean exactly these rows, ` +
+    `and any change or chart is about them only, never the rest of the list. Their refs are in ${list.table}; ` +
+    `each line is ref | name | facts. Use the refs as they are, and do not look the rows up again just to find them.${cut}\n` +
+    rows.join('\n')
+  );
+}
+
+function pageRowLine(page: PageContext): string {
   const at = `They asked from the ${page.page} page (${page.path})`;
   if (!page.row) return `${at}.`;
   const { table, ref, title } = page.row;
@@ -512,8 +541,11 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   // the thread hangs from (plan #1465).
   const row = context.page?.row;
   const subject = context.subject ? parseRef(context.subject.ref) : null;
+  const sent = context.page?.list;
+  const sentRefs = new Set(sent ? sent.rows.map((r) => r.ref) : []);
   const seenOrShown: DashSeen = (table, ref) =>
     seenByLookup(table, ref) ||
+    (sent?.table === table && sentRefs.has(ref)) ||
     (row?.table === table && row.ref === ref) ||
     (subject?.table === table && subject.id === ref);
 

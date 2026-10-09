@@ -22,6 +22,7 @@ import { scrim } from '@/components/ui/popover';
 import { commentWhen } from '@/lib/comments/when';
 import type { PaidCosts } from '@/lib/core/spend/paid-actions';
 import { isAskPath, roughPageName } from '@/lib/ask/page-name';
+import type { AskListFilter, AskRows } from '@/lib/ask/list-filter';
 import type { AskDashResult } from '@/lib/dash/ask';
 import type { DashChange } from '@/lib/talk/changes';
 import { heardLookup, readAskStream, STREAM_CUT, type LookupLine, type LookupWire } from '@/lib/talk/lookups';
@@ -75,6 +76,7 @@ export type AskSource = ChangePresses & {
     conversationRef: string | null,
     page?: string | null,
     onLookup?: (lookup: LookupWire) => void,
+    list?: AskListFilter | null,
   ) => Promise<AskDashResult>;
   recent: typeof recentAskQuestions;
   open: typeof openAskQuestion;
@@ -93,13 +95,14 @@ async function askLive(
   conversationRef: string | null,
   page: string | null = null,
   onLookup?: (lookup: LookupWire) => void,
+  list: AskListFilter | null = null,
 ): Promise<AskDashResult> {
   let response: Response;
   try {
     response = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ question, conversationRef, page }),
+      body: JSON.stringify({ question, conversationRef, page, list }),
     });
   } catch {
     return { turns: [], error: 'Dash could not be asked. Check your connection and try again.' };
@@ -128,8 +131,11 @@ const ACTIONS: AskSource = {
 };
 
 type AskDashHandle = {
-  /** Open the sheet on a new question, sending `question` at once when given. */
-  open: (question?: string) => void;
+  /**
+   * Open the sheet on a new question, sending `question` at once when given.
+   * `rows` attaches a filtered list to it (plan #1658).
+   */
+  open: (question?: string, rows?: AskRows) => void;
   source: AskSource;
 };
 
@@ -146,7 +152,7 @@ export function useAskDash(): AskDashHandle | null {
 const ACTION = 'app/api/ask/route.ts#POST';
 
 /** One opening of the sheet; the key makes a fresh one on every open. */
-type Session = { key: number; ask?: string };
+type Session = { key: number; ask?: string; rows?: AskRows };
 
 /**
  * One sheet per page. A provider inside another stands down, so the gallery
@@ -183,10 +189,10 @@ function AskDashRoot({
 }) {
   const [session, setSession] = useState<Session | null>(null);
   const opened = useRef(0);
-  const open = useCallback((question?: string) => {
+  const open = useCallback((question?: string, rows?: AskRows) => {
     opened.current += 1;
     const ask = question?.trim();
-    setSession({ key: opened.current, ask: ask || undefined });
+    setSession({ key: opened.current, ask: ask || undefined, rows });
   }, []);
   const close = useCallback(() => setSession(null), []);
   const handle = useMemo<AskDashHandle>(() => ({ open, source }), [open, source]);
@@ -208,6 +214,7 @@ function AskDashRoot({
         <AskDashSheet
           key={session.key}
           ask={session.ask}
+          rows={session.rows}
           page={page ?? pathname}
           source={source}
           onClose={close}
@@ -247,16 +254,21 @@ export function useAskSend(
   onChanges?: (changes: DashChange[]) => void,
   onHandedOff?: (count: number) => void,
   onLookup?: (lookup: LookupWire) => void,
+  list: AskListFilter | null = null,
 ): TalkSend {
   const source = useAskDash()?.source ?? ACTIONS;
   const ref = useRef(initialRef);
-  const heard = useRef({ onConversation, onChanges, onHandedOff, onLookup, page });
+  const heard = useRef({ onConversation, onChanges, onHandedOff, onLookup, page, list });
   useEffect(() => {
-    heard.current = { onConversation, onChanges, onHandedOff, onLookup, page };
+    heard.current = { onConversation, onChanges, onHandedOff, onLookup, page, list };
   });
   return useCallback<TalkSend>(async (body) => {
-    const result = await source.ask(body, ref.current, heard.current.page, (lookup) =>
-      heard.current.onLookup?.(lookup),
+    const result = await source.ask(
+      body,
+      ref.current,
+      heard.current.page,
+      (lookup) => heard.current.onLookup?.(lookup),
+      heard.current.list,
     );
     if (result.conversation && result.conversation.ref !== ref.current) {
       ref.current = result.conversation.ref;
@@ -286,6 +298,7 @@ export function AskThread({
   id,
   conversationRef,
   page = null,
+  list = null,
   turns,
   changes: initialChanges = [],
   openHandoffs = 0,
@@ -299,6 +312,8 @@ export function AskThread({
   openHandoffs?: number;
   /** The app address each question is asked from; null tells Dash no page. */
   page?: string | null;
+  /** The filter of a list sent with each question (plan #1658); null sends none. */
+  list?: AskListFilter | null;
   turns: readonly TalkTurn[];
   changes?: readonly DashChange[];
   onConversation?: (ref: string) => void;
@@ -330,6 +345,7 @@ export function AskThread({
     (added) => setChanges((current) => [...current.filter((c) => !added.some((a) => a.id === c.id)), ...added]),
     (count) => setOpen((current) => current + count),
     (lookup) => setLive((current) => heardLookup(current, lookup)),
+    list,
   );
   const onChanged = useCallback(
     (next: DashChange) => setChanges((current) => current.map((c) => (c.id === next.id ? next : c))),
@@ -421,6 +437,12 @@ function useHandoffReplies(
 /** What Dash says while it looks: long enough that the wait needs a reason. */
 export const ASK_WAITING = 'Dash is looking it up. A question that needs several lookups can take up to a minute.';
 
+/** What the box suggests while a list's rows are attached (plan #1658). */
+const ROWS_PLACEHOLDER = {
+  inventory: 'Which of these cost the most?',
+  pipeline: "Which of these haven't replied in two weeks?",
+} as const;
+
 /** The sheet shows a new question, or an earlier one reopened. */
 type View =
   | { kind: 'new'; ask?: string }
@@ -428,6 +450,8 @@ type View =
 
 type SheetProps = {
   ask?: string;
+  /** A filtered list sent with the question (plan #1658), shown above the box. */
+  rows?: AskRows;
   /** The page the sheet was opened over, told to Dash with each question. */
   page: string | null;
   source: AskSource;
@@ -442,6 +466,7 @@ function AskDashSheet(props: SheetProps) {
 /** What the sheet draws, apart from the portal it is drawn through; exported for tests. */
 export function AskDashPanel({
   ask,
+  rows: sent,
   page: opened,
   source,
   onClose,
@@ -452,6 +477,9 @@ export function AskDashPanel({
   // Dash nothing, so it starts dropped there.
   const [page, setPage] = useState(() => (opened && !isAskPath(opened) ? opened : null));
   const [pageLabel, setPageLabel] = useState<string | null>(null);
+  // The list sent with the question until its chip's × drops it; the sheet's
+  // later questions in the thread carry it too.
+  const [rows, setRows] = useState<AskRows | undefined>(sent);
   // Bumped on every change of view, so the thread below starts afresh.
   const [threadKey, setThreadKey] = useState(0);
   // Whether the question on screen has become a conversation, which is when
@@ -510,7 +538,14 @@ export function AskDashPanel({
   }
 
   const hint = <PaidHint action={ACTION} what="Cost of each answer from Dash" />;
-  const lookingAt = page ? (
+  // Rows sent from a list say more than the page they are on, so they take the chip's place.
+  const lookingAt = rows ? (
+    <LookingAt
+      label={rows.label}
+      onDrop={() => setRows(undefined)}
+      dropTitle="Do not send these rows to Dash"
+    />
+  ) : page ? (
     <LookingAt label={pageLabel ?? roughPageName(page)} onDrop={() => setPage(null)} />
   ) : null;
 
@@ -571,6 +606,7 @@ export function AskDashPanel({
                 key={threadKey}
                 ask={view.ask}
                 page={page}
+                list={rows}
                 source={source}
                 hint={hint}
                 lookingAt={lookingAt}
@@ -599,6 +635,7 @@ export function AskDashPanel({
 function NewQuestion({
   ask,
   page,
+  list,
   source,
   hint,
   lookingAt,
@@ -607,6 +644,7 @@ function NewQuestion({
 }: {
   ask?: string;
   page: string | null;
+  list?: AskRows;
   source: AskSource;
   hint: React.ReactNode;
   lookingAt: React.ReactNode;
@@ -643,10 +681,9 @@ function NewQuestion({
           <div className="min-w-0 flex-1 space-y-0.5">
             <span className="text-small font-semibold text-ink">Dash</span>
             <p className="text-body text-ink">
-              Ask me about anything in here: what you spent, who has not replied, what you wrote
-              about something. I look it up in your own things and link what I used. I can also add
-              a todo, add a step to a goal or mark a return sent back, and nothing is written until
-              you confirm it.
+              {list
+                ? `I have ${list.label}, the ones you filtered to. Ask me about them, or to change or chart just them. Nothing is written until you confirm it.`
+                : 'Ask me about anything in here: what you spent, who has not replied, what you wrote about something. I look it up in your own things and link what I used. I can also add a todo, add a step to a goal or mark a return sent back, and nothing is written until you confirm it.'}
             </p>
           </div>
         </div>
@@ -656,10 +693,11 @@ function NewQuestion({
         id="ask-dash"
         conversationRef={null}
         page={page}
+        list={list}
         turns={[]}
         onConversation={onStarted}
         label={asked ? 'Ask a follow-up' : 'Ask a question'}
-        placeholder="What did I spend on eBay this month?"
+        placeholder={list ? ROWS_PLACEHOLDER[list.list] : 'What did I spend on eBay this month?'}
         startWriting
         ask={ask}
         hint={hint}
@@ -691,7 +729,7 @@ function Earlier({
         <h3 id="ask-dash-earlier" className="text-small font-semibold text-ink-muted">
           Earlier questions
         </h3>
-        <Link href="/ask" className="text-small text-accent underline-offset-2 hover:underline">
+        <Link href="/ask" className="press-area text-small text-accent underline-offset-2 hover:underline">
           All of them
         </Link>
       </div>
@@ -776,7 +814,15 @@ function EarlierQuestion({
  * The page Dash will be told about, above the question box (plan #1272),
  * with an × that stops it being sent for the rest of the sheet.
  */
-export function LookingAt({ label, onDrop }: { label: string; onDrop: () => void }) {
+export function LookingAt({
+  label,
+  onDrop,
+  dropTitle = 'Do not tell Dash about this page',
+}: {
+  label: string;
+  onDrop: () => void;
+  dropTitle?: string;
+}) {
   return (
     <p className="flex w-fit max-w-full items-center gap-0.5 rounded-control bg-sunken py-0.5 pl-2 pr-0.5 text-small text-ink-muted">
       <span className="min-w-0 truncate">
@@ -785,11 +831,11 @@ export function LookingAt({ label, onDrop }: { label: string; onDrop: () => void
       <button
         type="button"
         onClick={onDrop}
-        title="Do not tell Dash about this page"
+        title={dropTitle}
         className="press flex size-6 shrink-0 items-center justify-center rounded-control hover:bg-surface hover:text-ink"
       >
         <X className="size-3.5" strokeWidth={2} aria-hidden />
-        <span className="sr-only">Do not tell Dash about this page</span>
+        <span className="sr-only">{dropTitle}</span>
       </button>
     </p>
   );

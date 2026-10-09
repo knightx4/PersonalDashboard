@@ -5,6 +5,7 @@ import { PipelineFilters } from '@/components/jobs/pipeline/filters';
 import { PipelineFocus } from '@/components/jobs/pipeline/focus';
 import { RolesTable } from '@/components/jobs/pipeline/table';
 import { PipelineViewToggle } from '@/components/jobs/pipeline/view-toggle';
+import { AskDashRowsButton } from '@/components/shell/ask-dash-rows-button';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
 import { PageHeader } from '@/components/shell/page-header';
@@ -12,6 +13,7 @@ import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { askListFilter } from '@/lib/ask/list-filter';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
 import { APPLICATION_SOURCES, isLive, type ApplicationSource } from '@/lib/jobs/pipeline';
 import { openApplications } from '@/lib/jobs/board-moment';
@@ -108,11 +110,13 @@ export function PipelinePage({
   for (const row of scoped) countsBySource.set(row.source, (countsBySource.get(row.source) ?? 0) + 1);
   const scored = rows.some((row) => row.scoreNote);
 
+  const askFilter = askListFilter('pipeline', params);
   const header = (
     <PageHeader
       title="Pipeline"
       actions={
         <>
+          <AskDashRowsButton filter={askFilter} count={filtered.length} className="max-sm:hidden" />
           <PipelineViewToggle view={state.view} params={params} />
           {state.view === 'table' && <DisplayMenu menu={menu} />}
           <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
@@ -126,15 +130,22 @@ export function PipelinePage({
   const tools = (
     <div className="mb-4 space-y-2">
       <SearchField placeholder="Search company or role" />
-      <PipelineFilters
-        params={params}
-        state={state}
-        counts={{ live: liveCount, closed: rows.length - liveCount, all: rows.length }}
-        sources={APPLICATION_SOURCES.filter((s) => countsBySource.has(s)).map(
-          (source) => [source, countsBySource.get(source) ?? 0] as const,
-        )}
-        scored={scored}
-      />
+      {/* On a phone the header's row has no room for the button's words, so
+          the mark alone sits at the end of the filters' line (plan #1658). */}
+      <div className="flex items-start gap-1">
+        <div className="min-w-0 flex-1">
+          <PipelineFilters
+            params={params}
+            state={state}
+            counts={{ live: liveCount, closed: rows.length - liveCount, all: rows.length }}
+            sources={APPLICATION_SOURCES.filter((s) => countsBySource.has(s)).map(
+              (source) => [source, countsBySource.get(source) ?? 0] as const,
+            )}
+            scored={scored}
+          />
+        </div>
+        <AskDashRowsButton filter={askFilter} count={filtered.length} compact className="sm:hidden" />
+      </div>
     </div>
   );
 
