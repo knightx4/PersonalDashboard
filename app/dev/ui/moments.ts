@@ -201,13 +201,13 @@ export const MOMENTS: readonly Moment[] = [
     workspace: 'dash',
     name: 'Dash at work',
     trigger: 'Asking Dash something, or a run it is doing.',
-    sees: 'Its mark comes alive in the shape of the work, and each lookup appears in the thread as Dash makes it.',
+    sees: 'Its mark comes alive in the shape of the work, and each lookup appears in the thread as Dash makes it. When Dash only acknowledges a comment, the mark comes to rest beside it and the seen mark appears in place of a reply.',
     reducedMotion:
-      'The mark holds the still shape for that kind of work, and the lookups still appear one by one.',
+      'The mark holds the still shape for that kind of work, and the lookups still appear one by one. An acknowledged comment goes straight to the resting mark and the seen mark.',
     state: {
       built: 'yes',
       where:
-        'DashMark in components/ui/dash-mark.tsx, and the lookup lines in components/talk/lookup-lines.tsx.',
+        'DashMark in components/ui/dash-mark.tsx, the lookup lines in components/talk/lookup-lines.tsx, and the seen ending in components/thread/thread.tsx.',
     },
   },
 ];

@@ -152,6 +152,7 @@ import {
 } from './goal-surfaces';
 import { StepArrivalDemo, StepCloseDemo } from './goal-moment-demos';
 import { BoardMomentDemo } from './jobs-moment-demos';
+import { DashSeenDemo } from './dash-moment-demos';
 import { OPEN_STATUSES } from '@/lib/jobs/board-moment';
 import {
   AskChangesSurface,
@@ -3123,6 +3124,40 @@ export const SURFACES: readonly Surface[] = [
               acknowledgedAt: new Date(Date.now() - 3 * 60 * 60 * 1000 - 5 * 60 * 1000 + 40_000).toISOString(),
             },
           ]}
+        />
+      </div>
+    ),
+  },
+  {
+    /* The "Dash at work" moment ending on the seen mark (plan #1652): Dash's
+     * mark works where its reply would go, then Dash only acknowledges and the
+     * mark rests under the comment as the seen mark arrives. */
+    id: 'dev-comment-thread-seen-moment',
+    label: 'Comments · Dash at work, then seen',
+    module: 'dev',
+    width: 'narrow',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="dash-seen"]',
+      shows:
+        'Dash’s mark leans and races beside “Reading the row and replying…” under the comment, then that line goes, the mark rests level under the comment and a check grows in beside “Seen by Dash”.',
+    },
+    render: () => (
+      <div className={cn(cardVariants({ padding: 'dense' }), 'space-y-2')}>
+        <p className="text-body text-ink">
+          The filter and the count disagree on who a step is handed to.
+        </p>
+        <DashSeenDemo
+          subject={threadRef('step', '00000000-0000-4000-8000-000000000416')}
+          comment={{
+            id: 'seen-moment-1',
+            author: 'me',
+            body: '@dash thanks, that settles it. I will hand #412 back myself.',
+            // Old enough that the thread is not already waiting on Dash: the
+            // press is what starts the wait.
+            createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+          }}
+          seenAt={new Date(Date.now() - 3 * 60 * 60 * 1000 + 40_000).toISOString()}
         />
       </div>
     ),

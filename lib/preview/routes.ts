@@ -40,6 +40,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'shopping-item-details': ['/shopping/inventory/[id]'],
   'dev-comment-thread': ['/dev/plan'],
   'dev-comment-thread-seen': ['/dev/plan'],
+  'dev-comment-thread-seen-moment': ['/dev/plan'],
   'dev-comment-thread-empty': ['/dev/plan'],
   'dev-comment-thread-composer': ['/dev/plan'],
   'dev-plan-tree': ['/dev/plan'],

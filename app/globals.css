@@ -2673,6 +2673,23 @@ button[aria-busy='true'] {
   animation: dash-mark-flash var(--motion-move) var(--ease-out-soft) both;
 }
 
+/* The seen mark arriving once Dash has only acknowledged a comment: it grows
+ * in from a little smaller as the mark beside it settles. */
+@keyframes dash-seen-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility dash-seen-in {
+  animation: dash-seen-in var(--motion-move) var(--ease-out-soft) both;
+}
+
 @keyframes dash-mark-wave {
   0% {
     transform: skewY(-6deg) scaleX(0.94);
@@ -2807,7 +2824,8 @@ button[aria-busy='true'] {
   .dash-mark-caret,
   .dash-mark-ponder,
   .dash-mark-flash,
-  .dash-mark-wave {
+  .dash-mark-wave,
+  .dash-seen-in {
     animation: none;
   }
 
