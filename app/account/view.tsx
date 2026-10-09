@@ -17,6 +17,7 @@ import { NotificationsSection } from './notifications';
 import { FeelSection } from './haptics';
 import { ConnectedAppsSection } from './connected-apps';
 import { CaptureTokensSection } from './capture-tokens';
+import { CaptureShortcutSection } from './capture-shortcut';
 import type { CaptureTokenListing } from '@/lib/capture/tokens';
 import type { ConnectedApp } from '@/lib/connector/apps';
 import { TabbedSections } from '@/components/patterns/tabbed-sections';
@@ -70,6 +71,8 @@ export function AccountView({
     tokens: CaptureTokenListing[];
     failed: string | null;
     justMade?: { label: string; token: string };
+    /** The capture address on this app's own origin, for the Shortcut's steps. */
+    address: string;
   } | null;
 }) {
   return (
@@ -95,7 +98,17 @@ export function AccountView({
         {tab === 'activity' && (
           <>
             {connected && <ConnectedAppsSection {...connected} timezone={settings.timezone} />}
-            {capture && <CaptureTokensSection {...capture} timezone={settings.timezone} />}
+            {capture && (
+              <>
+                <CaptureTokensSection
+                  tokens={capture.tokens}
+                  failed={capture.failed}
+                  justMade={capture.justMade}
+                  timezone={settings.timezone}
+                />
+                <CaptureShortcutSection address={capture.address} />
+              </>
+            )}
             <SpendSection />
             <TimelineSection />
           </>
