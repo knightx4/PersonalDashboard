@@ -1,3 +1,5 @@
+import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
+import { filterPipeline, parsePipeline } from '@/lib/jobs/pipeline-view';
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
 import { openingSource } from '@/lib/jobs/suggest/source';
@@ -634,6 +636,14 @@ const pipelineRows: PipelineRow[] = [
 ];
 
 /** The sent applications still open, which is all the moment demos draw. */
+/** The Pipeline narrowed to one source, as the filtered surfaces draw it (plan #1658). */
+const FILTERED_PIPELINE_PARAMS = { source: 'portal' };
+const FILTERED_PIPELINE = askListFilter('pipeline', FILTERED_PIPELINE_PARAMS)!;
+const FILTERED_PIPELINE_LABEL = askListLabel(
+  'pipeline',
+  filterPipeline(pipelineRows, parsePipeline(FILTERED_PIPELINE_PARAMS)).filtered.length,
+);
+
 const momentRows = pipelineRows.filter((row) => OPEN_STATUSES.includes(row.status));
 
 /**
@@ -2707,7 +2717,7 @@ function SpendEstimates() {
 }
 
 /** The jobs shell with This week in it, for surfaces drawn over a whole page. */
-function PreviewShell() {
+function PreviewShell({ children }: { children?: React.ReactNode }) {
   return (
     <AppShell
       account="preview"
@@ -2723,7 +2733,7 @@ function PreviewShell() {
       theme={{ kind: 'written', id: 'paper' }}
       brief={null}
     >
-      <TodayLists board={todayBoard} timezone="Europe/London" />
+      {children ?? <TodayLists board={todayBoard} timezone="Europe/London" />}
     </AppShell>
   );
 }
@@ -3175,6 +3185,22 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <PipelinePage rows={pipelineRows} params={{ view: 'board' }} />,
+  },
+  {
+    /* The Pipeline narrowed to one source (plan #1658): the header carries
+     * "Ask Dash about these", which opens the sheet with those roles. It is
+     * drawn inside the shell, which holds the sheet it opens. */
+    id: 'jobs-pipeline-filtered',
+    label: 'Pipeline · Filtered, with the button for Dash',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <AskDashSurface page="/jobs/pipeline">
+        <PreviewShell>
+          <PipelinePage rows={pipelineRows} params={FILTERED_PIPELINE_PARAMS} />
+        </PreviewShell>
+      </AskDashSurface>
+    ),
   },
   {
     /* The page as it opens: what is in process, waiting and to apply. */
@@ -4548,6 +4574,22 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <AskDashSurface open page={TRIP_GOAL}>
         <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
+    /* A filtered list sent to Dash (plan #1658): the Pipeline narrowed to one
+     * source, the sheet opened from its button with "N roles from Pipeline"
+     * above the question box in place of the page's name. */
+    id: 'ask-dash-rows',
+    label: 'Ask Dash · A filtered list sent with the question',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open page="/jobs/pipeline" rows={{ ...FILTERED_PIPELINE, label: FILTERED_PIPELINE_LABEL }}>
+        <PreviewShell>
+          <PipelinePage rows={pipelineRows} params={FILTERED_PIPELINE_PARAMS} />
+        </PreviewShell>
       </AskDashSurface>
     ),
   },

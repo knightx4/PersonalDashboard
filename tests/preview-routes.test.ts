@@ -114,6 +114,8 @@ describe('surfacesForFiles, on screen changes that shipped', () => {
       'jobs-roles-table',
       'jobs-pipeline-filtered',
       'shell-display-options',
+      'ask-dash-rows',
+      'jobs-pipeline-filtered',
     ]);
     expect(surfacesForFiles(['components/jobs/pipeline/board.tsx'])).toEqual([]);
   });
@@ -147,8 +149,15 @@ describe('surfacesForFiles, on screen changes that shipped', () => {
     ]);
   });
 
-  it('still follows a file that imports the thread to its pages', () => {
-    const found = surfacesForFiles(['components/shell/ask-dash.tsx'], using);
+  // Plan #1658: the sheet is imported by the shell too, and a change to it
+  // named 189 surfaces. It is looked at in the one that draws it open.
+  it('stops at the Ask Dash sheet\'s own surface', () => {
+    expect(surfacesForFiles(['components/shell/ask-dash.tsx'], using)).toEqual(['ask-dash-rows']);
+    expect(surfacesForFiles(['components/shell/ask-dash.tsx'])).toEqual(['ask-dash-rows']);
+  });
+
+  it('still follows a file that imports the sheet to its pages', () => {
+    const found = surfacesForFiles(['components/shell/app-shell.tsx'], using);
     expect(found).toContain('shell-full');
     // The Ask pages import the sheet for themselves, so they are still named.
     expect(found).toContain('ask-dash-page');
