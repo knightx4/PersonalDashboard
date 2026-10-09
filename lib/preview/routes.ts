@@ -129,6 +129,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-proposal': ['/ask', '/ask/[ref]'],
   'ask-dash-changes': ['/ask', '/ask/[ref]'],
   'ask-made-changes': ['/ask', '/ask/[ref]'],
+  'ask-dash-thread': ['/ask/[ref]'],
   'learn-clips': ['/learn/clips'],
   'learn-clips-empty': ['/learn/clips'],
   'learn-subject-clips': ['/learn/s/[id]/clips'],
@@ -232,6 +233,33 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-module': ['/dev/modules/[id]'],
 };
 
+/**
+ * Shared components drawn by a surface of their own, which a change to them
+ * is looked at in instead of every page that imports them (plan #1708).
+ *
+ * The Ask Dash thread is imported by the shell, so following its importers
+ * reached the root layout and named nearly every surface in the gallery. Its
+ * surface draws the thread in each state it has, and that is the check a
+ * change to it needs. The walk up from a changed file stops at a file listed
+ * here (lib/preview/importers.ts), so a file only it imports, such as a piece
+ * of the reply, stops there too.
+ *
+ * A file that imports one of these is not covered by it: a change to the
+ * Ask Dash sheet (components/shell/ask-dash.tsx) still reaches its pages.
+ */
+export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
+  'ask-dash-thread': ['components/talk/talk-thread.tsx'],
+};
+
+/** The surface that stands for a shared component, or null for any other file. */
+export function surfaceOfComponent(file: string): string | null {
+  const path = file.replace(/^\.\//, '');
+  for (const [id, files] of Object.entries(COMPONENT_SURFACES)) {
+    if (files.includes(path)) return id;
+  }
+  return null;
+}
+
 /** A route split into its segments; `/` is no segments. */
 function segmentsOf(route: string): string[] {
   return route.split('/').filter(Boolean);
@@ -328,7 +356,8 @@ function surfacesForAppFile(file: string): string[] {
  * `app/` (a component under `components/`) reaches its pages through the
  * files that import it, which `importers` supplies when the caller can read
  * the file system (lib/preview/importers.ts); without it such a file serves
- * nothing.
+ * nothing. A shared component in COMPONENT_SURFACES, changed or reached on
+ * the way up, serves its own surface in place of the pages above it.
  */
 export function surfacesForFiles(
   files: readonly string[],
@@ -340,9 +369,20 @@ export function surfacesForFiles(
     // The gallery's own files draw surfaces rather than serve a page; the
     // pages that import them (/dev/surfaces) are not what changed.
     if (!path.endsWith('.tsx') || path.startsWith('app/preview/')) continue;
+    // A shared component with a surface of its own is looked at there, and
+    // its importers are not followed (plan #1708).
+    const own = surfaceOfComponent(path);
+    if (own) {
+      found.add(own);
+      continue;
+    }
     const reached = path.startsWith('app/') ? [path] : [];
     if (importers) reached.push(...importers(path));
-    for (const appFile of reached) for (const id of surfacesForAppFile(appFile)) found.add(id);
+    for (const file of reached) {
+      const stop = surfaceOfComponent(file);
+      if (stop) found.add(stop);
+      else for (const id of surfacesForAppFile(file)) found.add(id);
+    }
   }
   return Object.keys(SURFACE_ROUTES).filter((id) => found.has(id));
 }

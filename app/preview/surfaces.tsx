@@ -161,6 +161,7 @@ import {
   FAILING_QUESTION,
   TRIP_GOAL,
 } from './ask-surfaces';
+import { TalkThreadSurface } from './talk-thread-surface';
 import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { WatchingSurface } from './watching-surfaces';
@@ -4200,6 +4201,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => <AskMadeChangesSurface />,
+  },
+  {
+    /* The Ask Dash thread on its own (plan #1708), where a change to
+     * components/talk/talk-thread.tsx is looked at: a short answer with its
+     * rows, a long markdown one, one with bars and one with a table. */
+    id: 'ask-dash-thread',
+    label: 'Ask Dash · The thread',
+    module: 'jobs',
+    width: 'page',
+    render: () => <TalkThreadSurface />,
   },
 
   {
