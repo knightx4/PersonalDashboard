@@ -72,8 +72,31 @@ const LONG_REPLY = [
   'which takes the total from $2,890 to $2,251. The flights are the only part with a deadline: the Tuesday fare has gone up twice since you saved it, so it is worth deciding on this week.',
 ].join('\n');
 
+/** A small picture standing in for a photo, as a data link since the gallery has no storage. */
+const PHOTO =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="128" height="128" fill="lightsteelblue"/><circle cx="44" cy="46" r="14" fill="khaki"/><path d="M0 128 L50 70 L84 104 L104 86 L128 112 V128 Z" fill="seagreen"/></svg>',
+  );
+
 const TURNS: TalkTurn[] = [
-  { id: 'q1', role: 'user', body: 'How much did I spend on eBay flips this quarter?', createdAt: at(9) },
+  {
+    id: 'q1',
+    role: 'user',
+    body: 'How much did I spend on eBay flips this quarter? The receipts are attached.',
+    createdAt: at(9),
+    files: [
+      { id: 'f1', name: 'catan-lot-receipt.png', contentType: 'image/png', size: 214_000, href: PHOTO },
+      { id: 'f2', name: 'ebay-orders-quarter-three.pdf', contentType: 'application/pdf', size: 1_480_000, href: '#' },
+      {
+        id: 'f3',
+        name: 'Penguin Classics bundle and the Ticket to Ride Europe listing notes, final version.docx',
+        contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        size: 48_000,
+        href: '#',
+      },
+    ],
+  },
   {
     id: 'a1',
     role: 'assistant',
@@ -167,6 +190,7 @@ export function TalkThreadSurface() {
           label="Ask a follow-up"
           placeholder="Ask more about this"
           onCard
+          withFiles
         />
       </Card>
     </div>

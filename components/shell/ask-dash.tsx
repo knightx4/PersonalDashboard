@@ -27,6 +27,7 @@ import type { DashChange } from '@/lib/talk/changes';
 import { heardLookup, readAskStream, STREAM_CUT, type LookupLine, type LookupWire } from '@/lib/talk/lookups';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
+import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { useClockNow } from '@/lib/use-clock-now';
 import {
   type OpenedAsk,
@@ -75,6 +76,7 @@ export type AskSource = ChangePresses & {
     conversationRef: string | null,
     page?: string | null,
     onLookup?: (lookup: LookupWire) => void,
+    files?: UploadedAttachment[],
   ) => Promise<AskDashResult>;
   recent: typeof recentAskQuestions;
   open: typeof openAskQuestion;
@@ -93,13 +95,14 @@ async function askLive(
   conversationRef: string | null,
   page: string | null = null,
   onLookup?: (lookup: LookupWire) => void,
+  files?: UploadedAttachment[],
 ): Promise<AskDashResult> {
   let response: Response;
   try {
     response = await fetch('/api/ask', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ question, conversationRef, page }),
+      body: JSON.stringify({ question, conversationRef, page, files }),
     });
   } catch {
     return { turns: [], error: 'Dash could not be asked. Check your connection and try again.' };
@@ -254,9 +257,13 @@ export function useAskSend(
   useEffect(() => {
     heard.current = { onConversation, onChanges, onHandedOff, onLookup, page };
   });
-  return useCallback<TalkSend>(async (body) => {
-    const result = await source.ask(body, ref.current, heard.current.page, (lookup) =>
-      heard.current.onLookup?.(lookup),
+  return useCallback<TalkSend>(async (body, files) => {
+    const result = await source.ask(
+      body,
+      ref.current,
+      heard.current.page,
+      (lookup) => heard.current.onLookup?.(lookup),
+      files,
     );
     if (result.conversation && result.conversation.ref !== ref.current) {
       ref.current = result.conversation.ref;
@@ -350,10 +357,11 @@ export function AskThread({
     <TalkThread
       id={id}
       turns={turns}
-      send={(body) => {
+      withFiles
+      send={(body, files) => {
         onSend?.();
         setLive([]);
-        return send(body);
+        return send(body, files);
       }}
       waiting={ASK_WAITING}
       working={<LookupList lines={live} label="What Dash is looking up" />}
