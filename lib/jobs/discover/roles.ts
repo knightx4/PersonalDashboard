@@ -99,6 +99,14 @@ export type DiscoveredRules = {
   room: number;
 };
 
+/** Engineering work, by its title: what a finance or operations CV cannot get. */
+const ENGINEERING_TITLE =
+  /\b(engineer|engineers|engineering|developer|programmer|swe|sre|devops|full[\s-]?stack|front[\s-]?end|back[\s-]?end)\b/i;
+
+export function isEngineeringTitle(title: string): boolean {
+  return ENGINEERING_TITLE.test(title);
+}
+
 /**
  * The roles to suggest, and the startups that had at least one role that fit
  * (whether or not it was suggested before), which is what keeps a startup on
@@ -108,9 +116,16 @@ export function pickDiscovered(
   postings: readonly DiscoveredPosting[],
   rules: DiscoveredRules,
 ): { picks: DiscoveredPosting[]; fitted: Set<string> } {
+  // Nothing after this rule asks Dash, so a title match is the whole test.
+  // One saved lead with "Engineer" in it matched every engineering role at
+  // every startup, so engineering roles come only to someone whose target
+  // titles are engineering.
+  const engineering = rules.targetTitles.some(isEngineeringTitle);
   const allowed = postings.filter(
     (posting) =>
-      !rules.knownCompanies.has(companyKey(posting.company)) && postingPlaceFits(posting.location, rules.preferences),
+      !rules.knownCompanies.has(companyKey(posting.company)) &&
+      postingPlaceFits(posting.location, rules.preferences) &&
+      (engineering || !isEngineeringTitle(posting.title)),
   );
   const base = {
     targetTitles: rules.targetTitles,
