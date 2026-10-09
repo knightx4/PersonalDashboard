@@ -86,7 +86,7 @@ describe('buildPostsPage', () => {
     const card = page.suggested[0]!;
     expect(card.sources.map((source) => source.label)).toEqual(['#1415', '#1417', 'a note']);
     expect(card.sources[2]).toMatchObject({ title: 'The posts page is slow', href: '/dev/bugs#note-n1' });
-    expect(card.images).toEqual(['https://example.com/shot.png']);
+    expect(card.images).toEqual([{ path: 'https://example.com/shot.png', src: 'https://example.com/shot.png' }]);
     expect(card.day).toBe('1 Oct');
     expect(page.posted[0]!.day).toBe('2 Oct');
   });

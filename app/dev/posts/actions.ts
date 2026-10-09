@@ -8,10 +8,14 @@ import { sourceProblems } from '@/lib/dev/post-check';
 import {
   angleFromPost,
   cleanThread,
+  isUploadedPostImage,
   MAX_ANGLE,
   MAX_POST_ASK,
+  MAX_POST_IMAGES,
   MAX_THREAD_POSTS,
+  ownsPostImagePath,
   parsePostedUrl,
+  POST_IMAGES_BUCKET,
 } from '@/lib/dev/posts';
 import { startPostsRun } from '@/lib/dev/posts-run';
 
@@ -189,6 +193,10 @@ export async function editPostBody(
  * The thread comes in as separate boxes (`post` repeated). The angle is
  * optional: left blank it is the first post's opening sentence
  * (angleFromPost), since the next run reads every angle to avoid repeating one.
+ *
+ * Images were uploaded to the person's folder of the bucket before the form
+ * was sent (upload-image.ts), so only their paths come in (`image`), each
+ * checked to be theirs.
  */
 // latency: pending
 export async function writePost(
@@ -207,9 +215,15 @@ export async function writePost(
   const angle = (typeof rawAngle === 'string' ? rawAngle.trim() : '') || angleFromPost(body[0]!);
   if (angle.length > MAX_ANGLE) return { error: `Keep what it is about under ${MAX_ANGLE} characters.` };
 
+  const images = formData.getAll('image').map(String);
+  if (images.length > MAX_POST_IMAGES) return { error: `A post takes at most ${MAX_POST_IMAGES} images.` };
+  if (images.some((path) => !ownsPostImagePath(user.id, path))) {
+    return { error: 'One of the images could not be found. Add it again.' };
+  }
+
   const { error } = await supabase
     .from('social_posts')
-    .insert({ user_id: user.id, angle, draft: body, body });
+    .insert({ user_id: user.id, angle, draft: body, body, image_paths: images });
   if (error) return { error: error.message };
 
   revalidatePath(POSTS_PATH);
@@ -243,6 +257,93 @@ export async function editPostAngle(
 
   revalidatePath(POSTS_PATH);
   return { message: 'Saved.' };
+}
+
+/**
+ * Add an image the person uploaded to a waiting draft, up to four. The file
+ * is already in their folder of the bucket; this records its path.
+ */
+// latency: pending
+export async function addPostImage(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = idSchema.safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing post.' };
+  const path = String(formData.get('path') ?? '');
+  if (!ownsPostImagePath(user.id, path)) return { error: 'That image could not be found. Add it again.' };
+
+  const { data: row, error: readError } = await supabase
+    .from('social_posts')
+    .select('image_paths')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'suggested')
+    .maybeSingle();
+  if (readError) return { error: readError.message };
+  if (!row) return { error: 'This draft is no longer waiting to be posted.' };
+  const current = (row.image_paths ?? []) as string[];
+  if (current.length >= MAX_POST_IMAGES) return { error: `A post takes at most ${MAX_POST_IMAGES} images.` };
+
+  const { error } = await supabase
+    .from('social_posts')
+    .update({ image_paths: [...current, path] })
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'suggested');
+  if (error) return { error: error.message };
+
+  revalidatePath(POSTS_PATH);
+  return { message: 'Image added.' };
+}
+
+/**
+ * Take an image off a waiting draft. An uploaded one is deleted from the
+ * bucket as well; a committed screenshot stays in the repository, since
+ * another draft may use it.
+ */
+// latency: pending
+export async function removePostImage(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = idSchema.safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing post.' };
+  const path = String(formData.get('path') ?? '');
+
+  const { data: row, error: readError } = await supabase
+    .from('social_posts')
+    .select('image_paths')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'suggested')
+    .maybeSingle();
+  if (readError) return { error: readError.message };
+  if (!row) return { error: 'This draft is no longer waiting to be posted.' };
+  const current = (row.image_paths ?? []) as string[];
+  if (!current.includes(path)) return {};
+
+  const { error } = await supabase
+    .from('social_posts')
+    .update({ image_paths: current.filter((p) => p !== path) })
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'suggested');
+  if (error) return { error: error.message };
+
+  if (isUploadedPostImage(path) && ownsPostImagePath(user.id, path)) {
+    // A file left behind costs a few hundred kilobytes; the draft is right either way.
+    await supabase.storage.from(POST_IMAGES_BUCKET).remove([path]);
+  }
+
+  revalidatePath(POSTS_PATH);
+  return { message: 'Image removed.' };
 }
 
 /** Mark a suggested draft posted, with the link the person pasted back. */
