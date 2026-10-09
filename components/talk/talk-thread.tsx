@@ -466,6 +466,7 @@ export function TalkThread({
             <ComposeBody
               id={`${id}-talk`}
               rows={1}
+              className="min-h-11 sm:min-h-0"
               autoFocus
               maxLength={MAX_TURN}
               placeholder={placeholder}
