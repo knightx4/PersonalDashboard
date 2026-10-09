@@ -1,4 +1,5 @@
 import { PostsScreen } from '@/app/dev/posts/posts-view';
+import { WritePost } from '@/app/dev/posts/write-post';
 import { socialPostFromRow } from '@/lib/dev/posts';
 import { buildPostsPage } from '@/lib/dev/posts-page';
 
@@ -102,4 +103,13 @@ export function PostsDraftingSurface() {
     now: NOW,
   });
   return <PostsScreen page={page} />;
+}
+
+/** Write your own, opened: the compose box a post the person writes goes in. */
+export function PostsWriteSurface() {
+  return (
+    <div className="mx-auto max-w-3xl">
+      <WritePost defaultOpen />
+    </div>
+  );
 }

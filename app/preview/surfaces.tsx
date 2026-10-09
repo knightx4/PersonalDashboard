@@ -174,7 +174,7 @@ import {
   InspirationListSurface,
   InspirationUnreadSurface,
 } from './inspiration-surfaces';
-import { PostsDraftingSurface, PostsSurface } from './posts-surfaces';
+import { PostsDraftingSurface, PostsSurface, PostsWriteSurface } from './posts-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
@@ -4348,6 +4348,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PostsDraftingSurface />,
+  },
+  {
+    /* Write your own, opened: a post the person writes joins the drafts. */
+    id: 'dev-posts-write',
+    label: 'Dev · Posts, writing your own',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsWriteSurface />,
   },
   {
     /* Home as a whole page on the main-plus-rail pattern (plan #1627): the

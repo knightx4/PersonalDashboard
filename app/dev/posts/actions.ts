@@ -5,7 +5,14 @@ import { z } from 'zod';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import { sourceProblems } from '@/lib/dev/post-check';
-import { cleanThread, MAX_POST_ASK, MAX_THREAD_POSTS, parsePostedUrl } from '@/lib/dev/posts';
+import {
+  angleFromPost,
+  cleanThread,
+  MAX_ANGLE,
+  MAX_POST_ASK,
+  MAX_THREAD_POSTS,
+  parsePostedUrl,
+} from '@/lib/dev/posts';
 import { startPostsRun } from '@/lib/dev/posts-run';
 
 /**
@@ -163,6 +170,70 @@ export async function editPostBody(
   const { data, error } = await supabase
     .from('social_posts')
     .update({ body })
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('status', 'suggested')
+    .select('id');
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: 'This draft is no longer waiting to be posted.' };
+
+  revalidatePath(POSTS_PATH);
+  return { message: 'Saved.' };
+}
+
+/**
+ * A post the person wrote themselves. It joins the drafts as a suggested row
+ * like any other, so it is edited, copied and marked posted the same way.
+ * `draft` starts equal to `body`, as for Dash's, and no run made it.
+ *
+ * The thread comes in as separate boxes (`post` repeated). The angle is
+ * optional: left blank it is the first post's opening sentence
+ * (angleFromPost), since the next run reads every angle to avoid repeating one.
+ */
+// latency: pending
+export async function writePost(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const posts = formData.getAll('post').map((value) => (typeof value === 'string' ? value : ''));
+  if (posts.length > MAX_THREAD_POSTS) return { error: `A thread is at most ${MAX_THREAD_POSTS} posts.` };
+  const body = cleanThread(posts);
+  if (!body) return { error: 'Write the post first.' };
+
+  const rawAngle = formData.get('angle');
+  const angle = (typeof rawAngle === 'string' ? rawAngle.trim() : '') || angleFromPost(body[0]!);
+  if (angle.length > MAX_ANGLE) return { error: `Keep what it is about under ${MAX_ANGLE} characters.` };
+
+  const { error } = await supabase
+    .from('social_posts')
+    .insert({ user_id: user.id, angle, draft: body, body });
+  if (error) return { error: error.message };
+
+  revalidatePath(POSTS_PATH);
+  return { message: 'Added to your drafts.' };
+}
+
+/** Change what a suggested draft is about: its one-line angle. */
+// latency: pending
+export async function editPostAngle(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = idSchema.safeParse(formData.get('id'));
+  if (!id.success) return { error: 'Missing post.' };
+  const angle = String(formData.get('angle') ?? '').trim();
+  if (!angle) return { error: 'Say what the post is about in a line.' };
+  if (angle.length > MAX_ANGLE) return { error: `Keep it under ${MAX_ANGLE} characters.` };
+
+  const { data, error } = await supabase
+    .from('social_posts')
+    .update({ angle })
     .eq('user_id', user.id)
     .eq('id', id.data)
     .eq('status', 'suggested')
