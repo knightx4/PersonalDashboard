@@ -174,6 +174,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-motion-travel': ['/dev/ui'],
   'dev-motion-settle': ['/dev/ui'],
   'dev-motion-clear': ['/dev/ui'],
+  'dash-mark': ['/dev/ui'],
   'todo-day-close': ['/todo'],
   'todo-day-closed': ['/todo'],
   'news-quick-got-through': ['/news'],
