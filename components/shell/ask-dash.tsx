@@ -28,6 +28,8 @@ import { heardLookup, readAskStream, STREAM_CUT, type LookupLine, type LookupWir
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
+import { filesEstimate } from '@/lib/dash/file-cost';
+import { DASH_MODELS } from '@/lib/dash/models';
 import { useClockNow } from '@/lib/use-clock-now';
 import {
   type OpenedAsk,
@@ -358,6 +360,14 @@ export function AskThread({
       id={id}
       turns={turns}
       withFiles
+      sendHint={(files) => (
+        <PaidHint
+          action={ACTION}
+          plus={filesEstimate(files, DASH_MODELS.ask)}
+          what={files.length > 0 ? 'Cost of this answer from Dash, reading the files' : 'Cost of this answer from Dash'}
+          align="end"
+        />
+      )}
       send={(body, files) => {
         onSend?.();
         setLive([]);
@@ -538,11 +548,10 @@ export function AskDashPanel({
         <PaidCostsProvider costs={costs}>
           <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex min-h-8 items-center gap-2">
                 <h2 id="ask-dash-title" className="text-ui font-semibold text-ink">
                   Ask Dash
                 </h2>
-                {hint}
               </div>
               {view.kind === 'earlier' && view.title && (
                 <p className="mt-0.5 line-clamp-2 break-words text-ui text-ink-muted">

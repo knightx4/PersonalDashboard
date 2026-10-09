@@ -131,6 +131,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-changes': ['/ask', '/ask/[ref]'],
   'ask-made-changes': ['/ask', '/ask/[ref]'],
   'ask-dash-thread': ['/ask/[ref]'],
+  'ask-dash-files': ['/ask', '/ask/[ref]'],
   'learn-clips': ['/learn/clips'],
   'learn-clips-empty': ['/learn/clips'],
   'learn-subject-clips': ['/learn/s/[id]/clips'],
@@ -261,6 +262,11 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
  */
 export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-thread': ['components/talk/talk-thread.tsx'],
+  // The box open with files added and the $ beside Send (plan #1716).
+  'ask-dash-files': ['components/talk/talk-thread.tsx'],
+  // The $ hint found by the action it prices: drawn on its own surface, as
+  // every paid button in the app imports it (plan #1716).
+  'core-cost-hint': ['components/ui/paid-hint.tsx'],
   'shell-full': ['components/shell/app-shell.tsx'],
   // The note button's panel, open with files added (plan #1713).
   'shell-note': ['components/shell/feedback-button.tsx'],

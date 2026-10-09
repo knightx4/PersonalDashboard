@@ -5,6 +5,7 @@ import type { PageContext } from '@/lib/ask/page';
 import type { DashChange, MadeDashChange, NewDashChange } from '@/lib/talk/changes';
 import { HANDED_OFF, handoffRequest, type DashHandoff } from '@/lib/talk/handoff';
 import { DASH_MODELS } from './models';
+import type { DashFile } from './files';
 import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import {
@@ -160,6 +161,8 @@ export type AskProposer = DashProposer;
 export async function answerQuestion(input: {
   /** The conversation so far, oldest first, ending with the question. */
   turns: readonly Pick<TalkTurn, 'role' | 'body' | 'citations'>[];
+  /** The files sent with the question, read, for the model to read (plan #1716). */
+  files?: readonly DashFile[];
   /** YYYY-MM-DD in the person's timezone. */
   today: string;
   /** The page the question was asked from; null or absent when none is told. */
@@ -195,6 +198,11 @@ export type AskStores = {
   start: (question: string) => Promise<TalkSubject & { kind: 'ask' }>;
   load: (ref: string) => Promise<TalkTurn[]>;
   append: (subject: TalkSubject, turns: readonly NewTalkTurn[]) => Promise<TalkTurn[]>;
+  /**
+   * The files a question was sent with, downloaded and read (plan #1716).
+   * Absent, or when it throws: Dash is told their names only.
+   */
+  readFiles?: (turnId: string) => Promise<DashFile[]>;
   /** Writes what the calls cost, under the operation 'ask-dash'. Never throws. */
   recordSpend: (reports: Parameters<SpendSink>[0][]) => Promise<void>;
   /** Keeps a proposal in the conversation (changes.ts insertProposal). */
@@ -399,9 +407,24 @@ export async function askDash(
       console.error('ask hand-offs were not removed', error);
     }
   };
+  // The newest question's files are read and sent to the model (plan #1716);
+  // earlier questions' files are named in the history and not sent again.
+  const conversationSoFar = [...earlier, ...asked];
+  const newest = conversationSoFar.findLastIndex((turn) => turn.role === 'user');
+  let files: DashFile[] | undefined;
+  const sentNow = conversationSoFar[newest];
+  if (sentNow?.files?.length && stores.readFiles) {
+    try {
+      files = await stores.readFiles(sentNow.id);
+    } catch (error) {
+      console.error('the files sent with a question were not read', error);
+    }
+  }
   const answer = await answerQuestion({
-    // Dash is told the files' names only for now (plan #1716 lets it read the newest).
-    turns: [...earlier, ...asked].map((turn) => ({ ...turn, body: bodyWithFileNames(turn) })),
+    turns: conversationSoFar.map((turn, index) =>
+      index === newest && files?.length ? turn : { ...turn, body: bodyWithFileNames(turn) },
+    ),
+    files,
     today: input.today,
     page: input.page,
     execute: input.execute,

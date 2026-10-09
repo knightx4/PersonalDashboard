@@ -34,7 +34,7 @@ import {
 } from './changes';
 import { appendTurns, listConversations, loadConversation, startAsk, type ConversationSummary } from './store';
 import type { TalkTurn } from './talk';
-import { recordTurnFiles, withTurnFiles } from './turn-files';
+import { readTurnFiles, recordTurnFiles, withTurnFiles } from './turn-files';
 
 /**
  * Asking Dash from a request (plan #1089): the signed-in person, their
@@ -91,6 +91,7 @@ export async function askDashInRequest(input: {
       load: async (ref) => withTurnFiles(core, await loadConversation(core, { kind: 'ask', ref })),
       append: async (subject, turns) =>
         recordTurnFiles(core, user.id, turns, await appendTurns(core, user.id, subject, turns)),
+      readFiles: (turnId) => readTurnFiles(core, turnId),
       recordSpend: (reports) =>
         recordSpendReports(core, user.id, { module: 'core', operation: 'ask-dash' }, reports),
       saveProposal: (conversationId, change) => insertProposal(core, user.id, conversationId, change),

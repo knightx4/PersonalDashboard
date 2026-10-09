@@ -6,6 +6,7 @@ import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { NO_HANDOFF } from '@/lib/talk/handoff';
 import { MAX_TURN, toModelMessages, type TalkCitation, type TalkToolCall, type TalkTurn } from '@/lib/talk/talk';
 import { parseRef } from '@/lib/core/refs';
+import { fileBlocks, type DashFile } from './files';
 import { dashTool, type DashHandoffTool, type DashTool, type DashWriteTool } from './registry';
 
 /**
@@ -356,6 +357,22 @@ function historyMessages(turns: readonly Pick<TalkTurn, 'role' | 'body' | 'citat
   );
 }
 
+/**
+ * The history with the newest question's files put before its words (plan
+ * #1716), so the model reads what was sent with it. Earlier questions' files
+ * are named in their bodies and not sent again.
+ */
+export function withNewestFiles(
+  messages: Anthropic.MessageParam[],
+  files: readonly DashFile[] | undefined,
+): Anthropic.MessageParam[] {
+  const last = messages[messages.length - 1];
+  if (!files || files.length === 0 || !last || last.role !== 'user') return messages;
+  const words: Anthropic.ContentBlockParam[] =
+    typeof last.content === 'string' ? [{ type: 'text', text: last.content }] : [...last.content];
+  return [...messages.slice(0, -1), { role: 'user', content: [...fileBlocks(files), ...words] }];
+}
+
 /** Moves the one rolling cache breakpoint onto the newest tool results. */
 function withRollingBreakpoint(messages: Anthropic.MessageParam[]): Anthropic.MessageParam[] {
   const last = messages[messages.length - 1];
@@ -434,6 +451,11 @@ export type DashRun = {
   context: DashContext;
   /** The conversation so far, oldest first, ending with the person's turn. */
   turns: readonly Pick<TalkTurn, 'role' | 'body' | 'citations'>[];
+  /**
+   * The files sent with the last turn, read (lib/dash/files.ts): put before
+   * its words for the model to read (plan #1716). Absent: none.
+   */
+  files?: readonly DashFile[];
   /** YYYY-MM-DD in the person's timezone. */
   today: string;
   execute: DashExecutor;
@@ -498,7 +520,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     if (!built) return { ok: false, detail, toolCalls };
     return { ok: true, body: built.body, toolCalls, citations: built.citations, stop: 'unfinished' };
   };
-  const history = historyMessages(input.turns);
+  const history = withNewestFiles(historyMessages(input.turns), input.files);
   if (history.length === 0 || history[history.length - 1].role !== 'user') {
     return { ok: false, detail: 'There is no question to answer.', toolCalls };
   }
