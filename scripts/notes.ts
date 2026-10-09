@@ -7,7 +7,10 @@
  *
  *   npx tsx scripts/notes.ts list [--all]
  *   npx tsx scripts/notes.ts next              # the open note to claim next
- *   npx tsx scripts/notes.ts show <id>          # the note, and the thread under it
+ *   npx tsx scripts/notes.ts show <id>          # the note, its files, and the thread under it
+ *   npx tsx scripts/notes.ts files <id>         # download its files to .notes-files/<id>/
+ *                                # needs NEXT_PUBLIC_SUPABASE_URL and
+ *                                # SUPABASE_SERVICE_ROLE_KEY as well
  *   npx tsx scripts/notes.ts start <id>
  *   npx tsx scripts/notes.ts done <id> --note "what changed" [--commit <sha>]
  *                                # refused unless GitHub says that commit is on
@@ -32,6 +35,10 @@
  * written.
  */
 import { execSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { createClient } from '@supabase/supabase-js';
+import { ATTACHMENTS_BUCKET, attachmentSize } from '../lib/attachments/rules';
 import postgres from 'postgres';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { and, eq, inArray, sql } from 'drizzle-orm';
@@ -104,6 +111,56 @@ async function threadOf(database: Db, noteId: string): Promise<ThreadRow[]> {
         where ref = ${`public.feedback_items:${noteId}`}
         order by created_at`,
   );
+}
+
+/**
+ * The files filed with a note from the note button (plan #1713), oldest
+ * first. Raw SQL for the same reason as the thread: core.attachments is not
+ * in lib/db/schema.ts.
+ */
+type FileRow = { id: string; name: string; content_type: string; size_bytes: number; path: string };
+
+async function filesOf(database: Db, noteId: string): Promise<FileRow[]> {
+  return database.execute<FileRow>(
+    sql`select id, name, content_type, size_bytes, path from core.attachments
+        where ref = ${`public.feedback_items:${noteId}`}
+        order by created_at`,
+  );
+}
+
+/**
+ * Download a note's files into .notes-files/<first 8 of its id>/, so a
+ * session can open each one: Read shows a picture or a PDF. The bucket is
+ * private, so this takes the service role key, which reads every folder.
+ */
+async function downloadFiles(noteId: string, files: FileRow[]): Promise<void> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    console.error(
+      'NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are needed to download files. ' +
+        'Without them, open the files from the note on /dev/bugs.',
+    );
+    process.exit(1);
+  }
+  const storage = createClient(url, key, { auth: { persistSession: false } }).storage.from(
+    ATTACHMENTS_BUCKET,
+  );
+  const dir = join('.notes-files', shortId(noteId));
+  mkdirSync(dir, { recursive: true });
+  for (const [index, file] of files.entries()) {
+    const { data, error } = await storage.download(file.path);
+    if (error || !data) {
+      console.error(`  ${file.name}: could not be downloaded (${error?.message ?? 'no data'})`);
+      continue;
+    }
+    // The stored name after its uuid, which attachmentPath has already made
+    // safe, numbered so two files of the same name both land.
+    const stored = file.path.split('/').pop() ?? '';
+    const target = join(dir, `${index + 1}-${stored.slice(37) || 'file'}`);
+    writeFileSync(target, Buffer.from(await data.arrayBuffer()));
+    console.log(`  ${target}  (${file.name}, ${attachmentSize(Number(file.size_bytes))})`);
+  }
 }
 
 async function findOne(database: Db, idPrefix: string) {
@@ -267,6 +324,14 @@ async function main(): Promise<void> {
     printRow(row, true);
     console.log(`\n${row.body}`);
 
+    const files = await filesOf(database, row.id);
+    if (files.length > 0) {
+      console.log(`\nFiled with it (open them before working it: notes.ts files ${shortId(row.id)}):`);
+      for (const file of files) {
+        console.log(`  ${file.name}  ${file.content_type}, ${attachmentSize(Number(file.size_bytes))}`);
+      }
+    }
+
     const thread = await threadOf(database, row.id);
     if (thread.length > 0) {
       console.log('\nWritten under it since:');
@@ -276,6 +341,17 @@ async function main(): Promise<void> {
         console.log(`  ${who} ${when}: ${comment.body.replace(/\s+/g, ' ')}`);
       }
     }
+    return;
+  }
+
+  if (command === 'files') {
+    const files = await filesOf(database, row.id);
+    if (files.length === 0) {
+      console.log(`${shortId(row.id)} has no files.`);
+      return;
+    }
+    console.log(`${shortId(row.id)}: ${files.length} file(s)`);
+    await downloadFiles(row.id, files);
     return;
   }
 

@@ -65,6 +65,7 @@ export function RunRoutineButton({
   onNavigate,
   divider = 'top',
   lastRun,
+  hint = true,
 }: {
   /** Outstanding notes, shown beside the button. Omitted while unknown. */
   openCount?: number | null;
@@ -82,6 +83,12 @@ export function RunRoutineButton({
    * would be a line under a line.
    */
   divider?: 'top' | 'bottom' | 'none';
+  /**
+   * The line saying what the button does. Left off on the Bugs page, where
+   * the page is about the queue and the line sat bare on the ground (critic,
+   * plan #1713); the panel in the top bar keeps it.
+   */
+  hint?: boolean;
   /**
    * What the last run did, as `notesLastRun` infers it. Passed by the Status
    * panel on Dash, where the row otherwise has nothing to say between runs.
@@ -182,7 +189,7 @@ export function RunRoutineButton({
           {notesLastRunLine(lastRun)}.
         </p>
       )}
-      {run === null && !lastRun && (
+      {hint && run === null && !lastRun && (
         <p className="text-ui text-ink-muted">
           Works the outstanding notes now instead of waiting for the schedule.
         </p>

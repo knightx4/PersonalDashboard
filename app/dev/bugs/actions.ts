@@ -22,6 +22,9 @@ import { triageRow } from '@/lib/feedback/triage-run';
 import { scoreIdeaRow } from '@/lib/ideas/score-run';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import { addThreadTurn } from '@/lib/thread/store';
+import { parseUploadedAttachments } from '@/lib/attachments/rules';
+import { recordAttachments, removeAttachmentsFor } from '@/lib/attachments/store';
+import { noteFilesBrief, noteRef, outstandingNoteFiles } from '@/lib/feedback/files';
 
 /** One queue, one page. The old per-workspace pages redirect to it. */
 function revalidateFeedback(): void {
@@ -100,9 +103,22 @@ export async function submitFeedback(
     .single();
   if (error) return { error: error.message };
 
+  // The files added with "Add a file" (plan #1713), already in your folder of
+  // the bucket, recorded against the note now that it has an id. The note is
+  // kept when this fails, and the message says the files did not go with it.
+  const files = parseUploadedAttachments(formData.get('attachments'), user.id);
+  let filesError: string | null = null;
+  if (files.length > 0 && data?.id) {
+    try {
+      await recordAttachments(await createCoreClient(), user.id, noteRef(String(data.id)), files);
+    } catch {
+      filesError = 'Note saved, but its files could not be added.';
+    }
+  }
+
   revalidateFeedback();
   return {
-    message: SAVED[parsed.data.kind],
+    message: filesError ?? SAVED[parsed.data.kind],
     filed: data?.id ? { table: 'feedback_items', id: String(data.id) } : undefined,
   };
 }
@@ -349,6 +365,14 @@ export async function deleteFeedback(
     .eq('user_id', user.id);
   if (error) return { error: error.message };
 
+  // A note's files are recorded by ref, which nothing cascades from, so they
+  // go with it here (plan #1713). Best effort: the note is already gone.
+  try {
+    await removeAttachmentsFor(await createCoreClient(), noteRef(id.data));
+  } catch (filesError) {
+    console.error(`Removing a deleted note's files failed: ${(filesError as Error).message}`);
+  }
+
   revalidateFeedback();
   return { message: 'Deleted.' };
 }
@@ -369,11 +393,26 @@ export async function runFeatureRoutine(
   const supabase = await createClient();
   const user = await requireOwner({ supabase });
 
+  // A run reads the queue through SQL, which cannot open the private bucket,
+  // so the files on the notes it will work go with it as signed links
+  // (plan #1713).
+  const { data: open } = await supabase
+    .from('feedback_items')
+    .select('id')
+    .eq('user_id', user.id)
+    .in('status', [...OUTSTANDING_STATUSES])
+    .in('kind', [...NOTES_WORK_KINDS]);
+  const files = await outstandingNoteFiles(
+    await createCoreClient(),
+    ((open ?? []) as { id: string }[]).map((row) => row.id),
+  );
+
   const result = await startRoutineRun({
     supabase,
     userId: user.id,
     job: 'notes',
     routine: notesRoutine(),
+    text: noteFilesBrief(files),
   });
   if (!result.ok) return { error: result.error };
   return { message: result.detail };
