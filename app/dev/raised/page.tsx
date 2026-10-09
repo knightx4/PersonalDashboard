@@ -10,6 +10,7 @@ import { loadConversations } from '@/lib/comments/recent';
 import { loadFeatureFires, loadLastRuns, loadStartedRuns } from '@/lib/plan/runs';
 import { loadOvernightRun } from '@/lib/plan/overnight';
 import { runnerCard } from '@/lib/plan/runner-card';
+import { loadAutoApprove } from '@/lib/plan/auto-approve';
 import { planRoutine } from '@/lib/feedback/routine';
 import { loadNotesLastRun } from '@/lib/feedback/last-worked';
 import { loadVisionReviewStatus } from '@/lib/specs/vision-review-run';
@@ -102,6 +103,7 @@ export default async function DevRaisedPage() {
     specChanges,
     mainCheck,
     recentScreens,
+    autoApprove,
   ] = await Promise.all([
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
@@ -139,6 +141,8 @@ export default async function DevRaisedPage() {
     // The screens changed in the last two days, for the pictures. Two days
     // rather than one, so a morning after a quiet day still has something.
     loadRecentScreenChanges(supabase, user.id, new Date(now - SHIPPED_WINDOW_MS).toISOString()),
+    // The runner's auto approve switch, drawn on its row.
+    loadAutoApprove(supabase, user.id),
   ]);
   const comingBack = (checkBacks.data ?? []).map((row) => checkBackFrom(row as Record<string, unknown>));
 
@@ -212,6 +216,7 @@ export default async function DevRaisedPage() {
         openNotes={openNotes.count ?? 0}
         notesLastRun={notesLastRun}
         vision={vision}
+        autoApprove={autoApprove}
         now={now}
       />
       {shipped.some((screen) => screen.change.after) && (

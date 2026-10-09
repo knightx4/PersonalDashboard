@@ -2,11 +2,12 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CornerDownRight, Moon, Pause, Play, Square } from 'lucide-react';
+import { CheckCheck, CornerDownRight, Moon, Pause, Play, Square } from 'lucide-react';
 
 import {
   pauseOvernightRunner,
   resumeOvernightRunner,
+  setAutoApproveAction,
   startOvernightRunner,
   stopOvernightRunner,
   type PlanActionState,
@@ -405,6 +406,7 @@ export function OvernightControl({
   refreshReadings = false,
   on = [],
   next = [],
+  autoApprove,
 }: {
   run: OvernightRun | null;
   canSend: boolean;
@@ -508,6 +510,12 @@ export function OvernightControl({
    * in the banner above the plan rather than on each thing it emptied.
    */
   push: StoredPush | null;
+  /**
+   * Whether auto approve is on, which draws its switch. Home passes it; the
+   * plan page leaves it off. With it on, every feature and step a session
+   * proposes is approved as it is written (lib/plan/auto-approve.ts).
+   */
+  autoApprove?: boolean;
 }) {
   const now = useClockNow();
   const standing = overnightStanding(run);
@@ -550,6 +558,10 @@ export function OvernightControl({
     stopOvernightRunner,
     {} as PlanActionState,
   );
+  const [autoState, autoAction, flipping] = useActionState(
+    setAutoApproveAction,
+    {} as PlanActionState,
+  );
 
   // Each form keeps its own last answer and nothing records which spoke most
   // recently, so the one shown is the latest in the order the buttons can be
@@ -557,7 +569,7 @@ export function OvernightControl({
   // The row above it is the truth either way -- every one of these actions
   // revalidates the page -- so this is the press being acknowledged, not the
   // state being reported.
-  const said = [stopState, resumeState, pauseState, startState].find(
+  const said = [autoState, stopState, resumeState, pauseState, startState].find(
     (state) => state.error ?? state.message,
   );
 
@@ -610,6 +622,27 @@ export function OvernightControl({
           {goalsReady && <p className="text-small text-ink-muted">{goalsReady}</p>}
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            {autoApprove !== undefined && (
+              <form action={autoAction}>
+                <input type="hidden" name="on" value={autoApprove ? 'false' : 'true'} />
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant={autoApprove ? 'primary' : 'secondary'}
+                  aria-pressed={autoApprove}
+                  pending={flipping}
+                  title={
+                    autoApprove
+                      ? 'On: every feature and step a session proposes is approved as it is written. Press to turn it off.'
+                      : 'Approve every proposed feature and step now, and each new one as it is written.'
+                  }
+                >
+                  <CheckCheck className="size-3.5" aria-hidden />
+                  {autoApprove ? 'Auto approve on' : 'Auto approve'}
+                </Button>
+              </form>
+            )}
+
             {standing === 'running' && (
               <form action={pauseAction}>
                 <Button

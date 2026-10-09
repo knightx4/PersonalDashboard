@@ -44,6 +44,7 @@ export function StatusPanel({
   openNotes,
   notesLastRun,
   vision,
+  autoApprove,
   now,
 }: {
   run: OvernightRun | null;
@@ -59,6 +60,8 @@ export function StatusPanel({
   notesLastRun: NotesLastRun | null;
   /** The weekly vision review's last run, or null when it could not be read. */
   vision: VisionReviewStatus | null;
+  /** Whether auto approve is on, for its switch on the Plan row. */
+  autoApprove: boolean;
   now: number;
 }) {
   return (
@@ -94,6 +97,7 @@ export function StatusPanel({
             }
             bare
             showBlocked={false}
+            autoApprove={autoApprove}
           />
           <div className="border-t border-border pt-3">
             <RunRoutineButton
