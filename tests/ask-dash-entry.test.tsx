@@ -170,8 +170,8 @@ describe('the page the sheet will tell Dash', () => {
     await sendFor(null, ask)('And after that?');
     expect(ask.mock.calls).toEqual([
       // The last is the listener for the lookups as they run (plan #1438).
-      ['What is left to book?', null, '/goals/00000000-0000-4000-8000-0000000000a1', expect.any(Function)],
-      ['And after that?', null, null, expect.any(Function)],
+      ['What is left to book?', null, '/goals/00000000-0000-4000-8000-0000000000a1', expect.any(Function), undefined],
+      ['And after that?', null, null, expect.any(Function), undefined],
     ]);
   });
 });
