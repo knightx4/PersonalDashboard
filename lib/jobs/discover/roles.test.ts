@@ -63,6 +63,19 @@ describe('pickDiscovered', () => {
     expect(Math.max(...counts.values())).toBeLessThanOrEqual(2);
   });
 
+  it('leaves out engineering roles unless a target title is engineering', () => {
+    const s = startup('LiveFlow');
+    const postings = [
+      role(s, 'Software Engineer - AI Agents'),
+      role(s, 'Senior Full Stack Engineer'),
+      role(s, 'Strategic Finance Manager'),
+    ];
+    const liked = rules({ likedTitles: ['Forward Deployed Engineer'] });
+    expect(pickDiscovered(postings, liked).picks.map((p) => p.title)).toEqual(['Strategic Finance Manager']);
+    const engineer = rules({ targetTitles: ['Software Engineer'] });
+    expect(pickDiscovered(postings, engineer).picks.map((p) => p.title)).toContain('Software Engineer - AI Agents');
+  });
+
   it('takes only what is left of the week', () => {
     const s = startup('Ramp');
     const postings = [role(s, 'Strategic Finance Manager'), role(s, 'Strategic Finance Lead')];
