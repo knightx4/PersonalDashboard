@@ -31,9 +31,10 @@ export type CostEstimate = {
    */
   per: 'run' | 'unit';
   /**
-   * The models the press calls, as the ledger names them (`claude-sonnet-5-5`,
-   * `jev-1.13.0`), each once and in the order the press runs them. A press
-   * that runs several operations on different models lists them all.
+   * The models the press calls, by the ids the ledger records (those in
+   * lib/core/models.ts, and Jev's), each once and in the order the press runs
+   * them. A press that runs several operations on different models lists them
+   * all.
    */
   models: readonly string[];
 };
@@ -102,9 +103,9 @@ export function costHintText(estimate: CostEstimate, count?: number): string {
 }
 
 /**
- * A model id as the hint names it: `claude-sonnet-5-5` is "Sonnet 5.5",
- * `claude-haiku-4-5-20251001` is "Haiku 4.5", `jev-1.13.0` is "Jev" and
- * `voyage-4-lite` is "Voyage 4 Lite".
+ * A model id as the hint names it: the Claude ids lose their prefix and any
+ * date and read as "Sonnet 5.5" or "Haiku 4.5", any version of Jev is "Jev",
+ * and `voyage-4-lite` is "Voyage 4 Lite". estimate-types.test.ts has each.
  */
 export function modelLabel(id: string): string {
   if (id.startsWith('jev-')) return 'Jev';

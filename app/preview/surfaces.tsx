@@ -122,6 +122,7 @@ import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { CostHint } from '@/components/ui/cost-hint';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
+import { HAIKU, OPUS, SONNET } from '@/lib/core/models';
 import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
 import { QuickReadView, type QuickReadViewProps } from '@/app/news/quick/quick-view';
 import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
@@ -2427,7 +2428,7 @@ const measuredDraft: CostEstimate = {
   runs: 12,
   basis: 'measured',
   per: 'run',
-  models: ['claude-sonnet-5-5'],
+  models: [SONNET],
 };
 
 const guessedSummary: CostEstimate = {
@@ -2437,7 +2438,7 @@ const guessedSummary: CostEstimate = {
   runs: 2,
   basis: 'guess',
   per: 'run',
-  models: ['claude-haiku-5-5'],
+  models: [HAIKU],
 };
 
 const perReading: CostEstimate = {
@@ -2447,7 +2448,7 @@ const perReading: CostEstimate = {
   runs: 40,
   basis: 'measured',
   per: 'unit',
-  models: ['claude-opus-5-5', 'jev-1.13.0'],
+  models: [OPUS, 'jev-1.13.0'],
 };
 
 function CostHintRows() {
