@@ -107,9 +107,8 @@ type MadeTrack = NonNullable<NewTrackResult['track']>;
  * while you wait (note 43b8d7ac).
  */
 function subjectEmpty(passed: number): string {
-  return passed === 0
-    ? 'Nothing here is ready. Cards you skipped come back in three days, and ones you want to work on in two.'
-    : 'You are through every card here. Cards you skipped come back in three days, and ones you want to work on in two.';
+  const start = passed === 0 ? 'Nothing here is ready.' : 'You are through every card here.';
+  return `${start} Generate more writes this subject's next lessons now, in a minute or two. Cards you skipped come back in three days.`;
 }
 
 export function LearnNowFeed({
