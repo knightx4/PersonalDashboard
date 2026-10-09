@@ -83,7 +83,9 @@ export async function loadCaptureContext(
   client: GoalsSupabaseClient,
   { userId, today }: Today,
 ): Promise<CaptureContext> {
-  const { goals, byGoal } = await loadLiveTree(client, { today });
+  // userId as well as RLS: the capture address files on the service-role
+  // client (plan #1706), where only the filter says whose tree this is.
+  const { goals, byGoal } = await loadLiveTree(client, { userId, today });
   const live = liveRhythms(
     goals.map((g) => g.goal),
     byGoal,

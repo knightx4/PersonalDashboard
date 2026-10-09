@@ -383,19 +383,26 @@ export function noteSavePorts(opts: {
  */
 export async function openConnectedSource(
   supabase: VaultSupabaseClient,
+  userId?: string,
 ): Promise<VaultSource | 'none' | 'reauth'> {
-  const opened = await openConnection(supabase);
+  const opened = await openConnection(supabase, userId);
   return typeof opened === 'string' ? opened : opened.source;
 }
 
-/** openConnectedSource, with the connection the source was opened from. */
+/**
+ * openConnectedSource, with the connection the source was opened from. On the
+ * session client RLS leaves one connection to read; the service-role client
+ * the capture address uses (plan #1706) has to name whose with `userId`.
+ */
 async function openConnection(
   supabase: VaultSupabaseClient,
+  userId?: string,
 ): Promise<{ source: VaultSource; connectionId: string; userId: string } | 'none' | 'reauth'> {
-  const { data, error } = await supabase
+  let query = supabase
     .from('vault_connections')
-    .select('id, user_id, repo_owner, repo_name, branch, subpath, access_token, status')
-    .maybeSingle();
+    .select('id, user_id, repo_owner, repo_name, branch, subpath, access_token, status');
+  if (userId) query = query.eq('user_id', userId);
+  const { data, error } = await query.maybeSingle();
   if (error) throw new Error(`Reading the vault connection failed: ${error.message}`);
   if (!data) return 'none';
   const row = data as {
@@ -428,6 +435,8 @@ async function openConnection(
  */
 export function noteCreatePorts(opts: {
   supabase: VaultSupabaseClient;
+  /** Whose vault, when `supabase` is the service-role client. */
+  userId?: string;
   afterSave: (noteId: string) => void;
 }): CreateNotePorts {
   const { supabase } = opts;
@@ -435,7 +444,7 @@ export function noteCreatePorts(opts: {
 
   return {
     async openSource() {
-      const connection = await openConnection(supabase);
+      const connection = await openConnection(supabase, opts.userId);
       if (typeof connection === 'string') return connection;
       opened = { connectionId: connection.connectionId, userId: connection.userId };
       return connection.source;
