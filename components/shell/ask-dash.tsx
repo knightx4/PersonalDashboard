@@ -699,7 +699,7 @@ function Earlier({
         <h3 id="ask-dash-earlier" className="text-small font-semibold text-ink-muted">
           Earlier questions
         </h3>
-        <Link href="/ask" className="text-small text-accent underline-offset-2 hover:underline">
+        <Link href="/ask" className="press-area text-small text-accent underline-offset-2 hover:underline">
           All of them
         </Link>
       </div>
