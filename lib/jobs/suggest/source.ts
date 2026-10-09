@@ -11,9 +11,9 @@ export type OpeningSource = (typeof OPENING_SOURCES)[number];
 export const OPENING_SOURCE_LABELS: Record<OpeningSource, string> = {
   yc: 'YC startup list',
   hn: 'Hacker News hiring thread',
-  board: 'A company you follow',
+  board: 'a company you follow',
   search: "Dash's web search",
-  goal: 'A goal step',
+  goal: 'a goal step',
 };
 
 export function isOpeningSource(value: unknown): value is OpeningSource {
