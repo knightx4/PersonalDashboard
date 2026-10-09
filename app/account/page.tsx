@@ -140,7 +140,7 @@ export default async function AccountPage({
                 connectorAddress: `${origin}/api/mcp`,
               }
             }
-            capture={capture}
+            capture={capture && { ...capture, address: `${origin}/api/capture` }}
             />
           </div>
         </div>
