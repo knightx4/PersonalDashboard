@@ -129,8 +129,14 @@ function failure(error: unknown): VaultWriteFailure {
 /**
  * Commit `text` as a new note in the Inbox folder and store it. A file
  * already at the name is never written over: the next number is tried.
+ * The note is named from its first line, or from `title` when one is given,
+ * as the vault's New note gives one (note 09ff8039).
  */
-export async function createCapturedNote(ports: CreateNotePorts, text: string): Promise<CreateNoteResult> {
+export async function createCapturedNote(
+  ports: CreateNotePorts,
+  text: string,
+  title?: string,
+): Promise<CreateNoteResult> {
   const now = ports.now?.() ?? new Date();
   const content = `${text.replace(/\r\n/g, '\n').trim()}\n`;
   const sizeBytes = new TextEncoder().encode(content).byteLength;
@@ -147,7 +153,7 @@ export async function createCapturedNote(ports: CreateNotePorts, text: string): 
     return { ok: false, reason: 'reconnect', error: VAULT_WRITE_ERRORS.reconnect };
   }
 
-  const name = inboxNoteName(content, now);
+  const name = inboxNoteName(title?.trim() ? title : content, now);
   for (let attempt = 1; attempt <= NAME_ATTEMPTS; attempt += 1) {
     const path = inboxNotePath(name, attempt);
     const parsed = parseNote(content, path);
