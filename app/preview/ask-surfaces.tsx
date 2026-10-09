@@ -10,6 +10,7 @@ import type { DashChange, MadeChange } from '@/lib/talk/changes';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { DashCredit } from '@/components/ui/dash-mark';
+import { SONNET } from '@/lib/core/models';
 
 /**
  * The Ask Dash sheet in the surface gallery (plan #1090), fed with typed
@@ -209,6 +210,7 @@ const FIXTURES: AskSource = {
       runs: 0,
       basis: 'guess',
       per: 'run',
+      models: [SONNET],
     },
   }),
 };

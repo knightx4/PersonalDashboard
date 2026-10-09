@@ -30,6 +30,13 @@ export type CostEstimate = {
    * button passes.
    */
   per: 'run' | 'unit';
+  /**
+   * The models the press calls, by the ids the ledger records (those in
+   * lib/core/models.ts, and Jev's), each once and in the order the press runs
+   * them. A press that runs several operations on different models lists them
+   * all.
+   */
+  models: readonly string[];
 };
 
 /** A per-unit estimate times the count; a per-run one is returned as it is. */
@@ -63,6 +70,7 @@ export function sumEstimates(estimates: readonly CostEstimate[]): CostEstimate |
     runs: Math.min(...estimates.map((e) => e.runs)),
     basis: estimates.every((e) => e.basis === 'measured') ? 'measured' : 'guess',
     per: estimates.every((e) => e.per === 'unit') ? 'unit' : 'run',
+    models: [...new Set(estimates.flatMap((e) => e.models))],
   };
 }
 
@@ -92,4 +100,35 @@ export function costHintText(estimate: CostEstimate, count?: number): string {
   const range = low === high ? '' : `, usually ${low} to ${high}`;
   const runs = `${scaled.runs} ${scaled.runs === 1 ? 'run' : 'runs'}`;
   return `${head}${range}, from ${runs}`;
+}
+
+/**
+ * A model id as the hint names it: the Claude ids lose their prefix and any
+ * date and read as "Sonnet 5.5" or "Haiku 4.5", any version of Jev is "Jev",
+ * and `voyage-4-lite` is "Voyage 4 Lite". estimate-types.test.ts has each.
+ */
+export function modelLabel(id: string): string {
+  if (id.startsWith('jev-')) return 'Jev';
+  const words = id
+    .replace(/^claude-/, '')
+    .replace(/-\d{8}$/, '')
+    .replace(/(\d)-(?=\d)/g, '$1.')
+    .split('-');
+  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
+/**
+ * The second line of the hint: which model the press calls, or which ones
+ * when it runs several. Empty when the estimate names none.
+ *
+ * One model: "Uses Sonnet 5.5". Several: "Uses Sonnet 5.5 and Jev".
+ */
+export function costHintModels(estimate: CostEstimate): string {
+  const names = [...new Set(estimate.models.map(modelLabel))];
+  if (names.length === 0) return '';
+  const list =
+    names.length === 1
+      ? names[0]
+      : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return `Uses ${list}`;
 }

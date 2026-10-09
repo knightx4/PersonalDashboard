@@ -122,6 +122,7 @@ import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { CostHint } from '@/components/ui/cost-hint';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
+import { HAIKU, OPUS, SONNET } from '@/lib/core/models';
 import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
 import { QuickReadView, type QuickReadViewProps } from '@/app/news/quick/quick-view';
 import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
@@ -2427,6 +2428,7 @@ const measuredDraft: CostEstimate = {
   runs: 12,
   basis: 'measured',
   per: 'run',
+  models: [SONNET],
 };
 
 const guessedSummary: CostEstimate = {
@@ -2436,6 +2438,7 @@ const guessedSummary: CostEstimate = {
   runs: 2,
   basis: 'guess',
   per: 'run',
+  models: [HAIKU],
 };
 
 const perReading: CostEstimate = {
@@ -2445,11 +2448,12 @@ const perReading: CostEstimate = {
   runs: 40,
   basis: 'measured',
   per: 'unit',
+  models: [OPUS, 'jev-1.13.0'],
 };
 
 function CostHintRows() {
   return (
-    <div className="space-y-16 pb-16">
+    <div className="space-y-24 pb-24">
       <div className="flex items-center gap-1">
         <Button>Draft cover letter</Button>
         <CostHint estimate={measuredDraft} what="Cost of drafting" defaultOpen />

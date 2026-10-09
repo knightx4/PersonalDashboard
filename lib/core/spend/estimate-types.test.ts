@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   approxDollars,
+  costHintModels,
   costHintText,
+  modelLabel,
   scaleEstimate,
   sumEstimates,
   type CostEstimate,
@@ -14,6 +16,7 @@ const measured: CostEstimate = {
   runs: 12,
   basis: 'measured',
   per: 'run',
+  models: ['claude-sonnet-5-5'],
 };
 
 const guess: CostEstimate = {
@@ -23,6 +26,7 @@ const guess: CostEstimate = {
   runs: 1,
   basis: 'guess',
   per: 'run',
+  models: ['jev-1.13.0', 'claude-sonnet-5-5'],
 };
 
 describe('costHintText', () => {
@@ -70,6 +74,7 @@ describe('sumEstimates', () => {
       runs: 1,
       basis: 'guess',
       per: 'run',
+      models: ['claude-sonnet-5-5', 'jev-1.13.0'],
     });
   });
 
@@ -85,5 +90,32 @@ describe('sumEstimates', () => {
 describe('approxDollars', () => {
   it('rounds to the cent', () => {
     expect(approxDollars(1_234_567)).toBe('$1.23');
+  });
+});
+
+describe('modelLabel', () => {
+  it('names a model the way the hint says it', () => {
+    expect(modelLabel('claude-sonnet-5-5')).toBe('Sonnet 5.5');
+    expect(modelLabel('claude-haiku-4-5-20251001')).toBe('Haiku 4.5');
+    expect(modelLabel('claude-opus-5')).toBe('Opus 5');
+    expect(modelLabel('jev-1.13.0')).toBe('Jev');
+    expect(modelLabel('voyage-4-lite')).toBe('Voyage 4 Lite');
+  });
+});
+
+describe('costHintModels', () => {
+  it('names the one model a press calls', () => {
+    expect(costHintModels(measured)).toBe('Uses Sonnet 5.5');
+  });
+
+  it('names every model when a press runs several', () => {
+    expect(costHintModels(guess)).toBe('Uses Jev and Sonnet 5.5');
+    expect(
+      costHintModels({ ...guess, models: ['claude-haiku-5-5', 'claude-opus-5-5', 'jev-1.13.0'] }),
+    ).toBe('Uses Haiku 5.5, Opus 5.5 and Jev');
+  });
+
+  it('says nothing when the estimate names no model', () => {
+    expect(costHintModels({ ...guess, models: [] })).toBe('');
   });
 });
