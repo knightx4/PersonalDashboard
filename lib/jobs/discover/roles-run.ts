@@ -14,16 +14,21 @@ import 'server-only';
 
 import { fetchBoard, isBoardVendor } from '@/lib/jobs/ats/board';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
+import { DEFAULT_MIN_FIT_SCORE } from '@/lib/jobs/suggest/fit-gate';
 import { exclusionWords } from '@/lib/jobs/suggest/payload';
+import type { OpeningScores } from '@/lib/jobs/suggest/scores';
+import { JEV_MODEL } from '@/lib/jev/wire';
 import { loadDiscoveryRules } from './read';
 import {
   EMPTY_WEEKS_LIMIT,
   SOURCE_LABELS,
   boardPosting,
   discoveredText,
+  passScored,
   pickDiscovered,
   postRoles,
   readingUpdates,
+  scoredPool,
   weekRoom,
   type DiscoveredPosting,
   type WatchedStartup,
@@ -67,6 +72,31 @@ export type DiscoveredOutcome = {
 
 const NOTHING: DiscoveredOutcome = { headlines: [], urls: [], startupsRead: 0 };
 
+/** Candidates scored at once, and how long the scoring may take in all. */
+const SCORE_PARALLEL = 6;
+const SCORE_BUDGET_MS = 25_000;
+
+/**
+ * Jev scores the pool, a few at a time within the budget, and what clears the
+ * gate comes back best first. A candidate not reached in time is not written;
+ * it is still on its board for the next run.
+ */
+async function scorePool(
+  pool: readonly DiscoveredPosting[],
+  score: (posting: DiscoveredPosting) => Promise<OpeningScores | null>,
+  room: number,
+  minimum: number,
+): Promise<{ posting: DiscoveredPosting; scores: OpeningScores | null }[]> {
+  const scored: { posting: DiscoveredPosting; scores: OpeningScores | null }[] = [];
+  const began = Date.now();
+  for (let i = 0; i < pool.length && Date.now() - began < SCORE_BUDGET_MS; i += SCORE_PARALLEL) {
+    const batch = pool.slice(i, i + SCORE_PARALLEL);
+    const results = await Promise.all(batch.map((posting) => score(posting).catch(() => null)));
+    batch.forEach((posting, index) => scored.push({ posting, scores: results[index] }));
+  }
+  return passScored(scored, room, minimum);
+}
+
 export async function suggestDiscoveredRoles(
   supabase: AppSupabaseClient,
   userId: string,
@@ -75,6 +105,13 @@ export async function suggestDiscoveredRoles(
     likedTitles: readonly string[];
     taken: { urls: ReadonlySet<string>; roles: ReadonlySet<string>; companies?: ReadonlySet<string> };
     now?: Date;
+    /**
+     * Jev's scores for one candidate, or null when it could not score it.
+     * Given when the person has Jev on: a wider pool is scored and only
+     * what clears `minFitScore` is written (fit-gate.ts).
+     */
+    score?: (posting: DiscoveredPosting) => Promise<OpeningScores | null>;
+    minFitScore?: number;
   },
 ): Promise<DiscoveredOutcome> {
   // With no titles to match nothing can fit, and counting that as an empty
@@ -139,7 +176,9 @@ export async function suggestDiscoveredRoles(
     });
   }
 
-  const { picks, fitted } = pickDiscovered(postings, {
+  const room = weekRoom(thisWeek.count ?? 0);
+  const scoring = !!context.score;
+  const { picks: pool, fitted } = pickDiscovered(postings, {
     targetTitles: context.targetTitles,
     likedTitles: context.likedTitles,
     taken: {
@@ -150,12 +189,16 @@ export async function suggestDiscoveredRoles(
     excludedWords: exclusionWords(rules.excludedIndustries),
     preferences: rules.preferences,
     knownCompanies: rules.knownCompanies,
-    room: weekRoom(thisWeek.count ?? 0),
+    room: scoring ? scoredPool(room) : room,
+    scored: scoring,
   });
+  const picks = scoring
+    ? await scorePool(pool, context.score!, room, context.minFitScore ?? DEFAULT_MIN_FIT_SCORE)
+    : pool.map((posting) => ({ posting, scores: null }));
 
   const headlines: string[] = [];
   const urls: string[] = [];
-  for (const posting of picks) {
+  for (const { posting, scores } of picks) {
     const { why, move } = discoveredText(posting);
     const { error } = await supabase.from('suggestions').insert({
       user_id: userId,
@@ -169,6 +212,8 @@ export async function suggestDiscoveredRoles(
       url: posting.url,
       location: posting.location,
       watchlist_startup_id: posting.startup.id,
+      // Scored already, so the daily scoring run leaves it alone.
+      ...(scores ? { scores, scored_at: new Date().toISOString(), score_model: JEV_MODEL } : {}),
     });
     if (!error) {
       headlines.push(`${posting.title} at ${posting.company}`);

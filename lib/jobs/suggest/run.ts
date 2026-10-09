@@ -11,7 +11,7 @@
  */
 import 'server-only';
 
-import type { SpendReport } from '@/lib/core/spend/pricing';
+import type { SpendReport, SpendSink } from '@/lib/core/spend/pricing';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { formatDate } from '@/lib/jobs/applications/load';
@@ -22,6 +22,10 @@ import { openingFeedback } from './feedback';
 import { pickBoardCandidates } from './board-pick';
 import { loadFollowedBoardPostings } from './boards';
 import { suggestDiscoveredRoles } from '@/lib/jobs/discover/roles-run';
+import { discoveredText, type DiscoveredPosting } from '@/lib/jobs/discover/roles';
+import { readMinFitScore } from './fit-gate';
+import { loadScoringContext } from './score-run';
+import { scoreOpening, type OpeningScores } from './scores';
 import { readPreferences } from './preferences';
 import type { SearchProgress } from './search-runs';
 import { queueSearch } from './search-batch';
@@ -217,6 +221,38 @@ async function runReachOut(
   return { ran: true, written: headlines.length, headlines, spend, error: null };
 }
 
+/**
+ * Jev's scoring for discovered roles: the person's scoring context, read
+ * once, and their fit minimum. A role is scored as the daily scoring run
+ * would score it, from its title, company and place.
+ */
+async function discoveredScorer(
+  supabase: AppSupabaseClient,
+  userId: string,
+  jev: { onSpend?: SpendSink },
+): Promise<{ score: (posting: DiscoveredPosting) => Promise<OpeningScores | null>; minFitScore: number } | null> {
+  try {
+    const [context, profile] = await Promise.all([
+      loadScoringContext(supabase, userId),
+      supabase.from('profiles').select('min_fit_score').eq('id', userId).maybeSingle(),
+    ]);
+    const minFitScore = readMinFitScore((profile.data as Row | null)?.min_fit_score);
+    const score = async (posting: DiscoveredPosting) => {
+      const { why, move } = discoveredText(posting);
+      const result = await scoreOpening({
+        opening: { title: posting.title, company: posting.company, location: posting.location, why, move },
+        context,
+        onSpend: jev.onSpend,
+      });
+      return result.ok ? result.scores : null;
+    };
+    return { score, minFitScore };
+  } catch (err) {
+    console.error('[jobs suggestions] scoring context', err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
 async function runApply(
   supabase: AppSupabaseClient,
   userId: string,
@@ -226,6 +262,7 @@ async function runApply(
   past: Row[],
   progress?: SearchProgress,
   deadline?: number,
+  jev: { onSpend?: SpendSink } | null = null,
 ): Promise<KindOutcome> {
   const spend: SpendReport[] = [];
   await progress?.stage('apply', 'boards');
@@ -256,10 +293,12 @@ async function runApply(
   // Roles at the startups weekly discovery found (plan #1685): up to ten a
   // week on top of what this search finds, stored first so the search
   // leaves their links alone.
+  const gate = jev ? await discoveredScorer(supabase, userId, jev) : null;
   const discovered = await suggestDiscoveredRoles(supabase, userId, {
     targetTitles: seeker.targetTitles,
     likedTitles,
     taken,
+    ...(gate ?? {}),
   }).catch((err: unknown) => {
     console.error('[jobs suggestions] discovered roles', err instanceof Error ? err.message : err);
     return { headlines: [] as string[], urls: [] as string[], startupsRead: 0 };
@@ -378,6 +417,12 @@ export async function runSuggestionsFor(
     progress?: SearchProgress;
     /** Epoch milliseconds by which the searches must be done; past it they go on as batches. */
     deadline?: number;
+    /**
+     * Set when the person has Jev on: roles at discovered startups are then
+     * scored before they are written, and only those that clear the fit gate
+     * are (fit-gate.ts). Told of each scoring call's cost.
+     */
+    jev?: { onSpend?: SpendSink } | null;
   },
 ): Promise<Record<SuggestionKind, KindOutcome>> {
   if (options.kinds.includes('apply')) await expireStaleOpenings(supabase, userId, options.now);
@@ -426,7 +471,17 @@ export async function runSuggestionsFor(
     await record('reach_out', out.reach_out);
   }
   if (due('apply')) {
-    out.apply = await runApply(supabase, userId, options.apiKey, seeker, applications, past, options.progress, options.deadline);
+    out.apply = await runApply(
+      supabase,
+      userId,
+      options.apiKey,
+      seeker,
+      applications,
+      past,
+      options.progress,
+      options.deadline,
+      options.jev ?? null,
+    );
     await record('apply', out.apply);
   }
   return out;

@@ -36,6 +36,7 @@ import {
   WORKPLACE_PREFERENCES,
   type JobPreferences,
 } from '@/lib/jobs/suggest/preferences';
+import { DEFAULT_MIN_FIT_SCORE } from '@/lib/jobs/suggest/fit-gate';
 
 /** The page's own three tones, in the four the Banner primitive names. */
 const BANNER_TONE = { ok: 'info', warn: 'warn', err: 'bad' } as const;
@@ -51,6 +52,8 @@ export function SettingsView(props: {
     writingStyleNotes: string;
     bannedConstructions: string;
     preferences: JobPreferences;
+    /** The lowest Jev fit score a recommended role may have (fit-gate.ts). */
+    minFitScore?: number;
   };
   accounts: InboxAccount[];
   resumes: Array<{
@@ -129,6 +132,8 @@ function ProfileSection({
     writingStyleNotes: string;
     bannedConstructions: string;
     preferences: JobPreferences;
+    /** The lowest Jev fit score a recommended role may have (fit-gate.ts). */
+    minFitScore?: number;
   };
   email: string;
 }) {
@@ -169,7 +174,7 @@ function ProfileSection({
           <ValueList>
             <ValueRow label="Search started" value={profile.searchStartedOn} />
             <ValueRow label="Ghost after" value={`${profile.ghostThresholdDays} days of silence`} />
-            <PreferenceRows prefs={prefs} />
+            <PreferenceRows prefs={prefs} minFitScore={profile.minFitScore ?? DEFAULT_MIN_FIT_SCORE} />
             <ValueRow label="How you want to sound" value={profile.writingStyleNotes} />
             <ValueRow
               label="Never write these"
@@ -264,13 +269,14 @@ function ProfileSection({
 }
 
 /**
- * The four job preferences, each edited where it is read (law 12): where you
- * live and the pay floor are inline fields that save on leaving them, and the
- * workplaces and company stages are choices that save when pressed. Rules for
- * the roles Dash recommends: a posting that states pay below the floor, or a
- * workplace not chosen, is left out; none chosen means any.
+ * The job preferences, each edited where it is read (law 12): where you
+ * live, the pay floor and the lowest fit score are inline fields that save on
+ * leaving them, and the workplaces and company stages are choices that save
+ * when pressed. Rules for the roles Dash recommends: a posting that states pay
+ * below the floor, a workplace not chosen, or a fit Jev scores below the
+ * minimum is left out; none chosen means any.
  */
-function PreferenceRows({ prefs }: { prefs: JobPreferences }) {
+function PreferenceRows({ prefs, minFitScore }: { prefs: JobPreferences; minFitScore: number }) {
   return (
     <>
       <PreferenceText
@@ -284,6 +290,13 @@ function PreferenceRows({ prefs }: { prefs: JobPreferences }) {
         label="Lowest base pay"
         value={prefs.salaryFloorCents ? formatPay(prefs.salaryFloorCents) : ''}
         placeholder="120,000 a year"
+        inputMode="numeric"
+      />
+      <PreferenceText
+        field="minFit"
+        label="Lowest fit score"
+        value={String(minFitScore)}
+        placeholder="25 out of 100; 0 shows every role"
         inputMode="numeric"
       />
       <PreferenceChoices
@@ -313,7 +326,7 @@ function PreferenceText({
   placeholder,
   inputMode,
 }: {
-  field: 'homeLocation' | 'salaryFloor';
+  field: 'homeLocation' | 'salaryFloor' | 'minFit';
   label: string;
   value: string;
   placeholder: string;

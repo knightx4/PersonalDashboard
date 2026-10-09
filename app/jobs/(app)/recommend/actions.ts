@@ -85,6 +85,12 @@ export async function suggestOpenings(): Promise<SuggestState> {
 
   after(async () => {
     let result;
+    // Roles at discovered startups are scored before they are written when
+    // Jev is on, and what that costs is recorded as scoring.
+    const discoveredSpend: SpendReport[] = [];
+    const jev = (await jevEnabledFor(await createCoreClient(), user.id))
+      ? { onSpend: (report: SpendReport) => discoveredSpend.push(report) }
+      : null;
     try {
       result = await runSuggestionsFor(supabase, user.id, {
         apiKey,
@@ -94,6 +100,7 @@ export async function suggestOpenings(): Promise<SuggestState> {
         // The search gets what is left of the page's five minutes; past this
         // it goes on as a Message Batch (lib/jobs/suggest/search-batch.ts).
         deadline: began + SEARCH_BUDGET_MS,
+        jev,
       });
     } catch (error) {
       await progress.finish('apply', {
@@ -104,6 +111,7 @@ export async function suggestOpenings(): Promise<SuggestState> {
     }
     const outcome = result.apply;
     await recordSessionSpend(user.id, { module: 'jobs', operation: 'find-openings' }, outcome.spend);
+    await recordSessionSpend(user.id, { module: 'jobs', operation: 'score-openings' }, discoveredSpend);
     if (!outcome.ran) {
       await progress.finish('apply', { written: 0, error: 'Write a career goals entry or add a role first.' });
       return;

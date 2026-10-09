@@ -7,9 +7,11 @@ import {
   SOURCE_LABELS,
   boardPosting,
   discoveredText,
+  passScored,
   pickDiscovered,
   postRoles,
   readingUpdates,
+  scoredPool,
   weekRoom,
   type DiscoveredRules,
   type WatchedStartup,
@@ -45,6 +47,24 @@ const rules = (over: Partial<DiscoveredRules> = {}): DiscoveredRules => ({
   ...over,
 });
 
+describe('passScored', () => {
+  const entry = (title: string, fit: number | null) => ({
+    title,
+    scores: fit === null ? null : { fit_score: { value: fit, confidence: 0.9 } },
+  });
+
+  it('keeps what clears the gate, best fit first, within the room', () => {
+    const kept = passScored([entry('A', 30), entry('B', 12), entry('C', 57), entry('D', null), entry('E', 41)], 2, 25);
+    expect(kept.map((e) => e.title)).toEqual(['C', 'E']);
+  });
+
+  it('scores three candidates for each place, at most thirty', () => {
+    expect(scoredPool(4)).toBe(12);
+    expect(scoredPool(10)).toBe(30);
+    expect(scoredPool(0)).toBe(0);
+  });
+});
+
 describe('pickDiscovered', () => {
   it('takes at most ten a week, and two from one startup, each startup first before any second', () => {
     const startups = Array.from({ length: 8 }, (_, i) => startup(`Co${i}`));
@@ -74,6 +94,13 @@ describe('pickDiscovered', () => {
     expect(pickDiscovered(postings, liked).picks.map((p) => p.title)).toEqual(['Strategic Finance Manager']);
     const engineer = rules({ targetTitles: ['Software Engineer'] });
     expect(pickDiscovered(postings, engineer).picks.map((p) => p.title)).toContain('Software Engineer - AI Agents');
+  });
+
+  it('lets engineering titles through to Jev when Jev will score them', () => {
+    const s = startup('LiveFlow');
+    const postings = [role(s, 'Forward Deployed Engineer'), role(s, 'Strategic Finance Manager')];
+    const scored = rules({ likedTitles: ['Forward Deployed Engineer'], scored: true });
+    expect(pickDiscovered(postings, scored).picks.map((p) => p.title)).toContain('Forward Deployed Engineer');
   });
 
   it('takes only what is left of the week', () => {

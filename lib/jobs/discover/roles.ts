@@ -1,6 +1,8 @@
 import type { BoardVendor } from '@/lib/jobs/ats/board';
 import { pickBoardCandidates, type BoardPosting } from '@/lib/jobs/suggest/board-pick';
+import { belowFitGate } from '@/lib/jobs/suggest/fit-gate';
 import { companyKey } from '@/lib/jobs/suggest/payload';
+import type { OpeningScores } from '@/lib/jobs/suggest/scores';
 import type { JobPreferences } from '@/lib/jobs/suggest/preferences';
 import { postingPlaceFits } from './filter';
 
@@ -97,6 +99,11 @@ export type DiscoveredRules = {
   knownCompanies: ReadonlySet<string>;
   /** How many more discovered roles this week may take. */
   room: number;
+  /**
+   * Jev will score what is picked before any of it is written (fit-gate.ts),
+   * so the engineering title rule, which stands in for that check, is off.
+   */
+  scored?: boolean;
 };
 
 /** Engineering work, by its title: what a finance or operations CV cannot get. */
@@ -116,11 +123,12 @@ export function pickDiscovered(
   postings: readonly DiscoveredPosting[],
   rules: DiscoveredRules,
 ): { picks: DiscoveredPosting[]; fitted: Set<string> } {
-  // Nothing after this rule asks Dash, so a title match is the whole test.
-  // One saved lead with "Engineer" in it matched every engineering role at
-  // every startup, so engineering roles come only to someone whose target
-  // titles are engineering.
-  const engineering = rules.targetTitles.some(isEngineeringTitle);
+  // Without Jev nothing after this rule judges the role, so a title match is
+  // the whole test. One saved lead with "Engineer" in it matched every
+  // engineering role at every startup, so then engineering roles come only to
+  // someone whose target titles are engineering. With Jev, its fit score
+  // decides, and keeps a forward deployed role it rates well.
+  const engineering = rules.scored || rules.targetTitles.some(isEngineeringTitle);
   const allowed = postings.filter(
     (posting) =>
       !rules.knownCompanies.has(companyKey(posting.company)) &&
@@ -161,6 +169,30 @@ export function pickDiscovered(
 }
 
 /** How many discovered roles this week may still take, from those suggested in the last seven days. */
+/** At most this many candidates are scored for the week's room. */
+export const SCORED_POOL_MAX = 30;
+
+/** How many candidates to score for `room` places: three for each, within the cap. */
+export function scoredPool(room: number): number {
+  return room <= 0 ? 0 : Math.min(SCORED_POOL_MAX, room * 3);
+}
+
+/**
+ * The scored candidates that clear the fit gate, best fit first, at most
+ * `room`. One Jev could not score is left for a later run rather than shown
+ * unjudged.
+ */
+export function passScored<T extends { scores: OpeningScores | null }>(
+  scored: readonly T[],
+  room: number,
+  minimum: number,
+): T[] {
+  return scored
+    .filter((entry) => entry.scores !== null && !belowFitGate(entry.scores, minimum))
+    .sort((a, b) => (b.scores?.fit_score?.value ?? 0) - (a.scores?.fit_score?.value ?? 0))
+    .slice(0, Math.max(0, room));
+}
+
 export function weekRoom(suggestedThisWeek: number): number {
   return Math.max(0, DISCOVERED_PER_WEEK - suggestedThisWeek);
 }
