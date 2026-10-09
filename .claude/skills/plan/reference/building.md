@@ -325,6 +325,23 @@ the step's row on /dev/plan, which shows the last fixes and shots (plan
 - **Said what to change** (their words on the step's thread, and an
   `Answered …` line): the builder gets three fresh rounds, numbered on from
   4, against their words; the stop then falls on round 6, and so on.
+- **Answered with an accept** (an `Answered …` line whose words take the
+  screens as they are: "Accept", "accept them", "fine as it is"): the same as
+  Accepted, written down by you. Run `npm run ui-guard -- <n> --accept`, or
+  the statement it prints through the connector. It records an `accepted`
+  round for each surface still waiting, quoting the answer, and writes
+  nothing unless the step's newest `Answered` line is newer than its newest
+  `Blocked` line. Then merge and close. Never put the same question to the
+  person again: #1702 was answered "Accept" and blocked on the same ask by
+  the next session, because the answer had never reached `ui_checks`.
+
+The same holds for a block that is not a critic stop: a step whose files
+reach surfaces nobody has checked, answered "accept those as unchanged".
+Most of those blocks are gone since the guard stops at a shared piece's own
+surface (`COMPONENT_SURFACES` in `lib/preview/routes.ts`): a change inside
+the shell is looked at on `shell-full`, and Dash's mark on `dash-mark`,
+rather than on every page under every layout. A shared component that has a
+surface drawing it in every state belongs on that list.
 
 **Recording a round.** Every round goes on record, passed or failed, before
 you make its fixes:

@@ -249,9 +249,21 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
  *
  * A file that imports one of these is not covered by it: a change to the
  * Ask Dash sheet (components/shell/ask-dash.tsx) still reaches its pages.
+ *
+ * The shell is the widest of them. Every workspace's layout mounts it, so a
+ * piece only the shell uses (the search bar, the Ask Dash button, the Dash
+ * mark beside it) used to name all of the 189 surfaces under those layouts,
+ * and a step that changed the mark waited on a check of each one (#1702).
+ * `shell-full` draws the shell around a page, which is where such a change
+ * shows. A piece a page imports for itself still reaches that page.
  */
 export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'ask-dash-thread': ['components/talk/talk-thread.tsx'],
+  'shell-full': ['components/shell/app-shell.tsx'],
+  // Every state of the mark, bare and in each hat, at every size.
+  'dash-mark': ['components/ui/dash-mark.tsx'],
+  // The runner's card with its four Dashes, running and off (plan #1704).
+  'dev-runner-crew': ['app/dev/plan/overnight-control.tsx', 'app/dev/plan/runner-crew.tsx'],
 };
 
 /** The surface that stands for a shared component, or null for any other file. */
