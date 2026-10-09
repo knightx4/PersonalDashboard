@@ -11,12 +11,14 @@ import {
   type FeedbackActionState,
 } from '@/app/dev/bugs/actions';
 import { submitIdea, type IdeaActionState } from '@/app/dev/ideas/actions';
+import { AddFile } from '@/components/attachments/add-file';
 import { Button } from '@/components/ui/button';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { TriageNote } from '@/components/feedback/triage-note';
 import { FieldError, Input, Label, Select, Textarea } from '@/components/ui/field';
 import { Popover } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
+import type { UploadedAttachment } from '@/lib/attachments/rules';
 import type { FeedbackKind } from '@/lib/feedback/load';
 import type { TriageView } from '@/lib/feedback/triage';
 import { MODULES, moduleForPath } from '@/lib/modules';
@@ -95,6 +97,8 @@ const KIND = Object.fromEntries(KINDS.map((entry) => [entry.id, entry])) as Reco
 export function FeedbackButton({
   allHref = '/dev/bugs',
   isOwner = false,
+  initialOpen = false,
+  initialFiles = [],
 }: {
   allHref?: string;
   /**
@@ -112,9 +116,12 @@ export function FeedbackButton({
    * says so, rather than one offering buttons whose actions would refuse.
    */
   isOwner?: boolean;
+  /** For the gallery, which draws the panel open with a file added. */
+  initialOpen?: boolean;
+  initialFiles?: UploadedAttachment[];
 } = {}) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [kind, setKind] = useState<Kind>('note');
   // No Idea tab for everybody else. Not a tab that refuses: `submitIdea`
   // turns a non-owner away before it looks at anything (#417), so offering it
@@ -127,6 +134,18 @@ export function FeedbackButton({
     {} as FeedbackActionState,
   );
   const [ideaState, ideaAction, ideaPending] = useActionState(submitIdea, {} as IdeaActionState);
+
+  // The files going with the next note (plan #1713): uploaded as they are
+  // chosen, recorded against the note when it saves, and cleared once it
+  // has. Kept while the panel is shut, so closing it by mistake does not
+  // lose a screenshot already sent up. Send waits while one is uploading.
+  const [files, setFiles] = useState<UploadedAttachment[]>(initialFiles);
+  const [uploading, setUploading] = useState(false);
+  const [settledNote, setSettledNote] = useState<FeedbackActionState | null>(null);
+  if (noteState.filed && noteState !== settledNote) {
+    setSettledNote(noteState);
+    setFiles([]);
+  }
 
   // Two writers behind one form, because the two tables are two writers. The
   // form takes whichever the open tab files to, and reports that one's result:
@@ -292,6 +311,19 @@ export function FeedbackButton({
               </div>
             )}
 
+            {/* A note only: a screenshot of what went wrong is half a bug
+                report. An idea is a sentence about the future and has
+                nothing to show yet. */}
+            {!idea && (
+              <AddFile
+                name="attachments"
+                value={files}
+                onChange={setFiles}
+                disabled={pending}
+                onUploadingChange={setUploading}
+              />
+            )}
+
             {/* The owner's, and only theirs. It is the code that guards the
                 dev workspace's own writing, and `submitFeedback` asks for it
                 from the owner alone -- a second account has nothing to type
@@ -311,7 +343,12 @@ export function FeedbackButton({
             )}
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="submit" size="sm" pending={pending}>
+              <Button
+                type="submit"
+                size="sm"
+                pending={pending}
+                disabled={!idea && uploading}
+              >
                 {pending ? 'Saving…' : 'Send'}
               </Button>
               {/* Saves the idea and hands it straight to Dash to shape into

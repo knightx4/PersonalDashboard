@@ -32,6 +32,7 @@ import {
   type OtherFeedbackRow,
 } from '@/lib/feedback/load';
 import type { IdeaList, IdeaRow } from '@/lib/ideas/load';
+import type { Attachment } from '@/lib/attachments/store';
 import { functionSpendRows } from '@/lib/usage/function-spend';
 import { usageReport } from '@/lib/usage/report';
 import type { UiReview } from '@/lib/ui-review/load';
@@ -71,12 +72,34 @@ function note(over: Partial<FeedbackRow> & Pick<FeedbackRow, 'id' | 'body'>): Fe
   };
 }
 
+/**
+ * A file filed with a note (plan #1713). The href is a picture the site
+ * already serves, standing in for /attachments/<id>, which signs a link to
+ * the private bucket and has nothing to sign here.
+ */
+function file(id: string, name: string, contentType: string, size: number, href: string): Attachment {
+  return {
+    id,
+    ref: `public.feedback_items:${id}`,
+    path: `preview/${id}-${name}`,
+    name,
+    contentType,
+    size,
+    createdAt: '2026-10-03T14:00:00Z',
+    href,
+  };
+}
+
 const notes: FeedbackRow[] = [
   note({
     id: 'n1',
     body: 'The plan page scrolls sideways on my phone when a step title is long and has a link in it',
     pagePath: '/dev/plan',
     priority: 1,
+    attachments: [
+      file('a1', 'plan-scrolls-sideways.png', 'image/png', 412_000, '/posts/2026-10-09-dev-plan-tree.png'),
+      file('a2', 'goals-page.png', 'image/png', 388_000, '/posts/2026-10-09-goals-page-steps.png'),
+    ],
   }),
   note({
     id: 'n2',
@@ -91,6 +114,9 @@ const notes: FeedbackRow[] = [
     body: 'Receipts from the Apple Store come in without a total',
     pagePath: '/shopping/orders',
     resolutionNote: 'Needs a sample receipt: the two in the inbox are both refunds.',
+    attachments: [
+      file('a3', 'Apple Store receipt, 14 September 2026, order W1234567890.pdf', 'application/pdf', 96_000, '#'),
+    ],
     createdAt: '2026-09-29T18:00:00Z',
   }),
   note({
@@ -134,10 +160,7 @@ const others: OtherFeedbackRow[] = [
 export function DevBugsSurface() {
   return column(
     <>
-      <PageHeader
-        title="Bugs and requests"
-        description="Everything captured from the header button, from any workspace. Say “knock out the notes” in a session to have them worked top to bottom."
-      />
+      <PageHeader title="Bugs and requests" />
       <FeedbackQueueView queue={queue} kind={null} />
       <OtherUsersFeedback rows={others} />
     </>,
