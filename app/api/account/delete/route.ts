@@ -12,6 +12,7 @@ import { gmailProvider } from '@/lib/email/providers/gmail';
 import { removeAttachmentFolder, vaultAttachmentFolder } from '@/lib/vault/attachment-storage';
 import { VAULT_TRANSCRIPTS_BUCKET } from '@/lib/vault/transcripts';
 import { UI_SHOTS_BUCKET } from '@/lib/preview/ui-checks';
+import { ATTACHMENTS_BUCKET } from '@/lib/attachments/rules';
 import { POST_IMAGES_BUCKET } from '@/lib/dev/posts';
 
 export const maxDuration = 60;
@@ -34,8 +35,9 @@ export const maxDuration = 60;
  *      this reaches further than it does.
  *   2. Delete the storage objects, which do not cascade with database rows --
  *      and only from this app's own buckets (job search, goals documents,
- *      vault attachments, design check shots and post images), since
- *      buckets are shared project-wide.
+ *      vault attachments, design check shots, post images and the files
+ *      added to notes, todos and questions), since buckets are shared
+ *      project-wide.
  *   3. Delete the auth.users row. Every table that names a user cascades from
  *      it, in all six schemas -- public, core, job_search, obsidian, todo and
  *      learn -- which is why one delete is enough, and why
@@ -154,6 +156,15 @@ export async function POST(request: NextRequest) {
   //    account, written only by the service role.
   try {
     await removeAttachmentFolder(admin, user.id, UI_SHOTS_BUCKET);
+  } catch {
+    // As above.
+  }
+
+  //    And the files added to notes, todos and questions for Dash (plan
+  //    #1712), one folder per account. Their core.attachments rows go with
+  //    the account below.
+  try {
+    await removeAttachmentFolder(admin, user.id, ATTACHMENTS_BUCKET);
   } catch {
     // As above.
   }
