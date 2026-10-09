@@ -56,6 +56,18 @@ describe('createCapturedNote', () => {
     expect(stored).toMatchObject([{ path: 'Inbox/Buy a kite.md', blobSha: 'b1', body: 'Buy a kite\nfor Sunday\n' }]);
   });
 
+  // The vault page's New note gives a name and a body (note 09ff8039).
+  it('names the note by the title it is given, and keeps the body as written', async () => {
+    const createNote = vi.fn(async () => ({ blobSha: 'b1', commitSha: 'c1' }));
+    const result = await createCapturedNote(ports({ createNote }), 'Some thoughts\non finding yourself', 'Against: finding');
+    expect(createNote).toHaveBeenCalledWith(
+      'Inbox/Against finding.md',
+      'Some thoughts\non finding yourself\n',
+      expect.any(String),
+    );
+    expect(result).toMatchObject({ ok: true, path: 'Inbox/Against finding.md' });
+  });
+
   it('never writes over a note already at the name, and tries the next number', async () => {
     const createNote = vi
       .fn()

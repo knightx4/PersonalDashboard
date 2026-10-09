@@ -68,6 +68,7 @@ import {
   type CalendarDay,
   type CalendarEntry,
 } from '@/lib/todo/calendar/month';
+import { NewVaultNote } from '@/components/vault/new-note';
 import { NoteProperties } from '@/components/vault/note-properties';
 import { NoteBody } from '@/components/vault/note-body';
 import { NoteEdit } from '@/app/vault/n/[...path]/note-edit';
@@ -118,7 +119,7 @@ import { threadRef } from '@/lib/thread/subjects';
 import type { DevComment } from '@/lib/comments/load';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { CostHint } from '@/components/ui/cost-hint';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
@@ -3781,6 +3782,25 @@ export const SURFACES: readonly Surface[] = [
           },
         ]}
       />
+    ),
+  },
+  {
+    /* New note on the vault page (note 09ff8039), opened from the header's
+     * one action: the name, the note, and the press that commits it to the
+     * vault's Inbox. */
+    id: 'vault-new-note',
+    label: 'Vault · New note',
+    module: 'vault',
+    width: 'narrow',
+    render: () => (
+      <>
+        <PageHeader
+          title="Vault"
+          description="knightx4/notes · main"
+          actions={<span className={buttonVariants({ size: 'sm' })}>New note</span>}
+        />
+        <NewVaultNote />
+      </>
     ),
   },
   {

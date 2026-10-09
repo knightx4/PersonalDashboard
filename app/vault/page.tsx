@@ -8,7 +8,9 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import { groupByFolder, loadConnection, loadNotes } from '@/lib/vault/notes/load';
 import { VaultStatusBanner } from '@/components/vault/status-banner';
 import { NoteConnections } from '@/components/vault/note-connections';
+import { NewVaultNote } from '@/components/vault/new-note';
 import { loadWeekConnections } from '@/lib/vault/notes/connections-load';
+import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 
@@ -27,9 +29,9 @@ export const dynamic = 'force-dynamic';
 export default async function VaultPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; new?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, new: composing } = await searchParams;
   const search = q?.trim() ?? '';
 
   const supabase = await createVaultClient();
@@ -61,11 +63,18 @@ export default async function VaultPage({
       <PageHeader
         title="Vault"
         description={`${connection.repoOwner}/${connection.repoName} · ${connection.branch}`}
+        actions={
+          <Link href="/vault?new=1" className={buttonVariants({ size: 'sm' })}>
+            New note
+          </Link>
+        }
       />
 
       <VaultStatusBanner connection={connection} />
 
       <NoteConnections connections={connections} />
+
+      {composing !== undefined && <NewVaultNote />}
 
       <div className="mb-5 max-w-md">
         <SearchField placeholder="Search your notes" />

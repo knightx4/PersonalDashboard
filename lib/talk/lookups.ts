@@ -49,6 +49,7 @@ export const WRITE_TOOL_NAMES_SHOWN_AS_CARDS: readonly string[] = [
   'add_goal',
   'add_goal_step',
   'close_goal_step',
+  'set_goal_done_when',
   'mark_returned',
   'add_role_note',
   'add_job_lead',

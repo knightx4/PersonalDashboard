@@ -115,6 +115,8 @@ export function changePaths(change: DashChange): string[] {
       return ['/todo', '/todo/all', '/home'];
     case 'close_goal_step':
       return ['/goals', `/goals/${change.input.goalId}`];
+    case 'set_goal_done_when':
+      return ['/goals', `/goals/${change.input.id}`];
     case 'add_role_note':
       return [`/jobs/roles/${change.input.roleId}`];
     case 'add_idea':
@@ -158,6 +160,7 @@ const WORKSPACE: Record<DashChangeKind, { module: ModuleId; label: string } | nu
   add_job_lead: { module: 'jobs', label: 'Jobs' },
   change_items: { module: 'shopping', label: 'Shopping' },
   move_roles: { module: 'jobs', label: 'Jobs' },
+  set_goal_done_when: { module: 'goals', label: 'Goals' },
 };
 
 const WRITTEN_TABLE: Record<DashChangeKind, string> = {
@@ -174,6 +177,7 @@ const WRITTEN_TABLE: Record<DashChangeKind, string> = {
   add_job_lead: 'job_search.roles',
   change_items: 'public.inventory_items',
   move_roles: 'job_search.applications',
+  set_goal_done_when: 'goals.items',
 };
 
 /** What each kind does to that row: a return changes the item, the rest add one. */
@@ -191,6 +195,7 @@ const WRITTEN_OP: Record<DashChangeKind, 'insert' | 'update'> = {
   add_job_lead: 'insert',
   change_items: 'update',
   move_roles: 'update',
+  set_goal_done_when: 'update',
 };
 
 /** A refusal the person reads: the sentence is theirs, the class only marks it as one. */

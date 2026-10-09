@@ -47,6 +47,23 @@ describe('threadFrom', () => {
     expect(thread.map((comment) => comment.id)).toEqual(['c1', 'c2']);
   });
 
+  // The plan and the other loaders on the shared store pass turns already read
+  // into the app shape; their times were coming back blank (note 8aa4a071).
+  it('keeps the time on a turn already in the app shape', () => {
+    const [comment] = threadFrom([
+      {
+        id: 'c1',
+        author: 'me',
+        body: 'Hello',
+        createdAt: '2026-09-13T09:00:00Z',
+        acknowledgedAt: '2026-09-13T09:01:00Z',
+      },
+    ]);
+
+    expect(comment.createdAt).toBe('2026-09-13T09:00:00Z');
+    expect(comment.acknowledgedAt).toBe('2026-09-13T09:01:00Z');
+  });
+
   // The CLI reads plan rows over a direct connection and asks for no thread.
   it('is empty when nothing was selected', () => {
     expect(threadFrom(undefined)).toEqual([]);

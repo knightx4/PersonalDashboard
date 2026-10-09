@@ -103,8 +103,12 @@ export function threadFrom(value: unknown): DevComment[] {
       id: row.id as string,
       author: row.author === 'claude' ? ('claude' as const) : ('me' as const),
       body: row.body as string,
-      createdAt: String(row.created_at ?? ''),
-      acknowledgedAt: row.acknowledged_at ? String(row.acknowledged_at) : null,
+      // The loaders built on the shared store hand over turns already in the
+      // app shape, so read either name: a blank time throws where it is drawn.
+      createdAt: String(row.created_at ?? row.createdAt ?? ''),
+      acknowledgedAt: (row.acknowledged_at ?? row.acknowledgedAt)
+        ? String(row.acknowledged_at ?? row.acknowledgedAt)
+        : null,
     }))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }

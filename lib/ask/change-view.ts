@@ -29,6 +29,8 @@ export function changeHref(change: DashChange): string {
       return `/todo/all?status=all&focus=${change.input.id}`;
     case 'close_goal_step':
       return stepHref(change.input.goalId, change.input.id);
+    case 'set_goal_done_when':
+      return `/goals/${change.input.id}`;
     case 'add_role_note':
       return `/jobs/roles/${change.input.roleId}`;
     case 'add_idea':
@@ -178,6 +180,14 @@ export function changeWords(change: DashChange, done: boolean, today?: string): 
         what: change.input.title,
         rest: ` under ${change.input.goalTitle}`,
       };
+    case 'set_goal_done_when':
+      return change.input.doneWhen
+        ? {
+            verb: 'Set the done-when of',
+            what: change.input.title,
+            rest: `: ${quoted(change.input.doneWhen)}`,
+          }
+        : { verb: done ? 'Cleared the done-when of' : 'Clear the done-when of', what: change.input.title, rest: '' };
     case 'add_role_note':
       return {
         verb: done ? 'Added a note to' : 'Add a note to',
@@ -234,6 +244,7 @@ export function changeWhere(change: DashChange): string {
     case 'close_todo':
       return 'Open in Todo';
     case 'close_goal_step':
+    case 'set_goal_done_when':
       return 'Open the goal';
     case 'add_role_note':
       return 'Open the role';
