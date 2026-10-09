@@ -25,7 +25,7 @@ export async function loadRaisedNotifications(userId: string): Promise<Notificat
     const supabase = await createClient();
     const { data } = await supabase
       .from('raised_items')
-      .select('id, title, detail, created_at, goal_id')
+      .select('id, title, detail, created_at, goal_id, module')
       .eq('user_id', userId)
       .eq('status', 'open')
       .order('created_at', { ascending: false });
@@ -34,8 +34,14 @@ export async function loadRaisedNotifications(userId: string): Promise<Notificat
       id: row.id as string,
       headline: row.title as string,
       detail: (row.detail as string | null) ?? null,
-      // A flag on a goal (plan #1015) is answered on the goal's page.
-      href: row.goal_id ? `/goals/${row.goal_id as string}#flag-${row.id as string}` : '/dev/inbox',
+      // A flag on a goal (plan #1015) is answered on the goal's page, and a
+      // problem the job search's health check raised (lib/jobs/health) is
+      // seen on Find, where the searches it is about are.
+      href: row.goal_id
+        ? `/goals/${row.goal_id as string}#flag-${row.id as string}`
+        : row.module === 'jobs'
+          ? '/jobs/find'
+          : '/dev/inbox',
       at: row.created_at as string,
     }));
   } catch {
