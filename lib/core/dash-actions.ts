@@ -112,6 +112,12 @@ export type DashActionDeps = {
   db: AskDb;
   /** Now, as an ISO timestamp. */
   now?: () => string;
+  /**
+   * Forget the files a row held (plan #1714), called once an undo has taken
+   * the row away. A ref is not a foreign key, so nothing else removes them.
+   * Left out where there is no storage to reach, as in the tests.
+   */
+  forget?: (ref: string) => Promise<void>;
 };
 
 export type DashActionUndo =
@@ -690,7 +696,21 @@ export async function undoDashAction(
     const now = await loadDashAction(deps, id);
     return { ok: false, error: now ? notDone(now.status) : GONE, action: now };
   }
+  if (decided.plan.op === 'delete') await forgetFiles(deps, ref!);
   return { ok: true, action: toDashAction(rows[0]) };
+}
+
+/**
+ * Remove the files of a row an undo took away. The undo has happened by now,
+ * so a failure here is logged rather than reported as the undo failing.
+ */
+export async function forgetFiles(deps: Pick<DashActionDeps, 'forget'>, ref: string): Promise<void> {
+  if (!deps.forget) return;
+  try {
+    await deps.forget(ref);
+  } catch (error) {
+    console.error('undo: forgetting the files failed', ref, error);
+  }
 }
 
 // ---------------------------------------------------------------------------

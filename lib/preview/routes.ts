@@ -180,6 +180,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dash-mark': ['/dev/ui'],
   'todo-day-close': ['/todo'],
   'todo-day-closed': ['/todo'],
+  'todo-task-files': ['/todo', '/todo/all'],
   'news-quick-got-through': ['/news'],
   'news-quick-got-through-loaded': ['/news'],
   'home-arrival': ['/home'],

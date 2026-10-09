@@ -17,6 +17,7 @@ import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
 import { DashMarkLooks } from './dash-mark-surface';
 import { CaptureBoxSurface } from './capture-surfaces';
+import { TaskFilesSurface } from './task-files-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
 import { TASTE } from '@/app/dev/ui/taste';
@@ -4790,6 +4791,16 @@ export const SURFACES: readonly Surface[] = [
         ]}
       />
     ),
+  },
+
+  /* Todos holding files (plan #1714): the paperclip and count on the row,
+   * and the files it opens under the row. */
+  {
+    id: 'todo-task-files',
+    label: 'Todo · A task with files',
+    module: 'todo',
+    width: 'narrow',
+    render: () => <TaskFilesSurface />,
   },
 
   /* The end of Quick read (plan #1557): played by passing the last story,

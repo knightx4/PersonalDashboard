@@ -32,6 +32,12 @@ export type CaptureWriters = {
   ) => Promise<{ ok: true; noteId: string; title: string; blobSha: string } | { ok: false; error: string }>;
   /** recordDashAction, bound to the person. */
   record: (entry: DashActionEntry) => Promise<string | null>;
+  /**
+   * Record the files sent with the capture against one row it filed (plan
+   * #1714), and say how many there are. Absent when nothing was sent, as from
+   * the shortcuts' capture-token route, which stays text-only.
+   */
+  attach?: (ref: string) => Promise<number>;
 };
 
 export type CaptureFiled = {
@@ -44,6 +50,55 @@ export type CaptureFiled = {
 function quoted(text: string): string {
   const flat = text.replace(/\s+/g, ' ').trim();
   return flat.length <= 80 ? flat : `${flat.slice(0, 79).trimEnd()}…`;
+}
+
+/**
+ * The rows of Goals a capture's lines touched, which its files go on: the
+ * step a line closed, counted, added or logged progress on, and the goal for
+ * a reading or an old note. Each row once.
+ */
+export function goalRefs(entries: readonly FiledEntry[]): string[] {
+  const ids = entries.map((entry) => {
+    switch (entry.kind) {
+      case 'close':
+      case 'count':
+      case 'add':
+        return entry.step_id;
+      case 'progress':
+        return entry.item_id;
+      case 'reading':
+      case 'note':
+        return entry.goal_id;
+      default:
+        return null;
+    }
+  });
+  return [...new Set(ids.filter((id): id is string => Boolean(id)))].map((id) => `goals.items:${id}`);
+}
+
+/**
+ * Put the capture's files on each row one part filed. A row that cannot take
+ * them leaves the row filed and says so; the count is of the files the first
+ * row now holds, for the box's line.
+ */
+async function attachTo(
+  writers: CaptureWriters,
+  refs: readonly string[],
+  errors: string[],
+): Promise<number | undefined> {
+  if (!writers.attach || refs.length === 0) return undefined;
+  let count: number | undefined;
+  for (const ref of refs) {
+    try {
+      const held = await writers.attach(ref);
+      count ??= held;
+    } catch (error) {
+      console.error('capture: recording the files failed', ref, error);
+      errors.push('It was filed, but the files could not be kept with it.');
+      return count;
+    }
+  }
+  return count || undefined;
 }
 
 /** File each part in turn. A part that fails is said in `errors` and the rest still go. */
@@ -65,14 +120,17 @@ export async function fileCaptureParts(
         continue;
       }
       const where = filedDestination('todo', {});
+      const subjectRef = `todo.tasks:${result.id}`;
+      const files = await attachTo(writers, [subjectRef], errors);
       const actionId = await writers.record({
         surface: 'capture',
         kind: 'add_todo',
-        subjectRef: `todo.tasks:${result.id}`,
+        subjectRef,
         op: 'insert',
         summary: `Dash added the todo "${quoted(text)}" from capture.`,
       });
       filed.push({
+        ...(files ? { files } : {}),
         place: 'todo',
         text,
         where: where?.name ?? 'Todo',
@@ -92,7 +150,9 @@ export async function fileCaptureParts(
       }
       const entries = result.filed ?? [];
       const where = filedDestination('goals', { entries });
+      const files = await attachTo(writers, goalRefs(entries), errors);
       filed.push({
+        ...(files ? { files } : {}),
         place: 'goals',
         text,
         where: where?.name ?? 'Goals',
@@ -115,6 +175,7 @@ export async function fileCaptureParts(
         continue;
       }
       const where = filedDestination('jobs', { role: part.role });
+      const files = await attachTo(writers, [result.subjectRef], errors);
       const actionId = await writers.record({
         surface: 'capture',
         kind: 'add_role_note',
@@ -123,6 +184,7 @@ export async function fileCaptureParts(
         summary: `Dash added a note to the role ${roleName(part.role)} from capture.`,
       });
       filed.push({
+        ...(files ? { files } : {}),
         place: 'jobs',
         text,
         where: where?.name ?? 'Job search',
@@ -141,6 +203,7 @@ export async function fileCaptureParts(
         continue;
       }
       const where = filedDestination('vault', {});
+      const files = await attachTo(writers, [`obsidian.notes:${result.noteId}`], errors);
       // Undo removes the file from the repository as well as the row, so it
       // is capture's own (lib/capture/vault.ts), told apart by the blob SHA
       // the note was written at.
@@ -153,6 +216,7 @@ export async function fileCaptureParts(
         undo: { vault_blob_sha: result.blobSha },
       });
       filed.push({
+        ...(files ? { files } : {}),
         place: 'vault',
         text,
         where: where?.name ?? 'Vault',

@@ -5,6 +5,7 @@ import { workingRefsForPage } from '@/lib/talk/handoffs';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { loadAllTasks, loadParentTitles } from '@/lib/todo/tasks/load';
 import { loadLinksForTasks } from '@/lib/todo/links/load';
+import { loadTaskFiles } from '@/lib/todo/tasks/files';
 import { resolveAnchors } from '@/lib/todo/agenda/anchors';
 import type { TaskStatus } from '@/lib/todo/tasks/model';
 import { PageHeader } from '@/components/shell/page-header';
@@ -71,7 +72,7 @@ export default async function AllTasksPage({
   // in. A workspace that cannot be read costs its labels and nothing else;
   // resolveAnchors swallows that per target.
   const links = await loadLinksForTasks(tasks.map((task) => task.id));
-  const [anchors, parents, threads] = await Promise.all([
+  const [anchors, parents, threads, files] = await Promise.all([
     resolveAnchors(links, undefined, settings.timezone),
     // Which task an item came out of. Only the titles, and only for the rows
     // on this page -- the list here is not nested, so the row has to say it.
@@ -88,6 +89,9 @@ export default async function AllTasksPage({
         ),
       )
       .catch(() => new Map<string, DevComment[]>()),
+    // The files each task holds (plan #1714). The task the page was sent to
+    // opens with them showing, since a task has no page of its own.
+    loadTaskFiles(tasks.map((task) => task.id)),
   ]);
 
   return (
@@ -151,6 +155,8 @@ export default async function AllTasksPage({
                 timezone={settings.timezone}
                 working={working}
                 thread={threads.get(threadRef('task', task.id))}
+                files={files.get(task.id)}
+                filesOpen={task.id === focus}
                 anchor={anchors.get(task.id) ?? null}
                 under={
                   parents.has(task.id)

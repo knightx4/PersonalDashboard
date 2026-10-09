@@ -2,7 +2,7 @@ import 'server-only';
 
 import { after } from 'next/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { markDashActionUndone, type DashAction, type DashActionDeps } from '@/lib/core/dash-actions';
+import { forgetFiles, markDashActionUndone, type DashAction, type DashActionDeps } from '@/lib/core/dash-actions';
 import { parseRef } from '@/lib/core/refs';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { noteCreatePorts, noteRemovePorts, openConnectedSource } from '@/lib/vault/db/ports';
@@ -92,5 +92,6 @@ export async function undoVaultCapture(
   const removed = await removeCapturedNote(noteRemovePorts(await createVaultClient()), parsed.id, blobSha);
   if (!removed.ok) return removed;
   await markDashActionUndone(deps, action.id);
+  await forgetFiles(deps, action.subjectRef!);
   return { ok: true, undoneAt: deps.now ? deps.now() : new Date().toISOString() };
 }
