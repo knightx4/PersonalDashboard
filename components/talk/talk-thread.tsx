@@ -115,6 +115,7 @@ function Turn({
   below,
   assistant,
   state,
+  onCard,
 }: {
   turn: TalkTurn;
   grouped: boolean;
@@ -123,9 +124,14 @@ function Turn({
   assistant: TalkAssistant;
   /** The mark's state on an assistant turn: done just after it lands. */
   state?: DashState;
+  onCard?: boolean;
 }) {
   return (
-    <li className="flex gap-2">
+    <li
+      className={
+        onCard && turn.role === 'assistant' ? '-mx-2 flex gap-2 rounded-lg bg-canvas px-2 py-1.5' : 'flex gap-2'
+      }
+    >
       <div className="flex w-4 shrink-0 justify-center pt-1">
         {!grouped && <AuthorMark role={turn.role} assistant={assistant} state={state} />}
       </div>
@@ -165,9 +171,11 @@ function Turn({
   );
 }
 
-// Taller on a phone so each row is a 44-pixel press (docs/UI-QUALITY-SPEC.md,
-// R3): a `press-area` would be clipped by the truncation's overflow.
-const CITED_LINK = 'min-w-0 truncate text-ui text-accent underline-offset-2 hover:underline max-sm:py-3';
+// A 44-pixel press on a phone (docs/UI-QUALITY-SPEC.md, R3) from `press-area`,
+// which draws no space of its own, so the rows stay one tight list at every
+// width (plan #1708). The truncation is on the words inside, since a clipping
+// link would clip the press area with them.
+const CITED_LINK = 'press-area flex min-w-0 text-ui text-accent underline-offset-2 hover:underline';
 
 /**
  * The rows an answer rests on, each a link to where it lives (plan #1090).
@@ -189,7 +197,7 @@ function Cited({ citations }: { citations: readonly TalkCitation[] }) {
           />
           {citation.href.startsWith('/') ? (
             <Link href={citation.href} className={CITED_LINK}>
-              {citation.title}
+              <span className="min-w-0 truncate">{citation.title}</span>
             </Link>
           ) : (
             // A message Dash searched in Gmail (plan #1316): it opens there, in a new tab.
@@ -199,7 +207,7 @@ function Cited({ citations }: { citations: readonly TalkCitation[] }) {
               rel="noopener noreferrer"
               className={CITED_LINK}
             >
-              {citation.title}
+              <span className="min-w-0 truncate">{citation.title}</span>
               <span className="sr-only"> (opens in Gmail)</span>
             </a>
           )}
@@ -226,6 +234,7 @@ export function TalkThread({
   activity,
   incoming,
   working,
+  onCard = false,
 }: {
   /** Unique on the page: the textarea's id is built from it. */
   id: string;
@@ -281,6 +290,14 @@ export function TalkThread({
    * for an Ask Dash answer, as each lookup starts (plan #1438).
    */
   working?: React.ReactNode;
+  /**
+   * The caller has put the thread on a card of its own. Dash's turns then
+   * take the recessed ground, so his words look different from yours at a
+   * glance (taste `no-bare-text`), as the dev pages' thread does with the
+   * same prop (components/thread/thread.tsx). Left off, the thread draws as
+   * it always has; a host takes it on when it puts the thread on a card.
+   */
+  onCard?: boolean;
 }) {
   const [own, setTurns] = useState<TalkTurn[]>([...initial]);
   // The thread's own turns, with any written elsewhere slotted in by time.
@@ -371,6 +388,7 @@ export function TalkThread({
               below={turn.id === PENDING ? undefined : below?.(turn)}
               assistant={assistant}
               state={turn.id === landed ? 'done' : undefined}
+              onCard={onCard}
             />
           ))}
           {sending && (

@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { importedBy, pagesUsing } from '@/lib/preview/importers';
 import {
+  COMPONENT_SURFACES,
   routeMatches,
   routeOfFile,
   SURFACE_ROUTES,
@@ -123,6 +124,39 @@ describe('surfacesForFiles, on screen changes that shipped', () => {
 
   it('ignores files that are not screens', () => {
     expect(surfacesForFiles(['lib/jobs/today/load.ts', 'app/news/actions.ts'], using)).toEqual([]);
+  });
+
+  // Plan #1708: the Ask Dash thread is imported by the shell, and walking its
+  // importers named every surface in the gallery.
+  it('stops at the Ask Dash thread\'s own surface', () => {
+    expect(surfacesForFiles(['components/talk/talk-thread.tsx'], using)).toEqual(['ask-dash-thread']);
+    // Without the file system too: the thread is named by its path.
+    expect(surfacesForFiles(['components/talk/talk-thread.tsx'])).toEqual(['ask-dash-thread']);
+  });
+
+  it('stops at the thread on the way up from a file beneath it', () => {
+    const graph = new Map<string, string[]>([
+      ['components/talk/piece.tsx', ['components/talk/talk-thread.tsx']],
+      ['components/talk/talk-thread.tsx', ['components/shell/ask-dash.tsx']],
+      ['components/shell/ask-dash.tsx', ['app/layout.tsx']],
+    ]);
+    expect(pagesUsing('components/talk/piece.tsx', graph)).toEqual(['components/talk/talk-thread.tsx']);
+    expect(surfacesForFiles(['components/talk/piece.tsx'], (f) => pagesUsing(f, graph))).toEqual([
+      'ask-dash-thread',
+    ]);
+  });
+
+  it('still follows a file that imports the thread to its pages', () => {
+    const found = surfacesForFiles(['components/shell/ask-dash.tsx'], using);
+    expect(found).toContain('shell-full');
+    expect(found.length).toBeGreaterThan(100);
+  });
+
+  it('names a surface in the gallery for every shared component', () => {
+    for (const [id, files] of Object.entries(COMPONENT_SURFACES)) {
+      expect(SURFACE_ROUTES[id]).toBeDefined();
+      for (const file of files) expect(statSync(join(root, file)).isFile()).toBe(true);
+    }
   });
 });
 
