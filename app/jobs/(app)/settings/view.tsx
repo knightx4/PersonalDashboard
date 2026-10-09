@@ -342,6 +342,7 @@ function PreferenceText({
           <input type="hidden" name="field" value={field} />
           <InlineInput
             name="value"
+            className="max-sm:min-h-11"
             aria-label={label}
             defaultValue={value}
             placeholder={placeholder}
