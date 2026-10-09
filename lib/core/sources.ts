@@ -34,6 +34,18 @@ export const coreSources: ModuleSources = {
       note: "role 'user' is theirs and 'assistant' is Dash's: read their turns as what they wanted to know, and Dash's only for context. On Dash's answers to an 'ask', citations lists the rows it relied on. In a thread with Maya the assistant's turns are Maya's, and detail holds a thought's points. conversation_id joins core.conversations, which says what the turn is about.",
     },
     {
+      table: 'core.attachments',
+      module: 'Home',
+      holds: 'Files they added to a note, a todo, a quick capture or a question for Dash: photos, screenshots, PDFs, Word files, text and CSV.',
+      weight: 'record',
+      search: ['name'],
+      title: 'name',
+      facts: ['content_type', 'size_bytes', 'ref'],
+      href: (id) => `/attachments/${id}`,
+      page: { title: 'name', href: (row) => `/attachments/${row.id}` },
+      note: "ref is the row the file came with, as schema.table:id; the same path recorded against two refs is one file that went with both. The file itself is in the private attachments bucket at path, and /attachments/<id> opens it through a short signed link. Read the row it belongs to for what the file was about.",
+    },
+    {
       table: 'core.observations',
       module: 'Home',
       holds: 'What Dash noticed each week across their modules, with a number and the timeline rows behind it, and whether they found it useful.',

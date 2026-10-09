@@ -1030,3 +1030,56 @@ describe('watches and their readings', () => {
       insert into core.watch_readings (user_id, watch_id, value) values (${userB}, ${watch.id}, 1)`).rejects.toThrow(/watch_readings_watch_fk/);
   });
 });
+
+describe('attachments', () => {
+  const file = (userId: string, n: number) => `${userId}/0b9d3c1e-5a4f-4e7b-9c2d-8f6a1b3e5d7${n}-shot.png`;
+
+  it('keeps each file to its owner, and lets them record and forget it but never rewrite it', async () => {
+    const ref = await ownRef(userA);
+    const [row] = await asUser(userA, (tx) => tx<{ id: string }[]>`
+      insert into core.attachments (user_id, path, name, content_type, size_bytes, ref)
+      values (${userA}, ${file(userA, 0)}, 'shot.png', 'image/png', 2048, ${ref})
+      returning id`);
+
+    expect(await asUser(userA, (tx) => tx`select id from core.attachments where id = ${row.id}`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from core.attachments`)).toHaveLength(0);
+    await expect(
+      asUser(userA, (tx) => tx`update core.attachments set name = 'other.png' where id = ${row.id}`),
+    ).rejects.toThrow(/permission denied/);
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into core.attachments (user_id, path, name, content_type, size_bytes, ref)
+        values (${userA}, ${file(userA, 1)}, 'x.png', 'image/png', 1, ${ref})`),
+    ).rejects.toThrow(/row-level security/);
+    expect(await asUser(userB, (tx) => tx`delete from core.attachments where id = ${row.id} returning id`)).toHaveLength(0);
+    expect(await asUser(userA, (tx) => tx`delete from core.attachments where id = ${row.id} returning id`)).toHaveLength(1);
+  });
+
+  it('refuses a path outside the owner folder, a type the store does not take, and a sixth file on a row', async () => {
+    const ref = await ownRef(userA);
+    await expect(admin`
+      insert into core.attachments (user_id, path, name, content_type, size_bytes, ref)
+      values (${userA}, ${file(userB, 0)}, 'x.png', 'image/png', 1, ${ref})`).rejects.toThrow(/attachments_path_in_own_folder_ck/);
+    await expect(admin`
+      insert into core.attachments (user_id, path, name, content_type, size_bytes, ref)
+      values (${userA}, ${file(userA, 0)}, 'x.svg', 'image/svg+xml', 1, ${ref})`).rejects.toThrow(/attachments_content_type_ck/);
+    await expect(admin`
+      insert into core.attachments (user_id, path, name, content_type, size_bytes, ref)
+      values (${userA}, ${file(userA, 0)}, 'x.png', 'image/png', 1, 'tasks')`).rejects.toThrow(/attachments_ref_ck/);
+
+    for (let n = 0; n < 5; n++) {
+      await admin`
+        insert into core.attachments (user_id, path, name, content_type, size_bytes, ref)
+        values (${userA}, ${file(userA, n)}, 'x.png', 'image/png', 1, ${ref})`;
+    }
+    await expect(admin`
+      insert into core.attachments (user_id, path, name, content_type, size_bytes, ref)
+      values (${userA}, ${file(userA, 5)}, 'x.png', 'image/png', 1, ${ref})`).rejects.toThrow(/five files at most/);
+
+    // The same file can go with a second row.
+    const other = await ownRef(userA);
+    await admin`
+      insert into core.attachments (user_id, path, name, content_type, size_bytes, ref)
+      values (${userA}, ${file(userA, 0)}, 'x.png', 'image/png', 1, ${other})`;
+  });
+});

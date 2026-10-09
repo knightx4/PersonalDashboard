@@ -482,6 +482,15 @@ Every comment thread and conversation with Dash: the thread under any row (a pla
 - Name a row by `title`; link it by `id`
 - subject_kind says what it is about: 'row' for a thread under one row, with subject_ref that row's ref (schema.table:id, such as goals.items:<id>, job_search.roles:<id> or news.saved_stories:<id>), or 'ask' for a question asked from anywhere, whose title is the question. The words are in core.conversation_turns, joined by conversation_id; core.thread_turns lists a row thread's turns with the ref beside each. voice 'maya' marks a note's thread with Maya (obsidian.notes:<id>): its title is the question the note is working on, summary is where they have got to, and origin is 'asked' when they asked Maya and 'automatic' when Maya wrote unasked.
 
+### `core.attachments` (Home)
+
+Files they added to a note, a todo, a quick capture or a question for Dash: photos, screenshots, PDFs, Word files, text and CSV.
+
+- Search: `name`
+- Name a row by `name`; link it by `id`
+- Opens at `/attachments/<id>`
+- ref is the row the file came with, as schema.table:id; the same path recorded against two refs is one file that went with both. The file itself is in the private attachments bucket at path, and /attachments/<id> opens it through a short signed link. Read the row it belongs to for what the file was about.
+
 ### `public.social_posts` (Dev)
 
 Posts about building this app that Dash drafted for X, and which ones they posted, with the link.
