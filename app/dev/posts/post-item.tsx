@@ -7,10 +7,11 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { FieldError, Input, Textarea } from '@/components/ui/field';
 import { StateLabel } from '@/components/dev/state-label';
 import { cn } from '@/lib/cn';
-import { MAX_THREAD_POSTS, threadCopyText, X_POST_LIMIT, xLength } from '@/lib/dev/posts';
+import { MAX_ANGLE, MAX_THREAD_POSTS, threadCopyText, X_POST_LIMIT, xLength } from '@/lib/dev/posts';
 import type { PostCard } from '@/lib/dev/posts-page';
 import {
   dropPost,
+  editPostAngle,
   editPostBody,
   markPostPosted,
   restorePost,
@@ -54,7 +55,7 @@ function useCopy() {
 }
 
 /** "243/280", or "12 over" in red once it is past the limit. */
-function Counter({ text, id }: { text: string; id?: string }) {
+export function Counter({ text, id }: { text: string; id?: string }) {
   const length = xLength(text);
   const over = length - X_POST_LIMIT;
   return (
@@ -118,6 +119,66 @@ function PostEditor({
         </span>
       </div>
       <FieldError>{error}</FieldError>
+    </form>
+  );
+}
+
+/**
+ * The angle, the one line saying what a draft is about. Text until clicked,
+ * like the posts under it; Enter or Save writes it, Escape puts it back.
+ */
+function Angle({ id, angle, editable }: { id: string; angle: string; editable: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const [state, action, pending] = useActionState(
+    async (prev: PostsActionState, formData: FormData) => {
+      const next = await editPostAngle(prev, formData);
+      if (!next.error) setEditing(false);
+      return next;
+    },
+    {} as PostsActionState,
+  );
+
+  if (!editable) return <h3 className="min-w-0 flex-1 text-ui font-semibold text-ink">{angle}</h3>;
+  if (!editing) {
+    return (
+      <h3 className="min-w-0 flex-1 text-ui font-semibold text-ink">
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          aria-label="Edit what this draft is about"
+          // ui-ok: the angle of a waiting draft is the button that opens its editor, as the posts are.
+          className="-mx-1 rounded-control px-1 text-left hover:bg-sunken focus-visible:outline-2"
+        >
+          {angle}
+        </button>
+      </h3>
+    );
+  }
+  return (
+    <form action={action} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+      <input type="hidden" name="id" value={id} />
+      <Input
+        name="angle"
+        required
+        autoFocus
+        defaultValue={angle}
+        maxLength={MAX_ANGLE}
+        aria-label="What this draft is about"
+        aria-invalid={state.error ? true : undefined}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setEditing(false);
+        }}
+        className="min-w-0 flex-1 basis-60"
+      />
+      <Button type="submit" size="sm" pending={pending}>
+        {pending ? 'Saving…' : 'Save'}
+      </Button>
+      <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={pending}>
+        Cancel
+      </Button>
+      <div className="basis-full">
+        <FieldError>{state.error}</FieldError>
+      </div>
     </form>
   );
 }
@@ -246,7 +307,7 @@ export function PostItem({ card }: { card: PostCard }) {
   return (
     <li id={`post-${post.id}`} className="flex scroll-mt-bar flex-col gap-2 px-4 py-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 className="min-w-0 flex-1 text-ui font-semibold text-ink">{post.angle}</h3>
+        <Angle id={post.id} angle={post.angle} editable={editable} />
         <StatusLine card={card} />
       </div>
 

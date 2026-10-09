@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { checkDraft, sourceProblems } from './post-check';
 import {
+  angleFromPost,
   POSTS_RUN_HOLD_MINUTES,
   postsRunState,
   postsRunText,
@@ -173,5 +174,23 @@ describe('socialPostFromRow and sortPosts', () => {
     const suggested = socialPostFromRow({ ...base, id: '2', status: 'suggested' });
     expect(posted.sourceFeedbackIds).toEqual([]);
     expect(sortPosts([posted, suggested]).map((p) => p.id)).toEqual(['2', '1']);
+  });
+});
+
+describe('angleFromPost', () => {
+  it('takes the first sentence of a post the person wrote', () => {
+    expect(angleFromPost('Todo is one list. It has a calendar too.')).toBe('Todo is one list.');
+  });
+
+  it('keeps a post with no full stop whole, on one line', () => {
+    expect(angleFromPost('  a quick note\nabout the plan  ')).toBe('a quick note about the plan');
+  });
+
+  it('cuts a long first sentence at a word, under 120 characters', () => {
+    const long = EXAMPLE.replace('. ', ', and ');
+    const angle = angleFromPost(long);
+    expect(angle.length).toBeLessThanOrEqual(121);
+    expect(angle.endsWith('…')).toBe(true);
+    expect(long.startsWith(angle.slice(0, -1))).toBe(true);
   });
 });

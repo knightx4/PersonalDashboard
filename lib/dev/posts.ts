@@ -313,6 +313,24 @@ export function cleanThread(posts: readonly string[]): string[] | null {
   return kept;
 }
 
+/** The table's limit on an angle (social_posts_angle_ck). */
+export const MAX_ANGLE = 300;
+
+/**
+ * The angle a post the person wrote themselves gets when they leave it blank:
+ * the first sentence of its first post, cut at a word before 120 characters.
+ * The angle is what the next run compares its ideas against, and a post's
+ * opening sentence is the nearest thing it has to one.
+ */
+export function angleFromPost(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  const sentence = flat.match(/^.+?[.!?](?=\s|$)/)?.[0] ?? flat;
+  if (sentence.length <= 120) return sentence;
+  const cut = sentence.slice(0, 120);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > 60 ? cut.slice(0, space) : cut).replace(/[,;:]$/, '')}…`;
+}
+
 /**
  * What Copy puts on the clipboard: every post in the thread, a blank line
  * between each, so one paste keeps the whole thread together. Each post also

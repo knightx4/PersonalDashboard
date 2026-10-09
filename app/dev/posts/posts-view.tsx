@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn';
 import type { PostCard, PostsPage } from '@/lib/dev/posts-page';
 import { PostItem } from './post-item';
 import { AskForPost, SuggestPosts } from './suggest-posts';
+import { WritePost } from './write-post';
 
 /**
  * The Posts tab in Dev (plan #1419): X posts Dash drafted about building this
@@ -58,6 +59,7 @@ export function PostsScreen({ page }: { page: PostsPage }) {
         <div className="-mt-3 space-y-1">
           <RunLine page={page} />
           <AskForPost runState={page.runState} />
+          <WritePost />
         </div>
       </div>
 
@@ -65,7 +67,7 @@ export function PostsScreen({ page }: { page: PostsPage }) {
         <EmptyState
           icon={Megaphone}
           title="No drafts yet"
-          description="Suggest posts asks Dash for three to five X posts about what shipped since the last one you posted, each citing the steps it came from. Edit one, copy it, post it on X yourself, then paste the link back here."
+          description="Suggest posts asks Dash for three to five X posts about what shipped since the last one you posted, each citing the steps it came from. Or write your own. Click a post to edit it, copy it, post it on X yourself, then paste the link back here."
         />
       ) : (
         page.suggested.length > 0 && <PostList cards={page.suggested} />
