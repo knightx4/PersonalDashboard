@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DASH_ACTIVITIES,
   DASH_ACTIVITY_LABELS,
+  DASH_LOOKS,
   DASH_STATES,
   DASH_STATE_LABELS,
   DashMark,
@@ -23,6 +24,7 @@ const MOTIONS = [
   'blink',
   'breathe',
   'snooze',
+  'tip',
   'streak',
   'rattle',
   'read',
@@ -138,6 +140,60 @@ describe('DashMark', () => {
     const html = render({});
     expect(html).toContain('data-dash-state="idle"');
     expect(html).toContain('width="16"');
+  });
+});
+
+describe('its looks', () => {
+  const STILL_STATES = ['idle', 'working', 'asleep'] as const;
+  const hatMask = (html: string) => html.match(/<mask id="[^"]+-hat"/g) ?? [];
+
+  it('draws nothing extra without a look', () => {
+    for (const state of DASH_STATES) {
+      const html = render({ state, tone: 'brand', size: 'lg' });
+      expect(hatMask(html)).toHaveLength(0);
+      expect(html).not.toContain('data-dash-look');
+      expect(html).not.toContain('dash-mark-tip');
+    }
+  });
+
+  it('wears each hat idle, working and asleep, and each reads differently in a still frame', () => {
+    for (const state of STILL_STATES) {
+      const frames = DASH_LOOKS.map((look) => {
+        const html = render({ state, look });
+        expect(hatMask(html)).toHaveLength(1);
+        expect(html).toContain(`data-dash-look="${look}"`);
+        return still(html);
+      });
+      frames.push(still(render({ state })));
+      expect(new Set(frames).size).toBe(DASH_LOOKS.length + 1);
+    }
+  });
+
+  it('wears the hat while working at any kind of work', () => {
+    for (const activity of DASH_ACTIVITIES) {
+      expect(hatMask(render({ state: 'working', activity, look: 'cowboy-hat' }))).toHaveLength(1);
+    }
+  });
+
+  it('leaves the hat off under the flag', () => {
+    for (const state of ['done', 'failed'] as const) {
+      const html = render({ state, look: 'top-hat' });
+      expect(hatMask(html)).toHaveLength(0);
+      expect(html).not.toContain('data-dash-look');
+    }
+  });
+
+  it('tips every hat but the ball cap while asleep', () => {
+    expect(render({ state: 'asleep', look: 'top-hat' })).toContain('dash-mark-tip');
+    expect(render({ state: 'asleep', look: 'cowboy-hat' })).toContain('dash-mark-tip');
+    expect(render({ state: 'asleep', look: 'newsboy-cap' })).toContain('dash-mark-tip');
+    expect(render({ state: 'asleep', look: 'ball-cap' })).not.toContain('dash-mark-tip');
+    expect(render({ state: 'idle', look: 'top-hat' })).not.toContain('dash-mark-tip');
+  });
+
+  it('draws the hat in the colour of its place on the brand ramp', () => {
+    const html = render({ state: 'idle', tone: 'brand', look: 'newsboy-cap' });
+    expect(html).toMatch(/<g fill="currentColor" mask="url\(#[^)]+-hat\)"/);
   });
 });
 

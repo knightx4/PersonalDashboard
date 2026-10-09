@@ -16,6 +16,9 @@ import { phoneShot } from './plan-surfaces';
 import { RaisedView } from '@/app/dev/raised/raised-view';
 import { ConversationsView } from '@/app/dev/raised/conversations-view';
 import { StatusPanel } from '@/app/dev/raised/status-panel';
+import { OvernightControl } from '@/app/dev/plan/overnight-control';
+import type { OvernightRun } from '@/lib/plan/overnight';
+import type { DigestNight } from '@/lib/digest/night';
 import { NowStrip } from '@/app/dev/raised/now-strip';
 import { AskBox } from '@/app/dev/raised/ask-box';
 import { CheckBacksPanel } from '@/app/dev/raised/check-backs-panel';
@@ -778,7 +781,16 @@ export function DevRaisedStatusSurface() {
     <StatusPanel
       run={null}
       canSend
-      card={{ night: null, on: [], progress: null, push: null, ready: 3, readySteps: 9, next: [] }}
+      card={{
+        night: null,
+        on: [],
+        progress: null,
+        push: null,
+        ready: 3,
+        readySteps: 9,
+        next: [],
+        sessions: [],
+      }}
       goals={null}
       openNotes={12}
       notesLastRun={null}
@@ -879,6 +891,113 @@ export function AccountSurface({
         connected={{ apps, failed: null, connectorAddress: 'https://dash.example.com/api/mcp' }}
         capture={{ tokens: onlyFirstToken ? [{ ...captureTokens[0], createdAt: '2026-10-09T15:30:00Z', lastUsedAt: null }] : captureTokens, failed: null, justMade, address: 'https://dash.example.com/api/capture' }}
       />
+    </>,
+  );
+}
+
+// ---- The runner's four Dashes (plan #1704) -------------------------------
+
+/** An instant `minutes` before the preview renders, so the clocks read sensibly. */
+function minutesAgo(minutes: number): string {
+  return new Date(Date.now() - minutes * 60_000).toISOString();
+}
+
+/**
+ * The runner card on /dev/plan in the two states the person asked to see: a
+ * night running with two feature sessions, a goal run and one slot asleep
+ * with the tick's reason, and the runner off with all four Dashes idle. The
+ * longest titles the plan has had, so the lines are seen cut.
+ */
+export function DevRunnerCrewSurface() {
+  const started = minutesAgo(130);
+  const run: OvernightRun = {
+    id: 'run-1',
+    running: true,
+    paused: false,
+    featuresBudget: 6,
+    featuresLeft: 3,
+    stopBy: null,
+    startedAt: started,
+    lastFiredAt: minutesAgo(31),
+    endedAt: null,
+    endedReason: null,
+    lastTickAt: minutesAgo(2),
+    lastTickNote: 'Waiting: 2 sessions are running, and nothing else is ready outside their modules.',
+    createdAt: started,
+    updatedAt: minutesAgo(2),
+  };
+  const night: DigestNight = {
+    standing: 'running',
+    startedAt: started,
+    endedAt: null,
+    endedReason: null,
+    featuresBudget: 6,
+    featuresLeft: 3,
+    features: [
+      { ref: '#1700', title: 'Four Dashes on the runner card, one for each thing it can run at once', at: minutesAgo(31) },
+    ],
+    lastFire: {
+      ref: '#1700',
+      title: 'Four Dashes on the runner card, one for each thing it can run at once',
+      at: minutesAgo(31),
+    },
+    closed: [],
+    blocked: [],
+  };
+  return column(
+    <>
+      <OvernightControl
+        run={run}
+        canSend
+        night={night}
+        push={null}
+        ready={2}
+        sessions={[
+          {
+            id: 's1',
+            firedAt: minutesAgo(31),
+            endedAt: null,
+            step: {
+              number: 1700,
+              ref: '#1700.4',
+              title: 'Show the four Dashes on the runner card, each in its own hat',
+            },
+            module: 'Dev',
+            doing: null,
+          },
+          {
+            id: 's2',
+            firedAt: minutesAgo(14),
+            endedAt: null,
+            step: { number: 1688, title: 'Returns list on Shopping' },
+            module: 'Shopping',
+            doing: null,
+          },
+        ]}
+        on={[
+          {
+            ref: '#1700',
+            title: 'Four Dashes on the runner card',
+            at: minutesAgo(31),
+            step: null,
+            progress: { done: 3, total: 4 },
+          },
+        ]}
+        goals={{
+          on: [
+            {
+              id: 'g1',
+              doing: 'Mapping the goal',
+              title: 'Run a half marathon',
+              at: minutesAgo(6),
+              nowOn: 'Reading Gmail for race dates',
+            },
+          ],
+          readySteps: 0,
+          toMap: 0,
+        }}
+      />
+      <OvernightControl run={null} canSend night={null} push={null} ready={2} />
     </>,
   );
 }

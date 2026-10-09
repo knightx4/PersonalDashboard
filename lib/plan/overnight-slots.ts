@@ -27,8 +27,11 @@ export type SlotSession = {
   firedAt: string;
   /** When it ended, or null while it is going. */
   endedAt: string | null;
-  /** The step it was sent at, or null when the fire left no record of one. */
-  step: { number: number; title: string } | null;
+  /**
+   * The step it was sent at, or null when the fire left no record of one.
+   * `ref` is how the plan writes it, "#1700.2" for a step under a feature.
+   */
+  step: { number: number; title: string; ref?: string } | null;
   /** The workspace the step is in, as the plan names it. */
   module: string | null;
   /** What the run last did, one short phrase, or null when nothing is known. */
@@ -46,6 +49,8 @@ export type SlotGoalRun = {
 export type SlotWork = {
   /** The step number, null for a goals run or a fire with no record. */
   step: number | null;
+  /** How the plan writes it ("#1700.2"), null where `step` is. */
+  ref: string | null;
   title: string | null;
   module: string | null;
   doing: string | null;
@@ -140,6 +145,7 @@ function workOf(
 ): SlotWork {
   return {
     step: src.step?.number ?? null,
+    ref: src.step ? (src.step.ref ?? `#${src.step.number}`) : null,
     title: src.step?.title ?? src.title ?? null,
     module: src.module,
     doing: src.doing,

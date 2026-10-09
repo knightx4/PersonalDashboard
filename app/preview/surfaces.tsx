@@ -15,6 +15,7 @@ import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
+import { DashMarkLooks } from './dash-mark-surface';
 import { CaptureBoxSurface } from './capture-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
@@ -213,6 +214,7 @@ import {
   DevRaisedSurface,
   DevInboxSurface,
   DevRaisedStatusSurface,
+  DevRunnerCrewSurface,
   DevSpecSurface,
   DevSpecsSurface,
   DevSpecsInterviewEmptySurface,
@@ -4730,6 +4732,17 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
 
+  /* Dash's mark wearing each of the four hats that tell the runner card's
+   * slots apart (plan #1702): idle, working and asleep, at 44 and 24 pixels,
+   * with bareheaded Dash first to show the plain mark is unchanged. */
+  {
+    id: 'dash-mark',
+    label: 'Dash · Hats for the runner’s four Dashes',
+    module: 'dev',
+    width: 'narrow',
+    render: () => <DashMarkLooks />,
+  },
+
   /* The day closing on the agenda (plan #1556): played by ticking the last
    * thing due today, and as a page that loads with the day already closed. */
   {
@@ -5055,6 +5068,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevRaisedStatusSurface />,
+  },
+  {
+    /* The runner card on /dev/plan with its four Dashes (plan #1704): a
+     * night with two sessions, a goal run and a slot asleep, then off. */
+    id: 'dev-runner-crew',
+    label: 'Dev · Plan, the runner’s four Dashes',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevRunnerCrewSurface />,
   },
   {
     id: 'dev-specs',
