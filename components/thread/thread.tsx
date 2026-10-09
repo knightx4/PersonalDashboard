@@ -202,6 +202,11 @@ function Message({
   // written yet has no id to delete by, so the control waits for the real row;
   // everything else about it is drawn exactly as a comment that landed.
   const unsent = comment.id === PENDING;
+  // Whether the comment was already seen when this row first drew. One that
+  // was is shown at rest; one that is acknowledged while the thread is open
+  // gets the seen mark arriving (plan #1652).
+  const [seenAtMount] = useState(Boolean(comment.acknowledgedAt));
+  const arrivedSeen = Boolean(comment.acknowledgedAt) && !seenAtMount;
 
   return (
     <li
@@ -251,7 +256,16 @@ function Message({
             is about. It stands where "replying…" would have stood. */}
         {comment.acknowledgedAt && (
           <p className="flex items-center gap-1 text-small text-ink-muted">
-            <Check className="size-4 shrink-0" strokeWidth={2} aria-hidden />
+            {/* Dash's mark comes to rest beside the comment, level and idle,
+                and the seen mark arrives after it. Only when the acknowledgment
+                lands while the thread is open: a comment that was already seen
+                when the page loaded just stands there. */}
+            <DashMark size="2xs" decorative className="text-ink-ghost" />
+            <Check
+              className={cn('size-4 shrink-0', arrivedSeen && 'dash-seen-in')}
+              strokeWidth={2}
+              aria-hidden
+            />
             <span>Seen by Dash</span>
             <time
               dateTime={comment.acknowledgedAt}
@@ -470,7 +484,16 @@ export function Thread({
           {asking && (
             <li className="flex gap-2" aria-live="polite">
               <div className="flex w-4 shrink-0 justify-center pt-1">
-                <AuthorMark author="claude" />
+                {/* Working while the answer is written. If Dash only
+                    acknowledges, this row goes and the mark comes to rest
+                    under your comment beside the seen mark. */}
+                <DashMark
+                  size="2xs"
+                  state="working"
+                  activity="reading"
+                  decorative
+                  className="text-ink-ghost"
+                />
               </div>
               <div className="min-w-0 flex-1 space-y-0.5">
                 <span className="text-small font-semibold text-ink-muted">Dash</span>
