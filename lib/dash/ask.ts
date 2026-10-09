@@ -5,7 +5,8 @@ import type { PageContext } from '@/lib/ask/page';
 import type { DashChange, MadeDashChange, NewDashChange } from '@/lib/talk/changes';
 import { HANDED_OFF, handoffRequest, type DashHandoff } from '@/lib/talk/handoff';
 import { DASH_MODELS } from './models';
-import { askTitle, MAX_TURN, type NewTalkTurn, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
+import { askTitle, bodyWithFileNames, MAX_TURN, type NewTalkTurn, type TalkSubject, type TalkTurn } from '@/lib/talk/talk';
+import type { UploadedAttachment } from '@/lib/attachments/rules';
 import {
   MAX_LOOKUPS,
   runDash,
@@ -274,6 +275,8 @@ export async function askDash(
     question: string;
     /** An `ask` conversation's ref, to continue it; absent to start a new one. */
     conversationRef?: string | null;
+    /** Files uploaded with this question; kept against its turn (plan #1715). */
+    files?: readonly UploadedAttachment[];
     today: string;
     /**
      * The page it was asked from, resolved (lib/ask/page.ts). Not kept with
@@ -314,7 +317,7 @@ export async function askDash(
     } else {
       subject = await stores.start(question);
     }
-    asked = await stores.append(subject, [{ role: 'user', body: question }]);
+    asked = await stores.append(subject, [{ role: 'user', body: question, files: input.files }]);
   } catch {
     return { turns: [], error: 'Your question was not kept. Try again.' };
   }
@@ -397,7 +400,8 @@ export async function askDash(
     }
   };
   const answer = await answerQuestion({
-    turns: [...earlier, ...asked],
+    // Dash is told the files' names only for now (plan #1716 lets it read the newest).
+    turns: [...earlier, ...asked].map((turn) => ({ ...turn, body: bodyWithFileNames(turn) })),
     today: input.today,
     page: input.page,
     execute: input.execute,
