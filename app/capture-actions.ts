@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requestAskDb, requestDashDeps } from '@/lib/ask/clients';
 import { requireUser } from '@/lib/auth/server';
+import { parseUploadedAttachments } from '@/lib/attachments/rules';
+import { recordAttachments } from '@/lib/attachments/store';
 import { fileCaptureParts, type CaptureFiled } from '@/lib/capture/file';
 import { captureFiling, offeredCapturePlaces } from '@/lib/capture/place';
 import {
@@ -152,10 +154,19 @@ export type CaptureBoxResult = CaptureFiled & {
  * File what was typed. With a sure sort or a pick from the box, each part
  * goes to its writer; with neither, the sentence is sorted here first, and an
  * unsure answer files nothing and comes back as `ask`.
+ *
+ * `uploaded` is what the box's "Add a file" put in the bucket (plan #1714).
+ * Each row filed gets every file, so a capture Dash split in two holds them
+ * on both; the copies in storage are shared.
  */
 // latency: pending
-export async function fileCaptureBox(body: string, shown: CaptureBoxShown): Promise<CaptureBoxResult> {
+export async function fileCaptureBox(
+  body: string,
+  shown: CaptureBoxShown,
+  uploaded: unknown = [],
+): Promise<CaptureBoxResult> {
   const user = await requireUser();
+  const files = parseUploadedAttachments(uploaded, user.id);
   const sentence = typeof body === 'string' ? body.trim() : '';
   if (!sentence) return { filed: [], errors: [], error: 'Type something first.' };
   if (sentence.length > CAPTURE_BODY_MAX) {
@@ -209,7 +220,16 @@ export async function fileCaptureBox(body: string, shown: CaptureBoxShown): Prom
     },
     vault: (text) => fileVaultNote(user.id, text),
     record: (entry) => recordDashAction(deps, entry),
+    ...(files.length > 0
+      ? {
+          attach: async (ref: string) => {
+            await recordAttachments(await createCoreClient(), user.id, ref, files);
+            return files.length;
+          },
+        }
+      : {}),
   });
+  if (files.length > 0) revalidatePath('/todo', 'layout');
   if (result.filed.some((item) => item.place === 'vault')) revalidatePath('/vault', 'layout');
   if (result.filed.some((item) => item.place === 'jobs')) revalidatePath('/jobs', 'layout');
   revalidatePath('/home');

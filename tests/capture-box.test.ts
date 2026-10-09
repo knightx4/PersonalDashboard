@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fileCaptureParts, type CaptureWriters } from '@/lib/capture/file';
+import { fileCaptureParts, goalRefs, type CaptureWriters } from '@/lib/capture/file';
 import type { CapturePart } from '@/lib/capture/sort';
 import { markDashActionUndone, recordDashAction, undoDashAction, undoneByVault } from '@/lib/core/dash-actions';
 import { writeRoleNote } from '@/lib/dash/writes';
@@ -217,5 +217,93 @@ describe('filing from the one capture box', () => {
     expect(filed).toEqual([]);
     expect(errors[0]).toMatch(/not one of theirs/);
     expect(world.tables['core.dash_actions']).toEqual([]);
+  });
+});
+
+describe('files sent with a capture (plan #1714)', () => {
+  it('puts the files on every row a split capture filed, and counts them on each line', async () => {
+    const world = setup();
+    const attach = vi.fn<(ref: string) => Promise<number>>(async () => 2);
+    const { filed, errors } = await fileCaptureParts(parts, { ...world.writers, attach });
+
+    expect(errors).toEqual([]);
+    const todoId = world.tables['todo.tasks'][0].id;
+    // A role note is a turn of the role's thread, so its files go on the turn.
+    const noteId = world.tables['core.conversation_turns'][0].id;
+    expect(attach.mock.calls.map(([ref]) => ref)).toEqual([
+      `todo.tasks:${todoId}`,
+      `goals.items:${GOAL_LINE.step_id}`,
+      `core.conversation_turns:${noteId}`,
+    ]);
+    expect(filed.map((item) => item.files)).toEqual([2, 2, 2]);
+  });
+
+  it('files the todo even when its files cannot be kept, and says so', async () => {
+    const world = setup();
+    const attach = vi.fn(async () => {
+      throw new Error('a sixth file');
+    });
+    const { filed, errors } = await fileCaptureParts(parts.slice(0, 1), { ...world.writers, attach });
+
+    expect(filed).toHaveLength(1);
+    expect(filed[0].files).toBeUndefined();
+    expect(world.tables['todo.tasks']).toHaveLength(1);
+    expect(errors).toEqual(['It was filed, but the files could not be kept with it.']);
+  });
+
+  it('records nothing and counts nothing when no files were sent', async () => {
+    const world = setup();
+    const { filed } = await fileCaptureParts(parts.slice(0, 1), world.writers);
+    expect(filed[0].files).toBeUndefined();
+  });
+
+  it('takes the files away with the todo on Undo', async () => {
+    const world = setup();
+    const forget = vi.fn(async () => {});
+    const { filed } = await fileCaptureParts(parts.slice(0, 1), { ...world.writers, attach: async () => 1 });
+    const todoId = world.tables['todo.tasks'][0].id;
+
+    const out = await undoDashTodayWith({ ...world.dash, forget }, filed[0].actionId!, vi.fn());
+    expect(out.ok).toBe(true);
+    expect(world.tables['todo.tasks']).toEqual([]);
+    expect(forget).toHaveBeenCalledWith(`todo.tasks:${todoId}`);
+  });
+
+  it('keeps the undo when forgetting the files fails', async () => {
+    const world = setup();
+    const { filed } = await fileCaptureParts(parts.slice(0, 1), world.writers);
+    const forget = vi.fn(async () => {
+      throw new Error('storage down');
+    });
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const out = await undoDashAction({ ...world.dash, forget }, filed[0].actionId!);
+    expect(out.ok).toBe(true);
+    expect(world.tables['core.dash_actions'][0].status).toBe('undone');
+    spy.mockRestore();
+  });
+
+  it('names each Goals row a capture touched once', () => {
+    const step = '00000000-0000-4000-8000-0000000000c1';
+    const goal = '00000000-0000-4000-8000-0000000000c2';
+    expect(
+      goalRefs([
+        GOAL_LINE,
+        { kind: 'add', step_id: step, title: 'Book a physio', step_kind: 'mine', goal_title: 'Run', undone_at: null },
+        {
+          kind: 'progress',
+          entry_id: fakeId(),
+          item_id: step,
+          step_title: 'Book a physio',
+          goal_title: 'Run',
+          text: 'called',
+          quantity: null,
+          unit: null,
+          happened_on: '2026-10-09',
+          undone_at: null,
+        },
+        { kind: 'reading', reading_id: fakeId(), goal_id: goal, goal_title: 'Weigh', value: 70, unit: 'kg', undone_at: null },
+      ]),
+    ).toEqual([`goals.items:${GOAL_LINE.step_id}`, `goals.items:${step}`, `goals.items:${goal}`]);
   });
 });

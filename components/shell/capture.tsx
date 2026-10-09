@@ -17,6 +17,8 @@ import { FieldError } from '@/components/ui/field';
 import { popoverSurface, scrim } from '@/components/ui/popover';
 import { PaidCostsProvider, PaidHint } from '@/components/ui/paid-hint';
 import { Kbd } from '@/components/shell/key-hints';
+import { AddFile } from '@/components/attachments/add-file';
+import type { UploadedAttachment } from '@/lib/attachments/rules';
 import {
   CaptureFoot,
   CaptureHeader,
@@ -622,6 +624,9 @@ function AnythingPanel({
   const [error, setError] = useState<string | null>(null);
   const [undoing, setUndoing] = useState<string | null>(null);
   const [undoError, setUndoError] = useState<string | null>(null);
+  /** What "Add a file" has put in the bucket for the next filing (plan #1714). */
+  const [uploads, setUploads] = useState<UploadedAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [pending, start] = useTransition();
   const panelRef = useRef<HTMLFormElement>(null);
   const fieldRef = useRef<HTMLTextAreaElement | null>(null);
@@ -631,6 +636,11 @@ function AnythingPanel({
 
   function submit() {
     if (pending || !text.trim()) return;
+    // A file still going up would be left behind, so Enter waits for it.
+    if (uploading) {
+      setMessage('Adding the file first.');
+      return;
+    }
     const sort = guess.state === 'answered' ? guess.sort : null;
     // Dash has said it is not sure and nothing is picked: the line is
     // already asking, so Enter waits for the answer rather than guessing.
@@ -639,7 +649,7 @@ function AnythingPanel({
       return;
     }
     start(async () => {
-      const result = await fileCaptureBox(text, { sort: sort?.sure ? sort : null, picked });
+      const result = await fileCaptureBox(text, { sort: sort?.sure ? sort : null, picked }, uploads);
       if (result.error) {
         setError(result.error);
         return;
@@ -660,6 +670,7 @@ function AnythingPanel({
       setMessage(undefined);
       setError(result.errors[0] ?? null);
       setText('');
+      setUploads([]);
       setPicked(null);
       setAsked(undefined);
       fieldRef.current?.focus();
@@ -743,7 +754,19 @@ function AnythingPanel({
           className="w-full resize-none bg-transparent px-3 py-3 text-body text-ink outline-none placeholder:text-ink-ghost"
         />
         <PlaceLine guess={guess} places={offered} picked={picked} onPick={setPicked} />
-        <CaptureFoot message={message} pending={pending && undoing === null} costs={costs} />
+        <CaptureFoot
+          message={message}
+          pending={pending && undoing === null}
+          costs={costs}
+          files={
+            <AddFile
+              value={uploads}
+              onChange={setUploads}
+              disabled={pending}
+              onUploadingChange={setUploading}
+            />
+          }
+        />
         {error && (
           <div className="px-3 pb-2">
             <FieldError>{error}</FieldError>

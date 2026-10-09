@@ -119,7 +119,7 @@ describe('surfacesForFiles, on screen changes that shipped', () => {
 
   it('names the Todo moments for the day-close change (d12fc78b)', () => {
     const found = surfacesForFiles(['app/todo/page.tsx', 'components/todo/day-closed.tsx'], using);
-    expect(found).toEqual(['todo-day-close', 'todo-day-closed']);
+    expect(found).toEqual(['todo-day-close', 'todo-day-closed', 'todo-task-files']);
   });
 
   it('ignores files that are not screens', () => {
@@ -190,7 +190,7 @@ describe('surfacesInText', () => {
   it('reads addresses, gallery links and screen files', () => {
     expect(surfacesInText('Show the date on /news/saved.')).toEqual(['news-saved', 'news-saved-empty']);
     expect(surfacesInText('See /preview?s=dev-ui for it.')).toEqual(['dev-ui']);
-    expect(surfacesInText('Change app/todo/page.tsx')).toEqual(['todo-day-close', 'todo-day-closed']);
+    expect(surfacesInText('Change app/todo/page.tsx')).toEqual(['todo-day-close', 'todo-day-closed', 'todo-task-files']);
     expect(surfacesInText('open /jobs/roles/42')).toEqual(
       Object.keys(SURFACE_ROUTES).filter((id) => SURFACE_ROUTES[id].includes('/jobs/roles/[id]')),
     );

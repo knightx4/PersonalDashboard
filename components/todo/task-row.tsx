@@ -40,7 +40,7 @@ import {
   unpointTask,
 } from '@/app/todo/actions';
 import { openCount, SNOOZE_DAYS, type Task, type TaskStatus } from '@/lib/todo/tasks/model';
-import { InlineInput } from '@/components/ui/field';
+import { InlineTextarea } from '@/components/ui/field';
 import { clockIn, dayIn } from '@/lib/todo/time';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { completionMoment } from '@/components/motion/complete';
@@ -56,6 +56,7 @@ import { threadRef } from '@/lib/thread/subjects';
 import { MoveLabel } from '@/components/ui/move-label';
 import { taskMove } from '@/lib/todo/tasks/move';
 import { rowRef, withRun } from '@/lib/core/move';
+import { TaskFiles, TaskFilesCount, type TaskFile } from '@/components/attachments/task-files';
 
 /**
  * One task, and what you can do to it without leaving the list.
@@ -132,6 +133,8 @@ export function TaskRow({
   under,
   working,
   thread = [],
+  files = [],
+  filesOpen = false,
 }: {
   task: Task;
   timezone: string;
@@ -169,8 +172,16 @@ export function TaskRow({
    * Comment when it has none.
    */
   thread?: readonly DevComment[];
+  /**
+   * The files the task holds (plan #1714). The row shows a paperclip and
+   * their count, which opens them under it.
+   */
+  files?: readonly TaskFile[];
+  /** Whether the files start open: the task the page was sent to. */
+  filesOpen?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+  const [showFiles, setShowFiles] = useState(filesOpen);
   /** Whether the thread is open under a task that has no comments yet. */
   const [commenting, setCommenting] = useState(false);
   /** Whether the box for writing the next item is open under this task. */
@@ -485,6 +496,14 @@ export function TaskRow({
               <Pin className="size-3 text-accent" strokeWidth={1.75} aria-label="Pinned" />
             )}
 
+            {files.length > 0 && (
+              <TaskFilesCount
+                count={files.length}
+                open={showFiles}
+                onToggle={() => setShowFiles(!showFiles)}
+              />
+            )}
+
             <DueLabel
               task={task}
               timezone={timezone}
@@ -687,6 +706,9 @@ export function TaskRow({
           )}
         </div>
       </div>
+
+      {/* The files, under the row, when the paperclip has opened them. */}
+      {showFiles && files.length > 0 && <TaskFiles files={files} className="pb-2 pl-9 pr-3" />}
 
       {/* The list, under the task it belongs to. Nothing at all when there is
           none and nothing is being written, so a task without one reads
@@ -960,7 +982,7 @@ function IconButton({
  * It used to be a button that swapped the whole row for a form with four
  * fields and a Save button, to change the one string you were already looking
  * at. Law 12: a value and its editor are the same object in the same place at
- * the same size. `InlineInput` is that component, and this is a task's title
+ * the same size. `InlineTextarea` is that component, and this is a task's title
  * in it.
  *
  * Enter and blur both commit, because both mean "done with this"; Escape puts
@@ -998,8 +1020,10 @@ function TaskTitle({
     onSave(next);
   }
 
+  // A textarea that grows with its words, so a long title wraps where it is
+  // read rather than stopping mid-letter at 390 (plan #1714's critic).
   return (
-    <InlineInput
+    <InlineTextarea
       value={draft}
       aria-label="Title"
       onChange={(event) => setDraft(event.target.value)}
@@ -1016,8 +1040,11 @@ function TaskTitle({
           requestAnimationFrame(() => event.currentTarget?.blur());
         }
       }}
+      // 44px to a finger on a phone without moving the row: the padding grows
+      // the box and the negative margin gives the room back (a textarea cannot
+      // carry the ::after the press-area utility draws).
       className={cn(
-        'w-full max-w-full text-ui font-medium text-ink',
+        'w-full max-w-full text-ui font-medium text-ink max-sm:-my-[9px] max-sm:min-h-11 max-sm:py-[11px]',
         struck && 'text-ink-muted line-through',
       )}
     />

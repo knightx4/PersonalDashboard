@@ -9,16 +9,29 @@ import {
   FiledCaptures,
   PlaceLine,
 } from '@/components/shell/capture-places';
+import { AddFile } from '@/components/attachments/add-file';
 import { captureAction, CAPTURE_ACTIONS, type CaptureAction } from '@/lib/capture/actions';
 import { goalsPlaceName } from '@/lib/capture/destination';
 import type { FiledCapture } from '@/lib/capture/place';
 import type { CapturePlace, CaptureSort } from '@/lib/capture/sort';
+import type { UploadedAttachment } from '@/lib/attachments/rules';
+
+/** A photo added with the sentence (plan #1714), already in the bucket. */
+const UPLOADED: UploadedAttachment[] = [
+  {
+    path: '00000000-0000-4000-8000-0000000000aa/00000000-0000-4000-8000-0000000000ab-IMG_4471.jpg',
+    name: 'IMG_4471.jpg',
+    contentType: 'image/jpeg',
+    size: 2_310_000,
+  },
+];
 
 /**
  * The one capture box (plan #1581) in the surface gallery, drawn twice from
  * fixtures: while a two-part sentence is typed, with the line saying where
  * each part will go, and after four things were filed (a note into the
- * vault's Inbox among them, plan #1582), with a sentence Dash
+ * vault's Inbox among them, plan #1582, and a todo filed with a photo, plan
+ * #1714), with a sentence Dash
  * is not sure about asking for a place. The real panel floats over the page;
  * here the same pieces sit in its surface without the scrim.
  */
@@ -56,6 +69,7 @@ const FILED: FiledCapture[] = [
     actionId: '00000000-0000-4000-8000-000000000011',
     goals: null,
     undoneAt: null,
+    files: 1,
   },
   {
     place: 'goals',
@@ -119,7 +133,11 @@ export function CaptureBoxSurface() {
     <div className="space-y-8 py-4">
       <Box text="Sent the cover letter to Stripe, chase Sam on Friday">
         <PlaceLine guess={{ state: 'answered', sort: TWO_PARTS }} places={PLACES} picked={null} onPick={nothing} />
-        <CaptureFoot pending={false} costs={{}} />
+        <CaptureFoot
+          pending={false}
+          costs={{}}
+          files={<AddFile value={UPLOADED} onChange={nothing} />}
+        />
       </Box>
       <Box text="Lunch with Priya">
         <PlaceLine
@@ -128,7 +146,7 @@ export function CaptureBoxSurface() {
           picked={null}
           onPick={nothing}
         />
-        <CaptureFoot pending={false} costs={{}} />
+        <CaptureFoot pending={false} costs={{}} files={<AddFile value={[]} onChange={nothing} />} />
         <FiledCaptures
           filed={FILED}
           busy={null}
