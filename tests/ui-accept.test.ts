@@ -56,7 +56,11 @@ describe('uiAcceptSql', () => {
     expect(written.map((r) => r.surface).sort()).toEqual(['home-page', 'shell-full']);
 
     const rows = await verdicts();
-    expect(rows.find((r) => r.surface === 'shell-full')).toMatchObject({ round: 2, verdict: 'accepted' });
+    // Numbered on from the fix it stopped on.
+    expect(rows.filter((r) => r.surface === 'shell-full').map((r) => [r.round, r.verdict])).toEqual([
+      [1, 'fix'],
+      [2, 'accepted'],
+    ]);
     expect(rows.find((r) => r.surface === 'home-page')).toMatchObject({ round: 1, verdict: 'accepted' });
     expect(rows.find((r) => r.surface === 'home-page')?.notes).toBe(
       'Accepted by you: Answered 2026-10-09: Accept',
