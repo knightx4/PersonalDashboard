@@ -7,17 +7,28 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { FieldError, Input, Textarea } from '@/components/ui/field';
 import { StateLabel } from '@/components/dev/state-label';
 import { cn } from '@/lib/cn';
-import { MAX_ANGLE, MAX_THREAD_POSTS, threadCopyText, X_POST_LIMIT, xLength } from '@/lib/dev/posts';
+import {
+  isUploadedPostImage,
+  MAX_ANGLE,
+  MAX_POST_IMAGES,
+  MAX_THREAD_POSTS,
+  threadCopyText,
+  X_POST_LIMIT,
+  xLength,
+} from '@/lib/dev/posts';
 import type { PostCard } from '@/lib/dev/posts-page';
 import {
+  addPostImage,
   dropPost,
   editPostAngle,
   editPostBody,
   markPostPosted,
+  removePostImage,
   restorePost,
   type PostsActionState,
 } from './actions';
 import { LinkedText } from '@/components/ui/linked-text';
+import { AddImage } from './add-image';
 
 /**
  * One draft on the Posts tab (plan #1419): its angle, its post and any thread
@@ -285,6 +296,58 @@ function StatusLine({ card }: { card: PostCard }) {
   return <span className="tabular text-small text-ink-muted">Drafted {day}</span>;
 }
 
+/**
+ * One image on a draft: the picture, Save image for attaching it on X, and on
+ * a waiting draft a Remove. An upload is saved through the signing route with
+ * `download`, since a link to another host ignores the download attribute.
+ */
+function PostImage({
+  postId,
+  image,
+  editable,
+}: {
+  postId: string;
+  image: PostCard['images'][number];
+  editable: boolean;
+}) {
+  const [state, remove, removing] = useActionState(removePostImage, {} as PostsActionState);
+  const uploaded = isUploadedPostImage(image.path);
+  return (
+    <div className="flex max-w-full flex-col items-start gap-1">
+      <a href={image.src} target="_blank" rel="noreferrer" className="block max-w-full">
+        {/* eslint-disable-next-line @next/next/no-img-element -- an image the person saves to post; the image optimiser would hand them a resized copy */}
+        <img
+          src={image.src}
+          alt="Image to post with this draft"
+          loading="lazy"
+          className="max-h-64 max-w-full rounded-sm bg-sunken object-contain"
+        />
+      </a>
+      <div className="flex flex-wrap items-center gap-1">
+        {/* The file itself, at full size, to attach on X. */}
+        <a
+          href={uploaded ? `${image.src}&download` : image.src}
+          download
+          className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+        >
+          <Download className="size-3.5" aria-hidden />
+          Save image
+        </a>
+        {editable && (
+          <form action={remove}>
+            <input type="hidden" name="id" value={postId} />
+            <input type="hidden" name="path" value={image.path} />
+            <Button type="submit" size="sm" variant="ghost" pending={removing}>
+              {removing ? 'Removing…' : 'Remove'}
+            </Button>
+          </form>
+        )}
+      </div>
+      <FieldError>{state.error}</FieldError>
+    </div>
+  );
+}
+
 export function PostItem({ card }: { card: PostCard }) {
   const { post } = card;
   const editable = post.status === 'suggested';
@@ -384,26 +447,27 @@ export function PostItem({ card }: { card: PostCard }) {
         </div>
       )}
 
-      {card.images.length > 0 && (
-        <div className="flex flex-wrap gap-3">
-          {card.images.map((src) => (
-            <div key={src} className="flex max-w-full flex-col items-start gap-1">
-              <a href={src} target="_blank" rel="noreferrer" className="block max-w-full">
-                {/* eslint-disable-next-line @next/next/no-img-element -- a screenshot the person saves to post; the image optimiser would hand them a resized copy */}
-                <img
-                  src={src}
-                  alt="Screenshot to post with this draft"
-                  loading="lazy"
-                  className="max-h-64 max-w-full rounded-sm bg-sunken object-contain"
-                />
-              </a>
-              {/* The file itself, at full size, to attach on X. */}
-              <a href={src} download className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-                <Download className="size-3.5" aria-hidden />
-                Save image
-              </a>
+      {(card.images.length > 0 || editable) && (
+        <div className="flex flex-col gap-2">
+          {card.images.length > 0 && (
+            <div className="flex flex-wrap gap-3">
+              {card.images.map((image) => (
+                <PostImage key={image.path} postId={post.id} image={image} editable={editable} />
+              ))}
             </div>
-          ))}
+          )}
+          {editable && card.images.length < MAX_POST_IMAGES && (
+            <AddImage
+              room={MAX_POST_IMAGES - card.images.length}
+              onUploaded={async (path) => {
+                const form = new FormData();
+                form.set('id', post.id);
+                form.set('path', path);
+                const result = await addPostImage({}, form);
+                return result.error;
+              }}
+            />
+          )}
         </div>
       )}
 

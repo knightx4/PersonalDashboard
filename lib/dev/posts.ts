@@ -362,18 +362,61 @@ export function parsePostedUrl(
   return { ok: true, url: url.href };
 }
 
+/* -------------------------------------------------------------------------
+ * Images the person uploads (migration 0192)
+ * ---------------------------------------------------------------------- */
+
+/** The private bucket an uploaded image goes in, one folder per account. */
+export const POST_IMAGES_BUCKET = 'post-images';
+
+/** X takes up to four images on a post; a draft holds no more. */
+export const MAX_POST_IMAGES = 4;
+
+/** The bucket refuses anything larger. */
+export const POST_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+
+/** The four image types X takes, which are the bucket's allowed types. */
+export const POST_IMAGE_TYPES: readonly string[] = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+
 /**
- * Where the card's screenshot is drawn from, for one entry of `image_paths`.
+ * Where an upload is kept: your own folder, then a fresh id so two images
+ * with the same name do not collide. The name keeps letters, digits, dots,
+ * dashes and underscores, which storage accepts in any position.
+ */
+export function postImagePath(userId: string, id: string, name: string): string {
+  const cleaned = name
+    .normalize('NFKD')
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-.]+|-+$/g, '')
+    .slice(-100);
+  return `${userId}/${id}-${cleaned || 'image'}`;
+}
+
+/** Whether a path is an upload of yours, in the shape postImagePath makes. */
+export function ownsPostImagePath(userId: string, path: string): boolean {
+  if (!path.startsWith(`${userId}/`)) return false;
+  return /^[0-9a-f-]{36}-[A-Za-z0-9._-]{1,100}$/.test(path.slice(userId.length + 1));
+}
+
+/** An entry of `image_paths` that is a path in the bucket, not a site path or link. */
+export function isUploadedPostImage(path: string): boolean {
+  return /^[0-9a-f-]{36}\/[0-9a-f-]{36}-[A-Za-z0-9._-]{1,100}$/.test(path);
+}
+
+/**
+ * Where the card's image is drawn from, for one entry of `image_paths`.
  *
  * A posts run photographs a Surfaces gallery fixture and commits the PNG
- * under public/posts/ (#1418), so an entry is a site path such as
+ * under public/posts/ (#1418), so its entry is a site path such as
  * `/posts/2026-10-02-dev-plan-tree.png`, served once that commit deploys.
- * Not a storage bucket: the run reaches the database only through SQL, which
- * cannot write a file, and the shots hold sample data meant for X anyway.
- * A full https link is drawn as it is too; anything else is not drawn, so a
- * malformed entry shows nothing rather than a broken image.
+ * An image the person uploaded is a path in the private bucket, drawn
+ * through the route that signs a short link to it on their session. A full
+ * https link is drawn as it is; anything else is not drawn, so a malformed
+ * entry shows nothing rather than a broken image.
  */
 export function postImageSrc(path: string): string | null {
+  if (isUploadedPostImage(path)) return `/dev/posts/image?path=${encodeURIComponent(path)}`;
   if (/^https:\/\//.test(path) || /^\/(?!\/)/.test(path)) return path;
   return null;
 }

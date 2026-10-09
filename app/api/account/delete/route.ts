@@ -12,6 +12,7 @@ import { gmailProvider } from '@/lib/email/providers/gmail';
 import { removeAttachmentFolder, vaultAttachmentFolder } from '@/lib/vault/attachment-storage';
 import { VAULT_TRANSCRIPTS_BUCKET } from '@/lib/vault/transcripts';
 import { UI_SHOTS_BUCKET } from '@/lib/preview/ui-checks';
+import { POST_IMAGES_BUCKET } from '@/lib/dev/posts';
 
 export const maxDuration = 60;
 
@@ -33,8 +34,8 @@ export const maxDuration = 60;
  *      this reaches further than it does.
  *   2. Delete the storage objects, which do not cascade with database rows --
  *      and only from this app's own buckets (job search, goals documents,
- *      vault attachments and design check shots), since buckets are shared
- *      project-wide.
+ *      vault attachments, design check shots and post images), since
+ *      buckets are shared project-wide.
  *   3. Delete the auth.users row. Every table that names a user cascades from
  *      it, in all six schemas -- public, core, job_search, obsidian, todo and
  *      learn -- which is why one delete is enough, and why
@@ -153,6 +154,14 @@ export async function POST(request: NextRequest) {
   //    account, written only by the service role.
   try {
     await removeAttachmentFolder(admin, user.id, UI_SHOTS_BUCKET);
+  } catch {
+    // As above.
+  }
+
+  //    And the images uploaded to posts on the Posts tab (migration 0192),
+  //    one folder per account.
+  try {
+    await removeAttachmentFolder(admin, user.id, POST_IMAGES_BUCKET);
   } catch {
     // As above.
   }
