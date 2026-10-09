@@ -14,7 +14,7 @@ import { POSTING_TEXT_FOR_SCORING } from './posting-text';
 import { preferenceState, type JobPreferences } from './preferences';
 
 export { companyKey };
-import { CHANCE_DISPLAY, chanceBand, type ChanceBand } from './chance-check';
+import { CHANCE_DISPLAY, CHANCE_FILTER_EDGES, chanceBand, type ChanceBand } from './chance-check';
 
 /**
  * Ten fixed questions about each opening Dash recommends (plan #1178; fit
@@ -483,7 +483,7 @@ const BAND_RANK: Record<ChanceBand, number> = { low: 0, medium: 1, high: 2 };
 
 /** The band a stored chance falls in, on CHANCE_DISPLAY's edges (the #1204 terciles when it shows the number). */
 export function chanceBandOf(value: number): ChanceBand {
-  return chanceBand(value, CHANCE_DISPLAY.kind === 'band' ? CHANCE_DISPLAY.edges : { medium: 27, high: 38 });
+  return chanceBand(value, CHANCE_DISPLAY.kind === 'band' ? CHANCE_DISPLAY.edges : CHANCE_FILTER_EDGES);
 }
 
 /** Whether a chance clears a minimum band. */

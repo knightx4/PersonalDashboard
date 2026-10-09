@@ -12,7 +12,7 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { ScoreReasons } from '@/components/jobs/ui/score-figures';
-import { CHANCE_BAND_LABELS } from '@/lib/jobs/suggest/chance-check';
+import { CHANCE_FILTER_EDGES } from '@/lib/jobs/suggest/chance-check';
 import { FIT_MINIMUMS, type ScoreNote } from '@/lib/jobs/suggest/score-notes';
 import { activeFilters, OPENING_PARAMS, type OpeningView } from '@/lib/jobs/suggest/opening-view';
 import { gmailComposeUrl } from '@/lib/jobs/followup/compose';
@@ -411,10 +411,8 @@ function OpeningControls({
             onChange={submit}
           >
             <option value="any">Any chance of an interview</option>
-            <option value="medium">
-              {CHANCE_BAND_LABELS.medium} chance of an interview or better
-            </option>
-            <option value="high">{CHANCE_BAND_LABELS.high} chance of an interview</option>
+            <option value="medium">Chance {CHANCE_FILTER_EDGES.medium} and up</option>
+            <option value="high">Chance {CHANCE_FILTER_EDGES.high} and up</option>
           </PressChip>
           <PressChip
             name={OPENING_PARAMS.hideRedFlags}
@@ -705,20 +703,18 @@ function moveSteps(move: string): string[] | null {
   return steps.length >= 2 ? steps : null;
 }
 
-const FIT_WORDS = { strong: 'Strong', partial: 'Partial', weak: 'Weak' } as const;
-
 /**
- * Fit as the facts line shows it. The figure only when Jev was sure and read
- * the posting itself; otherwise a word, since a two-digit number read from
- * Dash's two-sentence summary claims a precision it does not have (law 3),
- * which is why chance already shows as a band.
+ * Fit and chance as the facts line shows them: Jev's figure out of 100,
+ * always the number. A question mark follows it when Jev was unsure, or for
+ * fit when the posting itself was not read and Jev judged from Dash's
+ * summary alone; the tooltip gives the reason.
  */
 function fitFact(suggestion: OpenSuggestion, fit: NonNullable<ScoreNote['fit']>): string {
-  if (!fit.unsure && suggestion.postingRead) return `Fit ${fit.value}`;
-  const word =
-    suggestion.scores?.fit?.value ??
-    (fit.value >= 67 ? 'strong' : fit.value >= 34 ? 'partial' : 'weak');
-  return `${FIT_WORDS[word]} fit${fit.unsure ? '?' : ''}`;
+  return `Fit ${fit.value}${fit.unsure || !suggestion.postingRead ? '?' : ''}`;
+}
+
+function chanceFact(chance: NonNullable<ScoreNote['chance']>): string {
+  return `Chance ${chance.value}${chance.unsure ? '?' : ''}`;
 }
 
 /**
@@ -778,7 +774,7 @@ function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
   if (note?.chance) {
     facts.push({
       key: 'chance',
-      text: `${CHANCE_BAND_LABELS[note.chance.band]} chance${note.chance.unsure ? '?' : ''}`,
+      text: chanceFact(note.chance),
       title: note.chance.reason
         ? `Chance of an interview. ${note.chance.reason}`
         : 'Chance of an interview',
