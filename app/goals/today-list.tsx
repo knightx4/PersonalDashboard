@@ -177,7 +177,7 @@ export function TodayRow({
             href={item.url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-start gap-1 text-body font-semibold break-words text-ink underline-offset-2 hover:underline"
+            className="press-area inline-flex items-start gap-1 text-body font-semibold break-words text-ink underline-offset-2 hover:underline"
           >
             {item.title}
             <ExternalLink className="mt-1.5 size-3 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
@@ -185,7 +185,7 @@ export function TodayRow({
         ) : (
           <Link
             href={href}
-            className="block text-body font-semibold break-words text-ink underline-offset-2 hover:underline"
+            className="press-area block text-body font-semibold break-words text-ink underline-offset-2 hover:underline"
           >
             {item.title}
           </Link>
@@ -194,7 +194,7 @@ export function TodayRow({
           {meta && <>{meta} · </>}
           <Link
             href={`/goals/${item.goalId}`}
-            className="text-ink-muted underline-offset-2 hover:text-ink hover:underline"
+            className="press-area text-ink-muted underline-offset-2 hover:text-ink hover:underline"
           >
             {item.goalTitle}
           </Link>
@@ -223,7 +223,7 @@ export function TodayRow({
                 required
                 aria-label={`Your answer: ${item.title}`}
                 placeholder="Your answer"
-                className="w-full sm:w-64"
+                className="w-full max-sm:min-h-11 sm:w-64"
               />
             )}
             <Button

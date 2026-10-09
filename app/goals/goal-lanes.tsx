@@ -374,7 +374,7 @@ export function DashRow({ item }: { item: DashLaneItem }) {
     <li className="card-pad-x row-pad space-y-1">
       <Link
         href={stepHref(item.goalId, item.id)}
-        className="block text-ui font-semibold break-words text-ink underline-offset-2 hover:underline"
+        className="press-area block text-ui font-semibold break-words text-ink underline-offset-2 hover:underline"
       >
         {item.title}
       </Link>
@@ -420,7 +420,7 @@ function QuietGoalRow({
     <li className="card-pad-x row-pad space-y-1">
       <Link
         href={`/goals/${offer.goalId}`}
-        className="block text-ui font-semibold break-words text-ink underline-offset-2 hover:underline"
+        className="press-area block text-ui font-semibold break-words text-ink underline-offset-2 hover:underline"
       >
         {offer.title}
       </Link>
@@ -450,7 +450,7 @@ export function LaterRow({ item, onBack }: { item: LaterLaneItem; onBack: (gone:
     <li className="card-pad-x row-pad space-y-1">
       <Link
         href={stepHref(item.goalId, item.id)}
-        className="block text-ui font-semibold break-words text-ink underline-offset-2 hover:underline"
+        className="press-area block text-ui font-semibold break-words text-ink underline-offset-2 hover:underline"
       >
         {item.title}
       </Link>
