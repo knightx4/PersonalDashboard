@@ -44,6 +44,9 @@ function resolveSpecifier(root: string, from: string, spec: string): string | nu
   return null;
 }
 
+/** `import type { … } from '…'` and `export type { … } from '…'`, whole. */
+const TYPE_ONLY_IMPORT = /\b(?:import|export)\s+type\s[^;]*?\bfrom\s+['"][^'"]+['"]/g;
+
 /** Files that import each file, keyed by repository-relative path. */
 export function importedBy(root: string): Map<string, string[]> {
   const files: string[] = [];
@@ -52,7 +55,10 @@ export function importedBy(root: string): Map<string, string[]> {
   const pattern = /(?:\bfrom\s+|\bimport\s*\(?\s*)['"]([^'"]+)['"]/g;
   for (const file of files) {
     const from = file.split('\\').join('/');
-    const text = readFileSync(join(root, file), 'utf8');
+    // A type-only import draws nothing, so it is not a way for a change to
+    // reach a page: lib/raised/notifications.ts takes the Notification type
+    // from the shell's bell, and through it every layout reached the bell.
+    const text = readFileSync(join(root, file), 'utf8').replace(TYPE_ONLY_IMPORT, '');
     for (const m of text.matchAll(pattern)) {
       const target = resolveSpecifier(root, from, m[1]);
       if (!target || target === from) continue;

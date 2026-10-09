@@ -149,7 +149,33 @@ describe('surfacesForFiles, on screen changes that shipped', () => {
   it('still follows a file that imports the thread to its pages', () => {
     const found = surfacesForFiles(['components/shell/ask-dash.tsx'], using);
     expect(found).toContain('shell-full');
-    expect(found.length).toBeGreaterThan(100);
+    // The Ask pages import the sheet for themselves, so they are still named.
+    expect(found).toContain('ask-dash-page');
+    // The rest of the app reaches it only through the shell (#1702's fix).
+    expect(found).not.toContain('jobs-pipeline-board');
+  });
+
+  // #1702 changed Dash's mark and waited on a check of 189 surfaces, because
+  // the mark sits in the shell and every workspace's layout mounts the shell.
+  it("looks at a change to the shell's pieces on the shell's own surface", () => {
+    expect(surfacesForFiles(['components/shell/search-bar.tsx'], using)).toEqual(['shell-full']);
+    expect(surfacesForFiles(['components/shell/app-shell.tsx'], using)).toEqual(['shell-full']);
+  });
+
+  it("looks at a change to Dash's mark on the mark's own surface", () => {
+    expect(surfacesForFiles(['components/ui/dash-mark.tsx'], using)).toEqual(['dash-mark']);
+  });
+
+  it("looks at a change to the runner card on the card's own surface (#1704)", () => {
+    expect(surfacesForFiles(['app/dev/plan/overnight-control.tsx'], using)).toEqual(['dev-runner-crew']);
+    expect(surfacesForFiles(['app/dev/plan/runner-crew.tsx'], using)).toEqual(['dev-runner-crew']);
+  });
+
+  it('does not follow a type-only import, which draws nothing', () => {
+    // lib/raised/notifications.ts takes only the Notification type from the bell.
+    expect(surfacesForFiles(['components/shell/notifications-button.tsx'], using)).toEqual([
+      'shell-full',
+    ]);
   });
 
   it('names a surface in the gallery for every shared component', () => {
