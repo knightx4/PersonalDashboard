@@ -778,7 +778,16 @@ export function DevRaisedStatusSurface() {
     <StatusPanel
       run={null}
       canSend
-      card={{ night: null, on: [], progress: null, push: null, ready: 3, readySteps: 9, next: [] }}
+      card={{
+        night: null,
+        on: [],
+        progress: null,
+        push: null,
+        ready: 3,
+        readySteps: 9,
+        next: [],
+        sessions: [],
+      }}
       goals={null}
       openNotes={12}
       notesLastRun={null}

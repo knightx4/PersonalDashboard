@@ -27,6 +27,8 @@ import { runEnd, type StoredRunReading } from './run-end';
 import { overnightStanding, type OvernightRun } from './overnight';
 import { readyFeatureCount, runnerOrder } from './overnight-choice';
 import { topFeatureOf, type PlanSection } from './tree';
+import type { SlotSession } from './overnight-slots';
+import { moduleById, type ModuleId } from '@/lib/modules';
 
 /** A row a session is on, with how far through its feature the plan is. */
 export type OnLine = OnNow & { progress: FeatureProgress | null };
@@ -42,14 +44,29 @@ export type RunnerCard = {
   readySteps: number;
   /** The features the next ticks would fire, in the order they would fire them. */
   next: DigestNightRef[];
+  /**
+   * The night's feature sessions, ended ones too, for the four Dashes
+   * (`runnerSlots`): a session keeps its Dash only if the ones fired before
+   * it are known, so the ended ones come along.
+   */
+  sessions: SlotSession[];
 };
 
 /** How many of the features waiting are named. The count says the rest. */
 const NEXT_SHOWN = 3;
 
+/** A fire as `loadFeatureFires` reads it, with the times the four Dashes need. */
+type CardFire = NightFire & { id?: string; writtenBackAt?: string | null };
+
+/** The workspace's name as the app shows it, or null for the app as a whole. */
+function moduleName(module: string | null): string | null {
+  if (!module) return null;
+  return moduleById(module as ModuleId)?.label ?? module;
+}
+
 export function runnerCard(input: {
   run: OvernightRun | null;
-  fires: readonly NightFire[];
+  fires: readonly CardFire[];
   items: readonly PlanItem[];
   /** The whole tree, not a filtered view of it: what is ready is about the plan. */
   sections: readonly PlanSection[];
@@ -110,8 +127,48 @@ export function runnerCard(input: {
     if (next.length === NEXT_SHOWN) break;
   }
 
+  // The night's sessions for the four Dashes. Going is what `on` reads; any
+  // other fire of the night has ended, at the time its row was written back,
+  // or now when the quiet rule ended it before the sweep did.
+  const goingAt = new Set(going.map((started) => `${started.planItemId}@${started.at}`));
+  const sessions: SlotSession[] = [];
+  if (live && run?.startedAt) {
+    const since = new Date(run.startedAt).getTime();
+    const seen = new Set<string>();
+    const fired = [
+      ...input.fires,
+      // A session fired by hand beside the night's own holds a Dash too.
+      ...going.map((started) => ({ planItemId: started.planItemId, at: started.at })),
+    ];
+    for (const fire of fired) {
+      if (!fire.planItemId || new Date(fire.at).getTime() < since) continue;
+      const key = `${fire.planItemId}@${fire.at}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const item = itemById.get(fire.planItemId);
+      if (!item) continue;
+      const isGoing = goingAt.has(key);
+      const line = isGoing ? on.find((l) => l.ref === `#${item.number}`) : undefined;
+      const step = line?.step ?? null;
+      sessions.push({
+        id: ('id' in fire && fire.id) || key,
+        firedAt: fire.at,
+        endedAt: isGoing
+          ? null
+          : (('writtenBackAt' in fire && fire.writtenBackAt) || new Date(now).toISOString()),
+        // The step its session has claimed, or the feature until it claims one.
+        step: step
+          ? { number: item.number, title: step.title, ref: step.ref }
+          : { number: item.number, title: oneLine(item.title), ref: `#${item.number}` },
+        module: moduleName(item.module),
+        doing: null,
+      });
+    }
+  }
+
   return {
     night,
+    sessions,
     on,
     progress,
     push,
