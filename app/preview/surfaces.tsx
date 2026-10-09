@@ -2427,6 +2427,7 @@ const measuredDraft: CostEstimate = {
   runs: 12,
   basis: 'measured',
   per: 'run',
+  models: ['claude-sonnet-5-5'],
 };
 
 const guessedSummary: CostEstimate = {
@@ -2436,6 +2437,7 @@ const guessedSummary: CostEstimate = {
   runs: 2,
   basis: 'guess',
   per: 'run',
+  models: ['claude-haiku-5-5'],
 };
 
 const perReading: CostEstimate = {
@@ -2445,11 +2447,12 @@ const perReading: CostEstimate = {
   runs: 40,
   basis: 'measured',
   per: 'unit',
+  models: ['claude-opus-5-5', 'jev-1.13.0'],
 };
 
 function CostHintRows() {
   return (
-    <div className="space-y-16 pb-16">
+    <div className="space-y-24 pb-24">
       <div className="flex items-center gap-1">
         <Button>Draft cover letter</Button>
         <CostHint estimate={measuredDraft} what="Cost of drafting" defaultOpen />

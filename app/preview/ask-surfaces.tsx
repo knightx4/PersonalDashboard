@@ -209,6 +209,7 @@ const FIXTURES: AskSource = {
       runs: 0,
       basis: 'guess',
       per: 'run',
+      models: ['claude-sonnet-5-5'],
     },
   }),
 };

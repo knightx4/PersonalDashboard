@@ -57,6 +57,7 @@ describe('one operation', () => {
       runs: 5,
       basis: 'measured',
       per: 'run',
+      models: ['claude-opus-5-5'],
     });
   });
 
@@ -100,6 +101,7 @@ describe('a press that runs several operations', () => {
       runs: 5,
       basis: 'measured',
       per: 'run',
+      models: ['claude-haiku-5-5', 'claude-opus-5-5'],
     });
   });
 
