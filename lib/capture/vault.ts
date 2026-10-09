@@ -48,7 +48,8 @@ const EMBED_AFTER_WRITE_MS = 20_000;
 export async function fileVaultNote(
   userId: string,
   text: string,
-): Promise<{ ok: true; noteId: string; title: string; blobSha: string } | { ok: false; error: string }> {
+  title?: string,
+): Promise<{ ok: true; noteId: string; path: string; title: string; blobSha: string } | { ok: false; error: string }> {
   const supabase = await createVaultClient();
   const ports = noteCreatePorts({
     supabase,
@@ -65,13 +66,13 @@ export async function fileVaultNote(
       });
     },
   });
-  const result = await createCapturedNote(ports, text);
+  const result = await createCapturedNote(ports, text, title);
   if (!result.ok) {
     // The token stopped writing since it was checked: stop offering the vault.
     if (result.reason === 'read-only' || result.reason === 'reconnect') ACCESS.delete(userId);
     return { ok: false, error: result.error };
   }
-  return { ok: true, noteId: result.noteId, title: result.title, blobSha: result.blobSha };
+  return { ok: true, noteId: result.noteId, path: result.path, title: result.title, blobSha: result.blobSha };
 }
 
 /**

@@ -36,6 +36,7 @@ describe('DASH_TOOLS', () => {
       'add_goal',
       'add_goal_step',
       'close_goal_step',
+      'set_goal_done_when',
       'mark_returned',
       'add_role_note',
       'add_job_lead',

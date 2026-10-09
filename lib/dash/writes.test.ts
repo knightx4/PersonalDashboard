@@ -87,7 +87,7 @@ beforeEach(() => {
     ],
     'goals.areas': [{ id: AREA, user_id: ME, name: 'Health', position: 1, archived_at: null }],
     'goals.items': [
-      { id: GOAL, user_id: ME, level: 'goal', area_id: AREA, parent_id: null, title: 'Run a half marathon', status: 'open', archived_at: null, position: 1 },
+      { id: GOAL, user_id: ME, level: 'goal', area_id: AREA, parent_id: null, title: 'Run a half marathon', acceptance: null, status: 'open', archived_at: null, position: 1 },
       { id: STEP, user_id: ME, level: 'step', parent_id: GOAL, title: 'Buy running shoes', status: 'open', archived_at: null, position: 1 },
     ],
     'job_search.roles': [{ id: ROLE, user_id: ME, title: 'Product designer' }],
@@ -198,6 +198,32 @@ describe('close_goal_step', () => {
     const result = await apply('close_goal_step', { step_ref: GOAL });
     expect(!result.ok && result.error).toContain('That is a goal, not a step');
     expect(tables['goals.items'][0].status).toBe('open');
+  });
+});
+
+// Notes 06d36ab2 and fa2ac6fe: the person asked for a goal's done-when by
+// name and Dash had no tool, and the backup run was refused by the guard.
+describe('set_goal_done_when', () => {
+  it("writes a goal's done-when in their words, and Undo takes it back off", async () => {
+    seen.add(`goals.items:${GOAL}`);
+    const result = ok(await apply('set_goal_done_when', { goal_ref: GOAL, done_when: 'I finish the race' }));
+    expect(tables['goals.items'][0].acceptance).toBe('I finish the race');
+    expect(result).toMatchObject({
+      kind: 'set_goal_done_when',
+      op: 'update',
+      input: { id: GOAL, title: 'Run a half marathon', doneWhen: 'I finish the race', previous: null },
+      row: { href: `/goals/${GOAL}` },
+    });
+
+    const { undone } = await keepAndUndo(result);
+    expect(undone.ok).toBe(true);
+    expect(tables['goals.items'][0].acceptance ?? null).toBeNull();
+  });
+
+  it('will not give a step a done-when', async () => {
+    seen.add(`goals.items:${STEP}`);
+    const result = await apply('set_goal_done_when', { goal_ref: STEP, done_when: 'Shoes bought' });
+    expect(!result.ok && result.error).toContain('That is a step, not a goal');
   });
 });
 

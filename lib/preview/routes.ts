@@ -94,6 +94,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-insights': ['/jobs/analytics'],
   'todo-calendar-month': ['/todo/calendar'],
   'todo-feed-event': ['/todo/calendar'],
+  'vault-new-note': ['/vault'],
   'vault-note': ['/vault/n/[...path]'],
   'vault-note-edit': ['/vault/n/[...path]'],
   'vault-note-editing': ['/vault/n/[...path]'],
