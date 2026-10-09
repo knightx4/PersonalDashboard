@@ -40,6 +40,7 @@ export const DASH_CHANGE_KINDS = [
   'add_idea',
   'change_items',
   'move_roles',
+  'set_goal_done_when',
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -85,6 +86,8 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  *                  how many it left alone. Every application it moved is
  *                  kept in `undo.rows` with the event Dash wrote
  *                  (lib/dash/bulk-roles.ts).
+ * set_goal_done_when  the goal, the done-when it now has (null: cleared) and
+ *                  the one it had before (notes 06d36ab2, fa2ac6fe).
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -130,6 +133,7 @@ export type DashChangeInput = {
     titles: string[];
     left: number;
   };
+  set_goal_done_when: { id: string; title: string; doneWhen: string | null; previous: string | null };
 };
 
 /** The kinds Dash proposed for a Confirm before plan #1440, which keep their own undo in lib/ask/changes.ts. */

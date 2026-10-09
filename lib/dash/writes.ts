@@ -4,7 +4,7 @@ import { checkChange, type ProposalToolName } from '@/lib/ask/propose';
 import { isUuid, type AskRow } from '@/lib/ask/db';
 import { readSubject } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
-import { insertArea, insertGoal } from '@/lib/goals/store';
+import { insertArea, insertGoal, updateGoal } from '@/lib/goals/store';
 import { parseGoalFields } from '@/lib/goals/tree';
 import { setStepStatus } from '@/lib/goals/steps-store';
 import { MODULE_IDS, type ModuleId } from '@/lib/modules';
@@ -34,6 +34,7 @@ import { moveRoles, ROLE_STAGES } from './bulk-roles';
  *   add_goal         a goal under one of their areas.
  *   add_goal_step    a step at the end of a goal.
  *   close_goal_step  a step marked done.
+ *   set_goal_done_when  a goal's done-when written, changed or cleared.
  *   mark_returned    an owned item marked returned, with a full refund.
  *   add_role_note    a note on a role in Jobs.
  *   add_idea         an idea on the ideas page in Dev.
@@ -482,6 +483,53 @@ async function closeGoalStep(ctx: DashWriteContext, args: Args): Promise<DashWri
   );
 }
 
+/**
+ * A goal's done-when, set when they ask for it by name (notes 06d36ab2,
+ * fa2ac6fe). Written on their session, as add_goal is: goals.items_claude_guard
+ * refuses a done-when change made as Dash's, which is right for a run deciding
+ * on its own and wrong for the person asking in their own words.
+ */
+async function setGoalDoneWhen(ctx: DashWriteContext, args: Args): Promise<DashWriteResult> {
+  requireWorkspace(ctx, 'goals');
+  const { id } = seenRef(ctx, args, 'goal_ref', [TABLE.goalItem]);
+  const parsed = parseGoalFields((key) => (key === 'acceptance' ? text(args, 'done_when') : undefined));
+  if (!parsed.ok) throw new Refused(parsed.error);
+  const doneWhen = parsed.value.acceptance ?? null;
+
+  const goals = await ctx.db('goals');
+  const goal = await one<{ id: string; level: string; title: string; acceptance: string | null; archived_at: string | null }>(
+    goals
+      .from('items')
+      .select('id, level, title, acceptance, archived_at')
+      .eq('id', id)
+      .eq('user_id', ctx.userId)
+      .limit(1),
+  );
+  if (!goal || goal.archived_at) throw new Refused('That goal is not one of theirs, or it has been archived.');
+  if (goal.level !== 'goal') throw new Refused('That is a step, not a goal. Only a goal has a done-when.');
+  if ((goal.acceptance ?? null) === doneWhen) throw new Refused('That goal already has that done-when.');
+
+  const ref = toRef(TABLE.goalItem, id);
+  const before = await readSubject(ctx.db, ref);
+  if (!(await updateGoal(await ctx.goals({}), id, { acceptance: doneWhen }))) {
+    throw new Refused('That goal changed while Dash was writing its done-when.');
+  }
+  return made(
+    'set_goal_done_when',
+    { id, title: goal.title, doneWhen, previous: goal.acceptance ?? null },
+    {
+      subjectRef: ref,
+      op: 'update',
+      before,
+      after: await readSubject(ctx.db, ref),
+      summary: doneWhen
+        ? `Dash set the done-when of "${goal.title}" to "${doneWhen}".`
+        : `Dash cleared the done-when of "${goal.title}".`,
+      row: { table: TABLE.goalItem, ref: id, title: goal.title, href: `/goals/${id}` },
+    },
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Jobs
 // ---------------------------------------------------------------------------
@@ -823,6 +871,20 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
       additionalProperties: false,
     },
     closeGoalStep,
+  ),
+  tool(
+    'set_goal_done_when',
+    "Write, change or clear the done-when of one of their goals, when they ask for it: the line that says when the goal is finished (\"the song is live on Spotify\"). Name the goal by the goals.items ref search (kinds [\"goal\"]) or goal_status returned for it; look it up first. Write it in their words. An empty done_when clears it.",
+    {
+      type: 'object',
+      properties: {
+        goal_ref: { type: 'string', description: 'The goals.items ref a lookup returned for the goal.' },
+        done_when: { type: 'string', description: 'The done-when, as they said it; empty to clear it.' },
+      },
+      required: ['goal_ref', 'done_when'],
+      additionalProperties: false,
+    },
+    setGoalDoneWhen,
   ),
   tool(
     'mark_returned',
