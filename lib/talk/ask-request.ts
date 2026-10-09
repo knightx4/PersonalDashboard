@@ -8,6 +8,7 @@ import { requestAskDb } from '@/lib/ask/clients';
 import { resolvePage, type PageContext } from '@/lib/ask/page';
 import { isAskPath } from '@/lib/ask/page-name';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
@@ -33,6 +34,7 @@ import {
 } from './changes';
 import { appendTurns, listConversations, loadConversation, startAsk, type ConversationSummary } from './store';
 import type { TalkTurn } from './talk';
+import { recordTurnFiles, withTurnFiles } from './turn-files';
 
 /**
  * Asking Dash from a request (plan #1089): the signed-in person, their
@@ -53,6 +55,8 @@ export async function askDashInRequest(input: {
   conversationRef?: string | null;
   /** The app address it was asked from, already checked; null when dropped. */
   page?: string | null;
+  /** Files uploaded with the question, already checked (parseAskInput). */
+  files?: readonly UploadedAttachment[];
   /** Hears each lookup as it starts and finishes (plan #1438): the streaming route listens. */
   onLookup?: (event: AskLookupEvent) => void;
 }): Promise<AskDashResult> {
@@ -70,6 +74,7 @@ export async function askDashInRequest(input: {
     {
       question: input.question,
       conversationRef: input.conversationRef,
+      files: input.files,
       page,
       today,
       execute: (name, args) => executeAskTool(name, args, ctx),
@@ -83,8 +88,9 @@ export async function askDashInRequest(input: {
     },
     {
       start: (question) => startAsk(core, user.id, question),
-      load: (ref) => loadConversation(core, { kind: 'ask', ref }),
-      append: (subject, turns) => appendTurns(core, user.id, subject, turns),
+      load: async (ref) => withTurnFiles(core, await loadConversation(core, { kind: 'ask', ref })),
+      append: async (subject, turns) =>
+        recordTurnFiles(core, user.id, turns, await appendTurns(core, user.id, subject, turns)),
       recordSpend: (reports) =>
         recordSpendReports(core, user.id, { module: 'core', operation: 'ask-dash' }, reports),
       saveProposal: (conversationId, change) => insertProposal(core, user.id, conversationId, change),
@@ -194,7 +200,8 @@ export async function listAskConversations(limit = 50): Promise<ConversationSumm
 /** One past question's turns, oldest first, with each answer's lookups and citations; empty when it is not theirs or not there. */
 export async function loadAskConversation(ref: string): Promise<TalkTurn[]> {
   await requireUser();
-  return loadConversation(await createCoreClient(), { kind: 'ask', ref });
+  const core = await createCoreClient();
+  return withTurnFiles(core, await loadConversation(core, { kind: 'ask', ref }));
 }
 
 /**

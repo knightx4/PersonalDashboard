@@ -19,6 +19,9 @@ import {
 import { useClockNow } from '@/lib/use-clock-now';
 import { LinkedText } from '@/components/ui/linked-text';
 import { ReplyCharts } from '@/components/talk/reply-chart';
+import { AddFile } from '@/components/attachments/add-file';
+import { AskTurnFiles } from '@/components/attachments/ask-turn-files';
+import type { UploadedAttachment } from '@/lib/attachments/rules';
 
 /**
  * A saved conversation with Dash about a card or a story, and the box to add
@@ -39,7 +42,7 @@ import { ReplyCharts } from '@/components/talk/reply-chart';
  */
 
 /** What `send` hands back: the turns it kept, and why it stopped short, if it did. */
-export type TalkSend = (body: string) => Promise<{ turns?: TalkTurn[]; error?: string }>;
+export type TalkSend = (body: string, files?: UploadedAttachment[]) => Promise<{ turns?: TalkTurn[]; error?: string }>;
 
 const PENDING = 'pending';
 
@@ -165,6 +168,7 @@ function Turn({
             <LinkedText text={turn.body} />
           </p>
         )}
+        {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
         {/* A chart Dash drew (plan #1655) belongs to the answer, so it sits
             under the words and above the rows they rest on. */}
         {turn.role === 'assistant' && <ReplyCharts calls={turn.toolCalls} />}
@@ -239,6 +243,7 @@ export function TalkThread({
   incoming,
   working,
   onCard = false,
+  withFiles = false,
 }: {
   /** Unique on the page: the textarea's id is built from it. */
   id: string;
@@ -302,6 +307,8 @@ export function TalkThread({
    * it always has; a host takes it on when it puts the thread on a card.
    */
   onCard?: boolean;
+  /** Offer "Add a file" beside Send; the files go to `send` as its second argument (plan #1715). */
+  withFiles?: boolean;
 }) {
   const [own, setTurns] = useState<TalkTurn[]>([...initial]);
   // The thread's own turns, with any written elsewhere slotted in by time.
@@ -314,6 +321,8 @@ export function TalkThread({
   }, [own, incoming]);
   const [writing, setWriting] = useState(startWriting && !ask);
   const [draft, setDraft] = useState('');
+  const [files, setFiles] = useState<UploadedAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Why the last answer did not come: drawn in the thread with the failed
   // mark, where the working line was, until the next question is sent.
@@ -331,20 +340,25 @@ export function TalkThread({
       setError(checked.error);
       return;
     }
+    const sentFiles = withFiles ? files : [];
     const question: TalkTurn = {
       id: PENDING,
       role: 'user',
       body: checked.body,
       createdAt: new Date().toISOString(),
+      ...(sentFiles.length > 0
+        ? { files: sentFiles.map((file) => ({ ...file, id: file.path, href: '' })) }
+        : {}),
     };
     setError(null);
     setFailed(null);
     setLanded(null);
     setDraft('');
+    setFiles([]);
     setWriting(false);
     setTurns((current) => [...current, question]);
     startSend(async () => {
-      const result = await send(checked.body).catch(() => ({
+      const result = await send(checked.body, sentFiles.length > 0 ? sentFiles : undefined).catch(() => ({
         turns: undefined,
         error: 'That was not sent. Check your connection.',
       }));
@@ -357,6 +371,7 @@ export function TalkThread({
         else setLanded(kept.find((turn) => turn.role === 'assistant')?.id ?? null);
         if (kept.length === 0) {
           setDraft(checked.body);
+          setFiles(sentFiles);
           setWriting(true);
         }
       });
@@ -451,6 +466,7 @@ export function TalkThread({
             <ComposeBody
               id={`${id}-talk`}
               rows={1}
+              className="min-h-11 sm:min-h-0"
               autoFocus
               maxLength={MAX_TURN}
               placeholder={placeholder}
@@ -469,12 +485,17 @@ export function TalkThread({
                 form.current?.requestSubmit();
               }}
             />
-            <div className="mt-1 flex justify-end">
+            <div className="mt-1 flex items-start justify-between gap-2">
+              {withFiles ? (
+                <AddFile value={files} onChange={setFiles} disabled={sending} onUploadingChange={setUploading} />
+              ) : (
+                <span />
+              )}
               <Button
                 type="submit"
                 size="sm"
                 className="size-7 shrink-0 px-0"
-                disabled={!draft.trim() || sending}
+                disabled={!draft.trim() || sending || uploading}
                 title="Send"
               >
                 <ArrowUp className="size-4" strokeWidth={2} aria-hidden />

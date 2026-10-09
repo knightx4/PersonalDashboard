@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   } catch {
     body = {};
   }
-  const checked = parseAskInput(body.question, body.conversationRef, body.page);
+  const checked = parseAskInput(body.question, body.conversationRef, body.page, body.files, user.id);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
