@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus, Undo2 } from 'lucide-react';
+import { Paperclip, Plus, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
@@ -167,13 +167,19 @@ export function CaptureFoot({
   message,
   pending,
   costs,
+  files,
 }: {
   message?: string;
   pending: boolean;
   costs: PaidCosts;
+  /** "Add a file" and the chips of what it added (plan #1714), first in the row. */
+  files?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 border-t border-border px-3 py-2">
+      {/* A row of its own, so the chips it adds sit under the button and the
+          hint below stays level with File it. */}
+      {files && <div className="basis-full">{files}</div>}
       {/* No keys to press on a phone, so the hint is for a keyboard only. */}
       <span aria-hidden className="hidden text-small text-ink-ghost sm:inline">
         <Kbd always>↵</Kbd> files · <Kbd always>⇧↵</Kbd> new line
@@ -228,8 +234,16 @@ export function FiledCaptures({
             <div className="flex items-start gap-2">
               <ModuleMark module={CAPTURE_PLACE_MODULE[item.place]} size="sm" className="mt-1" />
               <span className="min-w-0 flex-1 py-0.5">
-                <span className={cn('block font-medium', item.undoneAt ? 'text-ink-muted' : 'text-ink')}>
-                  {item.where}
+                <span className={cn('flex items-baseline gap-1.5 font-medium', item.undoneAt ? 'text-ink-muted' : 'text-ink')}>
+                  <span className="min-w-0">{item.where}</span>
+                  {item.files ? (
+                    <span className="inline-flex shrink-0 items-center gap-0.5 font-normal text-ink-muted tabular-nums">
+                      <Paperclip className="size-3" strokeWidth={1.75} aria-hidden />
+                      <span className="sr-only">with </span>
+                      {item.files}
+                      <span className="sr-only">{item.files === 1 ? ' file' : ' files'}</span>
+                    </span>
+                  ) : null}
                 </span>
                 <span
                   className={cn(
