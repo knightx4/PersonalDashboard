@@ -212,6 +212,7 @@ import {
   DevRaisedSurface,
   DevInboxSurface,
   DevRaisedStatusSurface,
+  DevRunnerCrewSurface,
   DevSpecSurface,
   DevSpecsSurface,
   DevSpecsInterviewEmptySurface,
@@ -5021,6 +5022,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevRaisedStatusSurface />,
+  },
+  {
+    /* The runner card on /dev/plan with its four Dashes (plan #1704): a
+     * night with two sessions, a goal run and a slot asleep, then off. */
+    id: 'dev-runner-crew',
+    label: 'Dev · Plan, the runner’s four Dashes',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevRunnerCrewSurface />,
   },
   {
     id: 'dev-specs',

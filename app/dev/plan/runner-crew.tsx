@@ -81,7 +81,7 @@ export function RunnerCrew({
   return (
     <ul aria-label="What each of the runner's four sessions is doing" className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
       {slots.map((slot) => (
-        <li key={slot.slot} className="flex min-w-0 items-center gap-3">
+        <li key={slot.slot} className="flex min-w-0 items-start gap-3">
           <DashMark
             state={slot.state}
             look={LOOKS[slot.slot]}

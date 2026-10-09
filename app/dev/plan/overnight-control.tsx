@@ -651,7 +651,17 @@ export function OvernightControl({
                     </option>
                   ))}
                 </Select>
-                <Button type="submit" size="sm" pending={starting} disabled={!canSend}>
+                {/* On a phone the select beside it has to stay 44px with 16px
+                    text (a smaller one fails the press check, and iOS zooms on
+                    focus), so Start grows to match rather than sitting short
+                    beside it (critic, #1704 round 1). */}
+                <Button
+                  type="submit"
+                  size="sm"
+                  pending={starting}
+                  disabled={!canSend}
+                  className="max-sm:min-h-11 max-sm:px-4 max-sm:text-body"
+                >
                   {starting ? 'Starting…' : 'Start'}
                 </Button>
               </form>
