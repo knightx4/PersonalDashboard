@@ -1,4 +1,5 @@
 import type { SpendSink } from '@/lib/core/spend/pricing';
+import type { OpeningSource } from './source';
 import {
   askJevAll,
   type JevChoiceAnswer,
@@ -466,6 +467,8 @@ export type OpeningFilter = {
   minFit: number;
   /** The chance band an opening must reach, chosen by band while chance shows as one. */
   minChance: ChanceBand | 'any';
+  /** Where it came from (source.ts). */
+  source: OpeningSource | 'any';
 };
 
 export const NO_OPENING_FILTER: OpeningFilter = {
@@ -477,6 +480,7 @@ export const NO_OPENING_FILTER: OpeningFilter = {
   coverLetter: 'any',
   minFit: 0,
   minChance: 'any',
+  source: 'any',
 };
 
 const BAND_RANK: Record<ChanceBand, number> = { low: 0, medium: 1, high: 2 };
@@ -491,13 +495,15 @@ export function reachesBand(value: number, minimum: ChanceBand | 'any'): boolean
   return minimum === 'any' || BAND_RANK[chanceBandOf(value)] >= BAND_RANK[minimum];
 }
 
-type Sortable = { scores: OpeningScores | null; createdAt: string };
+type Sortable = { scores: OpeningScores | null; createdAt: string; source?: { key: OpeningSource } };
 
 /**
  * Whether an opening passes the filter. An unscored opening passes every
- * filter, so nothing vanishes because Jev has not read it yet.
+ * filter on Jev's answers, so nothing vanishes because Jev has not read it
+ * yet; the source filter applies to every opening.
  */
 export function passesFilter(opening: Sortable, filter: OpeningFilter): boolean {
+  if (filter.source !== 'any' && opening.source && opening.source.key !== filter.source) return false;
   const s = opening.scores;
   if (!s) return true;
   if (filter.workplace !== 'any' && s.workplace && s.workplace.value !== filter.workplace) return false;

@@ -13,6 +13,7 @@ import { cn } from '@/lib/cn';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { ScoreReasons } from '@/components/jobs/ui/score-figures';
 import { CHANCE_FILTER_EDGES } from '@/lib/jobs/suggest/chance-check';
+import { OPENING_SOURCE_LABELS, OPENING_SOURCES, sourceText } from '@/lib/jobs/suggest/source';
 import { FIT_MINIMUMS, type ScoreNote } from '@/lib/jobs/suggest/score-notes';
 import { activeFilters, OPENING_PARAMS, type OpeningView } from '@/lib/jobs/suggest/opening-view';
 import { gmailComposeUrl } from '@/lib/jobs/followup/compose';
@@ -343,6 +344,20 @@ function OpeningControls({
         }
       >
         <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1">
+          <PressChip
+            name={OPENING_PARAMS.source}
+            aria-label="Filter by where the role came from"
+            placeholderValue="any"
+            defaultValue={filter.source}
+            onChange={submit}
+          >
+            <option value="any">Any source</option>
+            {OPENING_SOURCES.map((value) => (
+              <option key={value} value={value}>
+                From {OPENING_SOURCE_LABELS[value]}
+              </option>
+            ))}
+          </PressChip>
           <PressChip
             name={OPENING_PARAMS.workplace}
             aria-label="Filter by workplace"
@@ -757,12 +772,10 @@ function RoleFacts({ suggestion }: { suggestion: OpenSuggestion }) {
     warn?: boolean;
     figure?: boolean;
   }[] = [];
+  // Every role says where it came from and which site its link is on, so the
+  // sources can be weighed against each other (source.ts).
+  facts.push({ key: 'source', text: sourceText(suggestion.source) });
   if (suggestion.location) facts.push({ key: 'where', text: suggestion.location });
-  // A startup weekly discovery found is a company they have not heard of, so
-  // where it was found is on the row rather than under Details (plan #1685).
-  if (suggestion.origin === 'discovered' && suggestion.foundIn) {
-    facts.push({ key: 'found', text: suggestion.foundIn });
-  }
   if (note?.fit) {
     facts.push({
       key: 'fit',
