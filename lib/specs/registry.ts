@@ -96,6 +96,14 @@ export const SPECS: readonly SpecDoc[] = [
     module: 'learn',
   },
   {
+    slug: 'learn-levels',
+    title: 'Learn: topics and levels',
+    blurb:
+      'One shared map of topics, ten fixed levels on each, and the rule that showing a level shows what it rests on: how Learn records what you know and picks what is next.',
+    file: 'LEARN-LEVELS-SPEC.md',
+    module: 'learn',
+  },
+  {
     slug: 'learn-graph',
     title: 'Learn: what you know',
     blurb:
