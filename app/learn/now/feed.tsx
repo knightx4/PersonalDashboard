@@ -43,6 +43,7 @@ import {
   askAboutCard,
   deleteCardNote,
   dismissCard,
+  generateSubjectCards,
   loadMoreCards,
   makeTrackOfCard,
   openCardSource,
@@ -102,12 +103,12 @@ type MadeTrack = NonNullable<NewTrackResult['track']>;
  * What a subject's deck says once nothing of it is left to show (plan #1698).
  * The header above already names the subject, so this does not. Its cards are
  * its lessons, which are written as you work through the subject rather than
- * from what you write about, so it promises no new ones.
+ * from what you write about; Generate more under it writes the next ones
+ * while you wait (note 43b8d7ac).
  */
 function subjectEmpty(passed: number): string {
-  return passed === 0
-    ? 'Nothing here is ready. Cards you skipped come back in three days, and ones you want to work on in two.'
-    : 'You are through every card here. Cards you skipped come back in three days, and ones you want to work on in two.';
+  const start = passed === 0 ? 'Nothing here is ready.' : 'You are through every card here.';
+  return `${start} Generate more writes this subject's next lessons now, in a minute or two. Cards you skipped come back in three days.`;
 }
 
 export function LearnNowFeed({
@@ -160,6 +161,30 @@ export function LearnNowFeed({
     } finally {
       busy.current = false;
       setLoading(false);
+    }
+  }, [subjectId]);
+
+  const [generating, setGenerating] = useState(false);
+  const [generated, setGenerated] = useState<string | null>(null);
+  /** Generate more on an empty subject deck (note 43b8d7ac). */
+  const generate = useCallback(async () => {
+    if (!subjectId || busy.current) return;
+    busy.current = true;
+    setGenerating(true);
+    setGenerated(null);
+    setError(null);
+    try {
+      const made = await generateSubjectCards(subjectId, loaded.current);
+      loaded.current = [...loaded.current, ...made.cards.map((card) => card.id)];
+      setDeck((current) => appendCards(current, made.cards));
+      setReady(made.ready);
+      setGenerated(made.message);
+      if (made.cards.length > 0) setEnded(false);
+    } catch {
+      setGenerated('Could not write more for this subject just now. Try again in a moment.');
+    } finally {
+      busy.current = false;
+      setGenerating(false);
     }
   }, [subjectId]);
 
@@ -340,17 +365,30 @@ export function LearnNowFeed({
                     : 'You are through every card ready now. More are being written, a few minutes each.'
                   : 'You are through every card ready now. Cards you skipped come back in three days, and ones you want to work on in two.'}
               </p>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  setEnded(false);
-                  setError(null);
-                  void loadMore();
-                }}
-              >
-                Check again
-              </Button>
+              {subjectId ? (
+                <>
+                  {generated && (
+                    <p className="text-ui text-ink-muted" aria-live="polite">
+                      {generated}
+                    </p>
+                  )}
+                  <Button type="button" variant="secondary" pending={generating} onClick={generate}>
+                    {generating ? 'Writing lessons…' : 'Generate more'}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setEnded(false);
+                    setError(null);
+                    void loadMore();
+                  }}
+                >
+                  Check again
+                </Button>
+              )}
             </div>
           )}
         </Card>
