@@ -22,10 +22,10 @@ import { openingFeedback } from './feedback';
 import { pickBoardCandidates } from './board-pick';
 import { loadFollowedBoardPostings } from './boards';
 import { suggestDiscoveredRoles } from '@/lib/jobs/discover/roles-run';
-import { discoveredText, type DiscoveredPosting } from '@/lib/jobs/discover/roles';
 import { readMinFitScore } from './fit-gate';
 import { loadScoringContext } from './score-run';
-import { scoreOpening, type OpeningScores } from './scores';
+import { scoreOpening, type OpeningText } from './scores';
+import type { Admitter } from './admit';
 import { readPreferences } from './preferences';
 import type { SearchProgress } from './search-runs';
 import { queueSearch } from './search-batch';
@@ -222,28 +222,24 @@ async function runReachOut(
 }
 
 /**
- * Jev's scoring for discovered roles: the person's scoring context, read
- * once, and their fit minimum. A role is scored as the daily scoring run
- * would score it, from its title, company and place.
+ * Jev's scoring for the roles a search finds (admit.ts): the person's scoring
+ * context, read once, and their lowest fit score. A role is scored as the
+ * daily scoring run would score it, from its title, company, place and
+ * Dash's summary.
  */
-async function discoveredScorer(
+async function openingAdmitter(
   supabase: AppSupabaseClient,
   userId: string,
   jev: { onSpend?: SpendSink },
-): Promise<{ score: (posting: DiscoveredPosting) => Promise<OpeningScores | null>; minFitScore: number } | null> {
+): Promise<Admitter | null> {
   try {
     const [context, profile] = await Promise.all([
       loadScoringContext(supabase, userId),
       supabase.from('profiles').select('min_fit_score').eq('id', userId).maybeSingle(),
     ]);
     const minFitScore = readMinFitScore((profile.data as Row | null)?.min_fit_score);
-    const score = async (posting: DiscoveredPosting) => {
-      const { why, move } = discoveredText(posting);
-      const result = await scoreOpening({
-        opening: { title: posting.title, company: posting.company, location: posting.location, why, move },
-        context,
-        onSpend: jev.onSpend,
-      });
+    const score = async (opening: OpeningText) => {
+      const result = await scoreOpening({ opening, context, onSpend: jev.onSpend });
       return result.ok ? result.scores : null;
     };
     return { score, minFitScore };
@@ -293,12 +289,13 @@ async function runApply(
   // Roles at the startups weekly discovery found (plan #1685): up to ten a
   // week on top of what this search finds, stored first so the search
   // leaves their links alone.
-  const gate = jev ? await discoveredScorer(supabase, userId, jev) : null;
+  // Every source is scored before its roles reach the list (admit.ts).
+  const admitter = jev ? await openingAdmitter(supabase, userId, jev) : null;
   const discovered = await suggestDiscoveredRoles(supabase, userId, {
     targetTitles: seeker.targetTitles,
     likedTitles,
     taken,
-    ...(gate ?? {}),
+    admitter,
   }).catch((err: unknown) => {
     console.error('[jobs suggestions] discovered roles', err instanceof Error ? err.message : err);
     return { headlines: [] as string[], urls: [] as string[], startupsRead: 0 };
@@ -343,7 +340,7 @@ async function runApply(
   }
 
   await progress?.stage('apply', 'saving');
-  const headlines = await storeOpenings(supabase, userId, result.suggestions, boardOrigins);
+  const headlines = await storeOpenings(supabase, userId, result.suggestions, boardOrigins, admitter);
   return withDiscovered({ ran: true, written: headlines.length, headlines, spend, error: null });
 }
 

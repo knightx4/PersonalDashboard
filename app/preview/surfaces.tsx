@@ -1,5 +1,6 @@
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
+import { openingSource } from '@/lib/jobs/suggest/source';
 import { CompanyRoles } from '@/app/jobs/(app)/companies/[slug]/company-roles';
 import type { RoleReminder } from '@/app/jobs/(app)/roles/[id]/types';
 import { RoleTodos } from '@/app/jobs/(app)/roles/[id]/todos';
@@ -2531,7 +2532,7 @@ function PreviewShell() {
 }
 
 /** Recommended roles on an ordinary day: two scored, one short of the preferences, one not yet read. */
-const recommendedOpening = (over: Partial<OpenSuggestion>): OpenSuggestion => ({
+const recommendedOpening = (over: Partial<OpenSuggestion>): OpenSuggestion => withSource({
   id: 'op-1',
   kind: 'apply',
   headline: 'Deployment Strategist',
@@ -2571,6 +2572,11 @@ const recommendedOpening = (over: Partial<OpenSuggestion>): OpenSuggestion => ({
   createdAt: '2026-09-29T05:02:03Z',
   ...over,
 });
+
+/** The row's source, read from its origin, found_in and link as the loader reads them. */
+function withSource(row: Omit<OpenSuggestion, 'source'> & { source?: OpenSuggestion['source'] }): OpenSuggestion {
+  return { ...row, source: row.source ?? openingSource(row) };
+}
 
 const recommendedRoles: OpenSuggestion[] = [
   recommendedOpening({}),
@@ -2784,6 +2790,13 @@ const findView = {
   aim: {
     targetTitles: 'Deployment Strategist, Strategic Finance, Forward Deployed Engineer, FP&A Manager',
     excludedIndustries: 'Crypto, Defense',
+    gaps: [
+      {
+        key: 'home' as const,
+        text: 'No home location is set, so roles and startups from anywhere are shown.',
+        href: '/jobs/settings',
+      },
+    ],
   },
   roles: {
     suggestions: recommendedRoles,

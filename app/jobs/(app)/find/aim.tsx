@@ -1,9 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useActionState, useRef, useState } from 'react';
 import { CardSection } from '@/components/ui/card';
 import { InlineInput } from '@/components/ui/field';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
+import type { SetupGap } from '@/lib/jobs/suggest/gaps';
 import { saveAim, type AimState } from './actions';
 
 /**
@@ -15,12 +17,29 @@ import { saveAim, type AimState } from './actions';
 export function SearchAim({
   targetTitles,
   excludedIndustries,
+  gaps = [],
 }: {
   targetTitles: string;
   excludedIndustries: string;
+  /** What is missing from the setup and what it changes (gaps.ts). */
+  gaps?: SetupGap[];
 }) {
   return (
     <CardSection title="What you are aiming at">
+      {gaps.length > 0 && (
+        <ul className="mb-2 space-y-1" aria-label="What the searches are missing">
+          {gaps.map((gap) => (
+            <li key={gap.key} className="text-small text-caution">
+              {gap.text}{' '}
+              {gap.href && (
+                <Link href={gap.href} className="press-area font-medium underline underline-offset-2">
+                  Set it
+                </Link>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
       <ValueList>
         <AimField
           field="targetTitles"

@@ -16,6 +16,9 @@ import { loadDiscoveredCompanies, loadLatestDiscoveryRun } from '@/lib/jobs/disc
 import { describeDiscovery } from '@/lib/jobs/discover/watchlist-view';
 import { otherParams, parseOpeningView } from '@/lib/jobs/suggest/opening-view';
 import { historyFromPipeline, withOpeningNotes } from '@/lib/jobs/suggest/score-notes-load';
+import { setupGaps } from '@/lib/jobs/suggest/gaps';
+import { readMinFitScore } from '@/lib/jobs/suggest/fit-gate';
+import { jevEnabledFor } from '@/lib/jev/enabled';
 import { FindView } from './view';
 
 export const metadata = { title: 'Find' };
@@ -62,6 +65,8 @@ export default async function FindPage({
     tracks,
     discovered,
     discoveryRun,
+    resume,
+    jevOn,
   ] = await Promise.all([
     loadPipeline(supabase, user.id),
     loadOpenSuggestions(supabase, user.id, 'apply'),
@@ -72,7 +77,7 @@ export default async function FindPage({
     loadLatestRun(supabase, user.id, 'apply'),
     supabase
       .from('profiles')
-      .select('timezone, target_titles, excluded_industries')
+      .select('timezone, target_titles, excluded_industries, min_fit_score')
       .eq('id', user.id)
       .single(),
     supabase
@@ -91,6 +96,14 @@ export default async function FindPage({
       return [];
     }),
     loadLatestDiscoveryRun(supabase, user.id),
+    supabase
+      .from('resume_versions')
+      .select('id')
+      .eq('user_id', user.id)
+      .not('text_content', 'is', null)
+      .limit(1)
+      .maybeSingle(),
+    jevEnabledFor(core, user.id),
   ]);
 
   const recommended = withPreferenceMisses(
@@ -112,6 +125,14 @@ export default async function FindPage({
         aim={{
           targetTitles: ((profile?.target_titles as string[] | null) ?? []).join(', '),
           excludedIndustries: ((profile?.excluded_industries as string[] | null) ?? []).join(', '),
+          gaps: setupGaps({
+            preferences,
+            targetTitles: (profile?.target_titles as string[] | null) ?? [],
+            goalEntries: entries.length,
+            hasResume: !!resume.data,
+            jevOn,
+            minFitScore: readMinFitScore(profile?.min_fit_score),
+          }),
         }}
         roles={{
           suggestions: recommended,
