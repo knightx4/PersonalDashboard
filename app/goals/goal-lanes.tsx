@@ -35,8 +35,8 @@ import { stepHref } from '@/lib/goals/all-goals';
  *   Dash shows only to the account that owns the app, as on a goal's page,
  *   because only that account can start a run.
  * - What Dash did since your last visit, passed in as `since`.
- * - Later: the rest of what is on you in the week's goals, and what is set
- *   aside until a later day, with Bring back now.
+ * - Set aside: what is off you until a later day, with Bring back now. The
+ *   rest of what is on you is on the Inbox tab, which Do next links to.
  * - Other goals: the goals that are not this week's, one line each, under
  *   their areas.
  *
@@ -48,8 +48,8 @@ import { stepHref } from '@/lib/goals/all-goals';
 export type GoalLanesProps = {
   /** Do next, ranked. */
   doNext: TodayItem[];
-  /** The rest of what is on you in the week's goals, ranked. */
-  rest: TodayItem[];
+  /** Everything on you across the goals, for the link to the Inbox. */
+  inboxCount: number;
   /** The goals Do next leaves out, errands first. */
   otherGoals: HomeGoal[];
   /** YYYY-MM-DD in the account's zone. */
@@ -82,7 +82,7 @@ const things = (n: number) => (n === 1 ? '1 thing' : `${n} things`);
 
 export function GoalLanes({
   doNext,
-  rest,
+  inboxCount,
   otherGoals,
   todayOn,
   preparable,
@@ -107,7 +107,6 @@ export function GoalLanes({
   const handedKeys = new Set(handed.map(keyOf));
   const shown = (item: TodayItem) => !aside.has(keyOf(item)) && !handedKeys.has(keyOf(item));
   const mine = doNext.filter(shown);
-  const more = rest.filter(shown);
   const listed = new Set(dash.map((item) => item.id));
   const dashRows: DashLaneItem[] = [
     ...handed
@@ -145,9 +144,21 @@ export function GoalLanes({
   return (
     <div className="space-y-6">
       <section aria-labelledby="do-next-heading" className="space-y-2">
-        <h2 id="do-next-heading" className="px-1 text-ui font-semibold text-ink">
-          Do next
-        </h2>
+        <div className="flex items-baseline justify-between gap-3 px-1">
+          <h2 id="do-next-heading" className="text-ui font-semibold text-ink">
+            Do next
+          </h2>
+          {/* Everything on you, of which these are the first five from the
+              week's goals. */}
+          {inboxCount > 0 && (
+            <Link
+              href="/goals/inbox"
+              className="press-area text-small text-accent underline-offset-2 hover:underline max-sm:min-h-11 max-sm:inline-flex max-sm:items-center"
+            >
+              All {inboxCount} in Inbox
+            </Link>
+          )}
+        </div>
         <Card>
           {mine.length === 0 ? (
             <p className="card-pad-x row-pad text-small text-ink-muted">
@@ -215,34 +226,18 @@ export function GoalLanes({
 
         {since}
 
-        {more.length + later.length > 0 && (
-          <FoldLine
-            title="Later"
-            meta={[
-              more.length > 0 ? `${more.length} more on you` : null,
-              later.length > 0 ? `${later.length} set aside` : null,
-            ]
-              .filter(Boolean)
-              .join(', ')}
-          >
+        {later.length > 0 && (
+          <FoldLine title="Set aside" meta={String(later.length)}>
             <Card>
-              {more.length > 0 && <ul className="divide-y divide-border">{more.map(row)}</ul>}
-              {later.length > 0 && (
-                <div className={cn(more.length > 0 && 'border-t border-border')}>
-                  <p className="card-pad-x pt-3 text-small font-semibold text-ink-muted">
-                    Set aside
-                  </p>
-                  <ul className="divide-y divide-border">
-                    {later.map((item) => (
-                      <LaterRow
-                        key={`later:${item.id}`}
-                        item={item}
-                        onBack={(gone) => setBack((current) => toggle(current, item.id, gone))}
-                      />
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <ul className="divide-y divide-border">
+                {later.map((item) => (
+                  <LaterRow
+                    key={`later:${item.id}`}
+                    item={item}
+                    onBack={(gone) => setBack((current) => toggle(current, item.id, gone))}
+                  />
+                ))}
+              </ul>
             </Card>
           </FoldLine>
         )}
@@ -374,7 +369,7 @@ function WorkingRow({ run }: { run: RunListing }) {
   );
 }
 
-function DashRow({ item }: { item: DashLaneItem }) {
+export function DashRow({ item }: { item: DashLaneItem }) {
   return (
     <li className="card-pad-x row-pad space-y-1">
       <Link
@@ -449,7 +444,7 @@ function QuietGoalRow({
   );
 }
 
-function LaterRow({ item, onBack }: { item: LaterLaneItem; onBack: (gone: boolean) => void }) {
+export function LaterRow({ item, onBack }: { item: LaterLaneItem; onBack: (gone: boolean) => void }) {
   const toast = useToast();
   return (
     <li className="card-pad-x row-pad space-y-1">

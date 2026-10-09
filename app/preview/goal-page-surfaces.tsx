@@ -1,4 +1,6 @@
 import type { ComponentProps } from 'react';
+import { GoalsInboxView } from '@/app/goals/inbox/inbox-view';
+import { goalInboxGroups } from '@/lib/goals/inbox';
 import { PageHeader } from '@/components/shell/page-header';
 import { allGoalsCrumbs } from '@/lib/goals/crumbs';
 import { Card } from '@/components/ui/card';
@@ -395,6 +397,24 @@ export function GoalsHomeSurface() {
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Goals" />
       <HomeView {...home} timeZone="Europe/London" canRun />
+    </div>
+  );
+}
+
+/** The Inbox tab in Goals: the same rows as the home, grouped by what finishes each. */
+export function GoalsInboxSurface() {
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <PageHeader
+        title="Inbox"
+        description="Everything on you across your goals: steps to do, questions to answer, and proposals to say yes to."
+      />
+      <GoalsInboxView
+        groups={goalInboxGroups(home.onYou, home.dash ?? [])}
+        laterOn={home.laterOn ?? []}
+        preparable={home.preparable ?? []}
+        canRun
+      />
     </div>
   );
 }

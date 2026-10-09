@@ -1,5 +1,5 @@
 import { PageHeader } from '@/components/shell/page-header';
-import { createClient, requireUser } from '@/lib/auth/server';
+import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { isOwner } from '@/lib/dev/owner';
 import { writtenWhen, type Brief } from '@/lib/goals/briefs';
@@ -7,7 +7,7 @@ import { loadBrief } from '@/lib/goals/briefs-store';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import type { DoneSince } from '@/lib/goals/done-since';
 import { loadDoneSince } from '@/lib/goals/done-since-store';
-import { loadHome } from '@/lib/goals/home-store';
+import { loadHomeForRequest } from '@/lib/goals/home-request';
 import { loadAreas } from '@/lib/goals/store';
 import { catchUpSince } from '@/lib/goals/catch-up';
 import { recordVisit } from '@/lib/goals/visits-store';
@@ -23,11 +23,6 @@ export const dynamic = 'force-dynamic';
 /** When Dash's note was written. Outside the component because it reads the clock. */
 function noteWhen(brief: Brief, timeZone: string): string | null {
   return writtenWhen(brief, timeZone, Date.now());
-}
-
-/** The clock, read outside the component because reading it during render is unstable. */
-function now(): number {
-  return Date.now();
 }
 
 /**
@@ -59,13 +54,8 @@ export default async function GoalsPage({
   const client = await createGoalsClient();
   const today = todayIn(account.timezone);
   const [home, visit, brief, areas, owner, plan] = await Promise.all([
-    createClient().then((supabase) =>
-      loadHome(client, supabase, {
-        userId: user.id,
-        today,
-        now: now(),
-      }),
-    ),
+    // The same read the tab's Inbox badge counts from, once per request.
+    loadHomeForRequest(user.id, today),
     recordVisit(client, { userId: user.id, today }),
     // A failed read leaves the note out rather than the page.
     loadBrief(client, null).catch((): Brief | null => null),

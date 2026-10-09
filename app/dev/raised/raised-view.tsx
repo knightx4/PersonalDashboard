@@ -31,6 +31,7 @@ import { raisedHealth, type RaisedHealth } from '@/lib/dev/health';
 import { RAISED_HEALTH_WORD } from '@/lib/dev/words';
 import { RAISED_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { PaidHint } from '@/components/ui/paid-hint';
+import { InboxOverview, inboxAnchor, type InboxCell } from '@/components/inbox/overview';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -334,39 +335,6 @@ const GROUP_HINT: Record<WaitingGroup['key'], string> = {
   approve: 'Need your yes',
 };
 
-/** The anchor each section of the inbox is reached by from the overview. */
-function sectionAnchor(key: string): string {
-  return `inbox-${key}`;
-}
-
-type OverviewCell = { key: string; title: string; count: number; hint: string };
-
-/**
- * The top of the inbox: how many of each kind there are, each a link to its
- * section. A long inbox otherwise has to be scrolled to find out whether the
- * questions are two or twenty, and that decides whether you start with them.
- */
-function Overview({ cells }: { cells: readonly OverviewCell[] }) {
-  return (
-    <nav
-      aria-label="Inbox sections"
-      className={cn(cardVariants({ padding: 'dense' }), 'grid grid-cols-2 gap-1 sm:grid-cols-4')}
-    >
-      {cells.map((cell) => (
-        <a
-          key={cell.key}
-          href={`#${sectionAnchor(cell.key)}`}
-          className="press flex flex-col gap-0.5 rounded-control p-2 hover:bg-sunken"
-        >
-          <span className="tabular text-title font-semibold text-ink">{cell.count}</span>
-          <span className="text-small font-semibold text-ink">{cell.title}</span>
-          <span className="text-micro text-ink-muted">{cell.hint}</span>
-        </a>
-      ))}
-    </nav>
-  );
-}
-
 /**
  * Everything waiting on you, the Inbox tab in Dev.
  *
@@ -401,7 +369,7 @@ export function RaisedView({
   titles?: PlanRefTitles;
 }) {
   const filled = groups.filter((group) => group.entries.length > 0);
-  const cells: OverviewCell[] = filled.map((group) => ({
+  const cells: InboxCell[] = filled.map((group) => ({
     key: group.key,
     title: group.title,
     count: group.entries.length,
@@ -425,7 +393,7 @@ export function RaisedView({
           description="A session writes here when it needs something you have to decide: a risk it found while building something else, or a question of taste it will not answer on its own."
         />
       ) : (
-        <Overview cells={cells} />
+        <InboxOverview cells={cells} />
       )}
 
       {/* One section per kind rather than one list sorted by how pressing each
@@ -433,7 +401,7 @@ export function RaisedView({
           thing in front of you was a job, a question or a yes, and the three
           want different amounts of you. */}
       {filled.map((group) => (
-        <div key={group.key} id={sectionAnchor(group.key)} className="scroll-mt-bar">
+        <div key={group.key} id={inboxAnchor(group.key)} className="scroll-mt-bar">
           <Group
             fold
             title={
@@ -472,7 +440,7 @@ export function RaisedView({
       ))}
 
       {queue.unfinished.length > 0 && (
-        <div id={sectionAnchor('unfinished')} className="scroll-mt-bar">
+        <div id={inboxAnchor('unfinished')} className="scroll-mt-bar">
           <SectionFold title="Answered, nothing done" count={queue.unfinished.length}>
             <p className="text-small text-ink-muted">
               These closed without anything coming of them. Run what they asked for, or close one

@@ -170,7 +170,7 @@ describe('the Goals home', () => {
       'Avalanche or snowball?',
       'Nothing with Dash',
       'Since your last visit',
-      'Later',
+      'Set aside',
       'Other goals',
     ];
     const positions = order.map((text) => html.indexOf(text));
@@ -220,14 +220,16 @@ describe('the Goals home', () => {
     expect(html).toContain('>Done<');
   });
 
-  it('keeps five in Do next and folds the rest under Later', () => {
+  it('keeps five in Do next and links to the Inbox for all of them', () => {
     const many = Array.from({ length: 7 }, (_, i) => item(`m${i}`, { title: `Errand ${i}` }));
     const html = render({ onYou: many });
     const doNext = html.slice(html.indexOf('Do next'), html.indexOf('Nothing with Dash'));
     expect(doNext).toContain('Errand 4');
     expect(doNext).not.toContain('Errand 5');
-    expect(html).toContain('2 more on you');
-    expect(html.indexOf('Errand 6')).toBeGreaterThan(html.indexOf('>Later<'));
+    // The other two are on the Inbox tab, not folded under the Home.
+    expect(html).not.toContain('Errand 6');
+    expect(doNext).toContain('All 7 in Inbox');
+    expect(html).toContain('href="/goals/inbox"');
   });
 
   it('leaves out steps of goals that are not this week’s, but not their questions', () => {
@@ -265,16 +267,16 @@ describe('the Goals home', () => {
     expect(html).toContain('Needs you: Which cards do you have?');
   });
 
-  it('lists set-aside steps under Later with Bring back now', () => {
+  it('lists set-aside steps under Set aside with Bring back now', () => {
     const html = render({
       laterOn: [
         { id: 'l1', title: 'Turn on autopay', goalId: 'g1', goalTitle: 'Pay off the debts', startsOn: '2026-11-01', dueOn: null },
       ],
     });
-    expect(html).toContain('1 set aside');
+    expect(html).toContain('Set aside');
     expect(html).toContain('back 1 Nov');
     expect(html).toContain('Bring back now');
-    expect(render()).not.toContain('>Later<');
+    expect(render()).not.toContain('Set aside');
   });
 
   it('lists each other goal on one line: its status and its next move', () => {

@@ -24,6 +24,7 @@ import {
 import type { DashLaneItem, LaterLaneItem } from '@/lib/goals/lanes';
 import type { RunListing } from '@/lib/goals/runs';
 import { TODAY_CAP, type TodayItem } from '@/lib/goals/today';
+import { goalInboxCount } from '@/lib/goals/inbox';
 import { AskDash } from './ask-dash';
 import { DoneSinceList } from './done-since-list';
 import { FoldLine } from './fold-line';
@@ -43,8 +44,10 @@ import { GoalLanes } from './goal-lanes';
  * 4. Do next: at most five things on you from the week's goals, with Dash's
  *    draft beside the step it is for (goal-lanes.tsx, homeLists in
  *    lib/goals/home.ts).
+ *    Everything else on you is on the Inbox tab (app/goals/inbox), which
+ *    Do next links to with its count.
  * 5. Lines that open in place: what Dash is on, what Dash did since your
- *    last visit (done-since-list.tsx), Later, and Other goals.
+ *    last visit (done-since-list.tsx), what you set aside, and Other goals.
  *
  * The day you come back after five or more days away (lib/goals/catch-up.ts),
  * Dash's card says how long you were gone and the line for what Dash did
@@ -117,7 +120,7 @@ export function HomeView({
   const summary = homeSummary(goals);
   const away = awayFrom && todayOn ? daysAway(awayFrom, todayOn) : null;
   const { errands } = splitErrands(goals);
-  const { doNext, rest, otherGoals } = homeLists(onYou, goals, todayOn, TODAY_CAP);
+  const { doNext, otherGoals } = homeLists(onYou, goals, todayOn, TODAY_CAP);
   const note = brief ? briefParts(brief.body) : null;
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -166,7 +169,7 @@ export function HomeView({
 
       <GoalLanes
         doNext={doNext}
-        rest={rest}
+        inboxCount={goalInboxCount(onYou, dash)}
         otherGoals={otherGoals}
         todayOn={todayOn}
         preparable={preparable}

@@ -180,6 +180,7 @@ import {
   GoalsAllSurface,
   GoalsAreaSurface,
   GoalsHomeSurface,
+  GoalsInboxSurface,
   InformationListSurface,
   InformationOneSurface,
 } from './goal-page-surfaces';
@@ -3344,13 +3345,21 @@ export const SURFACES: readonly Surface[] = [
   {
     /* The Goals home on an ordinary week (plans #1043, #1077): Dash's card
      * with a two-paragraph note, five things in Do next (one with Dash's
-     * draft beside it) and one folded under Later, Dash's line, a result
-     * Dash wrote, and an errand due later under Other goals. */
+     * draft beside it) linking to the Inbox, Dash's line, a result Dash
+     * wrote, and an errand due later under Other goals. */
     id: 'goals-home',
     label: 'Goals · home',
     module: 'goals',
     width: 'page',
     render: () => <GoalsHomeSurface />,
+  },
+  {
+    /* Everything on you in Goals, grouped as the Inbox in Dev is. */
+    id: 'goals-inbox',
+    label: 'Goals · Inbox',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalsInboxSurface />,
   },
   {
     /* Three areas and their goals, edited where they stand. */
