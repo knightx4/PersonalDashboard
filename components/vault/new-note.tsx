@@ -4,7 +4,7 @@ import { useActionState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
-import { ComposeBody, ComposeTitle, FieldError } from '@/components/ui/field';
+import { ComposeBody, ComposeTitle, FieldError, PressLabel } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { newVaultNote, type NewNoteState } from '@/app/vault/actions';
 
@@ -20,7 +20,18 @@ export function NewVaultNote() {
 
   return (
     <form action={action} className={cn(cardVariants(), 'mb-5 space-y-3 p-4')}>
-      <ComposeTitle name="title" placeholder="Name it" aria-label="Note name" autoFocus maxLength={60} />
+      <div className="relative">
+        <PressLabel htmlFor="vault-new-note-title" />
+        <ComposeTitle
+          id="vault-new-note-title"
+          name="title"
+          placeholder="Name it"
+          aria-label="Note name"
+          autoFocus
+          maxLength={60}
+          className="relative"
+        />
+      </div>
       <ComposeBody name="body" placeholder="Write the note" aria-label="Note" className="min-h-24" />
       <FieldError>{state.error}</FieldError>
       <p className="text-small text-ink-muted">Goes into your Inbox folder.</p>
