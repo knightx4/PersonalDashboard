@@ -95,7 +95,10 @@ export function WritePost({ defaultOpen = false }: { defaultOpen?: boolean }) {
                   aria-label="Remove this image"
                   className="press absolute -right-2 -top-2 grid size-11 place-items-center"
                 >
-                  <span className="grid size-6 place-items-center rounded-full border border-border bg-raised text-ink">
+                  <span
+                    // ui-ok: a round remove badge on a thumbnail, not a grouping box; the border keeps it off the picture.
+                    className="grid size-6 place-items-center rounded-full border border-border bg-raised text-ink"
+                  >
                     <X className="size-3.5" aria-hidden />
                   </span>
                 </button>
