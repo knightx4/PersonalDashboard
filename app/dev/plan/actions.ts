@@ -35,6 +35,7 @@ import {
   loadPlan,
   type PlanStatus,
 } from '@/lib/plan/load';
+import { setAutoApprove } from '@/lib/plan/auto-approve';
 import { handFeatureToClaude, handStepToClaude } from '@/lib/plan/handover';
 import {
   OVERNIGHT_FEATURE_CAP,
@@ -1905,6 +1906,36 @@ export async function stopOvernightRunner(
             } unspent`
       }. Anything already building ` +
       'finishes on its own; nothing follows it.',
+  };
+}
+
+/**
+ * Flip auto approve, from the runner's row on Home.
+ *
+ * The form sends the state it wants rather than "toggle", so a double press
+ * or a stale tab lands where the button said it would.
+ */
+// latency: pending
+export async function setAutoApproveAction(
+  _prev: PlanActionState,
+  formData: FormData,
+): Promise<PlanActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const on = field(formData, 'on') === 'true';
+  const { approved, error } = await setAutoApprove({ supabase, userId: user.id, on });
+  if (error) return { error };
+
+  revalidatePlan();
+  if (!on) return { message: 'Auto approve is off. New proposals wait for you again.' };
+  return {
+    message:
+      approved === 0
+        ? 'Auto approve is on. New features and steps are approved as they are written.'
+        : `Auto approve is on. Approved ${approved} waiting ${
+            approved === 1 ? 'proposal' : 'proposals'
+          }, and new ones are approved as they are written.`,
   };
 }
 

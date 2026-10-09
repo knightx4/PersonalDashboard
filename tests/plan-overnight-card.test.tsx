@@ -22,6 +22,7 @@ vi.mock('@/app/dev/plan/actions', () => {
   return {
     pauseOvernightRunner: noop,
     resumeOvernightRunner: noop,
+    setAutoApproveAction: noop,
     startOvernightRunner: noop,
     stopOvernightRunner: noop,
   };
@@ -391,5 +392,22 @@ describe('the goals half on Dash', () => {
     });
     expect(html).toContain('Ready');
     expect(html).toContain('1 goal step ready · 1 goal to map');
+  });
+});
+
+describe('the auto approve switch', () => {
+  it('is drawn only where the caller says whether it is on', () => {
+    expect(draw()).not.toContain('Auto approve');
+  });
+
+  it('says which way it is set, and sends the other way', () => {
+    const off = draw({ autoApprove: false });
+    expect(off).toContain('aria-pressed="false"');
+    expect(off).toContain('name="on" value="true"');
+
+    const on = draw({ autoApprove: true });
+    expect(on).toContain('aria-pressed="true"');
+    expect(on).toContain('Auto approve on');
+    expect(on).toContain('name="on" value="false"');
   });
 });

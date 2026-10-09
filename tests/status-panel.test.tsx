@@ -27,6 +27,7 @@ function render(run: Partial<OvernightRun> | null) {
       openNotes={0}
       notesLastRun={null}
       vision={null}
+      autoApprove={false}
       now={0}
     />,
   );
@@ -41,4 +42,5 @@ describe('the Status card', () => {
     expect(render(null)).toContain('data-dash-state="idle"');
     expect(render({ running: true, paused: true })).toContain('data-dash-state="idle"');
   });
+
 });
