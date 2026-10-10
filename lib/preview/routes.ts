@@ -96,6 +96,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'todo-calendar-month': ['/todo/calendar'],
   'todo-feed-event': ['/todo/calendar'],
   'vault-new-note': ['/vault'],
+  'vault-quick-note': ['/vault'],
+  'vault-quick-note-read-only': ['/vault'],
   'vault-triage': ['/vault/triage'],
   'vault-triage-empty': ['/vault/triage'],
   'vault-triage-read-only': ['/vault/triage'],

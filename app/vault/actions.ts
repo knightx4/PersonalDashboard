@@ -48,3 +48,22 @@ export async function newVaultNote(_prev: NewNoteState, formData: FormData): Pro
   revalidatePath('/vault');
   redirect(noteHref(result.path));
 }
+
+/**
+ * A quick note added from the Vault page (plan #1730, feature #1726): one
+ * piece of text, filed in the Inbox folder through the capture box's write
+ * (fileVaultNote) and left there to be sorted in Quick note triage. Unlike
+ * newVaultNote it opens nothing; the list stays where it is and the waiting
+ * count goes up.
+ */
+// latency: pending
+export async function addQuickNote(text: string): Promise<{ error: string | null }> {
+  const user = await requireUser();
+  const trimmed = text.trim();
+  if (!trimmed) return { error: 'Write the note first.' };
+  const result = await fileVaultNote(user.id, trimmed);
+  if (!result.ok) return { error: result.error };
+  revalidatePath('/vault');
+  revalidatePath('/vault/triage');
+  return { error: null };
+}
