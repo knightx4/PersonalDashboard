@@ -437,3 +437,26 @@ describe('the tracks of learning goals (plan #1143)', () => {
     expect(choice.dormant).toEqual([]);
   });
 });
+
+describe('weak concepts (plan #1720)', () => {
+  const track = {
+    subjectId: 's',
+    name: 'S',
+    units: [{ id: 'u1' }],
+    goals: [goal('u1', 'top')],
+    graph: graphOf({ near: 'unknown', far: 'unknown', top: 'unknown' }, ['near>top', 'far>top']),
+  } as unknown as LessonTrack;
+  const input = { tracks: [track], weights: new Map(), carded: new Set<string>(), slots: 2 };
+
+  it('leaves the slots empty when only weak concepts are ready', () => {
+    const choice = chooseLessons({ ...input, weak: new Set(['near', 'far']) });
+    expect(choice.picks).toEqual([]);
+  });
+
+  it('teaches the strong ones as before and skips the weak one', () => {
+    const choice = chooseLessons({ ...input, weak: new Set(['near']) });
+    expect(choice.picks.map((pick) => pick.concept.id)).toEqual(['far']);
+    const plain = chooseLessons(input);
+    expect(plain.picks.map((pick) => pick.concept.id).sort()).toEqual(['far', 'near']);
+  });
+});
