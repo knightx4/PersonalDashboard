@@ -9,7 +9,9 @@ import { groupByFolder, loadConnection, loadNotes } from '@/lib/vault/notes/load
 import { VaultStatusBanner } from '@/components/vault/status-banner';
 import { NoteConnections } from '@/components/vault/note-connections';
 import { NewVaultNote } from '@/components/vault/new-note';
-import { TriageEntry } from '@/components/vault/triage-entry';
+import { QuickNoteRow } from '@/components/vault/quick-note';
+import { requireUser } from '@/lib/auth/server';
+import { vaultWritable } from '@/lib/capture/vault';
 import { INBOX_FOLDER } from '@/lib/vault/paths';
 import { loadWeekConnections } from '@/lib/vault/notes/connections-load';
 import { buttonVariants } from '@/components/ui/button';
@@ -36,6 +38,7 @@ export default async function VaultPage({
   const { q, new: composing } = await searchParams;
   const search = q?.trim() ?? '';
 
+  const user = await requireUser();
   const supabase = await createVaultClient();
   const connection = await loadConnection(supabase);
 
@@ -54,9 +57,10 @@ export default async function VaultPage({
   }
 
   // This week's connections sit above the list, and only when not searching.
-  const [notes, connections] = await Promise.all([
+  const [notes, connections, writable] = await Promise.all([
     loadNotes(supabase, search ? { search } : {}),
     search ? Promise.resolve([]) : loadWeekConnections(supabase),
+    vaultWritable(user.id),
   ]);
   const groups = groupByFolder(notes);
   // Quick notes are the top level of the Inbox folder; the list already holds them.
@@ -80,7 +84,7 @@ export default async function VaultPage({
 
       {composing !== undefined && <NewVaultNote />}
 
-      {!search && <TriageEntry waiting={waiting} />}
+      {!search && <QuickNoteRow waiting={waiting} writable={writable} />}
 
       <div className="mb-5 max-w-md">
         <SearchField placeholder="Search your notes" />

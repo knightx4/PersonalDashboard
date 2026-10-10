@@ -73,7 +73,7 @@ import {
   type CalendarEntry,
 } from '@/lib/todo/calendar/month';
 import { NewVaultNote } from '@/components/vault/new-note';
-import { TriageEntry } from '@/components/vault/triage-entry';
+import { QuickNoteRow } from '@/components/vault/quick-note';
 import { TriagePreview } from './triage-surfaces';
 import { NoteProperties } from '@/components/vault/note-properties';
 import { NoteBody } from '@/components/vault/note-body';
@@ -3967,7 +3967,47 @@ export const SURFACES: readonly Surface[] = [
           actions={<span className={buttonVariants({ size: 'sm' })}>New note</span>}
         />
         <NewVaultNote />
-        <TriageEntry waiting={3} />
+        <QuickNoteRow waiting={3} writable />
+      </>
+    ),
+  },
+  {
+    /* Add a quick note on the vault page (plan #1730): the button beside the
+     * Quick note triage row, with its text box open and a long thought in it. */
+    id: 'vault-quick-note',
+    label: 'Vault · Add a quick note',
+    module: 'vault',
+    width: 'narrow',
+    render: () => (
+      <>
+        <PageHeader
+          title="Vault"
+          description="knightx4/notes · main"
+          actions={<span className={buttonVariants({ size: 'sm' })}>New note</span>}
+        />
+        <QuickNoteRow
+          waiting={12}
+          writable
+          startOpen
+          startText="Idea for the kitchen shelves: use the oak offcuts from the garage, ask Dad about the bracket drill he borrowed in March, and check whether the landlord needs to approve anything before I drill into the tiled wall by the window."
+        />
+      </>
+    ),
+  },
+  {
+    /* The same button under a vault token that can only read: it says why. */
+    id: 'vault-quick-note-read-only',
+    label: 'Vault · Add a quick note, read-only token',
+    module: 'vault',
+    width: 'narrow',
+    render: () => (
+      <>
+        <PageHeader
+          title="Vault"
+          description="knightx4/notes · main"
+          actions={<span className={buttonVariants({ size: 'sm' })}>New note</span>}
+        />
+        <QuickNoteRow waiting={0} writable={false} startOpen />
       </>
     ),
   },
