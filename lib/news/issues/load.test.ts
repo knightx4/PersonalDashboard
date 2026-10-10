@@ -17,6 +17,8 @@ const BASE = {
   summary: null,
   stories: null,
   digest_error: null,
+  confirm_url: null,
+  confirmed_at: null,
 };
 
 /** A client whose issue read returns `issue` and whose sender read returns nothing. */
@@ -63,6 +65,31 @@ describe('loadIssue', () => {
     );
     expect(issue?.digest).toBeNull();
     expect(issue?.digestError).toBe('the model call timed out');
+  });
+
+  it('returns the confirmation link and when it was pressed', async () => {
+    const waiting = await loadIssue(
+      clientReturning({ ...BASE, confirm_url: 'https://example.com/confirm?t=abc' }),
+      'i1',
+    );
+    expect(waiting?.confirmUrl).toBe('https://example.com/confirm?t=abc');
+    expect(waiting?.confirmedAt).toBeNull();
+
+    const done = await loadIssue(
+      clientReturning({
+        ...BASE,
+        confirm_url: 'https://example.com/confirm?t=abc',
+        confirmed_at: '2026-10-10T09:00:00Z',
+      }),
+      'i1',
+    );
+    expect(done?.confirmedAt).toBe('2026-10-10T09:00:00Z');
+  });
+
+  it('returns no link for an issue that is not a signup', async () => {
+    const issue = await loadIssue(clientReturning(BASE), 'i1');
+    expect(issue?.confirmUrl).toBeNull();
+    expect(issue?.confirmedAt).toBeNull();
   });
 });
 
