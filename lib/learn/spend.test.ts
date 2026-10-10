@@ -55,6 +55,7 @@ describe('the operation names', () => {
       'propose-floor',
       'classify-note',
       'concepts-from-note',
+      'judge-note-concepts',
       'concepts-from-prior',
       'concepts-from-brief',
       'concepts-from-course',

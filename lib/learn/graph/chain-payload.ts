@@ -185,7 +185,17 @@ export type ChainNode = {
   separatingQuestion?: string;
   /** What being wrong about it would cost. Set by the note extractor. */
   costIfWrong?: string;
+  /**
+   * What the second check said, for a concept read out of a note
+   * (lib/learn/graph/judge-concepts.ts). A dropped concept never reaches a
+   * chain, so the two left are these. Absent everywhere else.
+   */
+  verdict?: NoteVerdict;
 };
+
+/** The two verdicts a proposed note concept can carry. Stored as `learn.concepts.judge_verdict`. */
+export const NOTE_VERDICTS = ['keep', 'weak'] as const;
+export type NoteVerdict = (typeof NOTE_VERDICTS)[number];
 
 export type ChainEdge = {
   prerequisite: string;
@@ -479,6 +489,14 @@ export function approvedChainSchemaWith(limits: {
           // out to a browser and came back.
           kind: kindSchema,
           existingId: z.string().uuid().nullable(),
+          // Only a note's concepts carry these three (plan #1718), and they
+          // are kept on the concept once approved: the question can later
+          // serve as the probe, and a weak verdict keeps the concept out of
+          // a lesson slot of its own. Optional so every other path still
+          // parses.
+          separatingQuestion: z.string().trim().min(1).max(500).optional(),
+          costIfWrong: z.string().trim().min(1).max(500).optional(),
+          verdict: z.enum(NOTE_VERDICTS).optional(),
         }),
       )
       .min(1)
@@ -524,11 +542,32 @@ export function keepTicked(
   chain: ProposedChain,
   ticked: ReadonlySet<string>,
 ): { chain: ProposedChain; unplaced: ChainNode[] } {
+  return withoutNodes(chain, (node) => (ticked.has(key(node.name)) ? null : 'you left it out'));
+}
+
+/**
+ * Take new nodes out of a chain, and whatever that leaves floating.
+ *
+ * `reasonToRemove` answers for each new node: null keeps it, a sentence takes
+ * it out and is the reason recorded in `dropped`. A node already in the
+ * subject is never asked about. Removing a node removes the edges at either
+ * end of it, and a new node left with no edge goes too, under
+ * `unplacedReason`, rather than being written as a floating node. The
+ * ticks on the approval form and the note judge's drops both come through
+ * here.
+ */
+export function withoutNodes(
+  chain: ProposedChain,
+  reasonToRemove: (node: ChainNode) => string | null,
+  unplacedReason: string = UNPLACED_BY_TICKS,
+): { chain: ProposedChain; unplaced: ChainNode[] } {
   const dropped = [...chain.dropped];
 
   const kept = chain.nodes.filter((node) => {
-    if (node.existingId || ticked.has(key(node.name))) return true;
-    dropped.push({ name: node.name, reason: 'you left it out' });
+    if (node.existingId) return true;
+    const reason = reasonToRemove(node);
+    if (reason === null) return true;
+    dropped.push({ name: node.name, reason });
     return false;
   });
 
@@ -547,7 +586,7 @@ export function keepTicked(
   const placed = kept.filter((node) => {
     if (node.existingId || attached.has(key(node.name))) return true;
     unplaced.push(node);
-    dropped.push({ name: node.name, reason: UNPLACED_BY_TICKS });
+    dropped.push({ name: node.name, reason: unplacedReason });
     return false;
   });
 
