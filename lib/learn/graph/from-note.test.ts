@@ -59,13 +59,11 @@ const chain = (concepts: unknown[]) => ({
   subject: 'Economics',
   goal_concept: 'Expectations carry the rate',
   concepts,
-  edges: [
-    {
-      prerequisite: 'Rates are set, not cleared',
-      dependent: 'Expectations carry the rate',
-      basis: 'One rests on the other.',
-    },
-  ],
+  edges: (concepts as { name: string }[]).slice(1).map((c) => ({
+    prerequisite: (concepts as { name: string }[])[0].name,
+    dependent: c.name,
+    basis: 'One rests on the other.',
+  })),
 });
 
 describe('a note that only records what happened', () => {
@@ -76,7 +74,7 @@ describe('a note that only records what happened', () => {
 
   it('proposes none even when no goal concept is named', async () => {
     const result = await run({ subject: 'Economics', concepts: [], edges: [] });
-    expect(result).toMatchObject({ ok: false, reason: 'nothing-in-it' });
+    expect(result).toMatchObject({ ok: false, reason: 'nothing-in-it', counts: { proposed: 0 } });
   });
 });
 
@@ -120,8 +118,32 @@ describe('the second check', () => {
         reason: 'A paraphrase of the note.',
       })),
     });
-    const result = await run(chain([concept(), concept({ name: 'Rates are set, not cleared' })]), judge);
-    expect(result).toMatchObject({ ok: false, reason: 'nothing-in-it' });
+    const result = await run(chain([concept(), concept({ name: 'A second idea' })]), judge);
+    expect(result).toMatchObject({
+      ok: false,
+      reason: 'nothing-in-it',
+      counts: { proposed: 2, kept: 0, weak: 0, dropped: 2 },
+    });
+  });
+
+  it('counts what it kept, marked weak and dropped', async () => {
+    const judge: ConceptJudge = async (input) => {
+      const kept = await keepAll(input);
+      if (!kept.ok) return kept;
+      const verdicts = ['keep', 'weak', 'drop'] as const;
+      return { ok: true, verdicts: kept.verdicts.map((v, i) => ({ ...v, verdict: verdicts[i] })) };
+    };
+    const result = await run(
+      chain([
+        concept(),
+        concept({ name: 'A second idea' }),
+        concept({ name: 'Third idea' }),
+      ]),
+      judge,
+    );
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) return;
+    expect(result.counts).toEqual({ proposed: 3, kept: 1, weak: 1, dropped: 1 });
   });
 
   it('marks what it calls weak', async () => {

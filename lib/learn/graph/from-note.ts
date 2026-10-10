@@ -90,9 +90,18 @@ syllabus and the screen should be able to say so.
 IF THE NOTE INTRODUCES NOTHING -- it is a reaction, a to-do, a reminder that
 this was boring -- set too_vague true and return nothing.`;
 
+/**
+ * What one reading of a note found, for the report on concepts per note
+ * (plan #1721). `proposed` is the new concepts the extraction returned,
+ * `kept` and `weak` are what the judge let through, and `dropped` is what it
+ * took out, for any reason.
+ */
+export type NoteCounts = { proposed: number; kept: number; weak: number; dropped: number };
+
 export type FromNoteResult =
-  | { ok: true; chain: ProposedChain }
-  | { ok: false; reason: 'nothing-in-it' | 'error'; detail: string };
+  | { ok: true; chain: ProposedChain; counts: NoteCounts }
+  | { ok: false; reason: 'nothing-in-it'; detail: string; counts: NoteCounts }
+  | { ok: false; reason: 'error'; detail: string };
 
 export async function conceptsFromNote(input: {
   subject: string;
@@ -225,9 +234,11 @@ export async function conceptsFromNote(input: {
       ok: false,
       reason: 'nothing-in-it',
       detail: 'Nothing in that note your graph does not already have.',
+      counts: { proposed: 0, kept: 0, weak: 0, dropped: 0 },
     };
   }
 
+  const proposed = chain.nodes.filter((node) => node.existingId === null).length;
   const judge =
     input.judge ?? anthropicConceptJudge({ client, onSpend: input.onJudgeSpend });
   const judged = await judgeNoteChain(judge, {
@@ -238,9 +249,20 @@ export async function conceptsFromNote(input: {
   });
   if (!judged.ok) {
     return judged.reason === 'nothing-left'
-      ? { ok: false, reason: 'nothing-in-it', detail: judged.detail }
+      ? {
+          ok: false,
+          reason: 'nothing-in-it',
+          detail: judged.detail,
+          counts: { proposed, kept: 0, weak: 0, dropped: proposed },
+        }
       : { ok: false, reason: 'error', detail: judged.detail };
   }
 
-  return { ok: true, chain: judged.chain };
+  const shown = judged.chain.nodes.filter((node) => node.existingId === null);
+  const weak = shown.filter((node) => node.verdict === 'weak').length;
+  return {
+    ok: true,
+    chain: judged.chain,
+    counts: { proposed, kept: shown.length - weak, weak, dropped: proposed - shown.length },
+  };
 }
