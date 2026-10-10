@@ -73,6 +73,8 @@ import {
   type CalendarEntry,
 } from '@/lib/todo/calendar/month';
 import { NewVaultNote } from '@/components/vault/new-note';
+import { TriageEntry } from '@/components/vault/triage-entry';
+import { TriagePreview } from './triage-surfaces';
 import { NoteProperties } from '@/components/vault/note-properties';
 import { NoteBody } from '@/components/vault/note-body';
 import { NoteEdit } from '@/app/vault/n/[...path]/note-edit';
@@ -2349,6 +2351,11 @@ const shellSections: NavSection[] = [
   { href: '/jobs/review', label: 'Review', icon: 'review', badge: 4 },
 ];
 
+const triageCrumbs = [
+  { label: 'Vault', href: '/vault' },
+  { label: 'Quick note triage', href: '/vault/triage' },
+];
+
 /**
  * Three Learn now cards for the deck: a lesson from a track that cites no
  * section (plan #978), one idea card in the form the writer now produces, and
@@ -3896,6 +3903,55 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* Quick note triage (plan #1729): the waiting quick notes as a deck, each
+     * with its suggested notes, a search, and a note of its own; Leave for
+     * later is the forward press. The list of all waiting folds below. */
+    id: 'vault-triage',
+    label: 'Vault · Quick note triage',
+    module: 'vault',
+    width: 'narrow',
+    interaction: {
+      kind: 'swipe',
+      target: '[data-deck-item] [data-triage-text]',
+      direction: 'left',
+      shows: 'The quick note follows the finger left, then the next one comes in as it leaves.',
+    },
+    deck: { next: '[data-deck-next]', item: '[data-deck-item]' },
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <PageHeader crumbs={triageCrumbs} title="Quick note triage" />
+        <TriagePreview writable />
+      </div>
+    ),
+  },
+  {
+    /* Triage with nothing waiting: the deck's last word. */
+    id: 'vault-triage-empty',
+    label: 'Vault · Quick note triage, empty',
+    module: 'vault',
+    width: 'narrow',
+    render: () => (
+      <>
+        <PageHeader crumbs={triageCrumbs} title="Quick note triage" />
+        <TriagePreview empty writable />
+      </>
+    ),
+  },
+  {
+    /* Triage under a vault token that can only read: the reason in place of
+     * the buttons, and the suggestions as links. */
+    id: 'vault-triage-read-only',
+    label: 'Vault · Quick note triage, read-only token',
+    module: 'vault',
+    width: 'narrow',
+    render: () => (
+      <div className={SHELL_FOOT}>
+        <PageHeader crumbs={triageCrumbs} title="Quick note triage" />
+        <TriagePreview writable={false} />
+      </div>
+    ),
+  },
+  {
     /* New note on the vault page (note 09ff8039), opened from the header's
      * one action: the name, the note, and the press that commits it to the
      * vault's Inbox. */
@@ -3911,6 +3967,7 @@ export const SURFACES: readonly Surface[] = [
           actions={<span className={buttonVariants({ size: 'sm' })}>New note</span>}
         />
         <NewVaultNote />
+        <TriageEntry waiting={3} />
       </>
     ),
   },

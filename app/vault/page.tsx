@@ -9,6 +9,8 @@ import { groupByFolder, loadConnection, loadNotes } from '@/lib/vault/notes/load
 import { VaultStatusBanner } from '@/components/vault/status-banner';
 import { NoteConnections } from '@/components/vault/note-connections';
 import { NewVaultNote } from '@/components/vault/new-note';
+import { TriageEntry } from '@/components/vault/triage-entry';
+import { INBOX_FOLDER } from '@/lib/vault/paths';
 import { loadWeekConnections } from '@/lib/vault/notes/connections-load';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
@@ -57,6 +59,8 @@ export default async function VaultPage({
     search ? Promise.resolve([]) : loadWeekConnections(supabase),
   ]);
   const groups = groupByFolder(notes);
+  // Quick notes are the top level of the Inbox folder; the list already holds them.
+  const waiting = notes.filter((note) => note.folder === INBOX_FOLDER).length;
 
   return (
     <>
@@ -75,6 +79,8 @@ export default async function VaultPage({
       <NoteConnections connections={connections} />
 
       {composing !== undefined && <NewVaultNote />}
+
+      {!search && <TriageEntry waiting={waiting} />}
 
       <div className="mb-5 max-w-md">
         <SearchField placeholder="Search your notes" />

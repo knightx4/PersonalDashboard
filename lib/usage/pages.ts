@@ -146,4 +146,5 @@ export const PAGE_ROUTES: readonly string[] = [
   '/vault/maya/[id]',
   '/vault/n/[...path]',
   '/vault/settings',
+  '/vault/triage',
 ];
