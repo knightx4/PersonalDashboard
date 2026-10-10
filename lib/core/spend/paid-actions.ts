@@ -104,7 +104,7 @@ export const PAID_ACTIONS = {
   'app/learn/t/[id]/actions.ts#planTrack': ['plan-topic', 'name-areas'],
   'app/learn/r/[id]/actions.ts#findSources': ['suggest-sources'],
   'app/learn/r/[id]/actions.ts#openReading': ['locate-passage'],
-  'app/learn/r/[id]/actions.ts#readNoteIntoGraph': ['concepts-from-note'],
+  'app/learn/r/[id]/actions.ts#readNoteIntoGraph': ['concepts-from-note', 'judge-note-concepts'],
   'app/learn/r/[id]/actions.ts#approveNoteConcepts': ['place-track'],
   'app/learn/youtube/actions.ts#transcribeVideoAction': ['embed-catalogue'],
   'app/learn/youtube/actions.ts#transcribePlaylistAction': ['embed-catalogue'],

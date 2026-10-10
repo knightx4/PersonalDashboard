@@ -98,6 +98,7 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'propose-floor': run(SONNET, 3_000, 800),
   'classify-note': run(HAIKU, 1_200, 60),
   'concepts-from-note': run(HAIKU, 4_000, 1_000),
+  'judge-note-concepts': run(HAIKU, 2_000, 600),
   'concepts-from-prior': run(SONNET, 3_000, 2_000),
   'concepts-from-brief': run(SONNET, 3_000, 2_000),
   'concepts-from-course': run(SONNET, 3_000, 2_000),

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { conceptsFromNote } from './from-note';
+import type { ConceptJudge } from './judge-concepts';
 
 /**
  * Reading a note written after a reading.
@@ -20,7 +21,19 @@ function clientReturning(input: unknown) {
   } as never;
 }
 
-const run = (input: unknown) =>
+/** Keeps every concept, echoing the extractor's question and cost. */
+const keepAll: ConceptJudge = async ({ concepts }) => ({
+  ok: true,
+  verdicts: concepts.map((c) => ({
+    name: c.name,
+    verdict: 'keep' as const,
+    separatingQuestion: c.separatingQuestion ?? null,
+    costIfWrong: c.costIfWrong ?? null,
+    reason: 'Both tests pass.',
+  })),
+});
+
+const run = (input: unknown, judge: ConceptJudge = keepAll) =>
   conceptsFromNote({
     subject: 'Economics',
     readingTitle: 'The rate and what people expect',
@@ -28,6 +41,7 @@ const run = (input: unknown) =>
     existing: [{ id: '00000000-0000-4000-8000-000000000001', name: 'Rates are set, not cleared' }],
     anthropicApiKey: 'test',
     client: clientReturning(input),
+    judge,
   });
 
 const concept = (over: Record<string, unknown> = {}) => ({
@@ -91,5 +105,36 @@ describe('a concept from a note', () => {
   it('is refused when the cost is only that it is useful to know', async () => {
     const result = await run(chain([concept({ cost_if_wrong: 'It is useful to know how this works.' })]));
     expect(result).toMatchObject({ ok: false, reason: 'error' });
+  });
+});
+
+describe('the second check', () => {
+  it('runs before anything is proposed, and what it drops is not proposed', async () => {
+    const judge: ConceptJudge = async ({ concepts }) => ({
+      ok: true,
+      verdicts: concepts.map((c) => ({
+        name: c.name,
+        verdict: 'drop' as const,
+        separatingQuestion: null,
+        costIfWrong: null,
+        reason: 'A paraphrase of the note.',
+      })),
+    });
+    const result = await run(chain([concept(), concept({ name: 'Rates are set, not cleared' })]), judge);
+    expect(result).toMatchObject({ ok: false, reason: 'nothing-in-it' });
+  });
+
+  it('marks what it calls weak', async () => {
+    const judge: ConceptJudge = async (input) => {
+      const kept = await keepAll(input);
+      if (!kept.ok) return kept;
+      return { ok: true, verdicts: kept.verdicts.map((v) => ({ ...v, verdict: 'weak' as const })) };
+    };
+    const result = await run(chain([concept(), concept({ name: 'Rates are set, not cleared' })]), judge);
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) return;
+    expect(result.chain.nodes.find((n) => n.name === 'Expectations carry the rate')?.verdict).toBe(
+      'weak',
+    );
   });
 });
