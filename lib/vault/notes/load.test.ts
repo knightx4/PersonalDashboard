@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
-import { loadNotes } from './load';
+import { loadInboxNotes, loadNotes } from './load';
 
 /**
  * Reading the note list with a fake vault client (plan #1377): every note
@@ -47,6 +47,49 @@ function notes(count: number): Row[] {
     return { id: `id-${n}`, path: `f/${n}.md`, title: n, opening: `Note ${n}`, git_updated_at: null };
   });
 }
+
+describe('loadInboxNotes', () => {
+  function inboxVault(rows: { id: string; path: string; title: string; body: string }[]) {
+    const seen: { like?: string; orders: unknown[] } = { orders: [] };
+    const query = {
+      select: () => query,
+      is: () => query,
+      like: (_c: string, pattern: string) => {
+        seen.like = pattern;
+        return query;
+      },
+      order: (c: string, o?: unknown) => {
+        seen.orders.push([c, o]);
+        return query;
+      },
+      limit: async (n: number) => ({
+        data: rows.slice(0, n).map((r) => ({ ...r, git_updated_at: null })),
+        error: null,
+      }),
+    };
+    return { client: { from: () => query } as unknown as VaultSupabaseClient, seen };
+  }
+
+  it('reads the Inbox newest first with the text, and only its top level', async () => {
+    const { client, seen } = inboxVault([
+      { id: 'a', path: 'Inbox/Newest.md', title: 'Newest', body: 'Call the bank' },
+      { id: 'b', path: 'Inbox/Sorted/Old.md', title: 'Old', body: 'Filed by hand' },
+      { id: 'c', path: 'Inbox/Older.md', title: 'Older', body: 'Buy milk' },
+    ]);
+    const list = await loadInboxNotes(client);
+    expect(seen.like).toBe('Inbox/%');
+    expect(seen.orders).toEqual([
+      ['written_at', { ascending: false, nullsFirst: false }],
+      ['path', undefined],
+    ]);
+    expect(list.map((n) => n.id)).toEqual(['a', 'c']);
+    expect(list[0]).toMatchObject({ folder: 'Inbox', body: 'Call the bank', excerpt: 'Call the bank' });
+  });
+
+  it('returns an empty list for an empty Inbox', async () => {
+    expect(await loadInboxNotes(inboxVault([]).client)).toEqual([]);
+  });
+});
 
 describe('loadNotes', () => {
   it('returns every note when the vault holds more than a thousand', async () => {

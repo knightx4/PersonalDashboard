@@ -9,7 +9,7 @@ import { embedOne } from '@/lib/learn/embed/embed';
 import { DEFAULT_EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@/lib/learn/embed/voyage';
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
-import { noteHref } from '@/lib/vault/paths';
+import { folderOf, INBOX_FOLDER, noteHref } from '@/lib/vault/paths';
 
 /**
  * The person's own notes nearest a piece of text (plan #1112, under #1110).
@@ -341,4 +341,67 @@ export async function relatedNotesForStored(
 /** The fields a page draws, without the score: the score is not shown (law 3). */
 export function toLink({ noteId, title, href }: RelatedNote): RelatedNoteLink {
   return { noteId, title, href };
+}
+
+/** At most this many places suggested for a quick note (plan #1727). */
+export const SUGGESTED_NOTES_SHOWN = 3;
+
+/**
+ * How many times the notes wanted are asked of the lookup. It knows nothing of
+ * folders, so Inbox notes it returns are dropped afterwards, and the extra rows
+ * keep them from crowding out the notes that stay.
+ */
+const SUGGESTION_OVERFETCH = 4;
+
+function outsideInbox(note: RelatedNote): boolean {
+  return folderOf(note.path) !== INBOX_FOLDER;
+}
+
+/**
+ * Up to SUGGESTED_NOTES_SHOWN notes a quick note could be filed into: the
+ * nearest to its text above the floor, never a quick note in the Inbox,
+ * closest first. Notes in `exclude` are left out. None when nothing clears the
+ * floor. Errors are the caller's to catch.
+ */
+export async function findSuggestedNotes(
+  ports: RelatedNotesPorts,
+  text: string,
+  options: RelatedNotesOptions = {},
+): Promise<RelatedNote[]> {
+  const limit = options.limit ?? SUGGESTED_NOTES_SHOWN;
+  const found = await findRelatedNotes(ports, text, {
+    ...options,
+    limit: limit * SUGGESTION_OVERFETCH + (options.exclude?.length ?? 0),
+  });
+  return found.filter(outsideInbox).slice(0, limit);
+}
+
+/**
+ * The suggested notes for each quick note, keyed by the quick note's id. A
+ * quick note with no usable text, or whose lookup fails, gets an empty list
+ * and the others are unaffected. Never throws.
+ */
+export async function suggestedNotesForInbox(
+  vault: VaultSupabaseClient,
+  userId: string,
+  inbox: readonly { id: string; body: string }[],
+  options: RelatedNotesOptions & {
+    core?: Pick<CoreSupabaseClient, 'from'> | null;
+    apiKey?: string | null;
+  } = {},
+): Promise<Map<string, RelatedNote[]>> {
+  const ports = relatedNotesStore(vault, userId, options);
+  const found = await Promise.all(
+    inbox.map(async (note): Promise<[string, RelatedNote[]]> => {
+      try {
+        // The quick note leaves its own row out; other Inbox notes are dropped by path.
+        const exclude = [...(options.exclude ?? []), note.id];
+        return [note.id, await findSuggestedNotes(ports, note.body, { ...options, exclude })];
+      } catch (error) {
+        console.error('[vault suggested notes]', error instanceof Error ? error.message : error);
+        return [note.id, []];
+      }
+    }),
+  );
+  return new Map(found);
 }

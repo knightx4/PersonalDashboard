@@ -2,7 +2,7 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { VAULT_SCHEMA, type VaultSupabaseClient } from '@/lib/vault/db/schema-name';
-import { folderOf } from '@/lib/vault/paths';
+import { folderOf, INBOX_FOLDER } from '@/lib/vault/paths';
 import type { LinkTarget } from '@/lib/vault/markdown/obsidian';
 import type { AttachmentEntry } from '@/lib/vault/markdown/attachments';
 import type { SyncRunSummary } from '@/lib/vault/sync/progress';
@@ -238,6 +238,41 @@ export async function loadNotes(
   }
 
   return rows.map((row) => toSummary(row, row.opening));
+}
+
+/** A quick note waiting in the Inbox: the note and its whole text. */
+export type InboxNote = NoteSummary & { body: string };
+
+/** Quick notes read at once; an Inbox is a short list, and this bounds a runaway one. */
+export const INBOX_NOTES_MAX = 200;
+
+/**
+ * The notes in INBOX_FOLDER, newest first (plan #1727).
+ *
+ * Only the top level of the folder: a note in a subfolder of the Inbox was put
+ * there by hand and is not a quick note waiting to be sorted. Newest is by
+ * `written_at`, the day the app saw the note written, since a tree sync cannot
+ * date most notes; a note with no date goes last.
+ */
+export async function loadInboxNotes(
+  supabase: VaultSupabaseClient,
+  limit = INBOX_NOTES_MAX,
+): Promise<InboxNote[]> {
+  const { data, error } = await supabase
+    .from('notes')
+    .select('id, path, title, body, git_updated_at')
+    .is('deleted_at', null)
+    .like('path', `${INBOX_FOLDER}/%`)
+    .order('written_at', { ascending: false, nullsFirst: false })
+    .order('path')
+    .limit(limit);
+
+  assertSchemaExposed(error, VAULT_SCHEMA);
+  if (error) throw new Error(`Reading the Inbox failed: ${error.message}`);
+
+  return ((data ?? []) as NoteRow[])
+    .filter((row) => folderOf(row.path) === INBOX_FOLDER)
+    .map((row) => ({ ...toSummary(row, row.body), body: row.body }));
 }
 
 type DetailRow = NoteRow & {
