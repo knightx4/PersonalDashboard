@@ -11,6 +11,7 @@ import { suggestSources } from '@/lib/learn/import/suggest';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import { conceptsFromNote } from '@/lib/learn/graph/from-note';
 import { existingConcepts, saveChain } from '@/lib/learn/graph/save';
+import { markNoteReadApproved, recordNoteRead } from '@/lib/learn/graph/note-reads';
 import { loadConcept, loadGraph, loadSubject, subjectIdOfConcept } from '@/lib/learn/graph/load';
 import { isRooted, rootingFor, type Rooting } from '@/lib/learn/graph/rooting';
 import { aimFor, aimSentence, type Aim } from '@/lib/learn/graph/aim';
@@ -377,6 +378,8 @@ export type NoteGraphState = {
   /** Proposed, not saved. Nothing reaches the graph until it is approved. */
   chain?: ProposedChain;
   subjectId?: string;
+  /** The row counting this reading (learn.note_reads), sent back on approval. */
+  noteReadId?: string;
 };
 
 /**
@@ -431,12 +434,21 @@ export async function readNoteIntoGraph(
   await recordLearnSpend(user.id, 'judge-note-concepts', judgeSpend.reports);
 
   if (!result.ok) {
-    return result.reason === 'nothing-in-it'
-      ? { message: result.detail }
-      : { error: result.detail };
+    if (result.reason !== 'nothing-in-it') return { error: result.detail };
+    await recordNoteRead(supabase, user.id, {
+      readingId: reading.id,
+      subjectId: subject.id,
+      counts: result.counts,
+    });
+    return { message: result.detail };
   }
 
-  return { chain: result.chain, subjectId: subject.id };
+  const noteReadId = await recordNoteRead(supabase, user.id, {
+    readingId: reading.id,
+    subjectId: subject.id,
+    counts: result.counts,
+  });
+  return { chain: result.chain, subjectId: subject.id, ...(noteReadId ? { noteReadId } : {}) };
 }
 
 /** Attach what the note taught. The same writer as any other chain, minus the goal. */
@@ -463,11 +475,20 @@ export async function approveNoteConcepts(
   const safe = approvedChainSchema.safeParse(payload);
   if (!safe.success) return { error: 'That proposal did not survive the trip. Try again.' };
 
+  const noteReadId = z.string().uuid().safeParse(formData.get('noteReadId'));
+
   const supabase = await createLearnClient();
   try {
     await saveChain(supabase, user.id, safe.data as ProposedChain, safe.data.goalConcept, {
       goal: false,
     });
+    if (noteReadId.success) {
+      await markNoteReadApproved(
+        supabase,
+        noteReadId.data,
+        safe.data.nodes.filter((node) => !node.existingId).length,
+      );
+    }
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Could not save that.' };
   }
