@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
-  chainPayloadSchema,
+  noteChainPayloadSchema,
   normaliseChain,
   whyMalformed,
   type ExistingConcept,
@@ -47,9 +47,19 @@ IN THE NOTE'S TERMS. State each one in the words the note uses. "A policy rate
 only reaches prices through what people expect it to do next" is a concept;
 "Monetary policy" is a subject heading and does not belong in this graph.
 
-FEW. One to four. A reading introduces a couple of ideas and reminds you of a
-dozen; only the introduced ones count. If the note is thin, return one. If the
-note is somebody thinking out loud without landing anywhere, return none.
+FEW. Zero to four. A reading introduces a couple of ideas and reminds you of a
+dozen; only the introduced ones count. Zero is usually right for a note that
+only records what happened: what they read, what the author did, what the
+numbers were, what they thought of it. Do not stretch a thin note into one
+concept to have something to return. Return an empty concepts list and set
+too_vague true.
+
+SEPARATING QUESTION AND COST. Each concept states the question that somebody
+who holds it answers differently from somebody who does not
+(separating_question), and what being wrong about it would cost
+(cost_if_wrong): a decision made badly, a prediction that fails, a mistake in a
+calculation, in a sentence that names it. "It is useful to know" is not a cost.
+If you cannot name one, the concept fails the second test above: leave it out.
 
 EDGES. Join them to each other where one rests on the other, and to the
 concepts the subject already holds -- you are given those by name -- so each
@@ -102,7 +112,7 @@ export async function conceptsFromNote(input: {
   }
   lines.push(
     '',
-    `Call ${TOOL_NAME}, with goal_concept set to whichever concept the note is most about.`,
+    `Call ${TOOL_NAME}, with goal_concept set to whichever concept the note is most about, or concepts empty when it introduces none.`,
   );
 
   let response;
@@ -129,10 +139,28 @@ export async function conceptsFromNote(input: {
                     name: { type: 'string' },
                     claim: { type: 'string' },
                     basis: { type: 'string' },
+                    separating_question: {
+                      type: 'string',
+                      description:
+                        'A question somebody who holds this answers differently from somebody who does not.',
+                    },
+                    cost_if_wrong: {
+                      type: 'string',
+                      description:
+                        'What being wrong about this would cost, concretely. Leave the concept out if there is none.',
+                    },
                     mastery: MASTERY_TOOL_FIELD,
                     kind: KIND_TOOL_FIELD,
                   },
-                  required: ['name', 'claim', 'basis', 'mastery', 'kind'],
+                  required: [
+                    'name',
+                    'claim',
+                    'basis',
+                    'separating_question',
+                    'cost_if_wrong',
+                    'mastery',
+                    'kind',
+                  ],
                 },
               },
               edges: {
@@ -148,7 +176,7 @@ export async function conceptsFromNote(input: {
                 },
               },
             },
-            required: ['subject', 'goal_concept', 'concepts', 'edges'],
+            required: ['subject', 'concepts', 'edges'],
           },
         },
       ],
@@ -170,12 +198,13 @@ export async function conceptsFromNote(input: {
     return { ok: false, reason: 'error', detail: whyNoReport(response) };
   }
 
-  const safe = chainPayloadSchema.safeParse(block.input);
+  const safe = noteChainPayloadSchema.safeParse(block.input);
   if (!safe.success) {
     return { ok: false, reason: 'error', detail: whyMalformed(safe.error) };
   }
 
-  const chain = normaliseChain(safe.data, input.existing);
+  // No concepts is a complete answer for a note that only records what happened.
+  const chain = safe.data.concepts.length === 0 ? null : normaliseChain(safe.data, input.existing);
   if (!chain || safe.data.too_vague) {
     return {
       ok: false,

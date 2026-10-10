@@ -131,6 +131,46 @@ export const chainPayloadSchema = z.object({
 
 export type ChainPayload = z.infer<typeof chainPayloadSchema>;
 
+/**
+ * Cost lines that say nothing. "It is useful to know" is the answer a model
+ * gives when it has not found what rests on the claim, and a concept with that
+ * cost fails the second half of the node test, so the schema refuses it
+ * instead of letting it through as a proposal.
+ */
+const VAGUE_COST =
+  /\b(useful|helpful|good|nice|handy|important|worth)\b.{0,20}\b(to know|to understand|to have|to remember|to learn)\b|\b(be|is|are) (useful|helpful|important)\b|^(nothing|none|n\/a|unknown)\b/i;
+const MIN_COST_LENGTH = 20;
+
+export function isConcreteCost(cost: string): boolean {
+  const text = cost.trim();
+  return text.length >= MIN_COST_LENGTH && !VAGUE_COST.test(text);
+}
+
+/**
+ * A concept the note extractor proposes. It carries what the node test asks
+ * for: the question somebody who holds it answers differently, and what being
+ * wrong about it would cost. Both required, and the cost has to be concrete.
+ * Only the note extractor uses this; the other chain callers keep
+ * `proposedConceptSchema`.
+ */
+export const noteConceptSchema = proposedConceptSchema.extend({
+  separating_question: z.string().trim().min(10).max(500),
+  cost_if_wrong: z
+    .string()
+    .trim()
+    .max(500)
+    .refine(isConcreteCost, 'name what would go wrong if this were believed wrongly'),
+});
+
+/**
+ * What the note extractor reports. A note may yield no concepts, so the goal
+ * concept is optional here and an empty list is a complete answer.
+ */
+export const noteChainPayloadSchema = chainPayloadSchema.extend({
+  goal_concept: z.string().trim().max(200).default(''),
+  concepts: z.array(noteConceptSchema).max(40).default([]),
+});
+
 export type ChainNode = {
   name: string;
   claim: string;
@@ -141,6 +181,10 @@ export type ChainNode = {
   kind: ConceptKind | null;
   /** The id it matched in the subject already, or null when it is new. */
   existingId: string | null;
+  /** The question a holder answers differently. Set by the note extractor. */
+  separatingQuestion?: string;
+  /** What being wrong about it would cost. Set by the note extractor. */
+  costIfWrong?: string;
 };
 
 export type ChainEdge = {
@@ -261,6 +305,15 @@ export function placeMentions(
   return mentions;
 }
 
+/** The two fields only the note extractor's concepts carry, when present. */
+function noteFields(proposed: object): Pick<ChainNode, 'separatingQuestion' | 'costIfWrong'> {
+  const { separating_question: question, cost_if_wrong: cost } = proposed as Record<string, unknown>;
+  return {
+    ...(typeof question === 'string' ? { separatingQuestion: question.trim() } : {}),
+    ...(typeof cost === 'string' ? { costIfWrong: cost.trim() } : {}),
+  };
+}
+
 /**
  * Turn what the model said into something that can be shown and saved.
  *
@@ -307,6 +360,7 @@ export function normaliseChain(
       mastery: proposed.mastery,
       kind: proposed.kind,
       existingId,
+      ...noteFields(proposed),
     });
     if (nodes.length >= MAX_CHAIN) break;
   }
