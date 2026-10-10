@@ -63,7 +63,7 @@ describe('loadInboxNotes', () => {
         return query;
       },
       limit: async (n: number) => ({
-        data: rows.slice(0, n).map((r) => ({ ...r, git_updated_at: null })),
+        data: rows.slice(0, n).map((r) => ({ ...r, blob_sha: `sha-${r.id}`, git_updated_at: null })),
         error: null,
       }),
     };
@@ -83,7 +83,12 @@ describe('loadInboxNotes', () => {
       ['path', undefined],
     ]);
     expect(list.map((n) => n.id)).toEqual(['a', 'c']);
-    expect(list[0]).toMatchObject({ folder: 'Inbox', body: 'Call the bank', excerpt: 'Call the bank' });
+    expect(list[0]).toMatchObject({
+      folder: 'Inbox',
+      body: 'Call the bank',
+      excerpt: 'Call the bank',
+      blobSha: 'sha-a',
+    });
   });
 
   it('returns an empty list for an empty Inbox', async () => {

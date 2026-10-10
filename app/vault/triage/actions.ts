@@ -8,7 +8,8 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { noteCreatePorts, noteRemovePorts, noteSavePorts } from '@/lib/vault/db/ports';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
-import { FILE_ERRORS, fileQuickNote, type FileQuickNoteFailure } from '@/lib/vault/notes/file';
+import { FILE_ERRORS, fileQuickNote, isInInbox, type FileQuickNoteFailure } from '@/lib/vault/notes/file';
+import { loadNotes } from '@/lib/vault/notes/load';
 import { noteHref } from '@/lib/vault/paths';
 
 /**
@@ -104,7 +105,32 @@ export async function fileQuickNoteAction(
   if (!result.ok) return { reason: result.reason, error: result.error };
 
   revalidatePath('/vault');
+  revalidatePath('/vault/triage');
   revalidatePath(noteHref(result.path));
   revalidatePath(noteHref(input.data.quickPath));
   return { filedPath: result.path, filedTitle: result.title, warning: result.warning };
+}
+
+/** A note a quick note can be added to, as triage draws it. */
+export type TriagePlace = { path: string; title: string; href: string };
+
+/** Places a search offers at once. */
+const SEARCH_PLACES_SHOWN = 5;
+
+/**
+ * Notes outside the Inbox whose title or text match `query`, for adding a
+ * quick note to one the suggestions missed (plan #1729). The vault list's own
+ * full-text search; RLS keeps it to the person's notes.
+ */
+// latency: pending
+export async function searchTriagePlaces(query: string): Promise<TriagePlace[]> {
+  await requireUser();
+  const search = query.trim().slice(0, 200);
+  if (!search) return [];
+  const vault = await createVaultClient();
+  const found = await loadNotes(vault, { search, limit: SEARCH_PLACES_SHOWN * 4 });
+  return found
+    .filter((note) => !isInInbox(note.path))
+    .slice(0, SEARCH_PLACES_SHOWN)
+    .map((note) => ({ path: note.path, title: note.title, href: noteHref(note.path) }));
 }
