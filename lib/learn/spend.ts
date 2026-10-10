@@ -49,6 +49,10 @@ export const LEARN_OPERATIONS = [
   'propose-floor',
   'classify-note',
   'concepts-from-note',
+  // The second check on a note's concepts (plan #1718): one Haiku call per
+  // note that produced any, judging each keep, weak or drop. Apart from
+  // 'concepts-from-note' so the cost of the check can be read on its own.
+  'judge-note-concepts',
   'concepts-from-prior',
   'concepts-from-brief',
   // Proposing the ideas one transcript course covered (plan #1390), from the

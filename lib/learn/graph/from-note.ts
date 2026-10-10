@@ -13,6 +13,11 @@ import {
 import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
+import {
+  anthropicConceptJudge,
+  judgeNoteChain,
+  type ConceptJudge,
+} from '@/lib/learn/graph/judge-concepts';
 import { MODELS } from '@/lib/core/models';
 
 /**
@@ -32,6 +37,11 @@ import { MODELS } from '@/lib/core/models';
  * end of a reading, and a good half of what a model finds in one is phrasing
  * rather than concepts. Approval is what stops the graph filling with
  * paraphrases of your own shorthand.
+ *
+ * Judged before it is proposed (plan #1718). What the extraction returns goes
+ * through a second call that drops the concepts failing the node test and
+ * marks the thin ones weak, so the list you approve from is shorter than what
+ * the model first found. lib/learn/graph/judge-concepts.ts holds the rules.
  */
 
 const MODEL = MODELS.learnGraphFromNote;
@@ -91,7 +101,12 @@ export async function conceptsFromNote(input: {
   existing: ExistingConcept[];
   anthropicApiKey: string;
   client?: Anthropic;
+  /** The extraction's spend. */
   onSpend?: SpendSink;
+  /** The second check's spend, recorded under its own operation. */
+  onJudgeSpend?: SpendSink;
+  /** The second check. The live one through `client` when not given. */
+  judge?: ConceptJudge;
 }): Promise<FromNoteResult> {
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
 
@@ -213,5 +228,19 @@ export async function conceptsFromNote(input: {
     };
   }
 
-  return { ok: true, chain };
+  const judge =
+    input.judge ?? anthropicConceptJudge({ client, onSpend: input.onJudgeSpend });
+  const judged = await judgeNoteChain(judge, {
+    subject: input.subject,
+    readingTitle: input.readingTitle,
+    note: input.note,
+    chain,
+  });
+  if (!judged.ok) {
+    return judged.reason === 'nothing-left'
+      ? { ok: false, reason: 'nothing-in-it', detail: judged.detail }
+      : { ok: false, reason: 'error', detail: judged.detail };
+  }
+
+  return { ok: true, chain: judged.chain };
 }

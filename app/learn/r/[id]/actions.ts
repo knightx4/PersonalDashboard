@@ -417,6 +417,7 @@ export async function readNoteIntoGraph(
   if (!subject) return { error: 'That subject is not there any more.' };
 
   const spend = collectSpend();
+  const judgeSpend = collectSpend();
   const result = await conceptsFromNote({
     subject: subject.name,
     readingTitle: reading.subject,
@@ -424,8 +425,10 @@ export async function readNoteIntoGraph(
     existing: await existingConcepts(supabase, subject.id),
     anthropicApiKey: apiKey,
     onSpend: spend.sink,
+    onJudgeSpend: judgeSpend.sink,
   });
   await recordLearnSpend(user.id, 'concepts-from-note', spend.reports);
+  await recordLearnSpend(user.id, 'judge-note-concepts', judgeSpend.reports);
 
   if (!result.ok) {
     return result.reason === 'nothing-in-it'

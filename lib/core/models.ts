@@ -104,6 +104,8 @@ export const MODELS = {
   learnPersonalityRead: SONNET,
   /** lib/learn/graph/from-note.ts */
   learnGraphFromNote: HAIKU,
+  /** lib/learn/graph/judge-concepts.ts, one call per note read into the graph */
+  learnNoteConceptJudge: HAIKU,
   /** lib/learn/graph/from-prior.ts */
   learnGraphFromPrior: SONNET,
   /** lib/learn/graph/generate.ts */
