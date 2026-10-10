@@ -13,6 +13,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardBody, CardSection } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { AlsoInLine } from '@/components/news/also-in';
+import { ConfirmSignup } from '@/components/news/confirm-signup';
 import { SaveStoryButton } from '@/components/news/save-story-button';
 import { SendStoryButtons } from '@/components/news/send-story-buttons';
 import { StoryGrid } from '@/components/news/story-grid';
@@ -47,6 +48,12 @@ export type IssueViewProps = {
   /** Pictures held back from the original email while pictures are off. */
   blockedImages: number;
   unsubscribeUrl: string | null;
+  /**
+   * A signup email's confirmation link (plan #1724). `confirmedLabel` is when
+   * Confirm was pressed, already formatted, or null while it has not been.
+   * Null when the issue has no stored link.
+   */
+  confirm?: { url: string; confirmedLabel: string | null } | null;
   picturesHref: string;
   originalHref: string;
   summaryHref: string;
@@ -84,6 +91,7 @@ export function IssueView({
   pictureCount,
   blockedImages,
   unsubscribeUrl,
+  confirm = null,
   picturesHref,
   originalHref,
   summaryHref,
@@ -183,7 +191,7 @@ export function IssueView({
       <p className="mb-3">
         <Link
           href={back.href}
-          className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
+          className="inline-flex min-h-11 items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
           <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
           {back.label}
@@ -198,12 +206,31 @@ export function IssueView({
       {/* At phone width the actions get a row of their own under the byline,
           starting at its left edge, and all but the first show only their
           icon, so the row fits on one line (law 9). */}
-      <div className="-mt-3 mb-5 flex items-center gap-2 sm:hidden">{actions(true)}</div>
+      <div className="-mt-3 mb-5 flex items-center gap-2 sm:hidden">
+        {confirm && (
+          <ConfirmSignup
+            issueId={issueId}
+            url={confirm.url}
+            confirmedLabel={confirm.confirmedLabel}
+            className="mr-1"
+          />
+        )}
+        {actions(true)}
+      </div>
 
       {!digest && digestError && (
         <p className="mb-3 text-ui text-ink-muted">
           This issue could not be summarised, so it is shown as it arrived.
         </p>
+      )}
+
+      {confirm && (
+        <ConfirmSignup
+          issueId={issueId}
+          url={confirm.url}
+          confirmedLabel={confirm.confirmedLabel}
+          className="mb-4 max-sm:hidden"
+        />
       )}
 
       {showDigest && digest ? (

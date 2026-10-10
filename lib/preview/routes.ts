@@ -159,6 +159,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'news-issue-essay': ['/news/i/[id]'],
   'news-issue-original': ['/news/i/[id]'],
   'news-issue-failed': ['/news/i/[id]'],
+  'news-issue-confirm': ['/news/i/[id]'],
+  'news-issue-confirmed': ['/news/i/[id]'],
   'news-quick-story': ['/news'],
   'news-quick-in-shell': ['/news'],
   'news-quick-essay': ['/news'],

@@ -1942,6 +1942,29 @@ const issueEssay: IssueViewProps = {
   unsubscribeUrl: null,
 };
 
+/**
+ * A signup email waiting on its Confirm button (plan #1724): the original
+ * email under the button, with a confirmation address long enough to show the
+ * button never prints it.
+ */
+const issueSignup: IssueViewProps = {
+  ...issueBase,
+  digest: null,
+  showDigest: false,
+  issueId: 'issue-4',
+  subject: 'Please confirm your subscription to The Slow Letter',
+  byline: 'The Slow Letter · Sat 10 Oct, 9:38 AM',
+  html: '<p>Thanks for signing up. One last step: press the button below to confirm that this address is yours.</p><p><a href="https://example.com/confirm">Confirm my subscription</a></p><p>If you did not sign up, ignore this email and nothing will happen.</p>',
+  pictures: true,
+  pictureCount: 0,
+  blockedImages: 0,
+  unsubscribeUrl: null,
+  confirm: {
+    url: 'https://slowletter.example.com/subscribe/confirm?token=9f2c61d0a7b34e58b1c4d7e0f3a96b25&list=weekly',
+    confirmedLabel: null,
+  },
+};
+
 /** A newsletter whose digest failed: the email as it arrived, with one line above it. */
 const issueFailed: IssueViewProps = {
   ...issueBase,
@@ -4513,6 +4536,28 @@ export const SURFACES: readonly Surface[] = [
         html={issueFailed.html}
         pictures={false}
         blockedImages={1}
+      />
+    ),
+  },
+  {
+    id: 'news-issue-confirm',
+    label: 'News · Signup email waiting to be confirmed',
+    module: 'news',
+    width: 'page',
+    render: () => <IssueView {...issueSignup} />,
+  },
+  {
+    id: 'news-issue-confirmed',
+    label: 'News · Signup email confirmed',
+    module: 'news',
+    width: 'page',
+    render: () => (
+      <IssueView
+        {...issueSignup}
+        confirm={{
+          url: issueSignup.confirm?.url ?? '',
+          confirmedLabel: 'Sat 10 Oct, 9:41 AM',
+        }}
       />
     ),
   },

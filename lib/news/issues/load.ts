@@ -122,6 +122,13 @@ export type NewsIssueDetail = {
    * set.
    */
   digestError: string | null;
+  /**
+   * The https link a signup email asks you to press (plan #1723), or null
+   * when the issue is not a confirmation or no link was clear.
+   */
+  confirmUrl: string | null;
+  /** When Confirm was pressed for this issue (plan #1724), or null while it has not been. */
+  confirmedAt: string | null;
 };
 
 /**
@@ -134,7 +141,7 @@ export type NewsIssueDetail = {
  * type inside loadIssue are the only places the issue's shape is written down.
  */
 const ISSUE_DETAIL_COLUMNS =
-  'id, sender_id, subject, received_at, read_at, text_body, html_body, unsubscribe_url, unsubscribe_email, unsubscribe_sent_at, summary, stories, digest_error';
+  'id, sender_id, subject, received_at, read_at, text_body, html_body, unsubscribe_url, unsubscribe_email, unsubscribe_sent_at, summary, stories, digest_error, confirm_url, confirmed_at';
 
 /**
  * One issue, by id, or null when there is no such issue for this account.
@@ -175,6 +182,8 @@ export async function loadIssue(
     summary: string | null;
     stories: unknown;
     digest_error: string | null;
+    confirm_url: string | null;
+    confirmed_at: string | null;
   };
 
   const { data: senderRow } = await client
@@ -196,5 +205,7 @@ export async function loadIssue(
     unsubscribeSentAt: row.unsubscribe_sent_at ?? null,
     digest: row.summary ? { summary: row.summary, stories: readStories(row.stories) } : null,
     digestError: row.digest_error ?? null,
+    confirmUrl: row.confirm_url ?? null,
+    confirmedAt: row.confirmed_at ?? null,
   };
 }

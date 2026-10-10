@@ -98,19 +98,10 @@
     "targets": 4
   },
   "news-issue-digest": {
-    "targets": 3
+    "targets": 2
   },
   "news-issue-digest-no-pictures": {
-    "targets": 3
-  },
-  "news-issue-essay": {
-    "targets": 1
-  },
-  "news-issue-failed": {
-    "targets": 1
-  },
-  "news-issue-original": {
-    "targets": 1
+    "targets": 2
   },
   "news-quick-caught-up": {
     "targets": 3
