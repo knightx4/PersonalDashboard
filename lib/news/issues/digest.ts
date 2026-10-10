@@ -8,6 +8,7 @@ import type { NewsOperation } from '@/lib/core/spend/operations';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { forceTool } from '@/lib/learn/graph/tool-call';
 import type { NewsSupabaseClient } from '@/lib/news/db/schema-name';
+import { findConfirmLink } from '@/lib/news/issues/confirm-link';
 import { readStories, type NewsStory } from '@/lib/news/issues/stories';
 import { FALLBACK_TOPIC, NEWS_TOPICS, readTopic } from '@/lib/news/issues/topics';
 import { MODELS } from '@/lib/core/models';
@@ -613,7 +614,8 @@ function errorText(error: unknown): string {
  * reply was usable or not. Throws only when the row itself cannot be read or
  * written; a failed model call is saved as `digest_error` and returned, unless
  * the issue already had a summary, which is then kept. A new summary over an
- * old one also clears the issue's story passes.
+ * old one also clears the issue's story passes. An issue digested as a
+ * confirmation also gets its confirmation link (`confirm_url`, confirm-link.ts).
  *
  * A failure the API caused (`isTransientDigestError`) on an issue younger
  * than `DIGEST_RETRY_DAYS` writes nothing at all, so `digested_at` stays as it
@@ -687,6 +689,16 @@ export async function digestIssue(input: {
           summary: outcome.summary,
           summary_line: outcome.line,
           purpose: outcome.purpose ?? null,
+          // The link a signup email asks to be pressed, for the Confirm
+          // button (plan #1723). Null for every other purpose, so an issue
+          // re-read as something else loses its button.
+          confirm_url:
+            outcome.purpose === 'confirmation'
+              ? findConfirmLink({
+                  htmlBody: data.html_body as string | null,
+                  textBody: data.text_body as string | null,
+                })
+              : null,
           stories: outcome.stories,
           digest_error: null,
         }
