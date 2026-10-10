@@ -1,0 +1,181 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #efebe1; --card: #faf8f3; --ink: #1c1b19; --muted: #6e6a62;
+    --line: #b9b2a3; --you: #b5561a; --dash: #2f6b4f; --soft: #e5dfd2;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { width: 1600px; height: 900px; background: var(--bg); font-family: Inter, sans-serif; color: var(--ink); position: relative; overflow: hidden; }
+  h1 { position: absolute; left: 56px; top: 44px; font-size: 34px; font-weight: 600; letter-spacing: -0.02em; }
+  .sub { position: absolute; left: 56px; top: 92px; font-size: 18px; color: var(--muted); }
+  .legend { position: absolute; right: 56px; top: 52px; display: flex; gap: 22px; font-size: 16px; color: var(--muted); }
+  .legend span { display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+  .you { background: var(--you); } .dash { background: var(--dash); }
+
+  .stage { position: absolute; width: 176px; background: var(--card); border-radius: 16px; padding: 16px 16px 15px; box-shadow: 0 1px 0 rgba(0,0,0,0.04); }
+  .stage .name { font-size: 20px; font-weight: 600; display: flex; align-items: center; gap: 8px; letter-spacing: -0.01em; }
+  .stage .what { font-size: 13.5px; line-height: 1.4; color: var(--muted); margin-top: 6px; }
+  .stage .who { display: flex; gap: 5px; margin-left: auto; }
+
+  .band { position: absolute; left: 40px; right: 40px; top: 540px; height: 1px; background: var(--line); opacity: .5; }
+  .bandlabel { position: absolute; left: 56px; top: 552px; font-size: 14px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+  .routine { position: absolute; width: 176px; border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; background: rgba(250,248,243,.5); }
+  .routine .rn { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+  .routine .when { font-size: 12.5px; color: var(--dash); font-weight: 500; margin-top: 3px; }
+  .routine .rw { font-size: 12.5px; line-height: 1.35; color: var(--muted); margin-top: 4px; }
+
+  .note { position: absolute; font-size: 14px; color: var(--muted); font-style: italic; text-align: center; }
+  svg { position: absolute; inset: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<h1>How an idea becomes a shipped feature</h1>
+<div class="sub">My personal dashboard is built by Dash, my Claude Code agent. I steer it, and these routines keep it moving.</div>
+<div class="legend"><span><i class="dot you"></i>I decide</span><span><i class="dot dash"></i>Dash does it</span></div>
+
+<!-- Stages -->
+<div class="stage" id="vision" style="left:56px; top:300px">
+  <div class="name">Vision <span class="who"><i class="dot you"></i></span></div>
+  <div class="what">What each part of the app is for. Only I write it.</div>
+</div>
+<div class="stage" id="specs" style="left:268px; top:384px">
+  <div class="name">Specs <span class="who"><i class="dot dash"></i><i class="dot you"></i></span></div>
+  <div class="what">How it should work. Dash drafts changes of 60 lines or fewer, and I approve them.</div>
+</div>
+<div class="stage" id="ideas" style="left:268px; top:196px">
+  <div class="name">Ideas <span class="who"><i class="dot you"></i><i class="dot dash"></i></span></div>
+  <div class="what">Mine, plus suggestions Dash files while it builds.</div>
+</div>
+<div class="stage" id="features" style="left:480px; top:300px">
+  <div class="name">Features <span class="who"><i class="dot dash"></i><i class="dot you"></i></span></div>
+  <div class="what">Dash shapes them as proposals. Nothing gets built until I approve.</div>
+</div>
+<div class="stage" id="steps" style="left:692px; top:300px">
+  <div class="name">Steps <span class="who"><i class="dot dash"></i></span></div>
+  <div class="what">Each has a "done when" written before the work starts.</div>
+</div>
+<div class="stage" id="build" style="left:904px; top:300px">
+  <div class="name">Build <span class="who"><i class="dot dash"></i></span></div>
+  <div class="what">A session builds the step, tests it and commits with its number.</div>
+</div>
+<div class="stage" id="gate" style="left:1116px; top:300px">
+  <div class="name">Gate + CI <span class="who"><i class="dot dash"></i></span></div>
+  <div class="what">The same checks as CI run locally before anything reaches main.</div>
+</div>
+<div class="stage" id="shipped" style="left:1328px; top:300px; width:216px">
+  <div class="name">Shipped <span class="who"><i class="dot you"></i></span></div>
+  <div class="what">In the changelog, and in drafts for X that I edit and post myself.</div>
+</div>
+
+<div class="note" id="loopnote" style="left:560px; top:146px; width:600px">I use it, then file notes and ideas, and the loop starts again</div>
+<div class="note" id="qnote" style="left:560px; top:470px; width:300px">Questions I answer re-shape the feature</div>
+
+<div class="band"></div>
+<div class="bandlabel">Routines</div>
+
+<!-- Routines, each under the stage it works on -->
+<div class="routine" id="r-vision" style="left:56px; top:592px">
+  <div class="rn">Vision review</div><div class="when">Weekly, Sunday</div>
+  <div class="rw">Weighs what I filed against each vision and proposes edits.</div>
+</div>
+<div class="routine" id="r-audit" style="left:268px; top:592px">
+  <div class="rn">Spec audit</div><div class="when">Weekly, Monday</div>
+  <div class="rw">Compares code with every spec and drafts changes for drift.</div>
+</div>
+<div class="routine" id="r-scores" style="left:268px; top:732px">
+  <div class="rn">Idea scores</div><div class="when">Daily</div>
+  <div class="rw">Ranks the ideas list.</div>
+</div>
+<div class="routine" id="r-shape" style="left:480px; top:592px">
+  <div class="rn">Shape and re-shape</div><div class="when">On a button</div>
+  <div class="rw">Turns an idea into a feature with steps and sizes.</div>
+</div>
+<div class="routine" id="r-night" style="left:692px; top:592px">
+  <div class="rn">Overnight runner</div><div class="when">Every 4 min while I sleep</div>
+  <div class="rw">Picks the next ready feature, within a budget and stop time.</div>
+</div>
+<div class="routine" id="r-critic" style="left:904px; top:592px">
+  <div class="rn">UI critic</div><div class="when">Every screen change</div>
+  <div class="rw">Checks phone and laptop shots, up to three rounds.</div>
+</div>
+<div class="routine" id="r-notes" style="left:904px; top:732px">
+  <div class="rn">Notes run</div><div class="when">Every morning</div>
+  <div class="rw">Fixes the bugs and requests I filed in the app.</div>
+</div>
+<div class="routine" id="r-fix" style="left:1116px; top:592px">
+  <div class="rn">Fix with Dash</div><div class="when">When main goes red</div>
+  <div class="rw">Starts a run to get CI green again.</div>
+</div>
+<div class="routine" id="r-posts" style="left:1328px; top:592px; width:216px">
+  <div class="rn">Suggest posts</div><div class="when">On a button</div>
+  <div class="rw">Drafts X posts from what shipped, with screenshots.</div>
+</div>
+<div class="routine" id="r-digest" style="left:1328px; top:732px; width:216px">
+  <div class="rn">Morning digest</div><div class="when">Daily</div>
+  <div class="rw">Puts what's waiting on me on Dev Home.</div>
+</div>
+
+<svg id="arrows" width="1600" height="900">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8c8576"/>
+    </marker>
+    <marker id="ahy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b5561a"/>
+    </marker>
+  </defs>
+</svg>
+
+<script>
+  const svg = document.getElementById('arrows');
+  const r = id => document.getElementById(id).getBoundingClientRect();
+  const NS = 'http://www.w3.org/2000/svg';
+  function path(d, opts = {}) {
+    const p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', d);
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', opts.color || '#8c8576');
+    p.setAttribute('stroke-width', opts.w || 2);
+    if (opts.dash) p.setAttribute('stroke-dasharray', opts.dash);
+    if (opts.head !== false) p.setAttribute('marker-end', `url(#${opts.marker || 'ah'})`);
+    svg.appendChild(p);
+  }
+  const midY = b => b.top + b.height / 2;
+  const gap = 4;
+  // Horizontal flow
+  function across(a, b) {
+    const A = r(a), B = r(b);
+    const x1 = A.right + gap, y1 = midY(A), x2 = B.left - gap, y2 = midY(B);
+    const mx = (x1 + x2) / 2;
+    path(`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`);
+  }
+  across('vision', 'specs'); across('vision', 'ideas');
+  across('specs', 'features'); across('ideas', 'features');
+  across('features', 'steps'); across('steps', 'build');
+  across('build', 'gate'); across('gate', 'shipped');
+
+  // Big feedback loop: Shipped back over the top into Ideas
+  { const S = r('shipped'), I = r('ideas');
+    const x1 = S.left + S.width / 2, y1 = S.top - gap;
+    const x2 = I.left + I.width / 2, y2 = I.top - gap, top = 170;
+    path(`M${x1},${y1} L${x1},${top + 30} Q${x1},${top} ${x1 - 30},${top} L${x2 + 30},${top} Q${x2},${top} ${x2},${top + 30} L${x2},${y2}`, { color: '#b5561a', dash: '6 6', marker: 'ahy' });
+    const n = document.getElementById('loopnote');
+    n.style.top = (top - 26) + 'px';
+    n.style.left = ((x1 + x2) / 2 - 300) + 'px';
+  }
+  // Small loop: Steps back to Features (questions answered)
+  { const S = r('steps'), F = r('features');
+    const x1 = S.left + 40, y1 = S.bottom + gap, x2 = F.right - 40, y2 = F.bottom + gap;
+    path(`M${x1},${y1} C${x1},${y1 + 50} ${x2},${y2 + 50} ${x2},${y2}`, { color: '#b5561a', dash: '6 6', marker: 'ahy' });
+    const n = document.getElementById('qnote');
+    n.style.left = ((x1 + x2) / 2 - 150) + 'px';
+    n.style.top = (y1 + 56) + 'px';
+  }
+</script>
+</body>
+</html>
