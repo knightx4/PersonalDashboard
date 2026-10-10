@@ -10,7 +10,8 @@ import { noteCreatePorts, noteRemovePorts, noteSavePorts } from '@/lib/vault/db/
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
 import { FILE_ERRORS, fileQuickNote, isInInbox, type FileQuickNoteFailure } from '@/lib/vault/notes/file';
 import { loadNotes } from '@/lib/vault/notes/load';
-import { noteHref } from '@/lib/vault/paths';
+import { rebuildTriageNote } from '@/lib/vault/notes/triage-note-run';
+import { isTriageNotePath, noteHref } from '@/lib/vault/paths';
 
 /**
  * Filing a quick note out of Quick note triage (plan #1728, feature #1726):
@@ -104,6 +105,7 @@ export async function fileQuickNoteAction(
 
   if (!result.ok) return { reason: result.reason, error: result.error };
 
+  after(() => rebuildTriageNote(vault));
   revalidatePath('/vault');
   revalidatePath('/vault/triage');
   revalidatePath(noteHref(result.path));
@@ -130,7 +132,7 @@ export async function searchTriagePlaces(query: string): Promise<TriagePlace[]> 
   const vault = await createVaultClient();
   const found = await loadNotes(vault, { search, limit: SEARCH_PLACES_SHOWN * 4 });
   return found
-    .filter((note) => !isInInbox(note.path))
+    .filter((note) => !isInInbox(note.path) && !isTriageNotePath(note.path))
     .slice(0, SEARCH_PLACES_SHOWN)
     .map((note) => ({ path: note.path, title: note.title, href: noteHref(note.path) }));
 }
