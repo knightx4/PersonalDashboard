@@ -55,9 +55,18 @@ export function inboxNoteName(text: string, now: Date): string {
   return (space > NAME_MAX / 2 ? cut.slice(0, space) : cut).trim();
 }
 
-/** The vault path for a name, numbered from the second attempt: "Inbox/Idea 2.md". */
+/**
+ * The vault path for a name in a folder, numbered from the second attempt:
+ * "Inbox/Idea 2.md". An empty folder is the top of the vault: "Idea 2.md".
+ */
+export function notePathIn(folder: string, name: string, attempt = 1): string {
+  const file = `${attempt > 1 ? `${name} ${attempt}` : name}.md`;
+  return folder ? `${folder}/${file}` : file;
+}
+
+/** The Inbox path for a name, numbered from the second attempt: "Inbox/Idea 2.md". */
 export function inboxNotePath(name: string, attempt = 1): string {
-  return `${INBOX_FOLDER}/${attempt > 1 ? `${name} ${attempt}` : name}.md`;
+  return notePathIn(INBOX_FOLDER, name, attempt);
 }
 
 export function createCommitMessage(title: string): string {
@@ -131,11 +140,16 @@ function failure(error: unknown): VaultWriteFailure {
  * already at the name is never written over: the next number is tried.
  * The note is named from its first line, or from `title` when one is given,
  * as the vault's New note gives one (note 09ff8039).
+ *
+ * `folder` puts it somewhere other than the Inbox; '' is the top of the
+ * vault, where a quick note goes when it is made a note of its own
+ * (plan #1728).
  */
 export async function createCapturedNote(
   ports: CreateNotePorts,
   text: string,
   title?: string,
+  folder: string = INBOX_FOLDER,
 ): Promise<CreateNoteResult> {
   const now = ports.now?.() ?? new Date();
   const content = `${text.replace(/\r\n/g, '\n').trim()}\n`;
@@ -155,7 +169,7 @@ export async function createCapturedNote(
 
   const name = inboxNoteName(title?.trim() ? title : content, now);
   for (let attempt = 1; attempt <= NAME_ATTEMPTS; attempt += 1) {
-    const path = inboxNotePath(name, attempt);
+    const path = notePathIn(folder, name, attempt);
     const parsed = parseNote(content, path);
     let written: { blobSha: string; commitSha: string };
     try {
@@ -193,7 +207,7 @@ export async function createCapturedNote(
   return {
     ok: false,
     reason: 'error',
-    error: `Your Inbox already has notes called "${name}". Rename one and try again.`,
+    error: `${folder ? `Your ${folder} folder` : 'Your vault'} already has notes called "${name}". Rename one and try again.`,
   };
 }
 

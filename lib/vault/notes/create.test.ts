@@ -3,6 +3,7 @@ import {
   createCapturedNote,
   inboxNoteName,
   inboxNotePath,
+  notePathIn,
   removeCapturedNote,
   VAULT_WRITE_ERRORS,
   type CreateNotePorts,
@@ -30,6 +31,11 @@ describe('naming a note from its first line', () => {
   it('numbers the path from the second attempt', () => {
     expect(inboxNotePath('Idea')).toBe('Inbox/Idea.md');
     expect(inboxNotePath('Idea', 2)).toBe('Inbox/Idea 2.md');
+  });
+
+  it('puts a note with no folder at the top of the vault', () => {
+    expect(notePathIn('', 'Idea')).toBe('Idea.md');
+    expect(notePathIn('', 'Idea', 3)).toBe('Idea 3.md');
   });
 });
 
