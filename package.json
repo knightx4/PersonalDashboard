@@ -25,6 +25,7 @@
     "check:ebay": "tsx scripts/check-ebay.ts",
     "typecheck": "tsc --noEmit",
     "share:add": "tsx scripts/share-add.ts",
+    "note-report": "tsx --conditions=react-server scripts/learn-note-report.ts",
     "catalogue": "tsx --conditions=react-server scripts/learn-catalogue.ts",
     "news:digest": "tsx --conditions=react-server scripts/news-digest.ts",
     "news:repeats": "tsx --conditions=react-server scripts/news-repeats.ts",
