@@ -124,6 +124,7 @@ describe('RLS coverage', () => {
       'goals',
       'imports',
       'next_outcomes',
+      'note_reads',
       'opening_questions',
       'opening_sweeps',
       'personality_results',
