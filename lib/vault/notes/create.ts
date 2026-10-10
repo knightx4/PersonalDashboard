@@ -150,6 +150,8 @@ export async function createCapturedNote(
   text: string,
   title?: string,
   folder: string = INBOX_FOLDER,
+  /** Names tried when a file is already at the first; 1 never writes a numbered copy. */
+  maxAttempts: number = NAME_ATTEMPTS,
 ): Promise<CreateNoteResult> {
   const now = ports.now?.() ?? new Date();
   const content = `${text.replace(/\r\n/g, '\n').trim()}\n`;
@@ -168,7 +170,7 @@ export async function createCapturedNote(
   }
 
   const name = inboxNoteName(title?.trim() ? title : content, now);
-  for (let attempt = 1; attempt <= NAME_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const path = notePathIn(folder, name, attempt);
     const parsed = parseNote(content, path);
     let written: { blobSha: string; commitSha: string };

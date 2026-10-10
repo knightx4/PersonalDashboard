@@ -9,7 +9,7 @@ import { embedOne } from '@/lib/learn/embed/embed';
 import { DEFAULT_EMBEDDING_MODEL, EMBEDDING_DIMENSIONS } from '@/lib/learn/embed/voyage';
 import type { LearnOperation } from '@/lib/learn/spend';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
-import { folderOf, INBOX_FOLDER, noteHref } from '@/lib/vault/paths';
+import { folderOf, INBOX_FOLDER, isTriageNotePath, noteHref } from '@/lib/vault/paths';
 
 /**
  * The person's own notes nearest a piece of text (plan #1112, under #1110).
@@ -354,7 +354,7 @@ export const SUGGESTED_NOTES_SHOWN = 3;
 const SUGGESTION_OVERFETCH = 4;
 
 function outsideInbox(note: RelatedNote): boolean {
-  return folderOf(note.path) !== INBOX_FOLDER;
+  return folderOf(note.path) !== INBOX_FOLDER && !isTriageNotePath(note.path);
 }
 
 /**
