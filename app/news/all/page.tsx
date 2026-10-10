@@ -16,7 +16,7 @@ import { newsAddress, newsDomainOrNull } from '@/lib/news/address';
 import { deliveryGap } from '@/lib/news/inbound/readiness';
 import { loadRecommendations } from '@/lib/news/recommend/make';
 import { loadOrCreateLocalPart } from '@/lib/news/settings/address';
-import { loadIssues, loadSenders, loadUnreadStories } from '@/lib/news/issues/load';
+import { loadIssues, loadSenders, loadUnreadStories, loadWaitingSignups } from '@/lib/news/issues/load';
 import {
   countLabel,
   formatArrival,
@@ -31,6 +31,7 @@ import {
 } from '@/lib/news/issues/list';
 import { readTopic, type NewsTopic } from '@/lib/news/issues/topics';
 import { setSenderMuted } from '../actions';
+import { NeedsConfirming } from './needs-confirming';
 import { RecommendedNewsletters } from './recommended';
 
 export const metadata = { title: 'Newsletters' };
@@ -73,11 +74,12 @@ export default async function NewsPage({
   if (readListView(viewParam) === 'recommended') return <RecommendedPage userId={user.id} />;
   const client = await createNewsClient();
 
-  const [settings, senders, issues, unread] = await Promise.all([
+  const [settings, senders, issues, unread, waiting] = await Promise.all([
     loadAccountSettings(user.id),
     loadSenders(client),
     loadIssues(client, { topic }),
     loadUnreadStories(client),
+    loadWaitingSignups(client),
   ]);
 
   const byId = new Map(senders.map((sender) => [sender.id, sender]));
@@ -140,6 +142,8 @@ export default async function NewsPage({
         title="Newsletters"
         description="What has been sent to the address that belongs to this app."
       />
+
+      <NeedsConfirming signups={waiting} senders={byId} timezone={settings.timezone} />
 
       <ViewSwitch view={view} topic={topic} />
 

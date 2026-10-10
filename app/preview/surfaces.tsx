@@ -131,6 +131,7 @@ import { IssueView, type IssueViewProps } from '@/app/news/i/[id]/issue-view';
 import { QuickReadView, type QuickReadViewProps } from '@/app/news/quick/quick-view';
 import { SavedView, type SavedViewProps } from '@/app/news/saved/saved-view';
 import { ReviewView, type ReviewViewProps } from '@/app/news/review/review-view';
+import { NeedsConfirming } from '@/app/news/all/needs-confirming';
 import { StoryGrid, type GridStory } from '@/components/news/story-grid';
 import { StoryText } from '@/components/news/story-text';
 import {
@@ -2257,6 +2258,36 @@ const reviewFull: ReviewViewProps = {
   later: null,
   todayAt: null,
 };
+
+/* The newsletter list's Needs confirming section (plan #1725): three waiting
+ * signups, one with a long name and an address in place of a name. */
+const waitingSenders = new Map(
+  [
+    { id: 's1', email: 'hello@theweekly.example', name: 'The Weekly Digest of Slow Technology and Long Reading', muted: false },
+    { id: 's2', email: 'letters@fieldnotes.example', name: null, muted: false },
+    { id: 's3', email: 'news@harbour.example', name: 'Harbour Post', muted: false },
+  ].map((sender) => [sender.id, sender] as const),
+);
+
+function NeedsConfirmingSurface() {
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="Newsletters"
+        description="What has been sent to the address that belongs to this app."
+      />
+      <NeedsConfirming
+        timezone="Europe/London"
+        senders={waitingSenders}
+        signups={[
+          { id: 'w1', senderId: 's3', subject: 'Confirm your subscription', receivedAt: '2026-10-10T08:12:00Z', confirmUrl: 'https://harbour.example/confirm?t=abc' },
+          { id: 'w2', senderId: 's2', subject: 'Please confirm', receivedAt: '2026-10-08T17:40:00Z', confirmUrl: 'https://fieldnotes.example/c/1' },
+          { id: 'w3', senderId: 's1', subject: 'One more step', receivedAt: '2026-10-03T09:05:00Z', confirmUrl: 'https://theweekly.example/confirm/9' },
+        ]}
+      />
+    </div>
+  );
+}
 
 const savedStories: SavedViewProps = {
   stories: [
@@ -4701,6 +4732,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'shopping',
     width: 'page',
     render: () => <RecurringEmptySurface />,
+  },
+  {
+    id: 'news-needs-confirming',
+    label: 'News · Newsletters waiting to be confirmed',
+    module: 'news',
+    width: 'page',
+    render: () => <NeedsConfirmingSurface />,
   },
   {
     id: 'news-saved',

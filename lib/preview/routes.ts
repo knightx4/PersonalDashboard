@@ -171,6 +171,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'news-story-grid-no-pictures': ['/news/i/[id]', '/news'],
   'shopping-recurring': ['/shopping/recurring'],
   'shopping-recurring-empty': ['/shopping/recurring'],
+  'news-needs-confirming': ['/news/all'],
   'news-saved': ['/news/saved'],
   'news-saved-empty': ['/news/saved'],
   'news-review': ['/news/review'],
