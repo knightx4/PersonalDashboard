@@ -31,7 +31,7 @@ const MARK = {
 function AnswerButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" pending={pending}>
       {pending ? 'Marking…' : 'Answer'}
     </Button>
   );
@@ -40,7 +40,7 @@ function AnswerButton() {
 function SkipButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="ghost" disabled={pending}>
+    <Button type="submit" variant="ghost" pending={pending}>
       {pending ? 'Passing…' : 'I do not know'}
     </Button>
   );

@@ -24,8 +24,8 @@ export type BoardPosting = {
 /** How many candidates the search reads, so a big board cannot crowd the prompt. */
 export const BOARD_CANDIDATE_LIMIT = 40;
 
-export function pickBoardCandidates(
-  postings: readonly BoardPosting[],
+export function pickBoardCandidates<P extends BoardPosting>(
+  postings: readonly P[],
   rules: {
     targetTitles: readonly string[];
     /** Titles of roles saved or answered by a person: what has worked. */
@@ -33,14 +33,16 @@ export function pickBoardCandidates(
     taken: { urls: ReadonlySet<string>; roles: ReadonlySet<string>; companies?: ReadonlySet<string> };
     /** `exclusionWords` of the excluded industries. */
     excludedWords: readonly string[];
+    /** At most this many; BOARD_CANDIDATE_LIMIT unless given. */
+    limit?: number;
   },
-): BoardPosting[] {
+): P[] {
   const targets = rules.targetTitles.filter(Boolean);
   const liked = rules.likedTitles.filter(Boolean);
   if (targets.length === 0 && liked.length === 0) return [];
 
   const seen = new Set<string>();
-  const ranked: { posting: BoardPosting; rank: number }[] = [];
+  const ranked: { posting: P; rank: number }[] = [];
   for (const posting of postings) {
     if (rules.taken.urls.has(posting.url)) continue;
     const key = roleKey(posting.company, posting.title);
@@ -55,6 +57,6 @@ export function pickBoardCandidates(
   }
   return ranked
     .sort((a, b) => a.rank - b.rank)
-    .slice(0, BOARD_CANDIDATE_LIMIT)
+    .slice(0, rules.limit ?? BOARD_CANDIDATE_LIMIT)
     .map((entry) => entry.posting);
 }

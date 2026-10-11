@@ -3,6 +3,7 @@ import {
   BarChart3,
   BookOpen,
   BookOpenCheck,
+  Blocks,
   Bookmark,
   Boxes,
   Briefcase,
@@ -23,16 +24,17 @@ import {
   History,
   Hourglass,
   House,
+  Inbox,
   KanbanSquare,
   LayoutDashboard,
   Lightbulb,
   List,
   ListTodo,
+  Newspaper,
   Mail,
   Megaphone,
   Map,
   Network,
-  MessageCircleQuestion,
   MessageSquareText,
   MonitorPlay,
   Receipt,
@@ -86,12 +88,15 @@ export const NAV_ICONS = {
   answers: MessageSquareText,
   analytics: BarChart3,
   activity: Activity,
-  // Career goals: which way you are heading, so the compass. Not Target,
-  // which is Learn's Goals tab, and not Flag, which is the Goals workspace.
-  careerGoals: Compass,
+  // Find: which way the search is heading and what turned up along it, so
+  // the compass it had as Career goals. Not Target, which is Learn's Goals
+  // tab, and not Flag, which is the Goals workspace.
+  find: Compass,
   // Dev
   bugs: Bug,
-  raised: MessageCircleQuestion,
+  devHome: House,
+  // What is waiting on you, the way an inbox holds what is addressed to you.
+  inbox: Inbox,
   ideas: Lightbulb,
   // Looking outward for ideas, as Ideas is the ones you had yourself.
   inspiration: Telescope,
@@ -103,6 +108,8 @@ export const NAV_ICONS = {
   surfaces: Frame,
   // Which pages are opened and what each workspace spends (plan #1482).
   usage: Gauge,
+  // One page per workspace (the module pages): the app's parts, side by side.
+  modules: Blocks,
   // A project Dev builds outside this app (lib/plan/projects): a site.
   project: Globe,
   // A specification is a document you read and argue with, so it gets the
@@ -150,6 +157,9 @@ export const NAV_ICONS = {
   // Quick read deals the stories out one card at a time, so it gets the
   // stack of cards.
   quickRead: GalleryHorizontalEnd,
+  // The evening's review of the day's news (plan #1616): a newspaper, the
+  // day's stories on one page.
+  dailyReview: Newspaper,
   // Goals. A flag, the same object the workspace's own mark draws, as News
   // does with its envelope. Not Target, which is Learn's Goals tab.
   goalsHome: Flag,

@@ -63,7 +63,7 @@ function Material({ row, conceptId }: { row: ClaimMaterial; conceptId: string })
           href={row.item.canonicalUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-body font-medium text-ink hover:text-accent"
+          className="press-area text-body font-medium text-ink hover:text-accent"
         >
           {row.item.title}
         </a>

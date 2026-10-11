@@ -4,6 +4,7 @@ import {
   dueWords,
   isDue,
   parseDelay,
+  placeCheckBacks,
   wakeWindowStart,
   wakeTurn,
   WAKE_GRACE_MS,
@@ -100,5 +101,34 @@ describe('wakeTurn', () => {
     expect(text).toContain('from plan #1051');
     expect(text).toContain('Read videos_to_transcribe.');
     expect(text).toContain('plan.ts checked <id> --note');
+  });
+});
+
+describe('placeCheckBacks', () => {
+  const steps = [
+    { id: 'feature', number: 1073, outline: '1073', title: 'Close steps from evidence' },
+    { id: 'step', number: 1135, outline: '1073.4', title: 'Tune which evidence closes a step' },
+  ];
+  const rows = [
+    row({ id: 'later', planItemId: 'step', dueAt: '2026-10-12T00:00:00Z' }),
+    row({ id: 'sooner', planItemId: 'feature', dueAt: '2026-10-11T00:00:00Z' }),
+    row({ id: 'elsewhere', planItemId: 'other', dueAt: '2026-10-10T00:00:00Z' }),
+    row({ id: 'loose', planItemId: null, dueAt: '2026-10-09T00:00:00Z' }),
+  ];
+
+  it("names each one's step, soonest first, and leaves out a step not on the page", () => {
+    const placed = placeCheckBacks(rows, steps);
+    expect(placed.map((r) => r.id)).toEqual(['sooner', 'later']);
+    expect(placed[1]!.step).toEqual(steps[1]);
+  });
+
+  it('keeps the rest, with no step, where asked', () => {
+    const placed = placeCheckBacks(rows, steps, { keepUnplaced: true });
+    expect(placed.map((r) => [r.id, r.step?.number ?? null])).toEqual([
+      ['loose', null],
+      ['elsewhere', null],
+      ['sooner', 1073],
+      ['later', 1135],
+    ]);
   });
 });

@@ -5,7 +5,7 @@
  * at each step it starts (last_seen_at and now_on on goals.runs), so a run
  * with nothing heard for RUN_QUIET_MS has stopped. The sweep in
  * inngest/goals/quiet-runs.ts, run by the daily and overnight ticks, closes
- * each one as failed with the error below, which frees Work on this and Send
+ * each one as failed with the error below, which frees Ask Dash
  * on the steps it was on.
  *
  * Pure: the sweep reads the started rows and writes the closes.

@@ -74,7 +74,8 @@ export function HomeArrival({
       onAnimationEnd={(event) => {
         if (event.animationName !== 'home-arrive') return;
         const target = event.target as HTMLElement;
-        if (target.dataset.arrive === String(ARRIVE_LAST_STEP)) setPlaying(false);
+        // The step is in the --arrive property; data-arrive itself is empty.
+        if (target.style.getPropertyValue('--arrive') === String(ARRIVE_LAST_STEP)) setPlaying(false);
       }}
     >
       {children}

@@ -34,6 +34,18 @@ export const coreSources: ModuleSources = {
       note: "role 'user' is theirs and 'assistant' is Dash's: read their turns as what they wanted to know, and Dash's only for context. On Dash's answers to an 'ask', citations lists the rows it relied on. In a thread with Maya the assistant's turns are Maya's, and detail holds a thought's points. conversation_id joins core.conversations, which says what the turn is about.",
     },
     {
+      table: 'core.attachments',
+      module: 'Home',
+      holds: 'Files they added to a note, a todo, a quick capture or a question for Dash: photos, screenshots, PDFs, Word files, text and CSV.',
+      weight: 'record',
+      search: ['name'],
+      title: 'name',
+      facts: ['content_type', 'size_bytes', 'ref'],
+      href: (id) => `/attachments/${id}`,
+      page: { title: 'name', href: (row) => `/attachments/${row.id}` },
+      note: "ref is the row the file came with, as schema.table:id; the same path recorded against two refs is one file that went with both. The file itself is in the private attachments bucket at path, and /attachments/<id> opens it through a short signed link. Read the row it belongs to for what the file was about.",
+    },
+    {
       table: 'core.observations',
       module: 'Home',
       holds: 'What Dash noticed each week across their modules, with a number and the timeline rows behind it, and whether they found it useful.',
@@ -49,6 +61,7 @@ export const coreSources: ModuleSources = {
       weight: 'incidental',
       search: ['paragraphs'],
       title: 'year',
+      newest: 'year',
       ref: 'year',
       href: (year) => `/timeline/year/${year}`,
       page: {
@@ -86,6 +99,7 @@ export const coreSources: ModuleSources = {
   ],
   notSources: [
     { table: 'core.account_settings', reason: 'Settings.' },
+    { table: 'core.capture_tokens', reason: 'Personal tokens a Shortcut or other tool adds things with, kept as hashes, with when each was last used and its rate-limit counts; what they add is a source in its own module.' },
     { table: 'core.connector_calls', reason: 'Each call a connected Claude app made through the connector and the rows it returned, for the account page and the rate cap; the rows it points at are sources in their own modules.' },
     { table: 'core.connector_revocations', reason: 'When a connected app\'s access was removed, so its tokens stop working.' },
     { table: 'core.dash_handoffs', reason: 'Requests Ask Dash handed to the backup routine and whether it replied; the rows the routine wrote are sources in their own modules.' },

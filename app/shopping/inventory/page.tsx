@@ -44,6 +44,8 @@ import { redirect } from 'next/navigation';
 import { loadPeople, parsePersonFilter, peopleById } from '@/lib/people/load';
 import { loadShareOptions } from '@/lib/share/load-options';
 import { SendToShare } from '@/components/share/send-to-share';
+import { AskDashRowsButton } from '@/components/shell/ask-dash-rows-button';
+import { askListFilter } from '@/lib/ask/list-filter';
 
 export const metadata = { title: 'Inventory' };
 
@@ -677,6 +679,7 @@ export default async function InventoryPage({
             bulk={<InventoryBulkBar total={finalItems.length} />}
             actions={
               <>
+                <AskDashRowsButton filter={askListFilter('inventory', params)} count={stackRows.length} />
                 <SendToShare
                   shares={shareOptions}
                   inventoryItemIds={finalItems.map((item) => item.id)}

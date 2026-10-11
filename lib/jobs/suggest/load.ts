@@ -1,4 +1,5 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
+import { openingSource, type SourceView } from './source';
 import type { SuggestionKind } from './cadence';
 import { parseOpeningScores, SCORE_CONFIDENCE_FLOOR, type OpeningScores } from './scores';
 import type { ScoreNote } from './score-notes';
@@ -27,15 +28,17 @@ export type OpenSuggestion = {
   contact: { id: string; name: string; email: string | null; linkedinUrl: string | null } | null;
   /** Jev's answers on an opening (plans #1178, #1202); null until it has been scored. */
   scores: OpeningScores | null;
-  /** Fit and chance with their reasons (plan #1206), attached by the Roles page (`withOpeningNotes`). */
+  /** Fit and chance with their reasons (plan #1206), attached by the Find page (`withOpeningNotes`). */
   scoreNote?: ScoreNote | null;
-  /** Who found it (job_search 0039): the web search, a followed board or a goals run. */
+  /** Who found it (job_search 0039): the web search, a followed board, discovery or a goals run. */
   origin: string;
+  /** The same, as the row and the source filter read it (source.ts). */
+  source: SourceView;
   /** Whether the posting has been read from its link (posting.ts). */
   postingRead: boolean;
   compMaxCents: number | null;
   workMode: PostingWorkMode | null;
-  /** Where the posting falls outside the preferences, attached by the Roles page (`withPreferenceMisses`). */
+  /** Where the posting falls outside the preferences, attached by the Find page (`withPreferenceMisses`). */
   misses?: string[];
   createdAt: string;
 };
@@ -115,6 +118,7 @@ export async function loadOpenSuggestions(
           : null,
         scores: parseOpeningScores(row.scores),
         origin: row.origin ?? 'goal',
+        source: openingSource({ origin: row.origin, foundIn: row.found_in, url: row.url }),
         postingRead: row.posting_status === 'open',
         compMaxCents: row.comp_max_cents === null ? null : Number(row.comp_max_cents),
         workMode: (['onsite', 'hybrid', 'remote'] as const).find((mode) => mode === row.work_mode) ?? null,

@@ -34,8 +34,8 @@ export type PostSource = {
 export type PostCard = {
   post: SocialPost;
   sources: PostSource[];
-  /** The screenshots to draw, already turned into links (postImageSrc). */
-  images: string[];
+  /** The images to draw: each entry of `image_paths` and its link (postImageSrc). */
+  images: { path: string; src: string }[];
   /** The day it was drafted, posted or dropped, whichever its status says. */
   day: string;
 };
@@ -87,9 +87,10 @@ export function buildPostsPage(input: {
       if (!note) continue;
       sources.push({ kind: 'note', id, label: 'a note', title: firstLine(note.body), href: `/dev/bugs#note-${id}` });
     }
-    const images = post.imagePaths
-      .map(postImageSrc)
-      .filter((src): src is string => Boolean(src));
+    const images = post.imagePaths.flatMap((path) => {
+      const src = postImageSrc(path);
+      return src ? [{ path, src }] : [];
+    });
     const when = post.status === 'posted' ? post.postedAt : post.status === 'dropped' ? post.droppedAt : null;
     return { post, sources, images, day: dayLabel(when ?? post.createdAt, new Date(input.now)) };
   };

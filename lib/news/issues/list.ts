@@ -223,3 +223,36 @@ export function newsletterRows(
   }
   return [...rows.values()].sort((a, b) => b.latest.receivedAt.localeCompare(a.latest.receivedAt));
 }
+
+/** A signup email still waiting for its Confirm press (plan #1725). */
+export type WaitingSignup = {
+  id: string;
+  senderId: string;
+  subject: string | null;
+  receivedAt: string;
+  confirmUrl: string;
+};
+
+/**
+ * Which unconfirmed signups the list still offers a button for.
+ *
+ * `newsSince` maps a sender to when it last sent an issue whose purpose is
+ * news. A sender that has sent regular news after the signup email was
+ * evidently confirmed by other means (the backfilled signups mostly were), so
+ * its button would only be stale. Only the newest signup per sender is kept,
+ * since an older one's link is superseded by the later email. Newest first.
+ */
+export function waitingSignups(
+  signups: readonly WaitingSignup[],
+  newsSince: ReadonlyMap<string, string>,
+): WaitingSignup[] {
+  const seen = new Set<string>();
+  return [...signups]
+    .sort((a, b) => Date.parse(b.receivedAt) - Date.parse(a.receivedAt))
+    .filter((signup) => {
+      if (seen.has(signup.senderId)) return false;
+      seen.add(signup.senderId);
+      const news = newsSince.get(signup.senderId);
+      return !(news && Date.parse(news) > Date.parse(signup.receivedAt));
+    });
+}

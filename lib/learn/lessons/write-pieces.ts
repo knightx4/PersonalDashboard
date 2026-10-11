@@ -3,7 +3,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { CURRICULUM_MODEL } from '@/lib/learn/graph/curriculum';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { PIECES_MAX, piecesPrompt, readPieces, type PieceIdea, type PiecesResult } from './pieces-payload';
 
 /**
@@ -79,10 +79,10 @@ export async function writePieces(input: {
     try {
       response = await client.messages.create({
         model: PIECES_MODEL,
-        max_tokens: 1500,
+        max_tokens: 1500 + THINKING_ROOM,
         system: SYSTEM,
         tools: [TOOL],
-        tool_choice: forceTool(TOOL_NAME),
+        tool_choice: forceTool(TOOL_NAME, PIECES_MODEL),
         messages,
       });
     } catch (error) {
