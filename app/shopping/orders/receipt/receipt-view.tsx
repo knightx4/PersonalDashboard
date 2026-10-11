@@ -9,7 +9,6 @@ export function ReceiptView() {
     <div className="mx-auto max-w-2xl">
       <PageHeader
         title="Receipt photo"
-        description="Turn a paper receipt into an order and inventory units. Reuses the email extraction gate."
         actions={
           <Link href="/shopping/orders/new" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
             Manual order instead
