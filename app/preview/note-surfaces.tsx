@@ -30,3 +30,32 @@ export function NoteButtonSurface() {
     </div>
   );
 }
+
+/**
+ * The same panel just after a note saved (plan #1674): "Note saved." and
+ * Jev's triage under it, with the fix-or-plan answer last.
+ */
+export function NoteSavedSurface() {
+  return (
+    <div className="min-h-[44rem]">
+      <div className="flex h-(--bar-h) items-center justify-end px-3 sm:px-5">
+        <FeedbackButton
+          isOwner
+          initialOpen
+          initialSaved={{
+            message: 'Note saved.',
+            triage: {
+              parts: ['Bug', 'Dev', 'Priority: Next', 'Plan?'],
+              match: null,
+              maybeMatch: {
+                table: 'feedback_items',
+                id: 'n1',
+                line: 'The plan page scrolls sideways on my phone when a step title is long',
+              },
+            },
+          }}
+        />
+      </div>
+    </div>
+  );
+}
