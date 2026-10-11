@@ -1,5 +1,5 @@
-import { PageHeader } from '@/components/shell/page-header';
-import type { Crumb } from '@/components/shell/breadcrumb';
+import { Breadcrumb, type Crumb } from '@/components/shell/breadcrumb';
+import { PropertiesFold } from '@/components/patterns/properties-fold';
 import { DetailLayout } from '@/components/shell/detail-layout';
 import { Card } from '@/components/ui/card';
 import { Tabs } from '@/components/ui/tabs';
@@ -15,7 +15,14 @@ import type { Tab } from '@/lib/tabs';
  * It is `DetailLayout` with the tabs put above the body, so the order on a
  * phone is the crumbs and title, the properties as a grid of facts, then the
  * tabs and the open tab. From laptop width the properties move into a column
- * on the right and stay in place while the tab scrolls.
+ * on the right and stay in place while the tab scrolls. With `glance`, the
+ * phone shows only those facts in one row and folds the rest (plan #1688).
+ *
+ * Every tab is as wide as the row of tabs above it. A tab that capped its own
+ * width read as narrower than the one beside it, so none does (plan #1688).
+ *
+ * The header is the title, its one line under it, then the actions on the
+ * title's line at the right, at every width.
  *
  * No body text sits straight on the page background (plan #1686, taste
  * `no-bare-text`). `DetailLayout` draws the properties on a card, as a column
@@ -32,6 +39,7 @@ export function TabbedDetail({
   title,
   description,
   actions,
+  glance,
   properties,
   tabs,
   label,
@@ -45,7 +53,15 @@ export function TabbedDetail({
   description?: React.ReactNode;
   /** The action that belongs to the whole page, whatever tab is open. */
   actions?: React.ReactNode;
-  /** The facts, as `PropertyList` holding `Property`s. */
+  /**
+   * The facts read first, as bare `Property`s: status, health and progress
+   * on a feature. On a phone they are one row and `properties` folds under
+   * "All details" beneath them, so the tabs stay on the first screen; from
+   * laptop width they head the column. Without it every fact shows, as a grid
+   * on a phone.
+   */
+  glance?: React.ReactNode;
+  /** The facts, as `PropertyList` holding `Property`s; the rest of them when `glance` is given. */
   properties: React.ReactNode;
   tabs: readonly Tab[];
   /** Names the row of tabs for a screen reader, such as "Feature". */
@@ -58,9 +74,28 @@ export function TabbedDetail({
     <DetailLayout
       className={className}
       header={
-        <PageHeader crumbs={crumbs} title={title} description={description} actions={actions} />
+        <header className="mb-5">
+          <Breadcrumb crumbs={crumbs} className="mb-2" />
+          {/* The title and its one line take what is left of the row, and
+              the actions keep their width on the same line (plan #1688):
+              with the row free to wrap, a title wider than the space beside
+              the actions pushed them onto a line of their own. */}
+          <div className="flex items-start gap-3">
+            <h1 className="min-w-0 flex-1 font-display text-title tracking-tight text-ink [overflow-wrap:anywhere]">
+              {title}
+            </h1>
+            {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+          </div>
+          {/* The one line runs the header's full width, under the actions as
+              well as the title, so it stays one line on a phone. */}
+          {description && (
+            <p className="mt-0.5 text-body text-ink-muted [overflow-wrap:anywhere]">
+              {description}
+            </p>
+          )}
+        </header>
       }
-      properties={properties}
+      properties={glance ? <PropertiesFold glance={glance}>{properties}</PropertiesFold> : properties}
     >
       <Tabs tabs={tabs} label={label} className="mb-5" />
       {children}

@@ -216,7 +216,8 @@ export function FeaturePage({
         ...item,
         formAction: async (formData: FormData) => {
           const result = await deletePlanItem({}, formData);
-          if (!result.error) router.push(crumbs[2].href);
+          // The crumb before the feature's own: the module, or the plan.
+          if (!result.error) router.push(crumbs[crumbs.length - 2].href);
         },
       };
     }
@@ -224,8 +225,10 @@ export function FeaturePage({
   });
 
   const statusWord = STATUS_LABEL[featureStatus(node)];
-  const properties = (
-    <PropertyList>
+  // Status, health and progress are read first: one row on a phone, with the
+  // rest under "All details", so the tabs are on the first screen (plan #1688).
+  const glance = (
+    <>
       <Property
         label="Status"
         value={
@@ -233,7 +236,9 @@ export function FeaturePage({
             label={`Status of #${node.number} ${node.title}`}
             items={parts.statusMenu}
             align="start"
-            triggerClassName="-ml-1.5 h-7 w-auto px-1.5 text-ui font-normal text-ink"
+            // Pulled up by the room the press target adds, so its word sits on
+            // the same line as Health's and Progress's beside it.
+            triggerClassName="-my-1 -ml-1.5 h-7 w-auto px-1.5 text-ui font-normal text-ink"
             trigger={<span>{statusWord}</span>}
           />
         }
@@ -254,6 +259,17 @@ export function FeaturePage({
           }
         />
       )}
+      {split.scope > 0 && (
+        <Property
+          label="Progress"
+          hint="Steps and substeps beneath the feature, questions and setup jobs included, not dropped."
+          value={`${split.done} of ${split.scope} done`}
+        />
+      )}
+    </>
+  );
+  const properties = (
+    <PropertyList>
       {parts.move && <Property label={MOVE_LABEL} value={parts.move} />}
       <Property
         label="Priority"
@@ -301,13 +317,6 @@ export function FeaturePage({
       {node.commitSha && (
         <Property label="Commit" value={<span className="font-mono">{node.commitSha}</span>} />
       )}
-      {split.scope > 0 && (
-        <Property
-          label="Progress"
-          hint="Steps and substeps beneath the feature, questions and setup jobs included, not dropped."
-          value={`${split.done} of ${split.scope} done`}
-        />
-      )}
       {split.open > 0 && (
         <>
           <Property
@@ -347,10 +356,13 @@ export function FeaturePage({
             {/* The facts about where it came from. The one line it was written
                 with (plan #1670) opens the Overview's card instead, since a
                 sentence on the page background is bare text (plan #1686). */}
+            {/* The number and who added it each keep to one line and wrap
+                between them, so a date never breaks in two (plan #1688). */}
             <span className="inline-flex flex-wrap items-center gap-x-2 text-small">
-              <span>Feature #{node.number}</span>
+              <span className="whitespace-nowrap">Feature #{node.number}</span>
               {parts.addedBy && (
                 <span
+                  className="whitespace-nowrap"
                   title={parts.addedBy.session ? `Session ${parts.addedBy.session}` : undefined}
                 >
                   <DashCredit />
@@ -372,6 +384,7 @@ export function FeaturePage({
           <ActionMenu label={`Actions for #${node.number}`} items={menu} />
         </>
       }
+      glance={glance}
       properties={properties}
       tabs={tabs}
       label="Feature"
@@ -408,9 +421,10 @@ export function FeaturePage({
         // The compose surface it can be written in from /dev/plan, filled in
         // (plan #1670). Fog, the note and the commit stay on the row's own
         // Edit on /dev/plan, which is the whole row at once.
-        <FeatureCompose node={node} onDone={() => row.setEditing(false)} className="max-w-2xl" />
+        <FeatureCompose node={node} onDone={() => row.setEditing(false)} />
       ) : (
-        <div className="max-w-2xl space-y-5">
+        // As wide as the tabs, as Steps and Activity are (plan #1688).
+        <div className="space-y-5">
           {updates[0] && <FeatureUpdate update={updates[0]} />}
           {/* The summary, the fog, the feature's own words, what it is done
               when, what it needs and what it waits on, on one card (plan

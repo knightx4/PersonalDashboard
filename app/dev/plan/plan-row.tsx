@@ -1252,6 +1252,13 @@ export function usePlanRow({
 
   // The one press a feature's own page keeps in its header: the same Send the
   // row's opened panel leads with, asking first when the run has gone quiet.
+  // It reads "Send to Dash" on the title's line (plan #1688): on the
+  // feature's own page it plainly sends that feature, and the count of rows
+  // beneath, which is every row at any depth rather than the steps Progress
+  // counts, is in its title instead. On a phone it is the play mark alone,
+  // the words kept as its name, so the title keeps the width of the line.
+  const sendWords = 'max-sm:sr-only';
+  const sendShape = 'press-area max-sm:size-9 max-sm:px-0';
   const sendButton =
     closed || node.track === 'overhaul' ? null : quietAsk ? (
       <Button
@@ -1261,9 +1268,10 @@ export function usePlanRow({
         disabled={beingResolved}
         title={quietAsk}
         onClick={() => setConfirmingSend(true)}
+        className={sendShape}
       >
         <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
-        {sendLabel(node)}
+        <span className={sendWords}>Send to Dash</span>
       </Button>
     ) : (
       <form action={sendAction}>
@@ -1274,9 +1282,11 @@ export function usePlanRow({
           variant="secondary"
           pending={sendPending}
           disabled={beingResolved}
+          title={sendLabel(node)}
+          className={sendShape}
         >
           <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {sendPending ? 'Sending…' : sendLabel(node)}
+          <span className={sendWords}>{sendPending ? 'Sending…' : 'Send to Dash'}</span>
         </Button>
       </form>
     );

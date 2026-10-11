@@ -52,7 +52,8 @@ export function FeatureActivity({ entries }: { entries: readonly ActivityEntry[]
   const days = activityDays(shown);
 
   return (
-    <div className="max-w-2xl space-y-5">
+    // As wide as the tabs, as Overview and Steps are (plan #1688).
+    <div className="space-y-5">
       {days.map(({ day, entries: onDay }) => (
         <section key={day} aria-label={dayHeading(day)}>
           <h2 className="mb-2 text-small font-semibold uppercase tracking-wide text-ink-muted">

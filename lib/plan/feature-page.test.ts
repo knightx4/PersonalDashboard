@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PlanItem } from '@/lib/plan/load';
 import { buildPlanTree } from '@/lib/plan/tree';
 import {
+  crumbTitle,
   featureCrumbs,
   featureStatus,
   findFeature,
@@ -71,17 +72,28 @@ describe('the feature page', () => {
     expect(stepRedirect(step.feature, step.target)).toBe('/dev/plan/10?tab=steps#plan-12');
   });
 
-  it('reads Dev, Plan, the module, then the feature', () => {
+  it('reads Dev, Plan, the module, then the short title, never repeating a crumb', () => {
     const found = findFeature(tree, 10)!;
-    const crumbs = featureCrumbs(found.feature, found.module, found.moduleLabel);
-    expect(crumbs.map((crumb) => crumb.label)).toEqual(['Dev', 'Plan', found.moduleLabel, '#10']);
-    expect(crumbs[2].href).toBe('/dev/plan#plan-module-dev');
-    expect(crumbs[3].href).toBe('/dev/plan/10');
+    // A Dev feature leaves the module out: Dev › Plan › Dev would say it twice.
+    const dev = featureCrumbs(found.feature, found.module, 'Dev');
+    expect(dev.map((crumb) => crumb.label)).toEqual(['Dev', 'Plan', 'Feature pages']);
+    expect(dev[2].href).toBe('/dev/plan/10');
+    const crumbs = featureCrumbs(found.feature, 'shopping', 'Shopping');
+    expect(crumbs.map((crumb) => crumb.label)).toEqual(['Dev', 'Plan', 'Shopping', 'Feature pages']);
+    expect(crumbs[2].href).toBe('/dev/plan#plan-module-shopping');
     // A project has a page of its own in Dev, so its crumb goes there.
     const site = findFeature(tree, 20)!;
     expect(featureCrumbs(site.feature, site.module, site.moduleLabel)[2].href).toBe(
       '/dev/projects/website',
     );
+  });
+
+  it('cuts a long title at a word for the last crumb', () => {
+    expect(crumbTitle('Tidy the header')).toBe('Tidy the header');
+    expect(crumbTitle("Make a feature's status, health and next agree")).toBe(
+      "Make a feature's status, health…",
+    );
+    expect(crumbTitle('a'.repeat(40))).toBe(`${'a'.repeat(32)}…`);
   });
 });
 

@@ -111,11 +111,12 @@ function render(tab = '', extra = '') {
 }
 
 describe('the feature page', () => {
-  it('reads Dev, Plan, the module, then the feature, with the tabs under the title', () => {
+  it('reads Dev, Plan, then the feature, with the tabs under the title', () => {
     const html = render();
     expect(html).toContain('href="/dev"');
-    expect(html).toContain('href="/dev/plan#plan-module-dev"');
-    expect(html).toContain('href="/dev/plan/1"');
+    // The Dev module's crumb would say Dev twice, so it is left out (plan #1688).
+    expect(html).not.toContain('href="/dev/plan#plan-module-dev"');
+    expect(html).toMatch(/href="\/dev\/plan\/1"[^>]*>(<[^>]+>)*Feature pages</);
     expect(html).toContain('>Overview<');
     expect(html).toContain('href="/dev/plan/1?tab=steps"');
   });
@@ -134,7 +135,9 @@ describe('the feature page', () => {
     expect(html).toContain('Status of #1 Feature pages');
     expect(html).toContain('Priority of #1 Feature pages');
     expect(html).toContain('Actions for #1');
-    expect(html).toContain('Send #1');
+    // "Send to Dash" on the button, the count of rows beneath in its title.
+    expect(html).toContain('Send to Dash');
+    expect(html).toContain('title="Send #1');
     expect(html).toContain('Started');
     expect(html).toContain('2026-10-07');
   });

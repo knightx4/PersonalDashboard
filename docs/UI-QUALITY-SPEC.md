@@ -156,11 +156,13 @@ wide screen, and the sixth for pages of peer sections:
   loaded, as Quick read and Learn now work.
 - **Thread**: a row's comments and Dash's replies.
 - **Tabbed detail**: one thing's page with breadcrumbs, a title, tabs that
-  each have their own address, and its properties in a column on the right
-  that becomes a grid of facts under the title on a phone. The feature page
-  on the plan and the goal page use it (decision 1661, answered B, after
-  Linear's project page). Its text and its properties sit on cards (plan
-  1686).
+  each have their own address, and its properties in a column on the right.
+  On a phone the two or three facts read first sit in one row under the
+  title, with the rest folded under "All details", so the tabs are on the
+  first screen. The actions sit on the title's line, and every tab is as wide
+  as the row of tabs (plan 1688). The feature page on the plan and the goal
+  page use it (decision 1661, answered B, after Linear's project page). Its
+  text and its properties sit on cards (plan 1686).
 - **Main plus rail**: an overview page such as Home, with the column you work
   in and, from laptop width, a narrow column on the right holding what you
   glance at (counts, what is running, what Dash did, what is due soon). On a

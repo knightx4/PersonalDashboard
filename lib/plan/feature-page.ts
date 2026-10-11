@@ -105,28 +105,58 @@ export function stepRedirect(feature: PlanNode, target: PlanNode): string | null
 }
 
 /**
- * Dev, Plan, the module, then the feature. A project such as the website has
- * a page of its own in Dev, so its crumb goes there; a module's goes to its
- * section on the plan. The feature's own crumb is its number: the title is
- * printed in full right under the crumbs, and a long title as the last crumb
- * squeezed the module's crumb to nothing on a phone.
+ * The longest a feature's title runs as the last crumb before it is cut at a
+ * word. The title is printed in full right under the crumbs, so the crumb
+ * only has to say which feature this is.
+ */
+export const CRUMB_TITLE_LENGTH = 32;
+
+/** A title cut to `CRUMB_TITLE_LENGTH` at a word, with an ellipsis when cut. */
+export function crumbTitle(title: string): string {
+  const plain = title.trim();
+  if (plain.length <= CRUMB_TITLE_LENGTH) return plain;
+  const cut = plain.slice(0, CRUMB_TITLE_LENGTH);
+  const space = cut.lastIndexOf(' ');
+  const word = space > CRUMB_TITLE_LENGTH / 2 ? cut.slice(0, space) : cut;
+  return `${word.replace(/[\s,.;:–—-]+$/, '')}…`;
+}
+
+/**
+ * Dev, Plan, the module, then the feature's short title (plan #1688). A
+ * project such as the website has a page of its own in Dev, so its crumb
+ * goes there; a module's goes to its section on the plan. The module's crumb
+ * is left out when it says the same as one before it, so a Dev feature reads
+ * Dev › Plan › its title rather than Dev › Plan › Dev › #925. The last crumb
+ * was the number while the title went in uncut, because a long title
+ * squeezed the module's crumb to nothing on a phone; `crumbTitle` cuts it
+ * short instead.
  */
 export function featureCrumbs(
-  feature: Pick<PlanNode, 'number'>,
+  feature: Pick<PlanNode, 'number' | 'title'>,
   module: PlanScope | null,
   moduleLabel: string,
 ): Crumb[] {
-  return [
+  const start: Crumb[] = [
     { label: 'Dev', href: '/dev' },
     { label: 'Plan', href: '/dev/plan' },
-    {
-      label: moduleLabel,
-      href:
-        module && isProjectId(module)
-          ? `/dev/projects/${module}`
-          : `/dev/plan#${moduleAnchor(module)}`,
-    },
-    { label: `#${feature.number}`, href: featureHref(feature.number) },
+  ];
+  const label = moduleLabel.trim();
+  const repeats = !label || start.some((crumb) => crumb.label.toLowerCase() === label.toLowerCase());
+  const moduleCrumb: Crumb[] = repeats
+    ? []
+    : [
+        {
+          label,
+          href:
+            module && isProjectId(module)
+              ? `/dev/projects/${module}`
+              : `/dev/plan#${moduleAnchor(module)}`,
+        },
+      ];
+  return [
+    ...start,
+    ...moduleCrumb,
+    { label: crumbTitle(feature.title), href: featureHref(feature.number) },
   ];
 }
 
