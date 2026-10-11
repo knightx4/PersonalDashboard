@@ -202,16 +202,8 @@ export function ConceptPageView({ view, probes, opening, material, notes, timezo
         conceptId={concept.id}
         claim={concept.claim}
         wording={claimWordingLine(concept.claimRewrittenAt, now, timezone)}
+        original={concept.claimOriginal}
       />
-
-      {/* What the app first wrote, once there is a version of yours sitting
-          where it was. Nothing to show on a claim you have never rewritten,
-          and no heading either. */}
-      {concept.claimOriginal && (
-        <Group title="What the app first wrote" className="mb-5">
-          <p className="max-w-prose text-ui text-ink-muted">{concept.claimOriginal}</p>
-        </Group>
-      )}
 
       {/* Your notes on the idea, next to the claim they are about: the ones
           written on its Learn now cards and the ones written here. */}
@@ -332,7 +324,6 @@ export function ConceptPageView({ view, probes, opening, material, notes, timezo
       {opening && (
         <CardSection
           title="Asked before you started"
-          hint="Answered from memory, before anything about this subject was laid out."
           className="mb-5"
         >
           <p className="text-ui text-ink">{opening.question}</p>
@@ -347,11 +338,9 @@ export function ConceptPageView({ view, probes, opening, material, notes, timezo
 
       <CardSection
         title="Questions asked"
-        hint={
-          probes.length === 0
-            ? undefined
-            : 'Newest first, with the kind of question each was and why the answer is the answer.'
-        }
+        meta={`· ${probes.length}`}
+        fold="learn.fold.Questions asked"
+        defaultOpen={false}
       >
         {probes.length === 0 ? (
           <p className="text-ui text-ink-muted">
