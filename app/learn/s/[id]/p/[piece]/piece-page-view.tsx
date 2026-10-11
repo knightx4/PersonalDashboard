@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 import { PageHeader } from '@/components/shell/page-header';
 import type { PiecePage } from '@/lib/learn/lessons/piece-store';
 import type { PracticeView } from '@/lib/learn/lessons/practice';
@@ -39,10 +40,12 @@ export function PiecePageView({ page, practice, standing, reviews }: PiecePagePr
       />
 
       {unit.outcome && (
-        <p className="mb-5 text-ui text-ink-muted">
-          <span className="text-ink">By the end of the unit: </span>
-          {unit.outcome}
-        </p>
+        <Card padding="standard" className="mb-5">
+          <p className="text-ui text-ink-muted">
+            <span className="text-ink">By the end of the unit: </span>
+            {unit.outcome}
+          </p>
+        </Card>
       )}
 
       <ReviewList
@@ -53,7 +56,9 @@ export function PiecePageView({ page, practice, standing, reviews }: PiecePagePr
       />
 
       {page.ideas.length === 0 ? (
-        <p className="mb-6 text-body text-ink-muted">The ideas this piece covered are no longer in the subject.</p>
+        <p className="mb-6 text-body text-ink-muted">
+          The ideas this piece covered are no longer in the subject.
+        </p>
       ) : (
         <>
           <PieceLessons subjectId={subject.id} pieceId={piece.id} ideas={page.ideas} />
@@ -73,24 +78,31 @@ export function PiecePageView({ page, practice, standing, reviews }: PiecePagePr
 
       {siblings.length > 1 && (
         <nav aria-label="Pieces in this unit" className="mt-8">
-          <h2 className="mb-2 text-ui font-semibold text-ink-muted">This unit&rsquo;s pieces</h2>
-          <ol className="space-y-1">
-            {siblings.map((sibling) => (
-              <li key={sibling.id} className="flex items-baseline gap-2 text-ui">
-                <span className="w-5 shrink-0 text-ink-muted tabular-nums">{sibling.ordinal}.</span>
-                {sibling.id === piece.id ? (
-                  <span className="font-medium text-ink" aria-current="page">
-                    {sibling.title}
+          <Card padding="standard">
+            <h2 className="mb-2 text-ui font-semibold text-ink-muted">This unit&rsquo;s pieces</h2>
+            <ol className="space-y-1">
+              {siblings.map((sibling) => (
+                <li key={sibling.id} className="flex items-baseline gap-2 text-ui">
+                  <span className="w-5 shrink-0 text-ink-muted tabular-nums">
+                    {sibling.ordinal}.
                   </span>
-                ) : (
-                  <Link href={`/learn/s/${subject.id}/p/${sibling.id}`} className="press-area text-accent hover:underline">
-                    {sibling.title}
-                  </Link>
-                )}
-                {sibling.passed && <span className="text-small text-ink-muted">passed</span>}
-              </li>
-            ))}
-          </ol>
+                  {sibling.id === piece.id ? (
+                    <span className="font-medium text-ink" aria-current="page">
+                      {sibling.title}
+                    </span>
+                  ) : (
+                    <Link
+                      href={`/learn/s/${subject.id}/p/${sibling.id}`}
+                      className="press-area text-accent hover:underline"
+                    >
+                      {sibling.title}
+                    </Link>
+                  )}
+                  {sibling.passed && <span className="text-small text-ink-muted">passed</span>}
+                </li>
+              ))}
+            </ol>
+          </Card>
         </nav>
       )}
     </>
