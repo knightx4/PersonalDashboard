@@ -185,6 +185,45 @@ group counts as one note.
      note from its text if that is enough, and say in the resolution note
      that its files were not read. If the text is not enough, block it,
      saying the screenshot could not be opened.
+   **Move an oversized note to the ideas page instead of building it.** After
+   reading the note and the code it points at, check three things. Does the
+   fix need a migration? Does it need a new screen? Does it change more than
+   one workspace? Or did triage's route (`triage.route`) say `plan`, and does
+   the code agree? If any one holds, the fix is bigger than the note looked,
+   and you do not build it. Triage's route is a first guess made when the note
+   was filed, so a `plan?` the code disproves is built as a fix, and a `fix`
+   the code disproves is moved. Move it:
+
+   1. File an idea from the note's own words, with the note's module, and
+      `source = 'me'`. The person wrote it, so the hold on session-filed ideas
+      and the limit of two an hour do not apply. `plan.ts idea` writes
+      `source = 'claude'` and is held to both, so insert the row by hand
+      (below). Add a line after the text saying what you found
+      that makes it bigger, such as "Needs a new table and a new screen."
+   2. Mark the note `planned`, with a resolution naming the idea by its first
+      eight characters and saying what made it bigger. No commit.
+   3. List it in the closing report under its own heading, **Moved to ideas**
+      (*Closing report*).
+
+   ```sql
+   insert into ideas (user_id, body, module, source)
+   values ('<user_id>', $i$<the note's text>
+
+   Moved from a note: <what made the fix bigger>.$i$, '<module or null>', 'me')
+   returning id;
+
+   select core.dash_before('public.feedback_items:<note id>');
+   update feedback_items set status = 'planned',
+     resolution_note = $r$Moved to the ideas page as <first 8 of idea id>: <what made it bigger>. Approve it there and it is built as a plan.$r$,
+     commit_sha = null, completed_at = null where id = '<note id>';
+   select core.record_dash_action('<user_id>', 'public.feedback_items:<note id>', 'update',
+     'close_note', $s$Dash moved your note about <topic> to the ideas page, since the fix is bigger than a note.$s$);
+   ```
+
+   A note moved this way leaves the batch, and the same-cause group it was in
+   goes with it if the whole group shares the fix. Do this at the claim, before
+   writing any code; a note found oversized only after a fix is half built is
+   `blocked` with the question instead, as step 3 says.
 3. **Reproduce first, for bugs.** Find the actual cause in the code before
    changing anything. A fix for a guessed cause is how a note gets closed
    twice. If it cannot be reproduced, that is a `block`, with what you tried.
@@ -661,6 +700,9 @@ Then, below the table:
 
 - **Blocked** — one line each: the question, phrased so a one-line answer
   unblocks it.
+- **Moved to ideas** — each note moved to `/dev/ideas` instead of built, by
+  note id, the idea's first eight characters and what made the fix bigger.
+  Leave the heading out when none moved. These rows are `planned` in the table.
 - **Raised** — anything written to `/dev/inbox` during the run, by title, so
   the user knows a question is waiting there.
 - **Critic rounds** — for each surface a fix touched, how many rounds it
