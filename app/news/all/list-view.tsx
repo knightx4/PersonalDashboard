@@ -86,10 +86,7 @@ export function NewsListView({
      */
     return (
       <div className="mx-auto max-w-3xl space-y-6">
-        <PageHeader
-          title="Newsletters"
-          description="What has been sent to the address that belongs to this app."
-        />
+        <PageHeader title="Newsletters" />
         <EmptyState
           icon={Mail}
           title={gap ? 'Nothing can arrive yet' : 'Nothing has arrived yet'}
@@ -113,10 +110,7 @@ export function NewsListView({
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Newsletters"
-        description="What has been sent to the address that belongs to this app."
-      />
+      <PageHeader title="Newsletters" />
 
       <NeedsConfirming signups={waiting} senders={byId} timezone={timezone} />
 
@@ -140,9 +134,12 @@ export function NewsListView({
         />
       ) : (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
-          <nav aria-label="Filter by sender" className="min-w-0 space-y-1">
+          <nav
+            aria-label="Filter by sender"
+            className={cn(cardVariants(), 'min-w-0 divide-y divide-border overflow-hidden')}
+          >
             {column.map((sender) => (
-              <div key={sender.id} className="flex items-center gap-1">
+              <div key={sender.id} className="flex items-center gap-1 px-2 py-0.5">
                 <a
                   href={listHref({ from: selected === sender.id ? null : sender.id, topic })}
                   aria-current={selected === sender.id ? 'true' : undefined}
@@ -238,8 +235,13 @@ export function NewsListView({
                             {issue.subject ?? 'No subject'}
                             {!issue.readAt && <span className="sr-only"> (unread)</span>}
                           </span>
-                          <span className="mt-0.5 block truncate text-ui text-ink-muted">
-                            {sender ? senderLabel(sender) : 'Unknown sender'}
+                          <span className="mt-0.5 flex items-baseline gap-2 text-ui text-ink-muted">
+                            <span className="min-w-0 flex-1 truncate">
+                              {sender ? senderLabel(sender) : 'Unknown sender'}
+                            </span>
+                            <span className="shrink-0 sm:hidden">
+                              {formatArrival(issue.receivedAt, timezone)}
+                            </span>
                           </span>
                           {issue.summaryLine && (
                             <span className="mt-0.5 block truncate text-ui text-ink-muted">
@@ -247,7 +249,7 @@ export function NewsListView({
                             </span>
                           )}
                         </span>
-                        <span className="shrink-0 text-ui text-ink-muted">
+                        <span className="hidden shrink-0 text-ui text-ink-muted sm:inline">
                           {formatArrival(issue.receivedAt, timezone)}
                         </span>
                       </Link>

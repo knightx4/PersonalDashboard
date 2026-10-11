@@ -91,10 +91,7 @@ async function RecommendedPage({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Newsletters"
-        description="What has been sent to the address that belongs to this app."
-      />
+      <PageHeader title="Newsletters" />
       <ViewSwitch view="recommended" topic={null} />
       <RecommendedNewsletters
         stored={stored}
