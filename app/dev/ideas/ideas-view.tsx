@@ -516,8 +516,14 @@ export function IdeasView({
         <EmptyState
           icon={Lightbulb}
           title="Nothing written down yet"
-          description="Write down anything worth doing one day, for the app as a whole or for one workspace. Nothing here runs on its own: Dash shapes an idea into the plan when you ask, and you approve what it proposes there. Follow-ons Dash notices while building appear under Suggested by Dash, and dismissing one stops it being offered."
-        />
+          align="start"
+          description="Write down anything worth doing one day, for the app as a whole or for one workspace. Dash shapes an idea into the plan when you ask, and you approve what it proposes there. Nothing runs on its own."
+        >
+          <p className="max-w-sm text-body leading-relaxed text-ink-muted">
+            Follow-ons Dash notices while building appear under Suggested by Dash. Dismiss one and
+            it stops being offered.
+          </p>
+        </EmptyState>
       )}
 
       {/* Everything written down has been shaped. Not the empty state above:
