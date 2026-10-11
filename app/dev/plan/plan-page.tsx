@@ -272,7 +272,9 @@ export async function renderPlanPage({
         }
         description={
           project
-            ? `${project.description}, built from this plan in ${project.repo.owner}/${project.repo.repo}. Send a step to Dash and it is built there, pushed to ${project.repo.branch} and closed here with the commit.`
+            ? // One line naming where it is built (plan #1688): the paragraph
+              // that also said how a sent step lands sat bare on the page.
+              `Built in ${project.repo.owner}/${project.repo.repo}`
             : 'Features, the steps that get you there, and the substeps beneath those. Seeded from the docs once; edited here after, and read from here by whoever builds next.'
         }
       />

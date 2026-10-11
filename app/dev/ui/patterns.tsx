@@ -340,17 +340,22 @@ function TabbedSurface() {
   return (
     <TabbedDetail
       crumbs={[
-        { label: 'Plan', href: '#' },
         { label: 'Dev', href: '#' },
-        { label: 'Give each feature its own page with tabs', href: '#' },
+        { label: 'Plan', href: '#' },
+        { label: 'Give each feature its own…', href: '#' },
       ]}
       title="Give each feature its own page with tabs"
       description="Feature #1660"
-      properties={
-        <PropertyList>
+      glance={
+        <>
           <Property label="Status" value="In progress" />
           <Property label="Health" value="On track" />
-          <Property label="Steps" value="2 of 10 done" />
+          <Property label="Progress" value="2 of 10 done" />
+        </>
+      }
+      detailCount={5}
+      properties={
+        <PropertyList>
           <Property label="Waiting on you" value="None" />
           <Property label="Dash has" value="7 steps" />
           <Property label="Module" value="Dev" />

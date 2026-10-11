@@ -268,6 +268,20 @@ export function FeaturePage({
       )}
     </>
   );
+  // The facts below, counted for the closed fold on a phone: whose move,
+  // priority, size, held by, module, the dates, the commit and the split.
+  const detailCount = [
+    Boolean(parts.move),
+    true,
+    Boolean(node.size),
+    true,
+    true,
+    Boolean(when(node.startedAt)),
+    Boolean(when(node.completedAt)),
+    Boolean(node.commitSha),
+    split.open > 0,
+    split.open > 0,
+  ].filter(Boolean).length;
   const properties = (
     <PropertyList>
       {parts.move && <Property label={MOVE_LABEL} value={parts.move} />}
@@ -278,7 +292,8 @@ export function FeaturePage({
             label={`Priority of #${node.number} ${node.title}`}
             items={parts.priorityMenu}
             align="start"
-            triggerClassName="-ml-1.5 h-7 w-auto px-1.5 text-ui font-normal text-ink"
+            // Pulled up as Status is, so the gap above it matches the others.
+            triggerClassName="-my-1 -ml-1.5 h-7 w-auto px-1.5 text-ui font-normal text-ink"
             trigger={<span>{PLAN_PRIORITY_LABEL[node.priority]}</span>}
           />
         }
@@ -385,6 +400,7 @@ export function FeaturePage({
         </>
       }
       glance={glance}
+      detailCount={detailCount}
       properties={properties}
       tabs={tabs}
       label="Feature"
@@ -542,7 +558,6 @@ function FeatureSteps({
       trail={[]}
       asStep
       moveAfter
-      inlinePriority
       view="open"
       searching={false}
       unfolded

@@ -286,7 +286,8 @@ function SearchThePlan({
           onKeyDown={(event) => {
             if (event.key === 'Escape') onQuery('');
           }}
-          placeholder="Search the plan — a number, a title, a phrase"
+          // Short enough to show whole in a phone's box (plan #1688).
+          placeholder="Search by number or words"
           aria-label="Search the plan"
           className="relative w-full"
         />

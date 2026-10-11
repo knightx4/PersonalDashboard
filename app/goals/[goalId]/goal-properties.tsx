@@ -70,14 +70,12 @@ export function GoalGlance({ goal, review, progress }: Pick<Props, 'goal' | 'rev
   );
 }
 
-/**
- * The rest of the goal's facts in the tabbed detail's properties (plan
- * #1671): the area, the dates, and the open steps split between you and
- * Dash. The split is the steps' bands from `goalProgress`, the same counts
- * the goal's bar on Goals draws, so the two never disagree. When it was
- * added is the line under the title (`goalLine`).
- */
-export function GoalProperties({ goal, areaName, progress, timeZone }: Props) {
+/** The day it closed, and the open steps split between you and Dash. */
+function goalFacts(
+  goal: Props['goal'],
+  progress: Props['progress'],
+  timeZone: string,
+): { closed: string | null; split: string } {
   const closed =
     goal.status === 'done' || goal.status === 'dropped' ? dayOf(goal.closedAt, timeZone) : null;
   // The open steps split between you and Dash, leaving out a share of none:
@@ -89,6 +87,28 @@ export function GoalProperties({ goal, areaName, progress, timeZone }: Props) {
   ]
     .filter(Boolean)
     .join(' · ');
+  return { closed, split };
+}
+
+/** How many facts `GoalProperties` draws, said on the closed fold on a phone. */
+export function goalDetailCount(
+  goal: Props['goal'],
+  progress: Props['progress'],
+  timeZone: string,
+): number {
+  const { closed, split } = goalFacts(goal, progress, timeZone);
+  return 1 + (goal.dueOn ? 1 : 0) + (closed ? 1 : 0) + (split ? 1 : 0);
+}
+
+/**
+ * The rest of the goal's facts in the tabbed detail's properties (plan
+ * #1671): the area, the dates, and the open steps split between you and
+ * Dash. The split is the steps' bands from `goalProgress`, the same counts
+ * the goal's bar on Goals draws, so the two never disagree. When it was
+ * added is the line under the title (`goalLine`).
+ */
+export function GoalProperties({ goal, areaName, progress, timeZone }: Props) {
+  const { closed, split } = goalFacts(goal, progress, timeZone);
   return (
     <PropertyList>
       {/* Plain text, as the feature page's Module is: the path above the

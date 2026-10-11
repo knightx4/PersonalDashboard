@@ -40,6 +40,7 @@ export function TabbedDetail({
   description,
   actions,
   glance,
+  detailCount,
   properties,
   tabs,
   label,
@@ -61,6 +62,8 @@ export function TabbedDetail({
    * on a phone.
    */
   glance?: React.ReactNode;
+  /** How many facts `properties` holds when `glance` folds them, said on the closed fold. */
+  detailCount?: number;
   /** The facts, as `PropertyList` holding `Property`s; the rest of them when `glance` is given. */
   properties: React.ReactNode;
   tabs: readonly Tab[];
@@ -95,7 +98,15 @@ export function TabbedDetail({
           )}
         </header>
       }
-      properties={glance ? <PropertiesFold glance={glance}>{properties}</PropertiesFold> : properties}
+      properties={
+        glance ? (
+          <PropertiesFold glance={glance} count={detailCount}>
+            {properties}
+          </PropertiesFold>
+        ) : (
+          properties
+        )
+      }
     >
       <Tabs tabs={tabs} label={label} className="mb-5" />
       {children}

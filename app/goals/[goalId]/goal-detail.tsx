@@ -8,7 +8,7 @@ import type { Place } from '../move-goal';
 import { GoalAreaMenu } from './goal-area-menu';
 import { GoalGlyph } from './goal-close';
 import { GoalHeadingField } from './goal-heading';
-import { GoalGlance, GoalProperties, goalLine } from './goal-properties';
+import { GoalGlance, GoalProperties, goalDetailCount, goalLine } from './goal-properties';
 
 /**
  * A goal's page frame (plan #1671): the tabbed detail pattern the feature
@@ -66,6 +66,7 @@ export function GoalDetail({
         />
       }
       glance={<GoalGlance goal={goal} review={review} progress={progress} />}
+      detailCount={goalDetailCount(goal, progress, timeZone)}
       properties={
         <GoalProperties
           goal={goal}

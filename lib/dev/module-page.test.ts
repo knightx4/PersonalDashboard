@@ -3,7 +3,7 @@ import type { FeedbackRow } from '@/lib/feedback/load';
 import type { IdeaRow } from '@/lib/ideas/load';
 import { moduleById } from '@/lib/modules';
 import type { PlanItem } from '@/lib/plan/load';
-import { moduleCrumbs, moduleSummaries, moduleSummary, uiLine, type ModuleInputs } from './module-page';
+import { moduleCrumbs, moduleSummaries, moduleSummary, uiLine, uiShort, type ModuleInputs } from './module-page';
 
 let counter = 0;
 function item(over: Partial<PlanItem> & { id: string }): PlanItem {
@@ -106,5 +106,6 @@ describe("a module's page", () => {
 
   it('says a module nobody has reviewed was never reviewed', () => {
     expect(uiLine(null)).toBe('Never reviewed');
+    expect(uiShort(null)).toBe('Never');
   });
 });
