@@ -19,7 +19,6 @@ import {
   type ListView,
   type NewsIssue,
   type NewsSender,
-  sortSenders,
   type UnreadStories,
   unreadTopics,
   type WaitingSignup,
@@ -64,7 +63,6 @@ export function NewsListView({
   // sender always reads as Latest.
   const view = selected ? 'latest' : readListView(viewParam);
   const shown = visibleIssues(issues, senders, selected);
-  const column = sortSenders(senders);
   const topics = unreadTopics(unread, senders, selected);
   // The topic in force is shown by its own chip row below, so only the sender is here.
   const filters: FilterChip[] = [];
@@ -86,10 +84,7 @@ export function NewsListView({
      */
     return (
       <div className="mx-auto max-w-3xl space-y-6">
-        <PageHeader
-          title="Newsletters"
-          description="What has been sent to the address that belongs to this app."
-        />
+        <PageHeader title="Newsletters" />
         <EmptyState
           icon={Mail}
           title={gap ? 'Nothing can arrive yet' : 'Nothing has arrived yet'}
@@ -111,26 +106,26 @@ export function NewsListView({
     );
   }
 
+  const header = <PageHeader title="Newsletters" />;
+
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title="Newsletters"
-        description="What has been sent to the address that belongs to this app."
-      />
+    <div className="mx-auto max-w-3xl space-y-4">
+      {header}
 
       <NeedsConfirming signups={waiting} senders={byId} timezone={timezone} />
 
-      <ViewSwitch view={view} topic={topic} />
-
-      <FilterChips chips={filters} clearAllHref="/news/all" />
-      <TopicChips
-        topics={topics}
-        selected={topic}
-        hrefs={topicHrefs(topics, (t) => listHref({ from: selected, topic: t, view }))}
-        allHref={listHref({ from: selected, topic: null, view })}
-        // A chip is a link, so it takes its phone press area from here.
-        className="mb-4 [&_a]:press-area"
-      />
+      <div className="space-y-3">
+        <ViewSwitch view={view} topic={topic} />
+        <FilterChips chips={filters} clearAllHref="/news/all" />
+        <TopicChips
+          topics={topics}
+          selected={topic}
+          hrefs={topicHrefs(topics, (t) => listHref({ from: selected, topic: t, view }))}
+          allHref={listHref({ from: selected, topic: null, view })}
+          // A chip is a link, so it takes its phone press area from here.
+          className="[&_a]:press-area"
+        />
+      </div>
 
       {view === 'newsletters' ? (
         <NewsletterList
@@ -138,125 +133,85 @@ export function NewsListView({
           topic={topic}
           timezone={timezone}
         />
+      ) : shown.length === 0 ? (
+        <EmptyState
+          icon={Mail}
+          title={
+            topic
+              ? `Nothing on ${topic}`
+              : selected
+                ? 'Nothing from them yet'
+                : 'Every sender is muted'
+          }
+          description={
+            topic
+              ? 'No newsletter here has a story on this topic.'
+              : selected
+                ? 'This sender has written to you before, but nothing of theirs is here now.'
+                : 'Everything that has arrived is from a sender you have muted. Unmute one under By newsletter, or pick it there to read what it sent.'
+          }
+          action={
+            topic
+              ? { label: 'Show every topic', href: listHref({ from: selected, topic: null }) }
+              : selected
+                ? { label: 'Show everything', href: '/news/all' }
+                : { label: 'By newsletter', href: listHref({ from: null, topic: null, view: 'newsletters' }) }
+          }
+        />
       ) : (
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
-          <nav aria-label="Filter by sender" className="min-w-0 space-y-1">
-            {column.map((sender) => (
-              <div key={sender.id} className="flex items-center gap-1">
-                <a
-                  href={listHref({ from: selected === sender.id ? null : sender.id, topic })}
-                  aria-current={selected === sender.id ? 'true' : undefined}
-                  className={cn(
-                    'press-area min-w-0 flex-1 truncate rounded-control px-2 py-1.5 text-ui transition-colors duration-quick hover:bg-canvas',
-                    selected === sender.id
-                      ? 'bg-accent-tint font-medium text-ink'
-                      : 'text-ink-muted',
-                  )}
-                >
-                  {senderLabel(sender)}
-                  {sender.muted && <span className="ml-1 text-micro text-ink-ghost">muted</span>}
-                </a>
-                <form action={setSenderMuted}>
-                  <input type="hidden" name="senderId" value={sender.id} />
-                  <input type="hidden" name="muted" value={sender.muted ? 'false' : 'true'} />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    variant="ghost"
-                    aria-label={
-                      sender.muted ? `Unmute ${senderLabel(sender)}` : `Mute ${senderLabel(sender)}`
-                    }
+        <div>
+          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+            {shown.map((issue) => {
+              const sender = byId.get(issue.senderId);
+              return (
+                <li key={issue.id}>
+                  <Link
+                    // Which list this was opened from, carried so that back
+                    // comes back to it. An issue knows its sender and
+                    // cannot know whether you were filtered to them, so the
+                    // list is the only thing that can say -- note 71889d79.
+                    href={selected ? `/news/i/${issue.id}?from=${selected}` : `/news/i/${issue.id}`}
+                    className="flex items-baseline gap-3 px-4 py-3 transition-colors duration-quick hover:bg-canvas"
                   >
-                    <BellOff
-                      className={cn('size-3.5', sender.muted ? 'text-accent' : 'text-ink-ghost')}
-                      strokeWidth={1.75}
+                    <span
+                      className={cn(
+                        'mt-1.5 size-2 shrink-0 rounded-full',
+                        issue.readAt ? 'bg-transparent' : 'bg-accent',
+                      )}
+                      aria-hidden
                     />
-                  </Button>
-                </form>
-              </div>
-            ))}
-          </nav>
-
-          <div>
-            <p className="mb-3 text-body text-ink-muted">{countLabel(shown.length)}</p>
-
-            {shown.length === 0 ? (
-              <EmptyState
-                icon={Mail}
-                title={
-                  topic
-                    ? `Nothing on ${topic}`
-                    : selected
-                      ? 'Nothing from them yet'
-                      : 'Every sender is muted'
-                }
-                description={
-                  topic
-                    ? 'No newsletter here has a story on this topic.'
-                    : selected
-                      ? 'This sender has written to you before, but nothing of theirs is here now.'
-                      : 'Everything that has arrived is from a sender you have muted. Unmute one in the column, or pick it to read what it sent.'
-                }
-                action={
-                  topic
-                    ? { label: 'Show every topic', href: listHref({ from: selected, topic: null }) }
-                    : selected
-                      ? { label: 'Show everything', href: '/news/all' }
-                      : undefined
-                }
-              />
-            ) : (
-              <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-                {shown.map((issue) => {
-                  const sender = byId.get(issue.senderId);
-                  return (
-                    <li key={issue.id}>
-                      <Link
-                        // Which list this was opened from, carried so that back
-                        // comes back to it. An issue knows its sender and
-                        // cannot know whether you were filtered to them, so the
-                        // list is the only thing that can say -- note 71889d79.
-                        href={
-                          selected ? `/news/i/${issue.id}?from=${selected}` : `/news/i/${issue.id}`
-                        }
-                        className="flex items-baseline gap-3 px-4 py-3 transition-colors duration-quick hover:bg-canvas"
+                    <span className="min-w-0 flex-1">
+                      {/* The headline has the row's width and two lines for
+                          itself; the date sits on the sender's line. */}
+                      <span
+                        className={cn(
+                          'relative block line-clamp-2 text-body text-ink [overflow-wrap:anywhere]',
+                          issue.readAt ? '' : 'font-medium',
+                        )}
                       >
-                        <span
-                          className={cn(
-                            'mt-1.5 size-2 shrink-0 rounded-full',
-                            issue.readAt ? 'bg-transparent' : 'bg-accent',
-                          )}
-                          aria-hidden
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span
-                            className={cn(
-                              'relative block truncate text-body text-ink',
-                              issue.readAt ? '' : 'font-medium',
-                            )}
-                          >
-                            {issue.subject ?? 'No subject'}
-                            {!issue.readAt && <span className="sr-only"> (unread)</span>}
-                          </span>
-                          <span className="mt-0.5 block truncate text-ui text-ink-muted">
-                            {sender ? senderLabel(sender) : 'Unknown sender'}
-                          </span>
-                          {issue.summaryLine && (
-                            <span className="mt-0.5 block truncate text-ui text-ink-muted">
-                              {issue.summaryLine}
-                            </span>
-                          )}
+                        {issue.subject ?? 'No subject'}
+                        {!issue.readAt && <span className="sr-only"> (unread)</span>}
+                      </span>
+                      <span className="mt-0.5 flex items-baseline gap-3 text-ui text-ink-muted">
+                        <span className="min-w-0 flex-1 truncate">
+                          {sender ? senderLabel(sender) : 'Unknown sender'}
                         </span>
-                        <span className="shrink-0 text-ui text-ink-muted">
+                        <span className="shrink-0 tabular-nums">
                           {formatArrival(issue.receivedAt, timezone)}
                         </span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
+                      </span>
+                      {issue.summaryLine && (
+                        <span className="mt-0.5 block truncate text-ui text-ink-muted">
+                          {issue.summaryLine}
+                        </span>
+                      )}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-3 text-small text-ink-muted">{countLabel(shown.length)}</p>
         </div>
       )}
     </div>
@@ -296,42 +251,67 @@ function NewsletterList({
   }
 
   return (
-    <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-      {rows.map(({ sender, editions, unread, latest }) => (
-        <li key={sender.id}>
-          <Link
-            href={listHref({ from: sender.id, topic })}
-            className="flex items-baseline gap-3 px-4 py-3 transition-colors duration-quick hover:bg-canvas"
-          >
-            <span
-              className={cn(
-                'mt-1.5 size-2 shrink-0 rounded-full',
-                unread > 0 ? 'bg-accent' : 'bg-transparent',
-              )}
-              aria-hidden
-            />
-            <span className="min-w-0 flex-1">
+    <div>
+      <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+        {rows.map(({ sender, editions, unread, latest }) => (
+          <li key={sender.id} className="flex items-center">
+            <Link
+              href={listHref({ from: sender.id, topic })}
+              className="flex min-w-0 flex-1 items-baseline gap-3 py-3 pl-4 transition-colors duration-quick hover:bg-canvas"
+            >
               <span
-                className={cn('relative block truncate text-body text-ink', unread > 0 && 'font-medium')}
+                className={cn(
+                  'mt-1.5 size-2 shrink-0 rounded-full',
+                  unread > 0 ? 'bg-accent' : 'bg-transparent',
+                )}
+                aria-hidden
+              />
+              <span className="min-w-0 flex-1">
+                <span className="flex items-baseline gap-3">
+                  <span
+                    className={cn(
+                      'min-w-0 flex-1 truncate text-body text-ink',
+                      unread > 0 && 'font-medium',
+                    )}
+                  >
+                    {senderLabel(sender)}
+                    {sender.muted && <span className="ml-1 text-micro text-ink-ghost">muted</span>}
+                  </span>
+                  <span className="shrink-0 text-ui text-ink-muted tabular-nums">
+                    {formatArrival(latest.receivedAt, timezone)}
+                  </span>
+                </span>
+                <span className="mt-0.5 block truncate text-ui text-ink-muted">
+                  {latest.subject ?? 'No subject'}
+                </span>
+                <span className="mt-0.5 block text-ui text-ink-muted tabular-nums">
+                  {editions} {editions === 1 ? 'edition' : 'editions'}
+                  {unread > 0 && `, ${unread} unread`}
+                </span>
+              </span>
+            </Link>
+            {/* Muting lives on the newsletter's own row: it takes its issues
+                out of Latest, and the row stays here to bring them back. */}
+            <form action={setSenderMuted} className="shrink-0 pr-2 pl-1">
+              <input type="hidden" name="senderId" value={sender.id} />
+              <input type="hidden" name="muted" value={sender.muted ? 'false' : 'true'} />
+              <Button
+                type="submit"
+                size="sm"
+                variant="ghost"
+                aria-label={sender.muted ? `Unmute ${senderLabel(sender)}` : `Mute ${senderLabel(sender)}`}
               >
-                {senderLabel(sender)}
-                {sender.muted && <span className="ml-1 text-micro text-ink-ghost">muted</span>}
-              </span>
-              <span className="mt-0.5 block truncate text-ui text-ink-muted">
-                {latest.subject ?? 'No subject'}
-              </span>
-            </span>
-            <span className="shrink-0 text-right text-ui text-ink-muted">
-              <span className="block tabular-nums">
-                {editions} {editions === 1 ? 'edition' : 'editions'}
-                {unread > 0 && `, ${unread} unread`}
-              </span>
-              <span className="block">{formatArrival(latest.receivedAt, timezone)}</span>
-            </span>
-          </Link>
-        </li>
-      ))}
-    </ul>
+                <BellOff
+                  className={cn('size-3.5', sender.muted ? 'text-accent' : 'text-ink-ghost')}
+                  strokeWidth={1.75}
+                />
+              </Button>
+            </form>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-small text-ink-muted">{countLabel(rows.length)}</p>
+    </div>
   );
 }
 
