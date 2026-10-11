@@ -57,7 +57,7 @@ import { relatedNotes, toLink } from '@/lib/vault/notes/related';
 import { RelatedNotes } from '@/components/vault/related-notes';
 import { GoalStatusCard } from './goal-status';
 import { GoalActivity } from './goal-activity';
-import { GoalDetail } from './goal-detail';
+import { GoalDetail, GoalDoneWhen } from './goal-detail';
 import { GoalAddRow } from './goal-add-row';
 import { GoalStepsFold } from './goal-close';
 import type { Place } from '../move-goal';
@@ -409,9 +409,15 @@ export default async function GoalMapPage({
 
   const overview = (
     <div className="space-y-6">
-      {map.goal.fog && (
-        <GoalFog goalId={map.goal.id} fog={map.goal.fog} aside={Boolean(map.goal.fogDismissedAt)} />
-      )}
+      <GoalDoneWhen goal={map.goal}>
+        {map.goal.fog && (
+          <GoalFog
+            goalId={map.goal.id}
+            fog={map.goal.fog}
+            aside={Boolean(map.goal.fogDismissedAt)}
+          />
+        )}
+      </GoalDoneWhen>
       <div className="space-y-4">
         <GoalStatusCard
           line={line}

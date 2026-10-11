@@ -29,7 +29,7 @@ import { buildForest, type Step } from '@/lib/goals/steps';
 import type { GoalMap } from '@/lib/goals/steps-store';
 import type { AreaWithGoals, Goal } from '@/lib/goals/tree';
 import { DashCredit } from '@/components/ui/dash-mark';
-import { GoalDetail } from '@/app/goals/[goalId]/goal-detail';
+import { GoalDetail, GoalDoneWhen } from '@/app/goals/[goalId]/goal-detail';
 import { GoalActivity } from '@/app/goals/[goalId]/goal-activity';
 import { closedSteps, goalStages } from '@/lib/goals/goal-page';
 import { goalProgress } from '@/lib/goals/status';
@@ -405,10 +405,7 @@ export function GoalsHomeSurface() {
 export function GoalsInboxSurface() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader
-        title="Inbox"
-        description="Everything on you across your goals: steps to do, questions to answer, and proposals to say yes to."
-      />
+      <PageHeader title="Inbox" />
       <GoalsInboxView
         groups={goalInboxGroups(home.onYou, home.dash ?? [])}
         laterOn={home.laterOn ?? []}
@@ -680,6 +677,7 @@ export function GoalTopSurface() {
       timeZone="UTC"
     >
       <div className="space-y-6">
+        <GoalDoneWhen goal={cards} />
         <div className="space-y-4">
           <GoalStatusCard
             line="3 on you · 1 step ready for Dash"
@@ -771,7 +769,9 @@ export function GoalBareSurface() {
       timeZone="UTC"
     >
       <div className="space-y-6">
-        <GoalFog goalId={marathon.id} fog={marathon.fog!} aside={false} />
+        <GoalDoneWhen goal={marathon}>
+          <GoalFog goalId={marathon.id} fog={marathon.fog!} aside={false} />
+        </GoalDoneWhen>
         <GoalShaping
           goalId={marathon.id}
           approval={approvalLine({

@@ -74,6 +74,7 @@ export function GoalProperties({
       {progress.live > 0 && (
         <Property
           label="Progress"
+          wide
           hint="Steps and sub-steps that count, questions included; proposed and dropped ones left out. Yours: your move. Dash’s: Dash is on them or can take them. Waiting: on another step or a date."
           value={
             <span className="block">
