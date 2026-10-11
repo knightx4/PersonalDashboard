@@ -4,7 +4,11 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  featureSteps,
   isStalled,
+  SPLIT_ACTION,
+  splitPieces,
+  stallRunIds,
   raiseFeatureId,
   raiseHolds,
   runsByFeature,
@@ -131,7 +135,7 @@ describe('raiseFeatureId', () => {
 
 describe('stallRaise', () => {
   it('asks to send it again when neither session said why', () => {
-    const raise = stallRaise(FEATURE, [NEWER, OLDER]);
+    const raise = stallRaise(FEATURE, [NEWER, OLDER], 0);
     expect(raise.title).toBe('#1801 Raise a stalled feature is held: its last two sessions closed nothing');
     expect(raise.ask).toBe('Send #1801 Raise a stalled feature to a session again?');
     expect(raise.consequence).toMatchObject({ name: 'send_step', text: '#1801' });
@@ -142,7 +146,7 @@ describe('stallRaise', () => {
     const raise = stallRaise(FEATURE, [
       { ...NEWER, stopReason: 'Main was red from another merge.' },
       { ...OLDER, error: 'Nothing was heard from this run for 2h.' },
-    ]);
+    ], 0);
     expect(raise.ask).toBe(
       'A session on it stopped because "Main was red from another merge". Send #1801 Raise a stalled feature again as it stands?',
     );
@@ -153,28 +157,99 @@ describe('stallRaise', () => {
     expect(raise.consequence.name).toBe('send_step');
   });
 
-  it('lists the pieces a too-big step would split into', () => {
-    const raise = stallRaise(FEATURE, [
-      {
-        ...NEWER,
-        stopReason: 'Too big for one sitting.',
-        stopPieces: ['Read the runs', 'Write the raise', 'Hold on No'],
-      },
-      OLDER,
-    ]);
+  const TOO_BIG = [
+    {
+      ...NEWER,
+      stopReason: 'Too big for one sitting.',
+      stopPieces: ['Read the runs', 'Write the raise', 'Hold on No'],
+    },
+    OLDER,
+  ];
+
+  it('asks to split a feature with no steps into the pieces, and the Yes splits it', () => {
+    const raise = stallRaise(FEATURE, TOO_BIG, 0);
+    expect(raise.ask).toBe('Split #1801 Raise a stalled feature into 3 steps?');
+    expect(raise.detail).toMatch(/^This covers 3 pieces of work\. /);
+    expect(raise.detail).toContain('1. Read the runs\n2. Write the raise\n3. Hold on No');
+    expect(raise.detail).toContain('Yes writes them as steps under it, ready to build, and sends the first.');
+    expect(raise.consequence).toMatchObject({ name: SPLIT_ACTION, text: '#1801' });
+    expect(raise.source).toBe('stalled f1 runs r2 r1');
+  });
+
+  it('lists the pieces but asks to send again when the feature already has steps', () => {
+    const raise = stallRaise(FEATURE, TOO_BIG, 2);
     expect(raise.ask).toBe(
       'The sessions found #1801 Raise a stalled feature too big for one sitting and would split it into 3 steps. Send it again as it stands?',
     );
     expect(raise.detail).toContain('1. Read the runs\n2. Write the raise\n3. Hold on No');
+    expect(raise.consequence.name).toBe('send_step');
+  });
+
+  it('keeps "send it again?" with no reason, even for a feature with no steps', () => {
+    expect(stallRaise(FEATURE, [NEWER, OLDER], 0).consequence.name).toBe('send_step');
   });
 
   it('keeps the ask inside the column with the longest reason and title', () => {
-    const raise = stallRaise(
-      { ...FEATURE, title: 'x'.repeat(200) },
-      [{ ...NEWER, stopReason: 'y'.repeat(300) }, OLDER],
+    for (const raise of [
+      stallRaise({ ...FEATURE, title: 'x'.repeat(200) }, [{ ...NEWER, stopReason: 'y'.repeat(300) }, OLDER], 0),
+      stallRaise(
+        { ...FEATURE, title: 'x'.repeat(200) },
+        [{ ...NEWER, stopReason: 'y'.repeat(300), stopPieces: Array(20).fill('z'.repeat(200)) }, OLDER],
+        0,
+      ),
+    ]) {
+      expect(raise.ask.length).toBeLessThanOrEqual(500);
+      expect(raise.title.length).toBeLessThanOrEqual(200);
+      expect(raise.detail.length).toBeLessThanOrEqual(4000);
+      expect(raise.source.length).toBeLessThanOrEqual(200);
+    }
+  });
+});
+
+describe('featureSteps', () => {
+  it('counts the build rows beneath, leaving out dropped ones, questions and setup jobs', () => {
+    expect(
+      featureSteps({
+        children: [
+          { kind: 'build', status: 'not_started' },
+          { kind: 'build', status: 'done' },
+          { kind: 'build', status: 'dropped' },
+          { kind: 'decision', status: 'proposed' },
+          { kind: 'setup', status: 'not_started' },
+        ],
+      }),
+    ).toBe(2);
+    expect(featureSteps({ children: [] })).toBe(0);
+  });
+});
+
+describe('stallRunIds', () => {
+  it('reads the runs a stall raise names, newest first', () => {
+    expect(stallRunIds('stalled f1 runs r2 r1')).toEqual(['r2', 'r1']);
+    expect(stallRunIds('overnight held f1 after 2026-10-11T10:00:00Z')).toEqual([]);
+    expect(stallRunIds(null)).toEqual([]);
+  });
+});
+
+describe('splitPieces', () => {
+  it('takes the pieces of the first run named that left any, with its session', () => {
+    const found = splitPieces(
+      ['r2', 'r1'],
+      [
+        { id: 'r1', stopPieces: ['Older one', 'Older two'], session: 'cse_old' },
+        { id: 'r2', stopPieces: [' Read the runs ', 'Write the raise'], session: 'cse_new' },
+      ],
     );
-    expect(raise.ask.length).toBeLessThanOrEqual(500);
-    expect(raise.title.length).toBeLessThanOrEqual(200);
-    expect(raise.source.length).toBeLessThanOrEqual(200);
+    expect(found).toEqual({ pieces: ['Read the runs', 'Write the raise'], session: 'cse_new' });
+  });
+
+  it('falls back to the older run, and is null when neither left two pieces', () => {
+    const older = { id: 'r1', stopPieces: ['One', 'Two'], session: null };
+    expect(splitPieces(['r2', 'r1'], [{ id: 'r2', stopPieces: null, session: 'x' }, older])).toEqual({
+      pieces: ['One', 'Two'],
+      session: null,
+    });
+    expect(splitPieces(['r2'], [{ id: 'r2', stopPieces: ['Only one'], session: null }])).toBeNull();
+    expect(splitPieces([], [older])).toBeNull();
   });
 });

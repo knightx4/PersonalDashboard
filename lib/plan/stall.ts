@@ -24,6 +24,11 @@
  *   at it after the raise was filed or answered. A Yes sends one, which
  *   releases it; a No sends nothing, so the feature stays held until it is
  *   sent by hand. A dismissed raise holds nothing.
+ * - A feature with no steps whose session left the pieces it would split into
+ *   is asked "Split it into N steps?" instead (#1804). Its Yes is
+ *   `split_feature`: lib/comments/act.ts reads the pieces back off the runs the
+ *   raise's source names, writes them as ready steps and sends the first, and
+ *   that run releases the hold the same way.
  */
 import type { RunJob } from './run-end';
 
@@ -144,6 +149,51 @@ export function raiseHolds(
   return !newestRunAt || new Date(newestRunAt).getTime() <= since;
 }
 
+/** The action a Yes takes on a raise that splits a feature (#1804). */
+export const SPLIT_ACTION = 'split_feature';
+
+/**
+ * How many steps a feature has: its build rows that were not dropped. A
+ * question or a setup job beneath it is not a piece of its work.
+ */
+export function featureSteps(feature: {
+  children: readonly { kind: string; status: string }[];
+}): number {
+  return feature.children.filter((row) => row.kind === 'build' && row.status !== 'dropped').length;
+}
+
+/** The runs a stall raise's `source` names, newest first, or none. */
+export function stallRunIds(source: string | null | undefined): string[] {
+  if (!source?.startsWith(STALL_PREFIX)) return [];
+  const words = source.slice(STALL_PREFIX.length).split(' ').filter(Boolean);
+  return words[1] === 'runs' ? words.slice(2) : [];
+}
+
+/** One run as the split reads it back: its pieces and the session it was. */
+export type SplitRun = {
+  id: string;
+  stopPieces: string[] | null;
+  /** The session's id (`plan_runs.external_id`), for the stamp on each step. */
+  session: string | null;
+};
+
+/**
+ * The pieces to split a feature into: those of the first run, in the order
+ * the raise names them (newest first), that left two or more. The same choice
+ * `stallRaise` makes, so a Yes writes the list the raise showed.
+ */
+export function splitPieces(
+  runIds: readonly string[],
+  runs: readonly SplitRun[],
+): { pieces: string[]; session: string | null } | null {
+  for (const id of runIds) {
+    const found = runs.find((one) => one.id === id);
+    const pieces = (found?.stopPieces ?? []).map((piece) => piece.trim()).filter(Boolean);
+    if (found && pieces.length >= 2) return { pieces, session: found.session };
+  }
+  return null;
+}
+
 /** What the tick inserts into `raised_items` for a stall. */
 export type StallRaise = {
   module: string | null;
@@ -151,7 +201,7 @@ export type StallRaise = {
   ask: string;
   detail: string;
   consequence: {
-    name: 'send_step';
+    name: 'send_step' | typeof SPLIT_ACTION;
     text: string;
     module: null;
     field: null;
@@ -185,16 +235,26 @@ function runLine(run: StallRun): string {
  * again?". With one it quotes each session's line and asks whether to send it
  * again as it stands, which is what a Yes does. A session that found the work
  * too big leaves the pieces it would split it into; the raise lists them, and
- * `source` names both runs so #1804 can read the pieces off them when it adds
- * the split as the Yes.
+ * `source` names both runs so the split can read the pieces back off them.
+ *
+ * `steps` is how many steps the feature has (`featureSteps`). With pieces and
+ * none, the question is the split itself, "Split #N … into N steps?", and a
+ * Yes writes them and sends the first (#1804). A feature that already has
+ * steps keeps "send it again as it stands", since splitting it would write a
+ * second set beside the first.
  */
-export function stallRaise(feature: StallFeature, runs: readonly StallRun[]): StallRaise {
+export function stallRaise(
+  feature: StallFeature,
+  runs: readonly StallRun[],
+  steps: number,
+): StallRaise {
   const named = `#${feature.number} ${feature.title}`;
   const two = runs.slice(0, STALL_RUNS);
   const reason = two.find((run) => run.stopReason)?.stopReason ?? null;
   const pieces = two.find((run) => run.stopPieces && run.stopPieces.length > 0)?.stopPieces ?? null;
-  const consequence = {
-    name: 'send_step' as const,
+  const split = Boolean(pieces && pieces.length >= 2 && steps === 0);
+  const consequence: StallRaise['consequence'] = {
+    name: split ? SPLIT_ACTION : 'send_step',
     text: `#${feature.number}`,
     module: null,
     field: null,
@@ -224,6 +284,26 @@ export function stallRaise(feature: StallFeature, runs: readonly StallRun[]): St
     '',
     ...two.map(runLine),
   ];
+  if (pieces && split) {
+    lines[0] = `This covers ${pieces.length} pieces of work. ${lines[0]}`;
+    lines.push(
+      '',
+      `The last session found it too big for one sitting and would split it into these ${pieces.length} steps:`,
+      ...pieces.map((piece, index) => `${index + 1}. ${piece}`),
+      '',
+      'Yes writes them as steps under it, ready to build, and sends the first. No leaves it ' +
+        'held until you send it from its row on /dev/plan. To change something first, say ' +
+        'what in your answer.',
+    );
+    return {
+      module: feature.module,
+      title: cut(`${named} closed nothing in two sessions`, 200),
+      ask: cut(`Split ${named} into ${pieces.length} steps?`, 500),
+      detail: cut(lines.join('\n'), 4000),
+      consequence,
+      source,
+    };
+  }
   if (pieces) {
     lines.push(
       '',

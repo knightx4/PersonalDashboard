@@ -28,6 +28,7 @@ import { chooseOvernightFeature, OVERNIGHT_NOTHING_READY } from '@/lib/plan/over
 import { remainingUntil } from '@/lib/plan/elapsed';
 import { endsRun } from '@/lib/plan/run-end';
 import {
+  featureSteps,
   raiseFeatureId,
   raiseHolds,
   runsByFeature,
@@ -965,7 +966,7 @@ export async function fileStalls(input: {
     if (shouldRaiseStall(last, filed)) {
       const { error } = await supabase
         .from('raised_items')
-        .insert({ user_id: userId, ...stallRaise(feature, last), status: 'open' });
+        .insert({ user_id: userId, ...stallRaise(feature, last, featureSteps(feature)), status: 'open' });
       if (error) {
         console.error(`#${feature.number} could not be raised as stalled: ${error.message}`);
       } else {

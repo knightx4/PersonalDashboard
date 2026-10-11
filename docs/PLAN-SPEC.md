@@ -173,6 +173,13 @@ open, and after a No until a run is fired at the feature by hand. Yes sends
 it (`send_step`), which releases it. The rules are in `lib/plan/stall.ts`,
 and `fileStalls` in `inngest/dev/overnight.ts` does the reads and writes.
 
+A feature with no steps whose session left pieces is asked "Split #N … into
+N steps?" instead (#1804). Its Yes is `split_feature`, which only the tick
+files: `lib/comments/act.ts` reads the pieces back off the runs the raise's
+`source` names, writes them under the feature in order as ready steps stamped
+with the session that named them, and sends the first. That run releases the
+hold. A feature that has gained steps since is not split a second time.
+
 `app/api/plan/runs` is the only thing that asks GitHub about a run.
 `refreshRunReadings` in `lib/plan/runs.ts` does the work: the reader from
 `readRunLiveness` gets the claimed steps, the runs behind them and one activity
