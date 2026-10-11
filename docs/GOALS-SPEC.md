@@ -644,6 +644,12 @@ the same allowance. So Goals runs on a schedule rather than on every change:
   one sitting cost one run. It settles the provisional steps the answers
   held up and adds anything new (plan #1017).
 
+The scheduled runs above are listed on **Routines** (`/goals/routines`), each
+with how often it runs, when next, and how its last run went. It is drawn by
+the same component and registry as Dev's Routines tab (docs/PLAN-SPEC.md,
+"Recurring work lives on the Routines tab"), and links to Runs for every
+single run.
+
 ## Claude's own work
 
 Besides the scheduled runs, you can hand Claude one part of a goal, and the

@@ -543,6 +543,25 @@ between its steps, so a step that gets something wrong early has the rest
 built on top of it before anybody looks. Send a migration on its own; batch
 the rest once you have seen what it did.
 
+### Recurring work lives on the Routines tab
+
+Work that runs on a clock is listed on **Routines** (`/dev/routines`), not
+kept on the plan. Goals has the same tab (`/goals/routines`) for its own
+routines, and both draw one component from one registry,
+`lib/routines/registry.ts`. Each entry says what a run does, how often it runs
+and when next, when it last ran and how that went, and where its results are.
+The schedule comes from the live pg_cron job through
+`public.routine_schedules()` (migration 0194), or from `vercel.json` for a
+stage of `/api/cron/daily`; the last run comes from `plan_runs` or
+`goals.runs` by job. A pg_cron job that is missing, turned off, or whose last
+tick failed is shown on its row.
+
+A feature that builds a routine closes when the schedule is live. What the
+first runs should teach about it goes in the entry's `question` and shows
+under the routine as *Still being learned*, rather than as fog on a feature
+that could then never close. #1104, the weekly vision review, was the first
+moved this way: its fog became the vision review's question.
+
 ### Claims, and giving them back
 
 `in_progress` means one thing: somebody has this step in hand right now. A

@@ -135,6 +135,10 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     // Ideas because a takeaway is an idea someone else had.
     { href: '/dev/inspiration', label: 'Inspiration', icon: 'inspiration' },
     { href: '/dev/specs', label: 'Specs', icon: 'specs' },
+    // What Dash does on a clock: the vision review, the spec audit, the
+    // overnight runner. Recurring work is listed here rather than kept open
+    // as a step on the plan. Goals has the same tab.
+    { href: '/dev/routines', label: 'Routines', icon: 'routines' },
     // One page per workspace, gathering its rows from the lists above and
     // below. A single entry rather than one per module: a tab for each would
     // be the plan's sections again (note 4308875b).

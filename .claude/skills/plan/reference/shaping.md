@@ -142,6 +142,16 @@ not held.
    question. A question nobody can answer yet is still a decision if it is
    sharp.
 
+   **Recurring work is a routine, not a step.** A feature whose point is
+   something that happens on a clock (a weekly review, a daily check) gets
+   steps up to the one that schedules it, and that step closes when the
+   schedule is live. Nothing after it stays on the plan: there is no step to
+   "keep running" it, and what the first runs should teach (how to judge a
+   finding, what to tune) is not fog. Write it as the routine's `question` in
+   `lib/routines/registry.ts`, beside its entry, and it shows on the Routines
+   tab of Dev or Goals until it is settled. Add the entry in the scheduling
+   step if it is not there yet.
+
    **One patch of fog per feature.** `fog` is one column, so a second one
    replaces the first rather than joining it. A feature that seems to need two
    has at most one: the other is a decision, or it is a follow-on and belongs

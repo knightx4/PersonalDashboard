@@ -22,8 +22,9 @@ import { todayIn } from '@/lib/todo/tasks/model';
  * second line, not the first. No onboarding gate: nothing here needs a Gmail
  * grant.
  *
- * Two tabs: the home, which is the daily view (#926), and All goals, where
- * areas and goals are added and arranged (#924). The full tree of a goal
+ * Four tabs: the home, which is the daily view (#926), the Inbox, All goals,
+ * where areas and goals are added and arranged (#924), and Routines, what
+ * Dash does on a clock, drawn as Dev's Routines tab is. The full tree of a goal
  * opens from either (#925), so it is a deeper view rather than a tab. Files
  * (core.files) and Runs (#1012) are pages without a tab: Files is linked
  * from All goals and from a goal's Details, Runs from What Dash did on the
@@ -61,6 +62,8 @@ export default async function GoalsLayout({ children }: { children: React.ReactN
     // waiting on you there.
     { href: '/goals/inbox', label: 'Inbox', icon: 'inbox', badge: inbox },
     { href: '/goals/all', label: 'All goals', icon: 'goalsAll' },
+    // What Dash does on a clock for your goals, drawn as Dev's Routines tab is.
+    { href: '/goals/routines', label: 'Routines', icon: 'routines' },
   ];
 
   return (

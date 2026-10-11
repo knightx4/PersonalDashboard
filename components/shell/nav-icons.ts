@@ -1,5 +1,6 @@
 import {
   Activity,
+  AlarmClock,
   BarChart3,
   BookOpen,
   BookOpenCheck,
@@ -173,6 +174,10 @@ export const NAV_ICONS = {
   goalsFiles: FileText,
   // Shared: both workspaces have one, and they do the same job.
   review: ClipboardCheck,
+  // Shared too: what Dash does on a clock, in Dev and in Goals. An alarm
+  // clock, because each routine goes off at a set time. Not Repeat, which is
+  // a recurring payment.
+  routines: AlarmClock,
 } as const;
 
 export type NavIconName = keyof typeof NAV_ICONS;
