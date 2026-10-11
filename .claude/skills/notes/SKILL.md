@@ -482,8 +482,10 @@ gallery:
    round and do not decide what happens to the screen (decision #1535 on the
    plan). Push the batch branch, run `npm run ui-stop -- <note-id>` for the
    ask, and `block` the note with that ask as its note. The ask names each
-   surface that did not pass, how many fixes are open, where the shots are
-   and the branch, and ends "accept it as it is, or say what to change". List
+   surface that did not pass, how many fixes are open and where the shots
+   are, and ends "accept it as it is, or say what to change". It never names
+   the branch, which the person cannot open; keep the history line it prints,
+   which does, where the next run reads it. List
    the last fixes in full in the report. When the person says what to change,
    the next run gets three fresh rounds, numbered on from 4.
 

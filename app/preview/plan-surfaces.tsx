@@ -356,7 +356,7 @@ export function ProjectPlanSurface() {
  * uploaded and a line where they were not, and the two ways on.
  */
 const stopAsk =
-  "The design critic did not pass #1612's screen: jobs-contact after round 3 (2 fixes open, shots in ui-shots under 1612/jobs-contact/r3); jobs-contacts after round 3 (1 fix open, shots not uploaded, kept in .preview-shots/checks/ by the session that ran it). The work is on branch claude/contact-card. Look at the shots and the fixes, then accept it as it is, or say what to change.";
+  "The design critic did not pass #1612's screen: jobs-contact after round 3 (2 fixes open, shots in ui-shots under 1612/jobs-contact/r3); jobs-contacts after round 3 (1 fix open, shots not uploaded, kept in .preview-shots/checks/ by the session that ran it). Look at the shots and the fixes, then accept it as it is, or say what to change.";
 
 const stopItems: PlanItem[] = [
   item({
@@ -396,7 +396,6 @@ function fixtureShot(dark: boolean, wide: boolean): string {
 
 const criticStops: Record<string, CriticStopView> = {
   'contact-card': {
-    branch: 'claude/contact-card',
     surfaces: [
       {
         surface: 'jobs-contact',
