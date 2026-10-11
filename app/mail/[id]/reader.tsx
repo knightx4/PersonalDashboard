@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 /**
@@ -16,15 +16,46 @@ export function EmailFrame({ html, title }: { html: string; title: string }) {
   const [height, setHeight] = useState(240);
 
   const fit = useCallback(() => {
-    const doc = frame.current?.contentDocument;
-    if (doc?.documentElement) setHeight(doc.documentElement.scrollHeight + 8);
+    // The body's own height, since the root's scrollHeight is never less than
+    // the frame's, so measuring it would only ever make the frame taller.
+    const body = frame.current?.contentDocument?.body;
+    if (body) setHeight(Math.ceil(body.getBoundingClientRect().height) + 8);
   }, []);
+
+  // The frame can finish loading before this component hydrates, and its load
+  // event is then never heard, which left a long email cut at the first 240px.
+  // So the effect looks at the frame as it is, and listens for a later load.
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+    let watcher: ResizeObserver | null = null;
+    let timer = 0;
+    const wire = () => {
+      fit();
+      // Images and fonts arriving after load, and a narrower window, change
+      // the height; watching the body keeps the frame as tall as the email.
+      const body = el.contentDocument?.body;
+      watcher?.disconnect();
+      if (body && typeof ResizeObserver !== 'undefined') {
+        watcher = new ResizeObserver(fit);
+        watcher.observe(body);
+      }
+      timer = window.setTimeout(fit, 800);
+    };
+    el.addEventListener('load', wire);
+    if (el.contentDocument?.readyState === 'complete' && el.contentDocument.body) wire();
+    return () => {
+      el.removeEventListener('load', wire);
+      watcher?.disconnect();
+      window.clearTimeout(timer);
+    };
+  }, [fit, html]);
 
   const srcDoc =
     '<!doctype html><html><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width, initial-scale=1">' +
     '<base target="_blank">' +
-    '<style>html,body{margin:0;padding:0;background:#fff;color:#111;' +
+    '<style>html,body{margin:0;padding:0;background:#fff;color:#111;}body{padding:8px 12px;' +
     'font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;' +
     'overflow-wrap:anywhere}img{max-width:100%;height:auto}' +
     'table{max-width:100%}</style></head><body>' +
@@ -37,11 +68,6 @@ export function EmailFrame({ html, title }: { html: string; title: string }) {
       title={title}
       srcDoc={srcDoc}
       sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-      onLoad={() => {
-        fit();
-        // Images arriving after load change the height; one late look covers most.
-        window.setTimeout(fit, 800);
-      }}
       style={{ height }}
       className="block w-full rounded-control bg-white"
     />

@@ -5,6 +5,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { LinkedText } from '@/components/ui/linked-text';
 import { RunChanges } from '@/app/goals/runs/[runId]/run-changes';
 import { BackButton, EmailFrame } from '@/app/mail/[id]/reader';
+import { MessageHead } from '@/app/mail/[id]/message-head';
 import { replyMailto } from '@/lib/email/gmail-open';
 import type { GmailMessageContent } from '@/lib/email/providers/types';
 import type { ChangeLine } from '@/lib/goals/run-changes';
@@ -152,14 +153,10 @@ export function MailMessageSurface() {
         <ol className="divide-y divide-border">
           {MESSAGES.map((entry) => (
             <li key={entry.id} className="card-pad">
-              <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <p className="min-w-0 break-words text-ui font-semibold text-ink">
-                  {entry.fromAddress ?? 'Unknown sender'}
-                </p>
-                {entry.internalDate && (
-                  <p className="tabular text-small text-ink-muted">{when.format(entry.internalDate)}</p>
-                )}
-              </div>
+              <MessageHead
+                from={entry.fromAddress}
+                sent={entry.internalDate ? when.format(entry.internalDate) : null}
+              />
               {entry.html ? (
                 <EmailFrame html={entry.html} title={entry.subject ?? 'Email'} />
               ) : (
