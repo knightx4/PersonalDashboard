@@ -120,8 +120,20 @@ export async function generateSubjectCards(subjectId: string, shown: string[]): 
   if (!subject.success) {
     return { cards: [], ready: 0, written: 0, message: 'Could not tell which subject this is.' };
   }
+  const supabase = await createLearnClient();
+  // A survey subject only holds the questions asked about a theme, so it has
+  // no curriculum and the top-up never writes it lessons (note 727c77a2).
+  const { data: row } = await supabase.from('subjects').select('survey').eq('id', subject.data).maybeSingle();
+  if ((row as { survey: boolean } | null)?.survey) {
+    return {
+      cards: [],
+      ready: 0,
+      written: 0,
+      message: 'This subject only holds the questions you were asked about it, so it has no lessons. Lessons come from subjects you follow.',
+    };
+  }
   // A goal's lessons are on its plan, so its Now never deals them (plan #1143).
-  const goalTracks = await goalTrackIds(await createLearnClient(), user.id);
+  const goalTracks = await goalTrackIds(supabase, user.id);
   if (goalTracks.includes(subject.data)) {
     return {
       cards: [],

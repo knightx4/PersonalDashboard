@@ -92,7 +92,13 @@ export type LessonReport =
       /** Null when no source was given. */
       source: { verdict: SourceVerdict; note: string } | null;
     }
-  | { verdict: 'dropped'; reason: string; contradicted: boolean };
+  | { verdict: 'dropped'; reason: string; contradicted: boolean }
+  /**
+   * The report could not be read. That is a fault in the reply, not a
+   * judgement on the concept, so nothing is stored and a later run writes the
+   * lesson again (note 727c77a2).
+   */
+  | { verdict: 'failed'; reason: string };
 
 /**
  * What writing one lesson came to.
@@ -142,7 +148,10 @@ const text = z.preprocess((value) => (typeof value === 'string' ? value : null),
 
 /** `can_teach` as a boolean, also when it comes back as "true" or "false". */
 const yesNo = z.preprocess(
-  (value) => (typeof value === 'string' ? ({ true: true, false: false } as Record<string, boolean>)[value.trim().toLowerCase()] ?? value : value),
+  (value) =>
+    typeof value === 'string'
+      ? ({ true: true, false: false, yes: true, no: false } as Record<string, boolean>)[value.trim().toLowerCase()] ?? value
+      : value,
   z.boolean(),
 );
 
@@ -196,7 +205,7 @@ export function readLessonReport(input: unknown, hasSource: boolean): LessonRepo
   const parsed = payloadSchema.safeParse(input);
   if (!parsed.success) {
     const where = parsed.error.issues.map((issue) => issue.path.join('.') || 'the report').join(', ');
-    return { verdict: 'dropped', reason: `The report did not match its schema (${where}).`, contradicted: false };
+    return { verdict: 'failed', reason: `The report did not match its schema (${where}).` };
   }
   const data = parsed.data;
 
@@ -387,10 +396,13 @@ export async function writeLesson(input: {
   input.onSpend?.({ model: WRITE_LESSON_MODEL, usage: usageFrom(response.usage) });
 
   const block = response.content.find((piece) => piece.type === 'tool_use' && piece.name === TOOL_NAME);
-  if (!block || block.type !== 'tool_use')
-    return { outcome: 'dropped', reason: whyNoReport(response), contradicted: false, source: null };
+  // A reply with no report, or one that cannot be read, says nothing about
+  // the concept: stored as dropped, it would hold the concept's lesson, and
+  // every concept after it, back for good (note 727c77a2).
+  if (!block || block.type !== 'tool_use') return { outcome: 'failed', detail: whyNoReport(response) };
 
   const report = readLessonReport(block.input, source !== null);
+  if (report.verdict === 'failed') return { outcome: 'failed', detail: report.reason };
   if (report.verdict === 'dropped') {
     return {
       outcome: 'dropped',

@@ -135,11 +135,18 @@ describe('reading the lesson report', () => {
     });
   });
 
-  it('drops a report that does not match its schema', () => {
+  it('fails a report that does not match its schema, so the lesson is written again', () => {
     expect(readLessonReport({ claim: 'x' }, true)).toEqual({
-      verdict: 'dropped',
+      verdict: 'failed',
       reason: 'The report did not match its schema (can_teach).',
-      contradicted: false,
+    });
+  });
+
+  it('reads can_teach given as yes or no', () => {
+    expect(readLessonReport({ ...reported, can_teach: 'Yes' }, false)).toMatchObject({ verdict: 'ready' });
+    expect(readLessonReport({ ...reported, can_teach: 'no', fit: 'Too vague.' }, false)).toMatchObject({
+      verdict: 'dropped',
+      reason: 'Too vague.',
     });
   });
 
@@ -253,7 +260,7 @@ describe('writing a lesson', () => {
     });
   });
 
-  it('drops the lesson, and still records the spend, when there is no report', async () => {
+  it('fails, to be tried again, and still records the spend, when there is no report', async () => {
     const { client } = stubClient({ content: [{ type: 'text', text: 'Here it is.' }], stop_reason: 'end_turn', usage });
     const spent: string[] = [];
     const result = await writeLesson({
@@ -262,7 +269,7 @@ describe('writing a lesson', () => {
       client,
       onSpend: (report) => spent.push(report.model),
     });
-    expect(result).toMatchObject({ outcome: 'dropped', contradicted: false, source: null });
+    expect(result).toEqual({ outcome: 'failed', detail: 'The call answered in prose instead of reporting (stopped: end_turn).' });
     expect(spent).toHaveLength(1);
   });
 
