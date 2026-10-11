@@ -295,6 +295,11 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'shopping-shares': ['/shopping/share'],
   'shopping-share': ['/shopping/share/[id]'],
   'shopping-share-families': ['/shopping/share/families'],
+  'vault-map': ['/vault/map'],
+  'vault-theme': ['/vault/map/[id]'],
+  'vault-maya': ['/vault/maya'],
+  'vault-maya-thread': ['/vault/maya/[id]'],
+  'vault-settings': ['/vault/settings'],
 };
 
 /**
