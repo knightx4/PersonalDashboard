@@ -97,7 +97,7 @@ export function AddBookManualForm({
           />
         </div>
       </div>
-      <Button type="submit" disabled={pending} className="self-start">
+      <Button type="submit" pending={pending} className="self-start">
         {pending ? 'Saving…' : 'Add to library'}
       </Button>
       <FieldError>{state.error}</FieldError>

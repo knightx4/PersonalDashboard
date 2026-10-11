@@ -1,13 +1,16 @@
 import 'server-only';
 
-import { requireUser } from '@/lib/auth/server';
+import { createClient, requireUser } from '@/lib/auth/server';
 import { confirmChange, declineChange, undoChange, type ChangeDeps, type ChangeOutcome } from '@/lib/ask/changes';
 import { executeProposal } from '@/lib/ask/propose';
 import { executeAskTool } from '@/lib/ask/tools';
 import { requestAskDb } from '@/lib/ask/clients';
 import { resolvePage, type PageContext } from '@/lib/ask/page';
+import { resolveFilteredList } from '@/lib/ask/filtered-list';
+import { ASK_LISTS, type AskListFilter } from '@/lib/ask/list-filter';
 import { isAskPath } from '@/lib/ask/page-name';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import type { UploadedAttachment } from '@/lib/attachments/rules';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { recordSpendReports } from '@/lib/core/spend/record';
@@ -33,6 +36,7 @@ import {
 } from './changes';
 import { appendTurns, listConversations, loadConversation, startAsk, type ConversationSummary } from './store';
 import type { TalkTurn } from './talk';
+import { readTurnFiles, recordTurnFiles, withTurnFiles } from './turn-files';
 
 /**
  * Asking Dash from a request (plan #1089): the signed-in person, their
@@ -53,6 +57,14 @@ export async function askDashInRequest(input: {
   conversationRef?: string | null;
   /** The app address it was asked from, already checked; null when dropped. */
   page?: string | null;
+  /** Files uploaded with the question, already checked (parseAskInput). */
+  files?: readonly UploadedAttachment[];
+  /**
+   * The filter a list was under when the person sent it with the question
+   * (plan #1658), already checked. Its rows are read again here and told to
+   * Dash as the ones "these" means.
+   */
+  list?: AskListFilter | null;
   /** Hears each lookup as it starts and finishes (plan #1438): the streaming route listens. */
   onLookup?: (event: AskLookupEvent) => void;
 }): Promise<AskDashResult> {
@@ -61,7 +73,12 @@ export async function askDashInRequest(input: {
   const today = todayInTimezone(settings.timezone);
   const ctx = askContext(user.id, settings);
 
-  const page = input.page ? await pageFor(ctx, input.page) : null;
+  const list = input.list ? await resolveFilteredList(ctx, input.list) : null;
+  // The sent list is on a page of its own, which Dash is told even when the
+  // person left the page out of the question.
+  const where = input.page ?? (list ? ASK_LISTS[list.list].path : null);
+  const asked = where ? await pageFor(ctx, where) : null;
+  const page = asked && list ? { ...asked, list } : asked;
   // Dash is offered the hand-off only when the backup routine can be started.
   const backup = dashBackupRoutine();
   const canHandOff = Boolean(backup.id && backup.token);
@@ -70,6 +87,7 @@ export async function askDashInRequest(input: {
     {
       question: input.question,
       conversationRef: input.conversationRef,
+      files: input.files,
       page,
       today,
       execute: (name, args) => executeAskTool(name, args, ctx),
@@ -83,14 +101,27 @@ export async function askDashInRequest(input: {
     },
     {
       start: (question) => startAsk(core, user.id, question),
-      load: (ref) => loadConversation(core, { kind: 'ask', ref }),
-      append: (subject, turns) => appendTurns(core, user.id, subject, turns),
+      load: async (ref) => withTurnFiles(core, await loadConversation(core, { kind: 'ask', ref })),
+      append: async (subject, turns) =>
+        recordTurnFiles(core, user.id, turns, await appendTurns(core, user.id, subject, turns)),
+      readFiles: (turnId) => readTurnFiles(core, turnId),
       recordSpend: (reports) =>
         recordSpendReports(core, user.id, { module: 'core', operation: 'ask-dash' }, reports),
       saveProposal: (conversationId, change) => insertProposal(core, user.id, conversationId, change),
       saveChange: (conversationId, made) => insertMadeChange(core, user.id, conversationId, made),
       attachProposals: (ids, turnId) => attachProposals(core, ids, turnId),
       discardProposals: (ids) => discardProposals(core, ids),
+      noteGap: async (body, conversationRef) => {
+        try {
+          const supabase = await createClient();
+          const { error } = await supabase
+            .from('feedback_items')
+            .insert({ user_id: user.id, kind: 'feature', body, page_path: `/ask/${conversationRef}` });
+          if (error) console.error('the gap note was not filed', error.message);
+        } catch (error) {
+          console.error('the gap note was not filed', error);
+        }
+      },
       ...(canHandOff
         ? {
             saveHandoff: (conversationId: string, request: string, subjectRef: string | null) =>
@@ -126,7 +157,7 @@ export async function threadDashInRequest(userId: string): Promise<ThreadDash> {
     execute: (name, args) => executeAskTool(name, args, ctx),
     apply: (tool, args, seen, acts) =>
       tool.apply({ ...ctx, seen, goals: (history) => createGoalsClient(history), createTask, thread: acts }, args),
-    saveChange: (made) => insertMadeChange(core, userId, null, made),
+    saveChange: (made, cause) => insertMadeChange(core, userId, cause, made),
   };
 }
 
@@ -183,7 +214,8 @@ export async function listAskConversations(limit = 50): Promise<ConversationSumm
 /** One past question's turns, oldest first, with each answer's lookups and citations; empty when it is not theirs or not there. */
 export async function loadAskConversation(ref: string): Promise<TalkTurn[]> {
   await requireUser();
-  return loadConversation(await createCoreClient(), { kind: 'ask', ref });
+  const core = await createCoreClient();
+  return withTurnFiles(core, await loadConversation(core, { kind: 'ask', ref }));
 }
 
 /**

@@ -131,8 +131,9 @@ For each clip report:
 - caption: one line shown over the clip, at most 100 characters, saying what
   it shows, in plain words. No hype, no em dashes, no "in this clip".
 - idea: the point it makes, in one sentence.
-- serves: the name of the track or goal it serves, copied exactly from the
-  list, or empty when it serves none. Never the video's own title.
+- serves: every track and goal it serves, each name copied exactly from the
+  list, most relevant first; an empty list when it serves none. Never the
+  video's own title.
 - stands_alone: true only if it makes sense to someone who saw nothing before
   it.
 
@@ -157,7 +158,7 @@ const cutReplySchema = z.object({
         end: z.coerce.number(),
         caption: z.string(),
         idea: z.string().optional().nullable(),
-        serves: z.string().optional().nullable(),
+        serves: z.union([z.array(z.string()), z.string()]).optional().nullable(),
         stands_alone: z.boolean().optional().default(true),
       }),
     )
@@ -171,8 +172,11 @@ export type Clip = {
   caption: string;
   idea: string | null;
   serves: string | null;
+  /** The first track it serves; the ranker's theme lean reads it. */
   subjectId: string | null;
   goalId: string | null;
+  /** Every track it serves, first match first: one learn.video_clip_subjects row each. */
+  subjectIds: string[];
 };
 
 function cap(text: string, limit: number): string {
@@ -188,29 +192,54 @@ function key(name: string): string {
     .trim();
 }
 
-/** The track or goal a name points at, when it matches one by name. */
-export function matchServes(
-  serves: string | null,
-  profile: LearnerProfile,
-): { subjectId: string | null; goalId: string | null } {
-  if (!serves) return { subjectId: null, goalId: null };
-  const wanted = key(serves);
-  const track = profile.tracks.find((candidate) => candidate.id && key(candidate.name) === wanted);
-  if (track?.id) return { subjectId: track.id, goalId: null };
-  const goal = profile.goals.find((candidate) => candidate.id && key(candidate.title) === wanted);
-  return { subjectId: null, goalId: goal?.id ?? null };
-}
+/** Names the cutter may give one clip; any past this are ignored. */
+const MAX_SERVES_NAMES = 10;
+
+/** What a clip serves, read from the names the cutter gave. */
+export type ServesMatch = {
+  /** The name kept in video_clips.serves: the first track matched, else the first goal, else the first name of the profile. */
+  serves: string | null;
+  /** The first track matched, as before (plan #1695). */
+  subjectId: string | null;
+  /** The first goal matched, only when no track was. */
+  goalId: string | null;
+  /** Every track matched, in the cutter's order, each once. */
+  subjectIds: string[];
+};
 
 /**
- * Whether a name is one of the person's tracks or goals. A reply that names
- * anything else, most often the video's own title, serves nothing.
+ * The tracks and goals the names point at, when they match one by name. Every
+ * track named is kept (plan #1695); a name that matches nothing in the
+ * profile, most often the video's own title, serves nothing.
  */
-function namesProfile(serves: string, profile: LearnerProfile): boolean {
-  const wanted = key(serves);
-  return (
-    profile.tracks.some((track) => key(track.name) === wanted) ||
-    profile.goals.some((goal) => key(goal.title) === wanted)
-  );
+export function matchServes(names: readonly string[] | string | null, profile: LearnerProfile): ServesMatch {
+  const list = (typeof names === 'string' ? [names] : (names ?? []))
+    .map((name) => tidy(name))
+    .filter(Boolean)
+    .slice(0, MAX_SERVES_NAMES);
+  const subjectIds: string[] = [];
+  let firstTrack: string | null = null;
+  let firstGoal: { id: string; name: string } | null = null;
+  let firstNamed: string | null = null;
+  for (const name of list) {
+    const wanted = key(name);
+    const tracks = profile.tracks.filter((track) => key(track.name) === wanted);
+    const goals = profile.goals.filter((goal) => key(goal.title) === wanted);
+    if (tracks.length === 0 && goals.length === 0) continue;
+    firstNamed ??= name;
+    const track = tracks.find((candidate) => candidate.id);
+    if (track?.id) {
+      firstTrack ??= name;
+      if (!subjectIds.includes(track.id)) subjectIds.push(track.id);
+      continue;
+    }
+    const goal = goals.find((candidate) => candidate.id);
+    if (goal?.id && !firstGoal) firstGoal = { id: goal.id, name };
+  }
+  const subjectId = subjectIds[0] ?? null;
+  const goalId = subjectId ? null : (firstGoal?.id ?? null);
+  const serves = firstTrack ?? firstGoal?.name ?? firstNamed;
+  return { serves: serves ? cap(serves, SERVES_CHARS) : null, subjectId, goalId, subjectIds };
 }
 
 /** A caption with its em dashes turned into commas, which the prompt asks for and Haiku does not always give. */
@@ -239,7 +268,7 @@ function sentenceAt(sentences: readonly Sentence[], second: number): number {
  * standing alone, one with no caption, one shorter than ten seconds or longer
  * than ninety, and one that overlaps a clip before it. What is left is in
  * order, at most thirty. What a clip serves is kept only when it names one of
- * the person's tracks or goals.
+ * the person's tracks or goals, and every track it names is kept.
  */
 export function readCutReply(input: unknown, sentences: readonly Sentence[], profile: LearnerProfile): Clip[] | null {
   const parsed = cutReplySchema.safeParse(input);
@@ -257,15 +286,12 @@ export function readCutReply(input: unknown, sentences: readonly Sentence[], pro
     const endSeconds = Math.ceil(sentences[last].endSeconds);
     const span = endSeconds - startSeconds;
     if (span < MIN_CLIP_SECONDS || span > MAX_CLIP_SECONDS) continue;
-    const named = tidy(row.serves ?? '');
-    const serves = named && namesProfile(named, profile) ? named : null;
     candidates.push({
       startSeconds,
       endSeconds,
       caption: cap(caption, CAPTION_CHARS),
       idea: tidy(row.idea ?? '') ? cap(tidy(row.idea ?? ''), IDEA_CHARS) : null,
-      serves: serves ? cap(serves, SERVES_CHARS) : null,
-      ...matchServes(serves, profile),
+      ...matchServes(row.serves ?? null, profile),
     });
   }
   candidates.sort((a, b) => a.startSeconds - b.startSeconds);
@@ -321,7 +347,11 @@ export async function cutVideo(input: {
                       end: { type: 'integer', description: 'The number of the last sentence.' },
                       caption: { type: 'string' },
                       idea: { type: 'string' },
-                      serves: { type: 'string' },
+                      serves: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description: 'Every track and goal it serves, names copied exactly from the list.',
+                      },
                       stands_alone: { type: 'boolean' },
                     },
                     required: ['start', 'end', 'caption', 'idea', 'serves', 'stands_alone'],
@@ -332,7 +362,7 @@ export async function cutVideo(input: {
             },
           },
         ],
-        tool_choice: forceTool(CUT_TOOL),
+        tool_choice: forceTool(CUT_TOOL, CLIP_MODEL),
         messages: [{ role: 'user', content: cutPrompt(input.profile, input.video) }],
       },
       input.timeoutMs !== undefined ? { timeout: Math.max(1_000, input.timeoutMs), maxRetries: 0 } : undefined,

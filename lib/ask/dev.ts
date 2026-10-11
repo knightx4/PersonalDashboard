@@ -434,7 +434,7 @@ async function readStep(
   return {
     id: row.id,
     title: `#${row.number} ${row.title}`,
-    href: waiting ? `/dev/raised#${waitingAnchor(row.id)}` : planHref(row.number),
+    href: waiting ? `/dev/inbox#${waitingAnchor(row.id)}` : planHref(row.number),
     detail: {
       number: row.number,
       kind: row.kind,
@@ -471,7 +471,7 @@ async function readRaise(client: SchemaClient, ctx: AskContext, id: string): Pro
   return {
     id: row.id,
     title: row.title,
-    href: `/dev/raised#${raiseAnchor(row.id)}`,
+    href: `/dev/inbox#${raiseAnchor(row.id)}`,
     detail: {
       raised_by: 'Dash',
       raised_on: row.created_at.slice(0, 10),
@@ -625,7 +625,7 @@ function stepHit(row: Row): { title: string; href: string } {
   const waiting = row.kind === 'decision' && row.status !== 'done' && row.status !== 'dropped';
   return {
     title: `#${String(row.number)} ${str(row.title)}`,
-    href: waiting ? `/dev/raised#${waitingAnchor(row.id)}` : planHref(Number(row.number)),
+    href: waiting ? `/dev/inbox#${waitingAnchor(row.id)}` : planHref(Number(row.number)),
   };
 }
 
@@ -679,7 +679,7 @@ const COLUMN_READS: ColumnRead[] = [
     ([column, field]): ColumnRead => ({
       kind: 'raise', table: 'raised_items', column, select: `id, title, ${column}, created_at`, date: 'created_at', field,
       narrow: openRaise,
-      hit: (row) => ({ title: str(row.title), href: `/dev/raised#${raiseAnchor(row.id)}`, writtenBy: 'Dash' }),
+      hit: (row) => ({ title: str(row.title), href: `/dev/inbox#${raiseAnchor(row.id)}`, writtenBy: 'Dash' }),
     }),
   ),
 ];
@@ -932,7 +932,7 @@ export async function devRecallHrefs(
   for (const { sourceTable: table, sourceRef: ref } of hits) {
     if (table === 'public.ideas') out.push([table, ref, `/dev/ideas#idea-${ref}`]);
     else if (table === 'public.feedback_items') out.push([table, ref, `/dev/bugs#note-${ref}`]);
-    else if (table === 'public.raised_items') out.push([table, ref, `/dev/raised#${raiseAnchor(ref)}`]);
+    else if (table === 'public.raised_items') out.push([table, ref, `/dev/inbox#${raiseAnchor(ref)}`]);
     else if (table === SPEC_TABLE) {
       const [slug, anchor] = ref.split('#');
       out.push([table, ref, `/dev/specs/${slug}${anchor ? `#${anchor}` : ''}`]);

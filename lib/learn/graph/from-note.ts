@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
-  chainPayloadSchema,
+  noteChainPayloadSchema,
   normaliseChain,
   whyMalformed,
   type ExistingConcept,
@@ -13,6 +13,11 @@ import {
 import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
 import { NODE_RULE } from '@/lib/learn/graph/position-prompt';
+import {
+  anthropicConceptJudge,
+  judgeNoteChain,
+  type ConceptJudge,
+} from '@/lib/learn/graph/judge-concepts';
 import { MODELS } from '@/lib/core/models';
 
 /**
@@ -32,6 +37,11 @@ import { MODELS } from '@/lib/core/models';
  * end of a reading, and a good half of what a model finds in one is phrasing
  * rather than concepts. Approval is what stops the graph filling with
  * paraphrases of your own shorthand.
+ *
+ * Judged before it is proposed (plan #1718). What the extraction returns goes
+ * through a second call that drops the concepts failing the node test and
+ * marks the thin ones weak, so the list you approve from is shorter than what
+ * the model first found. lib/learn/graph/judge-concepts.ts holds the rules.
  */
 
 const MODEL = MODELS.learnGraphFromNote;
@@ -47,9 +57,19 @@ IN THE NOTE'S TERMS. State each one in the words the note uses. "A policy rate
 only reaches prices through what people expect it to do next" is a concept;
 "Monetary policy" is a subject heading and does not belong in this graph.
 
-FEW. One to four. A reading introduces a couple of ideas and reminds you of a
-dozen; only the introduced ones count. If the note is thin, return one. If the
-note is somebody thinking out loud without landing anywhere, return none.
+FEW. Zero to four. A reading introduces a couple of ideas and reminds you of a
+dozen; only the introduced ones count. Zero is usually right for a note that
+only records what happened: what they read, what the author did, what the
+numbers were, what they thought of it. Do not stretch a thin note into one
+concept to have something to return. Return an empty concepts list and set
+too_vague true.
+
+SEPARATING QUESTION AND COST. Each concept states the question that somebody
+who holds it answers differently from somebody who does not
+(separating_question), and what being wrong about it would cost
+(cost_if_wrong): a decision made badly, a prediction that fails, a mistake in a
+calculation, in a sentence that names it. "It is useful to know" is not a cost.
+If you cannot name one, the concept fails the second test above: leave it out.
 
 EDGES. Join them to each other where one rests on the other, and to the
 concepts the subject already holds -- you are given those by name -- so each
@@ -70,9 +90,18 @@ syllabus and the screen should be able to say so.
 IF THE NOTE INTRODUCES NOTHING -- it is a reaction, a to-do, a reminder that
 this was boring -- set too_vague true and return nothing.`;
 
+/**
+ * What one reading of a note found, for the report on concepts per note
+ * (plan #1721). `proposed` is the new concepts the extraction returned,
+ * `kept` and `weak` are what the judge let through, and `dropped` is what it
+ * took out, for any reason.
+ */
+export type NoteCounts = { proposed: number; kept: number; weak: number; dropped: number };
+
 export type FromNoteResult =
-  | { ok: true; chain: ProposedChain }
-  | { ok: false; reason: 'nothing-in-it' | 'error'; detail: string };
+  | { ok: true; chain: ProposedChain; counts: NoteCounts }
+  | { ok: false; reason: 'nothing-in-it'; detail: string; counts: NoteCounts }
+  | { ok: false; reason: 'error'; detail: string };
 
 export async function conceptsFromNote(input: {
   subject: string;
@@ -81,7 +110,12 @@ export async function conceptsFromNote(input: {
   existing: ExistingConcept[];
   anthropicApiKey: string;
   client?: Anthropic;
+  /** The extraction's spend. */
   onSpend?: SpendSink;
+  /** The second check's spend, recorded under its own operation. */
+  onJudgeSpend?: SpendSink;
+  /** The second check. The live one through `client` when not given. */
+  judge?: ConceptJudge;
 }): Promise<FromNoteResult> {
   const client = input.client ?? new Anthropic({ apiKey: input.anthropicApiKey });
 
@@ -102,7 +136,7 @@ export async function conceptsFromNote(input: {
   }
   lines.push(
     '',
-    `Call ${TOOL_NAME}, with goal_concept set to whichever concept the note is most about.`,
+    `Call ${TOOL_NAME}, with goal_concept set to whichever concept the note is most about, or concepts empty when it introduces none.`,
   );
 
   let response;
@@ -129,10 +163,28 @@ export async function conceptsFromNote(input: {
                     name: { type: 'string' },
                     claim: { type: 'string' },
                     basis: { type: 'string' },
+                    separating_question: {
+                      type: 'string',
+                      description:
+                        'A question somebody who holds this answers differently from somebody who does not.',
+                    },
+                    cost_if_wrong: {
+                      type: 'string',
+                      description:
+                        'What being wrong about this would cost, concretely. Leave the concept out if there is none.',
+                    },
                     mastery: MASTERY_TOOL_FIELD,
                     kind: KIND_TOOL_FIELD,
                   },
-                  required: ['name', 'claim', 'basis', 'mastery', 'kind'],
+                  required: [
+                    'name',
+                    'claim',
+                    'basis',
+                    'separating_question',
+                    'cost_if_wrong',
+                    'mastery',
+                    'kind',
+                  ],
                 },
               },
               edges: {
@@ -148,11 +200,11 @@ export async function conceptsFromNote(input: {
                 },
               },
             },
-            required: ['subject', 'goal_concept', 'concepts', 'edges'],
+            required: ['subject', 'concepts', 'edges'],
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, MODEL),
       messages: [{ role: 'user', content: lines.join('\n') }],
     });
   } catch (error) {
@@ -170,19 +222,47 @@ export async function conceptsFromNote(input: {
     return { ok: false, reason: 'error', detail: whyNoReport(response) };
   }
 
-  const safe = chainPayloadSchema.safeParse(block.input);
+  const safe = noteChainPayloadSchema.safeParse(block.input);
   if (!safe.success) {
     return { ok: false, reason: 'error', detail: whyMalformed(safe.error) };
   }
 
-  const chain = normaliseChain(safe.data, input.existing);
+  // No concepts is a complete answer for a note that only records what happened.
+  const chain = safe.data.concepts.length === 0 ? null : normaliseChain(safe.data, input.existing);
   if (!chain || safe.data.too_vague) {
     return {
       ok: false,
       reason: 'nothing-in-it',
       detail: 'Nothing in that note your graph does not already have.',
+      counts: { proposed: 0, kept: 0, weak: 0, dropped: 0 },
     };
   }
 
-  return { ok: true, chain };
+  const proposed = chain.nodes.filter((node) => node.existingId === null).length;
+  const judge =
+    input.judge ?? anthropicConceptJudge({ client, onSpend: input.onJudgeSpend });
+  const judged = await judgeNoteChain(judge, {
+    subject: input.subject,
+    readingTitle: input.readingTitle,
+    note: input.note,
+    chain,
+  });
+  if (!judged.ok) {
+    return judged.reason === 'nothing-left'
+      ? {
+          ok: false,
+          reason: 'nothing-in-it',
+          detail: judged.detail,
+          counts: { proposed, kept: 0, weak: 0, dropped: proposed },
+        }
+      : { ok: false, reason: 'error', detail: judged.detail };
+  }
+
+  const shown = judged.chain.nodes.filter((node) => node.existingId === null);
+  const weak = shown.filter((node) => node.verdict === 'weak').length;
+  return {
+    ok: true,
+    chain: judged.chain,
+    counts: { proposed, kept: shown.length - weak, weak, dropped: proposed - shown.length },
+  };
 }

@@ -13,6 +13,7 @@ import { dismiss, undismiss } from '@/lib/todo/agenda/dismissals';
 import { SNOOZE_DAYS, todayIn } from '@/lib/todo/tasks/model';
 import { optionAnswer, planOptions, recommendedLetter } from '@/lib/plan/options';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
  * Each open goal's next step of yours, and the goal steps you pressed Show on
@@ -33,6 +34,12 @@ import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/
  * the step, and a goal's next step is what Todo is for, so a switch on the
  * Todo settings page could only hide what you need to see. Turning the Goals
  * workspace off still takes them away, as it does for every source.
+ *
+ * **The week's focus narrows it** (goals 0070; lib/goals/focus.ts). Once the
+ * person has picked the goals they are pushing this week, only those goals,
+ * and errands due within a week, put their next step and their rhythms here.
+ * A flagged step and a question still come from any goal. The rules are
+ * goalTodoSteps and focusRhythms in lib/goals/todo.ts.
  *
  * **Rhythms come here too, with no button** (plan #928): each live rhythm is
  * an item for its current period until the period's count is met. Its key
@@ -63,7 +70,7 @@ export const goalStepsSource: AgendaSource = {
   module: 'goals',
   alwaysOn: true,
   description:
-    "Each goal's next step, steps you chose to show on Todo, and your rhythms until each is met.",
+    "Each goal's next step (only your focus goals' while you have chosen a focus), steps you chose to show on Todo, and your rhythms until each is met.",
 
   async fetch(ctx: SourceContext): Promise<AgendaItem[]> {
     const today = todayIn(ctx.timezone, ctx.now);
@@ -99,8 +106,10 @@ export const goalStepsSource: AgendaSource = {
       at: null,
       link: { href: `/goals/${rhythm.goalId}`, label: rhythm.goalTitle },
       action: null,
-      detail: progressLine(rhythm.period, rhythm),
-      completable: true,
+      detail: progressLine(rhythm.period, rhythm, rhythm.source?.kind),
+      // A rhythm that counts itself from Jobs or the calendar is kept by
+      // doing the thing, not by ticking it here.
+      completable: !rhythm.source,
     }));
 
     const questionItems: AgendaItem[] = questions.map((question) => {
@@ -114,7 +123,7 @@ export const goalStepsSource: AgendaSource = {
         // Today: a question holds up whatever sits above it on the goal.
         day: today,
         at: null,
-        link: { href: `/goals/${question.goalId}#step-${question.id}`, label: question.goalTitle },
+        link: { href: stepHref(question.goalId, question.id), label: question.goalTitle },
         action: null,
         detail: options.length > 0 ? 'Waiting on your answer' : 'Answer it on the goal',
         completable: false,

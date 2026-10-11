@@ -85,7 +85,6 @@ function ListAnatomy() {
       <div className="min-w-0 flex-1">
         <PageHeader
           title="Inventory"
-          description="Everything you own, one line each."
           actions={<Button size="sm">Add item</Button>}
         />
 
@@ -201,7 +200,7 @@ function DetailAnatomy() {
           </Card>
         </Group>
 
-        <CardSection title="Notes" hint="What you wrote while reading the page.">
+        <CardSection title="Notes">
           <p className="text-body text-ink-muted">
             The take-home was a backtest harness. Ask about their data licensing next time.
           </p>
@@ -252,23 +251,27 @@ function DashboardAnatomy() {
       </LeftRail>
 
       <div className="min-w-0 flex-1">
-        <PageHeader title="Dashboard" description="What you spent, and what is still returnable." />
+        <PageHeader title="Dashboard" />
 
         <div className="space-y-4">
-          <Figure
-            label="Spent this month"
-            meta="1 – 30 September"
-            value={formatMoney(total, 'USD', { showCents: false })}
-            caption="Refunds already taken off."
-            secondary={[
-              { value: '31', label: 'orders' },
-              { value: '3', label: 'still returnable' },
-              {
-                value: formatMoney(1_284_000, 'USD', { showCents: false }),
-                label: 'owned, at cost',
-              },
-            ]}
-          />
+          {/* On a card, so the figure, its note and the three numbers under
+              it do not sit bare on the page (plan #1688). */}
+          <Card padding="standard">
+            <Figure
+              label="Spent this month"
+              meta="1 – 30 September"
+              value={formatMoney(total, 'USD', { showCents: false })}
+              caption="Refunds already taken off."
+              secondary={[
+                { value: '31', label: 'orders' },
+                { value: '3', label: 'still returnable' },
+                {
+                  value: formatMoney(1_284_000, 'USD', { showCents: false }),
+                  label: 'owned, at cost',
+                },
+              ]}
+            />
+          </Card>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <CardSection title="Where it went" hint="By merchant, this month.">
@@ -291,7 +294,7 @@ function DashboardAnatomy() {
               </ul>
             </CardSection>
 
-            <CardSection title="By category" hint="The same money, cut the other way.">
+            <CardSection title="By category">
               <ul className="space-y-2">
                 {SPEND_BY_CATEGORY.map((row) => (
                   <li key={row.name} className="space-y-1">
@@ -338,13 +341,10 @@ function DashboardAnatomy() {
 function SettingsAnatomy() {
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title="Settings"
-        description="What this workspace does. Your name and timezone are under Account."
-      />
+      <PageHeader title="Settings" />
 
       <div className="space-y-4">
-        <CardSection title="Inboxes" hint="Where orders are read from.">
+        <CardSection title="Inboxes">
           <ul className="divide-y divide-border">
             <li className="row-pad flex items-center gap-3">
               <span className="min-w-0 flex-1">
@@ -379,7 +379,7 @@ function SettingsAnatomy() {
           </div>
         </CardSection>
 
-        <CardSection title="Categories" hint="Yours, in the order they are offered.">
+        <CardSection title="Categories">
           <ul className="divide-y divide-border">
             {SPEND_BY_CATEGORY.map((row, index) => (
               <li key={row.name} className="row-pad flex items-center gap-3 text-ui text-ink">

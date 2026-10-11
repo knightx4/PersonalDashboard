@@ -1,4 +1,5 @@
 import { FIT_MINIMUMS } from './score-notes';
+import { OPENING_SOURCES } from './source';
 import {
   NO_OPENING_FILTER,
   OPENING_SORTS,
@@ -29,6 +30,7 @@ export const OPENING_PARAMS = {
   minChance: 'rchance',
   hideRedFlags: 'rflags',
   hideDuplicates: 'rfile',
+  source: 'rsource',
 } as const;
 
 const OWN = new Set<string>(Object.values(OPENING_PARAMS));
@@ -60,6 +62,7 @@ export function parseOpeningView(params: Params): OpeningView {
       minChance: chance === 'medium' || chance === 'high' ? chance : 'any',
       hideRedFlags: get('hideRedFlags') === 'hide',
       hideDuplicates: get('hideDuplicates') === 'hide',
+      source: OPENING_SOURCES.find((value) => value === get('source')) ?? 'any',
     },
   };
 }

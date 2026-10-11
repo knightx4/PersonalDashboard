@@ -4,6 +4,7 @@ import { createCoreClient } from '@/lib/core/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { UPDATE_WINDOW_DAYS, type Update } from '@/lib/shell/home-model';
 import { endedUpdate, type WatchingRow } from '@/lib/shell/watching-model';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
  * What Dash is watching, for the home page (plan #1295).
@@ -95,7 +96,7 @@ async function goalLink(itemId: string): Promise<{ title: string; href: string }
     if (row.level === 'goal') {
       return {
         title: row.title,
-        href: row.id === itemId ? `/goals/${row.id}` : `/goals/${row.id}#step-${itemId}`,
+        href: row.id === itemId ? `/goals/${row.id}` : stepHref(row.id, itemId),
       };
     }
     id = row.parent_id;

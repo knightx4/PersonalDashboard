@@ -6,6 +6,8 @@ import { createServiceSupabase } from '@/inngest/jobs/supabase-admin';
 import { loadAccountSettings, moduleEnabled } from '@/lib/core/account/settings';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSpendReports } from '@/lib/core/spend/record';
+import { createServiceSupabase as createPublicServiceSupabase } from '@/inngest/supabase-admin';
+import { checkSearchHealth } from '@/lib/jobs/health/check';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import { suggestionsPayload } from '@/lib/jobs/suggest/notify';
 import { runSuggestionsFor } from '@/lib/jobs/suggest/run';
@@ -61,6 +63,12 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
       if (!moduleEnabled(await loadAccountSettings(userId, core), 'jobs')) continue;
       summary.people += 1;
       const progress = recordRuns(jobs, userId, 'daily');
+      // Roles at discovered startups are scored before they are written
+      // when Jev is on; that cost is recorded as scoring.
+      const discoveredSpend: SpendReport[] = [];
+      const jev = (await jevEnabledFor(core, userId))
+        ? { onSpend: (report: SpendReport) => discoveredSpend.push(report) }
+        : null;
       const result = await runSuggestionsFor(jobs, userId, {
         apiKey,
         kinds: ['reach_out', 'apply'],
@@ -69,6 +77,7 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
         // Past this the searches go on as Message Batches (search-batch.ts),
         // so one slow search cannot take the route's five minutes with it.
         deadline: Date.now() + DAILY_SEARCH_BUDGET_MS,
+        jev,
       });
       for (const kind of ['reach_out', 'apply'] as const) {
         const outcome = result[kind];
@@ -76,6 +85,7 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
       }
       await recordSpendReports(core, userId, { module: 'jobs', operation: 'suggest-outreach' }, result.reach_out.spend);
       await recordSpendReports(core, userId, { module: 'jobs', operation: 'find-openings' }, result.apply.spend);
+      await recordSpendReports(core, userId, { module: 'jobs', operation: 'score-openings' }, discoveredSpend);
       summary.reachOut += result.reach_out.written;
       summary.apply += result.apply.written;
       for (const outcome of [result.reach_out, result.apply]) {
@@ -101,7 +111,16 @@ export async function runJobSuggestions(now: Date = new Date()): Promise<JobSugg
   return summary;
 }
 
-export type OpeningUpkeepSummary = { people: number; read: number; closed: number; scored: number; failed: string[] };
+export type OpeningUpkeepSummary = {
+  people: number;
+  read: number;
+  closed: number;
+  scored: number;
+  /** Problems the health check raised to the bell, and raises it closed (lib/jobs/health). */
+  healthRaised: number;
+  healthClosed: number;
+  failed: string[];
+};
 
 /** Everything the upkeep may take, inside its route's five minutes. */
 const UPKEEP_BUDGET_MS = 250_000;
@@ -115,8 +134,10 @@ const UPKEEP_BUDGET_MS = 250_000;
  * closed posting off the list and gives Jev the posting's text; then, for
  * accounts that agreed to send text to TypeSafe, score the open openings not
  * yet scored (plan #1178), including ones a goals run wrote, and the open
- * applications not yet scored or whose role changed (plan #1203). What does
- * not fit in the time is left for the next day.
+ * applications not yet scored or whose role changed (plan #1203). Last, the
+ * health check raises to the bell anything wrong with the searches
+ * themselves (lib/jobs/health). What does not fit in the time is left for the
+ * next day.
  */
 export async function runOpeningUpkeep(now: Date = new Date()): Promise<OpeningUpkeepSummary> {
   const core = createCoreServiceSupabase();
@@ -126,7 +147,16 @@ export async function runOpeningUpkeep(now: Date = new Date()): Promise<OpeningU
 
   const began = Date.now();
   const left = () => UPKEEP_BUDGET_MS - (Date.now() - began);
-  const summary: OpeningUpkeepSummary = { people: 0, read: 0, closed: 0, scored: 0, failed: [] };
+  const publicDb = createPublicServiceSupabase();
+  const summary: OpeningUpkeepSummary = {
+    people: 0,
+    read: 0,
+    closed: 0,
+    scored: 0,
+    healthRaised: 0,
+    healthClosed: 0,
+    failed: [],
+  };
   for (const { user_id: userId } of (data ?? []) as { user_id: string }[]) {
     if (left() < 30_000) break;
     try {
@@ -135,7 +165,8 @@ export async function runOpeningUpkeep(now: Date = new Date()): Promise<OpeningU
       const checked = await checkOpeningPostings(jobs, userId, { now, budgetMs: Math.min(90_000, left() - 60_000) });
       summary.read += checked.read;
       summary.closed += checked.closed;
-      if (left() > 30_000 && (await jevEnabledFor(core, userId))) {
+      const jevOn = await jevEnabledFor(core, userId);
+      if (left() > 30_000 && jevOn) {
         const scoreSpend: SpendReport[] = [];
         const openings = await scoreOpeningsFor(jobs, userId, { onSpend: (report) => scoreSpend.push(report) });
         summary.scored += openings.scored;
@@ -143,6 +174,16 @@ export async function runOpeningUpkeep(now: Date = new Date()): Promise<OpeningU
         const applicationSpend: SpendReport[] = [];
         await scoreApplicationsFor(jobs, userId, { onSpend: (report) => applicationSpend.push(report) });
         await recordSpendReports(core, userId, { module: 'jobs', operation: 'score-applications' }, applicationSpend);
+      }
+      // Last, so it reads the day's runs and the scoring just done. A
+      // failure here is logged and never stops the next account's upkeep.
+      const health = await checkSearchHealth(jobs, publicDb, userId, { jevOn, now }).catch((err: unknown) => {
+        console.error('[jobs health]', err instanceof Error ? err.message : err);
+        return null;
+      });
+      if (health) {
+        summary.healthRaised += health.raised;
+        summary.healthClosed += health.closed;
       }
     } catch (err) {
       summary.failed.push(err instanceof Error ? err.message : String(err));

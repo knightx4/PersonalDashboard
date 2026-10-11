@@ -16,7 +16,7 @@ const RUN_POLL_MS = 15_000;
  * Plan this area: Claude proposes the goals an area needs, from what you
  * wrote you want from it (docs/GOALS-SPEC.md, "Planning an area"). Each goal
  * it proposes lands in the area as a proposal you approve or archive, and
- * Work on this on a kept goal maps its steps.
+ * Ask Dash on a kept goal maps its steps.
  *
  * An area with no goals gets a sentence saying so and the button as the one
  * thing to press. An area with goals gets the button smaller, for asking what

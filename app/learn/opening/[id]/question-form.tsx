@@ -25,7 +25,7 @@ import { answerOpening, skipOpening, type AnswerState } from './actions';
 function AnswerButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" pending={pending}>
       {pending ? 'Checking…' : 'Answer'}
     </Button>
   );
@@ -34,7 +34,7 @@ function AnswerButton() {
 function SkipButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="ghost" disabled={pending}>
+    <Button type="submit" variant="ghost" pending={pending}>
       {pending ? 'Passing…' : 'I do not know'}
     </Button>
   );

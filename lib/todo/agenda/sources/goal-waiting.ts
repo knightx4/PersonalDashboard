@@ -9,6 +9,7 @@ import { sessionClients } from '@/lib/todo/agenda/clients';
 import { dismiss } from '@/lib/todo/agenda/dismissals';
 import { SNOOZE_DAYS, todayIn } from '@/lib/todo/tasks/model';
 import type { AgendaItem, AgendaSource, SourceContext } from '@/lib/todo/agenda/sources';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
  * What your goals are waiting on you for that the goal steps source does not
@@ -93,7 +94,7 @@ export function goalWaitingItems(
         day: null,
         onYouSince: step.createdAt ?? null,
         at: null,
-        link: { href: `/goals/${goal.id}#step-${step.id}`, label: goal.title },
+        link: { href: stepHref(goal.id, step.id), label: goal.title },
         action: null,
         detail: step.blockAsk?.trim() ? `Needs: ${step.blockAsk.trim()}` : 'Blocked on you',
         completable: false,

@@ -314,14 +314,14 @@ describe('read_dev_row', () => {
 
   it('links an open question to its card on the Dash tab, and reads it as a step', async () => {
     const result = await read({ kind: 'plan', ref: '#1251' });
-    expect(result.ok && result.rows[0].href).toBe(`/dev/raised#waiting-${OPEN_QUESTION}`);
+    expect(result.ok && result.rows[0].href).toBe(`/dev/inbox#waiting-${OPEN_QUESTION}`);
   });
 
   it('reads a raise, which Dash raised', async () => {
     const result = await read({ kind: 'public.raised_items', ref: RAISE });
     expect(result.ok && result.rows[0]).toMatchObject({
       title: 'Migration 0019 is unapplied',
-      href: `/dev/raised#raise-${RAISE}`,
+      href: `/dev/inbox#raise-${RAISE}`,
       detail: { raised_by: 'Dash', ask: 'Apply it?', comments: '[2026-09-01, me] Go ahead.' },
     });
   });
@@ -471,7 +471,7 @@ describe('find_dev_text', () => {
       ['public.raised_items', RAISE, 'raise', 'Dash'],
       ['public.ideas', RANK_IDEA, 'comment', 'Dash'],
     ]);
-    expect(result.rows[2].href).toBe(`/dev/raised#raise-${RAISE}`);
+    expect(result.rows[2].href).toBe(`/dev/inbox#raise-${RAISE}`);
     expect(result.rows[1].detail?.field).toBe('resolution');
   });
 

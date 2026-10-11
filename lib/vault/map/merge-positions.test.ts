@@ -91,7 +91,7 @@ describe('positionProposalRow', () => {
     const row = positionProposalRow(
       pair('z', 'b', { similarity: 0.82 }),
       { pair: 0, same: true, name: 'Name b', reason: 'One claim.', confidence: 0.9 },
-      'claude-haiku-4-5',
+      'claude-haiku-5-5',
     );
     expect(row).toMatchObject({
       kind: 'position',
@@ -127,10 +127,10 @@ describe('runPositionMerges', () => {
         return pairs.filter((p) => !stored.some((row) => row.a_id === p.a.id)).slice(0, limit);
       },
       async judge(batch, onSpend) {
-        onSpend({ model: 'claude-haiku-4-5', usage: EMPTY_USAGE });
+        onSpend({ model: 'claude-haiku-5-5', usage: EMPTY_USAGE });
         return {
           ok: true,
-          model: 'claude-haiku-4-5',
+          model: 'claude-haiku-5-5',
           verdicts: batch.map((_, index) => ({
             pair: index,
             same: index === 0,

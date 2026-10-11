@@ -1,6 +1,6 @@
 ---
 name: notes
-description: Work the queue of in-app bug reports and feature requests in feedback_items — triage, fix one at a time, verify, commit, and close each with a reason. Use when the user says "knock out the notes", "work my feedback", "do my bug reports", or asks what is outstanding.
+description: Work the queue of in-app bug reports and feature requests in feedback_items — triage, group by shared cause and by area, fix group by group, verify, commit, and close each with a reason. Use when the user says "knock out the notes", "work my feedback", "do my bug reports", or asks what is outstanding.
 ---
 
 # Working the notes queue
@@ -22,7 +22,10 @@ to look tidy, and not marked `done` because the session is ending.
 npx tsx scripts/notes.ts list                 # the queue, in work order
 npx tsx scripts/notes.ts list --all           # including closed, and likes
 npx tsx scripts/notes.ts next                 # the open note to claim next
-npx tsx scripts/notes.ts show <id>            # the note, and the thread under it
+npx tsx scripts/notes.ts show <id>            # the note, its files, and the thread under it
+npx tsx scripts/notes.ts files <id>           # download its files to .notes-files/<id>/;
+                                              # also needs NEXT_PUBLIC_SUPABASE_URL and
+                                              # SUPABASE_SERVICE_ROLE_KEY
 npx tsx scripts/notes.ts start <id>           # claim it (in_progress)
 npx tsx scripts/notes.ts done <id> --note "…" [--commit <sha>]
                                               # close it; refused unless the
@@ -72,6 +75,12 @@ order by (kind = 'bug') desc, priority asc, created_at asc;
 -- as an 'me' comment rather than on the end of the body, and so does anything
 -- else written on the card afterwards.
 select author, body, created_at from core.thread_turns
+where ref = 'public.feedback_items:…' order by created_at;
+
+-- the files filed with a note from the note button (plan #1713), oldest
+-- first. The bucket is private and SQL cannot read it: see "Open a note's
+-- files" under The loop for how to get at the files themselves.
+select id, name, content_type, size_bytes, path from core.attachments
 where ref = 'public.feedback_items:…' order by created_at;
 
 -- start (a like is never claimed, so the update refuses one)
@@ -134,22 +143,48 @@ one is a debt: every run ends by listing them to the user.
 
 ## The loop
 
-Run this for each note, one at a time. Do not start the next until the current
-one is closed.
+Run this for each note, one at a time and group by group (*Grouping the
+batch*). Do not start the next until the current one is closed. A same-cause
+group counts as one note.
 
-1. **Read the queue.** `list` orders it correctly: bugs before features, then
-   priority, then oldest. Work it top to bottom. State the plan for the batch
-   before starting — how many notes, and in what order.
+1. **Read the queue and group it.** `list` orders it bugs first, then by
+   priority, then oldest. That is the order for choosing what matters, and
+   not the order to work in.
 
    Before claiming anything, do the two checks in *Requests that point at a
    missing rule* below: settle the notes waiting on a spec change that has
    since been decided, and look for a request filed on three pages. A note
-   that goes into a proposed rule leaves the batch.
+   that goes into a proposed rule leaves the batch. Mark the notes that ask
+   for something everywhere, or that two pages ask for (*Requests that apply
+   everywhere* below): each adds a preference in the batch that fixes it. Then group what is left,
+   as *Grouping the batch* says, and state the plan for the batch: each
+   group, its notes, and why they are together.
 2. **Claim one.** `start <id>`. Read it with `show <id>`, which prints the
    thread under the note as well as its text, and re-read the page path — it
    says where the user was standing. Read the thread before starting: an
    answer to a note that came back blocked is in there, and so is anything
    the user added after filing it.
+
+   **Open a note's files before working it.** A note can carry up to five
+   files from "Add a file" in the note button, most often a screenshot of
+   what went wrong. `show` lists them, as does the `core.attachments` select
+   above. Open every one before deciding what the note means: a screenshot
+   usually settles which screen, which state and which width the note is
+   about, and the text alone often does not. Get each one in whichever of
+   these ways the session allows:
+
+   - With the service role key in the environment: `files <id>` downloads
+     them to `.notes-files/<id>/`. Open each with Read, which shows a
+     picture or a PDF.
+   - A run started from "Run Feature Routine" is sent a signed link to each
+     file on the outstanding notes, listed under the note's first eight
+     characters. Download each with `curl -sSL -o <file> "<link>"` into the
+     scratchpad and open it with Read. The links work for 12 hours after
+     the run was started.
+   - With neither, the files cannot be opened from the session. Work the
+     note from its text if that is enough, and say in the resolution note
+     that its files were not read. If the text is not enough, block it,
+     saying the screenshot could not be opened.
 3. **Reproduce first, for bugs.** Find the actual cause in the code before
    changing anything. A fix for a guessed cause is how a note gets closed
    twice. If it cannot be reproduced, that is a `block`, with what you tried.
@@ -187,7 +222,9 @@ one is closed.
    so when you close it.
 6. **Commit the note on its own.** One note per commit, so a change can be
    traced back to the ask and reverted alone. End the subject with the short
-   id: `Fix the shelf photo picker (note 3f9c1a2b)`.
+   id: `Fix the shelf photo picker (note 3f9c1a2b)`. A same-cause group is
+   the one exception: its single fix is one commit naming every note in it,
+   `Search reads goal files and interview notes (notes 3d0b5fd8, f02c0850)`.
 7. **Do not close it yet.** Write down its id, its commit and the one-sentence
    resolution, and leave it `in_progress`. A note's commit on the batch branch
    is not shipped, and the queue must not say it is.
@@ -199,6 +236,50 @@ one is closed.
 the dependencies are installed. The SessionStart hook in `.claude/hooks/`
 does that before the session starts; if it has not run for some reason,
 `npm install` first rather than reading the failure as a broken repo.
+
+## Grouping the batch
+
+Worked in `list` order, a batch moves from Goals to Jobs to Learn and back,
+and reads the same large files again each time it returns. Twenty notes from
+two days on 4 and 5 October 2026 held four about one search gap and nine on
+the Goals pages. Group the queue before claiming anything, so each file is
+read once and each cause is fixed once.
+
+There are two kinds of group, and a note is in at most one.
+
+**Same cause.** Notes that one change fixes, however differently they are
+worded and whatever page they were filed on. "Dash couldn't find my interview
+notes" and "the command search can't see goal files" are one note if both go
+through the same search and the fix is to widen what it reads. Wording,
+`triage.duplicate` (a guess made when the note was filed) and the page paths
+are enough to suspect a group, and not enough to work one. Confirm it in the
+code when its first note is claimed: name the function or file the fix goes
+in, and the notes that name the same one stay in the group. A note that turns
+out to need a different fix goes back to its area. This is a different test from *Requests that point at a missing
+rule*, which is the same behaviour asked for on three pages and settled by a
+rule in a spec. A same-cause group shares one code path.
+
+Work a same-cause group as one note. Claim every note in it, make one fix,
+commit it once (step 6), and close each note against that commit with its own
+resolution saying what it now does for that note's page. When the shared fix
+is too large for a batch, block every note in the group with the same proposed
+split, and name the other notes in each block note so the answer to one
+settles them all.
+
+**Same area.** The rest, grouped by the code they touch. The page path's
+first segment names the workspace, so `/goals/files` and `/goals/runs` are both
+Goals. Split a workspace by its second segment when its notes touch separate
+parts of it, so `/learn/videos` is the video player and `/learn/r/…` the
+reader. `triage.module` is a hint for
+a note whose page path says little, such as one filed from Home; it is often
+wrong, so the page path wins when they disagree. Work one area to the end
+before starting the next.
+
+**Order.** A group that holds a bug goes before any group that does not, and
+groups holding bugs go in the order of their most urgent bug in `list`. Groups
+without bugs follow, by their most urgent note. Inside an area, keep `list`
+order. A run that cannot finish the queue finishes whole groups, and leaves
+whole groups for the next run, rather than one note from each area.
 
 ## Requests that point at a missing rule
 
@@ -293,6 +374,56 @@ For a group on three or more pages:
 Report each proposed rule under the closing table (*Proposed rules*). Never
 approve the change; that is the person's press.
 
+## Requests that apply everywhere: add a preference
+
+Some notes ask for a change on every page, not only the one they were filed
+on: "let me collapse the recommended roles and any similar boxes anywhere
+else", or "times should be 12-hour everywhere". The person also means this
+when the same request comes in from two different pages. Fixing only the
+pages named leaves the next new screen to break it again. So a request like
+this is fixed where it applies and also added to the person's preferences in
+`app/dev/ui/taste.ts`, which `/dev/ui` shows and the design critic holds every
+later screen to (docs/UI-QUALITY-SPEC.md, Part 3; plan #1547).
+
+**Find them while grouping.** `notes.ts list` marks the notes whose words ask
+for something everywhere (`lib/feedback/everywhere.ts`); offline, read the
+bodies for the same words. The mark only says where to look: "it crashes
+anywhere I tap" is a bug with no preference in it. For the two-page case, use
+the 30-day query in *Requests that point at a missing rule* above and look
+for one request filed on two pages. A request on three pages is a missing
+rule and goes through that section first; one that leaves the batch for a
+proposed rule adds no preference.
+
+**Before adding, check what is there.**
+
+- An entry in `TASTE` that already says it: add this note to that entry's
+  `sources` and add no new entry.
+- A preference the person removed from `/dev/ui`:
+  `select taste_id from ui_taste_removals where user_id = '…'`. Do not add
+  it back. Fix the pages the note names and say in the close that the
+  preference stays removed.
+- A request about behaviour rather than how a screen looks, such as "ask
+  before deleting": that is a rule for a spec, not a preference.
+
+**Add the entry** in the same batch as the fix, in the note's own commit:
+
+- `id`: a few words in kebab case, which the critic cites as `taste:<id>`.
+- `sentence`: the preference in one sentence, written so it holds on any page.
+- `sources`: one `{ where, on }` per note, where is the page as the person
+  would name it ("Roles", "Company page") and on is the day the note was
+  filed, `YYYY-MM-DD`. An entry with no source fails
+  `tests/dev-ui-taste.test.ts`.
+- `example`: a gallery surface id that shows it done right once the fix is
+  in. The pattern surfaces (`pattern-list`, `pattern-detail`, `pattern-deck`,
+  `pattern-thread`) fit a preference about lists, details, decks or threads.
+
+Then fix it everywhere it applies, the same way a surface note fixes a law:
+grep for the shape, not the page. Run `npx vitest run
+tests/dev-ui-taste.test.ts` with the note's other checks. Close the note with
+a resolution that names the entry: `Added "Times are 12-hour with AM and PM,
+everywhere." to your preferences on /dev/ui, and fixed the calendar and the
+agenda.` The person can take any entry off with Remove on `/dev/ui`.
+
 ## Surface notes: work the law, not the note
 
 A note whose page path is `/preview?s=<id>` was filed from `/dev/surfaces`,
@@ -336,7 +467,8 @@ gallery:
    per run, with the placeholder Supabase variables set).
 2. Give the four after shots, the before shots, the round and the note's text
    as the done-when to the `ui-critic` agent, as a subagent or headless with
-   `claude -p --agent ui-critic`.
+   `claude -p --agent ui-critic`. Name the preferences the person removed
+   (the `ui_taste_removals` query above), or "none", so it cites none of them.
 3. Record the round whatever the verdict: save its `json` block unchanged as
    `.preview-shots/checks/<note-id>--<surface>--r<round>.json`, then run
    `npm run ui-check -- <note-id> <surface> <round>`. That writes the round
@@ -350,8 +482,10 @@ gallery:
    round and do not decide what happens to the screen (decision #1535 on the
    plan). Push the batch branch, run `npm run ui-stop -- <note-id>` for the
    ask, and `block` the note with that ask as its note. The ask names each
-   surface that did not pass, how many fixes are open, where the shots are
-   and the branch, and ends "accept it as it is, or say what to change". List
+   surface that did not pass, how many fixes are open and where the shots
+   are, and ends "accept it as it is, or say what to change". It never names
+   the branch, which the person cannot open; keep the history line it prints,
+   which does, where the next run reads it. List
    the last fixes in full in the report. When the person says what to change,
    the next run gets three fresh rounds, numbered on from 4.
 
@@ -454,7 +588,7 @@ interchangeable:
 - **A plan decision** — a `decision` step under one feature, in
   `.claude/skills/plan`. A question about that feature, answered before it is
   built.
-- **A raise** — `raised_items`, read on `/dev/raised`. What a session ran into
+- **A raise** — `raised_items`, read on `/dev/inbox`. What a session ran into
   that belongs to no note and no one feature: a risk found in code it was only
   passing through, a question of taste, a thing it will not decide alone.
 
@@ -479,7 +613,7 @@ npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
 answer in one line. The detail is the evidence for it, not the ask itself.
 
 **A session never answers or dismisses a raise.** That is the user's move on
-`/dev/raised`, the same rule as never answering its own decision. A session
+`/dev/inbox`, the same rule as never answering its own decision. A session
 that answers its own question has no questions, only guesses with a paper
 trail. Replying to an answer the user has written is the exception, and it is
 a `claude` comment on the thread, not a close.
@@ -511,9 +645,9 @@ closed notes, so a missed update costs only the two hours until it looks.
 outcome — done, blocked, planned or declined. It is the first thing in the
 report, not an appendix:
 
-| Note | Type | Page | Issue | Result |
-|---|---|---|---|---|
-| `3f9c1a2b` | Bug | `/sell` | what they wrote, quoted or trimmed | One sentence: what changed and the commit, or what it is waiting on. |
+| Note | Group | Type | Page | Issue | Result |
+|---|---|---|---|---|---|
+| `3f9c1a2b` | Sell | Bug | `/sell` | what they wrote, quoted or trimmed | One sentence: what changed and the commit, or what it is waiting on. |
 
 For surface notes, say which law each one turned out to be, and where else that
 law was broken and fixed — the count of other places is the thing worth
@@ -527,7 +661,7 @@ Then, below the table:
 
 - **Blocked** — one line each: the question, phrased so a one-line answer
   unblocks it.
-- **Raised** — anything written to `/dev/raised` during the run, by title, so
+- **Raised** — anything written to `/dev/inbox` during the run, by title, so
   the user knows a question is waiting there.
 - **Critic rounds** — for each surface a fix touched, how many rounds it
   took and the last verdict; after a third failed round, its fixes in full.

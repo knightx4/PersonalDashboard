@@ -17,6 +17,7 @@ import type { ExtractResult, ExtractSource } from '@/lib/goals/extract-model';
 import type { LearnOperation } from '@/lib/learn/spend';
 import { TRANSCRIPT_TOOL, transcriptPrompt, transcriptTool } from '@/lib/vault/transcript-read';
 import { MODELS } from '@/lib/core/models';
+import { forceTool } from '@/lib/learn/graph/tool-call';
 
 export const TRANSCRIPT_MODEL = MODELS.vaultTranscript;
 
@@ -52,7 +53,7 @@ export async function askTranscriptModel(
       max_tokens: 16_000,
       system: transcriptPrompt(),
       tools: [transcriptTool() as Anthropic.Tool],
-      tool_choice: { type: 'tool', name: TRANSCRIPT_TOOL },
+      tool_choice: forceTool(TRANSCRIPT_TOOL, TRANSCRIPT_MODEL),
       messages: [
         {
           role: 'user',

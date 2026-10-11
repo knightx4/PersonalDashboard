@@ -194,6 +194,11 @@ export async function saveChainInto(
           // values or nothing, and nothing is what an unjudged concept is.
           kind: node.kind,
           origin: options.origin ?? 'generated',
+          // Only a note's concepts carry these (plan #1718). Left out
+          // otherwise, so the column stays null for a concept nobody judged.
+          ...(node.separatingQuestion ? { separating_question: node.separatingQuestion } : {}),
+          ...(node.costIfWrong ? { cost_if_wrong: node.costIfWrong } : {}),
+          ...(node.verdict ? { judge_verdict: node.verdict } : {}),
         })),
       )
       .select('id, name');

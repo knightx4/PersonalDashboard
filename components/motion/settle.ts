@@ -103,6 +103,28 @@ export function namePosition(
   return { left: Math.round(left), top: Math.round(top) };
 }
 
+/**
+ * Where the name goes when it is laid on the place's own edge rather than
+ * beside it: across the foot of the place at its right end, half over it and
+ * half over the gap below. For a place with neighbours on every side, such as
+ * a card in a stack, where beside or above would cover the next one's words.
+ */
+export function edgePosition(
+  target: Box,
+  size: { width: number; height: number },
+  view: { width: number; height: number },
+): { left: number; top: number } {
+  const left = Math.max(EDGE_PX, Math.min(target.right - GAP_PX - size.width, view.width - EDGE_PX - size.width));
+  return { left: Math.round(left), top: Math.round(target.bottom - size.height / 2) };
+}
+
+export type SettleOptions = {
+  /** Beside the place (the default), or across its own foot (`edgePosition`). */
+  at?: 'beside' | 'edge';
+  /** False to name the place without pulsing it, when it has just moved there. */
+  pulse?: boolean;
+};
+
 const NAME_CLASS =
   /* ui-ok: a floating pill appended to <body>, not a grouping box; it was exempt as a components/ui primitive before moving here */
   'toast-in pointer-events-none fixed z-toast max-w-xs truncate rounded-full border border-border bg-raised px-2.5 py-1 text-small font-medium text-ink shadow-lg';
@@ -114,11 +136,11 @@ let shown: { element: HTMLElement; timer: ReturnType<typeof setTimeout> } | null
  * Pulse `target` once and name it. The pulse is skipped under reduced motion;
  * the name never is. Does nothing outside a browser or for an empty name.
  */
-export function settle(target: Element, name: string): void {
+export function settle(target: Element, name: string, options: SettleOptions = {}): void {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   if (!name.trim()) return;
 
-  if (!prefersReducedMotion() && target instanceof HTMLElement) {
+  if (options.pulse !== false && !prefersReducedMotion() && target instanceof HTMLElement) {
     // Off and on again, with a read between, so a second filing restarts it.
     target.classList.remove('landed-pulse');
     void target.offsetWidth;
@@ -141,7 +163,7 @@ export function settle(target: Element, name: string): void {
   label.style.visibility = 'hidden';
   document.body.appendChild(label);
 
-  const place = namePosition(
+  const place = (options.at === 'edge' ? edgePosition : namePosition)(
     target.getBoundingClientRect(),
     { width: label.offsetWidth, height: label.offsetHeight },
     viewport(),
