@@ -43,6 +43,11 @@ export function FamiliesView({ suggestions }: { suggestions: PendingSuggestion[]
           </ul>
         </Card>
       )}
+      {suggestions.length > 0 && (
+        <p className="mt-3 text-small text-ink-muted">
+          {suggestions.length} {suggestions.length === 1 ? 'suggestion' : 'suggestions'}
+        </p>
+      )}
     </div>
   );
 }
