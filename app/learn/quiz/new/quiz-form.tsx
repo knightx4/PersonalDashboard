@@ -1,15 +1,15 @@
 'use client';
 
-import { useActionState, useEffect, useId, useState } from 'react';
+import { useActionState, useEffect, useId, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Field, Input, PressLabel, Textarea } from '@/components/ui/field';
+import { Field, Input, Label, PressLabel, Textarea } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { MIN_QUERY, type SearchHit } from '@/lib/search/sources';
 import { MAX_QUIZ_NOTES } from '@/lib/learn/quiz/model';
-import { QUIZ_FILE_ACCEPT, QUIZ_FILE_KINDS } from '@/lib/learn/quiz/file';
+import { QUIZ_FILE_ACCEPT } from '@/lib/learn/quiz/file';
 import { startQuiz, type NewQuizState } from './actions';
 
 /**
@@ -97,25 +97,21 @@ function NoteSearch({
             // form around it is not finished being filled in.
             if (event.key === 'Enter') event.preventDefault();
           }}
-          placeholder="Find a note by name"
-          aria-label="Find a note by name"
+          placeholder="Find a note or folder"
+          aria-label="Find a note or folder"
           disabled={full}
           data-focus-ring="none"
           className="relative h-(--control-h) w-full bg-transparent text-ui text-ink outline-none placeholder:text-ink-ghost"
         />
       </div>
 
+      {/* Nothing under the box until there is something to say: the
+          placeholder already says what to type. */}
       {full ? (
-        <p className="px-1 py-2 text-small text-ink-muted">
-          {MAX_QUIZ_NOTES} notes is as much material as one quiz is written from.
-        </p>
-      ) : hits.length === 0 ? (
-        <p className="px-1 py-2 text-small text-ink-muted">
-          {!searching
-            ? 'Type a few letters of a note name or its folder.'
-            : looking
-              ? 'Looking…'
-              : `No note matches “${needle}”.`}
+        <p className="py-2 text-small text-ink-muted">{MAX_QUIZ_NOTES} notes at most.</p>
+      ) : !searching ? null : hits.length === 0 ? (
+        <p className="py-2 text-small text-ink-muted">
+          {looking ? 'Looking…' : `No note matches “${needle}”.`}
         </p>
       ) : (
         <ul className="max-h-56 divide-y divide-border overflow-y-auto">
@@ -142,8 +138,10 @@ function NoteSearch({
 export function QuizForm({ maxPasteChars }: { maxPasteChars: number }) {
   const [state, formAction] = useActionState<NewQuizState, FormData>(startQuiz, {});
   const [picked, setPicked] = useState<PickedNote[]>([]);
+  const [pasting, setPasting] = useState(false);
   const [paste, setPaste] = useState('');
   const [file, setFile] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const ready = picked.length > 0 || paste.trim().length > 0 || file !== null;
 
@@ -156,11 +154,7 @@ export function QuizForm({ maxPasteChars }: { maxPasteChars: number }) {
         <input key={note.id} type="hidden" name="noteId" value={note.id} />
       ))}
 
-      <Field
-        label="Which notes?"
-        id="quiz-notes"
-        hint="Search your vault. The questions are written from what the notes say, so two or three related ones work better than everything you have."
-      >
+      <Field label="Notes" id="quiz-notes">
         <div id="quiz-notes">
           {picked.length > 0 && (
             <ul className="mb-2 flex flex-wrap gap-1.5">
@@ -191,63 +185,81 @@ export function QuizForm({ maxPasteChars }: { maxPasteChars: number }) {
         </div>
       </Field>
 
-      <Field
-        label="Anything else to be quizzed on?"
-        id="quiz-paste"
-        hint="Optional. Paste anything that is not in your vault — a job description, a spec, a chapter somebody sent you."
-        className="mt-4"
-      >
-        {/* ui-ok: composer-always-open -- the create. Choosing the material is
-          * the only thing this form does, and there is nothing to read before
-          * any of it has been chosen. */}
-        <Textarea
-          id="quiz-paste"
-          name="paste"
-          rows={5}
-          maxLength={maxPasteChars}
-          value={paste}
-          onChange={(event) => setPaste(event.target.value)}
-          placeholder="Paste the text here."
-        />
-      </Field>
-
-      <Field
-        label="Or a file"
-        id="quiz-file"
-        hint={`${QUIZ_FILE_KINDS} It is read as text and stored the same way a paste is, so the questions can quote it.`}
-        className="mt-4"
-      >
+      {/* Text or a file, as two buttons on one row. The native file control is
+          hidden and pressed through ours, so both read as the same kind of
+          thing, and the paste box opens only when it is asked for. */}
+      <div className="mt-4" role="group" aria-labelledby="quiz-add-label">
+        <Label id="quiz-add-label">Or add</Label>
         <input
+          ref={fileRef}
           id="quiz-file"
           name="file"
           type="file"
           accept={QUIZ_FILE_ACCEPT}
           onChange={(event) => setFile(event.target.files?.[0]?.name ?? null)}
-          className="block w-full text-ui text-ink file:mr-3 file:rounded-control file:border file:border-control file:bg-surface file:px-3 file:py-1 file:text-ui file:text-ink hover:file:bg-sunken"
+          className="hidden"
         />
-      </Field>
+        <div className="flex flex-wrap items-center gap-2">
+          {file ? (
+            <span className="inline-flex max-w-full items-center gap-1.5 rounded-pill bg-sunken py-1 pl-2.5 pr-1 text-small text-ink">
+              <span className="min-w-0 truncate">{file}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (fileRef.current) fileRef.current.value = '';
+                  setFile(null);
+                }}
+                title={`Not ${file}`}
+                className="press flex size-5 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors duration-quick hover:bg-accent-tint hover:text-accent"
+              >
+                <X className="size-3.5" strokeWidth={1.75} aria-hidden />
+                <span className="sr-only">Take {file} out of this quiz</span>
+              </button>
+            </span>
+          ) : (
+            <Button type="button" variant="secondary" onClick={() => fileRef.current?.click()}>
+              Choose file
+            </Button>
+          )}
+          {!pasting && (
+            <Button type="button" variant="secondary" onClick={() => setPasting(true)}>
+              Paste text
+            </Button>
+          )}
+          {!file && <span className="text-small text-ink-muted">.txt or .md</span>}
+        </div>
 
-      <Field
-        label="What are you preparing for?"
-        id="quiz-preparing-for"
-        hint="Optional, and worth writing: it is what the questions get aimed at, and it is what tells two quizzes over the same notes apart."
-        className="mt-4"
-      >
+        {pasting && (
+          <Textarea
+            id="quiz-paste"
+            name="paste"
+            aria-label="Text to be quizzed on"
+            rows={5}
+            autoFocus
+            maxLength={maxPasteChars}
+            value={paste}
+            onChange={(event) => setPaste(event.target.value)}
+            placeholder="A job description, a spec, a chapter"
+            className="mt-2"
+          />
+        )}
+      </div>
+
+      <Field label="Preparing for" id="quiz-preparing-for" className="mt-4">
         <Input
           id="quiz-preparing-for"
           name="preparingFor"
           maxLength={200}
-          placeholder="An interview on Thursday"
+          placeholder="An interview on Thursday (optional)"
         />
       </Field>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <StartButton ready={ready} />
-        {state.error && <span className="text-ui text-danger">{state.error}</span>}
-        {!ready && (
-          <span className="text-ui text-ink-muted">
-            Pick a note, paste something, or choose a file first.
-          </span>
+        {state.error ? (
+          <span className="text-ui text-danger">{state.error}</span>
+        ) : (
+          !ready && <span className="text-small text-ink-muted">Add a note, text or a file first.</span>
         )}
       </div>
     </form>

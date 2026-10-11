@@ -5526,7 +5526,15 @@ export const SURFACES: readonly Surface[] = [
     render: () => <AccountSurface tab="notifications" />,
   },
   {
-    /* Connected apps, capture tokens, spend and history (plan #1705). */
+    /* The workspaces and the one list of settings links, with Timeline and Model spend (plan #1743). */
+    id: 'account-workspaces',
+    label: 'Account · Workspaces and settings links',
+    module: 'dev',
+    width: 'page',
+    render: () => <AccountSurface tab="workspaces" />,
+  },
+  {
+    /* Connected apps and capture tokens (plan #1705). */
     id: 'account-activity',
     label: 'Account · Activity and capture tokens',
     module: 'dev',

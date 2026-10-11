@@ -117,9 +117,6 @@ export default async function AccountPage({
         mainCheck={mainCheck}
       >
         <div className="mx-auto max-w-3xl">
-          <p className="text-body text-ink-muted">
-            Settings that hold across every workspace.
-          </p>
 
           <div className="mt-5">
           <AccountView
