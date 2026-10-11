@@ -15,7 +15,7 @@ import { AddFile } from '@/components/attachments/add-file';
 import { Button } from '@/components/ui/button';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { TriageNote } from '@/components/feedback/triage-note';
-import { FieldError, Input, Label, Select, Textarea } from '@/components/ui/field';
+import { FieldError, Label, Select, Textarea } from '@/components/ui/field';
 import { Popover } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
@@ -46,9 +46,8 @@ import { usePopover } from '@/lib/use-popover';
  * works was not something anybody wanted to do from here. Likes already filed
  * stay in the queue as they were, for the vision review to read.
  *
- * Two tabs for the owner. The note alone for everybody else, with no tab row,
- * no code box and nothing under the form: see `isOwner` below for what goes
- * and why.
+ * Two tabs for the owner. The note alone for everybody else, with no tab row
+ * and nothing under the form: see `isOwner` below for what goes and why.
  */
 type Kind = 'note' | 'idea';
 
@@ -109,8 +108,8 @@ export function FeedbackButton({
    * It decides how much of this panel there is. Everyone gets the capture --
    * a bug is a bug whoever hit it -- and the rest of what is in here is the
    * dev workspace poking through the header: the Idea tab writes to a list
-   * only the owner can see, the submit code guards a queue only they work,
-   * and the routine section below the form is that queue's own controls.
+   * only the owner can see, and the routine section below the form is the
+   * notes queue's own controls.
    *
    * Omitted means "not the owner": the smaller panel, which files a note and
    * says so, rather than one offering buttons whose actions would refuse.
@@ -322,24 +321,6 @@ export function FeedbackButton({
                 disabled={pending}
                 onUploadingChange={setUploading}
               />
-            )}
-
-            {/* The owner's, and only theirs. It is the code that guards the
-                dev workspace's own writing, and `submitFeedback` asks for it
-                from the owner alone -- a second account has nothing to type
-                here and no way of knowing it. */}
-            {isOwner && (
-              <div>
-                <Label htmlFor="feedback_code">Code</Label>
-                <Input
-                  id="feedback_code"
-                  name="code"
-                  type="password"
-                  autoComplete="off"
-                  required
-                  placeholder="Submit code"
-                />
-              </div>
             )}
 
             <div className="flex flex-wrap items-center gap-2">

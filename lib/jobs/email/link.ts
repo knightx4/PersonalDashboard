@@ -245,8 +245,20 @@ export function roleHintFor(input: LinkInput, candidates: readonly LinkCandidate
   return named;
 }
 
+/**
+ * A sender domain that can name the employer. An ATS's or a scheduler's never
+ * does, whatever a company record says: buildwithporter.com had gem.com on
+ * file, and Circle's rejection, sent through Gem, was filed under it (note
+ * fc919f98). `employerDomain` follows the same rule for what is learned.
+ */
+function employerSender(domain: string | null): string | null {
+  if (!domain || isKnownAtsSender(domain) || isSchedulingSender(domain)) return null;
+  return domain;
+}
+
 function domainHit(candidate: LinkCandidate, domains: readonly (string | null)[]): boolean {
-  for (const domain of domains) {
+  for (const raw of domains) {
+    const domain = employerSender(raw);
     if (!domain) continue;
     for (const owned of candidate.companyDomains) {
       const needle = owned.toLowerCase();
@@ -736,7 +748,8 @@ function resolveCompany(
   const fromDomain = domainFromAddress(input.fromAddress);
   const replyDomain = domainFromAddress(input.replyToAddress);
 
-  for (const domain of [replyDomain, fromDomain]) {
+  for (const raw of [replyDomain, fromDomain]) {
+    const domain = employerSender(raw);
     if (!domain) continue;
     for (const company of companies) {
       if (domainOwnedBy(domain, company.domains)) return company;
