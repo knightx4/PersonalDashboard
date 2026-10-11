@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { answerPortsFor, sendUnactedAnswers, type AnswerSend } from '@/inngest/dev/answered';
 import { releaseStaleClaims } from '@/inngest/dev/claims';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
 import { goalsNightNote, runGoalsNight, type GoalsNightTick } from '@/inngest/goals/overnight';
@@ -1102,6 +1103,12 @@ export type OvernightTickSummary = {
   };
   /** Runs this tick wrote back as over, across every account. */
   runs: { finished: number; failed: number };
+  /**
+   * What the backstop for answered steps did, by user id: the step it sent,
+   * or why it sent none (inngest/dev/answered.ts). Empty when no account has
+   * an answer waiting.
+   */
+  answered: Record<string, AnswerSend>;
 };
 
 /**
@@ -1136,6 +1143,8 @@ export async function runOvernightTick(
     fetch?: typeof globalThis.fetch;
     /** The goals half for one account; `runGoalsNight` unless a test hands one in. */
     goalsNight?: (userId: string) => Promise<GoalsNightTick>;
+    /** The answered-step backstop; `sendUnactedAnswers` unless a test hands one in. */
+    answers?: () => Promise<Record<string, AnswerSend>>;
   } = {},
 ): Promise<OvernightTickSummary> {
   const supabase = input.supabase ?? createServiceSupabase();
@@ -1219,7 +1228,20 @@ export async function runOvernightTick(
     }
   }
 
-  return { accounts: users.length, fired, results, goals, main, runs };
+  // Answered steps no session was sent to, in every account and whether or
+  // not its runner is on (inngest/dev/answered.ts says why). After the nights,
+  // so a feature fired this tick already holds its slot. Stepped over if it
+  // breaks, like the other passes that are not the night itself.
+  let answered: Record<string, AnswerSend> = {};
+  try {
+    answered = await (input.answers ?? (() => sendUnactedAnswers(answerPortsFor({ supabase, now }))))();
+  } catch (err) {
+    console.error(
+      `answered steps could not be read on this tick: ${err instanceof Error ? err.message : 'failed'}`,
+    );
+  }
+
+  return { accounts: users.length, fired, results, goals, main, runs, answered };
 }
 
 /** The most started runs one sweep reads. There are a handful at any moment. */
