@@ -4,8 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
-import { isOwner, requireOwner } from '@/lib/dev/owner';
-import { codeMatches } from '@/lib/feedback/code';
+import { requireOwner } from '@/lib/dev/owner';
 import { notesRoutine } from '@/lib/feedback/routine';
 import {
   FEEDBACK_KINDS,
@@ -58,16 +57,9 @@ const submitSchema = z.object({
  *
  * `requireUser`, not `requireOwner`, on purpose. Do not "fix" it.
  *
- * The submit code goes the same way. It is the owner's code, printed nowhere
- * and known to nobody else, so asking a second account for it would be asking
- * for a value they cannot have -- the panel does not even draw the box for
- * them (#418). Still asked of the owner, because for them it is what stops a
- * note being filed by a page left open on a shared screen, and dropping it
- * would be weakening a check that is working.
- *
- * So: owner and wrong code is refused, exactly as before. Anyone else signed
- * in files without one, and whatever they typed in a field that is not there
- * is not read.
+ * There is no submit code. The owner was asked for one until note 7c1f7238
+ * asked for it to go: it guarded only against a page left open on a shared
+ * screen, where everything else in the app is open too.
  */
 // latency: pending
 export async function submitFeedback(
@@ -76,10 +68,6 @@ export async function submitFeedback(
 ): Promise<FeedbackActionState> {
   const user = await requireUser();
   const supabase = await createClient();
-
-  if ((await isOwner({ user, supabase })) && !codeMatches(String(formData.get('code') ?? ''))) {
-    return { error: 'That code is not right.' };
-  }
 
   const parsed = submitSchema.safeParse({
     kind: String(formData.get('kind') ?? 'feature'),
