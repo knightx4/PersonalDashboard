@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import type { TranscriptCue } from '@/lib/learn/catalogue/segment';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { MODULES, type ModuleId } from '@/lib/modules';
 import { MODELS } from '@/lib/core/models';
 
@@ -283,7 +283,7 @@ export async function extractVideoTakeaways(input: {
   try {
     response = await client.messages.create({
       model: TAKEAWAY_MODEL,
-      max_tokens: 4096,
+      max_tokens: 4096 + THINKING_ROOM,
       system: SYSTEM,
       tools: [
         {
@@ -312,7 +312,7 @@ export async function extractVideoTakeaways(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL),
+      tool_choice: forceTool(TOOL, TAKEAWAY_MODEL),
       messages: [{ role: 'user', content: prompt }],
     });
   } catch (error) {

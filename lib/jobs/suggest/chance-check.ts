@@ -144,14 +144,18 @@ export function checkChance(rows: readonly ChanceOutcome[]): ChanceCheck {
 export type ChanceDisplay = { kind: 'number' } | { kind: 'band'; edges: ChanceBandEdges };
 
 /**
- * What the run of 29 September 2026 chose, for #1205 and #1206 to read.
+ * How chance shows: the number, by the person's choice on 9 October 2026,
+ * with a question mark when Jev is unsure.
  *
- * 266 closed applications scored, 15 of which reached an interview: AUC 0.43,
- * mean percentile of the 15 was 43, mean chance 30 against 32 for the rest.
- * The number does not rank them higher, so chance shows as a band, with edges
- * at the terciles of that run. Re-run scripts/chance-check.ts and change this
- * when the questions or the history change enough to matter.
+ * The run of 29 September 2026 had chosen a band: 266 closed applications
+ * scored, 15 of which reached an interview, AUC 0.43, mean chance 30 against
+ * 32 for the rest, so the number did not rank them higher. The person would
+ * rather see the figure and weigh it themselves. scripts/chance-check.ts
+ * still reports how well it predicts.
  */
-export const CHANCE_DISPLAY: ChanceDisplay = { kind: 'band', edges: { medium: 27, high: 38 } };
+export const CHANCE_DISPLAY: ChanceDisplay = { kind: 'number' };
+
+/** The terciles of the 29 September run, still where the chance filter cuts. */
+export const CHANCE_FILTER_EDGES: ChanceBandEdges = { medium: 27, high: 38 };
 
 export const CHANCE_BAND_LABELS: Record<ChanceBand, string> = { low: 'Low', medium: 'Medium', high: 'High' };

@@ -204,7 +204,7 @@ describe('judgeVideo', () => {
       onSpend,
     });
     expect(judged.outcome).toBe('judged');
-    expect(create.mock.calls[0][0].model).toBe('claude-haiku-4-5');
+    expect(create.mock.calls[0][0].model).toBe('claude-haiku-5-5');
     expect(onSpend).toHaveBeenCalledTimes(1);
   });
 });

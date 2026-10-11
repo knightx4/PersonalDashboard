@@ -73,7 +73,7 @@ export async function summariseVideo(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL),
+      tool_choice: forceTool(TOOL, SUMMARY_MODEL),
       messages: [
         {
           role: 'user',

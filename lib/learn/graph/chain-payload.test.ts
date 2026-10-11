@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   approvedChainSchema,
   chainPayloadSchema,
+  isConcreteCost,
   keepTicked,
   MAX_CHAIN,
+  noteChainPayloadSchema,
   normaliseChain,
   whyMalformed,
   type ChainNode,
@@ -560,5 +562,42 @@ describe('whyMalformed', () => {
 
   it('says something usable when the payload is not an object at all', () => {
     expect(parse('nope')).toContain('malformed');
+  });
+});
+
+describe('what the note extractor must say about each concept', () => {
+  const full = {
+    ...node('Expectations carry the rate'),
+    separating_question: 'Does a held rate still loosen conditions if cuts are signalled?',
+    cost_if_wrong: 'You misread a held rate as tight and misjudge a position before the cut.',
+  };
+  const report = (concepts: unknown[]) => ({ subject: 'Economics', concepts, edges: [] });
+
+  it('accepts a report with no concepts and no goal concept', () => {
+    expect(noteChainPayloadSchema.safeParse(report([])).success).toBe(true);
+  });
+
+  it('accepts a concept that has both', () => {
+    expect(noteChainPayloadSchema.safeParse(report([full])).success).toBe(true);
+  });
+
+  it('refuses a concept with no cost, or no separating question', () => {
+    const noCost = { ...full, cost_if_wrong: undefined };
+    const noQuestion = { ...full, separating_question: undefined };
+    expect(noteChainPayloadSchema.safeParse(report([noCost])).success).toBe(false);
+    expect(noteChainPayloadSchema.safeParse(report([noQuestion])).success).toBe(false);
+  });
+
+  it('refuses a cost that says nothing', () => {
+    for (const cost of [
+      'It is useful to know.',
+      'Good to know how the rate works in general.',
+      'Helpful to understand the topic better.',
+      'none',
+      'Minor.',
+    ]) {
+      expect(isConcreteCost(cost), cost).toBe(false);
+    }
+    expect(isConcreteCost(full.cost_if_wrong)).toBe(true);
   });
 });

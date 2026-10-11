@@ -6,6 +6,7 @@ import { fetchDocument } from '@/lib/learn/providers';
 import { buildTextFragmentUrl, containsAnchor, toPlainText } from '@/lib/learn/locate/html';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
+import { forceTool } from '@/lib/learn/graph/tool-call';
 
 /**
  * Finding the paragraph, when you open the reading and not before.
@@ -144,7 +145,7 @@ export async function locatePassage(input: {
           },
         },
       ],
-      tool_choice: { type: 'tool', name: TOOL_NAME },
+      tool_choice: forceTool(TOOL_NAME, MODEL),
       messages: [
         {
           role: 'user',

@@ -35,7 +35,7 @@ const subject = {
 };
 
 describe('replyAbout', () => {
-  it('sends the material and the thread, forces the tool, and reports the spend', async () => {
+  it('sends the material and the thread, asks for the tool, and reports the spend', async () => {
     const { client, sent } = stubClient([
       { type: 'tool_use', name: 'reply', input: { reply: '  The search only looks at moves the network rates.  ' } },
     ]);
@@ -53,7 +53,7 @@ describe('replyAbout', () => {
     expect(sent[0].model).toBe(TALK_MODEL);
     expect(sent[0].system).toContain('Monte Carlo tree search');
     expect(sent[0].system).toContain('Title: AlphaGo');
-    expect(sent[0].tool_choice).toEqual({ type: 'tool', name: 'reply' });
+    expect(sent[0].tool_choice).toEqual({ type: 'auto' });
     expect(sent[0].messages).toEqual([
       { role: 'user', content: 'Why does a tree search beat brute force here?' },
     ]);

@@ -280,6 +280,7 @@ export async function loadGoalsNight(
   const steps = readyClaudeSteps(
     goals.map((g) => g.goal),
     byGoal,
+    today,
   ).map((step) => ({ ...step, dueOn: dueOf.get(step.id) ?? null }));
 
   // A run on nothing in the live tree (the morning run, a goal since

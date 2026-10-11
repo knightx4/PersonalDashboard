@@ -70,7 +70,7 @@ export function ModuleVisionPanel({
           yours. Saving an empty box takes it back.
         </FieldHint>
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit" size="sm" disabled={pending}>
+          <Button type="submit" size="sm" pending={pending}>
             {pending ? 'Saving…' : 'Save the vision'}
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>

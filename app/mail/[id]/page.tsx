@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
 import { BackButton, EmailFrame } from './reader';
+import { MessageHead } from './message-head';
 import { LinkedText } from '@/components/ui/linked-text';
 
 export const metadata = { title: 'Email' };
@@ -100,16 +101,10 @@ export default async function MailPage({ params }: { params: Promise<{ id: strin
               <ol className="divide-y divide-border">
                 {messages.map((message) => (
                   <li key={message.id} className="card-pad">
-                    <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                      <p className="min-w-0 break-words text-ui font-semibold text-ink">
-                        {message.fromAddress ?? 'Unknown sender'}
-                      </p>
-                      {message.internalDate && (
-                        <p className="tabular text-small text-ink-muted">
-                          {when.format(message.internalDate)}
-                        </p>
-                      )}
-                    </div>
+                    <MessageHead
+                      from={message.fromAddress}
+                      sent={message.internalDate ? when.format(message.internalDate) : null}
+                    />
                     {message.html ? (
                       <EmailFrame html={message.html} title={message.subject ?? 'Email'} />
                     ) : (

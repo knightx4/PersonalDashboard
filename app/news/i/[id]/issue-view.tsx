@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import {
   ArrowLeft,
+  CircleDot,
   ExternalLink,
   FileText,
   Image as ImageIcon,
@@ -12,6 +13,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardBody, CardSection } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { AlsoInLine } from '@/components/news/also-in';
+import { ConfirmSignup } from '@/components/news/confirm-signup';
 import { SaveStoryButton } from '@/components/news/save-story-button';
 import { SendStoryButtons } from '@/components/news/send-story-buttons';
 import { StoryGrid } from '@/components/news/story-grid';
@@ -46,6 +48,12 @@ export type IssueViewProps = {
   /** Pictures held back from the original email while pictures are off. */
   blockedImages: number;
   unsubscribeUrl: string | null;
+  /**
+   * A signup email's confirmation link (plan #1724). `confirmedLabel` is when
+   * Confirm was pressed, already formatted, or null while it has not been.
+   * Null when the issue has no stored link.
+   */
+  confirm?: { url: string; confirmedLabel: string | null } | null;
   picturesHref: string;
   originalHref: string;
   summaryHref: string;
@@ -83,6 +91,7 @@ export function IssueView({
   pictureCount,
   blockedImages,
   unsubscribeUrl,
+  confirm = null,
   picturesHref,
   originalHref,
   summaryHref,
@@ -96,12 +105,93 @@ export function IssueView({
   // page widens to hold it. An essay, the original email and anything below
   // md keep the one column they had.
   const grid = showDigest && digest !== null && digest.stories.length > 0;
+  /**
+   * The issue's actions. `compact` is the phone's row, where every action but
+   * the first keeps its name for screen readers and shows only its icon.
+   */
+  const actions = (compact: boolean) => {
+    const label = compact ? 'sr-only' : undefined;
+    const iconOnly = compact ? 'w-7 px-0' : undefined;
+    const showPictures =
+      showDigest || blockedImages === 0
+        ? 'Show pictures'
+        : blockedImages === 1
+          ? 'Show 1 picture'
+          : `Show ${blockedImages} pictures`;
+    return (
+      <>
+        {digest &&
+          (showDigest ? (
+            <Link
+              href={originalHref}
+              className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
+            >
+              <Mail className="size-3.5" strokeWidth={1.75} aria-hidden />
+              Original email
+            </Link>
+          ) : (
+            <Link
+              href={summaryHref}
+              className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
+            >
+              <FileText className="size-3.5" strokeWidth={1.75} aria-hidden />
+              Summary
+            </Link>
+          ))}
+        {pictureCount > 0 && (
+          <Link
+            href={picturesHref}
+            title={pictures ? 'Hide pictures' : showPictures}
+            className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), iconOnly)}
+          >
+            {pictures ? (
+              <ImageOff className="size-3.5" strokeWidth={1.75} aria-hidden />
+            ) : (
+              <ImageIcon className="size-3.5" strokeWidth={1.75} aria-hidden />
+            )}
+            <span className={label}>{pictures ? 'Hide pictures' : showPictures}</span>
+          </Link>
+        )}
+        <form action={markIssueUnread}>
+          <input type="hidden" name="issueId" value={issueId} />
+          <Button type="submit" size="sm" variant="secondary" title="Mark unread" className={iconOnly}>
+            <CircleDot className="size-3.5" strokeWidth={1.75} aria-hidden />
+            <span className={label}>Mark unread</span>
+          </Button>
+        </form>
+        {/*
+          A plain link rather than a form, because nothing is sent on your
+          behalf: the publisher's own page does the unsubscribing, and all
+          this does is open it. No confirm either -- #683 asks before a
+          mail goes, and there is no mail here to send.
+
+          Only for an issue that carried a link. An issue that carried only
+          an address is #667's, which sends the mail through Mailgun; an
+          issue that carried neither gets no button, and that is most of
+          the list, since only issues delivered after #614 shipped kept the
+          header at all.
+        */}
+        {unsubscribeUrl && (
+          <a
+            href={unsubscribeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Unsubscribe"
+            className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), iconOnly)}
+          >
+            <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
+            <span className={label}>Unsubscribe</span>
+          </a>
+        )}
+      </>
+    );
+  };
   return (
     <div className={cn('mx-auto max-w-3xl', grid && 'md:max-w-5xl')}>
       <p className="mb-3">
         <Link
           href={back.href}
-          className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
+          className="inline-flex min-h-11 items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
           <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
           {back.label}
@@ -111,85 +201,36 @@ export function IssueView({
       <PageHeader
         title={subject ?? 'No subject'}
         description={byline}
-        actions={
-          <>
-            {digest &&
-              (showDigest && digest ? (
-                <Link
-                  href={originalHref}
-                  className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
-                >
-                  <Mail className="size-3.5" strokeWidth={1.75} aria-hidden />
-                  Original email
-                </Link>
-              ) : (
-                <Link
-                  href={summaryHref}
-                  className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
-                >
-                  <FileText className="size-3.5" strokeWidth={1.75} aria-hidden />
-                  Summary
-                </Link>
-              ))}
-            {pictureCount > 0 && (
-              <Link
-                href={picturesHref}
-                className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
-              >
-                {pictures ? (
-                  <>
-                    <ImageOff className="size-3.5" strokeWidth={1.75} aria-hidden />
-                    Hide pictures
-                  </>
-                ) : (
-                  <>
-                    <ImageIcon className="size-3.5" strokeWidth={1.75} aria-hidden />
-                    {showDigest || blockedImages === 0
-                      ? 'Show pictures'
-                      : blockedImages === 1
-                        ? 'Show 1 picture'
-                        : `Show ${blockedImages} pictures`}
-                  </>
-                )}
-              </Link>
-            )}
-            <form action={markIssueUnread}>
-              <input type="hidden" name="issueId" value={issueId} />
-              <Button type="submit" size="sm" variant="secondary">
-                Mark unread
-              </Button>
-            </form>
-            {/*
-              A plain link rather than a form, because nothing is sent on your
-              behalf: the publisher's own page does the unsubscribing, and all
-              this does is open it. No confirm either -- #683 asks before a
-              mail goes, and there is no mail here to send.
-
-              Only for an issue that carried a link. An issue that carried only
-              an address is #667's, which sends the mail through Mailgun; an
-              issue that carried neither gets no button, and that is most of
-              the list, since only issues delivered after #614 shipped kept the
-              header at all.
-            */}
-            {unsubscribeUrl && (
-              <a
-                href={unsubscribeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }))}
-              >
-                <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
-                Unsubscribe
-              </a>
-            )}
-          </>
-        }
+        actions={<div className="contents max-sm:hidden">{actions(false)}</div>}
       />
+      {/* At phone width the actions get a row of their own under the byline,
+          starting at its left edge, and all but the first show only their
+          icon, so the row fits on one line (law 9). */}
+      <div className="-mt-3 mb-5 flex items-center gap-2 sm:hidden">
+        {confirm && (
+          <ConfirmSignup
+            issueId={issueId}
+            url={confirm.url}
+            confirmedLabel={confirm.confirmedLabel}
+            className="mr-1"
+          />
+        )}
+        {actions(true)}
+      </div>
 
       {!digest && digestError && (
         <p className="mb-3 text-ui text-ink-muted">
           This issue could not be summarised, so it is shown as it arrived.
         </p>
+      )}
+
+      {confirm && (
+        <ConfirmSignup
+          issueId={issueId}
+          url={confirm.url}
+          confirmedLabel={confirm.confirmedLabel}
+          className="mb-4 max-sm:hidden"
+        />
       )}
 
       {showDigest && digest ? (

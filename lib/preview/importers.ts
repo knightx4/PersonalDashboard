@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
+import { surfaceOfComponent } from './routes';
 
 /**
  * The pages a component reaches through the files that import it.
@@ -43,6 +44,9 @@ function resolveSpecifier(root: string, from: string, spec: string): string | nu
   return null;
 }
 
+/** `import type { … } from '…'` and `export type { … } from '…'`, whole. */
+const TYPE_ONLY_IMPORT = /\b(?:import|export)\s+type\s[^;]*?\bfrom\s+['"][^'"]+['"]/g;
+
 /** Files that import each file, keyed by repository-relative path. */
 export function importedBy(root: string): Map<string, string[]> {
   const files: string[] = [];
@@ -51,7 +55,10 @@ export function importedBy(root: string): Map<string, string[]> {
   const pattern = /(?:\bfrom\s+|\bimport\s*\(?\s*)['"]([^'"]+)['"]/g;
   for (const file of files) {
     const from = file.split('\\').join('/');
-    const text = readFileSync(join(root, file), 'utf8');
+    // A type-only import draws nothing, so it is not a way for a change to
+    // reach a page: lib/raised/notifications.ts takes the Notification type
+    // from the shell's bell, and through it every layout reached the bell.
+    const text = readFileSync(join(root, file), 'utf8').replace(TYPE_ONLY_IMPORT, '');
     for (const m of text.matchAll(pattern)) {
       const target = resolveSpecifier(root, from, m[1]);
       if (!target || target === from) continue;
@@ -71,6 +78,10 @@ function isGallery(file: string): boolean {
 /**
  * The pages and layouts under `app/` that use `file`, directly or through
  * other files. Pass the map from `importedBy` once and reuse it.
+ *
+ * The walk stops at a shared component with a surface of its own
+ * (COMPONENT_SURFACES in routes.ts, plan #1708): that file is returned in
+ * place of the pages above it, and surfacesForFiles names its surface.
  */
 export function pagesUsing(file: string, graph: Map<string, string[]>): string[] {
   const pages = new Set<string>();
@@ -81,6 +92,10 @@ export function pagesUsing(file: string, graph: Map<string, string[]>): string[]
     for (const importer of graph.get(current) ?? []) {
       if (seen.has(importer) || isGallery(importer)) continue;
       seen.add(importer);
+      if (surfaceOfComponent(importer)) {
+        pages.add(importer);
+        continue;
+      }
       if (/^app\/.*\/?(page|layout)\.tsx$/.test(importer)) pages.add(importer);
       queue.push(importer);
     }

@@ -81,6 +81,21 @@ not held.
    Put migrations and schema first, the page last, and the tests inside the
    step they test rather than as a step of their own.
 
+   **Shape for building side by side.** A feature run builds up to three
+   ready steps at once (`SKILL.md`, Building, step 3), and every step pays
+   the same fixed cost of a brief, design check, gate and merge, about half
+   an hour whatever its size. So:
+
+   - Make a step wait on another only when it reads code or a table the
+     other one creates. Living on the same page is not a reason; two steps
+     on one page that do not touch the same component can be built apart.
+   - Fold a small step into its neighbour when both change the same screen.
+     A progress block in a page's properties column belongs in the step that
+     builds the column, not in an `s` step of its own after it.
+   - Put the shared piece first and keep it small, so the steps that use it
+     are ready sooner. A chain of four steps each waiting on the last is a
+     day of building; four steps waiting on one is an hour and a half.
+
    **Do not pad to a step count.** Three real steps and an honest gap beat
    six, three of which were invented to look complete. What goes in the gap
    is a decision, fog, or an idea, and two tests in order say which.
@@ -131,6 +146,36 @@ not held.
    replaces the first rather than joining it. A feature that seems to need two
    has at most one: the other is a decision, or it is a follow-on and belongs
    on the ideas page.
+
+   **A step that adds or changes a screen names its pattern.** The patterns
+   are listed on `/dev/ui` under "Page patterns" (Part 4 of
+   `docs/UI-QUALITY-SPEC.md`), by the names in `lib/plan/patterns.ts`:
+   `list and detail`, `deck`, `thread`, `tabbed detail`, `main plus rail` and `tabbed sections`. End the step's `--detail` with
+   the name on a line of its own:
+
+   ```
+   Pattern: list and detail
+   ```
+
+   The step's brief prints that pattern's rule, and the building session
+   gives the rule to the design critic, which judges the screen against it.
+   A step that changes no screen has no pattern line.
+
+   **A screen that fits none of them is a decision for the person.** Every
+   later screen of that kind would follow it, so do not invent the layout in
+   a step's detail. Write the decision under the feature and make the step
+   `depends` on it:
+
+   ```
+   npx tsx scripts/plan.ts add "Which layout for <the screen>?" --parent <n> \
+     --kind decision --detail "A — Use <the closest pattern>. <what it would not show well>.
+   B — Make <the new pattern> a pattern of its own. <its rule in one or two sentences, and its component and gallery entry as part of this feature>.
+   Recommend <A or B>: <why>."
+   ```
+
+   Until it is answered, the step's detail says `Pattern: none fits, see
+   #<the decision>`. The brief reads any name that is not one of the three
+   as waiting on the person.
 
    **A feature whose screens have a moment ends with a moments step.** The
    moments are the catalogue in `app/dev/ui/moments.ts`, listed on `/dev/ui`

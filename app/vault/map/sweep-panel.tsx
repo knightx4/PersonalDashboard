@@ -1,15 +1,16 @@
 import { Button } from '@/components/ui/button';
-import { cardVariants } from '@/components/ui/card';
-import { cn } from '@/lib/cn';
+import { Disclosure } from '@/components/ui/disclosure';
 import type { SweepOutcome } from '@/lib/vault/map/sweep';
 import type { SweepView } from '@/lib/vault/map/sweep-read';
 import { startSweep, stopSweep } from './actions';
 
 /**
- * The sweep's state on the map page (plan #757): what it has reached, what
- * happened to each note and why, and the one button that applies.
+ * The sweep's state on the map page (plan #757): the one button that applies,
+ * beside the page's heading (SweepAction), and what it has reached and what
+ * happened to each note, folded into one line that opens to the breakdown
+ * (SweepPanel, plan #1792).
  *
- * A server component with plain forms. The sweep moves every five minutes,
+ * Server components with plain forms. The sweep moves every five minutes,
  * not every second, so the page shows where it stood when it was loaded.
  */
 
@@ -29,23 +30,26 @@ const OUTCOME_LINES: { outcome: SweepOutcome; label: string }[] = [
 
 const dateFormat = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long' });
 
+export function SweepAction({ sweep }: { sweep: SweepView | null }) {
+  const running = sweep?.status === 'running';
+  return (
+    <form action={running ? stopSweep : startSweep}>
+      <Button type="submit" variant={running || sweep?.status === 'done' ? 'secondary' : 'primary'}>
+        {running ? 'Stop' : 'Sweep'}
+      </Button>
+    </form>
+  );
+}
+
 export function SweepPanel({ sweep }: { sweep: SweepView | null }) {
   if (!sweep) {
     return (
-      <section className={cn(cardVariants(), 'mb-4 p-4')} aria-labelledby="sweep-heading">
-        <h2 id="sweep-heading" className="text-body font-semibold text-ink">
-          Sweep every note
-        </h2>
-        <p className="mt-1 text-ui text-ink-muted">
-          Reads every note in your vault the way a note&rsquo;s Map section does and writes what
-          it finds to the map. Notes in Me, notes with API keys and notes under 80 characters are
-          skipped, and so is Career/Job Applications. It runs in the background a few minutes at a time, carries on after you close
-          this page, and can be stopped.
-        </p>
-        <form action={startSweep} className="mt-3">
-          <Button type="submit">Sweep</Button>
-        </form>
-      </section>
+      <p className="mb-4 text-ui text-ink-muted">
+        Sweep reads every note in your vault the way a note&rsquo;s Map section does and writes
+        what it finds to the map. Notes in Me, notes with API keys and notes under 80 characters
+        are skipped, and so is Career/Job Applications. It runs in the background a few minutes at
+        a time, carries on after you close this page, and can be stopped.
+      </p>
     );
   }
 
@@ -57,94 +61,83 @@ export function SweepPanel({ sweep }: { sweep: SweepView | null }) {
 
   const heading =
     sweep.status === 'done'
-      ? `Swept ${sweep.reached} notes, finished ${dateFormat.format(new Date(sweep.finishedAt ?? sweep.startedAt))}`
+      ? `Swept ${sweep.reached} notes, ${dateFormat.format(new Date(sweep.finishedAt ?? sweep.startedAt))}`
       : sweep.status === 'stopped'
         ? `Sweep stopped: ${reachedLine}`
         : `Sweeping: ${reachedLine}`;
 
+  const failed = sweep.outcomes.failed ?? 0;
   const lines = OUTCOME_LINES.filter(({ outcome }) => (sweep.outcomes[outcome] ?? 0) > 0);
 
   return (
-    <section className={cn(cardVariants(), 'mb-4 p-4')} aria-labelledby="sweep-heading">
-      <h2 id="sweep-heading" className="text-body font-semibold text-ink">
-        {heading}
-      </h2>
-      {sweep.status === 'running' && (
-        <p className="mt-1 text-ui text-ink-muted">
-          It works for a few minutes every five minutes until every note is reached. Reload to see
-          how far it has got.
-        </p>
-      )}
+    <div className="mb-4">
+      {/* The error stays out of the fold: a sweep that could not continue is
+          not something to find by opening a line. */}
       {sweep.lastError && (
-        <p className="mt-2 rounded-lg bg-caution-tint px-3 py-2 text-ui text-ink">
+        <p className="mb-2 rounded-lg bg-caution-tint px-3 py-2 text-ui text-ink">
           The last run could not continue: {sweep.lastError}
         </p>
       )}
+      <Disclosure title={heading} meta={failed > 0 ? `· ${failed} failed` : undefined}>
+        {sweep.status === 'running' && (
+          <p className="text-ui text-ink-muted">
+            It works for a few minutes every five minutes until every note is reached. Reload to
+            see how far it has got.
+          </p>
+        )}
 
-      {lines.length > 0 && (
-        <ul className="mt-3 space-y-1 text-ui text-ink">
-          {lines.map(({ outcome, label }) => (
-            <li key={outcome}>
-              <span className="tabular-nums font-medium">{sweep.outcomes[outcome]}</span> {label}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {(sweep.positions > 0 || sweep.cutShort > 0 || sweep.sectionsFailed > 0) && (
-        <ul className="mt-2 space-y-1 text-ui text-ink-muted">
-          {sweep.positions > 0 && (
-            <li>
-              {sweep.positions} positions written, {sweep.newPositions} of them new to the map.
-            </li>
-          )}
-          {sweep.cutShort > 0 && (
-            <li>
-              {sweep.cutShort} {sweep.cutShort === 1 ? 'note was' : 'notes were'} longer than
-              400,000 characters and read only up to that point.
-            </li>
-          )}
-          {sweep.sectionsFailed > 0 && (
-            <li>
-              {sweep.sectionsFailed} {sweep.sectionsFailed === 1 ? 'note' : 'notes'} had sections
-              that failed to read. The rest of each was written, and the next sweep reads them
-              again.
-            </li>
-          )}
-        </ul>
-      )}
-
-      {sweep.failures.length > 0 && (
-        <div className="mt-3">
-          <h3 className="text-ui font-medium text-ink">Failed</h3>
-          <ul className="mt-1 space-y-1 text-ui text-ink-muted">
-            {sweep.failures.map((failure, i) => (
-              <li key={i}>
-                <span className="text-ink">{failure.title}</span>: {failure.detail}
+        {lines.length > 0 && (
+          <ul className="space-y-1 text-ui text-ink">
+            {lines.map(({ outcome, label }) => (
+              <li key={outcome}>
+                <span className="tabular-nums font-medium">{sweep.outcomes[outcome]}</span> {label}
               </li>
             ))}
           </ul>
-        </div>
-      )}
-
-      <form action={sweep.status === 'running' ? stopSweep : startSweep} className="mt-3">
-        {sweep.status === 'running' ? (
-          <Button type="submit" variant="secondary">
-            Stop
-          </Button>
-        ) : sweep.status === 'stopped' ? (
-          <Button type="submit">Sweep</Button>
-        ) : (
-          <>
-            <Button type="submit" variant="secondary">
-              Sweep
-            </Button>
-            <p className="mt-2 text-small text-ink-muted">
-              A new sweep sends only the notes that are new, changed or failed since this one.
-            </p>
-          </>
         )}
-      </form>
-    </section>
+
+        {(sweep.positions > 0 || sweep.cutShort > 0 || sweep.sectionsFailed > 0) && (
+          <ul className="mt-2 space-y-1 text-ui text-ink-muted">
+            {sweep.positions > 0 && (
+              <li>
+                {sweep.positions} positions written, {sweep.newPositions} of them new to the map.
+              </li>
+            )}
+            {sweep.cutShort > 0 && (
+              <li>
+                {sweep.cutShort} {sweep.cutShort === 1 ? 'note was' : 'notes were'} longer than
+                400,000 characters and read only up to that point.
+              </li>
+            )}
+            {sweep.sectionsFailed > 0 && (
+              <li>
+                {sweep.sectionsFailed} {sweep.sectionsFailed === 1 ? 'note' : 'notes'} had
+                sections that failed to read. The rest of each was written, and the next sweep
+                reads them again.
+              </li>
+            )}
+          </ul>
+        )}
+
+        {sweep.failures.length > 0 && (
+          <div className="mt-3">
+            <h3 className="text-ui font-medium text-ink">Failed</h3>
+            <ul className="mt-1 space-y-1 text-ui text-ink-muted">
+              {sweep.failures.map((failure, i) => (
+                <li key={i}>
+                  <span className="text-ink">{failure.title}</span>: {failure.detail}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {sweep.status === 'done' && (
+          <p className="mt-2 text-small text-ink-muted">
+            A new sweep sends only the notes that are new, changed or failed since this one.
+          </p>
+        )}
+      </Disclosure>
+    </div>
   );
 }

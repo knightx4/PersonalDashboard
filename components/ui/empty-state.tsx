@@ -29,6 +29,7 @@ export function EmptyState({
   action,
   secondaryAction,
   tone = 'empty',
+  align = 'center',
   seed,
   className,
   children,
@@ -39,6 +40,8 @@ export function EmptyState({
   action?: { label: string; href: string };
   secondaryAction?: { label: string; href: string };
   tone?: 'empty' | 'finished';
+  /** `start` for an explanation long enough to be read: a shared left edge. */
+  align?: 'center' | 'start';
   /** For `finished`: what the sigil is drawn from. Falls back to the title. */
   seed?: string;
   className?: string;
@@ -50,11 +53,13 @@ export function EmptyState({
   children?: React.ReactNode;
 }) {
   const finished = tone === 'finished';
+  const start = align === 'start';
 
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center px-6 text-center',
+        'flex flex-col justify-center px-6',
+        start ? 'items-start text-left' : 'items-center text-center',
         finished ? 'py-14' : 'sheet rounded-card border border-dashed bg-surface py-16',
         className,
       )}
@@ -98,7 +103,14 @@ export function EmptyState({
         </div>
       )}
       {children && (
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">{children}</div>
+        <div
+          className={cn(
+            'mt-3 flex flex-wrap items-center gap-2',
+            start ? 'justify-start' : 'justify-center',
+          )}
+        >
+          {children}
+        </div>
       )}
     </div>
   );

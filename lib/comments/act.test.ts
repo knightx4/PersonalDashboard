@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { carryOut, type ActInput } from './act';
-import { handStepToClaude } from '@/lib/plan/handover';
+import { handFeatureToClaude, handStepToClaude } from '@/lib/plan/handover';
 import type { DashAction } from './reply-payload';
 import { fakeDashDeps } from '../../tests/stubs/fake-schema-db';
 
@@ -14,6 +14,13 @@ vi.mock('@/lib/plan/handover', () => ({
     beneath: 0,
     detail: 'The routine is running.',
     changed: true,
+  })),
+  handFeatureToClaude: vi.fn(async () => ({
+    ok: true,
+    number: 1660,
+    title: 'Quick notes in the vault',
+    steps: 3,
+    detail: 'The routine is running.',
   })),
 }));
 
@@ -506,7 +513,7 @@ describe('sending a step to be built', () => {
   // A raise has no step of its own, so its consequence names one by number --
   // "yes, build #342". The number is looked up under the caller's own id.
   it('sends the step a raise named by number', async () => {
-    const { supabase } = db({ row: { id: 'step-342' } });
+    const { supabase } = db({ row: { id: 'step-342', parent_id: 'feature-340' } });
     const outcome = await carryOut(
       input({ supabase, target: 'raise', id: 'raise-1', action: action({ name: 'send_step', text: '#342' }) }),
     );
@@ -515,6 +522,22 @@ describe('sending a step to be built', () => {
     expect(vi.mocked(handStepToClaude)).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'user-1', id: 'step-342' }),
     );
+  });
+
+  // The overnight runner's raise for a feature it holds names the feature, and
+  // a yes sends it as a feature run, which is what the runner counts.
+  it('sends a feature a raise named by number as a whole feature', async () => {
+    vi.mocked(handStepToClaude).mockClear();
+    const { supabase } = db({ row: { id: 'feature-1660', parent_id: null } });
+    const outcome = await carryOut(
+      input({ supabase, target: 'raise', id: 'raise-2', action: action({ name: 'send_step', text: '#1660' }) }),
+    );
+
+    expect(outcome.ok === true && outcome.said).toContain('Sent #1660 Quick notes in the vault');
+    expect(vi.mocked(handFeatureToClaude)).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', id: 'feature-1660' }),
+    );
+    expect(vi.mocked(handStepToClaude)).not.toHaveBeenCalled();
   });
 
   it('says so when the number a raise named is not a step of yours', async () => {

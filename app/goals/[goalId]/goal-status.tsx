@@ -1,150 +1,80 @@
-import Link from 'next/link';
-import { CircleHelp, Flag, ListChecks, Megaphone, Sparkles, User } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
 import { Card } from '@/components/ui/card';
+import { DashCredit } from '@/components/ui/dash-mark';
 import { Disclosure } from '@/components/ui/disclosure';
-import { Meter } from '@/components/ui/meter';
 import type { Brief } from '@/lib/goals/briefs';
 import { formatDay } from '@/lib/goals/dates';
-import { claudeLine, type GoalStatusView, type StatusRowKind } from '@/lib/goals/goal-status';
-import { stagesLabel, stageWait, type Stage } from '@/lib/goals/goal-page';
 import type { GoalReview } from '@/lib/goals/reviews';
 import { VerdictLabel } from '../goal-line';
-import { DashCredit } from '@/components/ui/dash-mark';
 
 /**
- * The top of a goal's page (lib/goals/goal-status.ts, plan #1078): Dash's
- * status for the day, its latest note or the status's reason, the next move
- * with its date, a track of the stages, and, folded, everything on the goal
- * that is waiting on you, each opening where it is done lower on the page.
+ * Where the goal stands, under its title (plan #1078): Dash's verdict and one
+ * line of counts ("3 on you · Dash on 1 · due 31 Oct", `statusLine` in
+ * lib/goals/goal-status.ts), the verdict's next move as a sentence, Dash's
+ * latest note folded, what Dash is on, and Ask Dash. The page puts the
+ * goal's number and Waiting on you straight under it.
  */
 
-const ROW_ICONS: Record<StatusRowKind, typeof User> = {
-  question: CircleHelp,
-  flag: Megaphone,
-  approve: Flag,
-  read: Sparkles,
-  do: User,
-};
-
 export type GoalStatusCardProps = {
-  status: GoalStatusView;
-  brief: Brief | null;
-  /** When the note was written, to follow "written": "today", "on 3 Oct". */
-  briefWhen: string | null;
+  /** The line of counts, from `statusLine`. */
+  line: string;
   review: GoalReview | null;
   /** Whether that status is recent enough to stand as today's (isCurrent). */
   current: boolean;
-  /** The goal's stages, for the track along the foot; null for a goal that is one list. */
-  stages: Stage[] | null;
+  brief: Brief | null;
+  /** When the note was written, to follow "written": "today", "on 3 Oct". */
+  briefWhen: string | null;
+  /** What Dash is on under the goal, and what it finished in the last day. */
+  work?: React.ReactNode;
+  /** Ask Dash on the whole goal, while it has nothing to approve. */
+  ask?: React.ReactNode;
 };
 
-export function GoalStatusCard({ status, brief, briefWhen, review, current, stages }: GoalStatusCardProps) {
-  const dash = claudeLine(status);
-  const waiting = status.yourMove.length + status.moreSteps;
+export function GoalStatusCard({
+  line,
+  review,
+  current,
+  brief,
+  briefWhen,
+  work,
+  ask,
+}: GoalStatusCardProps) {
   return (
     <section aria-labelledby="status-heading">
-      <Card padding="standard" className="space-y-3">
+      <Card padding="standard" className="space-y-2">
         <h2 id="status-heading" className="sr-only">
           Where it stands
         </h2>
+        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-small text-ink-muted">
+          {review && <VerdictLabel review={review} current={current} />}
+          <span className="tabular">{line}</span>
+        </p>
         {review ? (
-          <VerdictLabel review={review} current={current} />
-        ) : (
-          <p className="text-small text-ink-muted">Dash has not checked this goal yet.</p>
-        )}
-
-        {brief ? (
-          <div className="space-y-1">
-            <FileBody markdown={brief.body} compact />
-            {briefWhen && <p className="text-small text-ink-muted">
-                <DashCredit />
-                Dash’s note, written {briefWhen}
-              </p>}
-          </div>
-        ) : (
-          review && <p className="text-ui text-ink">{review.reason}</p>
-        )}
-        {review && (
-          <p className="text-small text-ink-muted">
-            Next: <span className="text-ink">{review.nextMove}</span>
-            {review.nextOn && `, ${formatDay(review.nextOn)}`}
+          <p className="text-ui text-ink">
+            {review.nextMove}
+            {review.nextOn && (
+              <span className="tabular text-ink-muted"> · {formatDay(review.nextOn)}</span>
+            )}
           </p>
+        ) : (
+          <p className="text-ui text-ink-muted">Dash has not checked this goal yet.</p>
         )}
-
-        {stages && <StageTrack stages={stages} />}
-
-        {waiting > 0 && (
-          <Disclosure title="Waiting on you" meta={waiting}>
-            <ul className="space-y-1">
-              {status.yourMove.map((row) => {
-                const Icon = row.kind === 'approve' && row.href.startsWith('#step-') ? ListChecks : ROW_ICONS[row.kind];
-                return (
-                  <li key={`${row.kind}-${row.id}`}>
-                    <Link
-                      href={row.href}
-                      className="press -mx-1 flex items-start gap-2 rounded-control px-1 py-0.5 text-small hover:bg-sunken"
-                    >
-                      <Icon className="mt-0.5 size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
-                      <span className="min-w-0 flex-1 break-words text-ink">
-                        <span className="font-medium">{row.label}:</span> {row.title}
-                      </span>
-                    </Link>
-                  </li>
-                );
-              })}
-              {status.moreSteps > 0 && (
-                <li className="pl-5 text-small text-ink-muted">
-                  {status.moreSteps === 1 ? '1 more step' : `${status.moreSteps} more steps`} of yours in the stages
-                </li>
-              )}
-            </ul>
+        {brief && (
+          <Disclosure
+            title={
+              <>
+                <DashCredit />
+                Dash’s note
+              </>
+            }
+            meta={briefWhen ? `written ${briefWhen}` : undefined}
+          >
+            <FileBody markdown={brief.body} compact />
           </Disclosure>
         )}
-
-        {dash && <p className="text-small text-ink-muted">{dash}</p>}
+        {work}
+        {ask}
       </Card>
     </section>
-  );
-}
-
-/**
- * The stages as one bar of segments: a finished stage full, each stage under
- * way filled as far as its steps are done, the rest empty. The first and last
- * stages are named under it, so the bar reads as the way from one to the
- * other. A step closing on screen slides its stage's fill to the new length.
- */
-function StageTrack({ stages }: { stages: Stage[] }) {
-  const label = stagesLabel(stages);
-  return (
-    <div className="space-y-1">
-      <div className="flex gap-1" role="img" aria-label={label}>
-        {/* Every stage is a meter, done full and the rest empty, so a stage
-            finishing on screen slides to full rather than being swapped for
-            another element (plan #1342). */}
-        {stages.map((stage) => {
-          const current = stage.state === 'current';
-          const named = [stage.title, stageWait(stage)].filter(Boolean).join(': ');
-          return (
-            <Meter
-              key={stage.id}
-              value={stage.state === 'done' ? 1 : current ? stage.done : 0}
-              max={current ? stage.live : 1}
-              fill="bg-positive"
-              track="sunken"
-              minFraction={current ? 0.15 : 0}
-              moves
-              label={current ? `${stage.title}: ${stage.done} of ${stage.live} done` : named}
-              title={current ? undefined : named}
-              className="flex-1"
-            />
-          );
-        })}
-      </div>
-      <div className="flex justify-between gap-3 text-small text-ink-ghost">
-        <span className="min-w-0 truncate">{stages[0].title}</span>
-        <span className="min-w-0 truncate text-right">{stages[stages.length - 1].title}</span>
-      </div>
-    </div>
   );
 }

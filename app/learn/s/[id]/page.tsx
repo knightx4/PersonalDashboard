@@ -11,7 +11,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGoals, loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { weightReason } from '@/lib/learn/flow/interest';
 import { loadTrackInterest } from '@/lib/learn/flow/interest-load';
-import { practiceHref } from '@/lib/learn/flow/href';
+import { nowHref, practiceHref, subjectClipsHref } from '@/lib/learn/flow/href';
 import { GoalForm } from '@/app/learn/know/goal-form';
 import { ConceptList } from '@/components/learn/concept-list';
 import { ConfirmStep } from '@/components/ui/confirm-step';
@@ -288,7 +288,8 @@ export default async function SubjectPage({
   // The Channels section is the owner's alone (plan #1199): finding channels
   // spends their YouTube quota and transcript credits. Channels that cannot
   // be read leave the section showing none, with the button to find some.
-  const channels: SubjectChannels | null = (await isOwner({ user }))
+  const owner = await isOwner({ user });
+  const channels: SubjectChannels | null = owner
     ? await loadSubjectChannels(supabase, user.id, id).catch(() => ({ channels: [], kept: new Set<string>() }))
     : null;
   const counts = countStates(graph);
@@ -321,6 +322,19 @@ export default async function SubjectPage({
         }
         actions={
           <>
+            {/* Now with only this subject's cards (plan #1698). Its empty
+                state says when there are none, so it shows on every subject. */}
+            <Link href={nowHref(id)} className={buttonVariants({ variant: 'secondary' })}>
+              Now
+            </Link>
+            {/* The clips that serve this subject (plan #1697). The owner's
+                alone, like Videos, since they are cut from the owner's
+                YouTube library. Its own empty state says when none serve it. */}
+            {owner && (
+              <Link href={subjectClipsHref(id)} className={buttonVariants({ variant: 'secondary' })}>
+                Clips
+              </Link>
+            )}
             {counts.total > 0 && (
               <>
                 <Link
