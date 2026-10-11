@@ -4590,10 +4590,10 @@ export const SURFACES: readonly Surface[] = [
     render: () => <NoteButtonSurface />,
   },
   {
-    /* The same panel once a note has saved, with Jev's triage under it and
-     * the fix-or-plan answer last (plan #1674). */
+    /* The same panel once a note has saved and triage filed it as an idea,
+     * with the flip back and "Shape it now" (plans #1674, #1675). */
     id: 'shell-note-saved',
-    label: 'Top bar · A note just saved, as Jev sorted it',
+    label: 'Top bar · A note just saved and filed as an idea',
     module: 'dev',
     width: 'page',
     render: () => <NoteSavedSurface />,

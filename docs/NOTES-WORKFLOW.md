@@ -80,6 +80,13 @@ a fix belongs in the plan: add it there as a *proposed* feature with its
 steps, mark the note `planned`, and say which step it became. The person
 approves it on the plan page before anything is built.
 
+The header's box files everything as a note first. When triage is sure a
+note needs planning, the server writes an idea from the same text under the
+triaged workspace and marks the note `planned`, with a resolution naming the
+idea, so the queue does not work it (plan #1675). The saved panel says
+"Filed as a note" or "Filed as an idea" and moves it the other way in one
+press. An unsure answer stays a note for the notes routine to judge.
+
 The whole loop, then: small things go in as notes and get fixed; big
 thoughts go in as ideas, get shaped into proposals by pressing *Shape into a
 plan*, get approved and handed over on the plan page, and get built one step
