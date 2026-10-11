@@ -4,8 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
-import { isOwner, requireOwner } from '@/lib/dev/owner';
-import { codeMatches } from '@/lib/feedback/code';
+import { requireOwner } from '@/lib/dev/owner';
 import { notesRoutine } from '@/lib/feedback/routine';
 import {
   FEEDBACK_KINDS,
@@ -22,6 +21,9 @@ import { triageRow } from '@/lib/feedback/triage-run';
 import { scoreIdeaRow } from '@/lib/ideas/score-run';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import { addThreadTurn } from '@/lib/thread/store';
+import { parseUploadedAttachments } from '@/lib/attachments/rules';
+import { recordAttachments, removeAttachmentsFor } from '@/lib/attachments/store';
+import { noteFilesBrief, noteRef, outstandingNoteFiles } from '@/lib/feedback/files';
 
 /** One queue, one page. The old per-workspace pages redirect to it. */
 function revalidateFeedback(): void {
@@ -55,16 +57,9 @@ const submitSchema = z.object({
  *
  * `requireUser`, not `requireOwner`, on purpose. Do not "fix" it.
  *
- * The submit code goes the same way. It is the owner's code, printed nowhere
- * and known to nobody else, so asking a second account for it would be asking
- * for a value they cannot have -- the panel does not even draw the box for
- * them (#418). Still asked of the owner, because for them it is what stops a
- * note being filed by a page left open on a shared screen, and dropping it
- * would be weakening a check that is working.
- *
- * So: owner and wrong code is refused, exactly as before. Anyone else signed
- * in files without one, and whatever they typed in a field that is not there
- * is not read.
+ * There is no submit code. The owner was asked for one until note 7c1f7238
+ * asked for it to go: it guarded only against a page left open on a shared
+ * screen, where everything else in the app is open too.
  */
 // latency: pending
 export async function submitFeedback(
@@ -73,10 +68,6 @@ export async function submitFeedback(
 ): Promise<FeedbackActionState> {
   const user = await requireUser();
   const supabase = await createClient();
-
-  if ((await isOwner({ user, supabase })) && !codeMatches(String(formData.get('code') ?? ''))) {
-    return { error: 'That code is not right.' };
-  }
 
   const parsed = submitSchema.safeParse({
     kind: String(formData.get('kind') ?? 'feature'),
@@ -100,9 +91,22 @@ export async function submitFeedback(
     .single();
   if (error) return { error: error.message };
 
+  // The files added with "Add a file" (plan #1713), already in your folder of
+  // the bucket, recorded against the note now that it has an id. The note is
+  // kept when this fails, and the message says the files did not go with it.
+  const files = parseUploadedAttachments(formData.get('attachments'), user.id);
+  let filesError: string | null = null;
+  if (files.length > 0 && data?.id) {
+    try {
+      await recordAttachments(await createCoreClient(), user.id, noteRef(String(data.id)), files);
+    } catch {
+      filesError = 'Note saved, but its files could not be added.';
+    }
+  }
+
   revalidateFeedback();
   return {
-    message: SAVED[parsed.data.kind],
+    message: filesError ?? SAVED[parsed.data.kind],
     filed: data?.id ? { table: 'feedback_items', id: String(data.id) } : undefined,
   };
 }
@@ -349,6 +353,14 @@ export async function deleteFeedback(
     .eq('user_id', user.id);
   if (error) return { error: error.message };
 
+  // A note's files are recorded by ref, which nothing cascades from, so they
+  // go with it here (plan #1713). Best effort: the note is already gone.
+  try {
+    await removeAttachmentsFor(await createCoreClient(), noteRef(id.data));
+  } catch (filesError) {
+    console.error(`Removing a deleted note's files failed: ${(filesError as Error).message}`);
+  }
+
   revalidateFeedback();
   return { message: 'Deleted.' };
 }
@@ -369,11 +381,26 @@ export async function runFeatureRoutine(
   const supabase = await createClient();
   const user = await requireOwner({ supabase });
 
+  // A run reads the queue through SQL, which cannot open the private bucket,
+  // so the files on the notes it will work go with it as signed links
+  // (plan #1713).
+  const { data: open } = await supabase
+    .from('feedback_items')
+    .select('id')
+    .eq('user_id', user.id)
+    .in('status', [...OUTSTANDING_STATUSES])
+    .in('kind', [...NOTES_WORK_KINDS]);
+  const files = await outstandingNoteFiles(
+    await createCoreClient(),
+    ((open ?? []) as { id: string }[]).map((row) => row.id),
+  );
+
   const result = await startRoutineRun({
     supabase,
     userId: user.id,
     job: 'notes',
     routine: notesRoutine(),
+    text: noteFilesBrief(files),
   });
   if (!result.ok) return { error: result.error };
   return { message: result.detail };

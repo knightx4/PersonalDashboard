@@ -38,14 +38,16 @@ describe('ContactDetail', () => {
 
   it('offers Log a send as one button with no fields beside it', () => {
     expect(html).toMatch(/<button[^>]*>.*Log a send<\/button>/);
-    // The only "What you said" box is the one on the logged send's own line.
-    expect(html.match(/aria-label="What you said"/g)).toHaveLength(1);
+    // Nothing to type into beside it: a send's words are edited on its own
+    // line in the log, and only once they are pressed.
+    expect(html).not.toMatch(/<(?:input|textarea)[^>]*aria-label="What you said"/);
   });
 
   it('shows each send as its channel chip and its words, edited in place', () => {
     expect(html).toMatch(/<select[^>]*aria-label="How it went out"/);
     expect(html).toMatch(/<option value="email" selected="">email<\/option>/);
-    expect(html).toContain('aria-label="What you said"');
-    expect(html).toContain('value="Asked about the team"');
+    // At rest the words are text that wraps, and pressing them opens the
+    // editor where they are (law 14).
+    expect(html).toMatch(/<button[^>]*title="Edit what you said"[^>]*>Asked about the team<\/button>/);
   });
 });

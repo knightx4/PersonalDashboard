@@ -1,12 +1,12 @@
 /**
- * The goal page (plan #1078, under #1072): its stages and which of them is
- * the one to show open, the rhythm steps with their weeks, and what Dash
- * found, each as one plain sentence naming the step it came from.
+ * The goal page (plan #1078, under #1072): its stages, which of them open
+ * under Now and which fold into one line each, the rhythm steps with their
+ * weeks, and what Dash wrote for each step, said on the step it serves.
  *
  * Pure, so the page's reading of the tree is tested without a database.
  */
 import { awaitsReview } from '@/lib/goals/daily';
-import { firstLink } from '@/lib/goals/result-links';
+import { readySteps } from '@/lib/goals/dependencies';
 import type { StepNode } from '@/lib/goals/steps';
 
 /**
@@ -183,6 +183,63 @@ export function stagesLabel(stages: readonly Pick<Stage, 'state' | 'index'>[]): 
   return `${list.charAt(0).toUpperCase()}${list.slice(1)} of ${stages.length}`;
 }
 
+/**
+ * Whether a step waits on you now: a question to answer, a proposal to
+ * approve, a result of Dash's to read, or a step of yours with no sub-steps
+ * and nothing in its way.
+ */
+function onYouNow(node: StepNode, ready: ReadonlySet<string>): boolean {
+  if (node.status === 'proposed') return true;
+  if (awaitsReview(node)) return true;
+  if (node.status !== 'open') return false;
+  if (node.kind === 'decision') return node.resolution === null && !node.dismissedAt;
+  return node.kind === 'mine' && node.children.length === 0 && ready.has(node.id);
+}
+
+/**
+ * The stages the goal page opens under Now; the rest fold to one line each
+ * under the map. Now holds:
+ *
+ *  - the first stage neither finished nor held, which `goalStages` reads as
+ *    the first current one (or, when every stage left is held, the first of
+ *    those), so the page always opens one stage while any is left;
+ *  - every other stage holding something that waits on you now: a ready
+ *    step of yours, a question, a proposal or a result of Dash's to read.
+ *
+ * A stage that is only under way, with Dash working in it and nothing on
+ * you, stays on the map. The current rule opened every stage with work
+ * started, which on a goal of nine stages opened most of them. Anything the
+ * status lists as waiting on you is in a stage under Now, so its link lands
+ * on an open row. The waits count only once `attachDependencies` has run.
+ */
+export function nowStages(
+  stages: readonly Pick<Stage, 'id' | 'state'>[] | null,
+  steps: readonly StepNode[],
+): Set<string> {
+  const now = new Set<string>();
+  if (!stages) return now;
+  const first = stages.find((stage) => stage.state === 'current');
+  if (first) now.add(first.id);
+  const ready = readySteps(steps);
+  const stageIds = new Set(stages.map((stage) => stage.id));
+  for (const top of steps) {
+    if (!stageIds.has(top.id) || now.has(top.id)) continue;
+    if (descendants(top).some((node) => counts(node) && onYouNow(node, ready))) now.add(top.id);
+  }
+  return now;
+}
+
+/** What the Now heading says of the stages in it: "Stage 2 of 6", "Stages 2 and 5 of 9". */
+export function nowLabel(
+  stages: readonly Pick<Stage, 'id' | 'index'>[],
+  now: ReadonlySet<string>,
+): string | null {
+  const indices = stages.filter((stage) => now.has(stage.id)).map((stage) => stage.index);
+  if (indices.length === 0) return null;
+  const list = stageList(indices);
+  return `${list.charAt(0).toUpperCase()}${list.slice(1)} of ${stages.length}`;
+}
+
 /** The goal's live rhythm steps, in the order of the map, for its Rhythm section. */
 export function rhythmSteps(steps: readonly StepNode[]): StepNode[] {
   const out: StepNode[] = [];
@@ -196,23 +253,6 @@ export function rhythmSteps(steps: readonly StepNode[]): StepNode[] {
   walk(steps);
   return out;
 }
-
-/** One thing Dash found, as the page says it. */
-export type Finding = {
-  stepId: string;
-  /** The step it came from, named beside the fact. */
-  from: string;
-  fact: string;
-  /** The whole result, which the finding opens to. */
-  result: string;
-  /**
-   * Where to go from it: where the full result lives, or else the first
-   * place the result points to (a sign-up page, an event), or null.
-   */
-  url: string | null;
-  /** Whether it waits to be marked read, which the finding can do. */
-  unread: boolean;
-};
 
 /** The longest a fact runs before it is cut, in characters. */
 const FACT_MAX = 220;
@@ -246,40 +286,10 @@ export function firstSentence(markdown: string): string {
 }
 
 /**
- * What Dash found on this goal: every step carrying a result, in the order
- * of the map, each as its first sentence and the step it came from. The
- * finding opens to the whole result, so reading it does not mean finding
- * the step and opening its row.
- */
-export function goalFindings(steps: readonly StepNode[]): Finding[] {
-  const out: Finding[] = [];
-  const walk = (nodes: readonly StepNode[]) => {
-    for (const node of nodes) {
-      if (node.status !== 'dropped' && node.result?.trim()) {
-        const fact = firstSentence(node.result);
-        if (fact) {
-          out.push({
-            stepId: node.id,
-            from: node.title,
-            fact,
-            result: node.result,
-            url: node.resultUrl ?? firstLink(node.result),
-            unread: awaitsReview(node),
-          });
-        }
-      }
-      walk(node.children);
-    }
-  };
-  walk(steps);
-  return out;
-}
-
-/**
  * A Dash prep step as the step it serves shows it (plan #1218, under #1207):
- * "Dash is preparing: <title>" while it is open, and "Dash prepared: <first
- * sentence>" once it is done, linked to the prep step's row, where the whole
- * result is.
+ * "Dash is preparing: <title>" while it is open, and once it is done, Dash's
+ * draft on the served step's own row, folded to its first sentence, with the
+ * whole result a press away.
  */
 export type StepPrep = {
   /** The prep step, whose row the note links to. */
@@ -288,6 +298,12 @@ export type StepPrep = {
   done: boolean;
   /** The first sentence of what it produced, once done; null before, or when it wrote none. */
   line: string | null;
+  /** The whole result once done, as markdown; null before, or when it wrote none. */
+  result: string | null;
+  /** Where the result also lives, when it has a link. */
+  resultUrl: string | null;
+  /** Whether the result waits to be read, which opening the draft does. */
+  unread: boolean;
 };
 
 /** The step a prep step is for, which the prep step's own row names. */
@@ -326,12 +342,79 @@ export function stepPreps(trees: readonly (readonly StepNode[])[]): {
     if (title !== undefined) targetOf[prep.id] = { id: target, title };
     if (prepFor[target]) continue;
     const done = prep.status === 'done';
+    const result = done && prep.result?.trim() ? prep.result : null;
     prepFor[target] = {
       id: prep.id,
       title: prep.title,
       done,
-      line: done && prep.result?.trim() ? firstSentence(prep.result) || null : null,
+      line: result ? firstSentence(result) || null : null,
+      result,
+      resultUrl: done ? (prep.resultUrl ?? null) : null,
+      unread: done && awaitsReview(prep),
     };
   }
   return { prepFor, targetOf };
+}
+
+/* ------------------------------------------------------------ the tabs */
+
+/**
+ * The goal page's tabs (plan #1671), the feature page's three in the same
+ * order: Overview holds the status card and what feeds the goal, Steps the
+ * step tree, Activity the runs, the finished steps and the comments.
+ */
+export const GOAL_TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'steps', label: 'Steps' },
+  { id: 'activity', label: 'Activity' },
+] as const;
+
+export type GoalTab = (typeof GOAL_TABS)[number]['id'];
+
+/**
+ * A link from elsewhere on the goal page to a step's row. The rows are on the
+ * Steps tab, so the link opens that tab and scrolls to the row; from the
+ * Steps tab itself it lands on the same row.
+ */
+export function stepAnchor(stepId: string): string {
+  return `?tab=steps#step-${stepId}`;
+}
+
+/** Whether a link on the page goes to a step's row. */
+export function isStepAnchor(href: string): boolean {
+  return href.startsWith('?tab=steps#step-') || href.startsWith('#step-');
+}
+
+/** One finished or dropped step, as the Activity tab lists it. */
+export type ClosedStep = {
+  id: string;
+  title: string;
+  status: 'done' | 'dropped';
+  /** Whether it is Dash's step, of kind `claude`. */
+  dash: boolean;
+  closedAt: string;
+};
+
+/**
+ * Every step at any depth that was closed, done or dropped, newest first. A
+ * step with no closing time is left out, since the list is read by when.
+ */
+export function closedSteps(steps: readonly StepNode[]): ClosedStep[] {
+  const out: ClosedStep[] = [];
+  const walk = (nodes: readonly StepNode[]) => {
+    for (const node of nodes) {
+      if ((node.status === 'done' || node.status === 'dropped') && node.closedAt) {
+        out.push({
+          id: node.id,
+          title: node.title,
+          status: node.status,
+          dash: node.kind === 'claude',
+          closedAt: node.closedAt,
+        });
+      }
+      walk(node.children);
+    }
+  };
+  walk(steps);
+  return out.sort((a, b) => b.closedAt.localeCompare(a.closedAt));
 }

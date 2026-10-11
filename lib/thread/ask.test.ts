@@ -93,7 +93,7 @@ describe('Dash under a file', () => {
 
     expect(outcome).toEqual({ ok: true, message: 'Answered in the thread.' });
     expect(replies(state.tables)).toEqual(['It puts rent at 1,400 euros a month.']);
-    expect(sent[0].model).toBe('claude-sonnet-5');
+    expect(sent[0].model).toBe('claude-sonnet-5-5');
     const names = sent[0].tools.map((t) => t.name);
     expect(names).toEqual(expect.arrayContaining(['search', 'open_row', 'add_todo', 'answer']));
     // Dev rows' own tools are not offered on a file.

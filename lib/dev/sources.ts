@@ -23,7 +23,7 @@ const PAGES: Record<string, Page> = {
   },
   'public.ideas': { title: 'body', href: (row) => `/dev/ideas#idea-${row.id}` },
   'public.feedback_items': { title: 'body', href: (row) => `/dev/bugs#note-${row.id}` },
-  'public.raised_items': { title: 'title', href: (row) => `/dev/raised#raise-${row.id}` },
+  'public.raised_items': { title: 'title', href: (row) => `/dev/inbox#raise-${row.id}` },
 };
 
 export const devSources: ModuleSources = {
@@ -38,6 +38,16 @@ export const devSources: ModuleSources = {
       href: () => '/dev/posts',
       note: 'Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread.',
     },
+    {
+      table: 'public.spec_interviews',
+      module: 'Dev',
+      holds: 'Interviews Dash held about one workspace of the app, or the app as a whole: what they use it for, what they do there and their routines, in their own answers.',
+      weight: 'intent',
+      search: ['summary'],
+      title: 'module',
+      href: () => '/dev/specs',
+      note: "module is the workspace's id, or 'app'. The questions and answers are the thread under the row in core.conversations (ref public.spec_interviews:<id>): turns with role 'user' are their answers, quoted as what they said. summary is Dash's few sentences on what they said, written when it drafted; it is null while status is open.",
+    },
   ],
   notSources: [
     'public.check_backs',
@@ -48,11 +58,13 @@ export const devSources: ModuleSources = {
     'public.inspiration_videos',
     'public.plan_items',
     'public.plan_dependencies',
+    'public.plan_item_pictures',
     'public.plan_runs',
     'public.plan_commit_checks',
     'public.plan_main_checks',
     'public.plan_overnight_runs',
     'public.plan_seed_imports',
+    'public.plan_updates',
     'public.dev_comments',
     'public.dev_comment_reads',
     'public.dev_digests',
@@ -64,6 +76,7 @@ export const devSources: ModuleSources = {
     'public.spec_sections',
     'public.ui_checks',
     'public.ui_findings',
+    'public.ui_taste_removals',
     'public.ui_reviews',
     'public.vision_reviews',
   ].map((table) => ({ table, reason: ABOUT_THE_APP, page: PAGES[table] })),

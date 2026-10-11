@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { attachDependencies } from './dependencies';
 import { buildForest, markStartDates, type Step } from './steps';
 import { dailyView } from './daily';
-import { canShowOnTodo, goalsForTodo, goalTodoSteps, todoSteps, unreadDashResults } from './todo';
+import {
+  canShowOnTodo,
+  focusRhythms,
+  goalsForTodo,
+  goalTodoSteps,
+  todoSteps,
+  unreadDashResults,
+} from './todo';
 import type { Goal } from './tree';
 
 function goal(id: string, extra: Partial<Goal> = {}): Goal {
@@ -166,6 +173,29 @@ describe('goalTodoSteps', () => {
     ]);
   });
 
+  it('takes the next step only from goals in focus once a focus is chosen', () => {
+    const out = pick(
+      [
+        goal('focus', { focus: true }),
+        goal('rest'),
+        goal('errand', { errand: true, dueOn: '2026-10-03' }),
+        goal('later', { errand: true, dueOn: '2026-11-20' }),
+      ],
+      [
+        step('f1', 'focus'),
+        step('r1', 'rest'),
+        step('flagged', 'rest', { onTodo: true }),
+        step('e1', 'errand'),
+        step('l1', 'later'),
+      ],
+    );
+    expect(out.map((s) => [s.id, Boolean(s.next)])).toEqual([
+      ['flagged', false],
+      ['f1', true],
+      ['e1', true],
+    ]);
+  });
+
   it('keeps an overdue next step at its own due date, which the Goals home blanks', () => {
     const out = pick([goal('g')], [step('late', 'g', { dueOn: '2026-09-01' })]);
     expect(out.map((s) => [s.id, s.dueOn])).toEqual([['late', '2026-09-01']]);
@@ -318,5 +348,25 @@ describe('unreadDashResults', () => {
     expect(
       count([goal('p', { status: 'parked' })], [step('a', 'p', { kind: 'claude', status: 'done', result: 'x' })]),
     ).toBe(0);
+  });
+});
+
+describe('focusRhythms', () => {
+  const today = '2026-10-06';
+  const rhythms = [
+    { id: 'r-focus', goalId: 'focus' },
+    { id: 'r-rest', goalId: 'rest' },
+  ];
+
+  it('keeps every rhythm while no focus is chosen', () => {
+    expect(focusRhythms(rhythms, [goal('focus'), goal('rest')], today).map((r) => r.id)).toEqual([
+      'r-focus',
+      'r-rest',
+    ]);
+  });
+
+  it("keeps only focus goals' rhythms once a focus is chosen", () => {
+    const goals = [goal('focus', { focus: true }), goal('rest')];
+    expect(focusRhythms(rhythms, goals, today).map((r) => r.id)).toEqual(['r-focus']);
   });
 });

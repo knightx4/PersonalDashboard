@@ -80,7 +80,7 @@ export function reviewRoutine(): RoutineTarget {
 }
 
 /**
- * The routine that shapes and works personal goals -- "Work on this" on a
+ * The routine that shapes and works personal goals -- Ask Dash on a
  * goal's page (plan #932), and the scheduled goals runs after it.
  *
  * No fallback to the shared id, for the reason the review routine has none:
@@ -110,6 +110,22 @@ export function visionRoutine(): RoutineTarget {
 }
 
 /**
+ * The routine that audits the specs against the code -- fired each Monday by
+ * /api/cron/spec-audit (plan #1524). Its standing prompt is
+ * .claude/skills/spec-audit/reference/routine-prompt.md.
+ *
+ * No fallback to the shared id or the shared token: an audit sent to the
+ * plan routine would build a step instead. With either unset the weekly tick
+ * records a failed fire naming the one that is missing.
+ */
+export function specAuditRoutine(): RoutineTarget {
+  return {
+    id: firstSet(process.env.CLAUDE_SPEC_AUDIT_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_SPEC_AUDIT_ROUTINE_TOKEN),
+  };
+}
+
+/**
  * The routine Ask Dash hands a request to when none of its own tools can do
  * it (plan #1402). It follows .claude/skills/dash-backup and replies in the
  * conversation the request came from.
@@ -123,6 +139,23 @@ export function dashBackupRoutine(): RoutineTarget {
   return {
     id: firstSet(process.env.CLAUDE_DASH_BACKUP_ROUTINE_ID),
     token: firstSet(process.env.CLAUDE_DASH_BACKUP_ROUTINE_TOKEN),
+  };
+}
+
+/**
+ * The routine that works one overhaul -- "Work this overhaul" on an
+ * overhaul's row of /dev/plan (plan #1514). Its standing prompt is
+ * .claude/skills/plan/reference/overhaul-routine.md.
+ *
+ * No fallback to the shared id or the shared token: an overhaul sent to the
+ * plan routine would be built step by step without its design session, its
+ * phases or its review against the Contract. With either unset the row says
+ * so and starts nothing.
+ */
+export function overhaulRoutine(): RoutineTarget {
+  return {
+    id: firstSet(process.env.CLAUDE_OVERHAUL_ROUTINE_ID),
+    token: firstSet(process.env.CLAUDE_OVERHAUL_ROUTINE_TOKEN),
   };
 }
 

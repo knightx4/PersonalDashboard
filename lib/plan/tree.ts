@@ -124,6 +124,10 @@ export const PLAN_VIEWS = [
   'blocked',
   'fog',
   'dismissed',
+  // Not a filter but a layout: every open feature as one row of a table,
+  // grouped by module (plan #1669). The tree under it is the whole plan, as
+  // on Everything, and lib/plan/feature-table.ts picks the rows.
+  'table',
 ] as const;
 export type PlanView = (typeof PLAN_VIEWS)[number];
 
@@ -138,9 +142,10 @@ export function isPlanView(value: string): value is PlanView {
  * I pick up" or "what is waiting on me". These five answer those and give the
  * way back to the whole plan; the rest are a press further away in the menu
  * beside them, and the counts along the summary strip link to most of them
- * anyway.
+ * anyway. Table is the sixth: the same plan read one feature to a row
+ * (plan #1669), which is a way of reading it rather than a narrowing of it.
  */
-export const PLAN_VIEW_CHIPS = ['open', 'ready', 'you', 'claude', 'all'] as const;
+export const PLAN_VIEW_CHIPS = ['open', 'ready', 'you', 'claude', 'all', 'table'] as const;
 
 /** Every other view, in the menu at the end of the chip row. */
 export const PLAN_VIEW_MENU: readonly PlanView[] = PLAN_VIEWS.filter(
@@ -1170,6 +1175,9 @@ function matchesView(node: PlanNode, view: PlanView): boolean {
     // because a feature can be here for its fog while it is otherwise live.
     case 'dismissed':
       return isDismissed(node) || node.fogDismissedAt !== null;
+    // The table reads whole features, so nothing beneath one is pruned away.
+    case 'table':
+      return true;
   }
 }
 

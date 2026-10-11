@@ -9,6 +9,7 @@ import { loadAgenda } from '@/lib/todo/agenda/load';
 import { loadDashResultsCount } from '@/lib/todo/agenda/dash-results';
 import { dayClosed, doneToday } from '@/lib/todo/agenda/day-close';
 import { loadDoneSinceMidnight } from '@/lib/todo/tasks/load';
+import { loadTaskFiles } from '@/lib/todo/tasks/files';
 import { BUCKET_LABELS, todayIn } from '@/lib/todo/tasks/model';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
@@ -63,9 +64,13 @@ export default async function TodoPage() {
   const taskIds = agenda.piles.flatMap(({ entries }) =>
     entries.flatMap((entry) => (entry.kind === 'task' && entry.task ? [entry.task.id] : [])),
   );
-  const threads = await createClient()
-    .then((client) => loadRowThreads(client, THREAD_TABLES.task, taskIds, { userId: user.id }))
-    .catch(() => new Map<string, DevComment[]>());
+  // And the files each holds (plan #1714), read alongside.
+  const [threads, files] = await Promise.all([
+    createClient()
+      .then((client) => loadRowThreads(client, THREAD_TABLES.task, taskIds, { userId: user.id }))
+      .catch(() => new Map<string, DevComment[]>()),
+    loadTaskFiles(taskIds),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -195,6 +200,7 @@ export default async function TodoPage() {
                             items={entry.children}
                             working={working}
                             thread={threads.get(threadRef('task', entry.task.id))}
+                            files={files.get(entry.task.id)}
                           />
                         ) : entry.item ? (
                           <AgendaItemRow

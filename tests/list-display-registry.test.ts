@@ -32,7 +32,7 @@ describe('what the design page says about the lists', () => {
     expect(paths).toEqual([
       '/shopping/inventory',
       '/shopping/orders',
-      '/jobs/roles',
+      '/jobs/pipeline',
       '/jobs/companies',
     ]);
     expect(new Set(paths).size).toBe(paths.length);

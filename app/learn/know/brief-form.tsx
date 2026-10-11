@@ -38,7 +38,7 @@ const key = (name: string) => name.trim().toLowerCase();
 function ReadButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+    <Button type="submit" size="sm" variant="secondary" pending={pending}>
       <FileText className="size-4" strokeWidth={2} aria-hidden />
       {pending ? 'Reading it…' : 'Read the briefing'}
     </Button>

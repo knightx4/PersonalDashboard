@@ -151,10 +151,10 @@ export function SpecChangeCard({
       {proposed ? (
         <form className="flex flex-wrap items-center gap-2">
           <input type="hidden" name="id" value={change.id} />
-          <Button type="submit" size="sm" formAction={approve} disabled={pending}>
+          <Button type="submit" size="sm" formAction={approve} pending={pending}>
             {approving ? 'Approving…' : 'Approve'}
           </Button>
-          <Button type="submit" size="sm" variant="ghost" formAction={decline} disabled={pending}>
+          <Button type="submit" size="sm" variant="ghost" formAction={decline} pending={pending}>
             {declining ? 'Declining…' : 'Decline'}
           </Button>
           <FieldError>{approved.error ?? declined.error}</FieldError>

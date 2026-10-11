@@ -39,8 +39,8 @@ import {
   rescheduleTaskAction,
   unpointTask,
 } from '@/app/todo/actions';
-import { openCount, SNOOZE_DAYS, type Task, type TaskStatus } from '@/lib/todo/tasks/model';
-import { InlineInput } from '@/components/ui/field';
+import { openCount, SNOOZE_DAYS, todayIn, type Task, type TaskStatus } from '@/lib/todo/tasks/model';
+import { InlineTextarea } from '@/components/ui/field';
 import { clockIn, dayIn } from '@/lib/todo/time';
 import { useOptimisticWrite } from '@/lib/use-optimistic-write';
 import { completionMoment } from '@/components/motion/complete';
@@ -56,6 +56,7 @@ import { threadRef } from '@/lib/thread/subjects';
 import { MoveLabel } from '@/components/ui/move-label';
 import { taskMove } from '@/lib/todo/tasks/move';
 import { rowRef, withRun } from '@/lib/core/move';
+import { TaskFiles, TaskFilesCount, type TaskFile } from '@/components/attachments/task-files';
 
 /**
  * One task, and what you can do to it without leaving the list.
@@ -132,6 +133,9 @@ export function TaskRow({
   under,
   working,
   thread = [],
+  files = [],
+  filesOpen = false,
+  archive = false,
 }: {
   task: Task;
   timezone: string;
@@ -169,8 +173,25 @@ export function TaskRow({
    * Comment when it has none.
    */
   thread?: readonly DevComment[];
+  /**
+   * The files the task holds (plan #1714). The row shows a paperclip and
+   * their count, which opens them under it.
+   */
+  files?: readonly TaskFile[];
+  /** Whether the files start open: the task the page was sent to. */
+  filesOpen?: boolean;
+  /**
+   * Drawn on All tasks, a list read top to bottom (plan #1776). The title
+   * gets the row's width: on a phone every action sits behind the three
+   * dots, and on a pointer the actions float over the row's end instead of
+   * holding a column open. "On you" is left out, since every open todo is
+   * on you, so colour is kept for a date that has passed. Each line starts
+   * on the title's left edge.
+   */
+  archive?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+  const [showFiles, setShowFiles] = useState(filesOpen);
   /** Whether the thread is open under a task that has no comments yet. */
   const [commenting, setCommenting] = useState(false);
   /** Whether the box for writing the next item is open under this task. */
@@ -220,6 +241,14 @@ export function TaskRow({
   const done = task.status === 'done';
   const dropped = task.status === 'dropped';
   const whoseMove = withRun(taskMove(task), working, [rowRef('todo.tasks', task.id)]);
+  // On All an open todo being on you says nothing, so only Dash at work shows.
+  const shownMove = archive && whoseMove?.move.state === 'on_you' ? null : whoseMove;
+  const due = task.dueAt ? dayIn(task.dueAt, timezone) : task.dueOn;
+  const overdue = archive && task.status === 'open' && due !== null && due < todayIn(timezone);
+  // The title and the date pad their text by 4px for their hover ground; on
+  // All the rest of the row's lines take the same inset, so each starts on
+  // the title's left edge.
+  const inset = archive && 'px-1';
 
   /**
    * Run one of the writes the row does not draw ahead of: a move, a place, a
@@ -335,7 +364,10 @@ export function TaskRow({
           onSelect: () => run({ patch: { snoozedUntil: null }, write: () => bringBackTask(task.id) }),
         }
       : { id: 'later', label: 'Later', onSelect: later },
+    // On All the phone row is the menu alone, so Drop and Edit come in too.
+    ...(archive ? [{ id: 'drop', label: 'Drop', onSelect: drop }] : []),
     { id: 'add', label: 'Add an item', onSelect: () => setAdding(true) },
+    ...(archive ? [{ id: 'edit', label: 'Edit everything', onSelect: () => setEditing(true) }] : []),
     { id: 'comment', label: 'Comment', onSelect: () => setCommenting(true) },
     {
       id: 'about',
@@ -428,7 +460,11 @@ export function TaskRow({
           Hidden where there is no pointer to hover with: a touch screen
           cannot drag this and keeps the arrows on the right instead. */}
         <span
-          className="-ml-1 mt-0.5 hidden w-3 shrink-0 justify-center [@media(hover:hover)]:flex"
+          className={cn(
+            '-ml-1 mt-0.5 hidden w-3 shrink-0 justify-center',
+            // All is not a pile, so nothing there is dragged.
+            !archive && '[@media(hover:hover)]:flex',
+          )}
           aria-hidden
         >
           {sortable && (
@@ -482,12 +518,21 @@ export function TaskRow({
             />
 
             {task.pinned && !done && !dropped && (
-              <Pin className="size-3 text-accent" strokeWidth={1.75} aria-label="Pinned" />
+              <Pin className={cn('size-3 text-accent', archive && 'ml-1')} strokeWidth={1.75} aria-label="Pinned" />
+            )}
+
+            {files.length > 0 && (
+              <TaskFilesCount
+                count={files.length}
+                open={showFiles}
+                onToggle={() => setShowFiles(!showFiles)}
+              />
             )}
 
             <DueLabel
               task={task}
               timezone={timezone}
+              overdue={overdue}
               onSave={(day, time) =>
                 run({
                   // Drawn before the write lands, which needs the two columns
@@ -507,13 +552,19 @@ export function TaskRow({
             />
 
             {/* Whose move (plan #1454): an open todo is on you, in the same
-                word and colour as a plan step or an application. */}
-            {whoseMove && <MoveLabel move={whoseMove.move} title={whoseMove.title} />}
+                word and colour as a plan step or an application. Left out on
+                All, where every open row would say it (plan #1776). */}
+            {shownMove && (
+              <MoveLabel move={shownMove.move} title={shownMove.title} className={cn(inset)} />
+            )}
 
             {anchor && (
               <a
                 href={anchor.href}
-                className="truncate text-small text-ink-muted underline decoration-border underline-offset-2 transition-colors duration-quick hover:text-accent"
+                className={cn(
+                  'truncate text-small text-ink-muted underline decoration-border underline-offset-2 transition-colors duration-quick hover:text-accent',
+                  inset,
+                )}
               >
                 {anchor.label}
               </a>
@@ -521,10 +572,12 @@ export function TaskRow({
             {/* A subscribed appointment the calendar has dropped: the label is
                 the name and date saved when it was linked, and this says why
                 it is not the meeting as it stands now. */}
-            {anchor?.gone && <span className="truncate text-small text-ink-muted">{anchor.gone}</span>}
+            {anchor?.gone && (
+              <span className={cn('truncate text-small text-ink-muted', inset)}>{anchor.gone}</span>
+            )}
 
             {under && (
-              <span className="truncate text-small text-ink-muted">
+              <span className={cn('truncate text-small text-ink-muted', inset)}>
                 in{' '}
                 <a
                   href={under.href}
@@ -535,11 +588,11 @@ export function TaskRow({
               </span>
             )}
 
-            {dropped && <span className="text-small text-ink-muted">dropped</span>}
+            {dropped && <span className={cn('text-small text-ink-muted', inset)}>dropped</span>}
           </div>
 
           {task.body && (
-            <p className="mt-0.5 whitespace-pre-wrap text-small leading-snug text-ink-muted">
+            <p className={cn('mt-0.5 whitespace-pre-wrap text-small leading-snug text-ink-muted', inset)}>
               <LinkedText text={task.body} />
             </p>
           )}
@@ -556,7 +609,14 @@ export function TaskRow({
           and a task you can no longer read. Narrow gets the three that earn
           the room, and everything else moves into one menu behind them.
           Law 9. */}
-        <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+        <div
+          className={cn(
+            'flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100',
+            // On All the hidden icons hold no column open: they float over
+            // the row's end on its own ground, so the title has the width.
+            archive && 'sm:absolute sm:right-0 sm:top-1.5 sm:rounded-control sm:bg-surface sm:pl-2',
+          )}
+        >
           {!done && !dropped && (
             <span className="hidden sm:contents">
               {/* The arrows are how a task moves without a pointer: a touch
@@ -645,12 +705,17 @@ export function TaskRow({
             further away. */}
           {!done && !dropped && (
             <span className="flex items-center gap-0.5 sm:hidden">
-              <IconButton label="Drop" onClick={drop}>
-                <X className="size-3.5" strokeWidth={1.75} aria-hidden />
-              </IconButton>
-              <IconButton label="Edit everything" onClick={() => setEditing(true)}>
-                <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
-              </IconButton>
+              {/* On All the menu holds these two as well (plan #1776). */}
+              {!archive && (
+                <>
+                  <IconButton label="Drop" onClick={drop}>
+                    <X className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  </IconButton>
+                  <IconButton label="Edit everything" onClick={() => setEditing(true)}>
+                    <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
+                  </IconButton>
+                </>
+              )}
               <ActionMenu label="More actions" items={moreActions} />
               {/* Drawn with no trigger of its own -- the menu above opens it. */}
               <TaskAbout
@@ -687,6 +752,9 @@ export function TaskRow({
           )}
         </div>
       </div>
+
+      {/* The files, under the row, when the paperclip has opened them. */}
+      {showFiles && files.length > 0 && <TaskFiles files={files} className="pb-2 pl-9 pr-3" />}
 
       {/* The list, under the task it belongs to. Nothing at all when there is
           none and nothing is being written, so a task without one reads
@@ -960,7 +1028,7 @@ function IconButton({
  * It used to be a button that swapped the whole row for a form with four
  * fields and a Save button, to change the one string you were already looking
  * at. Law 12: a value and its editor are the same object in the same place at
- * the same size. `InlineInput` is that component, and this is a task's title
+ * the same size. `InlineTextarea` is that component, and this is a task's title
  * in it.
  *
  * Enter and blur both commit, because both mean "done with this"; Escape puts
@@ -998,8 +1066,10 @@ function TaskTitle({
     onSave(next);
   }
 
+  // A textarea that grows with its words, so a long title wraps where it is
+  // read rather than stopping mid-letter at 390 (plan #1714's critic).
   return (
-    <InlineInput
+    <InlineTextarea
       value={draft}
       aria-label="Title"
       onChange={(event) => setDraft(event.target.value)}
@@ -1016,8 +1086,11 @@ function TaskTitle({
           requestAnimationFrame(() => event.currentTarget?.blur());
         }
       }}
+      // 44px to a finger on a phone without moving the row: the padding grows
+      // the box and the negative margin gives the room back (a textarea cannot
+      // carry the ::after the press-area utility draws).
       className={cn(
-        'w-full max-w-full text-ui font-medium text-ink',
+        'w-full max-w-full text-ui font-medium text-ink max-sm:-my-[9px] max-sm:min-h-11 max-sm:py-[11px]',
         struck && 'text-ink-muted line-through',
       )}
     />
@@ -1039,10 +1112,13 @@ function TaskTitle({
 function DueLabel({
   task,
   timezone,
+  overdue = false,
   onSave,
 }: {
   task: Task;
   timezone: string;
+  /** Past its day and still open, drawn in the caution colour (plan #1776). */
+  overdue?: boolean;
   onSave: (day: string, time: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -1098,9 +1174,13 @@ function DueLabel({
       type="button"
       onClick={() => setEditing(true)}
       title="Change when it is due"
-      className="tabular press rounded-control px-1 py-0.5 text-small text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
+      className={cn(
+        'tabular press rounded-control px-1 py-0.5 text-small transition-colors duration-quick hover:bg-sunken hover:text-ink',
+        overdue ? 'text-caution' : 'text-ink-muted',
+      )}
     >
       {text}
+      {overdue && <span className="sr-only">, past its day</span>}
     </button>
   );
 }

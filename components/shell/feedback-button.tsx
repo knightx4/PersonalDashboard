@@ -11,12 +11,14 @@ import {
   type FeedbackActionState,
 } from '@/app/dev/bugs/actions';
 import { submitIdea, type IdeaActionState } from '@/app/dev/ideas/actions';
+import { AddFile } from '@/components/attachments/add-file';
 import { Button } from '@/components/ui/button';
 import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { TriageNote } from '@/components/feedback/triage-note';
-import { FieldError, Input, Label, Select, Textarea } from '@/components/ui/field';
+import { FieldError, Label, Select, Textarea } from '@/components/ui/field';
 import { Popover } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
+import type { UploadedAttachment } from '@/lib/attachments/rules';
 import type { FeedbackKind } from '@/lib/feedback/load';
 import type { TriageView } from '@/lib/feedback/triage';
 import { MODULES, moduleForPath } from '@/lib/modules';
@@ -44,9 +46,8 @@ import { usePopover } from '@/lib/use-popover';
  * works was not something anybody wanted to do from here. Likes already filed
  * stay in the queue as they were, for the vision review to read.
  *
- * Two tabs for the owner. The note alone for everybody else, with no tab row,
- * no code box and nothing under the form: see `isOwner` below for what goes
- * and why.
+ * Two tabs for the owner. The note alone for everybody else, with no tab row
+ * and nothing under the form: see `isOwner` below for what goes and why.
  */
 type Kind = 'note' | 'idea';
 
@@ -95,6 +96,9 @@ const KIND = Object.fromEntries(KINDS.map((entry) => [entry.id, entry])) as Reco
 export function FeedbackButton({
   allHref = '/dev/bugs',
   isOwner = false,
+  initialOpen = false,
+  initialFiles = [],
+  initialSaved = null,
 }: {
   allHref?: string;
   /**
@@ -105,16 +109,24 @@ export function FeedbackButton({
    * It decides how much of this panel there is. Everyone gets the capture --
    * a bug is a bug whoever hit it -- and the rest of what is in here is the
    * dev workspace poking through the header: the Idea tab writes to a list
-   * only the owner can see, the submit code guards a queue only they work,
-   * and the routine section below the form is that queue's own controls.
+   * only the owner can see, and the routine section below the form is the
+   * notes queue's own controls.
    *
    * Omitted means "not the owner": the smaller panel, which files a note and
    * says so, rather than one offering buttons whose actions would refuse.
    */
   isOwner?: boolean;
+  /** For the gallery, which draws the panel open with a file added. */
+  initialOpen?: boolean;
+  initialFiles?: UploadedAttachment[];
+  /**
+   * For the gallery, which draws the panel just after a note saved, with
+   * Jev's triage under it (plan #1674). Gone once anything is filed.
+   */
+  initialSaved?: { message: string; triage: TriageView } | null;
 } = {}) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [kind, setKind] = useState<Kind>('note');
   // No Idea tab for everybody else. Not a tab that refuses: `submitIdea`
   // turns a non-owner away before it looks at anything (#417), so offering it
@@ -127,6 +139,18 @@ export function FeedbackButton({
     {} as FeedbackActionState,
   );
   const [ideaState, ideaAction, ideaPending] = useActionState(submitIdea, {} as IdeaActionState);
+
+  // The files going with the next note (plan #1713): uploaded as they are
+  // chosen, recorded against the note when it saves, and cleared once it
+  // has. Kept while the panel is shut, so closing it by mistake does not
+  // lose a screenshot already sent up. Send waits while one is uploading.
+  const [files, setFiles] = useState<UploadedAttachment[]>(initialFiles);
+  const [uploading, setUploading] = useState(false);
+  const [settledNote, setSettledNote] = useState<FeedbackActionState | null>(null);
+  if (noteState.filed && noteState !== settledNote) {
+    setSettledNote(noteState);
+    setFiles([]);
+  }
 
   // Two writers behind one form, because the two tables are two writers. The
   // form takes whichever the open tab files to, and reports that one's result:
@@ -162,6 +186,7 @@ export function FeedbackButton({
   }, [filedId, filedTable]);
   const triaged = filedId !== null && triage?.id === filedId ? triage.view : null;
   const triaging = Boolean(filedId && triage?.id !== filedId);
+  const saved = filedId === null && !idea ? initialSaved : null;
 
   // Counted when the panel opens, and again after a note is filed from it, so
   // the number beside "Run Feature Routine" is the queue as it stands rather
@@ -292,26 +317,26 @@ export function FeedbackButton({
               </div>
             )}
 
-            {/* The owner's, and only theirs. It is the code that guards the
-                dev workspace's own writing, and `submitFeedback` asks for it
-                from the owner alone -- a second account has nothing to type
-                here and no way of knowing it. */}
-            {isOwner && (
-              <div>
-                <Label htmlFor="feedback_code">Code</Label>
-                <Input
-                  id="feedback_code"
-                  name="code"
-                  type="password"
-                  autoComplete="off"
-                  required
-                  placeholder="Submit code"
-                />
-              </div>
+            {/* A note only: a screenshot of what went wrong is half a bug
+                report. An idea is a sentence about the future and has
+                nothing to show yet. */}
+            {!idea && (
+              <AddFile
+                name="attachments"
+                value={files}
+                onChange={setFiles}
+                disabled={pending}
+                onUploadingChange={setUploading}
+              />
             )}
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="submit" size="sm" disabled={pending}>
+              <Button
+                type="submit"
+                size="sm"
+                pending={pending}
+                disabled={!idea && uploading}
+              >
                 {pending ? 'Saving…' : 'Send'}
               </Button>
               {/* Saves the idea and hands it straight to Dash to shape into
@@ -332,8 +357,9 @@ export function FeedbackButton({
 
             <FieldError>{state.error}</FieldError>
             {state.message && <p className="text-ui text-accent">{state.message}</p>}
+            {saved && <p className="text-ui text-accent">{saved.message}</p>}
             {triaging && <p className="text-small text-ink-muted">Sorting it…</p>}
-            <TriageNote view={triaged} onNavigate={() => setOpen(false)} />
+            <TriageNote view={triaged ?? saved?.triage ?? null} onNavigate={() => setOpen(false)} />
           </form>
 
           {/* Its own section below the form, not a link on the Send row: it is
