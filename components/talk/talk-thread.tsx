@@ -19,7 +19,7 @@ import {
 import { useClockNow } from '@/lib/use-clock-now';
 import { LinkedText } from '@/components/ui/linked-text';
 import { ReplyCharts } from '@/components/talk/reply-chart';
-import { AddFile } from '@/components/attachments/add-file';
+import { AddFile, type AddFileHandle } from '@/components/attachments/add-file';
 import { AskTurnFiles } from '@/components/attachments/ask-turn-files';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 
@@ -343,6 +343,7 @@ export function TalkThread({
   const [landed, setLanded] = useState<string | null>(null);
   const [sending, startSend] = useTransition();
   const form = useRef<HTMLFormElement>(null);
+  const adder = useRef<AddFileHandle>(null);
   const now = useClockNow();
   const ended = sending ? null : (closed?.(turns) ?? null);
 
@@ -484,6 +485,11 @@ export function TalkThread({
               placeholder={placeholder}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              // A picture copied from anywhere goes in as a file, without
+              // saving it and choosing it again (note 90a05309).
+              onPaste={(event) => {
+                if (adder.current?.paste(event.clipboardData)) event.preventDefault();
+              }}
               onKeyDown={(event) => {
                 if (event.key === 'Escape') {
                   event.preventDefault();
@@ -499,7 +505,13 @@ export function TalkThread({
             />
             <div className="mt-1 flex items-start justify-between gap-2">
               {withFiles ? (
-                <AddFile value={files} onChange={setFiles} disabled={sending} onUploadingChange={setUploading} />
+                <AddFile
+                  ref={adder}
+                  value={files}
+                  onChange={setFiles}
+                  disabled={sending}
+                  onUploadingChange={setUploading}
+                />
               ) : (
                 <span />
               )}

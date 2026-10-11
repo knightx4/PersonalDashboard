@@ -57,6 +57,28 @@ export function attachmentContentType(name: string): AttachmentContentType | nul
   return ext in TYPES ? TYPES[ext as keyof typeof TYPES] : null;
 }
 
+/** The extension a pasted file's type is kept under, for a type the store takes. */
+const PASTED_EXTENSIONS: Record<string, string> = Object.fromEntries(
+  Object.entries(TYPES)
+    .filter(([ext]) => ext !== 'jpeg')
+    .map(([ext, type]) => [type, ext]),
+);
+
+/**
+ * The name a file pasted into a message is kept under (note 90a05309).
+ * Browsers name every copied picture "image.png", or give it no name at all,
+ * so two pastes would read as the same chip: those are numbered on from the
+ * files already added, with the extension their type says. A pasted file
+ * that has a name of its own, such as one copied from Finder, keeps it.
+ */
+export function pastedFileName(name: string, type: string, number: number): string {
+  const generic = !name || /^image\.[a-z]+$/i.test(name);
+  if (!generic && attachmentContentType(name)) return name;
+  const ext = PASTED_EXTENSIONS[type];
+  if (!ext) return name;
+  return `Pasted ${type.startsWith('image/') ? 'image' : 'file'} ${number}.${ext}`;
+}
+
 /** Whether a stored file is a picture, so it shows as a thumbnail rather than a chip. */
 export function isImageAttachment(contentType: string): boolean {
   return contentType.startsWith('image/');
