@@ -1,6 +1,7 @@
 import { DashMark, type DashLook } from '@/components/ui/dash-mark';
 import type { FeatureProgress } from '@/lib/digest/night';
-import type { RunnerSlot, SlotId } from '@/lib/plan/overnight-slots';
+import { Disclosure } from '@/components/ui/disclosure';
+import { SLOT_ASLEEP_DEFAULT, type RunnerSlot, type SlotId } from '@/lib/plan/overnight-slots';
 
 /**
  * The runner's four Dashes, one for each thing it can run at once (plan
@@ -57,11 +58,22 @@ function SlotText({
     );
   }
   if (slot.state === 'asleep') {
+    const line = 'Asleep, nothing to work on';
+    // The default reason says nothing the line has not, so there is nothing to open.
+    if (slot.reason === SLOT_ASLEEP_DEFAULT) {
+      return <span className="block text-ui text-ink-muted">{line}</span>;
+    }
+    // The tick's reason can run to several lines (skipped features, the retry
+    // hint), so it stays folded until asked for. The fold is a native
+    // disclosure: keyboard reachable, and it opens before scripts load.
     return (
-      <>
-        <span className="block text-ui text-ink-muted">Asleep: nothing to work on</span>
+      <Disclosure
+        className="min-w-0"
+        title={<span className="font-normal text-ink-muted">{line}</span>}
+        bodyClassName="mt-1 ml-5.5"
+      >
         <span className="block text-small text-ink-muted">{slot.reason}</span>
-      </>
+      </Disclosure>
     );
   }
   return <span className="block text-ui text-ink-muted">{held ? 'Held' : 'Not running'}</span>;
