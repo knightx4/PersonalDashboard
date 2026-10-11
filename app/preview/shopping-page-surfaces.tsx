@@ -51,7 +51,7 @@ const kindleImage = productImage(
 
 const people: Person[] = [
   { id: 'p1', name: 'Alex', colour: 'brand', isDefault: true },
-  { id: 'p2', name: 'Samantha Okonkwo-Henderson', colour: 'pink', isDefault: false },
+  { id: 'p2', name: 'Samantha Okonkwo-Henderson', colour: 'purple', isDefault: false },
 ];
 
 // ---- Dashboard -------------------------------------------------------------
