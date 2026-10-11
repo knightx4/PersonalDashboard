@@ -1,10 +1,11 @@
 'use client';
 
-import { useActionState, useState, useTransition } from 'react';
-import { Check, Copy } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { CardSection } from '@/components/ui/card';
+import { useActionState, useRef, useState, useTransition } from 'react';
+import { Check, Copy, Plus } from 'lucide-react';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { FieldError, Input, Textarea } from '@/components/ui/field';
+import { Popover } from '@/components/ui/popover';
+import { usePopover } from '@/lib/use-popover';
 import {
   archiveShare,
   createShare,
@@ -14,35 +15,67 @@ import {
   type ShareActionState,
 } from './actions';
 
-export function CreateShareForm() {
+/**
+ * The page's one action: a New button in the header that opens the name box
+ * under it (plan #1789). The title is all it needs; the note for whoever
+ * opens the form is optional, and creating it goes straight to the new form,
+ * where the things go on it.
+ *
+ * A plain button carrying the button's look rather than `Button`, because the
+ * popover needs a ref on the trigger to hand focus back to it on close.
+ */
+export function NewShareButton() {
+  const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState<ShareActionState, FormData>(createShare, {});
+  const panelRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  usePopover({ open, onClose: () => setOpen(false), panelRef, triggerRef });
 
   return (
-    // The id is the empty state's target on /shopping/share.
-    <CardSection id="new-share" title="New shared form" className="h-fit scroll-mt-6">
-      <form action={action} className="mt-1 space-y-3">
-        <Input
-          name="title"
-          placeholder="Board games"
-          required
-          maxLength={120}
-          aria-label="Title"
-        />
-        <Textarea
-          name="intro"
-          rows={3}
-          maxLength={2000}
-          placeholder="A note for whoever opens it."
-          aria-label="A note for whoever opens it"
-          className="min-h-0"
-        />
-        <Button type="submit" pending={pending} className="w-full">
-          {pending ? 'Creating…' : 'Create'}
-        </Button>
-        <FieldError>{state.error}</FieldError>
-        {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
-      </form>
-    </CardSection>
+    <div className="relative">
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        onClick={() => setOpen((o) => !o)}
+        className={buttonVariants({ variant: 'primary', size: 'sm' })}
+      >
+        <Plus className="size-4" strokeWidth={2} aria-hidden />
+        New form
+      </button>
+      {open && (
+        <Popover
+          ref={panelRef}
+          role="dialog"
+          aria-label="New shared form"
+          padding="panel"
+          className="sm:w-80"
+        >
+          <form action={action} className="space-y-3 max-sm:[&_input]:min-h-11">
+            <Input
+              name="title"
+              placeholder="Board games"
+              required
+              maxLength={120}
+              aria-label="Title"
+            />
+            <Textarea
+              name="intro"
+              rows={2}
+              maxLength={2000}
+              placeholder="A note for whoever opens it (optional)"
+              aria-label="A note for whoever opens it"
+              className="min-h-0"
+            />
+            <Button type="submit" pending={pending} className="w-full">
+              {pending ? 'Creating…' : 'Create'}
+            </Button>
+            <FieldError>{state.error}</FieldError>
+          </form>
+        </Popover>
+      )}
+    </div>
   );
 }
 
@@ -70,9 +103,13 @@ export function ShareLinkRow({
   const [pending, startTransition] = useTransition();
 
   return (
-    <div className="row-pad flex flex-wrap items-center gap-2">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-ui text-ink">{url}</p>
+    <div className="row-pad space-y-2">
+      <div className="min-w-0">
+        <p className="flex text-ui text-ink" title={url}>
+          {/* One line at any width: the middle gives way, both ends stay. */}
+          <span className="min-w-0 truncate">{url.slice(0, -8)}</span>
+          <span className="shrink-0">{url.slice(-8)}</span>
+        </p>
         <p className="text-small text-ink-muted">
           {label}
           {revoked
@@ -83,7 +120,7 @@ export function ShareLinkRow({
         </p>
       </div>
       {!revoked && (
-        <>
+        <div className="flex items-center gap-2">
           <Button
             size="sm"
             variant="secondary"
@@ -112,7 +149,7 @@ export function ShareLinkRow({
           >
             Revoke
           </Button>
-        </>
+        </div>
       )}
     </div>
   );
