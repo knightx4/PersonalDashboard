@@ -27,7 +27,6 @@ export function DashboardView({
   data: DashboardData;
 }) {
   const showPeople = people.length > 1;
-  const activePerson = personId ? people.find((entry) => entry.id === personId) : null;
 
   return (
     <div className="flex flex-col gap-6 xl:flex-row [&_a]:press-area">
@@ -38,6 +37,7 @@ export function DashboardView({
               key={entry.id}
               label={entry.label}
               active={entry.id === range}
+              quiet={entry.id === 'this_month'}
               href={dashboardHref(entry.id, personId)}
             />
           ))}
@@ -45,7 +45,7 @@ export function DashboardView({
 
         {showPeople && (
           <RailGroup label="Whose">
-            <RailItem label="Everyone" active={!personId} href={dashboardHref(range)} />
+            <RailItem label="Everyone" active={!personId} quiet href={dashboardHref(range)} />
             {people.map((person) => (
               <RailItem
                 key={person.id}
@@ -59,14 +59,7 @@ export function DashboardView({
       </LeftRail>
 
       <div className="min-w-0 flex-1">
-        <PageHeader
-          title="Dashboard"
-          description={
-            activePerson
-              ? `${activePerson.name}'s spending, where it went, and what is still returnable.`
-              : 'What you spent, where it went, and what is still returnable.'
-          }
-        />
+        <PageHeader title="Spending" />
 
         {data.orderCount === 0 ? (
           <EmptyState

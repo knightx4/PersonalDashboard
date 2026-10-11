@@ -270,9 +270,12 @@ export function RailItem({
   iconSlug,
   onClick,
   href,
+  quiet = false,
 }: {
   label: string;
   active?: boolean;
+  /** The active item is the page's default: marked in ink, not the accent. */
+  quiet?: boolean;
   count?: number;
   swatch?: string;
   iconSlug?: string | null;
@@ -282,7 +285,9 @@ export function RailItem({
   const className = cn(
     'flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-ui transition-colors duration-quick',
     active
-      ? 'bg-accent-tint font-medium text-accent'
+      ? quiet
+        ? 'bg-sunken font-medium text-ink'
+        : 'bg-accent-tint font-medium text-accent'
       : 'text-ink-muted hover:bg-sunken hover:text-ink',
   );
 

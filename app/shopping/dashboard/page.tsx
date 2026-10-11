@@ -4,7 +4,7 @@ import { loadPeople, parsePersonFilter } from '@/lib/people/load';
 import { loadDashboard, parseDashboardRange } from '@/lib/dashboard/load';
 import { DashboardView } from './dashboard-view';
 
-export const metadata = { title: 'Dashboard' };
+export const metadata = { title: 'Spending' };
 
 /**
  * Every figure on this page comes from lib/money.ts. Do not compute spend
