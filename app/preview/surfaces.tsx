@@ -16,7 +16,6 @@ import { DetailFacts } from '@/components/patterns/list-detail';
 import { ChannelPicker } from '@/app/jobs/(app)/roles/[id]/channel-picker';
 import type { ReferrerOption } from '@/lib/jobs/contacts/referrers';
 import { StatusPicker } from '@/components/jobs/ui/status-picker';
-import { CasePageView, type CasePage } from '@/components/jobs/case-page';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
@@ -1845,62 +1844,6 @@ const trackReadings: ReadingRow[] = [
     },
   }),
 ];
-
-/**
- * A list with display options, drawn from the shared control and the shared
- * group header, with no page behind it yet.
- *
- * The rows are orders because orders is the list with the least of this today
- * -- one grouping it cannot leave, no sort at all -- and it is where the
- * control lands first. The params are a set arrangement rather than the page's
- * own: a sort that is not the default, a grouping that is, and one property
- * turned off, so the panel shows a chosen row, an unchosen one and both states
- * of a switch at once.
- */
-const casePageFixture: CasePage = {
-  company: 'Northwind Logistics',
-  role: 'Senior Product Designer, Warehouse Operations Platform',
-  body: 'Thanks for the chance to apply. Below is each line of the posting, with the work I would point to for it.',
-  matches: [
-    {
-      requirement: 'Five or more years designing complex B2B workflows',
-      kind: 'must_have',
-      verdict: 'strong',
-      why: '',
-      evidenceItemId: 'e1',
-    },
-    {
-      requirement: 'Experience running research with frontline operators on the shop floor',
-      kind: 'must_have',
-      verdict: 'strong',
-      why: '',
-      evidenceItemId: 'e2',
-    },
-    {
-      requirement: 'Fluency with design systems and a component library in code',
-      kind: 'nice_to_have',
-      verdict: 'partial',
-      why: '',
-      evidenceItemId: 'e1',
-    },
-  ],
-  evidence: [
-    {
-      id: 'e1',
-      title: 'Rebuilt the dispatch console',
-      body: 'Led the redesign of the dispatch console used by 400 planners, cutting the time to assign a load.',
-      context: 'Acme Freight, 2022',
-      metrics: 'Assignment time down 38%',
-    },
-    {
-      id: 'e2',
-      title: 'Floor research programme',
-      body: 'Ran monthly visits to three depots and turned what I saw into a backlog the team worked from.',
-      context: null,
-      metrics: null,
-    },
-  ],
-};
 
 type SampleOrder = {
   id: string;
@@ -4097,13 +4040,6 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'narrow',
     render: () => <ContactDetail contact={contact} timezone="Europe/London" />,
-  },
-  {
-    id: 'jobs-case-page',
-    label: 'Case page · Public',
-    module: 'jobs',
-    width: 'screen',
-    render: () => <CasePageView page={casePageFixture} />,
   },
   {
     id: 'jobs-role-new',
