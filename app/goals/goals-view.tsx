@@ -10,6 +10,7 @@ import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
+import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { ComposeBody, ComposeTitle, InlineInput, InlineTextarea } from '@/components/ui/field';
@@ -164,6 +165,7 @@ export function GoalsView({
   rhythms = {},
   canRun,
   areaId,
+  planCost = null,
 }: {
   areas: AreaWithGoals[];
   /** Which goals show (plan #1158); in the address as `?view=`. */
@@ -179,6 +181,8 @@ export function GoalsView({
   canRun: boolean;
   /** Draw this one area as its own page (plan #1619) rather than every area. */
   areaId?: string;
+  /** The usual cost of one Plan this area run, for the hint beside its button; none draws no hint. */
+  planCost?: CostEstimate | null;
 }) {
   const onYou = new Map(Object.entries(onYouCounts));
   // Where a goal can be moved to: every live area, shown in this view or not.
@@ -216,6 +220,7 @@ export function GoalsView({
         run={areaRuns[area.id] ?? null}
         rhythms={rhythms[area.id] ?? []}
         canRun={canRun}
+        planCost={planCost}
         places={places}
         page={{
           chips,
@@ -248,6 +253,7 @@ export function GoalsView({
             run={areaRuns[area.id] ?? null}
             rhythms={rhythms[area.id] ?? []}
             canRun={canRun}
+            planCost={planCost}
             places={places}
             view={view}
           />
@@ -266,6 +272,7 @@ function AreaSection({
   run,
   rhythms,
   canRun,
+  planCost,
   places,
   view = 'open',
   page,
@@ -277,6 +284,7 @@ function AreaSection({
   run: AreaRunView | null;
   rhythms: AreaRhythm[];
   canRun: boolean;
+  planCost: CostEstimate | null;
   places: Place[];
   /** The view All goals is on, which the area's link keeps. */
   view?: AllGoalsView;
@@ -426,7 +434,7 @@ function AreaSection({
           </form>
           {noteState.error && <p className="px-1 text-small text-danger">{noteState.error}</p>}
           {goalCount === 0 && (
-            <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} />
+            <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} cost={planCost} />
           )}
         </div>
         {page?.chips && <div className="pt-2 pb-1">{page.chips}</div>}
@@ -451,7 +459,7 @@ function AreaSection({
         )}
         {shownRhythms.length > 0 && <AreaRhythms areaId={area.id} rhythms={shownRhythms} />}
         {goalCount > 0 && (
-          <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} />
+          <AreaPlanner areaId={area.id} hasGoals={liveCount > 0} run={run} canRun={canRun} cost={planCost} />
         )}
         <GoalComposer areaId={area.id} areaName={area.name} learn={area.learn ?? false} />
       </div>
@@ -754,25 +762,23 @@ function AreaRhythms({ areaId, rhythms }: { areaId: string; rhythms: AreaRhythm[
   );
 }
 
-/** Approve every goal Claude proposed in the area at once. */
+/** Approve every goal Dash proposed in the area at once: the heading says who proposed them, the button sits at its right. */
 export function ApproveArea({ areaId, count }: { areaId: string; count: number }) {
   const [state, approve, approving] = useActionState(approveAreaAction, initial);
+  const headingId = `area-${areaId}-proposed`;
   return (
-    // On a card of its own, apart from the goals below it: Dash's sentence is
-    // body text, and none sits bare on the page (plan #1686).
-    <form
-      action={approve}
-      className={cn(cardVariants({ padding: 'dense' }), 'flex flex-wrap items-center gap-x-3 gap-y-1')}
-    >
+    <form action={approve} aria-labelledby={headingId} className="px-1 pt-1">
       <input type="hidden" name="id" value={areaId} />
-      <p className="min-w-0 flex-1 text-small text-ink-muted">
-        <DashCredit />
-        Dash proposed {count} goals here. Approve the ones you want, or all of them.
-      </p>
-      <Button type="submit" size="sm" variant="secondary" pending={approving}>
-        Approve all {count}
-      </Button>
-      {state.error && <span className="w-full text-small text-danger">{state.error}</span>}
+      <div className="flex items-center justify-between gap-3">
+        <h3 id={headingId} className="min-w-0 text-small font-semibold text-ink-muted">
+          <DashCredit />
+          Proposed by Dash
+        </h3>
+        <Button type="submit" size="sm" variant="secondary" pending={approving}>
+          Approve all {count}
+        </Button>
+      </div>
+      {state.error && <p className="pt-1 text-small text-danger">{state.error}</p>}
     </form>
   );
 }

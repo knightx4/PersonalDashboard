@@ -511,6 +511,15 @@ export function GoalsAreaSurface() {
           ],
         }}
         canRun
+        planCost={{
+          lowMicros: 380_000,
+          medianMicros: 520_000,
+          highMicros: 910_000,
+          runs: 6,
+          basis: 'measured',
+          per: 'run',
+          models: ['claude-sonnet-5-5'],
+        }}
       />
     </div>
   );
