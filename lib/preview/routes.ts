@@ -380,9 +380,20 @@ export function routeMatches(surfaceRoute: string, route: string, under = false)
   return s.length === r.length || under;
 }
 
-/** The surfaces standing for `route`, or for any page beneath it with `under`. */
+/**
+ * The surfaces standing for `route`, or for any page beneath it with `under`.
+ *
+ * A route with no pattern in it that a surface lists exactly is that page and
+ * no other: Next serves a static folder before a dynamic one, so
+ * `/shopping/orders/new` is never `/shopping/orders/[id]` (plan #1783).
+ */
 export function surfacesForRoute(route: string, under = false): string[] {
-  return Object.entries(SURFACE_ROUTES)
+  const entries = Object.entries(SURFACE_ROUTES);
+  if (!under && !route.includes('[')) {
+    const exact = entries.filter(([, routes]) => routes.includes(route)).map(([id]) => id);
+    if (exact.length > 0) return exact;
+  }
+  return entries
     .filter(([, routes]) => routes.some((r) => routeMatches(r, route, under)))
     .map(([id]) => id);
 }
