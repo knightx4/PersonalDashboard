@@ -1,7 +1,7 @@
 import { Inbox, FileText, Shield } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
-import { CardSection } from '@/components/ui/card';
+import { Card, CardSection } from '@/components/ui/card';
 import { Figure } from '@/components/ui/figure';
 import { Meter } from '@/components/ui/meter';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
@@ -192,8 +192,8 @@ export function JobsAnalyticsSurface() {
         title="Analytics"
         description="Where in the funnel you are losing, and whether that differs by channel."
       />
-      <Figure
-        className="mb-8"
+      <Card padding="standard" className="mb-4">
+        <Figure
         label="Human response rate"
         meta={`${overall.applicationsSent} sent`}
         value={formatRate(overall.responseRate)}
@@ -202,16 +202,16 @@ export function JobsAnalyticsSurface() {
           { value: String(overall.applicationsSent), label: 'applications sent' },
           {
             value: formatRate(overall.confirmationRate),
-            label: 'confirmed as received — not progress, only proof it landed',
+            label: 'confirmed as received (not progress, only proof it landed)',
           },
           { value: formatDays(overall.medianDaysToResponse), label: 'median days to a reply' },
         ]}
       />
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <CardSection
           title="The funnel"
-          hint="Each bar is everything that ever reached that rung — a rejection after an onsite still counts as having reached the onsite."
         >
           <ul className="mt-3 space-y-2">
             {LADDER.map((rung, index) => {
@@ -248,33 +248,32 @@ export function JobsAnalyticsSurface() {
 
         <CardSection
           title="By channel"
-          hint="The comparison a single blended number hides. This is usually the most actionable table in the app."
         >
           <div className="mt-3">
-            <Table flush>
+            <Table flush stack={false} fit>
               <THead>
                 <TR>
-                  <TH>Source</TH>
-                  <TH num>Sent</TH>
-                  <TH num>Replied</TH>
-                  <TH num>Screened</TH>
-                  <TH num>Ghosted</TH>
+                  <TH>Channel</TH>
+                  <TH num className="px-1.5! tracking-normal">Sent</TH>
+                  <TH num className="px-1.5! tracking-normal">Reply</TH>
+                  <TH num className="px-1.5! tracking-normal">Screen</TH>
+                  <TH num className="px-1.5! tracking-normal">Ghost</TH>
                 </TR>
               </THead>
               <TBody>
                 {bySource.map(({ source, metrics }) => (
                   <TR key={source}>
                     <TD primary>{SOURCE_LABELS[source]}</TD>
-                    <TD label="Sent" num muted>
+                    <TD label="Sent" num muted className="px-1.5!">
                       {metrics.applicationsSent}
                     </TD>
-                    <TD label="Replied" num>
+                    <TD label="Replied" num className="px-1.5!">
                       {formatRate(metrics.responseRate)}
                     </TD>
-                    <TD label="Screened" num muted>
+                    <TD label="Screened" num muted className="px-1.5!">
                       {formatRate(metrics.screenRate)}
                     </TD>
-                    <TD label="Ghosted" num muted>
+                    <TD label="Ghosted" num muted className="px-1.5!">
                       {formatRate(metrics.ghostRate)}
                     </TD>
                   </TR>
@@ -289,13 +288,13 @@ export function JobsAnalyticsSurface() {
           hint="Cohorted by submission date, always. Applications sent in June stay the June cohort forever and their response rate fills in as replies arrive."
         >
           <div className="mt-3">
-            <Table flush>
+            <Table flush stack={false} fit>
               <THead>
                 <TR>
                   <TH>Month</TH>
-                  <TH num>Sent</TH>
-                  <TH num>Replied</TH>
-                  <TH num>Screened</TH>
+                  <TH num className="px-1.5! tracking-normal">Sent</TH>
+                  <TH num className="px-1.5! tracking-normal">Replied</TH>
+                  <TH num className="px-1.5! tracking-normal">Screened</TH>
                 </TR>
               </THead>
               <TBody>
@@ -304,13 +303,13 @@ export function JobsAnalyticsSurface() {
                     <TD primary className="tabular">
                       {period.label}
                     </TD>
-                    <TD label="Sent" num muted>
+                    <TD label="Sent" num muted className="px-1.5!">
                       {metrics.applicationsSent}
                     </TD>
-                    <TD label="Replied" num muted={metrics.tooEarly}>
+                    <TD label="Replied" num muted={metrics.tooEarly} className="px-1.5!">
                       {metrics.tooEarly ? 'too early' : formatRate(metrics.responseRate)}
                     </TD>
-                    <TD label="Screened" num muted>
+                    <TD label="Screened" num muted className="px-1.5!">
                       {metrics.tooEarly ? '—' : formatRate(metrics.screenRate)}
                     </TD>
                   </TR>
@@ -327,10 +326,9 @@ export function JobsAnalyticsSurface() {
 
         <CardSection
           title="Where rejections happen"
-          hint="Rejection at resume review and rejection after a final round are opposite diagnoses leading to opposite responses. Without this split, every rejection looks the same."
         >
           {rejections.length === 0 ? (
-            <p className="mt-3 text-ui text-ink-muted">No rejections recorded yet.</p>
+            <p className="mt-3 text-ui text-ink-muted">No rejections recorded yet. Once there are some, each is split by the stage it came at, since a rejection at resume review and one after a final round call for opposite responses.</p>
           ) : (
             <ul className="mt-3 space-y-2">
               {rejections.map((item) => {
