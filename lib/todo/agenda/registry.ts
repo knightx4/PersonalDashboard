@@ -8,7 +8,6 @@ import { billsSource } from '@/lib/todo/agenda/sources/bills';
 import { deliveriesSource } from '@/lib/todo/agenda/sources/deliveries';
 import { draftsSource } from '@/lib/todo/agenda/sources/drafts';
 import { goalStepsSource } from '@/lib/todo/agenda/sources/goal-steps';
-import { goalWaitingSource } from '@/lib/todo/agenda/sources/goal-waiting';
 import { jobInterviewsSource } from '@/lib/todo/agenda/sources/job-interviews';
 import { jobRemindersSource } from '@/lib/todo/agenda/sources/job-reminders';
 import { planStepsSource } from '@/lib/todo/agenda/sources/plan-steps';
@@ -34,7 +33,6 @@ const SOURCES: AgendaSource[] = [
   draftsSource,
   applicationsSource,
   planStepsSource,
-  goalWaitingSource,
   raisedSource,
   threadsSource,
 ];

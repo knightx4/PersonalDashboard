@@ -86,16 +86,33 @@ export function GoalStepsFold({
       </Disclosure>
     );
   }
-  // The same two wrappers before and while it folds, so the steps keep their
-  // state; only the fold clips them while their height closes up.
+  // The same wrappers before and while it folds, so the steps keep their
+  // state; only the fold clips them while their height closes up. The
+  // folded line opens above them over the same span, so the steps fold into
+  // it and the tab is never empty between the two.
   return (
-    <div
-      className={cn('grid grid-cols-[minmax(0,1fr)] grid-rows-[1fr]', folding && 'goal-fold')}
-      onAnimationEnd={(event) => {
-        if (folding && event.target === event.currentTarget) setFolded(true);
-      }}
-    >
-      <div className={cn('min-h-0', folding && 'overflow-hidden')}>{children}</div>
+    <div>
+      {folding && (
+        <div className="goal-fold-in grid grid-cols-[minmax(0,1fr)]" inert>
+          <div className="min-h-0 overflow-hidden">
+            <Disclosure title="Steps" meta={meta} className="px-1">
+              {null}
+            </Disclosure>
+          </div>
+        </div>
+      )}
+      {/* Clipped while it folds, so the steps' lift does not pass over the
+          line above them; never otherwise, since a step's menu opens past it. */}
+      <div className={cn(folding && 'overflow-hidden')}>
+        <div
+          className={cn('grid grid-cols-[minmax(0,1fr)] grid-rows-[1fr]', folding && 'goal-fold')}
+          onAnimationEnd={(event) => {
+            if (folding && event.target === event.currentTarget) setFolded(true);
+          }}
+        >
+          <div className={cn('min-h-0', folding && 'overflow-hidden')}>{children}</div>
+        </div>
+      </div>
     </div>
   );
 }

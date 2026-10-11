@@ -2353,6 +2353,25 @@ button[aria-busy='true'] {
     calc(var(--motion-moment) - var(--motion-quick)) both;
 }
 
+/* The folded line opening over the same span as the fold above (plan #1735's
+ * critic round), so the steps fold into it rather than leaving the tab empty
+ * for a frame or two before it appears. */
+@keyframes goal-fold-in {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+
+@utility goal-fold-in {
+  animation: goal-fold-in var(--motion-move) var(--ease-sway)
+    calc(var(--motion-moment) - var(--motion-quick)) both;
+}
+
 /* A queue cleared on screen (plan #1340): the quiet-day sigil draws in cell by
  * cell, in reading order, each cell growing from 40% and fading up to its own
  * opacity. QueueCleared in components/motion/clear.tsx puts the class on
@@ -2836,7 +2855,8 @@ button[aria-busy='true'] {
     animation: none;
   }
 
-  .goal-fold {
+  .goal-fold,
+  .goal-fold-in {
     animation: none;
   }
 

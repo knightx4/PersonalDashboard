@@ -84,7 +84,7 @@ export type Step = {
    */
   countSource?: CountSource | null;
   countMatch?: string | null;
-  /** Whether you pressed Show on Todo on it (plan #927). */
+  /** Whether you pressed Send to Todo on it (plan #927). */
   onTodo: boolean;
   /**
    * What Claude produced for a `claude` step: the note or draft (plan #933).

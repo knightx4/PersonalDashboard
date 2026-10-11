@@ -32,20 +32,13 @@ import {
   type Practice,
   liveRhythms,
   type HomeRhythm,
-  type LiveRhythm,
   type RhythmRecord,
 } from '@/lib/goals/rhythms';
 import { loadLatestReviews } from '@/lib/goals/reviews-store';
 import { isCountSource } from '@/lib/goals/rhythm-sources';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
 import { goalProgress, type GoalProgress } from '@/lib/goals/status';
-import {
-  focusRhythms,
-  goalsForTodo,
-  unreadDashResults,
-  type TodoQuestion,
-  type TodoStep,
-} from '@/lib/goals/todo';
+import { todoSteps, type TodoStep } from '@/lib/goals/todo';
 import { nextPosition, reorder, type Goal, type GoalStatus } from '@/lib/goals/tree';
 import { todayIn } from '@/lib/todo/tasks/model';
 
@@ -691,51 +684,21 @@ export async function loadDailyView(
   };
 }
 
-/** A live rhythm whose current period is not yet met, for Todo (plan #928). */
-export type TodoRhythm = LiveRhythm & { startsOn: string; count: number };
-
 /**
  * What Goals puts on Todo, for the agenda source in
- * lib/todo/agenda/sources/goal-steps.ts: each open goal's next step of yours
- * (plan #1266) and the steps you pressed Show on Todo on (plan #927); the
- * rule for both is goalTodoSteps in lib/goals/todo.ts. The open questions
- * on your goals, to answer from Todo (plan #1267), from the same pass of
- * dailyView (goalsForTodo). And every live
- * rhythm until its current period's count is met (plan #928). Rhythms need no
- * flag, as the spec says; "Not this one" on Todo hides only this period.
- * While the week's focus is chosen, only the rhythms of goals in focus
- * (focusRhythms); every period is still brought up to date.
+ * lib/todo/agenda/sources/goal-steps.ts: the steps sent there, by you with
+ * Send to Todo or by Dash (plans #927, #1735). The rule is todoSteps in
+ * lib/goals/todo.ts. Nothing else comes through on its own any more: a goal's
+ * next step, rhythms, questions and Dash's results stay on the Goals home.
  */
 export async function loadTodoGoals(
   client: GoalsSupabaseClient,
   { userId, today }: Today,
-): Promise<{ steps: TodoStep[]; questions: TodoQuestion[]; rhythms: TodoRhythm[] }> {
+): Promise<{ steps: TodoStep[] }> {
   // userId narrows the read for a service-role client (the morning brief);
   // under RLS it changes nothing.
   const { goals, byGoal } = await loadLiveTree(client, { userId, today });
-  const goalList = goals.map((g) => g.goal);
-  const live = liveRhythms(goalList, byGoal);
-  const records = await syncRhythms(client, userId, live, today);
-  const rhythms = live.flatMap((rhythm) => {
-    const current = records.get(rhythm.id)?.current;
-    if (!current || current.count >= current.target) return [];
-    return [
-      { ...rhythm, target: current.target, startsOn: current.startsOn, count: current.count },
-    ];
-  });
-  return { ...goalsForTodo(goals, byGoal, today), rhythms: focusRhythms(rhythms, goalList, today) };
-}
-
-/**
- * How many of Dash's results wait to be read, for the line on Todo (plan
- * #1268); the rule is unreadDashResults in lib/goals/todo.ts.
- */
-export async function loadUnreadDashResults(
-  client: GoalsSupabaseClient,
-  { userId, today }: Today,
-): Promise<number> {
-  const { goals, byGoal } = await loadLiveTree(client, { userId, today });
-  return unreadDashResults(dailyView(goals, byGoal, today));
+  return { steps: todoSteps(goals.map((g) => g.goal), byGoal) };
 }
 
 /**

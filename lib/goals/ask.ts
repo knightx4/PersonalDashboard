@@ -343,7 +343,7 @@ async function takeStep(
  * Date the step the comment is on, and put it on Todo or take it off.
  *
  * Both are the person's own settings on their own step, one write each through
- * the same functions the row's date field and Show on Todo use, so a step that
+ * the same functions the row's date field and Send to Todo use, so a step that
  * cannot go on Todo (it is Dash's, or closed) is refused here as it is there.
  * The sentence says what changed, and what did not.
  */
