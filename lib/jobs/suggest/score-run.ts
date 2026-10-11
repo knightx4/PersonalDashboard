@@ -6,6 +6,7 @@ import type { Requirement } from '../jd/requirements';
 import { CLOSED_APPLICATION_STATUSES, scoreApplication } from './application-scores';
 import type { PastApplication } from './history';
 import { SCORE_CONFIDENCE_FLOOR, scoreOpening, type ScoringContext } from './scores';
+import { belowFitGate, readMinFitScore } from './fit-gate';
 import { readPreferences } from './preferences';
 
 /**
@@ -121,7 +122,11 @@ export async function scoreOpeningsFor(
   const openings = (data ?? []) as Row[];
   if (openings.length === 0) return outcome;
 
-  const context = await loadScoringContext(supabase, userId);
+  const [context, gate] = await Promise.all([
+    loadScoringContext(supabase, userId),
+    supabase.from('profiles').select('min_fit_score').eq('id', userId).maybeSingle(),
+  ]);
+  const minimum = readMinFitScore((gate.data as Row | null)?.min_fit_score);
   for (const row of openings) {
     const company = one(row.companies as Row | Row[] | null);
     const result = await scoreOpening({
@@ -149,12 +154,16 @@ export async function scoreOpeningsFor(
       continue;
     }
     // A sure duplicate of a role already on file comes off the list: it is
-    // one the person has already decided about.
+    // one the person has already decided about. So does a role whose fit is
+    // below the person's minimum (fit-gate.ts).
     const duplicate = result.scores.duplicate;
-    const expire =
+    const reason =
       duplicate?.value && duplicate.confidence >= SCORE_CONFIDENCE_FLOOR
-        ? { status: 'expired', expired_reason: 'duplicate', acted_at: new Date().toISOString() }
-        : {};
+        ? 'duplicate'
+        : belowFitGate(result.scores, minimum)
+          ? 'low_fit'
+          : null;
+    const expire = reason ? { status: 'expired', expired_reason: reason, acted_at: new Date().toISOString() } : {};
     const { error: writeError } = await supabase
       .from('suggestions')
       .update({ scores: result.scores, scored_at: new Date().toISOString(), score_model: JEV_MODEL, ...expire })

@@ -305,9 +305,9 @@ function ports(
     }),
     senderName: async () => 'Chris',
     write: async (_context, onSpend) => {
-      onSpend({ model: 'claude-sonnet-5', usage: { inputTokens: 1, outputTokens: 1 } } as never);
+      onSpend({ model: 'claude-sonnet-5-5', usage: { inputTokens: 1, outputTokens: 1 } } as never);
       return {
-        model: 'claude-sonnet-5',
+        model: 'claude-sonnet-5-5',
         draft: { subject: 'Return for A123', body: 'Hello — please.' },
       };
     },
@@ -349,7 +349,7 @@ describe('runDraftsFor', () => {
       to_address: 'returns@uniqlo.com',
       subject: 'Return for A123',
       body: 'Hello, please.',
-      model: 'claude-sonnet-5',
+      model: 'claude-sonnet-5-5',
       show_on: '2026-09-27',
       expires_at: '2026-09-30T08:00:00.000Z',
     });

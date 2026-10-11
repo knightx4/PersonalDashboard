@@ -67,7 +67,7 @@ describe('writing a case', () => {
   it('runs on Haiku, which is what the cost story assumes', async () => {
     const { client, create } = clientReturning('report_case', GOOD);
     await write(client);
-    expect(create.mock.calls[0][0].model).toBe('claude-haiku-4-5');
+    expect(create.mock.calls[0][0].model).toBe('claude-haiku-5-5');
   });
 
   it('sends the claim, the check and the situations already used, and nothing else', async () => {
@@ -100,7 +100,7 @@ describe('writing a case', () => {
     await write(client, { onSpend: (report) => reports.push(report) });
 
     expect(reports).toHaveLength(1);
-    expect(reports[0].model).toBe('claude-haiku-4-5');
+    expect(reports[0].model).toBe('claude-haiku-5-5');
   });
 });
 
@@ -164,7 +164,7 @@ describe('grading what was typed', () => {
     expect(prompt).toContain('supermarket chain');
     expect(prompt).toContain(GOOD.expected);
     expect(prompt).toContain('Their pay buys more.');
-    expect(create.mock.calls[0][0].model).toBe('claude-haiku-4-5');
+    expect(create.mock.calls[0][0].model).toBe('claude-haiku-5-5');
   });
 
   it('says the grading failed rather than throwing', async () => {

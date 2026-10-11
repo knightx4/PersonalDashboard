@@ -471,13 +471,13 @@ describe('the three groups', () => {
     expect(html).toContain('Your actions');
     expect(html).toContain('Questions for you');
     expect(html).toContain('To approve');
-    // Two actions, one question, one to approve -- and four on the section
-    // above them, which is the number the tab badge carries.
-    expect(html).toContain('Waiting on you');
+    // Two actions, one question, one to approve, on each heading and again in
+    // the overview at the top, each count a link to its section.
     expect(html).toMatch(/Your actions<span[^>]*>2</);
     expect(html).toMatch(/Questions for you<span[^>]*>1</);
     expect(html).toMatch(/To approve<span[^>]*>1</);
-    expect(html).toContain('(4)');
+    expect(html).toMatch(/href="#inbox-actions"[^>]*><span[^>]*>2</);
+    expect(html).toContain('id="inbox-actions"');
   });
 
   it('folds each group away by its heading (note 16a5d186)', () => {

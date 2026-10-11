@@ -1,13 +1,13 @@
 'use client';
 
-import { useActionState } from 'react';
+import Link from 'next/link';
+import { useRef, useState, useTransition } from 'react';
 import { cn } from '@/lib/cn';
-import { Button } from '@/components/ui/button';
-import { CardSection } from '@/components/ui/card';
-import { Field, FieldError, Input } from '@/components/ui/field';
+import { Card, CardSection } from '@/components/ui/card';
+import { FieldError, InlineInput } from '@/components/ui/field';
 import type { ModuleId } from '@/lib/modules';
 import type { SourceId } from '@/lib/todo/agenda/sources';
-import { updateAgendaSettings, type AgendaSettingsState } from './actions';
+import { saveAgendaSettingsNow } from './actions';
 
 export interface SourceOption {
   id: SourceId;
@@ -24,6 +24,13 @@ export interface SourceGroup {
   sources: SourceOption[];
 }
 
+/**
+ * Sources and the horizon. There is no Save: a ticked box saves when it is
+ * ticked, and the horizon saves when you leave it (plan #1777).
+ *
+ * Each save sends the whole current choice, so two quick changes cannot undo
+ * each other, and a failed save puts the page back to what is stored.
+ */
 export function AgendaSettingsForm({
   groups,
   enabled,
@@ -33,17 +40,45 @@ export function AgendaSettingsForm({
   enabled: SourceId[];
   horizonDays: number;
 }) {
-  const [state, action] = useActionState<AgendaSettingsState, FormData>(
-    updateAgendaSettings,
-    {},
-  );
+  const [on, setOn] = useState<SourceId[]>(enabled);
+  const [days, setDays] = useState(String(horizonDays));
+  const saved = useRef({ on: enabled, days: horizonDays });
+  const [editing, setEditing] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+  const [, start] = useTransition();
+
+  function save(nextOn: SourceId[], nextDays: string) {
+    const parsed = Number(nextDays);
+    start(async () => {
+      const result = await saveAgendaSettingsNow({ enabledSources: nextOn, horizonDays: parsed });
+      if (result.error) {
+        setError(result.error);
+        setOn(saved.current.on);
+        setDays(String(saved.current.days));
+        return;
+      }
+      setError(undefined);
+      saved.current = { on: nextOn, days: parsed };
+    });
+  }
+
+  function toggle(id: SourceId, checked: boolean) {
+    const next = checked ? [...on, id] : on.filter((s) => s !== id);
+    setOn(next);
+    save(next, days);
+  }
+
+  function leaveHorizon() {
+    if (Number(days) === saved.current.days) return;
+    save(on, days);
+  }
 
   return (
-    <form action={action} className="space-y-6">
+    <div className="space-y-6">
       <CardSection
         title="Sources"
         padding="standard"
-        hint="Things the other workspaces already know about, shown on your agenda. They are read where they live and never copied here — finishing one writes to the workspace that owns it."
+        hint="Things the other workspaces already know about, shown on your agenda. They are read where they live and never copied here. Finishing one writes to the workspace that owns it."
       >
         {groups.length === 0 ? (
           <p className="mt-2 text-ui text-ink-muted">
@@ -71,15 +106,13 @@ export function AgendaSettingsForm({
                     >
                       <input
                         type="checkbox"
-                        name={`source:${source.id}`}
-                        defaultChecked={enabled.includes(source.id)}
+                        checked={on.includes(source.id)}
+                        onChange={(event) => toggle(source.id, event.target.checked)}
                         disabled={!source.available}
                         className="mt-1 size-4 accent-accent"
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block text-ui font-medium text-ink">
-                          {source.label}
-                        </span>
+                        <span className="block text-ui font-medium text-ink">{source.label}</span>
                         <span className="block text-small leading-snug text-ink-muted">
                           {source.available
                             ? source.description
@@ -95,28 +128,51 @@ export function AgendaSettingsForm({
         )}
       </CardSection>
 
-      <CardSection
-        title="Horizon"
-        padding="standard"
-        hint="How far ahead counts as “this week”. Anything further out waits under Later."
-      >
-        <Field id="horizonDays" label="Days" className="mt-1">
-          <Input
-            id="horizonDays"
-            name="horizonDays"
-            type="number"
-            min={1}
-            max={90}
-            defaultValue={horizonDays}
-            className="w-24"
-          />
-        </Field>
-      </CardSection>
+      {/* The setting is the sentence. Pressing the number turns it into a box
+          and leaving the box saves it; anything further out waits under Later. */}
+      <Card padding="standard">
+        {/* eslint-disable-next-line no-restricted-syntax -- text-base matches the input's own 16px on a phone, which stops iOS zooming on focus, so the words and the number are one size. */}
+        <p className="text-base text-ink sm:text-ui">
+          This week covers{' '}
+          {editing ? (
+            <InlineInput
+              autoFocus
+              type="text"
+              inputMode="numeric"
+              maxLength={2}
+              value={days}
+              onChange={(event) => setDays(event.target.value)}
+              onBlur={() => {
+                setEditing(false);
+                leaveHorizon();
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') event.currentTarget.blur();
+              }}
+              aria-label="Days this week covers"
+              className="inline-block w-9 px-0 text-center"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              aria-label={`${days} days. Change how many days this week covers`}
+              className="press rounded-control underline decoration-ink-ghost decoration-dotted underline-offset-4 hover:bg-sunken"
+            >
+              {days}
+            </button>
+          )}{' '}
+          days
+        </p>
+        <p className="mt-2 text-small text-ink-muted">
+          Your timezone decides what counts as today, in every workspace.{' '}
+          <Link href="/account" className="press font-medium text-accent hover:underline">
+            Account settings
+          </Link>
+        </p>
+      </Card>
 
-      <FieldError>{state.error}</FieldError>
-      {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
-
-      <Button type="submit">Save</Button>
-    </form>
+      <FieldError>{error}</FieldError>
+    </div>
   );
 }

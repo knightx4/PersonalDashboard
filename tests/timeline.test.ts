@@ -209,7 +209,7 @@ describe('core.timeline', () => {
       expect(routeExists(href), `${event.kind} → ${href}`).toBe(true);
     }
     const step = events.find((e) => e.kind === 'step_done')!;
-    expect(timelineHref(step)).toBe(`/goals/${step.link_ref}#step-${step.source_id}`);
+    expect(timelineHref(step)).toBe(`/goals/${step.link_ref}/s/${step.source_id}`);
     const note = events.find((e) => e.kind === 'note_written')!;
     expect(timelineHref(note)).toBe('/vault/n/Journal/New%20note.md');
   });

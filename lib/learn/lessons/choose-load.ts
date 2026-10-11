@@ -69,6 +69,23 @@ async function loadChecked(supabase: LearnSupabaseClient, userId: string): Promi
   return new Set(rows.map((row) => row.unit_id));
 }
 
+/** Concepts judged weak: they get no lesson slot (plan #1720). Null means never judged. */
+async function loadWeak(supabase: LearnSupabaseClient, userId: string): Promise<Set<string>> {
+  const rows = await readAll<{ id: string }>((from, to) =>
+    supabase
+      .from('concepts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('judge_verdict', 'weak')
+      .order('id')
+      .range(from, to),
+  ).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Reading which concepts are weak failed: ${message}`);
+  });
+  return new Set(rows.map((row) => row.id));
+}
+
 /** The person's tracks whose whole outline is written (plan #1139). */
 async function loadOutlined(supabase: LearnSupabaseClient, userId: string): Promise<Set<string>> {
   const { data, error } = await supabase
@@ -85,13 +102,15 @@ async function loadOutlined(supabase: LearnSupabaseClient, userId: string): Prom
  * cards, the concepts whose lesson was rated too hard, the units that already
  * have a check, which tracks belong to learning goals (plan #972), and which
  * were picked up from a resting offer in the last four weeks (plan #1045).
+ * With `only`, just that track is weighed (plan #1699).
  */
 export async function loadLessonInput(
   supabase: LearnSupabaseClient,
   userId: string,
   now: Date = new Date(),
+  only: string | null = null,
 ): Promise<Omit<ChooseLessonsInput, 'slots'>> {
-  const [subjects, interest, cards, checked, goalTracks, resting, outlined] = await Promise.all([
+  const [subjects, interest, cards, checked, goalTracks, resting, outlined, weak] = await Promise.all([
     loadSubjects(supabase, userId),
     loadTrackInterest(supabase, now, userId),
     readAll<CardRow>((from, to) =>
@@ -113,10 +132,12 @@ export async function loadLessonInput(
     loadGoalTracks(supabase, userId),
     loadRestingRecord(supabase, userId),
     loadOutlined(supabase, userId),
+    loadWeak(supabase, userId),
   ]);
 
+  // One track's lessons when a subject's Now asks for them (plan #1699).
   const tracks = await Promise.all(
-    subjects.map(async (subject) => {
+    subjects.filter((subject) => !only || subject.id === only).map(async (subject) => {
       const [graph, goals, units] = await Promise.all([
         loadGraph(supabase, subject.id, userId),
         loadGoals(supabase, subject.id, userId),
@@ -149,6 +170,7 @@ export async function loadLessonInput(
     tooHard: new Set(
       cards.filter((card) => card.reason === 'lesson' && card.difficulty === 'too_hard').map((card) => card.concept_id),
     ),
+    weak,
     dealt,
     checked,
     goalTracks,
@@ -168,8 +190,9 @@ export async function chooseLessonsFor(
   userId: string,
   slots: number,
   now: Date = new Date(),
+  only: string | null = null,
 ): Promise<LessonChoice & { held: string[] }> {
-  const [input, heldIds] = await Promise.all([loadLessonInput(supabase, userId, now), loadHeld(supabase, userId, now)]);
+  const [input, heldIds] = await Promise.all([loadLessonInput(supabase, userId, now, only), loadHeld(supabase, userId, now)]);
   const choice = chooseLessons({ ...input, slots });
   const held = choice.needs.filter((need) => heldIds.has(need.subjectId)).map((need) => need.subjectId);
   return { ...choice, needs: choice.needs.filter((need) => !heldIds.has(need.subjectId)), held };

@@ -113,9 +113,10 @@ export function NotificationsSection({ publicKey }: { publicKey: string | null }
   }
 
   return (
-    // The id is where Dash points when a watch would reach no phone (lib/watch/start.ts).
+    // Dash points at this tab when a watch would reach no phone (lib/watch/start.ts);
+    // the id is where links written before Account had tabs still point.
     <section id="notifications" className={cn(cardVariants({ padding: 'standard' }), 'scroll-mt-bar')}>
-      <h2 className="text-body font-semibold text-ink">Notifications</h2>
+      <h2 className="text-body font-semibold text-ink">Morning brief</h2>
       <div className="mt-4 border-y border-border">
         {!publicKey ? (
           <p className="row-pad text-small text-ink-muted">

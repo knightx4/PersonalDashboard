@@ -42,7 +42,7 @@ export function WelcomeForm() {
       <p className="text-ui text-ink-muted">
         “This month” and other date ranges use your local timezone.
       </p>
-      <Button type="submit" disabled={pending} className="w-full sm:w-auto">
+      <Button type="submit" pending={pending} className="w-full sm:w-auto">
         {pending ? 'Continuing…' : 'Continue'}
       </Button>
       <FieldError>{state.error}</FieldError>
@@ -60,7 +60,7 @@ export function SkipGmailForm() {
         dispatch(formData);
       }}
     >
-      <Button type="submit" variant="secondary" disabled={pending} className="w-full sm:w-auto">
+      <Button type="submit" variant="secondary" pending={pending} className="w-full sm:w-auto">
         {pending ? 'Skipping…' : 'Skip for now'}
       </Button>
       <FieldError>{state.error}</FieldError>
@@ -80,7 +80,7 @@ export function FinishOnboardingForm({
   return (
     <form action={dispatch}>
       <input type="hidden" name="next" value={next} />
-      <Button type="submit" disabled={pending}>
+      <Button type="submit" pending={pending}>
         {pending ? 'Finishing…' : label}
       </Button>
       <FieldError>{state.error}</FieldError>

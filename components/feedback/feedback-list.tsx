@@ -31,6 +31,7 @@ import { KIND_TONE } from '@/components/feedback/kind-tone';
 import { TriageNote } from '@/components/feedback/triage-note';
 import { triageView } from '@/lib/feedback/triage';
 import { LinkedText } from '@/components/ui/linked-text';
+import { AttachmentList } from '@/components/attachments/attachment-list';
 
 // Defined in lib/feedback so both workspaces' pages and this component agree
 // on one shape.
@@ -197,6 +198,11 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
           <LinkedText text={row.body} />
         </p>
       )}
+
+      {/* What was filed with it, such as the screenshot of what went wrong
+          (plan #1713). Under the text while editing too: the files are not
+          part of what the form changes. */}
+      <AttachmentList files={row.attachments ?? []} />
 
       {row.resolutionNote && (
         <p className="rounded-lg bg-canvas px-3 py-2 text-ui text-ink-muted">

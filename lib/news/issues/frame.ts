@@ -47,6 +47,9 @@
 /** The stamp on every message the frame sends, so the page can tell them apart. */
 const FRAME_MARK = 'news-frame';
 
+/** What the page sends the frame once it is listening, asking for the height again. */
+export const FRAME_MEASURE = { source: FRAME_MARK, kind: 'measure' } as const;
+
 const FRAME_STYLES = `
   :root { --frame-pad: 16px; }
   html { -webkit-text-size-adjust: 100%; }
@@ -89,12 +92,13 @@ const FRAME_SCRIPT = `
 
   var last = 0;
   function measure() {
-    var d = document.documentElement;
+    // The body, not the document: the document is at least as tall as the
+    // frame already is, so measuring it never let the frame shrink from its
+    // first window's worth to an email shorter than that.
     var b = document.body;
-    var height = Math.max(
-      d.scrollHeight, d.offsetHeight,
-      b ? b.scrollHeight : 0, b ? b.offsetHeight : 0
-    );
+    var height = b
+      ? Math.max(b.scrollHeight, b.offsetHeight)
+      : document.documentElement.scrollHeight;
     if (height === last) return;
     last = height;
     send({ source: '${FRAME_MARK}', kind: 'height', height: height });
@@ -102,15 +106,25 @@ const FRAME_SCRIPT = `
 
   // A late picture is the case this exists for: the height is right when the
   // markup lands and wrong again a second later when the images arrive.
-  document.addEventListener('DOMContentLoaded', measure);
+  // The script runs in the head, before there is a body to watch, so the
+  // watching starts once the markup is in.
+  document.addEventListener('DOMContentLoaded', function () {
+    if (window.ResizeObserver) new ResizeObserver(measure).observe(document.body);
+    measure();
+  });
   window.addEventListener('load', measure);
   window.addEventListener('resize', measure);
   document.addEventListener('load', measure, true);
   document.addEventListener('error', measure, true);
-  if (window.ResizeObserver) {
-    new ResizeObserver(measure).observe(document.documentElement);
-  }
-  measure();
+
+  // The page asks again once it is listening: the first measure can land
+  // before the page has hydrated, and that message is lost.
+  window.addEventListener('message', function (event) {
+    if (event.source !== parent || !event.data || event.data.source !== '${FRAME_MARK}') return;
+    if (event.data.kind !== 'measure') return;
+    last = 0;
+    measure();
+  });
 
   document.addEventListener('click', function (event) {
     var node = event.target;

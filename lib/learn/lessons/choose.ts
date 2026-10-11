@@ -73,6 +73,11 @@ export type ChooseLessonsInput = {
   /** Concepts whose lesson was rated too hard. What sits under them is taught first. */
   tooHard?: ReadonlySet<string>;
   /**
+   * Concepts judged weak (`judge_verdict = 'weak'`, plan #1720). They get no
+   * lesson slot of their own: a slot with only these ready stays empty.
+   */
+  weak?: ReadonlySet<string>;
+  /**
    * Cards per track already waiting in the deck. They count as slots the
    * track has had, so a top-up does not pile more onto a track that is
    * already well represented.
@@ -185,6 +190,7 @@ export function planTrack(
   track: LessonTrack,
   carded: ReadonlySet<string>,
   tooHard: ReadonlySet<string> = new Set(),
+  weak: ReadonlySet<string> = new Set(),
 ): TrackPlan {
   const need = (because: TrackNeed['because'], unitId: string | null): TrackPlan => ({
     kind: 'need',
@@ -214,7 +220,8 @@ export function planTrack(
     track.graph,
     { id: track.subjectId, name: track.name },
     goalConceptIds,
-  ).filter((row) => onPath.has(row.concept.id) && !carded.has(row.concept.id));
+  ).filter((row) => onPath.has(row.concept.id) && !carded.has(row.concept.id) && !weak.has(row.concept.id),
+  );
 
   if (ready.length === 0) return { kind: 'waiting', ...short };
   const under = underTooHard(track.graph, tooHard);
@@ -273,7 +280,7 @@ export function chooseLessons(input: ChooseLessonsInput): LessonChoice {
     // A goal's lessons are on its plan, and its units are laid out by the
     // plan pass (plan #1143).
     if (goalTracks.has(track.subjectId)) continue;
-    const plan = planTrack(track, input.carded, input.tooHard);
+    const plan = planTrack(track, input.carded, input.tooHard, input.weak);
     if ('need' in plan && plan.need) needs.push(plan.need);
     if (plan.kind === 'waiting') waiting.push(track.subjectId);
     else if (plan.kind === 'teach') queues.set(track.subjectId, plan.candidates);

@@ -147,7 +147,7 @@ describe('a reopened conversation', () => {
     const first = html.indexOf('I can add that.');
     const declined = html.indexOf('Nothing was written.');
     const second = html.indexOf('I can add that too.');
-    const step = html.indexOf('/goals/g1#step-s1');
+    const step = html.indexOf('/goals/g1/s/s1');
     expect(first).toBeGreaterThan(-1);
     expect(declined).toBeGreaterThan(first);
     expect(second).toBeGreaterThan(declined);

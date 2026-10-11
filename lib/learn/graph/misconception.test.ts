@@ -121,7 +121,7 @@ describe('naming it', () => {
   it('runs on Haiku, the rarest call in the module', async () => {
     const { client, create } = clientReturning({ misconception: 'Believes something.' });
     await ask(client);
-    expect(create.mock.calls[0][0].model).toBe('claude-haiku-4-5');
+    expect(create.mock.calls[0][0].model).toBe('claude-haiku-5-5');
   });
 
   it('names nothing when the answers do not add up to a belief', async () => {

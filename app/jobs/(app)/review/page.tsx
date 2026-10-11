@@ -42,10 +42,10 @@ export default async function ReviewPage({
   const withCandidates = rows.map((row) => {
     if (row.kind !== 'message') return row;
 
-    // Everything the held message still has. The four below it are genuinely
-    // gone -- bodies are never stored and the extractor's output is not
-    // persisted -- but the thread id and reply-to are on the row, and scoring
-    // without them offered worse suggestions than the mailbox supports.
+    // Everything the held message still has. Bodies are never stored, but the
+    // thread id, reply-to and the role title the message named are on the
+    // row, and scoring without them offered worse suggestions than the
+    // mailbox supports.
     const input: LinkInput = {
       threadId: row.threadId,
       fromAddress: row.fromAddress,
@@ -55,7 +55,9 @@ export default async function ReviewPage({
       receivedAt: row.receivedAt ? new Date(row.receivedAt) : null,
       classification: row.classification as LinkInput['classification'],
       extractedCompany: null,
-      extractedRole: null,
+      // The role the message named, kept when it was ingested, so two roles at
+      // one company are told apart (note b48d2b61).
+      extractedRole: row.roleHint,
       extractedAtsJobId: null,
       companyHint: null,
     };

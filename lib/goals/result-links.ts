@@ -63,9 +63,16 @@ export function firstLink(markdown: string): string | null {
 
 /**
  * A markdown link, or a full address. Bare domains are written as markdown
- * links by `linkBareDomains` first, so this is all there is left to find.
+ * links by `linkBareDomains` first, so this is all there is left to find. A
+ * markdown link may also point inside the app (`/goals/files/…`), which is
+ * how Dash names a file it wrote (note 8b30d1d7); `//` is not such a path.
  */
-const LINK = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|<(https?:\/\/[^>\s]+)>|(https?:\/\/[^\s)<>\]]+)/gi;
+const LINK = /\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/(?!\/)[^)\s]*)\)|<(https?:\/\/[^>\s]+)>|(https?:\/\/[^\s)<>\]]+)/gi;
+
+/** Whether a link's target is a page of this app rather than another site. */
+export function isAppPath(href: string): boolean {
+  return href.startsWith('/') && !href.startsWith('//');
+}
 
 export type TextPart = { text: string } | { text: string; href: string };
 

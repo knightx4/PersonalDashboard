@@ -1,4 +1,6 @@
 import { createClient, requireUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { withNoteFiles } from '@/lib/feedback/files';
 import { PageHeader } from '@/components/shell/page-header';
 import { FeedbackQueueView } from '@/components/feedback/feedback-queue';
 import { OtherUsersFeedback } from '@/components/feedback/other-users';
@@ -33,13 +35,12 @@ export default async function DevBugsPage({
     loadFeedbackQueue(supabase, user.id),
     loadOtherUsersFeedback(supabase, user.id),
   ]);
+  // The files filed with each note (plan #1713), drawn under its text.
+  await withNoteFiles(await createCoreClient(), queue.rows);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader
-        title="Bugs and requests"
-        description="Everything captured from the header button, from any workspace. Say “knock out the notes” in a session to have them worked top to bottom."
-      />
+      <PageHeader title="Bugs and requests" />
       <FeedbackQueueView queue={queue} kind={kind} />
       {/* Below both of your sections, and gone entirely when nobody else has
           filed anything. Read-only, per #414. */}

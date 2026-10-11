@@ -1,4 +1,5 @@
 import type { ModuleSources, Page } from '@/lib/sources/types';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
  * Goals' own tables (lib/sources/types.ts). The goals skill reads them
@@ -18,8 +19,11 @@ const PAGES: Record<string, Page> = {
     title: 'title',
     reads: ['level', 'parent_id'],
     href: (row) =>
-      row.level === 'goal' || !row.parent_id ? `/goals/${row.id}` : `/goals/${row.parent_id}#step-${row.id}`,
+      row.level === 'goal' || !row.parent_id
+        ? `/goals/${row.id}`
+        : stepHref(String(row.parent_id), String(row.id)),
   },
+  // An area has its own page (areaHref in lib/goals/all-goals.ts).
   'goals.areas': { title: 'name', href: (row) => `/goals/area/${row.id}` },
   'goals.runs': {
     title: { reads: ['summary', 'job'], of: (row) => (row.summary as string | null) || (row.job as string | null) },

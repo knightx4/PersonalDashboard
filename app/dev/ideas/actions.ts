@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import { threadText } from '@/lib/comments/context';
-import { codeMatches } from '@/lib/feedback/code';
 import { planRoutine } from '@/lib/feedback/routine';
 import { IDEA_COLUMNS, IDEAS_TABLE, ideaRowFrom } from '@/lib/ideas/load';
 import { withThreads } from '@/lib/thread/store';
@@ -77,20 +76,16 @@ export async function addIdea(
  * doing one day. Folding them into one writer would be the first step towards
  * a queue that quietly contains both.
  *
- * What it does share is the panel's submit code, which is why that check now
- * lives in `lib/feedback/code.ts` rather than beside one of the two actions.
- *
  * The page path comes over so the panel can propose the workspace the person
  * was in; the module that is actually filed is whatever the select says, which
  * may be neither.
  *
- * The owner check is here as well as in `addIdea`, and it is first -- before
- * the submit code. This is the one action in this file the header panel calls,
- * so it is reachable from every page in the app rather than only from /dev, and
- * the check has to be the first thing it does or the answer it gives away is
- * whether the code was right. Filing a *note* is what stays open to every
- * account (#417); an idea is not a note, it is a row on the dev workspace's
- * own list.
+ * The owner check is here as well as in `addIdea`, and it is first. This is
+ * the one action in this file the header panel calls, so it is reachable from
+ * every page in the app rather than only from /dev. Filing a *note* is what
+ * stays open to every account (#417); an idea is not a note, it is a row on
+ * the dev workspace's own list. The panel's submit code went with note
+ * 7c1f7238.
  */
 // latency: pending
 export async function submitIdea(
@@ -98,10 +93,6 @@ export async function submitIdea(
   formData: FormData,
 ): Promise<IdeaActionState> {
   await requireOwner();
-
-  if (!codeMatches(String(formData.get('code') ?? ''))) {
-    return { error: 'That code is not right.' };
-  }
   const saved = await addIdea(_prev, formData);
 
   // "Send and shape" (note beadca47): the same save, then the same hand-off the
