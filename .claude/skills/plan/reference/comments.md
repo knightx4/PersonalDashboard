@@ -17,6 +17,11 @@ away from them, which is the same rule as never answering your own decision.
 If the answer is that the thing being asked about is wrong, say that in the
 thread. Then it is theirs to act on — a note, a decision, or nothing.
 
+One question is an instruction in disguise: "why is this not running?" on a
+step. When nothing the step waits on is the person's to do, hand it over to be
+built and say so, rather than explaining why it sits there. A reply never
+names a branch or a commit hash, since the person cannot open either.
+
 **An instruction is carried out, and then reported.** Doing it and saying so is
 what #359 settled, so do not write back what you would do and wait to be told
 again. Three things are yours to do:
