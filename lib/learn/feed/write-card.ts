@@ -3,7 +3,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { describeDepth, type Depth } from './depth';
 import { keepMentions, MAX_MENTIONS, type CardMention } from './mentions';
 import { MODELS } from '@/lib/core/models';
@@ -481,7 +481,7 @@ export async function writeCard(input: {
   try {
     response = await client.messages.create({
       model: WRITE_CARD_MODEL,
-      max_tokens: 6144,
+      max_tokens: 6144 + THINKING_ROOM,
       system: SYSTEM,
       tools: [
         {
@@ -531,7 +531,7 @@ export async function writeCard(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, WRITE_CARD_MODEL),
       messages: [{ role: 'user', content: cardPrompt(card) }],
     });
   } catch (error) {

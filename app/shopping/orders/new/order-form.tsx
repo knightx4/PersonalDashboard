@@ -6,7 +6,13 @@ import { createManualOrder, type ActionState } from '@/app/shopping/orders/actio
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AddTrigger } from '@/components/ui/add-trigger';
-import { ChipInput, ChipSelect, FieldError, InlineInput } from '@/components/ui/field';
+import {
+  ChipInput,
+  ChipSelect,
+  FieldError,
+  InlineInput,
+  InlineTextarea,
+} from '@/components/ui/field';
 import type { Person } from '@/lib/people/load';
 import type { OrderFormPrefill } from '@/lib/review/read-order';
 import {
@@ -33,6 +39,15 @@ interface LineDraft {
 }
 
 const initialState: ActionState = {};
+
+/*
+ * The line items' columns. On a phone: variant, category, quantity, the
+ * times sign and price, with the name spanning the first four above them
+ * and the bin over the price. From sm: name, variant, category, quantity,
+ * times, price and bin on one row, the bin straight after the price.
+ */
+const LINE_GRID =
+  'grid-cols-[minmax(0,1fr)_auto_2.75rem_auto_4.75rem] sm:grid-cols-[minmax(0,4fr)_minmax(0,2fr)_minmax(0,2fr)_3rem_auto_6rem_2rem] sm:gap-x-2';
 
 function newLine(): LineDraft {
   return {
@@ -113,9 +128,7 @@ export function OrderForm({
    */
   return (
     <form action={action} className="space-y-6">
-      {sourceMessageId && (
-        <input type="hidden" name="source_message_id" value={sourceMessageId} />
-      )}
+      {sourceMessageId && <input type="hidden" name="source_message_id" value={sourceMessageId} />}
       {prefill && <input type="hidden" name="currency" value={prefill.currency} />}
 
       <Card padding="dense" className="space-y-2">
@@ -172,26 +185,35 @@ export function OrderForm({
 
       <section>
         <h2 className="text-ui font-semibold text-ink">What you bought</h2>
-        {/* The column names, once, where there is room for columns. */}
+        {/* The column names, once, where there is room for columns. The
+         * figures and their names are right-aligned, so a price reads down
+         * its column. */}
         <div
           aria-hidden
-          className="mt-2 hidden gap-2 px-1 text-small text-ink-muted sm:grid sm:grid-cols-12"
+          className={`mt-2 hidden px-1 text-small text-ink-muted sm:grid ${LINE_GRID}`}
         >
-          <span className="sm:col-span-4">Item</span>
-          <span className="sm:col-span-2">Variant</span>
-          <span className="sm:col-span-2">Category</span>
-          <span className="sm:col-span-1">Qty</span>
-          <span className="sm:col-span-2">Unit price</span>
+          <span>Item</span>
+          <span>Variant</span>
+          <span>Category</span>
+          <span className="text-right">Qty</span>
+          <span />
+          <span className="text-right">Unit price</span>
         </div>
+        {/*
+         * Two lines per item on a phone: the name with its bin, then the
+         * variant, category and quantity times price, which read as one
+         * phrase ("Navy, M · Clothing · 1 × 49.90"). From sm up the same
+         * cells sit on one row under the column names.
+         */}
         <ul className="mt-1 divide-y divide-border border-y border-border">
           {lines.map((line, index) => (
-            <li key={line.key} className="row-pad grid grid-cols-6 items-center gap-1 sm:grid-cols-12 sm:gap-2">
-              <InlineInput
+            <li key={line.key} className={`row-pad grid items-center gap-x-1 ${LINE_GRID}`}>
+              <InlineTextarea
                 name="line_name"
                 required
                 aria-label="Item"
                 placeholder="What did you buy?"
-                className="col-span-6 sm:col-span-4"
+                className="col-span-4 col-start-1 row-start-1 max-sm:py-2.5 sm:col-span-1"
                 value={line.name}
                 onChange={(event) => setLine(index, { name: event.target.value })}
               />
@@ -199,7 +221,7 @@ export function OrderForm({
                 name="line_variant"
                 aria-label="Variant"
                 placeholder="Size, colour…"
-                className="col-span-3 sm:col-span-2"
+                className="col-start-1 row-start-2 sm:col-start-2 sm:row-start-1"
                 value={line.variant}
                 onChange={(event) => setLine(index, { variant: event.target.value })}
               />
@@ -207,7 +229,7 @@ export function OrderForm({
                 name="line_category_id"
                 aria-label="Category"
                 placeholderValue=""
-                className="col-span-3 sm:col-span-2"
+                className="col-start-2 row-start-2 sm:col-start-3 sm:row-start-1"
                 value={line.categoryId}
                 onChange={(event) => setLine(index, { categoryId: event.target.value })}
               >
@@ -223,17 +245,23 @@ export function OrderForm({
                 inputMode="numeric"
                 required
                 aria-label="Quantity"
-                className="tabular col-span-1 sm:col-span-1"
+                className="tabular col-start-3 row-start-2 text-right sm:col-start-4 sm:row-start-1"
                 value={line.quantity}
                 onChange={(event) => setLine(index, { quantity: event.target.value })}
               />
+              <span
+                aria-hidden
+                className="col-start-4 row-start-2 text-ui text-ink-muted sm:col-start-5 sm:row-start-1"
+              >
+                ×
+              </span>
               <InlineInput
                 name="line_unit_price"
                 inputMode="decimal"
                 required
                 aria-label="Unit price"
                 placeholder="0.00"
-                className="tabular col-span-4 sm:col-span-2"
+                className="tabular col-start-5 row-start-2 text-right sm:col-start-6 sm:row-start-1"
                 value={line.unitPrice}
                 onChange={(event) => setLine(index, { unitPrice: event.target.value })}
               />
@@ -241,7 +269,7 @@ export function OrderForm({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="col-span-1 justify-self-end"
+                className="col-start-5 row-start-1 justify-self-end px-1.5 sm:col-start-7"
                 disabled={lines.length === 1}
                 onClick={() => setLines((current) => current.filter((_, i) => i !== index))}
                 aria-label="Remove line"
@@ -300,18 +328,22 @@ export function OrderForm({
             {formatMoney(preview.totalCents)}
           </span>
         </SumRow>
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3">
-          <p className="text-small text-ink-muted">
-            Each physical unit lands in inventory with a proportional share of tax,
-            shipping and discount.
-          </p>
-          <Button type="submit" pending={pending}>
-            {pending ? 'Saving…' : 'Save order'}
-          </Button>
-        </div>
       </Card>
 
       <FieldError>{state.error}</FieldError>
+
+      {/* Pinned above the dock while the form scrolls on a phone, so Save
+       * order is in reach from the first screen (taste:forward-action-in-reach).
+       * The inventory note rides with it, since it says what the press does,
+       * and the pair sit on a panel of their own rather than on the page. */}
+      <div className="sheet sticky bottom-[calc(var(--dock-h)+env(safe-area-inset-bottom))] z-over-link -mx-4 flex items-center gap-3 border-t border-border bg-surface px-4 py-3 sm:static sm:mx-0 sm:rounded-card sm:border-0 sm:card-pad-dense">
+        <Button type="submit" pending={pending} className="shrink-0">
+          {pending ? 'Saving…' : 'Save order'}
+        </Button>
+        <p className="text-small text-ink-muted">
+          Each unit lands in inventory with its share of tax, shipping and discount.
+        </p>
+      </div>
     </form>
   );
 }

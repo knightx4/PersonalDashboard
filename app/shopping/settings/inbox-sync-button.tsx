@@ -1,10 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { ConfirmStep } from '@/components/ui/confirm-step';
-import { reparseInboxOrders, resetInboxImport } from './actions';
+import { RefreshCw } from 'lucide-react';
+import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { disconnectInbox, reparseInboxOrders, resetInboxImport } from './actions';
 import { PaidHint } from '@/components/ui/paid-hint';
 
 const SYNC_HINT = 'app/api/inbox/sync/route.ts#POST';
@@ -25,12 +27,34 @@ export type InboxSyncProgress = {
   updatedAt?: string;
 };
 
-export function InboxSyncButton({
+/**
+ * One connected inbox: its heading, its one button, its menu, and what a
+ * running import says.
+ *
+ * The button is Sync now once the first import has run, since that is the one
+ * used week to week; Import before then, and Reconnect when Google wants
+ * consent again. Everything else is in the menu, so an inbox's actions fit on
+ * one line at 390 (plan #1788, law 9).
+ */
+export function InboxControls({
   accountId,
+  email,
+  status,
+  reconnectHref,
+  heading,
+  children,
   initialJob = null,
   backfillCompleted = false,
 }: {
   accountId: string;
+  email: string;
+  status: string;
+  /** Set when the inbox needs consent again and OAuth is configured. */
+  reconnectHref?: string;
+  /** The address and its status line. */
+  heading: ReactNode;
+  /** Whose inbox it is, drawn under the heading. */
+  children?: ReactNode;
   initialJob?: InboxSyncProgress | null;
   /** True once the initial Gmail import finished — enables Sync now. */
   backfillCompleted?: boolean;
@@ -43,6 +67,7 @@ export function InboxSyncButton({
   const [syncingNow, setSyncingNow] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [reparsing, setReparsing] = useState(false);
+  const canSync = status === 'active';
 
   const active =
     progress != null &&
@@ -58,11 +83,12 @@ export function InboxSyncButton({
   }, [accountId]);
 
   useEffect(() => {
+    if (!canSync) return;
     const id = window.setInterval(() => {
       void refresh();
     }, 2500);
     return () => window.clearInterval(id);
-  }, [refresh]);
+  }, [refresh, canSync]);
 
   // When a run ends, re-read the server parts of the page (the inbox's "last
   // synced", the orders it imported) so they show without a reload.
@@ -105,7 +131,7 @@ export function InboxSyncButton({
       if (!result.ok) throw new Error(result.error ?? 'Reparse failed');
       setMessage(
         result.considered === 0
-          ? 'Nothing to reparse — all confirmations already use the latest parser.'
+          ? 'Nothing to reparse: every confirmation already uses the latest parser.'
           : `Reparsed ${result.updated} of ${result.considered} order email${result.considered === 1 ? '' : 's'}${
               result.errors ? ` · ${result.errors} error${result.errors === 1 ? '' : 's'}` : ''
             }.`,
@@ -136,76 +162,112 @@ export function InboxSyncButton({
   const busy = starting || syncingNow || resetting || reparsing || active;
   const isIncremental = progress?.type === 'incremental';
 
+  const menu: ActionMenuItem[] = [];
+  if (canSync && backfillCompleted) {
+    menu.push(
+      {
+        id: 'import',
+        label: 'Import orders again',
+        disabled: busy,
+        onSelect: () => void startMode('backfill'),
+      },
+      {
+        id: 'reparse',
+        label: 'Re-parse with latest parser',
+        disabled: busy,
+        onSelect: () => void reparseWithLatest(),
+      },
+    );
+  }
+  if (canSync) {
+    menu.push({
+      id: 'reset',
+      label: 'Reset & re-scan',
+      destructive: true,
+      disabled: busy,
+      confirm:
+        'Deletes the orders this inbox imported and re-scans Gmail from scratch. Manual orders are kept.',
+      onSelect: () => void resetAndRescan(),
+    });
+  }
+  menu.push({
+    id: 'disconnect',
+    label: 'Disconnect',
+    destructive: true,
+    formAction: disconnectInbox,
+    formFields: { id: accountId },
+  });
+
+  let primary: ReactNode = null;
+  if (reconnectHref) {
+    primary = (
+      <Link href={reconnectHref} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
+        <RefreshCw className="size-3.5" strokeWidth={1.75} />
+        Reconnect
+      </Link>
+    );
+  } else if (canSync && backfillCompleted) {
+    primary = (
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        disabled={busy}
+        onClick={() => startMode('incremental')}
+      >
+        {syncingNow || (active && isIncremental) ? 'Syncing…' : 'Sync now'}
+      </Button>
+    );
+  } else if (canSync) {
+    primary = (
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        disabled={busy}
+        onClick={() => startMode('backfill')}
+      >
+        {starting || active ? 'Importing…' : 'Import orders'}
+      </Button>
+    );
+  }
+
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={busy}
-          onClick={() => startMode('backfill')}
-        >
-          {starting || (active && !isIncremental)
-            ? 'Importing in background…'
-            : 'Import orders from Gmail'}
-        </Button>
-        {backfillCompleted && (
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={busy}
-            onClick={() => startMode('incremental')}
-          >
-            {syncingNow || (active && isIncremental) ? 'Syncing…' : 'Sync now'}
-          </Button>
-        )}
-        {/* Per order email the import reads, which it finds out as it goes. */}
-        <PaidHint action={SYNC_HINT} what="Cost of reading each order email" />
-        {backfillCompleted && (
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={busy}
-            onClick={reparseWithLatest}
-          >
-            {reparsing ? 'Reparsing…' : 'Re-parse with latest parser'}
-          </Button>
-        )}
-        {/* Per order email: how many there are is known only once the
-            reparse has looked. */}
-        {backfillCompleted && (
-          <PaidHint
-            action="app/shopping/settings/actions.ts#reparseInboxOrders"
-            what="Cost of re-reading each order email"
-          />
-        )}
-        <ConfirmStep
-          variant="ghost"
-          size="sm"
-          disabled={busy}
-          prompt="Deletes the orders this inbox imported and re-scans Gmail from scratch. Manual orders are kept."
-          confirmLabel="Reset & re-scan"
-          pendingLabel="Resetting…"
-          onConfirm={resetAndRescan}
-        >
-          {resetting ? 'Resetting…' : 'Reset & re-scan'}
-        </ConfirmStep>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">{heading}</div>
+        <div className="flex shrink-0 items-center gap-1">
+          {primary}
+          {/* Per order email the import reads, which it finds out as it goes. */}
+          {canSync && <PaidHint action={SYNC_HINT} what="Cost of reading each order email" />}
+          <ActionMenu label={`More for ${email}`} items={menu} />
+          {/* Re-parse is in the menu, whose items are words, so its cost sits
+              beside the menu. Per order email: how many there are is known
+              only once the reparse has looked. */}
+          {canSync && backfillCompleted && (
+            <PaidHint
+              action="app/shopping/settings/actions.ts#reparseInboxOrders"
+              what="Cost of re-parsing each order email, from the menu"
+            />
+          )}
+        </div>
       </div>
+      {children}
       {progress && (
         <p className="text-small text-ink-muted" aria-live="polite">
-          {isIncremental ? 'Sync' : 'Import'} — seen {progress.messagesSeen} · parsed{' '}
+          {isIncremental ? 'Sync' : 'Import'}: seen {progress.messagesSeen} · parsed{' '}
           {progress.messagesParsed}
-          {progress.messagesClassified
-            ? ` · classified ${progress.messagesClassified}`
-            : ''}
+          {progress.messagesClassified ? ` · classified ${progress.messagesClassified}` : ''}
           {progress.done && !progress.error
             ? ' · done'
             : active
-              ? ' · running in background…'
+              ? ' · running in the background'
               : ''}
+        </p>
+      )}
+      {(reparsing || resetting) && (
+        <p className="text-small text-ink-muted" aria-live="polite">
+          {reparsing ? 'Reparsing…' : 'Resetting…'}
         </p>
       )}
       {message && (
@@ -218,18 +280,9 @@ export function InboxSyncButton({
       )}
       {active && (
         <p className="text-small text-ink-muted">
-          You can leave this page — work keeps going on the server. Come back anytime to check
-          progress.
+          You can leave this page. The work keeps going on the server.
         </p>
       )}
-      <p className="text-small text-ink-muted">
-        Import skips messages it already saw. After the first import, Sync now (or the hourly
-        cron) picks up new mail via Gmail history. Use{' '}
-        <span className="text-ink-muted">Re-parse with latest parser</span> to refresh existing
-        orders in place when we improve extraction — prefer that over{' '}
-        <span className="text-ink-muted">Reset &amp; re-scan</span>, which deletes this inbox’s
-        email orders and starts over.
-      </p>
       {progress?.done &&
         progress.type !== 'incremental' &&
         progress.messagesSeen === 0 &&

@@ -1,5 +1,5 @@
 import { Fragment } from 'react';
-import { linkParts } from '@/lib/goals/result-links';
+import { isAppPath, linkParts } from '@/lib/goals/result-links';
 
 /**
  * Text written as plain text, with every link in it clickable (notes 91885079
@@ -18,8 +18,8 @@ export function LinkedText({ text }: { text: string }) {
           <a
             key={index}
             href={part.href}
-            target="_blank"
-            rel="noopener noreferrer"
+            // A path inside the app opens where you are; a site opens apart.
+            {...(isAppPath(part.href) ? {} : { target: '_blank', rel: 'noopener noreferrer' })}
             className="break-words text-accent underline underline-offset-2"
           >
             {part.text}

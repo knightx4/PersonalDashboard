@@ -25,6 +25,7 @@ import {
   type EvidenceSourceKind,
 } from './propose-payload';
 import { MODELS } from '@/lib/core/models';
+import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
 
 /**
  * Judgment, not retrieval: deciding what counts as a story and what is a
@@ -117,7 +118,7 @@ export async function proposeEvidenceFromSource(
   try {
     response = await client.messages.create({
       model: MODEL,
-      max_tokens: 8192,
+      max_tokens: 8192 + THINKING_ROOM,
       system: SYSTEM,
       tools: [
         {
@@ -147,7 +148,7 @@ export async function proposeEvidenceFromSource(
           },
         },
       ],
-      tool_choice: { type: 'tool', name: TOOL_NAME },
+      tool_choice: forceTool(TOOL_NAME, MODEL),
       messages: [
         {
           role: 'user',

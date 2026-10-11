@@ -52,7 +52,7 @@ describe('when it writes one', () => {
   it('runs on Haiku, which is what the cost story assumes', async () => {
     const { client, create } = clientReturning(GOOD);
     await ask(client);
-    expect(create.mock.calls[0][0].model).toBe('claude-haiku-4-5');
+    expect(create.mock.calls[0][0].model).toBe('claude-haiku-5-5');
   });
 
   it('sends the claim and the questions already asked, and nothing else', async () => {
@@ -81,7 +81,7 @@ describe('when it writes one', () => {
     await ask(client, { onSpend: (report) => reports.push(report) });
 
     expect(reports).toHaveLength(1);
-    expect(reports[0].model).toBe('claude-haiku-4-5');
+    expect(reports[0].model).toBe('claude-haiku-5-5');
   });
 });
 

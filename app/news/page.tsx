@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createNewsClient } from '@/lib/news/auth/server';
@@ -16,10 +17,12 @@ import { loadSentInIssues, sentKey, type StorySent } from '@/lib/news/saved/sent
 import {
   cardPasses,
   nextCard,
+  QUICK_AHEAD_COOKIE,
   quickHref,
   quickPage,
   quickProgress,
   quickTopics,
+  readAhead,
   type QuickCard,
 } from '@/lib/news/quick/next';
 import { topicHrefs } from '@/lib/news/topic-hrefs';
@@ -50,7 +53,10 @@ export const dynamic = 'force-dynamic';
  * the screen size. Next page records every story on it (#939).
  *
  * The story after the card is worked out too and drawn ahead, so Next on a
- * phone shows it at once while the pass is recorded (note 452a90d9).
+ * phone shows it at once while the pass is recorded (note 452a90d9). Next
+ * leaves that story in a cookie, and the card drawn after the pass is that
+ * story while it is unread, so the ranking the pass changed cannot swap it
+ * for another (note a0fc267e).
  *
  * The order is ranked rather than newest first (lib/news/quick/rank.ts): an
  * event several newsletters ran shows once, naming the others, and goes up
@@ -69,7 +75,8 @@ export default async function QuickReadPage({
   const params = await searchParams;
   const topic = readTopic(params.topic) ?? null;
   const user = await requireUser();
-  const [client, vault] = await Promise.all([createNewsClient(), createVaultClient()]);
+  const [client, vault, jar] = await Promise.all([createNewsClient(), createVaultClient(), cookies()]);
+  const ahead = readAhead(jar.get(QUICK_AHEAD_COOKIE)?.value);
 
   const [settings, senders, { issues, passes }, hidden, recent] = await Promise.all([
     loadAccountSettings(user.id),
@@ -82,7 +89,7 @@ export default async function QuickReadPage({
   const signals = await loadQuickSignals(client, issues);
   const filter = { topic, hidden };
 
-  const card = nextCard(issues, senders, passes, filter, signals);
+  const card = nextCard(issues, senders, passes, filter, signals, ahead);
   // The story Next brings up, worked out as though this card and its repeats
   // had been passed, so the phone can show it without waiting for the page
   // (note 452a90d9).

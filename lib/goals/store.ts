@@ -35,6 +35,7 @@ type GoalRow = {
   target: number | string | null;
   due_on: string | null;
   errand: boolean;
+  focus?: boolean;
   archived_at?: string | null;
 };
 
@@ -58,6 +59,7 @@ const toGoal = (row: GoalRow): Goal => ({
   target: row.target === null ? null : Number(row.target),
   dueOn: row.due_on,
   errand: row.errand,
+  focus: row.focus ?? false,
   archivedAt: row.archived_at ?? null,
 });
 
@@ -84,7 +86,7 @@ export async function loadGoals(
 ): Promise<Goal[]> {
   let query = client
     .from('items')
-    .select('id, area_id, title, acceptance, fog, status, position, unit, target, due_on, errand, archived_at')
+    .select('id, area_id, title, acceptance, fog, status, position, unit, target, due_on, errand, focus, archived_at')
     .eq('level', 'goal');
   if (!archived) query = query.is('archived_at', null);
   const { data, error } = await query.order('position').order('created_at');
@@ -111,19 +113,25 @@ async function writeOrder(
   if (failed?.error) throw new Error(failed.error.message);
 }
 
+/** A new area at the end of yours, and its id. */
 export async function insertArea(
   client: GoalsSupabaseClient,
   userId: string,
   name: string,
-): Promise<void> {
+): Promise<string> {
   const { data: rows, error: readError } = await client
     .from('areas')
     .select('position')
     .is('archived_at', null);
   if (readError) throw new Error(readError.message);
   const position = nextPosition((rows ?? []).map((row) => row.position as number));
-  const { error } = await client.from('areas').insert({ user_id: userId, name, position });
+  const { data, error } = await client
+    .from('areas')
+    .insert({ user_id: userId, name, position })
+    .select('id')
+    .single();
   if (error) throw new Error(error.message);
+  return data.id as string;
 }
 
 /** False when no live area has that id. */

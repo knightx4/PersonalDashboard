@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { stepHref } from '@/lib/goals/all-goals';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
   HISTORY_COLUMNS,
@@ -120,6 +121,46 @@ export async function loadRunChanges(
   const rows = await runHistory(client, runId);
   const [later, names] = await Promise.all([laterHistory(client, rows), loadNames(client, rows)]);
   return changeLines(rows, later, names);
+}
+
+/**
+ * The page each goal or step opens on, keyed by its id (note 55e9d14c): a goal
+ * its own page, a step its page under its goal, found by walking parent_id up
+ * a level per read. An item that cannot be placed is left out.
+ */
+export async function loadItemHrefs(
+  client: GoalsSupabaseClient,
+  itemIds: readonly string[],
+): Promise<Map<string, string>> {
+  type ItemLink = { id: string; level: string; parent_id: string | null };
+  const seen = new Map<string, ItemLink>();
+  let wanted = [...new Set(itemIds)];
+  for (let depth = 0; depth < 8 && wanted.length > 0; depth += 1) {
+    const found: ItemLink[] = [];
+    for (const part of chunks(wanted)) {
+      const { data, error } = await client.from('items').select('id, level, parent_id').in('id', part);
+      if (error) throw new Error(`Could not read where the steps are: ${error.message}`);
+      found.push(...((data ?? []) as ItemLink[]));
+    }
+    for (const row of found) seen.set(row.id, row);
+    wanted = [
+      ...new Set(
+        found
+          .filter((row) => row.level !== 'goal' && row.parent_id && !seen.has(row.parent_id))
+          .map((row) => row.parent_id as string),
+      ),
+    ];
+  }
+  const hrefs = new Map<string, string>();
+  for (const id of new Set(itemIds)) {
+    let current = seen.get(id);
+    for (let depth = 0; current && current.level !== 'goal' && depth < 8; depth += 1) {
+      current = current.parent_id ? seen.get(current.parent_id) : undefined;
+    }
+    if (!current || current.level !== 'goal') continue;
+    hrefs.set(id, id === current.id ? `/goals/${id}` : stepHref(current.id, id));
+  }
+  return hrefs;
 }
 
 /** Carry out one target's write. False when the row was not there to change. */

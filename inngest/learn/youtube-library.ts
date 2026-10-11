@@ -43,7 +43,9 @@ import {
 import { summariseWatchLists, type SummaryPassResult } from '@/lib/learn/youtube/summaries';
 import { haikuClient } from '@/lib/learn/clips/score-jev';
 import { scoreClips, type ScorePassResult } from '@/lib/learn/clips/score-run';
+import { rateClips, type RatePassResult } from '@/lib/learn/clips/rate-run';
 import { cutClips, type ClipPassResult } from '@/lib/learn/youtube/clip-run';
+import { TAG_BATCHES_PER_RUN, tagUntaggedClips, type TagPassResult } from '@/lib/learn/youtube/clip-tag-run';
 import { judgeWatchLists, type JudgePassResult } from '@/lib/learn/youtube/judging';
 import {
   judgeFoundChannels,
@@ -112,6 +114,11 @@ const TICK_CLIPS_HARD_MS = 262_000;
  * call is started after the first mark, no Haiku call with under six seconds
  * left before the second, and one still running at the second is abandoned,
  * so embedding keeps its slot. Clips left unscored come up next run.
+ *
+ * Then they are rated on educational value, entertainment and quality, under
+ * the same marks: one Jev request a clip, eight at a time, and Haiku for the
+ * rest. Scoring takes seconds, so rating gets most of the slot; clips left
+ * unrated come up next run, newest cut first.
  */
 const TICK_SCORE_MS = 266_000;
 const TICK_SCORE_HARD_MS = 269_000;
@@ -217,6 +224,35 @@ async function cutStoredClips(learn: LearnSupabaseClient, owner: string | null, 
 }
 
 /**
+ * Tag the clips cut before #1695 with every subject they serve (plan #1696),
+ * a few batches a run until none is left unchecked, each call recorded against
+ * the person the clips are for. Runs before cutting, under the same marks: one
+ * Haiku call per fifty clips takes seconds, and once the backlog is through
+ * the pass is one read.
+ */
+async function tagCutClips(learn: LearnSupabaseClient, started: number): Promise<TagPassResult | null> {
+  const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  if (!anthropicApiKey) return null;
+  const core = createCoreServiceSupabase();
+  const rows: Promise<unknown>[] = [];
+  try {
+    return await tagUntaggedClips(learn, {
+      anthropicApiKey,
+      deadline: started + TICK_CLIPS_MS,
+      hardDeadline: started + TICK_CLIPS_HARD_MS,
+      maxBatches: TAG_BATCHES_PER_RUN,
+      onSpend: (userId, report) =>
+        void rows.push(recordSpend(core, userId, { module: 'learn', operation: 'tag-clips', model: report.model, usage: report.usage })),
+    });
+  } catch (error) {
+    console.error('[youtube-library] tagging clips', error instanceof Error ? error.message : error);
+    return null;
+  } finally {
+    await Promise.all(rows);
+  }
+}
+
+/**
  * Score the clips waiting for one, Jev first and Haiku for the rest, each
  * model's spend recorded against the person the clips are for. Runs without
  * an Anthropic key too, on Jev alone.
@@ -235,6 +271,30 @@ async function scoreCutClips(learn: LearnSupabaseClient, started: number): Promi
     });
   } catch (error) {
     console.error('[youtube-library] scoring clips', error instanceof Error ? error.message : error);
+    return null;
+  } finally {
+    await Promise.all(rows);
+  }
+}
+
+/**
+ * Rate the unseen clips that have no rating, Jev first and Haiku for the
+ * rest, each model's spend recorded against the person the clips are for.
+ */
+async function rateCutClips(learn: LearnSupabaseClient, started: number): Promise<RatePassResult | null> {
+  const core = createCoreServiceSupabase();
+  const rows: Promise<unknown>[] = [];
+  try {
+    return await rateClips(learn, {
+      client: haikuClient(process.env.ANTHROPIC_API_KEY),
+      jevEnabled: (userId) => jevEnabledFor(core, userId),
+      deadline: started + TICK_SCORE_MS,
+      hardDeadline: started + TICK_SCORE_HARD_MS,
+      onSpend: (userId, report) =>
+        void rows.push(recordSpend(core, userId, { module: 'learn', operation: 'rate-clips', model: report.model, usage: report.usage })),
+    });
+  } catch (error) {
+    console.error('[youtube-library] rating clips', error instanceof Error ? error.message : error);
     return null;
   } finally {
     await Promise.all(rows);
@@ -288,8 +348,12 @@ export type TickReport = {
   foundChannels?: Awaited<ReturnType<typeof judgePendingChannels>> | null;
   /** Clips cut from stored transcripts for the clip stream (plan #1398). */
   clips?: ClipPassResult | null;
+  /** Clips cut before #1695 tagged with every subject they serve (plan #1696). */
+  clipTags?: TagPassResult | null;
   /** Clips scored for the clip stream (plan #1401). */
   clipScores?: ScorePassResult | null;
+  /** Clips rated on educational value, entertainment and quality. */
+  clipRatings?: RatePassResult | null;
 };
 
 /**
@@ -349,8 +413,10 @@ export async function runYouTubeLibraryTick(): Promise<TickReport> {
     });
   }
   report.foundChannels = await judgeChannels(learn, started + TICK_CHANNELS_MS);
+  report.clipTags = await tagCutClips(learn, started);
   report.clips = await cutStoredClips(learn, owner, started);
   report.clipScores = await scoreCutClips(learn, started);
+  report.clipRatings = await rateCutClips(learn, started);
 
   report.embedding = await embedNew(learn, started + TICK_EMBED_MS);
   return report;

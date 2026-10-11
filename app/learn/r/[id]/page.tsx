@@ -22,7 +22,7 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
   const elsewhere = reading.source
     ? await loadOtherReadingsOfSource(supabase, reading.source.id, reading.id)
     : [];
-  const alreadyRead = elsewhere.find((row) => row.status === 'read');
+  const alreadyRead = elsewhere.find((row) => row.status === 'read') ?? null;
 
   // A story sent from News says which newsletter it was in, and opens it
   // there: the story's text is kept in News, not copied here (plan #1368).

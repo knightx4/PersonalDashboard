@@ -4,8 +4,6 @@ import { ClipPlayer } from '@/components/learn/clip-player';
 import { PageHeader } from '@/components/shell/page-header';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
-import type { ReadingDetail } from '@/lib/learn/tracks/load';
-import type { StoryOrigin } from '@/lib/news/saved/stories';
 import { youtubeVideoId } from '@/lib/learn/youtube/format';
 import { formatMoney } from '@/lib/money';
 import { goDeeper, openReading } from './actions';
@@ -19,6 +17,10 @@ import { ReadNowButton } from './read-now-button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 
+import type { ReadingDetail } from '@/lib/learn/tracks/load';
+import type { Subject } from '@/lib/learn/graph/load';
+import type { StoryOrigin } from '@/lib/news/saved/stories';
+
 const ACCESS_TEXT: Record<string, string> = {
   open: 'Free to read',
   paywalled: 'Behind a paywall',
@@ -27,21 +29,18 @@ const ACCESS_TEXT: Record<string, string> = {
   unknown: 'Access not established',
 };
 
-/**
- * The reading page below the data loading, so the gallery draws the page the
- * route renders (plan #1770).
- */
-export function ReadingView({
-  reading,
-  subjects,
-  alreadyRead,
-  origin,
-}: {
+export type ReadingViewProps = {
   reading: ReadingDetail;
-  subjects: { id: string; name: string }[];
-  alreadyRead: { trackTitle: string } | undefined;
+  /** The subjects a note can be taken to, for the note-to-graph offer. */
+  subjects: Subject[];
+  /** The same source, read in another reading list, when it was. */
+  alreadyRead: { trackTitle: string } | null;
+  /** The newsletter a story sent from News came from. */
   origin: StoryOrigin | null;
-}) {
+};
+
+/** One reading, from what its page read (plan #1602). */
+export function ReadingView({ reading, subjects, alreadyRead, origin }: ReadingViewProps) {
   const verified = reading.locatorConfidence === 'verified';
   const pages =
     reading.pageFrom && reading.pageTo
@@ -61,7 +60,7 @@ export function ReadingView({
       <p className="mb-3">
         <Link
           href={`/learn/t/${reading.trackId}`}
-          className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
+          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
           <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
           {reading.trackTitle}
@@ -116,76 +115,74 @@ export function ReadingView({
           <FindSources readingId={reading.id} />
         </section>
       ) : (
-        <section className={cn(cardVariants({ padding: 'dense' }), 'mb-5')}>
-          <h2 className="mb-2 text-ui font-semibold text-ink-muted">Where to read</h2>
+      <section className={cn(cardVariants({ padding: 'dense' }), 'mb-5')}>
+        <h2 className="mb-2 text-ui font-semibold text-ink-muted">Where to read</h2>
 
-          <p className="flex items-start gap-2 text-body text-ink">
-            {verified ? (
-              <BadgeCheck className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-hidden />
-            ) : (
-              <AlertTriangle
-                className="mt-0.5 size-4 shrink-0 text-caution"
-                strokeWidth={2}
-                aria-hidden
-              />
-            )}
-            <span>{where || 'The whole thing'}</span>
-          </p>
+        <p className="flex items-start gap-2 text-body text-ink">
+          {verified ? (
+            <BadgeCheck className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-hidden />
+          ) : (
+            <AlertTriangle
+              className="mt-0.5 size-4 shrink-0 text-caution"
+              strokeWidth={2}
+              aria-hidden
+            />
+          )}
+          <span>{where || 'The whole thing'}</span>
+        </p>
 
-          {/*
-            The basis, in full and in words. This is the module's promise made
-            visible: "found verbatim in the fetched page" and "widely cited as
-            this chapter, unconfirmed" are different claims, and a reader who can
-            see which one they have loses a minute rather than twenty.
-          */}
-          <p className="mt-1.5 pl-6 text-ui text-ink-muted">{reading.locatorBasis}</p>
+        {/*
+          The basis, in full and in words. This is the module's promise made
+          visible: "found verbatim in the fetched page" and "widely cited as
+          this chapter, unconfirmed" are different claims, and a reader who can
+          see which one they have loses a minute rather than twenty.
+        */}
+        <p className="mt-1.5 pl-6 text-ui text-ink-muted">{reading.locatorBasis}</p>
 
+        <p className="mt-3 pl-6 text-ui text-ink-muted">
+          {ACCESS_TEXT[reading.source!.access] ?? ACCESS_TEXT.unknown}
+          {reading.source!.priceCents !== null && ` — ${formatMoney(reading.source!.priceCents)}`}
+          {reading.source!.pageCount ? ` · ${reading.source!.pageCount} pages` : ''}
+        </p>
+
+        {alreadyRead && (
           <p className="mt-3 pl-6 text-ui text-ink-muted">
-            {ACCESS_TEXT[reading.source!.access] ?? ACCESS_TEXT.unknown}
-            {reading.source!.priceCents !== null && ` — ${formatMoney(reading.source!.priceCents)}`}
-            {reading.source!.pageCount ? ` · ${reading.source!.pageCount} pages` : ''}
+            You read this one in <span className="text-ink">{alreadyRead.trackTitle}</span>.
           </p>
+        )}
 
-          {alreadyRead && (
-            <p className="mt-3 pl-6 text-ui text-ink-muted">
-              You read this one in <span className="text-ink">{alreadyRead.trackTitle}</span>.
+        <div className="mt-4 pl-6">
+          {url ? (
+            <form action={openReading} className="flex flex-wrap items-center gap-1">
+              <input type="hidden" name="readingId" value={reading.id} />
+              <Button type="submit" variant="primary" size="md">
+                <ExternalLink className="size-4" strokeWidth={2} aria-hidden />
+                Open
+              </Button>
+              <PaidHint
+                action="app/learn/r/[id]/actions.ts#openReading"
+                what="Cost of finding the passage"
+              />
+              {!verified && (
+                <span className="ml-2 text-small text-ink-muted">
+                  Finds the passage on the way, the first time.
+                </span>
+              )}
+            </form>
+          ) : (
+            // No link is a real outcome, not a bug: a book with no free
+            // edition still belongs in a queue, and saying so beats sending
+            // somebody to a summary site.
+            <p className="text-ui text-ink-muted">
+              No link — nothing free or legitimate was found. The location above is still where to
+              look once you have a copy.
             </p>
           )}
-
-          <div className="mt-4 pl-6">
-            {url ? (
-              <form action={openReading} className="flex flex-wrap items-center gap-1">
-                <input type="hidden" name="readingId" value={reading.id} />
-                <Button type="submit" variant="primary" size="md">
-                  <ExternalLink className="size-4" strokeWidth={2} aria-hidden />
-                  Open
-                </Button>
-                <PaidHint
-                  action="app/learn/r/[id]/actions.ts#openReading"
-                  what="Cost of finding the passage"
-                />
-                {!verified && (
-                  <span className="ml-2 text-small text-ink-muted">
-                    Finds the passage on the way, the first time.
-                  </span>
-                )}
-              </form>
-            ) : (
-              // No link is a real outcome, not a bug: a book with no free
-              // edition still belongs in a queue, and saying so beats sending
-              // somebody to a summary site.
-              <p className="text-ui text-ink-muted">
-                No link — nothing free or legitimate was found. The location above is still where to
-                look once you have a copy.
-              </p>
-            )}
-          </div>
-        </section>
+        </div>
+      </section>
       )}
 
-      {/* Where you are, then the two next steps beside each other. Whether to
-          read it next and whether to open it up are separate from the status,
-          and the pair that happens most is "reading" and "next". Each button's
+      {/* Where you are, then the two next steps side by side. Each button's
           name says what it does, so neither needs a heading or a sentence:
           "On Now" puts it on Now, where it comes first until it is finished;
           "Go deeper on this" opens it as a reading list of its own, planned
@@ -219,9 +216,6 @@ export function ReadingView({
         keeping -- it says you looked and decided against it. This is for the
         rows that should never have been here: a search that attached the wrong
         book, a line the parser invented out of a sentence.
-
-        Both links start on the page's left edge, a row apart, so the labels
-        line up with everything above them.
       */}
       <section className="mt-8 flex flex-col items-start gap-2 border-t border-border pt-4">
         <ConfirmStep

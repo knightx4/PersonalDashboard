@@ -9,28 +9,32 @@ import {
   TRIAGE_MAX_CANDIDATES,
   TRIAGE_MODULE_QUESTION,
   TRIAGE_PRIORITY_QUESTION,
+  TRIAGE_ROUTE_QUESTION,
   TRIAGE_TIMEOUT_MS,
   duplicateQuestion,
   isSure,
+  noteColumns,
   readTriage,
   triageState,
   type Triage,
   type TriageCandidate,
   type TriageTable,
 } from '@/lib/feedback/triage';
+import { readPathOpens30 } from '@/lib/usage/opens';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Client = SupabaseClient<any, 'public'>;
 
 /**
- * Ask Jev the four triage questions about one note or idea that was just
+ * Ask Jev the five triage questions about one note or idea that was just
  * filed, and store the answers on its row (plan #1179). The caller has
  * already checked the account agreed to send text to Jev.
  *
  * A note's `priority` and `kind` columns take Jev's answers when Jev is sure
  * of them, since nobody has set either yet: the header files a bug and a
  * request from one tab (note 55b53dc9), so the kind it saves is a placeholder.
- * Everything else lives in `triage` only.
+ * A Someday on a page opened often is stored as Normal (noteColumns, plan
+ * #1643). Everything else lives in `triage` only.
  *
  * Returns null, and writes nothing, when the row is not the caller's, is a
  * like, or Jev could not answer. Spend goes to `spend` whatever happens.
@@ -52,6 +56,7 @@ export async function triageRow(
       kind: TRIAGE_KIND_QUESTION,
       module: TRIAGE_MODULE_QUESTION,
       priority: TRIAGE_PRIORITY_QUESTION,
+      route: TRIAGE_ROUTE_QUESTION,
       duplicate,
     },
     onSpend: (report) => input.spend.push(report),
@@ -63,14 +68,16 @@ export async function triageRow(
   }
 
   const triage = readTriage(result.answers, keys);
-  if (!triage.kind && !triage.module && !triage.priority && !triage.duplicate) return null;
-
-  const update: Record<string, unknown> = { triage };
-  if (table === 'feedback_items' && triage.priority && isSure(triage.priority)) {
-    update.priority = triage.priority.value;
+  if (!triage.kind && !triage.module && !triage.priority && !triage.route && !triage.duplicate) {
+    return null;
   }
-  if (table === 'feedback_items' && triage.kind && isSure(triage.kind)) {
-    update.kind = triage.kind.value;
+
+  let update: Record<string, unknown> = { triage };
+  if (table === 'feedback_items') {
+    // Only a sure Someday can move, so the page's opens are read for that alone.
+    const someday = triage.priority?.value === 3 && isSure(triage.priority);
+    const opens30 = someday && row.pagePath ? await readPathOpens30(supabase, userId, row.pagePath) : null;
+    update = { ...update, ...noteColumns(triage, opens30) };
   }
   const { error } = await supabase.from(table).update(update).eq('id', id).eq('user_id', userId);
   if (error) {

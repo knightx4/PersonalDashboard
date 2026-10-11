@@ -18,7 +18,7 @@ import { writeQuestions, type WriteQuestionsState } from './actions';
 function WriteButton({ count }: { count: number }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" pending={pending}>
       <Sparkles className="size-4" strokeWidth={2} aria-hidden />
       {pending ? 'Reading the material…' : `Write ${count} questions`}
     </Button>

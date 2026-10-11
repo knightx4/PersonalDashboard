@@ -45,7 +45,7 @@ export function raisedItems(rows: readonly RaisedRowIn[]): AgendaItem[] {
       at: null,
       link: row.goal_id
         ? { href: `/goals/${row.goal_id}`, label: 'The goal' }
-        : { href: `/dev/raised#raise-${row.id}`, label: 'Dash' },
+        : { href: `/dev/inbox#raise-${row.id}`, label: 'Dash' },
       action: null,
       detail: row.ask?.trim() || null,
       completable: false,

@@ -20,17 +20,14 @@ export default function NewTrackPage() {
       <p className="mb-3">
         <Link
           href="/learn/lists"
-          className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
+          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
           <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
           Reading lists
         </Link>
       </p>
 
-      <PageHeader
-        title="New reading list"
-        description="Start with a topic you want to learn about, or paste a reading list somebody gave you."
-      />
+      <PageHeader title="New reading list" />
 
       <div className="max-w-2xl space-y-8">
         <section>
@@ -45,10 +42,7 @@ export default function NewTrackPage() {
         </div>
 
         <section>
-          <h2 className="mb-1 text-body font-semibold text-ink">Paste a reading list</h2>
-          <p className="mb-3 text-body text-ink-muted">
-            Each item gets found, priced and pointed at the part worth reading.
-          </p>
+          <h2 className="mb-3 text-body font-semibold text-ink">Paste a reading list</h2>
           <ImportForm />
         </section>
       </div>

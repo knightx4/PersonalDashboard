@@ -162,6 +162,8 @@ function hrefFor(target: CommentTarget, rowId: string, parent: Record<string, un
   }
   // The change's own card, which is where its thread is drawn (plan #1507).
   if (target === 'change') return `${TARGET_PATH.change}#spec-change-${rowId}`;
+  // The raise's own card in the inbox, the anchor search lands on too.
+  if (target === 'raise') return `${TARGET_PATH.raise}#raise-${rowId}`;
   return TARGET_PATH[target];
 }
 
@@ -254,7 +256,7 @@ export async function loadConversations(
     supabase
       .schema('core')
       .from('thread_turns')
-      .select('id, ref, author, body, created_at')
+      .select('id, ref, author, body, created_at, acknowledged_at')
       .eq('user_id', userId)
       .like('ref', 'public.%')
       // Newest first, so a cap this ever grows into drops the oldest messages
@@ -268,11 +270,11 @@ export async function loadConversations(
   // row, and (below) the row itself under the target's name.
   const rows: Record<string, unknown>[] = [];
   const idsByTarget = new Map<CommentTarget, Set<string>>();
-  for (const turn of (turns.data ?? []) as { id: string; ref: string; author: string; body: string; created_at: string }[]) {
+  for (const turn of (turns.data ?? []) as { id: string; ref: string; author: string; body: string; created_at: string; acknowledged_at?: string | null }[]) {
     const subject = threadSubject(turn.ref);
     if (!subject || !isCommentTarget(subject.target)) continue;
     const target = subject.target;
-    rows.push({ id: turn.id, author: turn.author, body: turn.body, created_at: turn.created_at, [TARGET_COLUMN[target]]: subject.id });
+    rows.push({ id: turn.id, author: turn.author, body: turn.body, created_at: turn.created_at, acknowledged_at: turn.acknowledged_at ?? null, [TARGET_COLUMN[target]]: subject.id });
     const ids = idsByTarget.get(target) ?? new Set<string>();
     ids.add(subject.id);
     idsByTarget.set(target, ids);

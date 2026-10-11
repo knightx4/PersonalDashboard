@@ -14,8 +14,10 @@
  *
  * What the run cannot see for itself is when anything was last done on a
  * goal, so the brief says it for each goal, measured here: the newest of a
- * step closed as done and a reading logged against the goal or one of its
- * steps, or the day the goal was approved when nothing has been done since.
+ * step closed as done, a reading logged, a progress entry that was not
+ * undone, a rhythm period with something counted in it, and a confirmed
+ * record in one of the goal's collections, on the goal or any of its steps;
+ * or the day the goal was approved when nothing has been done since.
  * Three weeks of nothing is stalled, and the brief says so outright rather
  * than leaving it to the run's reading.
  *
@@ -133,11 +135,65 @@ export type ActivityItem = {
   created_at?: string | null;
 };
 
-/** A reading, on a goal or on one of its steps. */
+/**
+ * Something done on a goal or one of its steps, at a time: a reading, or one
+ * of the touches activityTouches makes from the other reads.
+ */
 export type ActivityReading = { item_id: string; created_at: string };
 
+/** A progress entry as the activity read takes it; undone ones are left out by the store. */
+export type ActivityProgress = { item_id: string; created_at: string };
+
+/** A rhythm period with something counted in it. */
+export type ActivityPeriod = { item_id: string; ends_on: string; updated_at: string };
+
+/** A confirmed record, and the goals and steps its collection belongs to. */
+export type ActivityRecord = { collection_id: string; updated_at: string };
+export type ActivityCollection = { collection_id: string; item_id: string };
+
+/**
+ * Every touch besides a reading or a closed step, as item and time, so
+ * goalActivity walks each one up to its goal:
+ *
+ * - a progress entry, when it was logged;
+ * - a rhythm period with a count above nothing, when its count last changed,
+ *   or the day it ended if that is earlier, since a count written by the
+ *   sync after the period ended was done within it;
+ * - a confirmed record, when it last changed, on each goal or information
+ *   step its collection belongs to.
+ */
+export function activityTouches({
+  progress = [],
+  periods = [],
+  records = [],
+  collections = [],
+}: {
+  progress?: ActivityProgress[];
+  periods?: ActivityPeriod[];
+  records?: ActivityRecord[];
+  collections?: ActivityCollection[];
+}): ActivityReading[] {
+  const out: ActivityReading[] = progress.map((entry) => ({ ...entry }));
+  for (const period of periods) {
+    const ended = `${period.ends_on}T00:00:00Z`;
+    out.push({ item_id: period.item_id, created_at: period.updated_at < ended ? period.updated_at : ended });
+  }
+  const owners = new Map<string, string[]>();
+  for (const link of collections) {
+    const list = owners.get(link.collection_id) ?? [];
+    list.push(link.item_id);
+    owners.set(link.collection_id, list);
+  }
+  for (const record of records) {
+    for (const itemId of owners.get(record.collection_id) ?? []) {
+      out.push({ item_id: itemId, created_at: record.updated_at });
+    }
+  }
+  return out;
+}
+
 export type GoalActivity = {
-  /** The newest step closed as done, or reading logged; null when there is none. */
+  /** The newest thing done on the goal (see goalActivity); null when there is none. */
   lastDoneAt: string | null;
   /** When the goal was approved, or added when it has no approval on record. */
   since: string | null;
@@ -145,8 +201,8 @@ export type GoalActivity = {
 
 /**
  * When anything was last done on each goal: the newest step closed as done
- * and the newest reading, whichever is later, found by walking each step up
- * to its goal.
+ * and the newest of `readings` (readings, and the touches activityTouches
+ * makes), whichever is later, found by walking each step up to its goal.
  */
 export function goalActivity(
   items: ActivityItem[],
