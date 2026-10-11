@@ -161,6 +161,18 @@ two kinds of reason stay apart. The plan page's run line gives `stop_reason`
 first (`lastRunLine` in `lib/plan/run-end.ts`), and the rules for what may be
 stored are in `lib/plan/stop-reason.ts`.
 
+The overnight tick reads those lines back (#1803). When the two newest build
+runs on an approved feature (`step` and `feature` jobs, fired at the feature
+or any row under it) both ended `failed`, it files a raise on /dev/inbox.
+With a reason on record the raise quotes each session's line, lists any
+pieces, and asks whether to send the feature again as it stands; with none it
+asks the held raise's plain "send it again?". A feature gets one open raise
+at a time, counting the in-night held raise, and no second raise for a stall
+already answered. The raise holds the feature from the runner while it is
+open, and after a No until a run is fired at the feature by hand. Yes sends
+it (`send_step`), which releases it. The rules are in `lib/plan/stall.ts`,
+and `fileStalls` in `inngest/dev/overnight.ts` does the reads and writes.
+
 `app/api/plan/runs` is the only thing that asks GitHub about a run.
 `refreshRunReadings` in `lib/plan/runs.ts` does the work: the reader from
 `readRunLiveness` gets the claimed steps, the runs behind them and one activity
