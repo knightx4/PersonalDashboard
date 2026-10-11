@@ -375,6 +375,57 @@ week.
 Claude reading vault content is settled: the app has one user, who has said
 the vault is open to it.
 
+## Goals without a deadline
+
+Planned as plan #1733, agreed with the person on 11 October 2026. Until its
+steps close, the sections below still describe what is built.
+
+On 10 October 13 of the 16 open goals read "Waiting on you". Most of them
+have no deadline: knowing how the city's planning fights work, making a new
+song, the four Learn goals. Keeping the apartment clean has no end at all.
+Each one still put a step on Todo and got a daily verdict, so the goals that
+were actually due looked no different from the ones the person works on when
+there is time. Goals and steps stay what they are, and a goal may or may not
+have a due date. What changes is what asks for attention.
+
+- **Todo holds only what was sent there** (#1735). A goal step is on Todo
+  when the person pressed Send to Todo or Dash sent it, and an event they said
+  they would go to shows on its date. No goal puts its next step, a rhythm, a
+  question or a count of Dash's results there by itself. Those stay on the
+  Goals home and the goal's page.
+- **Dash sends a step with a near date** (#1736). The morning run puts a
+  step of the person's on Todo when it is due within seven days, or is the
+  next step of an errand due within seven days, with one line saying why:
+  "Due on the 13th". It never sends an undated step, and a step the person
+  took off is not sent again. `items.on_todo_by` and `items.on_todo_reason`
+  hold who sent it and why.
+- **Each goal has its usual pace** (#1737). It is read from what was done on
+  the goal over eight weeks: steps closed, progress logged, rhythm counts and
+  filed captures. The page shows the typical gap between active days and the
+  last one, as in "Usually every 5 days, last 2 days ago". Nothing is set by
+  hand. With fewer than four active days in six weeks it says there is not
+  enough to tell yet. The rule is `lib/goals/pace.ts`.
+- **A goal with no deadline is judged on its pace** (#1738). Waiting on you,
+  stalled and waiting on a date apply to goals with a due date, errands and
+  goals with a step on Todo. Any other goal gets **Keeping its pace**, or
+  **Slower than usual** once the current gap is more than one and a half
+  times its usual one, and no verdict while its pace is unknown.
+- **Every goal has suggestions** (#1739). The weekly run keeps two to four
+  things the person could do next on each open goal, including suggested
+  steps drawn from its map and its log, beside the events and reading it
+  already finds. They sit in their own section on the goal's page. **Add as
+  step** makes one a step of the goal and nothing more; it reaches Todo only
+  if it is then sent.
+- **What the person did can be logged from anywhere** (#1740). Besides quick
+  capture, a box on Home and on each goal's page takes a line such as
+  "cleaned the kitchen and did laundry" and files it as Capture describes. On
+  a goal's page that goal is the hint. Finished work that no step fits is
+  added as a step that is already closed, so it still counts towards the
+  pace. Home's Done today includes goal steps closed and progress logged.
+
+Whether the week's focus stays once Todo stops filling itself is decision
+#1741.
+
 ## The week's focus
 
 In early October 2026 fifteen goals were open, more than a hundred steps of
@@ -420,6 +471,9 @@ are pushing, and the rest wait (goals migration 0070).
 This follows the rule in [TODO-SPEC.md](TODO-SPEC.md): an obligation is shown
 by whoever needs to show it and written by whoever owns it. A goal step is
 owned by Goals and is never copied into `todo.tasks`.
+
+Plan #1733 replaces the automatic lines below with steps sent to Todo by the
+person or by Dash. See "Goals without a deadline".
 
 - Each open goal's **next step of yours** is on Todo with nothing pressed
   (plan #1266). It is one step per goal, the first of the next steps the

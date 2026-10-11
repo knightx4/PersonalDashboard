@@ -11,7 +11,8 @@ import type { PlanDependency, PlanItem } from '@/lib/plan/load';
 import type { CriticStopView } from '@/lib/plan/ui-check-stop';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import type { LastRun } from '@/lib/plan/run-end';
-import { applyView, buildPlanTree, summarize } from '@/lib/plan/tree';
+import { applyView, buildPlanTree, flatten, summarize } from '@/lib/plan/tree';
+import { placeCheckBacks } from '@/lib/plan/check-backs';
 
 /**
  * The dev plan, drawn from fixtures for the gallery (plan #993).
@@ -816,6 +817,33 @@ const featureActivitySources = {
   ],
 };
 
+/**
+ * What Dash said it would come back to on the feature's steps: one on a step
+ * already done, which the check confirms landed, and listed all the same.
+ */
+const featureComingBack = featureNode
+  ? placeCheckBacks(
+      [
+        {
+          id: 'cb-layout',
+          userId: 'u',
+          title: 'See whether the goal page opened on the shared layout',
+          detail: 'Open a goal and check its tabs have their own addresses.',
+          dueAt: '2026-10-09T09:00:00Z',
+          planItemId: 'feat-layout',
+          source: 'plan #3',
+          wake: true,
+          status: 'waiting',
+          outcome: null,
+          closedAt: null,
+          wokeAt: null,
+          createdAt: '2026-10-07T09:00:00Z',
+        },
+      ],
+      flatten([featureNode]),
+    )
+  : [];
+
 function FeatureFixture({ editing = false }: { editing?: boolean }) {
   if (!featureSection || !featureNode) return null;
   return (
@@ -829,6 +857,7 @@ function FeatureFixture({ editing = false }: { editing?: boolean }) {
       lastRuns={{}}
       updates={featureUpdates}
       activity={featureActivitySources}
+      comingBack={featureComingBack}
       commitChecks={{
         '79074ffd': {
           mergeSha: '79074ffd',
