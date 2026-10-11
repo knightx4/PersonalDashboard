@@ -24,7 +24,6 @@ export function AddGamesView({ mode }: { mode: GameMode }) {
     <div className="mx-auto max-w-3xl [&_a]:press-area">
       <PageHeader
         title="Add board games"
-        description="Photograph the whole stack, scan a box, or search by name. Editions are kept apart — a base box and its expansion are different products."
         actions={
           <Link
             href="/shopping/inventory/add/books"

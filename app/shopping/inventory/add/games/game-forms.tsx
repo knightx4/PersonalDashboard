@@ -52,7 +52,7 @@ export function GameCard({
           className="h-24 w-24 shrink-0 rounded-md object-cover bg-canvas"
         />
       ) : (
-        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-md bg-canvas text-small text-ink-muted">
+        <div className="hidden h-24 w-24 shrink-0 items-center sm:flex justify-center rounded-md bg-canvas text-small text-ink-muted">
           No image
         </div>
       )}
@@ -93,6 +93,10 @@ export function GameCard({
         {game.needsConfirmation && (game.alternates?.length ?? 0) > 0 && (
           // A heading and space rather than a second frame inside the card.
           <Group title="Other editions on BGG" className="mt-3">
+            <p className="text-small text-ink-muted">
+              Editions are kept apart: a base box and its expansion are different products, so
+              pick the one you own.
+            </p>
             <ul className="divide-y divide-border">
               {game.alternates?.map((candidate, index) => (
                 <li
