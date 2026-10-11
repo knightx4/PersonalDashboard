@@ -152,6 +152,20 @@ describe('the activity feed', () => {
 
     expect(entry.tone).toBe('muted');
     expect(entry.label).toBe('invented later');
+    expect(entry.stage).toBeNull();
+  });
+
+  it('gives each row the stage its event is evidence of', () => {
+    const entries = activityEntries({
+      newRoles: [newRole('n1', '2026-09-02T12:00:00Z')],
+      events: [
+        event({ id: 'i', created_at: '2026-09-02T11:00:00Z', kind: 'interview_scheduled' }),
+        event({ id: 'r', created_at: '2026-09-02T10:00:00Z', kind: 'rejection' }),
+        event({ id: 'n', created_at: '2026-09-02T09:00:00Z', kind: 'note' }),
+      ],
+    });
+
+    expect(entries.map((e) => e.stage)).toEqual(['lead', 'in_process', 'rejected', null]);
   });
 
   it('stops at the limit rather than becoming a second pipeline page', () => {
