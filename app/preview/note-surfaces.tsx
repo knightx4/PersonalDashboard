@@ -32,8 +32,9 @@ export function NoteButtonSurface() {
 }
 
 /**
- * The same panel just after a note saved (plan #1674): "Note saved." and
- * Jev's triage under it, with the fix-or-plan answer last.
+ * The same panel just after a note saved (plans #1674, #1675). Triage was
+ * sure it needs planning, so it was filed as an idea: the filed line with
+ * the flip back to notes, "Shape it now" under it, and Jev's triage below.
  */
 export function NoteSavedSurface() {
   return (
@@ -43,9 +44,9 @@ export function NoteSavedSurface() {
           isOwner
           initialOpen
           initialSaved={{
-            message: 'Note saved.',
+            filedAs: 'idea',
             triage: {
-              parts: ['Bug', 'Dev', 'Priority: Next', 'Plan?'],
+              parts: ['Request', 'Dev', 'Priority: Normal', 'Plan'],
               match: null,
               maybeMatch: {
                 table: 'feedback_items',
