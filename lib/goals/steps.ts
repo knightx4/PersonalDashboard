@@ -86,6 +86,10 @@ export type Step = {
   countMatch?: string | null;
   /** Whether you pressed Show on Todo on it (plan #927). */
   onTodo: boolean;
+  /** Who put it on Todo, when it is there (goals migration 0071). */
+  onTodoBy?: 'me' | 'claude' | null;
+  /** Why Dash put it there; null for the person's own. */
+  onTodoReason?: string | null;
   /**
    * What Claude produced for a `claude` step: the note or draft (plan #933).
    * On a step of yours, what Claude prepared for you to do it (plan #1001).
