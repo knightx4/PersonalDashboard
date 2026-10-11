@@ -21,7 +21,7 @@ import { planRefHref } from '@/lib/comments/refs';
 import { ShippedScreens, type ShippedScreen } from '@/components/dev/screen-change';
 import { Group } from '@/components/ui/disclosure';
 import { NOTES_WORK_KINDS } from '@/lib/feedback/load';
-import { CHECK_BACK_COLUMNS, checkBackFrom } from '@/lib/plan/check-backs';
+import { CHECK_BACK_COLUMNS, checkBackFrom, placeCheckBacks } from '@/lib/plan/check-backs';
 import { CheckBacksPanel } from './check-backs-panel';
 import { ConversationsView } from './conversations-view';
 import { DigestPanel } from './digest-panel';
@@ -144,11 +144,16 @@ export default async function DevRaisedPage() {
     // The runner's auto approve switch, drawn on its row.
     loadAutoApprove(supabase, user.id),
   ]);
-  const comingBack = (checkBacks.data ?? []).map((row) => checkBackFrom(row as Record<string, unknown>));
 
   // The tree once, for the two things below that read it: how much is
   // waiting on you, and how many features the runner could pick up.
   const sections = buildPlanTree(plan);
+  // Each check-back with the step it was set for, so its line links there.
+  const comingBack = placeCheckBacks(
+    (checkBacks.data ?? []).map((row) => checkBackFrom(row as Record<string, unknown>)),
+    flattenSections(sections),
+    { keepUnplaced: true },
+  );
   // Counted the way the tab's badge is (app/dev/layout.tsx), so the chip and
   // the badge never disagree.
   const onYou = queue.open.length + waitingOnYou(sections).length + specChanges;

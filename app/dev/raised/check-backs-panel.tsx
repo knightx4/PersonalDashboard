@@ -1,8 +1,15 @@
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
-import { dueWords, isDue, type CheckBack } from '@/lib/plan/check-backs';
+import { featureHref } from '@/lib/plan/feature-page';
+import {
+  dueWords,
+  isDue,
+  type CheckBackStep,
+  type PlacedCheckBack,
+} from '@/lib/plan/check-backs';
 import { dropCheckBack } from './check-back-actions';
 
 /**
@@ -17,8 +24,23 @@ import { dropCheckBack } from './check-back-actions';
  *
  * `now` is passed in, so the page reads the clock once and the list agrees
  * with itself.
+ *
+ * Each one names the plan row it was set for, linked: on the Dash tab to the
+ * row's page, which opens its feature's Steps tab at it, and on a feature's
+ * Steps tab, through `hrefOf`, to the row a little way down the same page.
+ *
+ * `now` is 0 on a client page before its clock has ticked, and the line says
+ * the due day until it has.
  */
-export function CheckBacksPanel({ rows, now }: { rows: CheckBack[]; now: number }) {
+export function CheckBacksPanel({
+  rows,
+  now,
+  hrefOf = (step) => featureHref(step.number),
+}: {
+  rows: readonly PlacedCheckBack[];
+  now: number;
+  hrefOf?: (step: CheckBackStep) => string;
+}) {
   if (rows.length === 0) return null;
 
   return (
@@ -28,7 +50,7 @@ export function CheckBacksPanel({ rows, now }: { rows: CheckBack[]; now: number 
       <SectionFold title="Coming back to" count={rows.length}>
         <ul className="divide-y divide-border">
           {rows.map((row) => {
-            const due = isDue(row, now);
+            const due = now > 0 && isDue(row, now);
             // Where it came from and how it is picked up, on hover: the line
             // itself is when and what.
             const how = [
@@ -49,10 +71,21 @@ export function CheckBacksPanel({ rows, now }: { rows: CheckBack[]; now: number 
                     due ? 'font-medium text-caution' : 'text-ink-muted',
                   )}
                 >
-                  {due ? 'Due' : dueWords(row.dueAt, now)}
+                  {due ? 'Due' : now > 0 ? dueWords(row.dueAt, now) : dueDay(row.dueAt)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-body break-words text-ink">{row.title}</p>
+                  {row.step && (
+                    <p className="truncate text-small text-ink-muted">
+                      For{' '}
+                      <Link
+                        href={hrefOf(row.step)}
+                        className="press-area text-ink underline underline-offset-2"
+                      >
+                        #{row.step.outline} {row.step.title}
+                      </Link>
+                    </p>
+                  )}
                   {row.detail && (
                     <p className="truncate text-small text-ink-muted">{row.detail}</p>
                   )}
@@ -70,4 +103,9 @@ export function CheckBacksPanel({ rows, now }: { rows: CheckBack[]; now: number 
       </SectionFold>
     </Card>
   );
+}
+
+/** "12 Oct": the due day, for the moment before a client page's clock has ticked. */
+function dueDay(dueAt: string): string {
+  return new Date(dueAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
