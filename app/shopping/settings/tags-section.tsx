@@ -12,14 +12,12 @@ export type SettingsTag = {
 export function TagsSection({ tags }: { tags: SettingsTag[] }) {
   return (
     <div className="space-y-3">
-      <p className="text-body text-ink-muted">
-        Tags are specific labels on order lines — shoes, sneakers, makeup — while categories stay
-        high-level (clothing, beauty). They are suggested on import and used to filter and search
-        orders.
-      </p>
+      {/* The sentence is the empty state: rows say what the card is once
+          there are any (plan #1788, law 15). */}
       {tags.length === 0 ? (
         <p className="text-body text-ink-muted">
-          None yet — tags appear automatically when orders are imported, or add one on an order.
+          No tags yet. Tags are specific labels on order lines, such as shoes or makeup, where
+          categories stay broad. They appear when orders are imported, or add one on an order.
         </p>
       ) : (
         // Divides and space, no frame: the settings card around this
