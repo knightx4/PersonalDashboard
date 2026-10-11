@@ -70,9 +70,10 @@ function Line({ conversation, titles }: { conversation: Conversation; titles?: P
   return (
     <li className="px-4 py-3">
       <Disclosure
-        // The meta keeps its width and the title wraps instead, so "Dash 6d
-        // ago" ends inside the card at 390.
-        summaryClassName="[&>span:last-child]:shrink-0"
+        // The meta keeps its width. At phone width it drops under the title,
+        // indented past the chevron, so the title has the whole row rather
+        // than the part a right-hand column leaves.
+        summaryClassName="[&>span:last-child]:shrink-0 max-sm:flex-wrap max-sm:[&>span:nth-of-type(1)]:basis-[calc(100%-1.375rem)] max-sm:[&>span:nth-of-type(2)]:ml-[1.375rem]"
         onToggle={(open) => {
           if (!open) return;
           setOpened(true);
