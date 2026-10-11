@@ -30,10 +30,7 @@ export function ProbeView({ subject, ideas, percent, namedConcept }: ProbeViewPr
         </Link>
       </p>
 
-      <PageHeader
-        title={`Questions on ${subject.name}`}
-        description="One question at a time, each written against one idea."
-      />
+      <PageHeader title={`Questions on ${subject.name}`} />
 
       {ideas === 0 ? (
         <p

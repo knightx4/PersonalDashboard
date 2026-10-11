@@ -51,7 +51,7 @@ function Bar({ percent }: { percent: number }) {
       <p className="mt-1 text-small text-ink-muted">
         {percent === 0
           ? 'Nothing answered yet.'
-          : `${percent}% of what this can find out — it measures what has been learned about you, not how many questions you have answered.`}
+          : `${percent}% of what this can find out`}
       </p>
     </div>
   );
