@@ -257,10 +257,32 @@ describe('the Overnight card while a night is running', () => {
       }),
       sessions: [],
     });
-    expect((html.match(/Asleep: nothing to work on/g) ?? []).length).toBe(4);
+    expect((html.match(/Asleep, nothing to work on/g) ?? []).length).toBe(4);
     expect(html).toContain('Waiting until something is ready. Nothing is handed to Dash.');
     expect(html).toContain('No goal step is ready.');
     expect((html.match(/data-dash-state="asleep"/g) ?? []).length).toBe(4);
+  });
+
+  it('keeps the asleep reason folded, so the closed card shows only the line', () => {
+    const html = draw({
+      run: run({ lastTickNote: 'Waiting until something is ready. Nothing is handed to Dash.' }),
+      sessions: [],
+    });
+    // A closed disclosure draws no text for its body: strip every closed
+    // details body and the reason is gone from what the card reads.
+    expect(html).not.toMatch(/<details[^>]*\sopen/);
+    const visible = html.replace(/<details[^>]*>[\s\S]*?<\/details>/g, (d) =>
+      (d.match(/<summary[^>]*>[\s\S]*?<\/summary>/) ?? [''])[0],
+    );
+    expect(visible).not.toContain('Waiting until something is ready.');
+    expect(visible).toContain('Asleep, nothing to work on');
+    expect((html.match(/Asleep, nothing to work on<\/span><\/span><\/summary>/g) ?? []).length).toBe(4);
+  });
+
+  it('draws no disclosure for an asleep slot with only the default reason', () => {
+    const html = draw({ run: run({ lastTickNote: null }), sessions: [] });
+    expect(html).toContain('Asleep, nothing to work on</span>');
+    expect(html).not.toContain('Waiting for the next check.');
   });
 
   it('leaves all four idle when the runner is off', () => {
