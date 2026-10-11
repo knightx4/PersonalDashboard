@@ -1,22 +1,27 @@
-import type { ActivityTone } from '@/lib/jobs/activity/load';
+import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 
 /**
- * The tone, as a tinted chip.
+ * The stage ink for the glyph a timeline row leads with.
  *
- * These are the pipeline's own status colours rather than new ones: a
- * rejection is the same red here as it is on the board, and every pair is
- * already checked by scripts/check-contrast.ts in all four themes. The chip
- * carries a word, never a colour alone -- the colour is what makes the one
- * line you were looking for findable, not what tells you which line it is.
+ * The same status tokens, stage for stage, as STATUS_INK in
+ * components/jobs/ui/status-badge.tsx, so an interview reads the same amber
+ * here as on the board. Kept beside the feed rather than imported because
+ * that map is private to the badge; a change to one belongs in both.
  *
- * ui-ok-file: stage-tint-without-glyph -- a tone on a line of history, not a
- * status chip. The four here say what happened to a role, not which stage it
- * is in, and each one is read off the word in the chip rather than the ground
- * behind it. The glyph belongs on the badge, which is what says the stage.
+ * The rows used to carry a tinted chip coloured by tone, which made
+ * "Interview booked" green and said nothing about the stage (plan #1755). The
+ * glyph now carries the stage in its ink and the label is ordinary ink.
  */
-export const TONE_CHIP: Record<ActivityTone, string> = {
-  bad: 'bg-status-rejected-tint text-status-rejected',
-  good: 'bg-status-offer-tint text-status-offer',
-  info: 'bg-status-submitted-tint text-status-submitted',
-  muted: 'bg-status-lead-tint text-status-lead',
+export const STAGE_INK: Record<ApplicationStatus, string> = {
+  lead: 'text-status-lead',
+  drafting: 'text-status-lead',
+  submitted: 'text-status-submitted',
+  acknowledged: 'text-status-submitted',
+  in_process: 'text-status-process',
+  final_round: 'text-status-final',
+  offer: 'text-status-offer',
+  rejected: 'text-status-rejected',
+  withdrawn: 'text-status-lead',
+  ghosted: 'text-status-ghosted',
+  role_closed: 'text-status-ghosted',
 };

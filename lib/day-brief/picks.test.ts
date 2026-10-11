@@ -45,7 +45,7 @@ const step: Candidate = {
   kind: 'goal-step',
   key: 'goal-step:s1',
   title: 'Measure the walls that could take furniture',
-  href: '/goals/g1#step-s1',
+  href: '/goals/g1/s/s1',
   goalTitle: 'Furnish the flat',
   waiting: 5,
   dashWaiting: 5,

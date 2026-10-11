@@ -5,6 +5,7 @@ import {
   STALLED_AFTER_DAYS,
   VERDICTS,
   VERDICT_LABELS,
+  activityTouches,
   goalActivity,
   isCurrent,
   latestByGoal,
@@ -67,6 +68,19 @@ describe('goalActivity', () => {
   it('counts a reading on the goal or a step as something done', () => {
     const activity = goalActivity(items, [{ item_id: 'p', created_at: '2026-09-15T00:00:00Z' }]);
     expect(activity.get('g')?.lastDoneAt).toBe('2026-09-15T00:00:00Z');
+  });
+
+  it('counts progress, a period with something counted and a confirmed record as done', () => {
+    const touches = activityTouches({
+      progress: [{ item_id: 'p', created_at: '2026-09-20T00:00:00Z' }],
+      periods: [{ item_id: 's1', ends_on: '2026-09-21', updated_at: '2026-09-25T06:00:00Z' }],
+      records: [{ collection_id: 'c', updated_at: '2026-09-18T00:00:00Z' }],
+      collections: [{ collection_id: 'c', item_id: 'h' }],
+    });
+    const activity = goalActivity(items, touches);
+    // The period's count was written after it ended, so it reads as its last day.
+    expect(activity.get('g')?.lastDoneAt).toBe('2026-09-21T00:00:00Z');
+    expect(activity.get('h')?.lastDoneAt).toBe('2026-09-18T00:00:00Z');
   });
 
   it('falls back to when the goal was added when it has no approval', () => {

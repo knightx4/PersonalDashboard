@@ -11,13 +11,14 @@ export type MutedMerchant = {
 export function MutedMerchantsSection({ exclusions }: { exclusions: MutedMerchant[] }) {
   return (
     <div className="space-y-3">
-      <p className="text-body text-ink-muted">
-        Muted senders are skipped on Import and Reset &amp; re-scan, for orders and for their
-        shipping, delivery and return emails. Add one from an order with “Don’t import from…”, or
-        from an email in Review with “Exclude sender”.
-      </p>
+      {/* The sentence is the empty state: rows say what the card is once
+          there are any (plan #1788, law 15). */}
       {exclusions.length === 0 ? (
-        <p className="text-body text-ink-muted">Nothing muted yet.</p>
+        <p className="text-body text-ink-muted">
+          Nothing muted yet. Muted senders are skipped on Import and Reset &amp; re-scan, for
+          orders and for their shipping, delivery and return emails. Mute one from an order with
+          “Don’t import from…”, or from an email in Review with “Exclude sender”.
+        </p>
       ) : (
         // Divides and space, no frame: the settings card around this
         // already said these belong together. Law 11.

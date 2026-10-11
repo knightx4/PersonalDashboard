@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useState, useSyncExternalStore, useTransition } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Banner as UiBanner } from '@/components/ui/banner';
@@ -8,7 +8,7 @@ import { ModuleMark } from '@/components/ui/module-mark';
 import { signOut } from '@/app/(auth)/actions';
 import { Button } from '@/components/ui/button';
 import { Input, Label, Select } from '@/components/ui/field';
-import { TimezoneField } from '@/components/ui/timezone-field';
+import { TimezoneField, detectTimeZone } from '@/components/ui/timezone-field';
 import { DISPLAY_CURRENCIES } from '@/lib/fx/money-fx';
 import { modulesFor, type ModuleId } from '@/lib/modules';
 import { updateAccountSettings, updateEnabledModules, type AccountState } from './actions';
@@ -16,15 +16,36 @@ import { cardVariants } from '@/components/ui/card';
 import { NotificationsSection } from './notifications';
 import { FeelSection } from './haptics';
 import { ConnectedAppsSection } from './connected-apps';
+import { CaptureTokensSection } from './capture-tokens';
+import { CaptureShortcutSection } from './capture-shortcut';
+import type { CaptureTokenListing } from '@/lib/capture/tokens';
 import type { ConnectedApp } from '@/lib/connector/apps';
+import { TabbedSections } from '@/components/patterns/tabbed-sections';
+import { ACCOUNT_TAB_ADDRESS, ACCOUNT_TABS, type AccountTab } from './tabs';
 
+/**
+ * Account, one section at a time behind tabs (the tabbed sections pattern,
+ * plan #1628). The page reads the open tab from the address and passes it
+ * in, and only that tab's sections are drawn; app/account/tabs.ts says which
+ * sections each tab holds.
+ */
 export function AccountView({
+  tab,
+  opensOn,
   email,
   settings,
   isOwner,
   vapidPublicKey,
   connected,
+  capture,
 }: {
+  /** The open tab, read from the address by the page. */
+  tab: AccountTab;
+  /**
+   * The gallery's: the tab the row marks when the address names none. The
+   * page leaves it out, since its address and `tab` always agree.
+   */
+  opensOn?: AccountTab;
   email: string;
   settings: {
     displayName: string;
@@ -36,21 +57,246 @@ export function AccountView({
   isOwner: boolean;
   /** The key browsers subscribe to push with; null when the server has none. */
   vapidPublicKey: string | null;
-  /** The Connected apps section's data, read on the server (plan #1258). */
-  connected: { apps: ConnectedApp[]; failed: string | null; connectorAddress: string };
+  /**
+   * The Connected apps section's data, read on the server (plan #1258), and
+   * only when Activity is the open tab; null on the others.
+   */
+  connected: { apps: ConnectedApp[]; failed: string | null; connectorAddress: string } | null;
+  /**
+   * The Capture tokens section's data (plan #1705), read with the connected
+   * apps and only on Activity; null on the other tabs. `justMade` is the
+   * gallery's, for a token as it shows straight after it is made.
+   */
+  capture: {
+    tokens: CaptureTokenListing[];
+    failed: string | null;
+    justMade?: { label: string; token: string };
+    /** The capture address on this app's own origin, for the Shortcut's steps. */
+    address: string;
+  } | null;
 }) {
   return (
-    <div className="space-y-6">
-      <YouSection email={email} settings={settings} />
-      <ModulesSection enabled={settings.enabledModules} isOwner={isOwner} />
-      <NotificationsSection publicKey={vapidPublicKey} />
-      <FeelSection />
-      <ConnectedAppsSection {...connected} timezone={settings.timezone} />
-      <ModuleSettingsSection enabled={settings.enabledModules} />
-      <TimelineSection />
-      <SpendSection />
-      <SessionSection />
-      <DangerSection vaultEnabled={settings.enabledModules.includes('vault')} />
+    <TabbedSections
+      tabs={ACCOUNT_TABS}
+      label="Account"
+      address={opensOn ? { ...ACCOUNT_TAB_ADDRESS, opensOn } : ACCOUNT_TAB_ADDRESS}
+    >
+      <div className="space-y-6">
+        {tab === 'you' && <YouSection email={email} settings={settings} />}
+        {tab === 'workspaces' && (
+          <>
+            <ModulesSection enabled={settings.enabledModules} isOwner={isOwner} />
+            <ModuleSettingsSection enabled={settings.enabledModules} />
+          </>
+        )}
+        {tab === 'notifications' && (
+          <>
+            <NotificationsSection publicKey={vapidPublicKey} />
+            <FeelSection />
+          </>
+        )}
+        {tab === 'activity' && (
+          <>
+            {connected && <ConnectedAppsSection {...connected} timezone={settings.timezone} />}
+            {capture && (
+              <>
+                <CaptureTokensSection
+                  tokens={capture.tokens}
+                  failed={capture.failed}
+                  justMade={capture.justMade}
+                  timezone={settings.timezone}
+                />
+                <CaptureShortcutSection address={capture.address} />
+              </>
+            )}
+          </>
+        )}
+        {tab === 'session' && (
+          <>
+            <SessionSection />
+            <DangerSection vaultEnabled={settings.enabledModules.includes('vault')} />
+          </>
+        )}
+      </div>
+    </TabbedSections>
+  );
+}
+
+function YouSection({
+  email,
+  settings,
+}: {
+  email: string;
+  settings: { displayName: string; timezone: string; displayCurrency: string };
+}) {
+  const [values, setValues] = useState({
+    displayName: settings.displayName,
+    timezone: settings.timezone,
+    displayCurrency: settings.displayCurrency,
+  });
+  const [editing, setEditing] = useState<keyof typeof values | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const detected = useSyncExternalStore(subscribeNever, detectTimeZone, () => null);
+
+  /** Saves the three together, as the action expects, when one has changed. */
+  function commit(field: keyof typeof values, value: string) {
+    setEditing(null);
+    if (value === values[field]) return;
+    const next = { ...values, [field]: value };
+    setValues(next);
+    setError(null);
+    const form = new FormData();
+    form.set('displayName', next.displayName);
+    form.set('timezone', next.timezone);
+    form.set('displayCurrency', next.displayCurrency);
+    startTransition(async () => {
+      const result = await updateAccountSettings({}, form);
+      if (result.error) {
+        setError(result.error);
+        setValues(values);
+      }
+    });
+  }
+
+  return (
+    <section className={cardVariants({ padding: 'standard' })}>
+      {/* No "You" heading: the tab above already says it (law 9). */}
+      <p className="text-ui text-ink-muted">{email}</p>
+
+      <div className={cn('mt-3 divide-y divide-border border-y border-border', pending && 'opacity-70')}>
+        <SettingRow
+          label="Name"
+          editing={editing === 'displayName'}
+          onOpen={() => setEditing('displayName')}
+          display={values.displayName || 'Add a name'}
+          empty={!values.displayName}
+        >
+          <Input
+            aria-label="Name"
+            autoFocus
+            defaultValue={values.displayName}
+            onBlur={(event) => commit('displayName', event.target.value.trim())}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') event.currentTarget.blur();
+              if (event.key === 'Escape') setEditing(null);
+            }}
+          />
+        </SettingRow>
+
+        <SettingRow
+          label="Timezone"
+          editing={editing === 'timezone'}
+          onOpen={() => setEditing('timezone')}
+          display={values.timezone.replace(/_/g, ' ')}
+          aside={
+            detected && detected !== values.timezone ? (
+              <button
+                type="button"
+                onClick={() => commit('timezone', detected)}
+                className="text-micro text-accent hover:underline"
+              >
+                Use {detected.replace(/_/g, ' ')}
+              </button>
+            ) : null
+          }
+        >
+          <div
+            onBlur={(event) => {
+              if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+              const input = event.currentTarget.querySelector('input');
+              commit('timezone', input?.value.trim() ?? values.timezone);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
+                // The combobox swallows Enter when it picks a suggestion.
+                if (!event.defaultPrevented) event.target.blur();
+              }
+            }}
+          >
+            <TimezoneField
+              id="timezone"
+              name="timezone"
+              defaultValue={values.timezone}
+              suggest={false}
+              autoFocus
+            />
+          </div>
+        </SettingRow>
+
+        <SettingRow
+          label="Currency"
+          editing={editing === 'displayCurrency'}
+          onOpen={() => setEditing('displayCurrency')}
+          display={values.displayCurrency}
+        >
+          <Select
+            aria-label="Currency"
+            autoFocus
+            defaultValue={values.displayCurrency}
+            onChange={(event) => commit('displayCurrency', event.target.value)}
+            onBlur={() => setEditing(null)}
+          >
+            {DISPLAY_CURRENCIES.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
+          </Select>
+        </SettingRow>
+      </div>
+
+      {error && (
+        <div className="mt-3">
+          <UiBanner tone="bad">{error}</UiBanner>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * A setting as a line of text. Pressing it opens its editor in place; leaving
+ * the editor saves, so there is no Save button to find.
+ */
+function SettingRow({
+  label,
+  display,
+  empty,
+  editing,
+  onOpen,
+  aside,
+  children,
+}: {
+  label: string;
+  display: string;
+  empty?: boolean;
+  editing: boolean;
+  onOpen: () => void;
+  aside?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="row-pad flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span className="w-24 shrink-0 text-small font-medium text-ink-muted">{label}</span>
+      {editing ? (
+        <div className="min-w-0 flex-1">{children}</div>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={onOpen}
+            aria-label={`${label}: ${display}. Edit`}
+            className={cn(
+              'min-w-0 flex-1 truncate text-left text-ui hover:text-accent',
+              empty ? 'text-ink-ghost' : 'text-ink',
+            )}
+          >
+            {display}
+          </button>
+          {aside}
+        </>
+      )}
     </div>
   );
 }
@@ -62,58 +308,9 @@ function Banner({ state }: { state: AccountState }) {
   return <UiBanner tone={state.error ? 'bad' : 'info'}>{state.error ?? state.message}</UiBanner>;
 }
 
-function YouSection({
-  email,
-  settings,
-}: {
-  email: string;
-  settings: { displayName: string; timezone: string; displayCurrency: string };
-}) {
-  const [state, action] = useActionState<AccountState, FormData>(updateAccountSettings, {});
-
-  return (
-    <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">You</h2>
-      <p className="mt-0.5 text-ui text-ink-muted">{email}</p>
-
-      <form action={action} className="mt-4 space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="displayName">Name</Label>
-            <Input id="displayName" name="displayName" defaultValue={settings.displayName} />
-          </div>
-          <div>
-            <Label htmlFor="timezone">Timezone</Label>
-            <TimezoneField id="timezone" name="timezone" defaultValue={settings.timezone} />
-            <p className="mt-1 text-small text-ink-muted">
-              Every workspace reads dates in this zone — what counts as today, when a return
-              window closes, what time an interview is.
-            </p>
-          </div>
-          <div>
-            <Label htmlFor="displayCurrency">Display currency</Label>
-            <Select
-              id="displayCurrency"
-              name="displayCurrency"
-              defaultValue={settings.displayCurrency}
-            >
-              {DISPLAY_CURRENCIES.map((code) => (
-                <option key={code} value={code}>
-                  {code}
-                </option>
-              ))}
-            </Select>
-            <p className="mt-1 text-small text-ink-muted">
-              Spend totals are converted into this. Orders keep the currency they were paid in.
-            </p>
-          </div>
-        </div>
-
-        <Banner state={state} />
-        <Button type="submit">Save</Button>
-      </form>
-    </section>
-  );
+/** The detected zone never changes while the page is open. */
+function subscribeNever(): () => void {
+  return () => {};
 }
 
 function ModulesSection({ enabled, isOwner }: { enabled: ModuleId[]; isOwner: boolean }) {
@@ -129,10 +326,8 @@ function ModulesSection({ enabled, isOwner }: { enabled: ModuleId[]; isOwner: bo
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">Workspaces</h2>
-      <p className="mt-0.5 text-ui text-ink-muted">
-        Which of these appear in the switcher. Turning one off hides it — nothing is deleted, and
-        turning it back on restores exactly what was there.
+      {/* No "Workspaces" heading: the tab above already says it (law 9). */}
+      <p className="text-ui text-ink-muted">Turning one off hides it. Nothing is deleted.
       </p>
 
       <form action={action} className="mt-4">
@@ -189,7 +384,7 @@ function ModuleSettingsSection({ enabled }: { enabled: ModuleId[] }) {
       module: 'jobs',
       href: '/jobs/settings',
       label: 'Job search settings',
-      hint: 'Target titles, ghost threshold, résumés and evidence',
+      hint: 'Ghost threshold, résumés and evidence',
     },
     {
       module: 'vault',
@@ -204,16 +399,25 @@ function ModuleSettingsSection({ enabled }: { enabled: ModuleId[] }) {
       hint: 'How far ahead the agenda looks, and what feeds it',
     },
   ] as const).filter((link) => enabled.includes(link.module));
+  // Account-wide pages read every workspace, so they sit in the same list.
+  const rows = [
+    ...links,
+    {
+      href: '/timeline',
+      label: 'Timeline',
+      hint: 'Orders, applications, tasks, notes, Learn and goals, month by month',
+    },
+    {
+      href: '/account/spend',
+      label: 'Model spend',
+      hint: 'This month and all time, by module and operation',
+    },
+  ];
 
   return (
-    <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">Module settings</h2>
-      <p className="mt-0.5 text-ui text-ink-muted">
-        Settings that only mean something inside one workspace live in that workspace.
-      </p>
-
-      <ul className="mt-4 divide-y divide-border">
-        {links.map((link) => (
+    <section aria-label="More" className={cardVariants({ padding: 'standard' })}>
+      <ul className="divide-y divide-border">
+        {rows.map((link) => (
           <li key={link.href}>
             <a href={link.href} className="block py-2.5 hover:text-accent">
               <span className="block text-ui font-medium text-ink">{link.label}</span>
@@ -228,74 +432,18 @@ function ModuleSettingsSection({ enabled }: { enabled: ModuleId[] }) {
 
 
 /**
- * The timeline (plan #1118). An account page rather than a workspace's,
- * because it reads all of them.
- */
-function TimelineSection() {
-  return (
-    <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">History</h2>
-      <p className="mt-0.5 text-ui text-ink-muted">
-        What you did in every workspace, read from what they already hold.
-      </p>
-      <ul className="mt-4 divide-y divide-border">
-        <li>
-          <a href="/timeline" className="block py-2.5 hover:text-accent">
-            <span className="block text-ui font-medium text-ink">Timeline</span>
-            <span className="block text-small text-ink-muted">
-              Orders, applications, tasks, notes, Learn and goals, month by month
-            </span>
-          </a>
-        </li>
-      </ul>
-    </section>
-  );
-}
-
-/**
- * What the models have cost.
- *
- * An account concern rather than a module one, on the same test as everything
- * else here: it survives every module being switched off, and several of them
- * spend. The screen itself is a page rather than a panel because it is a
- * ledger -- rows you scroll -- and this page is settings.
- */
-function SpendSection() {
-  return (
-    <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">Spend</h2>
-      <p className="mt-0.5 text-ui text-ink-muted">
-        Every model call this app makes, what it was doing, and what it cost.
-      </p>
-      <ul className="mt-4 divide-y divide-border">
-        <li>
-          <a href="/account/spend" className="block py-2.5 hover:text-accent">
-            <span className="block text-ui font-medium text-ink">Model spend</span>
-            <span className="block text-small text-ink-muted">
-              This month and all time, by module and operation
-            </span>
-          </a>
-        </li>
-      </ul>
-    </section>
-  );
-}
-
-/**
  * Signing out is an account action, so it lives on the account page.
  *
  * It used to exist in exactly one place -- Shopping settings -- which meant a
- * person who switched Shopping off under Workspaces above had no way to sign
+ * person who switched Shopping off under Workspaces had no way to sign
  * out of their own account. An account-level action can never live inside a
  * module.
  */
 function SessionSection() {
   return (
     <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">Session</h2>
-      <p className="mt-0.5 text-ui text-ink-muted">
-        Signing out ends this session on this device. Nothing is deleted.
-      </p>
+      <h2 className="text-body font-semibold text-ink">Sign out</h2>
+      <p className="mt-0.5 text-ui text-ink-muted">Nothing is deleted.</p>
       <form action={signOut} className="mt-4">
         <Button variant="secondary" type="submit">
           Sign out
@@ -310,7 +458,7 @@ function SessionSection() {
  *
  * It used to live on the job search settings page, which made the whole
  * account deletable only from inside one workspace -- switch that workspace
- * off under Workspaces above and there was no way to leave. Signing out moved
+ * off under Workspaces and there was no way to leave. Signing out moved
  * here for exactly the same reason; deleting is the same kind of action, one
  * step further.
  */

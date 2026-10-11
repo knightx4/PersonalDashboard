@@ -87,7 +87,7 @@ beforeEach(() => {
     ],
     'goals.areas': [{ id: AREA, user_id: ME, name: 'Health', position: 1, archived_at: null }],
     'goals.items': [
-      { id: GOAL, user_id: ME, level: 'goal', area_id: AREA, parent_id: null, title: 'Run a half marathon', status: 'open', archived_at: null, position: 1 },
+      { id: GOAL, user_id: ME, level: 'goal', area_id: AREA, parent_id: null, title: 'Run a half marathon', acceptance: null, status: 'open', archived_at: null, position: 1 },
       { id: STEP, user_id: ME, level: 'step', parent_id: GOAL, title: 'Buy running shoes', status: 'open', archived_at: null, position: 1 },
     ],
     'job_search.roles': [{ id: ROLE, user_id: ME, title: 'Product designer' }],
@@ -158,6 +158,22 @@ describe('add_goal', () => {
   it('names their areas when the one asked for is not there', async () => {
     const result = await apply('add_goal', { area: 'Money', title: 'Save for a car' });
     expect(!result.ok && result.error).toContain('Their areas are "Health"');
+    expect(!result.ok && result.error).toContain('new_area true');
+  });
+
+  it('makes a new area when asked to, and puts the goal under it', async () => {
+    const result = ok(await apply('add_goal', { area: 'Music', new_area: true, title: 'Publish a song on Spotify' }));
+    const area = tables['goals.areas'].find((row) => row.name === 'Music');
+    expect(area).toMatchObject({ user_id: ME });
+    const goal = tables['goals.items'].find((row) => row.title === 'Publish a song on Spotify');
+    expect(goal).toMatchObject({ level: 'goal', area_id: area!.id });
+    expect(result).toMatchObject({ input: { areaName: 'Music', areaMade: true } });
+  });
+
+  it('uses the area they have when new_area names one that exists', async () => {
+    const result = ok(await apply('add_goal', { area: 'Health', new_area: true, title: 'Sleep eight hours' }));
+    expect(tables['goals.areas']).toHaveLength(1);
+    expect(result).toMatchObject({ input: { areaId: AREA, areaMade: false } });
   });
 });
 
@@ -169,7 +185,7 @@ describe('close_goal_step', () => {
     expect(result).toMatchObject({
       kind: 'close_goal_step',
       input: { id: STEP, goalId: GOAL, goalTitle: 'Run a half marathon' },
-      row: { href: `/goals/${GOAL}#step-${STEP}` },
+      row: { href: `/goals/${GOAL}/s/${STEP}` },
     });
 
     const { undone } = await keepAndUndo(result);
@@ -182,6 +198,32 @@ describe('close_goal_step', () => {
     const result = await apply('close_goal_step', { step_ref: GOAL });
     expect(!result.ok && result.error).toContain('That is a goal, not a step');
     expect(tables['goals.items'][0].status).toBe('open');
+  });
+});
+
+// Notes 06d36ab2 and fa2ac6fe: the person asked for a goal's done-when by
+// name and Dash had no tool, and the backup run was refused by the guard.
+describe('set_goal_done_when', () => {
+  it("writes a goal's done-when in their words, and Undo takes it back off", async () => {
+    seen.add(`goals.items:${GOAL}`);
+    const result = ok(await apply('set_goal_done_when', { goal_ref: GOAL, done_when: 'I finish the race' }));
+    expect(tables['goals.items'][0].acceptance).toBe('I finish the race');
+    expect(result).toMatchObject({
+      kind: 'set_goal_done_when',
+      op: 'update',
+      input: { id: GOAL, title: 'Run a half marathon', doneWhen: 'I finish the race', previous: null },
+      row: { href: `/goals/${GOAL}` },
+    });
+
+    const { undone } = await keepAndUndo(result);
+    expect(undone.ok).toBe(true);
+    expect(tables['goals.items'][0].acceptance ?? null).toBeNull();
+  });
+
+  it('will not give a step a done-when', async () => {
+    seen.add(`goals.items:${STEP}`);
+    const result = await apply('set_goal_done_when', { goal_ref: STEP, done_when: 'Shoes bought' });
+    expect(!result.ok && result.error).toContain('That is a step, not a goal');
   });
 });
 
@@ -209,6 +251,84 @@ describe('add_role_note', () => {
     seen.add(`job_search.roles:${ROLE}`);
     const result = await apply('add_role_note', { role_ref: ROLE, body: 'x' }, context(['todo']));
     expect(!result.ok && result.error).toContain('Jobs workspace is switched off');
+  });
+});
+
+describe('add_job_lead', () => {
+  const POSTING = 'https://boards.greenhouse.io/acme/jobs/123';
+  const reading = (title: string): DashWriteContext => ({
+    ...context(),
+    readPosting: async () => ({
+      ok: true,
+      tier: 1,
+      posting: { vendor: 'greenhouse', title, text: '', url: POSTING, location: 'London', atsJobId: '123', boardToken: 'acme', questions: [] },
+    }),
+  });
+
+  beforeEach(() => {
+    tables['job_search.companies'] = [];
+  });
+
+  it('saves a posting link as a lead, reading its title, and Undo takes the role and application back', async () => {
+    const result = ok(await apply('add_job_lead', { url: POSTING, company: 'Acme' }, reading('Data analyst')));
+    const role = tables['job_search.roles'].find((r) => r.jd_url === POSTING);
+    expect(role).toMatchObject({ user_id: ME, title: 'Data analyst', location: 'London', ats_job_id: '123' });
+    expect(tables['job_search.companies']).toEqual([expect.objectContaining({ name: 'Acme', user_id: ME })]);
+    expect(tables['job_search.applications']).toContainEqual(expect.objectContaining({ role_id: role!.id, created_by: 'manual' }));
+    expect(result).toMatchObject({
+      kind: 'add_job_lead',
+      op: 'insert',
+      input: { roleId: role!.id, roleTitle: 'Data analyst', companyName: 'Acme', url: POSTING },
+      row: { table: 'job_search.roles', href: `/jobs/roles/${role!.id}` },
+      summary: 'Dash saved Data analyst at Acme to your leads.',
+    });
+
+    const { undone } = await keepAndUndo(result);
+    expect(undone.ok).toBe(true);
+    expect(tables['job_search.roles'].some((r) => r.jd_url === POSTING)).toBe(false);
+  });
+
+  it('asks for the title when the link cannot be read, and saves nothing', async () => {
+    const ctx = { ...context(), readPosting: async () => ({ ok: false as const, tier: 3 as const, reason: 'no', detected: {} as never }) };
+    const result = await apply('add_job_lead', { url: 'https://jobs.example.com/351766', company: 'UBS' }, ctx);
+    expect(!result.ok && result.error).toContain('Ask them for the role title');
+    expect(tables['job_search.roles']).toHaveLength(1);
+  });
+
+  it('asks for a link or a title and company when given neither', async () => {
+    const result = await apply('add_job_lead', {});
+    expect(!result.ok && result.error).toContain('Give the posting link, or the role title and the company');
+  });
+
+  it('refuses a posting already saved', async () => {
+    tables['job_search.roles'][0].jd_url = POSTING;
+    const result = await apply('add_job_lead', { url: POSTING, title: 'x', company: 'Acme' });
+    expect(!result.ok && result.error).toContain('saved already');
+  });
+});
+
+describe('add_idea', () => {
+  it('files the idea as theirs, and Undo deletes it', async () => {
+    tables['public.ideas'] = [];
+    const result = ok(await apply('add_idea', { text: 'Save a job lead from a posting link', module: 'jobs' }));
+    expect(tables['public.ideas']).toEqual([
+      expect.objectContaining({ user_id: ME, body: 'Save a job lead from a posting link', module: 'jobs' }),
+    ]);
+    expect(result).toMatchObject({
+      kind: 'add_idea',
+      op: 'insert',
+      input: { body: 'Save a job lead from a posting link', module: 'jobs' },
+      row: { table: 'public.ideas', href: '/dev/ideas' },
+    });
+
+    const { undone } = await keepAndUndo(result);
+    expect(undone.ok).toBe(true);
+    expect(tables['public.ideas']).toEqual([]);
+  });
+
+  it('refuses a workspace that does not exist', async () => {
+    const result = await apply('add_idea', { text: 'Something good', module: 'cooking' });
+    expect(!result.ok && result.error).toContain('is not a workspace');
   });
 });
 
@@ -248,5 +368,12 @@ describe('the card under the answer', () => {
     const note = card('add_role_note', { roleId: ROLE, roleTitle: 'Product designer', body: 'Recruiter is Sam.\nMore.' });
     expect(changeSentence(note, true)).toBe('Added a note to Product designer: Recruiter is Sam.');
     expect(changeHref(note)).toBe(`/jobs/roles/${ROLE}`);
+
+    const lead = card('add_job_lead', { roleId: ROLE, roleTitle: 'Data analyst', companyName: 'Acme', url: null });
+    expect(changeSentence(lead, true)).toBe('Saved the lead Data analyst at Acme');
+    expect(changeHref(lead)).toBe(`/jobs/roles/${ROLE}`);
+
+    const idea = card('add_idea', { body: 'Save leads from links', module: null });
+    expect(changeSentence(idea, true)).toBe('Filed the idea Save leads from links on the ideas page');
   });
 });

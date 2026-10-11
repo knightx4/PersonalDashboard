@@ -40,6 +40,7 @@ import { ideaHealth, type IdeaHealth } from '@/lib/dev/health';
 import { IDEA_HEALTH_WORD } from '@/lib/dev/words';
 import { IDEA_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { AddTrigger } from '@/components/ui/add-trigger';
+import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import { TriageNote } from '@/components/feedback/triage-note';
@@ -121,7 +122,7 @@ function AddIdea() {
       />
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <ModuleSelect name="module" defaultValue={null} />
-        <Button type="submit" size="sm" disabled={pending}>
+        <Button type="submit" size="sm" pending={pending}>
           {pending ? 'Saving…' : 'Add idea'}
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={() => setComposing(false)}>
@@ -239,18 +240,43 @@ function IdeaScoreLabel({ idea }: { idea: IdeaRow }) {
 function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [saveState, saveAction, savePending] = useActionState(updateIdea, {} as IdeaActionState);
-  const [deleteState, deleteAction, deletePending] = useActionState(
-    deleteIdea,
-    {} as IdeaActionState,
-  );
-  const [asideState, asideAction, asidePending] = useActionState(
-    dismissed ? restoreIdea : dismissIdea,
-    {} as IdeaActionState,
-  );
+  const [asideState, asideAction, asidePending] = useActionState(restoreIdea, {} as IdeaActionState);
+  const [menuError, setMenuError] = useState<string | undefined>(undefined);
+
+  // The menu runs these as plain transitions, so the result is read here
+  // rather than through useActionState.
+  async function run(
+    action: (prev: IdeaActionState, formData: FormData) => Promise<IdeaActionState>,
+    formData: FormData,
+  ) {
+    const result = await action({}, formData);
+    setMenuError(result.error);
+  }
+
+  const menuItems: ActionMenuItem[] = [
+    ...(dismissed
+      ? []
+      : [
+          {
+            id: 'dismiss',
+            label: 'Dismiss',
+            formAction: (formData: FormData) => run(dismissIdea, formData),
+            formFields: { id: idea.id },
+          },
+        ]),
+    {
+      id: 'delete',
+      label: 'Delete',
+      destructive: true,
+      confirm: 'Delete this idea?',
+      formAction: (formData) => run(deleteIdea, formData),
+      formFields: { id: idea.id },
+    },
+  ];
 
   return (
     // The id is where the app-wide search lands an idea: /dev/ideas#idea-<id>.
-    <li id={`idea-${idea.id}`} className="flex scroll-mt-bar flex-col gap-2 px-4 py-3">
+    <li id={`idea-${idea.id}`} className="row-pad flex scroll-mt-bar flex-col gap-2 px-4">
       <div className="flex flex-wrap items-center gap-2">
         {/* With the workspace's own mark (note 7bdcb540), and the home mark
             for Everything, so the chip reads before its word does. */}
@@ -311,9 +337,11 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
             placeholder="What you think about this idea, or what you would want it to do. Shaping reads it; tag @dash to ask about it."
           />
           <div className="flex flex-wrap items-center gap-2">
-            {/* A dismissed idea gets one move back into the list and nothing
-                else. Shaping or editing one from inside the fold would be
-                working on a row you have already said no to. */}
+            {/* One line at 390. Shaping is the move this page is for and stays
+                a button; putting aside and deleting are rarer and sit in the
+                menu. A dismissed idea gets one move back into the list and
+                nothing else: shaping or editing one from inside the fold would
+                be working on a row you have already said no to. */}
             {!dismissed && (
               <>
                 <ShapeIdea idea={idea} />
@@ -322,19 +350,16 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
                 </Button>
               </>
             )}
-            <form action={asideAction}>
-              <input type="hidden" name="id" value={idea.id} />
-              <Button type="submit" size="sm" variant="ghost" pending={asidePending}>
-                {dismissed ? 'Bring back' : 'Dismiss'}
-              </Button>
-            </form>
-            <form action={deleteAction}>
-              <input type="hidden" name="id" value={idea.id} />
-              <Button type="submit" size="sm" variant="ghost" disabled={deletePending}>
-                Delete
-              </Button>
-            </form>
-            <FieldError>{deleteState.error ?? asideState.error}</FieldError>
+            {dismissed && (
+              <form action={asideAction}>
+                <input type="hidden" name="id" value={idea.id} />
+                <Button type="submit" size="sm" variant="ghost" pending={asidePending}>
+                  Bring back
+                </Button>
+              </form>
+            )}
+            <ActionMenu label="Idea actions" items={menuItems} className="ml-auto" />
+            <FieldError>{menuError ?? asideState.error}</FieldError>
           </div>
         </>
       )}
@@ -476,7 +501,10 @@ export function IdeasView({
       {mine.length + suggested.length > 1 && (
         <div className="space-y-2">
           <Arrange grouping={grouping} sort={sort} />
-          <p className="text-small text-ink-muted">{IDEA_RANKING_RULE}</p>
+          {/* On a quiet panel rather than bare on the page (taste:no-bare-text). */}
+          <p className="rounded-md bg-sunken px-3 py-2 text-small text-ink-muted">
+            {IDEA_RANKING_RULE}
+          </p>
         </div>
       )}
 
@@ -488,8 +516,14 @@ export function IdeasView({
         <EmptyState
           icon={Lightbulb}
           title="Nothing written down yet"
-          description="An idea here becomes work when you have Dash shape it into the plan, and approve what it proposes there."
-        />
+          align="start"
+          description="Write down anything worth doing one day, for the app as a whole or for one workspace. Dash shapes an idea into the plan when you ask, and you approve what it proposes there. Nothing runs on its own."
+        >
+          <p className="max-w-sm text-body leading-relaxed text-ink-muted">
+            Follow-ons Dash notices while building appear under Suggested by Dash. Dismiss one and
+            it stops being offered.
+          </p>
+        </EmptyState>
       )}
 
       {/* Everything written down has been shaped. Not the empty state above:
@@ -557,13 +591,6 @@ export function IdeasView({
             Suggested by Dash{' '}
             <span className="font-normal text-ink-muted">({suggested.length})</span>
           </summary>
-          {/* What to do with one, which the heading does not say. The sentence
-              that used to open this -- "follow-ons a session wrote down while
-              building something else" -- was the heading again in longer words
-              (law 15). */}
-          <p className="mt-2 text-small text-ink-muted">
-            Shape one into the plan, or dismiss it and it stops being offered.
-          </p>
           <div className="mt-2 space-y-3 pl-5">
             {suggestedGroups.map((group) =>
               // One list has no heading to fold by, the same as above.

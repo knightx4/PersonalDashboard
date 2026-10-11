@@ -1,13 +1,8 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
-import { PageHeader } from '@/components/shell/page-header';
-import { cardVariants } from '@/components/ui/card';
-import { cn } from '@/lib/cn';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadGraph, loadSubject } from '@/lib/learn/graph/load';
 import { subjectBarPercent } from '@/lib/learn/graph/session';
-import { ProbeSession } from './session';
+import { ProbeView } from './probe-view';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,42 +39,18 @@ export default async function ProbePage({
   );
 
   return (
-    <>
-      <p className="mb-3">
-        <Link
-          href={`/learn/s/${id}`}
-          className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          {subject.name}
-        </Link>
-      </p>
-
-      <PageHeader
-        title={`Questions on ${subject.name}`}
-        description="One question at a time, each written against one idea."
-      />
-
-      {graph.concepts.length === 0 ? (
-        <p
-          className={cn(
-            cardVariants(),
-            'border-dashed px-4 py-6 text-center text-body text-ink-muted',
-          )}
-        >
-          Nothing in this subject to ask about yet. Name a goal first, and the chain leading to it is
-          what gets asked about.
-        </p>
-      ) : (
-        <ProbeSession
-          subjectId={id}
-          startingPercent={percent}
-          startConceptId={namedConceptId ?? null}
-          startConceptName={
-            graph.concepts.find((concept) => concept.id === namedConceptId)?.name ?? null
-          }
-        />
-      )}
-    </>
+    <ProbeView
+      subject={subject}
+      ideas={graph.concepts.length}
+      percent={percent}
+      namedConcept={
+        namedConceptId
+          ? {
+              id: namedConceptId,
+              name: graph.concepts.find((concept) => concept.id === namedConceptId)?.name ?? null,
+            }
+          : null
+      }
+    />
   );
 }

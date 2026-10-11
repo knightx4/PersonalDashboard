@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { frameMessage, issueDocument } from '@/lib/news/issues/frame';
+import { FRAME_MEASURE, frameMessage, issueDocument } from '@/lib/news/issues/frame';
 
 /**
  * The room a newsletter is shown in.
@@ -40,12 +40,18 @@ export function IssueFrame({ html }: { html: string }) {
     }
 
     window.addEventListener('message', onMessage);
+    // The frame measured itself as soon as it loaded, which can be before
+    // this listener existed; ask again now that it does. Sent to any origin
+    // because the sandboxed frame has none, and it carries nothing private.
+    frame.current?.contentWindow?.postMessage(FRAME_MEASURE, '*');
     return () => window.removeEventListener('message', onMessage);
   }, []);
 
   return (
     <iframe
       ref={frame}
+      // A load after hydration asks too, for the same reason as the effect.
+      onLoad={() => frame.current?.contentWindow?.postMessage(FRAME_MEASURE, '*')}
       title="The newsletter"
       srcDoc={issueDocument(html)}
       sandbox="allow-scripts"

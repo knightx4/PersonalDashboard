@@ -1,8 +1,8 @@
 /**
  * A goals run the person starts records each step it holds (plan #1573,
  * feature #1456). Before a run reads the tree, holdActingSteps turns a Claude
- * step that acts outside the plan into a proposal; from Work on this
- * (startGoalRun) and from Send or an @dash reply (sendGoalStep) each hold is
+ * step that acts outside the plan into a proposal; from Ask Dash on a goal
+ * (startGoalRun) and from Ask Dash on a step or an @dash reply (sendGoalStep) each hold is
  * now a core.dash_actions row with surface `thread`, which Home lists with an
  * Undo. The morning run's holds are covered in scheduled-dash-actions.test.ts.
  *
@@ -90,7 +90,7 @@ function expectHoldRecord(tables: FakeTables) {
 }
 
 describe('starting a goal run records the steps it holds', () => {
-  it('records each hold when Work on this starts the run', async () => {
+  it('records each hold when Ask Dash on a goal starts the run', async () => {
     const tables = tree();
     const started = await startGoalRun({
       client: goalsClient(tables) as never,

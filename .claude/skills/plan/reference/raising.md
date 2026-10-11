@@ -22,7 +22,7 @@ interchangeable:
   passing: it is what the page shows as where the suggestion came from. One
   the user dismisses stops being listed, including by `ideas`, so do not
   write it again.
-- **A raise** — `raised_items`, read on `/dev/raised`. What a session ran into
+- **A raise** — `raised_items`, read on `/dev/inbox`. What a session ran into
   that belongs to none of those: a risk found in code it was only passing
   through, a question of taste, a thing it will not decide alone. Without it,
   that goes in the transcript, where it is only read by somebody who opens

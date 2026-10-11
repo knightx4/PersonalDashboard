@@ -40,11 +40,6 @@ export function FeelSection() {
   return (
     <section className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">Buzz and click</h2>
-      <p className="mt-0.5 text-ui text-ink-muted">
-        When you finish something, such as ticking off a todo or closing a goal, a phone that can
-        vibrate gives one short buzz. You can add a soft click as well.
-      </p>
-
       <div className="mt-4 divide-y divide-border border-y border-border">
         {buzz === 'unsupported' ? (
           <p className="row-pad text-small text-ink-muted">

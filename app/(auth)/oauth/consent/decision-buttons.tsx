@@ -8,7 +8,7 @@ export function DecisionButtons() {
   const { pending } = useFormStatus();
   return (
     <>
-      <Button type="submit" name="decision" value="allow" className="flex-1" disabled={pending}>
+      <Button type="submit" name="decision" value="allow" className="flex-1" pending={pending}>
         {pending ? 'One moment…' : 'Allow'}
       </Button>
       <Button

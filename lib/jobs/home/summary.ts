@@ -1,19 +1,25 @@
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
-import { isTerminal } from '@/lib/jobs/pipeline';
+import { isLive } from '@/lib/jobs/pipeline';
+import {
+  PIPELINE_STAGES,
+  pipelineHref,
+  sentWithin,
+  type PipelineStageKey,
+} from '@/lib/jobs/pipeline-view';
 import { roundsOf } from '@/lib/jobs/interview-groups';
 import { INTERVIEW_HORIZON_DAYS } from '@/lib/jobs/today/load';
 
 /**
- * The few numbers at the top of Home (plan #1151): where the search stands.
+ * The few numbers on Today (plan #1151, #1591): where the search stands.
  *
- * PURE, and counted from the same rows the Pipeline and Interviews tabs read,
- * so each number can be checked against the tab it links to. No model call.
+ * PURE, and counted from the same rows Pipeline reads, so each number opens
+ * Pipeline narrowed to exactly what it counted (`stageHref`, `sentHref`).
+ * No model call.
  *
- * The stages are the board's columns from Submitted to Offer, folded the way
- * components/jobs/pipeline/board.tsx folds them: `submitted` and
- * `acknowledged` are one column, and so are `in_process` and `final_round`.
- * Leads and drafts are not applications yet, so they are not counted as live;
- * the four closed statuses (TERMINAL_STATUSES) are left out entirely.
+ * Live is Pipeline's rule (`isLive`: not closed, leads included), and the
+ * stages are PIPELINE_STAGES, the board's columns folded the way the board
+ * folds them. Together the stages are every live status, so they add up to
+ * the live count.
  */
 
 export const SENT_WINDOW_DAYS = 7;
@@ -21,17 +27,15 @@ export { INTERVIEW_HORIZON_DAYS };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export const SUMMARY_STAGES = [
-  { key: 'submitted', label: 'Submitted', statuses: ['submitted', 'acknowledged'] },
-  { key: 'in_process', label: 'In process', statuses: ['in_process', 'final_round'] },
-  { key: 'offer', label: 'Offer', statuses: ['offer'] },
-] as const satisfies ReadonlyArray<{
-  key: string;
-  label: string;
-  statuses: readonly ApplicationStatus[];
-}>;
+/** Pipeline's table, narrowed to the live applications at one stage. */
+export function stageHref(key: PipelineStageKey): string {
+  return pipelineHref({}, { view: 'table', stage: key });
+}
 
-export type SummaryStageKey = (typeof SUMMARY_STAGES)[number]['key'];
+/** Pipeline's table, narrowed to what was sent in the window, live or closed. */
+export function sentHref(days: number = SENT_WINDOW_DAYS): string {
+  return pipelineHref({}, { view: 'table', status: 'all', sent: String(days) });
+}
 
 export interface SummaryApplication {
   status: ApplicationStatus;
@@ -48,9 +52,9 @@ export interface SummaryInterview {
 }
 
 export interface SearchSummary {
-  /** Applications sent and not closed: the sum of the stages. */
+  /** Applications not closed, leads included: the sum of the stages. */
   live: number;
-  byStage: Array<{ key: SummaryStageKey; label: string; count: number }>;
+  byStage: Array<{ key: PipelineStageKey; label: string; count: number }>;
   /** Sent in the last SENT_WINDOW_DAYS days, whatever has happened since. */
   sentRecently: number;
   /**
@@ -68,28 +72,19 @@ export function summariseSearch(
 ): SearchSummary {
   const nowMs = now.getTime();
 
-  const byStage = SUMMARY_STAGES.map((stage) => ({
+  const byStage = PIPELINE_STAGES.map((stage) => ({
     key: stage.key,
     label: stage.label,
-    count: applications.filter(
-      (app) =>
-        !isTerminal(app.status) &&
-        (stage.statuses as readonly ApplicationStatus[]).includes(app.status),
+    count: applications.filter((app) =>
+      (stage.statuses as readonly ApplicationStatus[]).includes(app.status),
     ).length,
   }));
 
-  // An application created from its confirmation email can carry the
-  // confirmation's time and no separate send time; that is when it was sent.
-  const sentSince = nowMs - SENT_WINDOW_DAYS * DAY_MS;
-  const sentRecently = applications.filter((app) => {
-    const sent = app.submittedAt ?? app.confirmationReceivedAt;
-    if (!sent) return false;
-    const at = new Date(sent).getTime();
-    return Number.isFinite(at) && at >= sentSince && at <= nowMs;
-  }).length;
+  // Pipeline's own rule, so "Sent in the last 7 days" is the list it opens.
+  const sentRecently = applications.filter((app) => sentWithin(app, SENT_WINDOW_DAYS, now)).length;
 
   return {
-    live: byStage.reduce((sum, stage) => sum + stage.count, 0),
+    live: applications.filter((app) => isLive(app.status)).length,
     byStage,
     sentRecently,
     interviewsSoon: interviews === null ? null : countInterviewsSoon(interviews, nowMs),

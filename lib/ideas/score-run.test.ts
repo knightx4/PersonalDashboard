@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ScoreIdeaInput } from '@/lib/ideas/score-ask';
 import { scoreIdeaRow, scoreUnscoredIdeas } from '@/lib/ideas/score-run';
+import { IDEA_SCORE_VERSION, SCORE_DUE_FILTER, needsScore } from '@/lib/ideas/score';
 import type { Triage } from '@/lib/feedback/triage';
 
 type Row = Record<string, unknown>;
@@ -36,6 +37,11 @@ function stub(ideas: Row[], visions: Row[] = []) {
           filters.push((row) => (row[column] ?? null) === value);
           return q;
         },
+        or: (filter: string) => {
+          if (filter !== SCORE_DUE_FILTER) throw new Error(`unexpected or filter: ${filter}`);
+          filters.push((row) => needsScore(row.score));
+          return q;
+        },
         order: () => q,
         limit: (n: number) => {
           limit = n;
@@ -60,7 +66,9 @@ function stub(ideas: Row[], visions: Row[] = []) {
 }
 
 const USER = 'u1';
-const SCORE = { value: 60, confidence: 0.9, at: '2026-09-30T00:00:00.000Z' };
+const SCORE = { value: 60, confidence: 0.9, at: '2026-09-30T00:00:00.000Z', question: IDEA_SCORE_VERSION };
+/** A score asked before the question's wording was numbered: version 1. */
+const OLD_SCORE = { value: 25, confidence: 0.9, at: '2026-09-30T00:00:00.000Z' };
 
 function idea(id: string, extra: Row = {}): Row {
   return { id, user_id: USER, body: `idea ${id}`, module: null, triage: null, score: null, dismissed_at: null, ...extra };
@@ -176,5 +184,24 @@ describe('scoreUnscoredIdeas', () => {
       },
     });
     expect(timed).toEqual({ scored: 1, failed: 0, left: 2 });
+  });
+
+  it('asks again an idea scored under an older wording, and keeps the old score when Jev fails', async () => {
+    const ideas = [
+      idea('a', { score: OLD_SCORE }),
+      idea('b', { score: { ...OLD_SCORE, question: IDEA_SCORE_VERSION - 1 } }),
+      idea('c', { score: SCORE }),
+      idea('d', { score: OLD_SCORE }),
+    ];
+    const { client, updates } = stub(ideas);
+    const result = await scoreUnscoredIdeas(client, {
+      userId: USER,
+      spend: [],
+      gapMs: 0,
+      ask: asker(new Set(['idea d'])).ask,
+    });
+    expect(result).toEqual({ scored: 2, failed: 1, left: 0 });
+    expect(updates.map((u) => u.id)).toEqual(['a', 'b']);
+    expect(ideas[3].score).toEqual(OLD_SCORE);
   });
 });

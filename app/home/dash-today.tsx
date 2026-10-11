@@ -22,7 +22,8 @@ export const GROUP_SHOWN = 4;
  * newest few and folds the rest. An undo that goes through leaves the row in
  * place, said as undone, so the press has something to answer it; the next
  * load lists it the same way. A change recorded with no Undo (plan #1571)
- * says why beneath its sentence instead of offering the button.
+ * says why beneath its sentence instead of offering the button. A change
+ * made in a thread links to the row whose thread asked for it (plan #1518).
  */
 export function DashTodaySection({
   groups,
@@ -37,7 +38,7 @@ export function DashTodaySection({
   const count = groups.reduce((sum, group) => sum + group.entries.length, 0);
   if (count === 0) return null;
   return (
-    <Card id="dash-today" padding="standard" className="mt-4 scroll-mt-bar">
+    <Card id="dash-today" padding="standard" className="scroll-mt-bar">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-ui font-semibold text-ink">What Dash did today</h2>
         <span className="tabular text-small text-ink-muted">
@@ -117,21 +118,43 @@ function DashTodayRow({
     });
   }
 
+  const time = formatClock(entry.at, { timeZone: timezone });
   return (
     <li className="py-2">
       <div className="flex items-baseline gap-3">
-        <span className="tabular w-12 shrink-0 text-small text-ink-muted">
-          {formatClock(entry.at, { timeZone: timezone })}
-        </span>
-        <p className={undone ? 'min-w-0 flex-1 text-ui text-ink-muted' : 'min-w-0 flex-1 text-ui text-ink'}>
-          {entry.href && !undone ? (
-            <Link href={entry.href} className="hover:text-accent">
-              {entry.sentence}
-            </Link>
-          ) : (
-            entry.sentence
-          )}
-        </p>
+        <div className="min-w-0 flex-1">
+          <p className={undone ? 'text-ui text-ink-muted' : 'text-ui text-ink'}>
+            {entry.href && !undone ? (
+              // Block, with a 44px hit area centred on it: a one-line
+              // sentence is otherwise a 16px press target on a phone.
+              <Link
+                href={entry.href}
+                // ui-ok: the hit area is the 44px touch minimum, not a control height
+                className="relative block hover:text-accent before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-['']"
+              >
+                {entry.sentence}
+              </Link>
+            ) : (
+              entry.sentence
+            )}
+          </p>
+          {/* The time sits on this quiet line, so the sentence has the row's
+              width: in Home's rail (plan #1627) the row is narrow at every
+              screen size. */}
+          <p className="text-small text-ink-muted">
+            <span className="tabular">{time}</span>
+            {entry.from && (
+              <>
+                <span aria-hidden>{' · '}</span>
+                <Link href={entry.from} className="hover:text-accent">
+                  From your comment
+                </Link>
+              </>
+            )}
+          </p>
+          {entry.noUndo && !undone && <p className="text-small text-ink-muted">{entry.noUndo}</p>}
+          {error && <FieldError>{error}</FieldError>}
+        </div>
         {undone ? (
           <span className="inline-flex shrink-0 items-center gap-1 text-small font-medium text-ink-muted">
             <Undo2 className="size-3.5" strokeWidth={2} aria-hidden />
@@ -152,12 +175,6 @@ function DashTodayRow({
           </Button>
         )}
       </div>
-      {entry.noUndo && !undone && <p className="pl-15 text-small text-ink-muted">{entry.noUndo}</p>}
-      {error && (
-        <div className="pl-15">
-          <FieldError>{error}</FieldError>
-        </div>
-      )}
     </li>
   );
 }

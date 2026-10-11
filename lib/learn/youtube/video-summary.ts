@@ -140,7 +140,7 @@ export async function writeVideoSummary(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL),
+      tool_choice: forceTool(TOOL, VIDEO_SUMMARY_MODEL),
       messages: [{ role: 'user', content: summaryPrompt(input.video) }],
     });
   } catch (error) {

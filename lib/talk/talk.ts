@@ -10,6 +10,8 @@
  * call in reply.ts.
  */
 
+import type { UploadedAttachment } from '@/lib/attachments/rules';
+
 /**
  * What a conversation can be about.
  *
@@ -60,6 +62,17 @@ export type TalkToolCall = { name: string; input: unknown; result: unknown };
  */
 export type TalkCitation = { table: string; ref: string; title: string; href: string };
 
+/**
+ * A file sent with a turn (plan #1715): what the chat draws as a chip or a
+ * thumbnail. `href` opens it through a short signed link.
+ */
+export type TalkFile = { id: string; name: string; contentType: string; size: number; href: string };
+
+/** The ref a turn's files are recorded under in core.attachments. */
+export function turnFilesRef(turnId: string): string {
+  return `core.conversation_turns:${turnId}`;
+}
+
 export type TalkTurn = {
   id: string;
   role: TalkRole;
@@ -68,6 +81,8 @@ export type TalkTurn = {
   /** Dash's turns in an `ask` conversation only; absent everywhere else. */
   toolCalls?: TalkToolCall[];
   citations?: TalkCitation[];
+  /** Files the person sent with this turn, in an `ask` conversation; absent when there are none. */
+  files?: TalkFile[];
 };
 
 export type TalkTurnRow = {
@@ -85,6 +100,8 @@ export type NewTalkTurn = {
   body: string;
   toolCalls?: readonly TalkToolCall[];
   citations?: readonly TalkCitation[];
+  /** Files uploaded with a person's turn; the ask wrapper records them against the turn once it is written. */
+  files?: readonly UploadedAttachment[];
 };
 
 /** The longest turn the table takes (conversation_turns_body_ck). */
@@ -153,4 +170,13 @@ export function toModelMessages(
     messages[0].content = `(Dash said earlier: ${opening.join('\n\n')})\n\n${messages[0].content}`;
   }
   return messages;
+}
+
+/**
+ * A turn as the model reads it. Until Dash reads files (plan #1716) it is told
+ * their names only, on the turn they came with.
+ */
+export function bodyWithFileNames(turn: Pick<TalkTurn, 'body' | 'files'>): string {
+  if (!turn.files || turn.files.length === 0) return turn.body;
+  return `${turn.body}\n\n(Sent with this: ${turn.files.map((file) => file.name).join(', ')})`;
 }

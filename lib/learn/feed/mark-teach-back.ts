@@ -128,7 +128,7 @@ async function call(
           input_schema: { type: 'object', properties: input.properties, required: input.required },
         },
       ],
-      tool_choice: forceTool(input.tool),
+      tool_choice: forceTool(input.tool, TEACH_BACK_MODEL),
       messages: [{ role: 'user', content: input.content }],
     });
   } catch (error) {

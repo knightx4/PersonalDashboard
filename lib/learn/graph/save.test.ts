@@ -149,6 +149,39 @@ describe('saving an approved chain', () => {
     expect(concepts[0].mastery).toBeNull();
   });
 
+  it('writes the note judge’s question, cost and verdict on a concept that has them', async () => {
+    const { client, inserts } = clientReturningIds('subject-1');
+    const judged = {
+      ...CHAIN,
+      nodes: CHAIN.nodes.map((node) =>
+        node.existingId
+          ? node
+          : {
+              ...node,
+              separatingQuestion: 'Does an expected rise still lower unemployment?',
+              costIfWrong: 'You expect a stimulus to keep working after it is priced in.',
+              verdict: 'weak' as const,
+            },
+      ),
+    };
+    await saveChain(client, 'user-1', judged, 'how rates reach prices');
+
+    expect(rowsFor(inserts, 'concepts')[0]).toMatchObject({
+      separating_question: 'Does an expected rise still lower unemployment?',
+      cost_if_wrong: 'You expect a stimulus to keep working after it is priced in.',
+      judge_verdict: 'weak',
+    });
+  });
+
+  it('leaves the judge’s columns out for a concept nobody judged', async () => {
+    const { client, inserts } = clientReturningIds('subject-1');
+    await saveChain(client, 'user-1', CHAIN, 'how rates reach prices');
+
+    const row = rowsFor(inserts, 'concepts')[0] as Record<string, unknown>;
+    expect(row).not.toHaveProperty('judge_verdict');
+    expect(row).not.toHaveProperty('separating_question');
+  });
+
   it('writes the door mark on a concept that came back with one', async () => {
     const { client, inserts } = clientReturningIds('subject-1');
     await saveChain(client, 'user-1', CHAIN, 'how rates reach prices');

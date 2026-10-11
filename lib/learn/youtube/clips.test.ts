@@ -1,7 +1,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
-import { cutClips } from './clip-run';
+import { alternate, clipSubjectRows, cutClips } from './clip-run';
 import { cutPrompt, cutVideo, matchServes, readCutReply, sentencesFromCues } from './clips';
 import { CLIP_TRANSCRIPT } from './fixtures/clip-transcript';
 import type { LearnerProfile } from './judge-video';
@@ -15,14 +15,17 @@ import { encodeTranscript, storagePathFor } from './transcripts';
  */
 
 const PROFILE: LearnerProfile = {
-  tracks: [{ id: 'subject-1', name: 'Startup Finance', note: null, frontier: ['Cash flow timing'], settled: 3 }],
+  tracks: [
+    { id: 'subject-1', name: 'Startup Finance', note: null, frontier: ['Cash flow timing'], settled: 3 },
+    { id: 'subject-2', name: 'Pricing', note: null, frontier: [], settled: 0 },
+  ],
   goals: [{ id: 'goal-1', title: 'Raise a seed round', detail: null }],
   ideas: [],
 };
 
 const REPLY = {
   clips: [
-    { start: 21, end: 47, caption: 'Why profitable firms still run out of cash', idea: 'Working capital gaps need funding.', serves: 'Startup Finance', stands_alone: true },
+    { start: 21, end: 47, caption: 'Why profitable firms still run out of cash', idea: 'Working capital gaps need funding.', serves: ['Startup Finance', 'Pricing'], stands_alone: true },
     { start: 65, end: 92, caption: 'The cash conversion cycle in one sum', idea: 'Inventory plus receivables minus payables days.', serves: 'Goal: "Raise a seed round"', stands_alone: true },
     { start: 97, end: 102, caption: 'Back to the earlier gap', idea: 'Refers back.', serves: '', stands_alone: false },
     { start: 0, end: 106, caption: 'The whole video', idea: 'Everything.', serves: '', stands_alone: true },
@@ -80,6 +83,7 @@ describe('readCutReply', () => {
         serves: 'Startup Finance',
         subjectId: 'subject-1',
         goalId: null,
+        subjectIds: ['subject-1', 'subject-2'],
       },
       {
         startSeconds: 65,
@@ -89,6 +93,7 @@ describe('readCutReply', () => {
         serves: 'Goal: "Raise a seed round"',
         subjectId: null,
         goalId: 'goal-1',
+        subjectIds: [],
       },
     ]);
   });
@@ -109,9 +114,22 @@ describe('readCutReply', () => {
   });
 
   it('matches what a clip serves by name only', () => {
-    expect(matchServes('startup finance', PROFILE)).toEqual({ subjectId: 'subject-1', goalId: null });
-    expect(matchServes('Cooking', PROFILE)).toEqual({ subjectId: null, goalId: null });
-    expect(matchServes(null, PROFILE)).toEqual({ subjectId: null, goalId: null });
+    expect(matchServes('startup finance', PROFILE)).toEqual({ serves: 'startup finance', subjectId: 'subject-1', goalId: null, subjectIds: ['subject-1'] });
+    expect(matchServes(null, PROFILE)).toEqual({ serves: null, subjectId: null, goalId: null, subjectIds: [] });
+  });
+
+  it('keeps every track a clip serves, the first one as its subject (plan #1695)', () => {
+    expect(matchServes(['Raise a seed round', 'Pricing', 'startup finance', 'pricing'], PROFILE)).toEqual({
+      serves: 'Pricing',
+      subjectId: 'subject-2',
+      goalId: null,
+      subjectIds: ['subject-2', 'subject-1'],
+    });
+  });
+
+  it('matches nothing when no name is a track or goal', () => {
+    expect(matchServes(['Cooking', 'Working capital', ''], PROFILE)).toEqual({ serves: null, subjectId: null, goalId: null, subjectIds: [] });
+    expect(matchServes([], PROFILE)).toEqual({ serves: null, subjectId: null, goalId: null, subjectIds: [] });
   });
 });
 
@@ -124,7 +142,7 @@ describe('cutVideo', () => {
     const result = await cutVideo({ profile: PROFILE, video, anthropicApiKey: 'k', client, onSpend });
     expect(result.outcome === 'cut' && result.clips.map((clip) => clip.startSeconds)).toEqual([21, 65]);
     expect(create).toHaveBeenCalledTimes(1);
-    expect(onSpend).toHaveBeenCalledWith(expect.objectContaining({ model: 'claude-haiku-4-5' }));
+    expect(onSpend).toHaveBeenCalledWith(expect.objectContaining({ model: 'claude-haiku-5-5' }));
   });
 
   it('tells a failed call from an unreadable reply', async () => {
@@ -146,6 +164,7 @@ type Row = Record<string, unknown>;
 const CONFLICT: Record<string, string[]> = {
   video_clips: ['user_id', 'video_id', 'start_seconds'],
   video_clip_cuts: ['user_id', 'video_id'],
+  video_clip_subjects: ['clip_id', 'subject_id'],
 };
 
 function fakeLearn(tables: Record<string, Row[]>, stored: Record<string, Buffer>) {
@@ -166,12 +185,16 @@ function fakeLearn(tables: Record<string, Row[]>, stored: Record<string, Buffer>
       then: (resolve: (value: { data: Row[] | null; error: null }) => void) => {
         const rows = (tables[table] ??= []);
         if (upserting) {
+          const touched: Row[] = [];
           for (const next of upserting) {
             const at = rows.findIndex((row) => CONFLICT[table].every((column) => row[column] === next[column]));
-            if (at === -1) rows.push({ ...next });
-            else Object.assign(rows[at], next);
+            if (at === -1) {
+              const row = { id: `${table}-${rows.length + 1}`, ...next };
+              rows.push(row);
+              touched.push(row);
+            } else touched.push(Object.assign(rows[at], next));
           }
-          return resolve({ data: null, error: null });
+          return resolve({ data: touched, error: null });
         }
         const hit = rows.filter((row) => filters.every((filter) => filter(row)));
         resolve({ data: range ? hit.slice(range[0], range[1] + 1) : hit, error: null });
@@ -231,8 +254,15 @@ function world() {
   return { tables, learn: fakeLearn(tables, stored) };
 }
 
+describe('alternate', () => {
+  it('takes one from each list in turn, then the rest of the longer', () => {
+    expect(alternate<number | string>([1, 2, 3], ['a'])).toEqual([1, 'a', 2, 3]);
+    expect(alternate([], ['a', 'b'])).toEqual(['a', 'b']);
+  });
+});
+
 describe('cutClips', () => {
-  it('cuts your list first, then followed channels newest first, and skips what is cut or not transcribed', async () => {
+  it('cuts your list and followed channels in turn, each newest first, and skips what is cut or not transcribed', async () => {
     const { tables, learn } = world();
     const { client, create } = stubClient();
     const spend = vi.fn();
@@ -254,12 +284,49 @@ describe('cutClips', () => {
     const cuts = tables.video_clip_cuts.filter((row) => row.video_id !== DONE);
     expect(cuts.map((row) => [row.video_id, row.came_from, row.clip_count])).toEqual([
       [LISTED, 'playlist', 2],
-      [LISTED_OLDER, 'playlist', 2],
       [CHANNEL_NEW, 'channel', 2],
+      [LISTED_OLDER, 'playlist', 2],
     ]);
     const first = tables.video_clips.find((row) => row.video_id === CHANNEL_NEW && row.start_seconds === 21);
     expect(first).toMatchObject({ user_id: OWNER, item_id: 'item-c1', came_from: 'channel', end_seconds: 61, subject_id: 'subject-1' });
     expect(first).not.toHaveProperty('score');
+    // Tagged with both tracks it serves; the goal clip carries no track.
+    const tags = tables.video_clip_subjects.filter((row) => row.clip_id === first!.id);
+    expect(tags.map((row) => [row.user_id, row.subject_id])).toEqual([
+      [OWNER, 'subject-1'],
+      [OWNER, 'subject-2'],
+    ]);
+    expect(tables.video_clip_subjects).toHaveLength(6);
+  });
+
+  it('adds tags on a re-cut and never doubles one', async () => {
+    const { tables, learn } = world();
+    const { client } = stubClient();
+    await cutClips(learn, { anthropicApiKey: 'k', owner: OWNER, deadline: Date.now() + 60_000, limit: 1, client, now: () => NOW, profileFor: async () => PROFILE });
+    tables.video_clip_cuts = tables.video_clip_cuts.filter((row) => row.video_id !== LISTED);
+    await cutClips(learn, { anthropicApiKey: 'k', owner: OWNER, deadline: Date.now() + 60_000, limit: 1, client, now: () => NOW, profileFor: async () => PROFILE });
+    expect(tables.video_clip_subjects.map((row) => row.subject_id)).toEqual(['subject-1', 'subject-2']);
+  });
+});
+
+describe('clipSubjectRows', () => {
+  it('makes one row per stored clip and track, matched by start second', () => {
+    const rows = clipSubjectRows(
+      OWNER,
+      [
+        { id: 'clip-a', start_seconds: 21 },
+        { id: 'clip-b', start_seconds: 65 },
+      ],
+      [
+        { startSeconds: 21, subjectIds: ['subject-1', 'subject-2', 'subject-1'] },
+        { startSeconds: 65, subjectIds: [] },
+        { startSeconds: 99, subjectIds: ['subject-1'] },
+      ],
+    );
+    expect(rows).toEqual([
+      { user_id: OWNER, clip_id: 'clip-a', subject_id: 'subject-1' },
+      { user_id: OWNER, clip_id: 'clip-a', subject_id: 'subject-2' },
+    ]);
   });
 
   it('records a video that gave no clips, and leaves a failed call for the next run', async () => {
@@ -271,7 +338,7 @@ describe('cutClips', () => {
     const failing = { messages: { create: vi.fn(async () => Promise.reject(new Error('timeout'))) } } as unknown as Anthropic;
     const result = await cutClips(learn, { anthropicApiKey: 'k', owner: OWNER, deadline: Date.now() + 60_000, limit: 1, client: failing, now: () => NOW, profileFor: async () => PROFILE });
     expect(result.failed).toBe(1);
-    expect(tables.video_clip_cuts.some((row) => row.video_id === LISTED_OLDER)).toBe(false);
+    expect(tables.video_clip_cuts.some((row) => row.video_id === CHANNEL_NEW)).toBe(false);
   });
 
   it('cuts nothing for a person who already has forty clips not yet shown', async () => {

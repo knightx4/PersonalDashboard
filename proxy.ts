@@ -65,6 +65,10 @@ const PUBLIC_PATHS = [
   // match covers /.well-known/oauth-protected-resource/api/mcp too.
   '/api/mcp',
   '/.well-known/oauth-protected-resource',
+  // The capture address (plan #1706). A Siri Shortcut carries a personal
+  // capture token, never the cookie. The route checks the token itself and
+  // answers 401 without one; the token can only add things.
+  '/api/capture',
 ];
 
 function isPublic(pathname: string): boolean {

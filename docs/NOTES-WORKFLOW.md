@@ -11,9 +11,9 @@ priority by hand.
 
 ### Triage on filing
 
-Once a bug, request or idea has saved, the panel asks Jev four questions
+Once a bug, request or idea has saved, the panel asks Jev five questions
 about it in one call: bug or request, which workspace, how soon (next,
-normal, someday), and which open note or idea, if any, asks for the same
+normal, someday), fix or plan, and which open note or idea, if any, asks for the same
 thing. The duplicate question lists the first line of every open note and
 every idea neither dismissed nor shaped. The answers and their confidences go
 in the row's `triage` column (migration 0121) and show under "saved" in the
@@ -32,6 +32,16 @@ A trial of twelve hand-written notes against 36 open items on 29 September
 at 0.8 or more; priority right 9 of 12, with two of the three misses under
 0.8; duplicate right 11 of 12, and the miss was at 0.69, so it showed as a
 maybe. Each call took 130 to 420 ms and read about 2,000 tokens.
+
+The fifth question, fix or plan (plan #1674), is stored as `route` in the same
+`triage` value and shown as "Fix" or "Plan", with a "?" under 0.8. A row
+filed before it existed has no `route` and shows nothing for it. The twelve
+trial notes were hand-written for the trial and not kept, so they cannot be
+run again. It is scored instead on the first twelve real notes filed after it
+shipped: each note's route against how it was actually handled, a fix that a
+session closed in one commit or a note that went to the plan. The score goes
+here as a count out of twelve, with how many were under 0.8. Pending until
+those twelve have been handled.
 
 ## Working them
 
@@ -65,12 +75,24 @@ step's brief, claim it, build it against its "done when", verify, commit with
 the step number in the subject, close it with a note. The full model is in
 [PLAN-SPEC.md](PLAN-SPEC.md).
 
-A request in the notes queue that turns out to be a body of work rather than
-a fix belongs in the plan: add it there as a *proposed* feature with its
-steps, mark the note `planned`, and say which step it became. The person
-approves it on the plan page before anything is built.
+A note can turn out to be bigger than it looked. When the notes run claims one
+and finds that the fix needs a migration, a new screen or changes in more than
+one workspace, or that triage's route was plan and the code agrees, it does not
+build it. It files an idea on `/dev/ideas` from the note's own text, with
+source `me` because you wrote it, so the hold on ideas filed by sessions and
+the limit of two an hour do not apply. It marks the note `planned` with a
+resolution naming the idea, and lists the note in its report under *Moved to
+ideas*. You approve the work there before any of it is done.
+
+The header's box files everything as a note first. When triage is sure a
+note needs planning, the server writes an idea from the same text under the
+triaged workspace and marks the note `planned`, with a resolution naming the
+idea, so the queue does not work it (plan #1675). The saved panel says
+"Filed as a note" or "Filed as an idea" and moves it the other way in one
+press. An unsure answer stays a note for the notes routine to judge.
 
 The whole loop, then: small things go in as notes and get fixed; big
-thoughts go in as ideas, get shaped into proposals by pressing *Shape into a
-plan*, get approved and handed over on the plan page, and get built one step
-a night. Corrections to what was built go back in as notes.
+thoughts, and notes that turn out to be big, go in as ideas, get shaped into
+proposals by pressing *Shape into a plan*, get approved and handed over on the
+plan page, and get built one step a night. Corrections to what was built go
+back in as notes.

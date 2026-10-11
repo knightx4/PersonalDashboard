@@ -119,6 +119,16 @@ export function isTerminal(status: ApplicationStatus): boolean {
   return RANK[status] === -1;
 }
 
+/**
+ * Whether an application is live: not closed, leads included (plan #1590).
+ * The one rule Jobs counts live applications by, so Pipeline, Today and any
+ * count of them agree. Wider than OPEN_STATUSES in lib/jobs/board-moment.ts,
+ * which leaves out what has not been sent.
+ */
+export function isLive(status: ApplicationStatus): boolean {
+  return !isTerminal(status);
+}
+
 /** Statuses that mean "the application reached a live human conversation". */
 export const IN_PROCESS_OR_LATER: readonly ApplicationStatus[] = [
   'in_process',
@@ -415,6 +425,8 @@ export interface FunnelApplication {
   rejectionStage: RejectionStage | null;
   /** Highest status ever reached, so a rejection does not erase the progress. */
   highWaterStatus: ApplicationStatus;
+  /** At least one interview is logged against it. Absent reads as none. */
+  interviewed?: boolean;
 }
 
 export interface Period {
@@ -632,6 +644,91 @@ export function metricsBySource(
       opts,
     ),
   })).filter((entry) => entry.metrics.applicationsSent > 0);
+}
+
+/**
+ * The rungs a channel's applications are counted against on Insights, in
+ * order. The first is the denominator.
+ */
+export const CHANNEL_LADDER: readonly ApplicationStatus[] = [
+  'submitted',
+  'acknowledged',
+  'in_process',
+  'final_round',
+  'offer',
+];
+
+/**
+ * Below this many sent, a channel's shares are shown but not compared: one
+ * reply in eight reads as 12%, and the next reply moves it to 25%. The same
+ * fifteen the empty state names as where these numbers start being useful.
+ */
+export const CHANNEL_MIN_SENT = 15;
+
+export interface ChannelStage {
+  stage: ApplicationStatus;
+  /** Sent applications from this channel that ever reached the rung. */
+  count: number;
+  /** Of those that reached the rung below, the share that reached this one. Null on the first rung. */
+  movedOn: number | null;
+}
+
+export interface ChannelStages {
+  source: ApplicationSource;
+  sent: number;
+  stages: ChannelStage[];
+  /** Closed as ghosted after at least one logged interview. */
+  quietAfterInterview: number;
+  /** Closed as ghosted with no reply from a person and no interview. */
+  noAnswer: number;
+  /** Enough sent for its shares to be set beside another channel's. */
+  enough: boolean;
+}
+
+function wentQuiet(app: FunnelApplication): boolean {
+  return app.status === 'ghosted' || app.outcome === 'ghosted';
+}
+
+/**
+ * How far each channel's applications got (plan #1595): for every channel
+ * with at least one sent, the count reaching each rung of CHANNEL_LADDER and
+ * the share that moved on from the rung below.
+ *
+ * Going quiet after an interview is its own outcome, apart from applications
+ * nobody answered: the first says the process stalled with a person, the
+ * second that nobody read it. A ghosted application with a reply but no
+ * interview is in neither.
+ */
+export function channelStages(applications: readonly FunnelApplication[]): ChannelStages[] {
+  return APPLICATION_SOURCES.map((source) => {
+    const sent = applications.filter((a) => a.source === source && a.submittedAt !== null);
+    let previous = sent.length;
+    const stages = CHANNEL_LADDER.map((stage, index) => {
+      const count = sent.filter((a) => reached(a, stage)).length;
+      const movedOn = index === 0 ? null : rate(count, previous);
+      previous = count;
+      return { stage, count, movedOn };
+    });
+    return {
+      source,
+      sent: sent.length,
+      stages,
+      quietAfterInterview: sent.filter((a) => wentQuiet(a) && a.interviewed === true).length,
+      noAnswer: sent.filter((a) => wentQuiet(a) && !a.interviewed && a.firstHumanResponseAt === null)
+        .length,
+      enough: sent.length >= CHANNEL_MIN_SENT,
+    };
+  }).filter((entry) => entry.sent > 0);
+}
+
+/** Where rejections happen, split by channel. Channels with none are left out. */
+export function rejectionsByChannel(
+  applications: readonly FunnelApplication[],
+): Array<{ source: ApplicationSource; total: number; stages: Array<{ stage: RejectionStage; count: number }> }> {
+  return APPLICATION_SOURCES.map((source) => {
+    const stages = rejectionStageDistribution(applications.filter((a) => a.source === source));
+    return { source, total: stages.reduce((sum, entry) => sum + entry.count, 0), stages };
+  }).filter((entry) => entry.total > 0);
 }
 
 /** Monthly cohorts in the user's timezone-free local terms, newest last. */
