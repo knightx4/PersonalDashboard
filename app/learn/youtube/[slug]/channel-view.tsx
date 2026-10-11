@@ -3,9 +3,8 @@ import { YOUTUBE_HREF } from '@/app/learn/videos/library-section';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SearchField } from '@/components/shell/search-field';
-import { Button } from '@/components/ui/button';
+import { ActionMenu } from '@/components/ui/action-menu';
 import { cardVariants } from '@/components/ui/card';
-import { ConfirmStep } from '@/components/ui/confirm-step';
 import { Disclosure } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { SEARCH_PARAM } from '@/lib/list-search';
@@ -77,35 +76,42 @@ export function ChannelView({
       <PageHeader
         title={channel.name}
         description={
-          <a href={channel.homeUrl} className="press-area hover:underline" target="_blank" rel="noreferrer">
-            {channel.handle ?? 'Open on YouTube'}
-          </a>
+          <>
+            <a href={channel.homeUrl} className="press-area hover:underline" target="_blank" rel="noreferrer">
+              {channel.handle ?? 'Open on YouTube'}
+            </a>
+          </>
         }
       />
 
-      <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="mb-6 flex items-center gap-2">
         <Press
           action={relistChannelAction}
           fields={{ providerId: channel.id }}
           label="Look for new videos"
           pendingLabel="Listing…"
         />
-        <form action={setAutoTranscribeAction}>
-          <input type="hidden" name="providerId" value={channel.id} />
-          <input type="hidden" name="on" value={channel.autoTranscribe ? 'false' : 'true'} />
-          <Button type="submit" size="sm" variant="ghost" aria-pressed={channel.autoTranscribe}>
-            {channel.autoTranscribe ? 'New uploads are transcribed · turn off' : 'Transcribe new uploads'}
-          </Button>
-        </form>
-        <ConfirmStep
-          action={removeChannelAction}
-          fields={{ providerId: channel.id }}
-          prompt="Stop following this channel and delete its listed videos and playlists from the catalogue. Stored transcripts stay in storage."
-          confirmLabel="Yes, stop following"
+        <ActionMenu
+          label="Channel settings"
           align="start"
-        >
-          Stop following
-        </ConfirmStep>
+          items={[
+            {
+              id: 'transcribe',
+              label: channel.autoTranscribe ? 'Stop transcribing new uploads' : 'Transcribe new uploads',
+              formAction: setAutoTranscribeAction,
+              formFields: { providerId: channel.id, on: channel.autoTranscribe ? 'false' : 'true' },
+            },
+            {
+              id: 'remove',
+              label: 'Stop following',
+              destructive: true,
+              confirm:
+                'Stop following this channel and delete its listed videos and playlists from the catalogue. Stored transcripts stay in storage.',
+              formAction: removeChannelAction,
+              formFields: { providerId: channel.id },
+            },
+          ]}
+        />
       </div>
 
       <div className="space-y-6">
