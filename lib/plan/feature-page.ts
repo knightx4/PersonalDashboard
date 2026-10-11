@@ -9,7 +9,7 @@ import {
   type PlanNode,
   type PlanSection,
 } from '@/lib/plan/tree';
-import type { PlanStatus } from '@/lib/plan/load';
+import { isClosed, type PlanStatus } from '@/lib/plan/load';
 import type { Tab } from '@/lib/tabs';
 
 /**
@@ -102,6 +102,21 @@ export function findFeature(
 export function stepRedirect(feature: PlanNode, target: PlanNode): string | null {
   if (feature.id === target.id) return null;
   return `${featureHref(feature.number)}?tab=steps#${planRowId(target.number)}`;
+}
+
+/**
+ * Where an "After #…" on a step goes: the waited-on step's row, by its anchor
+ * when it is on the same feature's page, or through its number, which opens
+ * its own feature's Steps tab at it, when it is elsewhere on the plan.
+ */
+export function waitedOnHref(
+  step: Pick<PlanNode, 'outline'>,
+  on: Pick<PlanNode, 'number'> & { outline?: string },
+): string {
+  const featureOf = (outline: string | undefined) => outline?.split('.')[0];
+  return on.outline && featureOf(on.outline) === featureOf(step.outline)
+    ? `#${planRowId(on.number)}`
+    : featureHref(on.number);
 }
 
 /**
@@ -226,6 +241,11 @@ export type GroupedStep = {
   node: PlanNode;
   /** Named by its outline, `#925.3`, as its row heads itself. */
   parent: Pick<PlanNode, 'number' | 'outline' | 'title'> | null;
+  /**
+   * The open step on this feature it waits on, when it is listed straight
+   * beneath that step rather than in a group of its own. Null otherwise.
+   */
+  after: Pick<PlanNode, 'number' | 'outline' | 'title'> | null;
 };
 
 export type StepGroup = {
@@ -243,6 +263,12 @@ export type StepGroup = {
  * on. Groups with nothing in them are not returned. `only` keeps just the
  * steps whose ids it holds (the Steps tab filtered by who holds them, plan
  * #1668), their substeps still looked through.
+ *
+ * A step that waits on another open step listed here goes straight beneath
+ * that step, in its group, rather than into Not started on its own: filed
+ * there, "After #1673.2" was the only sign of what it was waiting for, and
+ * the step it named was in a different group. Waiting on several, it goes
+ * under the last of them in the tree's order, the one it can start after.
  */
 export function stepGroups(
   feature: PlanNode,
@@ -260,14 +286,55 @@ export function stepGroups(
       found.push({
         node,
         parent: parent && { number: parent.number, outline: parent.outline, title: parent.title },
+        after: null,
       });
       walk(node.children, node);
     }
   };
   walk(feature.children, null);
+
+  // The step each one is listed beneath, by id, when it waits on one here.
+  const order = new Map(found.map((step, index) => [step.node.id, index]));
+  const under = new Map<string, string>();
+  for (const step of found) {
+    if (isClosed(step.node.status)) continue;
+    const targets = step.node.dependsOn
+      .map((link) => link.item)
+      .filter((ref) => !isClosed(ref.status) && order.has(ref.id));
+    const last = targets.sort((a, b) => order.get(a.id)! - order.get(b.id)!).at(-1);
+    if (last) under.set(step.node.id, last.id);
+  }
+  // A loop of waits has no first step to hang the rest from; each of its
+  // steps keeps its own group instead.
+  for (const id of [...under.keys()]) {
+    const seen = new Set<string>();
+    let at: string | undefined = id;
+    while (at !== undefined && !seen.has(at)) {
+      seen.add(at);
+      at = under.get(at);
+    }
+    if (at !== undefined) seen.forEach((looped) => under.delete(looped));
+  }
+  const waiters = new Map<string, GroupedStep[]>();
+  const byId = new Map(found.map((step) => [step.node.id, step]));
+  for (const step of found) {
+    const target = under.get(step.node.id);
+    if (!target) continue;
+    const of = byId.get(target)!.node;
+    step.after = { number: of.number, outline: of.outline, title: of.title };
+    waiters.set(target, [...(waiters.get(target) ?? []), step]);
+  }
+  const withWaiters = (step: GroupedStep): GroupedStep[] => [
+    step,
+    ...(waiters.get(step.node.id) ?? []).flatMap(withWaiters),
+  ];
+
   return STEP_GROUPS.map((group) => ({
     ...group,
-    steps: found.filter(({ node }) => stepGroupOf(healthOf(asListed(node), liveness)) === group.id),
+    steps: found
+      .filter(({ node }) => !under.has(node.id))
+      .filter(({ node }) => stepGroupOf(healthOf(asListed(node), liveness)) === group.id)
+      .flatMap(withWaiters),
   })).filter((group) => group.steps.length > 0);
 }
 
