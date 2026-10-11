@@ -46,7 +46,6 @@ export function ModulesIndexView({ summaries }: { summaries: readonly ModuleSumm
       <PageHeader
         crumbs={moduleCrumbs()}
         title="Modules"
-        description="Each workspace on its own page: its plan, its bugs and ideas, its spec, its UI review and how much it is used."
       />
       <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
         {summaries.map((summary) => (

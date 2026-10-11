@@ -159,7 +159,8 @@ wide screen, and the sixth for pages of peer sections:
   each have their own address, and its properties in a column on the right
   that becomes a grid of facts under the title on a phone. The feature page
   on the plan and the goal page use it (decision 1661, answered B, after
-  Linear's project page).
+  Linear's project page). Its text and its properties sit on cards (plan
+  1686).
 - **Main plus rail**: an overview page such as Home, with the column you work
   in and, from laptop width, a narrow column on the right holding what you
   glance at (counts, what is running, what Dash did, what is due soon). On a
