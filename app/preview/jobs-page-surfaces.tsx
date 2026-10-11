@@ -1,6 +1,6 @@
 import { Inbox, FileText, Shield } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { Card, CardSection } from '@/components/ui/card';
+import { Card, CardSection, cardVariants } from '@/components/ui/card';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { Figure } from '@/components/ui/figure';
 import { Meter } from '@/components/ui/meter';
@@ -534,26 +534,29 @@ export function JobsOnboardingSurface() {
             <h1 className="font-display mt-2 text-title font-semibold tracking-tight text-ink">
               A pipeline that keeps itself current
             </h1>
-            <p className="mt-3 text-body leading-relaxed text-ink-muted">
+          </div>
+
+          <div className={cardVariants({ padding: 'standard' }) + ' space-y-4'}>
+            <p className="text-body leading-relaxed text-ink-muted">
               Applying creates the record whether or not you remembered to log it. What that buys
               you is a funnel you can actually trust — which is the only way to see where your
               search is losing, and whether that differs by channel.
             </p>
+            <ul className="space-y-3 text-body text-ink">
+              <li className="flex gap-3">
+                <Inbox className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
+                <span>Confirmations, rejections, interview invites and recruiter mail, read and filed.</span>
+              </li>
+              <li className="flex gap-3">
+                <FileText className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
+                <span>Paste a job link and the description, requirements and questions come with it.</span>
+              </li>
+              <li className="flex gap-3">
+                <Shield className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
+                <span>Email bodies are never stored. Never fills in a form or applies for you.</span>
+              </li>
+            </ul>
           </div>
-          <ul className="space-y-3 text-body text-ink">
-            <li className="flex gap-3">
-              <Inbox className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
-              <span>Confirmations, rejections, interview invites and recruiter mail, read and filed.</span>
-            </li>
-            <li className="flex gap-3">
-              <FileText className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
-              <span>Paste a job link and the description, requirements and questions come with it.</span>
-            </li>
-            <li className="flex gap-3">
-              <Shield className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
-              <span>Email bodies are never stored. Never fills in a form or applies for you.</span>
-            </li>
-          </ul>
           <WelcomeForm />
         </section>
       </div>
