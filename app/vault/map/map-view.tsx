@@ -8,7 +8,7 @@ import type { MergeLogPage } from '@/lib/vault/map/merge-log';
 import type { SweepView } from '@/lib/vault/map/sweep-read';
 import { cn } from '@/lib/cn';
 import { MergeLog } from './merge-log';
-import { SweepPanel } from './sweep-panel';
+import { SweepAction, SweepPanel } from './sweep-panel';
 
 /**
  * The map's list of themes, drawn from what the page read (page.tsx), so the
@@ -30,7 +30,7 @@ export function VaultMapView({
   if (themes.length === 0) {
     return (
       <>
-        <PageHeader title="Map" />
+        <PageHeader title="Map" actions={<SweepAction sweep={sweep} />} />
         <SweepPanel sweep={sweep} />
         {/* Themes arrive two ways: the sweep above, and one note's own Map
             section. The empty state names both. */}
@@ -46,7 +46,7 @@ export function VaultMapView({
 
   return (
     <>
-      <PageHeader title="Map" />
+      <PageHeader title="Map" actions={<SweepAction sweep={sweep} />} />
       <SweepPanel sweep={sweep} />
 
       <p className="mb-3 text-body text-ink-muted">
