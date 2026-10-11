@@ -5,12 +5,16 @@ import { AddBookManualForm, AddBookPasteForm, AddBookSearchForm } from '../add-b
 import { BarcodeScanPanel } from '../barcode-scan';
 import { PhotoCapturePanel } from '../photo-capture';
 
+/*
+ * One word each so the row fits one line at 390 wide; nowrap and the sideways
+ * scroll cover a narrower phone or larger text (plan #1779).
+ */
 export const BOOK_MODES = [
   { id: 'search', label: 'Search' },
-  { id: 'paste', label: 'Paste list' },
-  { id: 'scan', label: 'Scan barcode' },
-  { id: 'photo', label: 'Shelf / cover photo' },
-  { id: 'manual', label: 'By hand' },
+  { id: 'paste', label: 'Paste' },
+  { id: 'scan', label: 'Scan' },
+  { id: 'photo', label: 'Photo' },
+  { id: 'manual', label: 'Manual' },
 ] as const;
 
 export type BookMode = (typeof BOOK_MODES)[number]['id'];
@@ -24,7 +28,6 @@ export function AddBooksView({ mode }: { mode: BookMode }) {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Add owned books"
-        description="Capture books you already own. Barcodes are sell-ready; titles and shelf photos need a confirm tap."
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
@@ -43,7 +46,7 @@ export function AddBooksView({ mode }: { mode: BookMode }) {
         }
       />
 
-      <nav className="mb-6 flex flex-wrap gap-1" aria-label="Add mode">
+      <nav className="mb-6 flex gap-1 overflow-x-auto whitespace-nowrap" aria-label="Add mode">
         {BOOK_MODES.map((entry) => (
           <Link
             key={entry.id}
