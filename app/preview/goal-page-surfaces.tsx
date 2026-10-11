@@ -675,12 +675,13 @@ export function GoalTopSurface() {
       review={cardsReview}
       progress={cardsProgress}
       timeZone="UTC"
+      pace={{ known: true, activeDays: 9, typicalGap: 5, lastOn: '2026-10-09', daysSince: 2, slower: false }}
     >
       <div className="space-y-6">
         <GoalDoneWhen goal={cards} />
         <div className="space-y-4">
           <GoalStatusCard
-            line="3 on you · 1 step ready for Dash"
+            line="3 on you · 1 step ready for Dash · usually every 5 days, last 2 days ago"
             brief={{
               id: 'brief-1',
               itemId: cards.id,
@@ -767,6 +768,7 @@ export function GoalBareSurface() {
         move: 'settled',
       })}
       timeZone="UTC"
+      pace={{ known: false, activeDays: 1, lastOn: '2026-10-08', daysSince: 3 }}
     >
       <div className="space-y-6">
         <GoalDoneWhen goal={marathon}>
@@ -1097,6 +1099,11 @@ export function TabbedGoal({
       review={cardsReview}
       progress={goalProgress(tabbedMap.steps)}
       timeZone="UTC"
+      pace={
+        closed
+          ? null
+          : { known: true, activeDays: 6, typicalGap: 4, lastOn: '2026-10-01', daysSince: 10, slower: true }
+      }
     >
       {children}
     </GoalDetail>
