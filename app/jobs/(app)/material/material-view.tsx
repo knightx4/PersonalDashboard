@@ -10,7 +10,6 @@ import { ChipSelect, Input, Label, PressLabel, Select, Textarea } from '@/compon
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { EmptyState } from '@/components/ui/empty-state';
-import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { cardVariants } from '@/components/ui/card';
 import { segmentedFrame } from '@/components/ui/segmented';
 import { PaidHint } from '@/components/ui/paid-hint';
@@ -25,7 +24,7 @@ import {
   materialHref,
   type MaterialPart,
 } from '@/lib/jobs/material';
-import { AnswerBank } from './bank';
+import { AnswerBank, KindChips } from './bank';
 import { updateWritingVoice, type VoiceState } from './actions';
 import {
   acceptEvidence,
@@ -145,7 +144,7 @@ function AnswersPart({ questions, kind }: { questions: MaterialQuestion[]; kind:
       <EmptyState
         icon={MessageSquareText}
         title="No questions captured yet"
-        description="Use the bookmarklet on an application form, or paste the questions onto a role. Greenhouse postings bring their questions along automatically."
+        description="Use the bookmarklet on an application form, or paste the questions onto a role. Greenhouse postings bring their questions along automatically. Questions are deduped by fingerprint, so the same question asked in different words lands on one row."
         action={{ label: 'Add a role', href: '/jobs/roles/new' }}
         secondaryAction={{ label: 'Get the bookmarklet', href: '/jobs/settings#bookmarklet' }}
       />
@@ -156,40 +155,24 @@ function AnswersPart({ questions, kind }: { questions: MaterialQuestion[]; kind:
   const withCanonical = questions.filter((row) => row.canonicalAnswer).length;
 
   return (
-    <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
-      <LeftRail>
-        <RailGroup label="Kind">
-          <RailItem
-            label="All"
-            href={materialHref('answers')}
-            active={!kind}
-            count={questions.length}
-          />
-          {QUESTION_KINDS.filter((entry) => questions.some((row) => row.kind === entry)).map(
-            (entry) => (
-              <RailItem
-                key={entry}
-                label={entry}
-                href={materialHref('answers', entry)}
-                active={kind === entry}
-                count={questions.filter((row) => row.kind === entry).length}
-              />
-            ),
-          )}
-        </RailGroup>
-        <p className="px-1 text-small leading-relaxed text-ink-muted">
-          Questions are deduped by fingerprint, so the same question asked in different words lands
-          on one row.
-        </p>
-      </LeftRail>
-
-      <div className="min-w-0 flex-1 space-y-3">
-        <p className="tabular text-ui text-ink-muted">
-          {withCanonical} of {questions.length} questions have a default answer. Each one you set
-          makes the next application shorter.
-        </p>
-        <AnswerBank questions={filtered} />
-      </div>
+    <div className="space-y-3">
+      <p className="tabular text-ui text-ink-muted">
+        {withCanonical} of {questions.length} questions have a default answer
+      </p>
+      <KindChips
+        items={[
+          { label: 'All', href: materialHref('answers'), count: questions.length, active: !kind },
+          ...QUESTION_KINDS.filter((entry) => questions.some((row) => row.kind === entry)).map(
+            (entry) => ({
+              label: entry,
+              href: materialHref('answers', entry),
+              count: questions.filter((row) => row.kind === entry).length,
+              active: kind === entry,
+            }),
+          ),
+        ]}
+      />
+      <AnswerBank questions={filtered} />
     </div>
   );
 }
@@ -210,7 +193,6 @@ function VoiceSection({
   return (
     <section className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">Writing voice</h2>
-      <p className="mt-0.5 text-ui text-ink-muted">Every draft Dash writes for you reads these.</p>
 
       {!editing ? (
         <div className="mt-4 space-y-2">
@@ -555,7 +537,7 @@ function EvidenceSection({
         </ul>
       )}
 
-      <SeedFromWriting resumes={resumes} />
+      <SeedFromWriting resumes={resumes} bankEmpty={evidence.length === 0} />
 
       {/* Six fields, open on arrival, under the bank they are meant to fill.
           The comment on SeedFromWriting below already says nobody fills this
@@ -654,7 +636,9 @@ type EvidenceDraft = {
 
 function SeedFromWriting({
   resumes,
+  bankEmpty,
 }: {
+  bankEmpty: boolean;
   resumes: Array<{ id: string; label: string; hasText: boolean }>;
 }) {
   const readable = resumes.filter((resume) => resume.hasText);
@@ -688,10 +672,12 @@ function SeedFromWriting({
     // in the Evidence card and it belongs to it, so the frame around it was the
     // card's frame said twice. Law 11.
     <Group title="Seed it from what you have written" className="mt-4 border-t border-border pt-3">
-      <p className="text-small leading-relaxed text-ink-muted">
-        Read a resume, your approved behavioural answers, or your interview debriefs, and propose
-        the stories in them. Nothing is added until you tick it.
-      </p>
+      {bankEmpty && (
+        <p className="text-small leading-relaxed text-ink-muted">
+          Read a resume, your approved behavioural answers, or your interview debriefs, and
+          propose the stories in them. Nothing is added until you tick it.
+        </p>
+      )}
 
       {/* Chips rather than labelled selects: the chosen value says what each
           one is, and at 390 the two sit on one row instead of four (law 9). */}
