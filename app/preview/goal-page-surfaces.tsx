@@ -6,6 +6,7 @@ import { allGoalsCrumbs } from '@/lib/goals/crumbs';
 import { Card } from '@/components/ui/card';
 import { HomeView } from '@/app/goals/home-view';
 import { GoalsView } from '@/app/goals/goals-view';
+import { SONNET } from '@/lib/core/models';
 import { GoalAddRow } from '@/app/goals/[goalId]/goal-add-row';
 import { GoalLinksSection } from '@/app/goals/[goalId]/goal-links';
 import { GoalStatusCard } from '@/app/goals/[goalId]/goal-status';
@@ -518,7 +519,7 @@ export function GoalsAreaSurface() {
           runs: 6,
           basis: 'measured',
           per: 'run',
-          models: ['claude-sonnet-5-5'],
+          models: [SONNET],
         }}
       />
     </div>
