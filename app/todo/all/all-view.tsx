@@ -5,7 +5,7 @@ import type { Task } from '@/lib/todo/tasks/model';
 import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
 import { PageHeader } from '@/components/shell/page-header';
-import { Card } from '@/components/ui/card';
+import { ListPage } from '@/components/patterns/list-detail';
 import { EmptyState } from '@/components/ui/empty-state';
 import { QueueCleared } from '@/components/motion/clear';
 import { TaskRow } from '@/components/todo/task-row';
@@ -26,7 +26,9 @@ export type Filter = (typeof FILTERS)[number]['id'];
 
 /**
  * All tasks, drawn from what the page read (page.tsx), so the gallery can
- * draw it from fixtures (plan #1603).
+ * draw it from fixtures (plan #1603). Laid out as the list pattern
+ * (components/patterns/list-detail.tsx): the header, the tabs and search,
+ * one surface of rows, then the count (plan #1776).
  */
 export function AllTasksView({
   status,
@@ -56,71 +58,76 @@ export function AllTasksView({
   /** What the quiet-day mark is drawn from, so it changes once a day. */
   seed: string;
 }) {
-  return (
-    <div className="mx-auto max-w-3xl">
-      <PageHeader title="All tasks" description="Everything, including what is finished." />
-
+  // No line under the title: the tabs below already say what the list covers.
+  const header = (
+    <>
+      <PageHeader title="All tasks" />
       {focus && <FocusTask id={focus} />}
+    </>
+  );
 
-      <div className="flex flex-col gap-3">
-        <nav className="flex flex-wrap items-center gap-1" aria-label="Filter by status">
-          {FILTERS.map((filter) => {
-            const href = { pathname: '/todo/all', query: { status: filter.id, ...(search ? { q: search } : {}) } };
-            return (
-              <Link
-                key={filter.id}
-                href={href}
-                aria-current={filter.id === status ? 'page' : undefined}
-                className={cn(
-                  'press-area rounded-lg px-3 py-1.5 text-ui font-medium transition-colors duration-quick',
-                  filter.id === status
-                    ? 'bg-accent-tint text-accent'
-                    : 'text-ink-muted hover:bg-canvas hover:text-ink',
-                )}
-              >
-                {filter.label}
-              </Link>
-            );
-          })}
-        </nav>
+  // Directly above the list it narrows, like every other list in the app. The
+  // status filter rides along in the URL, so searching stays inside the tab
+  // you are on.
+  const tools = (
+    <div className="flex flex-col gap-3">
+      <nav className="flex flex-wrap items-center gap-1" aria-label="Filter by status">
+        {FILTERS.map((filter) => {
+          const href = { pathname: '/todo/all', query: { status: filter.id, ...(search ? { q: search } : {}) } };
+          return (
+            <Link
+              key={filter.id}
+              href={href}
+              aria-current={filter.id === status ? 'page' : undefined}
+              className={cn(
+                'press-area rounded-lg px-3 py-1.5 text-ui font-medium transition-colors duration-quick',
+                filter.id === status
+                  ? 'bg-accent-tint text-accent'
+                  : 'text-ink-muted hover:bg-canvas hover:text-ink',
+              )}
+            >
+              {filter.label}
+            </Link>
+          );
+        })}
+      </nav>
+      <SearchField placeholder="Search titles" />
+    </div>
+  );
 
-        {/* Directly above the list it narrows, like every other list in the
-            app. The status filter rides along in the URL, so searching stays
-            inside the tab you are on. */}
-        <SearchField placeholder="Search titles" />
-      </div>
-
-      {/* Finishing the last open task draws the day's sigil in (plan #1340).
-          Keyed by the view, so opening a tab that is already empty is not a
-          clear. */}
-      <QueueCleared key={`${status}:${search ?? ''}`} cleared={status === 'open' && !search && tasks.length === 0}>
-      {tasks.length === 0 && search ? (
-        <SearchEmpty query={search} className="mt-6" />
-      ) : tasks.length === 0 ? (
-        <AllTasksEmpty
-          status={status}
-          seed={seed}
-        />
+  return (
+    // Finishing the last open task draws the day's sigil in (plan #1340).
+    // Keyed by the view, so opening a tab that is already empty is not a
+    // clear.
+    <QueueCleared key={`${status}:${search ?? ''}`} cleared={status === 'open' && !search && tasks.length === 0}>
+      {tasks.length === 0 ? (
+        <div className="mx-auto max-w-3xl">
+          {header}
+          {tools}
+          {search ? (
+            <SearchEmpty query={search} className="mt-6" />
+          ) : (
+            <AllTasksEmpty status={status} seed={seed} />
+          )}
+        </div>
       ) : (
-        <Card
-          padding="none"
-          // The rows are the agenda's, so their links and title fields get
-          // their phone press areas from here.
-          className="mt-4 divide-y divide-border px-3 [&_a]:press-area max-sm:[&_input]:min-h-11"
-        >
+        <ListPage header={header} tools={tools} foot={countLine(tasks.length, status, search)}>
           {tasks.map((task) => (
-            <div
+            <li
               key={task.id}
               id={`task-${task.id}`}
               className={cn(
-                'scroll-mt-24 -mx-3 px-3',
-                task.id === focus && 'animate-[pulse_1.2s_ease-in-out_2] rounded-lg bg-accent-tint',
+                // The rows are the agenda's, so their links and title fields
+                // get their phone press areas from here.
+                'scroll-mt-24 px-3 [&_a]:press-area max-sm:[&_input]:min-h-11',
+                task.id === focus && 'animate-[pulse_1.2s_ease-in-out_2] bg-accent-tint',
               )}
             >
               <TaskRow
                 task={task}
                 timezone={timezone}
                 working={working}
+                archive
                 thread={threads.get(threadRef('task', task.id))}
                 files={files.get(task.id)}
                 filesOpen={task.id === focus}
@@ -136,15 +143,22 @@ export function AllTasksView({
                     : null
                 }
               />
-            </div>
+            </li>
           ))}
-        </Card>
+        </ListPage>
       )}
-      </QueueCleared>
-    </div>
+    </QueueCleared>
   );
 }
 
+/**
+ * The count under the list (plan #1776), in the tab's own word: "6 open",
+ * "12 done", "40 tasks" on Everything, and what a search found.
+ */
+export function countLine(count: number, status: Filter, search: string): string {
+  const word = status === 'all' ? (count === 1 ? 'task' : 'tasks') : status;
+  return search ? `${count} ${word} matching “${search}”` : `${count} ${word}`;
+}
 
 /**
  * Two kinds of nothing, neither of them a search: an empty Open list is the
