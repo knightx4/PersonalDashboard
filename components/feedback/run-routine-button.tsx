@@ -189,11 +189,6 @@ export function RunRoutineButton({
           {notesLastRunLine(lastRun)}.
         </p>
       )}
-      {hint && run === null && !lastRun && (
-        <p className="text-ui text-ink-muted">
-          Works the outstanding notes now instead of waiting for the schedule.
-        </p>
-      )}
 
       {running && run && (
         <p className="flex items-start gap-2 text-ui text-ink-muted">
