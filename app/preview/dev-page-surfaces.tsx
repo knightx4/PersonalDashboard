@@ -32,6 +32,7 @@ import {
   type OtherFeedbackRow,
 } from '@/lib/feedback/load';
 import type { IdeaList, IdeaRow } from '@/lib/ideas/load';
+import type { Triage } from '@/lib/feedback/triage';
 import type { Attachment } from '@/lib/attachments/store';
 import { functionSpendRows } from '@/lib/usage/function-spend';
 import { usageReport } from '@/lib/usage/report';
@@ -90,12 +91,34 @@ function file(id: string, name: string, contentType: string, size: number, href:
   };
 }
 
+/**
+ * Jev's triage as filed (plan #1179), with the fix-or-plan answer (plan
+ * #1674): sure on the first, unsure of the route on the second.
+ */
+function triage(over: Partial<Triage>): Triage {
+  return {
+    at: '2026-10-03T14:00:02Z',
+    kind: null,
+    module: null,
+    priority: null,
+    route: null,
+    duplicate: { value: null, confidence: 0.95 },
+    ...over,
+  };
+}
+
 const notes: FeedbackRow[] = [
   note({
     id: 'n1',
     body: 'The plan page scrolls sideways on my phone when a step title is long and has a link in it',
     pagePath: '/dev/plan',
     priority: 1,
+    triage: triage({
+      kind: { value: 'bug', confidence: 0.97 },
+      module: { value: 'dev', confidence: 0.92 },
+      priority: { value: 1, confidence: 0.85 },
+      route: { value: 'fix', confidence: 0.9 },
+    }),
     attachments: [
       file('a1', 'plan-scrolls-sideways.png', 'image/png', 412_000, '/posts/2026-10-09-dev-plan-tree.png'),
       file('a2', 'goals-page.png', 'image/png', 388_000, '/posts/2026-10-09-goals-page-steps.png'),
@@ -107,6 +130,12 @@ const notes: FeedbackRow[] = [
     body: 'Let me snooze a todo to next Monday from the swipe, without opening it',
     pagePath: '/todo',
     createdAt: '2026-10-02T09:30:00Z',
+    triage: triage({
+      kind: { value: 'feature', confidence: 0.95 },
+      module: { value: 'todo', confidence: 0.96 },
+      priority: { value: 2, confidence: 0.6 },
+      route: { value: 'plan', confidence: 0.62 },
+    }),
   }),
   note({
     id: 'n3',
@@ -190,6 +219,12 @@ const ideas: IdeaList = {
       id: 'i1',
       module: 'shopping',
       body: 'Read receipts from photos of paper receipts, the way order emails are read',
+      triage: triage({
+        kind: { value: 'feature', confidence: 0.98 },
+        module: { value: 'shopping', confidence: 0.94 },
+        priority: { value: 3, confidence: 0.82 },
+        route: { value: 'plan', confidence: 0.93 },
+      }),
       score: { value: 74, confidence: 0.9, at: '2026-09-30T09:01:00Z' },
     }),
     idea({

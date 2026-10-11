@@ -21,7 +21,7 @@ import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
 import { DashMarkLooks } from './dash-mark-surface';
 import { CaptureBoxSurface } from './capture-surfaces';
-import { NoteButtonSurface } from './note-surfaces';
+import { NoteButtonSurface, NoteSavedSurface } from './note-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
 import { UiStandard } from '@/app/dev/ui/standard';
 import { TasteList } from '@/app/dev/ui/taste-list';
@@ -4522,6 +4522,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <NoteButtonSurface />,
+  },
+  {
+    /* The same panel once a note has saved, with Jev's triage under it and
+     * the fix-or-plan answer last (plan #1674). */
+    id: 'shell-note-saved',
+    label: 'Top bar · A note just saved, as Jev sorted it',
+    module: 'dev',
+    width: 'page',
+    render: () => <NoteSavedSurface />,
   },
 
   {
