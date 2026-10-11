@@ -85,7 +85,7 @@ import { criticStopNeeds, type CriticStopView } from '@/lib/plan/ui-check-stop';
 import { CriticStop } from './critic-stop';
 import { SendScreenBack } from './send-back';
 import { ScreenChanges } from '@/components/dev/screen-change';
-import { featureHref } from '@/lib/plan/feature-page';
+import { featureHref, waitedOnHref } from '@/lib/plan/feature-page';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import type { PlanPicture } from '@/lib/plan/pictures';
 import { PlanPictures } from '@/components/dev/plan-pictures';
@@ -629,7 +629,8 @@ export function usePlanRow({
   /**
    * A small line under the title saying where the row sits, for a list that
    * does not draw the tree: the Steps tab's status groups name a substep's
-   * step this way (plan #1665). Read by `PlanRow`, not here.
+   * step this way (plan #1665), and a step listed beneath the one it waits on
+   * names it. Read by `PlanRow`, not here.
    */
   source?: string;
 }) {
@@ -1297,12 +1298,27 @@ export function usePlanRow({
     health,
     move: move.move ? (
       moveAfter && afterWord(move.move) ? (
-        <StateLabel
-          glyph={null}
-          word={afterWord(move.move)!}
-          tone={MOVE_TONE.waiting}
-          title={move.title}
-        />
+        // Waiting on one step, the words link to it (on this page, its row).
+        node.waitingOn.length === 1 ? (
+          <a
+            href={waitedOnHref(node, node.waitingOn[0])}
+            className="press-area underline underline-offset-2"
+          >
+            <StateLabel
+              glyph={null}
+              word={afterWord(move.move)!}
+              tone={MOVE_TONE.waiting}
+              title={`${move.title} Opens #${node.waitingOn[0].outline ?? node.waitingOn[0].number}.`}
+            />
+          </a>
+        ) : (
+          <StateLabel
+            glyph={null}
+            word={afterWord(move.move)!}
+            tone={MOVE_TONE.waiting}
+            title={move.title}
+          />
+        )
       ) : (
         <MoveLabel move={move.move} title={move.title} />
       )
