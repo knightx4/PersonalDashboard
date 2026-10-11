@@ -9,14 +9,7 @@ export function TakeQuizView({ quiz, current }: { quiz: Quiz; current: QuizQuest
 
   return (
     <>
-      <PageHeader
-        title={quiz.title}
-        description={
-          quiz.preparingFor
-            ? `For ${quiz.preparingFor}. Answer in your own words — a phrase or a sentence is enough.`
-            : 'Answer in your own words — a phrase or a sentence is enough.'
-        }
-      />
+      <PageHeader title={quiz.title} />
 
       <div className="max-w-2xl">
         <QuestionForm
@@ -26,6 +19,11 @@ export function TakeQuizView({ quiz, current }: { quiz: Quiz; current: QuizQuest
           question={current.question}
           position={total - left + 1}
           total={total}
+          intro={
+            quiz.preparingFor
+              ? `For ${quiz.preparingFor}. Answer in your own words — a phrase or a sentence is enough.`
+              : 'Answer in your own words — a phrase or a sentence is enough.'
+          }
           left={left}
         />
       </div>
