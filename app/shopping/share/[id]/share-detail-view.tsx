@@ -75,7 +75,7 @@ export function ShareDetailView({
         actions={<ShareControls shareId={share.id} archived={share.status !== 'active'} />}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="space-y-6">
         <div className="min-w-0">
           {groups.length === 0 ? (
             <EmptyState

@@ -70,9 +70,9 @@ export function ShareLinkRow({
   const [pending, startTransition] = useTransition();
 
   return (
-    <div className="row-pad flex flex-wrap items-center gap-2">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-ui text-ink">{url}</p>
+    <div className="row-pad space-y-2">
+      <div className="min-w-0">
+        <p className="break-all text-ui text-ink">{url}</p>
         <p className="text-small text-ink-muted">
           {label}
           {revoked
@@ -83,7 +83,7 @@ export function ShareLinkRow({
         </p>
       </div>
       {!revoked && (
-        <>
+        <div className="flex items-center gap-2">
           <Button
             size="sm"
             variant="secondary"
@@ -112,7 +112,7 @@ export function ShareLinkRow({
           >
             Revoke
           </Button>
-        </>
+        </div>
       )}
     </div>
   );
