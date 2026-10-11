@@ -20,16 +20,13 @@ export function FamiliesView({ suggestions }: { suggestions: PendingSuggestion[]
         <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> Shared forms
       </Link>
 
-      <PageHeader
-        title="Grouping"
-        description="Games that look like they belong together. Confirm one and the shared form puts them under a single heading."
-      />
+      <PageHeader title="Possible families" />
 
       {suggestions.length === 0 ? (
         <EmptyState
           icon={Layers}
           title="Nothing to group"
-          description="Either everything is already grouped, or no two games on your shelf are named after each other."
+          description="Either everything is already grouped, or no two games on your shelf are named after each other. When two are, confirming a family puts them under a single heading on the shared form."
           action={{ label: 'Open inventory', href: '/shopping/inventory' }}
           secondaryAction={{ label: 'Shared forms', href: '/shopping/share' }}
         />
