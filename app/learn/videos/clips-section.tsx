@@ -23,15 +23,19 @@ export const CLIPS_HREF = '/learn/videos?open=clips#clips';
 export function ClipsSection({
   progress,
   player,
+  count,
 }: {
+  /** Clips cut so far; with none, and the player not open, the fold is left out. */
+  count: number;
   /** What is cut, what is left and when the next batch comes. */
   progress: string;
   /** The clips to play, when the player is open. */
   player: { clips: PlayerClip[] } | null;
 }) {
+  if (count === 0 && player === null) return null;
   return (
     <div id="clips" className="mt-8 scroll-mt-6">
-      <SectionFold title="Clips" defaultOpen={player !== null}>
+      <SectionFold title="Clips" count={count} defaultOpen={player !== null}>
         <p className="text-small tabular-nums text-ink-muted">{progress}</p>
         {player === null ? (
           <div>

@@ -81,7 +81,7 @@ export function VideoRows({
         const pile = PILE_LABEL[video.verdict ?? 'unjudged'];
         const clips = clipCounts.get(video.videoId);
         return (
-          <li key={video.videoId} className="flex items-start gap-3 px-3 py-2">
+          <li key={video.videoId} className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1 px-3 py-2 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
             <Link href={href} className="press-area shrink-0" tabIndex={-1} aria-hidden>
               {/* eslint-disable-next-line @next/next/no-img-element -- YouTube's own stills, not worth the image optimiser */}
               <img
@@ -90,15 +90,15 @@ export function VideoRows({
                 loading="lazy"
                 width={96}
                 height={54}
-                className="h-[54px] w-24 rounded-sm bg-sunken object-cover"
+                className="h-[36px] w-16 rounded-sm bg-sunken object-cover sm:h-[54px] sm:w-24"
               />
             </Link>
-            <span className="min-w-0 flex-1">
+            <span className="min-w-0">
               <Link href={href} className="press-area block text-ui text-ink hover:underline">
                 <span className="line-clamp-2">{video.title}</span>
               </Link>
               <span className="block truncate text-small tabular-nums text-ink-muted">{meta.join(' · ')}</span>
-              <span className="mt-0.5 block text-small text-ink-muted">
+              <span className="mt-0.5 block truncate text-small text-ink-muted">
                 <span className={cn('font-medium', video.verdict ? 'text-ink' : 'text-ink-muted')}>
                   {pile}
                   {detail && video.verdict === 'card' && cards > 0 ? (
@@ -118,10 +118,11 @@ export function VideoRows({
                     {clips === 0 ? 'no clips in it' : clips === 1 ? '1 clip' : `${clips} clips`}
                   </span>
                 )}
-                <span className="line-clamp-2">{verdictReason(video)}</span>
-              </span>
+                </span>
+              <span className="line-clamp-1 text-small text-ink-muted">{verdictReason(video)}</span>
             </span>
-            <span className="flex shrink-0 items-center gap-1">
+            {/* Under the text on a phone, so the text keeps the full width; beside it from sm up. */}
+            <span className="col-span-2 flex items-center justify-end gap-1 sm:col-span-1 sm:justify-start">
               <WatchedToggle videoId={video.videoId} watched={video.watchedAt !== null} />
               <ActionMenu label={`Move ${video.title}`} items={moveItems(video)} />
             </span>

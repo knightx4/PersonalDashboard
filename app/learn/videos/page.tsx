@@ -51,6 +51,7 @@ export default async function VideosPage({
       cardCounts={cardCounts}
       clipCounts={clipProgress.perVideo}
       progress={clipProgressLine(clipProgress, now)}
+      clipTotal={clipProgress.clips}
       clips={clips}
       channels={channels}
       usage={usage}

@@ -712,6 +712,7 @@ export function LearnVideosSurface() {
       cardCounts={new Map([['vid00000002', 2]])}
       clipCounts={new Map([['vid00000001', 3]])}
       progress="14 clips cut from 5 videos, 9 left to play. The next batch is cut tonight."
+      clipTotal={14}
       clips={null}
       channels={channels}
       usage={usage}
