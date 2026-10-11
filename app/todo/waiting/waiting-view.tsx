@@ -16,12 +16,7 @@ export function WaitingView({ waiting }: { waiting: Waiting }) {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title="Waiting"
-        description={
-          count === 0 ? 'Nothing is waiting on anyone else.' : 'What someone else has to move next, by who.'
-        }
-      />
+      <PageHeader title="Waiting" />
 
       {waiting.failed.length > 0 && (
         <Banner tone="bad" className="mt-4">
@@ -34,7 +29,7 @@ export function WaitingView({ waiting }: { waiting: Waiting }) {
         <EmptyState
           icon={Hourglass}
           title="Nothing waiting."
-          description="An application you send or an order on its way shows here until it is yours to move."
+          description="Nothing is waiting on anyone else. An application you send or an order on its way shows here until it is yours to move."
           className="mt-6"
         />
       ) : (
@@ -51,31 +46,30 @@ export function WaitingView({ waiting }: { waiting: Waiting }) {
                 {group.entries.map((entry) => {
                   const since = sinceLabel(entry.since, waiting.timezone);
                   return (
-                    <div key={entry.key} className="row-pad flex items-start gap-3" title={entry.why}>
-                      <span className="mt-0.5 self-start">
-                        <ModuleMark module={entry.module} size="xs" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                          {entry.link ? (
-                            <a
-                              href={entry.link.href}
-                              className="press-area text-ui font-medium text-ink transition-colors duration-quick hover:text-accent"
-                            >
-                              {entry.title}
-                            </a>
-                          ) : (
-                            <span className="text-ui font-medium text-ink">{entry.title}</span>
-                          )}
-                          {entry.detail && (
-                            <span className="text-small text-ink-muted">{entry.detail}</span>
-                          )}
-                        </div>
-                        <p className="text-small text-ink-muted">{entry.why}</p>
+                    <div key={entry.key} className="row-pad" title={entry.why}>
+                      <div className="flex items-start gap-3">
+                        <span className="mt-0.5 self-start">
+                          <ModuleMark module={entry.module} size="xs" />
+                        </span>
+                        {entry.link ? (
+                          <a
+                            href={entry.link.href}
+                            className="press-area line-clamp-2 min-w-0 flex-1 text-ui font-medium text-ink transition-colors duration-quick [overflow-wrap:anywhere] hover:text-accent"
+                          >
+                            {entry.title}
+                          </a>
+                        ) : (
+                          <span className="line-clamp-2 min-w-0 flex-1 text-ui font-medium text-ink [overflow-wrap:anywhere]">
+                            {entry.title}
+                          </span>
+                        )}
+                        {since && (
+                          <span className="tabular shrink-0 text-small text-ink-muted">{since}</span>
+                        )}
                       </div>
-                      {since && (
-                        <span className="tabular shrink-0 text-small text-ink-muted">{since}</span>
-                      )}
+                      <p className="truncate text-small text-ink-muted">
+                        {entry.detail ? `${entry.detail} · ${entry.why}` : entry.why}
+                      </p>
                     </div>
                   );
                 })}
