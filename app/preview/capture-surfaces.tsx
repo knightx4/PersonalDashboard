@@ -39,12 +39,12 @@ const UPLOADED: UploadedAttachment[] = [
 const ACTION = captureAction('anything') as CaptureAction;
 /** Every place, the vault included: its token can write (plan #1582). */
 const PLACES: CapturePlace[] = ['todo', 'goals', 'jobs', 'vault'];
-const ROLE = { id: '00000000-0000-4000-8000-000000000002', title: 'Senior Product Analyst, Payments Risk', company: 'Stripe' };
+const ROLE = { id: '00000000-0000-4000-8000-000000000002', title: 'Senior Product Analyst, Payments Risk', company: 'Lattice Pay' };
 const GOAL = { id: '00000000-0000-4000-8000-000000000001', title: 'Run a half marathon before the end of March' };
 
 const TWO_PARTS: CaptureSort = {
   parts: [
-    { place: 'jobs', text: 'Sent the cover letter to Stripe', goal: null, role: ROLE },
+    { place: 'jobs', text: 'Sent the cover letter to Lattice Pay', goal: null, role: ROLE },
     { place: 'todo', text: 'chase Sam on Friday', goal: null, role: null },
   ],
   confidence: 0.92,
@@ -131,7 +131,7 @@ function Box({
 export function CaptureBoxSurface() {
   return (
     <div className="space-y-8 py-4">
-      <Box text="Sent the cover letter to Stripe, chase Sam on Friday">
+      <Box text="Sent the cover letter to Lattice Pay, chase Sam on Friday">
         <PlaceLine guess={{ state: 'answered', sort: TWO_PARTS }} places={PLACES} picked={null} onPick={nothing} />
         <CaptureFoot
           pending={false}
