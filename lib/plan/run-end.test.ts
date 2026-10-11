@@ -105,6 +105,19 @@ describe('lastRunLine', () => {
     );
   });
 
+  it("gives the session's own reason over the app's note", () => {
+    expect(
+      lastRunLine(
+        run({
+          status: 'failed',
+          error: 'Nothing was heard from this run for 2h.',
+          stopReason: 'Too big for one sitting: six pieces of work.',
+        }),
+        at(150),
+      ),
+    ).toBe('Last run stopped: Too big for one sitting: six pieces of work.');
+  });
+
   it('says so when a stopped run kept no reason', () => {
     expect(lastRunLine(run({ status: 'failed' }), at(60))).toBe(
       'Last run stopped: no reason recorded',

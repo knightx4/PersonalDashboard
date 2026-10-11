@@ -169,6 +169,27 @@ insert into plan_items (user_id, module, parent_id, title, acceptance, size,
 values ('…', 'dev', '<the feature id>', '…', '…', 's', 'proposed', 30,
         'From #63''s answer: <that answer, first line>');
 
+-- stopped: a run ending with its step neither closed nor blocked says why,
+-- in one line of 300 characters or fewer, on the newest run fired at the step
+-- or a row above it (a feature batch is fired at the feature). A run still
+-- 'started' is ended 'failed' with the reason as its error too; one the
+-- cutoff already ended keeps the app's note in `error`. `stop_pieces` is the
+-- split a too-big step would take, two to twenty titles in order, or null.
+-- A run row is Dash's own record, so no record_dash_action call.
+with recursive chain as (
+  select id, parent_id from plan_items where id = '<the step id>' and user_id = '…'
+  union all
+  select p.id, p.parent_id from plan_items p join chain on p.id = chain.parent_id
+)
+update plan_runs
+set stop_reason = $r$<why, one line>$r$, stop_pieces = null, stopped_at = now(),
+    status = case when status = 'started' then 'failed' else status end,
+    error = case when status = 'started' then $r$<why, one line>$r$ else error end
+where id = (select id from plan_runs where user_id = '…'
+            and plan_item_id in (select id from chain)
+            order by created_at desc limit 1)
+  and status <> 'finished';
+
 -- block: not finished, so no commit. `block_ask` is the one sentence saying
 -- what it needs, rewritten on every block and read by Dash and the plan row;
 -- the dated line is the history and is appended. Clear `block_ask` whenever
