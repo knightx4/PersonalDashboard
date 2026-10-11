@@ -109,6 +109,16 @@ export default async function IssuePage({
       pictureCount={showDigest ? digest.stories.filter((story) => story.image).length : images}
       blockedImages={blockedImages}
       unsubscribeUrl={issue.unsubscribeUrl}
+      confirm={
+        issue.confirmUrl
+          ? {
+              url: issue.confirmUrl,
+              confirmedLabel: issue.confirmedAt
+                ? formatArrival(issue.confirmedAt, settings.timezone)
+                : null,
+            }
+          : null
+      }
       picturesHref={picturesHref}
       originalHref={originalHref}
       summaryHref={summaryHref}

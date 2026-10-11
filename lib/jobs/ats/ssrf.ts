@@ -56,13 +56,18 @@ export async function assertPublicHttpUrl(rawUrl: string): Promise<URL> {
 export const FETCH_TIMEOUT_MS = 12_000;
 export const MAX_BODY_BYTES = 2_000_000;
 
-/** Fetch with the constraints above, following no redirects blindly. */
+/**
+ * Fetch with the constraints above, following no redirects blindly.
+ * `maxBytes` raises the body limit for a known feed that is larger than a
+ * page (the YC hiring list is about 2.6 MB).
+ */
 export async function safeFetch(
   rawUrl: string,
-  init: RequestInit = {},
+  options: RequestInit & { maxBytes?: number } = {},
   depth = 0,
 ): Promise<{ url: string; status: number; body: string; contentType: string }> {
   if (depth > 3) throw new Error('Too many redirects.');
+  const { maxBytes = MAX_BODY_BYTES, ...init } = options;
 
   const url = await assertPublicHttpUrl(rawUrl);
   const controller = new AbortController();
@@ -85,12 +90,12 @@ export async function safeFetch(
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
       if (!location) throw new Error('Redirect without a destination.');
-      return safeFetch(new URL(location, url).toString(), init, depth + 1);
+      return safeFetch(new URL(location, url).toString(), options, depth + 1);
     }
 
     const contentType = response.headers.get('content-type') ?? '';
     const buffer = await response.arrayBuffer();
-    if (buffer.byteLength > MAX_BODY_BYTES) {
+    if (buffer.byteLength > maxBytes) {
       throw new Error('That page is too large to read.');
     }
 

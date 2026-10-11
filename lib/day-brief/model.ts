@@ -75,7 +75,7 @@ export async function writeBrief(
         },
       },
     ],
-    tool_choice: forceTool(TOOL_NAME),
+    tool_choice: forceTool(TOOL_NAME, BRIEF_MODEL),
     messages: [{ role: 'user', content: picksPrompt(day, picks) }],
   });
   options.onSpend?.({ model: BRIEF_MODEL, usage: usageFrom(response.usage) });
@@ -128,7 +128,7 @@ export async function choosePicks(
         },
       },
     ],
-    tool_choice: forceTool(PICK_TOOL),
+    tool_choice: forceTool(PICK_TOOL, BRIEF_MODEL),
     messages: [{ role: 'user', content: shortlistPrompt(day, list) }],
   });
   options.onSpend?.({ model: BRIEF_MODEL, usage: usageFrom(response.usage) });

@@ -58,7 +58,7 @@ function AskButton({ label }: { label: string }) {
   // wait is only long when the queue ran dry and it is being written now.
   return (
     <span className="inline-flex items-center gap-1">
-      <Button type="submit" disabled={pending}>
+      <Button type="submit" pending={pending}>
         {pending ? 'Getting the next question…' : label}
       </Button>
       <PaidHint action="app/learn/flow/actions.ts#flowStep:ask" what="Cost of the next question" />
@@ -154,7 +154,7 @@ function StartButton() {
   // One call to write the track's ideas and one to write its first question,
   // so this is the slowest press in the flow and says so.
   return (
-    <Button type="submit" variant="secondary" size="sm" disabled={pending}>
+    <Button type="submit" variant="secondary" size="sm" pending={pending}>
       {pending ? 'Writing the subject…' : 'Start'}
     </Button>
   );

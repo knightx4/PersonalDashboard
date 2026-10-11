@@ -117,7 +117,7 @@ export async function writeUnitCheck(input: {
           },
         },
       ],
-      tool_choice: forceTool(WRITE_TOOL),
+      tool_choice: forceTool(WRITE_TOOL, UNIT_CHECK_MODEL),
       messages: [{ role: 'user', content: [...unitLines(input.unit), '', `Call ${WRITE_TOOL}.`].join('\n') }],
     });
   } catch (error) {

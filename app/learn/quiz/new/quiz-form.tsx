@@ -1,10 +1,10 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useId, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Field, Input, Textarea } from '@/components/ui/field';
+import { Field, Input, PressLabel, Textarea } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { MIN_QUERY, type SearchHit } from '@/lib/search/sources';
@@ -45,6 +45,7 @@ function NoteSearch({
   onPick: (note: PickedNote) => void;
 }) {
   const [query, setQuery] = useState('');
+  const fieldId = useId();
   /**
    * The last answer and the query it answered, kept together so "is something
    * still on its way" is derived rather than stored. It is also what stops a
@@ -84,9 +85,11 @@ function NoteSearch({
 
   return (
     <div>
-      <div className="flex items-center gap-2 border-b border-border">
+      <div className="relative flex items-center gap-2 border-b border-border">
         <Search className="size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+        <PressLabel htmlFor={fieldId} />
         <input
+          id={fieldId}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={(event) => {
@@ -98,7 +101,7 @@ function NoteSearch({
           aria-label="Find a note by name"
           disabled={full}
           data-focus-ring="none"
-          className="h-(--control-h) w-full bg-transparent text-ui text-ink outline-none placeholder:text-ink-ghost"
+          className="relative h-(--control-h) w-full bg-transparent text-ui text-ink outline-none placeholder:text-ink-ghost"
         />
       </div>
 

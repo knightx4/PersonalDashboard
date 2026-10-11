@@ -1,10 +1,11 @@
 /**
- * The Usage tab in Dev (plan #1482), drawn from a fixture of page views: opens
- * and spend per page and workspace, the pages not opened in 30 days first.
+ * The Usage tab in Dev (plans #1482 and #1693), drawn from fixtures: spend per
+ * function first, then the page opens folded below it.
  */
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { UsageScreen } from '@/app/dev/usage/usage-view';
+import { functionSpendRows } from '@/lib/usage/function-spend';
 import type { PageOpens } from '@/lib/usage/opens';
 import { PAGE_ROUTES } from '@/lib/usage/pages';
 import { usageReport, type WorkspaceSpend } from '@/lib/usage/report';
@@ -55,21 +56,42 @@ describe('usageReport', () => {
   });
 });
 
+const functions = functionSpendRows([
+  { module: 'learn', operation: 'plan-topic', spend_7: 2_000_000, spend_30: 8_500_000, calls_30: 40, unpriced_30: 0 },
+  { module: 'core', operation: 'ask-dash', spend_7: 50_000, spend_30: 90_000, calls_30: 9, unpriced_30: 0 },
+  { module: 'website', operation: 'odd-job', spend_7: 0, spend_30: 300_000, calls_30: 7, unpriced_30: 1 },
+]);
+
 describe('UsageScreen', () => {
-  it('draws the unopened pages first, then opens and spend per workspace', () => {
-    const html = renderToStaticMarkup(<UsageScreen report={usageReport(opened, spend)} now={now} />);
-    const notOpened = html.indexOf('Not opened in 30 days');
-    expect(notOpened).toBeGreaterThan(-1);
-    expect(notOpened).toBeLessThan(html.indexOf('>Learn<'));
-    expect(html).toContain('last opened 62 days ago');
-    expect(html).toContain('$8.50 spent in 30 days ($2.00 in 7) over 40 calls');
-    expect(html).toContain('7 calls, 1 not priced');
-    expect(html).toContain('last opened today');
+  it('opens on the functions, biggest first, with the total above them', () => {
+    const html = renderToStaticMarkup(<UsageScreen report={usageReport(opened)} functions={functions} now={now} />);
+    const total = html.indexOf('$8.89');
+    const first = html.indexOf('Plan topic');
+    expect(total).toBeGreaterThan(-1);
+    expect(total).toBeLessThan(first);
+    expect(first).toBeLessThan(html.indexOf('odd-job'));
+    expect(html.indexOf('odd-job')).toBeLessThan(html.indexOf('Ask Dash'));
+    expect(html).toContain('$2.00 in 7 days · 40 calls');
+    expect(html).toContain('Learn');
+    expect(html).toContain('Outside a workspace');
+    expect(html).toContain('website · 1 not priced');
+    expect(html).toContain('3 functions');
     expect(html).not.toContain('Claude');
   });
 
-  it('says nothing has been opened yet before the first view lands', () => {
-    const html = renderToStaticMarkup(<UsageScreen report={usageReport([], [])} now={now} />);
+  it('folds the page opens below the functions, shut', () => {
+    const html = renderToStaticMarkup(<UsageScreen report={usageReport(opened)} functions={functions} now={now} />);
+    const fold = html.indexOf('<details');
+    expect(fold).toBeGreaterThan(html.indexOf('Ask Dash'));
+    expect(html.slice(fold, html.indexOf('>', fold))).not.toContain('open');
+    expect(html).toContain('Not opened in 30 days');
+    expect(html).toContain('last opened 62 days ago');
+    expect(html).toContain('Opens by workspace');
+  });
+
+  it('says so when nothing has been spent or opened yet', () => {
+    const html = renderToStaticMarkup(<UsageScreen report={usageReport([])} functions={[]} now={now} />);
+    expect(html).toContain('No model calls in the last 30 days');
     expect(html).toContain('No page has been opened since recording started');
   });
 });

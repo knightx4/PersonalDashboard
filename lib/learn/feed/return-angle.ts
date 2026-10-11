@@ -112,7 +112,7 @@ export async function nameReturnAngle(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, NAME_MATERIAL_MODEL),
       messages: [{ role: 'user', content: describeReturn(input.request) }],
     });
   } catch (error) {

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { moduleForPath, type ModuleId } from '@/lib/modules';
 import { PAGE_ROUTES } from '@/lib/usage/pages';
+import { routePattern } from '@/lib/usage/page-view';
 
 /**
  * How often each page has been opened, from core.page_opens (plan #1481), for
@@ -70,4 +71,32 @@ export function pageUsage(opened: readonly PageOpens[]): PageOpens[] {
     }
     return b.opens30 - a.opens30 || a.route.localeCompare(b.route);
   });
+}
+
+/**
+ * How often the page a path opens was opened in the last 30 days, read from
+ * core.page_opens by its route pattern: a note written on `/learn/s/6f1c…`
+ * counts the opens of `/learn/s/[id]`, every session's together. 0 for a page
+ * never opened, null when the path is not one of the app's pages or the read
+ * fails. Note triage reads it to tell a busy page (plan #1643).
+ */
+export async function readPathOpens30(
+  client: SupabaseClient,
+  userId: string,
+  path: string,
+): Promise<number | null> {
+  const route = routePattern(path.split(/[?#]/)[0]);
+  if (!route) return null;
+  const { data, error } = await client
+    .schema('core')
+    .from('page_opens')
+    .select('opens_30')
+    .eq('user_id', userId)
+    .eq('route', route)
+    .maybeSingle();
+  if (error) {
+    console.warn(`[opens] could not read the opens of ${route}: ${error.message}`);
+    return null;
+  }
+  return (data as { opens_30: number } | null)?.opens_30 ?? 0;
 }

@@ -3,6 +3,7 @@ import type { DailyView } from '@/lib/goals/daily';
 import { addDays } from '@/lib/todo/tasks/model';
 import { formatClock } from '@/lib/clock';
 import { isInterviewContext } from '@/lib/todo/agenda/sources';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
  * The morning brief's facts (plan #1123): what today holds, as short lines,
@@ -243,7 +244,7 @@ export function taskHref(taskId: string): string {
 }
 
 export function goalStepHref(goalId: string | null, stepId: string): string | null {
-  return goalId ? `/goals/${goalId}#step-${stepId}` : null;
+  return goalId ? stepHref(goalId, stepId) : null;
 }
 
 /**

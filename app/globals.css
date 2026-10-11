@@ -2224,6 +2224,25 @@ tr:has([data-link-pending]) {
   animation: link-pending var(--motion-moment) var(--ease-sway) var(--motion-instant) infinite alternate;
 }
 
+/* A button whose action is in flight glows softly in the accent while it works
+ * (note 01f7a4ee), so a long run reads as working rather than as a dead,
+ * disabled button. Button's `pending` marks it aria-busy, which is the hook. */
+@keyframes working-glow {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 0%, transparent);
+  }
+  to {
+    box-shadow:
+      0 0 0 3px color-mix(in oklab, var(--color-accent) 25%, transparent),
+      0 0 12px 2px color-mix(in oklab, var(--color-accent) 35%, transparent);
+  }
+}
+
+button[aria-busy='true'] {
+  cursor: progress;
+  animation: working-glow calc(var(--motion-moment) * 2) var(--ease-sway) infinite alternate;
+}
+
 @keyframes toast-in {
   from {
     transform: translateY(6px);
@@ -2317,18 +2336,20 @@ tr:has([data-link-pending]) {
 
 @keyframes goal-fold {
   from {
+    grid-template-rows: 1fr;
     transform: none;
     opacity: 1;
   }
   to {
-    transform: translateY(-0.5rem) scaleY(0.94);
+    grid-template-rows: 0fr;
+    transform: translateY(-0.5rem);
     opacity: 0;
   }
 }
 
 @utility goal-fold {
   transform-origin: top;
-  animation: goal-fold var(--motion-move) var(--ease-out-soft)
+  animation: goal-fold var(--motion-move) var(--ease-sway)
     calc(var(--motion-moment) - var(--motion-quick)) both;
 }
 
@@ -2351,6 +2372,13 @@ tr:has([data-link-pending]) {
     transform-origin: center;
     animation: sigil-cell var(--motion-move) var(--ease-out-soft) both;
     animation-delay: calc(var(--sigil-cell, 0) * var(--motion-instant) / 2);
+  }
+  /* The empty state's words lift in once the sigil has begun, so nothing
+   * lands at full size in the frame the last row leaves (plan #1688). While
+   * the class is on, the wrapper holds only the finished EmptyState. */
+  & h3,
+  & h3 + p {
+    animation: got-through-rise var(--motion-move) var(--ease-out-soft) var(--motion-quick) both;
   }
 }
 
@@ -2487,6 +2515,25 @@ tr:has([data-link-pending]) {
 
 @utility dash-mark-snooze {
   animation: dash-mark-snooze calc(var(--motion-moment) * 6) var(--ease-sway) infinite;
+}
+
+/* A hat on a sleeping Dash (plan #1702) is already tipped over in its still
+ * shape, and slips a little further with each breath. --dash-tip carries the
+ * way it leans, so the newsboy cap slips forward and the others back. */
+@keyframes dash-mark-tip {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(var(--dash-tip, -4deg));
+  }
+}
+
+@utility dash-mark-tip {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: dash-mark-tip calc(var(--motion-moment) * 6) var(--ease-sway) infinite;
 }
 
 @keyframes dash-mark-streak {
@@ -2654,6 +2701,23 @@ tr:has([data-link-pending]) {
   animation: dash-mark-flash var(--motion-move) var(--ease-out-soft) both;
 }
 
+/* The seen mark arriving once Dash has only acknowledged a comment: it grows
+ * in from a little smaller as the mark beside it settles. */
+@keyframes dash-seen-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility dash-seen-in {
+  animation: dash-seen-in var(--motion-move) var(--ease-out-soft) both;
+}
+
 @keyframes dash-mark-wave {
   0% {
     transform: skewY(-6deg) scaleX(0.94);
@@ -2735,6 +2799,7 @@ tr:has([data-link-pending]) {
     transform: none;
   }
 
+  button[aria-busy='true'],
   a:has([data-link-pending]),
   tr:has([data-link-pending]) {
     animation: none;
@@ -2778,6 +2843,7 @@ tr:has([data-link-pending]) {
   .dash-mark-blink,
   .dash-mark-breathe,
   .dash-mark-snooze,
+  .dash-mark-tip,
   .dash-mark-streak,
   .dash-mark-rattle,
   .dash-mark-read,
@@ -2787,11 +2853,14 @@ tr:has([data-link-pending]) {
   .dash-mark-caret,
   .dash-mark-ponder,
   .dash-mark-flash,
-  .dash-mark-wave {
+  .dash-mark-wave,
+  .dash-seen-in {
     animation: none;
   }
 
-  .sigil-draw-in [data-sigil-cell] {
+  .sigil-draw-in [data-sigil-cell],
+  .sigil-draw-in h3,
+  .sigil-draw-in h3 + p {
     animation: none;
   }
 
@@ -3621,26 +3690,10 @@ form[data-auto-submit] [data-fallback-submit] {
   display: none;
 }
 
-/* The workspace takes the sky's largest pool, top left, in the vivid end of
- * its own mark (lib/modules.ts). The sky keeps the other three, so Jobs in
- * Polar is still Polar, with violet coming up behind it. This replaces the
- * glass rooms' corner pool, which in Aurora would be a fifth pool on top. */
-[data-theme='aurora'] [data-workspace='shopping'],
-[data-theme='dawn'] [data-workspace='shopping'] { --c-wash-near: #fb7185; }
-[data-theme='aurora'] [data-workspace='jobs'],
-[data-theme='dawn'] [data-workspace='jobs'] { --c-wash-near: #a78bfa; }
-[data-theme='aurora'] [data-workspace='todo'],
-[data-theme='dawn'] [data-workspace='todo'] { --c-wash-near: #38bdf8; }
-[data-theme='aurora'] [data-workspace='vault'],
-[data-theme='dawn'] [data-workspace='vault'] { --c-wash-near: #e879f9; }
-[data-theme='aurora'] [data-workspace='learn'],
-[data-theme='dawn'] [data-workspace='learn'] { --c-wash-near: #34d399; }
-[data-theme='aurora'] [data-workspace='news'],
-[data-theme='dawn'] [data-workspace='news'] { --c-wash-near: #e8c760; }
-[data-theme='aurora'] [data-workspace='goals'],
-[data-theme='dawn'] [data-workspace='goals'] { --c-wash-near: #a3e635; }
-[data-theme='aurora'] [data-workspace='dev'],
-[data-theme='dawn'] [data-workspace='dev'] { --c-wash-near: #94a3b8; }
+/* The sky is the same in every workspace. Each one used to take the largest
+ * ribbon in its own hue, and Goals' lime clashed with every sky, so the
+ * ribbons now stay the sky's own wherever you are. The workspace still shows
+ * in its accent: links, the current place in the sidebar, its mark. */
 
 [data-theme='aurora'] .shell-ground,
 [data-theme='dawn'] .shell-ground {

@@ -195,7 +195,7 @@ export async function startAreaRun(input: {
 }
 
 /**
- * The run row and the fire, for any job: "Work on this" on one goal, the
+ * The run row and the fire, for any job: Ask Dash on one goal, the
  * morning run (plan #933), the weekly run, a re-shape after answers
  * (plan #1017), one step or phase sent from its row (plan #1000), or an
  * area (Plan this area). `text` is the brief, given the new run's id. The

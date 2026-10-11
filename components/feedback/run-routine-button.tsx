@@ -65,6 +65,7 @@ export function RunRoutineButton({
   onNavigate,
   divider = 'top',
   lastRun,
+  hint = true,
 }: {
   /** Outstanding notes, shown beside the button. Omitted while unknown. */
   openCount?: number | null;
@@ -82,6 +83,12 @@ export function RunRoutineButton({
    * would be a line under a line.
    */
   divider?: 'top' | 'bottom' | 'none';
+  /**
+   * The line saying what the button does. Left off on the Bugs page, where
+   * the page is about the queue and the line sat bare on the ground (critic,
+   * plan #1713); the panel in the top bar keeps it.
+   */
+  hint?: boolean;
   /**
    * What the last run did, as `notesLastRun` infers it. Passed by the Status
    * panel on Dash, where the row otherwise has nothing to say between runs.
@@ -157,7 +164,7 @@ export function RunRoutineButton({
             away on an inference is worse than saying what it thinks is true and
             leaving the decision -- the button says the run is already going, so
             pressing it is a choice rather than an accident. */}
-        <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+        <Button type="submit" size="sm" variant="secondary" pending={pending}>
           <Play className="size-3.5" aria-hidden />
           {pending ? 'Starting…' : running ? 'Run it again anyway' : 'Run Feature Routine'}
         </Button>
@@ -170,7 +177,7 @@ export function RunRoutineButton({
           <Link
             href={allHref}
             onClick={onNavigate}
-            className="ml-auto text-ui text-accent hover:underline"
+            className="press-area ml-auto text-ui text-accent hover:underline"
           >
             See all
           </Link>
@@ -182,7 +189,7 @@ export function RunRoutineButton({
           {notesLastRunLine(lastRun)}.
         </p>
       )}
-      {run === null && !lastRun && (
+      {hint && run === null && !lastRun && (
         <p className="text-ui text-ink-muted">
           Works the outstanding notes now instead of waiting for the schedule.
         </p>

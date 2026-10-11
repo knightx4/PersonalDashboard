@@ -90,7 +90,7 @@ export async function writeReviewQuestion(input: {
           },
         },
       ],
-      tool_choice: forceTool(WRITE_TOOL),
+      tool_choice: forceTool(WRITE_TOOL, REVIEW_MODEL),
       messages: [{ role: 'user', content: reviewPrompt(input.idea, input.asked, WRITE_TOOL) }],
     });
   } catch (error) {
