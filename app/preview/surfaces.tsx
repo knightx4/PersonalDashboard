@@ -77,7 +77,8 @@ import { ReadingCard } from '@/components/learn/reading-card';
 import { LearnNowFeed } from '@/app/learn/now/feed';
 import type { FeedCard } from '@/lib/learn/feed/card';
 import { ConceptList } from '@/components/learn/concept-list';
-import type { ReadingRow } from '@/lib/learn/tracks/load';
+import type { ReadingDetail, ReadingRow } from '@/lib/learn/tracks/load';
+import { ReadingView } from '@/app/learn/r/[id]/reading-view';
 import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
 import { DisplayMenu } from '@/components/shell/display-menu';
@@ -1416,6 +1417,36 @@ const subjectConcepts: Concept[] = [
     declaredAt: null,
   },
 ];
+
+/** One reading's page: a source, a long note, on Now, the longest title. */
+const readingPage: ReadingDetail = {
+  ...readingRow({
+    id: 'rd2',
+    position: 2,
+    status: 'reading',
+    subject: 'Jepsen: PostgreSQL 12.3, and what the analysis found about serializable snapshot isolation',
+    why: 'The failure modes are the part nobody writes down.',
+    readNowAt: '2026-09-09T19:00:00.000Z',
+    locatorLabel: 'Section 3, Results',
+    locatorBasis: 'Found verbatim in the fetched page.',
+    note: 'Snapshot isolation allowed a G2-item anomaly under a default configuration. The fix was one line, and the report is clear about which versions carry it.',
+    openUrl: 'https://jepsen.io/analyses/postgresql-12.3',
+    source: {
+      id: 's2',
+      title: 'Jepsen: PostgreSQL 12.3',
+      author: 'Kyle Kingsbury',
+      kind: 'article',
+      year: 2020,
+      canonicalUrl: 'https://jepsen.io/analyses/postgresql-12.3',
+      access: 'open',
+      priceCents: null,
+      pageCount: null,
+    },
+  }),
+  trackId: 't1',
+  trackTitle: 'How databases fail',
+  trackQuestion: null,
+};
 
 const trackReadings: ReadingRow[] = [
   readingRow({
@@ -3098,6 +3129,23 @@ export const SURFACES: readonly Surface[] = [
           <ReadingCard key={reading.id} reading={reading} />
         ))}
       </ul>
+    ),
+  },
+  {
+    /* One reading's page: the note as text that opens for editing, the next
+     * steps in one row under the status, and the two links on the left edge
+     * (plan #1770). */
+    id: 'learn-reading',
+    label: 'Reading · The page',
+    module: 'learn',
+    width: 'narrow',
+    render: () => (
+      <ReadingView
+        reading={readingPage}
+        subjects={[{ id: 'sj1', name: 'Distributed systems' }]}
+        alreadyRead={undefined}
+        origin={null}
+      />
     ),
   },
   {

@@ -75,6 +75,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'vault-education-check': ['/vault/education'],
   'vault-education-list': ['/vault/education'],
   'learn-track-readings': ['/learn/t/[id]'],
+  'learn-reading': ['/learn/r/[id]'],
   'learn-now-deck': ['/learn/now'],
   'learn-courses-empty': ['/learn/know'],
   'learn-courses-list': ['/learn/know'],
