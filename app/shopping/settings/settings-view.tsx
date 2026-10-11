@@ -224,7 +224,7 @@ export function ShoppingSettingsView({
           <CardBody className="space-y-3">
             <p className="text-body text-ink-muted">
               We never store the contents of your email. Deleting your account revokes our
-              access to your inbox and removes every row we hold. Arrives with build step 15.
+              access to your inbox and removes every row we hold.
             </p>
             <form action={signOut}>
               <Button variant="secondary" size="sm" type="submit">
