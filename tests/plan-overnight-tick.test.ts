@@ -1101,6 +1101,27 @@ describe('fileStalls', () => {
     expect(String(inserted[0].detail)).toContain('"Main was red."');
   });
 
+  // #1804: the split is only asked of a feature with no steps of its own.
+  it('asks to split a feature with no steps into the pieces its session left', async () => {
+    const pieces = { stop_reason: 'Too big.', stop_pieces: ['Read the runs', 'Write the raise'] };
+    const bare = () => tree([item({ id: 'feature', number: 1801 })]);
+    const runs = [
+      failed('r2', '2026-10-11T10:00:00.000Z', { plan_item_id: 'feature', ...pieces }),
+      failed('r1', '2026-10-10T10:00:00.000Z', { plan_item_id: 'feature' }),
+    ];
+
+    const lone = db(runs, []);
+    await fileStalls({ supabase: lone.supabase, userId: 'u', sections: bare(), now: MIDNIGHT });
+    expect(lone.inserted[0]).toMatchObject({
+      ask: expect.stringMatching(/^Split #1801 .* into 2 steps\?$/),
+      consequence: { name: 'split_feature', text: '#1801' },
+    });
+
+    const stepped = db(runs.map((run) => ({ ...run, plan_item_id: 'step' })), []);
+    await fileStalls({ supabase: stepped.supabase, userId: 'u', sections: sections(), now: MIDNIGHT });
+    expect(stepped.inserted[0]).toMatchObject({ consequence: { name: 'send_step' } });
+  });
+
   it('adds no second raise while the first is open', async () => {
     const { supabase, inserted } = db(
       [failed('r3', '2026-10-12T10:00:00.000Z'), failed('r2', '2026-10-11T10:00:00.000Z')],
