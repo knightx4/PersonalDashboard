@@ -159,7 +159,7 @@ export const ROUTINES: readonly Routine[] = [
     does:
       'Researches events, reading, courses and job leads for each goal that asks for them, reading how you reacted to last week’s.',
     clock: { kind: 'daily', stage: 'goals-weekly' },
-    cadence: 'Every week, checked each morning',
+    cadence: 'Every week, checked by the morning cron',
     runs: { table: 'goals_runs', job: 'weekly' },
     results: { label: 'Runs', href: '/goals/runs' },
     builtBy: 934,

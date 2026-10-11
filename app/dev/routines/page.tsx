@@ -1,5 +1,4 @@
-import { PageHeader } from '@/components/shell/page-header';
-import { RoutineList } from '@/components/routines/routine-list';
+import { RoutinesScreen } from '@/components/routines/routine-list';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { routinesFor } from '@/lib/routines/registry';
@@ -23,9 +22,9 @@ export default async function DevRoutinesPage() {
   const views = routineViews(routines, facts, account.timezone);
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <PageHeader title="Routines" description="What Dash does on a schedule for the app, and how each last went." />
-      <RoutineList routines={views} />
-    </div>
+    <RoutinesScreen
+      description="What Dash does on a schedule for the app, and how each last went."
+      routines={views}
+    />
   );
 }

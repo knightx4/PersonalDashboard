@@ -93,7 +93,7 @@ export function routineView(routine: Routine, facts: RoutineFacts, now: number, 
     (clock.kind === 'claude' ? 'On a schedule set on claude.ai' : expression ? describeCron(expression) : 'Not scheduled');
   const schedule = [
     cadence,
-    clock.kind === 'daily' ? 'with the morning cron' : null,
+    clock.kind === 'daily' && !routine.cadence ? 'with the morning cron' : null,
     next ? `next ${when(next, timeZone)}` : null,
   ]
     .filter(Boolean)

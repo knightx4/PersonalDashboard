@@ -1,4 +1,5 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
+import { DevRoutinesSurface, GoalRoutinesSurface } from './routine-surfaces';
 import { filterPipeline, parsePipeline } from '@/lib/jobs/pipeline-view';
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
@@ -5643,6 +5644,20 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevUsageEmptySurface />,
+  },
+  {
+    id: 'dev-routines',
+    label: 'Dev · Routines',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevRoutinesSurface />,
+  },
+  {
+    id: 'goals-routines',
+    label: 'Goals · Routines',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalRoutinesSurface />,
   },
   {
     id: 'dev-modules',

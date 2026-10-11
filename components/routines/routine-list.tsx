@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
 import { LinkedText } from '@/components/ui/linked-text';
 import type { RoutineView } from '@/lib/routines/view';
@@ -11,7 +12,27 @@ import type { RoutineView } from '@/lib/routines/view';
  * One component for both workspaces, so a routine reads the same wherever it
  * is listed. Server-rendered and without controls: the clocks are set in
  * migrations and the results pages are where a run's work is acted on.
+ *
+ * RoutinesScreen is the whole page after its reads, so Dev, Goals and the
+ * gallery draw the same markup.
  */
+export function RoutinesScreen({
+  description,
+  actions,
+  routines,
+}: {
+  description: string;
+  actions?: React.ReactNode;
+  routines: readonly RoutineView[];
+}) {
+  return (
+    <div className="mx-auto max-w-3xl">
+      <PageHeader title="Routines" description={description} actions={actions} />
+      <RoutineList routines={routines} />
+    </div>
+  );
+}
+
 export function RoutineList({ routines }: { routines: readonly RoutineView[] }) {
   return (
     <Card>

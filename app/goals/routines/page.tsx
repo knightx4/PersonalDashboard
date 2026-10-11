@@ -1,6 +1,5 @@
 import Link from 'next/link';
-import { PageHeader } from '@/components/shell/page-header';
-import { RoutineList } from '@/components/routines/routine-list';
+import { RoutinesScreen } from '@/components/routines/routine-list';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createGoalsClient } from '@/lib/goals/auth/server';
@@ -29,17 +28,14 @@ export default async function GoalRoutinesPage() {
   const views = routineViews(routines, facts, account.timezone);
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title="Routines"
-        description="What Dash does on a schedule for your goals, and how each last went."
-        actions={
-          <Link href="/goals/runs" className="text-small text-ink-muted underline-offset-2 hover:underline">
-            Every run
-          </Link>
-        }
-      />
-      <RoutineList routines={views} />
-    </div>
+    <RoutinesScreen
+      description="What Dash does on a schedule for your goals, and how each last went."
+      actions={
+        <Link href="/goals/runs" className="text-small text-ink-muted underline-offset-2 hover:underline">
+          Every run
+        </Link>
+      }
+      routines={views}
+    />
   );
 }
