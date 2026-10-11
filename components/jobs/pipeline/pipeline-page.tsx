@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
 import { buttonVariants } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { askListFilter } from '@/lib/ask/list-filter';
 import type { PipelineRow } from '@/lib/jobs/applications/load';
@@ -118,7 +119,7 @@ export function PipelinePage({
         <>
           <AskDashRowsButton filter={askFilter} count={filtered.length} className="max-sm:hidden" />
           <PipelineViewToggle view={state.view} params={params} />
-          {state.view === 'table' && <DisplayMenu menu={menu} />}
+          {state.view === 'table' && <DisplayMenu menu={menu} className="max-sm:hidden" />}
           <Link href="/jobs/roles/new" className={buttonVariants({ size: 'sm' })}>
             Add a role
           </Link>
@@ -145,6 +146,8 @@ export function PipelinePage({
           />
         </div>
         <AskDashRowsButton filter={askFilter} count={filtered.length} compact className="sm:hidden" />
+        {/* Display comes down here too, so Add a role keeps the switcher's line. */}
+        {state.view === 'table' && <DisplayMenu menu={menu} className="sm:hidden" wordClassName="sr-only" />}
       </div>
     </div>
   );
@@ -206,7 +209,9 @@ export function PipelinePage({
           {sections.map((section) => (
             <div key={section.key} className="space-y-2">
               {display.group !== NO_GROUP && <GroupHeader label={section.label} count={section.count} />}
-              <RolesTable rows={section.rows} sorts={menu.sorts} hidden={display.hidden} />
+              <Card className="overflow-hidden">
+                <RolesTable rows={section.rows} sorts={menu.sorts} hidden={display.hidden} />
+              </Card>
             </div>
           ))}
           <nav aria-label="Pages" className="flex items-center justify-between gap-3">
