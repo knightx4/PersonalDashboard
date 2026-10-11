@@ -70,6 +70,7 @@ export function VideosView({
       {/* The playlist link field and its Save are 36 pixels tall; on a phone
           they take the 44 a thumb needs, set from here so the field's own
           component, which the subject page also draws, is left as it is. */}
+      {/* ui-ok: the 44 pixel phone press target, set over a component this page does not own */}
       <div className="max-sm:[&_form:has(input[name=playlist])_:is(input,button)]:h-11">
         <LibrarySection channels={channels} usage={usage} list={list} now={now} open={open === 'youtube'} />
       </div>
