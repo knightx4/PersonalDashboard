@@ -5,7 +5,7 @@ import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { Figure } from '@/components/ui/figure';
 import { Meter } from '@/components/ui/meter';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
-import { LinkedText } from '@/components/ui/linked-text';
+import { CasePageView, type CasePage } from '@/components/jobs/case-page';
 import { ActivityFeed } from '@/components/jobs/activity/activity-feed';
 import { CheckInboxNow } from '@/components/jobs/activity/check-inbox-now';
 import { AnswerBank, KindChips } from '@/app/jobs/(app)/material/bank';
@@ -563,15 +563,15 @@ export function JobsOnboardingSurface() {
 
 // ---- The shared case page ---------------------------------------------------
 
-const CASE = {
+const CASE: CasePage = {
   company: 'Copperline',
   role: 'Senior Financial Analyst, Revenue Operations and Planning',
   body: 'I have spent four years building the planning models finance teams run the year on, most recently for a 400-person payments company. The role asks for someone who can own the revenue model and sit with the operators who move it. Below is each thing the posting asks for and the work I would point to for it. The full model behind the second example is at https://example.com/cohort-model.',
   matches: [
-    { requirement: 'Own the revenue forecast and the monthly reforecast process', kind: 'must_have', evidenceItemId: 'e1' },
-    { requirement: 'Build cohort and unit economics analyses that change how budget is spent', kind: 'must_have', evidenceItemId: 'e2' },
-    { requirement: 'Advanced SQL', kind: 'must_have', evidenceItemId: null },
-    { requirement: 'Experience at a fintech or payments company', kind: 'nice_to_have', evidenceItemId: 'e3' },
+    { requirement: 'Own the revenue forecast and the monthly reforecast process', kind: 'must_have', verdict: 'match', why: '', evidenceItemId: 'e1' },
+    { requirement: 'Build cohort and unit economics analyses that change how budget is spent', kind: 'must_have', verdict: 'match', why: '', evidenceItemId: 'e2' },
+    { requirement: 'Advanced SQL', kind: 'must_have', verdict: 'match', why: '', evidenceItemId: null },
+    { requirement: 'Experience at a fintech or payments company', kind: 'nice_to_have', verdict: 'match', why: '', evidenceItemId: 'e3' },
   ],
   evidence: [
     {
@@ -598,60 +598,7 @@ const CASE = {
   ],
 };
 
-/** The markup of app/jobs/p/[slug]/page.tsx, with one shared page as its read. */
+/** The public case page, drawn by the component the route renders. */
 export function JobsCasePageSurface() {
-  const pageData = CASE;
-  const byId = new Map(pageData.evidence.map((item) => [item.id, item]));
-  const groups = [
-    { kind: 'must_have', label: 'What the role asks for' },
-    { kind: 'nice_to_have', label: 'Also mentioned' },
-  ];
-
-  return (
-    <main className="mx-auto max-w-2xl px-5 py-12">
-      <header>
-        <p className="text-ui text-ink-muted">{pageData.company}</p>
-        <h1 className="font-display mt-0.5 text-title tracking-tight text-ink">{pageData.role}</h1>
-      </header>
-      <section className="mt-6 whitespace-pre-wrap text-body leading-relaxed text-ink">
-        <LinkedText text={pageData.body} />
-      </section>
-      <section className="mt-10">
-        <h2 className="text-body font-semibold text-ink">The role, line by line</h2>
-        <p className="mt-0.5 text-ui text-ink-muted">Each requirement below, and the work behind it.</p>
-        {groups.map((group) => {
-          const lines = pageData.matches.filter((match) => match.kind === group.kind);
-          if (lines.length === 0) return null;
-          return (
-            <div key={group.kind} className="mt-5">
-              <h3 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">{group.label}</h3>
-              <ul className="mt-2 space-y-4">
-                {lines.map((match, index) => {
-                  const item = match.evidenceItemId ? byId.get(match.evidenceItemId) : null;
-                  return (
-                    <li key={`${group.kind}-${index}`} className="border-l-2 border-border pl-3">
-                      <p className="text-body font-medium text-ink">{match.requirement}</p>
-                      {item && (
-                        <div className="mt-1">
-                          <p className="text-ui text-ink">
-                            <span className="font-medium">{item.title}</span>
-                            {item.context && <span className="text-ink-muted"> · {item.context}</span>}
-                          </p>
-                          <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">{item.body}</p>
-                          {item.metrics && <p className="tabular mt-0.5 text-ui text-ink">{item.metrics}</p>}
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          );
-        })}
-      </section>
-      <footer className="mt-12 border-t border-border pt-4 text-small text-ink-muted">
-        A private link, shared for this application. It expires.
-      </footer>
-    </main>
-  );
+  return <CasePageView page={CASE} />;
 }
