@@ -33,19 +33,16 @@ const horizonSchema = z.coerce
   .max(90, 'Ninety days is the most the agenda will look ahead.');
 
 // latency: pending
-export async function updateAgendaSettings(
-  _prev: AgendaSettingsState,
-  formData: FormData,
-): Promise<AgendaSettingsState> {
-  const horizon = horizonSchema.safeParse(formData.get('horizonDays'));
+export async function saveAgendaSettingsNow(input: {
+  enabledSources: string[];
+  horizonDays: number;
+}): Promise<{ error?: string }> {
+  const horizon = horizonSchema.safeParse(input.horizonDays);
   if (!horizon.success) return { error: horizon.error.issues[0].message };
 
   // Only names this build knows. A stale value in a form is a stale value, not
   // an instruction, and unknown source names must not reach the column.
-  const enabledSources = [...formData.keys()]
-    .filter((key) => key.startsWith('source:') && formData.get(key) === 'on')
-    .map((key) => key.slice('source:'.length))
-    .filter((id): id is SourceId => isSourceId(id));
+  const enabledSources = input.enabledSources.filter((id): id is SourceId => isSourceId(id));
 
   const user = await requireUser();
   const { error } = await saveAgendaSettings(user.id, {
@@ -58,7 +55,7 @@ export async function updateAgendaSettings(
   revalidatePath('/todo');
   revalidatePath('/todo/settings');
   revalidatePath('/home');
-  return { message: 'Saved.' };
+  return {};
 }
 
 /**

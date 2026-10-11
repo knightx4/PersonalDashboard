@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Attachment } from '@/lib/attachments/store';
 import { threadFrom, type DevComment } from '@/lib/comments/load';
 import { withThreads } from '@/lib/thread/store';
 import { triageFrom, type Triage } from '@/lib/feedback/triage';
@@ -57,6 +58,12 @@ export type FeedbackRow = {
   thread: DevComment[];
   /** Jev's triage when it was filed (plan #1179); null when it was not triaged. */
   triage?: Triage | null;
+  /**
+   * The files filed with it from the note button (plan #1713), oldest first.
+   * Read by the Bugs page through lib/feedback/files.ts; absent where a
+   * caller did not ask for them.
+   */
+  attachments?: Attachment[];
 };
 
 /** Anything not finished — including blocked, the state most easily forgotten. */

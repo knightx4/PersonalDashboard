@@ -48,7 +48,7 @@ const EVENTS: TimelineEvent[] = [
   row('2026-09-22T13:24:00Z', 'todo', 'task_done', 'Vote music'),
   row('2026-09-21T16:00:00Z', 'shopping', 'ordered', 'James Avery Artisan Jewelry', 'E1004820684', 6097),
   row('2026-09-18T11:05:00Z', 'vault', 'note_written', 'Notes on the Array interview loop'),
-  row('2026-09-17T09:12:00Z', 'jobs', 'applied', 'Senior Financial Analyst at Ramp'),
+  row('2026-09-17T09:12:00Z', 'jobs', 'applied', 'Senior Financial Analyst at Copperline'),
   row('2026-09-15T14:30:00Z', 'jobs', 'rejected', 'Corporate Development Analyst at Brex', 'applied'),
   row('2026-09-01T13:28:00Z', 'jobs', 'withdrew', 'Engagement Lead, Future Platforms at EliseAI'),
   row('2026-08-28T10:00:00Z', 'jobs', 'applied', 'FP&A Analyst at Array'),

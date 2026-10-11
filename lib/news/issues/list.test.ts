@@ -11,6 +11,8 @@ import {
   sortSenders,
   unreadTopics,
   visibleIssues,
+  waitingSignups,
+  type WaitingSignup,
   type NewsIssue,
   type NewsSender,
 } from '@/lib/news/issues/list';
@@ -194,5 +196,48 @@ describe('the by-newsletter view (note 20a58f93)', () => {
     expect(listHref({ from: null, topic: null, view: 'recommended' })).toBe('/news/all?view=recommended');
     expect(listHref({ from: null, topic: null, view: 'newsletters' })).toBe('/news/all?view=newsletters');
     expect(listHref({ from: 's1', topic: null, view: 'latest' })).toBe('/news/all?from=s1');
+  });
+});
+
+describe('waitingSignups', () => {
+  const signup = (id: string, senderId: string, receivedAt: string): WaitingSignup => ({
+    id,
+    senderId,
+    subject: 'Confirm',
+    receivedAt,
+    confirmUrl: 'https://example.com/c',
+  });
+
+  it('lists newest first', () => {
+    const rows = waitingSignups(
+      [signup('a', 's1', '2026-10-01T00:00:00Z'), signup('b', 's2', '2026-10-05T00:00:00Z')],
+      new Map(),
+    );
+    expect(rows.map((r) => r.id)).toEqual(['b', 'a']);
+  });
+
+  it('leaves out a signup whose sender has sent news since', () => {
+    const rows = waitingSignups(
+      [signup('a', 's1', '2026-10-01T00:00:00Z'), signup('b', 's2', '2026-10-02T00:00:00Z')],
+      new Map([['s1', '2026-10-03T00:00:00Z']]),
+    );
+    expect(rows.map((r) => r.id)).toEqual(['b']);
+  });
+
+  it('keeps a signup that came after the sender last sent news', () => {
+    const rows = waitingSignups(
+      [signup('a', 's1', '2026-10-05T00:00:00Z')],
+      new Map([['s1', '2026-10-03T00:00:00Z']]),
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it('keeps only the newest signup per sender, and none when none wait', () => {
+    const rows = waitingSignups(
+      [signup('a', 's1', '2026-10-01T00:00:00Z'), signup('b', 's1', '2026-10-02T00:00:00Z')],
+      new Map(),
+    );
+    expect(rows.map((r) => r.id)).toEqual(['b']);
+    expect(waitingSignups([], new Map())).toEqual([]);
   });
 });

@@ -4,6 +4,9 @@ import { EMPTY_USAGE } from '@/lib/core/spend/pricing';
 import { EMBEDDING_DIMENSIONS } from '@/lib/learn/embed/voyage';
 import {
   findRelatedNotes,
+  findSuggestedNotes,
+  suggestedNotesForInbox,
+  SUGGESTED_NOTES_SHOWN,
   matchText,
   matchTextHash,
   MATCH_TEXT_MAX_CHARS,
@@ -99,6 +102,71 @@ describe('findRelatedNotes', () => {
     fake.ports.embed = async () => null;
     expect(await findRelatedNotes(fake.ports, 'Rates held')).toEqual([]);
     expect(fake.kept.size).toBe(0);
+  });
+});
+
+describe('findSuggestedNotes', () => {
+  const row = (n: number, path: string, similarity: number) => ({
+    note_id: `n${n}`,
+    path,
+    title: path,
+    similarity,
+  });
+
+  it('leaves out quick notes in the Inbox and keeps the rest in order', async () => {
+    const fake = fakePorts([
+      row(1, 'Inbox/Other quick note.md', 0.9),
+      row(2, 'Money/On rates.md', 0.8),
+      row(3, 'Inbox/Sorted/Kept by hand.md', 0.7),
+      row(4, 'Ideas/Pricing.md', 0.6),
+    ]);
+    const found = await findSuggestedNotes(fake.ports, 'Rates held');
+    // A note in a subfolder of the Inbox was put there by hand: it is a real note.
+    expect(found.map((n) => n.path)).toEqual([
+      'Money/On rates.md',
+      'Inbox/Sorted/Kept by hand.md',
+      'Ideas/Pricing.md',
+    ]);
+  });
+
+  it('shows at most three, asking for more so the Inbox cannot crowd them out', async () => {
+    const fake = fakePorts(
+      Array.from({ length: 8 }, (_, i) => row(i, `Notes/${i}.md`, 0.9 - i * 0.01)),
+    );
+    const found = await findSuggestedNotes(fake.ports, 'x');
+    expect(found.map((n) => n.noteId)).toEqual(['n0', 'n1', 'n2']);
+    expect(found).toHaveLength(SUGGESTED_NOTES_SHOWN);
+    expect(fake.asked[0]).toMatchObject({ minSimilarity: RELATED_NOTE_MIN_SIMILARITY });
+    expect(fake.asked[0]!.limit).toBeGreaterThan(SUGGESTED_NOTES_SHOWN);
+  });
+
+  it('returns none when nothing clears the floor, only Inbox notes do, or there is no text', async () => {
+    expect(await findSuggestedNotes(fakePorts([row(1, 'A.md', 0.3)]).ports, 'x')).toEqual([]);
+    expect(await findSuggestedNotes(fakePorts([row(1, 'Inbox/A.md', 0.9)]).ports, 'x')).toEqual([]);
+    expect(await findSuggestedNotes(fakePorts([]).ports, '  ')).toEqual([]);
+  });
+});
+
+describe('suggestedNotesForInbox', () => {
+  it('gives a quick note with no text an empty list and makes no lookup', async () => {
+    const calls: Record<string, unknown>[] = [];
+    const vault = {
+      from: () => {
+        const q = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: null, error: null }) };
+        return q;
+      },
+      async rpc(_name: string, args: Record<string, unknown>) {
+        calls.push(args);
+        return { data: [], error: null };
+      },
+    } as never;
+    const found = await suggestedNotesForInbox(vault, 'user-1', [
+      { id: 'q1', body: '' },
+      { id: 'q2', body: '   ' },
+    ]);
+    expect(found.get('q1')).toEqual([]);
+    expect(found.get('q2')).toEqual([]);
+    expect(calls).toEqual([]);
   });
 });
 

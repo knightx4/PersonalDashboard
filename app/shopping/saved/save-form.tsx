@@ -48,7 +48,7 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
           setDismissedPreview(false);
           previewAction(formData);
         }}
-        className="flex flex-col gap-2 sm:flex-row sm:items-start"
+        className="flex flex-row items-start gap-2"
       >
         <div className="min-w-0 flex-1">
           {!compact && <Label htmlFor="url">Product URL</Label>}
@@ -78,7 +78,8 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
           type="submit"
           pending={previewPending}
           disabled={!urlInputValue.trim()}
-          className="sm:mt-0 shrink-0"
+          // As tall as the URL box beside it, which grows to 44px on a phone.
+          className="shrink-0 max-sm:min-h-11"
         >
           {previewPending ? 'Looking up…' : 'Look up'}
         </Button>

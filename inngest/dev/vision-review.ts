@@ -44,7 +44,6 @@ export async function runVisionReviewTick(
   deps?: Partial<VisionReviewTickDeps>,
 ): Promise<VisionReviewTickResult> {
   const routine = deps?.routine ?? visionRoutine();
-  if (!routine.id) return { skipped: 'CLAUDE_VISION_ROUTINE_ID is not set' };
   const client = deps?.client ?? createServiceSupabase();
   const now = deps?.now ?? Date.now();
 
@@ -56,6 +55,31 @@ export async function runVisionReviewTick(
   const facts = await loadVisionRunFacts(client, userId);
   const due = visionReviewDue({ ...facts, now });
   if (!due.due) return { skipped: due.reason };
+
+  // A due week with no routine is a failed fire, recorded like one, so the
+  // Dash tab says why nothing ran. Returned as a skip it left no trace: the
+  // tick of 4 October 2026 found the id unset and pg_cron logged a success.
+  const missing = !routine.id
+    ? 'CLAUDE_VISION_ROUTINE_ID'
+    : !routine.token
+      ? 'CLAUDE_VISION_ROUTINE_TOKEN'
+      : null;
+  if (missing) {
+    const error = `${missing} is not set on the deployment, so the weekly vision review could not start.`;
+    const { error: insertError } = await client.from('plan_runs').insert({
+      user_id: userId,
+      plan_item_id: null,
+      job: 'vision',
+      routine_id: routine.id,
+      external_id: null,
+      status: 'failed',
+      http_status: null,
+      response: null,
+      error,
+    });
+    if (insertError) console.error(`plan_runs insert failed for a vision run: ${insertError.message}`);
+    return { failed: error };
+  }
 
   // The opens since the last review go in the turn (plan #1483). A failed
   // read does not stop the review: the turn says so and the skill reads them.

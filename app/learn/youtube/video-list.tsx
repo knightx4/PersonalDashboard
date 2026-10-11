@@ -45,10 +45,12 @@ export function VideoList({ videos, numbered = false }: { videos: VideoRow[]; nu
             <span className="min-w-0 flex-1">
               <Link
                 href={`/learn/youtube/v/${video.videoId}`}
-                className="block truncate text-ui text-ink hover:underline"
+                className="press-area block text-ui text-ink hover:underline"
               >
-                {numbered ? <span className="tabular-nums text-ink-muted">{index + 1}. </span> : null}
-                {video.title}
+                <span className="block truncate">
+                  {numbered ? <span className="tabular-nums text-ink-muted">{index + 1}. </span> : null}
+                  {video.title}
+                </span>
               </Link>
               <span className="flex items-center gap-1.5 text-small text-ink-muted">
                 {state && <StatusGlyph glyph={state.glyph} size={12} />}

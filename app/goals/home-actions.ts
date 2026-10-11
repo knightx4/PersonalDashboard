@@ -1,20 +1,19 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { formatDay } from '@/lib/goals/dates';
-import { saveErrandAndStart } from '@/lib/goals/errand-store';
-import {
-  SET_ASIDE_CHOICES,
-  setAsideFields,
-  setAsideOn,
-} from '@/lib/goals/set-aside';
+import { saveErrandAndStart, saveGoalAndStart } from '@/lib/goals/errand-store';
+import { SET_ASIDE_CHOICES, setAsideFields, setAsideOn } from '@/lib/goals/set-aside';
 import { updateStep } from '@/lib/goals/steps-store';
 import { COMMENT_MAX } from '@/lib/goals/comments';
-import { GOAL_TITLE_MAX } from '@/lib/goals/tree';
+import { GOAL_TITLE_MAX, parseGoalFields } from '@/lib/goals/tree';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { createLearnClient } from '@/lib/learn/auth/server';
+import { steerLearnAfterGoalSaved } from '@/lib/learn/goal-saved';
 import { todayIn } from '@/lib/todo/tasks/model';
 import { addGoalComment } from './[goalId]/comment-actions';
 
@@ -128,12 +127,14 @@ export async function bringBackAction(form: FormData): Promise<SetAsideState> {
 export type AskDashState = { error?: string; message?: string; goalId?: string; done?: number };
 
 /**
- * Ask Dash from the Goals home. `target` is a goal's id or `errand`.
+ * Ask Dash from the Goals home. `target` is a goal's id, `errand` or `goal`.
  *
  * On a goal, the words go in as an @dash comment on it (addGoalComment), so
  * Dash answers in the goal's thread, or starts a run when the ask needs one.
  * As an errand, they are the errand's title, saved with its due date and
- * handed to Dash in the same press (saveErrandAndStart).
+ * handed to Dash in the same press (saveErrandAndStart). As a new goal, they
+ * are its title, checked as the goal composer checks one, and the goal is
+ * handed to Dash the same way (saveGoalAndStart).
  */
 // latency: pending
 export async function askDashAction(_prev: AskDashState, form: FormData): Promise<AskDashState> {
@@ -142,9 +143,36 @@ export async function askDashAction(_prev: AskDashState, form: FormData): Promis
   const target = String(form.get('target') ?? '');
   if (!body) return { error: 'Say what Dash should do.' };
 
+  if (target === 'goal') {
+    const areaId = Id.safeParse(form.get('areaId'));
+    if (!areaId.success) return { error: 'Choose which area the goal is for.' };
+    const parsed = parseGoalFields((key) => (key === 'title' ? body : null), {
+      requireTitle: true,
+    });
+    if (!parsed.ok) return { error: parsed.error };
+    const title = parsed.value.title;
+    if (!title) return { error: 'Give the goal a title.' };
+    const result = await saveGoalAndStart({
+      client: await createGoalsClient(),
+      user,
+      areaId: areaId.data,
+      title,
+    });
+    if (!result.ok) return { error: result.error };
+    // A goal in the Learn area is placed and planned by Learn, as one added on All goals is.
+    const goalId = result.goalId;
+    after(async () => {
+      await steerLearnAfterGoalSaved(await createLearnClient(), user.id, goalId);
+    });
+    redraw();
+    return { message: result.message, goalId, done: Date.now() };
+  }
+
   if (target === 'errand') {
     if (body.length > GOAL_TITLE_MAX) {
-      return { error: `Keep an errand under ${GOAL_TITLE_MAX} characters. Put the rest on its page.` };
+      return {
+        error: `Keep an errand under ${GOAL_TITLE_MAX} characters. Put the rest on its page.`,
+      };
     }
     const areaId = Id.safeParse(form.get('areaId'));
     const due = Day.safeParse(form.get('due'));
@@ -163,7 +191,7 @@ export async function askDashAction(_prev: AskDashState, form: FormData): Promis
   }
 
   const goalId = Id.safeParse(target);
-  if (!goalId.success) return { error: 'Choose a goal, or make it a new errand.' };
+  if (!goalId.success) return { error: 'Choose a goal, or make it a new goal or errand.' };
   if (body.length > COMMENT_MAX - 7) return { error: 'That is too long for one ask.' };
   const comment = new FormData();
   comment.set('id', goalId.data);

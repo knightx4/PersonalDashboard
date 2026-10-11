@@ -3,14 +3,14 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
 import { draftPrompt, type DraftContext } from './write';
 import { MODELS } from '@/lib/core/models';
 
 /**
  * The model call behind a drafted follow-up or return request (plan #1129).
  * Sonnet is given the record and the thread (draftPrompt) and returns a
- * subject and a body through a forced tool. The message goes out over the
+ * subject and a body through a tool. The message goes out over the
  * person's name, so it is held to the facts it was given; checkDraft
  * (lib/drafts/find.ts) reads what comes back before it is stored.
  */
@@ -63,7 +63,7 @@ export async function writeDraft(
 
   const response = await client.messages.create({
     model: DRAFT_MODEL,
-    max_tokens: 800,
+    max_tokens: 800 + THINKING_ROOM,
     system: SYSTEM,
     tools: [
       {
@@ -77,8 +77,8 @@ export async function writeDraft(
         },
       },
     ],
-    tool_choice: forceTool(TOOL_NAME),
-    messages: [{ role: 'user', content: draftPrompt(context) }],
+    tool_choice: forceTool(TOOL_NAME, DRAFT_MODEL),
+    messages: [{ role: 'user', content: `${draftPrompt(context)}\n\nReport through ${TOOL_NAME}.` }],
   });
   options.onSpend?.({ model: DRAFT_MODEL, usage: usageFrom(response.usage) });
 
