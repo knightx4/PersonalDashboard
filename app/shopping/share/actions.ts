@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import {
@@ -80,7 +81,9 @@ export async function createShare(
   });
 
   revalidatePath('/shopping/share');
-  return { message: 'Share created.' };
+  // Straight to the new form: putting things on it is the next thing to do,
+  // and the list's name box has nothing left to say (plan #1789).
+  redirect(`/shopping/share/${share.id}`);
 }
 
 /**
