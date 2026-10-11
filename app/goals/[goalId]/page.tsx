@@ -13,6 +13,8 @@ import { loadContext } from '@/lib/goals/context-store';
 import { loadGoalFlags } from '@/lib/goals/flags-store';
 import { lastProgressOn, summariseProgress, type ProgressEntry } from '@/lib/goals/progress';
 import { loadProgressEntries } from '@/lib/goals/progress-store';
+import { activeDays, goalPace, paceLine, PACE_WINDOW_DAYS, type GoalPace } from '@/lib/goals/pace';
+import { loadPaceRows } from '@/lib/goals/pace-store';
 import { loadNumberFrom, loadReadings } from '@/lib/goals/readings-store';
 import { goalRunRows, type RunListing } from '@/lib/goals/runs';
 import { loadGoalRuns } from '@/lib/goals/runs-store';
@@ -38,7 +40,7 @@ import { loadAimForGoal, loadLevel3Counts } from '@/lib/learn/aims-store';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { loadPlans } from '@/lib/learn/lessons/plan-store';
 import { progressLine } from '@/lib/learn/lessons/plan-view';
-import { todayIn } from '@/lib/todo/tasks/model';
+import { addDays, todayIn } from '@/lib/todo/tasks/model';
 import { FileLinks } from '@/components/files/file-links';
 import type { LinkedFile } from '@/lib/files/files';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -129,6 +131,48 @@ function stepIdsOn(map: GoalMap): string[] {
   walk(map.steps);
   walk(map.linked.map((entry) => entry.step));
   return ids;
+}
+
+/** The goal's own steps at any depth, leaving out those linked in from other goals. */
+function ownSteps(nodes: readonly StepNode[]): StepNode[] {
+  return nodes.flatMap((node) => [node, ...ownSteps(node.children)]);
+}
+
+/**
+ * How often something happens on the goal (plan #1737), for an open or
+ * parked goal that is not an errand; null for the rest, and when its rows
+ * cannot be read, which leaves the pace out rather than the page.
+ */
+async function loadGoalPace(
+  client: Awaited<ReturnType<typeof createGoalsClient>>,
+  map: GoalMap,
+  progress: Promise<ProgressEntry[]>,
+  today: string,
+  timeZone: string,
+): Promise<GoalPace | null> {
+  const goal = map.goal;
+  if (goal.errand || (goal.status !== 'open' && goal.status !== 'parked')) return null;
+  const steps = ownSteps(map.steps);
+  const itemIds = new Set([goal.id, ...steps.map((step) => step.id)]);
+  try {
+    const [rows, entries] = await Promise.all([
+      loadPaceRows(client, [...itemIds], addDays(today, -PACE_WINDOW_DAYS)),
+      progress,
+    ]);
+    const days = activeDays(
+      {
+        steps,
+        progress: entries.filter((entry) => itemIds.has(entry.itemId)),
+        ...rows,
+        itemIds,
+      },
+      today,
+      timeZone,
+    );
+    return goalPace(days, today);
+  } catch {
+    return null;
+  }
 }
 
 /** Each sent step's run line (plan #1044). Outside the component because it reads the clock. */
@@ -305,7 +349,12 @@ export default async function GoalMapPage({
     goalMatchText({ title: map.goal.title, acceptance: map.goal.acceptance }),
     { core },
   ).then((found) => found.map(toLink));
-  const [stepRuns, filesOf, brief, review, places, progressEntries, arrivals] = await Promise.all([
+  // The partial progress logged on the goal and its steps (plan #1276). A
+  // failed read leaves the steps as they were rather than the page.
+  const progressRead = loadProgressEntries(client, [map.goal.id, ...stepIdsOn(map)]).catch(
+    (): ProgressEntry[] => [],
+  );
+  const [stepRuns, filesOf, brief, review, places, progressEntries, arrivals, pace] = await Promise.all([
     loadStepRuns(client, stepIdsOn(map)).catch((): Record<string, GoalRun> => ({})),
     // The files the goal and its steps link to. A failed read leaves them
     // out rather than the page, as do the note and the verdict below.
@@ -321,14 +370,11 @@ export default async function GoalMapPage({
     loadAreas(client)
       .then((areas) => areas.map((area) => ({ id: area.id, name: area.name })))
       .catch((): Place[] => []),
-    // The partial progress logged on the goal and its steps (plan #1276). A
-    // failed read leaves the steps as they were rather than the page.
-    loadProgressEntries(client, [map.goal.id, ...stepIdsOn(map)]).catch(
-      (): ProgressEntry[] => [],
-    ),
+    progressRead,
     // The finished steps Dash closed lately, which arrive with its mark
     // (plan #1561). A failed read leaves the moment out.
     loadDashArrivals(client, doneStepIdsOn(map)).catch((): string[] => []),
+    loadGoalPace(client, map, progressRead, today, account.timezone),
   ]);
   const status = goalStatus(
     map.goal,
@@ -398,6 +444,7 @@ export default async function GoalMapPage({
     // An errand's date is already in the properties as Due.
     dueOn: errand ? null : (map.goal.dueOn ?? null),
     lastProgressOn: lastProgressOn(stepProgress),
+    pace: pace ? paceLine(pace) : null,
   });
   const questions = questionsOn(
     map,
@@ -469,6 +516,7 @@ export default async function GoalMapPage({
       review={review}
       progress={progress}
       timeZone={account.timezone}
+      pace={pace}
     >
       {tab === 'steps' ? (
         <GoalStepsFold closed={closed} meta={stepsMeta}>
