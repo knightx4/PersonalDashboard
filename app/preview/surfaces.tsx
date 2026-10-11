@@ -63,6 +63,7 @@ import { buildAttachmentIndex, type AttachmentEntry } from '@/lib/vault/markdown
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
 import { noteHref } from '@/lib/vault/paths';
 import { PageHeader } from '@/components/shell/page-header';
+import { AddGamesSurface } from './add-games-surface';
 import { AddTranscript } from '@/app/vault/education/add-transcript';
 import { EducationCheckPreview, EducationUploadPreview } from './education-surfaces';
 import { FlowScopePreview, LearnGoalsPreview } from './learn-goal-surfaces';
@@ -3584,6 +3585,15 @@ export const SURFACES: readonly Surface[] = [
     module: 'shopping',
     width: 'page',
     render: () => <RecurringSurface />,
+  },
+  {
+    /* Shopping's Add board games page on the Search tab (plan #1780): no
+     * sentence under the heading; the edition note sits with the picker. */
+    id: 'shopping-add-games',
+    label: 'Shopping · Add board games, edition to pick',
+    module: 'shopping',
+    width: 'page',
+    render: () => <AddGamesSurface />,
   },
   {
     id: 'shopping-recurring-empty',

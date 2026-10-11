@@ -122,6 +122,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'news-quick-caught-up': ['/news'],
   'news-story-grid': ['/news/i/[id]', '/news'],
   'news-story-grid-no-pictures': ['/news/i/[id]', '/news'],
+  'shopping-add-games': ['/shopping/inventory/add/games'],
   'shopping-recurring': ['/shopping/recurring'],
   'shopping-recurring-empty': ['/shopping/recurring'],
   'news-saved': ['/news/saved'],
