@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import type { Feed } from '@/lib/todo/feeds/load';
 import type { SourceId } from '@/lib/todo/agenda/sources';
 import { allSources } from '@/lib/todo/agenda/registry';
@@ -54,27 +53,13 @@ export function TodoSettingsView({
 }) {
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title="Todo settings"
-        description="What this workspace does. Your name and timezone are under Account."
-      />
+      <PageHeader title="Todo settings" />
 
-      <AgendaSettingsForm
-        groups={groups}
-        enabled={enabled}
-        horizonDays={horizonDays}
-      />
+      <AgendaSettingsForm groups={groups} enabled={enabled} horizonDays={horizonDays} />
 
       <div className="mt-6">
         <CalendarFeeds feeds={feeds} timezone={timezone} />
       </div>
-
-      <p className="mt-6 text-ui text-ink-muted">
-        Your timezone decides what counts as today here, and it holds across every workspace.{' '}
-        <Link href="/account" className="font-medium text-accent hover:underline">
-          Account settings
-        </Link>
-      </p>
     </div>
   );
 }
