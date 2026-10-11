@@ -1,3 +1,4 @@
+import { ArrowDown, ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 /**
@@ -77,9 +78,9 @@ export function Figure({
 }
 
 /**
- * A period-over-period change, said once, with the colour rule the design
- * language sets: green means money came back, so a falling spend is the only
- * delta that earns it. Rising is plain ink -- a fact, not an alarm.
+ * A period-over-period change, said once, in plain ink. The sign in the label
+ * and an arrow carry the direction, so no colour has to: green is kept for
+ * money that came back (a refund), and a falling spend is not that.
  */
 export function FigureDelta({
   label,
@@ -91,14 +92,11 @@ export function FigureDelta({
   suffix?: string;
 }) {
   if (label === null) return <span>No prior period to compare</span>;
+  const Arrow = direction === 'up' ? ArrowUp : direction === 'down' ? ArrowDown : null;
   return (
     <span>
-      <span
-        className={cn(
-          'tabular font-medium',
-          direction === 'down' ? 'text-positive' : direction === 'up' ? 'text-ink' : 'text-ink-muted',
-        )}
-      >
+      <span className={cn('tabular font-medium', direction === 'flat' ? 'text-ink-muted' : 'text-ink')}>
+        {Arrow && <Arrow className="mr-0.5 inline size-3.5 align-[-0.125em]" aria-hidden />}
         {label}
       </span>
       {suffix && ` ${suffix}`}
