@@ -25,6 +25,8 @@ export type VideosViewProps = {
   clipCounts: ReadonlyMap<string, number>;
   /** The Clips section's line: what is cut, what is left, when the next batch comes. */
   progress: string;
+  /** How many clips are cut, for the Clips line. */
+  clipTotal: number;
   /** The clips to play, when `?open=clips` started the player. */
   clips: PlayerClip[] | null;
   channels: ChannelSummary[];
@@ -54,6 +56,7 @@ export function VideosView({
   cardCounts,
   clipCounts,
   progress,
+  clipTotal,
   clips,
   channels,
   usage,
@@ -65,6 +68,7 @@ export function VideosView({
     <>
       <ClipsSection
         progress={progress}
+        count={clipTotal}
         player={clips === null ? null : { clips }}
       />
       {/* The playlist link field and its Save are 36 pixels tall; on a phone
