@@ -7,6 +7,7 @@ import {
   undoItemReturned,
   type ActionState,
 } from '@/app/shopping/returns/actions';
+import { ActionMenu } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
@@ -63,7 +64,68 @@ export function PlanReturnButton({
   );
 }
 
-export function MarkReturnedButton({ itemId }: { itemId: string }) {
+/**
+ * The rest of a row's actions, behind its overflow button (plan #1785): the
+ * row keeps one button beside its deadline, and marking to return is the
+ * move made less often. The toast and its undo are the button's.
+ */
+export function ReturnRowMenu({
+  itemId,
+  name,
+  planned,
+}: {
+  itemId: string;
+  name: string;
+  planned: boolean;
+}) {
+  const toast = useToast();
+
+  async function toggle() {
+    const next = await setReturnPlanned(
+      initial,
+      formOf({ id: itemId, planned: planned ? 'false' : 'true' }),
+    );
+    if (next.error) {
+      toast({ text: next.error });
+      return;
+    }
+    toast({
+      text: planned ? 'Unmarked to return' : 'Marked to return',
+      undo: async () => {
+        const undone = await setReturnPlanned(
+          initial,
+          formOf({ id: itemId, planned: planned ? 'true' : 'false' }),
+        );
+        if (undone.error) throw new Error(undone.error);
+      },
+    });
+  }
+
+  return (
+    <ActionMenu
+      label={`More for ${name}`}
+      items={[
+        {
+          id: 'plan',
+          label: planned ? 'Unmark to return' : 'Mark to return',
+          onSelect: () => void toggle(),
+        },
+      ]}
+    />
+  );
+}
+
+/**
+ * Marks the item returned. Quiet by default; `strong` gives it the accent
+ * for an item marked to return or past its window, the one that needs doing.
+ */
+export function MarkReturnedButton({
+  itemId,
+  strong = false,
+}: {
+  itemId: string;
+  strong?: boolean;
+}) {
   const toast = useToast();
   const [state, action, pending] = useActionState(async (prev: ActionState, formData: FormData) => {
     const next = await markItemReturned(prev, formData);
@@ -89,7 +151,7 @@ export function MarkReturnedButton({ itemId }: { itemId: string }) {
   return (
     <form action={action} className="inline-flex flex-col items-end gap-1">
       <input type="hidden" name="id" value={itemId} />
-      <Button type="submit" size="sm" pending={pending}>
+      <Button type="submit" variant={strong ? 'primary' : 'secondary'} size="sm" pending={pending}>
         {pending ? 'Saving…' : 'Returned'}
       </Button>
       <FieldError>{state.error}</FieldError>

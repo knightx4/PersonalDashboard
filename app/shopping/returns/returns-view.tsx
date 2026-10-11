@@ -1,10 +1,10 @@
 import { RotateCcw } from 'lucide-react';
 import Link from 'next/link';
-import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
+import { ListPage } from '@/components/patterns/list-detail';
+import { FilterSheet } from '@/components/shell/filter-sheet';
+import { RailGroup, RailItem } from '@/components/shell/left-rail';
 import { PageHeader } from '@/components/shell/page-header';
-import { cardVariants } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { cn } from '@/lib/cn';
 import {
   filterReturnsRows,
   groupReturnsByOrder,
@@ -32,7 +32,9 @@ function returnsHref(
 
 /**
  * Returns, drawn from what the page read (page.tsx), so the gallery can draw
- * it from fixtures (plan #1604).
+ * it from fixtures (plan #1604). A list page of the list-and-detail pattern
+ * (plan #1785): the heading and its action, the filters, one surface of rows,
+ * then the count, with the year's on-time savings beneath it.
  */
 export function ReturnsPageView({
   data,
@@ -86,90 +88,128 @@ export function ReturnsPageView({
     },
   };
 
-  return (
-    <div className="flex flex-col gap-6 xl:flex-row [&_a]:press-area">
-      <LeftRail>
-        <RailGroup label="Group by">
-          {RETURNS_GROUPS.map((entry) => (
-            <RailItem
-              key={entry.id}
-              label={entry.label}
-              active={entry.id === group}
-              href={returnsHref(view, { merchant: merchantFilter, group: entry.id })}
-            />
-          ))}
-        </RailGroup>
-        <RailGroup label="View">
-          {RETURNS_VIEWS.map((entry) => (
-            <RailItem
-              key={entry.id}
-              label={`${entry.label}${data.counts[entry.id] ? ` (${data.counts[entry.id]})` : ''}`}
-              active={entry.id === view}
-              href={returnsHref(entry.id, { merchant: merchantFilter, group })}
-            />
-          ))}
-        </RailGroup>
-        <RailGroup label="Merchant">
-          <RailItem
-            label="Any"
-            active={!merchantFilter}
-            href={returnsHref(view, { group })}
-          />
-          {merchantOptions.map(([id, name]) => (
-            <RailItem
-              key={id}
-              label={name}
-              active={merchantFilter === id}
-              href={returnsHref(view, { merchant: id, group })}
-            />
-          ))}
-        </RailGroup>
-      </LeftRail>
+  const viewLabel = RETURNS_VIEWS.find((entry) => entry.id === view)?.label ?? '';
+  const merchantName = merchantOptions.find(([id]) => id === merchantFilter)?.[1];
+  const summary = [viewLabel, merchantName, group === 'orders' ? 'By order' : null]
+    .filter(Boolean)
+    .join(' · ');
 
-      <div className="min-w-0 flex-1">
-        <PageHeader
-          title="Returns"
-          description="Track deadlines, mark what you’re sending back, and keep returned items undoable."
-          actions={
-            <Link
-              href="/shopping/settings#return-policies"
-              className="text-ui font-medium text-accent hover:underline"
-            >
-              Edit return policies
-            </Link>
+  // The heading and its one action, with no line under it: the count at the
+  // foot says what the list holds (plan #1785).
+  const header = (
+    <PageHeader
+      title="Returns"
+      actions={
+        <Link
+          href="/shopping/settings#return-policies"
+          className="press-area text-ui font-medium text-accent hover:underline"
+        >
+          Edit return policies
+        </Link>
+      }
+    />
+  );
+
+  // What the list is narrowed by, behind one button at every width: the page
+  // is one column on a laptop too.
+  const tools = (
+    <FilterSheet summary={summary}>
+      <RailGroup label="View">
+        {RETURNS_VIEWS.map((entry) => (
+          <RailItem
+            key={entry.id}
+            label={`${entry.label}${data.counts[entry.id] ? ` (${data.counts[entry.id]})` : ''}`}
+            active={entry.id === view}
+            href={returnsHref(entry.id, { merchant: merchantFilter, group })}
+          />
+        ))}
+      </RailGroup>
+      <RailGroup label="Group by">
+        {RETURNS_GROUPS.map((entry) => (
+          <RailItem
+            key={entry.id}
+            label={entry.label}
+            active={entry.id === group}
+            href={returnsHref(view, { merchant: merchantFilter, group: entry.id })}
+          />
+        ))}
+      </RailGroup>
+      <RailGroup label="Merchant">
+        <RailItem label="Any" active={!merchantFilter} href={returnsHref(view, { group })} />
+        {merchantOptions.map(([id, name]) => (
+          <RailItem
+            key={id}
+            label={name}
+            active={merchantFilter === id}
+            href={returnsHref(view, { merchant: id, group })}
+          />
+        ))}
+      </RailGroup>
+    </FilterSheet>
+  );
+
+  if (rows.length === 0) {
+    return (
+      <div className="mx-auto max-w-3xl">
+        {header}
+        <div className="mb-4">{tools}</div>
+        <EmptyState
+          icon={RotateCcw}
+          title={emptyCopy[view].title}
+          description={emptyCopy[view].description}
+          action={
+            merchantFilter
+              ? { label: 'Clear merchant', href: returnsHref(view, { group }) }
+              : view !== 'all' && view !== 'returned'
+                ? { label: 'See all items', href: returnsHref('all', { group }) }
+                : { label: 'Open inventory', href: '/shopping/inventory' }
+          }
+          secondaryAction={
+            view === 'all' && !merchantFilter
+              ? { label: 'Set return policies', href: '/shopping/settings#return-policies' }
+              : undefined
           }
         />
-
-        <OnTimeSavingsFigure savings={savings} />
-
-        {rows.length === 0 ? (
-          <EmptyState
-            icon={RotateCcw}
-            title={emptyCopy[view].title}
-            description={emptyCopy[view].description}
-            action={
-              merchantFilter
-                ? { label: 'Clear merchant', href: returnsHref(view, { group }) }
-                : view !== 'all' && view !== 'returned'
-                  ? { label: 'See all items', href: returnsHref('all', { group }) }
-                  : { label: 'Open inventory', href: '/shopping/inventory' }
-            }
-            secondaryAction={
-              view === 'all' && !merchantFilter
-                ? { label: 'Set return policies', href: '/shopping/settings#return-policies' }
-                : undefined
-            }
-          />
-        ) : group === 'orders' ? (
-          <ReturnsOrderList groups={orderGroups} working={working} />
-        ) : (
-          <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
-            {rows.map((row) => (
-              <ReturnItemRow key={row.inventoryItemId} row={row} working={working} />
-            ))}
-          </ul>
-        )}
+        <OnTimeSavingsFigure savings={savings} className="mt-6" />
       </div>
-    </div>
+    );
+  }
+
+  return (
+    <ListPage
+      header={header}
+      tools={tools}
+      foot={
+        <>
+          <p>{countLine(rows.length, view)}</p>
+          <OnTimeSavingsFigure savings={savings} className="mt-4" />
+        </>
+      }
+    >
+      {group === 'orders' ? (
+        <ReturnsOrderList groups={orderGroups} working={working} />
+      ) : (
+        rows.map((row) => <ReturnItemRow key={row.inventoryItemId} row={row} working={working} />)
+      )}
+    </ListPage>
   );
+}
+
+/**
+ * The count under the list (plan #1785), in the view's own words: "3 due
+ * soon", "1 overdue", "2 to return", "18 items", "4 returned".
+ */
+export function countLine(count: number, view: ReturnsView): string {
+  switch (view) {
+    case 'soon':
+      return `${count} due soon`;
+    case 'overdue':
+      return `${count} overdue`;
+    case 'marked':
+      return `${count} to return`;
+    case 'returned':
+      return `${count} returned`;
+    case 'all':
+      return `${count} ${count === 1 ? 'item' : 'items'}`;
+  }
 }
