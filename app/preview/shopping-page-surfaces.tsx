@@ -2,6 +2,7 @@ import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { MODELS } from '@/lib/core/models';
 import { DashboardView } from '@/app/shopping/dashboard/dashboard-view';
 import { AddBooksView } from '@/app/shopping/inventory/add/books/books-view';
+import { GamesEditionPickerDemo } from './shopping-games-edition-demo';
 import { AddGamesView } from '@/app/shopping/inventory/add/games/games-view';
 import { OrderDetailView, type OrderDetail } from '@/app/shopping/orders/[id]/order-detail-view';
 import { NewOrderView } from '@/app/shopping/orders/new/new-order-view';
@@ -123,7 +124,16 @@ export function ShoppingAddBooksSurface() {
 }
 
 export function ShoppingAddGamesSurface() {
-  return <AddGamesView mode="photo" />;
+  // The Search tab with a result that has other editions, which is where the
+  // base-box and expansion note now sits (plan #1780).
+  return (
+    <div>
+      <AddGamesView mode="search" />
+      <div className="mx-auto mt-4 max-w-3xl">
+        <GamesEditionPickerDemo />
+      </div>
+    </div>
+  );
 }
 
 // ---- One order -------------------------------------------------------------
