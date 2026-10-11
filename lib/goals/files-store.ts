@@ -127,6 +127,24 @@ export async function loadFileUses(goals: GoalsSupabaseClient, fileId: string): 
  * opening a file a result links to is reading it. Only a Claude step with a
  * result is touched, as with Mark read; how many were marked.
  */
+/**
+ * The files still to read (note 29321f82): those linked from a Dash step
+ * whose result has not been opened, the same test markStepsRead clears when
+ * the file is opened.
+ */
+export async function loadUnreadFileIds(goals: GoalsSupabaseClient): Promise<Set<string>> {
+  const { data, error } = await goals
+    .from('links')
+    .select('target_id, items!inner (id)')
+    .eq('kind', 'file')
+    .is('archived_at', null)
+    .is('items.archived_at', null)
+    .eq('items.kind', 'claude')
+    .is('items.reviewed_at', null);
+  if (error) throw new Error(`Could not read which files are unread: ${error.message}`);
+  return new Set(((data ?? []) as { target_id: string | null }[]).flatMap((row) => (row.target_id ? [row.target_id] : [])));
+}
+
 export async function markStepsRead(
   goals: GoalsSupabaseClient,
   stepIds: string[],

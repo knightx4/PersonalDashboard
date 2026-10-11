@@ -74,7 +74,7 @@ export function GameCard({
         )}
 
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button type="button" size="sm" disabled={pending} onClick={() => onSave(true)}>
+          <Button type="button" size="sm" pending={pending} onClick={() => onSave(true)}>
             {game.needsConfirmation ? 'Yes — this box' : 'Add to collection'}
           </Button>
           {game.needsConfirmation && (
@@ -188,7 +188,7 @@ export function AddGameManualForm({
           />
         </div>
       </div>
-      <Button type="submit" disabled={pending} className="self-start">
+      <Button type="submit" pending={pending} className="self-start">
         {pending ? 'Saving…' : 'Add to collection'}
       </Button>
       <FieldError>{state.error}</FieldError>

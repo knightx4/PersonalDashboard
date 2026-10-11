@@ -112,6 +112,8 @@ export type FiledCapture = {
   goals: { captureId: string; entries: FiledEntry[] } | null;
   /** When it was undone, for a todo or a job note. */
   undoneAt: string | null;
+  /** How many files went with it (plan #1714); absent when none did. */
+  files?: number;
 };
 
 /** Where a part went, in the words the box shows and the landing draws. */

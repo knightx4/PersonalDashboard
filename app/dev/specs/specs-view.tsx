@@ -13,6 +13,8 @@ import { ModuleVisionPanel } from './vision-view';
 import { VisionEditPanel } from './vision-edit';
 import { SpecChangeCard } from './spec-change-card';
 import { SpecFindings } from './spec-findings';
+import { InterviewPanel } from './interview-card';
+import type { InterviewCardView } from '@/lib/specs/interview-view';
 import { cn } from '@/lib/cn';
 
 /**
@@ -52,12 +54,18 @@ export function SpecsView({
   edits,
   changes,
   audit,
+  interviews = {},
+  openInterviews = false,
 }: {
   counts: Record<string, number>;
   visions: Partial<Record<VisionScope, ModuleVision>>;
   edits: Partial<Record<VisionScope, VisionReview>>;
   changes: SpecChange[];
   audit: LatestFindings;
+  /** The interview card for each workspace that has one (plan #1641). */
+  interviews?: Partial<Record<VisionScope, InterviewCardView>>;
+  /** Draw open interviews opened rather than behind Continue: the gallery's. */
+  openInterviews?: boolean;
 }) {
   const groups = groupSpecs(SPECS, counts);
 
@@ -148,6 +156,17 @@ export function SpecsView({
                   />
                 )}
               </div>
+
+              {/* Dash's interview about the workspace, under its vision and
+                  any edit waiting there (plan #1641): the offer to start one,
+                  the one under way, or the last one while its drafts wait. */}
+              <InterviewPanel
+                module={group.module ?? APP_VISION}
+                label={group.module ? group.label : 'the app'}
+                view={interviews[group.module ?? APP_VISION] ?? null}
+                defaultOpen={openInterviews}
+                defaultWriting={openInterviews}
+              />
 
               {/* A workspace with no spec has no page of its own, so what the
                   audit found about it (usually that nothing describes it) is

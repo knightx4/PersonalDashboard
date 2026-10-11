@@ -30,6 +30,44 @@ export function embedUrl(videoId: string, start: number | null, end: number | nu
   return url.toString();
 }
 
+/**
+ * How far a player is through one section of a video, or null when the clip
+ * has no closed span to be through. `time` is the player's own clock, in
+ * seconds from the start of the whole video. The player stops at `end`, so
+ * half a second short of it counts as the end reached.
+ */
+export function sectionProgress(
+  start: number | null,
+  end: number | null,
+  time: number,
+): { watched: number; length: number; done: boolean } | null {
+  if (start === null || end === null || end <= start) return null;
+  const length = end - start;
+  const watched = Math.min(length, Math.max(0, time - start));
+  return { watched, length, done: time >= end - 0.5 };
+}
+
+/**
+ * The player's clock from one message a YouTube embed posts to the page, or
+ * null for any other message. With `enablejsapi=1` and a `listening` message
+ * sent to it, the embed posts its state as JSON strings, and the ones whose
+ * `event` is `infoDelivery` carry `currentTime` while it plays.
+ */
+export function playerTime(data: unknown): number | null {
+  if (typeof data !== 'string') return null;
+  let message: unknown;
+  try {
+    message = JSON.parse(data);
+  } catch {
+    return null;
+  }
+  if (!message || typeof message !== 'object') return null;
+  const { event, info } = message as { event?: unknown; info?: unknown };
+  if (event !== 'infoDelivery' || !info || typeof info !== 'object') return null;
+  const time = (info as { currentTime?: unknown }).currentTime;
+  return typeof time === 'number' && Number.isFinite(time) ? time : null;
+}
+
 /** A watch link that opens at a time. */
 export function watchAt(videoId: string, start: number): string {
   const url = new URL('https://www.youtube.com/watch');

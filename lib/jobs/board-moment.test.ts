@@ -31,8 +31,8 @@ describe('openApplications and stillOpenLine', () => {
   });
 
   it('names the company and the count plainly', () => {
-    expect(stillOpenLine('Acme', 4)).toBe('Acme is filed under Closed. 4 applications are still open.');
-    expect(stillOpenLine('Acme', 1)).toBe('Acme is filed under Closed. 1 application is still open.');
-    expect(stillOpenLine('', 0)).toBe('Filed under Closed. No applications are open right now.');
+    expect(stillOpenLine('Acme', 4)).toBe('4 still open · Acme is in Closed');
+    expect(stillOpenLine('Acme', 1)).toBe('1 still open · Acme is in Closed');
+    expect(stillOpenLine('', 0)).toBe('None still open · Moved to Closed');
   });
 });

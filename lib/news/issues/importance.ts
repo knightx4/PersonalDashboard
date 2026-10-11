@@ -96,7 +96,7 @@ async function haikuRatings(
     max_tokens: 2_000,
     system: SYSTEM,
     tools: [TOOL],
-    tool_choice: forceTool(TOOL_NAME),
+    tool_choice: forceTool(TOOL_NAME, IMPORTANCE_MODEL),
     messages: [
       {
         role: 'user',

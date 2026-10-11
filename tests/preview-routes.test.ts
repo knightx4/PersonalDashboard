@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { importedBy, pagesUsing } from '@/lib/preview/importers';
 import {
+  COMPONENT_SURFACES,
   routeMatches,
   routeOfFile,
   SURFACE_ROUTES,
@@ -29,6 +30,12 @@ function idsIn(file: string, after: string): string[] {
 const GALLERY = [
   ...idsIn('app/preview/surfaces.tsx', 'export const SURFACES'),
   ...idsIn('app/dev/ui/anatomy.tsx', 'export const ANATOMIES'),
+  // The page patterns' surfaces, one per line inside each pattern's list.
+  ...[
+    ...readFileSync(join(root, 'app/dev/ui/patterns.tsx'), 'utf8').matchAll(
+      /\bid: '(pattern-[\w-]+)'/g,
+    ),
+  ].map((m) => m[1]),
 ];
 
 function pages(dir: string, out: string[] = []): string[] {
@@ -99,19 +106,83 @@ describe('surfacesForFiles, on screen changes that shipped', () => {
   it('follows a component to the page that uses it (20a8a7c7)', () => {
     expect(surfacesForFiles(['components/jobs/pipeline/board.tsx'], using)).toEqual([
       'jobs-pipeline-board',
+      'jobs-moment-forward',
+      'jobs-moment-offer',
+      'jobs-moment-reject',
+      'jobs-pipeline-focus',
       'jobs-pipeline-dense',
-      'jobs-pipeline-list',
+      'jobs-roles-table',
+      'jobs-pipeline-filtered',
+      'shell-display-options',
+      'ask-dash-rows',
     ]);
     expect(surfacesForFiles(['components/jobs/pipeline/board.tsx'])).toEqual([]);
   });
 
   it('names the Todo moments for the day-close change (d12fc78b)', () => {
     const found = surfacesForFiles(['app/todo/page.tsx', 'components/todo/day-closed.tsx'], using);
-    expect(found).toEqual(['todo-day-close', 'todo-day-closed']);
+    expect(found).toEqual(['todo-day-close', 'todo-day-closed', 'todo-task-files']);
   });
 
   it('ignores files that are not screens', () => {
     expect(surfacesForFiles(['lib/jobs/today/load.ts', 'app/news/actions.ts'], using)).toEqual([]);
+  });
+
+  // Plan #1708: the Ask Dash thread is imported by the shell, and walking its
+  // importers named every surface in the gallery.
+  it('stops at the Ask Dash thread\'s own surface', () => {
+    expect(surfacesForFiles(['components/talk/talk-thread.tsx'], using)).toEqual(['ask-dash-thread']);
+    // Without the file system too: the thread is named by its path.
+    expect(surfacesForFiles(['components/talk/talk-thread.tsx'])).toEqual(['ask-dash-thread']);
+  });
+
+  it('stops at the thread on the way up from a file beneath it', () => {
+    const graph = new Map<string, string[]>([
+      ['components/talk/piece.tsx', ['components/talk/talk-thread.tsx']],
+      ['components/talk/talk-thread.tsx', ['components/shell/ask-dash.tsx']],
+      ['components/shell/ask-dash.tsx', ['app/layout.tsx']],
+    ]);
+    expect(pagesUsing('components/talk/piece.tsx', graph)).toEqual(['components/talk/talk-thread.tsx']);
+    expect(surfacesForFiles(['components/talk/piece.tsx'], (f) => pagesUsing(f, graph))).toEqual([
+      'ask-dash-thread',
+    ]);
+  });
+
+  // Plan #1658: the sheet is imported by the shell too, and a change to it
+  // named 189 surfaces. It is looked at in the one that draws it open.
+  it('stops at the Ask Dash sheet\'s own surface', () => {
+    expect(surfacesForFiles(['components/shell/ask-dash.tsx'], using)).toEqual(['ask-dash-rows']);
+    expect(surfacesForFiles(['components/shell/ask-dash.tsx'])).toEqual(['ask-dash-rows']);
+  });
+
+  // #1702 changed Dash's mark and waited on a check of 189 surfaces, because
+  // the mark sits in the shell and every workspace's layout mounts the shell.
+  it("looks at a change to the shell's pieces on the shell's own surface", () => {
+    expect(surfacesForFiles(['components/shell/search-bar.tsx'], using)).toEqual(['shell-full']);
+    expect(surfacesForFiles(['components/shell/app-shell.tsx'], using)).toEqual(['shell-full']);
+  });
+
+  it("looks at a change to Dash's mark on the mark's own surface", () => {
+    expect(surfacesForFiles(['components/ui/dash-mark.tsx'], using)).toEqual(['dash-mark']);
+  });
+
+  it("looks at a change to the runner card on the card's own surface (#1704)", () => {
+    expect(surfacesForFiles(['app/dev/plan/overnight-control.tsx'], using)).toEqual(['dev-runner-crew']);
+    expect(surfacesForFiles(['app/dev/plan/runner-crew.tsx'], using)).toEqual(['dev-runner-crew']);
+  });
+
+  it('does not follow a type-only import, which draws nothing', () => {
+    // lib/raised/notifications.ts takes only the Notification type from the bell.
+    expect(surfacesForFiles(['components/shell/notifications-button.tsx'], using)).toEqual([
+      'shell-full',
+    ]);
+  });
+
+  it('names a surface in the gallery for every shared component', () => {
+    for (const [id, files] of Object.entries(COMPONENT_SURFACES)) {
+      expect(SURFACE_ROUTES[id]).toBeDefined();
+      for (const file of files) expect(statSync(join(root, file)).isFile()).toBe(true);
+    }
   });
 });
 
@@ -119,7 +190,7 @@ describe('surfacesInText', () => {
   it('reads addresses, gallery links and screen files', () => {
     expect(surfacesInText('Show the date on /news/saved.')).toEqual(['news-saved', 'news-saved-empty']);
     expect(surfacesInText('See /preview?s=dev-ui for it.')).toEqual(['dev-ui']);
-    expect(surfacesInText('Change app/todo/page.tsx')).toEqual(['todo-day-close', 'todo-day-closed']);
+    expect(surfacesInText('Change app/todo/page.tsx')).toEqual(['todo-day-close', 'todo-day-closed', 'todo-task-files']);
     expect(surfacesInText('open /jobs/roles/42')).toEqual(
       Object.keys(SURFACE_ROUTES).filter((id) => SURFACE_ROUTES[id].includes('/jobs/roles/[id]')),
     );

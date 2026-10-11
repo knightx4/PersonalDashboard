@@ -7,7 +7,13 @@
  * in lib/goals/daily.ts), so a parked goal, a step that waits on another and
  * a step for later put nothing there. And any step you pressed Show on Todo on
  * is there too, as below. A step that is both is listed once.
- * *
+ *
+ * While the person has chosen the week's focus (lib/goals/focus.ts), only a
+ * goal in focus puts its next step there: a focus goal, or an errand due
+ * within a week. A flagged step, a question and a dated errand still come
+ * through from any goal, and so do the rhythms of goals in focus only
+ * (focusRhythms).
+ *
  * A step is on Todo while you have pressed Show on Todo on it and it is still
  * something to do: yours, open, and reachable through open steps from an open
  * goal. A step under a dropped branch or a goal you have not taken on yet
@@ -21,6 +27,7 @@
  * lib/todo/agenda/sources/goal-steps.ts.
  */
 import { dailyView, type DailyView } from '@/lib/goals/daily';
+import { inFocus } from '@/lib/goals/focus';
 import type { Step, StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 
@@ -73,6 +80,8 @@ export function todoSteps(goals: Goal[], byGoal: Map<string, StepNode[]>): TodoS
 /**
  * Everything Goals puts on Todo as steps: each open goal's next step of yours
  * (plan #1266) and the steps flagged with Show on Todo, one row per step.
+ * While a focus is chosen, the next step comes only from goals in focus; a
+ * flagged step comes from any goal, since it was asked for one at a time.
  *
  * The pick is dailyView's first next item for the goal, so Todo and the Goals
  * home never disagree about what is next. dailyView blanks an overdue due
@@ -97,8 +106,10 @@ export function goalTodoSteps(
   };
   for (const roots of byGoal.values()) index(roots);
 
+  const all = goals.map((g) => g.goal);
   const picks = new Map<string, TodoStep>();
   for (const { goal, next } of view.goals) {
+    if (!inFocus(goal, all, today)) continue;
     const node = next[0] && nodes.get(next[0].id);
     if (!node) continue;
     picks.set(node.id, {
@@ -116,6 +127,22 @@ export function goalTodoSteps(
   const listed = new Set(out.map((step) => step.id));
   for (const pick of picks.values()) if (!listed.has(pick.id)) out.push(pick);
   return out;
+}
+
+/**
+ * The rhythms Todo lists while a focus is chosen: those of goals in focus.
+ * With no focus chosen, every rhythm, as before.
+ */
+export function focusRhythms<T extends { goalId: string }>(
+  rhythms: readonly T[],
+  goals: readonly Goal[],
+  today: string,
+): T[] {
+  const byId = new Map(goals.map((goal) => [goal.id, goal]));
+  return rhythms.filter((rhythm) => {
+    const goal = byId.get(rhythm.goalId);
+    return !goal || inFocus(goal, goals, today);
+  });
 }
 
 /**

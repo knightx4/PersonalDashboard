@@ -51,7 +51,7 @@ export function CalendarFeeds({ feeds, timezone }: { feeds: Feed[]; timezone: st
               required
             />
           </Field>
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" pending={pending}>
             {pending ? 'Reading…' : 'Subscribe'}
           </Button>
         </div>
@@ -98,7 +98,7 @@ function FeedRow({ feed, timezone }: { feed: Feed; timezone: string }) {
       {error && <span className="text-small text-status-rejected">{error}</span>}
 
       <span className="ml-auto flex items-center gap-1">
-        <Button type="button" variant="ghost" size="sm" onClick={refresh} disabled={pending}>
+        <Button type="button" variant="ghost" size="sm" onClick={refresh} pending={pending}>
           <RefreshCw className="size-3.5" strokeWidth={1.75} aria-hidden />
           {pending ? 'Reading…' : 'Refresh now'}
         </Button>

@@ -231,7 +231,7 @@ export async function screenVideos(input: {
           },
         },
       ],
-      tool_choice: forceTool(SCREEN_TOOL),
+      tool_choice: forceTool(SCREEN_TOOL, JUDGE_VIDEO_MODEL),
       messages: [{ role: 'user', content: screenPrompt(input.profile, input.videos) }],
     });
   } catch (error) {
@@ -481,7 +481,7 @@ export async function judgeVideo(input: {
           },
         },
       ],
-      tool_choice: forceTool(JUDGE_TOOL),
+      tool_choice: forceTool(JUDGE_TOOL, JUDGE_VIDEO_MODEL),
       messages: [{ role: 'user', content: judgePrompt(input.profile, input.video) }],
     });
   } catch (error) {

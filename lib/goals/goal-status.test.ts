@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { claudeLine, goalStatus, STATUS_STEPS_SHOWN } from './goal-status';
+import { claudeLine, goalStatus, statusLine, STATUS_STEPS_SHOWN } from './goal-status';
 import { buildForest, type Step } from './steps';
 import type { Goal } from './tree';
 
@@ -51,10 +51,10 @@ describe('goalStatus', () => {
       step('proposed', { status: 'proposed', title: 'Email the recruiter' }),
     ]);
     expect(view.yourMove.map((row) => [row.kind, row.title, row.href])).toEqual([
-      ['question', 'Which lane first?', '#step-question'],
-      ['approve', '1 proposed step', '#step-proposed'],
-      ['read', 'Split by role family', '#step-result'],
-      ['do', 'Update the resume', '#step-mine-1'],
+      ['question', 'Which lane first?', '?tab=steps#step-question'],
+      ['approve', '1 proposed step', '?tab=steps#step-proposed'],
+      ['read', 'Split by role family', '?tab=steps#step-result'],
+      ['do', 'Update the resume', '?tab=steps#step-mine-1'],
     ]);
   });
 
@@ -107,5 +107,25 @@ describe('claudeLine', () => {
     expect(claudeLine({ claudeReady: 1, claudeHeld: 1 })).toBe(
       'Dash will work 1 step on its next run. 1 Dash step waits for your approval.',
     );
+  });
+});
+
+describe('statusLine', () => {
+  const row = { id: 'x', kind: 'do' as const, label: 'Do', title: 'x', href: '#x' };
+
+  it('counts what is on you, what Dash is on, the due date and the last progress', () => {
+    expect(
+      statusLine(
+        { yourMove: [row, row], moreSteps: 1, claudeReady: 4 },
+        { running: 1, dueOn: '2026-10-31', lastProgressOn: '2026-10-03' },
+      ),
+    ).toBe('3 on you · Dash on 1 · due 31 Oct · last progress 3 Oct');
+  });
+
+  it('says how many steps are ready for Dash when no run is going, and when nothing is on you', () => {
+    expect(statusLine({ yourMove: [], moreSteps: 0, claudeReady: 2 })).toBe(
+      'Nothing on you · 2 steps ready for Dash',
+    );
+    expect(statusLine({ yourMove: [], moreSteps: 0, claudeReady: 0 })).toBe('Nothing on you');
   });
 });

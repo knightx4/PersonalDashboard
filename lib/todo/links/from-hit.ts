@@ -44,11 +44,15 @@ export const TARGET_FOR_HIT: Record<HitKind, LinkTarget | null> = {
   vision: null,
   // A story lives inside a newsletter issue rather than in a row of its own.
   story: null,
+  // task_links has no column for an area; a task is about one of its goals.
+  area: null,
   // Goals and steps are both rows of goals.items, which is what goal_id
   // references, so a step is linked through the goal column too (note
   // fa4800bc).
   goal: 'goal',
   step: 'goal',
+  // task_links has no column for a file.
+  file: null,
 };
 
 /** What a task would point at if it were pointed at this hit. */
