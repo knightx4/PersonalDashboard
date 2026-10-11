@@ -253,6 +253,7 @@ import {
   DevChangelogSurface,
   DevChangelogScreensSurface,
   DevIdeasSurface,
+  DevIdeasEmptySurface,
   DevRaisedSurface,
   DevInboxSurface,
   DevRaisedStatusSurface,
@@ -5598,6 +5599,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevIdeasSurface />,
+  },
+  {
+    id: 'dev-ideas-empty',
+    label: 'Dev · Ideas, nothing written down',
+    module: 'dev',
+    width: 'page',
+    render: () => <DevIdeasEmptySurface />,
   },
   {
     id: 'dev-project-plan',
