@@ -31,7 +31,7 @@ export default async function GoalRoutinesPage() {
     <RoutinesScreen
       description="What Dash does on a schedule for your goals, and how each last went."
       actions={
-        <Link href="/goals/runs" className="text-small text-ink-muted underline-offset-2 hover:underline">
+        <Link href="/goals/runs" className="press-area text-small text-ink-muted underline-offset-2 hover:underline">
           Every run
         </Link>
       }

@@ -51,7 +51,7 @@ function RoutineRow({ routine }: { routine: RoutineView }) {
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
         <h2 className="text-ui font-semibold break-words text-ink">{routine.title}</h2>
         {routine.results && (
-          <Link href={routine.results.href} className="text-small text-ink-muted underline-offset-2 hover:underline">
+          <Link href={routine.results.href} className="press-area text-small text-ink-muted underline-offset-2 hover:underline">
             {routine.results.label}
           </Link>
         )}
