@@ -632,7 +632,7 @@ async function addJobLead(ctx: DashWriteContext, args: Args): Promise<DashWriteR
   requireWorkspace(ctx, 'jobs');
   const url = text(args, 'url') || null;
   let title = text(args, 'title');
-  const companyName = text(args, 'company');
+  let companyName = text(args, 'company');
   if (url && !/^https?:\/\/\S+$/i.test(url)) throw new Refused('url is not a web link starting http:// or https://.');
   if (!url && (!title || !companyName)) {
     throw new Refused('Give the posting link, or the role title and the company. Ask them for whichever is missing.');
@@ -648,13 +648,18 @@ async function addJobLead(ctx: DashWriteContext, args: Args): Promise<DashWriteR
 
   let location: string | null = null;
   let atsJobId: string | null = null;
-  if (url && !title) {
+  if (url && (!title || !companyName)) {
     const read = ctx.readPosting ?? (await import('@/lib/jobs/ats')).fetchPostingFromUrl;
     const outcome = await read(url).catch(() => null);
     if (outcome?.ok) {
-      title = outcome.posting.title.trim();
-      location = outcome.posting.location;
-      atsJobId = outcome.posting.atsJobId;
+      // What they told Dash outranks the page; the page fills what is missing,
+      // the employer from its JobPosting data, site name, title or domain.
+      if (!title) {
+        title = outcome.posting.title.trim();
+        location = outcome.posting.location;
+        atsJobId = outcome.posting.atsJobId;
+      }
+      if (!companyName) companyName = outcome.posting.company?.trim() ?? '';
     }
   }
   if (!title) {
@@ -915,7 +920,7 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
   ),
   tool(
     'add_job_lead',
-    'Save a job to their leads in Jobs, when they ask you to ("add this job to my leads", a pasted posting link). Pass the posting link when there is one; the title is read from the posting when it can be. Pass the title and company when they named them, and always the company, from the link\'s site or their words. When the role is on the page they are on, use its title, company and link. When there is no link and no role you can name, ask them for the link rather than calling this.',
+    'Save a job to their leads in Jobs, when they ask you to ("add this job to my leads", a pasted posting link). Pass the posting link when there is one; the title and the company are read from the posting when it names them, so a bare link is enough and you do not ask for the company first. Pass the title and company when they named them or you know them. If the posting names no company the call says so, and then you ask. When the role is on the page they are on, use its title, company and link. When there is no link and no role you can name, ask them for the link rather than calling this.',
     {
       type: 'object',
       properties: {
