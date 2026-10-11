@@ -98,6 +98,7 @@ export function FeedbackButton({
   isOwner = false,
   initialOpen = false,
   initialFiles = [],
+  initialSaved = null,
 }: {
   allHref?: string;
   /**
@@ -118,6 +119,11 @@ export function FeedbackButton({
   /** For the gallery, which draws the panel open with a file added. */
   initialOpen?: boolean;
   initialFiles?: UploadedAttachment[];
+  /**
+   * For the gallery, which draws the panel just after a note saved, with
+   * Jev's triage under it (plan #1674). Gone once anything is filed.
+   */
+  initialSaved?: { message: string; triage: TriageView } | null;
 } = {}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(initialOpen);
@@ -180,6 +186,7 @@ export function FeedbackButton({
   }, [filedId, filedTable]);
   const triaged = filedId !== null && triage?.id === filedId ? triage.view : null;
   const triaging = Boolean(filedId && triage?.id !== filedId);
+  const saved = filedId === null && !idea ? initialSaved : null;
 
   // Counted when the panel opens, and again after a note is filed from it, so
   // the number beside "Run Feature Routine" is the queue as it stands rather
@@ -350,8 +357,9 @@ export function FeedbackButton({
 
             <FieldError>{state.error}</FieldError>
             {state.message && <p className="text-ui text-accent">{state.message}</p>}
+            {saved && <p className="text-ui text-accent">{saved.message}</p>}
             {triaging && <p className="text-small text-ink-muted">Sorting it…</p>}
-            <TriageNote view={triaged} onNavigate={() => setOpen(false)} />
+            <TriageNote view={triaged ?? saved?.triage ?? null} onNavigate={() => setOpen(false)} />
           </form>
 
           {/* Its own section below the form, not a link on the Send row: it is
