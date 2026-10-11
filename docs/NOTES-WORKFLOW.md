@@ -84,6 +84,13 @@ the limit of two an hour do not apply. It marks the note `planned` with a
 resolution naming the idea, and lists the note in its report under *Moved to
 ideas*. You approve the work there before any of it is done.
 
+The header's box files everything as a note first. When triage is sure a
+note needs planning, the server writes an idea from the same text under the
+triaged workspace and marks the note `planned`, with a resolution naming the
+idea, so the queue does not work it (plan #1675). The saved panel says
+"Filed as a note" or "Filed as an idea" and moves it the other way in one
+press. An unsure answer stays a note for the notes routine to judge.
+
 The whole loop, then: small things go in as notes and get fixed; big
 thoughts, and notes that turn out to be big, go in as ideas, get shaped into
 proposals by pressing *Shape into a plan*, get approved and handed over on the
