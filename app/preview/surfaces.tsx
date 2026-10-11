@@ -1,3 +1,5 @@
+import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
+import { filterPipeline, parsePipeline } from '@/lib/jobs/pipeline-view';
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
 import { openingSource } from '@/lib/jobs/suggest/source';
@@ -49,6 +51,7 @@ import { CompanyPanels } from '@/app/jobs/(app)/companies/[slug]/panels';
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { ReviewQueue } from '@/app/jobs/(app)/review/list';
 import { SettingsView } from '@/app/jobs/(app)/settings/view';
+import { MaterialView, type MaterialProps } from '@/app/jobs/(app)/material/material-view';
 import { ContactsView, type ContactListRow, type ContactRow } from '@/app/jobs/(app)/contacts/view';
 import { ContactDetail } from '@/app/jobs/(app)/contacts/[id]/contact-detail';
 import { RoleForm } from '@/app/jobs/(app)/roles/new/role-form';
@@ -61,6 +64,11 @@ import type { ReviewRow, SearchableRole } from '@/lib/jobs/review/load';
 import { PipelinePage } from '@/components/jobs/pipeline/pipeline-page';
 import { RoundsTable, type RoundView } from '@/app/jobs/(app)/interviews/rounds-table';
 import { TodayLists } from '@/app/jobs/(app)/_home/this-week-lists';
+import { TodayPage } from '@/app/jobs/(app)/_home/today-page';
+import { summariseSearch } from '@/lib/jobs/home/summary';
+import type { SinceView } from '@/lib/jobs/home/since-load';
+import { liveByMove } from '@/lib/jobs/today/live';
+import type { ReviewPeek } from '@/lib/jobs/today/review-peek';
 import type { TodayBoard } from '@/lib/jobs/today/load';
 import type { ModuleId } from '@/lib/modules';
 import type { Interaction } from '@/lib/preview/interaction';
@@ -212,6 +220,15 @@ import {
 } from './public-surfaces';
 import { WeekReviewNoneSurface, WeekReviewSurface } from './week-surfaces';
 import { JobsInsightsSurface } from './jobs-insights-surface';
+import {
+  JobsActivitySurface,
+  JobsAnalyticsSurface,
+  JobsAnswersSurface,
+  JobsCasePageSurface,
+  JobsOnboardingSurface,
+  JobsThoughtsSurface,
+} from './jobs-page-surfaces';
+import { GoalRunSurface, MailMessageSurface } from './mail-run-surfaces';
 import {
   AccountSurface,
   DevBugsSurface,
@@ -619,6 +636,14 @@ const pipelineRows: PipelineRow[] = [
 ];
 
 /** The sent applications still open, which is all the moment demos draw. */
+/** The Pipeline narrowed to one source, as the filtered surfaces draw it (plan #1658). */
+const FILTERED_PIPELINE_PARAMS = { source: 'portal' };
+const FILTERED_PIPELINE = askListFilter('pipeline', FILTERED_PIPELINE_PARAMS)!;
+const FILTERED_PIPELINE_LABEL = askListLabel(
+  'pipeline',
+  filterPipeline(pipelineRows, parsePipeline(FILTERED_PIPELINE_PARAMS)).filtered.length,
+);
+
 const momentRows = pipelineRows.filter((row) => OPEN_STATUSES.includes(row.status));
 
 /**
@@ -836,8 +861,6 @@ const settings = {
     excludedIndustries: 'Crypto, Healthcare, Defense',
     searchStartedOn: '2026-07-06',
     ghostThresholdDays: 21,
-    writingStyleNotes: 'Plain sentences. No "passionate", no "excited to".',
-    bannedConstructions: 'leverage, synergy, reach out',
     preferences: {
       homeLocation: 'London',
       workplaces: ['hybrid', 'remote'] as const,
@@ -861,6 +884,61 @@ const settings = {
       },
     },
   ],
+  excludedSenders: [
+    { id: 'x1', domain: 'jobalerts.linkedin.com' },
+    { id: 'x2', domain: 'hi.wellfound.com' },
+  ],
+};
+
+
+/**
+ * Material for the same person: a question bank with long and unanswered
+ * questions across kinds, the two resumes and the evidence bank Settings used
+ * to hold, and a writing voice with its own banned phrases.
+ */
+const material: MaterialProps = {
+  part: 'answers',
+  kind: null,
+  questions: [
+    {
+      id: 'q1',
+      text: 'Why do you want to work at Fieldline, and why this team in particular rather than the wider platform organisation?',
+      kind: 'motivation',
+      canonicalAnswer:
+        'I have spent four years making slow batch systems incremental, and your settlement platform is the same problem at ten times the volume. The platform team owns the part I am best at.',
+      timesSeen: 7,
+      usedIn: 5,
+      approvedAnswer: null,
+    },
+    {
+      id: 'q2',
+      text: 'Describe a time you disagreed with a technical decision.',
+      kind: 'behavioral',
+      canonicalAnswer: null,
+      timesSeen: 4,
+      usedIn: 2,
+      approvedAnswer:
+        'We were about to shard the reconciliation tables. I argued for moving the joins into the warehouse first; we did, and sharding was never needed.',
+    },
+    {
+      id: 'q3',
+      text: 'Are you authorised to work in the UK?',
+      kind: 'logistics',
+      canonicalAnswer: 'Yes, without sponsorship.',
+      timesSeen: 12,
+      usedIn: 11,
+      approvedAnswer: null,
+    },
+    {
+      id: 'q4',
+      text: 'What is your notice period?',
+      kind: 'logistics',
+      canonicalAnswer: null,
+      timesSeen: 1,
+      usedIn: 0,
+      approvedAnswer: null,
+    },
+  ],
   resumes: [
     {
       id: 'cv1',
@@ -871,10 +949,6 @@ const settings = {
       hasPdf: true,
     },
     { id: 'cv2', label: 'Quant', isDefault: false, notes: null, hasText: false, hasPdf: false },
-  ],
-  excludedSenders: [
-    { id: 'x1', domain: 'jobalerts.linkedin.com' },
-    { id: 'x2', domain: 'hi.wellfound.com' },
   ],
   evidence: [
     {
@@ -898,6 +972,10 @@ const settings = {
       usedCount: 0,
     },
   ],
+  voice: {
+    writingStyleNotes: 'Plain sentences. No "passionate", no "excited to".',
+    bannedConstructions: 'leverage\nsynergy\nreach out',
+  },
 };
 
 /** Nine people on file, in every state a send to somebody can be in. */
@@ -1106,6 +1184,76 @@ const todayBoard: TodayBoard = {
       followUpHref: null,
     },
   ],
+  debriefs: [],
+};
+
+/**
+ * Today with something in every section (plan #1591): five imports waiting,
+ * the week above with a round owing a debrief, the live applications split
+ * by whose move it is, and two changes since the last visit. Marshall Wace
+ * and D. E. Shaw have interviews booked, so the move is yours; Monzo's mail
+ * asked a question, which makes it yours too.
+ */
+const todayPageNow = new Date('2026-09-09T12:00:00.000Z');
+const todayPageRows: PipelineRow[] = pipelineRows.map((row) =>
+  row.applicationId === 'p1' || row.applicationId === 'p2'
+    ? { ...row, lastTurnEvent: 'interview_scheduled' }
+    : row,
+);
+const todayPageBoard: TodayBoard = {
+  ...todayBoard,
+  debriefs: [
+    {
+      key: 'tg0',
+      leadId: 'ti0',
+      roleId: 'role-p2',
+      companyName: 'The D. E. Shaw group',
+      roleTitle: 'Software Developer',
+      scheduledAt: '2026-09-08T15:00:00.000Z',
+      timeKnown: true,
+    },
+  ],
+};
+const todayPageReview: ReviewPeek = {
+  count: 5,
+  items: [
+    {
+      id: 'rv1',
+      title: 'Your application to Senior Backend Engineer, Core Banking Platform has been received',
+      kind: 'Confirmation email',
+    },
+    { id: 'rv2', title: 'Wise · Software Engineer, Treasury', kind: 'New application from mail' },
+    { id: 'rv3', title: 'Quick chat this week?', kind: 'Recruiter outreach email' },
+  ],
+};
+const todayPageSince: SinceView = {
+  state: 'loaded',
+  hint: 'Since 8 Sept, 18:40',
+  stopped: [],
+  entries: [
+    {
+      id: 'ts1',
+      at: '2026-09-09T08:10:00.000Z',
+      source: 'email',
+      label: 'interview booked',
+      subject: 'The D. E. Shaw group · Software Developer',
+      tone: 'good',
+      detail: null,
+      roleId: 'role-p2',
+    },
+    {
+      id: 'ts2',
+      at: '2026-09-08T21:30:00.000Z',
+      source: 'email',
+      label: 'new role',
+      subject: 'Wise · Software Engineer, Treasury',
+      tone: 'info',
+      detail: null,
+      roleId: 'role-p5',
+    },
+  ],
+  more: 3,
+  error: null,
 };
 
 /** Two upcoming rounds and three past ones, one of them still owing a debrief. */
@@ -2340,16 +2488,13 @@ const savedStories: SavedViewProps = {
 
 /** The job search's ten sections, as its layout lists them. */
 const shellSections: NavSection[] = [
-  { href: '/jobs', label: 'Home', icon: 'jobsHome', exact: true },
+  { href: '/jobs', label: 'Today', icon: 'jobsHome', exact: true },
   { href: '/jobs/pipeline', label: 'Pipeline', icon: 'pipeline' },
   { href: '/jobs/find', label: 'Find', icon: 'find' },
   { href: '/jobs/companies', label: 'Companies', icon: 'companies' },
   { href: '/jobs/contacts', label: 'Contacts', icon: 'contacts' },
-  { href: '/jobs/interviews', label: 'Interviews', icon: 'interviews' },
-  { href: '/jobs/answers', label: 'Answers', icon: 'answers' },
+  { href: '/jobs/material', label: 'Material', icon: 'answers' },
   { href: '/jobs/analytics', label: 'Analytics', icon: 'analytics' },
-  { href: '/jobs/activity', label: 'Activity', icon: 'activity' },
-  { href: '/jobs/review', label: 'Review', icon: 'review', badge: 4 },
 ];
 
 const triageCrumbs = [
@@ -2572,7 +2717,7 @@ function SpendEstimates() {
 }
 
 /** The jobs shell with This week in it, for surfaces drawn over a whole page. */
-function PreviewShell() {
+function PreviewShell({ children }: { children?: React.ReactNode }) {
   return (
     <AppShell
       account="preview"
@@ -2588,7 +2733,7 @@ function PreviewShell() {
       theme={{ kind: 'written', id: 'paper' }}
       brief={null}
     >
-      <TodayLists board={todayBoard} timezone="Europe/London" />
+      {children ?? <TodayLists board={todayBoard} timezone="Europe/London" />}
     </AppShell>
   );
 }
@@ -3040,6 +3185,22 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <PipelinePage rows={pipelineRows} params={{ view: 'board' }} />,
+  },
+  {
+    /* The Pipeline narrowed to one source (plan #1658): the header carries
+     * "Ask Dash about these", which opens the sheet with those roles. It is
+     * drawn inside the shell, which holds the sheet it opens. */
+    id: 'jobs-pipeline-filtered',
+    label: 'Pipeline · Filtered, with the button for Dash',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <AskDashSurface page="/jobs/pipeline">
+        <PreviewShell>
+          <PipelinePage rows={pipelineRows} params={FILTERED_PIPELINE_PARAMS} />
+        </PreviewShell>
+      </AskDashSurface>
+    ),
   },
   {
     /* The page as it opens: what is in process, waiting and to apply. */
@@ -3698,7 +3859,14 @@ export const SURFACES: readonly Surface[] = [
     label: 'Company · Research, contacts and sends',
     module: 'jobs',
     width: 'wide',
-    render: () => <CompanyPanels {...companyPanels} />,
+    // With the search's estimate, as the jobs layout provides it (law 16).
+    render: () => (
+      <PaidCostsProvider
+        costs={{ 'app/jobs/(app)/companies/actions.ts#proposeAiCompanyEnrichment': guessedSummary }}
+      >
+        <CompanyPanels {...companyPanels} />
+      </PaidCostsProvider>
+    ),
   },
   {
     /* The About tab: details, then what you know about the place (plan #1628). */
@@ -3715,7 +3883,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     // With the search's estimate, as the jobs layout provides it, so the $
-    // beside Search with AI is drawn (law 16).
+    // beside "Fill blanks from the web" is drawn (law 16).
     render: () => (
       <PaidCostsProvider
         costs={{ 'app/jobs/(app)/companies/actions.ts#proposeAiCompanyEnrichment': guessedSummary }}
@@ -3751,6 +3919,35 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'wide',
     render: () => <SettingsView {...settings} />,
+  },
+  {
+    id: 'jobs-material',
+    label: 'Material · Answers',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <MaterialView {...material} />,
+  },
+  {
+    id: 'jobs-material-evidence',
+    label: 'Material · Evidence',
+    module: 'jobs',
+    width: 'wide',
+    // With the proposal's estimate, as the jobs layout provides it, so the $
+    // beside Propose is drawn (law 16).
+    render: () => (
+      <PaidCostsProvider
+        costs={{ 'app/jobs/(app)/material/evidence-actions.ts#proposeEvidence': guessedSummary }}
+      >
+        <MaterialView {...material} part="evidence" />
+      </PaidCostsProvider>
+    ),
+  },
+  {
+    id: 'jobs-material-voice',
+    label: 'Material · Voice',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <MaterialView {...material} part="voice" />,
   },
   {
     id: 'jobs-contacts',
@@ -3826,11 +4023,42 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PipelinePage rows={pipelineRows} params={{ view: 'table' }} />,
   },
   {
-    id: 'jobs-today',
-    label: 'This week',
+    /* The table as a number on Today opens it (plan #1591): narrowed to one
+     * stage, with the filter shown as a chip that takes it off. */
+    id: 'jobs-pipeline-filtered',
+    label: 'Pipeline · Opened from Today',
     module: 'jobs',
     width: 'wide',
-    render: () => <TodayLists board={todayBoard} timezone="Europe/London" />,
+    render: () => (
+      <PipelinePage rows={pipelineRows} params={{ view: 'table', stage: 'submitted' }} />
+    ),
+  },
+  {
+    /* Today, where Jobs opens (plan #1591): the review strip, This week, the
+     * live applications by whose move it is, and what came in since. */
+    id: 'jobs-today',
+    label: 'Today',
+    module: 'jobs',
+    width: 'wide',
+    render: () => (
+      <TodayPage
+        review={todayPageReview}
+        board={todayPageBoard}
+        summary={summariseSearch(
+          todayPageRows,
+          todayPageBoard.interviews.map((interview) => ({
+            id: interview.id,
+            scheduledAt: interview.scheduledAt,
+            timeKnown: interview.timeKnown,
+            groupId: interview.groupId,
+          })),
+          todayPageNow,
+        )}
+        live={liveByMove(todayPageRows, new Set(['p3']))}
+        since={todayPageSince}
+        timezone="Europe/London"
+      />
+    ),
   },
   {
     /* Analytics: how far each channel's applications got (plan #1595). */
@@ -4346,6 +4574,22 @@ export const SURFACES: readonly Surface[] = [
     render: () => (
       <AskDashSurface open page={TRIP_GOAL}>
         <PreviewShell />
+      </AskDashSurface>
+    ),
+  },
+  {
+    /* A filtered list sent to Dash (plan #1658): the Pipeline narrowed to one
+     * source, the sheet opened from its button with "N roles from Pipeline"
+     * above the question box in place of the page's name. */
+    id: 'ask-dash-rows',
+    label: 'Ask Dash · A filtered list sent with the question',
+    module: 'jobs',
+    width: 'page',
+    render: () => (
+      <AskDashSurface open page="/jobs/pipeline" rows={{ ...FILTERED_PIPELINE, label: FILTERED_PIPELINE_LABEL }}>
+        <PreviewShell>
+          <PipelinePage rows={pipelineRows} params={FILTERED_PIPELINE_PARAMS} />
+        </PreviewShell>
       </AskDashSurface>
     ),
   },
@@ -5383,6 +5627,65 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <DevModuleSurface />,
+  },
+
+  /* The Goals, Jobs and Mail pages (plan #1601). Fixtures in
+   * jobs-page-surfaces.tsx and mail-run-surfaces.tsx. */
+  {
+    id: 'goals-run',
+    label: 'Goals · One run and what it changed',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalRunSurface />,
+  },
+  {
+    id: 'jobs-activity',
+    label: 'Jobs · Activity',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsActivitySurface />,
+  },
+  {
+    id: 'jobs-analytics',
+    label: 'Jobs · Analytics',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsAnalyticsSurface />,
+  },
+  {
+    id: 'jobs-answers',
+    label: 'Jobs · Answers',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsAnswersSurface />,
+  },
+  {
+    id: 'jobs-thoughts',
+    label: 'Jobs · Career goals',
+    module: 'jobs',
+    width: 'page',
+    render: () => <JobsThoughtsSurface />,
+  },
+  {
+    id: 'jobs-onboarding',
+    label: 'Jobs · Onboarding, the first step',
+    module: 'jobs',
+    width: 'screen',
+    render: () => <JobsOnboardingSurface />,
+  },
+  {
+    id: 'jobs-case-page',
+    label: 'Jobs · The case page shared with an employer',
+    module: 'jobs',
+    width: 'screen',
+    render: () => <JobsCasePageSurface />,
+  },
+  {
+    id: 'mail-message',
+    label: 'Mail · An email read in the app',
+    module: 'jobs',
+    width: 'page',
+    render: () => <MailMessageSurface />,
   },
 
   /* The page anatomies, framed at two widths by the anatomy section on

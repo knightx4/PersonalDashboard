@@ -1,7 +1,9 @@
 'use client';
 
 import { useId, useState, type ComponentProps } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { ChipSelect } from '@/components/ui/field';
 import { SOURCE_LABELS, type ApplicationSource } from '@/lib/jobs/pipeline';
@@ -54,6 +56,19 @@ export function PipelineFilters({
     <form action={PIPELINE_PATH} className="flex flex-wrap items-center gap-x-1 gap-y-1">
       {params.view && <input type="hidden" name="view" value={params.view} />}
       {params.q && <input type="hidden" name="q" value={params.q} />}
+      {state.stage && <input type="hidden" name="stage" value={state.stage.key} />}
+      {state.sentDays !== null && <input type="hidden" name="sent" value={state.sentDays} />}
+      {/* What a number on Today narrowed the page to (plan #1591), each with
+          its own way out, ahead of the chips anybody can set here. */}
+      {state.stage && (
+        <ClearChip href={pipelineHref(params, { stage: undefined })} label={state.stage.label} />
+      )}
+      {state.sentDays !== null && (
+        <ClearChip
+          href={pipelineHref(params, { sent: undefined })}
+          label={`Sent in the last ${state.sentDays} ${state.sentDays === 1 ? 'day' : 'days'}`}
+        />
+      )}
       <PressChip
         name="status"
         aria-label="Which applications"
@@ -142,6 +157,21 @@ export function PipelineFilters({
         </button>
       </noscript>
     </form>
+  );
+}
+
+/** A filter Today set, shown as a chip that takes it off. */
+function ClearChip({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      scroll={false}
+      aria-label={`${label}: remove this filter`}
+      className="press press-area inline-flex items-center gap-1 rounded-full bg-accent-tint px-2 py-0.5 text-ui text-ink transition-colors duration-quick hover:bg-sunken"
+    >
+      {label}
+      <X className="size-3.5 text-ink-muted" strokeWidth={1.75} aria-hidden />
+    </Link>
   );
 }
 

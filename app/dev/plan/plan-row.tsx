@@ -1285,7 +1285,7 @@ export function usePlanRow({
     row,
     sendButton,
     batchAction,
-    node: criticStop ? { ...node, blockAsk: criticStopNeeds(criticStop.branch) } : node,
+    node: criticStop ? { ...node, blockAsk: criticStopNeeds() } : node,
     health,
     move: move.move ? (
       moveAfter && afterWord(move.move) ? (

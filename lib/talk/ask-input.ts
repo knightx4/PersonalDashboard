@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { parseUploadedAttachments, type UploadedAttachment } from '@/lib/attachments/rules';
+import { parseAskListFilter, type AskListFilter } from '@/lib/ask/list-filter';
 
 /**
  * A question to Dash as it arrives from a browser, checked before anything is
@@ -25,6 +26,8 @@ export type AskInput = {
   page: string | null;
   /** Files already uploaded to the person's folder, sent with this question (plan #1715). */
   files: UploadedAttachment[];
+  /** The filter a list was under when it was sent to Dash (plan #1658); null when none came or it was not one. */
+  list: AskListFilter | null;
 };
 
 /** The question, the conversation it continues and the page, or the sentence saying why not. */
@@ -34,6 +37,7 @@ export function parseAskInput(
   page: unknown,
   files?: unknown,
   userId?: string,
+  list?: unknown,
 ): { ok: true; input: AskInput } | { ok: false; error: string } {
   if (typeof question !== 'string') return { ok: false, error: 'Write a question first.' };
   let ref: string | null = null;
@@ -50,6 +54,7 @@ export function parseAskInput(
       conversationRef: ref,
       page: onPage?.success ? onPage.data : null,
       files: userId ? parseUploadedAttachments(files, userId) : [],
+      list: parseAskListFilter(list),
     },
   };
 }
