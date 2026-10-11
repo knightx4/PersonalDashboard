@@ -69,6 +69,8 @@ import { cn } from '@/lib/cn';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
 import { RowIconButton } from '@/components/plan-tree/row-icon-button';
 import { MoveLabel } from '@/components/ui/move-label';
+import { MOVE_TONE, waitingOnName, type Move } from '@/lib/core/move';
+import { StateLabel } from '@/components/dev/state-label';
 import {
   ASSIGNEE_LABEL,
   AddStep,
@@ -549,6 +551,7 @@ export function usePlanRow({
   unfolded,
   opened = false,
   asStep = false,
+  moveAfter = false,
   inlinePriority = false,
 }: {
   node: PlanNode;
@@ -618,6 +621,12 @@ export function usePlanRow({
    * link (plan #1664).
    */
   asStep?: boolean;
+  /**
+   * Say a waiting move as "After #935" rather than "Waiting on #935". The
+   * feature page sets it: its Health column already says "Waiting", and a
+   * second "Waiting" beside it in the move column named a different fact.
+   */
+  moveAfter?: boolean;
   /**
    * Keep the priority word and the size on one line. The menu's wrapper is a
    * block, so at Normal, where the word is hidden until hover, it still took
@@ -1278,7 +1287,18 @@ export function usePlanRow({
     batchAction,
     node: criticStop ? { ...node, blockAsk: criticStopNeeds() } : node,
     health,
-    move: move.move ? <MoveLabel move={move.move} title={move.title} /> : null,
+    move: move.move ? (
+      moveAfter && afterWord(move.move) ? (
+        <StateLabel
+          glyph={null}
+          word={afterWord(move.move)!}
+          tone={MOVE_TONE.waiting}
+          title={move.title}
+        />
+      ) : (
+        <MoveLabel move={move.move} title={move.title} />
+      )
+    ) : null,
     statusMenu,
     priorityMenu,
     menu,
@@ -1299,6 +1319,13 @@ export function usePlanRow({
     panelActions,
     addChild,
   };
+}
+
+/** A waiting move said by what it comes after, so it never repeats Health's "Waiting". */
+function afterWord(move: Move): string | undefined {
+  if (move.state !== 'waiting') return undefined;
+  const name = move.waitingOn ? waitingOnName(move.waitingOn).trim() : '';
+  return name ? `After ${name}` : 'After other steps';
 }
 
 export type PlanRowProps = Parameters<typeof usePlanRow>[0];

@@ -40,6 +40,8 @@ import {
   asListed,
   featureCrumbs,
   featureHref,
+  featureStatus,
+  MOVE_LABEL,
   stepGroups,
   stepsViewFrom,
   stepsViewHref,
@@ -149,6 +151,7 @@ export function FeaturePage({
     searching: false,
     unfolded: false,
     opened: true,
+    moveAfter: true,
   });
   const { row, health } = parts;
   const { setEditing } = row;
@@ -160,8 +163,10 @@ export function FeaturePage({
 
   const crumbs = featureCrumbs(node, module, moduleLabel);
   const steps = node.children.filter((child) => child.kind !== 'decision');
+  const split = progressSplit(node);
+  // The count says what it holds: open steps, so it does not read as the total.
   const tabs = FEATURE_TABS.map((t) =>
-    t.id === 'steps' ? { ...t, count: progressSplit(node).open, countNoun: 'open' } : t,
+    t.id === 'steps' && split.open > 0 ? { ...t, label: `Steps · ${split.open} open` } : t,
   );
   // Where the page's own address is, for the presses that need a tab.
   const overview = featureHref(node.number);
@@ -220,7 +225,6 @@ export function FeaturePage({
   });
 
   const statusWord = STATUS_LABEL[featureStatus(node)];
-  const split = progressSplit(node);
   const properties = (
     <PropertyList>
       <Property
@@ -251,7 +255,7 @@ export function FeaturePage({
           }
         />
       )}
-      {parts.move && <Property label="Whose move" value={parts.move} />}
+      {parts.move && <Property label={MOVE_LABEL} value={parts.move} />}
       <Property
         label="Priority"
         value={
@@ -524,6 +528,7 @@ function FeatureSteps({
       node={step}
       trail={[]}
       asStep
+      moveAfter
       inlinePriority
       view="open"
       searching={false}
@@ -566,7 +571,7 @@ function FeatureSteps({
               'divide-y divide-border overflow-hidden [&>li]:opacity-100',
             )}
           >
-            <ColumnHeader />
+            <ColumnHeader status={MOVE_LABEL} priority="Size" />
             {view === 'tree' && !held
               ? steps.map((step) => row(step))
               : groups.map((group) => (
