@@ -117,11 +117,6 @@ export function NotificationsSection({ publicKey }: { publicKey: string | null }
     // the id is where links written before Account had tabs still point.
     <section id="notifications" className={cn(cardVariants({ padding: 'standard' }), 'scroll-mt-bar')}>
       <h2 className="text-body font-semibold text-ink">Morning brief</h2>
-      <p className="mt-0.5 text-ui text-ink-muted">
-        Each morning Dash writes a brief of your day. It can arrive on this device as a
-        notification, and pressing it opens the brief.
-      </p>
-
       <div className="mt-4 border-y border-border">
         {!publicKey ? (
           <p className="row-pad text-small text-ink-muted">

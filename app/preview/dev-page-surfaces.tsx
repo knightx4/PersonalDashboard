@@ -934,7 +934,6 @@ export function AccountSurface({
 }) {
   return column(
     <>
-      <p className="text-body text-ink-muted">Settings that hold across every workspace.</p>
       <AccountView
         tab={tab}
         opensOn={tab}
