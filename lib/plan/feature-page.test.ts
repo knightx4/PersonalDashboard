@@ -3,6 +3,7 @@ import type { PlanItem } from '@/lib/plan/load';
 import { buildPlanTree } from '@/lib/plan/tree';
 import {
   featureCrumbs,
+  featureStatus,
   findFeature,
   newFeatureHref,
   stepGroups,
@@ -169,5 +170,19 @@ describe('newFeatureHref', () => {
     expect(newFeatureHref('/dev/projects/website', null)).toBe(
       '/dev/projects/website?new=feature',
     );
+  });
+
+  it('reads a feature as in progress once a step beneath it has started', () => {
+    const rolled = buildPlanTree({
+      items: [
+        item({ id: 'f', title: 'Feature', number: 30 }),
+        item({ id: 'a', title: 'Underway', parentId: 'f', number: 31, status: 'in_progress' }),
+        item({ id: 'g', title: 'Idle feature', number: 40 }),
+        item({ id: 'h', title: 'Idle step', parentId: 'g', number: 41 }),
+      ],
+      dependencies: [],
+    });
+    expect(featureStatus(findFeature(rolled, 30)!.feature)).toBe('in_progress');
+    expect(featureStatus(findFeature(rolled, 40)!.feature)).toBe('not_started');
   });
 });
