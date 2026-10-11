@@ -78,6 +78,7 @@ function suggestion(id: string, itemId: string, extra: Partial<Suggestion> = {})
     id,
     itemId,
     kind: 'events',
+    acceptedStepId: null,
     title: id,
     detail: null,
     url: null,
