@@ -206,7 +206,7 @@ export function PipelinePage({
         <p className="text-ui text-ink-muted">No applications match these filters.</p>
       ) : (
         <div className="space-y-5">
-          {sections.map((section) => (
+          {/* ui-ok: one card per group of rows, each holding its rows as one table, not a card per row */ sections.map((section) => (
             <div key={section.key} className="space-y-2">
               {display.group !== NO_GROUP && <GroupHeader label={section.label} count={section.count} />}
               <Card className="overflow-hidden">
