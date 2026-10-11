@@ -75,12 +75,17 @@ step's brief, claim it, build it against its "done when", verify, commit with
 the step number in the subject, close it with a note. The full model is in
 [PLAN-SPEC.md](PLAN-SPEC.md).
 
-A request in the notes queue that turns out to be a body of work rather than
-a fix belongs in the plan: add it there as a *proposed* feature with its
-steps, mark the note `planned`, and say which step it became. The person
-approves it on the plan page before anything is built.
+A note can turn out to be bigger than it looked. When the notes run claims one
+and finds that the fix needs a migration, a new screen or changes in more than
+one workspace, or that triage's route was plan and the code agrees, it does not
+build it. It files an idea on `/dev/ideas` from the note's own text, with
+source `me` because you wrote it, so the hold on ideas filed by sessions and
+the limit of two an hour do not apply. It marks the note `planned` with a
+resolution naming the idea, and lists the note in its report under *Moved to
+ideas*. You approve the work there before any of it is done.
 
 The whole loop, then: small things go in as notes and get fixed; big
-thoughts go in as ideas, get shaped into proposals by pressing *Shape into a
-plan*, get approved and handed over on the plan page, and get built one step
-a night. Corrections to what was built go back in as notes.
+thoughts, and notes that turn out to be big, go in as ideas, get shaped into
+proposals by pressing *Shape into a plan*, get approved and handed over on the
+plan page, and get built one step a night. Corrections to what was built go
+back in as notes.
