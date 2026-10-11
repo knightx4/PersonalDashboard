@@ -32,10 +32,9 @@ export function NewOrderView({
   return (
     // A form, but not a narrow one: each line item is a six-field row, and at
     // the single-form width those fields would be too tight to type into.
-    <div className="mx-auto max-w-3xl max-sm:[&_input:not([type=checkbox]):not([type=radio])]:min-h-11 max-sm:[&_select]:min-h-11 max-sm:[&_select]:min-w-11">
+    <div className="mx-auto max-w-3xl max-sm:[&_input:not([type=checkbox]):not([type=radio])]:min-h-11 max-sm:[&_select]:min-h-11 max-sm:[&_select]:min-w-11 max-sm:[&_textarea]:min-h-11">
       <PageHeader
         title="Add an order"
-        description="Enter what you bought. Each unit lands in inventory with its share of tax, shipping and discount."
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
