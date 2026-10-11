@@ -62,10 +62,7 @@ export default async function DevUiReviewPage({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader
-        title="Review"
-        description="One module at a time: what the gate counts, what there is to look at, and what the last pass found."
-      />
+      <PageHeader title="Review" />
       <ReviewView standings={standings} only={only} />
     </div>
   );
