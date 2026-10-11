@@ -4,6 +4,7 @@ import { useActionState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 import { CostHint } from '@/components/ui/cost-hint';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import type { AreaRunView } from '@/lib/goals/shaping';
@@ -80,7 +81,7 @@ export function AreaPlanner({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="min-w-0 flex-[1_1_18rem]">{line}</div>
         {canRun && (
-          <form action={plan} className="flex items-center gap-1">
+          <form action={plan} className={cn('flex items-center gap-1', hasGoals && '-ml-2.5')}>
             <input type="hidden" name="id" value={areaId} />
             <Button
               type="submit"
