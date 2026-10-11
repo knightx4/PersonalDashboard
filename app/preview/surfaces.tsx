@@ -3241,6 +3241,14 @@ export const SURFACES: readonly Surface[] = [
     ),
   },
   {
+    /* The table view, every live application a row on one surface. */
+    id: 'jobs-pipeline-table',
+    label: 'Pipeline · Table',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <PipelinePage rows={pipelineRows} params={{ view: 'table' }} />,
+  },
+  {
     /* The page as it opens: what is in process, waiting and to apply. */
     id: 'jobs-pipeline-focus',
     label: 'Pipeline · Focus',

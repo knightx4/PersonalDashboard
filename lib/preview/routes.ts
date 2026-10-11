@@ -37,6 +37,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-moment-offer': ['/jobs/pipeline'],
   'jobs-moment-reject': ['/jobs/pipeline'],
   'jobs-pipeline-focus': ['/jobs/pipeline'],
+  'jobs-pipeline-table': ['/jobs/pipeline'],
   'shopping-item-details': ['/shopping/inventory/[id]'],
   'dev-comment-thread': ['/dev/plan'],
   'dev-comment-thread-seen': ['/dev/plan'],
