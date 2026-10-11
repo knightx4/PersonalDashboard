@@ -151,7 +151,13 @@ export function MaterialForClaim({
   if (view.material.length === 0) return null;
 
   return (
-    <CardSection title="Material for this idea" className={className}>
+    <CardSection
+      title="Material for this idea"
+      meta={`· ${view.material.length}`}
+      fold="learn.fold.Material for this idea"
+      defaultOpen={false}
+      className={className}
+    >
       {/* One surface with hairlines rather than a card each, law 13. Every row
           runs to several lines, and a frame round each of them inside a card
           that already has one is the mistake law 11 names. */}
