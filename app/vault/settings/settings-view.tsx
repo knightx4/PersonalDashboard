@@ -1,6 +1,5 @@
 import { AlertTriangle, GitBranch } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { Button } from '@/components/ui/button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import type { VaultConnectionSummary } from '@/lib/vault/notes/load';
@@ -8,7 +7,7 @@ import type { WriteAccess } from '@/lib/vault/notes/write-access';
 import { describeRun, type SyncProgress, type SyncRunSummary } from '@/lib/vault/sync/progress';
 import { ConnectVaultForm } from './connect-form';
 import { SyncNowButton } from './sync-now-button';
-import { disconnectVault, rescanVault } from './actions';
+import { VaultMoreMenu } from './more-menu';
 import { formatClock } from '@/lib/clock';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -164,57 +163,47 @@ export function VaultSettingsView({
                 pull anything you have pushed since.
               </p>
 
-              <div className="flex flex-wrap items-center gap-2 pt-1">
+              <div className="flex items-center gap-2 pt-1">
                 <SyncNowButton active={progress?.phase === 'running'} />
-                <form action={rescanVault}>
-                  <input type="hidden" name="id" value={connection.id} />
-                  <Button type="submit" variant="secondary">
-                    Re-read everything
-                  </Button>
-                </form>
-                <form action={disconnectVault}>
-                  <input type="hidden" name="id" value={connection.id} />
-                  <Button type="submit" variant="secondary">
-                    Disconnect
-                  </Button>
-                </form>
+                <VaultMoreMenu connectionId={connection.id} />
               </div>
-              <p className="text-ui text-ink-muted">
-                Re-reading walks the whole tree again and re-fetches only what actually changed.
-                Disconnecting removes this copy of your notes; your vault itself is untouched.
-              </p>
             </CardBody>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>
-                {connection.status === 'needs_reauth' ? 'Reconnect' : 'Update the connection'}
-              </CardTitle>
-            </CardHeader>
-            <CardBody className="space-y-4">
-              {connection.status === 'needs_reauth' && (
-                <p className="text-body leading-relaxed text-ink-muted">
-                  Fine-grained tokens expire — a year at most — so this is routine rather than a
-                  fault. Generate a new one with <strong>Contents: Read and write</strong> and paste
-                  it below. Your notes and sync position are kept, so nothing is re-read.
-                </p>
-              )}
-              {writeAccess === 'no' && (
-                <p className="text-body leading-relaxed text-ink-muted">
-                  This token can read the vault but not write to it, so edits made here will not
-                  save. Generate one with <strong>Contents: Read and write</strong> on this
-                  repository and paste it below. Your notes and sync position are kept.
-                </p>
-              )}
-              <ConnectVaultForm
-                defaults={{
-                  repo: `${connection.repoOwner}/${connection.repoName}`,
-                  branch: connection.branch,
-                  subpath: connection.subpath,
-                }}
-                submitLabel="Save connection"
-              />
+            <CardBody>
+              <Disclosure
+                title={connection.status === 'needs_reauth' ? 'Reconnect' : 'Update the connection'}
+                meta={`${connection.repoOwner}/${connection.repoName}`}
+                defaultOpen={connection.status === 'needs_reauth' || writeAccess === 'no'}
+                bodyClassName="mt-3"
+              >
+                <div className="space-y-4">
+                  {connection.status === 'needs_reauth' && (
+                    <p className="text-body leading-relaxed text-ink-muted">
+                      Fine-grained tokens expire — a year at most — so this is routine rather than
+                      a fault. Generate a new one with <strong>Contents: Read and write</strong>{' '}
+                      and paste it below. Your notes and sync position are kept, so nothing is
+                      re-read.
+                    </p>
+                  )}
+                  {writeAccess === 'no' && (
+                    <p className="text-body leading-relaxed text-ink-muted">
+                      This token can read the vault but not write to it, so edits made here will
+                      not save. Generate one with <strong>Contents: Read and write</strong> on this
+                      repository and paste it below. Your notes and sync position are kept.
+                    </p>
+                  )}
+                  <ConnectVaultForm
+                    defaults={{
+                      repo: `${connection.repoOwner}/${connection.repoName}`,
+                      branch: connection.branch,
+                      subpath: connection.subpath,
+                    }}
+                    submitLabel="Save connection"
+                  />
+                </div>
+              </Disclosure>
             </CardBody>
           </Card>
         </div>
@@ -236,7 +225,7 @@ function SyncProgressBar({ progress }: { progress: SyncProgress }) {
     progress.phase === 'failed'
       ? 'bg-caution-fill'
       : progress.phase === 'up_to_date'
-        ? 'bg-status-offer'
+        ? 'bg-ink'
         : 'bg-accent';
 
   return (
