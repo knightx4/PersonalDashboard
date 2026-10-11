@@ -255,10 +255,7 @@ const standings: Standing[] = [
 export function DevUiReviewSurface() {
   return column(
     <>
-      <PageHeader
-        title="Review"
-        description="One module at a time: what the gate counts, what there is to look at, and what the last pass found."
-      />
+      <PageHeader title="Review" />
       <ReviewView standings={standings} only={null} />
     </>,
   );
