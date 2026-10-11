@@ -51,7 +51,7 @@ export function ReturnItemRow({
             ) : (
               <Link
                 href={`/shopping/orders/${row.orderId}`}
-                className="after:absolute after:inset-0 after:content-['']"
+                className="-my-3.5 block py-3.5 after:absolute after:inset-0 after:content-['']"
               >
                 {row.name}
               </Link>
@@ -107,7 +107,7 @@ export function ReturnItemRow({
                   : 'Awaiting delivery for deadline'}
           </p>
         </div>
-        <div className="relative z-10 flex shrink-0 items-center gap-1">
+        <div className="relative z-over-link flex shrink-0 items-center gap-1">
           {returned ? (
             row.returnId && (
               <UndoReturnedButton itemId={row.inventoryItemId} returnId={row.returnId} />
