@@ -165,7 +165,7 @@ const tasks: Task[] = [
 ];
 
 const anchors = new Map<string, Anchor>([
-  ['t2', { label: 'Quant developer at D. E. Shaw', href: '/jobs/roles/r1' }],
+  ['t2', { label: 'Quant developer at Halloran-Achterberg', href: '/jobs/roles/r1' }],
   ['t3', { label: 'Kettle, Argos order 1182-4410', href: '/shopping/returns' }],
 ]);
 
@@ -232,7 +232,7 @@ const waiting: Waiting = {
   groups: [
     {
       key: 'name:d. e. shaw',
-      name: 'D. E. Shaw',
+      name: 'Halloran-Achterberg',
       entries: [
         {
           key: 'a1',

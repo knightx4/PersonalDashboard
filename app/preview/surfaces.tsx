@@ -384,7 +384,7 @@ const roleReminderFixtures: RoleReminder[] = [
     dueAt: '2026-09-12T00:00:00.000Z',
     message: {
       id: 'm1',
-      subject: 'Next steps with the D. E. Shaw group',
+      subject: 'Next steps with the Halloran-Achterberg group',
       gmailHref: 'https://mail.google.com/mail/u/0/#inbox/1',
     },
   },
@@ -420,7 +420,7 @@ const rolePanels: PanelProps = {
       kind: 'rejection',
       occurredAt: '2026-09-08T09:02:00.000Z',
       source: 'email',
-      summary: 'From the D. E. Shaw group',
+      summary: 'From the Halloran-Achterberg group',
       needsReview: false,
       gmailHref: 'https://mail.google.com/mail/u/0/#inbox/1',
     },
@@ -429,7 +429,7 @@ const rolePanels: PanelProps = {
       kind: 'confirmation',
       occurredAt: '2026-09-01T08:30:00.000Z',
       source: 'email',
-      summary: 'Your application to the D. E. Shaw group',
+      summary: 'Your application to the Halloran-Achterberg group',
       needsReview: false,
       gmailHref: 'https://mail.google.com/mail/u/0/#inbox/2',
     },
@@ -494,14 +494,14 @@ const rolePanels: PanelProps = {
       messageIds: [],
     },
   ],
-  companyName: 'The D. E. Shaw group',
+  companyName: 'The Halloran-Achterberg group',
   matchCandidates: [],
   otherAttempts: [],
   messages: [
     {
       id: 'm1',
-      subject: 'From the D. E. Shaw group',
-      fromAddress: 'careers@deshaw.example',
+      subject: 'From the Halloran-Achterberg group',
+      fromAddress: 'careers@halloran.example',
       receivedAt: '2026-09-08T09:02:00.000Z',
       classification: 'rejection',
       linkMethod: 'ats_id',
@@ -558,7 +558,7 @@ const pipelineRow = (
 const pipelineRows: PipelineRow[] = [
   pipelineRow({
     applicationId: 'p1',
-    companyName: 'Marshall Wace',
+    companyName: 'Larkspur Vane',
     roleTitle: 'Quantitative Developer, Systematic Strategies',
     status: 'in_process',
     excitement: 5,
@@ -571,7 +571,7 @@ const pipelineRows: PipelineRow[] = [
   }),
   pipelineRow({
     applicationId: 'p2',
-    companyName: 'The D. E. Shaw group',
+    companyName: 'The Halloran-Achterberg group',
     roleTitle: 'Software Developer',
     status: 'in_process',
     excitement: 4,
@@ -583,7 +583,7 @@ const pipelineRows: PipelineRow[] = [
   }),
   pipelineRow({
     applicationId: 'p3',
-    companyName: 'Monzo',
+    companyName: 'Tallow',
     roleTitle: 'Backend Engineer, Payments',
     status: 'acknowledged',
     source: 'referral',
@@ -596,7 +596,7 @@ const pipelineRows: PipelineRow[] = [
   }),
   pipelineRow({
     applicationId: 'p4',
-    companyName: 'Starling Bank',
+    companyName: 'Kestrel Bank',
     roleTitle: 'Platform Engineer',
     status: 'acknowledged',
     // Long enough to be called stale on the card, which is a state the board
@@ -606,7 +606,7 @@ const pipelineRows: PipelineRow[] = [
   }),
   pipelineRow({
     applicationId: 'p5',
-    companyName: 'Wise',
+    companyName: 'Brightwell',
     roleTitle: 'Senior Engineer, Money Movement',
     status: 'submitted',
     submittedAt: '2026-09-06T18:20:00.000Z',
@@ -616,7 +616,7 @@ const pipelineRows: PipelineRow[] = [
   }),
   pipelineRow({
     applicationId: 'p6',
-    companyName: 'Cleo',
+    companyName: 'Fennel',
     roleTitle: 'Data Engineer',
     status: 'drafting',
     submittedAt: null,
@@ -627,7 +627,7 @@ const pipelineRows: PipelineRow[] = [
   }),
   pipelineRow({
     applicationId: 'p7',
-    companyName: 'Ocado Technology',
+    companyName: 'Marrowby Technology',
     roleTitle: 'Simulation Engineer',
     status: 'lead',
     submittedAt: null,
@@ -639,7 +639,7 @@ const pipelineRows: PipelineRow[] = [
   }),
   pipelineRow({
     applicationId: 'p8',
-    companyName: 'Palantir Technologies UK',
+    companyName: 'Quillon Systems UK',
     roleTitle: 'Forward Deployed Engineer',
     status: 'lead',
     submittedAt: null,
@@ -650,7 +650,7 @@ const pipelineRows: PipelineRow[] = [
   }),
   pipelineRow({
     applicationId: 'p9',
-    companyName: 'Man Group',
+    companyName: 'Ashgrove Group',
     roleTitle: 'Research Engineer',
     status: 'offer',
     excitement: 5,
@@ -662,7 +662,7 @@ const pipelineRows: PipelineRow[] = [
   }),
   pipelineRow({
     applicationId: 'p10',
-    companyName: 'Revolut',
+    companyName: 'Pennyroyal',
     roleTitle: 'Engineering Manager, Core Banking',
     status: 'rejected',
     outcome: 'rejected',
@@ -674,7 +674,7 @@ const pipelineRows: PipelineRow[] = [
   }),
   pipelineRow({
     applicationId: 'p11',
-    companyName: 'Deliveroo',
+    companyName: 'Larder',
     roleTitle: 'Staff Engineer',
     status: 'ghosted',
     outcome: 'ghosted',
@@ -739,12 +739,12 @@ const companyPanels = {
   companyId: 'co-1',
   research:
     'Systematic manager, roughly 500 people in London. The research platform team owns the backtester and the data pipeline; the posting is on that team.\n\nThey moved off a vendor risk system in 2024, which is what the "market data at scale" line in the posting is about.',
-  domains: 'deshaw.com, deshaw.co.uk',
+  domains: 'halloran.example, halloran.co.uk',
   industry: 'Quantitative investment management',
   hqLocation: 'New York, NY',
-  careersUrl: 'https://www.deshaw.com/careers',
+  careersUrl: 'https://www.halloran.example/careers',
   linkedinUrl: 'https://www.linkedin.com/company/de-shaw',
-  website: 'https://www.deshaw.com',
+  website: 'https://www.halloran.example',
   priority: 'high',
   timezone: 'Europe/London',
   contacts: [
@@ -755,7 +755,7 @@ const companyPanels = {
       relationship: 'interviewer',
       status: 'replied',
       linkedinUrl: 'https://www.linkedin.com/in/dana-ruiz',
-      email: 'dana.ruiz@deshaw.example',
+      email: 'dana.ruiz@halloran.example',
       howWeConnect: 'Ran the phone screen.',
     },
     {
@@ -765,7 +765,7 @@ const companyPanels = {
       relationship: 'recruiter',
       status: 'contacted',
       linkedinUrl: null,
-      email: 'p.raghunathan@deshaw.example',
+      email: 'p.raghunathan@halloran.example',
       howWeConnect: null,
     },
     {
@@ -817,10 +817,10 @@ const reviewRows: ReviewRow[] = [
   {
     kind: 'message',
     id: 'r1',
-    subject: 'Your application to Monzo — Backend Engineer, Payments',
+    subject: 'Your application to Tallow — Backend Engineer, Payments',
     fromAddress: 'no-reply@greenhouse.io',
-    threadId: 'thread-monzo-payments',
-    replyToAddress: 'careers@monzo.example',
+    threadId: 'thread-tallow-payments',
+    replyToAddress: 'careers@tallow.example',
     roleHint: null,
     receivedAt: '2026-09-09T07:41:00.000Z',
     classification: 'confirmation',
@@ -829,13 +829,13 @@ const reviewRows: ReviewRow[] = [
     candidates: [
       {
         applicationId: 'p3',
-        label: 'Monzo · Backend Engineer, Payments',
+        label: 'Tallow · Backend Engineer, Payments',
         reason: 'Company and role title both match',
         confidence: 0.91,
       },
       {
         applicationId: 'p5',
-        label: 'Wise · Senior Engineer, Money Movement',
+        label: 'Brightwell · Senior Engineer, Money Movement',
         reason: 'Same ATS vendor',
         confidence: 0.22,
       },
@@ -863,8 +863,8 @@ const reviewRows: ReviewRow[] = [
     id: 'r3',
     applicationId: 'p4',
     roleId: 'role-p4',
-    companyName: 'Starling Bank',
-    companyDomains: ['starlingbank.com'],
+    companyName: 'Kestrel Bank',
+    companyDomains: ['kestrelbank.example'],
     roleTitle: 'Platform Engineer',
     status: 'acknowledged',
     submittedAt: '2026-08-14T09:00:00.000Z',
@@ -876,7 +876,7 @@ const reviewRows: ReviewRow[] = [
     id: 'r4',
     applicationId: 'p1',
     roleId: 'role-p1',
-    companyName: 'Marshall Wace',
+    companyName: 'Larkspur Vane',
     roleTitle: 'Quantitative Developer, Systematic Strategies',
     status: 'in_process',
     eventKind: 'interview_scheduled',
@@ -1034,7 +1034,7 @@ const contactRows: ContactListRow[] = [
     title: 'Engineering Manager, Research Platform',
     relationship: 'interviewer',
     status: 'replied',
-    companyName: 'The D. E. Shaw group',
+    companyName: 'The Halloran-Achterberg group',
     companySlug: 'de-shaw',
     lastTouchAt: '2026-08-21T08:30:00.000Z',
     pendingReplies: 0,
@@ -1045,7 +1045,7 @@ const contactRows: ContactListRow[] = [
     title: 'Technical Recruiter',
     relationship: 'recruiter',
     status: 'contacted',
-    companyName: 'The D. E. Shaw group',
+    companyName: 'The Halloran-Achterberg group',
     companySlug: 'de-shaw',
     lastTouchAt: '2026-09-02T11:00:00.000Z',
     pendingReplies: 1,
@@ -1056,8 +1056,8 @@ const contactRows: ContactListRow[] = [
     title: null,
     relationship: 'warm_intro',
     status: 'not_contacted',
-    companyName: 'Monzo',
-    companySlug: 'monzo',
+    companyName: 'Tallow',
+    companySlug: 'tallow',
     lastTouchAt: null,
     pendingReplies: 0,
   },
@@ -1067,8 +1067,8 @@ const contactRows: ContactListRow[] = [
     title: 'Head of Engineering',
     relationship: 'hiring_manager',
     status: 'contacted',
-    companyName: 'Starling Bank',
-    companySlug: 'starling-bank',
+    companyName: 'Kestrel Bank',
+    companySlug: 'kestrel-bank',
     lastTouchAt: '2026-08-30T09:10:00.000Z',
     pendingReplies: 2,
   },
@@ -1092,11 +1092,11 @@ const contact: ContactRow = {
   relationship: 'hiring_manager',
   status: 'contacted',
   linkedinUrl: 'https://www.linkedin.com/in/aoife-ni-bhraonain',
-  email: 'aoife@starlingbank.example',
+  email: 'aoife@kestrelbank.example',
   howWeConnect: 'Spoke at the same meetup in March; she remembered the talk.',
   notes: 'Owns the platform group. Prefers a short note to a long one.',
-  companyName: 'Starling Bank',
-  companySlug: 'starling-bank',
+  companyName: 'Kestrel Bank',
+  companySlug: 'kestrel-bank',
   touches: [
     {
       id: 't1',
@@ -1127,8 +1127,8 @@ const contact: ContactRow = {
 
 /** People to name as a referrer: one with the longest name, one with no company. */
 const referrerFixtures: ReferrerOption[] = [
-  { id: 'contact-1', name: 'Alexandra Montgomery-Fitzwilliam', company: 'The D. E. Shaw group' },
-  { id: 'contact-2', name: 'Priya Raman', company: 'Ramp' },
+  { id: 'contact-1', name: 'Alexandra Montgomery-Fitzwilliam', company: 'The Halloran-Achterberg group' },
+  { id: 'contact-2', name: 'Priya Raman', company: 'Copperline' },
   { id: 'contact-3', name: 'Sam Okafor', company: null },
 ];
 
@@ -1148,7 +1148,7 @@ const todayBoard: TodayBoard = {
       id: 'ti1',
       applicationId: 'p1',
       roleId: 'role-p1',
-      companyName: 'Marshall Wace',
+      companyName: 'Larkspur Vane',
       roleTitle: 'Quantitative Developer, Systematic Strategies',
       scheduledAt: '2026-09-11T13:30:00.000Z',
       timeKnown: true,
@@ -1165,7 +1165,7 @@ const todayBoard: TodayBoard = {
       id: 'ti2',
       applicationId: 'p2',
       roleId: 'role-p2',
-      companyName: 'The D. E. Shaw group',
+      companyName: 'The Halloran-Achterberg group',
       roleTitle: 'Software Developer',
       scheduledAt: '2026-09-16T08:00:00.000Z',
       timeKnown: false,
@@ -1182,7 +1182,7 @@ const todayBoard: TodayBoard = {
       id: 'ti3',
       applicationId: 'p2',
       roleId: 'role-p2',
-      companyName: 'The D. E. Shaw group',
+      companyName: 'The Halloran-Achterberg group',
       roleTitle: 'Software Developer',
       scheduledAt: '2026-09-16T10:00:00.000Z',
       timeKnown: false,
@@ -1201,7 +1201,7 @@ const todayBoard: TodayBoard = {
       eventId: 'tw1',
       applicationId: 'p3',
       roleId: 'role-p3',
-      companyName: 'Monzo',
+      companyName: 'Tallow',
       roleTitle: 'Backend Engineer, Payments',
       kind: 'question',
       summary: 'Asked for three dates in the week of the 21st and a note on notice period.',
@@ -1216,7 +1216,7 @@ const todayBoard: TodayBoard = {
       dueAt: '2026-09-09T00:00:00.000Z',
       applicationId: 'p4',
       roleId: 'role-p4',
-      companyName: 'Starling Bank',
+      companyName: 'Kestrel Bank',
       roleTitle: 'Platform Engineer',
       followUpHref: 'https://mail.google.com/mail/?view=cm&to=&su=Following%20up',
     },
@@ -1227,7 +1227,7 @@ const todayBoard: TodayBoard = {
       dueAt: '2026-09-12T00:00:00.000Z',
       applicationId: 'p1',
       roleId: 'role-p1',
-      companyName: 'Marshall Wace',
+      companyName: 'Larkspur Vane',
       roleTitle: 'Quantitative Developer, Systematic Strategies',
       followUpHref: null,
     },
@@ -1238,8 +1238,8 @@ const todayBoard: TodayBoard = {
 /**
  * Today with something in every section (plan #1591): five imports waiting,
  * the week above with a round owing a debrief, the live applications split
- * by whose move it is, and two changes since the last visit. Marshall Wace
- * and D. E. Shaw have interviews booked, so the move is yours; Monzo's mail
+ * by whose move it is, and two changes since the last visit. Larkspur Vane
+ * and Halloran-Achterberg have interviews booked, so the move is yours; Tallow's mail
  * asked a question, which makes it yours too.
  */
 const todayPageNow = new Date('2026-09-09T12:00:00.000Z');
@@ -1255,7 +1255,7 @@ const todayPageBoard: TodayBoard = {
       key: 'tg0',
       leadId: 'ti0',
       roleId: 'role-p2',
-      companyName: 'The D. E. Shaw group',
+      companyName: 'The Halloran-Achterberg group',
       roleTitle: 'Software Developer',
       scheduledAt: '2026-09-08T15:00:00.000Z',
       timeKnown: true,
@@ -1270,7 +1270,7 @@ const todayPageReview: ReviewPeek = {
       title: 'Your application to Senior Backend Engineer, Core Banking Platform has been received',
       kind: 'Confirmation email',
     },
-    { id: 'rv2', title: 'Wise · Software Engineer, Treasury', kind: 'New application from mail' },
+    { id: 'rv2', title: 'Brightwell · Software Engineer, Treasury', kind: 'New application from mail' },
     { id: 'rv3', title: 'Quick chat this week?', kind: 'Recruiter outreach email' },
   ],
 };
@@ -1284,7 +1284,7 @@ const todayPageSince: SinceView = {
       at: '2026-09-09T08:10:00.000Z',
       source: 'email',
       label: 'interview booked',
-      subject: 'The D. E. Shaw group · Software Developer',
+      subject: 'The Halloran-Achterberg group · Software Developer',
       tone: 'good',
       stage: 'in_process',
       detail: null,
@@ -1295,7 +1295,7 @@ const todayPageSince: SinceView = {
       at: '2026-09-08T21:30:00.000Z',
       source: 'email',
       label: 'new role',
-      subject: 'Wise · Software Engineer, Treasury',
+      subject: 'Brightwell · Software Engineer, Treasury',
       tone: 'info',
       stage: 'lead',
       detail: null,
@@ -1312,7 +1312,7 @@ const interviewRounds: RoundView[] = [
     key: 'ir1',
     leadId: 'ti1',
     roleId: 'role-p1',
-    companyName: 'Marshall Wace',
+    companyName: 'Larkspur Vane',
     roleTitle: 'Quantitative Developer, Systematic Strategies',
     scheduledAt: '2026-09-11T13:30:00.000Z',
     timeKnown: true,
@@ -1325,7 +1325,7 @@ const interviewRounds: RoundView[] = [
     key: 'ir2',
     leadId: 'ti2',
     roleId: 'role-p2',
-    companyName: 'The D. E. Shaw group',
+    companyName: 'The Halloran-Achterberg group',
     roleTitle: 'Software Developer',
     scheduledAt: '2026-09-16T08:00:00.000Z',
     timeKnown: false,
@@ -1338,7 +1338,7 @@ const interviewRounds: RoundView[] = [
     key: 'ir3',
     leadId: 'ti4',
     roleId: 'role-p1',
-    companyName: 'Marshall Wace',
+    companyName: 'Larkspur Vane',
     roleTitle: 'Quantitative Developer, Systematic Strategies',
     scheduledAt: '2026-08-27T09:00:00.000Z',
     timeKnown: true,
@@ -1351,7 +1351,7 @@ const interviewRounds: RoundView[] = [
     key: 'ir4',
     leadId: 'ti5',
     roleId: 'role-p10',
-    companyName: 'Revolut',
+    companyName: 'Pennyroyal',
     roleTitle: 'Engineering Manager, Core Banking',
     scheduledAt: '2026-08-25T15:00:00.000Z',
     timeKnown: true,
@@ -1445,7 +1445,7 @@ const calendarEntries: Record<string, CalendarEntry[]> = {
       end: null,
       eventId: null,
       feedEventId: null,
-      title: 'Marshall Wace · Technical',
+      title: 'Larkspur Vane · Technical',
       href: '/jobs/roles/role-p1',
       done: false,
     },
@@ -1458,7 +1458,7 @@ const calendarEntries: Record<string, CalendarEntry[]> = {
       end: null,
       eventId: null,
       feedEventId: null,
-      title: 'The D. E. Shaw group · Final',
+      title: 'The Halloran-Achterberg group · Final',
       href: '/jobs/roles/role-p2',
       done: false,
     },
@@ -3193,7 +3193,7 @@ export const SURFACES: readonly Surface[] = [
       <div className="space-y-4">
           <PageHeader
             title="Senior Software Engineer, Platform"
-            description="The D. E. Shaw group · New York · Hybrid"
+            description="The Halloran-Achterberg group · New York · Hybrid"
             actions={
               <div className="flex items-center gap-2">
                 <StatusPicker
@@ -3273,14 +3273,14 @@ export const SURFACES: readonly Surface[] = [
       kind: 'press',
       target: '[data-motion-demo="board-move"]',
       shows:
-        'Monzo’s Backend Engineer card glides from Submitted down into In process while the cards and lanes around it glide to their new places, then “In process” is named across the foot of Monzo’s card.',
+        'Tallow’s Backend Engineer card glides from Submitted down into In process while the cards and lanes around it glide to their new places, then “In process” is named across the foot of Tallow’s card.',
     },
     render: () => (
       <BoardMomentDemo
         rows={momentRows}
         applicationId="p3"
         to="in_process"
-        label="Move Monzo to In process"
+        label="Move Tallow to In process"
       />
     ),
   },
@@ -3293,14 +3293,14 @@ export const SURFACES: readonly Surface[] = [
       kind: 'press',
       target: '[data-motion-demo="board-move"]',
       shows:
-        'Marshall Wace’s card glides from In process down into Offer while the D. E. Shaw card slides up and the lanes resize with it, then “Offer · Marshall Wace” is named across the card’s foot and one accent ring leaves the card and fades.',
+        'Larkspur Vane’s card glides from In process down into Offer while the Halloran-Achterberg card slides up and the lanes resize with it, then “Offer · Larkspur Vane” is named across the card’s foot and one accent ring leaves the card and fades.',
     },
     render: () => (
       <BoardMomentDemo
         rows={momentRows}
         applicationId="p1"
         to="offer"
-        label="Move Marshall Wace to Offer"
+        label="Move Larkspur Vane to Offer"
       />
     ),
   },
@@ -3313,14 +3313,14 @@ export const SURFACES: readonly Surface[] = [
       kind: 'press',
       target: '[data-motion-demo="board-move"]',
       shows:
-        'Starling Bank’s card fades where it stands with nothing moving, Submitted then closes up over the space it left, and a toast reads “5 still open · Starling Bank is in Closed”.',
+        'Kestrel Bank’s card fades where it stands with nothing moving, Submitted then closes up over the space it left, and a toast reads “5 still open · Kestrel Bank is in Closed”.',
     },
     render: () => (
       <BoardMomentDemo
         rows={momentRows}
         applicationId="p4"
         to="rejected"
-        label="Reject Starling Bank"
+        label="Reject Kestrel Bank"
       />
     ),
   },
@@ -4037,9 +4037,9 @@ export const SURFACES: readonly Surface[] = [
       <ContactsView
         contacts={contactRows}
         companies={[
-          { id: 'co-1', name: 'The D. E. Shaw group' },
-          { id: 'co-2', name: 'Monzo' },
-          { id: 'co-3', name: 'Starling Bank' },
+          { id: 'co-1', name: 'The Halloran-Achterberg group' },
+          { id: 'co-2', name: 'Tallow' },
+          { id: 'co-3', name: 'Kestrel Bank' },
         ]}
         timezone="Europe/London"
       />

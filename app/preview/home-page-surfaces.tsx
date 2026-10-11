@@ -166,7 +166,7 @@ export function HomePageSurface() {
               rows={[
                 { key: 'w1', day: '2026-10-07', at: '2026-10-07T18:00:00Z', label: 'Reading group', detail: 'The Pinch', href: '/todo', booked: true },
                 { key: 'w2', day: '2026-10-08', at: null, label: 'Uniqlo return window closes', detail: null, href: '/shopping', booked: false },
-                { key: 'w3', day: '2026-10-09', at: null, label: 'Take-home for Monzo due', detail: null, href: '/jobs', booked: false },
+                { key: 'w3', day: '2026-10-09', at: null, label: 'Take-home for Tallow due', detail: null, href: '/jobs', booked: false },
                 { key: 'w4', day: '2026-10-10', at: '2026-10-10T08:30:00Z', label: 'Dentist', detail: 'Check-up', href: '/todo', booked: true },
                 { key: 'w5', day: '2026-10-12', at: null, label: 'Council tax', detail: null, href: '/todo', booked: false },
               ]}

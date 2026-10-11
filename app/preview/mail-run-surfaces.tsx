@@ -41,7 +41,7 @@ function line(key: string, sentence: string, over: Partial<ChangeLine> = {}): Ch
 }
 
 const LINES: ChangeLine[] = [
-  line('1', 'Added the step "Ask Ramp\'s recruiter whether the role sponsors an H-1B transfer" under Applications.'),
+  line('1', 'Added the step "Ask Copperline\'s recruiter whether the role sponsors an H-1B transfer" under Applications.'),
   line('2', 'Settled "Decide on New York or remote" as New York, from your answer.'),
   line('3', 'Added the collection "Application documents" with three drafts: resume, cover letter, references.'),
   line('4', 'Moved the phase "Interview practice" ahead of "Portfolio".', {
@@ -114,7 +114,7 @@ const MESSAGES: GmailMessageContent[] = [
     internalDate: new Date('2026-10-06T11:02:00Z'),
     fromAddress: 'Dana Whitfield-Okonkwo <dana.whitfield-okonkwo@recruiting.ramp.example.com>',
     subject: 'Re: Senior Financial Analyst, Revenue Operations and Planning: availability next week',
-    html: '<p>Hi Chris,</p><p>Thursday 9 October at 2:00 pm Eastern works for Priya, who leads planning. The invite is on its way with a video link.</p><p>She will want to talk through a forecast you rebuilt, so bring one you can share your screen on.</p><p>Best,<br>Dana</p><p style="color:#666;font-size:12px">Ramp Recruiting · 28 West 23rd Street, New York</p>',
+    html: '<p>Hi Chris,</p><p>Thursday 9 October at 2:00 pm Eastern works for Priya, who leads planning. The invite is on its way with a video link.</p><p>She will want to talk through a forecast you rebuilt, so bring one you can share your screen on.</p><p>Best,<br>Dana</p><p style="color:#666;font-size:12px">Copperline Recruiting · 28 West 23rd Street, New York</p>',
   }),
 ];
 

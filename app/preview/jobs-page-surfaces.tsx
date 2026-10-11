@@ -80,7 +80,7 @@ const ACTIVITY: Activity = {
   highlights: { days: 7, newRoles: 4, movedForward: 3, rejections: 2, closedOut: 5 },
   lastSweepAt: '2026-10-06T07:00:00Z',
   entries: [
-    entry('a1', '2026-10-06T11:03:00Z', 'email', 'good', 'in_process', 'Interview booked', 'Ramp · Senior Financial Analyst, Revenue Operations and Planning', 'Hiring manager, Thursday 9 October at 2:00 pm'),
+    entry('a1', '2026-10-06T11:03:00Z', 'email', 'good', 'in_process', 'Interview booked', 'Copperline · Senior Financial Analyst, Revenue Operations and Planning', 'Hiring manager, Thursday 9 October at 2:00 pm'),
     entry('a2', '2026-10-06T11:03:00Z', 'email', 'info', 'acknowledged', 'Application confirmed', 'Check · Strategic Finance Associate'),
     entry('a3', '2026-10-06T07:00:00Z', 'sweep', 'muted', 'ghosted', 'Closed as ghosted', 'Brex · FP&A Manager', 'No reply in 45 days'),
     entry('a4', '2026-10-05T18:20:00Z', 'email', 'bad', 'rejected', 'Rejected after the recruiter screen', 'Plaid · Finance Business Partner'),
@@ -559,7 +559,7 @@ export function JobsOnboardingSurface() {
 // ---- The shared case page ---------------------------------------------------
 
 const CASE = {
-  company: 'Ramp',
+  company: 'Copperline',
   role: 'Senior Financial Analyst, Revenue Operations and Planning',
   body: 'I have spent four years building the planning models finance teams run the year on, most recently for a 400-person payments company. The role asks for someone who can own the revenue model and sit with the operators who move it. Below is each thing the posting asks for and the work I would point to for it. The full model behind the second example is at https://example.com/cohort-model.',
   matches: [
