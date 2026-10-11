@@ -1,5 +1,6 @@
 import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { formatDay } from '@/lib/goals/dates';
+import { lastActiveWords, paceHint, paceWords, type GoalPace } from '@/lib/goals/pace';
 import { VERDICT_LABELS, type GoalReview } from '@/lib/goals/reviews';
 import type { GoalProgress } from '@/lib/goals/status';
 import type { Goal, GoalStatus } from '@/lib/goals/tree';
@@ -38,6 +39,8 @@ type Props = {
   review: GoalReview | null;
   progress: Pick<GoalProgress, 'live' | 'done' | 'bands'>;
   timeZone: string;
+  /** How often something happens on the goal (plan #1737); null on a closed goal or an errand. */
+  pace?: GoalPace | null;
 };
 
 /**
@@ -95,19 +98,21 @@ export function goalDetailCount(
   goal: Props['goal'],
   progress: Props['progress'],
   timeZone: string,
+  pace: GoalPace | null = null,
 ): number {
   const { closed, split } = goalFacts(goal, progress, timeZone);
-  return 1 + (goal.dueOn ? 1 : 0) + (closed ? 1 : 0) + (split ? 1 : 0);
+  const pacing = pace ? 1 + (lastActiveWords(pace) ? 1 : 0) : 0;
+  return 1 + (goal.dueOn ? 1 : 0) + (closed ? 1 : 0) + (split ? 1 : 0) + pacing;
 }
 
 /**
  * The rest of the goal's facts in the tabbed detail's properties (plan
- * #1671): the area, the dates, and the open steps split between you and
- * Dash. The split is the steps' bands from `goalProgress`, the same counts
+ * #1671): the area, the dates, the open steps split between you and
+ * Dash, and the goal's usual pace (plan #1737). The split is the steps' bands from `goalProgress`, the same counts
  * the goal's bar on Goals draws, so the two never disagree. When it was
  * added is the line under the title (`goalLine`).
  */
-export function GoalProperties({ goal, areaName, progress, timeZone }: Props) {
+export function GoalProperties({ goal, areaName, progress, timeZone, pace = null }: Props) {
   const { closed, split } = goalFacts(goal, progress, timeZone);
   return (
     <PropertyList>
@@ -125,6 +130,18 @@ export function GoalProperties({ goal, areaName, progress, timeZone }: Props) {
           hint="Yours: your move. Dash’s: Dash is on them or can take them. Waiting: on another step or a date."
           value={split}
         />
+      )}
+      {pace && (
+        <Property
+          label="Usual pace"
+          // "Not enough to tell yet" is too long for half the phone's grid.
+          wide={!pace.known}
+          hint={paceHint(pace)}
+          value={paceWords(pace)}
+        />
+      )}
+      {pace && lastActiveWords(pace) && (
+        <Property label="Last active" value={lastActiveWords(pace)} />
       )}
     </PropertyList>
   );

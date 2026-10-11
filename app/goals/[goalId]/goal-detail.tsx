@@ -1,6 +1,7 @@
 import { DetailCard, DetailPart, TabbedDetail } from '@/components/patterns/tabbed-detail';
 import { goalCrumbs } from '@/lib/goals/crumbs';
 import { GOAL_TABS } from '@/lib/goals/goal-page';
+import type { GoalPace } from '@/lib/goals/pace';
 import type { GoalReview } from '@/lib/goals/reviews';
 import { goalGlyph, type GoalProgress } from '@/lib/goals/status';
 import type { Goal } from '@/lib/goals/tree';
@@ -24,6 +25,7 @@ export function GoalDetail({
   review,
   progress,
   timeZone,
+  pace = null,
   children,
 }: {
   goal: Goal;
@@ -33,6 +35,8 @@ export function GoalDetail({
   review: GoalReview | null;
   progress: GoalProgress;
   timeZone: string;
+  /** The goal's usual pace, for the properties (plan #1737). */
+  pace?: GoalPace | null;
   /** The open tab's content. */
   children: React.ReactNode;
 }) {
@@ -66,7 +70,7 @@ export function GoalDetail({
         />
       }
       glance={<GoalGlance goal={goal} review={review} progress={progress} />}
-      detailCount={goalDetailCount(goal, progress, timeZone)}
+      detailCount={goalDetailCount(goal, progress, timeZone, pace)}
       properties={
         <GoalProperties
           goal={goal}
@@ -74,6 +78,7 @@ export function GoalDetail({
           review={review}
           progress={progress}
           timeZone={timeZone}
+          pace={pace}
         />
       }
       tabs={tabs}
