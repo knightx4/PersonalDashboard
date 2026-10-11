@@ -8,6 +8,7 @@ import {
   findFeature,
   newFeatureHref,
   stepGroups,
+  waitedOnHref,
   stepRedirect,
   stepsViewFrom,
   stepsViewHref,
@@ -129,16 +130,15 @@ describe("the Steps tab's status groups", () => {
       'blocked',
       'in_progress',
       'ready',
-      'not_started',
       'done',
       'dropped',
     ]);
     expect(numbers('blocked')).toEqual([103]);
-    expect(numbers('in_progress')).toEqual([104]);
+    // A step waiting on another is listed straight beneath it, in its group.
+    expect(numbers('in_progress')).toEqual([104, 107]);
     // A substep with nothing ahead of it is ready, though its step is done.
     expect(numbers('ready')).toEqual([102]);
-    // Waiting on another step has not started.
-    expect(numbers('not_started')).toEqual([107]);
+    expect(numbers('not_started')).toEqual([]);
     expect(numbers('done')).toEqual([101]);
     expect(numbers('dropped')).toEqual([105]);
     const all = groups.flatMap((group) => group.steps.map((step) => step.node.number));
@@ -152,6 +152,41 @@ describe("the Steps tab's status groups", () => {
     expect(substep?.parent?.outline).toBe(substep?.node.outline.split('.').slice(0, -1).join('.'));
     const step = groups.flatMap((group) => group.steps).find((s) => s.node.number === 103);
     expect(step?.parent).toBeNull();
+  });
+
+  it('names the step a waiting step is listed beneath, and links to its row', () => {
+    const all = groups.flatMap((group) => group.steps);
+    const waiting = all.find((step) => step.node.number === 107)!;
+    expect(waiting.after).toMatchObject({ number: 104, title: 'Claimed' });
+    expect(all.find((step) => step.node.number === 104)?.after).toBeNull();
+    expect(waitedOnHref(waiting.node, waiting.node.waitingOn[0])).toBe('#plan-104');
+    expect(waitedOnHref({ outline: '100.4' }, { number: 900, outline: '899.1' })).toBe(
+      '/dev/plan/900',
+    );
+  });
+
+  it('keeps a step in its own group when what it waits on is closed, elsewhere or a loop', () => {
+    const tree = buildPlanTree({
+      items: [
+        item({ id: 'f', title: 'Feature', number: 300 }),
+        item({ id: 'x', title: 'Done first', parentId: 'f', number: 301, status: 'done' }),
+        item({ id: 'y', title: 'After a done one', parentId: 'f', number: 302 }),
+        item({ id: 'l1', title: 'Loop one', parentId: 'f', number: 303 }),
+        item({ id: 'l2', title: 'Loop two', parentId: 'f', number: 304 }),
+        item({ id: 'o', title: 'Other feature', number: 400 }),
+        item({ id: 'z', title: 'Elsewhere', parentId: 'o', number: 401 }),
+        item({ id: 'w', title: 'After elsewhere', parentId: 'f', number: 305 }),
+      ],
+      dependencies: [
+        { id: 'y->x', itemId: 'y', dependsOnId: 'x' },
+        { id: 'l1->l2', itemId: 'l1', dependsOnId: 'l2' },
+        { id: 'l2->l1', itemId: 'l2', dependsOnId: 'l1' },
+        { id: 'w->z', itemId: 'w', dependsOnId: 'z' },
+      ],
+    });
+    const listed = stepGroups(findFeature(tree, 300)!.feature).flatMap((group) => group.steps);
+    expect(listed.map((step) => step.node.number).sort()).toEqual([301, 302, 303, 304, 305]);
+    expect(listed.every((step) => step.after === null)).toBe(true);
   });
 
   it('folds done and dropped, and leaves out an empty group', () => {

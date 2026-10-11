@@ -45,6 +45,7 @@ import {
   stepGroups,
   stepsViewFrom,
   stepsViewHref,
+  type GroupedStep,
   type StepGroup,
   type StepsView,
 } from '@/lib/plan/feature-page';
@@ -604,10 +605,8 @@ function FeatureSteps({
               ? steps.map((step) => row(step))
               : groups.map((group) => (
                   <StepGroupRows key={group.id} group={group}>
-                    {group.steps.map(({ node: step, parent }) =>
-                      row(asListed(step), {
-                        source: parent ? `Under #${parent.outline} ${parent.title}` : undefined,
-                      }),
+                    {group.steps.map(({ node: step, parent, after }) =>
+                      row(asListed(step), { source: stepSource(parent, after) }),
                     )}
                   </StepGroupRows>
                 ))}
@@ -628,6 +627,23 @@ function FeatureSteps({
       )}
     </div>
   );
+}
+
+/**
+ * The line under a grouped step's title: the step it sits under, when it is a
+ * substep, and the step it waits on, when it is listed beneath that one. Text
+ * only, since the title is a button; the Whose move column's "After #…" is
+ * the link to that step.
+ */
+function stepSource(
+  parent: GroupedStep['parent'],
+  after: GroupedStep['after'],
+): string | undefined {
+  const lines = [
+    parent && `Under #${parent.outline} ${parent.title}`,
+    after && `After #${after.outline} ${after.title}`,
+  ].filter(Boolean);
+  return lines.length > 0 ? lines.join(' · ') : undefined;
 }
 
 /** A count in the properties that opens the Steps tab on just those steps. */
