@@ -274,37 +274,30 @@ export function ImportForm() {
   }
 
   return (
-    <form action={parse}>
-      <Field
-        label="What are you trying to work out?"
-        id="question"
-        hint="Optional, and the most useful thing here. A specific question gets a better answer than a topic — and it is what each source gets aimed at when you open it."
-      >
+    <form action={parse} className="space-y-4">
+      <Field label="What are you trying to work out? (optional)" id="question">
         <Textarea
           id="question"
           name="question"
-          rows={3}
-          placeholder="Price is supposed to quantify value, but it only reports an equilibrium — and the equilibrium depends on how much money everyone started with."
+          rows={2}
+          placeholder="Why does a price only report an equilibrium, not value?"
         />
       </Field>
 
-      <Field
-        label="Paste what you were told to read"
-        id="text"
-        hint="A reply from a chat, a syllabus, a footnote, a friend's text message. Anything."
-      >
+      <Field label="Paste what you were told to read" id="text">
         {/* ui-ok: composer-always-open -- the create. The pasted text is the
           * whole point of the page and there is nothing to read before it. */}
         <Textarea
           id="text"
           name="text"
-          rows={10}
+          rows={4}
           required
+          placeholder="A chat reply, a syllabus, a footnote"
           onChange={(event) => setLines(lineCount(event.target.value))}
         />
       </Field>
 
-      <Field label="Where did it come from?" id="sourceHint" hint="Optional.">
+      <Field label="Where did it come from? (optional)" id="sourceHint">
         <Input id="sourceHint" name="sourceHint" placeholder="claude" />
       </Field>
 
@@ -319,11 +312,6 @@ export function ImportForm() {
         />
         {parseState.error && <span className="text-ui text-danger">{parseState.error}</span>}
       </div>
-
-      <p className="mt-3 text-small text-ink-muted">
-        The list appears straight away, then each item is looked up one at a time. Nothing is saved
-        until you confirm.
-      </p>
     </form>
   );
 }
