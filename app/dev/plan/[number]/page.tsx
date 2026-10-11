@@ -12,6 +12,7 @@ import { loadFeatureUpdates } from '@/lib/plan/updates-load';
 import { loadActivitySources } from '@/lib/plan/activity-load';
 import { buildPlanTree, flatten, planLiveness } from '@/lib/plan/tree';
 import { findFeature, stepRedirect } from '@/lib/plan/feature-page';
+import { CHECK_BACK_COLUMNS, checkBackFrom, placeCheckBacks } from '@/lib/plan/check-backs';
 import { projectById } from '@/lib/plan/projects';
 import { planRoutine, projectRoutine } from '@/lib/feedback/routine';
 import { catalogOf } from '../plan-catalog';
@@ -79,7 +80,7 @@ export default async function FeatureRoute({ params }: { params: Params }) {
 
   const { feature, module, moduleLabel } = found;
   const beneath = flatten([feature]);
-  const [overhaulProgress, criticStops, updates, activity] = await Promise.all([
+  const [overhaulProgress, criticStops, updates, activity, checkBacks] = await Promise.all([
     loadOverhaulProgress(
       supabase,
       user.id,
@@ -92,7 +93,22 @@ export default async function FeatureRoute({ params }: { params: Params }) {
       user.id,
       beneath.map((node) => node.id),
     ),
+    // What Dash has said it will come back to, on the feature or a row
+    // beneath it, done or not: the Steps tab lists them with their step.
+    supabase
+      .from('check_backs')
+      .select(CHECK_BACK_COLUMNS)
+      .eq('user_id', user.id)
+      .eq('status', 'waiting')
+      .in(
+        'plan_item_id',
+        beneath.map((node) => node.id),
+      ),
   ]);
+  const comingBack = placeCheckBacks(
+    (checkBacks.data ?? []).map((row) => checkBackFrom(row as Record<string, unknown>)),
+    beneath,
+  );
 
   // A project's feature sends to the project's routine, and only once it is
   // set, as on the project's page.
@@ -118,6 +134,7 @@ export default async function FeatureRoute({ params }: { params: Params }) {
       pictures={pictures}
       updates={updates}
       activity={activity}
+      comingBack={comingBack}
     />
   );
 }

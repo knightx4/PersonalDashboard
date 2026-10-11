@@ -67,6 +67,9 @@ import { FeatureUpdate } from './feature-update';
 import { FeatureActivity } from './feature-activity';
 import { FeatureCompose } from './feature-compose';
 import type { PlanUpdate } from '@/lib/plan/updates';
+import type { PlacedCheckBack } from '@/lib/plan/check-backs';
+import { useClockNow } from '@/lib/use-clock-now';
+import { CheckBacksPanel } from '../raised/check-backs-panel';
 import { featureActivity, type ActivityDashAction, type ActivityRun } from '@/lib/plan/activity';
 
 /**
@@ -102,6 +105,7 @@ export function FeaturePage({
   pictures,
   updates = [],
   activity,
+  comingBack = [],
   startEditing = false,
 }: {
   feature: PlanNode;
@@ -126,6 +130,11 @@ export function FeaturePage({
     runs: readonly ActivityRun[];
     actions: readonly ActivityDashAction[];
   };
+  /**
+   * What Dash has said it will come back to on the feature or a row beneath
+   * it, each with that row. Listed on the Steps tab, linked to the row.
+   */
+  comingBack?: readonly PlacedCheckBack[];
   /** Open with the compose surface already showing, for the gallery. The page leaves it off. */
   startEditing?: boolean;
 }) {
@@ -413,6 +422,7 @@ export function FeaturePage({
       ) : tab === 'steps' ? (
         <FeatureSteps
           node={node}
+          comingBack={comingBack}
           steps={steps}
           view={stepsView}
           held={held}
@@ -525,6 +535,7 @@ export function FeaturePage({
  */
 function FeatureSteps({
   node,
+  comingBack,
   steps,
   view,
   held,
@@ -536,6 +547,7 @@ function FeatureSteps({
   rowProps,
 }: {
   node: PlanNode;
+  comingBack: readonly PlacedCheckBack[];
   steps: readonly PlanNode[];
   view: StepsView;
   held: HeldBy | null;
@@ -565,8 +577,20 @@ function FeatureSteps({
       {...extra}
     />
   );
+  const now = useClockNow();
   return (
     <div className="space-y-3">
+      {/* What Dash will come back to on these steps, above them and linked to
+          each one's row, so a step waiting on a check is not only on the
+          Dash tab. A done step's row is in its folded group, which opens
+          when the link names it. */}
+      <CheckBacksPanel
+        rows={comingBack}
+        now={now}
+        hrefOf={(step) =>
+          step.id === node.id ? featureHref(node.number) : `#${planRowId(step.number)}`
+        }
+      />
       {steps.length > 0 ? (
         <>
           {held ? (
