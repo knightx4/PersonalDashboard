@@ -895,6 +895,33 @@ describe('runOvernightTick', () => {
     vi.unstubAllEnvs();
   });
 
+  it('sends answered steps on a tick with no night running', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase } = quietNight();
+    const answers = vi.fn(async () => ({
+      u1: { act: 'sent' as const, step: 1600, refused: [] },
+    }));
+
+    const summary = await runOvernightTick({ supabase, now: NOW, fetch: green() as never, answers });
+
+    expect(summary.accounts).toBe(0);
+    expect(answers).toHaveBeenCalledTimes(1);
+    expect(summary.answered).toEqual({ u1: { act: 'sent', step: 1600, refused: [] } });
+    vi.unstubAllEnvs();
+  });
+
+  it('finishes the tick when the answered-step pass breaks', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase } = quietNight();
+    const answers = vi.fn(async () => Promise.reject(new Error('plan_items unreadable')));
+
+    const summary = await runOvernightTick({ supabase, now: NOW, fetch: green() as never, answers });
+
+    expect(summary.answered).toEqual({});
+    expect(summary.main.conclusion).toBe('passed');
+    vi.unstubAllEnvs();
+  });
+
   it('still runs the nights when the CI read is the thing that broke', async () => {
     vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
     const { supabase } = quietNight();
