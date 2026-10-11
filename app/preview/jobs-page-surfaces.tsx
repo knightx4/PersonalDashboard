@@ -1,6 +1,5 @@
 import { Inbox, FileText, Shield } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
-import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { Card, CardSection } from '@/components/ui/card';
 import { Figure } from '@/components/ui/figure';
 import { Meter } from '@/components/ui/meter';
@@ -8,7 +7,7 @@ import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { CasePageView, type CasePage } from '@/components/jobs/case-page';
 import { ActivityFeed } from '@/components/jobs/activity/activity-feed';
 import { CheckInboxNow } from '@/components/jobs/activity/check-inbox-now';
-import { AnswerBank } from '@/app/jobs/(app)/material/bank';
+import { AnswerBank, KindChips } from '@/app/jobs/(app)/material/bank';
 import { ThoughtList } from '@/app/jobs/(app)/find/thoughts';
 import { LearningTracks } from '@/app/jobs/(app)/find/tracks';
 import OnboardingLayout from '@/app/jobs/(onboarding)/layout';
@@ -418,24 +417,21 @@ export function JobsAnswersSurface() {
     <>
       <PageHeader
         title="Answers"
-        description={`2 of ${QUESTIONS.length} questions have a default answer. Each one you set makes the next application shorter.`}
+        description={`2 of ${QUESTIONS.length} questions have a default answer`}
       />
-      <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
-        <LeftRail>
-          <RailGroup label="Kind">
-            <RailItem label="All" href="/jobs/answers" active count={QUESTIONS.length} />
-            {['motivation', 'behavioral', 'technical', 'logistics'].map((kind) => (
-              <RailItem key={kind} label={kind} href={`/jobs/answers?kind=${kind}`} count={counts.get(kind) ?? 0} />
-            ))}
-          </RailGroup>
-          <p className="px-1 text-small leading-relaxed text-ink-muted">
-            Questions are deduped by fingerprint, so the same question asked in different words
-            lands on one row.
-          </p>
-        </LeftRail>
-        <div className="min-w-0 flex-1">
-          <AnswerBank questions={QUESTIONS} />
-        </div>
+      <div className="space-y-3">
+        <KindChips
+          items={[
+            { label: 'All', href: '/jobs/answers', count: QUESTIONS.length, active: true },
+            ...['motivation', 'behavioral', 'technical', 'logistics'].map((kind) => ({
+              label: kind,
+              href: `/jobs/answers?kind=${kind}`,
+              count: counts.get(kind) ?? 0,
+              active: false,
+            })),
+          ]}
+        />
+        <AnswerBank questions={QUESTIONS} />
       </div>
     </>
   );
