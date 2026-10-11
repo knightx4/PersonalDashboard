@@ -128,4 +128,13 @@ describe('statusLine', () => {
     );
     expect(statusLine({ yourMove: [], moreSteps: 0, claudeReady: 0 })).toBe('Nothing on you');
   });
+
+  it('says the goal’s pace in place of the last progress when it has one', () => {
+    expect(
+      statusLine(
+        { yourMove: [], moreSteps: 0, claudeReady: 0 },
+        { lastProgressOn: '2026-10-03', pace: 'usually every 5 days, last 2 days ago' },
+      ),
+    ).toBe('Nothing on you · usually every 5 days, last 2 days ago');
+  });
 });
