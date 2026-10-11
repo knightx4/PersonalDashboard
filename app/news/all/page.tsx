@@ -23,11 +23,11 @@ export const maxDuration = 300;
 /**
  * What has arrived, newest first.
  *
- * The senders are a column of their own rather than a dropdown, because the
- * question this page is usually opened with is "has the one I read come out
- * yet", and that is answered by seeing the names. A muted sender is still
- * listed there -- muting takes its issues out of the list, not the newsletter
- * out of your life.
+ * The page is one column at every width (the list-and-detail pattern, plan
+ * #1774): the header, the view tabs and topic chips, the rows, then the count.
+ * The senders are listed under By newsletter, one row each with its mute
+ * button. A muted sender is still listed there -- muting takes its issues out
+ * of Latest, not the newsletter out of your life.
  *
  * The confirmation mail a publisher sends when you sign up arrives here like
  * anything else, which is how you reach the link in it.
@@ -90,11 +90,8 @@ async function RecommendedPage({ userId }: { userId: string }) {
   const domain = newsDomainOrNull();
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title="Newsletters"
-        description="What has been sent to the address that belongs to this app."
-      />
+    <div className="mx-auto max-w-3xl space-y-4">
+      <PageHeader title="Newsletters" />
       <ViewSwitch view="recommended" topic={null} />
       <RecommendedNewsletters
         stored={stored}
