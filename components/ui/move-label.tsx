@@ -21,21 +21,18 @@ export function MoveLabel({
   title,
   className,
   wordClassName,
-  word,
 }: {
   move: Move;
   title?: string;
   className?: string;
   /** Classes for the word alone, such as hiding it at one width. */
   wordClassName?: string;
-  /** Says the move in these words instead of the shared ones. */
-  word?: string;
 }) {
   const label = moveLabel(move);
   return (
     <StateLabel
       glyph={null}
-      word={word ?? label.word}
+      word={label.word}
       tone={label.tone}
       title={title ?? label.title}
       className={className}

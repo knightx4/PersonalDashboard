@@ -9,7 +9,6 @@ import {
   type PlanNode,
   type PlanSection,
 } from '@/lib/plan/tree';
-import type { PlanStatus } from '@/lib/plan/load';
 import type { Tab } from '@/lib/tabs';
 
 /**
@@ -21,24 +20,6 @@ import type { Tab } from '@/lib/tabs';
  */
 
 /** The address of a feature's page. */
-/**
- * The status a feature page shows. A feature's stored status is only ever
- * claimed or closed by a session, so one whose step is underway still reads
- * not started; the page rolls it up from the steps, the way its health does.
- */
-/**
- * What the feature page calls the fact and the column that say whose move a
- * step is. Not "Waiting on": a cell there already reads "Waiting on #935",
- * Health has its own "Waiting", and the overview says "Waits on" of a
- * dependency, so the three would be one word for three things.
- */
-export const MOVE_LABEL = 'Whose move';
-
-export function featureStatus(node: PlanNode): PlanStatus {
-  const underway = flatten(node.children).some((step) => step.status === 'in_progress');
-  return node.status === 'not_started' && underway ? 'in_progress' : node.status;
-}
-
 export function featureHref(number: number): string {
   return `/dev/plan/${number}`;
 }
