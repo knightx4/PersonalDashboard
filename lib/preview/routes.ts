@@ -134,6 +134,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'shell-search-bar': ['/home'],
   'shell-capture': ['/home'],
   'shell-note': ['/dev/bugs'],
+  'shell-note-saved': ['/dev/bugs'],
   'ask-dash-new': ['/ask', '/ask/[ref]'],
   'ask-dash-answer': ['/ask', '/ask/[ref]'],
   'ask-dash-failed': ['/ask', '/ask/[ref]'],
@@ -318,6 +319,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'shell-full': ['components/shell/app-shell.tsx'],
   // The note button's panel, open with files added (plan #1713).
   'shell-note': ['components/shell/feedback-button.tsx'],
+  // The same panel once a note has saved, with its triage (plan #1674).
+  'shell-note-saved': ['components/shell/feedback-button.tsx', 'components/feedback/triage-note.tsx'],
   // Every state of the mark, bare and in each hat, at every size.
   'dash-mark': ['components/ui/dash-mark.tsx'],
   // The runner's card with its four Dashes, running and off (plan #1704).

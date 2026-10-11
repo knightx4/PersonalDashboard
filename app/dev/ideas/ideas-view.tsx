@@ -476,7 +476,10 @@ export function IdeasView({
       {mine.length + suggested.length > 1 && (
         <div className="space-y-2">
           <Arrange grouping={grouping} sort={sort} />
-          <p className="text-small text-ink-muted">{IDEA_RANKING_RULE}</p>
+          {/* On a quiet panel rather than bare on the page (taste:no-bare-text). */}
+          <p className="rounded-md bg-sunken px-3 py-2 text-small text-ink-muted">
+            {IDEA_RANKING_RULE}
+          </p>
         </div>
       )}
 
