@@ -1,5 +1,5 @@
 import { cn } from '@/lib/cn';
-import { CardSection } from '@/components/ui/card';
+import { Card, CardSection } from '@/components/ui/card';
 import { Figure } from '@/components/ui/figure';
 import { Meter } from '@/components/ui/meter';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
@@ -78,21 +78,22 @@ export function AnalyticsView({
       {/* The response rate is the number the search turns on, so it is the
           figure; the three that used to share a grid with it are its
           supporting row. */}
-      <Figure
-        className="mb-8"
-        label="Human response rate"
-        meta={`${overall.applicationsSent} sent`}
-        value={formatRate(overall.responseRate)}
-        caption="Automated confirmations and bulk rejections are excluded."
-        secondary={[
-          { value: String(overall.applicationsSent), label: 'applications sent' },
-          {
-            value: formatRate(overall.confirmationRate),
-            label: 'confirmed as received — not progress, only proof it landed',
-          },
-          { value: formatDays(overall.medianDaysToResponse), label: 'median days to a reply' },
-        ]}
-      />
+      <Card padding="standard" className="mb-4">
+        <Figure
+          label="Human response rate"
+          meta={`${overall.applicationsSent} sent`}
+          value={formatRate(overall.responseRate)}
+          caption="Automated confirmations and bulk rejections are excluded."
+          secondary={[
+            { value: String(overall.applicationsSent), label: 'applications sent' },
+            {
+              value: formatRate(overall.confirmationRate),
+              label: 'confirmed as received (not progress, only proof it landed)',
+            },
+            { value: formatDays(overall.medianDaysToResponse), label: 'median days to a reply' },
+          ]}
+        />
+      </Card>
 
       <CardSection
         className="mb-4"
@@ -159,15 +160,13 @@ export function AnalyticsView({
       </CardSection>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <CardSection
-          title="The funnel"
-          hint="Each bar is everything that ever reached that rung — a rejection after an onsite still counts as having reached the onsite."
-        >
+        <CardSection title="The funnel">
           <ul className="mt-3 space-y-2">
             {LADDER.map((rung, index) => {
               const count = reached(rung.stage);
               const share = overall.applicationsSent === 0 ? 0 : count / overall.applicationsSent;
-              const advance = index === 0 ? null : advanceRate(applications, LADDER[index - 1].stage);
+              const advance =
+                index === 0 ? null : advanceRate(applications, LADDER[index - 1].stage);
               return (
                 <li key={rung.stage}>
                   <div className="flex items-baseline justify-between gap-2 text-ui">
@@ -196,12 +195,13 @@ export function AnalyticsView({
           </ul>
         </CardSection>
 
-        <CardSection
-          title="Where rejections happen"
-          hint="Rejection at resume review and rejection after a final round call for opposite responses, so each channel's rejections are split by the stage they came at."
-        >
+        <CardSection title="Where rejections happen">
           {rejections.length === 0 ? (
-            <p className="mt-3 text-ui text-ink-muted">No rejections recorded yet.</p>
+            <p className="mt-3 text-ui text-ink-muted">
+              No rejections recorded yet. Once there are some, each channel&apos;s rejections are
+              split by the stage they came at, since a rejection at resume review and one after a
+              final round call for opposite responses.
+            </p>
           ) : (
             <div className="mt-3 space-y-5">
               {rejections.map((channel) => (
@@ -216,7 +216,9 @@ export function AnalyticsView({
                     {channel.stages.map((entry) => (
                       <li key={entry.stage}>
                         <div className="flex items-baseline justify-between gap-2 text-ui">
-                          <span className="text-ink">{STAGE_LABELS[entry.stage] ?? entry.stage}</span>
+                          <span className="text-ink">
+                            {STAGE_LABELS[entry.stage] ?? entry.stage}
+                          </span>
                           <span className="tabular text-ink-muted">{entry.count}</span>
                         </div>
                         <Meter
@@ -270,7 +272,11 @@ export function AnalyticsView({
                     {metrics.applicationsSent}
                   </td>
                   <td
-                    className={cn(MONTH_CELL, MONTH_NUM, metrics.tooEarly ? 'text-ink-muted' : 'text-ink')}
+                    className={cn(
+                      MONTH_CELL,
+                      MONTH_NUM,
+                      metrics.tooEarly ? 'text-ink-muted' : 'text-ink',
+                    )}
                   >
                     {metrics.tooEarly ? 'too early' : formatRate(metrics.responseRate)}
                   </td>
