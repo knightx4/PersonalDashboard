@@ -288,6 +288,46 @@ describe('add_job_lead', () => {
     expect(tables['job_search.roles'].some((r) => r.jd_url === POSTING)).toBe(false);
   });
 
+  it('saves a bare careers link with the company the page names, and Undo takes it back', async () => {
+    const BARE = 'https://jobs.ubs.com/job/351766';
+    const ctx: DashWriteContext = {
+      ...context(),
+      readPosting: async () => ({
+        ok: true,
+        tier: 2,
+        posting: { vendor: 'other', title: 'Data analyst', text: '', url: BARE, location: null, company: 'UBS', atsJobId: null, boardToken: null, questions: [] },
+      }),
+    };
+    const result = ok(await apply('add_job_lead', { url: BARE }, ctx));
+    expect(tables['job_search.companies']).toEqual([expect.objectContaining({ name: 'UBS', user_id: ME })]);
+    expect(result).toMatchObject({
+      input: { roleTitle: 'Data analyst', companyName: 'UBS', url: BARE },
+      summary: 'Dash saved Data analyst at UBS to your leads.',
+    });
+    const { undone } = await keepAndUndo(result);
+    expect(undone.ok).toBe(true);
+    expect(tables['job_search.roles'].some((r) => r.jd_url === BARE)).toBe(false);
+  });
+
+  it('prefers the company they gave over the one the page names', async () => {
+    const ctx: DashWriteContext = {
+      ...context(),
+      readPosting: async () => ({
+        ok: true,
+        tier: 2,
+        posting: { vendor: 'other', title: 'Data analyst', text: '', url: POSTING, location: null, company: 'Page Name', atsJobId: null, boardToken: null, questions: [] },
+      }),
+    };
+    ok(await apply('add_job_lead', { url: POSTING, company: 'Acme' }, ctx));
+    expect(tables['job_search.companies']).toEqual([expect.objectContaining({ name: 'Acme' })]);
+  });
+
+  it('still asks for the company when the page names none, and saves nothing', async () => {
+    const result = await apply('add_job_lead', { url: POSTING }, reading('Data analyst'));
+    expect(!result.ok && result.error).toContain('Ask them which company "Data analyst" is at');
+    expect(tables['job_search.roles'].some((r) => r.jd_url === POSTING)).toBe(false);
+  });
+
   it('asks for the title when the link cannot be read, and saves nothing', async () => {
     const ctx = { ...context(), readPosting: async () => ({ ok: false as const, tier: 3 as const, reason: 'no', detected: {} as never }) };
     const result = await apply('add_job_lead', { url: 'https://jobs.example.com/351766', company: 'UBS' }, ctx);
