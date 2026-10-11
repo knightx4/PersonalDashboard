@@ -75,7 +75,7 @@ export function GoalRunSurface() {
           </Link>
         }
       />
-      <p className="text-small break-words whitespace-pre-wrap text-ink">
+      <p className="rounded-card bg-sunken card-pad text-small break-words whitespace-pre-wrap text-ink">
         <LinkedText text={RUN.summary!} />
       </p>
       <Card>

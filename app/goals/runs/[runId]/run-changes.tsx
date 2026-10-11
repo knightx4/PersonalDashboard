@@ -62,15 +62,19 @@ function ChangeRow({ runId, line, href }: { runId: string; line: ChangeLine; hre
           line.sentence
         )}
       </span>
-      {note && <span className="text-small text-ink-muted">{note}</span>}
-      {line.state === 'undoable' && (
-        <form action={undo} className="flex items-center gap-2">
-          <input type="hidden" name="runId" value={runId} />
-          <input type="hidden" name="key" value={line.key} />
-          <Button type="submit" size="sm" variant="ghost" pending={pending}>
-            Undo
-          </Button>
-        </form>
+      {(note || line.state === 'undoable') && (
+        <div className="ml-auto flex items-center justify-end gap-2">
+          {note && <span className="text-small text-ink-muted">{note}</span>}
+          {line.state === 'undoable' && (
+            <form action={undo} className="-mr-2.5 flex items-center">
+              <input type="hidden" name="runId" value={runId} />
+              <input type="hidden" name="key" value={line.key} />
+              <Button type="submit" size="sm" variant="ghost" pending={pending}>
+                Undo
+              </Button>
+            </form>
+          )}
+        </div>
       )}
       {state.error && <span className="w-full text-small text-danger">{state.error}</span>}
       {state.message && <span className="w-full text-small text-ink-muted">{state.message}</span>}
