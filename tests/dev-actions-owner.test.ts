@@ -180,6 +180,11 @@ const LOCKED: ReadonlyArray<{ file: string; name: string; run: () => Promise<unk
     run: () => (bugs.runFeatureRoutine as Action)({}, form({})),
   },
   {
+    file: 'app/dev/bugs/actions.ts',
+    name: 'flipFiled',
+    run: () => bugs.flipFiled({ noteId: SOME_UUID, ideaId: null, to: 'idea' }),
+  },
+  {
     file: 'app/dev/comment-actions.ts',
     name: 'addComment',
     run: () =>

@@ -134,7 +134,7 @@ it and send both again. The `user_id` is the note's own.
 | `open` | Filed, not started. |
 | `in_progress` | Claimed right now, or committed and waiting for the batch to reach main. At most one being worked at a time. |
 | `blocked` | Needs an answer or an external dependency. Reason required. |
-| `planned` | Accepted, deliberately deferred to a later batch, or waiting on a proposed rule (`spec_change_id` set). |
+| `planned` | Accepted, deliberately deferred to a later batch, waiting on a proposed rule (`spec_change_id` set), or moved to the ideas page (resolution "Moved to the ideas page as the idea …"). Leave a moved note alone: its idea is the one to shape. |
 | `done` | On main and verified. Carries a commit that main contains. |
 | `declined` | Will not be done. Reason required. |
 
