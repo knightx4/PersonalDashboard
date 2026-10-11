@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { StatusGlyph } from '@/components/ui/status-glyph';
+import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
@@ -25,6 +27,13 @@ const MARK = {
   wrong: 'Not quite',
   skipped: 'Passed',
 } as const;
+
+/** A shape for each result, so right and wrong read without colour. */
+const GLYPH: Record<keyof typeof MARK, GlyphName> = {
+  right: 'check',
+  wrong: 'cross',
+  skipped: 'dashed',
+};
 
 /** One quiz from its rows and its material, as read by the page (plan #1602). */
 export function QuizView({ quiz, material }: { quiz: Quiz; material: QuizMaterial[] }) {
@@ -109,12 +118,8 @@ export function QuizView({ quiz, material }: { quiz: Quiz; material: QuizMateria
                           <span className="min-w-0 flex-1 text-ui text-ink">
                             {question.question}
                           </span>
-                          <span
-                            className={cn(
-                              'shrink-0 text-small font-medium',
-                              question.outcome === 'right' ? 'text-positive' : 'text-ink-muted',
-                            )}
-                          >
+                          <span className="inline-flex shrink-0 items-center gap-1 text-small font-medium text-ink">
+                            <StatusGlyph glyph={GLYPH[question.outcome!]} size={14} />
                             {MARK[question.outcome!]}
                           </span>
                         </p>
@@ -125,7 +130,9 @@ export function QuizView({ quiz, material }: { quiz: Quiz; material: QuizMateria
                         </p>
 
                         <p className="mt-1.5 text-small text-ink-muted">What the material said</p>
-                        <p className="text-ui text-ink">{question.expected}</p>
+                        <blockquote className="mt-0.5 border-l-2 border-border-strong pl-3 text-ui italic text-ink">
+                          {question.expected}
+                        </blockquote>
 
                         <p className="mt-1.5 text-small text-ink-ghost">
                           From {from.get(question.sourceId)?.label ?? 'material that is gone'}
