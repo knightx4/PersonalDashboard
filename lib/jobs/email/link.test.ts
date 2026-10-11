@@ -486,6 +486,40 @@ describe('the acceptance criteria', () => {
       }
     });
 
+    it('never matches a company by an ATS domain it has on file (note fc919f98)', () => {
+      // buildwithporter.com had gem.com on its record, and Circle's rejection,
+      // sent through Gem, was filed under it.
+      const gem = { from: 'The Circle TA Team <no-reply@appreview.gem.com>' };
+      const input = message({
+        threadId: null,
+        fromAddress: gem.from,
+        replyToAddress: null,
+        classification: 'rejection',
+        extractedCompany: 'Circle',
+        extractedRole: 'Strategic Finance Manager',
+      });
+      const porter = candidate({
+        companyId: 'c-porter',
+        companyName: 'buildwithporter.com',
+        companyDomains: ['gem.com'],
+        roleTitle: 'Founding Accountant',
+      });
+      expect(scoreCandidate(input, porter).method).not.toBe('domain');
+
+      const decision = decideLink(input, [], {
+        companies: [
+          { id: 'c-porter', name: 'buildwithporter.com', domains: ['gem.com'] },
+          { id: 'c-circle', name: 'Circle', domains: ['jobalerts.circle.com'] },
+        ],
+        now: new Date('2026-04-06T10:00:00Z'),
+      });
+      if (decision.action === 'create_inferred_application') {
+        expect(decision.company).toMatchObject({ kind: 'existing', id: 'c-circle' });
+      } else {
+        throw new Error(`expected an inferred application, got ${decision.action}`);
+      }
+    });
+
     it('falls back to the ATS subdomain when the body named nobody', () => {
       const decision = decideLink(
         // Subdomains are lowercase by construction, and "monzo-bank" reads as
