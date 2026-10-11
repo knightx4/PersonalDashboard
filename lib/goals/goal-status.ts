@@ -143,8 +143,9 @@ export function claudeLine(view: Pick<GoalStatusView, 'claudeReady' | 'claudeHel
  * the page has already read: "3 on you · Dash on 1 · due 31 Oct". How many
  * things are on you (everything Waiting on you lists, and every step of
  * yours that is ready), how many runs Dash has going on the goal or else how
- * many of its steps the next run will work, the goal's due date, and the day
- * anything on it last moved.
+ * many of its steps the next run will work, the goal's due date, and its
+ * usual pace (plan #1737: "usually every 5 days, last 2 days ago"), or,
+ * where no pace is given, the day anything on it last moved.
  */
 export function statusLine(
   view: Pick<GoalStatusView, 'yourMove' | 'moreSteps' | 'claudeReady'>,
@@ -152,7 +153,14 @@ export function statusLine(
     running = 0,
     dueOn = null,
     lastProgressOn = null,
-  }: { running?: number; dueOn?: string | null; lastProgressOn?: string | null } = {},
+    pace = null,
+  }: {
+    running?: number;
+    dueOn?: string | null;
+    lastProgressOn?: string | null;
+    /** The goal's pace in words, from `paceLine` in lib/goals/pace.ts. */
+    pace?: string | null;
+  } = {},
 ): string {
   const onYou = view.yourMove.length + view.moreSteps;
   return [
@@ -163,7 +171,7 @@ export function statusLine(
         ? `${plural(view.claudeReady, 'step', 'steps')} ready for Dash`
         : null,
     dueOn ? `due ${formatDay(dueOn)}` : null,
-    lastProgressOn ? `last progress ${formatDay(lastProgressOn)}` : null,
+    pace ?? (lastProgressOn ? `last progress ${formatDay(lastProgressOn)}` : null),
   ]
     .filter(Boolean)
     .join(' · ');
