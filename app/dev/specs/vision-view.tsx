@@ -92,9 +92,9 @@ export function ModuleVisionPanel({
   }
 
   return (
-    <div className="space-y-1 pb-2">
+    <div className="mb-3 space-y-1 rounded-lg border-l-2 border-border-strong bg-sunken px-4 py-3">
       <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 whitespace-pre-wrap text-body text-ink">
+        <p className="min-w-0 whitespace-pre-wrap text-body italic text-ink">
           <LinkedText text={vision.body} />
         </p>
         <button

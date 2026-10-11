@@ -27,10 +27,7 @@ function SpecRow({ spec, comments }: { spec: SpecDoc; comments: number }) {
     <li>
       <Link
         href={`/dev/specs/${spec.slug}`}
-        className={cn(
-          cardVariants({ padding: 'dense' }),
-          'block transition-colors duration-quick hover:border-border-strong',
-        )}
+        className="block px-4 py-3 transition-colors duration-quick hover:bg-sunken"
       >
         <div className="flex items-start justify-between gap-3">
           <h3 className="text-body font-semibold text-ink">{spec.title}</h3>
@@ -42,7 +39,7 @@ function SpecRow({ spec, comments }: { spec: SpecDoc; comments: number }) {
           )}
         </div>
         <p className="mt-1 text-ui text-ink-muted">{spec.blurb}</p>
-        <p className="mt-2 text-caption text-ink-ghost">docs/{spec.file}</p>
+        <p className="mt-1 text-caption text-ink-ghost">docs/{spec.file}</p>
       </Link>
     </li>
   );
@@ -71,10 +68,7 @@ export function SpecsView({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader
-        title="Specs"
-        description="The vision for the app and each workspace, and the documents behind it read from the repository. Comment on any section; tag @dash in one to ask about it."
-      />
+      <PageHeader title="Specs" />
 
       {/* Changes Dash proposes to the specs, above the documents they change
           (plan #1506). First because they are the one thing on the page
@@ -182,7 +176,7 @@ export function SpecsView({
               )}
 
               {group.specs.length > 0 && (
-                <ul className="space-y-2">
+                <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
                   {group.specs.map((spec) => (
                     <SpecRow key={spec.slug} spec={spec} comments={counts[spec.slug] ?? 0} />
                   ))}
