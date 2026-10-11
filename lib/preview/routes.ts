@@ -60,6 +60,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-settings': ['/jobs/settings'],
   'jobs-contacts': ['/jobs/contacts'],
   'jobs-contact': ['/jobs/contacts/[id]'],
+  'jobs-case-page': ['/jobs/p/[slug]'],
   'jobs-role-new': ['/jobs/roles/new'],
   'jobs-recommended-roles': ['/jobs/roles'],
   'jobs-roles-table': ['/jobs/roles'],
