@@ -1,4 +1,6 @@
 import NewTrackPage from '@/app/learn/new/page';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
+import { MODELS } from '@/lib/core/models';
 import NewQuizPage from '@/app/learn/quiz/new/page';
 import { ConceptPageView } from '@/app/learn/c/[id]/concept-view';
 import { ListsView } from '@/app/learn/lists/lists-view';
@@ -355,8 +357,27 @@ const sweep: OpeningSweep = {
   ],
 };
 
+/* The learn layout hands every paid press its estimate; the gallery has no
+ * layout, so laying out the chain gets a typical figure here and its hint
+ * draws beside the button (plan #1764). */
 export function LearnOpeningSurface() {
-  return <OpeningView sweep={sweep} />;
+  return (
+    <PaidCostsProvider
+      costs={{
+        'app/learn/know/actions.ts#proposeGoal': {
+          lowMicros: 18_000,
+          medianMicros: 32_000,
+          highMicros: 61_000,
+          runs: 9,
+          basis: 'measured',
+          per: 'run',
+          models: [MODELS.learnOpeningClaims, MODELS.learnGraphGenerate],
+        },
+      }}
+    >
+      <OpeningView sweep={sweep} />
+    </PaidCostsProvider>
+  );
 }
 
 // ---- A quiz, part answered, and the question you are on -----------------------

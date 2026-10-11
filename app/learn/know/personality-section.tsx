@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { buttonVariants } from '@/components/ui/button';
 import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { Meter } from '@/components/ui/meter';
+import { cardVariants } from '@/components/ui/card';
+import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
 import {
   BIG_FIVE_FACTORS,
@@ -141,7 +143,7 @@ export function PersonalitySection({
         hint={latest ? `Big Five, taken ${formatDay(latest.takenAt, true)}` : undefined}
       >
         {!latest ? (
-          <div className="max-w-2xl space-y-4">
+          <div className={cn(cardVariants({ padding: 'standard' }), 'max-w-2xl space-y-4')}>
             <p className="text-ui text-ink-muted">
               <Link
                 href={PERSONALITY_HREF}
@@ -154,7 +156,7 @@ export function PersonalitySection({
             <OtherTests typed={typed} now={at} />
           </div>
         ) : (
-          <div className="max-w-2xl space-y-4">
+          <div className={cn(cardVariants({ padding: 'standard' }), 'max-w-2xl space-y-4')}>
             <ul className="space-y-4">
               {BIG_FIVE_FACTORS.map((factor) => {
                 const percent = factorPercent(latest.scores[factor]);
@@ -185,11 +187,15 @@ export function PersonalitySection({
               </p>
             )}
 
-            <PersonalityReadPanel
-              resultId={latest.id}
-              read={latest.read}
-              status={readStatus(latest, at)}
-            />
+            {/* Dash's read on its own panel inside the card, so its words
+                stand apart from the scores and the note titles (plan #1764). */}
+            <div className="rounded-md bg-sunken p-3">
+              <PersonalityReadPanel
+                resultId={latest.id}
+                read={latest.read}
+                status={readStatus(latest, at)}
+              />
+            </div>
 
             <OtherTests typed={typed} now={at} />
 

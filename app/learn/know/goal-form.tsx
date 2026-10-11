@@ -218,11 +218,7 @@ export function GoalForm({
         </p>
       )}
 
-      <p className="mt-2 text-small text-ink-muted">
-        As specific as you can make it: a narrow question gets a short chain that is right. It lays
-        out what you would have to understand first, in order, and saves nothing until you have read
-        it.
-      </p>
+      <p className="mt-2 text-small text-ink-muted">A narrow question gets a short chain.</p>
     </form>
   );
 }
