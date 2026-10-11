@@ -1059,6 +1059,25 @@ a menu, plan #1157). They are gone: Now and Other stages divide the steps
 by stage, Waiting on you is the On you list, and Finished is a fold rather
 than a view.
 
+### Pace
+
+An open goal that is not an errand shows how often something usually
+happens on it (plan #1737, `lib/goals/pace.ts`). An active day is a day on
+which you closed one of its steps, logged progress on it, counted one of its
+rhythms, or filed a capture line on it. A step Dash closed does not count,
+and neither does a capture that only added a step. Over the last eight weeks
+the usual pace is the median number of days between active days.
+
+The properties say it as **Usual pace** ("Every 5 days") and **Last active**
+("2 days ago"), and the status line says "usually every 5 days, last 2 days
+ago" where it said when progress was last logged. With fewer than four
+active days in the last six weeks the pace reads "Not enough to tell yet",
+and the status line keeps only the last active day. A gap since the last
+active day of more than one and a half times the usual one is slower than
+usual, which the morning review reads (plan #1738). The four days, the six
+and eight weeks and the one and a half are named constants at the top of
+the file.
+
 ## Your examples, broken down
 
 These are the first goals to enter once it exists, and a check on whether the
