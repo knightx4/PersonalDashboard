@@ -50,7 +50,7 @@ function fakePorts(
       return new Map(ids.map((id) => [id, `opening of ${id}`]));
     },
     async sentences(groups, onSpend) {
-      onSpend({ model: 'claude-haiku-4-5', usage: { ...EMPTY_USAGE, inputTokens: 900 } });
+      onSpend({ model: 'claude-haiku-5-5', usage: { ...EMPTY_USAGE, inputTokens: 900 } });
       return options.sentences ?? groups.map(() => 'Both follow how money grew up with the first cities.');
     },
     async ledger(_userId, report) {

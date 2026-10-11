@@ -18,6 +18,10 @@ import {
 } from '@/lib/talk/talk';
 import { useClockNow } from '@/lib/use-clock-now';
 import { LinkedText } from '@/components/ui/linked-text';
+import { ReplyCharts } from '@/components/talk/reply-chart';
+import { AddFile } from '@/components/attachments/add-file';
+import { AskTurnFiles } from '@/components/attachments/ask-turn-files';
+import type { UploadedAttachment } from '@/lib/attachments/rules';
 
 /**
  * A saved conversation with Dash about a card or a story, and the box to add
@@ -38,7 +42,7 @@ import { LinkedText } from '@/components/ui/linked-text';
  */
 
 /** What `send` hands back: the turns it kept, and why it stopped short, if it did. */
-export type TalkSend = (body: string) => Promise<{ turns?: TalkTurn[]; error?: string }>;
+export type TalkSend = (body: string, files?: UploadedAttachment[]) => Promise<{ turns?: TalkTurn[]; error?: string }>;
 
 const PENDING = 'pending';
 
@@ -115,6 +119,7 @@ function Turn({
   below,
   assistant,
   state,
+  onCard,
 }: {
   turn: TalkTurn;
   grouped: boolean;
@@ -123,9 +128,14 @@ function Turn({
   assistant: TalkAssistant;
   /** The mark's state on an assistant turn: done just after it lands. */
   state?: DashState;
+  onCard?: boolean;
 }) {
   return (
-    <li className="flex gap-2">
+    <li
+      className={
+        onCard && turn.role === 'assistant' ? '-mx-2 flex gap-2 rounded-lg bg-canvas px-2 py-1.5' : 'flex gap-2'
+      }
+    >
       <div className="flex w-4 shrink-0 justify-center pt-1">
         {!grouped && <AuthorMark role={turn.role} assistant={assistant} state={state} />}
       </div>
@@ -158,6 +168,10 @@ function Turn({
             <LinkedText text={turn.body} />
           </p>
         )}
+        {turn.files && turn.files.length > 0 && <AskTurnFiles files={turn.files} />}
+        {/* A chart Dash drew (plan #1655) belongs to the answer, so it sits
+            under the words and above the rows they rest on. */}
+        {turn.role === 'assistant' && <ReplyCharts calls={turn.toolCalls} />}
         {turn.citations && turn.citations.length > 0 && <Cited citations={turn.citations} />}
         {below}
       </div>
@@ -165,9 +179,11 @@ function Turn({
   );
 }
 
-// Taller on a phone so each row is a 44-pixel press (docs/UI-QUALITY-SPEC.md,
-// R3): a `press-area` would be clipped by the truncation's overflow.
-const CITED_LINK = 'min-w-0 truncate text-ui text-accent underline-offset-2 hover:underline max-sm:py-3';
+// A 44-pixel press on a phone (docs/UI-QUALITY-SPEC.md, R3) from `press-area`,
+// which draws no space of its own, so the rows stay one tight list at every
+// width (plan #1708). The truncation is on the words inside, since a clipping
+// link would clip the press area with them.
+const CITED_LINK = 'press-area flex min-w-0 text-ui text-accent underline-offset-2 hover:underline';
 
 /**
  * The rows an answer rests on, each a link to where it lives (plan #1090).
@@ -189,7 +205,7 @@ function Cited({ citations }: { citations: readonly TalkCitation[] }) {
           />
           {citation.href.startsWith('/') ? (
             <Link href={citation.href} className={CITED_LINK}>
-              {citation.title}
+              <span className="min-w-0 truncate">{citation.title}</span>
             </Link>
           ) : (
             // A message Dash searched in Gmail (plan #1316): it opens there, in a new tab.
@@ -199,7 +215,7 @@ function Cited({ citations }: { citations: readonly TalkCitation[] }) {
               rel="noopener noreferrer"
               className={CITED_LINK}
             >
-              {citation.title}
+              <span className="min-w-0 truncate">{citation.title}</span>
               <span className="sr-only"> (opens in Gmail)</span>
             </a>
           )}
@@ -226,6 +242,11 @@ export function TalkThread({
   activity,
   incoming,
   working,
+  onCard = false,
+  withFiles = false,
+  sendHint,
+  initialDraft = '',
+  initialFiles = [],
 }: {
   /** Unique on the page: the textarea's id is built from it. */
   id: string;
@@ -281,6 +302,25 @@ export function TalkThread({
    * for an Ask Dash answer, as each lookup starts (plan #1438).
    */
   working?: React.ReactNode;
+  /**
+   * The caller has put the thread on a card of its own. Dash's turns then
+   * take the recessed ground, so his words look different from yours at a
+   * glance (taste `no-bare-text`), as the dev pages' thread does with the
+   * same prop (components/thread/thread.tsx). Left off, the thread draws as
+   * it always has; a host takes it on when it puts the thread on a card.
+   */
+  onCard?: boolean;
+  /** Offer "Add a file" beside Send; the files go to `send` as its second argument (plan #1715). */
+  withFiles?: boolean;
+  /**
+   * Beside Send: the $ hint for this reply, given the files added so far, so
+   * the figure rises as files are added (plan #1716).
+   */
+  sendHint?: (files: readonly UploadedAttachment[]) => React.ReactNode;
+  /** For the preview gallery: the box opens with these words in it. */
+  initialDraft?: string;
+  /** For the preview gallery: the box opens with these files added. */
+  initialFiles?: UploadedAttachment[];
 }) {
   const [own, setTurns] = useState<TalkTurn[]>([...initial]);
   // The thread's own turns, with any written elsewhere slotted in by time.
@@ -292,7 +332,9 @@ export function TalkThread({
     return [...own, ...added].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }, [own, incoming]);
   const [writing, setWriting] = useState(startWriting && !ask);
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(initialDraft);
+  const [files, setFiles] = useState<UploadedAttachment[]>(initialFiles);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Why the last answer did not come: drawn in the thread with the failed
   // mark, where the working line was, until the next question is sent.
@@ -310,20 +352,25 @@ export function TalkThread({
       setError(checked.error);
       return;
     }
+    const sentFiles = withFiles ? files : [];
     const question: TalkTurn = {
       id: PENDING,
       role: 'user',
       body: checked.body,
       createdAt: new Date().toISOString(),
+      ...(sentFiles.length > 0
+        ? { files: sentFiles.map((file) => ({ ...file, id: file.path, href: '' })) }
+        : {}),
     };
     setError(null);
     setFailed(null);
     setLanded(null);
     setDraft('');
+    setFiles([]);
     setWriting(false);
     setTurns((current) => [...current, question]);
     startSend(async () => {
-      const result = await send(checked.body).catch(() => ({
+      const result = await send(checked.body, sentFiles.length > 0 ? sentFiles : undefined).catch(() => ({
         turns: undefined,
         error: 'That was not sent. Check your connection.',
       }));
@@ -336,6 +383,7 @@ export function TalkThread({
         else setLanded(kept.find((turn) => turn.role === 'assistant')?.id ?? null);
         if (kept.length === 0) {
           setDraft(checked.body);
+          setFiles(sentFiles);
           setWriting(true);
         }
       });
@@ -371,6 +419,7 @@ export function TalkThread({
               below={turn.id === PENDING ? undefined : below?.(turn)}
               assistant={assistant}
               state={turn.id === landed ? 'done' : undefined}
+              onCard={onCard}
             />
           ))}
           {sending && (
@@ -429,6 +478,7 @@ export function TalkThread({
             <ComposeBody
               id={`${id}-talk`}
               rows={1}
+              className="min-h-11 sm:min-h-0"
               autoFocus
               maxLength={MAX_TURN}
               placeholder={placeholder}
@@ -447,17 +497,25 @@ export function TalkThread({
                 form.current?.requestSubmit();
               }}
             />
-            <div className="mt-1 flex justify-end">
-              <Button
-                type="submit"
-                size="sm"
-                className="size-7 shrink-0 px-0"
-                disabled={!draft.trim() || sending}
-                title="Send"
-              >
-                <ArrowUp className="size-4" strokeWidth={2} aria-hidden />
-                <span className="sr-only">Send</span>
-              </Button>
+            <div className="mt-1 flex items-start justify-between gap-2">
+              {withFiles ? (
+                <AddFile value={files} onChange={setFiles} disabled={sending} onUploadingChange={setUploading} />
+              ) : (
+                <span />
+              )}
+              <div className="flex shrink-0 items-center gap-1">
+                {sendHint?.(files)}
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="size-7 shrink-0 px-0"
+                  disabled={!draft.trim() || sending || uploading}
+                  title="Send"
+                >
+                  <ArrowUp className="size-4" strokeWidth={2} aria-hidden />
+                  <span className="sr-only">Send</span>
+                </Button>
+              </div>
             </div>
           </ComposeBox>
         </form>

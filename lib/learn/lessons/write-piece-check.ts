@@ -96,7 +96,7 @@ export async function writePieceCheck(input: {
           },
         },
       ],
-      tool_choice: forceTool(WRITE_TOOL),
+      tool_choice: forceTool(WRITE_TOOL, PIECE_CHECK_MODEL),
       messages: [{ role: 'user', content: pieceCheckPrompt(input.piece, input.asked, WRITE_TOOL) }],
     });
   } catch (error) {

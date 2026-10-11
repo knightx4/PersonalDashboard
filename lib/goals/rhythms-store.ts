@@ -1,8 +1,10 @@
 import 'server-only';
 
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
+import { readSourceCounts } from '@/lib/goals/rhythm-sources-store';
 import {
   recordsOf,
+  sourcedSpans,
   syncPlan,
   type LiveRhythm,
   type PeriodRow,
@@ -57,9 +59,15 @@ async function readPeriods(client: GoalsSupabaseClient, itemIds: string[]): Prom
  * every rhythm in `live` and `alsoShow` (a rhythm on the page that is not
  * live, whose stored periods are shown as they are).
  *
+ * A rhythm that counts itself has its source read over the periods this
+ * sync touches (lib/goals/rhythm-sources-store.ts), one read per source, and
+ * the plan is made again with those counts.
+ *
  * Two readers at once (Todo and the Goals home) can both try to open the same
  * period; the second insert is ignored by the unique start day, and a close
- * only applies to a row still open.
+ * only applies to a row still open. The daily cron runs the same sync for
+ * the owner (inngest/goals/rhythms.ts), so periods close even on a day no
+ * page is opened.
  */
 export async function syncRhythms(
   client: GoalsSupabaseClient,
@@ -70,26 +78,47 @@ export async function syncRhythms(
 ): Promise<Map<string, RhythmRecord>> {
   const ids = [...new Set([...live.map((r) => r.id), ...alsoShow])];
   const rows = await readPeriods(client, ids);
-  const plan = syncPlan(live, rows, today);
-  if (plan.close.length + plan.reshape.length + plan.insert.length === 0) {
-    return recordsOf(rows, today);
+  let plan = syncPlan(live, rows, today);
+  if (live.some((r) => r.source)) {
+    // A source that cannot be read leaves the stored counts as they are for
+    // this sync rather than failing the page; the period just closed is read
+    // again on the next one.
+    const counts = await readSourceCounts(
+      client,
+      userId,
+      live,
+      sourcedSpans(live, rows, plan, today),
+      today,
+    ).catch((error: unknown) => {
+      console.warn(`[goals] rhythm sources not read: ${error instanceof Error ? error.message : 'failed'}`);
+      return null;
+    });
+    if (counts) plan = syncPlan(live, rows, today, counts);
   }
+  const writes = plan.close.length + plan.reshape.length + plan.recount.length + plan.insert.length;
+  if (writes === 0) return recordsOf(rows, today);
 
   const closedAt = new Date().toISOString();
-  const writes: PromiseLike<{ error: { message: string } | null }>[] = [
-    ...plan.close.map(({ id, kept }) =>
+  const pending: PromiseLike<{ error: { message: string } | null }>[] = [
+    ...plan.close.map(({ id, kept, count }) =>
       client
         .from('periods')
-        .update({ kept, closed_at: closedAt })
+        .update({ kept, closed_at: closedAt, ...(count === undefined ? {} : { count }) })
         .eq('id', id)
         .is('closed_at', null),
     ),
+    // A reshape and a recount of the same open row write different columns.
     ...plan.reshape.map(({ id, target, endsOn }) =>
       client.from('periods').update({ target, ends_on: endsOn }).eq('id', id).is('closed_at', null),
     ),
+    ...plan.recount.map(({ id, count, kept }) =>
+      kept === null
+        ? client.from('periods').update({ count }).eq('id', id).is('closed_at', null)
+        : client.from('periods').update({ count, kept }).eq('id', id).not('closed_at', 'is', null),
+    ),
   ];
   if (plan.insert.length > 0) {
-    writes.push(
+    pending.push(
       client.from('periods').upsert(
         plan.insert.map((row) => ({
           user_id: userId,
@@ -97,7 +126,7 @@ export async function syncRhythms(
           starts_on: row.startsOn,
           ends_on: row.endsOn,
           target: row.target,
-          count: 0,
+          count: row.count,
           kept: row.kept,
           closed_at: row.kept === null ? null : closedAt,
         })),
@@ -105,7 +134,7 @@ export async function syncRhythms(
       ),
     );
   }
-  const results = await Promise.all(writes);
+  const results = await Promise.all(pending);
   const failed = results.find((result) => result.error);
   if (failed?.error) throw new Error(`Could not update rhythm periods: ${failed.error.message}`);
 
@@ -115,9 +144,10 @@ export async function syncRhythms(
 /**
  * Count `by` towards a rhythm's open period starting on `startsOn`, or take
  * back with a negative `by`. The count never goes below nothing. False when
- * that period is not there (or not open, unless `closed` allows it), when
- * there was nothing to take back, or when the count moved underneath and did
- * not settle.
+ * the rhythm counts itself from a source (its count is the source's, and the
+ * next sync would put it back), when that period is not there (or not open,
+ * unless `closed` allows it), when there was nothing to take back, or when
+ * the count moved underneath and did not settle.
  *
  * `closed` lets capture count towards a period that has already closed,
  * such as last week's for something done yesterday on a Monday (plan #1279).
@@ -130,6 +160,14 @@ export async function countTowards(
   by: number,
   { closed = false }: { closed?: boolean } = {},
 ): Promise<boolean> {
+  const { data: item, error: itemError } = await client
+    .from('items')
+    .select('count_source')
+    .eq('id', itemId)
+    .maybeSingle();
+  if (itemError) throw new Error(itemError.message);
+  if (item?.count_source) return false;
+
   // Read then write on the count read, so two ticks at once are both counted
   // rather than one overwriting the other: the loser sees nothing updated and
   // reads again.

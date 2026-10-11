@@ -28,6 +28,13 @@ describe('awaitingDash', () => {
     expect(awaitingDash([turn('me', 'Yes, do it.')], 'step', at(1))).toBe(false);
   });
 
+  // Plan #1648: a comment Dash saw and chose not to reply to is answered.
+  it('stops when the last comment carries the seen mark', () => {
+    const marked = { ...turn('me', 'Pushed the fix @dash'), acknowledgedAt: '2026-09-17T02:00:30.000Z' };
+    expect(awaitingDash([marked], 'step', at(1))).toBe(false);
+    expect(awaitingDash([turn('me', 'Pushed the fix @dash')], 'step', at(1))).toBe(true);
+  });
+
   it('stops the moment Dash has replied', () => {
     expect(
       awaitingDash(

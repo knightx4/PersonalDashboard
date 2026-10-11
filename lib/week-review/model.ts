@@ -2,7 +2,7 @@ import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool } from '@/lib/learn/graph/tool-call';
 import type { WeekFacts } from './facts';
 import {
   MAX_REVIEW_OBSERVATIONS,
@@ -95,7 +95,7 @@ export async function writeWeekReview(
 
   const response = await client.messages.create({
     model: WEEK_REVIEW_MODEL,
-    max_tokens: 3000,
+    max_tokens: 3000 + THINKING_ROOM,
     system: SYSTEM,
     tools: [
       {
@@ -123,8 +123,13 @@ export async function writeWeekReview(
         },
       },
     ],
-    tool_choice: forceTool(TOOL_NAME),
-    messages: [{ role: 'user', content: reviewPrompt(input.facts, input.previous, input.homeSaid) }],
+    tool_choice: forceTool(TOOL_NAME, WEEK_REVIEW_MODEL),
+    messages: [
+      {
+        role: 'user',
+        content: `${reviewPrompt(input.facts, input.previous, input.homeSaid)}\n\nReport through ${TOOL_NAME}.`,
+      },
+    ],
   });
   options.onSpend?.({ model: WEEK_REVIEW_MODEL, usage: usageFrom(response.usage) });
 

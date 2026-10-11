@@ -4,6 +4,7 @@ import { clip, isUuid, type AskContext } from './db';
 import { OPENABLE } from './lookups';
 import { pathOf } from './page-name';
 import { executeAskTool } from './tools';
+import type { ListContext } from './filtered-list';
 
 export { pathOf };
 
@@ -57,6 +58,13 @@ const EXTRA_PAGES: readonly ExtraPage[] = [
   { table: 'goals.items', href: (id) => `/goals/${id}`, title: 'title', module: 'goals' },
   { table: 'goals.areas', href: (id) => `/goals/area/${id}`, title: 'name', module: 'goals' },
 ];
+
+/**
+ * A step's own page (plan #1620), /goals/<goal>/s/<step>. Its address holds
+ * two ids, which the one-marker patterns above cannot read, so it is matched
+ * on its own. A step is a goals.items row like its goal.
+ */
+const STEP_PAGE = /^\/goals\/[0-9a-f-]{36}\/s\/([0-9a-f-]{36})$/i;
 
 /** What a row is called where the table's own name does not say it. */
 const NOUNS: Record<string, string> = {
@@ -169,6 +177,10 @@ function wordsOf(segments: readonly string[]): string {
 export function matchPage(address: string, patterns: readonly RowPattern[] = ROW_PATTERNS): PageMatch {
   const path = pathOf(address);
   const workspace = moduleOf(path);
+  const step = STEP_PAGE.exec(path);
+  if (step && isUuid(step[1])) {
+    return { path, module: 'goals', page: 'Goals step', row: { table: 'goals.items', ref: step[1] } };
+  }
   const row = matchRow(path, patterns);
   if (row) {
     return {
@@ -206,6 +218,11 @@ export type PageContext = {
    * that is on. Its `table` and `ref` are what open_row takes.
    */
   row: { table: string; ref: string; title: string; href: string } | null;
+  /**
+   * The rows of a filtered list the person sent with the question (plan
+   * #1658), read again from the filter they were under. Absent otherwise.
+   */
+  list?: ListContext | null;
 };
 
 /**
@@ -221,7 +238,9 @@ export async function resolvePage(ctx: AskContext, address: string): Promise<Pag
   const extra = EXTRA_PAGES.find((p) => p.table === match.row!.table);
   if (extra) {
     const row = await readExtra(ctx, extra, match.row.ref);
-    return row ? { ...base, row } : base;
+    // A step's page is its own address, not the goal page its id would make.
+    const href = STEP_PAGE.test(match.path) ? match.path : row?.href;
+    return row && href ? { ...base, row: { ...row, href } } : base;
   }
 
   const result = await executeAskTool('open_row', match.row, ctx);

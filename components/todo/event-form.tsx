@@ -148,7 +148,7 @@ export function EventForm({
         <FieldError>{state.error}</FieldError>
 
         <div className="flex gap-2">
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" pending={pending}>
             Save
           </Button>
           <Link href={back} className={buttonVariants({ variant: 'ghost' })}>
@@ -179,7 +179,7 @@ function DeleteEvent({ id, view, anchor }: { id: string; view: string; anchor: s
       <input type="hidden" name="view" value={view} />
       <input type="hidden" name="date" value={anchor} />
 
-      <Button type="submit" variant="danger" size="sm" disabled={pending}>
+      <Button type="submit" variant="danger" size="sm" pending={pending}>
         Delete
       </Button>
       <FieldError>{state.error}</FieldError>

@@ -44,7 +44,7 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isModuleId, MODULES, type ModuleId } from '@/lib/modules';
-import { handStepToClaude } from '@/lib/plan/handover';
+import { handFeatureToClaude, handStepToClaude } from '@/lib/plan/handover';
 import { countChangedLines, diffFits, MAX_CHANGED_LINES, rebaseDiff } from '@/lib/specs/changes';
 import { readSpec, specBySlug } from '@/lib/specs/registry';
 import { nextPlanPosition } from '@/lib/plan/position';
@@ -691,19 +691,21 @@ function rewritten(what: string, now: string, was: string | null): string {
  * A comment on a step means that step. A raise means whichever step its
  * consequence named, because a raise whose answer is "build #342" has no step
  * of its own to point at. The number is looked up under the caller's own id,
- * so a number belonging to somebody else finds nothing.
+ * so a number belonging to somebody else finds nothing. `feature` is true for
+ * a row at the top of its plan, which is sent as a feature.
  */
-async function stepNamed(input: ActInput): Promise<string | null> {
+async function stepNamed(input: ActInput): Promise<{ id: string; feature: boolean } | null> {
   const number = Number(input.action.text?.trim().replace(/^#/, ''));
   if (!Number.isInteger(number) || number <= 0) return null;
 
   const { data } = await input.supabase
     .from('plan_items')
-    .select('id')
+    .select('id, parent_id')
     .eq('user_id', input.userId)
     .eq('number', number)
     .maybeSingle();
-  return (data as { id: string } | null)?.id ?? null;
+  const row = data as { id: string; parent_id?: string | null } | null;
+  return row ? { id: row.id, feature: row.parent_id === null } : null;
 }
 
 /**
@@ -716,12 +718,27 @@ async function stepNamed(input: ActInput): Promise<string | null> {
  * thread says, so a comment that started nothing says why.
  */
 async function sendStep(input: ActInput): Promise<ActOutcome> {
-  const id = input.target === 'step' ? input.id : await stepNamed(input);
-  if (!id) {
+  const named = input.target === 'step' ? { id: input.id, feature: false } : await stepNamed(input);
+  if (!named) {
     return {
       ok: false,
       why:
         'This is not a plan step and nothing here names one by number, so nothing was started.',
+    };
+  }
+  const id = named.id;
+
+  // A feature named by number is sent the way the plan page's Send and the
+  // overnight runner send one, as a feature run. The runner reads those runs
+  // to decide which features it holds, so the yes on its "send it again" raise
+  // counts as the new attempt it is.
+  if (named.feature) {
+    const batch = await handFeatureToClaude({ supabase: input.supabase, userId: input.userId, id });
+    if (!batch.ok) return { ok: false, why: `I did not send it: ${batch.error}` };
+    const open = batch.steps === 1 ? 'one open step' : `${batch.steps} open steps`;
+    return {
+      ok: true,
+      said: `Sent #${batch.number} ${batch.title} to be built, with ${open}. ${batch.detail}`,
     };
   }
 

@@ -55,6 +55,10 @@ export type FeedCardRow = {
   video_id?: string | null;
   video_start_seconds?: number | null;
   video_end_seconds?: number | null;
+  /** The segment "In this video" was written about, and its two sentences (note cde86a10). */
+  clip_note_segment_id?: string | null;
+  clip_said?: string | null;
+  clip_why?: string | null;
 };
 
 type CatalogueItem = { title: string; canonical_url: string; licence: string | null };
@@ -157,6 +161,12 @@ export type FeedVideo = {
   title: string;
   start: number | null;
   end: number | null;
+  /**
+   * "In this video" (note cde86a10): what the clip says and why it is on the
+   * card. Only on a clip found for the card's idea, once the top-up has
+   * written it about the segment that is playing.
+   */
+  note?: { said: string; why: string } | null;
 };
 
 /** Characters shown before the fold: about a phone screen of text. */

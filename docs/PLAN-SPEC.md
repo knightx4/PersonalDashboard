@@ -13,6 +13,24 @@ builders, and everything Linear or Jira has that exists to coordinate more
 people than that is left out. What is kept is the part that changes what gets
 picked up next.
 
+## Levels
+
+Everything the person reads in Dev names the four levels the same way:
+
+- **Module**: a workspace of the app, such as shopping, jobs or dev, or the
+  website, which `lib/plan/projects.ts` builds from its own repository. A
+  plan row's `module` column holds it, and each one is a section on
+  `/dev/plan`.
+- **Feature**: a row at the top of a module, with no parent. It carries the
+  done-when the steps beneath it add up to.
+- **Step**: a row under a feature.
+- **Substep**: a row under a step, at any depth below that.
+
+"Project" and "phase" are not levels. Code identifiers such as `ProjectId`
+and the `/dev/projects` route keep their names; only the words on screen
+follow this list. The rest of this document says "step" for a row at any
+level where the level does not matter.
+
 ## Where it came from
 
 The plan began as `docs/BUILD-ORDER.md` and the per-module specs, and was
@@ -725,13 +743,14 @@ typecheck at each surface rather than drawing itself as a proposal, and
 Each module is a section with its progress bar. Each step is a line: the
 status picker (one click changes it), the number, the title, and the facts
 that matter — *Next* or *Someday*, the size, *Yours*, *Ready*, *Waits on
-#n*, and *done/live steps* on a feature. The chevron folds the sub-steps,
+#n*, and *done/live steps* on a feature. The chevron folds the rows beneath,
 closed by default on a finished step. The title opens the detail: what it
 involves, done when, your note, what it waits on and unblocks, dates, the
-commit, and the actions — edit, add a sub-step, mark it yours or give it
-back, send to Claude. The menu on the line adds a sub-step, edits, moves the step up or
-down among its siblings, or deletes it with its count of sub-steps in the
-confirm.
+commit, and the actions — edit, add a row beneath, mark it yours or give it
+back, send to Claude. The menu on the line adds a step (on a feature) or a
+substep (on a step), edits, moves the row up or down among its siblings, or
+deletes it with its count of rows beneath in the confirm. The foot of each
+module adds a feature.
 
 A decision is marked where a build step's checkbox would be, with a `?`. Its
 health reads *Unanswered* rather than *Ready* — on a question, "ready" would
@@ -760,6 +779,84 @@ comment on the raise once the action has run.
 Editing a step includes moving it: *Part of* lists the module's other steps,
 less the step's own subtree. A moved step goes last under its new parent. The
 editor also holds the *not yet specified* box; emptying it clears the column.
+
+### The Table view
+
+The *Table* chip (`view=table`, plan #1669) lists every open feature one to a
+row, grouped by module in the plan's order, with its health, priority, size,
+who has it, its open steps and the percent of its live steps done. Open means
+what it means on the Open view: a closed feature with work still open
+beneath it stays, and one put aside does not. The health is the same derived
+health the tree's column shows, so the two views agree. Pressing a row opens
+the feature's page. On a phone a row keeps the title, the health and the
+percent, and Table is the first entry in *More* rather than a chip, so the
+chips stay on one line. The search narrows the table to the features it
+finds.
+
+### A feature's page
+
+A feature's title on the plan opens `/dev/plan/<number>`, a page in the
+tabbed detail pattern (plan #1664). The crumbs read Dev, Plan, the module and
+the feature. Under the title sit three tabs, *Overview*, *Activity* and
+*Steps*, and beside
+them the properties: status and priority as menus, health when it says more
+than the status, whose move it is, size, who holds it, the module and the
+dates. The Overview tab holds what the row's opened panel holds: the detail,
+done when, what it needs, the questions with their answer boxes, what it waits
+on and the thread. The row's presses (Mine, Send, send what is
+beneath, re-shape, and the menu) sit above whichever tab is open, so anything
+done to a feature from its row can be done here. The Steps tab lists the
+feature's steps and substeps in status groups (plan #1665): blocked, in
+progress, ready and not started open, done and dropped folded, each heading
+with its count and each folding on a press. A step is listed once, under the
+group its own health word falls in rather than what is open beneath it, and a
+substep names the step it sits under on a line below its title. A *Tree* chip,
+kept in the address as `view=tree`, swaps the groups for the plan's tree,
+unfolded. A step's own number opens its feature's page on the Steps tab at
+that step's row, opening a folded group to show it, so every number on the
+plan has an address. The row on the plan itself is unchanged; only its title
+became a link.
+
+At the end of each build or re-shape run, Dash writes an update on each
+feature it worked (plan #1666), kept in `plan_updates`: a health (on track,
+at risk or blocked), two or three sentences on what moved, and how many of
+the feature's steps were done before the run and after it. The count covers
+steps and substeps, leaving out decisions, setup jobs and dropped steps;
+"before" is the count when the last update was written, or a day earlier for
+the first. The latest update is a card at the top of Overview: the health,
+the date, the sentences and a line such as "5 of 9 steps done, up from 3".
+The health is Dash's judgement of whether the feature will land, written
+with the update, and is separate from the health the row derives from its
+status. Sessions write updates with `plan.ts update`; the page only reads
+them.
+
+The Activity tab (plan #1667) is the feature's history, newest first under a
+heading per day: rows added, started, blocked, closed with their commit and
+close note, dropped, questions answered, comments on any row, runs sent at
+them and how each ended, Dash's updates, and anything else Dash recorded
+doing to them. Each entry links to the row it is about. Nothing is recorded
+for the tab: it reads each row's own dates, the dated lines in its comment
+(which keep the blocks and closes the dates have since forgotten), the
+threads, `plan_runs`, `plan_updates` and `core.dash_actions`. A Dash action
+that says the same as a dated entry marks that entry as Dash's rather than
+being listed twice. The first forty entries show, and the rest behind a
+press.
+
+### Writing a feature
+
+*New feature* in the plan's header opens one compose surface at the top of
+the plan (plan #1670), and *Add a feature* at the foot of a module's section
+opens the same surface with the module set. It holds the title, a one-line
+summary, chips for the module, priority, size and who holds it, then the
+description and what the feature is done when. Saving writes a not-started
+feature with no session stamp, so it reads as yours, last in its module's
+section, and a line under the header links to its page for adding steps. The
+header's press is a link to `?new=feature`, so it works before the page's
+script has loaded. The summary is kept in `plan_items.summary`, one line of
+at most 200 characters, and shows under the title on the feature's page.
+*Edit* on that page opens the same surface filled in, without the module
+chip; the status, fog, note and commit stay on the row's own Edit on the
+plan.
 
 ## The changelog
 
@@ -898,8 +995,9 @@ in progress and never closed to look tidy.
 
 ## What is deliberately not here
 
-- **Labels, projects, cycles, estimates in hours.** The module is the
-  project; the tree is the grouping; the size is the estimate.
+- **Labels, projects, cycles, estimates in hours.** The module and the
+  feature do what a project would; the tree is the grouping; the size is the
+  estimate.
 - **Drag and drop.** Move up and move down are two clicks and cannot drop a
   step somewhere by accident. Moving between parents is a select in the
   edit form.

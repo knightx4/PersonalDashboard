@@ -38,14 +38,14 @@ export function CategoriesSection({ categories }: { categories: SettingsCategory
 
   return (
     <div className="space-y-5">
-      <p className="text-body text-ink-muted">
-        Built-in categories are shared and read-only. Add your own — email import will consider
-        them when auto-categorizing new items.
-      </p>
-
+      {/* The sentence is the empty state: rows say what the card is once
+          there are any (plan #1788, law 15). */}
       <Group title="Your categories">
         {custom.length === 0 && !creating ? (
-          <p className="text-body text-ink-muted">None yet — create one below.</p>
+          <p className="text-body text-ink-muted">
+            None of your own yet. The built-in ones below are shared and fixed; add your own and
+            email import will consider them when it sorts new items.
+          </p>
         ) : custom.length > 0 ? (
           // Divides and space, no frame: the settings card around this
           // already said these belong together. Law 11.

@@ -6,6 +6,7 @@ import {
   READY_LOW,
   planTopUp,
   runTopUpFor,
+  subjectLessonsWanted,
   type TopUpPorts,
 } from './top-up';
 import type { CardToWrite, WriteResult } from './write-card';
@@ -189,5 +190,20 @@ describe('topping up one person', () => {
     const summary = await runTopUpFor(run.ports, { userId: 'u', threshold: 10, deadline: PICK_RESERVE_MS - 1 });
     expect(summary).toMatchObject({ pickRounds: 0, stopped: 'deadline' });
     expect(run.picks).toHaveLength(0);
+  });
+});
+
+describe('topping up one subject', () => {
+  it('writes the lesson share of a batch for a subject with one ready card', () => {
+    expect(subjectLessonsWanted(1, false)).toBe(Math.round(READY_BATCH * 0.8));
+  });
+
+  it('writes nothing for a subject with enough cards', () => {
+    expect(subjectLessonsWanted(READY_LOW, false)).toBeNull();
+    expect(subjectLessonsWanted(READY_LOW - 1, false)).not.toBeNull();
+  });
+
+  it('leaves a goal track alone, since its lessons are on its plan', () => {
+    expect(subjectLessonsWanted(0, true)).toBeNull();
   });
 });
