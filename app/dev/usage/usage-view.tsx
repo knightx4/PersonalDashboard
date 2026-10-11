@@ -8,11 +8,11 @@ import type { PageOpens } from '@/lib/usage/opens';
 import { openedText, type FunctionSpend, type UsageGroup, type UsageReport } from '@/lib/usage/report';
 
 /**
- * The Usage tab in Dev (plans #1482 and #1693). It opens on what each
+ * The Usage tab in Dev (plans #1482, #1693 and #1752). It opens on views per
+ * workspace for 7 and 30 days, from core.page_views, then what each
  * function's model calls cost, from core.function_spend, biggest 30-day
- * spend first. Which pages are opened, from core.page_views, is folded
- * below: the pages not opened in 30 days, which the cut-back
- * (docs/CUT-BACK-SPEC.md) is decided from, and each workspace's opens.
+ * spend first. The pages not opened in 30 days, which the cut-back
+ * (docs/CUT-BACK-SPEC.md) is decided from, are a closed fold at the foot.
  *
  * Apart from the route so a test can draw it from a fixture.
  */
@@ -130,44 +130,44 @@ function GroupRow({ group }: { group: UsageGroup }) {
   );
 }
 
-function PageOpensFold({ report, now }: { report: UsageReport; now: Date }) {
+function OpensByWorkspace({ report }: { report: UsageReport }) {
   const groups = report.groups.filter((group) => group.pages.length > 0 || group.notOpened > 0);
-  const labels = new Map(groups.map((group) => [group.workspace, group.label]));
-  const hint = report.anyOpens
-    ? `${report.notOpened.length} not opened in 30 days`
-    : 'nothing opened since recording started';
   return (
-    <SectionFold title="Page opens" hint={hint} defaultOpen={false} className="mt-8">
-      {!report.anyOpens && (
-        <p className="text-small text-ink-muted">
+    <section aria-labelledby="usage-by-workspace">
+      <h2 id="usage-by-workspace" className="mb-2 text-ui font-semibold text-ink">
+        Views by workspace
+      </h2>
+      {groups.length > 0 && report.anyOpens ? (
+        <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+          {groups.map((group) => (
+            <GroupRow key={`${group.workspace}-${group.label}`} group={group} />
+          ))}
+        </ul>
+      ) : (
+        <p className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center text-body text-ink-muted')}>
           No page has been opened since recording started. Opens appear here from the next page you load.
         </p>
       )}
-      {report.notOpened.length > 0 && (
-        <section aria-labelledby="usage-not-opened">
-          <h3 id="usage-not-opened" className="mb-2 text-ui font-semibold text-ink">
-            Not opened in 30 days{' '}
-            <span className="font-normal text-ink-muted tabular-nums">{report.notOpened.length}</span>
-          </h3>
-          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-            {report.notOpened.map((page) => (
-              <PageRow key={page.route} page={page} now={now} workspace={labels.get(page.workspace) ?? OUTSIDE} />
-            ))}
-          </ul>
-        </section>
-      )}
-      {groups.length > 0 && report.anyOpens && (
-        <section aria-labelledby="usage-by-workspace" className="mt-6">
-          <h3 id="usage-by-workspace" className="mb-2 text-ui font-semibold text-ink">
-            Opens by workspace
-          </h3>
-          <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-            {groups.map((group) => (
-              <GroupRow key={`${group.workspace}-${group.label}`} group={group} />
-            ))}
-          </ul>
-        </section>
-      )}
+    </section>
+  );
+}
+
+function NotOpenedFold({ report, now }: { report: UsageReport; now: Date }) {
+  if (!report.anyOpens || report.notOpened.length === 0) return null;
+  const groups = report.groups.filter((group) => group.pages.length > 0 || group.notOpened > 0);
+  const labels = new Map(groups.map((group) => [group.workspace, group.label]));
+  return (
+    <SectionFold
+      title="Not opened in 30 days"
+      hint={String(report.notOpened.length)}
+      defaultOpen={false}
+      className="mt-8"
+    >
+      <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
+        {report.notOpened.map((page) => (
+          <PageRow key={page.route} page={page} now={now} workspace={labels.get(page.workspace) ?? OUTSIDE} />
+        ))}
+      </ul>
     </SectionFold>
   );
 }
@@ -184,13 +184,14 @@ export function UsageScreen({
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Usage" />
-      <section aria-labelledby="usage-functions">
-        <h2 id="usage-functions" className="sr-only">
+      <OpensByWorkspace report={report} />
+      <section aria-labelledby="usage-functions" className="mt-8">
+        <h2 id="usage-functions" className="mb-2 text-ui font-semibold text-ink">
           Spend by function
         </h2>
         <FunctionList functions={functions} />
       </section>
-      <PageOpensFold report={report} now={now} />
+      <NotOpenedFold report={report} now={now} />
     </div>
   );
 }

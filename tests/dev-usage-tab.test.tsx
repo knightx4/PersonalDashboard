@@ -63,9 +63,10 @@ const functions = functionSpendRows([
 ]);
 
 describe('UsageScreen', () => {
-  it('opens on the functions, biggest first, with the total above them', () => {
+  it('lists the functions biggest first, with the total above them, after the workspace views', () => {
     const html = renderToStaticMarkup(<UsageScreen report={usageReport(opened)} functions={functions} now={now} />);
     const total = html.indexOf('$8.89');
+    expect(html.indexOf('Views by workspace')).toBeLessThan(html.indexOf('Spend by function'));
     const first = html.indexOf('Plan topic');
     expect(total).toBeGreaterThan(-1);
     expect(total).toBeLessThan(first);
@@ -79,14 +80,14 @@ describe('UsageScreen', () => {
     expect(html).not.toContain('Claude');
   });
 
-  it('folds the page opens below the functions, shut', () => {
+  it('folds the pages not opened below the functions, shut, with the count in its summary', () => {
     const html = renderToStaticMarkup(<UsageScreen report={usageReport(opened)} functions={functions} now={now} />);
     const fold = html.indexOf('<details');
     expect(fold).toBeGreaterThan(html.indexOf('Ask Dash'));
     expect(html.slice(fold, html.indexOf('>', fold))).not.toContain('open');
     expect(html).toContain('Not opened in 30 days');
     expect(html).toContain('last opened 62 days ago');
-    expect(html).toContain('Opens by workspace');
+    expect(html).toContain('Views by workspace');
   });
 
   it('says so when nothing has been spent or opened yet', () => {
