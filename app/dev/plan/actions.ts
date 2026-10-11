@@ -71,6 +71,7 @@ import {
 } from '@/lib/plan/ui-check-stop';
 import { PASSING_VERDICTS } from '@/lib/plan/ui-check-guard';
 import { appendCommentLine, sentBackLine } from '@/lib/plan/screen-change';
+import { answerAccepts } from '@/lib/plan/answer-accepts';
 
 export type PlanActionState = {
   error?: string;
@@ -1045,6 +1046,97 @@ export async function answerPlanDecision(
   };
 }
 
+/** A blocked step as the two answers to it read it. */
+type AnsweredStep = {
+  number: number;
+  status: string;
+  block_ask: string | null;
+  comment: string | null;
+};
+
+/**
+ * Accept a screen the design critic stopped: one `accepted` round in
+ * `ui_checks` for each surface that stopped, which the close guard counts as
+ * passed, and the dated `Accepted …` line naming the branch that holds the
+ * work, for the caller to append to the step's history.
+ *
+ * Shared by the Accept button and by an answer that reads as an accept
+ * (`answerAccepts`), so both write the same rounds and the same line.
+ */
+async function recordCriticAccept(input: {
+  supabase: Db;
+  userId: string;
+  step: AnsweredStep;
+  /** What the rounds' notes say about where the accept came from. */
+  notes: string;
+}): Promise<{ ok: true; line: string } | { ok: false; error: string }> {
+  const { supabase, userId, step } = input;
+  const { data: rounds, error: readError } = await supabase
+    .from('ui_checks')
+    .select('surface, round, verdict, fixes, shots')
+    .eq('user_id', userId)
+    .eq('step', step.number);
+  if (readError) return { ok: false, error: readError.message };
+  const stopped = stoppedSurfaces(
+    (rounds ?? []).map((r) => ({
+      surface: r.surface as string,
+      round: r.round as number,
+      verdict: r.verdict as string,
+      fixes: Array.isArray(r.fixes) ? r.fixes : [],
+      shots: (r.shots as string[] | null) ?? [],
+    })),
+  );
+  if (stopped.length === 0) {
+    return { ok: false, error: 'No round on record stopped this screen, so there is nothing to accept.' };
+  }
+
+  const { error: writeError } = await supabase.from('ui_checks').insert(
+    acceptedRounds(stopped).map((r) => ({
+      user_id: userId,
+      step: step.number,
+      ...r,
+      notes: input.notes.slice(0, 2000),
+    })),
+  );
+  if (writeError) return { ok: false, error: writeError.message };
+
+  return {
+    ok: true,
+    line: acceptedLine({
+      date: new Date().toISOString().slice(0, 10),
+      surfaces: stopped.map((s) => s.surface),
+      branch: stopBranch(step.block_ask, step.comment),
+    }),
+  };
+}
+
+/**
+ * Send a step whose block was just lifted to a session, the same send as the
+ * plan page's Send button (`handStepToClaude`).
+ *
+ * An answer used to lift the block and stop there, leaving the step for
+ * whichever session happened to pick it up next, and on most days none did.
+ * A send that fails does not undo the answer, which is already written: the
+ * sentence says so, and the overnight tick's backstop (`unactedAnswers`)
+ * sends any answered step that has had no run since its answer.
+ */
+async function sendAnswered(
+  supabase: Db,
+  userId: string,
+  id: string,
+  /** What the session is sent to do, ending the sentence: "to merge the work". */
+  purpose = '',
+): Promise<string> {
+  try {
+    const sent = await handStepToClaude({ supabase, userId, id });
+    if (sent.ok) return `Sent #${sent.number} to a session${purpose ? ` ${purpose}` : ''}.`;
+    return `It could not be sent to a session yet (${sent.error.replace(/[.\s]+$/, '')}), so the plan's clock tries again within a few minutes.`;
+  } catch (failed) {
+    const why = failed instanceof Error ? failed.message : 'the send failed';
+    return `It could not be sent to a session yet (${why}), so the plan's clock tries again within a few minutes.`;
+  }
+}
+
 /**
  * An answer to a step that stopped on a question, from where the question is
  * read.
@@ -1055,6 +1147,15 @@ export async function answerPlanDecision(
  * that picks the step up reads them (the step's thread, as a line of yours,
  * and a dated line on its comment), and lifts the block the same way
  * `setPlanItemStatus` does, back to not started with the mark taken off.
+ *
+ * When the block is a design-critic stop and the words take the screen as it
+ * is ("It's fine", "yes", "Accept"; `answerAccepts`), the accept is recorded
+ * here as the Accept button records it, after the `Answered …` line. Leaving
+ * that to the next session is how accepted work sat on branches unmerged. An
+ * answer the rule cannot read as an accept goes to the session as words, as
+ * before, and a failed accept write falls back to the same.
+ *
+ * Either way the step is then sent to a session (`sendAnswered`).
  *
  * Not `answerPlanDecision`: that closes a decision as done, and a blocked
  * step is work that still has to be built once it has its answer.
@@ -1076,7 +1177,7 @@ export async function answerBlockedStep(
 
   const { data: current } = await supabase
     .from('plan_items')
-    .select('status, comment')
+    .select('number, status, block_ask, comment')
     .eq('user_id', user.id)
     .eq('id', id.data)
     .maybeSingle();
@@ -1095,8 +1196,22 @@ export async function answerBlockedStep(
   }
 
   const stamp = new Date().toISOString().slice(0, 10);
-  const line = `Answered ${stamp}: ${answer.data}`;
-  const comment = current.comment ? `${current.comment}\n\n${line}` : line;
+  let comment = appendCommentLine(current.comment, `Answered ${stamp}: ${answer.data}`);
+
+  // Only a critic stop has rounds to accept. The rounds go in before the
+  // block is lifted, so a step back at not started with an `Accepted` line
+  // always has them.
+  let accepted: { ok: boolean; error?: string } | null = null;
+  if (isCriticStopAsk(current.block_ask) && answerAccepts(answer.data)) {
+    const recorded = await recordCriticAccept({
+      supabase,
+      userId: user.id,
+      step: current as AnsweredStep,
+      notes: `Accepted by you on /dev/plan: ${answer.data}`,
+    });
+    accepted = recorded;
+    if (recorded.ok) comment = appendCommentLine(comment, recorded.line);
+  }
 
   const { error } = await supabase
     .from('plan_items')
@@ -1106,19 +1221,32 @@ export async function answerBlockedStep(
   if (error) return { error: error.message };
 
   revalidatePlan();
-  return { message: 'Answered. The step is back to not started.' };
+  const sent = await sendAnswered(
+    supabase,
+    user.id,
+    id.data,
+    accepted?.ok ? 'to merge the work and close the step' : '',
+  );
+  if (accepted?.ok) {
+    return { message: `Answered, and taken as an accept of the screen as it is. ${sent}` };
+  }
+  if (accepted) {
+    return {
+      message: `Answered. Your words read as an accept, but it could not be recorded (${accepted.error}), so the session reads them instead. ${sent}`,
+    };
+  }
+  return { message: `Answered. ${sent}` };
 }
 
 /**
  * Let a screen through that the design critic would not pass (plan #1610,
  * decision #1535).
  *
- * Only on a step the critic stopped after its last round. For each surface
- * that stopped it writes one more round to `ui_checks` with the verdict
- * `accepted`, which the close guard counts as passed, then lifts the block
- * the way `answerBlockedStep` does. The dated line on the comment names the
- * branch, so the session that picks the step up merges it and closes it
- * rather than building it again.
+ * Only on a step the critic stopped after its last round. The rounds and the
+ * dated line are `recordCriticAccept`, shared with an answer that reads as an
+ * accept; then the block is lifted the way `answerBlockedStep` lifts it and
+ * the step is sent to a session, which merges the branch the line names and
+ * closes the step rather than building it again.
  *
  * Saying what to change instead is `answerBlockedStep`: the words go on the
  * step's thread and the next session runs three more rounds against them.
@@ -1145,41 +1273,15 @@ export async function acceptCriticStop(
     return { error: 'That step is no longer waiting on the design critic.' };
   }
 
-  const { data: rounds, error: readError } = await supabase
-    .from('ui_checks')
-    .select('surface, round, verdict, fixes, shots')
-    .eq('user_id', user.id)
-    .eq('step', current.number);
-  if (readError) return { error: readError.message };
-  const stopped = stoppedSurfaces(
-    (rounds ?? []).map((r) => ({
-      surface: r.surface as string,
-      round: r.round as number,
-      verdict: r.verdict as string,
-      fixes: Array.isArray(r.fixes) ? r.fixes : [],
-      shots: (r.shots as string[] | null) ?? [],
-    })),
-  );
-  if (stopped.length === 0) {
-    return { error: 'No round on record stopped this screen, so there is nothing to accept.' };
-  }
-
-  const { error: writeError } = await supabase.from('ui_checks').insert(
-    acceptedRounds(stopped).map((r) => ({
-      user_id: user.id,
-      step: current.number,
-      ...r,
-      notes: "Accepted as it is from /dev/plan, past the critic's last round.",
-    })),
-  );
-  if (writeError) return { error: writeError.message };
-
-  const line = acceptedLine({
-    date: new Date().toISOString().slice(0, 10),
-    surfaces: stopped.map((s) => s.surface),
-    branch: stopBranch(current.block_ask, current.comment),
+  const recorded = await recordCriticAccept({
+    supabase,
+    userId: user.id,
+    step: current as AnsweredStep,
+    notes: "Accepted as it is from /dev/plan, past the critic's last round.",
   });
-  const comment = current.comment ? `${current.comment}\n\n${line}` : line;
+  if (!recorded.ok) return { error: recorded.error };
+
+  const comment = appendCommentLine(current.comment, recorded.line);
   const { error } = await supabase
     .from('plan_items')
     .update({ status: 'not_started', ...blockPatch('not_started'), assignee: null, comment })
@@ -1188,7 +1290,8 @@ export async function acceptCriticStop(
   if (error) return { error: error.message };
 
   revalidatePlan();
-  return { message: 'Accepted. The step is ready for a session to merge and close.' };
+  const sent = await sendAnswered(supabase, user.id, id.data, 'to merge the work and close the step');
+  return { message: `Accepted. ${sent}` };
 }
 
 /**
