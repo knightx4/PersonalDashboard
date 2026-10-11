@@ -797,7 +797,8 @@ export function DevRaisedSurface() {
           {
             id: 'cb1',
             userId: 'u1',
-            planItemId: null,
+            planItemId: 'p611',
+            step: { id: 'p611', number: 611, outline: '608.3', title: 'Send the weekly digest' },
             outcome: null,
             closedAt: null,
             createdAt: '2026-10-05T09:00:00Z',
