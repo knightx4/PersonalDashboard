@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { companyFromPage, stripCompanyFromTitle } from './company';
+import { detectPosting } from './detect';
 import { safeFetch } from './ssrf';
 import type { FetchedPosting } from './types';
 
@@ -17,7 +19,7 @@ interface JobPostingLd {
   title?: string;
   description?: string;
   jobLocation?: unknown;
-  hiringOrganization?: { name?: string };
+  hiringOrganization?: unknown;
   identifier?: { value?: string } | string;
   baseSalary?: {
     currency?: string;
@@ -118,6 +120,9 @@ export async function fetchPosting(url: string): Promise<FetchedPosting> {
   if (status !== 200) throw new Error(`That page returned ${status}.`);
 
   const ld = extractJsonLd(body);
+  // The host stands in for a name only when it is the employer's own, not a
+  // board that fell through from tier 1.
+  const ownHost = detectPosting(finalUrl).vendor === 'other';
   if (ld?.title && ld.description) {
     const identifier =
       typeof ld.identifier === 'string' ? ld.identifier : ld.identifier?.value ?? null;
@@ -127,6 +132,7 @@ export async function fetchPosting(url: string): Promise<FetchedPosting> {
       text: htmlToText(ld.description),
       url: finalUrl,
       location: locationName(ld.jobLocation),
+      company: companyFromPage({ html: body, url: finalUrl, posting: ld, role: ld.title, ownHost })?.name ?? null,
       atsJobId: identifier,
       boardToken: null,
       questions: [],
@@ -140,12 +146,15 @@ export async function fetchPosting(url: string): Promise<FetchedPosting> {
     );
   }
 
+  const rawTitle = titleFromHtml(body);
+  const company = companyFromPage({ html: body, url: finalUrl, posting: ld, role: ld?.title ?? null, ownHost });
   return {
     vendor: 'other',
-    title: titleFromHtml(body) ?? 'Untitled role',
+    title: rawTitle ? (company ? stripCompanyFromTitle(rawTitle, company.name) : rawTitle) : 'Untitled role',
     text,
     url: finalUrl,
     location: null,
+    company: company?.name ?? null,
     atsJobId: null,
     boardToken: null,
     questions: [],
