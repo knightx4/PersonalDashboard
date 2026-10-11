@@ -379,6 +379,8 @@ export function TreeRow<E extends TreeCatalogEntry>({
   const titleClass = cn(
     'min-w-0',
     open ? 'break-words' : 'break-words sm:truncate',
+    // On a phone the title has the row's width, and two lines of it at most.
+    !open && layout === 'grid' && 'max-sm:line-clamp-2',
     node.status === 'dropped' && 'text-ink-muted line-through',
   );
   const toggle = () => {
@@ -479,6 +481,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
       <span
         className={cn(
           'flex min-w-0 items-baseline gap-1.5 text-ui',
+          !list && 'sm:leading-7',
           trail.length === 0 ? 'font-medium text-ink' : 'text-ink',
         )}
       >
@@ -490,8 +493,12 @@ export function TreeRow<E extends TreeCatalogEntry>({
               comments and the CLI say, it is the anchor a `#597` link
               lands on, and the button around this says "Open #597" -- and
               the search box takes either. */}
+        {/* On a phone the number moves to the line under the title, with
+            the health, so the title has the row's width (plan #1747). */}
         {!list && (
-          <span className="tabular shrink-0 text-small text-ink-ghost">#{node.outline}</span>
+          <span className="tabular shrink-0 text-small text-ink-ghost max-sm:hidden">
+            #{node.outline}
+          </span>
         )}
         {/* Truncated closed, whole open. A row is a line and a long title
          * has to give way to keep it one; but opening the step is the
@@ -556,13 +563,13 @@ export function TreeRow<E extends TreeCatalogEntry>({
       )}
       {source && <span className="block truncate text-small text-ink-ghost">{source}</span>}
       {need && !open && (
-        <span className="block truncate text-small text-ink">
+        <span className={cn('block truncate text-small text-ink', !list && 'max-sm:hidden')}>
           <span className="font-medium text-caution">Needs: </span>
           {need}
         </span>
       )}
       {gloss && !open && !need && (
-        <span className="block truncate text-small text-ink-muted">
+        <span className={cn('block truncate text-small text-ink-muted', !list && 'max-sm:hidden')}>
           {!node.detail && 'Note: '}
           {gloss}
         </span>
@@ -581,7 +588,14 @@ export function TreeRow<E extends TreeCatalogEntry>({
       <li
         id={anchorId ?? planRowId(node.number)}
         className={cn(
-          list ? 'flex items-start gap-x-1' : ROW_GRID,
+          // The grid's cells sit on the title's line rather than across the
+          // title and its note: each first line is the health word's 28px,
+          // so the health, the priority and the size read as part of the
+          // title's line (plan #1747). On a phone the title takes the whole
+          // first line and the rest go on a second.
+          list
+            ? 'flex items-start gap-x-1'
+            : cn(ROW_GRID, 'max-sm:grid-cols-[minmax(0,1fr)_2rem] sm:items-start'),
           'group scroll-mt-24 px-3',
           (gloss || need) && !open ? 'py-1.5' : 'py-2',
           !node.matches && 'opacity-60',
@@ -593,7 +607,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
           closed && !list && !open && 'opacity-70',
         )}
       >
-        <div className={cn('flex min-w-0 items-stretch', list && 'flex-1')}>
+        <div className={cn('flex min-w-0 items-stretch', list ? 'flex-1' : 'max-sm:col-span-2')}>
           <TreeGuides trail={trail} />
 
           {/* The fold, where there is something beneath to fold. A spacer
@@ -610,7 +624,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                 'press flex shrink-0 items-center justify-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
                 // In the list the row can run to several lines (the title,
                 // Needs, a date), so the fold sits on the title's line.
-                list ? 'mt-1 h-5 self-start' : 'h-5 self-center',
+                list ? 'mt-1 h-5 self-start' : 'h-5 self-center sm:mt-1 sm:self-start',
               )}
             >
               <ChevronDown
@@ -683,7 +697,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
             <div
               className={cn(
                 'min-w-0 flex-1 text-left',
-                list ? 'self-start py-1 pl-1' : 'self-center',
+                list ? 'self-start py-1 pl-1' : 'self-center sm:self-start',
               )}
             >
               {rowLines}
@@ -696,7 +710,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
               title={expanded ? `Close #${handle}` : `Open #${handle}`}
               className={cn(
                 'min-w-0 flex-1 text-left hover:text-accent',
-                list ? 'self-start py-1 pl-1' : 'self-center',
+                list ? 'self-start py-1 pl-1' : 'self-center sm:self-start',
               )}
             >
               {rowLines}
@@ -704,7 +718,33 @@ export function TreeRow<E extends TreeCatalogEntry>({
           )}
         </div>
 
-        {!list && healthMenu}
+        {!list && <div className="max-sm:hidden">{healthMenu}</div>}
+
+        {/* The phone's second line: the number, the health as its glyph, and
+            what the step involves, under the title from where it starts. */}
+        {!list && (
+          <div
+            className="flex min-w-0 items-center gap-1.5 sm:hidden"
+            style={{ paddingLeft: `${(trail.length + 1) * 1.25}rem` }}
+          >
+            <span className="tabular shrink-0 text-small text-ink-ghost">#{node.outline}</span>
+            {healthMenu}
+            {need && !open ? (
+              <span className="min-w-0 truncate text-small text-ink">
+                <span className="font-medium text-caution">Needs: </span>
+                {need}
+              </span>
+            ) : (
+              gloss &&
+              !open && (
+                <span className="min-w-0 truncate text-small text-ink-muted">
+                  {!node.detail && 'Note: '}
+                  {gloss}
+                </span>
+              )
+            )}
+          </div>
+        )}
 
         {/* Whose move it is, beside how far along it is.
 
@@ -728,14 +768,14 @@ export function TreeRow<E extends TreeCatalogEntry>({
           )
         ) : (
           <>
-            <span className="hidden min-w-0 truncate text-small sm:block">{move}</span>
+            <span className="hidden min-w-0 truncate text-small sm:block sm:leading-7">{move}</span>
 
-            <span className="hidden truncate text-small sm:block">{priority}</span>
+            <span className="hidden truncate text-small sm:block sm:leading-7">{priority}</span>
 
             {/* No "Who" column. It was a column of dashes with the occasional
                 name in it -- one fact, on a plan whose every approved step the
                 runner takes unless you keep it, and keeping it is a button. */}
-            <span className="hidden sm:block">
+            <span className="hidden sm:flex sm:h-7 sm:items-center">
               <Breakdown rollup={node.rollup} />
             </span>
           </>
@@ -745,7 +785,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
             for everything else. Under the pointer or under focus, so a plan at
             rest is a plan rather than a wall of icons; the same actions are in
             the menu, which is how a phone reaches them. */}
-        <div className={cn('flex items-center justify-self-end', list && 'shrink-0')}>
+        <div className={cn('flex items-center justify-self-end', list ? 'shrink-0' : 'self-center sm:self-start')}>
           {quickActions && (
             <div className="hidden items-center opacity-0 transition-opacity duration-quick group-focus-within:opacity-100 group-hover:opacity-100 sm:flex">
               {quickActions}
