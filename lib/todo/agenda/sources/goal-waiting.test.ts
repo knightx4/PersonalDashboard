@@ -99,7 +99,7 @@ describe('goalWaitingItems', () => {
       title: 's1',
       detail: 'Needs: Send the form.',
       onYouSince: '2026-10-01T09:00:00.000Z',
-      link: { href: '/goals/g1#step-s1', label: 'Goal g1' },
+      link: { href: '/goals/g1/s/s1', label: 'Goal g1' },
     });
     expect(items([goal('g1')], [step('s1', 'g1')])).toEqual([]);
   });

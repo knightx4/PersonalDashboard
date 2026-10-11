@@ -87,7 +87,7 @@ export function Dependencies<E extends TreeCatalogEntry>({
     <div className="space-y-2">
       {(node.dependsOn.length > 0 || inherited.length > 0) && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-small text-ink-muted">Waits on</span>
+          <span className="text-small text-ink-muted">Depends on</span>
           {node.dependsOn.map((link) => (
             <form key={link.dependencyId} action={removeAction} className="contents">
               <input type="hidden" name="id" value={link.dependencyId} />

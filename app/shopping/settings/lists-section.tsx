@@ -35,14 +35,14 @@ export function ListsSection({ lists }: { lists: SettingsList[] }) {
 
   return (
     <div className="space-y-5">
-      <p className="text-body text-ink-muted">
-        Lists are personal trackers — gifts to wrap, things to return, a trip packing set —
-        not taxonomy like categories. Filter inventory by a list anytime.
-      </p>
-
+      {/* The sentence is the empty state: rows say what the card is once
+          there are any (plan #1788, law 15). */}
       <Group title="Your lists">
         {lists.length === 0 && !creating ? (
-          <p className="text-body text-ink-muted">None yet — create one below.</p>
+          <p className="text-body text-ink-muted">
+            No lists yet. A list tracks things for yourself, such as gifts to wrap, things to
+            return or a packing set, and inventory can be filtered by one.
+          </p>
         ) : lists.length > 0 ? (
           // Divides and space, no frame: the settings card around this
           // already said these belong together. Law 11.

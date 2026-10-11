@@ -18,6 +18,20 @@ export const UI_SHOTS_BUCKET = 'ui-shots';
 export const SHOT_NAMES = ['phone-light', 'phone-dark', 'laptop-light', 'laptop-dark'] as const;
 export type ShotName = (typeof SHOT_NAMES)[number];
 
+/**
+ * A shot as it is kept and uploaded: the round's own, or the same view of the
+ * surface on main before the step changed it (plan #1541), which the plan row
+ * and the changelog show beside the after.
+ */
+export type KeptShot = ShotName | `before-${ShotName}`;
+
+/**
+ * Where the builder leaves main's shots of a surface for the recorder to pick
+ * up: the worktree's `.preview-shots/<id>--<shot>.png`, copied here. A new
+ * surface has none, and the round is recorded without them.
+ */
+export const BEFORE_SHOTS_DIR = '.preview-shots/before';
+
 /** Who a round belongs to: a plan step by number, or a note by id. */
 export type CheckOwner = { step: number; noteId: null } | { step: null; noteId: string };
 
@@ -89,8 +103,13 @@ export function shotFile(surface: string, shot: ShotName): string {
   return `.preview-shots/${surface}--${shot}.png`;
 }
 
+/** Main's shot of the surface, as the builder copied it from the worktree. */
+export function beforeShotFile(surface: string, shot: ShotName): string {
+  return `${BEFORE_SHOTS_DIR}/${surface}--${shot}.png`;
+}
+
 /** The copy kept beside the verdict, so the next round cannot overwrite it. */
-export function keptShotFile(owner: CheckOwner, surface: string, round: number, shot: ShotName): string {
+export function keptShotFile(owner: CheckOwner, surface: string, round: number, shot: KeptShot): string {
   return `.preview-shots/checks/${ownerKey(owner)}--${surface}--r${round}--${shot}.png`;
 }
 
@@ -100,7 +119,7 @@ export function bucketPath(
   owner: CheckOwner,
   surface: string,
   round: number,
-  shot: ShotName,
+  shot: KeptShot,
 ): string {
   return `${userId}/${ownerKey(owner)}/${surface}/r${round}/${shot}.png`;
 }

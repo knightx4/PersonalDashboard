@@ -346,7 +346,7 @@ export async function judgeLinkPairs(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, MERGE_MODEL),
       messages: [{ role: 'user', content: renderLinkPairs(input.pairs) }],
     });
 

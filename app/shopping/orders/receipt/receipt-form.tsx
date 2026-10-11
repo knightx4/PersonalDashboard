@@ -56,9 +56,10 @@ export function ReceiptPhotoForm() {
 
   return (
     <div className="flex flex-col gap-4">
+      <Card padding="standard" className="flex flex-col gap-4">
       <p className="text-body text-ink-muted">
-        Photograph a paper receipt. We extract an order the same way as email
-        import, then attach book details when lines look like books.
+        Photograph a paper receipt and Dash turns it into an order, adding book
+        details when lines look like books.
       </p>
       {/* One button that opens the camera or the photo library; the native
           file input sits inside it, so there is no labelled field to fill. */}
@@ -93,6 +94,7 @@ export function ReceiptPhotoForm() {
       </div>
       <FieldError>{imageError ?? previewState.error ?? saveState.error}</FieldError>
 
+      </Card>
       {previewState.preview && previewState.rawOrder && (
         <form action={saveAction} className={cn(cardVariants({ padding: 'dense' }), 'space-y-3')}>
           <input type="hidden" name="raw_order" value={previewState.rawOrder} />

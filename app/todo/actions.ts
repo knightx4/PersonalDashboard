@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { removeAttachmentsFor } from '@/lib/attachments/store';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { loadErrandAreas, saveErrandAndStart } from '@/lib/goals/errand-store';
 import { isLinkTarget } from '@/lib/todo/links/model';
@@ -413,6 +415,12 @@ export async function removeTask(id: string): Promise<{ error: string | null }> 
   const user = await requireUser();
   const { error } = await deleteTask(user.id, id);
   if (error) return { error };
+  // The files it held go with it (plan #1714): a ref is not a foreign key.
+  try {
+    await removeAttachmentsFor(await createCoreClient(), `todo.tasks:${id}`);
+  } catch (failed) {
+    console.error('todo: removing the files failed', failed);
+  }
 
   revalidateTodo();
   return { error: null };

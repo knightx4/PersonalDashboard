@@ -86,7 +86,7 @@ export function ConnectVaultForm({
           money in this design system, which a saved form does not. */}
       {state.message && <p className="text-ui text-ink-muted">{state.message}</p>}
 
-      <Button type="submit" disabled={pending}>
+      <Button type="submit" pending={pending}>
         {pending ? 'Saving…' : submitLabel}
       </Button>
     </form>

@@ -1,13 +1,17 @@
 /**
- * The Status card on /dev/raised: Dash's mark beside the heading works while
- * the plan runner is firing and rests otherwise (note 414ead16).
+ * The Status card on /dev/raised: Dash's mark, under Plan since note
+ * 076e7744, works while the plan runner is firing and rests otherwise
+ * (note 414ead16).
  */
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { OvernightRun } from '@/lib/plan/overnight';
 import type { RunnerCard } from '@/lib/plan/runner-card';
 
-vi.mock('@/app/dev/plan/overnight-control', () => ({ OvernightControl: () => null }));
+// The Plan row draws the mark it is handed and nothing else here.
+vi.mock('@/app/dev/plan/overnight-control', () => ({
+  OvernightControl: ({ mark }: { mark?: React.ReactNode }) => mark ?? null,
+}));
 vi.mock('@/components/feedback/run-routine-button', () => ({ RunRoutineButton: () => null }));
 vi.mock('@/app/dev/raised/vision-review-line', () => ({ VisionReviewLine: () => null }));
 
@@ -23,6 +27,7 @@ function render(run: Partial<OvernightRun> | null) {
       openNotes={0}
       notesLastRun={null}
       vision={null}
+      autoApprove={false}
       now={0}
     />,
   );
@@ -37,4 +42,5 @@ describe('the Status card', () => {
     expect(render(null)).toContain('data-dash-state="idle"');
     expect(render({ running: true, paused: true })).toContain('data-dash-state="idle"');
   });
+
 });

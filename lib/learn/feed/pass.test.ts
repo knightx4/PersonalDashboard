@@ -178,7 +178,7 @@ describe('running the pass once', () => {
       userId: 'u1',
       targets: 8,
       deadline: Number.MAX_SAFE_INTEGER,
-      model: 'claude-sonnet-5',
+      model: 'claude-sonnet-5-5',
     });
 
     expect(run.cards).toHaveLength(24);

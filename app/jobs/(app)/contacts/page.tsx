@@ -2,21 +2,16 @@ import { Users } from 'lucide-react';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
-import { loadOpenSuggestions } from '@/lib/jobs/suggest/load';
-import { RecommendedPeople } from '../recommend/sections';
 import { ContactsView } from './view';
 
 export const metadata = { title: 'Contacts' };
-
-// Search now on the people to meet runs a web search in this page's server
-// action, which can take a couple of minutes.
-export const maxDuration = 300;
 
 export default async function ContactsPage() {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const [{ data: contacts }, { data: companies }, { data: touches }, { data: profile }, recommended] =
+  // The people Dash recommends meeting are on Find now (plan #1589).
+  const [{ data: contacts }, { data: companies }, { data: touches }, { data: profile }] =
     await Promise.all([
       supabase
         .from('contacts')
@@ -30,7 +25,6 @@ export default async function ContactsPage() {
         .eq('user_id', user.id)
         .order('sent_at', { ascending: false }),
       supabase.from('profiles').select('timezone').eq('id', user.id).single(),
-      loadOpenSuggestions(supabase, user.id, 'reach_out'),
     ]);
 
   const timezone = (profile?.timezone as string) ?? 'UTC';
@@ -42,9 +36,6 @@ export default async function ContactsPage() {
           title="Contacts"
           description="People to talk to, and a record of when you did."
         />
-        <div className="mb-6">
-          <RecommendedPeople suggestions={recommended} />
-        </div>
         <EmptyState
           icon={Users}
           title="No contacts yet"
@@ -83,10 +74,6 @@ export default async function ContactsPage() {
             : 'Recording the sends is what makes the response rate computable later.'
         }
       />
-
-      <div className="mb-6">
-        <RecommendedPeople suggestions={recommended} />
-      </div>
 
       <ContactsView
         timezone={timezone}
