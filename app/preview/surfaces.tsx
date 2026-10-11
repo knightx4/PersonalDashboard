@@ -1845,17 +1845,6 @@ const trackReadings: ReadingRow[] = [
   }),
 ];
 
-/**
- * A list with display options, drawn from the shared control and the shared
- * group header, with no page behind it yet.
- *
- * The rows are orders because orders is the list with the least of this today
- * -- one grouping it cannot leave, no sort at all -- and it is where the
- * control lands first. The params are a set arrangement rather than the page's
- * own: a sort that is not the default, a grouping that is, and one property
- * turned off, so the panel shows a chosen row, an unchosen one and both states
- * of a switch at once.
- */
 type SampleOrder = {
   id: string;
   merchant: string;
