@@ -2461,11 +2461,9 @@ const waitingSenders = new Map(
 
 function NeedsConfirmingSurface() {
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title="Newsletters"
-        description="What has been sent to the address that belongs to this app."
-      />
+    // The top of the All newsletters page as it draws now (plan #1774).
+    <div className="mx-auto max-w-3xl space-y-4">
+      <PageHeader title="Newsletters" />
       <NeedsConfirming
         timezone="Europe/London"
         senders={waitingSenders}
