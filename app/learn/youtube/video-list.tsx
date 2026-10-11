@@ -21,7 +21,7 @@ const STATE_GLYPH: Record<TranscriptState, { glyph: 'full' | 'empty' | 'slash' |
   fetched: { glyph: 'full', word: 'Transcript stored' },
   queued: { glyph: 'empty', word: 'Queued' },
   none: { glyph: 'slash', word: 'No captions' },
-  failed: { glyph: 'cross', word: 'Failed, will retry' },
+  failed: { glyph: 'cross', word: 'Failed' },
 };
 
 function published(date: string | null): string | null {
@@ -41,7 +41,7 @@ export function VideoList({ videos, numbered = false }: { videos: VideoRow[]; nu
         const state = video.state ? STATE_GLYPH[video.state] : null;
         const meta = [published(video.publishedAt), durationLabel(video.durationSeconds)].filter(Boolean);
         return (
-          <li key={video.itemId} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-2">
+          <li key={video.itemId} className="flex items-center justify-between gap-3 px-4 py-2">
             <span className="min-w-0 flex-1">
               <Link
                 href={`/learn/youtube/v/${video.videoId}`}
@@ -52,10 +52,12 @@ export function VideoList({ videos, numbered = false }: { videos: VideoRow[]; nu
                   {video.title}
                 </span>
               </Link>
-              <span className="flex items-center gap-1.5 text-small text-ink-muted">
+              <span
+                className="flex items-center gap-1.5 text-small text-ink-muted"
+                title={video.note && video.state === 'failed' ? video.note : undefined}
+              >
                 {state && <StatusGlyph glyph={state.glyph} size={12} />}
-                {[state?.word, ...meta].filter(Boolean).join(' · ')}
-                {video.note && video.state === 'failed' ? ` · ${video.note}` : ''}
+                <span className="min-w-0 truncate">{[state?.word, ...meta].filter(Boolean).join(' · ')}</span>
               </span>
             </span>
             {video.state !== 'fetched' && video.state !== 'queued' && (
@@ -66,6 +68,7 @@ export function VideoList({ videos, numbered = false }: { videos: VideoRow[]; nu
                 label={video.state === 'none' ? 'Try again' : 'Get transcript'}
                 pendingLabel="Fetching…"
                 variant="ghost"
+                className="shrink-0"
               />
             )}
           </li>

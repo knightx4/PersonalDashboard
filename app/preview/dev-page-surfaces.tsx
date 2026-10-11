@@ -263,9 +263,22 @@ export function DevIdeasSurface() {
     <>
       <PageHeader
         title="Ideas"
-        description="Long-term ideas, for the app as a whole or for one workspace. Nothing here does anything on its own — it is a place to put the thought."
       />
       <IdeasView ideas={ideas} grouping="workspace" sort="score" />
+    </>,
+  );
+}
+
+/** The page with nothing written down, which is where the explanation lives. */
+export function DevIdeasEmptySurface() {
+  return column(
+    <>
+      <PageHeader title="Ideas" />
+      <IdeasView
+        ideas={{ mine: [], suggested: [], lowScored: [], shaped: [], dismissed: [] }}
+        grouping="workspace"
+        sort="score"
+      />
     </>,
   );
 }
