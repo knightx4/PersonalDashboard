@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pageUsage, type PageOpens } from './opens';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { pageUsage, readPathOpens30, type PageOpens } from './opens';
 import { PAGE_ROUTES } from './pages';
 
 function opened(route: string, opens30: number, lastOpened: string): PageOpens {
@@ -23,5 +24,33 @@ describe('pageUsage', () => {
     expect(idle.at(-1)?.route).toBe('/news');
     expect(usage.slice(idle.length).map((row) => row.route)).toEqual(['/goals', '/learn']);
     expect(usage.find((row) => row.route === '/learn/s/[id]')?.workspace).toBe('learn');
+  });
+});
+
+describe('readPathOpens30', () => {
+  /** A client whose page_opens answers with `row`, recording what it was asked for. */
+  function client(row: { opens_30: number } | null) {
+    const asked: Record<string, string> = {};
+    const query = {
+      select: () => query,
+      eq: (column: string, value: string) => {
+        asked[column] = value;
+        return query;
+      },
+      maybeSingle: async () => ({ data: row, error: null }),
+    };
+    const fake = { schema: () => ({ from: () => query }) } as unknown as SupabaseClient;
+    return { fake, asked };
+  }
+
+  it('counts the opens of the route pattern the path opens', async () => {
+    const { fake, asked } = client({ opens_30: 14 });
+    expect(await readPathOpens30(fake, 'u1', '/learn/s/6f1c1f5e-0000-4000-8000-0000000000d0?tab=x')).toBe(14);
+    expect(asked).toEqual({ user_id: 'u1', route: '/learn/s/[id]' });
+  });
+
+  it('is 0 for a page never opened and null for a path that is no page', async () => {
+    expect(await readPathOpens30(client(null).fake, 'u1', '/learn')).toBe(0);
+    expect(await readPathOpens30(client(null).fake, 'u1', '/api/nothing')).toBeNull();
   });
 });

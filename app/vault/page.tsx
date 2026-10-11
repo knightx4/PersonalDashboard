@@ -8,7 +8,13 @@ import { createVaultClient } from '@/lib/vault/auth/server';
 import { groupByFolder, loadConnection, loadNotes } from '@/lib/vault/notes/load';
 import { VaultStatusBanner } from '@/components/vault/status-banner';
 import { NoteConnections } from '@/components/vault/note-connections';
+import { NewVaultNote } from '@/components/vault/new-note';
+import { QuickNoteRow } from '@/components/vault/quick-note';
+import { requireUser } from '@/lib/auth/server';
+import { vaultWritable } from '@/lib/capture/vault';
+import { INBOX_FOLDER } from '@/lib/vault/paths';
 import { loadWeekConnections } from '@/lib/vault/notes/connections-load';
+import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 
@@ -27,11 +33,12 @@ export const dynamic = 'force-dynamic';
 export default async function VaultPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; new?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, new: composing } = await searchParams;
   const search = q?.trim() ?? '';
 
+  const user = await requireUser();
   const supabase = await createVaultClient();
   const connection = await loadConnection(supabase);
 
@@ -50,22 +57,34 @@ export default async function VaultPage({
   }
 
   // This week's connections sit above the list, and only when not searching.
-  const [notes, connections] = await Promise.all([
+  const [notes, connections, writable] = await Promise.all([
     loadNotes(supabase, search ? { search } : {}),
     search ? Promise.resolve([]) : loadWeekConnections(supabase),
+    vaultWritable(user.id),
   ]);
   const groups = groupByFolder(notes);
+  // Quick notes are the top level of the Inbox folder; the list already holds them.
+  const waiting = notes.filter((note) => note.folder === INBOX_FOLDER).length;
 
   return (
     <>
       <PageHeader
         title="Vault"
         description={`${connection.repoOwner}/${connection.repoName} · ${connection.branch}`}
+        actions={
+          <Link href="/vault?new=1" className={buttonVariants({ size: 'sm' })}>
+            New note
+          </Link>
+        }
       />
 
       <VaultStatusBanner connection={connection} />
 
       <NoteConnections connections={connections} />
+
+      {composing !== undefined && <NewVaultNote />}
+
+      {!search && <QuickNoteRow waiting={waiting} writable={writable} />}
 
       <div className="mb-5 max-w-md">
         <SearchField placeholder="Search your notes" />

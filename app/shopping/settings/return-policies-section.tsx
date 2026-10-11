@@ -82,12 +82,28 @@ function PolicyRow({
 
   return (
     <li className="row-pad">
+      {/* "Use default" sits on the subline, so the name has the row's full
+          width and every row's day count ends on the same right edge (plan
+          #1788, law 18). No hidden intent: a commit from the field submits
+          none and saves, and the reset button sends its own. */}
       <form ref={formRef} action={action} className="flex items-center gap-3">
         <input type="hidden" name="merchant_id" value={policy.merchantId} />
-        <input type="hidden" name="intent" value="save" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-body font-medium text-ink">{policy.name}</p>
-          <p className="truncate text-small text-ink-muted">{policyMeta(policy)}</p>
+          <p className="text-body font-medium text-ink">{policy.name}</p>
+          <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-small text-ink-muted">
+            <span>{policyMeta(policy)}</span>
+            {policy.hasOverride && (
+              <button
+                type="submit"
+                name="intent"
+                value="reset"
+                disabled={pending}
+                className="press shrink-0 rounded-control text-small font-medium text-accent hover:underline disabled:opacity-50"
+              >
+                Use default
+              </button>
+            )}
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <InlineInput
@@ -105,18 +121,6 @@ function PolicyRow({
           />
           <span className="text-small text-ink-muted">days</span>
         </div>
-        {policy.hasOverride && (
-          <Button
-            type="submit"
-            name="intent"
-            value="reset"
-            size="sm"
-            variant="ghost"
-            disabled={pending}
-          >
-            Use default
-          </Button>
-        )}
       </form>
       {state.error && <FieldError>{state.error}</FieldError>}
     </li>
@@ -313,11 +317,6 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
 
   return (
     <div className="space-y-5">
-      <p className="text-body text-ink-muted">
-        Deadlines use delivery date plus this window. Search a retailer to edit its policy,
-        or add one that isn’t listed. Your changes stay private to you.
-      </p>
-
       <div ref={rootRef} className="relative space-y-3">
         <div>
           <Label htmlFor={`${listId}-search`}>Find a retailer</Label>
@@ -454,8 +453,9 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
       <Group title="Your policies">
         {rows.length === 0 ? (
           <p className="text-body text-ink-muted">
-            Nothing customized yet. Search above when you want to change a window — seeded
-            defaults apply until then.
+            Nothing customized yet. A return deadline is the delivery date plus the
+            retailer’s window. Search above to change one or add a retailer that isn’t listed;
+            the defaults apply until then, and your changes stay private to you.
           </p>
         ) : (
           // Divides and space, no frame: the card around this already said

@@ -175,3 +175,54 @@ export function uiGuardSql(step: number, surfaces: readonly string[], userId?: s
     `where last.verdict is null or last.verdict not in (${passing});`,
   ].join('\n');
 }
+
+/**
+ * The person's answer to a design-check block, written down where the close
+ * guard reads it (`npm run ui-guard -- <n> --accept`).
+ *
+ * The person answers a block on /dev/plan in words, and the answer lands on
+ * the step's thread and as an `Answered <date>: …` line on its comment. The
+ * guard reads only `ui_checks`, so an "Accept" there used to change nothing:
+ * the next session hit the same surfaces and asked again (#1702 asked twice).
+ * This writes one `accepted` round for each surface that has not passed,
+ * numbered on from its last round, with the answer quoted in the notes.
+ *
+ * It writes nothing unless the step's comment has an `Answered` line newer
+ * than its last `Blocked` line: the person has to have answered the block
+ * this is about, so a session cannot accept its own screens. Reading that
+ * answer as an accept, rather than as what to change, is the session's call,
+ * made by the rule in building.md.
+ */
+export function uiAcceptSql(step: number, surfaces: readonly string[]): string {
+  const check = uiGuardSql(step, surfaces);
+  if (!check) return '';
+  const list = surfaces.map((s) => `'${s}'`).join(', ');
+  const passing = PASSING_VERDICTS.map((v) => `'${v}'`).join(', ');
+  return [
+    'with step as (',
+    '  select p.user_id, p.comment,',
+    "    substring(p.comment from '.*(Answered [0-9-]+: [^\\n]*)') as answer",
+    `  from plan_items p where p.number = ${step}`,
+    // The newest Answered line comes after the newest Blocked line.
+    "    and strpos(reverse(p.comment), reverse('Answered ')) > 0",
+    "    and (strpos(reverse(p.comment), reverse('Blocked ')) = 0",
+    "      or strpos(reverse(p.comment), reverse('Answered ')) < strpos(reverse(p.comment), reverse('Blocked ')))",
+    '  limit 1',
+    '), waiting as (',
+    '  select s.surface, coalesce(last.round, 0) + 1 as round',
+    `  from unnest(array[${list}]::text[]) as s(surface)`,
+    '  cross join step',
+    '  left join lateral (',
+    '    select c.round, c.verdict from ui_checks c',
+    `    where c.user_id = step.user_id and c.step = ${step} and c.surface = s.surface`,
+    '    order by c.round desc limit 1',
+    '  ) last on true',
+    `  where last.verdict is null or last.verdict not in (${passing})`,
+    ')',
+    'insert into ui_checks (user_id, step, surface, round, verdict, fixes, earlier, notes, shots)',
+    `select step.user_id, ${step}, waiting.surface, waiting.round, 'accepted', '[]'::jsonb, '[]'::jsonb,`,
+    "  'Accepted by you: ' || step.answer, '{}'::text[]",
+    'from waiting cross join step',
+    'returning surface, round;',
+  ].join('\n');
+}

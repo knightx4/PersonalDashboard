@@ -92,7 +92,7 @@ describe('linkRecordRow', () => {
     const row = linkRecordRow(
       pair('z', 'a'),
       { pair: 0, relation: 'supports', from: 'A', reason: 'Z is why A holds.', confidence: 0.7 },
-      'claude-haiku-4-5',
+      'claude-haiku-5-5',
     );
     expect(row).toEqual({
       a_id: 'a',
@@ -101,7 +101,7 @@ describe('linkRecordRow', () => {
       from_id: 'z',
       reason: 'Z is why A holds.',
       confidence: 0.7,
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-5-5',
     });
   });
 
@@ -146,10 +146,10 @@ function ports(batches: LinkPair[][], overrides: Partial<LinkPassPorts> = {}) {
   const value: LinkPassPorts = {
     candidates: async () => batches[read++] ?? [],
     judge: async (pairs, onSpend) => {
-      onSpend({ model: 'claude-haiku-4-5', usage: EMPTY_USAGE });
+      onSpend({ model: 'claude-haiku-5-5', usage: EMPTY_USAGE });
       return {
         ok: true,
-        model: 'claude-haiku-4-5',
+        model: 'claude-haiku-5-5',
         verdicts: pairs.map((_, index) => ({
           pair: index,
           relation: index === 0 ? 'supports' : 'none',

@@ -1,7 +1,7 @@
 import 'server-only';
 
 import Anthropic from '@anthropic-ai/sdk';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import {
   chainPayloadSchema,
@@ -110,7 +110,7 @@ export async function proposeFloor(input: {
   try {
     response = await client.messages.create({
       model: MODEL,
-      max_tokens: 4096,
+      max_tokens: 4096 + THINKING_ROOM,
       system: SYSTEM,
       tools: [
         {
@@ -153,7 +153,7 @@ export async function proposeFloor(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, MODEL),
       messages: [{ role: 'user', content: lines.join('\n') }],
     });
   } catch (error) {

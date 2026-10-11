@@ -18,6 +18,7 @@ describe('parseOpeningView', () => {
       rchance: 'medium',
       rflags: 'hide',
       rfile: 'hide',
+      rsource: 'yc',
     });
     expect(view).toEqual({
       sort: 'chance',
@@ -30,9 +31,10 @@ describe('parseOpeningView', () => {
         minChance: 'medium',
         hideRedFlags: true,
         hideDuplicates: true,
+        source: 'yc',
       },
     });
-    expect(activeFilters(view.filter)).toBe(8);
+    expect(activeFilters(view.filter)).toBe(9);
   });
 
   it('turns anything unreadable into the default', () => {

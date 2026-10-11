@@ -159,6 +159,7 @@ function MeasureLine({
 }) {
   const [state, save, saving] = useActionState(setMeasureAction, initial);
   const formRef = useRef<HTMLFormElement>(null);
+  const [addingDate, setAddingDate] = useState(false);
   const committed = {
     unit: unit ?? '',
     target: target === null ? '' : String(target),
@@ -238,7 +239,19 @@ function MeasureLine({
           />
         </>
       )}
-      {unit && target !== null && (
+      {unit && target !== null && !committed.dueOn && !addingDate && (
+        // No date yet: one quiet press rather than an empty date box waiting
+        // for typing (plan #1671).
+        <button
+          type="button"
+          onClick={() => setAddingDate(true)}
+          disabled={saving}
+          className="press-area text-small text-ink-muted underline underline-offset-2 hover:text-ink"
+        >
+          add a date
+        </button>
+      )}
+      {unit && target !== null && (committed.dueOn || addingDate) && (
         <>
           <span>by</span>
           <InlineInput
@@ -248,6 +261,7 @@ function MeasureLine({
             aria-label="When the goal is due. Clear it to have none."
             onKeyDown={onKeyDown}
             disabled={saving}
+            autoFocus={addingDate && !committed.dueOn}
             className="tabular w-auto"
           />
         </>

@@ -9,7 +9,7 @@ import { signIn, signInWithGoogle, signUp, type AuthState } from './actions';
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" className="w-full" disabled={pending}>
+    <Button type="submit" className="w-full" pending={pending}>
       {pending ? 'One moment…' : label}
     </Button>
   );

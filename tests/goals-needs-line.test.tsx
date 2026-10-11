@@ -115,13 +115,13 @@ describe('the Needs line on a goal step', () => {
 });
 
 describe('whose a goal step is (plan #1159)', () => {
-  it('marks every open step as yours or Dash’s', () => {
+  it('marks Dash’s steps and leaves yours unmarked (plan #1078)', () => {
     const html = render([
       step('a', { title: 'Turn on autopay' }),
       step('b', { title: 'Log each loan balance', kind: 'rhythm', rhythmCount: 1, rhythmPeriod: 'month', position: 20 }),
       step('c', { title: 'List balances', kind: 'claude', position: 30 }),
     ]);
-    expect(html.match(/sr-only">Yours</g)).toHaveLength(2);
+    expect(html).not.toContain('sr-only">Yours<');
     // Dash's is the mark itself (plan #1338), named for a screen reader.
     expect(html.match(/role="img" aria-label="Dash&#x27;s"/g)).toHaveLength(1);
   });

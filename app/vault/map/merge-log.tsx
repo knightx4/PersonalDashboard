@@ -7,6 +7,7 @@ import { quoteFragment } from '@/lib/vault/map/fragment';
 import type { MergeLogItem, MergeLogPage, MergeLogRow, MergeLogSide } from '@/lib/vault/map/merge-log';
 import { noteHref } from '@/lib/vault/paths';
 import { SurvivorName, UndoMergeButton } from './merge-log-controls';
+import { MERGE_NAME } from './merge-name';
 
 /**
  * Every merge the map has made, with an undo on each (plan #821).
@@ -32,10 +33,8 @@ export function MergeLog({ log }: { log: MergeLogPage }) {
       </h2>
       <p className="mb-3 mt-1 text-ui text-ink-muted">
         {count(counts.theme, 'theme merge', 'theme merges')} and{' '}
-        {count(counts.position, 'position merge', 'position merges')}, theme merges first, newest
-        first within each
-        {counts.undone > 0 && `. ${counts.undone} undone`}. Undoing one puts both sides back as
-        they were, and the map will not merge that pair again.
+        {count(counts.position, 'position merge', 'position merges')}
+        {counts.undone > 0 && `, ${counts.undone} undone`}
       </p>
 
       <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
@@ -131,8 +130,8 @@ function Side({
   return (
     <div className="min-w-0">
       <p className="text-small text-ink-muted">{label}</p>
-      {name ?? <p className="text-ui font-medium text-ink">{side.name}</p>}
-      {was && <p className="px-1 text-small text-ink-muted">Was {was}</p>}
+      {name ?? <p className={cn(MERGE_NAME, 'border-y border-transparent py-0.5')}>{side.name}</p>}
+      {was && <p className="text-small text-ink-muted">Was {was}</p>}
       {renamed && <p className="text-small text-ink-muted">Now {renamed}</p>}
       {side.items.length > 0 ? (
         <ul className="mt-1 space-y-1">

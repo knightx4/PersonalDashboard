@@ -131,6 +131,46 @@ export const chainPayloadSchema = z.object({
 
 export type ChainPayload = z.infer<typeof chainPayloadSchema>;
 
+/**
+ * Cost lines that say nothing. "It is useful to know" is the answer a model
+ * gives when it has not found what rests on the claim, and a concept with that
+ * cost fails the second half of the node test, so the schema refuses it
+ * instead of letting it through as a proposal.
+ */
+const VAGUE_COST =
+  /\b(useful|helpful|good|nice|handy|important|worth)\b.{0,20}\b(to know|to understand|to have|to remember|to learn)\b|\b(be|is|are) (useful|helpful|important)\b|^(nothing|none|n\/a|unknown)\b/i;
+const MIN_COST_LENGTH = 20;
+
+export function isConcreteCost(cost: string): boolean {
+  const text = cost.trim();
+  return text.length >= MIN_COST_LENGTH && !VAGUE_COST.test(text);
+}
+
+/**
+ * A concept the note extractor proposes. It carries what the node test asks
+ * for: the question somebody who holds it answers differently, and what being
+ * wrong about it would cost. Both required, and the cost has to be concrete.
+ * Only the note extractor uses this; the other chain callers keep
+ * `proposedConceptSchema`.
+ */
+export const noteConceptSchema = proposedConceptSchema.extend({
+  separating_question: z.string().trim().min(10).max(500),
+  cost_if_wrong: z
+    .string()
+    .trim()
+    .max(500)
+    .refine(isConcreteCost, 'name what would go wrong if this were believed wrongly'),
+});
+
+/**
+ * What the note extractor reports. A note may yield no concepts, so the goal
+ * concept is optional here and an empty list is a complete answer.
+ */
+export const noteChainPayloadSchema = chainPayloadSchema.extend({
+  goal_concept: z.string().trim().max(200).default(''),
+  concepts: z.array(noteConceptSchema).max(40).default([]),
+});
+
 export type ChainNode = {
   name: string;
   claim: string;
@@ -141,7 +181,21 @@ export type ChainNode = {
   kind: ConceptKind | null;
   /** The id it matched in the subject already, or null when it is new. */
   existingId: string | null;
+  /** The question a holder answers differently. Set by the note extractor. */
+  separatingQuestion?: string;
+  /** What being wrong about it would cost. Set by the note extractor. */
+  costIfWrong?: string;
+  /**
+   * What the second check said, for a concept read out of a note
+   * (lib/learn/graph/judge-concepts.ts). A dropped concept never reaches a
+   * chain, so the two left are these. Absent everywhere else.
+   */
+  verdict?: NoteVerdict;
 };
+
+/** The two verdicts a proposed note concept can carry. Stored as `learn.concepts.judge_verdict`. */
+export const NOTE_VERDICTS = ['keep', 'weak'] as const;
+export type NoteVerdict = (typeof NOTE_VERDICTS)[number];
 
 export type ChainEdge = {
   prerequisite: string;
@@ -261,6 +315,15 @@ export function placeMentions(
   return mentions;
 }
 
+/** The two fields only the note extractor's concepts carry, when present. */
+function noteFields(proposed: object): Pick<ChainNode, 'separatingQuestion' | 'costIfWrong'> {
+  const { separating_question: question, cost_if_wrong: cost } = proposed as Record<string, unknown>;
+  return {
+    ...(typeof question === 'string' ? { separatingQuestion: question.trim() } : {}),
+    ...(typeof cost === 'string' ? { costIfWrong: cost.trim() } : {}),
+  };
+}
+
 /**
  * Turn what the model said into something that can be shown and saved.
  *
@@ -307,6 +370,7 @@ export function normaliseChain(
       mastery: proposed.mastery,
       kind: proposed.kind,
       existingId,
+      ...noteFields(proposed),
     });
     if (nodes.length >= MAX_CHAIN) break;
   }
@@ -425,6 +489,14 @@ export function approvedChainSchemaWith(limits: {
           // out to a browser and came back.
           kind: kindSchema,
           existingId: z.string().uuid().nullable(),
+          // Only a note's concepts carry these three (plan #1718), and they
+          // are kept on the concept once approved: the question can later
+          // serve as the probe, and a weak verdict keeps the concept out of
+          // a lesson slot of its own. Optional so every other path still
+          // parses.
+          separatingQuestion: z.string().trim().min(1).max(500).optional(),
+          costIfWrong: z.string().trim().min(1).max(500).optional(),
+          verdict: z.enum(NOTE_VERDICTS).optional(),
         }),
       )
       .min(1)
@@ -470,11 +542,32 @@ export function keepTicked(
   chain: ProposedChain,
   ticked: ReadonlySet<string>,
 ): { chain: ProposedChain; unplaced: ChainNode[] } {
+  return withoutNodes(chain, (node) => (ticked.has(key(node.name)) ? null : 'you left it out'));
+}
+
+/**
+ * Take new nodes out of a chain, and whatever that leaves floating.
+ *
+ * `reasonToRemove` answers for each new node: null keeps it, a sentence takes
+ * it out and is the reason recorded in `dropped`. A node already in the
+ * subject is never asked about. Removing a node removes the edges at either
+ * end of it, and a new node left with no edge goes too, under
+ * `unplacedReason`, rather than being written as a floating node. The
+ * ticks on the approval form and the note judge's drops both come through
+ * here.
+ */
+export function withoutNodes(
+  chain: ProposedChain,
+  reasonToRemove: (node: ChainNode) => string | null,
+  unplacedReason: string = UNPLACED_BY_TICKS,
+): { chain: ProposedChain; unplaced: ChainNode[] } {
   const dropped = [...chain.dropped];
 
   const kept = chain.nodes.filter((node) => {
-    if (node.existingId || ticked.has(key(node.name))) return true;
-    dropped.push({ name: node.name, reason: 'you left it out' });
+    if (node.existingId) return true;
+    const reason = reasonToRemove(node);
+    if (reason === null) return true;
+    dropped.push({ name: node.name, reason });
     return false;
   });
 
@@ -493,7 +586,7 @@ export function keepTicked(
   const placed = kept.filter((node) => {
     if (node.existingId || attached.has(key(node.name))) return true;
     unplaced.push(node);
-    dropped.push({ name: node.name, reason: UNPLACED_BY_TICKS });
+    dropped.push({ name: node.name, reason: unplacedReason });
     return false;
   });
 

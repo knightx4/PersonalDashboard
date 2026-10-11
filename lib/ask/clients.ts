@@ -9,6 +9,8 @@ import { createNewsClient } from '@/lib/news/auth/server';
 import { createTodoClient } from '@/lib/todo/auth/server';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import type { DashActionDeps } from '@/lib/core/dash-actions';
+import { removeAttachmentsFor } from '@/lib/attachments/store';
+import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import type { AskDb, AskSchema, SchemaClient } from './db';
 
 /**
@@ -48,5 +50,14 @@ export function requestAskDb(): AskDb {
  */
 export async function requestDashDeps(userId: string): Promise<DashActionDeps> {
   const db = requestAskDb();
-  return { userId, core: await db('core'), db };
+  const core = await db('core');
+  return {
+    userId,
+    core,
+    db,
+    // The core client is the person's own, with storage, so their files go with the row.
+    forget: async (ref) => {
+      await removeAttachmentsFor(core as unknown as CoreSupabaseClient, ref);
+    },
+  };
 }

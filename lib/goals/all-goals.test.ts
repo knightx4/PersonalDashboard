@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   allGoalsViewOf,
+  areaHref,
+  areaInView,
   areasInView,
   countAllGoalsView,
   goalInView,
@@ -125,5 +127,20 @@ describe('All goals views (plan #1158)', () => {
     expect(allGoalsViewOf(['all'])).toBe('all');
     expect(allGoalsViewOf('ready')).toBe('open');
     expect(allGoalsViewOf(undefined)).toBe('open');
+  });
+});
+
+describe('areaHref', () => {
+  it('opens the area on its own page, under Everything when it has no open goal', () => {
+    expect(areaHref('a1')).toBe('/goals/area/a1');
+    expect(areaHref('a1', { open: false })).toBe('/goals/area/a1?view=all');
+  });
+});
+
+describe('areaInView', () => {
+  it('keeps an area whose goals all fall out of the view', () => {
+    const area = { id: 'a1', name: 'Health', note: null, position: 0, goals: [] } as unknown as AreaWithGoals;
+    expect(areaInView(area, 'you', new Map())).toMatchObject({ id: 'a1', goals: [], liveCount: 0 });
+    expect(areasInView([area], 'you', new Map())).toEqual([]);
   });
 });

@@ -68,7 +68,7 @@ export function InventoryBulkBar({ total }: { total: number }) {
       <form action={saleAction} className="contents">
         {hidden}
         <input type="hidden" name="for_sale" value="true" />
-        <Button type="submit" size="sm" disabled={pending}>
+        <Button type="submit" size="sm" pending={pending}>
           Mark for sale
         </Button>
       </form>
@@ -76,7 +76,7 @@ export function InventoryBulkBar({ total }: { total: number }) {
       <form action={saleAction} className="contents">
         {hidden}
         <input type="hidden" name="for_sale" value="false" />
-        <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+        <Button type="submit" size="sm" variant="secondary" pending={pending}>
           Not for sale
         </Button>
       </form>
@@ -84,7 +84,7 @@ export function InventoryBulkBar({ total }: { total: number }) {
       <form action={returnAction} className="contents">
         {hidden}
         <input type="hidden" name="planned" value="true" />
-        <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+        <Button type="submit" size="sm" variant="secondary" pending={pending}>
           Mark to return
         </Button>
       </form>
@@ -92,7 +92,7 @@ export function InventoryBulkBar({ total }: { total: number }) {
       <form action={returnAction} className="contents">
         {hidden}
         <input type="hidden" name="planned" value="false" />
-        <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+        <Button type="submit" size="sm" variant="secondary" pending={pending}>
           Not returning
         </Button>
       </form>
@@ -103,7 +103,7 @@ export function InventoryBulkBar({ total }: { total: number }) {
       {ids.length > 1 && (
         <form action={groupAction} className="contents">
           {hidden}
-          <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+          <Button type="submit" size="sm" variant="secondary" pending={pending}>
             {groupPending ? 'Grouping…' : 'Group as one item'}
           </Button>
         </form>
@@ -114,7 +114,7 @@ export function InventoryBulkBar({ total }: { total: number }) {
           <span className="text-ui text-ink">This cannot be undone.</span>
           <form action={deleteAction} className="contents">
             {hidden}
-            <Button type="submit" size="sm" variant="danger" disabled={pending}>
+            <Button type="submit" size="sm" variant="danger" pending={pending}>
               {deletePending ? 'Deleting…' : `Delete ${ids.length} permanently`}
             </Button>
           </form>

@@ -131,7 +131,7 @@ vi.mock('@/lib/talk/reply', () => ({
   }) => {
     store.guidance.push(input.guidance);
     store.material.push(input.subject.material);
-    input.onSpend?.({ model: 'claude-sonnet-5', usage: {} });
+    input.onSpend?.({ model: 'claude-sonnet-5-5', usage: {} });
     const last = input.guidance.includes('LAST REPLY');
     return {
       ok: true,

@@ -245,7 +245,7 @@ async function extractFrom(input: ExtractInput): Promise<{
       const truncated = input.text.slice(0, 14_000);
       const message = await client.messages.create({
         model: EXTRACT_MODEL,
-        max_tokens: 1800,
+        max_tokens: 6_000, // room for Haiku 5.5's thinking as well as the answer
         system: buildSystemPrompt(categoryOptions),
         messages: [
           {

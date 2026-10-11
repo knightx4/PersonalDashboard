@@ -74,7 +74,7 @@ export async function profileFingerprint(learn: LearnSupabaseClient, userId: str
 }
 
 /** Everyone with clips: one row per video cut, so a few hundred at most. */
-async function peopleWithClips(learn: LearnSupabaseClient): Promise<string[]> {
+export async function peopleWithClips(learn: LearnSupabaseClient): Promise<string[]> {
   const out = new Set<string>();
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await learn
@@ -90,7 +90,7 @@ async function peopleWithClips(learn: LearnSupabaseClient): Promise<string[]> {
   }
 }
 
-type ClipRow = {
+export type ClipRow = {
   id: string;
   video_id: string;
   start_seconds: number;
@@ -102,7 +102,7 @@ type ClipRow = {
   item: { title: string; author: string | null } | { title: string; author: string | null }[] | null;
 };
 
-const CLIP_COLUMNS =
+export const CLIP_COLUMNS =
   'id, video_id, start_seconds, end_seconds, caption, idea, serves, score, item:catalogue_items!video_clips_item_id_fkey(title, author)';
 
 /** The clips waiting for a score: unscored first, then unseen ones scored against old tracks and goals. */
@@ -151,7 +151,7 @@ export function clipWords(
 }
 
 /** Each clip with its words, reading each video's transcript once. */
-async function withWords(learn: LearnSupabaseClient, rows: readonly ClipRow[]): Promise<ClipToScore[]> {
+export async function withWords(learn: LearnSupabaseClient, rows: readonly ClipRow[]): Promise<ClipToScore[]> {
   const sentences = new Map<string, Promise<{ startSeconds: number; text: string }[] | null>>();
   const of = (videoId: string) => {
     let found = sentences.get(videoId);
