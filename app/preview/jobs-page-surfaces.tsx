@@ -13,6 +13,7 @@ import { ThoughtList } from '@/app/jobs/(app)/find/thoughts';
 import { LearningTracks } from '@/app/jobs/(app)/find/tracks';
 import OnboardingLayout from '@/app/jobs/(onboarding)/layout';
 import { WelcomeForm } from '@/app/jobs/(onboarding)/onboarding/forms';
+import { SONNET } from '@/lib/core/models';
 import type { Activity, ActivityEntry } from '@/lib/jobs/activity/load';
 import {
   RESPONSE_WINDOW_DAYS,
@@ -451,7 +452,7 @@ export function JobsThoughtsSurface() {
           runs: 2,
           basis: 'guess',
           per: 'run',
-          models: ['claude-sonnet-5-5'],
+          models: [SONNET],
         },
       }}
     >
