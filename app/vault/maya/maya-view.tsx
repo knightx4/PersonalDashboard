@@ -2,10 +2,9 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { OwlIcon } from '@/components/shell/owl-icon';
 import { EmptyState } from '@/components/ui/empty-state';
-import { cardVariants } from '@/components/ui/card';
+import { ListPage } from '@/components/patterns/list-detail';
 import type { MayaThreadRow } from '@/lib/vault/maya/store';
 import { mayaThreadHref } from '@/lib/vault/paths';
-import { cn } from '@/lib/cn';
 
 /**
  * Every thread with Maya, drawn from what the page read (page.tsx), so the
@@ -27,36 +26,38 @@ export function MayaListView({ threads, limit }: { threads: MayaThreadRow[]; lim
     );
   }
 
-  return (
-    <>
-      <PageHeader title="Maya" />
-      <p className="mb-3 text-body text-ink-muted">
-        {threads.length} {threads.length === 1 ? 'thread' : 'threads'}, most recent first
-        {threads.length === limit && ` (the first ${limit} are shown)`}
-      </p>
+  const lead = (thread: MayaThreadRow) =>
+    thread.summary ?? (thread.note ? `On ${thread.note.title}` : 'On a note no longer in the vault');
 
-      <ul className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
-        {threads.map((thread) => (
-          <li key={thread.id}>
-            <Link
-              href={mayaThreadHref(thread.id)}
-              className="flex items-baseline gap-4 px-4 py-3 transition-colors duration-quick hover:bg-canvas"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block text-body font-medium text-ink">{thread.question}</span>
-                <span className="mt-0.5 block truncate text-ui text-ink-muted">
-                  {thread.summary ?? (thread.note ? `On ${thread.note.title}` : 'On a note no longer in the vault')}
-                </span>
+  return (
+    <ListPage
+      header={<PageHeader title="Maya" />}
+      foot={
+        <>
+          {threads.length} {threads.length === 1 ? 'thread' : 'threads'}, most recent first
+          {threads.length === limit && ` (the first ${limit} are shown)`}
+        </>
+      }
+    >
+      {threads.map((thread) => (
+        <li key={thread.id}>
+          <Link
+            href={mayaThreadHref(thread.id)}
+            className="card-pad-x row-pad flex min-h-11 items-baseline gap-4 transition-colors duration-quick hover:bg-sunken"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block text-body font-medium text-ink">{thread.question}</span>
+              <span className="mt-0.5 block truncate text-ui text-ink-muted">
+                {thread.origin === 'automatic' ? `Maya picked · ${lead(thread)}` : lead(thread)}
               </span>
-              <span className="shrink-0 text-small tabular-nums text-ink-muted">
-                {thread.origin === 'automatic' ? 'Maya picked · ' : ''}
-                <time dateTime={thread.updatedAt}>{day(thread.updatedAt)}</time>
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </>
+            </span>
+            <time dateTime={thread.updatedAt} className="shrink-0 text-small tabular-nums text-ink-muted">
+              {day(thread.updatedAt)}
+            </time>
+          </Link>
+        </li>
+      ))}
+    </ListPage>
   );
 }
 
