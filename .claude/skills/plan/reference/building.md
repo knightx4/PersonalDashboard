@@ -327,12 +327,18 @@ the step's row on /dev/plan, which shows the last fixes and shots (plan
   `Answered …` line): the builder gets three fresh rounds, numbered on from
   4, against their words; the stop then falls on round 6, and so on.
 - **Answered with an accept** (an `Answered …` line that does not ask for a
-  change): the same as Accepted, written down by you. Any answer that names
-  nothing to change is an accept: "Accept", "yes", "ok", "sure", "looks
-  good", "It's fine", "It's probably fine", "I'll let you know if something
-  comes up". On 10 October a step answered "It's fine", "yes" and "Accept"
-  went back to not started with its work never merged, because no session
-  read those as accepts. Run `npm run ui-guard -- <n> --accept`, or the
+  change): the same as Accepted. The app now records the accept itself when
+  it can read the answer as one (`answerAccepts` in
+  `lib/plan/answer-accepts.ts`): it writes the `accepted` rounds and an
+  `Accepted …` line straight after the `Answered …` line, and sends the step
+  to a session. So an `Answered …` line that is the newest line, on a stop,
+  is one the app could not read as an accept, or one written by Dash or by
+  hand. Read it yourself: any answer that names nothing to change is an
+  accept, such as "Accept", "yes", "ok", "sure", "looks good", "It's fine",
+  "It's probably fine" or "I'll let you know if something comes up". On 10
+  October a step answered "It's fine", "yes" and "Accept" went back to not
+  started with its work never merged, because no session read those as
+  accepts. For an accept the app did not record, run `npm run ui-guard -- <n> --accept`, or the
   statement it prints through the connector. It records an `accepted` round
   for each surface still waiting, quoting the answer, and writes nothing
   unless the step's newest `Answered` line is newer than its newest
