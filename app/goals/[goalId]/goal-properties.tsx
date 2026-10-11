@@ -19,42 +19,35 @@ function dayOf(iso: string | null | undefined, timeZone: string): string | null 
 }
 
 /**
- * The goal's facts in the tabbed detail's properties column (plan #1671),
- * as the feature page has its own: the area, the status, Dash's verdict, the
- * dates, and the progress split between you and Dash. The split is the
- * steps' bands from `goalProgress`, the same counts the goal's bar on Goals
- * draws, so the two never disagree.
+ * The one line under the goal's title (plan #1688), as a feature's says
+ * "Feature #925" and who added it: what kind of thing it is, and when it was
+ * added. The area is the crumb above the title, so it is not said again.
  */
-export function GoalProperties({
-  goal,
-  areaName,
-  review,
-  progress,
-  timeZone,
-}: {
+export function goalLine(
+  goal: Pick<Goal, 'createdAt' | 'errand'>,
+  timeZone: string,
+): string {
+  const kind = goal.errand ? 'Errand' : 'Goal';
+  const added = dayOf(goal.createdAt, timeZone);
+  return added ? `${kind}, added ${added}` : kind;
+}
+
+type Props = {
   goal: Pick<Goal, 'areaId' | 'status' | 'dueOn' | 'createdAt' | 'closedAt' | 'errand'>;
   areaName: string;
   review: GoalReview | null;
   progress: Pick<GoalProgress, 'live' | 'done' | 'bands'>;
   timeZone: string;
-}) {
-  const added = dayOf(goal.createdAt, timeZone);
-  const closed =
-    goal.status === 'done' || goal.status === 'dropped' ? dayOf(goal.closedAt, timeZone) : null;
-  // The open steps split between you and Dash, leaving out a share of none:
-  // "3 yours · 1 Dash’s · 1 waiting".
-  const split = [
-    progress.bands.on_you > 0 && `${progress.bands.on_you} yours`,
-    progress.bands.with_dash > 0 && `${progress.bands.with_dash} Dash’s`,
-    progress.bands.waiting > 0 && `${progress.bands.waiting} waiting`,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+};
+
+/**
+ * The goal's facts read first (plan #1688): the status, Dash's verdict and
+ * the progress. One row on a phone, with the rest under "All details"; the
+ * head of the column from laptop width.
+ */
+export function GoalGlance({ goal, review, progress }: Pick<Props, 'goal' | 'review' | 'progress'>) {
   return (
-    <PropertyList>
-      {/* Plain text, as the feature page's Module is: the path above the
-          title already goes to the area. */}
-      <Property label="Area" value={areaName} />
+    <>
       <Property
         label="Status"
         value={goal.errand ? `${STATUS_WORD[goal.status]} errand` : STATUS_WORD[goal.status]}
@@ -66,24 +59,71 @@ export function GoalProperties({
           value={VERDICT_LABELS[review.verdict]}
         />
       )}
-      {goal.dueOn && <Property label="Due" value={formatDay(goal.dueOn, true)} />}
-      {added && <Property label="Added" value={added} />}
-      {closed && (
-        <Property label={goal.status === 'dropped' ? 'Dropped' : 'Finished'} value={closed} />
-      )}
       {progress.live > 0 && (
         <Property
           label="Progress"
+          hint="Steps and sub-steps that count, questions included; proposed and dropped ones left out."
+          value={`${progress.done} of ${progress.live} done`}
+        />
+      )}
+    </>
+  );
+}
+
+/** The day it closed, and the open steps split between you and Dash. */
+function goalFacts(
+  goal: Props['goal'],
+  progress: Props['progress'],
+  timeZone: string,
+): { closed: string | null; split: string } {
+  const closed =
+    goal.status === 'done' || goal.status === 'dropped' ? dayOf(goal.closedAt, timeZone) : null;
+  // The open steps split between you and Dash, leaving out a share of none:
+  // "3 yours · 1 Dash’s · 1 waiting".
+  const split = [
+    progress.bands.on_you > 0 && `${progress.bands.on_you} yours`,
+    progress.bands.with_dash > 0 && `${progress.bands.with_dash} Dash’s`,
+    progress.bands.waiting > 0 && `${progress.bands.waiting} waiting`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return { closed, split };
+}
+
+/** How many facts `GoalProperties` draws, said on the closed fold on a phone. */
+export function goalDetailCount(
+  goal: Props['goal'],
+  progress: Props['progress'],
+  timeZone: string,
+): number {
+  const { closed, split } = goalFacts(goal, progress, timeZone);
+  return 1 + (goal.dueOn ? 1 : 0) + (closed ? 1 : 0) + (split ? 1 : 0);
+}
+
+/**
+ * The rest of the goal's facts in the tabbed detail's properties (plan
+ * #1671): the area, the dates, and the open steps split between you and
+ * Dash. The split is the steps' bands from `goalProgress`, the same counts
+ * the goal's bar on Goals draws, so the two never disagree. When it was
+ * added is the line under the title (`goalLine`).
+ */
+export function GoalProperties({ goal, areaName, progress, timeZone }: Props) {
+  const { closed, split } = goalFacts(goal, progress, timeZone);
+  return (
+    <PropertyList>
+      {/* Plain text, as the feature page's Module is: the path above the
+          title already goes to the area. */}
+      <Property label="Area" value={areaName} />
+      {goal.dueOn && <Property label="Due" value={formatDay(goal.dueOn, true)} />}
+      {closed && (
+        <Property label={goal.status === 'dropped' ? 'Dropped' : 'Finished'} value={closed} />
+      )}
+      {split && (
+        <Property
+          label="Open steps"
           wide
-          hint="Steps and sub-steps that count, questions included; proposed and dropped ones left out. Yours: your move. Dash’s: Dash is on them or can take them. Waiting: on another step or a date."
-          value={
-            <span className="block">
-              <span className="block">{`${progress.done} of ${progress.live} done`}</span>
-              {split && (
-                <span className="block whitespace-normal text-small text-ink-muted">{split}</span>
-              )}
-            </span>
-          }
+          hint="Yours: your move. Dash’s: Dash is on them or can take them. Waiting: on another step or a date."
+          value={split}
         />
       )}
     </PropertyList>

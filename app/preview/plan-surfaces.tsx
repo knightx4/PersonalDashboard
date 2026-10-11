@@ -331,7 +331,7 @@ export function ProjectPlanSurface() {
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title={site.label}
-        description={`${site.description}, built from this plan in ${site.repo.owner}/${site.repo.repo}. Send a step to Dash and it is built there, pushed to ${site.repo.branch} and closed here with the commit.`}
+        description={`Built in ${site.repo.owner}/${site.repo.repo}`}
       />
       <PlanView
         basePath="/dev/projects/website"

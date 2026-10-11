@@ -2371,6 +2371,13 @@ button[aria-busy='true'] {
     animation: sigil-cell var(--motion-move) var(--ease-out-soft) both;
     animation-delay: calc(var(--sigil-cell, 0) * var(--motion-instant) / 2);
   }
+  /* The empty state's words lift in once the sigil has begun, so nothing
+   * lands at full size in the frame the last row leaves (plan #1688). While
+   * the class is on, the wrapper holds only the finished EmptyState. */
+  & h3,
+  & h3 + p {
+    animation: got-through-rise var(--motion-move) var(--ease-out-soft) var(--motion-quick) both;
+  }
 }
 
 /* The day closing on the agenda (plan #1556): the done tasks spring from
@@ -2849,7 +2856,9 @@ button[aria-busy='true'] {
     animation: none;
   }
 
-  .sigil-draw-in [data-sigil-cell] {
+  .sigil-draw-in [data-sigil-cell],
+  .sigil-draw-in h3,
+  .sigil-draw-in h3 + p {
     animation: none;
   }
 

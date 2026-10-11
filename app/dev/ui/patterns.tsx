@@ -340,17 +340,22 @@ function TabbedSurface() {
   return (
     <TabbedDetail
       crumbs={[
-        { label: 'Plan', href: '#' },
         { label: 'Dev', href: '#' },
-        { label: 'Give each feature its own page with tabs', href: '#' },
+        { label: 'Plan', href: '#' },
+        { label: 'Give each feature its own…', href: '#' },
       ]}
       title="Give each feature its own page with tabs"
       description="Feature #1660"
-      properties={
-        <PropertyList>
+      glance={
+        <>
           <Property label="Status" value="In progress" />
           <Property label="Health" value="On track" />
-          <Property label="Steps" value="2 of 10 done" />
+          <Property label="Progress" value="2 of 10 done" />
+        </>
+      }
+      detailCount={5}
+      properties={
+        <PropertyList>
           <Property label="Waiting on you" value="None" />
           <Property label="Dash has" value="7 steps" />
           <Property label="Module" value="Dev" />
@@ -639,7 +644,7 @@ export const PATTERNS: readonly PagePattern[] = [
     name: 'tabbed detail',
     label: 'Tabbed detail',
     when: 'One thing with several views of itself and a set of facts, such as a feature on the plan or a goal.',
-    rule: 'Breadcrumbs first, then the title, then the tabs, then the open tab. Each tab is a link that puts the tab in the address, so a reload, the back button and a pasted link open the same tab, and the first tab is the plain address. The properties sit in a column on the right from laptop width and stay in view while the tab scrolls; on a phone they are a grid of facts between the title and the tabs. The row of tabs stays on one line at every width. Every paragraph, done-when, list of facts and the properties sit on a card; only headings, breadcrumbs, tab labels and a one-line count sit on the page background.',
+    rule: 'Breadcrumbs first, then the title, then the tabs, then the open tab. Each tab is a link that puts the tab in the address, so a reload, the back button and a pasted link open the same tab, and the first tab is the plain address. The actions sit on the title’s line. The properties sit in a column on the right from laptop width and stay in view while the tab scrolls; on a phone the two or three facts read first are one row between the title and the tabs, and the rest fold under All details, so the tabs are on the first screen. Every tab is as wide as the row of tabs. The row of tabs stays on one line at every width. Every paragraph, done-when, list of facts and the properties sit on a card; only headings, breadcrumbs, tab labels and a one-line count sit on the page background.',
     component: {
       path: 'components/patterns/tabbed-detail.tsx',
       exports: ['TabbedDetail'],

@@ -12,6 +12,7 @@ import {
   moduleCrumbs,
   moduleHref,
   uiLine,
+  uiShort,
   type ModuleSummary,
   type ModuleTab,
 } from '@/lib/dev/module-page';
@@ -31,13 +32,20 @@ import { openedText } from '@/lib/usage/report';
 
 // ---- The index -------------------------------------------------------------
 
+/**
+ * What a module has open, then its UI review. A count of none is left out,
+ * so a quiet module reads "Never reviewed" and the ones with something open
+ * are the ones that show numbers (plan #1688).
+ */
 function indexLine(summary: ModuleSummary): string {
   return [
-    counted(summary.features.length, 'open feature'),
-    counted(summary.bugs.length, 'bug'),
-    counted(summary.ideas.length, 'idea'),
+    summary.features.length > 0 && counted(summary.features.length, 'open feature'),
+    summary.bugs.length > 0 && counted(summary.bugs.length, 'bug'),
+    summary.ideas.length > 0 && counted(summary.ideas.length, 'idea'),
     uiLine(summary.ui),
-  ].join(' · ');
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 export function ModulesIndexView({ summaries }: { summaries: readonly ModuleSummary[] }) {
@@ -446,12 +454,19 @@ export function ModuleView({
   tab: ModuleTab;
   now: Date;
 }) {
-  const properties = (
-    <PropertyList>
+  // Open steps, bugs and the UI review are read first: one row on a phone,
+  // with the other three under "All details" (plan #1688).
+  const glance = (
+    <>
       <Property label="Open steps" value={summary.openSteps} />
       <Property label="Bugs" value={summary.bugs.length} />
+      {/* Short, to fit a third of a phone's row; the hint has it in full. */}
+      <Property label="UI review" value={uiShort(summary.ui)} hint={uiLine(summary.ui)} />
+    </>
+  );
+  const properties = (
+    <PropertyList>
       <Property label="Ideas" value={summary.ideas.length} />
-      <Property label="UI review" value={uiLine(summary.ui)} />
       <Property label="Opens, 30 days" value={summary.usage?.opens30 ?? 0} />
       <Property label="Spend, 30 days" value={spendValue(summary)} />
     </PropertyList>
@@ -462,6 +477,8 @@ export function ModuleView({
       crumbs={moduleCrumbs(summary.module)}
       title={summary.module.label}
       description={summary.module.description}
+      glance={glance}
+      detailCount={3}
       properties={properties}
       tabs={moduleTabs(summary)}
       label="Module"

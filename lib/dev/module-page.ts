@@ -153,6 +153,21 @@ export function counted(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? '' : 's'}`;
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * The UI review's standing short enough for a third of a phone's row (plan
+ * #1688): what is left to decide when something is, otherwise the day it was
+ * last reviewed ("28 Sep"), or "Never".
+ */
+export function uiShort(ui: ScopeReview | null): string {
+  if (!ui?.lastReview) return 'Never';
+  const open = ui.openFindings.length;
+  if (open > 0) return `${open} to decide`;
+  const [, month, day] = ui.lastReview.createdAt.slice(0, 10).split('-').map(Number);
+  return `${day} ${MONTHS[month - 1]}`;
+}
+
 /** The UI review's standing in a few words, which says never when nobody has looked. */
 export function uiLine(ui: ScopeReview | null): string {
   if (!ui?.lastReview) return 'Never reviewed';

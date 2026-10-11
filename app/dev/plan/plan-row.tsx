@@ -552,7 +552,6 @@ export function usePlanRow({
   opened = false,
   asStep = false,
   moveAfter = false,
-  inlinePriority = false,
 }: {
   node: PlanNode;
   /** One entry per level above: whether that level's line carries on below this row. */
@@ -627,13 +626,6 @@ export function usePlanRow({
    * second "Waiting" beside it in the move column named a different fact.
    */
   moveAfter?: boolean;
-  /**
-   * Keep the priority word and the size on one line. The menu's wrapper is a
-   * block, so at Normal, where the word is hidden until hover, it still took
-   * the cell's first line and pushed the size half a line low. The feature
-   * page's Steps tab asks for this (plan #1664); /dev/plan is unchanged.
-   */
-  inlinePriority?: boolean;
   /**
    * A small line under the title saying where the row sits, for a list that
    * does not draw the tree: the Steps tab's status groups name a substep's
@@ -1012,11 +1004,14 @@ export function usePlanRow({
            * by its own routine and the runner never fires it, which is the
            * one thing about it a resting plan would otherwise hide: its ready
            * steps look like any other's. A word rather than an icon, because
-           * there is no glyph that already means "replaces how this works". */}
+           * there is no glyph that already means "replaces how this works".
+           * Not on a phone, where it took the title's width beside it and a
+           * title of six words ran to three lines (plan #1688); an overhaul's
+           * summary line under the title says what it is. */}
           {node.track === 'overhaul' && (
             <span
               title="Overhaul. Built by its own routine; the runner will not take it."
-              className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1.5 py-0.5 text-micro text-accent"
+              className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1.5 py-0.5 text-micro text-accent max-sm:hidden"
             >
               Overhaul
             </span>
@@ -1055,7 +1050,10 @@ export function usePlanRow({
             label={`Priority of #${node.number} ${node.title}`}
             items={priorityMenu}
             align="start"
-            className={inlinePriority ? 'inline-block align-baseline' : undefined}
+            // Inline in the column too, so the word and the size after it stay
+            // on one line ("Next · M") rather than the size dropping under
+            // the menu's block (plan #1688).
+            className="inline-block align-baseline"
             triggerClassName={cn(
               'h-auto w-auto rounded px-0.5 py-0 font-normal',
               node.priority === 2 &&
@@ -1252,6 +1250,13 @@ export function usePlanRow({
 
   // The one press a feature's own page keeps in its header: the same Send the
   // row's opened panel leads with, asking first when the run has gone quiet.
+  // It reads "Send to Dash" on the title's line (plan #1688): on the
+  // feature's own page it plainly sends that feature, and the count of rows
+  // beneath, which is every row at any depth rather than the steps Progress
+  // counts, is in its title instead. On a phone it is the play mark alone,
+  // the words kept as its name, so the title keeps the width of the line.
+  const sendWords = 'max-sm:sr-only';
+  const sendShape = 'press-area max-sm:size-9 max-sm:px-0';
   const sendButton =
     closed || node.track === 'overhaul' ? null : quietAsk ? (
       <Button
@@ -1261,9 +1266,10 @@ export function usePlanRow({
         disabled={beingResolved}
         title={quietAsk}
         onClick={() => setConfirmingSend(true)}
+        className={sendShape}
       >
         <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
-        {sendLabel(node)}
+        <span className={sendWords}>Send to Dash</span>
       </Button>
     ) : (
       <form action={sendAction}>
@@ -1274,9 +1280,11 @@ export function usePlanRow({
           variant="secondary"
           pending={sendPending}
           disabled={beingResolved}
+          title={sendLabel(node)}
+          className={sendShape}
         >
           <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
-          {sendPending ? 'Sending…' : sendLabel(node)}
+          <span className={sendWords}>{sendPending ? 'Sending…' : 'Send to Dash'}</span>
         </Button>
       </form>
     );
@@ -1398,7 +1406,6 @@ export function PlanRow(props: PlanRowProps) {
           searching={searching}
           unfolded={unfolded}
           opened={opened}
-          inlinePriority={props.inlinePriority}
         />
       )}
     />
