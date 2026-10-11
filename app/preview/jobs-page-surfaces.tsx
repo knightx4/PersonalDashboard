@@ -1,6 +1,7 @@
 import { Inbox, FileText, Shield } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardSection } from '@/components/ui/card';
+import { PaidCostsProvider } from '@/components/ui/paid-hint';
 import { Figure } from '@/components/ui/figure';
 import { Meter } from '@/components/ui/meter';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
@@ -441,12 +442,37 @@ export function JobsAnswersSurface() {
 
 export function JobsThoughtsSurface() {
   return (
-    <>
-      <PageHeader
-        title="Career goals"
-        description="What you want from the next job and where you are now, in your own words. Add a new entry when your thinking changes; the newest one counts."
-      />
-      <div className="mb-3 max-w-3xl">
+    <PaidCostsProvider
+      costs={{
+        'app/jobs/(app)/find/actions.ts#suggestTracks': {
+          lowMicros: 20_000,
+          medianMicros: 40_000,
+          highMicros: 80_000,
+          runs: 2,
+          basis: 'guess',
+          per: 'run',
+          models: ['claude-sonnet-5-5'],
+        },
+      }}
+    >
+      {/* Career goals and Learning tracks as the Find page stacks them. */}
+      <div className="space-y-6">
+        <ThoughtList
+          thoughts={[
+            {
+              id: 'th1',
+              body: 'I want a strategic finance role at a company between 200 and 1,000 people, where the planning model is the thing the leadership team argues over. Not another reporting job. I am strongest at building the model and weakest at presenting it, so a role with a CFO who lets me present would be worth a smaller title.',
+              written: 'Oct 2, 2026',
+              edited: 'Oct 4, 2026',
+            },
+            {
+              id: 'th2',
+              body: 'Starting the search. Open to FP&A or strategic finance, fintech or developer tools, New York or remote.',
+              written: 'Jul 1, 2026',
+              edited: null,
+            },
+          ]}
+        />
         <LearningTracks
           hasEntries
           started={[
@@ -479,23 +505,7 @@ export function JobsThoughtsSurface() {
           ]}
         />
       </div>
-      <ThoughtList
-        thoughts={[
-          {
-            id: 'th1',
-            body: 'I want a strategic finance role at a company between 200 and 1,000 people, where the planning model is the thing the leadership team argues over. Not another reporting job. I am strongest at building the model and weakest at presenting it, so a role with a CFO who lets me present would be worth a smaller title.',
-            written: 'Oct 2, 2026',
-            edited: 'Oct 4, 2026',
-          },
-          {
-            id: 'th2',
-            body: 'Starting the search. Open to FP&A or strategic finance, fintech or developer tools, New York or remote.',
-            written: 'Jul 1, 2026',
-            edited: null,
-          },
-        ]}
-      />
-    </>
+    </PaidCostsProvider>
   );
 }
 
