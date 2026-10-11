@@ -30,6 +30,9 @@ npx tsx scripts/plan.ts needs "<what to set>" --for <n> [--detail "…"]
                                                # setup step of theirs under the same feature and
                                                # makes <n> wait on it
 npx tsx scripts/plan.ts reopen <n>             # put it back to not started
+npx tsx scripts/plan.ts stopped <n> --reason "…" [--piece "…" --piece "…"]
+                                               # ending the run with <n> neither closed
+                                               # nor blocked: say why, in one line
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
                                                [--proposed] [--size s|m|l] [--from <n>]
@@ -170,6 +173,18 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
    `SKILL.md` describes: `update <the feature> --health … --body "…"`. A
    builder that was sent leaves the update to the session that sent it, which
    writes one per feature when its batch ends.
+10. **Ending without closing, say why.** A run that ends with its step
+    neither closed nor blocked writes one line on why before it stops:
+    `stopped <n> --reason "…"`. The line goes on the run the step was sent
+    as, ends it, and shows on the plan page after "Last run stopped". When
+    two runs on a feature close nothing, the app raises the feature quoting
+    these lines (#1801), so write what the next session or the person would
+    need: "Too big for one sitting: the export, the import and the page are
+    three pieces of work", not "ran out of time". If the step is too big,
+    add the pieces you would split it into, in order, one `--piece` each
+    (two to twenty), titled as steps. Working offline, the SQL is in
+    `offline.md`. A step you hand back with a commit for the sender to
+    close is not a stop: that run did its work.
 
 ## What to report back
 

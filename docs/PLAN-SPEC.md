@@ -150,6 +150,17 @@ GitHub key says nothing about whether the run started. `storedReading` in
 `readingFor` and `readingColumns` beside it turn a reading back into the
 columns, so the write and the read are worked out in one place.
 
+A session that ends its run with the step neither closed nor blocked writes
+why onto the run with `plan.ts stopped <n> --reason "…"` (#1802): one line in
+`stop_reason`, the time in `stopped_at`, and, for a step too big for one
+sitting, the pieces it would split into in `stop_pieces`, two to twenty titles
+in order. The run is the newest fired at the step or a row above it, and one
+still `started` is ended `failed` with the reason as its `error`. A run the
+cutoff ended keeps the app's note in `error` and has no `stop_reason`, so the
+two kinds of reason stay apart. The plan page's run line gives `stop_reason`
+first (`lastRunLine` in `lib/plan/run-end.ts`), and the rules for what may be
+stored are in `lib/plan/stop-reason.ts`.
+
 `app/api/plan/runs` is the only thing that asks GitHub about a run.
 `refreshRunReadings` in `lib/plan/runs.ts` does the work: the reader from
 `readRunLiveness` gets the claimed steps, the runs behind them and one activity

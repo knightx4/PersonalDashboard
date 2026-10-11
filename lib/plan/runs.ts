@@ -825,7 +825,7 @@ export async function loadLastRuns(supabase: Db, userId: string): Promise<Record
   const { data, error } = await supabase
     .from('plan_runs')
     .select(
-      'plan_item_id, status, error, created_at, job, github_checked_at, last_push_at, last_push_sha, last_push_subject, github_error',
+      'plan_item_id, status, error, created_at, job, github_checked_at, last_push_at, last_push_sha, last_push_subject, github_error, stop_reason, stop_pieces',
     )
     .eq('user_id', userId)
     .not('plan_item_id', 'is', null)
@@ -843,6 +843,8 @@ export async function loadLastRuns(supabase: Db, userId: string): Promise<Record
       error: string | null;
       created_at: string;
       job: string;
+      stop_reason?: string | null;
+      stop_pieces?: string[] | null;
     } & Partial<RunReadingColumns>
   >) {
     if (last[row.plan_item_id]) continue;
@@ -852,6 +854,8 @@ export async function loadLastRuns(supabase: Db, userId: string): Promise<Record
       error: row.error,
       job: row.job as RunJob,
       reading: storedReading(row),
+      stopReason: row.stop_reason ?? null,
+      stopPieces: row.stop_pieces ?? null,
     };
   }
   return last;

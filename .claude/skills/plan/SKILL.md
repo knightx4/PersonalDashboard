@@ -39,6 +39,10 @@ npx tsx scripts/plan.ts needs "<what to set>" --for <n> [--detail "…"]
                                                # an account. Writes a setup step of theirs under
                                                # the same feature and makes <n> wait on it
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
+npx tsx scripts/plan.ts stopped <n> --reason "…" [--piece "…" --piece "…"]
+                                               # ending without closing or blocking <n>:
+                                               # one line on why, onto the run. Too big?
+                                               # name the pieces it would split into
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
                                                [--proposed] [--from <n>]
                                                # ready under an approved feature, a

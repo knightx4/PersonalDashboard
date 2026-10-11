@@ -53,6 +53,10 @@
  *                                # rather than on something only you can supply
  *   npx tsx scripts/plan.ts drop <n> --note "why not"
  *   npx tsx scripts/plan.ts reopen <n>
+ *   npx tsx scripts/plan.ts stopped <n> --reason "why, in one line" [--piece "…" --piece "…"]
+ *                                # ending a run with the step neither closed nor
+ *                                # blocked: the reason goes on the run, and the
+ *                                # pieces are the split a too-big step would take
  *   npx tsx scripts/plan.ts fog <n> --note "what cannot be seen yet" | --clear
  *                                # one patch per feature, about finishing it
  *   npx tsx scripts/plan.ts update <feature> --health on_track|at_risk|blocked --body "…"
@@ -89,6 +93,7 @@ import { uiCheckRefusal, type CheckRound } from '../lib/plan/ui-check-guard';
 import { stepScreenInputs } from '../lib/plan/ui-check-local';
 import type { VisionBodies } from '../lib/specs/vision';
 import { closeRefusal, commitOnMain } from '../lib/plan/github';
+import { runForStop, stopColumns, stopLine, stopRefusal } from '../lib/plan/stop-reason';
 import { branchesContaining } from '../lib/plan/branches';
 import {
   needsLines,
@@ -217,6 +222,15 @@ const argv = process.argv.slice(2);
 function arg(flag: string): string | null {
   const index = argv.indexOf(flag);
   return index > -1 ? (argv[index + 1] ?? null) : null;
+}
+
+/** Every value a repeatable flag was given, in order. */
+function args(flag: string): string[] {
+  const out: string[] = [];
+  argv.forEach((value, index) => {
+    if (value === flag && argv[index + 1] !== undefined) out.push(argv[index + 1]);
+  });
+  return out;
 }
 
 function has(flag: string): boolean {
@@ -1246,6 +1260,58 @@ async function main(): Promise<void> {
         update plan_items set status = 'not_started', block_ask = null, block_kind = null
         where id = ${item.id} and user_id = ${userId}`;
       console.log(`#${item.number} reopened.`);
+      return;
+    }
+
+    // Why a session stopped without closing its step (plan #1802), written onto
+    // the run it was sent as: the newest run fired at the step or a row above
+    // it. A run still going is ended, since the session has said it is over.
+    // `--piece`, given twice or more, is the split a too-big step would take.
+    if (command === 'stopped') {
+      const reason = stopLine(arg('--reason'));
+      const pieces = args('--piece').map(stopLine);
+      const refusal = stopRefusal(reason, pieces);
+      if (refusal) fail(refusal);
+      if (item.status === 'done' || item.status === 'blocked') {
+        fail(
+          `#${item.number} is ${item.status}, which already says how the run ended. A stop ` +
+            `reason is for a run that ends with its step neither closed nor blocked.`,
+        );
+      }
+      const chain = await sql<{ id: string }[]>`
+        with recursive chain as (
+          select id, parent_id from plan_items where id = ${item.id} and user_id = ${userId}
+          union all
+          select p.id, p.parent_id from plan_items p
+          join chain on p.id = chain.parent_id
+          where p.user_id = ${userId}
+        )
+        select id from chain`;
+      const ids = chain.map((row) => row.id);
+      const rows = await sql<{ id: string; plan_item_id: string; status: string; created_at: Date }[]>`
+        select id, plan_item_id, status, created_at from plan_runs
+        where user_id = ${userId} and plan_item_id in ${sql(ids)}`;
+      const run = runForStop(
+        rows.map((row) => ({
+          id: row.id,
+          planItemId: row.plan_item_id,
+          status: row.status,
+          createdAt: row.created_at.toISOString(),
+        })),
+        ids,
+      );
+      if (!run) fail(`No run was fired at #${item.number} or above it, so there is no run to explain.`);
+      if (run.status === 'finished') {
+        fail(`The last run on #${item.number} already reads finished; there is no stop to explain.`);
+      }
+      const columns = stopColumns(run, reason, pieces, new Date().toISOString());
+      await sql`
+        update plan_runs set ${sql(columns)}
+        where id = ${run.id} and user_id = ${userId}`;
+      console.log(`#${item.number} last run stopped: ${reason}`);
+      if (pieces.length > 0) {
+        pieces.forEach((piece, index) => console.log(`  ${index + 1}. ${piece}`));
+      }
       return;
     }
 
