@@ -7,6 +7,7 @@ import {
   attachmentProblem,
   ownsAttachmentPath,
   parseUploadedAttachments,
+  pastedFileName,
 } from './rules';
 
 const USER = 'd001bb0f-ffe8-4bfb-880f-17dd1a62b685';
@@ -94,5 +95,18 @@ describe('parseUploadedAttachments', () => {
 describe('attachmentHref', () => {
   it('opens through the signing route', () => {
     expect(attachmentHref(ID)).toBe(`/attachments/${ID}`);
+  });
+});
+
+describe('pastedFileName', () => {
+  it('numbers the names browsers give every copied picture', () => {
+    expect(pastedFileName('image.png', 'image/png', 1)).toBe('Pasted image 1.png');
+    expect(pastedFileName('', 'image/webp', 2)).toBe('Pasted image 2.webp');
+    expect(pastedFileName('', 'image/jpeg', 3)).toBe('Pasted image 3.jpg');
+  });
+
+  it('keeps a name of its own, and a type the store does not take', () => {
+    expect(pastedFileName('Floor plan.jpg', 'image/jpeg', 1)).toBe('Floor plan.jpg');
+    expect(pastedFileName('clip.heic', 'image/heic', 1)).toBe('clip.heic');
   });
 });

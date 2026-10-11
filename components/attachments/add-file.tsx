@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef, useState } from 'react';
+import { useId, useImperativeHandle, useRef, useState } from 'react';
 import { Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
@@ -8,9 +8,29 @@ import {
   ATTACHMENT_ACCEPT,
   ATTACHMENTS_PER_ITEM,
   attachmentSize,
+  pastedFileName,
   type UploadedAttachment,
 } from '@/lib/attachments/rules';
 import { discardUpload, uploadAttachment } from './upload';
+
+/** What a form's message box hands a paste to (note 90a05309). */
+export type AddFileHandle = {
+  /** Add the files on a paste, if it holds any; true when it did, so the box keeps no text for it. */
+  paste: (data: DataTransfer) => boolean;
+};
+
+/**
+ * The files on a paste, named so each reads apart from the others. A paste
+ * that carries text as well, such as a run of a document with a picture in
+ * it, is left to the box as text.
+ */
+export function filesFromPaste(data: DataTransfer, already: number): File[] {
+  if (data.getData('text/plain').trim()) return [];
+  return Array.from(data.files).map((file, index) => {
+    const name = pastedFileName(file.name, file.type, already + index + 1);
+    return name === file.name ? file : new File([file], name, { type: file.type });
+  });
+}
 
 /**
  * "Add a file" for any form that saves a row (plan #1712): the note button,
@@ -22,9 +42,11 @@ import { discardUpload, uploadAttachment } from './upload';
  * field when `name` is given, and its server action passes them through
  * parseUploadedAttachments to recordAttachments once the row is saved.
  * `onUploadingChange` lets the form hold its submit while a file is still
- * going up.
+ * going up. `ref` lets the form's message box pass on a picture pasted into
+ * it, which is added as if it had been chosen.
  */
 export function AddFile({
+  ref,
   value,
   onChange,
   name,
@@ -32,6 +54,7 @@ export function AddFile({
   disabled = false,
   onUploadingChange,
 }: {
+  ref?: React.Ref<AddFileHandle>;
   value: readonly UploadedAttachment[];
   onChange: (files: UploadedAttachment[]) => void;
   /** The hidden field the list goes in as JSON, for a form posted as FormData. */
@@ -69,6 +92,16 @@ export function AddFile({
     setErrors(problems);
     if (added.length > 0) onChange([...value, ...added]);
   };
+
+  useImperativeHandle(ref, () => ({
+    paste: (data) => {
+      if (disabled || uploading) return false;
+      const files = filesFromPaste(data, value.length);
+      if (files.length === 0) return false;
+      void choose(files);
+      return true;
+    },
+  }));
 
   const remove = (path: string) => {
     onChange(value.filter((file) => file.path !== path));

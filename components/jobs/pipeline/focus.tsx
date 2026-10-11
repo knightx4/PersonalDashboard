@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { AlertTriangle, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { CardSection, cardVariants } from '@/components/ui/card';
 import { MoveLabel } from '@/components/ui/move-label';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { StatusBadge } from '@/components/jobs/ui/status-badge';
@@ -166,13 +167,12 @@ function FocusSection({
   children: React.ReactNode;
 }) {
   return (
-    <section aria-label={label}>
-      <h2 className="mb-1 flex items-baseline gap-2 px-2 text-ui font-semibold text-ink">
-        {label}
-        <span className="tabular text-small font-normal text-ink-muted">{count}</span>
-      </h2>
-      <ul className="divide-y divide-border">{children}</ul>
-    </section>
+    // Each section is one surface over the canvas, its rows hairlined inside
+    // it (law 13), as lists are elsewhere. The rows' own inset is taken back
+    // so their text lines up with the heading.
+    <CardSection title={label} meta={count}>
+      <ul className="-mx-2 divide-y divide-border">{children}</ul>
+    </CardSection>
   );
 }
 
@@ -215,7 +215,8 @@ function FocusLine({
           className="size-5 shrink-0 text-micro"
         />
 
-        <span className="min-w-0 flex-1 truncate text-ui text-ink">
+        {/* The title keeps a few words on a phone; whose move it is gives way first. */}
+        <span className="min-w-28 flex-1 truncate text-ui text-ink">
           {row.roleTitle}
           <span className="ml-2 text-ink-muted">
             {row.companyName}
@@ -250,7 +251,7 @@ function FocusLine({
           />
         )}
 
-        {move && <MoveLabel move={move.move} title={move.title} className="shrink-0" />}
+        {move && <MoveLabel move={move.move} title={move.title} className="min-w-0" />}
 
         <span
           className={cn('tabular w-10 shrink-0 text-right text-micro', stale ? 'text-caution' : 'text-ink-muted')}
@@ -284,7 +285,10 @@ function ClosedLine({ rows, href }: { rows: readonly PipelineRow[]; href: string
   return (
     <Link
       href={href}
-      className="group flex min-h-11 items-center gap-2 rounded-control px-2 text-ui transition-colors duration-quick hover:bg-shell-hover sm:min-h-10"
+      className={cn(
+        cardVariants({ padding: 'dense' }),
+        'group flex min-h-11 items-center gap-2 text-ui transition-colors duration-quick hover:bg-shell-hover sm:min-h-10',
+      )}
     >
       <span className="font-semibold text-ink">Closed</span>
       <span className="tabular text-small text-ink-muted">{rows.length}</span>

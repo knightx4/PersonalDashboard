@@ -249,6 +249,9 @@ export const MAX_DEV_COMMENTS = 40;
 /** The most characters of one comment a read returns. */
 export const DEV_COMMENT_CHARS = 2000;
 
+/** The most sessions sent at a step that one read returns: the newest. */
+export const MAX_STEP_RUNS = 5;
+
 /** Who wrote a comment or filed an idea, as the model is to name them. */
 export function writer(author: string | null | undefined): string {
   if (author === 'claude') return 'Dash';
@@ -405,7 +408,10 @@ async function readStep(
 
   // The questions put beneath it, which is where "what is decided so far" is
   // written: each answered one with its answer, each open one as waiting.
-  const [below, above] = await Promise.all([
+  // And the sessions sent at it, newest first, with how each ended and the
+  // line a session wrote on stopping (plan #1802), so "why did that one get
+  // skipped" has an answer on the row.
+  const [below, above, sent] = await Promise.all([
     client
       .from('plan_items')
       .select('number, title, status, resolution')
@@ -417,9 +423,18 @@ async function readStep(
     row.parent_id
       ? client.from('plan_items').select('number, title').eq('user_id', ctx.userId).eq('id', row.parent_id).limit(1)
       : Promise.resolve({ data: [], error: null }),
+    client
+      .from('plan_runs')
+      .select('status, error, stop_reason, stop_pieces, created_at')
+      .eq('user_id', ctx.userId)
+      .eq('plan_item_id', row.id)
+      .order('created_at', { ascending: false })
+      .limit(MAX_STEP_RUNS),
   ]);
   if (below.error) throw new Error(`plan_items: ${below.error.message}`);
   if (above.error) throw new Error(`plan_items: ${above.error.message}`);
+  if (sent.error) throw new Error(`plan_runs: ${sent.error.message}`);
+  const runs = ((sent.data ?? []) as StepRun[]).map(runLine);
   const decisions = ((below.data ?? []) as { number: number; title: string; status: string; resolution: string | null }[])
     .filter((d) => d.status !== 'dropped')
     .map((d) =>
@@ -448,8 +463,39 @@ async function readStep(
       // Mostly dated lines sessions wrote as they started, blocked and closed it.
       history: longText(row.comment),
       decisions: decisions.length > 0 ? decisions.join('\n') : null,
+      sessions: runs.length > 0 ? runs.join('\n') : null,
     },
   };
+}
+
+type StepRun = {
+  status: string;
+  error: string | null;
+  stop_reason: string | null;
+  stop_pieces: string[] | null;
+  created_at: string;
+};
+
+/**
+ * One session sent at a step, on one line: its day and how it ended, then the
+ * session's own reason for stopping and the split it proposed, or the app's
+ * note when the session gave none (a timeout, a refused fire).
+ */
+export function runLine(run: StepRun): string {
+  const parts = [`[${run.created_at.slice(0, 10)}] ${run.status}.`];
+  if (run.stop_reason) {
+    parts.push(`The session said why it stopped: ${run.stop_reason}`);
+    if (run.stop_pieces && run.stop_pieces.length > 0) {
+      parts.push(`It would split the work into: ${run.stop_pieces.join('; ')}.`);
+    }
+  }
+  if (run.error && run.error !== run.stop_reason) {
+    parts.push(`The app's note: ${run.error}`);
+  }
+  if (!run.stop_reason && !run.error && run.status !== 'started') {
+    parts.push('Nothing was written about how it ended.');
+  }
+  return parts.join(' ');
 }
 
 async function readRaise(client: SchemaClient, ctx: AskContext, id: string): Promise<Found | null> {
