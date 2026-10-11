@@ -12,6 +12,7 @@ import {
   type VideoCard,
 } from '@/lib/learn/youtube/videos';
 import { Button } from '@/components/ui/button';
+import { cardVariants } from '@/components/ui/card';
 import { moveVideoAction } from '../actions';
 import { addedLabel } from '../video-rows';
 import { WatchedToggle } from '../watched-toggle';
@@ -45,7 +46,7 @@ export function ListVideoView({ video, start, cards, related, relatedError }: Li
   ].filter(Boolean);
 
   return (
-    <>
+    <div className="max-w-3xl">
       <p className="mb-3">
         <Link href="/learn/videos" className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink">
           <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
@@ -66,11 +67,11 @@ export function ListVideoView({ video, start, cards, related, relatedError }: Li
         actions={<WatchedToggle videoId={video.videoId} watched={video.watchedAt !== null} />}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <div className="space-y-6">
         <div className="min-w-0 space-y-4">
           <ClipPlayer videoId={video.videoId} title={video.title} start={start} />
           {video.chapters.length > 0 && (
-            <section>
+            <section className={cardVariants({ padding: 'standard' })}>
               <h2 className="mb-1 text-ui font-semibold text-ink-muted">Chapters</h2>
               <ol className="space-y-0.5">
                 {video.chapters.map((chapter) => (
@@ -90,15 +91,15 @@ export function ListVideoView({ video, start, cards, related, relatedError }: Li
           )}
         </div>
 
-        <div className="min-w-0 space-y-5">
-          <Pile video={video} cards={cards} />
-          <Summary video={video} />
+        <Pile video={video} cards={cards} />
+        <Summary video={video} />
+        <div className="min-w-0">
           {relatedError ? (
             <p role="alert" className="text-small text-danger">
               {relatedError}
             </p>
           ) : related && related.length > 0 ? (
-            <section>
+            <section className={cardVariants({ padding: 'standard' })}>
               <h2 className="mb-1 text-ui font-semibold text-ink-muted">Closest to your ideas</h2>
               <ul className="space-y-1">
                 {related.map((idea) => (
@@ -121,7 +122,7 @@ export function ListVideoView({ video, start, cards, related, relatedError }: Li
           ) : null}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -136,7 +137,7 @@ function summaryNote(video: ListVideoPage): string | null {
 function Summary({ video }: { video: ListVideoPage }) {
   if (!video.summary) {
     return (
-      <section>
+      <section className={cardVariants({ padding: 'standard' })}>
         <h2 className="mb-1 text-ui font-semibold text-ink-muted">Summary</h2>
         <p className="text-ui text-ink-muted">
           {video.summarisedAt
@@ -148,7 +149,7 @@ function Summary({ video }: { video: ListVideoPage }) {
   }
   const note = summaryNote(video);
   return (
-    <section>
+    <section className={cardVariants({ padding: 'standard' })}>
       <h2 className="mb-1 text-ui font-semibold text-ink-muted">Summary</h2>
       <p className="text-body text-ink">{video.summary}</p>
       {note && <p className="mt-1 text-small text-ink-muted">{note}</p>}
@@ -173,7 +174,7 @@ function Summary({ video }: { video: ListVideoPage }) {
  */
 function Pile({ video, cards }: { video: ListVideoPage; cards: VideoCard[] }) {
   return (
-    <section>
+    <section className={cardVariants({ padding: 'standard' })}>
       <h2 className="mb-1 text-ui font-semibold text-ink-muted">{PILE_LABEL[video.verdict ?? 'unjudged']}</h2>
       <p className="text-ui text-ink">{verdictReason(video)}</p>
       {video.verdict === 'watch' && (
