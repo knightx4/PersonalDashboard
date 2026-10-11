@@ -59,7 +59,7 @@ describe('the filter a list is under (plan #1658)', () => {
   });
 
   it('reaches the question as the route reads it', () => {
-    const checked = parseAskInput('Mark these for sale', null, '/shopping/inventory', {
+    const checked = parseAskInput('Mark these for sale', null, '/shopping/inventory', undefined, undefined, {
       list: 'inventory',
       query: 'category=c1',
     });
