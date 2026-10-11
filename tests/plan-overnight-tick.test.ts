@@ -22,6 +22,7 @@ import {
   overnightTick,
   featureRunLiveness,
   featureRunsInFlight,
+  fileStalls,
   heldRaise,
   OVERNIGHT_NO_PROGRESS,
   personAnsweredSince,
@@ -448,6 +449,27 @@ describe('overnightTick', () => {
 
     await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired' });
     expect(calls.fired).toEqual([{ feature: 'second', step: 'second-step' }]);
+  });
+
+  it('passes over a feature its stall raise holds and fires the next', async () => {
+    const { ports: p, calls } = ports({
+      loadSections: async () => tree(twoFeatures()),
+      stalls: async () => ['first'],
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired' });
+    expect(calls.fired).toEqual([{ feature: 'second', step: 'second-step' }]);
+  });
+
+  it('still fires when the stalls cannot be read', async () => {
+    const { ports: p, calls } = ports({
+      stalls: async () => {
+        throw new Error('plan_runs is unreadable');
+      },
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired' });
+    expect(calls.fired).toEqual([{ feature: 'feature', step: 'step' }]);
   });
 
   it('fires a run with no cap without counting anything down', async () => {
@@ -1005,6 +1027,113 @@ describe('outsideRunning', () => {
     const sections = tree([item({ id: 'todo-a', module: 'todo' })]);
     const ids = outsideRunning(sections, ['gone']).flatMap((one) => one.nodes.map((n) => n.id));
     expect(ids).toEqual(['todo-a']);
+  });
+});
+
+describe('fileStalls', () => {
+  type Row = Record<string, unknown>;
+
+  /**
+   * plan_runs and raised_items as chains that answer every read with the
+   * given rows, and record what is inserted. The filters are left to the
+   * real query; what is checked is what the tick does with the answer.
+   */
+  function db(runs: Row[], raises: Row[]) {
+    const inserted: Row[] = [];
+    const from = (table: string) => {
+      const rows = table === 'plan_runs' ? runs : raises;
+      const answer = { data: rows, error: null };
+      const chain: Record<string, unknown> = {
+        select: () => chain,
+        eq: () => chain,
+        in: () => chain,
+        not: () => chain,
+        order: () => chain,
+        limit: async () => answer,
+        like: (_column: string, pattern: string) =>
+          Promise.resolve({
+            data: rows.filter((row) =>
+              String(row.source).startsWith(pattern.replace(/%$/, '')),
+            ),
+            error: null,
+          }),
+        insert: async (row: Row) => {
+          inserted.push(row);
+          return { error: null };
+        },
+      };
+      return chain;
+    };
+    return { supabase: { from } as never, inserted };
+  }
+
+  const sections = () => tree([item({ id: 'feature', number: 1801 }), item({ id: 'step', parentId: 'feature' })]);
+  const failed = (id: string, at: string, over: Row = {}) => ({
+    id,
+    plan_item_id: 'step',
+    status: 'failed',
+    created_at: at,
+    stop_reason: null,
+    stop_pieces: null,
+    error: null,
+    ...over,
+  });
+
+  it('raises a feature whose last two runs closed nothing, quoting why, and holds it', async () => {
+    const { supabase, inserted } = db(
+      [
+        failed('r2', '2026-10-11T10:00:00.000Z', { stop_reason: 'Main was red.' }),
+        failed('r1', '2026-10-10T10:00:00.000Z'),
+      ],
+      [],
+    );
+
+    const held = await fileStalls({ supabase, userId: 'u', sections: sections(), now: Date.parse('2026-10-11T12:00:00.000Z') });
+
+    expect(held).toEqual(['feature']);
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]).toMatchObject({
+      user_id: 'u',
+      status: 'open',
+      source: 'stalled feature runs r2 r1',
+      consequence: { name: 'send_step', text: '#1801' },
+    });
+    expect(String(inserted[0].detail)).toContain('"Main was red."');
+  });
+
+  it('adds no second raise while the first is open', async () => {
+    const { supabase, inserted } = db(
+      [failed('r3', '2026-10-12T10:00:00.000Z'), failed('r2', '2026-10-11T10:00:00.000Z')],
+      [
+        {
+          source: 'stalled feature runs r2 r1',
+          status: 'open',
+          created_at: '2026-10-11T11:00:00.000Z',
+          answered_at: null,
+        },
+      ],
+    );
+
+    const held = await fileStalls({ supabase, userId: 'u', sections: sections(), now: MIDNIGHT });
+
+    expect(inserted).toEqual([]);
+    // Sent by hand since the raise, so the raise no longer holds it.
+    expect(held).toEqual([]);
+  });
+
+  it('raises nothing for a feature whose newest run closed a step', async () => {
+    const { supabase, inserted } = db(
+      [
+        failed('r2', '2026-10-11T10:00:00.000Z', { status: 'finished' }),
+        failed('r1', '2026-10-10T10:00:00.000Z'),
+      ],
+      [],
+    );
+
+    const held = await fileStalls({ supabase, userId: 'u', sections: sections(), now: MIDNIGHT });
+
+    expect(inserted).toEqual([]);
+    expect(held).toEqual([]);
   });
 });
 

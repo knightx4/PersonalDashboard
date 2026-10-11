@@ -27,6 +27,16 @@ import {
 import { chooseOvernightFeature, OVERNIGHT_NOTHING_READY } from '@/lib/plan/overnight-choice';
 import { remainingUntil } from '@/lib/plan/elapsed';
 import { endsRun } from '@/lib/plan/run-end';
+import {
+  raiseFeatureId,
+  raiseHolds,
+  runsByFeature,
+  shouldRaiseStall,
+  stallRaise,
+  STALL_JOBS,
+  type FeatureRaise,
+  type StallRun,
+} from '@/lib/plan/stall';
 import { endQuietRuns } from '@/lib/plan/runs';
 import { subtreeBlockedAt, subtreeClosedAt, subtreeTrail } from '@/lib/plan/subtree';
 import { buildPlanTree, flatten, type PlanNode, type PlanSection } from '@/lib/plan/tree';
@@ -542,6 +552,13 @@ export type OvernightPorts = {
    * already filed for the same fire. Left out, nothing is filed.
    */
   raiseHeld?: (held: readonly PassedOver[]) => Promise<void>;
+  /**
+   * File a raise for each feature whose last two runs closed nothing, quoting
+   * why the sessions stopped (`lib/plan/stall.ts`), and return the features a
+   * raise holds from the runner: one still open, or one answered no with
+   * nothing sent at the feature since. Left out, nothing is raised or held.
+   */
+  stalls?: (sections: readonly PlanSection[]) => Promise<readonly string[]>;
 };
 
 /** A feature session that is still going, as the tick counts it. */
@@ -569,6 +586,28 @@ async function raiseHeldForGood(
         err instanceof Error ? err.message : 'failed'
       }`,
     );
+  }
+}
+
+/**
+ * Raise the stalled features and return the ones a raise holds. A failure is
+ * logged and holds nothing: the tick still has features to fire, and the
+ * in-night guard still stops it resending one that closed nothing.
+ */
+async function raiseStalls(
+  ports: OvernightPorts,
+  sections: readonly PlanSection[],
+): Promise<readonly string[]> {
+  if (!ports.stalls) return [];
+  try {
+    return await ports.stalls(sections);
+  } catch (err) {
+    console.error(
+      `stalled features could not be raised on the overnight tick: ${
+        err instanceof Error ? err.message : 'failed'
+      }`,
+    );
+    return [];
   }
 }
 
@@ -690,9 +729,14 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
   // send, which writes. So the choosing and the firing take turns, each
   // refusal costs one candidate, and the loop can go round at most once per
   // top-level feature.
+  // Stalled features are raised before the choice, so a feature held by its
+  // raise is never chosen and never gets the plainer held raise below as well.
+  const raiseHeldIds = await raiseStalls(ports, sections);
+
   const refused: RefusedFeature[] = [];
   const raised = new Set<string>();
   let remaining: readonly PlanSection[] = outsideRunning(sections, runningIds);
+  for (const id of raiseHeldIds) remaining = without(remaining, id);
   const rounds = remaining.reduce((total, section) => total + section.nodes.length, 0) + 1;
 
   for (let round = 0; round < rounds; round += 1) {
@@ -817,6 +861,121 @@ async function featureFires(
     else if (!previous[row.plan_item_id]) previous[row.plan_item_id] = row.created_at;
   }
   return { last, previous };
+}
+
+/** How many of the newest build runs the stall check reads. */
+const STALL_RUN_READ = 1000;
+
+type StallRunRow = {
+  id: string;
+  plan_item_id: string;
+  status: string;
+  created_at: string;
+  stop_reason: string | null;
+  stop_pieces: string[] | null;
+  error: string | null;
+};
+
+type HeldRaiseRow = {
+  source: string | null;
+  status: string;
+  created_at: string;
+  answered_at: string | null;
+};
+
+/**
+ * Raise each approved feature whose last two runs closed nothing, and say
+ * which features a raise holds (plan #1803; the rules are `lib/plan/stall.ts`).
+ *
+ * Two reads: the account's newest build runs, and its raises about held
+ * features of either kind. Every run on a feature counts, whoever sent it, so
+ * this sees stalls the in-night guard cannot. A raise that cannot be written
+ * is logged and the next feature is tried.
+ */
+export async function fileStalls(input: {
+  supabase: Db;
+  userId: string;
+  sections: readonly PlanSection[];
+  now?: number;
+}): Promise<string[]> {
+  const { supabase, userId, sections } = input;
+
+  // The approved features, and every row beneath each, by id.
+  const features = new Map<string, PlanNode>();
+  const featureOf = new Map<string, string>();
+  for (const section of sections) {
+    for (const node of section.nodes) {
+      if (node.status === 'done' || node.status === 'dropped' || node.status === 'proposed') {
+        continue;
+      }
+      features.set(node.id, node);
+      for (const row of flatten([node])) featureOf.set(row.id, node.id);
+    }
+  }
+  if (features.size === 0) return [];
+
+  const [runRead, heldRead, stallRead] = await Promise.all([
+    supabase
+      .from('plan_runs')
+      .select('id, plan_item_id, status, created_at, stop_reason, stop_pieces, error')
+      .eq('user_id', userId)
+      .in('job', [...STALL_JOBS])
+      .not('plan_item_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(STALL_RUN_READ),
+    supabase
+      .from('raised_items')
+      .select('source, status, created_at, answered_at')
+      .eq('user_id', userId)
+      .like('source', 'overnight held %'),
+    supabase
+      .from('raised_items')
+      .select('source, status, created_at, answered_at')
+      .eq('user_id', userId)
+      .like('source', 'stalled %'),
+  ]);
+  const readError = runRead.error ?? heldRead.error ?? stallRead.error;
+  if (readError) throw new Error(readError.message);
+
+  const runs: StallRun[] = ((runRead.data ?? []) as StallRunRow[]).map((row) => ({
+    id: row.id,
+    planItemId: row.plan_item_id,
+    status: row.status,
+    createdAt: row.created_at,
+    stopReason: row.stop_reason,
+    stopPieces: row.stop_pieces,
+    error: row.error,
+  }));
+  const byFeature = runsByFeature(runs, (id) => featureOf.get(id) ?? null);
+
+  const raises = new Map<string, FeatureRaise[]>();
+  for (const row of [...(heldRead.data ?? []), ...(stallRead.data ?? [])] as HeldRaiseRow[]) {
+    const feature = raiseFeatureId(row.source);
+    if (!feature || !features.has(feature)) continue;
+    const list = raises.get(feature) ?? [];
+    list.push({ status: row.status, createdAt: row.created_at, answeredAt: row.answered_at });
+    raises.set(feature, list);
+  }
+
+  const now = new Date(input.now ?? Date.now()).toISOString();
+  const held: string[] = [];
+  for (const [id, feature] of features) {
+    const last = byFeature.get(id) ?? [];
+    const filed = raises.get(id) ?? [];
+    if (shouldRaiseStall(last, filed)) {
+      const { error } = await supabase
+        .from('raised_items')
+        .insert({ user_id: userId, ...stallRaise(feature, last), status: 'open' });
+      if (error) {
+        console.error(`#${feature.number} could not be raised as stalled: ${error.message}`);
+      } else {
+        console.log(`overnight: raised #${feature.number}, its last two runs closed nothing.`);
+        filed.push({ status: 'open', createdAt: now, answeredAt: null });
+      }
+    }
+    if (raiseHolds(filed, last[0]?.createdAt ?? null)) held.push(id);
+  }
+  return held;
 }
 
 /**
@@ -1057,6 +1216,7 @@ function portsFor(input: {
       const { error } = await stopOvernightRun({ supabase, userId, reason, now: new Date(now) });
       if (error) console.error(`the overnight run could not be ended: ${error}`);
     },
+    stalls: (planSections) => fileStalls({ supabase, userId, sections: planSections, now }),
     raiseHeld: async (held) => {
       for (const one of held) {
         const raise = heldRaise(one);
@@ -1073,6 +1233,20 @@ function portsFor(input: {
           continue;
         }
         if ((filed ?? []).length > 0) continue;
+        // One open raise per feature (plan #1803): a stall raise filed for it
+        // already asks the same question with the cause.
+        const { data: open, error: openError } = await supabase
+          .from('raised_items')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('status', 'open')
+          .like('source', `%${one.id}%`)
+          .limit(1);
+        if (openError) {
+          console.error(`the raises could not be read for #${one.number}: ${openError.message}`);
+          continue;
+        }
+        if ((open ?? []).length > 0) continue;
         const { error } = await supabase.from('raised_items').insert({ user_id: userId, ...raise });
         if (error) console.error(`#${one.number} could not be raised: ${error.message}`);
         else console.log(`overnight: raised #${one.number}, held for good, on /dev/inbox.`);
