@@ -14,6 +14,7 @@ import {
   isDatePlausible,
   mentionsRoleTitle,
   normalizeCompanyName,
+  roleHintFor,
   scoreCandidate,
   titleSimilarity,
   type LinkCandidate,
@@ -485,6 +486,40 @@ describe('the acceptance criteria', () => {
       }
     });
 
+    it('never matches a company by an ATS domain it has on file (note fc919f98)', () => {
+      // buildwithporter.com had gem.com on its record, and Circle's rejection,
+      // sent through Gem, was filed under it.
+      const gem = { from: 'The Circle TA Team <no-reply@appreview.gem.com>' };
+      const input = message({
+        threadId: null,
+        fromAddress: gem.from,
+        replyToAddress: null,
+        classification: 'rejection',
+        extractedCompany: 'Circle',
+        extractedRole: 'Strategic Finance Manager',
+      });
+      const porter = candidate({
+        companyId: 'c-porter',
+        companyName: 'buildwithporter.com',
+        companyDomains: ['gem.com'],
+        roleTitle: 'Founding Accountant',
+      });
+      expect(scoreCandidate(input, porter).method).not.toBe('domain');
+
+      const decision = decideLink(input, [], {
+        companies: [
+          { id: 'c-porter', name: 'buildwithporter.com', domains: ['gem.com'] },
+          { id: 'c-circle', name: 'Circle', domains: ['jobalerts.circle.com'] },
+        ],
+        now: new Date('2026-04-06T10:00:00Z'),
+      });
+      if (decision.action === 'create_inferred_application') {
+        expect(decision.company).toMatchObject({ kind: 'existing', id: 'c-circle' });
+      } else {
+        throw new Error(`expected an inferred application, got ${decision.action}`);
+      }
+    });
+
     it('falls back to the ATS subdomain when the body named nobody', () => {
       const decision = decideLink(
         // Subdomains are lowercase by construction, and "monzo-bank" reads as
@@ -703,5 +738,40 @@ describe('the acceptance criteria', () => {
       candidate({ atsJobId: null, roleTitle: 'Warehouse Operative' }),
     );
     expect(wrong.confidence).toBeLessThan(right.confidence);
+  });
+});
+
+describe('roleHintFor (note b48d2b61)', () => {
+  const strategist = candidate({ applicationId: 'a-ds', roleTitle: 'Deployment Strategist' });
+  const opsLead = candidate({ applicationId: 'a-ops', roleTitle: 'Strategy and Ops Leader' });
+
+  it('keeps the role the extractor read', () => {
+    expect(roleHintFor(message({ extractedRole: ' Deployment Strategist ' }), [opsLead])).toBe('Deployment Strategist');
+  });
+
+  it('falls back to the role the body names word for word', () => {
+    const input = message({
+      extractedRole: null,
+      subject: 'Thanks for applying',
+      bodyPreview: 'Thanks for applying to the Deployment Strategist role at Moment.',
+    });
+    expect(roleHintFor(input, [opsLead, strategist])).toBe('Deployment Strategist');
+  });
+
+  it('has nothing to keep when neither names a role', () => {
+    expect(roleHintFor(message({ extractedRole: null, subject: 'Hello', bodyPreview: 'Hi there.' }), [opsLead])).toBeNull();
+  });
+
+  it('separates two roles at one company once the review queue scores with it', () => {
+    // As the review page scores a held message: no body, the hint as the role.
+    const held = message({
+      subject: 'Thanks for applying',
+      bodyPreview: null,
+      extractedCompany: null,
+      extractedRole: 'Deployment Strategist',
+    });
+    const right = scoreCandidate(held, strategist).confidence;
+    const wrong = scoreCandidate(held, opsLead).confidence;
+    expect(right).toBeGreaterThan(wrong);
   });
 });

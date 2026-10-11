@@ -85,7 +85,7 @@ function Rooting({ note }: { note: RootingNote }) {
 function SearchButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" disabled={pending}>
+    <Button type="submit" variant="secondary" pending={pending}>
       <Search className="size-4" strokeWidth={2} aria-hidden />
       {pending ? 'Searching…' : 'Find something to read'}
     </Button>

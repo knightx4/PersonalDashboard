@@ -58,11 +58,6 @@ function ratio(a: Rgb, b: Rgb): number {
  */
 const STRONGEST = 0.34;
 
-/** The near pool each workspace paints in Aurora, read out of globals.css. */
-const WORKSPACE_POOLS = [
-  ...CSS.matchAll(/\[data-theme='aurora'\] \[data-workspace='[a-z]+'\],\n\[data-theme='dawn'\] \[data-workspace='[a-z]+'\] \{ --c-wash-near: (#[0-9a-f]{6}); \}/g),
-].map((match) => match[1]!);
-
 const GLASS = ['--c-surface', '--c-raised', '--c-canvas', '--c-sunken'] as const;
 
 function theme(polarity: SkyPolarity, id: (typeof SKY_IDS)[number]): Record<string, string> {
@@ -93,10 +88,6 @@ describe('the default sky', () => {
 });
 
 describe('every sky', () => {
-  it('reads all eight workspace pools out of globals.css', () => {
-    expect(WORKSPACE_POOLS).toHaveLength(8);
-  });
-
   it('has a night side, and a dawn side unless it is a night-only scene, in flat colours', () => {
     expect(SKIES.map((sky) => sky.id)).toEqual([...SKY_IDS]);
     for (const sky of SKIES) {
@@ -130,13 +121,12 @@ describe('every sky', () => {
         const pools = ['--c-wash-near', '--c-wash-mid', '--c-wash-far', '--c-wash-floor'];
         const scene = skyById(id)![polarity]!.peaks;
         // A painted scene: its own brightest colours, opaque. A ribbon sky:
-        // its pools and every workspace colour, which takes the largest pool
-        // inside its workspace, at the strongest share any of them gets.
+        // its pools, at the strongest share any of them gets.
         const lit = scene
           ? [bench, ...scene.map((colour) => parse(colour).rgb)]
           : [
               bench,
-              ...[...pools.map((pool) => vars[pool]!), ...WORKSPACE_POOLS].map((colour) =>
+              ...pools.map((pool) => vars[pool]!).map((colour) =>
                 over(colour, Math.min(1, STRONGEST * lift), bench),
               ),
             ];

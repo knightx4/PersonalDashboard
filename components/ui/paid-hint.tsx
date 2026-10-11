@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from 'react';
 import { CostHint } from '@/components/ui/cost-hint';
-import { scaleEstimate, sumEstimates } from '@/lib/core/spend/estimate-types';
+import { scaleEstimate, sumEstimates, type CostEstimate } from '@/lib/core/spend/estimate-types';
 import type { PaidAction, PaidCosts } from '@/lib/core/spend/paid-actions';
 
 /**
@@ -33,6 +33,7 @@ export function PaidCostsProvider({
 export function PaidHint({
   action,
   count,
+  plus,
   what,
   align,
   className,
@@ -44,6 +45,11 @@ export function PaidHint({
   action: PaidAction | readonly PaidAction[];
   /** How many items the press works on, for its per-unit operations. */
   count?: number;
+  /**
+   * A part of this press the ledger does not price on its own, added to the
+   * figure: reading the files sent with a question (plan #1716).
+   */
+  plus?: CostEstimate | null;
   /** What the button does, for a screen reader: "Cost of reading the list". */
   what?: string;
   align?: 'start' | 'end';
@@ -54,10 +60,11 @@ export function PaidHint({
   const parts = actions.map((key) => costs[key]);
   if (parts.some((part) => !part)) return null;
 
-  const estimate =
+  const priced =
     count == null
-      ? sumEstimates(parts as NonNullable<(typeof parts)[number]>[])
-      : sumEstimates(parts.map((part) => scaleEstimate(part!, count)));
+      ? (parts as NonNullable<(typeof parts)[number]>[])
+      : parts.map((part) => scaleEstimate(part!, count));
+  const estimate = sumEstimates(plus ? [...priced, plus] : priced);
   if (!estimate) return null;
 
   return <CostHint estimate={estimate} what={what} align={align} className={className} />;

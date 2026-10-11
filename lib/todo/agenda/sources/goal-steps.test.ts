@@ -109,7 +109,7 @@ describe('goalStepsSource', () => {
       key: 'goal_questions:q1',
       title: 'Which bank?',
       day: '2026-09-29',
-      link: { href: '/goals/g#step-q1', label: 'Goal' },
+      link: { href: '/goals/g/s/q1', label: 'Goal' },
       completable: false,
       options: [
         { letter: 'A', label: 'The local one', answer: 'A — The local one', recommended: false },
@@ -122,7 +122,7 @@ describe('goalStepsSource', () => {
     questions.push({ id: 'q2', title: 'What matters most?', detail: 'Say it in your words.', goalId: 'g', goalTitle: 'Goal' });
     const [item] = await goalStepsSource.fetch(ctx);
     expect(item.options).toBeUndefined();
-    expect(item.link?.href).toBe('/goals/g#step-q2');
+    expect(item.link?.href).toBe('/goals/g/s/q2');
     expect(item.detail).toBe('Answer it on the goal');
   });
 

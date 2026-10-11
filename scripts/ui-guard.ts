@@ -1,7 +1,7 @@
 /**
  * Check whether a step that changed a screen may close (plan #1534).
  *
- *   npm run ui-guard -- <step> [--commit <sha>]
+ *   npm run ui-guard -- <step> [--commit <sha>] [--accept]
  *
  * The same check `scripts/plan.ts done` makes, for a session that closes
  * through the Supabase connector because it has no DATABASE_URL
@@ -16,9 +16,14 @@
  *     close while there is one.
  *
  * A step that changed no screen file prints that and exits 0.
+ *
+ * With `--accept`, for a step whose block the person has answered with an
+ * accept, it writes (or prints, without DATABASE_URL) an `accepted` round
+ * for each surface that has not passed, and only when the step's comment
+ * carries an `Answered` line newer than its last block (`uiAcceptSql`).
  */
 import postgres from 'postgres';
-import { isScreenFile, uiCheckRefusal, uiGuardSql, type CheckRound } from '../lib/plan/ui-check-guard';
+import { isScreenFile, uiAcceptSql, uiCheckRefusal, uiGuardSql, type CheckRound } from '../lib/plan/ui-check-guard';
 import { localGit, stepScreenInputs } from '../lib/plan/ui-check-local';
 
 function arg(flag: string): string | null {
@@ -33,6 +38,7 @@ function fail(message: string): never {
 
 async function main(): Promise<void> {
   const stepArg = process.argv.slice(2).find((a, i, all) => !a.startsWith('--') && all[i - 1] !== '--commit');
+  const accept = process.argv.includes('--accept');
   const step = Number((stepArg ?? '').replace(/^#/, ''));
   if (!Number.isInteger(step) || step < 1) fail('npm run ui-guard -- <step> [--commit <sha>]');
   const commit = arg('--commit') ?? localGit(['rev-parse', 'HEAD']).trim();
@@ -49,6 +55,28 @@ async function main(): Promise<void> {
   console.log(`#${step} serves: ${surfaces.join(', ')}`);
 
   const databaseUrl = process.env.DATABASE_URL;
+  if (accept) {
+    const statement = uiAcceptSql(step, surfaces);
+    if (!databaseUrl) {
+      console.log('\nRun this through the Supabase connector. It writes an accepted round for each');
+      console.log('surface still waiting, and nothing unless the step has an answer newer than its block.\n');
+      console.log(statement);
+      return;
+    }
+    const sql = postgres(databaseUrl, { max: 1, prepare: false, onnotice: () => {} });
+    try {
+      const rows = await sql.unsafe(statement);
+      console.log(
+        rows.length === 0
+          ? `Nothing written: every surface had passed, or #${step} has no answer newer than its block.`
+          : `Accepted ${rows.length} surface${rows.length === 1 ? '' : 's'} on #${step}.`,
+      );
+    } finally {
+      await sql.end({ timeout: 5 });
+    }
+    return;
+  }
+
   if (!databaseUrl) {
     console.log('\nRun this through the Supabase connector. No rows: it may close. Any row: it may not.\n');
     console.log(uiGuardSql(step, surfaces));

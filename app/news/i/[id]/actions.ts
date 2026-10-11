@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createNewsClient } from '@/lib/news/auth/server';
-import { markUnread } from '@/lib/news/issues/read';
+import { markConfirmed, markUnread } from '@/lib/news/issues/read';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { queueNewsStory, type QueuedStory } from '@/lib/learn/tracks/news';
 import { loadAccountSettings } from '@/lib/core/account/settings';
@@ -38,6 +38,36 @@ export async function markIssueUnread(formData: FormData): Promise<void> {
 
   revalidatePath('/news/all');
   redirect('/news/all');
+}
+
+export type ConfirmIssueResult = { error: string | null };
+
+/**
+ * Note that Confirm was pressed on a signup email (plan #1724). Shared by the
+ * issue page and, from #1725, the Needs confirming section on the list.
+ *
+ * The link itself is opened by the browser, in a new tab, from the button's
+ * own anchor: the app never visits a confirmation link, since a server
+ * following one could subscribe you to something you did not choose. This
+ * only records the press as confirmed_at, scoped to the signed-in account, so
+ * the button gives way to a line saying when. A repeat press, or one for an
+ * issue with no stored link, changes nothing and is not an error.
+ */
+// latency: optimistic -- the button says Confirmed at once, and a refused write puts it back with a toast
+export async function confirmIssue(issueId: string): Promise<ConfirmIssueResult> {
+  const parsed = z.string().uuid().safeParse(issueId);
+  if (!parsed.success) return { error: 'That signup could not be found.' };
+
+  const user = await requireUser();
+  try {
+    await markConfirmed(await createNewsClient(), user.id, parsed.data);
+  } catch {
+    return { error: 'That did not save. Try again.' };
+  }
+
+  revalidatePath(`/news/i/${parsed.data}`);
+  revalidatePath('/news/all');
+  return { error: null };
 }
 
 const SaveInput = z.object({

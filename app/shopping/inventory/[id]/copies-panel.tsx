@@ -146,7 +146,7 @@ export function CopiesPanel({
             {copies.length > 1 && (
               <form action={separateAction} className="shrink-0">
                 <input type="hidden" name="id" value={copy.id} />
-                <Button type="submit" size="sm" variant="ghost" disabled={pending}>
+                <Button type="submit" size="sm" variant="ghost" pending={pending}>
                   Separate
                 </Button>
               </form>

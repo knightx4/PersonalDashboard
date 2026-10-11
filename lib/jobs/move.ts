@@ -24,6 +24,7 @@ export function lastTurnEvent(kindsNewestFirst: readonly string[]): ApplicationE
 }
 
 const OFFER = 'There is an offer to answer.';
+const ASKED = 'They asked you something by mail, and the answer is yours.';
 
 /** After these, the next thing has to come from you. */
 const YOURS_AFTER: Partial<Record<ApplicationEventKind, string>> = {
@@ -39,6 +40,13 @@ export type ApplicationMoveInput = {
   /** The newest event that counts (`lastTurnEvent`), or null when there is none. */
   lastEvent: ApplicationEventKind | null;
   companyName: string;
+  /**
+   * Mail on it asked you something and has not been answered or put aside
+   * (This week's "Waiting on you"). Whatever the last event was, a question
+   * waiting on you makes the move yours. Today passes it; the board does not
+   * read the mail, and leaves it out.
+   */
+  asked?: boolean;
 };
 
 /**
@@ -49,6 +57,7 @@ export function applicationMove({
   status,
   lastEvent,
   companyName,
+  asked = false,
 }: ApplicationMoveInput): { move: Move; title: string } | null {
   if (isTerminal(status)) return null;
 
@@ -61,6 +70,7 @@ export function applicationMove({
 
   const yours = lastEvent ? YOURS_AFTER[lastEvent] : undefined;
   if (yours) return { move: { state: 'on_you' }, title: yours };
+  if (asked) return { move: { state: 'on_you' }, title: ASKED };
 
   const company = companyName.trim();
   return {
@@ -69,5 +79,33 @@ export function applicationMove({
       status === 'submitted' || status === 'acknowledged'
         ? 'Sent; the next move is theirs.'
         : 'The last move was yours; the next one is theirs.',
+  };
+}
+
+/** Who moved an application to a stage: the person on the board, or Dash when asked. */
+export type StageMoveBy = 'hand' | 'Dash';
+
+/**
+ * The event a stage move writes, the same from the board's drag, the role
+ * page's picker and Dash's move_roles (plan #1657). The status column is
+ * never written: public.sync_application_state() derives it from this event
+ * and the override column, so a move is this row plus
+ * `status_manual_override` set to the same status.
+ */
+export function stageMoveEvent(
+  userId: string,
+  applicationId: string,
+  status: ApplicationStatus,
+  by: StageMoveBy,
+  occurredAt: string,
+) {
+  return {
+    user_id: userId,
+    application_id: applicationId,
+    kind: 'status_override' as const,
+    occurred_at: occurredAt,
+    source: 'manual' as const,
+    summary: `Moved to ${status.replace(/_/g, ' ')} by ${by === 'hand' ? 'hand' : 'Dash'}`,
+    payload: { status },
   };
 }

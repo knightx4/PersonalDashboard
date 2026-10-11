@@ -45,7 +45,7 @@ async function llmParseLines(
   const client = new Anthropic({ apiKey });
   const response = await client.messages.create({
     model: PASTE_MODEL,
-    max_tokens: 2048,
+    max_tokens: 8_000, // room for Haiku 5.5's thinking as well as the answer
     system: `You parse a pasted list of owned books into structured lines.
 Return ONLY JSON: {"lines":[{"title":"...","author":"...|null","isbn":"...|null"}]}
 Rules:

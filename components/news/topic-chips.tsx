@@ -87,18 +87,18 @@ export function TopicChips({ topics, selected, hrefs, allHref, className }: Topi
 
   return (
     <div className={cn('relative', className)}>
-      <div
-        ref={ghostRef}
-        aria-hidden
-        className="pointer-events-none invisible absolute left-0 top-0 flex gap-1.5"
-      >
-        <span className={CHIP}>All topics</span>
-        {phoneOrder.map((topic) => (
-          <span key={topic} className={CHIP}>
-            {topic}
-          </span>
-        ))}
-        <span className={CHIP}>More</span>
+      {/* The measuring row is wider than a phone, so it sits in a box of no
+          height that clips it; otherwise the page could scroll sideways into it. */}
+      <div aria-hidden className="pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden">
+        <div ref={ghostRef} className="flex w-max gap-1.5">
+          <span className={CHIP}>All topics</span>
+          {phoneOrder.map((topic) => (
+            <span key={topic} className={CHIP}>
+              {topic}
+            </span>
+          ))}
+          <span className={CHIP}>More</span>
+        </div>
       </div>
       <nav
         ref={rowRef}

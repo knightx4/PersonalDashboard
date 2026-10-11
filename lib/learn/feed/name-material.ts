@@ -221,7 +221,7 @@ export async function nameMaterial(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, NAME_MATERIAL_MODEL),
       messages: [
         {
           role: 'user',

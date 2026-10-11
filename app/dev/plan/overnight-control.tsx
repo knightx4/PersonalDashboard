@@ -2,11 +2,12 @@
 
 import { useActionState, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CornerDownRight, Moon, Pause, Play, Square } from 'lucide-react';
+import { CheckCheck, Moon, Pause, Play, Square } from 'lucide-react';
 
 import {
   pauseOvernightRunner,
   resumeOvernightRunner,
+  setAutoApproveAction,
   startOvernightRunner,
   stopOvernightRunner,
   type PlanActionState,
@@ -28,10 +29,12 @@ import {
   type FeatureProgress,
   type OnNow,
 } from '@/lib/digest/night';
-import { goalsReadyLine, type GoalOnLine, type GoalsStatus } from '@/lib/goals/runner-status';
+import { goalsReadyLine, type GoalsStatus } from '@/lib/goals/runner-status';
 import { elapsedSince, remainingUntil } from '@/lib/plan/elapsed';
 import { commitSubject, type StoredPush } from '@/lib/plan/liveness';
 import { readyFeaturesLine } from '@/lib/plan/overnight-choice';
+import { runnerSlots, type SlotSession } from '@/lib/plan/overnight-slots';
+import { RunnerCrew } from './runner-crew';
 import {
   OVERNIGHT_DEFAULT_FEATURES,
   OVERNIGHT_DEFAULT_HOURS,
@@ -96,98 +99,6 @@ function Totals({ night }: { night: DigestNight }) {
   );
 }
 
-/**
- * The feature being built, and how long it has been on it.
- *
- * `lastFire` rather than the last of `features`: a runner that came back to an
- * earlier feature is working that feature, and the deduplicated list is in the
- * order the night first reached each one. See the field's note in `night.ts`.
- */
-function OnFeature({
-  fire,
-  now,
-  progress,
-}: {
-  fire: NonNullable<DigestNight['lastFire']>;
-  now: number;
-  progress: FeatureProgress | null;
-}) {
-  return (
-    <>
-      <p className="text-small text-ink-muted">
-        On <span className="tabular text-ink">{fire.ref}</span>{' '}
-        <span className="text-ink">{fire.title}</span>
-        {now > 0 && (
-          <>
-            {' · '}
-            <span className="tabular">{elapsedSince(fire.at, now)}</span>
-          </>
-        )}
-        {progress && (
-          <>
-            {' · '}
-            <span className="tabular">
-              {progress.done} of {progress.total} steps done
-            </span>
-          </>
-        )}
-      </p>
-      {/* The step under it that a session has claimed, hung off the feature
-          as a branch the way the plan page draws a child -- note 84482e92.
-          Nothing is drawn between a fire and the session's first claim. */}
-      {fire.step && (
-        <p className="flex min-w-0 items-baseline gap-1.5 pl-2 text-small text-ink-muted">
-          <CornerDownRight
-            className="size-3 shrink-0 translate-y-0.5 text-ink-ghost"
-            strokeWidth={1.75}
-            aria-hidden
-          />
-          <span className="sr-only">Working on</span>
-          <span className="tabular text-ink">{fire.step.ref}</span>
-          <span className="min-w-0 truncate text-ink">{fire.step.title}</span>
-        </p>
-      )}
-    </>
-  );
-}
-
-/**
- * A goal run going now, drawn the way `OnFeature` draws a plan feature, with
- * what the session last said it was on hung beneath it.
- */
-function OnGoal({ run, now }: { run: GoalOnLine; now: number }) {
-  return (
-    <>
-      <p className="text-small text-ink-muted">
-        {run.doing}
-        {run.title && (
-          <>
-            {' '}
-            <span className="text-ink">{run.title}</span>
-          </>
-        )}
-        {now > 0 && (
-          <>
-            {' · '}
-            <span className="tabular">{elapsedSince(run.at, now)}</span>
-          </>
-        )}
-      </p>
-      {run.nowOn && (
-        <p className="flex min-w-0 items-baseline gap-1.5 pl-2 text-small text-ink-muted">
-          <CornerDownRight
-            className="size-3 shrink-0 translate-y-0.5 text-ink-ghost"
-            strokeWidth={1.75}
-            aria-hidden
-          />
-          <span className="sr-only">Now on</span>
-          <span className="min-w-0 truncate text-ink">{run.nowOn}</span>
-        </p>
-      )}
-    </>
-  );
-}
-
 /** How long the runner may go without a tick before the page says so. */
 const TICK_SILENT_AFTER_MINUTES = 15;
 
@@ -214,17 +125,8 @@ function TickNote({ run, now }: { run: OvernightRun; now: number }) {
       </p>
     );
   }
-  // A fire is already on the line above, as the feature it is on.
-  if (run.lastTickNote.startsWith('Started #')) return null;
-
-  return (
-    <p className="text-small text-ink-muted">
-      {run.lastTickNote}{' '}
-      <span className="tabular">
-        {ago === 'just now' ? 'Checked just now.' : `Checked ${ago} ago.`}
-      </span>
-    </p>
-  );
+  // Otherwise the note is what each sleeping Dash says beside it (plan #1704).
+  return null;
 }
 
 /**
@@ -399,11 +301,13 @@ export function OvernightControl({
   fresh = false,
   label = 'Overnight',
   bare = false,
+  mark = null,
   showBlocked = true,
-  progress = null,
   refreshReadings = false,
   on = [],
+  sessions = [],
   next = [],
+  autoApprove,
 }: {
   run: OvernightRun | null;
   canSend: boolean;
@@ -455,6 +359,11 @@ export function OvernightControl({
    */
   bare?: boolean;
   /**
+   * Drawn under the label, on the left: the Status panel on Dash puts Dash's
+   * own mark here, working while a run is going (note 076e7744).
+   */
+  mark?: React.ReactNode;
+  /**
    * List the steps the night left blocked on you. Dash leaves it off: the same
    * steps are the first rows of its "waiting on you" list a little further
    * down, and the status card saying it again was note 7a08286c.
@@ -473,6 +382,11 @@ export function OvernightControl({
    * pages pass it, from `runnerCard`, so they name the same sessions.
    */
   on?: readonly (OnNow & { progress?: FeatureProgress | null })[];
+  /**
+   * The night's feature sessions, ended ones too, as `runnerCard` reads them,
+   * for the four Dashes (plan #1704).
+   */
+  sessions?: readonly SlotSession[];
   /**
    * The features the next ticks would fire, as `runnerCard` reads them. Named
    * under the ready count so it says which ones.
@@ -502,6 +416,12 @@ export function OvernightControl({
    * in the banner above the plan rather than on each thing it emptied.
    */
   push: StoredPush | null;
+  /**
+   * Whether auto approve is on, which draws its switch. Home passes it; the
+   * plan page leaves it off. With it on, every feature and step a session
+   * proposes is approved as it is written (lib/plan/auto-approve.ts).
+   */
+  autoApprove?: boolean;
 }) {
   const now = useClockNow();
   const standing = overnightStanding(run);
@@ -509,6 +429,22 @@ export function OvernightControl({
   // A stopped run on a fresh card reads as one that was never started.
   const resting = fresh && !live;
   const goalsReady = goals ? goalsReadyLine(goals) : null;
+  const goalOn = goals?.on[0] ?? null;
+  const slots = runnerSlots({
+    run,
+    sessions,
+    goalRun: goalOn
+      ? {
+          startedAt: goalOn.at,
+          // "Working the goal step: Find three courses", so the line says the
+          // kind of run as well as what it is on.
+          title: goalOn.title ? `${goalOn.doing}: ${goalOn.title}` : goalOn.doing,
+          doing: goalOn.nowOn,
+        }
+      : null,
+    goalsReason: goalsReady ?? 'No goal step is ready.',
+    now,
+  });
 
   const router = useRouter();
   useEffect(() => {
@@ -544,6 +480,10 @@ export function OvernightControl({
     stopOvernightRunner,
     {} as PlanActionState,
   );
+  const [autoState, autoAction, flipping] = useActionState(
+    setAutoApproveAction,
+    {} as PlanActionState,
+  );
 
   // Each form keeps its own last answer and nothing records which spoke most
   // recently, so the one shown is the latest in the order the buttons can be
@@ -551,8 +491,17 @@ export function OvernightControl({
   // The row above it is the truth either way -- every one of these actions
   // revalidates the page -- so this is the press being acknowledged, not the
   // state being reported.
-  const said = [stopState, resumeState, pauseState, startState].find(
+  const said = [autoState, stopState, resumeState, pauseState, startState].find(
     (state) => state.error ?? state.message,
+  );
+
+  // As tall as a control, so the label lines up with the row beside it when
+  // the mark puts it in a column of its own.
+  const labelText = (
+    <span className="inline-flex min-h-(--control-h) items-center gap-1.5 text-ui font-medium text-ink">
+      <Moon className="size-4 text-ink-muted" aria-hidden />
+      {label}
+    </span>
   );
 
   return (
@@ -560,154 +509,192 @@ export function OvernightControl({
       aria-label="The overnight runner"
       className={cn(!bare && cardVariants({ padding: 'dense' }), 'space-y-2')}
     >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="inline-flex items-center gap-1.5 text-ui font-medium text-ink">
-          <Moon className="size-4 text-ink-muted" aria-hidden />
-          {label}
-        </span>
-        {resting && (ready > 0 || goalsReady) ? (
-          <StateLabel glyph="half" word={DEV_STATE_WORD.ready} tone="accent" />
-        ) : (
-          <OvernightState standing={resting ? 'off' : standing} />
+      {/* With a mark, the label and the mark under it are a column of their
+          own, and the rest of the row starts on one edge beside them. */}
+      <div className="flex items-start gap-3">
+        {mark && (
+          <span className="flex shrink-0 flex-col items-start gap-1.5">
+            {labelText}
+            {mark}
+          </span>
         )}
-        {/* The totals are the headline while a night is on; a night that is
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
+          {!mark && labelText}
+          {resting && (ready > 0 || goalsReady) ? (
+            <StateLabel glyph="half" word={DEV_STATE_WORD.ready} tone="accent" />
+          ) : (
+            <OvernightState standing={resting ? 'off' : standing} />
+          )}
+          {/* The totals are the headline while a night is on; a night that is
             over or has never run has none, and says what it is doing instead.
             A fresh card says neither: the ready count beside it is the news. */}
-        {resting ? null : night && (live || night.features.length > 0) ? (
-          <Totals night={night} />
-        ) : (
-          <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
-        )}
-        {/* What there is left for it to pick up, which nothing else on the card
+          {resting ? null : night && (live || night.features.length > 0) ? (
+            <Totals night={night} />
+          ) : (
+            <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
+          )}
+          {/* What there is left for it to pick up, which nothing else on the card
             can say: the budget counts what a night has spent, and a night with
             three features left in it and nothing ready stops on its next tick.
             In features because that is what a tick fires and what the budget is
             spent in -- the ask on note 2721ff74 was "features (not steps)".
             Said in both states, because before bed it is what decides whether
             to start a night at all. */}
-        <p className="text-small text-ink-muted">{readyFeaturesLine(ready, readySteps)}</p>
-        {goalsReady && <p className="text-small text-ink-muted">{goalsReady}</p>}
+          <p className="text-small text-ink-muted">{readyFeaturesLine(ready, readySteps)}</p>
+          {goalsReady && <p className="text-small text-ink-muted">{goalsReady}</p>}
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {standing === 'running' && (
-            <form action={pauseAction}>
-              <Button
-                type="submit"
-                size="sm"
-                variant="secondary"
-                pending={pausing}
-                title="Fire nothing more. What is already building finishes and commits."
-              >
-                <Pause className="size-3.5" aria-hidden />
-                {pausing ? 'Holding…' : 'Hold'}
-              </Button>
-            </form>
-          )}
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {autoApprove !== undefined && (
+              <form action={autoAction}>
+                <input type="hidden" name="on" value={autoApprove ? 'false' : 'true'} />
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant={autoApprove ? 'primary' : 'secondary'}
+                  aria-pressed={autoApprove}
+                  pending={flipping}
+                  title={
+                    autoApprove
+                      ? 'On: every feature and step a session proposes is approved as it is written. Press to turn it off.'
+                      : 'Approve every proposed feature and step now, and each new one as it is written.'
+                  }
+                >
+                  <CheckCheck className="size-3.5" aria-hidden />
+                  {autoApprove ? 'Auto approve on' : 'Auto approve'}
+                </Button>
+              </form>
+            )}
 
-          {standing === 'paused' && (
-            <form action={resumeAction}>
-              <Button
-                type="submit"
-                size="sm"
-                variant="secondary"
-                pending={resuming}
-                title="Carry on from wherever the plan now is, on what is left of the budget and the clock"
-              >
-                <Play className="size-3.5" aria-hidden />
-                {resuming ? 'Resuming…' : 'Resume'}
-              </Button>
-            </form>
-          )}
+            {standing === 'running' && (
+              <form action={pauseAction}>
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="secondary"
+                  pending={pausing}
+                  title="Fire nothing more. What is already building finishes and commits."
+                >
+                  <Pause className="size-3.5" aria-hidden />
+                  {pausing ? 'Holding…' : 'Hold'}
+                </Button>
+              </form>
+            )}
 
-          {(standing === 'running' || standing === 'paused') && (
-            <form action={stopAction}>
-              <Button
-                type="submit"
-                size="sm"
-                variant="ghost"
-                pending={stopping}
-                title="End the night. What is already building still finishes; nothing follows it."
-              >
-                <Square className="size-3.5" aria-hidden />
-                {stopping ? 'Stopping…' : 'Stop'}
-              </Button>
-            </form>
-          )}
+            {standing === 'paused' && (
+              <form action={resumeAction}>
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="secondary"
+                  pending={resuming}
+                  title="Carry on from wherever the plan now is, on what is left of the budget and the clock"
+                >
+                  <Play className="size-3.5" aria-hidden />
+                  {resuming ? 'Resuming…' : 'Resume'}
+                </Button>
+              </form>
+            )}
 
-          {/* The start form is the whole of the resting state, so it stands
+            {(standing === 'running' || standing === 'paused') && (
+              <form action={stopAction}>
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="ghost"
+                  pending={stopping}
+                  title="End the night. What is already building still finishes; nothing follows it."
+                >
+                  <Square className="size-3.5" aria-hidden />
+                  {stopping ? 'Stopping…' : 'Stop'}
+                </Button>
+              </form>
+            )}
+
+            {/* The start form is the whole of the resting state, so it stands
               open rather than behind a trigger: two fields with their defaults
               already right is not a compose box, and the press this control
               exists for is the one made on the way to bed. */}
-          {(standing === 'off' || standing === 'stopped') && (
-            <form action={startAction} className="flex flex-wrap items-center gap-2">
-              {/* The features field goes away on "until I stop it" rather than
+            {(standing === 'off' || standing === 'stopped') && (
+              <form action={startAction} className="flex flex-wrap items-center gap-2">
+                {/* The features field goes away on "until I stop it" rather than
                   greying out: a cap that does not apply is a number to wonder
                   about, and the sentence reads as one thing either way. */}
-              {!keepGoing && (
-                <>
-                  <span className="text-small text-ink-muted">Up to</span>
-                  <Input
-                    type="number"
-                    name="features"
-                    min={1}
-                    max={OVERNIGHT_FEATURE_CAP}
-                    step={1}
-                    defaultValue={OVERNIGHT_DEFAULT_FEATURES}
-                    aria-label="Features it may fire"
-                    className="w-16"
-                  />
-                  <span className="text-small text-ink-muted">features, over</span>
-                </>
-              )}
-              {keepGoing && <span className="text-small text-ink-muted">Run</span>}
-              <Select
-                name="hours"
-                value={hours}
-                onChange={(event) => setHours(Number(event.target.value))}
-                aria-label="How long it may run for"
-                className="w-auto"
-              >
-                {/* First, because it is the default and the ordinary press. */}
-                <option value={OVERNIGHT_NO_LIMIT}>until I stop it</option>
-                {OVERNIGHT_HOUR_CHOICES.map((choice) => (
-                  <option key={choice} value={choice}>
-                    {choice === 1 ? '1 hour' : `${choice} hours`}
-                  </option>
-                ))}
-              </Select>
-              <Button type="submit" size="sm" pending={starting} disabled={!canSend}>
-                {starting ? 'Starting…' : 'Start'}
-              </Button>
-            </form>
-          )}
+                {!keepGoing && (
+                  <>
+                    <span className="text-small text-ink-muted">Up to</span>
+                    <Input
+                      type="number"
+                      name="features"
+                      min={1}
+                      max={OVERNIGHT_FEATURE_CAP}
+                      step={1}
+                      defaultValue={OVERNIGHT_DEFAULT_FEATURES}
+                      aria-label="Features it may fire"
+                      className="w-16"
+                    />
+                    <span className="text-small text-ink-muted">features, over</span>
+                  </>
+                )}
+                {keepGoing && <span className="text-small text-ink-muted">Run</span>}
+                <Select
+                  name="hours"
+                  value={hours}
+                  onChange={(event) => setHours(Number(event.target.value))}
+                  aria-label="How long it may run for"
+                  className="min-h-11 w-auto sm:min-h-0"
+                >
+                  {/* First, because it is the default and the ordinary press. */}
+                  <option value={OVERNIGHT_NO_LIMIT}>until I stop it</option>
+                  {OVERNIGHT_HOUR_CHOICES.map((choice) => (
+                    <option key={choice} value={choice}>
+                      {choice === 1 ? '1 hour' : `${choice} hours`}
+                    </option>
+                  ))}
+                </Select>
+                {/* On a phone the select beside it has to stay 44px with 16px
+                    text (a smaller one fails the press check, and iOS zooms on
+                    focus), so Start grows to match rather than sitting short
+                    beside it (critic, #1704 round 1). */}
+                <Button
+                  type="submit"
+                  size="sm"
+                  pending={starting}
+                  disabled={!canSend}
+                  className="max-sm:min-h-11 max-sm:px-4 max-sm:text-body"
+                >
+                  {starting ? 'Starting…' : 'Start'}
+                </Button>
+              </form>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* What the night has actually been doing, under the totals: the feature
-          it is on, the last thing it pushed, and then the clock. A night that
-          has fired nothing says so in the runner's own sentence rather than
-          leaving the block empty and reading like one that is working. */}
+      {/* One Dash for each thing the runner can run at once, on or off
+          (plan #1704): working on its step, asleep with nothing ready, or
+          idle while the runner is off. */}
+      <RunnerCrew
+        slots={slots}
+        held={standing === 'paused'}
+        progress={Object.fromEntries(
+          on.flatMap((line) => (line.progress ? [[line.ref, line.progress]] : [])),
+        )}
+      />
+
+      {/* What the night has done around the Dashes: held or not, the last
+          thing it pushed, and then the clock. */}
       {live && run && night && (
         <div className="space-y-0.5">
-          {on.length > 0 ? (
-            on.map((fire) => (
-              <OnFeature
-                key={fire.ref}
-                fire={fire}
-                now={now}
-                progress={fire.progress ?? (fire.ref === night.lastFire?.ref ? progress : null)}
-              />
-            ))
-          ) : night.lastFire ? (
-            <OnFeature fire={night.lastFire} now={now} progress={progress} />
-          ) : (
+          {/* A night that has fired nothing says so in the runner's own
+              sentence, so four sleeping Dashes do not read as a stuck one. */}
+          {!night.lastFire && standing !== 'paused' && (
             <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
           )}
 
           {/* The held sentence is worth saying even when a feature is named,
               because "on #494" and "nothing new is being fired" are both true
               of a night somebody paused mid-feature. */}
-          {standing === 'paused' && night.lastFire && (
+          {standing === 'paused' && (
             <p className="text-small text-ink-muted">{overnightLine(run, now)}</p>
           )}
 
@@ -737,16 +724,6 @@ export function OvernightControl({
           />
           {showBlocked && night.blocked.length > 0 && <BlockedSteps night={night} />}
           {night.closed.length > 0 && <WhichSteps night={night} />}
-        </div>
-      )}
-
-      {/* Goal runs, whoever started them: a step sent by hand is still the
-          thing Dash is working on, and it is on no plan row. */}
-      {goals && goals.on.length > 0 && (
-        <div className="space-y-0.5">
-          {goals.on.map((run) => (
-            <OnGoal key={run.id} run={run} now={now} />
-          ))}
         </div>
       )}
 

@@ -2,12 +2,13 @@ import 'server-only';
 
 import { after } from 'next/server';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { markDashActionUndone, type DashAction, type DashActionDeps } from '@/lib/core/dash-actions';
+import { forgetFiles, markDashActionUndone, type DashAction, type DashActionDeps } from '@/lib/core/dash-actions';
 import { parseRef } from '@/lib/core/refs';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { noteCreatePorts, noteRemovePorts, openConnectedSource } from '@/lib/vault/db/ports';
 import { createCapturedNote, removeCapturedNote } from '@/lib/vault/notes/create';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
+import { rebuildTriageNote } from '@/lib/vault/notes/triage-note-run';
 import { checkWriteAccess, type WriteAccess } from '@/lib/vault/notes/write-access';
 
 /**
@@ -48,7 +49,8 @@ const EMBED_AFTER_WRITE_MS = 20_000;
 export async function fileVaultNote(
   userId: string,
   text: string,
-): Promise<{ ok: true; noteId: string; title: string; blobSha: string } | { ok: false; error: string }> {
+  title?: string,
+): Promise<{ ok: true; noteId: string; path: string; title: string; blobSha: string } | { ok: false; error: string }> {
   const supabase = await createVaultClient();
   const ports = noteCreatePorts({
     supabase,
@@ -65,13 +67,15 @@ export async function fileVaultNote(
       });
     },
   });
-  const result = await createCapturedNote(ports, text);
+  const result = await createCapturedNote(ports, text, title);
   if (!result.ok) {
     // The token stopped writing since it was checked: stop offering the vault.
     if (result.reason === 'read-only' || result.reason === 'reconnect') ACCESS.delete(userId);
     return { ok: false, error: result.error };
   }
-  return { ok: true, noteId: result.noteId, title: result.title, blobSha: result.blobSha };
+  // The new note is a quick note waiting, so the triage note lists it (plan #1732).
+  after(() => rebuildTriageNote(supabase));
+  return { ok: true, noteId: result.noteId, path: result.path, title: result.title, blobSha: result.blobSha };
 }
 
 /**
@@ -88,8 +92,11 @@ export async function undoVaultCapture(
   if (!parsed || parsed.schema !== 'obsidian' || parsed.name !== 'notes' || typeof blobSha !== 'string') {
     return { ok: false, error: 'Dash did not keep what this changed, so it cannot be undone.' };
   }
-  const removed = await removeCapturedNote(noteRemovePorts(await createVaultClient()), parsed.id, blobSha);
+  const vault = await createVaultClient();
+  const removed = await removeCapturedNote(noteRemovePorts(vault), parsed.id, blobSha);
   if (!removed.ok) return removed;
+  after(() => rebuildTriageNote(vault));
   await markDashActionUndone(deps, action.id);
+  await forgetFiles(deps, action.subjectRef!);
   return { ok: true, undoneAt: deps.now ? deps.now() : new Date().toISOString() };
 }

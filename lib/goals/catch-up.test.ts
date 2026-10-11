@@ -2,12 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   AWAY_DAYS,
   SITTING_MINUTES,
-  catchUp,
   catchUpSince,
+  daysAway,
   nextVisit,
   type VisitRecord,
 } from './catch-up';
-import type { DailyGoal } from './daily';
 
 const at = (iso: string) => new Date(iso);
 
@@ -78,37 +77,13 @@ describe('nextVisit sittings (plan #1010)', () => {
   });
 });
 
-function daily(id: string, next: string[]): DailyGoal {
-  return {
-    goal: {
-      id,
-      areaId: 'area',
-      title: `Goal ${id}`,
-      acceptance: null,
-      fog: null,
-      status: 'open',
-      position: 10,
-      unit: null,
-      target: null,
-    },
-    areaName: 'Money',
-    next: next.map((title) => ({ id: title, title, kind: 'mine', dueOn: null, under: null })),
-    more: 0,
-    hasSteps: next.length > 0,
-  };
-}
 
-describe('catchUp', () => {
-  const since = '2026-09-18T08:00:00Z';
+describe('daysAway', () => {
+  it('counts whole days from the visit before the time away', () => {
+    expect(daysAway('2026-09-18T21:30:00Z', '2026-09-24')).toBe(6);
+  });
 
-  it('takes one next step per goal and skips a goal with none', () => {
-    const result = catchUp(since, {
-      goals: [daily('g1', ['First', 'Second']), daily('g2', []), daily('g3', ['Only'])],
-      waiting: [],
-    });
-    expect(result.next.map((n) => [n.goalId, n.item.title])).toEqual([
-      ['g1', 'First'],
-      ['g3', 'Only'],
-    ]);
+  it('is never below nothing', () => {
+    expect(daysAway('2026-09-24T08:00:00Z', '2026-09-23')).toBe(0);
   });
 });

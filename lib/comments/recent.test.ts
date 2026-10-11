@@ -73,7 +73,7 @@ describe('conversationsFrom', () => {
 
     expect(conversations.map((conversation) => conversation.about)).toEqual(['Newer', 'Middle', 'Older']);
     expect(conversations.map((conversation) => conversation.href)).toEqual([
-      '/dev/raised',
+      '/dev/inbox#raise-r1',
       '/dev/bugs',
       '/dev/ideas',
     ]);
