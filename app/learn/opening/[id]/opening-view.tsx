@@ -1,5 +1,6 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { cardVariants } from '@/components/ui/card';
+import { StatusGlyph } from '@/components/ui/status-glyph';
 import { cn } from '@/lib/cn';
 import { nextQuestion, outstandingCount, type OpeningSweep } from '@/lib/learn/graph/opening';
 import { GoalForm } from '@/app/learn/know/goal-form';
@@ -70,18 +71,31 @@ export function OpeningView({ sweep }: { sweep: OpeningSweep }) {
           <li key={question.id} className="px-4 py-3">
             <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <span className="text-body font-medium text-ink">{question.claimName}</span>
-              <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-                {question.outcome ? OUTCOME_LABEL[question.outcome] : 'Not reached'}
-              </span>
+              {/* Right and Passed stay quiet; the miss carries the glyph and
+                  the colour, since it is the row worth reading (plan #1764). */}
+              {question.outcome === 'wrong' ? (
+                <span className="inline-flex items-center gap-1 self-center text-small font-medium text-caution">
+                  <StatusGlyph glyph="cross" size={12} />
+                  {OUTCOME_LABEL.wrong}
+                </span>
+              ) : (
+                <span className="text-small text-ink-muted">
+                  {question.outcome ? OUTCOME_LABEL[question.outcome] : 'Not reached'}
+                </span>
+              )}
             </p>
             <p className="mt-0.5 text-ui text-ink-muted">{question.question}</p>
+            {/* Your words as a quote, set off by the rule and the marks, so
+                they never read as the answer below them. */}
             {question.response && (
-              <p className="mt-0.5 text-ui text-ink">You said: {question.response}</p>
+              <blockquote className="mt-1.5 border-l-2 border-border pl-2.5 text-ui text-ink-muted">
+                “{question.response}”
+              </blockquote>
             )}
             {/* The expected answer, on every row. A sweep somebody passed on
                 is still worth reading afterwards, and this is the only place
                 these claims are ever stated if no chain gets approved. */}
-            <p className="mt-0.5 text-ui text-ink">{question.expected}</p>
+            <p className="mt-1.5 text-ui text-ink">{question.expected}</p>
           </li>
         ))}
       </ul>
