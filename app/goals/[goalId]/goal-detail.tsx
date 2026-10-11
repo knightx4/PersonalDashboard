@@ -69,8 +69,8 @@ export function GoalDetail({
           places={places}
         />
       }
-      glance={<GoalGlance goal={goal} review={review} progress={progress} />}
-      detailCount={goalDetailCount(goal, progress, timeZone, pace)}
+      glance={<GoalGlance goal={goal} review={review} progress={progress} pace={pace} />}
+      detailCount={goalDetailCount(goal, progress, timeZone, pace, review)}
       properties={
         <GoalProperties
           goal={goal}

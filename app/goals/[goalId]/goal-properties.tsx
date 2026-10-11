@@ -44,11 +44,33 @@ type Props = {
 };
 
 /**
- * The goal's facts read first (plan #1688): the status, Dash's verdict and
- * the progress. One row on a phone, with the rest under "All details"; the
- * head of the column from laptop width.
+ * Whether Last active sits with the facts read first (plan #1737): when the
+ * goal has one and the glance would otherwise hold fewer than three facts,
+ * so a goal with no verdict or no steps yet still shows on a phone's first
+ * screen when anything last happened on it.
  */
-export function GoalGlance({ goal, review, progress }: Pick<Props, 'goal' | 'review' | 'progress'>) {
+export function lastActiveFirst(
+  review: GoalReview | null,
+  progress: Pick<GoalProgress, 'live'>,
+  pace: GoalPace | null,
+): boolean {
+  if (!pace || lastActiveWords(pace) === null) return false;
+  return 1 + (review ? 1 : 0) + (progress.live > 0 ? 1 : 0) < 3;
+}
+
+/**
+ * The goal's facts read first (plan #1688): the status, Dash's verdict and
+ * the progress, and Last active where there is room (`lastActiveFirst`). One
+ * row on a phone, with the rest under "All details"; the head of the column
+ * from laptop width.
+ */
+export function GoalGlance({
+  goal,
+  review,
+  progress,
+  pace = null,
+}: Pick<Props, 'goal' | 'review' | 'progress' | 'pace'>) {
+  const last = lastActiveFirst(review, progress, pace) && pace ? lastActiveWords(pace) : null;
   return (
     <>
       <Property
@@ -69,6 +91,7 @@ export function GoalGlance({ goal, review, progress }: Pick<Props, 'goal' | 'rev
           value={`${progress.done} of ${progress.live} done`}
         />
       )}
+      {last && <Property label="Last active" value={last} />}
     </>
   );
 }
@@ -99,21 +122,26 @@ export function goalDetailCount(
   progress: Props['progress'],
   timeZone: string,
   pace: GoalPace | null = null,
+  review: GoalReview | null = null,
 ): number {
   const { closed, split } = goalFacts(goal, progress, timeZone);
-  const pacing = pace ? 1 + (lastActiveWords(pace) ? 1 : 0) : 0;
+  const last = pace && lastActiveWords(pace) && !lastActiveFirst(review, progress, pace);
+  const pacing = pace ? 1 + (last ? 1 : 0) : 0;
   return 1 + (goal.dueOn ? 1 : 0) + (closed ? 1 : 0) + (split ? 1 : 0) + pacing;
 }
 
 /**
  * The rest of the goal's facts in the tabbed detail's properties (plan
  * #1671): the area, the dates, the open steps split between you and
- * Dash, and the goal's usual pace (plan #1737). The split is the steps' bands from `goalProgress`, the same counts
- * the goal's bar on Goals draws, so the two never disagree. When it was
- * added is the line under the title (`goalLine`).
+ * Dash, and the goal's usual pace (plan #1737). The split is the steps'
+ * bands from `goalProgress`, the same counts the goal's bar on Goals draws,
+ * so the two never disagree. When it was added is the line under the title
+ * (`goalLine`).
  */
-export function GoalProperties({ goal, areaName, progress, timeZone, pace = null }: Props) {
+export function GoalProperties({ goal, areaName, review, progress, timeZone, pace = null }: Props) {
   const { closed, split } = goalFacts(goal, progress, timeZone);
+  // Last active is said once: in the glance when it went there.
+  const last = pace && !lastActiveFirst(review, progress, pace) ? lastActiveWords(pace) : null;
   return (
     <PropertyList>
       {/* Plain text, as the feature page's Module is: the path above the
@@ -140,9 +168,7 @@ export function GoalProperties({ goal, areaName, progress, timeZone, pace = null
           value={paceWords(pace)}
         />
       )}
-      {pace && lastActiveWords(pace) && (
-        <Property label="Last active" value={lastActiveWords(pace)} />
-      )}
+      {last && <Property label="Last active" value={last} />}
     </PropertyList>
   );
 }
