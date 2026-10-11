@@ -19,8 +19,6 @@ export type Tab = {
   id: string;
   label: string;
   count?: number;
-  /** What the count counts, said after it ("6 open"), so it does not read as a total. */
-  countNoun?: string;
   icon?: React.ComponentType<{ className?: string; strokeWidth?: number; 'aria-hidden'?: boolean }>;
 };
 

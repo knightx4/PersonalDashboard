@@ -862,7 +862,7 @@ describe('health and status, as two columns', () => {
   it('heads both columns', () => {
     const html = render('all');
     expect(html).toContain('>Health<');
-    expect(html).toContain('>Whose move<');
+    expect(html).toContain('>Status<');
   });
 
   // The complaint the note was filed about: a feature whose first step is done
