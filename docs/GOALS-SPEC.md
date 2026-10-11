@@ -619,6 +619,21 @@ marks the entry undone. A bad amount drops the entry and keeps the step.
 Progress still goes on the goal itself when the work belongs to the goal as a
 whole rather than to a piece of it.
 
+Work the sentence says is finished, with no step for it, is added as a step
+that is already closed (plan #1740). The add move carries `done`, only for a
+step of the person's, and the step is written and closed in one line with no
+progress entry, since the close is the record. With a cleaning goal and no
+bathroom step, "cleaned the bathroom" files `Added "Clean the bathroom" in …
+as done`, and Undo archives the step.
+
+The same filing runs from the "What did you do?" box on Home, at the top of
+Done today, and on each open goal's Overview (`components/goals/log-done.tsx`).
+On a goal's page the message names that goal as the one the line was written
+on, and filing keeps to it unless the sentence plainly concerns another.
+Home's Done today lists every task ticked since midnight, goal steps closed
+and progress logged since then, newest first, eight at most with the rest
+counted (`lib/goals/done-today.ts`). The day's sigil keeps its own rule.
+
 A count can be several at once, on the day they happened (plan #1279). The
 count move takes an amount, one when the sentence gives none, and a day read
 as the progress move reads it. "Sent three applications yesterday" adds 3 to

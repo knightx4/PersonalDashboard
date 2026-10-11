@@ -200,6 +200,7 @@ import { RecurringEmptySurface, RecurringSurface } from './recurring-surfaces';
 import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { WatchingSurface } from './watching-surfaces';
 import { DashTodaySurface } from './dash-today-surfaces';
+import { LogDoneSurface } from './log-done-surfaces';
 import { HomePageSurface } from './home-page-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface, SubjectClipsEmptySurface, SubjectClipsSurface } from './clip-surfaces';
 import {
@@ -4907,6 +4908,17 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'wide',
     render: () => <DashTodaySurface />,
+  },
+  {
+    /* The "What did you do?" box (plan #1740): Home's Done today with a line
+     * filed as three changes and the day's list, the same card with nothing
+     * done yet, and the box on a goal's Overview. Fixtures in
+     * log-done-surfaces.tsx. */
+    id: 'goals-log-done',
+    label: 'Home and goals · What did you do?',
+    module: 'goals',
+    width: 'wide',
+    render: () => <LogDoneSurface />,
   },
   {
     /* The timeline (plan #1118): the months newest first, the newest open,
