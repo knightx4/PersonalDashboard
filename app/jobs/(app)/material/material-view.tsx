@@ -10,7 +10,6 @@ import { ChipSelect, Input, Label, PressLabel, Select, Textarea } from '@/compon
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { EmptyState } from '@/components/ui/empty-state';
-import { LeftRail, RailGroup, RailItem } from '@/components/shell/left-rail';
 import { cardVariants } from '@/components/ui/card';
 import { segmentedFrame } from '@/components/ui/segmented';
 import { PaidHint } from '@/components/ui/paid-hint';
@@ -25,7 +24,7 @@ import {
   materialHref,
   type MaterialPart,
 } from '@/lib/jobs/material';
-import { AnswerBank } from './bank';
+import { AnswerBank, KindChips } from './bank';
 import { updateWritingVoice, type VoiceState } from './actions';
 import {
   acceptEvidence,
@@ -145,7 +144,7 @@ function AnswersPart({ questions, kind }: { questions: MaterialQuestion[]; kind:
       <EmptyState
         icon={MessageSquareText}
         title="No questions captured yet"
-        description="Use the bookmarklet on an application form, or paste the questions onto a role. Greenhouse postings bring their questions along automatically."
+        description="Use the bookmarklet on an application form, or paste the questions onto a role. Greenhouse postings bring their questions along automatically. Questions are deduped by fingerprint, so the same question asked in different words lands on one row."
         action={{ label: 'Add a role', href: '/jobs/roles/new' }}
         secondaryAction={{ label: 'Get the bookmarklet', href: '/jobs/settings#bookmarklet' }}
       />
@@ -156,40 +155,24 @@ function AnswersPart({ questions, kind }: { questions: MaterialQuestion[]; kind:
   const withCanonical = questions.filter((row) => row.canonicalAnswer).length;
 
   return (
-    <div className="flex flex-col gap-4 xl:flex-row xl:gap-6">
-      <LeftRail>
-        <RailGroup label="Kind">
-          <RailItem
-            label="All"
-            href={materialHref('answers')}
-            active={!kind}
-            count={questions.length}
-          />
-          {QUESTION_KINDS.filter((entry) => questions.some((row) => row.kind === entry)).map(
-            (entry) => (
-              <RailItem
-                key={entry}
-                label={entry}
-                href={materialHref('answers', entry)}
-                active={kind === entry}
-                count={questions.filter((row) => row.kind === entry).length}
-              />
-            ),
-          )}
-        </RailGroup>
-        <p className="px-1 text-small leading-relaxed text-ink-muted">
-          Questions are deduped by fingerprint, so the same question asked in different words lands
-          on one row.
-        </p>
-      </LeftRail>
-
-      <div className="min-w-0 flex-1 space-y-3">
-        <p className="tabular text-ui text-ink-muted">
-          {withCanonical} of {questions.length} questions have a default answer. Each one you set
-          makes the next application shorter.
-        </p>
-        <AnswerBank questions={filtered} />
-      </div>
+    <div className="space-y-3">
+      <p className="tabular text-ui text-ink-muted">
+        {withCanonical} of {questions.length} questions have a default answer
+      </p>
+      <KindChips
+        items={[
+          { label: 'All', href: materialHref('answers'), count: questions.length, active: !kind },
+          ...QUESTION_KINDS.filter((entry) => questions.some((row) => row.kind === entry)).map(
+            (entry) => ({
+              label: entry,
+              href: materialHref('answers', entry),
+              count: questions.filter((row) => row.kind === entry).length,
+              active: kind === entry,
+            }),
+          ),
+        ]}
+      />
+      <AnswerBank questions={filtered} />
     </div>
   );
 }

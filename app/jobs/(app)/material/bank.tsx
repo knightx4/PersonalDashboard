@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import Link from '@/components/ui/link';
 import { cn } from '@/lib/cn';
-import { cardVariants } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { promoteToCanonical } from '@/app/jobs/(app)/roles/actions';
 
@@ -20,11 +21,13 @@ export function AnswerBank({
   }>;
 }) {
   return (
-    <div className="space-y-3">
-      {questions.map((question) => (
-        <QuestionCard key={question.id} question={question} />
-      ))}
-    </div>
+    <Card padding="none">
+      <ul className="divide-y divide-border">
+        {questions.map((question) => (
+          <QuestionCard key={question.id} question={question} />
+        ))}
+      </ul>
+    </Card>
   );
 }
 
@@ -47,7 +50,7 @@ function QuestionCard({
   const suggestion = !question.canonicalAnswer && question.approvedAnswer;
 
   return (
-    <section className={cn(cardVariants({ padding: 'dense' }))}>
+    <li className="card-pad-x row-pad">
       {/* The kind and the count sit beside the question from sm up, and on
        * the bottom line on a phone, where beside it they took a third of the
        * width and wrapped a short question onto two lines (law 9). */}
@@ -90,7 +93,7 @@ function QuestionCard({
           </span>
         )}
       </div>
-    </section>
+    </li>
   );
 }
 
@@ -109,5 +112,34 @@ function QuestionMeta({
       </span>
       <span className="tabular text-small text-ink-muted">seen {question.timesSeen}×</span>
     </span>
+  );
+}
+
+/**
+ * The kinds the list is narrowed by, on one line above it at every width. Each
+ * is a link, so the filter is in the address.
+ */
+export function KindChips({
+  items,
+}: {
+  items: Array<{ label: string; href: string; count: number; active: boolean }>;
+}) {
+  return (
+    <nav aria-label="Kind" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      {items.map((item) => (
+        <Link
+          key={item.label}
+          href={item.href}
+          aria-current={item.active ? 'page' : undefined}
+          className={cn(
+            'press inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-small',
+            item.active ? 'bg-accent-tint font-medium text-accent' : 'bg-sunken text-ink-muted hover:text-ink',
+          )}
+        >
+          {item.label}
+          <span className="tabular">{item.count}</span>
+        </Link>
+      ))}
+    </nav>
   );
 }
