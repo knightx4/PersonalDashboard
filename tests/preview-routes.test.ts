@@ -78,6 +78,15 @@ describe('routeOfFile', () => {
     expect(routeMatches('/jobs/roles/[id]', '/jobs/roles')).toBe(false);
     expect(routeMatches('/jobs/roles/[id]', '/jobs', true)).toBe(true);
   });
+
+  it('serves a static folder before a dynamic one, as Next does', () => {
+    const found = surfacesForFiles(['app/shopping/orders/new/order-form.tsx']);
+    expect(found).toContain('shopping-order-new');
+    expect(found).not.toContain('shopping-order');
+    expect(surfacesForFiles(['app/shopping/orders/[id]/order-detail-view.tsx'])).toContain(
+      'shopping-order',
+    );
+  });
 });
 
 describe('surfacesForFiles, on screen changes that shipped', () => {

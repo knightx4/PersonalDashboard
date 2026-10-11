@@ -258,50 +258,54 @@ export function ShoppingOrderSurface() {
 // ---- Add an order and the receipt photo ------------------------------------
 
 export function ShoppingOrderNewSurface() {
+  // The padding is the room the app shell keeps under a page for the dock, so
+  // Save order, pinned above the dock, sits where it does in the app.
   return (
-    <NewOrderView
-      people={people}
-      defaultPersonId="p1"
-      merchants={[
-        { id: 'm1', name: 'Amazon' },
-        { id: 'm2', name: 'Uniqlo' },
-        { id: 'm3', name: 'The Conran Shop and Kitchen Supplies' },
-      ]}
-      categories={[
-        { id: 'c1', name: 'Clothing' },
-        { id: 'c2', name: 'Electronics' },
-        { id: 'c3', name: 'Home' },
-      ]}
-      defaultDate={TODAY}
-      prefill={{
-        merchantId: 'm2',
-        merchantName: 'Uniqlo',
-        orderDate: '2026-10-06',
-        externalOrderNumber: 'UQ-77120934',
-        currency: 'USD',
-        lines: [
-          {
-            name: 'Merino crew-neck jumper',
-            variant: 'Navy, M',
-            quantity: '1',
-            unitPrice: '49.90',
-            categoryId: 'c1',
-          },
-          {
-            name: 'Ultra Light Down packable jacket with a longer name than most',
-            variant: 'Olive, L',
-            quantity: '2',
-            unitPrice: '79.90',
-            categoryId: 'c1',
-          },
-        ],
-        tax: '15.66',
-        shipping: '',
-        discount: '10.00',
-      }}
-      sourceMessageId="e9"
-      readError={null}
-    />
+    <div className="max-sm:pb-[calc(var(--dock-h)+2.125rem)]">
+      <NewOrderView
+        people={people}
+        defaultPersonId="p1"
+        merchants={[
+          { id: 'm1', name: 'Amazon' },
+          { id: 'm2', name: 'Uniqlo' },
+          { id: 'm3', name: 'The Conran Shop and Kitchen Supplies' },
+        ]}
+        categories={[
+          { id: 'c1', name: 'Clothing' },
+          { id: 'c2', name: 'Electronics' },
+          { id: 'c3', name: 'Home' },
+        ]}
+        defaultDate={TODAY}
+        prefill={{
+          merchantId: 'm2',
+          merchantName: 'Uniqlo',
+          orderDate: '2026-10-06',
+          externalOrderNumber: 'UQ-77120934',
+          currency: 'USD',
+          lines: [
+            {
+              name: 'Merino crew-neck jumper',
+              variant: 'Navy, M',
+              quantity: '1',
+              unitPrice: '49.90',
+              categoryId: 'c1',
+            },
+            {
+              name: 'Ultra Light Down packable jacket with a longer name than most',
+              variant: 'Olive, L',
+              quantity: '2',
+              unitPrice: '79.90',
+              categoryId: 'c1',
+            },
+          ],
+          tax: '15.66',
+          shipping: '',
+          discount: '10.00',
+        }}
+        sourceMessageId="e9"
+        readError={null}
+      />
+    </div>
   );
 }
 
