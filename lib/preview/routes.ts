@@ -275,6 +275,12 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-youtube-channel': ['/learn/youtube/[slug]'],
   'learn-youtube-playlist': ['/learn/youtube/p/[id]'],
   'learn-youtube-video': ['/learn/youtube/v/[videoId]'],
+  'news-all': ['/news/all'],
+  'news-story': ['/news/i/[id]/s/[index]'],
+  'news-settings': ['/news/settings'],
+  'todo-all': ['/todo/all'],
+  'todo-settings': ['/todo/settings'],
+  'todo-waiting': ['/todo/waiting'],
 };
 
 /**
