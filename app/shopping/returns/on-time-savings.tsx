@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { countAt, useReducedMotion } from '@/components/ui/motion';
+import { cn } from '@/lib/cn';
 import { formatMoney } from '@/lib/money';
 import { MOTION_MS } from '@/lib/motion';
 import type { OnTimeSavings } from '@/lib/returns/savings';
@@ -110,10 +111,16 @@ function SavingsFigure({ savings }: { savings: OnTimeSavings }) {
   );
 }
 
-export function OnTimeSavingsFigure({ savings }: { savings: OnTimeSavings[] }) {
+export function OnTimeSavingsFigure({
+  savings,
+  className,
+}: {
+  savings: OnTimeSavings[];
+  className?: string;
+}) {
   if (savings.length === 0) return null;
   return (
-    <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+    <div className={cn('flex flex-wrap items-baseline gap-x-3 gap-y-1', className)}>
       <span className="text-ui text-ink-muted">Saved by returning on time this year</span>
       {savings.map((entry) => (
         <SavingsFigure key={entry.currency} savings={entry} />

@@ -194,7 +194,7 @@ export const MOMENTS: readonly Moment[] = [
     state: {
       built: 'yes',
       where:
-        'OnTimeSavingsFigure in app/shopping/returns/on-time-savings.tsx, under the header on /shopping/returns, with the year of on-time refunds summed by lib/returns/savings.ts.',
+        'OnTimeSavingsFigure in app/shopping/returns/on-time-savings.tsx, under the count at the foot of /shopping/returns, with the year of on-time refunds summed by lib/returns/savings.ts.',
     },
   },
   {
