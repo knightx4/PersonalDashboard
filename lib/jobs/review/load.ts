@@ -54,6 +54,8 @@ export interface ReviewMessageRow {
    */
   threadId: string | null;
   replyToAddress: string | null;
+  /** The role title the message names, read at ingestion (note b48d2b61). */
+  roleHint: string | null;
   receivedAt: string | null;
   classification: string;
   reason: string;
@@ -151,7 +153,7 @@ export async function loadReviewQueue(
       ? supabase
           .from('inbox_messages')
           .select(
-            'id, email_account_id, thread_id, provider_message_id, subject, from_address, reply_to_address, received_at, classification, error, link_confidence',
+            'id, email_account_id, thread_id, provider_message_id, subject, from_address, reply_to_address, role_hint, received_at, classification, error, link_confidence',
           )
           .in('email_account_id', accountIds)
           .eq('parse_status', 'needs_review')
@@ -186,6 +188,7 @@ export async function loadReviewQueue(
       fromAddress: (raw.from_address as string) ?? null,
       threadId: (raw.thread_id as string) ?? null,
       replyToAddress: (raw.reply_to_address as string) ?? null,
+      roleHint: (raw.role_hint as string) ?? null,
       receivedAt: (raw.received_at as string) ?? null,
       classification: (raw.classification as string) ?? 'unknown',
       reason:

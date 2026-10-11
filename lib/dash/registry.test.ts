@@ -36,8 +36,13 @@ describe('DASH_TOOLS', () => {
       'add_goal',
       'add_goal_step',
       'close_goal_step',
+      'set_goal_done_when',
       'mark_returned',
       'add_role_note',
+      'add_job_lead',
+      'add_idea',
+      'change_items',
+      'move_roles',
     ]);
     expect(dashToolsOf('write').map((t) => t.name)).toEqual([
       ...WRITE_TOOL_NAMES,
@@ -68,14 +73,16 @@ describe('DASH_TOOLS', () => {
     ]);
   });
 
-  it('offers each thread the lookups, the writes and its own row\'s tools, without the watch or the hand-off', () => {
+  it('offers each thread the lookups, the writes and its own row\'s tools, without the watch, the hand-off or the chart', () => {
     const own = (table: string) =>
       threadDashTools(table)
         .map((t) => t.name)
         .filter((name) => !ASK_TOOL_NAMES.includes(name as never) && !WRITE_TOOL_NAMES.includes(name));
+    const lookups = ASK_TOOL_NAMES.filter((name) => name !== 'show_chart');
     for (const table of [...Object.values(DEV_THREAD_TABLES), GOAL_THREAD_TABLE, ROLE_THREAD_TABLE]) {
       const names = threadDashTools(table).map((t) => t.name);
-      expect(names.slice(0, ASK_TOOL_NAMES.length + WRITE_TOOL_NAMES.length)).toEqual([...ASK_TOOL_NAMES, ...WRITE_TOOL_NAMES]);
+      expect(names.slice(0, lookups.length + WRITE_TOOL_NAMES.length)).toEqual([...lookups, ...WRITE_TOOL_NAMES]);
+      expect(names).not.toContain('show_chart');
       expect(names).not.toContain('propose_watch');
       expect(names).not.toContain(HAND_OFF_TOOL_NAME);
     }

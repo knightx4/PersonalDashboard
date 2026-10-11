@@ -1,29 +1,14 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient, requireUser } from '@/lib/auth/server';
-import { PageHeader } from '@/components/shell/page-header';
-import { DetailLayout, Property, PropertyList } from '@/components/shell/detail-layout';
-import { Banner } from '@/components/ui/banner';
-import { buttonVariants } from '@/components/ui/button';
-import { Card, cardVariants } from '@/components/ui/card';
-import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
-import { cn } from '@/lib/cn';
 import { gmailOpenUrl } from '@/lib/email/gmail-open';
 import { convertToDisplayCents, loadDisplayCurrency } from '@/lib/fx/display';
 import { normalizeCurrencyCode } from '@/lib/fx/money-fx';
 import { formatMoney, lineSubtotalCents } from '@/lib/money';
-import { ConfirmOrderButton, DiscardOrderButton } from '@/app/shopping/review/review-buttons';
-import { ExcludeMerchantButton } from './exclude-merchant-button';
-import { DeleteOrderButton } from './delete-order-button';
-import { OrderItemTags } from '../order-item-tags';
-import { restoreDeletedOrder } from '@/app/shopping/orders/actions';
-import { Button } from '@/components/ui/button';
 import { orderItemTags } from '@/lib/orders/search';
-import { GmailAnchor } from '@/components/ui/gmail-anchor';
-import { Thread } from '@/components/thread/thread';
 import type { DevComment } from '@/lib/comments/load';
 import { loadThread } from '@/lib/thread/store';
 import { threadRef } from '@/lib/thread/subjects';
+import { OrderDetailView } from './order-detail-view';
 
 export const metadata = { title: 'Order' };
 
@@ -175,406 +160,74 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   }
 
   return (
-    <DetailLayout
-      header={
-        <>
-          <PageHeader
-            title={merchant?.name ?? orderEmailMessage?.subject?.slice(0, 48) ?? 'Order'}
-            description={`${order.order_date}${
-              order.external_order_number ? ` · #${order.external_order_number}` : ''
-            } · ${order.status.replaceAll('_', ' ')}${
-              order.needs_review ? ' · needs review' : ''
-            }${isDeleted ? ' · deleted' : ''}`}
-            actions={
-              <div className="flex flex-wrap gap-2">
-                {orderEmailHref && (
-                  <a
-                    href={orderEmailHref}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                  >
-                    Open order email
-                  </a>
-                )}
-                {!isDeleted && (
-                  <>
-                    <ExcludeMerchantButton
-                      orderId={order.id}
-                      merchantName={merchant?.name ?? 'this sender'}
-                    />
-                    <DeleteOrderButton
-                      orderId={order.id}
-                      merchantName={merchant?.name ?? 'this order'}
-                    />
-                    <Link
-                      href="/shopping/review"
-                      className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-                    >
-                      Review queue
-                    </Link>
-                  </>
-                )}
-                {isDeleted && (
-                  <form action={restoreDeletedOrder}>
-                    <input type="hidden" name="orderId" value={order.id} />
-                    <Button type="submit" size="sm">
-                      Restore order
-                    </Button>
-                  </form>
-                )}
-                <Link
-                  href="/shopping/orders"
-                  className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                >
-                  All orders
-                </Link>
-              </div>
-            }
-          />
-
-          {isDeleted && (
-            <Banner tone="warn">
-              This order is in Deleted orders. Its inventory is hidden from your owned list until
-              you restore it. Manage it in{' '}
-              <Link
-                href="/shopping/settings#deleted-orders"
-                className="underline underline-offset-2"
-              >
-                Settings
-              </Link>
-              .
-            </Banner>
-          )}
-
-          {!isDeleted && order.needs_review && (
-            <Banner tone="warn">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="font-medium">Needs review</p>
-                  <p className="text-ui text-ink-muted">
-                    Imported with the fallback parser. Confirm the totals and items, or discard if
-                    this should not count toward spend.
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <ConfirmOrderButton orderId={order.id} />
-                  <DiscardOrderButton orderId={order.id} />
-                </div>
-              </div>
-            </Banner>
-          )}
-        </>
-      }
-      properties={
-        <PropertyList>
-          <Property label="Ordered" value={order.order_date} />
-          <Property label="Total" value={moneyLabel(displayTotal, order.total_cents)} />
-          <Property label="Status" value={order.status.replaceAll('_', ' ')} />
-          {showNative && <Property label="Order currency" value={nativeCurrency} />}
-          {order.return_deadline && (
-            <Property label="Return deadline" value={order.return_deadline} />
-          )}
-          <Property label="Source" value={order.source.replaceAll('_', ' ')} />
-          {inboxAddress && <Property label="Inbox" value={inboxAddress} />}
-        </PropertyList>
-      }
-    >
-      <div className="space-y-6">
-        {(shipments?.length ?? 0) > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-              Shipments
-            </h2>
-            <ul
-              className={cn(
-                cardVariants({ padding: 'none' }),
-                'divide-y divide-border overflow-hidden',
-              )}
-            >
-              {(shipments ?? []).map((shipment) => {
-                const links = shipmentEmailLinks.get(shipment.id) ?? {};
-                return (
-                  <li key={shipment.id} className="row-pad px-4 text-body">
-                    <p className="font-medium text-ink">
-                      {shipment.status.replaceAll('_', ' ')}
-                      {shipment.carrier ? ` · ${shipment.carrier}` : ''}
-                    </p>
-                    <p className="mt-1 text-ui text-ink-muted">
-                      {[
-                        shipment.tracking_number ? `Tracking ${shipment.tracking_number}` : null,
-                        shipment.shipped_at
-                          ? `Shipped ${new Date(shipment.shipped_at).toLocaleDateString()}`
-                          : null,
-                        shipment.delivered_at
-                          ? `Delivered ${new Date(shipment.delivered_at).toLocaleDateString()}`
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ') || 'No tracking details yet'}
-                    </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                      {shipment.tracking_url && (
-                        <a
-                          href={shipment.tracking_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-ui font-medium text-accent hover:underline"
-                        >
-                          Track package
-                        </a>
-                      )}
-                      {links.shippingHref && (
-                        <a
-                          href={links.shippingHref}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-ui text-ink-muted transition-colors duration-quick hover:text-accent hover:underline"
-                        >
-                          Open shipping email
-                        </a>
-                      )}
-                      {links.deliveryHref && (
-                        <a
-                          href={links.deliveryHref}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-ui text-ink-muted transition-colors duration-quick hover:text-accent hover:underline"
-                        >
-                          Open delivery email
-                        </a>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
-
-        {(returnRows?.length ?? 0) > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-              Returns
-            </h2>
-            <ul
-              className={cn(
-                cardVariants({ padding: 'none' }),
-                'divide-y divide-border overflow-hidden',
-              )}
-            >
-              {(displayReturns ?? []).map((row) => (
-                <li key={row.id} className="row-pad flex justify-between gap-4 px-4 text-body">
-                  <span className="text-ink">
-                    {row.status.replaceAll('_', ' ')}
-                    {row.refunded_at ? ` · ${row.refunded_at}` : ` · ${row.initiated_at}`}
-                    {row.emailHref && (
-                      <a
-                        href={row.emailHref}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="ml-3 text-ui text-ink-muted transition-colors duration-quick hover:text-accent hover:underline"
-                      >
-                        Open return email
-                      </a>
-                    )}
-                  </span>
-                  <span className="tabular text-ink-muted">
-                    {moneyLabel(row.display_refund_cents, row.refund_amount_cents)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {/* Every email linked to the order, including one attached from the
-            review queue that wrote nothing onto it (a pickup notice, a support
-            thread), which no other section would show. */}
-        {(sourceMessages?.length ?? 0) > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-              Emails
-            </h2>
-            <ul
-              className={cn(
-                cardVariants({ padding: 'none' }),
-                'divide-y divide-border overflow-hidden',
-              )}
-            >
-              {(sourceMessages ?? []).map((message) => {
-                const href = messageGmailHref(message);
-                return (
-                  <li key={message.id} className="row-pad flex justify-between gap-4 px-4">
-                    <div className="min-w-0">
-                      <p className="truncate text-body text-ink">
-                        {message.subject?.trim() || 'Email without subject'}
-                      </p>
-                      <p className="text-ui text-ink-muted">
-                        {[
-                          message.classification?.replaceAll('_', ' '),
-                          message.received_at
-                            ? new Date(message.received_at).toLocaleDateString()
-                            : null,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </p>
-                    </div>
-                    {href && (
-                      <GmailAnchor
-                        href={href}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="shrink-0 text-ui text-ink-muted transition-colors duration-quick hover:text-accent hover:underline"
-                      >
-                        Open in Gmail
-                      </GmailAnchor>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
-
-        <Card padding="none" className="overflow-hidden">
-          <Table>
-            <THead>
-              <TR>
-                <TH>Item</TH>
-                <TH num>Qty</TH>
-                <TH num>Unit</TH>
-                <TH num>Line</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {displayItems.map((item) => {
-                const category = Array.isArray(item.categories)
-                  ? item.categories[0]
-                  : item.categories;
-                const units = item.display_units;
-                return (
-                  <TR key={item.id}>
-                    {/* The primary cell is set medium; everything under the
-                        name steps back to the normal weight. */}
-                    <TD primary className="text-body">
-                      <p className="text-ink">{item.name}</p>
-                      <p className="text-ui font-normal text-ink-muted">
-                        {[item.variant, category?.name].filter(Boolean).join(' · ') || '—'}
-                      </p>
-                      <div className="font-normal">
-                        <OrderItemTags
-                          orderId={order.id}
-                          orderItemId={item.id}
-                          tags={orderItemTags(item)
-                            .map((tag) => ({
-                              id: tag.id ?? '',
-                              name: tag.name,
-                            }))
-                            .filter((tag) => tag.id)}
-                          readOnly={isDeleted}
-                        />
-                      </div>
-                      {item.product_url && (
-                        <p className="mt-1.5">
-                          <a
-                            href={item.product_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-ui font-medium text-accent hover:underline"
-                          >
-                            View product
-                          </a>
-                        </p>
-                      )}
-                      {units.length > 0 && (
-                        <ul className="mt-2 space-y-1.5 font-normal">
-                          {units.map((unit, index) => (
-                            <li
-                              key={unit.id}
-                              className="flex flex-wrap items-center gap-x-3 gap-y-1"
-                            >
-                              <Link
-                                href={`/shopping/inventory/${unit.id}`}
-                                className="text-ui font-medium text-accent hover:underline"
-                              >
-                                View in inventory
-                                {units.length > 1 ? ` (${index + 1} of ${units.length})` : ''}
-                              </Link>
-                              <span className="tabular text-ui text-ink-muted">
-                                Landed {moneyLabel(unit.display_cost_cents, unit.cost_cents)}
-                              </span>
-                              <span className="rounded-md bg-canvas px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wide text-ink-muted">
-                                {unit.status.replaceAll('_', ' ')}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </TD>
-                    <TD num muted label="Qty" className="text-body">
-                      {item.quantity}
-                    </TD>
-                    <TD num label="Unit" className="text-body">
-                      {moneyLabel(item.display_unit_cents, item.unit_price_cents)}
-                    </TD>
-                    <TD num label="Line" className="text-body">
-                      {moneyLabel(
-                        item.display_line_cents,
-                        lineSubtotalCents(item.quantity, item.unit_price_cents),
-                      )}
-                    </TD>
-                  </TR>
-                );
-              })}
-            </TBody>
-          </Table>
-        </Card>
-
-        <dl
-          className={cn(cardVariants({ padding: 'dense' }), 'grid gap-2 text-body sm:grid-cols-2')}
-        >
-          <div className="flex justify-between gap-4 sm:col-span-2">
-            <dt className="text-ink-muted">Subtotal</dt>
-            <dd className="tabular text-ink">
-              {moneyLabel(displaySubtotal, order.subtotal_cents)}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-ink-muted">Tax</dt>
-            <dd className="tabular text-ink">{moneyLabel(displayTax, order.tax_cents)}</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-ink-muted">Shipping</dt>
-            <dd className="tabular text-ink">
-              {moneyLabel(displayShipping, order.shipping_cents)}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-ink-muted">Discount</dt>
-            <dd className="tabular text-ink">
-              {moneyLabel(displayDiscount, order.discount_cents)}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-4 border-t border-border pt-2 sm:col-span-2">
-            <dt className="font-medium text-ink">Total</dt>
-            <dd className="tabular font-semibold text-ink">
-              {moneyLabel(displayTotal, order.total_cents)}
-            </dd>
-          </div>
-        </dl>
-
-        {/* Notes on the order; one tagged @dash is answered here, from the order (plan #1471). */}
-        <section aria-label="Comments" className="px-1">
-          <Thread
-            subject={threadRef('order', order.id)}
-            turns={thread}
-            placeholder="A note on this order, or a question for Dash."
-          />
-        </section>
-      </div>
-    </DetailLayout>
+    <OrderDetailView
+      order={{
+        id: order.id,
+        title: merchant?.name ?? orderEmailMessage?.subject?.slice(0, 48) ?? 'Order',
+        merchantName: merchant?.name ?? null,
+        order_date: order.order_date,
+        status: order.status,
+        source: order.source,
+        external_order_number: order.external_order_number,
+        return_deadline: order.return_deadline,
+        needs_review: order.needs_review,
+        deleted: isDeleted,
+        nativeCurrency: showNative ? nativeCurrency : null,
+        inboxAddress,
+        emailHref: orderEmailHref,
+      }}
+      totals={{
+        subtotal: moneyLabel(displaySubtotal, order.subtotal_cents),
+        tax: moneyLabel(displayTax, order.tax_cents),
+        shipping: moneyLabel(displayShipping, order.shipping_cents),
+        discount: moneyLabel(displayDiscount, order.discount_cents),
+        total: moneyLabel(displayTotal, order.total_cents),
+      }}
+      shipments={(shipments ?? []).map((shipment) => ({
+        ...shipment,
+        links: shipmentEmailLinks.get(shipment.id) ?? {},
+      }))}
+      returns={displayReturns.map((row) => ({
+        id: row.id,
+        status: row.status,
+        initiated_at: row.initiated_at,
+        refunded_at: row.refunded_at,
+        refundLabel: moneyLabel(row.display_refund_cents, row.refund_amount_cents),
+        emailHref: row.emailHref,
+      }))}
+      emails={(sourceMessages ?? []).map((message) => ({
+        id: message.id,
+        subject: message.subject,
+        classification: message.classification,
+        received_at: message.received_at,
+        href: messageGmailHref(message),
+      }))}
+      items={displayItems.map((item) => {
+        const category = Array.isArray(item.categories) ? item.categories[0] : item.categories;
+        return {
+          id: item.id,
+          name: item.name,
+          variant: item.variant,
+          quantity: item.quantity,
+          categoryName: category?.name ?? null,
+          product_url: item.product_url,
+          tags: orderItemTags(item)
+            .map((tag) => ({ id: tag.id ?? '', name: tag.name }))
+            .filter((tag) => tag.id),
+          unitLabel: moneyLabel(item.display_unit_cents, item.unit_price_cents),
+          lineLabel: moneyLabel(
+            item.display_line_cents,
+            lineSubtotalCents(item.quantity, item.unit_price_cents),
+          ),
+          units: item.display_units.map((unit) => ({
+            id: unit.id,
+            status: unit.status,
+            costLabel: moneyLabel(unit.display_cost_cents, unit.cost_cents),
+          })),
+        };
+      })}
+      thread={thread}
+    />
   );
 }
 

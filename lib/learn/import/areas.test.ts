@@ -106,7 +106,7 @@ describe('naming the areas inside a broad topic', () => {
     await ask(client, (report) => reports.push(report));
 
     expect(reports).toHaveLength(1);
-    expect(reports[0].model).toBe('claude-sonnet-5');
+    expect(reports[0].model).toBe('claude-sonnet-5-5');
     expect(LEARN_OPERATIONS).toContain('name-areas');
   });
 });

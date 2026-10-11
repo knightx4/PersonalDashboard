@@ -12,8 +12,8 @@
  *
  * A comment on a step telling Claude to take it ("@dash draft this for me")
  * hands that step over (plan #1003) through the same hand-over as the row's
- * Send and Prepare, lib/goals/handover-store.ts, so it refuses what they
- * refuse and the thread says why. A phase with nothing of Claude's in it goes
+ * Ask Dash, lib/goals/handover-store.ts, with the job askDash picks, so it
+ * refuses what the row refuses and the thread says why. A phase with nothing of Claude's in it goes
  * to the goals routine instead, which adds the step the comment asks for.
  *
  * The same shape as lib/comments/ask.ts for the dev pages, and the same rule:
@@ -25,6 +25,7 @@
  * core.dash_actions alongside the write (plan #1459), so it can be undone
  * while nobody has changed the row since.
  */
+import { SEEN_MESSAGE } from '@/lib/comments/awaiting';
 import 'server-only';
 
 import type Anthropic from '@anthropic-ai/sdk';
@@ -50,6 +51,7 @@ import {
   type ReplyCollection,
 } from '@/lib/goals/comments';
 import { loadThreads, writeComment } from '@/lib/goals/comments-store';
+import { acknowledgeThreadTurn } from '@/lib/thread/store';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import { commentMode, hasClaudeWork, jobFor, locateStep } from '@/lib/goals/handover';
 import { sendGoalStep } from '@/lib/goals/handover-store';
@@ -266,6 +268,8 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
           ? schedule(args)
           : { ok: false, error: 'That cannot be done on a goal.' },
     handOff,
+    acknowledge: () =>
+      acknowledgeThreadTurn(input.claude, { userId: input.userId, ref: subjectRef, turnId: input.commentId }),
     anthropicApiKey: input.apiKey,
     client: input.anthropic,
     onSpend: (report) => spend.push(report),
@@ -286,6 +290,7 @@ async function produceReply(input: GoalAskInput): Promise<GoalAskOutcome> {
   if (reply.passedOn && reply.made.length === 0) {
     return { ok: true, message: 'Dash is working on this goal. Its reply lands in this thread.' };
   }
+  if (reply.acknowledged) return { ok: true, message: SEEN_MESSAGE };
 
   await say(input, reply.body);
   return {
@@ -317,7 +322,9 @@ async function takeStep(
           map.steps,
           input.itemId,
         );
-  // On the goal itself there is no one step to take: that is Work on this.
+  // On the goal itself there is no one step to take: that is a goal run, as
+  // Ask Dash on the goal starts. commentMode reads askDash for a step, so a
+  // comment and the row's Ask Dash choose the same job.
   if (!located) return handToRoutine(input, history, 'You asked Dash to work on the goal.');
   const mode = commentMode(located.step);
   // A phase of only your own steps gives a phase run nothing to do, so

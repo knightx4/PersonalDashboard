@@ -3,7 +3,15 @@ import { attachDependencies, type DependencyRow } from './dependencies';
 import type { HomeRhythm } from './rhythms';
 import { buildForest, markStartDates, type Step } from './steps';
 import type { Suggestion } from './suggestions';
-import { askedOfYou, rhythmBehind, TODAY_CAP, todayList, type TodayInput } from './today';
+import {
+  askedOfYou,
+  rhythmBehind,
+  TODAY_CAP,
+  todayList,
+  todayRanked,
+  withPrepared,
+  type TodayInput,
+} from './today';
 import type { Goal } from './tree';
 
 const TODAY = '2026-09-26';
@@ -468,5 +476,37 @@ describe('helpers', () => {
     expect(rhythmBehind({ target: 1, count: 0, daysLeft: 2 })).toBe(false);
     expect(rhythmBehind({ target: 1, count: 0, daysLeft: 1 })).toBe(true);
     expect(rhythmBehind({ target: 1, count: 1, daysLeft: 1 })).toBe(false);
+  });
+});
+
+describe('withPrepared', () => {
+  it('puts what Dash prepared beside the step it is for', () => {
+    const g = goal('g', 'Get the job', 'Work');
+    const data = input(
+      [g],
+      [
+        step('apply', 'g', { title: 'Apply to Acme', dueOn: '2026-09-27' }),
+        step('prep', 'g', {
+          kind: 'claude',
+          status: 'done',
+          preparesId: 'apply',
+          result: 'Dear Acme,',
+        }),
+        step('call', 'g', { title: 'Call the bank', dueOn: '2026-09-28', result: '  Ask for the fee.  ' }),
+        step('dropped-prep', 'g', {
+          kind: 'claude',
+          status: 'dropped',
+          preparesId: 'call',
+          result: 'An old script',
+        }),
+        step('plain', 'g', { title: 'Plain step', dueOn: '2026-09-29' }),
+      ],
+    );
+    const items = withPrepared(todayRanked(data), data.byGoal);
+    const by = new Map(items.map((item) => [item.id, item.prepared?.text ?? null]));
+    // A prep step's result first; a step's own result when it has no live prep step.
+    expect(by.get('apply')).toBe('Dear Acme,');
+    expect(by.get('call')).toBe('Ask for the fee.');
+    expect(by.get('plain')).toBeNull();
   });
 });

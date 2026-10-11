@@ -8,6 +8,7 @@ import {
 } from '@/lib/learn/import/parse-heuristic';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { MODELS } from '@/lib/core/models';
+import { forceTool } from '@/lib/learn/graph/tool-call';
 
 /**
  * Reading a pasted list into references, and nothing more.
@@ -114,7 +115,7 @@ async function llmParse(
         },
       },
     ],
-    tool_choice: { type: 'tool', name: TOOL_NAME },
+    tool_choice: forceTool(TOOL_NAME, MODEL),
     messages: [{ role: 'user', content: text.slice(0, MAX_INPUT_CHARS) }],
   });
 

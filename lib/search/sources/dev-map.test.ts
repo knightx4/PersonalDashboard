@@ -94,8 +94,8 @@ describe('dev search hits', () => {
       raises: [{ id: 'r1', title: 'Token expired', detail: 'It ran out.', ask: 'Renew it?', status: 'open' }],
     });
     expect(hits.map((hit) => [hit.kind, hit.href])).toEqual([
-      ['plan', '/dev/raised#waiting-q1'],
-      ['raise', '/dev/raised#raise-r1'],
+      ['plan', '/dev/inbox#waiting-q1'],
+      ['raise', '/dev/inbox#raise-r1'],
     ]);
     expect(hits[0].subtitle).toBe('Question #900 · waiting on you');
     expect(hits[0].match).toContain('JSON');

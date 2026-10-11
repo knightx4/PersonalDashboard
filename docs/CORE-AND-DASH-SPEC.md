@@ -231,6 +231,21 @@ answered on 2 October 2026. Anything that acts outside the app, such as
 sending an email or buying something, is always a proposal. Anything no tool
 can do goes to the hand-off routine (#1402).
 
+**Reach.** `list_rows` (`lib/ask/list-rows.ts`) reads any table in the sources
+catalogue that is tied to its owner by a column, newest first, so a table is
+readable by Dash the day its module declares it. `tests/ask-reach.test.ts`
+fails a source Dash cannot list unless it says why. Before it, a table no
+lookup was written for was invisible: on 7 October 2026 Dash told the person
+it had no way to pick a YouTube video, with 122 on their watch list.
+
+**Refusing.** The `answer` tool takes `could_not`, a sentence for what the
+person asked that Dash did not do. An answer that sets it before any lookup
+is sent back once with `LOOK_FIRST` (`lib/dash/loop.ts`). In Ask, a
+`could_not` that stands is filed as a feature note on `/dev/bugs`, naming
+what was missing and quoting the question, so the gap is built rather than
+met again. Deleting, sending and spending are the only requests Ask turns
+down; anything else is looked up, done with a tool, or handed on.
+
 **Model.** One file, `lib/dash/models.ts`, names the model per surface: Sonnet
 for Ask and threads, Haiku for capture, where speed matters more than reach.
 The other model constants in the app move to `lib/core/models.ts` in the same
@@ -297,9 +312,105 @@ The counters count these things:
   what the person typed, which are the ones named `ask-`, `reply-` or
   `discuss-`, and capture's `file-capture`.
 - `model-id-files`: files under `app`, `components`, `inngest`, `lib` and
-  `scripts`, tests aside, that contain a model id such as `'claude-sonnet-5'`.
+  `scripts`, tests aside, that contain a model id such as `'claude-sonnet-5-5'`.
 - `link-tables-per-target-column`: tables with a check that exactly one of
   three or more `_id` columns is set.
+
+## Contract
+
+Rules: R1, R2, R3, R4.
+
+Written by the design session (#1518), with job roles as the workspace moved
+across. Each file below is the one place its piece is defined; a later step
+that needs the piece uses it rather than writing a second copy.
+
+Refs (Part 1):
+
+- `lib/core/refs.ts`: parsing a ref, the page it opens and the titles of a
+  batch of refs, read from the sources catalogue.
+- `lib/sources/catalogue.ts`: every table with a page, its href and how its
+  title is read; the registry `lib/core/refs.ts` reads.
+- `supabase/migrations/0156_ref_owned.sql`: the database check that a ref
+  written into a row names a row of the same account.
+
+Threads (Part 2):
+
+- `supabase/migrations/0167_thread_turns.sql`: `core.add_thread_turn`, which
+  writes a turn under any ref, and `core.thread_turns`, which reads them.
+- `lib/thread/store.ts`: the app's reads and writes of a row's thread, and
+  `threadCause`, the comment a reply's writes are recorded under.
+- `lib/thread/subjects.ts`: which rows have a thread, and the ref for each.
+- `components/thread/thread.tsx`: `<Thread subject={ref} />`, the one thread
+  component, with `@dash` recognised.
+
+Whose move (Part 3):
+
+- `lib/core/move.ts`: the five states, their words, and `withRun`, which
+  marks a row Dash is working on.
+- `components/ui/move-label.tsx`: the one label that draws a move.
+- `lib/jobs/move.ts`: the move of a job application, as the example of a
+  workspace's own move function.
+
+The record of what Dash did (Part 5):
+
+- `supabase/migrations/0161_dash_actions.sql`: `core.dash_actions`, one row
+  per write Dash makes, with the row before and after.
+- `supabase/migrations/0163_record_dash_action.sql`:
+  `core.record_dash_action`, the one call a routine records a write with.
+- `lib/core/dash-actions.ts`: recording a write from the app, and the one
+  undo rule.
+- `lib/talk/changes.ts`: keeping a registry write's record, from Ask or
+  from a thread under the comment that asked for it.
+- `lib/shell/dash-today.ts` and `app/home/dash-today.tsx`: what Dash did
+  today, by workspace, with Undo and, for a thread's write, a link to the
+  row whose thread asked for it.
+
+One Dash (Part 6):
+
+- `lib/dash/loop.ts`: the one loop every surface runs.
+- `lib/dash/registry.ts`: the one tool registry, with the tools each surface
+  is offered.
+- `lib/dash/writes.ts`: the registry's write tools, each with its apply and
+  undo.
+- `lib/dash/thread.ts`: a thread's reply through the loop, recording each
+  write under the comment it answers.
+- `lib/dash/thread-tools.ts`: the tools that act on a thread's own row, such
+  as the role's cover letter.
+- `lib/dash/models.ts` and `lib/core/models.ts`: the model per surface, and
+  every other model id.
+
+The workspace moved across:
+
+- `lib/jobs/role-thread/ask.ts`: Dash's reply on a role, on the loop, with
+  its writes recorded under the comment.
+- `tests/flows/role-thread-dash.test.ts`: the flow the later phases keep
+  passing, from an `@dash` comment on a role to a todo undone from Home.
+
+## Design log
+
+- 2026-10-03 (#1518): Job roles were already on the shared pieces on main
+  when the design session began: the thread in `core.conversations` (#1470),
+  the loop (#1465), the move label (#1454) and Dash today (#1461). The
+  session added what was missing instead of building them again.
+- 2026-10-03 (#1518): A thread's write is recorded with `conversation_id` as
+  the row's thread and `turn_id` as the person's comment, so Home can link a
+  todo to the role it came from. The columns and their foreign keys were
+  already there, so there is no migration.
+- 2026-10-03 (#1518): Only the role's reply passes its comment so far. Dev
+  rows, goals and the generic thread reply still record their writes with no
+  comment until phase 2 moves each of them, which is one argument to
+  `replyInThread`.
+- 2026-10-03 (#1518): The role's reply keeps its own spend operation,
+  `reply-to-role-comment`. Folding it into another would split its spend
+  history before anyone has decided what the one operation for R2 is called,
+  so that waits for R2's removal step.
+- 2026-10-03 (#1518): `job_search.notes` and `job_search.attachments` keep
+  their column per target (R4). The live database is shared with main, so
+  those columns cannot go on a branch; they are phase 3 work. The role's
+  notes stay notes, as Part 2 says.
+- 2026-10-03 (#1518): The flow test runs the code over in-memory tables and
+  checks the record it writes against the local database separately. The app
+  reaches the database through PostgREST, and the test database has none.
 
 ## Decisions
 

@@ -49,6 +49,15 @@ describe('matchPage', () => {
     expect(matchPage(`/goals/${GOAL}`).page).toBe('Goals goal');
   });
 
+  it("reads a step's own page as the step, not the goal", () => {
+    expect(matchPage(`/goals/${THEIR_GOAL}/s/${GOAL}`)).toEqual({
+      path: `/goals/${THEIR_GOAL}/s/${GOAL}`,
+      module: 'goals',
+      page: 'Goals step',
+      row: { table: 'goals.items', ref: GOAL },
+    });
+  });
+
   it('gives only the page for a list page and for pages that are not ids', () => {
     expect(matchPage('/jobs/pipeline')).toEqual({
       path: '/jobs/pipeline',
@@ -153,6 +162,13 @@ describe('resolvePage', () => {
       href: `/jobs/roles/${ROLE}`,
     });
     expect((await resolvePage(context(), `/goals/${GOAL}`)).row?.title).toBe('Run a marathon');
+    // A step is an item like its goal, and keeps its own page's address.
+    expect((await resolvePage(context(), `/goals/${THEIR_GOAL}/s/${GOAL}`)).row).toEqual({
+      table: 'goals.items',
+      ref: GOAL,
+      title: 'Run a marathon',
+      href: `/goals/${THEIR_GOAL}/s/${GOAL}`,
+    });
   });
 
   it("gives the page without a row for another person's id", async () => {

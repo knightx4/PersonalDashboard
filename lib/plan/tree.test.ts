@@ -568,8 +568,8 @@ describe('applyView', () => {
 });
 
 describe('the chip row', () => {
-  it('draws five views and keeps every other one in the menu', () => {
-    expect([...PLAN_VIEW_CHIPS]).toEqual(['open', 'ready', 'you', 'claude', 'all']);
+  it('draws five views and the table, and keeps every other one in the menu', () => {
+    expect([...PLAN_VIEW_CHIPS]).toEqual(['open', 'ready', 'you', 'claude', 'all', 'table']);
     expect([...PLAN_VIEW_CHIPS, ...PLAN_VIEW_MENU].sort()).toEqual([...PLAN_VIEWS].sort());
     expect(
       PLAN_VIEW_MENU.some((view) => (PLAN_VIEW_CHIPS as readonly string[]).includes(view)),
