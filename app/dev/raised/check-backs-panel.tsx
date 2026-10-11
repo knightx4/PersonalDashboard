@@ -64,38 +64,36 @@ export function CheckBacksPanel({
               .filter(Boolean)
               .join(' · ');
             return (
-              <li key={row.id} className="row-pad flex items-baseline gap-3" title={how}>
-                <span
+              <li key={row.id} className="row-pad" title={how}>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="min-w-0 flex-1 text-body break-words text-ink">{row.title}</p>
+                  <form action={dropCheckBack} className="shrink-0">
+                    <input type="hidden" name="id" value={row.id} />
+                    <Button type="submit" variant="ghost" size="sm">
+                      Drop
+                    </Button>
+                  </form>
+                </div>
+                <p
                   className={cn(
-                    'tabular w-20 shrink-0 text-small',
+                    'tabular text-small',
                     due ? 'font-medium text-caution' : 'text-ink-muted',
                   )}
                 >
                   {due ? 'Due' : now > 0 ? dueWords(row.dueAt, now) : dueDay(row.dueAt)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-body break-words text-ink">{row.title}</p>
-                  {row.step && (
-                    <p className="truncate text-small text-ink-muted">
-                      For{' '}
-                      <Link
-                        href={hrefOf(row.step)}
-                        className="press-area text-ink underline underline-offset-2"
-                      >
-                        #{row.step.outline} {row.step.title}
-                      </Link>
-                    </p>
-                  )}
-                  {row.detail && (
-                    <p className="truncate text-small text-ink-muted">{row.detail}</p>
-                  )}
-                </div>
-                <form action={dropCheckBack} className="shrink-0">
-                  <input type="hidden" name="id" value={row.id} />
-                  <Button type="submit" variant="ghost" size="sm">
-                    Drop
-                  </Button>
-                </form>
+                </p>
+                {row.step && (
+                  <p className="break-words text-small text-ink-muted">
+                    For{' '}
+                    <Link
+                      href={hrefOf(row.step)}
+                      className="press-area text-ink underline underline-offset-2"
+                    >
+                      #{row.step.outline} {row.step.title}
+                    </Link>
+                  </p>
+                )}
+                {row.detail && <p className="line-clamp-2 text-small text-ink-muted">{row.detail}</p>}
               </li>
             );
           })}

@@ -1,11 +1,20 @@
 import Link from 'next/link';
+import { StatusGlyph } from '@/components/ui/status-glyph';
 import { TONE_TEXT, type DevTone } from '@/components/dev/state-label';
 import { cn } from '@/lib/cn';
 import type { MainCheck } from '@/lib/plan/main-check';
 import { overnightStanding, type OvernightRun } from '@/lib/plan/overnight';
 
 /** One fact of the strip: a word, the tone it is said in, and the page it opens. */
-type Chip = { key: string; label: string; value: string; tone: DevTone; href: string };
+type Chip = {
+  key: string;
+  label: string;
+  value: string;
+  tone: DevTone;
+  href: string;
+  /** A passing state is a check in ink, never a green dot (law 4). */
+  check?: boolean;
+};
 
 const RUNNER_WORD = {
   running: 'Running',
@@ -39,7 +48,7 @@ function mainChip(check: MainCheck | null): Chip {
   }
   switch (check.conclusion) {
     case 'passed':
-      return { ...base, value: 'Green', tone: 'positive' };
+      return { ...base, value: 'Green', tone: 'quiet', check: true };
     case 'failed':
       return { ...base, value: 'Red', tone: 'caution' };
     case 'running':
@@ -88,7 +97,8 @@ export function NowStrip({
       key: 'inbox',
       label: 'Inbox',
       value: inbox === 0 ? 'Clear' : `${inbox} waiting`,
-      tone: inbox === 0 ? 'positive' : 'caution',
+      tone: inbox === 0 ? 'quiet' : 'caution',
+      check: inbox === 0,
       href: '/dev/inbox',
     },
   ];
@@ -101,7 +111,13 @@ export function NowStrip({
           href={chip.href}
           className="press press-area inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-small hover:bg-sunken"
         >
-          <span aria-hidden className={cn('size-1.5 shrink-0 rounded-full bg-current', TONE_TEXT[chip.tone])} />
+          {chip.check ? (
+            <span className="shrink-0 text-ink-muted">
+              <StatusGlyph glyph="check" size={12} />
+            </span>
+          ) : (
+            <span aria-hidden className={cn('size-1.5 shrink-0 rounded-full bg-current', TONE_TEXT[chip.tone])} />
+          )}
           <span className="font-semibold text-ink">{chip.label}</span>
           <span className={cn('tabular', chip.tone === 'quiet' ? 'text-ink-muted' : TONE_TEXT[chip.tone])}>
             {chip.value}
