@@ -193,7 +193,6 @@ function VoiceSection({
   return (
     <section className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">Writing voice</h2>
-      <p className="mt-0.5 text-ui text-ink-muted">Every draft Dash writes for you reads these.</p>
 
       {!editing ? (
         <div className="mt-4 space-y-2">
@@ -538,7 +537,7 @@ function EvidenceSection({
         </ul>
       )}
 
-      <SeedFromWriting resumes={resumes} />
+      <SeedFromWriting resumes={resumes} bankEmpty={evidence.length === 0} />
 
       {/* Six fields, open on arrival, under the bank they are meant to fill.
           The comment on SeedFromWriting below already says nobody fills this
@@ -637,7 +636,9 @@ type EvidenceDraft = {
 
 function SeedFromWriting({
   resumes,
+  bankEmpty,
 }: {
+  bankEmpty: boolean;
   resumes: Array<{ id: string; label: string; hasText: boolean }>;
 }) {
   const readable = resumes.filter((resume) => resume.hasText);
@@ -671,10 +672,12 @@ function SeedFromWriting({
     // in the Evidence card and it belongs to it, so the frame around it was the
     // card's frame said twice. Law 11.
     <Group title="Seed it from what you have written" className="mt-4 border-t border-border pt-3">
-      <p className="text-small leading-relaxed text-ink-muted">
-        Read a resume, your approved behavioural answers, or your interview debriefs, and propose
-        the stories in them. Nothing is added until you tick it.
-      </p>
+      {bankEmpty && (
+        <p className="text-small leading-relaxed text-ink-muted">
+          Read a resume, your approved behavioural answers, or your interview debriefs, and
+          propose the stories in them. Nothing is added until you tick it.
+        </p>
+      )}
 
       {/* Chips rather than labelled selects: the chosen value says what each
           one is, and at 390 the two sit on one row instead of four (law 9). */}
