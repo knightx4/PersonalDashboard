@@ -8,6 +8,8 @@ import { Segmented } from '@/components/ui/segmented';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Banner } from '@/components/ui/banner';
 import { cn } from '@/lib/cn';
+import { planHref } from '@/lib/search/sources/dev-map';
+import type { SurfaceChange } from '@/lib/plan/screen-change';
 import { noteOnSurface, type SurfaceNoteState } from './actions';
 
 export type SurfaceNote = {
@@ -21,8 +23,15 @@ export type ReviewSurface = {
   id: string;
   label: string;
   module: string;
+  /** The step that changed it in the last seven days, or null (plan #1542). */
+  changed?: SurfaceChange | null;
   notes: SurfaceNote[];
 };
+
+/** "5 Oct". In UTC, so the server's render and the browser's agree. */
+function shortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
 
 /**
  * A surface, framed at a real width, with a box to say what is wrong.
@@ -37,9 +46,21 @@ export type ReviewSurface = {
  * Phone first, because that is where this app is used and where every fault
  * found so far has been. The laptop width is a toggle, not the default.
  */
-export function SurfaceReview({ surfaces }: { surfaces: ReviewSurface[] }) {
+export function SurfaceReview({
+  surfaces,
+  show: startShow = 'all',
+}: {
+  surfaces: ReviewSurface[];
+  /** Which surfaces to start on; the gallery shoots both. */
+  show?: 'all' | 'changed';
+}) {
   const [width, setWidth] = useState<'phone' | 'laptop'>('phone');
-  const modules = [...new Set(surfaces.map((surface) => surface.module))];
+  // "Changed this week" (plan #1542): only the surfaces a step changed in the
+  // last seven days, which is where a correction is most likely to be due.
+  const [show, setShow] = useState<'all' | 'changed'>(startShow);
+  const changedCount = surfaces.filter((surface) => surface.changed).length;
+  const shown = show === 'changed' ? surfaces.filter((surface) => surface.changed) : surfaces;
+  const modules = [...new Set(shown.map((surface) => surface.module))];
 
   return (
     <div className="space-y-6">
@@ -53,17 +74,28 @@ export function SurfaceReview({ surfaces }: { surfaces: ReviewSurface[] }) {
             { value: 'laptop', label: 'Laptop · 1280' },
           ]}
         />
-        <p className="text-small text-ink-muted">
-          {surfaces.length} surfaces · a note here joins the queue in Bugs and requests
-        </p>
+        <Segmented
+          label="Show"
+          value={show}
+          onChange={setShow}
+          options={[
+            { value: 'all', label: `All · ${surfaces.length}` },
+            { value: 'changed', label: `Changed this week · ${changedCount}` },
+          ]}
+        />
+        <p className="text-small text-ink-muted">A note here joins the queue in Bugs and requests</p>
       </div>
+
+      {shown.length === 0 && (
+        <p className="text-ui text-ink-muted">No step changed a screen in the last seven days.</p>
+      )}
 
       {/* The sections are named so /dev/ui/review can send you straight to one
           module's surfaces rather than to the top of a page of six modules'. */}
       {modules.map((module) => (
         <section key={module} id={`surfaces-${module}`} className="space-y-3">
           <h2 className="text-ui font-semibold text-ink capitalize">{module}</h2>
-          {surfaces
+          {shown
             .filter((surface) => surface.module === module)
             .map((surface) => (
               <SurfaceCard key={surface.id} surface={surface} width={width} />
@@ -82,12 +114,23 @@ function SurfaceCard({ surface, width }: { surface: ReviewSurface; width: 'phone
   return (
     <Card padding="dense" className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-ui font-medium text-ink">{surface.label}</h3>
+        <div className="min-w-0">
+          <h3 className="text-ui font-medium text-ink">{surface.label}</h3>
+          {surface.changed && (
+            <p className="text-small text-ink-muted">
+              Changed by{' '}
+              <a href={planHref(surface.changed.step)} className="text-accent hover:underline">
+                #{surface.changed.step}
+              </a>{' '}
+              on {shortDate(surface.changed.checkedAt)}
+            </p>
+          )}
+        </div>
         <a
           href={`/preview?s=${surface.id}`}
           target="_blank"
           rel="noreferrer"
-          className="text-small text-ink-muted hover:text-accent"
+          className="press-area shrink-0 text-small text-ink-muted hover:text-accent"
         >
           Open alone
         </a>

@@ -1,4 +1,5 @@
 import type { SpendSink } from '@/lib/core/spend/pricing';
+import type { OpeningSource } from './source';
 import {
   askJevAll,
   type JevChoiceAnswer,
@@ -14,7 +15,7 @@ import { POSTING_TEXT_FOR_SCORING } from './posting-text';
 import { preferenceState, type JobPreferences } from './preferences';
 
 export { companyKey };
-import { CHANCE_DISPLAY, chanceBand, type ChanceBand } from './chance-check';
+import { CHANCE_DISPLAY, CHANCE_FILTER_EDGES, chanceBand, type ChanceBand } from './chance-check';
 
 /**
  * Ten fixed questions about each opening Dash recommends (plan #1178; fit
@@ -466,6 +467,8 @@ export type OpeningFilter = {
   minFit: number;
   /** The chance band an opening must reach, chosen by band while chance shows as one. */
   minChance: ChanceBand | 'any';
+  /** Where it came from (source.ts). */
+  source: OpeningSource | 'any';
 };
 
 export const NO_OPENING_FILTER: OpeningFilter = {
@@ -477,13 +480,14 @@ export const NO_OPENING_FILTER: OpeningFilter = {
   coverLetter: 'any',
   minFit: 0,
   minChance: 'any',
+  source: 'any',
 };
 
 const BAND_RANK: Record<ChanceBand, number> = { low: 0, medium: 1, high: 2 };
 
 /** The band a stored chance falls in, on CHANCE_DISPLAY's edges (the #1204 terciles when it shows the number). */
 export function chanceBandOf(value: number): ChanceBand {
-  return chanceBand(value, CHANCE_DISPLAY.kind === 'band' ? CHANCE_DISPLAY.edges : { medium: 27, high: 38 });
+  return chanceBand(value, CHANCE_DISPLAY.kind === 'band' ? CHANCE_DISPLAY.edges : CHANCE_FILTER_EDGES);
 }
 
 /** Whether a chance clears a minimum band. */
@@ -491,13 +495,15 @@ export function reachesBand(value: number, minimum: ChanceBand | 'any'): boolean
   return minimum === 'any' || BAND_RANK[chanceBandOf(value)] >= BAND_RANK[minimum];
 }
 
-type Sortable = { scores: OpeningScores | null; createdAt: string };
+type Sortable = { scores: OpeningScores | null; createdAt: string; source?: { key: OpeningSource } };
 
 /**
  * Whether an opening passes the filter. An unscored opening passes every
- * filter, so nothing vanishes because Jev has not read it yet.
+ * filter on Jev's answers, so nothing vanishes because Jev has not read it
+ * yet; the source filter applies to every opening.
  */
 export function passesFilter(opening: Sortable, filter: OpeningFilter): boolean {
+  if (filter.source !== 'any' && opening.source && opening.source.key !== filter.source) return false;
   const s = opening.scores;
   if (!s) return true;
   if (filter.workplace !== 'any' && s.workplace && s.workplace.value !== filter.workplace) return false;

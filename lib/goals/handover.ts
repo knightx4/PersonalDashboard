@@ -1,7 +1,7 @@
 /**
- * Sending one step or one phase of a goal to Claude from its row (plan #1000).
+ * Asking Dash to take one step or one phase of a goal from its row (plan #1000).
  *
- * "Work on this" hands Claude a whole goal and the morning run takes every
+ * Ask Dash on a goal hands Dash the whole goal and the morning run takes every
  * ready Claude step at once. This is the smaller hand-over: one Claude step,
  * or one phase (a step with sub-steps), worked by a run of its own with job
  * `step` or `phase`. The dev plan's send button in app/dev/plan is the model,
@@ -59,15 +59,10 @@ function substeps(step: StepNode): StepNode[] {
  * in it. A Claude step with none is a step. A step of yours with none is not
  * sent here; preparing one is its own job (prepareJob, plan #1001).
  */
-export function sendJob(step: Pick<StepNode, 'kind' | 'children'>): SendJob | null {
+export function sendJob(step: Pick<StepNode, 'kind' | 'children'>): 'step' | 'phase' | null {
   if (step.kind === 'decision') return null;
   if (step.children.some((child) => child.kind !== 'decision')) return 'phase';
   return step.kind === 'claude' ? 'step' : null;
-}
-
-/** Whether the row offers Send at all. What is refused once pressed is sendRefusal's. */
-export function offersSend(step: StepNode): boolean {
-  return sendJob(step) !== null && step.status !== 'done' && step.status !== 'dropped';
 }
 
 /**
@@ -80,18 +75,40 @@ export function prepareJob(step: Pick<StepNode, 'kind' | 'children'>): 'prepare'
   return step.children.some((child) => child.kind !== 'decision') ? null : 'prepare';
 }
 
-/** Whether the row offers Prepare. What is refused once pressed is sendRefusal's. */
-export function offersPrepare(step: StepNode): boolean {
-  return prepareJob(step) !== null && step.status !== 'done' && step.status !== 'dropped';
+/** What Ask Dash starts: a step or phase handed over, a prepare, or a run on the whole goal. */
+export type AskDashChoice =
+  | { mode: 'send'; job: 'step' | 'phase' }
+  | { mode: 'prepare'; job: 'prepare' }
+  | { mode: 'goal'; job: 'goal' };
+
+/**
+ * Which run Ask Dash starts. The person presses one control and this picks
+ * the job: a Dash step is sent, a phase (a step with sub-steps, whoever's it
+ * is) gets a phase run, a step of yours with no sub-steps is prepared and
+ * stays yours, and the goal itself (`null`) gets a goal run. A question or a
+ * rhythm has nothing to ask for, so it is null. The row's control and an
+ * @dash comment both read this, so they cannot choose differently.
+ */
+export function askDash(step: Pick<StepNode, 'kind' | 'children'> | null): AskDashChoice | null {
+  if (step === null) return { mode: 'goal', job: 'goal' };
+  const sent = sendJob(step);
+  if (sent) return { mode: 'send', job: sent };
+  return prepareJob(step) ? { mode: 'prepare', job: 'prepare' } : null;
+}
+
+/** Whether the row offers Ask Dash. What is refused once pressed is sendRefusal's. */
+export function offersAsk(step: StepNode): boolean {
+  return askDash(step) !== null && step.status !== 'done' && step.status !== 'dropped';
 }
 
 /**
- * Which hand-over an @dash comment asking Claude to take a step starts
- * (plan #1003): a step of yours is prepared and stays yours, and anything
- * else is sent. A step that fits neither is refused by sendRefusal as a send.
+ * Which hand-over an @dash comment asking Dash to take a step starts
+ * (plan #1003), read from askDash: a step of yours is prepared and stays
+ * yours, and anything else is sent. A step that fits neither is refused by
+ * sendRefusal as a send.
  */
 export function commentMode(step: Pick<StepNode, 'kind' | 'children'>): SendMode {
-  return prepareJob(step) ? 'prepare' : 'send';
+  return askDash(step)?.mode === 'prepare' ? 'prepare' : 'send';
 }
 
 /** The job a send or a prepare would start on a step, or null when it has none. */
@@ -225,13 +242,19 @@ export function sendRunText(input: {
   collections: readonly SendCollection[];
   userId: string;
   runId: string;
-  /** The @dash comment that asked for it (plan #1003), when it came from the thread. */
+  /**
+   * What they wrote when they asked: the @dash comment (plan #1003), or the
+   * box beside Ask Dash on the row.
+   */
   asked?: string;
+  /** Where `asked` was written; a comment unless the row says otherwise. */
+  askedOn?: 'comment' | 'row';
   /** What was said on the row before that comment, oldest first. */
   thread?: readonly { author: string; body: string }[];
 }): string {
   const { target, job, collections } = input;
-  const from = input.asked ? 'a comment on its row' : 'its row on the goal page';
+  const from =
+    input.asked && input.askedOn !== 'row' ? 'a comment on its row' : 'its row on the goal page';
   const { goal, step, above, siblings } = target;
   const noun = job === 'phase' ? 'phase' : 'step';
 

@@ -167,7 +167,7 @@ async function readChunk(
       max_tokens: 8192,
       system: SYSTEM,
       tools: [TOOL],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, MODEL),
       messages: [{ role: 'user', content: lines.join('\n') }],
     });
   } catch (error) {

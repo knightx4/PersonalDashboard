@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summariseSearch, type SummaryApplication, type SummaryInterview } from './summary';
+import { sentHref, stageHref, summariseSearch, type SummaryApplication, type SummaryInterview } from './summary';
 
 const NOW = new Date('2026-09-27T12:00:00.000Z');
 const DAY = 24 * 60 * 60 * 1000;
@@ -24,7 +24,7 @@ function interview(
 }
 
 describe('summariseSearch', () => {
-  it('counts live applications by the board columns, closed and unsent ones left out', () => {
+  it('counts live applications by the board columns, leads included and closed ones left out', () => {
     const summary = summariseSearch(
       [
         app('lead'),
@@ -43,11 +43,12 @@ describe('summariseSearch', () => {
       NOW,
     );
     expect(summary.byStage).toEqual([
+      { key: 'unsent', label: 'Not sent yet', count: 2 },
       { key: 'submitted', label: 'Submitted', count: 2 },
       { key: 'in_process', label: 'In process', count: 2 },
       { key: 'offer', label: 'Offer', count: 1 },
     ]);
-    expect(summary.live).toBe(5);
+    expect(summary.live).toBe(7);
   });
 
   it('counts what was sent in the last seven days, whatever became of it', () => {
@@ -89,5 +90,12 @@ describe('summariseSearch', () => {
 
   it('reports interviews it could not read as unknown, not zero', () => {
     expect(summariseSearch([], null, NOW).interviewsSoon).toBeNull();
+  });
+});
+
+describe('the links each number opens', () => {
+  it('opens the table at one stage, and what was sent whatever became of it', () => {
+    expect(stageHref('submitted')).toBe('/jobs/pipeline?view=table&stage=submitted');
+    expect(sentHref()).toBe('/jobs/pipeline?view=table&status=all&sent=7');
   });
 });

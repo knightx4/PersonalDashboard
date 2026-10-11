@@ -2,10 +2,12 @@ import Anthropic from '@anthropic-ai/sdk';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { citationsOf, toolResultText, type AskToolResult } from '@/lib/ask/db';
 import type { PageContext } from '@/lib/ask/page';
-import { whyNoReport } from '@/lib/learn/graph/tool-call';
+import type { ListContext } from '@/lib/ask/filtered-list';
+import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { NO_HANDOFF } from '@/lib/talk/handoff';
 import { MAX_TURN, toModelMessages, type TalkCitation, type TalkToolCall, type TalkTurn } from '@/lib/talk/talk';
 import { parseRef } from '@/lib/core/refs';
+import { fileBlocks, type DashFile } from './files';
 import { dashTool, type DashHandoffTool, type DashTool, type DashWriteTool } from './registry';
 
 /**
@@ -83,24 +85,53 @@ const ANSWER: Anthropic.Tool = {
           additionalProperties: false,
         },
       },
+      could_not: {
+        type: 'string',
+        description:
+          'Only when the answer does not do what they asked: what they wanted that you could not do or could not see, in one sentence naming the ability or the data that was missing ("pick a video from the watch list: no lookup reads it"). Leave out when you did it, or handed it on.',
+      },
     },
     required: ['answer', 'cited'],
     additionalProperties: false,
   },
 };
 
+export const ACKNOWLEDGE_TOOL = 'acknowledge';
+
 /**
- * The tools sent on every call: the voice's registry tools, then `answer`.
- * The same list in the same order every time, with the cache breakpoint on
- * the last, so the prefix is cached across rounds and across questions.
+ * The other way a thread's turn can end (plan #1649): the comment is marked
+ * seen and no reply is written. Only a voice with `acknowledge` is sent it,
+ * and only a thread run with an `acknowledge` handler can carry it out, so
+ * Ask Dash always answers in words.
  */
-export function modelTools(tools: readonly DashTool[], finish: Anthropic.Tool = ANSWER): Anthropic.Tool[] {
-  return [...tools.map((tool) => tool.definition), { ...finish, cache_control: { type: 'ephemeral' } }];
+const ACKNOWLEDGE: Anthropic.Tool = {
+  name: ACKNOWLEDGE_TOOL,
+  description:
+    'Mark their comment as seen and write no reply, when it needs nothing back: a status update, a thanks, "looks good". Never for a question or a request, and never once you have changed anything, since a change is always said through answer. Call it on its own. It ends your turn.',
+  input_schema: { type: 'object', properties: {}, additionalProperties: false },
+};
+
+/**
+ * The tools sent on every call: the voice's registry tools, then
+ * `acknowledge` when the voice may end that way, then `answer`. The same list
+ * in the same order every time, with the cache breakpoint on the last, so the
+ * prefix is cached across rounds and across questions.
+ */
+export function modelTools(
+  tools: readonly DashTool[],
+  finish: Anthropic.Tool = ANSWER,
+  acknowledge = false,
+): Anthropic.Tool[] {
+  return [
+    ...tools.map((tool) => tool.definition),
+    ...(acknowledge ? [ACKNOWLEDGE] : []),
+    { ...finish, cache_control: { type: 'ephemeral' } },
+  ];
 }
 
 /** Every tool a voice is sent: its server tools first, then modelTools. */
 function voiceTools(voice: DashVoice): Anthropic.ToolUnion[] {
-  return [...(voice.serverTools ?? []), ...modelTools(voice.tools, voice.finish)];
+  return [...(voice.serverTools ?? []), ...modelTools(voice.tools, voice.finish, voice.acknowledge === true)];
 }
 
 /** The surfaces Dash talks on, as core.dash_actions names them. */
@@ -126,6 +157,11 @@ export type DashVoice = {
    * the answer's `report`, and its `answer` field, when it has one, as the body.
    */
   finish?: Anthropic.Tool;
+  /**
+   * Whether the turn may end by marking the comment seen with no reply
+   * (plan #1649). Threads only: Ask Dash's voice never sets it.
+   */
+  acknowledge?: boolean;
   /** Output tokens for one call; ANSWER_MAX_TOKENS when absent. */
   maxTokens?: number;
 };
@@ -143,9 +179,33 @@ export type DashContext = {
   page: PageContext | null;
 };
 
-/** What the model is told the date is: after the cache breakpoint, since it changes daily. */
-function dateLine(today: string): string {
-  return `Today is ${today} in the person's timezone. Read "this month", "last week" and the like from it.`;
+/** "Sunday, 4 October 2026", from a YYYY-MM-DD day read as a calendar day. */
+function spelledDay(day: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${day}T00:00:00Z`));
+}
+
+/**
+ * What the model is told the date is: after the cache breakpoint, since it
+ * changes daily. The weekday and tomorrow are spelled out (note de8e7fbb):
+ * given only the bare date, Dash argued with "tomorrow" in its own reply.
+ */
+export function dateLine(today: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) {
+    return `Today is ${today} in the person's timezone. Read "this month", "last week" and the like from it.`;
+  }
+  const next = new Date(`${today}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  const tomorrow = next.toISOString().slice(0, 10);
+  return (
+    `Today is ${spelledDay(today)} (${today}) in the person's timezone, and tomorrow is ` +
+    `${spelledDay(tomorrow)} (${tomorrow}). Read "tomorrow", "this month", "last week" and the like from it.`
+  );
 }
 
 /**
@@ -155,6 +215,34 @@ function dateLine(today: string): string {
  */
 export function pageLine(page: PageContext | null | undefined): string | null {
   if (!page) return null;
+  const listed = page.list ? listLine(page.list) : null;
+  const shown = pageRowLine(page);
+  return listed ? `${shown} ${listed}` : shown;
+}
+
+/**
+ * The filtered list they sent with the question (plan #1658): which rows
+ * "these" are, with the refs the change tools take and enough of each row
+ * to count, total or chart them without a lookup apiece.
+ */
+export function listLine(list: ListContext): string {
+  if (list.total === 0) {
+    return `They sent the filtered ${list.path} list with the question, and nothing matches the filter: say so, and change nothing.`;
+  }
+  const rows = list.rows.map((row) => `${row.ref} | ${row.title.replace(/\s+/g, ' ').trim()} | ${row.facts}`);
+  const cut =
+    list.total > list.rows.length
+      ? ` Only the first ${list.rows.length} of ${list.total} are listed, which is the most one change can touch: for a change to all of them, say so and ask them to narrow the filter; for a count or a chart, say it covers the first ${list.rows.length}.`
+      : '';
+  return (
+    `They sent the list they are looking at, filtered: ${list.label}. "These", "them" and "the ones here" mean exactly these rows, ` +
+    `and any change or chart is about them only, never the rest of the list. Their refs are in ${list.table}; ` +
+    `each line is ref | name | facts. Use the refs as they are, and do not look the rows up again just to find them.${cut}\n` +
+    rows.join('\n')
+  );
+}
+
+function pageRowLine(page: PageContext): string {
   const at = `They asked from the ${page.page} page (${page.path})`;
   if (!page.row) return `${at}.`;
   const { table, ref, title } = page.row;
@@ -166,6 +254,15 @@ export function pageLine(page: PageContext | null | undefined): string | null {
     : `open_row with table ${table} and ref ${ref} reads it`;
   return `${at}, which shows "${shown}" (${table}, ref ${ref}): ${reach}.`;
 }
+
+/**
+ * Said to the model when it answers that it could not do something before
+ * it has looked anything up (the YouTube question, 7 October 2026: Dash said
+ * it had no way to pick a video with 122 on the person's watch list). It is
+ * sent once; a second refusal stands.
+ */
+export const LOOK_FIRST =
+  'Not yet: you have not looked anything up. What they asked about is probably in their own rows, which reach much further than the summary in your rules. Look first: list_rows reads any table of theirs, search finds a thing by name, recall finds what they wrote about a topic. When they ask you to pick or suggest, choose from what you find. When it is something to do that no tool can, hand it on with hand_off. Say you cannot only after that.';
 
 /** Said to the model when a limit is reached, in place of any further lookup. */
 const LIMIT_REACHED = 'No lookups are left for this answer. Answer now with what you have.';
@@ -197,6 +294,17 @@ export type DashAnswer =
        * the model cited, which an exact quote can be checked against.
        */
       webCited?: string[];
+      /**
+       * What the person asked for that Dash could not do or see, in the
+       * model's sentence, when the answer says so. Ask files it as a note so
+       * the missing ability gets built (lib/talk/ask-request.ts).
+       */
+      couldNot?: string;
+      /**
+       * The comment was marked seen in place of a reply (plan #1649): the
+       * body is empty and nothing is to be written into the thread.
+       */
+      acknowledged?: true;
     }
   | { ok: false; detail: string; toolCalls: TalkToolCall[] };
 
@@ -236,6 +344,11 @@ export type DashWriter = (tool: DashWriteTool, input: unknown, seen: DashSeen) =
 const NO_PROPOSALS = 'Changes cannot be proposed here. Answer in words.';
 /** Said to the model when a write is called where none can be made. */
 const NO_WRITES = 'Changes cannot be made here. Answer in words.';
+/** Said to the model when it tries to end with only a seen mark where there is no comment to mark. */
+export const NO_ACKNOWLEDGE = 'There is no comment to mark seen here. Answer in words.';
+/** Said to the model when it marks a comment seen in the same round as other calls. */
+export const ACKNOWLEDGE_ALONE =
+  'Marking the comment seen ends your turn, so it is called on its own. Nothing was marked. Finish what you are doing, then answer in words or call acknowledge alone.';
 
 /** A proposal tool, or a name the model made up in their shape: both go to the proposer, which refuses any but the four. */
 const isProposal = (name: string) => name.startsWith('propose_');
@@ -271,6 +384,22 @@ function historyMessages(turns: readonly Pick<TalkTurn, 'role' | 'body' | 'citat
       return { role: turn.role, body: `${turn.body}\n\n(Rows cited: ${rows})` };
     }),
   );
+}
+
+/**
+ * The history with the newest question's files put before its words (plan
+ * #1716), so the model reads what was sent with it. Earlier questions' files
+ * are named in their bodies and not sent again.
+ */
+export function withNewestFiles(
+  messages: Anthropic.MessageParam[],
+  files: readonly DashFile[] | undefined,
+): Anthropic.MessageParam[] {
+  const last = messages[messages.length - 1];
+  if (!files || files.length === 0 || !last || last.role !== 'user') return messages;
+  const words: Anthropic.ContentBlockParam[] =
+    typeof last.content === 'string' ? [{ type: 'text', text: last.content }] : [...last.content];
+  return [...messages.slice(0, -1), { role: 'user', content: [...fileBlocks(files), ...words] }];
 }
 
 /** Moves the one rolling cache breakpoint onto the newest tool results. */
@@ -311,9 +440,10 @@ export function answerFromLookups(found: readonly TalkCitation[]): { body: strin
   return { body: body.slice(0, MAX_TURN), citations: listed };
 }
 
-function answerInput(input: unknown): { answer: string; cited: { table: string; ref: string }[] } {
+function answerInput(input: unknown): { answer: string; cited: { table: string; ref: string }[]; couldNot: string | null } {
   const raw = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
   const answer = typeof raw.answer === 'string' ? raw.answer.trim() : '';
+  const couldNot = typeof raw.could_not === 'string' && raw.could_not.trim() ? raw.could_not.trim().slice(0, 500) : null;
   const cited = Array.isArray(raw.cited)
     ? raw.cited.flatMap((c) =>
         c && typeof c === 'object' && typeof (c as { table?: unknown }).table === 'string' &&
@@ -322,7 +452,7 @@ function answerInput(input: unknown): { answer: string; cited: { table: string; 
           : [],
       )
     : [];
-  return { answer, cited };
+  return { answer, cited, couldNot };
 }
 
 /**
@@ -350,6 +480,11 @@ export type DashRun = {
   context: DashContext;
   /** The conversation so far, oldest first, ending with the person's turn. */
   turns: readonly Pick<TalkTurn, 'role' | 'body' | 'citations'>[];
+  /**
+   * The files sent with the last turn, read (lib/dash/files.ts): put before
+   * its words for the model to read (plan #1716). Absent: none.
+   */
+  files?: readonly DashFile[];
   /** YYYY-MM-DD in the person's timezone. */
   today: string;
   execute: DashExecutor;
@@ -363,6 +498,12 @@ export type DashRun = {
   handOff?: (input: unknown, seen: DashSeen, tool: DashHandoffTool) => Promise<AskToolResult>;
   /** Absent: every write is refused. */
   write?: DashWriter;
+  /**
+   * Marks the comment being answered as seen, in place of a reply (plan
+   * #1649), or says why it will not. Absent, or on any surface but a
+   * thread: refused, and the model is told to answer in words.
+   */
+  acknowledge?: () => Promise<{ ok: true } | { ok: false; error: string }>;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;
@@ -384,6 +525,10 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   const maxTokens = voice.maxTokens ?? ANSWER_MAX_TOKENS;
   // A voice with server tools chooses each round; one without must call a tool.
   const choose = (voice.serverTools?.length ?? 0) > 0;
+  // A model that rejects a forced tool (Opus 5.5, Sonnet 5.5) chooses too, and
+  // is asked once more for its answer if it stops without one, as a voice with
+  // server tools is.
+  const chooses = choose || forceTool(finishName, model).type !== 'tool';
   const webCited: string[] = [];
   const extras = (): { report?: unknown; webCited?: string[] } => ({
     ...(choose ? { webCited } : {}),
@@ -404,7 +549,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     if (!built) return { ok: false, detail, toolCalls };
     return { ok: true, body: built.body, toolCalls, citations: built.citations, stop: 'unfinished' };
   };
-  const history = historyMessages(input.turns);
+  const history = withNewestFiles(historyMessages(input.turns), input.files);
   if (history.length === 0 || history[history.length - 1].role !== 'user') {
     return { ok: false, detail: 'There is no question to answer.', toolCalls };
   }
@@ -418,8 +563,11 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   // the thread hangs from (plan #1465).
   const row = context.page?.row;
   const subject = context.subject ? parseRef(context.subject.ref) : null;
+  const sent = context.page?.list;
+  const sentRefs = new Set(sent ? sent.rows.map((r) => r.ref) : []);
   const seenOrShown: DashSeen = (table, ref) =>
     seenByLookup(table, ref) ||
+    (sent?.table === table && sentRefs.has(ref)) ||
     (row?.table === table && row.ref === ref) ||
     (subject?.table === table && subject.id === ref);
 
@@ -464,6 +612,9 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
   let inputTokens = 0;
   // Set when a voice that chooses stopped without its answer: the next round must give it.
   let asked = false;
+  // Set once a refusal made before any lookup has been sent back (LOOK_FIRST).
+  let pushedBack = false;
+  const canLook = voice.tools.some((tool) => tool.kind === 'lookup');
 
   // Each round either answers or makes at least one lookup, and the lookups
   // are capped, so this ends; the bound is a second guard.
@@ -485,7 +636,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         max_tokens: maxTokens,
         system,
         tools,
-        tool_choice: mustAnswer ? { type: 'tool', name: finishName } : choose ? { type: 'auto' } : { type: 'any' },
+        tool_choice: mustAnswer ? forceTool(finishName, model) : chooses ? { type: 'auto' } : { type: 'any' },
         messages: withRollingBreakpoint(messages),
       });
     } catch (error) {
@@ -499,6 +650,23 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
 
     const uses = response.content.filter((c): c is Anthropic.ToolUseBlock => c.type === 'tool_use');
     const answered = uses.find((c) => c.name === finishName);
+    if (
+      answered &&
+      !pushedBack &&
+      !mustAnswer &&
+      canLook &&
+      toolCalls.length === 0 &&
+      uses.length === 1 &&
+      answerInput(answered.input).couldNot
+    ) {
+      // A refusal before any lookup: sent back once to look first.
+      pushedBack = true;
+      messages.push(
+        { role: 'assistant', content: response.content },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: answered.id, content: LOOK_FIRST, is_error: true }] },
+      );
+      continue;
+    }
     if (answered) {
       // Writes made in the same round as the answer are made first (plan
       // #1478): the answer says they are done, and capture files every move
@@ -523,7 +691,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         }
       });
       lookups += writes.length;
-      const { answer, cited } = answerInput(answered.input);
+      const { answer, cited, couldNot } = answerInput(answered.input);
       if (!answer && !voice.finish) return fail('The answer came back empty.');
       const citations: TalkCitation[] = [];
       const seen = new Set<string>();
@@ -545,7 +713,35 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
         stop,
         ...extras(),
         ...(voice.finish ? { report: answered.input } : {}),
+        ...(couldNot && !voice.finish ? { couldNot } : {}),
       };
+    }
+
+    // The comment needs nothing back, so it is marked seen and no reply is
+    // written (plan #1649). Only a thread run can do that, and only with the
+    // call on its own; refused, the model is told why and carries on.
+    const acked = !mustAnswer && uses.length === 1 && uses[0].name === ACKNOWLEDGE_TOOL ? uses[0] : null;
+    if (acked) {
+      let outcome: { ok: true } | { ok: false; error: string };
+      if (context.surface !== 'thread' || !input.acknowledge) {
+        outcome = { ok: false, error: NO_ACKNOWLEDGE };
+      } else {
+        try {
+          outcome = await input.acknowledge();
+        } catch (error) {
+          outcome = { ok: false, error: `It could not be marked seen: ${error instanceof Error ? error.message : 'no reason given'}. Answer in words.` };
+        }
+      }
+      toolCalls.push({ name: ACKNOWLEDGE_TOOL, input: acked.input, result: outcome });
+      if (outcome.ok) {
+        return { ok: true, body: '', toolCalls, citations: [], stop: 'answered', acknowledged: true };
+      }
+      lookups += 1;
+      messages.push(
+        { role: 'assistant', content: response.content },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: acked.id, content: outcome.error, is_error: true }] },
+      );
+      continue;
     }
 
     // Server tools paused the turn (a long search): send it back as it is.
@@ -557,7 +753,7 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
     }
     // A voice that chooses stopped without its answer: ask for it once, keeping
     // what it searched and wrote.
-    if (choose && uses.length === 0 && !mustAnswer && stopped !== 'max_tokens' && stopped !== 'refusal') {
+    if (chooses && uses.length === 0 && !mustAnswer && stopped !== 'max_tokens' && stopped !== 'refusal') {
       messages.push(
         { role: 'assistant', content: response.content },
         { role: 'user', content: `Now give it through ${finishName}.` },
@@ -624,6 +820,9 @@ export async function runDash(input: DashRun): Promise<DashAnswer> {
       uses.map(async (use, i): Promise<AskToolResult> => {
         if (lookups + i >= MAX_LOOKUPS) return { ok: false, error: LIMIT_REACHED };
         hear({ phase: 'started', id: use.id, index: lookups + i, name: use.name, input: use.input });
+        if (use.name === ACKNOWLEDGE_TOOL) {
+          return { ok: false, error: context.surface === 'thread' && input.acknowledge ? ACKNOWLEDGE_ALONE : NO_ACKNOWLEDGE };
+        }
         return run(use.name, use.input);
       }),
     );

@@ -30,7 +30,7 @@ import { approveChain, proposeGoal, type ApproveState, type ProposeState } from 
 function AskButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+    <Button type="submit" size="sm" variant="secondary" pending={pending}>
       <Sparkles className="size-4" strokeWidth={2} aria-hidden />
       {pending ? 'Laying it out…' : 'Lay out the chain'}
     </Button>
@@ -40,7 +40,7 @@ function AskButton() {
 function ApproveButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" pending={pending}>
       {pending ? 'Saving…' : 'Approve and save'}
     </Button>
   );

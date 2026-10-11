@@ -60,6 +60,15 @@ const lastWeek = (): PeriodRow => ({
 });
 
 describe('countTowards (plan #1279)', () => {
+  it('refuses a rhythm that counts itself from a source', async () => {
+    const row = { ...lastWeek(), closed_at: null, kept: null };
+    // The fake answers every table from one list, so the step's own row sits
+    // beside its period: the items read finds it by id.
+    const step = { id: 'apply', count_source: 'applications' } as unknown as PeriodRow;
+    expect(await countTowards(fakeClient([row, step]), 'apply', '2026-09-21', 1)).toBe(false);
+    expect(row.count).toBe(3);
+  });
+
   it('leaves a closed period alone unless told it may count there', async () => {
     const row = lastWeek();
     expect(await countTowards(fakeClient([row]), 'apply', '2026-09-21', 3)).toBe(false);

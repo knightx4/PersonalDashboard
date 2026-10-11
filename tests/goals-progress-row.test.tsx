@@ -116,12 +116,13 @@ describe('a step with progress on it', () => {
     expect(older).toBeGreaterThan(newer);
   });
 
-  it('tells the parent and the goal when it last moved', () => {
+  // The goal's own last progress is in its status line (statusLine in
+  // lib/goals/goal-status.ts), above the steps (plan #1078).
+  it('tells the parent when it last moved', () => {
     const html = render([phase, bags, shelf], entries);
     expect(html).toMatch(
-      /Last progress 29 Sept? on <a href="#step-bags"[^>]*>Move the bags to their spot</,
+      /Last progress 29 Sept? on <a [^>]*href="\/goals\/goal-move\/s\/bags"[^>]*>Move the bags to their spot</,
     );
-    expect(html).toMatch(/<span class="tabular text-small text-ink-muted">Last progress 29 Sept?</);
   });
 
   it('says nothing on the row once the step is done', () => {

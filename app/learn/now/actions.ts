@@ -25,6 +25,7 @@ import {
   recordFeedAction,
   setCardDifficulty,
 } from '@/lib/learn/feed/load';
+import { goalTrackIds } from '@/lib/learn/feed/plan-lessons';
 import { relatedNotesForCards } from '@/lib/learn/feed/related-notes';
 import { settleIdeaFromSwipe } from '@/lib/learn/feed/ideas-store';
 import { noteBody, type NoteWrite } from '@/lib/learn/notes/notes';
@@ -75,16 +76,23 @@ const CardIds = z.array(z.string().uuid()).max(1000);
 
 export type MoreCards = { cards: FeedCard[]; ready: number };
 
+/**
+ * The next page of the deck, leaving out what it already holds. On a
+ * subject's Now (plan #1698) `subjectId` keeps the page to that subject; an
+ * id that is not one deals the whole deck, as the page itself does.
+ */
 // latency: pending
-export async function loadMoreCards(shown: string[]): Promise<MoreCards> {
+export async function loadMoreCards(shown: string[], subjectId?: string | null): Promise<MoreCards> {
   const user = await requireUser();
   const exclude = CardIds.safeParse(shown);
+  const subject = CardId.safeParse(subjectId);
+  const only = subject.success ? subject.data : null;
   const supabase = await createLearnClient();
   const [cards, ready] = await Promise.all([
-    loadFeedPage(supabase, exclude.success ? exclude.data : []),
-    countReadyCards(supabase),
+    loadFeedPage(supabase, exclude.success ? exclude.data : [], { subjectId: only }),
+    countReadyCards(supabase, only),
   ]);
-  after(() => topUpFeedAfterResponse(user.id));
+  after(() => topUpFeedAfterResponse(user.id, only));
   // These cards load behind the one on screen, so waiting for their related
   // notes here is not waiting in front of anybody (plan #1113).
   const related = await relatedNotesForCards(supabase, user.id, cards);
@@ -95,6 +103,56 @@ export async function loadMoreCards(shown: string[]): Promise<MoreCards> {
     }),
     ready,
   };
+}
+
+export type GeneratedCards = MoreCards & { written: number; message: string | null };
+
+/**
+ * Generate more, on a subject's Now once its deck is empty (note 43b8d7ac).
+ * Writes the subject's next lessons while the person waits, the same top-up
+ * loading more starts after the response, and then deals what it wrote. A
+ * subject with nothing ready to teach gets a line saying why instead.
+ */
+// latency: pending -- a model call per lesson; the button says it is working
+export async function generateSubjectCards(subjectId: string, shown: string[]): Promise<GeneratedCards> {
+  const user = await requireUser();
+  const subject = CardId.safeParse(subjectId);
+  if (!subject.success) {
+    return { cards: [], ready: 0, written: 0, message: 'Could not tell which subject this is.' };
+  }
+  const supabase = await createLearnClient();
+  // A survey subject only holds the questions asked about a theme, so it has
+  // no curriculum and the top-up never writes it lessons (note 727c77a2).
+  const { data: row } = await supabase.from('subjects').select('survey').eq('id', subject.data).maybeSingle();
+  if ((row as { survey: boolean } | null)?.survey) {
+    return {
+      cards: [],
+      ready: 0,
+      written: 0,
+      message: 'This subject only holds the questions you were asked about it, so it has no lessons. Lessons come from subjects you follow.',
+    };
+  }
+  // A goal's lessons are on its plan, so its Now never deals them (plan #1143).
+  const goalTracks = await goalTrackIds(supabase, user.id);
+  if (goalTracks.includes(subject.data)) {
+    return {
+      cards: [],
+      ready: 0,
+      written: 0,
+      message: "This subject is a goal's, so its lessons are on the goal's plan rather than here.",
+    };
+  }
+  const summary = await topUpFeedAfterResponse(user.id, subject.data);
+  const more = await loadMoreCards(shown, subject.data);
+  const written = summary?.written ?? 0;
+  if (more.cards.length > 0) return { ...more, written, message: null };
+  const message =
+    summary === null
+      ? 'Could not write more for this subject just now. Try again in a moment.'
+      : summary.lessons?.held.includes(subject.data)
+        ? "This subject's next unit could not be written, so it rests for a day before Dash tries again."
+        : 'Nothing in this subject is ready to be taught yet. Its next lessons open as you pass the ones before them.';
+  return { ...more, written, message };
 }
 
 /**

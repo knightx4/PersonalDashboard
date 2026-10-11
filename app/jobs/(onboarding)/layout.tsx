@@ -5,7 +5,7 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
   return (
     <div className="min-h-dvh">
       <header className="mx-auto flex h-16 max-w-5xl items-center px-6">
-        <Link href="/jobs/pipeline" className="flex items-center gap-2">
+        <Link href="/jobs/pipeline" className="press-area flex items-center gap-2">
           {/* The shell's own mark, not a gradient tile of its own: the mark is
               the one thing that says "same app" before the shell exists. */}
           <ModuleMark module="jobs" size="sm" />

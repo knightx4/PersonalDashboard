@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import type { AskRows } from '@/lib/ask/list-filter';
 import { AskDashProvider, AskThread, useAskDash, type AskSource } from '@/components/shell/ask-dash';
 import type { ChangeOutcome } from '@/lib/ask/changes';
 import { PageHeader } from '@/components/shell/page-header';
@@ -10,6 +11,7 @@ import type { DashChange, MadeChange } from '@/lib/talk/changes';
 import type { ConversationSummary } from '@/lib/talk/store';
 import type { TalkTurn } from '@/lib/talk/talk';
 import { DashCredit } from '@/components/ui/dash-mark';
+import { SONNET } from '@/lib/core/models';
 
 /**
  * The Ask Dash sheet in the surface gallery (plan #1090), fed with typed
@@ -209,15 +211,16 @@ const FIXTURES: AskSource = {
       runs: 0,
       basis: 'guess',
       per: 'run',
+      models: [SONNET],
     },
   }),
 };
 
 /** Opens the sheet as the page arrives, sending `question` when given. */
-function OpenOnArrival({ question }: { question?: string }) {
+function OpenOnArrival({ question, rows }: { question?: string; rows?: AskRows }) {
   const handle = useAskDash();
   useEffect(() => {
-    handle?.open(question);
+    handle?.open(question, rows);
     // Once, on arrival.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -227,11 +230,14 @@ function OpenOnArrival({ question }: { question?: string }) {
 export function AskDashSurface({
   open = false,
   question,
+  rows,
   page = '/jobs',
   children,
 }: {
   open?: boolean;
   question?: string;
+  /** A filtered list sent with the question (plan #1658). */
+  rows?: AskRows;
   /** The page the sheet opens over; the gallery's own address says nothing. */
   page?: string;
   children: React.ReactNode;
@@ -239,7 +245,7 @@ export function AskDashSurface({
   return (
     <AskDashProvider source={FIXTURES} page={page}>
       {children}
-      {open && <OpenOnArrival question={question} />}
+      {open && <OpenOnArrival question={question} rows={rows} />}
     </AskDashProvider>
   );
 }

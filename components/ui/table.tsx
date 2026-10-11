@@ -34,6 +34,7 @@ export function Table({
   className,
   stack = true,
   flush = false,
+  fit = false,
   ...props
 }: React.TableHTMLAttributes<HTMLTableElement> & {
   /**
@@ -44,10 +45,12 @@ export function Table({
   stack?: boolean;
   /** Inside a padded card: the first and last cells meet the card's own padding. */
   flush?: boolean;
+  /** A grid of a few narrow columns that fits a phone: no scroll, so no fade at the edge. */
+  fit?: boolean;
 }) {
   return (
     <TableContext.Provider value={{ stack, flush }}>
-      <div className={cn('overflow-x-auto', !stack && 'max-lg:scroll-fade-x')}>
+      <div className={cn('overflow-x-auto', !stack && !fit && 'max-lg:scroll-fade-x')}>
         <table
           className={cn('w-full border-collapse text-ui', stack && 'max-md:block', className)}
           {...props}

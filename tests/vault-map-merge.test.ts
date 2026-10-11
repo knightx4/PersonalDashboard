@@ -391,7 +391,7 @@ describe('merging across users', () => {
       insert into map_merge_proposals (user_id, kind, a_id, b_id, a_name, b_name, source,
                                        verdict, survivor_id, survivor_name, reason, confidence, model)
       values (${userA}, 'theme', ${lo}, ${hi}, 'x', 'y', 'trigram', 'same', ${lo}, 'Rent',
-              'One subject.', 0.9, 'claude-haiku-4-5')
+              'One subject.', 0.9, 'claude-haiku-5-5')
       returning id`;
     await expect(
       asUser(userA, (tx) => tx`select merge_themes(${s}, ${a}, null, ${proposal.id})`),
@@ -415,7 +415,7 @@ describe('apply_merge_proposals (plan #820)', () => {
       insert into map_merge_proposals (user_id, kind, a_id, b_id, a_name, b_name, source,
                                        verdict, survivor_id, survivor_name, reason, confidence, model)
       values (${userA}, 'theme', ${lo}, ${hi}, ${labels.lo}, ${labels.hi}, 'embedding', 'same',
-              ${survivor}, ${name}, 'One subject.', ${confidence}, 'claude-haiku-4-5')
+              ${survivor}, ${name}, 'One subject.', ${confidence}, 'claude-haiku-5-5')
       returning id`;
     return row.id;
   }
@@ -563,7 +563,7 @@ describe('undo_merges_for_rule and requeue_merge_proposals (plan #879)', () => {
                                        verdict, survivor_id, survivor_name, reason, confidence, model)
       values (${userC}, 'theme', ${lo}, ${hi},
               (select name from themes where id = ${lo}), (select name from themes where id = ${hi}),
-              'embedding', 'same', ${survivor}, ${name}, 'One subject.', ${confidence}, 'claude-haiku-4-5')
+              'embedding', 'same', ${survivor}, ${name}, 'One subject.', ${confidence}, 'claude-haiku-5-5')
       returning id`;
     return row.id;
   }
@@ -689,7 +689,7 @@ describe('apply_merge_proposals for positions (plan #882)', () => {
                                        verdict, survivor_id, survivor_name, reason, confidence, model)
       values (${userD}, 'position', ${lo}, ${hi},
               (select name from positions where id = ${lo}), (select name from positions where id = ${hi}),
-              'embedding', 'same', ${survivor}, ${name}, 'One position.', ${confidence}, 'claude-haiku-4-5')
+              'embedding', 'same', ${survivor}, ${name}, 'One position.', ${confidence}, 'claude-haiku-5-5')
       returning id`;
     return row.id;
   }
