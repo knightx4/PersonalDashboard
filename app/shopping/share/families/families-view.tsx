@@ -20,7 +20,7 @@ export function FamiliesView({ suggestions }: { suggestions: PendingSuggestion[]
         <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden /> Shared forms
       </Link>
 
-      <PageHeader title="Grouping" />
+      <PageHeader title="Possible families" />
 
       {suggestions.length === 0 ? (
         <EmptyState
