@@ -132,6 +132,26 @@ const HAS_PINNED_ROW = `[...document.querySelectorAll('body *')].some(function(e
  */
 const RECORD = process.argv.includes('--record');
 
+/**
+ * The page to stand the surface on, inside the whole shell: sidebar, top bar
+ * and all (app/preview/shell-frame.tsx). A posts run sets it on every picture,
+ * since a screenshot going on X should look like the app rather than a panel
+ * cut out of it:
+ *
+ *   SHOOT_SHELL=/shopping/dashboard SHOOT_WIDTHS=laptop npm run shoot -- shopping-dashboard
+ */
+const SHELL = process.env.SHOOT_SHELL?.trim() || null;
+
+/**
+ * How much taller the window has to be to show the whole page. From lg up the
+ * shell scrolls its pane rather than the window, so a full-page capture stops
+ * at the window's foot; the window is grown by whatever the tallest scrolling
+ * box still hides.
+ */
+const HIDDEN_HEIGHT = `[...document.querySelectorAll('body *')].reduce(function(most,e){
+  var s=getComputedStyle(e);if(s.overflowY!=='auto'&&s.overflowY!=='scroll')return most;
+  return Math.max(most,e.scrollHeight-e.clientHeight);},0)`;
+
 const THEMES = (process.env.SHOOT_THEMES ?? (RECORD ? 'light' : 'light,dark'))
   .split(',')
   .map((value) => value.trim())
@@ -286,7 +306,9 @@ async function main() {
           mobile: size.name === 'phone',
         });
         await send('Page.navigate', {
-          url: `http://localhost:${PORT}/preview?s=${surfaceId}`,
+          url:
+            `http://localhost:${PORT}/preview?s=${surfaceId}` +
+            (SHELL ? `&shell=${encodeURIComponent(SHELL)}` : ''),
         });
         await wait(2200);
         await send('Runtime.evaluate', {
@@ -303,6 +325,19 @@ async function main() {
           expression: FRAMES_MEASURED,
           awaitPromise: true,
         });
+
+        if (SHELL) {
+          const hidden = (await evaluate<number>(send, HIDDEN_HEIGHT)) ?? 0;
+          if (hidden > 0) {
+            await send('Emulation.setDeviceMetricsOverride', {
+              width: size.width,
+              height: size.height + hidden,
+              deviceScaleFactor: 2,
+              mobile: size.name === 'phone',
+            });
+            await wait(400);
+          }
+        }
 
         // Measure before capturing, and drop to 1x if a 2x shot would exceed
         // what this browser can allocate. See MAX_SIDE / MAX_AREA above: over
