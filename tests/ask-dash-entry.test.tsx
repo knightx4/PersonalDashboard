@@ -169,9 +169,10 @@ describe('the page the sheet will tell Dash', () => {
     await sendFor('/goals/00000000-0000-4000-8000-0000000000a1', ask)('What is left to book?');
     await sendFor(null, ask)('And after that?');
     expect(ask.mock.calls).toEqual([
-      // The last is the listener for the lookups as they run (plan #1438).
-      ['What is left to book?', null, '/goals/00000000-0000-4000-8000-0000000000a1', expect.any(Function), undefined],
-      ['And after that?', null, null, expect.any(Function), undefined],
+      // Then the listener for the lookups as they run (plan #1438), the files
+      // sent with it (plan #1715) and the list sent with it (plan #1658).
+      ['What is left to book?', null, '/goals/00000000-0000-4000-8000-0000000000a1', expect.any(Function), undefined, null],
+      ['And after that?', null, null, expect.any(Function), undefined, null],
     ]);
   });
 });

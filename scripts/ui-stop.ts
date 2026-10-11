@@ -8,7 +8,9 @@
  * (or 6, 9 after a redirect) prints:
  *
  *   - the ask to block the step or note with (`criticStopAsk`), naming each
- *     surface, how many fixes are open, where the shots are and the branch;
+ *     surface, how many fixes are open and where the shots are;
+ *   - the history line (`criticStopNote`), which is the ask and the branch.
+ *     The person cannot open branches, so the branch goes only there;
  *   - the last fixes in full, for the report;
  *   - for a step, the `plan.ts block` command and the statement for the
  *     Supabase connector that write the block.
@@ -22,6 +24,7 @@ import { execFileSync } from 'node:child_process';
 import {
   criticStopAsk,
   criticStopBlockSql,
+  criticStopNote,
   stoppedSurfaces,
   surfaceLabels,
   type StopRound,
@@ -88,22 +91,29 @@ function main(): void {
   const stopped = stoppedSurfaces(rounds).map((s) => ({ ...s, label: labels.get(s.surface) }));
   if (stopped.length === 0) fail(`No surface of ${ownerArg} is stopped on a failed third round.`);
 
-  const ask = criticStopAsk({ owner: key, surfaces: stopped, branch });
+  const ask = criticStopAsk({ owner: key, surfaces: stopped });
+  const note = criticStopNote({ ask, branch });
   console.log(`Ask:\n${ask}\n`);
+  console.log(`History line, with the branch for the session that merges it:\n${note}\n`);
   for (const s of stopped) {
     const v = verdicts.find((x) => x.surface === s.surface && x.round === s.round)!;
     console.log(`${s.surface}, round ${s.round}: shots ${DIR}/${key}--${s.surface}--r${s.round}--*.png`);
     for (const f of v.fixes) console.log(`  - [${f.shot}] ${f.where}: ${f.problem} (${f.breaks}) -> ${f.change}`);
   }
   if (owner.step === null) {
-    console.log('\nA note: block it with this ask as its note (notes skill, "Surfaces").');
+    console.log(
+      '\nA note: block it with the ask, and keep the history line where the next session ' +
+        'reads it (notes skill, "Surfaces"). The ask names no branch: the person cannot open one.',
+    );
     return;
   }
   console.log(`\nPush ${branch}, then block the step. With DATABASE_URL:\n`);
-  console.log(`npx tsx scripts/plan.ts block ${owner.step} --ask ${JSON.stringify(ask)}\n`);
+  console.log(
+    `npx tsx scripts/plan.ts block ${owner.step} --ask ${JSON.stringify(ask)} --note ${JSON.stringify(note)}\n`,
+  );
   console.log('Without it, through the Supabase connector:\n');
   const date = new Date().toISOString().slice(0, 10);
-  console.log(criticStopBlockSql({ step: owner.step, ask, date }));
+  console.log(criticStopBlockSql({ step: owner.step, ask, note, date }));
 }
 
 main();

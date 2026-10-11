@@ -306,12 +306,13 @@ it should use, and that is the person's (decision #1535). So:
 2. Commit what you have and push your branch, so the work outlives the
    session.
 3. Run `npm run ui-stop -- <step>`. It reads the recorded verdicts and prints
-   the ask: each surface that did not pass, how many fixes are open, where the
-   shots are and the branch, ending "accept it as it is, or say what to
-   change". It also prints the last fixes in full, and the block to write:
-   `plan.ts block <n> --ask "…"` with no `--on-steps`, or the statement for
-   the connector. Write that block. It waits on the person, not on other
-   steps.
+   the ask: each surface that did not pass, how many fixes are open and where
+   the shots are, ending "accept it as it is, or say what to change". The
+   branch goes only in the `--note` it prints, which is the history line the
+   next session reads. It also prints the last fixes in full, and the block
+   to write: `plan.ts block <n> --ask "…" --note "…"` with no `--on-steps`, or
+   the statement for the connector. Write that block. It waits on the person,
+   not on other steps.
 4. Report the block, with the last verdict's fixes and where the shots are.
 
 The person either accepts the screen as it is or says what to change, from
@@ -325,15 +326,20 @@ the step's row on /dev/plan, which shows the last fixes and shots (plan
 - **Said what to change** (their words on the step's thread, and an
   `Answered …` line): the builder gets three fresh rounds, numbered on from
   4, against their words; the stop then falls on round 6, and so on.
-- **Answered with an accept** (an `Answered …` line whose words take the
-  screens as they are: "Accept", "accept them", "fine as it is"): the same as
-  Accepted, written down by you. Run `npm run ui-guard -- <n> --accept`, or
-  the statement it prints through the connector. It records an `accepted`
-  round for each surface still waiting, quoting the answer, and writes
-  nothing unless the step's newest `Answered` line is newer than its newest
-  `Blocked` line. Then merge and close. Never put the same question to the
-  person again: #1702 was answered "Accept" and blocked on the same ask by
-  the next session, because the answer had never reached `ui_checks`.
+- **Answered with an accept** (an `Answered …` line that does not ask for a
+  change): the same as Accepted, written down by you. Any answer that names
+  nothing to change is an accept: "Accept", "yes", "ok", "sure", "looks
+  good", "It's fine", "It's probably fine", "I'll let you know if something
+  comes up". On 10 October a step answered "It's fine", "yes" and "Accept"
+  went back to not started with its work never merged, because no session
+  read those as accepts. Run `npm run ui-guard -- <n> --accept`, or the
+  statement it prints through the connector. It records an `accepted` round
+  for each surface still waiting, quoting the answer, and writes nothing
+  unless the step's newest `Answered` line is newer than its newest
+  `Blocked` line. Then merge the branch the history names and close the
+  step. Never put the same question to the person again: #1702 was answered
+  "Accept" and blocked on the same ask by the next session, because the
+  answer had never reached `ui_checks`.
 
 The same holds for a block that is not a critic stop: a step whose files
 reach surfaces nobody has checked, answered "accept those as unchanged".
@@ -438,7 +444,7 @@ Then report the block. Do not move on to another step; that is not your call.
 
 The same two moves close out a merge that will not go through, when the merge
 was yours because nobody sent you: push the working branch before you block the
-step, and name that branch in the `--ask`. The work then outlives the session
+step, and name that branch in the `--note`, never the `--ask`. The work then outlives the session
 that wrote it, and whoever picks the step up reads it instead of building it
 twice. Leave the step open — its commit is on a branch, which is the thing
 `done` refuses.
@@ -591,11 +597,31 @@ to look at screens:
   cannot reach main (the gate will not pass, or the drawing needs a page
   change that is not ready), the ask says so and says where the shots are,
   rather than offering a link to something they cannot open.
+- **Never names a branch.** The person cannot open one, and has said so many
+  times. They see pictures: a `/preview?s=<id>` link to a drawing merged to
+  main, or the shots on the step's row. The branch goes in `--note`, and
+  `block` refuses an ask that names one.
 - **Ends with the move wanted** in words they can answer in one line, such as
   "accept these as drawn, or say what to change on which one".
 
 The critic stop (`npm run ui-stop`) writes its ask with the links already in
 it. A hand-written ask is held to the same.
+
+### An answer always moves the step
+
+This holds for every block, design or not. Once the person has answered, the
+next session acts on the answer; the step never stays where it was.
+
+- When the answer picks a direction, build it.
+- When it does not ("It's fine", "I'll let you know if something comes up"),
+  take the option the ask recommended, or the one you would recommend, and
+  build it. Write `Took <option> on your answer '<their words>'` in the
+  history so they can overrule it.
+- Only when no direction can be chosen at all, block again with a new,
+  different question, whose options they can pick in one line.
+
+Never put the same question to them twice, and never end a run having
+changed nothing on an answered step.
 
 ## The other two files you may need
 

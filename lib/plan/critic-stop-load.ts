@@ -6,7 +6,6 @@ import {
   isCriticStopAsk,
   readStopFixes,
   shotName,
-  stopBranch,
   stoppedSurfaces,
   type CriticStopView,
 } from './ui-check-stop';
@@ -84,7 +83,7 @@ export async function loadCriticStops(
           })),
       };
     });
-    out[node.id] = { surfaces, branch: stopBranch(node.blockAsk) };
+    out[node.id] = { surfaces };
   }
   return out;
 }

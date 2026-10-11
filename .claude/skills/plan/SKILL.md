@@ -163,6 +163,13 @@ thousand tokens, and gets to the end.
    to do about each answer"` rather than a routine on the account: it shows on
    the Dash tab, any session can finish it, and the tick wakes one an hour past
    due if none has.
+
+   A step whose history ends in an `Answered …` or `Accepted …` line is acted
+   on in this batch. An answer that asks for no change ("It's fine", "yes",
+   "ok") is an accept: merge and close. An answer that picks no direction
+   takes the option the ask recommended. A new question goes out only when no
+   direction can be chosen, and never the same one twice
+   (`reference/building.md`, "An answer always moves the step").
 2. **Work out the order.** `show <the feature>` gives the tree, the done-whens
    and what waits on what. List the steps you are going to build, in dependency
    order. Steps that wait on nothing come first; a step whose dependency is
@@ -241,7 +248,9 @@ thousand tokens, and gets to the end.
    **When the merge will not go through** — a conflict you cannot resolve from
    what you have read, or a check you cannot get passing — push the working
    branch first, so what the step built survives this session, then `block <n>
-   --ask "…"` with that branch named in the ask. Stop the batch there: do not
+   --ask "…" --note "…"` with that branch named in the note. The ask never
+   names it: the person cannot open branches, and `block` refuses an ask that
+   names one. Stop the batch there: do not
    send the next step, and do not close the blocked one, because its commit is
    on a branch and that is what the guard on `done` is for. Decisions #685 and
    #695 are why. The next session starts from main as it then stands, and can
@@ -279,7 +288,7 @@ thousand tokens, and gets to the end.
    `/dev/inbox`, by title. A report that says "closed four steps" makes the
    person go and look. Say which steps reached main and which did not: a closed
    step is on main already, and a step blocked on a failed merge is on the
-   branch the block names, which the report names too.
+   branch its history names, which the report names too.
 
 If the batch ends before the steps do — something blocked, or you are running
 short — say exactly which steps are left and that they are still handed over.

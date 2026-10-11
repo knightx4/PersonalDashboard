@@ -1177,7 +1177,7 @@ export async function acceptCriticStop(
   const line = acceptedLine({
     date: new Date().toISOString().slice(0, 10),
     surfaces: stopped.map((s) => s.surface),
-    branch: stopBranch(current.block_ask),
+    branch: stopBranch(current.block_ask, current.comment),
   });
   const comment = current.comment ? `${current.comment}\n\n${line}` : line;
   const { error } = await supabase

@@ -65,6 +65,17 @@ export function InterviewGroupCard({
   const [saved, setSaved] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
   /**
+   * The number and the name as last saved. Save the round shows only once
+   * one of them has been changed from these: a save control on a round
+   * nobody is editing offered to save nothing (law 14).
+   */
+  const [savedHeading, setSavedHeading] = useState({
+    label: group.label ?? '',
+    roundNumber: group.roundNumber === null ? '' : String(group.roundNumber),
+  });
+  const headingChanged =
+    label !== savedHeading.label || roundNumber.trim() !== savedHeading.roundNumber.trim();
+  /**
    * Open, until you fold it.
    *
    * A pursuit that has been running a while carries five or six rounds, and
@@ -115,6 +126,7 @@ export function InterviewGroupCard({
         roundNumber: parsed,
       });
       setSaved(result.error ?? 'Saved.');
+      if (!result.error) setSavedHeading({ label, roundNumber });
     });
 
   return (
@@ -257,17 +269,17 @@ export function InterviewGroupCard({
                 <NoteKindButton label="Note on this round" onClick={() => setShowNotes(true)} />
               )}
               {/* The number and the name are saved here whether or not the
-                round has a note. The button used to sit in the no-note branch
-                only, so once a note was written an edited number or name had
-                nothing to save it. */}
-              <button
-                type="button"
-                disabled={pending}
-                onClick={save}
-                className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
-              >
-                Save the round
-              </button>
+                round has a note, and only once one of them has changed. */}
+              {headingChanged && (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={save}
+                  className="text-small text-ink-muted underline underline-offset-2 hover:text-accent"
+                >
+                  Save the round
+                </button>
+              )}
               {saved && <span className="text-small text-ink-muted">{saved}</span>}
             </div>
           </div>

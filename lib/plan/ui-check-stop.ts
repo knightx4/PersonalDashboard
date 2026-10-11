@@ -4,9 +4,13 @@
  * When a surface's round 3 still comes back `fix`, the builder runs no fourth
  * round. It records the round, pushes its branch, and blocks the step on the
  * person (`block_kind = 'outside'`) with the ask this file writes: each
- * surface that did not pass, how many fixes are open, where the shots are and
- * the branch, ending "accept it as it is, or say what to change". A note the
- * notes routine fixed is blocked with the same ask.
+ * surface that did not pass, how many fixes are open and where the shots are,
+ * ending "accept it as it is, or say what to change". A note the notes
+ * routine fixed is blocked with the same ask.
+ *
+ * The ask never names the branch: branch deploys are off, so the person cannot
+ * open it. The branch goes in the dated line on the step's history instead
+ * (`criticStopNote`), where the session that merges the work reads it.
  *
  * After the person says what to change, the builder gets three fresh rounds,
  * numbered on from 4, so the stop falls on rounds 3, 6, 9 and so on.
@@ -110,22 +114,30 @@ function describe(s: StoppedSurface, owner: string): string {
 
 /**
  * The ask a step (or note) is blocked with. `owner` is the step number or the
- * note id; `branch` is the pushed branch that holds the work.
+ * note id. The branch is left out; `criticStopNote` carries it.
  */
 export function criticStopAsk(input: {
   owner: number | string;
   surfaces: readonly StoppedSurface[];
-  branch: string;
 }): string {
   if (input.surfaces.length === 0) throw new Error('No surface stopped: nothing to ask.');
-  if (!input.branch.trim()) throw new Error('Name the branch that holds the work.');
   const owner = String(input.owner).replace(/^#/, '');
   const label = /^\d+$/.test(owner) ? `#${owner}` : `note ${owner}`;
   const which = input.surfaces.map((s) => describe(s, owner)).join('; ');
   return (
     `${STOP_ASK_OPENING}${label}'s screen: ${which}. ` +
-    `The work is on branch ${input.branch.trim()}. Look at the shots and the fixes on the step's row in /dev/plan, then ${STOP_ASK_ENDING}`
+    `Look at the shots and the fixes on the step's row in /dev/plan, then ${STOP_ASK_ENDING}`
   );
+}
+
+/**
+ * The dated history line a stop is blocked with: the ask, then the pushed
+ * branch that holds the work, so the session that merges it can find it.
+ */
+export function criticStopNote(input: { ask: string; branch: string }): string {
+  const branch = input.branch.trim();
+  if (!branch) throw new Error('Name the branch that holds the work.');
+  return `${input.ask.trim()} The work is on branch ${branch}.`;
 }
 
 /** True for a block ask `criticStopAsk` wrote. */
@@ -137,12 +149,15 @@ export function isCriticStopAsk(ask: string | null | undefined): boolean {
 /**
  * The connector statement that blocks a plan step with the ask, as offline.md
  * writes a block: waiting on the person, the ask on the row and a dated line
- * appended to its history, recorded for Home's undo. The ask is dollar-quoted,
- * so the apostrophe in it reaches the connector as written.
+ * appended to its history, recorded for Home's undo. The dated line is `note`
+ * when given (`criticStopNote`, which adds the branch), and the ask otherwise.
+ * Both are dollar-quoted, so the apostrophe in them reaches the connector as
+ * written.
  */
 export function criticStopBlockSql(input: {
   step: number;
   ask: string;
+  note?: string;
   date: string;
   /** The step's owner; read from the step itself when left out. */
   userId?: string;
@@ -152,7 +167,8 @@ export function criticStopBlockSql(input: {
   }
   if (!Number.isInteger(input.step) || input.step < 1) throw new Error(`"${input.step}" is not a step number.`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) throw new Error(`"${input.date}" is not a date.`);
-  if (input.ask.includes('$a$')) throw new Error('The ask cannot contain $a$.');
+  const note = input.note ?? input.ask;
+  if (input.ask.includes('$a$') || note.includes('$a$')) throw new Error('The ask cannot contain $a$.');
   const user = input.userId
     ? `'${input.userId}'`
     : `(select user_id from plan_items where number = ${input.step} limit 1)`;
@@ -162,7 +178,7 @@ export function criticStopBlockSql(input: {
     `select core.dash_before(${ref});`,
     'update plan_items',
     `set status = 'blocked', block_ask = $a$${input.ask}$a$, block_kind = 'outside',`,
-    `    comment = coalesce(comment || E'\\n\\n', '') || $a$Blocked ${input.date}: ${input.ask}$a$`,
+    `    comment = coalesce(comment || E'\\n\\n', '') || $a$Blocked ${input.date}: ${note}$a$`,
     `where ${match};`,
     `select core.record_dash_action(${user}, ${ref}, 'update', 'block_step',`,
     `  $a$Dash stopped step #${input.step} after the design critic's last round and handed the screen to you.$a$);`,
@@ -170,13 +186,22 @@ export function criticStopBlockSql(input: {
 }
 
 /**
- * The branch a stop ask names, or null when it names none. Accepting the
- * screen hands that branch to the session that merges and closes the step.
+ * The branch that holds a stopped step's work, or null when nothing names one.
+ * Accepting the screen hands it to the session that merges and closes the
+ * step. Asks written before 11 October 2026 named it in the ask itself; since
+ * then it is on the step's history (`criticStopNote`), where the latest line
+ * that names one wins.
  */
-export function stopBranch(ask: string | null | undefined): string | null {
-  if (!ask) return null;
-  const m = /The work is on branch (\S+?)\.?\s+Look at the shots/.exec(ask);
-  return m ? m[1] : null;
+export function stopBranch(
+  ask: string | null | undefined,
+  history?: string | null,
+): string | null {
+  const named = (text: string | null | undefined): string | null => {
+    if (!text) return null;
+    const all = [...text.matchAll(/The work is on branch (\S+?)[.:]?(?=\s|$)/g)];
+    return all.length > 0 ? all[all.length - 1][1] : null;
+  };
+  return named(ask) ?? named(history);
 }
 
 /** One fix as the critic wrote it, with every part a string (plan #1610). */
@@ -216,7 +241,7 @@ export type StopSurfaceView = {
 };
 
 /** What /dev/plan shows on a step the critic stopped, by step id. */
-export type CriticStopView = { surfaces: StopSurfaceView[]; branch: string | null };
+export type CriticStopView = { surfaces: StopSurfaceView[] };
 
 /** The shot's name from its bucket path: `…/r3/phone-light.png` is `phone-light`. */
 export function shotName(path: string): string {
@@ -249,9 +274,9 @@ export function acceptedLine(input: {
 
 /**
  * The Needs line /dev/plan draws on a stopped step in place of the whole ask,
- * since the panel beneath it lists the surfaces, fixes and shots.
+ * since the panel beneath it lists the surfaces, fixes and shots. It names no
+ * branch, which the person cannot open.
  */
-export function criticStopNeeds(branch: string | null): string {
-  const where = branch ? ` The work is on branch ${branch}.` : '';
-  return `Your call on a screen the design critic would not pass.${where}`;
+export function criticStopNeeds(): string {
+  return 'Your call on a screen the design critic would not pass. The shots are below.';
 }
