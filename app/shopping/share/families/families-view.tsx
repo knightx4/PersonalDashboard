@@ -26,7 +26,7 @@ export function FamiliesView({ suggestions }: { suggestions: PendingSuggestion[]
         <EmptyState
           icon={Layers}
           title="Nothing to group"
-          description="Either everything is already grouped, or no two games on your shelf are named after each other. When two are, confirming a family puts them under a single heading on the shared form."
+          description="Games named after each other show up here, and confirming one puts them under a single heading on a shared form. Either everything is already grouped, or no two games on your shelf match."
           action={{ label: 'Open inventory', href: '/shopping/inventory' }}
           secondaryAction={{ label: 'Shared forms', href: '/shopping/share' }}
         />
@@ -42,6 +42,11 @@ export function FamiliesView({ suggestions }: { suggestions: PendingSuggestion[]
             ))}
           </ul>
         </Card>
+      )}
+      {suggestions.length > 0 && (
+        <p className="mt-3 text-small text-ink-muted">
+          {suggestions.length} {suggestions.length === 1 ? 'suggestion' : 'suggestions'}
+        </p>
       )}
     </div>
   );
