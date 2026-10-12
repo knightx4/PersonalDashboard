@@ -120,9 +120,25 @@ const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> 
 /** The view names on the chip row: the shared ones, with the whole plan as "All". */
 const PLAN_CHIP_LABEL = { ...VIEW_LABEL, all: 'All', table: 'Table' };
 
-/** The chips at phone width: every one but Table, which leads the menu there. */
-const PHONE_VIEW_CHIPS: readonly View[] = PLAN_VIEW_CHIPS.filter((chip) => chip !== 'table');
-const PHONE_VIEW_MENU: readonly View[] = ['table', ...PLAN_VIEW_MENU];
+/**
+ * The chips at phone width: the three views that answer "what can move", then
+ * More. Dash's, Everything and Table lead the menu there, so the row and More
+ * stay on one line at 390 whichever view More names (plan #1747).
+ */
+const PHONE_VIEW_CHIPS: readonly View[] = ['open', 'ready', 'you'];
+const PHONE_VIEW_MENU: readonly View[] = [
+  ...PLAN_VIEW_CHIPS.filter((chip) => !PHONE_VIEW_CHIPS.includes(chip)),
+  ...PLAN_VIEW_MENU,
+];
+/** In the menu there is room for the whole plan's own name. */
+const PHONE_CHIP_LABEL = { ...PLAN_CHIP_LABEL, all: VIEW_LABEL.all };
+
+/**
+ * The counts a phone keeps: the page's first question and the three that ask
+ * something of someone. The rest are a view away in More, and drawn as well
+ * they took the strip onto a second line at 390 (plan #1747).
+ */
+const PHONE_COUNTS: ReadonlySet<string> = new Set(['open', 'on you', 'ready', 'waiting']);
 
 /**
  * The numbers across the plan, and the views over it.
@@ -170,12 +186,15 @@ function SummaryStrip({
             <Link
               key={fact.noun}
               href={viewHref(fact.view, basePath)}
-              className="press-area hover:text-accent hover:underline"
+              className={cn(
+                'press-area hover:text-accent hover:underline',
+                !PHONE_COUNTS.has(fact.noun) && 'max-sm:hidden',
+              )}
             >
               <span className="tabular font-semibold text-ink">{fact.value}</span> {fact.noun}
             </Link>
           ) : (
-            <span key={fact.noun}>
+            <span key={fact.noun} className={cn(!PHONE_COUNTS.has(fact.noun) && 'max-sm:hidden')}>
               <span className="tabular font-semibold text-ink">{fact.value}</span> {fact.noun}
             </span>
           ),
@@ -195,18 +214,16 @@ function SummaryStrip({
         labels={PLAN_CHIP_LABEL}
         hrefOf={(chip) => viewHref(chip, basePath)}
       />
-      {/* On a phone the row has a line of its own and starts at the edge, and
-          a sixth chip would push More onto a second line, so Table is the
-          first entry in More there. The phone table keeps only the title,
-          health and percent, which makes it the less used view at that width.
-          The chips are a little narrower here so that More still fits on
-          the line when it names the view you are on. */}
+      {/* On a phone the row has a line of its own and starts at the edge.
+          Three chips and More fit it with room for More to name the view you
+          are on; Dash's, Everything and Table are the first entries in More
+          there (plan #1747). */}
       <ViewChips
         className="-ml-2 [&>*:last-child]:ml-1 [&_a]:px-2 [&_button]:w-auto [&_button]:px-2 sm:hidden"
         view={view}
         chips={PHONE_VIEW_CHIPS}
         menu={PHONE_VIEW_MENU}
-        labels={PLAN_CHIP_LABEL}
+        labels={PHONE_CHIP_LABEL}
         hrefOf={(chip) => viewHref(chip, basePath)}
       />
     </div>
