@@ -6,6 +6,10 @@ import { PostsScreen } from './posts-view';
 
 export const metadata = { title: 'Posts' };
 
+// Check X now runs from this page, and a first read pages through every post
+// X returns (plan #1819).
+export const maxDuration = 300;
+
 /**
  * X posts Dash drafted about building this app (plan #1419, feature #1414).
  *

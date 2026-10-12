@@ -330,6 +330,12 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.x_posts = xPost.id;
 
+  const [xRead] = await admin<{ id: string }[]>`
+    insert into x_reads (user_id, run_id, trigger, kind, http_status, posts_read, outcome)
+    values (${userId}, gen_random_uuid(), 'manual', 'new', 200, 1, 'ok')
+    returning id`;
+  ids.x_reads = xRead.id;
+
   const [commitCheck] = await admin<{ id: string }[]>`
     insert into plan_commit_checks (user_id, commit_sha, merge_sha, conclusion)
     values (${userId}, ${'abc1234'}, ${'def5678'}, 'passed')
