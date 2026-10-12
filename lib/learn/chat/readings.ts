@@ -192,12 +192,15 @@ export async function addChatReadings(
   let position = (last as { position: number } | null)?.position ?? 0;
 
   // Provenance, as the paste import keeps it: what the chat sent, and why.
+  // `parsed` is the works as a list, which imports_parsed_is_array_ck
+  // requires; the question goes at the top of the text.
+  const lines = input.items.map((item) => [item.title, item.author, item.url, item.why].filter(Boolean).join(' | '));
   const { error: importError } = await learn.from('imports').insert({
     user_id: userId,
     track_id: trackId,
-    raw_text: input.items.map((item) => [item.title, item.author, item.url, item.why].filter(Boolean).join(' | ')).join('\n'),
+    raw_text: (input.question ? [`Question: ${input.question}`, ...lines] : lines).join('\n'),
     source_hint: 'conversation',
-    parsed: { question: input.question, items: input.items },
+    parsed: input.items,
   });
   if (importError) throw failed('Recording what the chat sent', importError);
 
