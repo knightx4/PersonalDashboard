@@ -230,9 +230,9 @@ describe('PlanView', () => {
     // already held offers the press that gives it back.
     expect(html).toContain('title="Mine"');
     expect(html).toContain('title="Not mine"');
-    // And the values those forms send are the two the action takes.
-    expect(html).toContain('name="assignee" value="me"');
-    expect(html).toContain('name="assignee" value=""');
+    // Pressed buttons, not forms: the row changes at once (plan #1850), so the
+    // press carries no hidden fields for the action to read.
+    expect(html).not.toContain('name="assignee"');
     expect(html).not.toContain('Hand to Dash');
   });
 
