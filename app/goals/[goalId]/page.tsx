@@ -51,7 +51,7 @@ import { goalScopeRef, loadScopeDays, type ScopeDay } from '@/lib/goals/scope-da
 import { writtenWhen, type Brief } from '@/lib/goals/briefs';
 import { loadBrief } from '@/lib/goals/briefs-store';
 import { loadFilesOf } from '@/lib/goals/files-store';
-import { goalFileRows, stepTitlesIn } from '@/lib/goals/goal-files';
+import { goalFileRows, stepTitlesIn, unreadWords } from '@/lib/goals/goal-files';
 import { flagsWaiting } from '@/lib/goals/flags';
 import { goalStatus, statusLine } from '@/lib/goals/goal-status';
 import { goalProgress } from '@/lib/goals/status';
@@ -510,6 +510,9 @@ export default async function GoalMapPage({
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 px-1">
             <h2 id="files-heading" className="text-ui font-semibold text-ink">
               Files
+              {unreadWords(files) && (
+                <span className="ml-2 font-normal text-ink-muted">{unreadWords(files)}</span>
+              )}
             </h2>
             <Link
               href="/goals/files"
