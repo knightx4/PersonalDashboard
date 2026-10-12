@@ -20,9 +20,6 @@
   "dev-inspiration-list": {
     "targets": 1
   },
-  "dev-posts": {
-    "targets": 1
-  },
   "dev-ui": {
     "targets": 55,
     "contrast": 11
