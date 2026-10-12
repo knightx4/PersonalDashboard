@@ -16,6 +16,7 @@
  * shows a run's state in the browser.
  */
 import { STALLED_AFTER_MINUTES, elapsedSince } from './elapsed';
+import type { RunWaitingStatus } from '@/lib/core/run-activities';
 
 /** What a run ends as. `started` is the third state, and the one it begins in. */
 export type RunEnd = 'finished' | 'failed';
@@ -153,6 +154,14 @@ export type StoredRunReading = {
 
 /** The last run against one step, as the plan page reads it. */
 export type LastRun = {
+  /** The plan_runs row, which its lines hang on (plan #1826). Absent in older fixtures. */
+  id?: string;
+  /**
+   * The status beside `started` that says why a run is not working right
+   * now: it asked you something, or it stopped writing lines. `status` still
+   * reads `started` for both, so every rule that reads it is unchanged.
+   */
+  waiting?: RunWaitingStatus | null;
   status: RunStatus;
   createdAt: string;
   /** Why it did not finish. Null on every run that is going or that did. */

@@ -31,6 +31,10 @@ import { checkLine, checkWord, type CommitCheck } from '@/lib/plan/checks';
 import type { PlanNode } from '@/lib/plan/tree';
 import { subtreeOf, type PlanCatalogEntry } from './plan-catalog';
 import { cn } from '@/lib/cn';
+import { LiveRunLines } from '@/components/runs/live-run-lines';
+import { AcknowledgeRun } from '@/components/runs/acknowledge-run';
+import type { RunLinesState } from '@/components/runs/run-lines';
+import { acknowledgePlanRunAction } from './run-actions';
 
 export function when(iso: string | null): string | null {
   return iso ? iso.slice(0, 10) : null;
@@ -194,8 +198,30 @@ export function RunWork({
           muted: nothing on this row can be read properly until the key is
           fixed, and the sentence says how. */}
       {refused && <p className="text-ui text-caution">{refused}</p>}
+      {/* The lines the run wrote as it worked, filling in while it is going
+          (plan #1826). Read in the browser, since the row is opened there. */}
+      {run.id && (
+        <LiveRunLines
+          runTable="plan_runs"
+          runId={run.id}
+          state={planLinesState(run)}
+          className="mt-2"
+          acknowledge={
+            run.waiting === 'stale' ? (
+              <AcknowledgeRun runId={run.id} action={acknowledgePlanRunAction} />
+            ) : undefined
+          }
+        />
+      )}
     </div>
   );
+}
+
+/** How a plan run's lines are drawn for how it stands. */
+function planLinesState(run: LastRun): RunLinesState {
+  if (run.waiting === 'stale') return 'stale';
+  if (run.waiting === 'awaiting_input') return 'waiting';
+  return run.status === 'started' ? 'live' : 'ended';
 }
 
 /**
