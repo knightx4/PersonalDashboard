@@ -112,6 +112,14 @@ export const SPECS: readonly SpecDoc[] = [
     module: 'learn',
   },
   {
+    slug: 'learn-essays',
+    title: 'Learn: essays',
+    blurb:
+      'Short essays about what you learned, written by you in the app with Dash as a demanding first reader, saved to the vault and published to your website.',
+    file: 'LEARN-ESSAYS-SPEC.md',
+    module: 'learn',
+  },
+  {
     slug: 'learn',
     title: 'Learn: the reading queue',
     blurb:

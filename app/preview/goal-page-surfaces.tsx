@@ -397,6 +397,26 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       dueOn: null,
     },
   ],
+  // Seven of Dash's files not opened (plan #1861): the line lists five and links the rest.
+  filesToRead: [
+    ['f-rates', 'Which card to pay first', 'Paying the 27% card first saves about $310 over paying the smaller balance first.', 2],
+    ['f-letter', 'A letter asking Chase to lower the rate on the Sapphire Preferred card it has charged 27% on since March', 'Asks for the rate to drop to the 19% offered to new cardholders.', 1],
+    ['f-firms', 'Firms hiring FP&A analysts in Boston this month', null, 1],
+    ['f-recruiters', 'What the three recruiters said, and when each will reply', 'Two reply by Monday; the third wants a call first.', 3],
+    ['f-race', 'Half marathons in the spring within two hours of home', null, 1],
+    ['f-fund', 'How long the emergency fund takes at $300 a month', null, 1],
+    ['f-gyms', 'Gyms near the new office', null, 1],
+  ].map(([id, title, summary, version], index) => ({
+    id: id as string,
+    title: title as string,
+    summary: summary as string | null,
+    madeBy: 'claude' as const,
+    version: version as number,
+    origin: null,
+    createdAt: '2026-09-20T09:00:00Z',
+    updatedAt: new Date(Date.parse('2026-09-25T08:00:00Z') - index * 5 * 3_600_000).toISOString(),
+    readAt: null,
+  })),
   brief: {
     body: 'The card balance is down to **$6,980**, $730 lower than August. The one thing waiting on you is *Which card first?* on **Pay off the credit cards**: it decides the next three steps.\n\nThe job search is quiet until the recruiters reply, which they said would be by Monday. The half marathon has no steps yet; ask me to map it when you want to start.',
     when: 'today',
@@ -626,6 +646,7 @@ const cardFiles = [
     summary: 'Paying the 27% card first saves about $310 over paying the smaller balance first.',
     meta: 'Written by Dash for “Compare the two cards’ rates” · version 2',
     byDash: true,
+    unread: true,
   },
   {
     fileId: 'f-letter',
@@ -823,6 +844,7 @@ export function GoalTopSurface() {
         <section aria-labelledby="files-heading" className="space-y-2">
           <h2 id="files-heading" className="px-1 text-ui font-semibold text-ink">
             Files
+            <span className="ml-2 font-normal text-ink-muted">1 not read</span>
           </h2>
           <FileLinks files={cardFiles} />
         </section>
