@@ -177,7 +177,34 @@ select core.record_dash_action('<user>', 'goals.items:<id>', 'update', 'send_ste
 The reason shows under the row on Todo and on the step. Name the steps sent
 in the run summary, with the reason, so the person can see what appeared.
 
-Give every open goal one verdict, taking the first that fits:
+
+**First, which kind of goal it is** (plan #1738; docs/GOALS-SPEC.md, "Goals
+without a deadline"). A goal with a due date, an errand, or a goal with an
+open step on Todo is judged on what it waits on, by the list below. Every
+other goal is **judged on its pace**, and the brief says so on its lines,
+with the pace worked out by `lib/goals/pace.ts` and the verdict that pace
+gives:
+
+- **met** when its done-when is met, exactly as below.
+- Otherwise **pace_holding** ("Keeping its pace") or **pace_slipping**
+  ("Slower than usual"), whichever the brief names. The reason says the pace
+  in words ("Usually every 5 days, last done 2 days ago."); the next move
+  names the step they would most likely do next, with no `next_on` unless
+  that step has a date.
+- **No row at all** when the brief says its pace is unknown (too little
+  history, or it could not be read). The goal then shows no status, which is
+  right: there is nothing to judge yet.
+
+Such a goal is never waiting_on_you, stalled, waiting_on_date, on_track or
+waiting_on_goal, however long it has been quiet and whatever its open steps
+wait on. Three quiet weeks are not stalled on it, so add no step for that;
+"Slower than usual" says it. The pages ignore an older verdict of those
+kinds on it, so leaving it without a row clears yesterday's "Waiting on
+you". A goal that has run out of map still gets its next step, as below,
+and keeps its pace verdict.
+
+For a goal judged on what it waits on, give one verdict, taking the first
+that fits:
 
 - **met**: the done-when is met. This is the proposal to close the goal: the
   Goals home offers it on Today with one button, and closing stays the
@@ -277,6 +304,8 @@ home and out of the runs until the person takes it back up. That offer is
 the app's, from what was last done, so there is nothing to write for it.
 A parked goal is not in the brief.
 
-One row per goal per run. Rows are never updated: tomorrow's run adds a new
+One row per goal per run, except a goal judged on its pace with its pace
+unknown, which gets none. Rows are never updated: tomorrow's run adds a new
 one, and the pages show the newest. The run summary gives the count of each
-verdict and names the stalled goals and the met ones.
+verdict, names the stalled goals and the met ones, and counts the goals left
+without a row because their pace is unknown.
