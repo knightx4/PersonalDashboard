@@ -131,6 +131,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'embed-map': unit(VOYAGE_LITE, 1_000, 0),
   'embed-notes': background(unit(VOYAGE_LITE, 1_500, 0)),
   'embed-note-match': unit(VOYAGE_LITE, 300, 0),
+  // One passage of a note with its Folder > Note > Heading place in front.
+  'embed-note-blocks': background(unit(VOYAGE_LITE, 400, 0)),
   'write-note-connections': background(run(HAIKU, 1_800, 250)),
   // A note, its eight nearest notes cut to 1,500 characters, and up to
   // sixteen positions with quotes, plus up to two searches read back. The

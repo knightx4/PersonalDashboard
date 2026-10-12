@@ -83,6 +83,7 @@ describe('the operation names', () => {
       'embed-map',
       'embed-notes',
       'embed-note-match',
+      'embed-note-blocks',
       'write-note-connections',
       'write-maya-thought',
       'gate-maya-note',

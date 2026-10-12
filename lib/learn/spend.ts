@@ -144,6 +144,11 @@ export const LEARN_OPERATIONS = [
   // the person's notes nearest it (plan #1112). Once per distinct text: the
   // vector is kept in obsidian.text_embeddings by the text's hash.
   'embed-note-match',
+  // Embedding the passages of every vault note, split at its headings, for
+  // passage search (plan #1863.7). Recorded against the note's owner, from
+  // the vault sync and the map sweep's tick; a passage is embedded again only
+  // when its text or the note's path changes.
+  'embed-note-blocks',
   // Writing the sentence over each of the week's connections between new and
   // older vault notes (plan #1115). One Haiku call a week per person, from
   // the Monday cron, and none in a week with nothing to point out.

@@ -122,6 +122,7 @@ export const vaultSources: ModuleSources = {
     { table: 'obsidian.map_sweep_notes', reason: 'Map upkeep: which notes a sweep read.' },
     { table: 'obsidian.map_sweeps', reason: 'Map upkeep.' },
     { table: 'obsidian.maya_gate_checks', reason: 'Bookkeeping: which note versions Jev has looked at for Maya.' },
+    { table: 'obsidian.note_blocks', reason: 'An index of notes split at their headings, for passage search; read through notes.' },
     { table: 'obsidian.note_embeddings', reason: 'A vector per note for matching by subject; read through notes.' },
     { table: 'obsidian.text_embeddings', reason: 'Cache: vectors of page texts matched against the notes.' },
     { table: 'obsidian.position_edges', reason: 'Links between positions; read through positions.' },

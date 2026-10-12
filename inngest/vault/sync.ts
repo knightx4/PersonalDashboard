@@ -6,6 +6,7 @@ import { decryptAccessToken, vaultPortsFor } from '@/lib/vault/db/ports';
 import { VaultAuthError } from '@/lib/vault/providers';
 import { runVaultSync, type VaultConnectionRow } from '@/lib/vault/sync/run';
 import { activeRun } from '@/lib/vault/sync/manual';
+import { indexNoteBlocks } from '@/lib/vault/notes/block-index';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
 import type { SyncRunSummary } from '@/lib/vault/sync/progress';
 import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
@@ -230,7 +231,14 @@ export async function syncOneConnection(
 const EMBED_AFTER_SYNC_MS = 20_000;
 
 /**
- * Give the notes this sync wrote their vectors, as far as the time allows.
+ * How long a sync may then spend splitting the notes it wrote into passages
+ * (plan #1863.7). The same reasoning: the map sweep's tick finishes the rest.
+ */
+const BLOCKS_AFTER_SYNC_MS = 10_000;
+
+/**
+ * Give the notes this sync wrote their vectors, and then their passages'
+ * vectors (plan #1863.7), as far as the time allows.
  * Never throws: the sync itself succeeded, and a note left unembedded is
  * picked up by the next map sweep tick.
  */
@@ -245,6 +253,18 @@ async function embedAfterSync(supabase: VaultSupabaseClient, userId: string): Pr
     }
   } catch (err) {
     console.error('[vault sync] note embedding', err instanceof Error ? err.message : err);
+  }
+
+  try {
+    const blocks = await indexNoteBlocks(supabase, createCoreServiceSupabase(), {
+      userId,
+      deadline: Date.now() + BLOCKS_AFTER_SYNC_MS,
+    });
+    if (blocks.stopped && blocks.stopped.reason !== 'time' && blocks.stopped.reason !== 'no-key') {
+      console.error('[vault sync] note blocks', blocks.stopped.reason, blocks.stopped.detail);
+    }
+  } catch (err) {
+    console.error('[vault sync] note blocks', err instanceof Error ? err.message : err);
   }
 }
 
