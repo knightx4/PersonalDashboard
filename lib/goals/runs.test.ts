@@ -80,7 +80,8 @@ describe('runOutcome', () => {
     const at = Date.parse(line);
     const run = { status: 'started' as const, createdAt: created, lastLineAt: line };
     expect(runOutcome(run, at + 29 * 60_000)).toBe('running');
-    expect(runOutcome(run, at + 30 * 60_000)).toBe('stale');
+    // Past the 45-minute mark, but its lines decide and the sweep marks it.
+    expect(runOutcome(run, at + 60 * 60_000)).toBe('running');
     expect(runOutcome({ status: 'stale', createdAt: created }, start)).toBe('stale');
     expect(runOutcome({ status: 'awaiting_input', createdAt: created }, start)).toBe('waiting');
   });
@@ -90,7 +91,15 @@ describe('runOutcome', () => {
     const [listing] = toRunListings([row({ status: 'stale' })]);
     const { outcome, meta } = runMeta({ ...listing, createdAt: created, lastLineAt: line }, Date.parse(line) + 40 * 60_000, 'UTC');
     expect(outcome).toBe('stale');
-    expect(meta).toMatch(/^Went silent · last heard from 40 minutes ago · /);
+    expect(meta).toMatch(/^Gone quiet · last heard from 40 minutes ago · /);
+  });
+
+  it('reads a run waiting on you and a run gone quiet from their status, whatever the clock says', () => {
+    const late = start + RUN_QUIET_MS * 3;
+    expect(runOutcome({ status: 'awaiting_input', createdAt: created }, late)).toBe('waiting');
+    expect(runOutcome({ status: 'stale', createdAt: created }, start)).toBe('stale');
+    const [listing] = toRunListings([row({ status: 'stale' })]);
+    expect(listing.status).toBe('stale');
   });
 
   it('passes done and failed through', () => {

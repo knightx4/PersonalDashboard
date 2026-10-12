@@ -2,26 +2,34 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createClient } from '@/lib/auth/server';
-import { requireOwner } from '@/lib/dev/owner';
-import { acknowledgeStaleRun } from '@/lib/core/run-ack';
+import { createClient, requireUser } from '@/lib/auth/server';
+import { ACKNOWLEDGED_STALE_ERROR } from '@/lib/core/run-activities';
+import type { AcknowledgeRunState } from '@/components/runs/acknowledge-run';
 
 /**
- * Acknowledge a plan run that went silent, which ends it (plan #1825). Apart
- * from actions.ts, which is far too large to open for one small action.
+ * Acknowledge on a plan run that has gone quiet (plan #1826): it ends as
+ * failed, saying it stopped writing and you saw it. Only a run still reading
+ * stale is touched, so a run that woke up in the meantime keeps going. Kept
+ * out of actions.ts, which every plan press already loads.
  */
-const Input = z.string().uuid();
-
 // latency: pending
-export async function acknowledgePlanRun(runId: string): Promise<{ error?: string }> {
+export async function acknowledgePlanRunAction(
+  _prev: AcknowledgeRunState,
+  form: FormData,
+): Promise<AcknowledgeRunState> {
+  const user = await requireUser();
+  const runId = z.string().uuid().safeParse(form.get('runId'));
+  if (!runId.success) return { error: 'Could not tell which run that was.' };
   const supabase = await createClient();
-  await requireOwner({ supabase });
-  const parsed = Input.safeParse(runId);
-  if (!parsed.success) return { error: 'Could not tell which run that was.' };
-
-  const { ended, error } = await acknowledgeStaleRun(supabase, 'plan_runs', parsed.data);
-  if (error) return { error: 'The run could not be ended. Try again.' };
+  const { data, error } = await supabase
+    .from('plan_runs')
+    .update({ status: 'failed', error: ACKNOWLEDGED_STALE_ERROR })
+    .eq('id', runId.data)
+    .eq('user_id', user.id)
+    .eq('status', 'stale')
+    .select('id');
+  if (error) return { error: 'That could not be saved. Try again.' };
+  if (!data || data.length === 0) return { error: 'This run is not quiet any more. Reload to see where it stands.' };
   revalidatePath('/dev/plan', 'layout');
-  if (!ended) return { error: 'That run is no longer silent. Reload to see where it stands.' };
   return {};
 }

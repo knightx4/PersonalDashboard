@@ -68,12 +68,13 @@ export const JOB_LABELS: Record<RunJob, string> = {
  * RUN_QUIET_MS is one whose session died without writing back; the sweep
  * closes it as failed on the next tick, and until then it reads as silent.
  */
-export type RunOutcome = 'done' | 'failed' | 'running' | 'silent' | 'stale' | 'waiting';
+export type RunOutcome = 'done' | 'failed' | 'running' | 'silent' | 'waiting' | 'stale';
 
 /**
- * A run that writes lines (plan #1825) is read from its newest line: stale
- * once silent for RUN_SILENT_MINUTES, and stays stale until you acknowledge
- * it. A run with no lines keeps the 45-minute rule above.
+ * A run that writes lines (plan #1825) is read from its newest line: the
+ * sweep marks it stale once silent for RUN_SILENT_MINUTES, and it stays
+ * stale until you acknowledge it. A run with no lines keeps the 45-minute
+ * rule above.
  */
 export function runOutcome(
   run: Pick<RunListing, 'status' | 'createdAt'> & {
@@ -86,8 +87,10 @@ export function runOutcome(
   if (run.status === 'failed') return 'failed';
   if (run.status === 'stale') return 'stale';
   if (run.status === 'awaiting_input') return 'waiting';
-  const silent = lineSilent(run.lastLineAt, now);
-  if (silent !== null) return silent ? 'stale' : 'running';
+  // A run that writes lines is never "never reported back": the sweep marks
+  // it stale from its last line, and only a stale row can be acknowledged,
+  // so until then it reads as going.
+  if (lineSilent(run.lastLineAt, now) !== null) return 'running';
   return runIsQuiet(run, now) ? 'silent' : 'running';
 }
 
@@ -96,8 +99,8 @@ export const OUTCOME_LABELS: Record<RunOutcome, string> = {
   failed: 'Failed',
   running: 'Still running',
   silent: 'Never reported back',
-  stale: 'Went silent',
-  waiting: 'Waiting on your answer',
+  waiting: 'Waiting on you',
+  stale: 'Gone quiet',
 };
 
 /** When a run was last heard from: its newest line, its last report, or its start. */
@@ -195,17 +198,8 @@ export function toRunListings(rows: readonly RunRowWithItem[]): RunListing[] {
  * to, when it started, and how long it took. Shared by the Runs page and a
  * run's own page (plan #1013).
  */
-export function runMeta(
-  run: RunListing,
-  now: number,
-  timeZone: string,
-  /** The run's own page, where a stale run's state and last-heard time are on its panel (plan #1825). */
-  options: { stalePanel?: boolean } = {},
-): { outcome: RunOutcome; meta: string } {
+export function runMeta(run: RunListing, now: number, timeZone: string): { outcome: RunOutcome; meta: string } {
   const outcome = runOutcome(run, now);
-  if (options.stalePanel && run.status === 'stale') {
-    return { outcome, meta: formatInstant(run.createdAt, timeZone) };
-  }
   const took = runDuration(run);
   const progress =
     outcome === 'running'
@@ -222,19 +216,6 @@ export function runMeta(
     .filter(Boolean)
     .join(' · ');
   return { outcome, meta };
-}
-
-/** The facts a stale run's panel shows (plan #1825): when last heard from, on what, and when it started. */
-export function staleFacts(
-  run: RunListing,
-  now: number,
-  timeZone: string,
-): { lastHeard: string; lastOn: string | null; started: string } {
-  return {
-    lastHeard: minutesAgo(lastHeardIso(run), now),
-    lastOn: run.nowOn?.trim() || null,
-    started: formatInstant(run.createdAt, timeZone),
-  };
 }
 
 /** How many runs a goal's page lists (plan #1014); the rest are on the Runs page. */

@@ -9,6 +9,7 @@
 import type { DevTone } from '@/components/dev/state-label';
 import { MOVE_TONE, moveWord, type Move, type MoveState, type WaitingOn } from '@/lib/core/move';
 import { DEV_STATE_WORD } from '@/lib/dev/words';
+import { checkDay } from '@/lib/plan/check-backs';
 import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import type { PlanHealth, PlanMove } from '@/lib/plan/tree';
 
@@ -142,6 +143,8 @@ export type HealthFacts = {
   comment: string | null;
   /** What holds it up, for the Waiting tooltip. */
   waitingOn: readonly StepRef[];
+  /** The check-backs it waits for (`PlanNode.waitsUntil`). Absent reads as none. */
+  waitsUntil?: readonly { title: string; dueAt: string }[];
 };
 
 const named = (ref: StepRef) => `#${ref.outline ?? ref.number} ${ref.title}`;
@@ -170,7 +173,13 @@ export function healthOf(
   if (health === 'answered') return { ...base, title: facts.resolution ?? undefined };
   if (health === 'blocked') return { ...base, title: facts.blockAsk ?? facts.comment ?? undefined };
   if (health === 'waiting') {
-    return { ...base, title: `Waits on ${facts.waitingOn.map(named).join(', ')}` };
+    const parts = [
+      facts.waitingOn.length > 0 ? `Waits on ${facts.waitingOn.map(named).join(', ')}` : '',
+      ...(facts.waitsUntil ?? []).map(
+        (check) => `Waits until ${checkDay(check.dueAt)}: ${check.title.replace(/[.]+$/, '')}`,
+      ),
+    ].filter(Boolean);
+    return { ...base, title: parts.join('. ') };
   }
   return base;
 }

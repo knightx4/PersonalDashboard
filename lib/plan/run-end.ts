@@ -16,24 +16,11 @@
  * shows a run's state in the browser.
  */
 import { STALLED_AFTER_MINUTES, elapsedSince } from './elapsed';
+import type { RunWaitingStatus } from '@/lib/core/run-activities';
 
-/**
- * What a run ends as. `started` is the state it begins in; `awaiting_input`
- * (it asked a question) and `stale` (it stopped writing lines, plan #1825)
- * are the two it can sit in before it ends.
- */
+/** What a run ends as. `started` is the third state, and the one it begins in. */
 export type RunEnd = 'finished' | 'failed';
-export type RunStatus = 'started' | 'awaiting_input' | 'stale' | RunEnd;
-
-/** A status read off a row, with anything unknown read as still going. */
-export function runStatusOf(value: string): RunStatus {
-  return value === 'finished' ||
-    value === 'failed' ||
-    value === 'stale' ||
-    value === 'awaiting_input'
-    ? value
-    : 'started';
-}
+export type RunStatus = 'started' | RunEnd;
 
 /**
  * Which press started the run.
@@ -65,7 +52,8 @@ export type RunJob =
   | 'posts'
   | 'spec_change'
   | 'overhaul'
-  | 'audit';
+  | 'audit'
+  | 'unstick';
 
 /**
  * What to call the press, where the page names the run behind a step.
@@ -93,6 +81,7 @@ export const RUN_JOB_LABEL: Record<RunJob, string> = {
   spec_change: 'A run writing in a spec change',
   overhaul: 'An overhaul run',
   audit: 'A spec audit',
+  unstick: 'A look at why a feature stalled',
 };
 
 /**
@@ -121,6 +110,7 @@ export const RUN_JOB_NOUN: Record<RunJob, string> = {
   spec_change: 'spec change run',
   overhaul: 'overhaul run',
   audit: 'spec audit',
+  unstick: 'stall diagnosis',
 };
 
 /**
@@ -164,8 +154,14 @@ export type StoredRunReading = {
 
 /** The last run against one step, as the plan page reads it. */
 export type LastRun = {
-  /** The plan_runs row, so a stale run can be acknowledged. Absent on older reads. */
+  /** The plan_runs row, which its lines hang on (plan #1826). Absent in older fixtures. */
   id?: string;
+  /**
+   * The status beside `started` that says why a run is not working right
+   * now: it asked you something, or it stopped writing lines. `status` still
+   * reads `started` for both, so every rule that reads it is unchanged.
+   */
+  waiting?: RunWaitingStatus | null;
   status: RunStatus;
   createdAt: string;
   /** Why it did not finish. Null on every run that is going or that did. */
@@ -413,16 +409,16 @@ export function runQuietNote(createdAt: string, now: number): string {
  * a run the cutoff caught only says how long it was quiet.
  */
 export function lastRunLine(
-  run: Pick<LastRun, 'status' | 'createdAt' | 'error' | 'stopReason' | 'lastLineAt'>,
+  run: Pick<LastRun, 'status' | 'createdAt' | 'error' | 'stopReason' | 'lastLineAt' | 'waiting'>,
   now: number,
 ): string {
   if (run.status === 'finished') return 'Last run finished';
-  if (run.status === 'stale') {
+  if (run.status === 'started' && run.waiting === 'stale') {
     return now === 0
-      ? 'Last run went silent'
-      : `Last run went silent: last heard from ${elapsedSince(run.lastLineAt ?? run.createdAt, now)} ago`;
+      ? 'Last run went quiet'
+      : `Last run went quiet: last heard from ${elapsedSince(run.lastLineAt ?? run.createdAt, now)} ago`;
   }
-  if (run.status === 'awaiting_input') return 'Last run is waiting on your answer';
+  if (run.status === 'started' && run.waiting === 'awaiting_input') return 'Last run is waiting on your answer';
   if (run.status === 'failed') {
     return `Last run stopped: ${run.stopReason ?? run.error ?? 'no reason recorded'}`;
   }
@@ -434,6 +430,6 @@ export function lastRunLine(
  * account of its run: its newest line, or its start if the line was not read.
  */
 export function staleLine(run: Pick<LastRun, 'createdAt' | 'lastLineAt'>, now: number): string {
-  if (now === 0) return 'Gone silent.';
-  return `Gone silent: last heard from ${elapsedSince(run.lastLineAt ?? run.createdAt, now)} ago.`;
+  if (now === 0) return 'Gone quiet.';
+  return `Gone quiet: last heard from ${elapsedSince(run.lastLineAt ?? run.createdAt, now)} ago.`;
 }

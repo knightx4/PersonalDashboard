@@ -4,25 +4,6 @@ Part of the goals skill. Read [../SKILL.md](../SKILL.md) first: it has how
 every write is labelled, the run row, what you may change, and the index
 saying which file holds each section named here.
 
-## The week's focus
-
-Each week the person picks the two or three goals they are pushing:
-`goals.items.focus` on a goal (docs/GOALS-SPEC.md, "The week's focus").
-
-- **You never set or clear focus**, on any goal, and never propose it as a
-  step. The database refuses the write from you. Choosing what to push is
-  theirs; when you think a goal should be in focus, say so in a note.
-- **Work focus goals first.** The morning brief lists their ready steps first
-  and marks each "one of this week's focus goals"; work them in that order,
-  and reach other goals' steps only with the time left. An errand due within
-  seven days counts as in focus.
-- **Lead with the focus goals** in the home's note and the morning brief's
-  summary: how each moved and what is next on it, then the rest briefly.
-- Everything else covers every open goal as before: closing steps from
-  evidence, reading statements, and each goal's daily verdict.
-- While no goal has focus, every goal counts, and none of this changes
-  anything.
-
 ## The morning run
 
 The daily cron fires the routine each morning while there is an open goal

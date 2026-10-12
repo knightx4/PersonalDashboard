@@ -37,7 +37,6 @@ import {
   endsRun,
   runEnd,
   runQuietNote,
-  runStatusOf,
   storedReading,
   type LastRun,
   type RunEnd,
@@ -55,6 +54,8 @@ import {
   noWorkNote,
   readsWork,
   reshapeWork,
+  unstickWork,
+  beneath,
   within,
   workedEnd,
   workWindow,
@@ -457,7 +458,7 @@ export async function readRunWork(
   }
 
   let planRows: WorkRow[] = [];
-  if (needs('feature', 'overhaul', 'reshape')) {
+  if (needs('feature', 'overhaul', 'reshape', 'unstick')) {
     type Row = {
       id: string;
       parent_id: string | null;
@@ -486,6 +487,22 @@ export async function readRunWork(
       completedAt: row.completed_at,
       blockedAt: row.blocked_at,
     }));
+  }
+
+  // Check-backs written on plan rows since the oldest run: how a stall
+  // diagnosis records that a step waits on data or time.
+  let checksAdded: Array<{ planItemId: string; createdAt: string }> = [];
+  if (needs('unstick')) {
+    const { data, error } = await supabase
+      .from('check_backs')
+      .select('plan_item_id, created_at')
+      .eq('user_id', userId)
+      .not('plan_item_id', 'is', null)
+      .gte('created_at', earliest);
+    if (error) throw new Error(`check_backs: ${error.message}`);
+    checksAdded = ((data ?? []) as Array<{ plan_item_id: string; created_at: string }>).map(
+      (row) => ({ planItemId: row.plan_item_id, createdAt: row.created_at }),
+    );
   }
 
   // Top-level rows written since the oldest run: what a shaping run proposes,
@@ -532,6 +549,15 @@ export async function readRunWork(
       out.set(run.id, { done: done.length });
     } else if (run.job === 'reshape' && run.plan_item_id) {
       out.set(run.id, reshapeWork(planRows, run.plan_item_id, window, topLevel));
+    } else if (run.job === 'unstick' && run.plan_item_id) {
+      const under = new Set([
+        run.plan_item_id,
+        ...beneath(planRows, run.plan_item_id).map((row) => row.id),
+      ]);
+      const checks = checksAdded.filter(
+        (row) => under.has(row.planItemId) && within(row.createdAt, window),
+      ).length;
+      out.set(run.id, unstickWork(planRows, run.plan_item_id, window, checks));
     } else if ((run.job === 'feature' || run.job === 'overhaul') && run.plan_item_id) {
       out.set(
         run.id,
@@ -907,7 +933,8 @@ export async function loadLastRuns(supabase: Db, userId: string): Promise<Record
     newestId.set(row.plan_item_id, row.id);
     last[row.plan_item_id] = {
       id: row.id,
-      status: runStatusOf(row.status),
+      status: row.status === 'finished' || row.status === 'failed' ? row.status : 'started',
+      waiting: row.status === 'awaiting_input' || row.status === 'stale' ? row.status : null,
       createdAt: row.created_at,
       error: row.error,
       job: row.job as RunJob,

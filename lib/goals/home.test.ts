@@ -188,12 +188,12 @@ describe('nextVisitDays', () => {
   });
 });
 
-function focused(id: string, areaId: string, focus: boolean): HomeGoal {
+function dated(id: string, areaId: string, dueOn: string | null): HomeGoal {
   const base = line(id, areaId);
-  return { ...base, goal: { ...base.goal, focus } as HomeGoal['goal'] };
+  return { ...base, goal: { ...base.goal, dueOn } as HomeGoal['goal'] };
 }
 
-function onYou(id: string, goalId: string, kind: TodayKind = 'step'): TodayItem {
+function onYou(id: string, goalId: string, kind: TodayKind = 'step', onTodo = false): TodayItem {
   return {
     kind,
     id,
@@ -204,55 +204,54 @@ function onYou(id: string, goalId: string, kind: TodayKind = 'step'): TodayItem 
     action: 'Done',
     unblocks: 0,
     on: null,
+    ...(onTodo && { onTodo: true }),
   };
 }
 
 describe('homeLists', () => {
-  const today = '2026-10-06';
   const goals = [
-    focused('a', 'x', true),
-    focused('b', 'x', false),
+    dated('a', 'x', '2026-12-01'),
+    dated('b', 'x', null),
     errand('soon', 'x', '2026-10-08'),
     errand('far', 'x', '2026-11-30'),
   ];
 
-  it('keeps the focus goals and questions, flags and approvals from any goal, capped', () => {
+  it('keeps steps on Todo, goals with a due date, and questions, flags and approvals from any goal, capped', () => {
     const ranked = [
       onYou('b-step', 'b'),
       onYou('b-question', 'b', 'question'),
       onYou('a1', 'a'),
       onYou('b-flag', 'b', 'flag'),
-      onYou('soon-step', 'soon'),
+      onYou('b-sent', 'b', 'step', true),
       onYou('b-breakdown', 'b', 'breakdown'),
       onYou('a2', 'a'),
       onYou('far-step', 'far'),
     ];
-    const { doNext, rest } = homeLists(ranked, goals, today, 5);
+    const { doNext, rest } = homeLists(ranked, goals, 5);
     expect(doNext.map((item) => item.id)).toEqual([
       'b-question',
       'a1',
       'b-flag',
-      'soon-step',
+      'b-sent',
       'b-breakdown',
     ]);
-    expect(rest.map((item) => item.id)).toEqual(['a2']);
+    expect(rest.map((item) => item.id)).toEqual(['a2', 'far-step']);
   });
 
-  it('lists the goals out of focus, errands first, and an errand with no row in Do next', () => {
-    expect(homeLists([], goals, today, 5).otherGoals.map((l) => l.goal.id)).toEqual([
+  it('lists the goals with no due date, errands first, and an errand with no row in Do next', () => {
+    expect(homeLists([], goals, 5).otherGoals.map((l) => l.goal.id)).toEqual([
       'soon',
       'far',
       'b',
     ]);
-    const listed = homeLists([onYou('soon-step', 'soon')], goals, today, 5);
+    const listed = homeLists([onYou('soon-step', 'soon')], goals, 5);
     expect(listed.otherGoals.map((l) => l.goal.id)).toEqual(['far', 'b']);
   });
 
-  it('keeps everything while no goal is a focus goal', () => {
-    const plain = [line('a', 'x'), line('b', 'x')];
-    const { doNext, otherGoals } = homeLists([onYou('1', 'a'), onYou('2', 'b')], plain, today, 5);
-    expect(doNext).toHaveLength(2);
-    expect(otherGoals).toEqual([]);
+  it('leaves out a step of a goal with no due date that is not on Todo', () => {
+    const { doNext, otherGoals } = homeLists([onYou('1', 'b')], [dated('b', 'x', null)], 5);
+    expect(doNext).toEqual([]);
+    expect(otherGoals.map((l) => l.goal.id)).toEqual(['b']);
   });
 });
 

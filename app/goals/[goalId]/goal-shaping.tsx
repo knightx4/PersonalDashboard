@@ -1,9 +1,9 @@
 'use client';
 
-import { useActionState, useEffect } from 'react';
+import { useActionState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { useRunRefresh } from '@/components/runs/use-run-refresh';
 import { Card } from '@/components/ui/card';
 import { FogNote } from '@/components/dev/fog-note';
 import type { GoalRunRow } from '@/lib/goals/runs';
@@ -16,13 +16,6 @@ import {
 import { LinkedText } from '@/components/ui/linked-text';
 
 const initial: ShapingActionState = {};
-
-/**
- * How often the page looks again while a run is going, so the working line
- * turns into what the run changed without a reload. A run takes minutes, so
- * a quarter of one is soon enough.
- */
-const RUN_POLL_MS = 15_000;
 
 /**
  * Claude on this goal (plan #932): whether you have approved it, what Claude
@@ -60,13 +53,8 @@ export function GoalShaping({
   /** Leave out the approval line while there is nothing to approve, and the run history always. */
   quiet?: boolean;
 }) {
-  const router = useRouter();
   const running = progress !== null;
-  useEffect(() => {
-    if (!running) return;
-    const timer = setInterval(() => router.refresh(), RUN_POLL_MS);
-    return () => clearInterval(timer);
-  }, [running, router]);
+  useRunRefresh(running);
   const [approveState, approve, approving] = useActionState(approveGoalAction, initial);
   const [workState, work, starting] = useActionState(workOnGoalAction, initial);
   const error = approveState.error ?? workState.error;

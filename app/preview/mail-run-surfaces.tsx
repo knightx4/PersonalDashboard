@@ -3,16 +3,15 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
 import { LinkedText } from '@/components/ui/linked-text';
-import { ListChecks } from 'lucide-react';
-import { EmptyState } from '@/components/ui/empty-state';
 import { RunChanges } from '@/app/goals/runs/[runId]/run-changes';
-import { AcknowledgeRun } from '@/app/goals/runs/[runId]/acknowledge-run';
 import { BackButton, EmailFrame } from '@/app/mail/[id]/reader';
 import { MessageHead } from '@/app/mail/[id]/message-head';
 import { replyMailto } from '@/lib/email/gmail-open';
 import type { GmailMessageContent } from '@/lib/email/providers/types';
 import type { ChangeLine } from '@/lib/goals/run-changes';
-import { JOB_LABELS, runMeta, staleFacts, type RunListing } from '@/lib/goals/runs';
+import { JOB_LABELS, runMeta, type RunListing } from '@/lib/goals/runs';
+import { RunLinesView } from '@/components/runs/run-lines';
+import type { RunActivity } from '@/lib/core/run-activities';
 
 /**
  * One goal run and one email in the gallery (plan #1601). Both pages are
@@ -56,6 +55,27 @@ const LINES: ChangeLine[] = [
   line('6', 'Marked "Update the resume" done.', { actor: 'me', state: 'none' }),
 ];
 
+function activity(id: string, kind: RunActivity['kind'], at: string, body: string): RunActivity {
+  return {
+    id,
+    user_id: 'u',
+    run_table: 'goals.runs',
+    run_id: RUN.id,
+    kind,
+    body,
+    options: null,
+    created_at: `2026-10-06T${at}:00.000Z`,
+  };
+}
+
+/** The lines the run wrote as it worked (plan #1826), drawn once it has ended. */
+const ACTIVITY: RunActivity[] = [
+  activity('a1', 'thought', '12:41', 'Reading your answers on the visa question and the move.'),
+  activity('a2', 'action', '12:43', 'Settled "Decide on New York or remote" as New York.'),
+  activity('a3', 'action', '12:46', 'Added the collection "Application documents" with three drafts.'),
+  activity('a4', 'action', '12:47', 'Finished: two steps settled, one collection added, one phase moved.'),
+];
+
 /** The markup of app/goals/runs/[runId]/page.tsx after its reads. */
 export function GoalRunSurface() {
   const { meta } = runMeta(RUN, NOW, 'America/New_York');
@@ -82,60 +102,10 @@ export function GoalRunSurface() {
       <p className="rounded-card bg-sunken card-pad text-small break-words whitespace-pre-wrap text-ink">
         <LinkedText text={RUN.summary!} />
       </p>
+      <RunLinesView lines={ACTIVITY} state="ended" />
       <Card>
         <RunChanges runId={RUN.id} lines={LINES} />
       </Card>
-    </div>
-  );
-}
-
-/**
- * A goal run that went silent (plan #1825): it wrote lines while it worked and
- * then stopped, so it is marked stale rather than closed, says when it was
- * last heard from, and waits for Acknowledge.
- */
-const STALE_RUN: RunListing = {
-  ...RUN,
-  id: '9a1c4e7f-3b2d-4f6a-8e5c-7d9b1a2c3e4f',
-  job: 'phase',
-  status: 'stale',
-  createdAt: '2026-10-06T12:02:00Z',
-  endedAt: null,
-  summary: null,
-  lastSeenAt: '2026-10-06T12:58:00Z',
-  nowOn: 'Draft the cover letter for the Copperline application',
-  lastLineAt: '2026-10-06T13:04:00Z',
-};
-
-/** The markup of app/goals/runs/[runId]/page.tsx for a stale run with no changes yet. */
-export function GoalRunStaleSurface() {
-  const { meta } = runMeta(STALE_RUN, NOW, 'America/New_York', { stalePanel: true });
-  return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <PageHeader
-        title={JOB_LABELS[STALE_RUN.job]}
-        description={
-          <>
-            {'On '}
-            <Link href={`/goals/${STALE_RUN.item!.id}`} className="underline-offset-2 hover:underline">
-              {STALE_RUN.item!.title}
-            </Link>
-            {' · '}
-            {meta}
-          </>
-        }
-        actions={
-          <Link href="/goals/runs" className="press-area text-small text-ink-muted underline-offset-2 hover:underline">
-            All runs
-          </Link>
-        }
-      />
-      <AcknowledgeRun runId={STALE_RUN.id} {...staleFacts(STALE_RUN, NOW, 'America/New_York')} />
-      <EmptyState
-        icon={ListChecks}
-        title="No changes"
-        description="This run did not change any goal, step or collection."
-      />
     </div>
   );
 }

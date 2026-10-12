@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { RUN_SILENT_MINUTES, acknowledgedNote, lineSilent, readLastLines } from './run-liveness';
+import { RUN_SILENT_MINUTES, lineSilent, readLastLines } from './run-liveness';
 
 const NOW = Date.parse('2026-10-12T12:00:00Z');
 const minutesAgo = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
@@ -20,15 +20,6 @@ describe('lineSilent (plan #1825)', () => {
 
   it('is never silent before the clock has mounted', () => {
     expect(lineSilent(minutesAgo(600), 0)).toBe(false);
-  });
-});
-
-describe('acknowledgedNote', () => {
-  it('names when the last line was written', () => {
-    expect(acknowledgedNote('2026-10-12T09:41:12Z')).toBe(
-      'Went silent after its last line at 2026-10-12 09:41 UTC, and you acknowledged it.',
-    );
-    expect(acknowledgedNote(null)).toBe('Went silent, and you acknowledged it.');
   });
 });
 

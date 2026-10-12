@@ -93,13 +93,13 @@ describe('lastRunLine', () => {
   });
 
   it('says when a stale run was last heard from (plan #1825)', () => {
-    expect(lastRunLine(run({ status: 'stale', lastLineAt: new Date(at(60)).toISOString() }), at(105))).toBe(
-      'Last run went silent: last heard from 45m ago',
+    expect(lastRunLine(run({ waiting: 'stale', lastLineAt: new Date(at(60)).toISOString() }), at(105))).toBe(
+      'Last run went quiet: last heard from 45m ago',
     );
-    expect(lastRunLine(run({ status: 'stale' }), 0)).toBe('Last run went silent');
-    expect(lastRunLine(run({ status: 'awaiting_input' }), at(5))).toBe('Last run is waiting on your answer');
+    expect(lastRunLine(run({ waiting: 'stale' }), 0)).toBe('Last run went quiet');
+    expect(lastRunLine(run({ waiting: 'awaiting_input' }), at(5))).toBe('Last run is waiting on your answer');
     expect(staleLine(run({ lastLineAt: new Date(at(60)).toISOString() }), at(150))).toBe(
-      'Gone silent: last heard from 1h 30m ago.',
+      'Gone quiet: last heard from 1h 30m ago.',
     );
   });
 

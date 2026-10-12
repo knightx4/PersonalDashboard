@@ -260,7 +260,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-modules': ['/dev/modules'],
   'dev-module': ['/dev/modules/[id]'],
   'goals-run': ['/goals/runs/[runId]'],
-  'goals-run-stale': ['/goals/runs/[runId]'],
+  'run-lines': ['/goals/runs/[runId]', '/dev/plan/[number]'],
   'jobs-activity': ['/jobs/activity'],
   'jobs-analytics': ['/jobs/analytics'],
   'jobs-answers': ['/jobs/answers'],
@@ -355,6 +355,12 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'dash-mark': ['components/ui/dash-mark.tsx'],
   // The runner's card with its four Dashes, running and off (plan #1704).
   'dev-runner-crew': ['app/dev/plan/overnight-control.tsx', 'app/dev/plan/runner-crew.tsx'],
+  // A run's lines in every state, on a plan step and a goal run (plan #1826).
+  'run-lines': [
+    'components/runs/run-lines.tsx',
+    'components/runs/live-run-lines.tsx',
+    'components/runs/acknowledge-run.tsx',
+  ],
 };
 
 /** The surface that stands for a shared component, or null for any other file. */

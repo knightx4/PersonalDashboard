@@ -193,8 +193,6 @@ export function runStartedLine(work: RunWork, now: number): string {
   const when = stamp(work.startedAt);
   if (work.status === 'failed') return `${label} started ${when} and stopped.`;
   if (work.status === 'finished') return `${label} started ${when} and finished.`;
-  if (work.status === 'stale') return `${label} started ${when} and went silent.`;
-  if (work.status === 'awaiting_input') return `${label} started ${when} and is waiting on your answer.`;
   const going = ago(work.startedAt, now);
   return going ? `${label} started ${when}, going ${going}.` : `${label} started ${when}.`;
 }

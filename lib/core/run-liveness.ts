@@ -31,17 +31,6 @@ export function lineSilent(lastLineAt: string | null | undefined, now: number): 
   return (now - at) / 60_000 >= RUN_SILENT_MINUTES;
 }
 
-/**
- * The error a stale run is ended with when the person acknowledges it. Dated
- * in UTC to the minute, the way the plan's comment lines are.
- */
-export function acknowledgedNote(lastLineAt: string | null): string {
-  const at = lastLineAt ? new Date(lastLineAt).toISOString().slice(0, 16).replace('T', ' ') : null;
-  return at
-    ? `Went silent after its last line at ${at} UTC, and you acknowledged it.`
-    : 'Went silent, and you acknowledged it.';
-}
-
 /** The minimum a client needs for the read below: `.rpc` on the core schema. */
 type CoreRpc = {
   rpc: (
