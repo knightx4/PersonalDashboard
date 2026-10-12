@@ -30,7 +30,10 @@
  *   raise's source names, writes them as ready steps and sends the first, and
  *   that run releases the hold the same way.
  */
+import { checkDay } from './check-backs';
+import { isClosed, isDismissed } from './load';
 import type { RunJob } from './run-end';
+import { flatten, isWaiting, isWaitingOnThePerson, type PlanNode } from './tree';
 
 /** The jobs whose runs build steps, and so can close one. */
 export const STALL_JOBS: readonly RunJob[] = ['step', 'feature'];
@@ -198,6 +201,30 @@ export function raiseHolds(
   if (!newest || newest.status === 'dismissed') return false;
   const since = new Date(newest.answeredAt ?? newest.createdAt).getTime();
   return !newestRunAt || new Date(newestRunAt).getTime() <= since;
+}
+
+/**
+ * Why nothing under a feature can be worked now, when every open step beneath
+ * it waits on another step or on a check-back, or null when one can be. A
+ * feature with no steps is its own work and is never refused here.
+ */
+export function waitingSteps(node: PlanNode): string | null {
+  const beneath = flatten(node.children).filter(
+    (step) =>
+      !isClosed(step.status) &&
+      step.status !== 'proposed' &&
+      !isDismissed(step) &&
+      step.children.every((child) => isClosed(child.status) || isDismissed(child)),
+  );
+  if (beneath.length === 0) return null;
+  if (beneath.some((step) => !isWaiting(step) && !isWaitingOnThePerson(step))) return null;
+  const said = beneath.slice(0, 3).map((step) => {
+    const check = step.waitsUntil[step.waitsUntil.length - 1];
+    if (check) return `#${step.number} waits until ${checkDay(check.dueAt)} (${check.title.replace(/[.]+$/, '')})`;
+    if (step.waitingOn.length > 0) return `#${step.number} waits on #${step.waitingOn[0].number}`;
+    return `#${step.number} waits on you`;
+  });
+  return `Nothing under #${node.number} can be worked now: ${said.join('; ')}.`;
 }
 
 /** The action a Yes takes on a raise that splits a feature (#1804). */

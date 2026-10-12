@@ -29,6 +29,7 @@ import {
   underwayRefusal,
 } from './liveness';
 import { QUESTION_RULE, planBrief } from './brief';
+import { waitingSteps } from './stall';
 import { loadVisionBodies } from '@/lib/specs/vision';
 import { endRunsOnStep, loadLastRuns, reshapeUnderway, startRoutineRun } from './runs';
 import { isClosed, loadPlan } from './load';
@@ -472,6 +473,13 @@ export async function handFeatureToClaude(input: {
       refused: true,
     };
   }
+
+  // Nor when every open step beneath waits on another step or on a check-back.
+  // The feature row itself is always open, so it was counted as work: #1073
+  // went out three times with its one step waiting on a check-back for two
+  // weeks of data, and each session found nothing to do and said so.
+  const waits = waitingSteps(node);
+  if (waits) return { ok: false, error: waits, refused: true };
 
   // A session is started on the feature and not one row is written. Nothing is
   // handed over and nothing is marked underway.

@@ -288,9 +288,24 @@ export type PlanDependency = {
   dependsOnId: string;
 };
 
+/**
+ * A check-back still waiting on a plan row: a session said to look again at
+ * a time, because the step needs something that does not exist yet, such as
+ * two weeks of data. The step waits on it the way it waits on another step
+ * (`PlanNode.waitsUntil`), so the runner does not send it before then.
+ */
+export type PlanCheckWait = {
+  id: string;
+  planItemId: string;
+  title: string;
+  dueAt: string;
+};
+
 export type PlanData = {
   items: PlanItem[];
   dependencies: PlanDependency[];
+  /** The waiting check-backs on plan rows. Absent reads as none. */
+  checkWaits?: PlanCheckWait[];
 };
 
 /** Every column the app reads off a plan row. Shared with the changelog. */
@@ -316,7 +331,7 @@ export async function loadPlan(
   supabase: SupabaseClient<any, 'public'>,
   userId: string,
 ): Promise<PlanData> {
-  const [rows, deps, threads] = await Promise.all([
+  const [rows, deps, threads, checks] = await Promise.all([
     readAll<Record<string, unknown>>((from, to) =>
       supabase
         .from('plan_items')
@@ -339,7 +354,16 @@ export async function loadPlan(
     // Every thread under a plan row, from the shared store (plan #1470), in
     // one read keyed by ref rather than a ref per row.
     loadTableThreads(supabase, PLAN_TABLE, { userId }),
+    // The check-backs a step waits on. A failed read leaves them out, which
+    // is how the plan read before they counted.
+    supabase
+      .from('check_backs')
+      .select('id, plan_item_id, title, due_at')
+      .eq('user_id', userId)
+      .eq('status', 'waiting')
+      .not('plan_item_id', 'is', null),
   ]);
+  if (checks.error) console.error(`the check-backs could not be read for the plan: ${checks.error.message}`);
 
   return {
     items: rows.map((row) => planItemFromRow({ ...row, thread: threads.get(`${PLAN_TABLE}:${row.id}`) })),
@@ -347,6 +371,12 @@ export async function loadPlan(
       id: row.id as string,
       itemId: row.item_id as string,
       dependsOnId: row.depends_on_id as string,
+    })),
+    checkWaits: ((checks.data ?? []) as Record<string, unknown>[]).map((row) => ({
+      id: row.id as string,
+      planItemId: row.plan_item_id as string,
+      title: row.title as string,
+      dueAt: row.due_at as string,
     })),
   };
 }
