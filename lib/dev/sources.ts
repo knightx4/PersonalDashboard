@@ -68,6 +68,7 @@ export const devSources: ModuleSources = {
     'public.inspiration_videos',
     'public.plan_items',
     'public.plan_dependencies',
+    'public.plan_history',
     'public.plan_item_pictures',
     'public.plan_runs',
     'public.plan_commit_checks',
