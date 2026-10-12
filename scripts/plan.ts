@@ -57,6 +57,10 @@
  *                                # ending a run with the step neither closed nor
  *                                # blocked: the reason goes on the run, and the
  *                                # pieces are the split a too-big step would take
+ *   npx tsx scripts/plan.ts activity <n> --kind thought|action|question|error --body "…"
+ *                                [--option "…" ...]   # one line on the run fired at <n> (or
+ *                                # the feature above it), shown live on the run's page; a
+ *                                # question takes 1-10 options and parks the run on you
  *   npx tsx scripts/plan.ts fog <n> --note "what cannot be seen yet" | --clear
  *                                # one patch per feature, about finishing it
  *   npx tsx scripts/plan.ts update <feature> --health on_track|at_risk|blocked --body "…"
@@ -98,6 +102,7 @@ import { uiCheckRefusal, type CheckRound } from '../lib/plan/ui-check-guard';
 import { stepScreenInputs } from '../lib/plan/ui-check-local';
 import type { VisionBodies } from '../lib/specs/vision';
 import { closeRefusal, commitOnMain } from '../lib/plan/github';
+import { runLine, statusAfterLine } from '../lib/plan/run-line';
 import { runForStop, stopColumns, stopLine, stopRefusal } from '../lib/plan/stop-reason';
 import { branchesContaining } from '../lib/plan/branches';
 import {
@@ -1333,6 +1338,49 @@ async function main(): Promise<void> {
     // the run it was sent as: the newest run fired at the step or a row above
     // it. A run still going is ended, since the session has said it is over.
     // `--piece`, given twice or more, is the split a too-big step would take.
+    if (command === 'activity') {
+      const parsed = runLine(arg('--kind'), arg('--body'), args('--option'));
+      if ('refusal' in parsed) fail(parsed.refusal);
+      const chain = await sql<{ id: string }[]>`
+        with recursive chain as (
+          select id, parent_id from plan_items where id = ${item.id} and user_id = ${userId}
+          union all
+          select p.id, p.parent_id from plan_items p
+          join chain on p.id = chain.parent_id
+          where p.user_id = ${userId}
+        )
+        select id from chain`;
+      const ids = chain.map((row) => row.id);
+      const rows = await sql<{ id: string; plan_item_id: string; status: string; created_at: Date }[]>`
+        select id, plan_item_id, status, created_at from plan_runs
+        where user_id = ${userId} and plan_item_id in ${sql(ids)}`;
+      const run = runForStop(
+        rows.map((row) => ({
+          id: row.id,
+          planItemId: row.plan_item_id,
+          status: row.status,
+          createdAt: row.created_at.toISOString(),
+        })),
+        ids,
+      );
+      // A session working by hand has no run; that is not an error to stop on.
+      if (!run) {
+        console.log(`No run was fired at #${item.number} or above it; no line written.`);
+        return;
+      }
+      const { line } = parsed;
+      await sql`
+        insert into core.run_activities (user_id, run_table, run_id, kind, body, options)
+        values (${userId}, 'plan_runs', ${run.id}, ${line.kind}, ${line.body},
+                ${line.options === null ? null : sql.json(line.options)})`;
+      const next = statusAfterLine(run.status, line.kind);
+      if (next !== run.status) {
+        await sql`update plan_runs set status = ${next} where id = ${run.id} and user_id = ${userId}`;
+      }
+      console.log(`#${item.number} run line (${line.kind}): ${line.body}`);
+      return;
+    }
+
     if (command === 'stopped') {
       const reason = stopLine(arg('--reason'));
       const pieces = args('--piece').map(stopLine);
