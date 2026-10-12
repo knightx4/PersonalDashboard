@@ -9,6 +9,8 @@ import { loadCriticStops } from '@/lib/plan/critic-stop-load';
 import { loadScreenChanges } from '@/lib/plan/screen-change-load';
 import { loadPlanPictures } from '@/lib/plan/pictures-load';
 import { loadFeatureUpdates } from '@/lib/plan/updates-load';
+import { featureRow } from '@/lib/plan/feature-table';
+import { updateOverdueDaysNow } from '@/lib/plan/updates';
 import { loadActivitySources } from '@/lib/plan/activity-load';
 import { buildPlanTree, flatten, planLiveness } from '@/lib/plan/tree';
 import { findFeature, stepRedirect } from '@/lib/plan/feature-page';
@@ -117,6 +119,12 @@ export default async function FeatureRoute({ params }: { params: Params }) {
     ? Boolean(projectRoutine(project).id && projectRoutine(project).token)
     : Boolean(planRoutine().token);
 
+  const overdueDays = updateOverdueDaysNow(
+    feature,
+    featureRow(feature, liveness).health,
+    updates[0]?.createdAt,
+  );
+
   return (
     <FeaturePage
       feature={feature}
@@ -127,6 +135,7 @@ export default async function FeatureRoute({ params }: { params: Params }) {
       lastRuns={lastRuns}
       runRaises={runRaises}
       liveness={liveness}
+      overdueDays={overdueDays}
       commitChecks={commitChecks}
       overhaulProgress={overhaulProgress}
       criticStops={criticStops}

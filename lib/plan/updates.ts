@@ -18,7 +18,8 @@
  */
 import type { DevTone } from '@/components/dev/state-label';
 import type { StatusGlyph } from '@/lib/status-glyphs';
-import { flatten, type PlanNode } from './tree';
+import { parseSnapshot, type ProgressSnapshot } from '@/lib/progress-snapshot';
+import { flatten, type PlanHealth, type PlanNode } from './tree';
 
 export const PLAN_UPDATE_HEALTHS = ['on_track', 'at_risk', 'blocked'] as const;
 export type PlanUpdateHealth = (typeof PLAN_UPDATE_HEALTHS)[number];
@@ -50,11 +51,13 @@ export type PlanUpdate = {
   stepsTotal: number;
   session: string | null;
   createdAt: string;
+  /** What the feature stood at when this was written; null on updates from before plan #1832. */
+  snapshot: ProgressSnapshot | null;
 };
 
 /** The columns `planUpdateFromRow` reads. */
 export const PLAN_UPDATE_COLUMNS =
-  'id, feature_id, health, body, steps_done_before, steps_done_after, steps_total, session, created_at';
+  'id, feature_id, health, body, steps_done_before, steps_done_after, steps_total, session, created_at, snapshot';
 
 /** A row as the table returns it, or null when it is not one. */
 export function planUpdateFromRow(row: Record<string, unknown>): PlanUpdate | null {
@@ -84,6 +87,7 @@ export function planUpdateFromRow(row: Record<string, unknown>): PlanUpdate | nu
     stepsTotal: total,
     session: typeof row.session === 'string' ? row.session : null,
     createdAt: created instanceof Date ? created.toISOString() : String(created ?? ''),
+    snapshot: parseSnapshot(row.snapshot),
   };
 }
 
@@ -131,4 +135,90 @@ export function progressSince(update: Pick<PlanUpdate, 'stepsDoneBefore' | 'step
   if (after > before) return `${now}, up from ${before}.`;
   if (after < before) return `${now}, down from ${before}.`;
   return `${now}, no change.`;
+}
+
+/**
+ * What changed in the steps between an update and the one before it, in words
+ * for the Overview card (plan #1834). Null when there is no earlier update to
+ * compare with.
+ *
+ * With a snapshot on both updates the added and removed steps are counted from
+ * the ids of the open steps; a step that left the open list and was not
+ * finished in between was taken out. Without one (updates written before the
+ * snapshot existed) the stored totals give the net change instead.
+ */
+export function changeSincePrevious(
+  update: Pick<PlanUpdate, 'stepsDoneAfter' | 'stepsTotal' | 'snapshot'>,
+  earlier: Pick<PlanUpdate, 'stepsDoneAfter' | 'stepsTotal' | 'snapshot'> | null | undefined,
+): string | null {
+  if (!earlier) return null;
+  const closed = update.stepsDoneAfter - earlier.stepsDoneAfter;
+  let added: number;
+  let removed: number;
+  if (update.snapshot && earlier.snapshot) {
+    const now = new Set(update.snapshot.openIds);
+    const before = new Set(earlier.snapshot.openIds);
+    const left = earlier.snapshot.openIds.filter((id) => !now.has(id)).length;
+    added = update.snapshot.openIds.filter((id) => !before.has(id)).length;
+    removed = Math.max(0, left - Math.max(closed, 0));
+  } else {
+    const net = update.stepsTotal - earlier.stepsTotal;
+    added = Math.max(net, 0);
+    removed = Math.max(-net, 0);
+  }
+  const noun = (n: number) => (n === 1 ? 'step' : 'steps');
+  const parts: string[] = [];
+  if (closed > 0) parts.push(`${closed} ${noun(closed)} closed`);
+  if (closed < 0) parts.push(`${-closed} ${noun(-closed)} reopened`);
+  if (added > 0) parts.push(`${added} added`);
+  if (removed > 0) parts.push(`${removed} removed`);
+  if (parts.length === 0) return 'No change in the steps since the update before.';
+  return `Since the update before: ${parts.join(', ')}.`;
+}
+
+/** Days with no update after which a feature that is moving is overdue for one. */
+export const UPDATE_OVERDUE_DAYS = 7;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The health readings of a feature that is being worked. */
+const MOVING: readonly PlanHealth[] = ['in_progress', 'working', 'quiet'];
+
+/**
+ * How many whole days a moving feature has gone without an update, once that
+ * reaches seven; null when it is not moving or is not yet overdue. The clock
+ * starts at its latest update, or at when it started if it has had none, and
+ * a feature that never records a start of its own takes the first start among
+ * its steps.
+ */
+export function updateOverdueDays(
+  feature: Pick<PlanNode, 'startedAt' | 'children'>,
+  health: PlanHealth,
+  latestUpdateAt: string | null | undefined,
+  now: number,
+): number | null {
+  if (!MOVING.includes(health)) return null;
+  const starts = [feature.startedAt, ...flatten([...(feature.children ?? [])]).map((n) => n.startedAt)]
+    .filter((at): at is string => Boolean(at))
+    .map((at) => Date.parse(at))
+    .filter((at) => !Number.isNaN(at));
+  const since = latestUpdateAt
+    ? Date.parse(latestUpdateAt)
+    : feature.startedAt
+      ? Date.parse(feature.startedAt)
+      : starts.length > 0
+        ? Math.min(...starts)
+        : Number.NaN;
+  if (Number.isNaN(since)) return null;
+  const days = Math.floor((now - since) / DAY_MS);
+  return days >= UPDATE_OVERDUE_DAYS ? days : null;
+}
+
+/** `updateOverdueDays` at the server's clock, for a page that renders it once. */
+export function updateOverdueDaysNow(
+  feature: Pick<PlanNode, 'startedAt' | 'children'>,
+  health: PlanHealth,
+  latestUpdateAt: string | null | undefined,
+): number | null {
+  return updateOverdueDays(feature, health, latestUpdateAt, Date.now());
 }

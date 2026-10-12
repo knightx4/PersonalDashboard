@@ -51,6 +51,7 @@ const update: PlanUpdate = {
   stepsTotal: 3,
   session: null,
   createdAt: '2026-10-03T12:00:00Z',
+  snapshot: null,
 };
 
 describe('datedLines', () => {

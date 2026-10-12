@@ -1,4 +1,7 @@
 import { createClient, requireUser } from '@/lib/auth/server';
+import { featureTable } from '@/lib/plan/feature-table';
+import { updateOverdueDays } from '@/lib/plan/updates';
+import { loadLatestUpdateTimes } from '@/lib/plan/updates-load';
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
@@ -142,7 +145,7 @@ export async function renderPlanPage({
   // end of a run, so this is where it gets noticed.
   await endQuietRuns({ supabase, userId: user.id });
 
-  const [data, lastRuns, runRaises, commitChecks, overnight, fires, started] = await Promise.all([
+  const [data, lastRuns, runRaises, commitChecks, overnight, fires, started, updateTimes] = await Promise.all([
     loadPlan(supabase, user.id),
     loadLastRuns(supabase, user.id),
     // What sessions have raised against a step, so an opened step can say what
@@ -166,6 +169,8 @@ export async function renderPlanPage({
     // Every run still going, after the sweep above, so the card can name each
     // session running in parallel rather than only the last fire (note 39576272).
     loadStartedRuns(supabase, user.id),
+    // When each feature last had an update, for the overdue mark on its row.
+    loadLatestUpdateTimes(supabase, user.id),
   ]);
 
   // What the runs say about the steps that are claimed, so the counts beside a
@@ -180,6 +185,15 @@ export async function renderPlanPage({
   // answer instead.
   const refusedKey = refusedKeyAsOfNow(lastRuns);
   const everything = buildPlanTree(data, liveness);
+  // Features that are moving and a week without an update (plan #1834), by id.
+  const overdueUpdates: Record<string, number> = {};
+  const nowMs = Date.now();
+  for (const group of featureTable(everything, liveness)) {
+    for (const row of group.rows) {
+      const days = updateOverdueDays(row.node, row.health, updateTimes[row.node.id], nowMs);
+      if (days !== null) overdueUpdates[row.node.id] = days;
+    }
+  }
   // On a project's page, only its section: the counts, the views and the
   // tree are all about the project.
   const whole = project
@@ -319,6 +333,7 @@ export async function renderPlanPage({
         runRaises={runRaises}
         keyRefusal={refusedKey}
         liveness={liveness}
+        overdueUpdates={overdueUpdates}
         commitChecks={commitChecks}
         overhaulProgress={overhaulProgress}
         criticStops={criticStops}
