@@ -194,8 +194,9 @@ function focusLine(focus: PostsRunFocus | null | undefined): string {
   }
   return (
     'Write one draft about what the person asked for, quoted below. Find the shipped steps ' +
-    'and closed notes it is about and cite them; every rule in the skill still holds, so if ' +
-    'it needs another workspace or nothing shipped bears on it, write no draft and say why.\n\n' +
+    'and closed notes it is about and cite them. An ask may be about any workspace, and may ' +
+    'allow a picture with real data, as the skill\'s section on asks says; the other rules ' +
+    'still hold. If nothing shipped bears on it, write no draft and say why.\n\n' +
     focus.ask
       .split('\n')
       .map((line) => `> ${line}`)
@@ -211,7 +212,8 @@ export function postsRunText(input: { userId: string; focus?: PostsRunFocus | nu
     'Read .claude/skills/posts/SKILL.md first and follow it, and read docs/X-POSTS.md in ' +
       'full before drafting. Check every draft with `npx tsx scripts/posts-check.ts` and insert ' +
       'only the ones that pass, as suggested rows in social_posts carrying this run in run_id. ' +
-      'Then mark this run finished in plan_runs.',
+      'Then mark this run finished in plan_runs. If you insert no draft, write why in the ' +
+      "run's note column as you mark it finished, in a sentence or two the person reads on the Posts tab.",
     '',
     focusLine(input.focus),
     '',
@@ -227,6 +229,8 @@ export type PostsRun = {
   status: 'started' | 'finished' | 'failed';
   createdAt: string;
   error: string | null;
+  /** Why a run that finished wrote no draft, in Dash's words. */
+  note: string | null;
   /** The drafts in `social_posts` that carry this run's id. */
   drafts: number;
 };
@@ -277,14 +281,14 @@ export async function loadSocialPosts(supabase: Db, userId: string): Promise<Soc
 export async function loadLastPostsRun(supabase: Db, userId: string): Promise<PostsRun | null> {
   const { data, error } = await supabase
     .from('plan_runs')
-    .select('id, status, created_at, error')
+    .select('id, status, created_at, error, note')
     .eq('user_id', userId)
     .eq('job', 'posts')
     .order('created_at', { ascending: false })
     .limit(1);
   if (error) throw new Error(`Could not read the posts runs: ${error.message}`);
   const row = (data ?? [])[0] as
-    | { id: string; status: string; created_at: string; error: string | null }
+    | { id: string; status: string; created_at: string; error: string | null; note: string | null }
     | undefined;
   if (!row) return null;
 
@@ -299,6 +303,7 @@ export async function loadLastPostsRun(supabase: Db, userId: string): Promise<Po
     status: row.status === 'finished' || row.status === 'failed' ? row.status : 'started',
     createdAt: row.created_at,
     error: row.error,
+    note: row.note,
     drafts: count ?? 0,
   };
 }

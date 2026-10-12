@@ -109,6 +109,14 @@ describe('sourceProblems', () => {
     expect(sourceProblems({ label: '#3', module: 'jobs', text: 'Add a column' })).toHaveLength(1);
     expect(sourceProblems({ label: '#4', module: null, text: 'Track debt payoff' }).length).toBe(1);
   });
+  it('lets an ask open the workspace it is about, and no other', () => {
+    const vault = { label: '#5', module: 'vault', text: 'Sync the diary notes from Obsidian' };
+    expect(sourceProblems(vault, [], ['vault'])).toEqual([]);
+    expect(sourceProblems(vault, [], ['learn'])).toContain('#5 is in the vault workspace');
+    expect(sourceProblems(vault, ['Obsidian'], ['vault'])).toEqual([
+      '#5 names "Obsidian", which is on the never-in-a-post list',
+    ]);
+  });
 });
 
 describe('postsRunState', () => {
@@ -118,6 +126,7 @@ describe('postsRunState', () => {
     status: 'started',
     createdAt: new Date(now - 5 * 60_000).toISOString(),
     error: null,
+    note: null,
     drafts: 0,
     ...over,
   });

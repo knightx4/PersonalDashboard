@@ -246,16 +246,26 @@ export function checkDraft(draft: DraftToCheck, avoid: readonly string[] = []): 
  * the app as a whole, and its text says nothing about another workspace's data
  * or names anyone on the avoid list. The reasons are empty when it may.
  *
+ * `open` is the workspaces the person's own ask is about (docs/X-POSTS.md,
+ * "Asks"). A step in one of them may be cited, and its text is not held to
+ * the other-workspace words, since describing that workspace is the point.
+ * The avoid list and email addresses still refuse it.
+ *
  * Links, paths, session stamps and row ids are ordinary in a step's text and
  * are not held against it; only the post must not carry them.
  */
-export function sourceProblems(source: SourceToCheck, avoid: readonly string[] = []): string[] {
+export function sourceProblems(
+  source: SourceToCheck,
+  avoid: readonly string[] = [],
+  open: readonly string[] = [],
+): string[] {
   const problems: string[] = [];
-  if (source.module !== null && source.module !== 'dev') {
+  const opened = source.module !== null && open.includes(source.module);
+  if (source.module !== null && source.module !== 'dev' && !opened) {
     problems.push(`${source.label} is in the ${source.module} workspace`);
   }
   if (EMAIL.test(source.text)) problems.push(`${source.label} has an email address`);
-  for (const word of OTHER_WORKSPACE_WORDS) {
+  for (const word of opened ? [] : OTHER_WORKSPACE_WORDS) {
     if (mentions(source.text, word)) {
       problems.push(`${source.label} mentions "${word}", which belongs to another workspace`);
     }

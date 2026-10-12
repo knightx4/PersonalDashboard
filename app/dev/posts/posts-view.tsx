@@ -31,7 +31,10 @@ export function PostList({ cards }: { cards: PostCard[] }) {
   );
 }
 
-/** Where the last run stands, said only when it is going or did not finish. */
+/**
+ * Where the last run stands, said when it is going, did not finish, or
+ * finished without a draft, in which case the run's note says why.
+ */
 function RunLine({ page }: { page: PostsPage }) {
   // On a panel of its own, like the X row, rather than bare on the page.
   if (page.runState === 'going') {
@@ -45,6 +48,13 @@ function RunLine({ page }: { page: PostsPage }) {
     return (
       <p role="alert" className={cn(cardVariants({ padding: 'dense' }), 'text-small text-caution')}>
         The last run did not finish{page.run?.error ? `: ${page.run.error}` : '.'}
+      </p>
+    );
+  }
+  if (page.runState === 'finished' && page.run?.drafts === 0) {
+    return (
+      <p role="status" className={cn(cardVariants({ padding: 'dense' }), 'text-small text-ink-muted')}>
+        {page.run.note ? `Dash wrote no draft. ${page.run.note}` : 'The last run finished without a draft.'}
       </p>
     );
   }

@@ -221,7 +221,14 @@ import {
   InspirationListSurface,
   InspirationUnreadSurface,
 } from './inspiration-surfaces';
-import { PostsDraftingSurface, PostsMatchedSurface, PostsSurface, PostsWriteSurface, PostsXSurface } from './posts-surfaces';
+import {
+  PostsDraftingSurface,
+  PostsMatchedSurface,
+  PostsNoDraftSurface,
+  PostsSurface,
+  PostsWriteSurface,
+  PostsXSurface,
+} from './posts-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
@@ -4922,6 +4929,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PostsDraftingSurface />,
+  },
+  {
+    /* A run that wrote no draft, with the note it left saying why. */
+    id: 'dev-posts-no-draft',
+    label: 'Dev · Posts, when Dash wrote no draft',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsNoDraftSurface />,
   },
   {
     /* Write your own, opened: a post the person writes joins the drafts. */
