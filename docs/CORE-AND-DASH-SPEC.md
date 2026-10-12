@@ -17,8 +17,8 @@ meant to remove.
 > features on `/dev/plan`. Three features already proposed there became parts
 > of this one; they are named under **Order of work**.
 >
-> **Held 3 October 2026.** Its seven features are blocked until
-> [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) is in place. This becomes the first
+> **Held 3 October 2026, released since.** The spec layer is in place and the
+> plan steps for Parts 1 to 6 are done. R2, R4 and R5 are still open. This was the first
 > overhaul built that way: rules first, a design session in code, then steps
 > rewritten from it. #1436, Ask Dash reliability, is not held.
 
