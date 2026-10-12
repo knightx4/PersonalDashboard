@@ -180,8 +180,11 @@ values ('…', 'dev', '<the feature id>', '…', '…', 's', 'proposed', 30,
 -- stopped: a run ending with its step neither closed nor blocked says why,
 -- in one line of 300 characters or fewer, on the newest run fired at the step
 -- or a row above it (a feature batch is fired at the feature). A run still
--- 'started' is ended 'failed' with the reason as its error too; one the
--- cutoff already ended keeps the app's note in `error`. `stop_pieces` is the
+-- going is ended in the same statement: 'failed' with the reason as its
+-- error, or 'finished' for a diagnosis ('unstick'), whose line is how it
+-- finishes. One the cutoff already ended keeps the app's note in `error`.
+-- Send the statement whole. A line stored without the status leaves the run
+-- going until the next sweep finds the line and ends it. `stop_pieces` is the
 -- split a too-big step would take, two to twenty titles in order, or null.
 -- A run row is Dash's own record, so no record_dash_action call.
 with recursive chain as (
@@ -191,8 +194,10 @@ with recursive chain as (
 )
 update plan_runs
 set stop_reason = $r$<why, one line>$r$, stop_pieces = null, stopped_at = now(),
-    status = case when status = 'started' then 'failed' else status end,
-    error = case when status = 'started' then $r$<why, one line>$r$ else error end
+    status = case when status not in ('started', 'stale', 'awaiting_input') then status
+                  when job = 'unstick' then 'finished' else 'failed' end,
+    error = case when status not in ('started', 'stale', 'awaiting_input') then error
+                 when job = 'unstick' then null else $r$<why, one line>$r$ end
 where id = (select id from plan_runs where user_id = '…'
             and plan_item_id in (select id from chain)
             order by created_at desc limit 1)

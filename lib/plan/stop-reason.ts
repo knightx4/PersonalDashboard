@@ -26,6 +26,8 @@ export type StopRunCandidate = {
   planItemId: string;
   status: string;
   createdAt: string;
+  /** The run's job; missing on rows read without it. */
+  job?: string | null;
 };
 
 /** One line: inner whitespace and line breaks folded to single spaces. */
@@ -83,19 +85,43 @@ export type StopColumns = {
   stop_reason: string;
   stop_pieces: string[] | null;
   stopped_at: string;
-  /** Present only when the run still read `started`: the stop ends it. */
-  status?: 'failed';
-  error?: string;
+  /** Present only when the run was still going: the stop ends it. */
+  status?: 'finished' | 'failed';
+  /** The reason, on a run the stop ends as failed; null on one it finishes. */
+  error?: string | null;
 };
 
+/** The statuses of a run whose session has not been written off. */
+const GOING = new Set(['started', 'stale', 'awaiting_input']);
+
+/** Whether a run with this status is still counted as going. */
+export function stillGoing(status: string): boolean {
+  return GOING.has(status);
+}
+
 /**
- * The columns to write. A run still `started` is ended as `failed` with the
- * reason as its `error`, since the session has said it is over and the plan
- * page should stop showing it as going. A run the cutoff already ended keeps
- * the app's note in `error`; the reason goes beside it.
+ * How a run whose session wrote a stop line ends.
+ *
+ * A diagnosis (`unstick`) writes its line as the last thing it does whether
+ * or not it found a wall (`reference/unsticking.md`), so its line is the
+ * finish and not a failure. Every other job writes one only when its step was
+ * neither closed nor blocked, which is a run that did not get there.
+ */
+export function stoppedEnd(
+  run: { job?: string | null },
+  reason: string,
+): { status: 'finished'; error: null } | { status: 'failed'; error: string } {
+  return run.job === 'unstick' ? { status: 'finished', error: null } : { status: 'failed', error: reason };
+}
+
+/**
+ * The columns to write. A run still going is ended, as `stoppedEnd` says,
+ * since the session has said it is over and the plan page and the overnight
+ * runner should stop counting it. A run the cutoff already ended keeps the
+ * app's note in `error`; the reason goes beside it.
  */
 export function stopColumns(
-  run: Pick<StopRunCandidate, 'status'>,
+  run: Pick<StopRunCandidate, 'status'> & { job?: string | null },
   reason: string,
   pieces: readonly string[],
   at: string,
@@ -105,9 +131,6 @@ export function stopColumns(
     stop_pieces: pieces.length > 0 ? [...pieces] : null,
     stopped_at: at,
   };
-  if (run.status === 'started') {
-    columns.status = 'failed';
-    columns.error = reason;
-  }
+  if (stillGoing(run.status)) Object.assign(columns, stoppedEnd(run, reason));
   return columns;
 }

@@ -86,6 +86,23 @@ describe('stopColumns', () => {
     });
   });
 
+  it('ends a run marked stale or waiting on an answer the same way', () => {
+    expect(stopColumns({ status: 'stale' }, 'Too big.', [], at)).toMatchObject({ status: 'failed' });
+    expect(stopColumns({ status: 'awaiting_input' }, 'Too big.', [], at)).toMatchObject({
+      status: 'failed',
+    });
+  });
+
+  it('finishes a diagnosis, whose line is how it ends', () => {
+    expect(stopColumns({ status: 'started', job: 'unstick' }, 'Waits on 2 Nov.', [], at)).toEqual({
+      stop_reason: 'Waits on 2 Nov.',
+      stop_pieces: null,
+      stopped_at: at,
+      status: 'finished',
+      error: null,
+    });
+  });
+
   it("leaves the app's note on a run the cutoff ended", () => {
     expect(stopColumns({ status: 'failed' }, 'Too big.', ['A', 'B'], at)).toEqual({
       stop_reason: 'Too big.',

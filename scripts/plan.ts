@@ -1336,8 +1336,10 @@ async function main(): Promise<void> {
         )
         select id from chain`;
       const ids = chain.map((row) => row.id);
-      const rows = await sql<{ id: string; plan_item_id: string; status: string; created_at: Date }[]>`
-        select id, plan_item_id, status, created_at from plan_runs
+      const rows = await sql<
+        { id: string; plan_item_id: string; status: string; created_at: Date; job: string }[]
+      >`
+        select id, plan_item_id, status, created_at, job from plan_runs
         where user_id = ${userId} and plan_item_id in ${sql(ids)}`;
       const run = runForStop(
         rows.map((row) => ({
@@ -1345,6 +1347,7 @@ async function main(): Promise<void> {
           planItemId: row.plan_item_id,
           status: row.status,
           createdAt: row.created_at.toISOString(),
+          job: row.job,
         })),
         ids,
       );

@@ -1078,7 +1078,13 @@ export async function fileStalls(input: {
  */
 const IN_FLIGHT_LOOKBACK_MS = 6 * 60 * 60 * 1000;
 
-type FeatureRunRow = { plan_item_id: string | null; status: string; created_at: string };
+type FeatureRunRow = {
+  plan_item_id: string | null;
+  status: string;
+  created_at: string;
+  /** Set when the session wrote why it stopped, which ends it. */
+  stop_reason?: string | null;
+};
 
 /**
  * The feature sessions still going, whoever fired them.
@@ -1107,7 +1113,7 @@ export async function featureRunsInFlight(input: {
 
   const { data, error } = await supabase
     .from('plan_runs')
-    .select('plan_item_id, status, created_at')
+    .select('plan_item_id, status, created_at, stop_reason')
     .eq('user_id', userId)
     .eq('job', 'feature')
     .gte('created_at', new Date(since).toISOString())
@@ -1130,7 +1136,11 @@ export async function featureRunsInFlight(input: {
     }
   }
 
-  const started = rows.filter((row) => row.status !== 'finished' && row.status !== 'failed');
+  // A run whose session wrote a stop line is over even while its status still
+  // says otherwise; `endQuietRuns` writes it back, and this tick need not wait.
+  const started = rows.filter(
+    (row) => row.status !== 'finished' && row.status !== 'failed' && !row.stop_reason,
+  );
   if (started.length === 0) return out;
 
   // One listing of pushes for all of them, from the oldest start: the listing

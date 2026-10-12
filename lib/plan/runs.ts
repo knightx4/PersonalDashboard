@@ -47,6 +47,7 @@ import {
 } from './run-end';
 import { commitSubjects, listPushes } from './ci';
 import type { RunRaise } from './work';
+import { stoppedEnd } from './stop-reason';
 import {
   checkBackWork,
   featureWork,
@@ -238,7 +239,7 @@ export async function endQuietRuns(input: {
   // Started runs, and stale ones, which a closed step can still finish.
   const { data: rows, error } = await input.supabase
     .from('plan_runs')
-    .select('id, plan_item_id, created_at, routine_id, job, status')
+    .select('id, plan_item_id, created_at, routine_id, job, status, stop_reason')
     .eq('user_id', input.userId)
     .in('status', ['started', 'stale']);
   if (error) {
@@ -305,6 +306,17 @@ export async function endQuietRuns(input: {
   const ended: Array<{ id: string; note: string }> = [];
   const silent: string[] = [];
   for (const row of started) {
+    // The session wrote why it stopped, so it is over whatever else is read.
+    // `plan.ts stopped` ends the run in the same write, but a session working
+    // through the connector can store the line and not the status: the #1496
+    // diagnosis on 12 October did, and its run read `started` for over an
+    // hour, holding a slot of the overnight runner, until it was ended by hand.
+    if (row.stop_reason) {
+      const end = stoppedEnd(row, row.stop_reason);
+      if (end.status === 'finished') finished.push(row.id);
+      else ended.push({ id: row.id, note: end.error });
+      continue;
+    }
     const step = (row.plan_item_id ? stamps.get(row.plan_item_id) : null) ?? {
       completedAt: null,
       blockedAt: null,
@@ -402,6 +414,8 @@ export type QuietRun = {
   job?: string | null;
   /** `started` or `stale`; missing on rows read through an older select. */
   status?: string;
+  /** The line the session wrote when it stopped (`plan.ts stopped`), if it did. */
+  stop_reason?: string | null;
 };
 
 /**

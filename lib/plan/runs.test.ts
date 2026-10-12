@@ -311,6 +311,40 @@ describe('endQuietRuns', () => {
     expect(updates).toEqual([{ values: { status: 'finished', error: null }, ids: ['run-1'] }]);
   });
 
+  it('ends a run whose session wrote why it stopped, without waiting on the clock', async () => {
+    // The #1496 diagnosis on 12 October stored its line and not its status,
+    // and read started for over an hour, holding a slot of the overnight runner.
+    const { supabase, updates } = db([
+      {
+        id: 'run-1',
+        plan_item_id: 'feature-1',
+        created_at: minutesAgo(10),
+        job: 'feature',
+        stop_reason: 'Too big for one sitting.',
+      } as never,
+      {
+        id: 'run-2',
+        plan_item_id: 'feature-2',
+        created_at: minutesAgo(10),
+        job: 'unstick',
+        stop_reason: 'Both steps wait on 2 Nov.',
+      } as never,
+    ]);
+
+    const result = await endQuietRuns({
+      supabase: supabase as never,
+      userId: 'user-1',
+      now: NOW,
+      pushes: pushes({ ref: 'claude/one', minutes: 1 }),
+    });
+
+    expect(result).toEqual({ finished: 1, failed: 1, stale: 0, error: null });
+    expect(updates).toEqual([
+      { values: { status: 'finished', error: null }, ids: ['run-2'] },
+      { values: { status: 'failed', error: 'Too big for one sitting.' }, ids: ['run-1'] },
+    ]);
+  });
+
   it('falls back to the clock when nobody has read what was pushed', async () => {
     const { supabase, updates } = db([
       { id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(300) },
