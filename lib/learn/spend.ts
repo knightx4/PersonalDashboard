@@ -309,6 +309,11 @@ export const LEARN_OPERATIONS = [
   // subjects (plan #1809): one Haiku call per reading list or session added
   // through the connector, made only when a name is not an exact match.
   'match-subjects',
+  // Embedding each idea's claim as Learn saves it, from every route that
+  // writes one: a track's chain, a reading, the survey, a conversation and a
+  // rewritten claim (plan #1853). One Voyage call per write, about 65 tokens
+  // an idea, recorded against the idea's owner by whatever client wrote it.
+  'embed-idea',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
