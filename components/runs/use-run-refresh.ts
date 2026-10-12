@@ -12,7 +12,7 @@ import { createClient } from '@/lib/auth/client';
  * tree and the area planner each kept while a run was going. The goals skill
  * writes the run row at each step it starts (last_seen_at and now_on) and
  * when it ends, and goals.runs is in the supabase_realtime publication
- * (0198_runs_realtime.sql), so an update to the row is the moment there is
+ * (0199_runs_realtime.sql), so an update to the row is the moment there is
  * something new to draw. Realtime reads each event through the viewer's RLS,
  * so only your own runs are heard. Several updates close together refresh
  * once.
