@@ -3,7 +3,8 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceSupabase } from '@/inngest/supabase-admin';
 import { recordScheduled, scheduledBefore } from '@/lib/core/scheduled-actions';
-import { claimExpiredNote, expiredClaim } from '@/lib/plan/claims';
+import { readLastLines } from '@/lib/core/run-liveness';
+import { claimExpiredNote, claimHeldByRun, expiredClaim } from '@/lib/plan/claims';
 import { listPushes } from '@/lib/plan/ci';
 import { claimIsLive, claimLiveness, lastPushSince } from '@/lib/plan/liveness';
 import { endsRun, readingFor } from '@/lib/plan/run-end';
@@ -259,14 +260,29 @@ export async function releaseStaleClaims(
     }
   }
 
+  // A claim whose run writes lines is held by them and never by the clock
+  // (plan #1825). Asked before GitHub, which only the rest need.
+  // A read that throws holds nothing, the same as one that errors.
+  const held = await claimsHeldByLines(supabase, expired).catch((err: unknown) => {
+    console.error(
+      `the lines behind the stale claims could not be read: ${err instanceof Error ? err.message : 'failed'}`,
+    );
+    return new Set<string>();
+  });
+  const condemned = expired.filter(({ row }) => !held.has(row.id));
+
   // Asked once, for the whole condemned set, before anything is written.
-  const { live, unheard } = await claimsWithLiveRuns(supabase, expired, now, options.fetch);
+  const { live, unheard } = await claimsWithLiveRuns(supabase, condemned, now, options.fetch);
 
   const steps: number[] = [];
   const kept: number[] = [];
   let released = 0;
 
-  for (const { row, startedAt } of expired) {
+  for (const { row } of expired) {
+    if (held.has(row.id) && row.number !== null) kept.push(row.number);
+  }
+
+  for (const { row, startedAt } of condemned) {
     if (live.has(row.id)) {
       if (row.number !== null) kept.push(row.number);
       continue;
@@ -307,6 +323,92 @@ export async function releaseStaleClaims(
   }
 
   return { released, steps, kept };
+}
+
+/** How far up the tree a claim's run is looked for: step, feature, and above. */
+const CHAIN_DEPTH = 6;
+
+/**
+ * The claims held by the lines of the run behind them (plan #1825), by step id.
+ *
+ * The run behind a claim is the newest plan run fired at the step or at a row
+ * above it, the same one `plan.ts activity` writes its lines on, since a
+ * feature batch is fired at the feature and claims the steps beneath it. A
+ * failed read holds nothing, which leaves every claim to the clock and the
+ * pushes as before.
+ */
+async function claimsHeldByLines(
+  supabase: SupabaseClient,
+  claims: readonly StaleClaim[],
+): Promise<Set<string>> {
+  const held = new Set<string>();
+  if (claims.length === 0) return held;
+
+  // Each claim's chain of rows, the step first.
+  const parentOf = new Map<string, string | null>();
+  let frontier = claims.map((claim) => claim.row.id);
+  for (let depth = 0; depth < CHAIN_DEPTH && frontier.length > 0; depth += 1) {
+    const { data, error } = await supabase
+      .from('plan_items')
+      .select('id, parent_id')
+      .in('id', frontier);
+    if (error) {
+      console.error(`the rows above the stale claims could not be read: ${error.message}`);
+      return held;
+    }
+    const next: string[] = [];
+    for (const item of (data ?? []) as Array<{ id: string; parent_id: string | null }>) {
+      parentOf.set(item.id, item.parent_id);
+      if (item.parent_id && !parentOf.has(item.parent_id)) next.push(item.parent_id);
+    }
+    frontier = next;
+  }
+  const chainOf = (id: string): string[] => {
+    const chain: string[] = [];
+    let at: string | null | undefined = id;
+    while (at && chain.length <= CHAIN_DEPTH) {
+      chain.push(at);
+      at = parentOf.get(at);
+    }
+    return chain;
+  };
+
+  const { data: runs, error } = await supabase
+    .from('plan_runs')
+    .select('id, plan_item_id, status, created_at')
+    .in('plan_item_id', [...parentOf.keys()])
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error(`the runs behind the stale claims could not be read: ${error.message}`);
+    return held;
+  }
+  const newestAt = new Map<string, RunRow>();
+  for (const run of (runs ?? []) as RunRow[]) {
+    if (run.plan_item_id && !newestAt.has(run.plan_item_id)) newestAt.set(run.plan_item_id, run);
+  }
+
+  // The newest run anywhere on the chain, as `plan.ts activity` finds it.
+  const behind = new Map<string, RunRow>();
+  for (const { row } of claims) {
+    const newest = chainOf(row.id)
+      .map((id) => newestAt.get(id))
+      .filter((run): run is RunRow => !!run)
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+    if (newest) behind.set(row.id, newest);
+  }
+  if (behind.size === 0) return held;
+
+  const lines = await readLastLines(
+    supabase.schema('core') as never,
+    'plan_runs',
+    [...behind.values()].map((run) => run.id),
+  );
+  for (const [stepId, run] of behind) {
+    if (claimHeldByRun({ status: run.status, lastLineAt: lines.get(run.id) ?? null })) {
+      held.add(stepId);
+    }
+  }
+  return held;
 }
 
 /** The cron's entry point. */

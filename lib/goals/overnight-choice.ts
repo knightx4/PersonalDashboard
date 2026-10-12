@@ -58,7 +58,7 @@ function failedTwice(runs: readonly NightRun[], now: number): boolean {
   if (latest.length < 2) return false;
   return latest.every((run) => {
     const outcome = runOutcome(run, now);
-    return outcome === 'failed' || outcome === 'silent';
+    return outcome === 'failed' || outcome === 'silent' || outcome === 'stale';
   });
 }
 

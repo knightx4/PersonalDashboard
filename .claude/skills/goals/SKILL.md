@@ -162,9 +162,16 @@ step of a phase, and at least every 15 minutes during anything long, such as
 reading a long Gmail thread or researching one step. `now_on` is a short
 line, up to 300 characters; the step's title is usually right.
 
-A run with no report for 45 minutes is taken to have died. A sweep every few
-minutes closes it as failed, and the person can press **Ask Dash** again. If you find your run row already closed as failed, stop
-working: say so in your last message and do not write to it again.
+A run that has written a line is judged by its newest line or report: silent
+for 30 minutes, a sweep marks it `stale`, and it stays so until the person
+acknowledges it, which ends it as failed. If you resume a run you find
+`stale`, write a line and set it back with `update goals.runs set status =
+'started' where id = '<run id>' and user_id = '<user>' and status = 'stale'`.
+A run that has
+written no line keeps the old rule: no report for 45 minutes and the sweep
+closes it as failed. Either way the person can press **Ask Dash** again. If
+you find your run row already closed as failed, stop working: say so in your
+last message and do not write to it again.
 
 ## Reading the goal
 
