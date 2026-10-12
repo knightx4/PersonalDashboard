@@ -126,6 +126,7 @@ import {
   LearnYoutubePlaylistSurface,
   LearnYoutubeVideoSurface,
 } from './learn-page-surfaces';
+import { LearnEssaySurface, LearnEssaysEmptySurface, LearnEssaysSurface } from './essay-surfaces';
 import { SchoolCourses } from '@/app/vault/education/course-list';
 import { educationGroups, educationCounts } from './education-fixtures';
 import { ReadingCard } from '@/components/learn/reading-card';
@@ -5980,6 +5981,29 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnYoutubeVideoSurface />,
+  },
+
+  /* Essays (plan #1865). Fixtures in essay-surfaces.tsx. */
+  {
+    id: 'learn-essays',
+    label: 'Essays · Drafts and one published',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssaysSurface />,
+  },
+  {
+    id: 'learn-essays-empty',
+    label: 'Essays · None yet',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssaysEmptySurface />,
+  },
+  {
+    id: 'learn-essay',
+    label: 'Essay · Writing a draft',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssaySurface />,
   },
 
   /* The News and Todo pages that had no picture (plan #1603). Fixtures in

@@ -86,7 +86,9 @@ export default async function LearnLayout({ children }: { children: React.ReactN
       label: 'Subjects',
       icon: 'know',
       exact: true,
-      alsoMatches: ['/learn/s/', '/learn/c/', '/learn/quiz'],
+      // Essays are reached from Subjects rather than a tab of their own,
+      // since Learn keeps four tabs (docs/CUT-BACK-SPEC.md, R1; plan #1865).
+      alsoMatches: ['/learn/s/', '/learn/c/', '/learn/quiz', '/learn/essays', '/learn/e/'],
     },
     // No Goals tab (plan #1491): the learning goals are goals in the Learn
     // area on /goals, linked from Subjects, and /learn/goals redirects there.
