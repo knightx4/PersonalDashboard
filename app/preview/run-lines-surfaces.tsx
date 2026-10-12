@@ -1,4 +1,5 @@
 import { RunLinesView } from '@/components/runs/run-lines';
+import { RunLinesArriving } from './run-lines-demo';
 import { AcknowledgeRun } from '@/components/runs/acknowledge-run';
 import { acknowledgeGoalRunAction, answerGoalRunAction } from '@/app/goals/runs/[runId]/actions';
 import type { RunActivity, RunActivityKind } from '@/lib/core/run-activities';
@@ -11,7 +12,8 @@ import type { RunQuestion } from '@/lib/core/run-questions';
  * question asked without choices, answered in your own words; one gone quiet with its Acknowledge press; one just
  * started with nothing written yet; and one whose live connection dropped.
  * The live part (components/runs/live-run-lines.tsx) only feeds these lines
- * from Realtime, so the drawing is the same.
+ * from Realtime, so the drawing is the same. The first card is a going run
+ * whose next line arrives on a press (run-lines-demo.tsx), for the strip.
  */
 
 const RUN = '6f0c2a7e-1b7d-4c55-9a0e-2d8f3c1b9a01';
@@ -98,7 +100,7 @@ export const GOAL_RUN_QUESTION: RunQuestion = {
 export function RunLinesSurface() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <RunLinesView lines={RUN_LINES} state="live" />
+      <RunLinesArriving lines={RUN_LINES} />
       <RunLinesView lines={RUN_LINES.slice(0, 5)} state="waiting" answer={answerGoalRunAction} />
       <RunLinesView lines={OPEN_QUESTION_LINES} state="waiting" answer={answerGoalRunAction} />
       <RunLinesView

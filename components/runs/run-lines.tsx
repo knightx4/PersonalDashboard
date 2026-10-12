@@ -1,6 +1,6 @@
 'use client';
 
-import { DashMark } from '@/components/ui/dash-mark';
+import { DashMark, type DashActivity, type DashState } from '@/components/ui/dash-mark';
 import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
 import { LinkedText } from '@/components/ui/linked-text';
@@ -38,6 +38,23 @@ const STATE_LINE: Record<Exclude<RunLinesState, 'ended'>, { text: string; glyph:
   stale: { text: 'Dash has stopped writing lines', glyph: 'cross' },
 };
 
+/**
+ * The mark beside the title follows the run (plan #1827). Going, it works in
+ * the shape of the latest line: thinking after a thought, writing after an
+ * action. Waiting, it stands level and blinks, since the work is yours now.
+ * Gone quiet, it sleeps, because it has to be woken. Ended, it is still.
+ */
+function markFor(
+  state: RunLinesState,
+  connection: RunLinesConnection,
+  lines: readonly RunActivity[],
+): { state: DashState; activity?: DashActivity } {
+  if (state === 'stale') return { state: 'asleep' };
+  if (state !== 'live' || connection === 'lost') return { state: 'idle' };
+  const last = lines[lines.length - 1]?.kind;
+  return { state: 'working', activity: last === 'thought' ? 'thinking' : last === 'action' ? 'writing' : undefined };
+}
+
 const LOST = {
   text: 'Lost the live connection. Reload to see the newest lines.',
   glyph: 'dashed' as GlyphName,
@@ -66,6 +83,7 @@ export function RunLinesView({
   connection = 'open',
   acknowledge,
   answer,
+  arrived,
   className,
 }: {
   lines: readonly RunActivity[];
@@ -75,6 +93,8 @@ export function RunLinesView({
   acknowledge?: React.ReactNode;
   /** The runs table's answer action, which makes a waiting question answerable here. */
   answer?: AnswerRunAction;
+  /** Ids of lines that came in while the page was open; each rises in once. */
+  arrived?: ReadonlySet<string>;
   className?: string;
 }) {
   const now = useClockNow();
@@ -82,12 +102,12 @@ export function RunLinesView({
   const open = state === 'waiting' && answer ? openQuestion(lines) : null;
   const title = (
     <span className="flex min-w-0 items-center gap-1.5 text-body font-medium text-ink">
-      <DashMark size="2xs" decorative className="text-ink-muted" />
+      <DashMark size="2xs" decorative className="text-ink-muted" {...markFor(state, connection, lines)} />
       Dash&rsquo;s lines
     </span>
   );
   const list = (
-    <LineList lines={lines} now={now} open={open && answer ? { id: open.id, action: answer } : null} />
+    <LineList lines={lines} now={now} arrived={arrived} open={open && answer ? { id: open.id, action: answer } : null} />
   );
 
   if (state === 'ended') {
@@ -131,9 +151,11 @@ function LineList({
   lines,
   now,
   open,
+  arrived,
 }: {
   lines: readonly RunActivity[];
   now: number;
+  arrived?: ReadonlySet<string>;
   /** The question still waiting, and the action that answers it. */
   open: { id: string; action: AnswerRunAction } | null;
 }) {
@@ -144,6 +166,7 @@ function LineList({
           key={line.id}
           line={line}
           now={now}
+          arrived={arrived?.has(line.id) ?? false}
           answer={line.kind === 'question' ? answerAfter(lines, index) : null}
           answerWith={open?.id === line.id ? open.action : undefined}
         />
@@ -164,11 +187,13 @@ function answerAfter(lines: readonly RunActivity[], index: number): string | nul
 function RunLine({
   line,
   now,
+  arrived,
   answer,
   answerWith,
 }: {
   line: RunActivity;
   now: number;
+  arrived: boolean;
   answer: string | null;
   /** Given on the question the run is waiting on: its choices become presses. */
   answerWith?: AnswerRunAction;
@@ -176,7 +201,7 @@ function RunLine({
   const yours = line.kind === 'response';
 
   return (
-    <li className={cn('min-w-0 py-1', !yours && '-mx-2 rounded-lg bg-canvas px-2 py-1.5')}>
+    <li className={cn('min-w-0 py-1', arrived && 'run-line-in', !yours && '-mx-2 rounded-lg bg-canvas px-2 py-1.5')}>
       <p className="flex flex-wrap items-baseline gap-x-2 text-small">
         <span className={cn('font-medium', line.kind === 'error' ? 'text-danger' : 'text-ink-muted')}>
           {RUN_ACTIVITY_LABEL[line.kind]}

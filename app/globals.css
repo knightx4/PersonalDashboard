@@ -2737,6 +2737,20 @@ button[aria-busy='true'] {
   animation: dash-seen-in var(--motion-move) var(--ease-out-soft) both;
 }
 
+/* A line Dash writes while the run's page is open (plan #1827): it rises in
+ * where it joins the list, as the mark beside the title keeps working. Only
+ * lines heard from Realtime carry the class, never the ones read on load. */
+@keyframes run-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.375rem);
+  }
+}
+
+@utility run-line-in {
+  animation: run-line-in var(--motion-move) var(--ease-out-soft) both;
+}
+
 @keyframes dash-mark-wave {
   0% {
     transform: skewY(-6deg) scaleX(0.94);
@@ -2852,6 +2866,10 @@ button[aria-busy='true'] {
   }
 
   .home-arrive [data-arrive] {
+    animation: none;
+  }
+
+  .run-line-in {
     animation: none;
   }
 

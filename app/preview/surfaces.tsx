@@ -5791,6 +5791,12 @@ export const SURFACES: readonly Surface[] = [
     label: 'Runs · Dash’s lines as it works',
     module: 'goals',
     width: 'page',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="run-line"]',
+      shows:
+        'Dash’s mark in the first card’s header keeps working while a new line, “Kept stale runs open until acknowledged, and committed 7d2e5a1.”, rises into the foot of the list beneath it and the button above goes quiet.',
+    },
     render: () => <RunLinesSurface />,
   },
   {
