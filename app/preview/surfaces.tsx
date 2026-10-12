@@ -131,6 +131,7 @@ import {
   LearnEssayBriefSurface,
   LearnEssayChangedSurface,
   LearnEssayMarksSurface,
+  LearnEssayNotesSurface,
   LearnEssayRephraseSurface,
   LearnEssayInterviewLaterSurface,
   LearnEssayInterviewSurface,
@@ -6058,6 +6059,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnEssayRephraseSurface />,
+  },
+  {
+    id: 'learn-essay-notes',
+    label: 'Essay · Margin notes from the checks',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayNotesSurface />,
   },
   {
     id: 'learn-essay-marks',

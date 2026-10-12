@@ -20,6 +20,31 @@ import { DEFAULT_SELF_NAME, MARK_AUTHORS, readDraftMarks, type AuthorMark } from
 import { rephraseContext, rephraseProblem } from '@/lib/learn/essays/rephrase';
 import { rephraseSelection } from '@/lib/learn/essays/rephrase-model';
 import {
+  checkById,
+  checkUnits,
+  CHECK_ESSAY_MAX,
+  DISMISSALS_TO_STOP,
+  freshFindings,
+  newStatuses,
+  nextRung,
+  type ComparedNote,
+  type Finding,
+  type Paragraph,
+} from '@/lib/learn/essays/checks';
+import { writingGuideFindings } from '@/lib/learn/essays/checks-local';
+import { runCheckCall } from '@/lib/learn/essays/checks-model';
+import {
+  closeNote,
+  insertNotes,
+  loadNote,
+  loadNoteStates,
+  moveNotes,
+  setNoteRung,
+  shownNotes,
+  type EssayNotes,
+} from '@/lib/learn/essays/notes-store';
+import { relatedNotes } from '@/lib/vault/notes/related';
+import {
   BRIEF_FIELDS,
   parseWordTarget,
   readBrief,
@@ -33,6 +58,7 @@ import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import {
   adoptNoteVersion,
   loadBriefJson,
+  loadCheckEssay,
   loadVaultEssay,
   recordEssayNote,
   saveBriefJson,
@@ -369,13 +395,17 @@ const RephraseInput = z.object({
   doc: z.string().max(400_000),
   from: z.number().int().min(0),
   to: z.number().int().min(0),
+  noteId: z.string().uuid().nullable(),
 });
 
 /**
  * Rephrase on a selection, rung 4 (plan #1868): Dash rewords the selected
  * text, one Sonnet call, and the editor shows it as a change to accept or
- * reject. Nothing is written here; accepting it is an edit like any other,
- * marked as Dash's, and saved with the draft.
+ * reject. Nothing in the essay is written here; accepting it is an edit like
+ * any other, marked as Dash's, and saved with the draft.
+ *
+ * With `noteId` it is a margin note's rung 4 (plan #1869): the selection is
+ * the note's text, the note's hint goes with it, and the note moves to rung 4.
  */
 // latency: pending
 export async function rephraseEssaySelection(
@@ -383,9 +413,10 @@ export async function rephraseEssaySelection(
   doc: string,
   from: number,
   to: number,
+  noteId: string | null = null,
 ): Promise<RephraseResult> {
   const user = await requireUser();
-  const parsed = RephraseInput.safeParse({ id, doc, from, to });
+  const parsed = RephraseInput.safeParse({ id, doc, from, to, noteId });
   if (!parsed.success || parsed.data.to > parsed.data.doc.length || parsed.data.from >= parsed.data.to) {
     return { ok: false, error: 'Select the words you want reworded first.' };
   }
@@ -400,12 +431,15 @@ export async function rephraseEssaySelection(
     const row = await loadBriefJson(supabase, parsed.data.id);
     if (!row) return { ok: false, error: 'That essay is not there any more.' };
     const brief = readBrief(row.brief);
+    const note = parsed.data.noteId ? await loadNote(supabase, parsed.data.id, parsed.data.noteId) : null;
+    if (parsed.data.noteId && note?.status !== 'open') return { ok: false, error: 'That note is closed now.' };
     const spend = collectSpend();
     const result = await rephraseSelection({
       selection,
       ...rephraseContext(parsed.data.doc, parsed.data.from, parsed.data.to),
       claim: brief.claim,
       reader: brief.reader,
+      guidance: note ? (note.ladder[1] ?? note.body) : undefined,
       anthropicApiKey: apiKey,
       onSpend: spend.sink,
     });
@@ -414,6 +448,7 @@ export async function rephraseEssaySelection(
       console.error('[essay rephrase]', result.detail);
       return { ok: false, error: 'Dash could not reword that. Try again, or select a little more or less.' };
     }
+    if (note) await setNoteRung(supabase, note, 4);
     return {
       ok: true,
       from: parsed.data.from,
@@ -425,5 +460,228 @@ export async function rephraseEssaySelection(
   } catch (error) {
     console.error('[essay rephrase]', error instanceof Error ? error.message : error);
     return { ok: false, error: 'Dash could not reword that. Try again in a moment.' };
+  }
+}
+
+export type NotesResult = ({ ok: true } & EssayNotes) | { ok: false; error: string };
+export type CheckResult = ({ ok: true; raised: number } & EssayNotes) | { ok: false; error: string };
+
+const CheckInput = z.object({
+  id: z.string().uuid(),
+  check: z.string().max(40),
+  doc: z.string().max(400_000),
+});
+
+/** How many calls of one run go at once, after the first has filled the cache. */
+const CHECKS_AT_ONCE = 4;
+/** Your notes compared with a paragraph for Already Said, and how much of each. */
+const COMPARED_NOTES = 2;
+const COMPARED_CHARS = 1_500;
+
+/**
+ * Run one named check on the draft (plan #1869; spec, "Margin notes and
+ * checks"). A model check makes one Sonnet call per paragraph it reads; the
+ * first goes alone so the essay is in the cache for the rest. Already Said
+ * first finds your two notes nearest each paragraph and skips a paragraph
+ * with none. The writing guide check runs locally and costs nothing.
+ *
+ * What it finds becomes margin notes: open while fewer than three are,
+ * waiting after, and never twice at the same place. A check dismissed twice
+ * on this essay does not run.
+ */
+// latency: pending
+export async function runEssayCheck(id: string, checkId: string, doc: string): Promise<CheckResult> {
+  const user = await requireUser();
+  const parsed = CheckInput.safeParse({ id, check: checkId, doc });
+  const check = parsed.success ? checkById(parsed.data.check) : null;
+  if (!parsed.success || !check) return { ok: false, error: 'Could not find that check.' };
+  const supabase = await createLearnClient();
+  try {
+    const essay = await loadCheckEssay(supabase, parsed.data.id);
+    if (!essay) return { ok: false, error: 'That essay is not there any more.' };
+    const states = await loadNoteStates(supabase, parsed.data.id);
+    const dismissed = states.filter((note) => note.checkName === check.id && note.status === 'dismissed').length;
+    if (dismissed >= DISMISSALS_TO_STOP) {
+      return { ok: false, error: `You dismissed ${check.name} twice, so it no longer runs on this essay.` };
+    }
+
+    let found: Finding[];
+    if (check.kind === 'local') {
+      found = writingGuideFindings(parsed.data.doc);
+    } else {
+      if (parsed.data.doc.length > CHECK_ESSAY_MAX) {
+        return { ok: false, error: 'Checks read essays up to about 4,000 words. This one is longer.' };
+      }
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) return { ok: false, error: 'Checks need the Anthropic key, which is not set on this deployment.' };
+      const units = checkUnits(check, parsed.data.doc);
+      if (units.length === 0) {
+        return { ok: false, error: 'Write a paragraph or two first; there is nothing to check yet.' };
+      }
+      const brief = readBrief(essay.brief);
+      const spend = collectSpend();
+      const compare =
+        check.id === 'already_said'
+          ? await notesToCompare(user.id, units, essay.noteId)
+          : new Map<Paragraph | null, ComparedNote[]>();
+      const runnable =
+        check.id === 'already_said' ? units.filter((unit) => (compare.get(unit) ?? []).length > 0) : units;
+      const call = (unit: Paragraph | null) =>
+        runCheckCall({
+          check,
+          doc: parsed.data.doc,
+          unit,
+          claim: brief.claim,
+          reader: brief.reader,
+          notes: compare.get(unit) ?? [],
+          anthropicApiKey: apiKey,
+          onSpend: spend.sink,
+        });
+      const results = runnable.length > 0 ? [await call(runnable[0])] : [];
+      for (let i = 1; i < runnable.length; i += CHECKS_AT_ONCE) {
+        results.push(...(await Promise.all(runnable.slice(i, i + CHECKS_AT_ONCE).map(call))));
+      }
+      await recordLearnSpend(user.id, 'check-essay-paragraph', spend.reports);
+      const failed = results.flatMap((result) => (result.ok ? [] : [result.detail]));
+      if (failed.length > 0) console.error('[essay check]', check.id, failed.join('; '));
+      if (results.length > 0 && failed.length === results.length) {
+        return { ok: false, error: `Dash could not run ${check.name}. Try again in a moment.` };
+      }
+      found = results.flatMap((result) => (result.ok && result.finding ? [result.finding] : []));
+    }
+
+    const fresh = freshFindings(check.id, found, states);
+    const open = states.filter((note) => note.status === 'open').length;
+    const statuses = newStatuses(open, fresh.length);
+    await insertNotes(
+      supabase,
+      user.id,
+      parsed.data.id,
+      check.id,
+      fresh.map((finding, i) => ({ finding, status: statuses[i] })),
+    );
+    return { ok: true, raised: fresh.length, ...(await shownNotes(supabase, parsed.data.id)) };
+  } catch (error) {
+    console.error('[essay check]', error instanceof Error ? error.message : error);
+    return { ok: false, error: `Dash could not run ${check.name}. Try again in a moment.` };
+  }
+}
+
+/**
+ * For Already Said: your notes nearest each paragraph, at most two above the
+ * related-notes floor, with the start of each. The essay's own note is left out.
+ */
+async function notesToCompare(
+  userId: string,
+  units: readonly (Paragraph | null)[],
+  essayNoteId: string | null,
+): Promise<Map<Paragraph | null, ComparedNote[]>> {
+  const [vault, core] = await Promise.all([createVaultClient(), createCoreClient()]);
+  const found = await Promise.all(
+    units.map(async (unit) =>
+      unit
+        ? relatedNotes(vault, userId, unit.text, {
+            core,
+            limit: COMPARED_NOTES,
+            exclude: essayNoteId ? [essayNoteId] : [],
+          })
+        : [],
+    ),
+  );
+  const ids = [...new Set(found.flat().map((note) => note.noteId))];
+  const bodies = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data, error } = await vault.from('notes').select('id, body').in('id', ids);
+    if (error) throw new Error(error.message);
+    for (const row of (data ?? []) as { id: string; body: string | null }[]) {
+      bodies.set(row.id, (row.body ?? '').slice(0, COMPARED_CHARS));
+    }
+  }
+  return new Map(
+    units.map((unit, i) => [
+      unit,
+      found[i]
+        .filter((note) => bodies.get(note.noteId))
+        .map((note) => ({ path: note.path, title: note.title, text: bodies.get(note.noteId)! })),
+    ]),
+  );
+}
+
+const NoteInput = z.object({ id: z.string().uuid(), noteId: z.string().uuid() });
+
+/** Help: the note moves one rung up the ladder (spec, "What Dash does"). Rung 4 is Suggest wording. */
+// latency: optimistic
+export async function helpEssayNote(id: string, noteId: string): Promise<NotesResult> {
+  await requireUser();
+  const parsed = NoteInput.safeParse({ id, noteId });
+  if (!parsed.success) return { ok: false, error: 'Could not find that note.' };
+  const supabase = await createLearnClient();
+  try {
+    const note = await loadNote(supabase, parsed.data.id, parsed.data.noteId);
+    if (!note || note.status !== 'open') return { ok: false, error: 'That note is closed now.' };
+    const rung = nextRung(note.rung);
+    if (rung === null) return { ok: false, error: 'This note is as far up the ladder as Help goes.' };
+    await setNoteRung(supabase, note, rung);
+    return { ok: true, ...(await shownNotes(supabase, parsed.data.id)) };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Could not move the note.' };
+  }
+}
+
+/** Done or Dismiss on a note; a waiting note takes its place. */
+// latency: optimistic
+export async function closeEssayNote(
+  id: string,
+  noteId: string,
+  outcome: 'done' | 'dismissed',
+): Promise<NotesResult> {
+  await requireUser();
+  const parsed = NoteInput.safeParse({ id, noteId });
+  if (!parsed.success || (outcome !== 'done' && outcome !== 'dismissed')) {
+    return { ok: false, error: 'Could not find that note.' };
+  }
+  const supabase = await createLearnClient();
+  try {
+    return { ok: true, ...(await closeNote(supabase, parsed.data.id, parsed.data.noteId, outcome)) };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Could not close the note.' };
+  }
+}
+
+const MovesInput = z
+  .array(
+    z.object({
+      id: z.string().uuid(),
+      quote: z.string().min(1).max(4_000),
+      prefix: z.string().max(200),
+      suffix: z.string().max(200),
+      offset: z.number().int().min(0),
+    }),
+  )
+  .max(200);
+
+export type NoteMove = z.infer<typeof MovesInput>[number];
+
+/**
+ * Where the notes sit after the person's edits, as the editor has moved
+ * them, sent after a draft save so a reload finds them by offset.
+ */
+// latency: optimistic
+export async function moveEssayNotes(id: string, moves: NoteMove[]): Promise<{ ok: boolean }> {
+  await requireUser();
+  const parsedId = z.string().uuid().safeParse(id);
+  const parsed = MovesInput.safeParse(moves);
+  if (!parsedId.success || !parsed.success) return { ok: false };
+  try {
+    const supabase = await createLearnClient();
+    await moveNotes(
+      supabase,
+      parsedId.data,
+      parsed.data.map(({ id: noteId, ...anchor }) => ({ id: noteId, anchor })),
+    );
+    return { ok: true };
+  } catch (error) {
+    console.error('[essay notes]', error instanceof Error ? error.message : error);
+    return { ok: false };
   }
 }

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { essayTitle } from '@/lib/learn/essays/model';
 import { loadEssay } from '@/lib/learn/essays/store';
+import { loadEssayNotes } from '@/lib/learn/essays/notes-store';
 import { EssayView } from './essay-view';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,12 @@ async function read(id: string) {
   return loadEssay(supabase, id);
 }
 
+/** The margin notes, found again in the draft as it now is (plan #1869). */
+async function readNotes(id: string, doc: string) {
+  const supabase = await createLearnClient();
+  return loadEssayNotes(supabase, id, doc);
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const essay = await read((await params).id);
   return { title: essay ? essayTitle(essay.draftBody, essay.path) : 'Essay' };
@@ -23,5 +30,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function EssayPage({ params }: { params: Promise<{ id: string }> }) {
   const essay = await read((await params).id);
   if (!essay) notFound();
-  return <EssayView essay={essay} />;
+  const notes = await readNotes(essay.id, essay.draftBody);
+  return <EssayView essay={essay} notes={notes} />;
 }

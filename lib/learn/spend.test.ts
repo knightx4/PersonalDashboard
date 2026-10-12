@@ -129,6 +129,7 @@ describe('the operation names', () => {
       'embed-idea',
       'word-essay-question',
       'rephrase-essay-selection',
+      'check-essay-paragraph',
     ]);
   });
 });

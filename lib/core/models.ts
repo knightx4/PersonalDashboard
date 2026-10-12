@@ -142,6 +142,8 @@ export const MODELS = {
   learnEssayInterview: SONNET,
   /** lib/learn/essays/rephrase-model.ts, Rephrase on a selected sentence of an essay */
   learnEssayRephrase: SONNET,
+  /** lib/learn/essays/checks-model.ts, a named check on one paragraph of an essay */
+  learnEssayCheck: SONNET,
   /** lib/learn/survey/idea.ts */
   learnSurveyIdea: HAIKU,
   /** lib/learn/vault/classify.ts */

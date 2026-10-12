@@ -9,6 +9,8 @@ import type { Essay, EssayPin, EssaySummary } from '@/lib/learn/essays/model';
 import type { PlanUnit } from '@/lib/learn/lessons/plan-view';
 import type { ProjectView } from '@/lib/learn/lessons/project';
 import { ESSAY_VAULT_ERRORS } from '@/lib/learn/essays/vault';
+import { makeAnchor } from '@/lib/learn/essays/anchor';
+import type { EssayNote, EssayNotes } from '@/lib/learn/essays/notes-store';
 
 /**
  * The Essays list and the essay editor (plan #1865), from fixtures shaped like
@@ -125,10 +127,17 @@ const rephraseCost: CostEstimate = {
   models: [SONNET],
 };
 
+/** About what one paragraph's check costs, as the Learn layout would give it. */
+const checkCost: CostEstimate = { ...rephraseCost, per: 'unit', lowMicros: 9_000, medianMicros: 12_000, highMicros: 18_000 };
+
 function WithCosts({ children }: { children: React.ReactNode }) {
   return (
     <PaidCostsProvider
-      costs={{ 'app/learn/e/[id]/actions.ts#rephraseEssaySelection': rephraseCost }}
+      costs={{
+        'app/learn/e/[id]/actions.ts#rephraseEssaySelection': rephraseCost,
+        'app/learn/e/[id]/actions.ts#runEssayCheck:model': checkCost,
+        'app/learn/e/[id]/actions.ts#runEssayCheck:already-said': checkCost,
+      }}
     >
       {children}
     </PaidCostsProvider>
@@ -177,6 +186,69 @@ export function LearnEssayRephraseSurface() {
           name: MODELS.learnEssayRephrase,
         }}
       />
+    </WithCosts>
+  );
+}
+
+/** A note on a sentence of the first paragraph, so a phone's first screen shows its marker. */
+function noteOn(
+  id: string,
+  checkName: string,
+  quote: string,
+  rung: number,
+  ladder: [string, string, string],
+  status: EssayNote['status'] = 'open',
+): EssayNote {
+  const at = draft.indexOf(quote);
+  return {
+    id,
+    checkName,
+    rung,
+    body: rung === 0 ? '' : ladder[Math.min(rung, 3) - 1],
+    ladder,
+    why: 'Counterpoint looks for the strongest objection a reader who disagrees would raise, which the essay does not answer.',
+    status,
+    anchor: at >= 0 ? makeAnchor(draft, at, at + quote.length) : { quote, prefix: '', suffix: '', offset: null },
+    createdAt: `2026-10-12T14:0${id.slice(-1)}:00Z`,
+  };
+}
+
+const COUNTERPOINT_ID = '00000000-0000-4000-8000-0000000000d1';
+
+const essayNotes: EssayNotes = {
+  notes: [
+    noteOn(COUNTERPOINT_ID, 'counterpoint', 'A loaf is worth less on Thursday than on Monday.', 2, [
+      'What would someone who disagrees say about the loaf?',
+      'Flour and tinned food keep for years; the essay rests on goods that spoil, and a reader will think of ones that do not.',
+      'Narrow the claim to goods you use up, or answer the tinned-food case in a sentence.',
+    ]),
+    noteOn('00000000-0000-4000-8000-0000000000d2', 'the_claim', 'Every good you buy wears out, gets eaten or goes out of fashion.', 1, [
+      'Is this the claim you set out to argue, or the ground for it?',
+      'The brief claims money holds value because it can become every other good; the opening argues that goods wear out.',
+      'Say the brief\u2019s claim in the first paragraph, or change the brief to match what the essay argues.',
+    ]),
+    noteOn('00000000-0000-4000-8000-0000000000d3', 'writing_guide', 'A coat is worth less after a winter.', 0, [
+      'Would one example do the work of two?',
+      'Two short examples in a row read as a list.',
+      'Keep the loaf or the coat.',
+    ]),
+    noteOn('00000000-0000-4000-8000-0000000000d4', 'missing_step', 'Bread goes to the hungry, offices to the qualified.', 1, [
+      'q', 'h', 'd',
+    ], 'waiting'),
+    noteOn('00000000-0000-4000-8000-0000000000d5', 'fact_to_verify', 'Gold held its value for exactly four thousand years.', 1, [
+      'Where does that figure come from?',
+      'h',
+      'd',
+    ], 'detached'),
+  ],
+  stopped: ['so_what'],
+};
+
+/** Checks and the margin notes they raised (plan #1869): three open, one waiting, one detached. */
+export function LearnEssayNotesSurface() {
+  return (
+    <WithCosts>
+      <EssayView essay={essay} notes={essayNotes} initialNoteOpen={COUNTERPOINT_ID} />
     </WithCosts>
   );
 }

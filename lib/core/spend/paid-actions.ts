@@ -48,6 +48,10 @@ export const PAID_ACTIONS = {
   'app/learn/e/[id]/actions.ts#answerEssayInterview': ['word-essay-question'],
   // Learn: Rephrase on a selection in an essay (plan #1868)
   'app/learn/e/[id]/actions.ts#rephraseEssaySelection': ['rephrase-essay-selection'],
+  // Learn: a named check on an essay, one call per paragraph it reads (plan
+  // #1869). Already Said also finds your notes nearest each paragraph.
+  'app/learn/e/[id]/actions.ts#runEssayCheck:model': ['check-essay-paragraph'],
+  'app/learn/e/[id]/actions.ts#runEssayCheck:already-said': ['check-essay-paragraph', 'embed-note-match'],
   // Saving a personality result has Dash read it against your notes once the
   // page has answered (plan #1635); the button under the read asks again.
   'app/learn/know/personality/actions.ts#saveBigFiveAction': ['read-personality', 'embed-note-match'],
