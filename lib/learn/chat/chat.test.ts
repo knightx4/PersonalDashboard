@@ -177,6 +177,9 @@ describe('addChatReadings', () => {
     ]);
     const imported = queries.find((query) => query.table === 'imports')!.values as Record<string, unknown>;
     expect(imported).toMatchObject({ user_id: 'me', track_id: 'list', source_hint: 'conversation' });
+    // imports_parsed_is_array_ck refuses anything but a list.
+    expect(Array.isArray(imported.parsed)).toBe(true);
+    expect(imported.raw_text).toMatch(/^Question: How do I build reliable agents\?\n/);
   });
 });
 
