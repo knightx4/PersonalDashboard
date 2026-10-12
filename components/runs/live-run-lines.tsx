@@ -54,6 +54,7 @@ export function LiveRunLines({
 }) {
   const router = useRouter();
   const [lines, setLines] = useState<RunActivity[]>(() => mergeRunLines([], initial ?? []));
+  const [arrived, setArrived] = useState<ReadonlySet<string>>(() => new Set());
   const [connection, setConnection] = useState<RunLinesConnection>('connecting');
   const following = state === 'live' || state === 'waiting';
   const readHere = initial === undefined;
@@ -92,7 +93,9 @@ export function LiveRunLines({
         { event: 'INSERT', schema: 'core', table: 'run_activities', filter: `run_id=eq.${runId}` },
         (payload) => {
           const line = runActivityFrom(payload.new as Record<string, unknown>);
-          if (line) setLines((held) => mergeRunLines(held, [line]));
+          if (!line) return;
+          setLines((held) => mergeRunLines(held, [line]));
+          setArrived((ids) => new Set(ids).add(line.id));
         },
       )
       .on(
@@ -130,6 +133,7 @@ export function LiveRunLines({
       connection={following ? connection : 'open'}
       acknowledge={acknowledge}
       answer={answer}
+      arrived={arrived}
       className={className}
     />
   );
