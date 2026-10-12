@@ -113,6 +113,25 @@ describe('unactedAnswers', () => {
     expect(unactedAnswers([step({ id: 'a' })], [run('a', '2026-10-07T20:00:00Z')])).toHaveLength(1);
   });
 
+  it('does not send again a step answered and sent on the same day, by the history', () => {
+    // Answered by Dash through SQL, so no turn holds the words: only the
+    // history knows the block was lifted at 14:00.
+    const answered = step({ id: 'a', unblockedAt: ['2026-10-07T14:00:00Z'] });
+    expect(unactedAnswers([answered], [run('a', '2026-10-07T14:05:00Z')])).toEqual([]);
+    // A run that morning, before the answer, still leaves it to send.
+    expect(unactedAnswers([answered], [run('a', '2026-10-07T08:00:00Z')])).toEqual([
+      { id: 'a', number: 1600, date: '2026-10-07', answeredAt: '2026-10-07T14:00:00Z' },
+    ]);
+  });
+
+  it('prefers the history to a turn, and ignores a history row from another day', () => {
+    const turns = [{ body: 'yes', createdAt: '2026-10-07T14:53:00Z' }];
+    const both = step({ id: 'a', turns, unblockedAt: ['2026-10-07T14:52:59Z'] });
+    expect(unactedAnswers([both], [])[0].answeredAt).toBe('2026-10-07T14:52:59Z');
+    const older = step({ id: 'a', unblockedAt: ['2026-10-05T10:00:00Z'] });
+    expect(unactedAnswers([older], [])[0].answeredAt).toBeNull();
+  });
+
   it('ignores a turn whose words differ from the line', () => {
     const turns = [{ body: 'something else', createdAt: '2026-10-07T14:53:00Z' }];
     const [found] = unactedAnswers([step({ id: 'a', turns })], []);
