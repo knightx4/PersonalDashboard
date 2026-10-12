@@ -1006,7 +1006,10 @@ in place to be answered; a proposal or a result is a link to its row on the
 Steps tab (`stepAnchor` in `lib/goals/goal-page.ts`). Your own ready steps
 are not listed there, since they are the open rows on Steps and the status
 line counts them. Below that is what feeds the goal rather than being its
-work: context from the other modules, the kinds of weekly help, links to
+work: context from the other modules, then **Suggestions** on an open goal
+(plan #1739): a few suggested steps, each with **Add as step** and **Not for
+me**, and the events or reading the goal asks for, with **Going**, beneath
+which a line names the kinds of weekly help with **Change**. Then links to
 Learn and the job search, the Learn section, files, related vault notes, and
 the add lines for whatever is still empty.
 

@@ -167,6 +167,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'home-watching': ['/home'],
   'home-dash-today': ['/home'],
   'goals-log-done': ['/home', '/goals/[goalId]'],
+  'goals-suggestions': ['/goals/[goalId]'],
   'timeline-page': ['/timeline'],
   'timeline-year': ['/timeline/year/[year]'],
   'shell-full': ['/home'],
@@ -343,6 +344,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // The "What did you do?" box on Home and each goal's page (plan #1740),
   // drawn filed, empty and on a goal.
   'goals-log-done': ['components/goals/log-done.tsx'],
+  // A goal's Suggestions section (plan #1739), drawn full and empty.
+  'goals-suggestions': ['app/goals/[goalId]/goal-suggestions.tsx'],
   // The note button's panel, open with files added (plan #1713).
   'shell-note': ['components/shell/feedback-button.tsx'],
   // The same panel once a note has saved, with its triage (plan #1674).

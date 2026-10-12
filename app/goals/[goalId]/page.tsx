@@ -19,6 +19,8 @@ import { loadNumberFrom, loadReadings } from '@/lib/goals/readings-store';
 import { goalRunRows, type RunListing } from '@/lib/goals/runs';
 import { loadGoalRuns } from '@/lib/goals/runs-store';
 import { loadDashArrivals } from '@/lib/goals/dash-arrivals-store';
+import { goalSuggestions, type Suggestion } from '@/lib/goals/suggestions';
+import { loadGoalSuggestions } from '@/lib/goals/suggestions-store';
 import {
   approvalLine,
   countOpenQuestions,
@@ -67,6 +69,7 @@ import type { Place } from '../move-goal';
 import { GoalContext } from './goal-context';
 import { WaitingOnYou } from './goal-flags';
 import { GoalHelp } from './goal-help';
+import { GoalSuggestions } from './goal-suggestions';
 import { GoalLearn } from './goal-learn';
 import { GoalLinksSection } from './goal-links';
 import { GoalNumber } from './goal-number';
@@ -273,7 +276,8 @@ function runRowsOf(history: { runs: RunListing[] }, timeZone: string) {
  *
  *  - Overview: the status card with Dash's verdict and next move, the
  *    number, Waiting on you, and what feeds the goal (context from the other
- *    modules, weekly help, links, Learn, files, related notes, add lines);
+ *    modules, Dash's suggestions with the weekly help, links, Learn, files,
+ *    related notes, add lines);
  *  - Steps: the step tree, with Now, Other stages and the rhythms;
  *  - Activity: the steps closed, the runs and the goal's comments.
  *
@@ -355,7 +359,8 @@ export default async function GoalMapPage({
   const progressRead = loadProgressEntries(client, [map.goal.id, ...stepIdsOn(map)]).catch(
     (): ProgressEntry[] => [],
   );
-  const [stepRuns, filesOf, brief, review, places, progressEntries, arrivals, pace] = await Promise.all([
+  const suggestionIds = [map.goal.id, ...ownSteps(map.steps).map((step) => step.id)];
+  const [stepRuns, filesOf, brief, review, places, progressEntries, arrivals, pace, suggestions] = await Promise.all([
     loadStepRuns(client, stepIdsOn(map)).catch((): Record<string, GoalRun> => ({})),
     // The files the goal and its steps link to. A failed read leaves them
     // out rather than the page, as do the note and the verdict below.
@@ -376,6 +381,11 @@ export default async function GoalMapPage({
     // (plan #1561). A failed read leaves the moment out.
     loadDashArrivals(client, doneStepIdsOn(map)).catch((): string[] => []),
     loadGoalPace(client, map, progressRead, today, account.timezone),
+    // What Dash suggests doing next on the goal (plan #1739). A failed read
+    // shows the section empty rather than breaking the page.
+    loadGoalSuggestions(client, suggestionIds)
+      .then((all) => goalSuggestions(all, new Set(suggestionIds), today))
+      .catch((): Suggestion[] => []),
   ]);
   const status = goalStatus(
     map.goal,
@@ -486,7 +496,15 @@ export default async function GoalMapPage({
         <WaitingOnYou rows={status.yourMove} flags={flags} questions={questions} />
       </div>
       <GoalContext items={shownItems} />
-      {!errand && !helpEmpty && <GoalHelp {...help} />}
+      {map.goal.status === 'open' && (
+        <GoalSuggestions
+          goalId={map.goal.id}
+          suggestions={suggestions}
+          helpKinds={errand ? [] : help.helpKinds}
+          proposedHelpKinds={errand ? [] : help.proposedHelpKinds}
+        />
+      )}
+      {map.goal.status !== 'open' && !errand && !helpEmpty && <GoalHelp {...help} />}
       {!linksEmpty && <GoalLinksSection {...linked} />}
       {learnGoal && <GoalLearn {...learnGoal} />}
       {files.length > 0 && (
