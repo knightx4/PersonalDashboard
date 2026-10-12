@@ -3,6 +3,7 @@ import {
   createCapturedNote,
   inboxNoteName,
   inboxNotePath,
+  notePathIn,
   removeCapturedNote,
   VAULT_WRITE_ERRORS,
   type CreateNotePorts,
@@ -31,6 +32,11 @@ describe('naming a note from its first line', () => {
     expect(inboxNotePath('Idea')).toBe('Inbox/Idea.md');
     expect(inboxNotePath('Idea', 2)).toBe('Inbox/Idea 2.md');
   });
+
+  it('puts a note with no folder at the top of the vault', () => {
+    expect(notePathIn('', 'Idea')).toBe('Idea.md');
+    expect(notePathIn('', 'Idea', 3)).toBe('Idea 3.md');
+  });
 });
 
 function ports(source: Partial<VaultSource>, stored: unknown[] = []): CreateNotePorts {
@@ -54,6 +60,18 @@ describe('createCapturedNote', () => {
     expect(createNote).toHaveBeenCalledWith('Inbox/Buy a kite.md', 'Buy a kite\nfor Sunday\n', 'Add Buy a kite from Dash');
     expect(result).toEqual({ ok: true, noteId: 'note-1', path: 'Inbox/Buy a kite.md', title: 'Buy a kite', blobSha: 'b1', commitSha: 'c1' });
     expect(stored).toMatchObject([{ path: 'Inbox/Buy a kite.md', blobSha: 'b1', body: 'Buy a kite\nfor Sunday\n' }]);
+  });
+
+  // The vault page's New note gives a name and a body (note 09ff8039).
+  it('names the note by the title it is given, and keeps the body as written', async () => {
+    const createNote = vi.fn(async () => ({ blobSha: 'b1', commitSha: 'c1' }));
+    const result = await createCapturedNote(ports({ createNote }), 'Some thoughts\non finding yourself', 'Against: finding');
+    expect(createNote).toHaveBeenCalledWith(
+      'Inbox/Against finding.md',
+      'Some thoughts\non finding yourself\n',
+      expect.any(String),
+    );
+    expect(result).toMatchObject({ ok: true, path: 'Inbox/Against finding.md' });
   });
 
   it('never writes over a note already at the name, and tries the next number', async () => {

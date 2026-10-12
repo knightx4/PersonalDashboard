@@ -110,11 +110,16 @@ export function TimezoneField({
   name = 'timezone',
   defaultValue = '',
   placeholder = 'Europe/London',
+  suggest = true,
+  autoFocus = false,
 }: {
   id?: string;
   name?: string;
   defaultValue?: string;
   placeholder?: string;
+  /** Whether to offer this computer's zone under the field. */
+  suggest?: boolean;
+  autoFocus?: boolean;
 }) {
   const reactId = useId();
   const inputId = id ?? `timezone-${reactId}`;
@@ -244,6 +249,7 @@ export function TimezoneField({
         value={value}
         placeholder={placeholder}
         autoComplete="off"
+        autoFocus={autoFocus}
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}
@@ -328,7 +334,7 @@ export function TimezoneField({
         replacing it because the laptop moved is how somebody ends up reading
         interview times in an airport's timezone.
       */}
-      {detected && value !== detected && (
+      {suggest && detected && value !== detected && (
         <button
           type="button"
           onClick={() => choose(detected)}

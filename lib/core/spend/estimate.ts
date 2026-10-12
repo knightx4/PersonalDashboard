@@ -69,6 +69,7 @@ export function guessEstimate(operation: OperationName): CostEstimate {
     runs: 0,
     basis: 'guess',
     per: guess.per,
+    models: [guess.model],
   };
 }
 
@@ -85,6 +86,7 @@ export function estimateFor(
     runs: measured.runs,
     basis: 'measured',
     per: OPERATION_GUESSES[operation].per,
+    models: [OPERATION_GUESSES[operation].model],
   };
 }
 

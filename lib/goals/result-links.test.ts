@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { firstLink, linkBareDomains, linkParts } from './result-links';
+import { firstLink, isAppPath, linkBareDomains, linkParts } from './result-links';
 
 describe('linkBareDomains', () => {
   it('turns a bare domain and its path into a link, leaving the full stop outside', () => {
@@ -78,5 +78,22 @@ describe('linkParts', () => {
 
   it('leaves text with no link alone', () => {
     expect(linkParts('Measure the wall')).toEqual([{ text: 'Measure the wall' }]);
+  });
+
+  it('links a markdown link to a page of the app, and not one to //', () => {
+    expect(linkParts('Check [the list Dash found](/goals/files/7dabe6ba) first.')).toEqual([
+      { text: 'Check ' },
+      { text: 'the list Dash found', href: '/goals/files/7dabe6ba' },
+      { text: ' first.' },
+    ]);
+    expect(linkParts('[x](//evil.example)')).toEqual([{ text: '[x](//evil.example)' }]);
+  });
+});
+
+describe('isAppPath', () => {
+  it('is true for a path in the app and false for a site', () => {
+    expect(isAppPath('/goals/files/1')).toBe(true);
+    expect(isAppPath('//evil.example')).toBe(false);
+    expect(isAppPath('https://example.com')).toBe(false);
   });
 });

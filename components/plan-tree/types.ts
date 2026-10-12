@@ -85,6 +85,8 @@ export type TreeDependencyNode = {
   waitingOn: readonly Omit<TreeStepRef, 'status'>[];
   /** The steps declared to wait on this one. */
   blocks: readonly Omit<TreeStepRef, 'status'>[];
+  /** The check-backs it waits for, its own and above it. Absent reads as none. */
+  waitsUntil?: readonly { id: string; title: string; dueAt: string }[];
 };
 
 /** A step the dependency picker offers. */

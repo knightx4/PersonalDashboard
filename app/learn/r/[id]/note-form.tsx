@@ -1,10 +1,8 @@
 'use client';
 
-import { useActionState } from 'react';
-import { useFormStatus } from 'react-dom';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/field';
-import { updateNote, type ReadingActionState } from './actions';
+import { useState } from 'react';
+import { EditableProse } from '@/components/ui/editable-prose';
+import { updateNote } from './actions';
 
 /**
  * What you took from it.
@@ -18,32 +16,32 @@ import { updateNote, type ReadingActionState } from './actions';
  * the app.
  */
 
-function SaveButton({ dirty }: { dirty: boolean }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" variant="secondary" size="sm" disabled={pending || !dirty}>
-      {pending ? 'Saving…' : 'Save'}
-    </Button>
-  );
-}
-
+/**
+ * The note reads as plain text and opens for editing when pressed (plan
+ * #1770). Save and Cancel exist only while editing, so a page that is being
+ * read carries no form chrome.
+ */
 export function NoteForm({ readingId, note }: { readingId: string; note: string | null }) {
-  const [state, formAction] = useActionState<ReadingActionState, FormData>(updateNote, {});
+  // What was last saved here, shown until the revalidated page brings it back.
+  const [saved, setSaved] = useState<string | null>(null);
+
+  async function save(next: string): Promise<string | null> {
+    const formData = new FormData();
+    formData.set('readingId', readingId);
+    formData.set('note', next);
+    const result = await updateNote({}, formData);
+    if (result.error) return result.error;
+    setSaved(next);
+    return null;
+  }
 
   return (
-    <form action={formAction}>
-      <input type="hidden" name="readingId" value={readingId} />
-      <Textarea
-        name="note"
-        defaultValue={note ?? ''}
-        rows={4}
-        placeholder="The one thing worth remembering."
-        aria-label="What you took from this reading"
-      />
-      <div className="mt-2 flex items-center gap-3">
-        <SaveButton dirty />
-        {state.error && <span className="text-ui text-danger">{state.error}</span>}
-      </div>
-    </form>
+    <EditableProse
+      value={saved ?? note ?? ''}
+      onSave={save}
+      label="What you took from this reading"
+      empty="The one thing worth remembering."
+      placeholder="The one thing worth remembering."
+    />
   );
 }

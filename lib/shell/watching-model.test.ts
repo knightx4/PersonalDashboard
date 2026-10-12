@@ -61,12 +61,12 @@ describe('endedUpdate', () => {
     latest: 215,
     first: 240,
     currency: 'USD',
-    goalHref: '/goals/g1#step-s1',
+    goalHref: '/goals/g1/s/s1',
   };
 
   it('says it never fired and where the price finished', () => {
     const update = endedUpdate(base);
-    expect(update).toMatchObject({ key: 'watch-w1', module: null, href: '/goals/g1#step-s1' });
+    expect(update).toMatchObject({ key: 'watch-w1', module: null, href: '/goals/g1/s/s1' });
     expect(update.text).toBe('Finished watching Jamie xx at Nowadays');
     expect(update.detail).toBe('Never went under $200; last read $215, from $240');
   });

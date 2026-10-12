@@ -88,6 +88,18 @@ export type TodayItem = {
   startsOn?: string;
   /** For a suggestion: the page it came from, when it has one. */
   url?: string;
+  /** For a step of yours: what Dash prepared for it, when there is something (withPrepared). */
+  prepared?: Prepared;
+  /** For a step of yours: whether it is on Todo, sent there by you or by Dash. */
+  onTodo?: boolean;
+  /** Set when a snooze on the row ran out and nothing changed under it (plan #1844). */
+  backFromSnooze?: boolean;
+};
+
+/** What Dash wrote for a step of yours: a draft, a script or a checklist. */
+export type Prepared = {
+  /** The text, as Dash wrote it (markdown). */
+  text: string;
 };
 
 /** The button each kind carries. */
@@ -282,7 +294,15 @@ export function todayCandidates(input: TodayInput): Candidate[] {
           const on = node.dueOn === null ? null : node.dueOn < today ? today : node.dueOn;
           const plain = unblocks === 0 && on === null;
           if (!plain || !plainTaken) {
-            add({ ...base, kind: 'step', title: node.title, detail: null, unblocks, on });
+            add({
+              ...base,
+              kind: 'step',
+              title: node.title,
+              detail: null,
+              unblocks,
+              on,
+              ...(node.onTodo && { onTodo: true }),
+            });
             if (plain) plainTaken = true;
           }
         }
@@ -464,6 +484,41 @@ export function rankToday(candidates: readonly Candidate[]): TodayItem[] {
       ...(c.startsOn ? { startsOn: c.startsOn } : {}),
       ...(c.url ? { url: c.url } : {}),
     }));
+}
+
+/**
+ * Each step of yours with what Dash prepared for it, so the row can show the
+ * draft beside the step it is for. A prep step (a Dash step whose
+ * `prepares_id` names the step) that is not dropped and has a result comes
+ * first; otherwise the step's own result, which a prepare run writes onto the
+ * step itself (plan #1001). Other rows come back as they were.
+ */
+export function withPrepared(
+  items: readonly TodayItem[],
+  byGoal: ReadonlyMap<string, readonly StepNode[]>,
+): TodayItem[] {
+  const own = new Map<string, Prepared>();
+  const fromPrep = new Map<string, Prepared>();
+  const walk = (list: readonly StepNode[]) => {
+    for (const node of list) {
+      const text = node.result?.trim();
+      if (text) {
+        const prepared = { text };
+        if (node.kind === 'claude' && node.preparesId && node.status !== 'dropped') {
+          if (!fromPrep.has(node.preparesId)) fromPrep.set(node.preparesId, prepared);
+        } else if (node.kind === 'mine') {
+          own.set(node.id, prepared);
+        }
+      }
+      walk(node.children);
+    }
+  };
+  for (const roots of byGoal.values()) walk(roots);
+  return items.map((item) => {
+    if (item.kind !== 'step') return item;
+    const prepared = fromPrep.get(item.id) ?? own.get(item.id);
+    return prepared ? { ...item, prepared } : item;
+  });
 }
 
 function compareOn(a: string | null, b: string | null): number {

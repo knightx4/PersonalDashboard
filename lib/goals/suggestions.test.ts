@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   didYouGoSuggestions,
+  goalSuggestions,
   helpGoals,
   homeSuggestions,
   ignoredBefore,
@@ -19,6 +20,7 @@ function suggestion(over: Partial<Suggestion>): Suggestion {
     id: 's',
     itemId: null,
     kind: 'events',
+    acceptedStepId: null,
     title: 'A talk',
     detail: null,
     url: 'https://example.test/talk',
@@ -265,5 +267,51 @@ describe('did you go', () => {
     expect(pastLine(suggestion({ title: 'A talk', reaction: 'going', attended: false }))).toContain(
       'going, and did not go',
     );
+  });
+});
+
+describe('a goal’s Suggestions section (plan #1739)', () => {
+  const today = '2026-10-01';
+  const ids = new Set(['g', 'step-1']);
+
+  it('lists what is waiting on the goal and its steps, suggested steps first', () => {
+    const out = goalSuggestions(
+      [
+        suggestion({ id: 'event', itemId: 'g', happensOn: '2026-10-04' }),
+        suggestion({ id: 'step', itemId: 'g', kind: 'step', url: null, happensOn: null }),
+        suggestion({ id: 'going', itemId: 'step-1', reaction: 'going', happensOn: '2026-10-02' }),
+        suggestion({ id: 'other-goal', itemId: 'h', kind: 'step', happensOn: null }),
+        suggestion({ id: 'no', itemId: 'g', kind: 'step', reaction: 'not_for_me', happensOn: null }),
+        suggestion({ id: 'ignored', itemId: 'g', kind: 'step', reaction: 'ignored', happensOn: null }),
+        suggestion({ id: 'added', itemId: 'g', kind: 'step', acceptedStepId: 'x', happensOn: null }),
+        suggestion({ id: 'past', itemId: 'g', happensOn: '2026-09-30' }),
+      ],
+      ids,
+      today,
+    );
+    expect(out.map((s) => s.id)).toEqual(['step', 'going', 'event']);
+  });
+
+  it('keeps suggested steps off the home and off Todo', () => {
+    const step = suggestion({ id: 'step', kind: 'step', happensOn: null });
+    expect(homeSuggestions([step], today)).toEqual([]);
+    expect(todoSuggestions([{ ...step, reaction: 'going' }], today, '2026-10-14')).toEqual([]);
+  });
+
+  it('asks the weekly run for steps on every open goal, with what became of the last ones', () => {
+    const text = weeklyRunText({
+      userId: 'u1',
+      runId: 'run-9',
+      goals: [],
+      open: [{ id: 'g', title: 'Keep the apartment clean' }],
+      past: [
+        suggestion({ title: 'Sort the hall closet', kind: 'step', acceptedStepId: 's1', happensOn: null }),
+        suggestion({ title: 'Buy a robot vacuum', kind: 'step', reaction: 'not_for_me', happensOn: null }),
+      ],
+    });
+    expect(text).toContain('suggest two to four steps for each open goal');
+    expect(text).toContain('- "Keep the apartment clean" (goals.items id g)');
+    expect(text).toContain('- added as a step: "Sort the hall closet"');
+    expect(text).toContain('- not_for_me: "Buy a robot vacuum"');
   });
 });

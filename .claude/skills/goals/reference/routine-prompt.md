@@ -1,13 +1,22 @@
 # The goals routine
 
-The standing prompt for the Claude Code routine that **Work on this** on a
-goal's page fires (`app/goals/[goalId]/shaping-actions.ts`), that **Plan
-this area** on the All goals page fires (`app/goals/actions.ts`), that the
-daily cron fires each morning when a Claude step is ready
-(`inngest/goals/daily.ts`), and that the re-shape tick fires once questions
-on a goal are answered (`inngest/goals/reshape.ts`). The app appends a turn naming the area, the goal or the
-steps, the account and the `goals.runs` row it wrote; the prompt below is what
-the routine carries when it starts. The prompt and the connectors are stored
+The standing prompt for the one Claude Code routine every goals run fires.
+The app writes the `goals.runs` row first, then fires the routine with a turn
+naming the job, the account, the run row and what to work. The jobs, and what
+starts each:
+
+| Job | Started by |
+|---|---|
+| `goal` | **Ask Dash** on a goal, a new goal or errand saved from the home, or the night run mapping a goal with no map or with changed fog (`inngest/goals/overnight.ts`) |
+| `area` | **Plan this area** on All goals (`app/goals/actions.ts`) |
+| `step`, `phase` | **Ask Dash** on a Dash step or a phase, an `@dash` comment that hands over the step, or the night run working ready Dash steps one at a time (`lib/goals/handover-store.ts`) |
+| `prepare` | **Ask Dash** on one of the person's own steps with nothing under it, or an `@dash` comment asking for the same |
+| `reshape` | the re-shape tick, ten minutes after the last answer to a question on a goal (`inngest/goals/reshape.ts`) |
+| `raise` | the person answering a flag (`lib/goals/flags-store.ts`) |
+| `daily` | the daily cron each morning while any goal is open (`inngest/goals/daily.ts`) |
+| `weekly` | the daily cron, once a week, while a goal asks for weekly help (`inngest/goals/weekly.ts`) |
+
+The skill says what each job does. The prompt and the connectors are stored
 on claude.ai, not read from here, so a change to either takes effect only
 once it is made on the routine itself.
 
@@ -18,7 +27,7 @@ once it is made on the routine itself.
    information step with drafts from the person's email; without it the run
    writes the step empty and says so. It needs no schedule of its own: the app's daily cron
    (`vercel.json`, `/api/cron/daily`) fires the morning run through the API,
-   with the same id and token as Work on this.
+   with the same id and token as Ask Dash.
 2. Paste the prompt below as its instructions.
 3. Copy the routine's id (`trig_…`) and create a token for it.
 4. In Vercel, on the project's Production environment, set
@@ -26,7 +35,8 @@ once it is made on the routine itself.
    token, then redeploy. The token is scoped to this routine; the plan
    routine's token answers 401.
 
-Until both are set, Work on this says so and starts nothing.
+Until both are set, Ask Dash says so and starts nothing, and the scheduled
+runs fire nothing.
 
 ## The prompt
 
@@ -41,10 +51,15 @@ steps pre-filled from Gmail, provisional steps, questions with lettered
 options), what you may change before and after the person approves a goal,
 and how every write is labelled with goals.actor and goals.run_id.
 
-The turn after this one says what to work (one area, one goal, or the
-morning's Claude steps), which user_id and which goals.runs row this run is. If there is no such turn, write a goals.runs row yourself as
+The turn after this one names the job (goal, area, step, phase, prepare,
+reshape, raise, daily or weekly), what to work, which user_id and which
+goals.runs row this run is. If there is no such turn, write a goals.runs row yourself as
 the skill says and work every open goal that is new or has fog.
 
 You change rows, not code. Do not commit or push. Close the run row with a
 summary before you stop.
+
+Environment (Claude Code on the web):
+- Read and write through the claude.ai Supabase connector (tools mcp__Supabase__*, loaded with ToolSearch before the first call). This repository has no .mcp.json on purpose; use only the connector.
+- The goals tables are in the goals schema. Do not run npm ci; you do not need the app built.
 ```

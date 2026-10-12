@@ -141,7 +141,7 @@ export function serverEnv() {
       CLAUDE_NOTES_ROUTINE_TOKEN: z.string().min(1).optional(),
       /** Bearer for the plan routine. Scoped to it, not to the account. */
       CLAUDE_PLAN_ROUTINE_TOKEN: z.string().min(1).optional(),
-      /** The routine "Work on this" on a goal fires (plan #932). No fallback. */
+      /** The routine Ask Dash on a goal or step fires (plan #932). No fallback. */
       CLAUDE_GOALS_ROUTINE_ID: z.string().min(1).optional(),
       /** Bearer for the goals routine. Scoped to it, not to the account. */
       CLAUDE_GOALS_ROUTINE_TOKEN: z.string().min(1).optional(),
@@ -166,6 +166,13 @@ export function serverEnv() {
       EBAY_VERIFICATION_TOKEN: z.string().regex(/^[A-Za-z0-9_-]{32,80}$/).optional(),
       /** Only when the registered endpoint is not NEXT_PUBLIC_APP_URL's. */
       EBAY_DELETION_ENDPOINT_URL: z.string().url().optional(),
+      /**
+       * Optional. The X app's OAuth 2.0 client (plan #1818), read through
+       * lib/x/env.ts. Without them the Posts tab says the keys are not set
+       * and offers no Connect X.
+       */
+      X_CLIENT_ID: z.string().min(1).optional(),
+      X_CLIENT_SECRET: z.string().min(1).optional(),
       INNGEST_EVENT_KEY: z.string().optional(),
       INNGEST_SIGNING_KEY: z.string().optional(),
       /**

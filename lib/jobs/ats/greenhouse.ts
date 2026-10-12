@@ -14,6 +14,7 @@ const BASE = 'https://boards-api.greenhouse.io/v1/boards';
 export interface GreenhouseJob {
   id?: number;
   title?: string;
+  company_name?: string;
   content?: string;
   absolute_url?: string;
   location?: { name?: string };
@@ -76,6 +77,7 @@ export function toPosting(
     text: job.content ? htmlToText(job.content) : '',
     url: job.absolute_url ?? null,
     location: job.location?.name ?? null,
+    company: job.company_name?.trim() || null,
     atsJobId: job.id != null ? String(job.id) : jobId,
     boardToken,
     questions: (job.questions ?? []).map(toQuestion).filter(Boolean) as FetchedQuestion[],

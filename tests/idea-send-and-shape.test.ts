@@ -28,7 +28,6 @@ function fakeClient() {
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 vi.mock('@/lib/auth/server', () => ({ createClient: async () => fakeClient() }));
 vi.mock('@/lib/dev/owner', () => ({ requireOwner: async () => ({ id: 'owner' }) }));
-vi.mock('@/lib/feedback/code', () => ({ codeMatches: (given: string) => given === 'right' }));
 vi.mock('@/lib/feedback/routine', () => ({ planRoutine: () => ({ id: 'r', token: 't' }) }));
 vi.mock('@/lib/specs/vision', async (original) => ({
   ...(await original<typeof import('@/lib/specs/vision')>()),
@@ -72,7 +71,7 @@ beforeEach(() => {
 
 describe('filing an idea from the header panel', () => {
   it('only saves on a plain Send', async () => {
-    const result = await submitIdea({}, form({ body: 'a search box', module: '', code: 'right' }));
+    const result = await submitIdea({}, form({ body: 'a search box', module: '' }));
 
     expect(result.message).toBe('Idea saved.');
     expect(state.fired).toEqual([]);
@@ -81,7 +80,7 @@ describe('filing an idea from the header panel', () => {
   it('saves and sends it to be shaped on Send and shape', async () => {
     const result = await submitIdea(
       {},
-      form({ body: 'a search box', module: '', code: 'right', then: 'shape' }),
+      form({ body: 'a search box', module: '', then: 'shape' }),
     );
 
     expect(result.error).toBeUndefined();
@@ -96,20 +95,10 @@ describe('filing an idea from the header panel', () => {
 
     const result = await submitIdea(
       {},
-      form({ body: 'a search box', module: '', code: 'right', then: 'shape' }),
+      form({ body: 'a search box', module: '', then: 'shape' }),
     );
 
     expect(result.error).toBe('Idea saved, but not sent: No routine.');
     expect(result.filed).toEqual({ table: 'ideas', id: IDEA_ID });
-  });
-
-  it('shapes nothing when the code is wrong', async () => {
-    const result = await submitIdea(
-      {},
-      form({ body: 'a search box', module: '', code: 'wrong', then: 'shape' }),
-    );
-
-    expect(result.error).toBe('That code is not right.');
-    expect(state.fired).toEqual([]);
   });
 });

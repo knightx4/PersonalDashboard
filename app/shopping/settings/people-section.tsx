@@ -3,6 +3,7 @@
 import { useActionState, useState, useTransition } from 'react';
 import { Users } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
 import { FieldError, Input } from '@/components/ui/field';
 import {
@@ -23,17 +24,32 @@ import {
  *
  * One login, several people. Adding somebody here is what makes their mailbox
  * assignable below, and what puts a label on the orders that come out of it.
+ *
+ * Each person is a short row, their colour and their name, which opens for
+ * editing when pressed; the form for a new one opens from "Add person" (plan
+ * #1788, law 14). The sentence saying what people are for is the empty
+ * state, read by someone who has none yet (law 15).
  */
 export function PeopleSection({ people }: { people: Person[] }) {
-  const [state, action, pending] = useActionState(addPerson, {} as PeopleState);
+  const [adding, setAdding] = useState(false);
+  const [state, action, pending] = useActionState(
+    async (prev: PeopleState, formData: FormData) => {
+      const next = await addPerson(prev, formData);
+      if (!next.error) setAdding(false);
+      return next;
+    },
+    {} as PeopleState,
+  );
   const [colour, setColour] = useState<PersonColour>('brand');
 
   return (
-    <div className="space-y-4">
-      <p className="text-body text-ink-muted">
-        Shopping is labelled by person, so two people can share this account and still see whose
-        is whose. Add someone, then say which inbox is theirs below.
-      </p>
+    <div className="space-y-3">
+      {people.length === 0 && (
+        <p className="text-body text-ink-muted">
+          Shopping is labelled by person, so two people can share this account and still see
+          whose is whose. Add someone, then say which inbox is theirs below.
+        </p>
+      )}
 
       {/* Divides and space, no frame: the People card already said these
           belong together, and a ground per row inside it was a second box
@@ -46,24 +62,50 @@ export function PeopleSection({ people }: { people: Person[] }) {
         </ul>
       )}
 
-      <form action={action} className="flex flex-wrap items-end gap-2">
-        <div className="min-w-0 flex-1">
-          <Input name="name" placeholder="Name" maxLength={60} required aria-label="Name" />
+      {adding ? (
+        <form action={action} className="flex flex-wrap items-center gap-2">
+          <ColourPicker value={colour} onChange={setColour} />
+          <input type="hidden" name="colour" value={colour} />
+          <Input
+            name="name"
+            placeholder="Name"
+            maxLength={60}
+            required
+            autoFocus
+            aria-label="Name"
+            className="min-w-40 flex-1"
+          />
+          <Button type="submit" size="sm" pending={pending}>
+            {pending ? 'Adding…' : 'Add'}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={pending}
+            onClick={() => setAdding(false)}
+          >
+            Cancel
+          </Button>
+        </form>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <AddTrigger label="Add person" onClick={() => setAdding(true)} />
+          {state.message && <p className="text-ui text-accent">{state.message}</p>}
         </div>
-        <input type="hidden" name="colour" value={colour} />
-        <ColourPicker value={colour} onChange={setColour} />
-        <Button type="submit" size="sm" variant="secondary" disabled={pending}>
-          {pending ? 'Adding…' : 'Add person'}
-        </Button>
-      </form>
+      )}
 
       <FieldError>{state.error}</FieldError>
-      {state.message && <p className="text-ui text-accent">{state.message}</p>}
     </div>
   );
 }
 
+/**
+ * A person, read as their colour and name. Pressing the row opens it: the
+ * colours, the name in a field, Save, and Remove.
+ */
 function PersonRow({ person, canRemove }: { person: Person; canRemove: boolean }) {
+  const [editing, setEditing] = useState(false);
   const [name, setName] = useState(person.name);
   const [colour, setColour] = useState<PersonColour>(person.colour);
   const [confirming, setConfirming] = useState(false);
@@ -72,76 +114,111 @@ function PersonRow({ person, canRemove }: { person: Person; canRemove: boolean }
 
   const dirty = name.trim() !== person.name || colour !== person.colour;
 
+  const close = () => {
+    setEditing(false);
+    setConfirming(false);
+    setName(person.name);
+    setColour(person.colour);
+    setError(null);
+  };
+
   const save = () =>
     startTransition(async () => {
       const result = await updatePerson({ personId: person.id, name: name.trim(), colour });
       setError(result.error);
+      if (!result.error) setEditing(false);
     });
 
+  if (!editing) {
+    return (
+      <li>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          aria-label={`Edit ${person.name}`}
+          className="press row-pad flex w-full min-w-0 items-center gap-2.5 text-left"
+        >
+          <span
+            className={cn('size-3 shrink-0 rounded-full', PERSON_DOT_CLASS[person.colour])}
+            aria-hidden
+          />
+          <span className="min-w-0 flex-1 truncate text-body font-medium text-ink">
+            {person.name}
+          </span>
+          {person.isDefault && (
+            <span className="shrink-0 rounded-full bg-sunken px-2 py-0.5 text-small text-ink-muted">
+              default
+            </span>
+          )}
+        </button>
+      </li>
+    );
+  }
+
   return (
-    <li className="row-pad flex flex-wrap items-center gap-2">
-      <ColourPicker value={colour} onChange={(next) => setColour(next)} />
-
-      <Input
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        maxLength={60}
-        aria-label={`Name for ${person.name}`}
-        className="min-w-0 flex-1"
-      />
-
-      {person.isDefault && (
-        <span className="shrink-0 rounded-full bg-sunken px-2 py-0.5 text-small text-ink-muted">
-          default
-        </span>
-      )}
-
-      {dirty && (
-        <Button type="button" size="sm" disabled={pending} onClick={save}>
+    <li className="row-pad space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <ColourPicker value={colour} onChange={setColour} />
+        <Input
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') close();
+            if (event.key === 'Enter' && dirty) save();
+          }}
+          maxLength={60}
+          autoFocus
+          aria-label={`Name for ${person.name}`}
+          className="min-w-40 flex-1"
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" pending={pending} disabled={!dirty} onClick={save}>
           {pending ? 'Saving…' : 'Save'}
         </Button>
-      )}
-
-      {canRemove &&
-        (confirming ? (
-          <span className="flex shrink-0 items-center gap-1">
+        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={close}>
+          Cancel
+        </Button>
+        {canRemove &&
+          (confirming ? (
+            <span className="ml-auto flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    const result = await removePerson(person.id);
+                    setError(result.error);
+                  })
+                }
+                className="press rounded px-1.5 py-0.5 text-small font-medium text-danger hover:bg-danger-tint"
+              >
+                Remove
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirming(false)}
+                className="press rounded px-1 py-0.5 text-small text-ink-muted hover:text-ink"
+              >
+                Keep
+              </button>
+            </span>
+          ) : (
             <button
               type="button"
-              disabled={pending}
-              onClick={() =>
-                startTransition(async () => {
-                  const result = await removePerson(person.id);
-                  setError(result.error);
-                })
-              }
-              className="press rounded px-1.5 py-0.5 text-small font-medium text-danger hover:bg-danger-tint"
+              onClick={() => setConfirming(true)}
+              className="press ml-auto shrink-0 rounded px-1.5 py-0.5 text-small text-ink-muted hover:text-danger"
             >
               Remove
             </button>
-            <button
-              type="button"
-              onClick={() => setConfirming(false)}
-              className="press rounded px-1 py-0.5 text-small text-ink-muted hover:text-ink"
-            >
-              Keep
-            </button>
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setConfirming(true)}
-            className="press shrink-0 rounded px-1.5 py-0.5 text-small text-ink-muted hover:text-danger"
-          >
-            Remove
-          </button>
-        ))}
-
+          ))}
+      </div>
       {confirming && (
-        <p className="w-full text-small text-ink-muted">
-          Their shopping stays — those orders simply stop being labelled.
+        <p className="text-small text-ink-muted">
+          Their shopping stays. Those orders simply stop being labelled.
         </p>
       )}
-      {error && <p className="w-full text-small text-danger">{error}</p>}
+      {error && <p className="text-small text-danger">{error}</p>}
     </li>
   );
 }

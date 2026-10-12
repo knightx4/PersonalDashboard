@@ -3,7 +3,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
-import { forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
+import { THINKING_ROOM, forceTool, whyNoReport } from '@/lib/learn/graph/tool-call';
 import { MAX_TURN, toModelMessages, type TalkTurn } from './talk';
 import { MODELS } from '@/lib/core/models';
 
@@ -84,7 +84,7 @@ export async function replyAbout(input: {
   try {
     response = await client.messages.create({
       model: TALK_MODEL,
-      max_tokens: 1500,
+      max_tokens: 1500 + THINKING_ROOM,
       system,
       tools: [
         {
@@ -97,7 +97,7 @@ export async function replyAbout(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, TALK_MODEL),
       messages,
     });
   } catch (error) {

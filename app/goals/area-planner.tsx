@@ -1,22 +1,22 @@
 'use client';
 
-import { useActionState, useEffect } from 'react';
+import { useActionState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { useRunRefresh } from '@/components/runs/use-run-refresh';
+import { cn } from '@/lib/cn';
+import { CostHint } from '@/components/ui/cost-hint';
+import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import type { AreaRunView } from '@/lib/goals/shaping';
 import { planAreaAction, type GoalsActionState } from './actions';
 
 const initial: GoalsActionState = {};
 
-/** How often the page looks again while a run is going, as on a goal's page. */
-const RUN_POLL_MS = 15_000;
-
 /**
  * Plan this area: Claude proposes the goals an area needs, from what you
  * wrote you want from it (docs/GOALS-SPEC.md, "Planning an area"). Each goal
  * it proposes lands in the area as a proposal you approve or archive, and
- * Work on this on a kept goal maps its steps.
+ * Ask Dash on a kept goal maps its steps.
  *
  * An area with no goals gets a sentence saying so and the button as the one
  * thing to press. An area with goals gets the button smaller, for asking what
@@ -27,20 +27,18 @@ export function AreaPlanner({
   hasGoals,
   run,
   canRun,
+  cost = null,
 }: {
   areaId: string;
   hasGoals: boolean;
   run: AreaRunView | null;
   /** Whether this account can start a run (the owner's only). */
   canRun: boolean;
+  /** The usual cost of one area plan, shown beside the button; none draws no hint. */
+  cost?: CostEstimate | null;
 }) {
-  const router = useRouter();
   const running = run?.running ?? null;
-  useEffect(() => {
-    if (!running) return;
-    const timer = setInterval(() => router.refresh(), RUN_POLL_MS);
-    return () => clearInterval(timer);
-  }, [running, router]);
+  useRunRefresh(Boolean(running));
   const [state, plan, starting] = useActionState(planAreaAction, initial);
 
   if (!canRun && !run) return null;
@@ -75,7 +73,7 @@ export function AreaPlanner({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="min-w-0 flex-[1_1_18rem]">{line}</div>
         {canRun && (
-          <form action={plan}>
+          <form action={plan} className={cn('flex items-center gap-1', hasGoals && '-ml-2.5')}>
             <input type="hidden" name="id" value={areaId} />
             <Button
               type="submit"
@@ -86,6 +84,7 @@ export function AreaPlanner({
             >
               {hasGoals ? 'Plan what is missing' : 'Plan this area'}
             </Button>
+            {cost && <CostHint estimate={cost} what="Cost of planning this area" align="end" />}
           </form>
         )}
       </div>
