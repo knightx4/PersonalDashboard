@@ -15,7 +15,7 @@
  * named here so the threshold is one edit.
  *
  * Pure. lib/goals/pace-store.ts reads the rows; the goal page and the
- * morning review (plan #1738) read the result.
+ * morning review (plan #1738, through paceForGoal) read the result.
  */
 import type { FiledEntry } from '@/lib/goals/capture';
 import type { StepKind, StepStatus } from '@/lib/goals/steps';
@@ -39,6 +39,8 @@ export type PaceStep = { kind: StepKind; status: StepStatus; closedAt?: string |
 
 /** A rhythm period of one of the goal's steps. */
 export type PacePeriod = {
+  /** The rhythm step the period counts; read by `paceForGoal` to sort periods by goal. */
+  itemId?: string;
   startsOn: string;
   /** The day after the period's last day. */
   endsOn: string;
@@ -170,6 +172,48 @@ export function goalPace(days: readonly string[], today: string): GoalPace {
     daysSince,
     slower: daysSince > typicalGap * PACE_SLOWER_FACTOR,
   };
+}
+
+/** A step as `paceForGoal` walks it: what pace reads, its id and the steps under it. */
+export type PaceNode = PaceStep & { id: string; children: readonly PaceNode[] };
+
+/**
+ * One goal's pace from rows read for many goals at once, as the morning run
+ * reads them (plan #1738): the goal's steps at any depth, and the progress
+ * and rhythm periods of every goal, kept here to the goal and its steps.
+ */
+export function paceForGoal(
+  goalId: string,
+  steps: readonly PaceNode[],
+  rows: {
+    progress: readonly { itemId: string; happenedOn: string }[];
+    periods: readonly PacePeriod[];
+    captures: readonly PaceCapture[];
+  },
+  today: string,
+  timeZone: string,
+): GoalPace {
+  const flat: PaceNode[] = [];
+  const walk = (nodes: readonly PaceNode[]) => {
+    for (const node of nodes) {
+      flat.push(node);
+      walk(node.children);
+    }
+  };
+  walk(steps);
+  const itemIds = new Set([goalId, ...flat.map((step) => step.id)]);
+  const days = activeDays(
+    {
+      steps: flat,
+      progress: rows.progress.filter((entry) => itemIds.has(entry.itemId)),
+      periods: rows.periods.filter((period) => period.itemId !== undefined && itemIds.has(period.itemId)),
+      captures: rows.captures,
+      itemIds,
+    },
+    today,
+    timeZone,
+  );
+  return goalPace(days, today);
 }
 
 /** "today", "yesterday", "5 days ago". */
