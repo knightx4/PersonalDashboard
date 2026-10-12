@@ -104,6 +104,37 @@ export async function loadCheckEssay(
   return { brief: row.brief, noteId: row.note_id };
 }
 
+/** What the study panel's search needs from the essay (plan #1863.8). */
+export async function loadStudyEssay(
+  supabase: LearnSupabaseClient,
+  id: string,
+): Promise<{ brief: unknown; noteId: string | null; hidden: string[] } | null> {
+  const { data, error } = await supabase
+    .from('essays')
+    .select('brief, note_id, study_hidden')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw new Error(`Could not read the essay: ${error.message}`);
+  if (!data) return null;
+  const row = data as { brief: unknown; note_id: string | null; study_hidden: string[] | null };
+  return { brief: row.brief, noteId: row.note_id, hidden: row.study_hidden ?? [] };
+}
+
+/** The most items one essay keeps hidden; the oldest go first past it. */
+const HIDDEN_MAX = 200;
+
+/** Hide one study item for this essay. Hiding one already hidden changes nothing. */
+export async function hideStudyItem(supabase: LearnSupabaseClient, id: string, key: string): Promise<void> {
+  const essay = await loadStudyEssay(supabase, id);
+  if (!essay) throw new Error('That essay is not there any more.');
+  if (essay.hidden.includes(key)) return;
+  const { error } = await supabase
+    .from('essays')
+    .update({ study_hidden: [...essay.hidden, key].slice(-HIDDEN_MAX) })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
 /** The whole brief, answers and interview together. */
 export async function saveBriefJson(
   supabase: LearnSupabaseClient,

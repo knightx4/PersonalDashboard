@@ -15,6 +15,7 @@ import type { AuthorMark } from '@/lib/learn/essays/authorship';
 import {
   authorMarks,
   authorship,
+  insertedBy,
   setMarks,
   showSuggestion,
   suggestionField,
@@ -51,6 +52,13 @@ export type MarkdownEditorHandle = {
   notes(): NoteRange[];
   /** Highlight one note's text, or none. */
   showNote(id: string | null): void;
+  /**
+   * Put text in at the cursor, after any selection, with a space before it
+   * when it would otherwise run into a word (plan #1863.8). With `quote`
+   * the text is marked as quoted from that source; without, it is the
+   * person's, like a link they chose.
+   */
+  insert(text: string, quote?: { name: string }): void;
 };
 
 /** From laptop width the essay page is the calm one; below it a plain editor. */
@@ -85,6 +93,7 @@ export function MarkdownEditor({
   onTyping,
   onSaveNow,
   onSelect,
+  onCaret,
 }: {
   initialDoc: string;
   /** The runs of `initialDoc` that are Dash's or quoted. */
@@ -110,15 +119,17 @@ export function MarkdownEditor({
   onTyping?: () => void;
   /** Cmd-S or Ctrl-S. */
   onSaveNow?: () => void;
+  /** Where the cursor is, whenever it moves or the text changes (plan #1863.8). */
+  onCaret?: (pos: number) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const focus = useRef(new Compartment());
-  const callbacks = useRef({ onChange, onTyping, onSaveNow, onSelect, onOpenNote });
+  const callbacks = useRef({ onChange, onTyping, onSaveNow, onSelect, onOpenNote, onCaret });
   // Written after render, never during it, so the editor always calls the
   // newest callbacks without being rebuilt for them.
   useEffect(() => {
-    callbacks.current = { onChange, onTyping, onSaveNow, onSelect, onOpenNote };
+    callbacks.current = { onChange, onTyping, onSaveNow, onSelect, onOpenNote, onCaret };
   });
   const firstDoc = useRef(initialDoc);
   const firstMarks = useRef(initialMarks);
@@ -169,6 +180,7 @@ export function MarkdownEditor({
             if (update.selectionSet || update.docChanged) {
               const selected = !update.state.selection.main.empty;
               if (selected !== !update.startState.selection.main.empty) callbacks.current.onSelect?.(selected);
+              callbacks.current.onCaret?.(update.state.selection.main.head);
             }
             const marks = update.state.field(authorMarks);
             if (!update.docChanged && marks === update.startState.field(authorMarks)) return;
@@ -224,6 +236,24 @@ export function MarkdownEditor({
       },
       showNote(id) {
         view.current?.dispatch({ effects: setActiveNote.of(id) });
+      },
+      insert(text, quote) {
+        const editor = view.current;
+        if (!editor || !text) return;
+        const at = editor.state.selection.main.to;
+        const before = at > 0 ? editor.state.sliceDoc(at - 1, at) : '';
+        const after = editor.state.sliceDoc(at, at + 1);
+        const lead = before && !/\s/.test(before) ? ' ' : '';
+        const trail = after && !/[\s.,;:!?)]/.test(after) ? ' ' : '';
+        const insert = `${lead}${text}${trail}`;
+        editor.dispatch({
+          changes: { from: at, insert },
+          selection: { anchor: at + insert.length },
+          // No `input` event: an insert from the rail is not typing, so the tools stay.
+          annotations: quote ? insertedBy.of({ author: 'quote', name: quote.name }) : undefined,
+          scrollIntoView: true,
+        });
+        editor.focus();
       },
     }),
     [],

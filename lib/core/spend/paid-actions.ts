@@ -52,6 +52,10 @@ export const PAID_ACTIONS = {
   // #1869). Already Said also finds your notes nearest each paragraph.
   'app/learn/e/[id]/actions.ts#runEssayCheck:model': ['check-essay-paragraph'],
   'app/learn/e/[id]/actions.ts#runEssayCheck:already-said': ['check-essay-paragraph', 'embed-note-match'],
+  // Learn: the study panel searches with the paragraph you are writing after
+  // a pause, and the interview with the brief (plan #1863.8). One embedding,
+  // cached, so a paragraph searched before costs nothing.
+  'app/learn/e/[id]/actions.ts#findEssayStudy': ['embed-note-match'],
   // Saving a personality result has Dash read it against your notes once the
   // page has answered (plan #1635); the button under the read asks again.
   'app/learn/know/personality/actions.ts#saveBigFiveAction': ['read-personality', 'embed-note-match'],

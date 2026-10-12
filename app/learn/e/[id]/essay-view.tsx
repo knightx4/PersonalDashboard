@@ -41,6 +41,7 @@ import {
 } from './actions';
 import { EssayBriefFold, EssayInterviewCard } from './essay-brief';
 import { EssayNotesCard, noteRangesIn, useEssayNotes } from './essay-notes';
+import { EssayStudyCard, useEssayStudy, type StudyState } from './essay-study';
 
 /** How long after the last keystroke the draft is saved. */
 const SAVE_AFTER_MS = 800;
@@ -418,10 +419,15 @@ function TargetForm({ id, target, onSet }: { id: string; target: number | null; 
  * #1869, essay-notes.tsx); each open note is a marker in the editor's right
  * margin. On a phone they follow the text, above the length and the vault.
  *
- * `initialVault`, `briefOpen`, `initialSuggestion`, `initialAskMarks` and
- * `initialNoteOpen` are for the gallery, which draws a save that stopped,
- * the brief unfolded, a suggestion waiting, the question after a reload and
- * a note opened.
+ * Below the checks, From your study (plan #1863.8, essay-study.tsx) lists
+ * what you already have on the paragraph the cursor is in, searched two
+ * seconds after you pause; its buttons insert a link or a quote at the
+ * cursor. It is laptop only, as the spec says.
+ *
+ * `initialVault`, `briefOpen`, `initialSuggestion`, `initialAskMarks`,
+ * `initialNoteOpen` and `study` are for the gallery, which draws a save that
+ * stopped, the brief unfolded, a suggestion waiting, the question after a
+ * reload, a note opened and the study panel in a given state.
  */
 export function EssayView({
   essay,
@@ -431,6 +437,8 @@ export function EssayView({
   initialAskMarks = false,
   notes = NO_NOTES,
   initialNoteOpen = null,
+  study,
+  originStudy,
 }: {
   essay: Essay;
   initialVault?: VaultState;
@@ -440,6 +448,10 @@ export function EssayView({
   /** The margin notes, found again in the draft on load (plan #1869). */
   notes?: EssayNotes;
   initialNoteOpen?: string | null;
+  /** The study panel drawn in this state and never searching, for the gallery. */
+  study?: StudyState;
+  /** What the interview's "What made you think this?" offers, for the gallery. */
+  originStudy?: StudyState;
 }) {
   const [doc, setDoc] = useState({ text: essay.draftBody, marks: essay.marks, version: 0 });
   const [words, setWords] = useState(() => countWords(essay.draftBody));
@@ -452,6 +464,11 @@ export function EssayView({
   const editor = useRef<MarkdownEditorHandle>(null);
   const [paragraphs, setParagraphs] = useState(() => essayParagraphs(essay.draftBody).length);
   const noteApi = useEssayNotes(essay.id, notes, editor, initialNoteOpen);
+  const studyApi = useEssayStudy(essay.id, editor, study, study !== undefined);
+  const onInsert = useCallback((text: string, quote?: { name: string }) => {
+    editor.current?.insert(text, quote);
+  }, []);
+  const onHideStudy = studyApi.hide;
   const placedNotes = noteApi.notes;
   const initialNotes = useMemo(() => noteRangesIn(doc.text, placedNotes), [doc, placedNotes]);
   const [title, setTitle] = useState(() => essayTitle(essay.draftBody, essay.path));
@@ -615,7 +632,13 @@ export function EssayView({
         </Card>
       )}
       {asking ? (
-        <EssayInterviewCard essayId={essay.id} interview={asking} onChange={onBrief} />
+        <EssayInterviewCard
+          essayId={essay.id}
+          interview={asking}
+          brief={brief}
+          onChange={onBrief}
+          initialFound={originStudy}
+        />
       ) : (
         <EssayBriefFold
           essayId={essay.id}
@@ -642,6 +665,7 @@ export function EssayView({
           onTyping={onTyping}
           onSaveNow={onSaveNow}
           onSelect={onSelect}
+          onCaret={studyApi.onCaret}
         />
       </Card>
       {rephrase.kind === 'failed' && (
@@ -662,6 +686,7 @@ export function EssayView({
   const rail = (
     <div className={cn('flex flex-col gap-4', quiet)}>
       <EssayNotesCard api={noteApi} paragraphs={paragraphs} />
+      <EssayStudyCard state={studyApi.state} onInsert={onInsert} onHide={(key) => void onHideStudy(key)} />
       <Card padding="none">
         <CardSection title="Length">
           {target !== null && (
