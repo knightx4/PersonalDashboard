@@ -20,6 +20,8 @@
  *  - `feature`: steps beneath the feature closed or blocked while it ran.
  *  - `overhaul`: the same as `feature`, since it works the steps beneath one
  *    overhaul in their phase order (plan #1514).
+ *  - `unstick`: any row at or beneath the feature changed while it ran, such
+ *    as a block written, a step re-opened or one added.
  *
  * The notes, shaping and check-back trails are the account's, not the run's:
  * nothing records which note a notes run closed. Two notes runs at once read
@@ -40,7 +42,15 @@ import type { RunEnd } from './run-end';
 export const WORK_WINDOW_MINUTES = 6 * 60;
 
 /** The jobs whose runs are judged by what they left behind. */
-export const WORK_JOBS = ['notes', 'check_back', 'shape', 'reshape', 'feature', 'overhaul'] as const;
+export const WORK_JOBS = [
+  'notes',
+  'check_back',
+  'shape',
+  'reshape',
+  'feature',
+  'overhaul',
+  'unstick',
+] as const;
 export type WorkJob = (typeof WORK_JOBS)[number];
 
 export function readsWork(job: string | null | undefined): job is WorkJob {
@@ -122,6 +132,7 @@ const NOTHING_DONE: Record<WorkJob, string> = {
   reshape: 'Nothing beneath the feature was added or dropped while it ran.',
   feature: 'No step beneath the feature closed or stopped on a question while it ran.',
   overhaul: 'No step beneath the overhaul closed or stopped on a question while it ran.',
+  unstick: 'Nothing at or beneath the feature changed while it ran.',
 };
 
 /**
@@ -227,6 +238,23 @@ export function reshapeWork(
             new RegExp(`#${number}(?!\\d)`).test(row.detail ?? ''),
         ).length;
   return { done: written + raised };
+}
+
+/**
+ * What a stall diagnosis did: rows at or beneath the feature changed in its
+ * window. A fix in code shows as the step it re-opened or re-wrote, a blocker
+ * as the step it blocked, and a wait as the check-back it added, which the
+ * caller counts into `checks`.
+ */
+export function unstickWork(
+  rows: readonly WorkRow[],
+  root: string,
+  window: { from: string; to: string },
+  checks = 0,
+): RunWork {
+  const own = rows.filter((row) => row.id === root);
+  const changed = [...own, ...beneath(rows, root)].filter((row) => within(row.updatedAt, window));
+  return { done: changed.length + checks };
 }
 
 /** What a check-back run did, from the check-backs it was woken for. */
