@@ -71,6 +71,12 @@ export interface SearchHit {
    * matches nearly every row, which is worse than missing a few.
    */
   match?: string;
+  /**
+   * Free text the thing contains, such as a file's body. Matched as a plain
+   * substring and never as a subsequence, since "tax" is a subsequence of
+   * almost any paragraph. A hit found this way ranks below a title match.
+   */
+  matchText?: string;
   /** A route that exists. The palette pushes it on Enter. */
   href: string;
 }

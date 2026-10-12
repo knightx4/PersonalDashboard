@@ -203,8 +203,18 @@ export const learnSources: ModuleSources = {
       href: () => '/learn/know#personality',
       note: 'kind is big_five, mbti, enneagram or other. A big_five row has the five IPIP factor scores, 10 to 50 each (extraversion, agreeableness, conscientiousness, emotional_stability, intellect); the others have typed_value, the type as they typed it in from a test taken elsewhere. note is an optional line of their own about the result. A retake is a new row, so read the latest by taken_at. read_points is Dash\'s read of the result against their notes, once written.',
     },
+    {
+      table: 'learn.essays',
+      module: 'Learn',
+      holds: 'Essays they are writing or have published: the draft, the brief (question, claim, reader) and the words.',
+      weight: 'record',
+      search: ['path', 'draft_body'],
+      title: 'path',
+      note: 'Each essay is also a note in the vault Essays folder, which the vault source reads. draft_body can be ahead of the note while unsaved is true. authorship marks which ranges are theirs and which Dash suggested and they accepted.',
+    },
   ],
   notSources: [
+    { table: 'learn.essay_notes', reason: 'Margin notes Dash wrote on an essay; read through the essay.' },
     { table: 'learn.area_check_articles', reason: 'Reference data for placing subjects.' },
     { table: 'learn.area_domains', reason: 'Reference data for placing subjects.' },
     { table: 'learn.area_fields', reason: 'Reference data for placing subjects.' },
