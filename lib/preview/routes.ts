@@ -360,6 +360,8 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
     'components/runs/run-lines.tsx',
     'components/runs/live-run-lines.tsx',
     'components/runs/acknowledge-run.tsx',
+    // The presses that answer a waiting question (plan #1824).
+    'components/runs/run-answer.tsx',
   ],
 };
 

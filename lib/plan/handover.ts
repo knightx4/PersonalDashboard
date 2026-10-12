@@ -57,7 +57,7 @@ type Db = SupabaseClient<any, 'public'>;
  * with no id, the routine call falls back to the plan routine, which would
  * build the step in this repository.
  */
-function builderFor(
+export function builderFor(
   sections: readonly PlanSection[],
   node: PlanNode,
 ): { ok: true; project: DevProject | null; routine: RoutineTarget } | { ok: false; error: string } {
@@ -74,7 +74,7 @@ function builderFor(
 }
 
 /** The sentence that tells a project's session where it is and what to read. */
-function projectPreamble(project: DevProject): string {
+export function projectPreamble(project: DevProject): string {
   const { owner, repo, branch } = project.repo;
   return (
     `This step belongs to ${project.label}, the repository ${owner}/${repo} ` +

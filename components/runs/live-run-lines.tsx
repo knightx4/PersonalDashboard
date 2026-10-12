@@ -11,6 +11,7 @@ import {
   type RunTable,
 } from '@/lib/core/run-activities';
 import { RunLinesView, type RunLinesConnection, type RunLinesState } from './run-lines';
+import type { AnswerRunAction } from './run-answer';
 
 /** Where each runs table lives, for a Realtime subscription to its rows. */
 const RUN_ROW: Record<RunTable, { schema: string; table: string }> = {
@@ -39,6 +40,7 @@ export function LiveRunLines({
   state,
   initial,
   acknowledge,
+  answer,
   className,
 }: {
   runTable: RunTable;
@@ -46,6 +48,8 @@ export function LiveRunLines({
   state: RunLinesState;
   initial?: readonly RunActivity[];
   acknowledge?: React.ReactNode;
+  /** Answers the question the run is waiting on, from its lines (plan #1824). */
+  answer?: AnswerRunAction;
   className?: string;
 }) {
   const router = useRouter();
@@ -125,6 +129,7 @@ export function LiveRunLines({
       state={state}
       connection={following ? connection : 'open'}
       acknowledge={acknowledge}
+      answer={answer}
       className={className}
     />
   );

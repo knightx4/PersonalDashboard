@@ -3,6 +3,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { loadRaised } from '@/lib/raised/load';
 import { planRefTitles } from '@/lib/plan/load';
 import { loadPlanForRequest } from '@/lib/plan/request-plan';
+import { loadPlanRunQuestions } from '@/lib/plan/run-answer';
 import { buildPlanTree, flattenSections, type PlanSection } from '@/lib/plan/tree';
 import { sortAsksWithJev, waitingGroups, waitingOnYou } from '@/lib/plan/waiting';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -54,10 +55,12 @@ async function readWaitingRows(sections: readonly PlanSection[], userId: string)
 export default async function DevInboxPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const [queue, plan, specChanges] = await Promise.all([
+  const [queue, plan, specChanges, runQuestions] = await Promise.all([
     loadRaised(supabase, user.id),
     loadPlanForRequest(user.id),
     loadOpenSpecChanges(supabase, user.id),
+    // Runs held on a question they asked partway (plan #1824).
+    loadPlanRunQuestions(supabase, user.id),
   ]);
 
   const sections = buildPlanTree(plan);
@@ -66,6 +69,7 @@ export default async function DevInboxPage() {
     queue,
     await readWaitingRows(sections, user.id),
     specChanges.map((change) => ({ change, specTitle: specBySlug(change.spec)?.title ?? null })),
+    runQuestions,
   );
 
   // What every "#494" on this page is called, built once rather than looked up
@@ -74,10 +78,7 @@ export default async function DevInboxPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader
-        title="Inbox"
-        description="Everything waiting on you: jobs to go and do, questions to answer, and proposals to say yes to. Answer one and the next run reads it."
-      />
+      <PageHeader title="Inbox" />
       <RaisedView queue={queue} groups={groups} titles={titles} />
     </div>
   );

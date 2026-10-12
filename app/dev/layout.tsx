@@ -12,6 +12,7 @@ import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { loadPlanForRequest } from '@/lib/plan/request-plan';
 import { buildPlanTree } from '@/lib/plan/tree';
 import { waitingOnYou } from '@/lib/plan/waiting';
+import { countPlanRunQuestions } from '@/lib/plan/run-answer';
 import { countProposedSpecChanges } from '@/lib/specs/changes';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { estimatePaidActions, paidActionsUnder } from '@/lib/core/spend/paid-actions';
@@ -56,7 +57,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     return <NoPermission what="The Dev workspace" />;
   }
 
-  const [settings, counts, activity, raised, plan, mainCheck, costs, specChanges] =
+  const [settings, counts, activity, raised, plan, mainCheck, costs, specChanges, runQuestions] =
     await Promise.all([
       loadAccountSettings(user.id),
       loadModuleCounts(user.id),
@@ -72,6 +73,9 @@ export default async function DevLayout({ children }: { children: React.ReactNod
       // Changes to specs waiting on a yes, which Home lists under To approve
       // (plan #1506).
       countProposedSpecChanges(supabase, user.id),
+      // Runs held on a question they asked partway, which the Inbox lists
+      // under Need your answer (plan #1824).
+      countPlanRunQuestions(supabase, user.id),
     ]);
 
   /**
@@ -126,7 +130,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
       href: '/dev/inbox',
       label: 'Inbox',
       icon: 'inbox',
-      badge: raised.length + waiting.length + specChanges,
+      badge: raised.length + waiting.length + specChanges + runQuestions,
     },
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
