@@ -91,7 +91,7 @@ export type PlanNode = PlanItem & {
    * a session said to look again at a time because the work needs something
    * that does not exist yet, such as two weeks of data. Held up until each is
    * checked, the same as by an unfinished step, so the runner leaves it alone
-   * and the row says "Waiting on the check on 26 Oct".
+   * and the row says "Waiting on 26 Oct".
    */
   waitsUntil: PlanCheckWait[];
   /** Over the leaf steps beneath it. `live` is 0 on a step with none. */
@@ -1003,8 +1003,13 @@ export function moveOf(node: MoveInput, context?: MoveContext): PlanMove {
   return MOVE_RANK.find((move) => moves.has(move)) ?? 'settled';
 }
 
-/** How many steps are in each state. Every health has an entry, most of them 0. */
-export type PlanTally = Record<PlanHealth, number>;
+/**
+ * How many steps are in each state. Every health has an entry, most of them 0.
+ *
+ * `checkingBack` is the part of `waiting` held only by a check-back, which the
+ * heading draws as the clock rather than the dashed hexagon (note 5025f689).
+ */
+export type PlanTally = Record<PlanHealth, number> & { checkingBack: number };
 
 /**
  * The states of a module's steps, counted.
@@ -1018,10 +1023,17 @@ export type PlanTally = Record<PlanHealth, number>;
  * asked about.
  */
 export function tallyHealth(nodes: readonly PlanNode[], liveness?: PlanLiveness): PlanTally {
-  const tally = Object.fromEntries(PLAN_HEALTHS.map((health) => [health, 0])) as PlanTally;
+  const tally = {
+    ...Object.fromEntries(PLAN_HEALTHS.map((health) => [health, 0])),
+    checkingBack: 0,
+  } as PlanTally;
   for (const leaf of leavesOf(nodes)) {
     if (isDismissed(leaf)) continue;
-    tally[healthOf(leaf, liveness)] += 1;
+    const health = healthOf(leaf, liveness);
+    tally[health] += 1;
+    if (health === 'waiting' && leaf.waitingOn.length === 0 && leaf.waitsUntil.length > 0) {
+      tally.checkingBack += 1;
+    }
   }
   return tally;
 }

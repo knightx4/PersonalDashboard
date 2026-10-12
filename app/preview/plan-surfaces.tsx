@@ -22,7 +22,8 @@ import { placeCheckBacks } from '@/lib/plan/check-backs';
  * and the check that nothing moved is that these shots do not change. Every
  * state a row can be in is somewhere in the tree -- a feature with fog, one
  * with a question beneath it, a proposal, a block, a setup job, a step
- * waiting on another, a finished step and a dropped one.
+ * waiting on another, one waiting on a check-back, a finished step and a
+ * dropped one.
  *
  * No clock anywhere in it. A step underway carries no start time, because the
  * row would print how long it has been going and two shots taken minutes
@@ -101,6 +102,12 @@ const items: PlanItem[] = [
     id: 'words',
     parentId: 'shared',
     title: 'Move plan health and move wording into a pure module',
+    size: 's',
+  }),
+  item({
+    id: 'checked-later',
+    parentId: 'goal-tree',
+    title: 'Read how the first week of goal steps went',
     size: 's',
   }),
   item({
@@ -193,6 +200,10 @@ const items: PlanItem[] = [
 const whole = buildPlanTree({
   items,
   dependencies: [dep('render', 'shared'), dep('blocked-steps', 'shared')],
+  // Put down until a day, so the tree draws the clock beside the dashed wait.
+  checkWaits: [
+    { id: 'check-week', planItemId: 'checked-later', title: 'A week of goal steps exists.', dueAt: '2026-10-26T06:00:00Z' },
+  ],
 });
 
 const catalog = catalogOf(whole);

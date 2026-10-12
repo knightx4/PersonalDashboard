@@ -21,6 +21,7 @@ describe('healthOf', () => {
   it('names what a waiting step waits on', () => {
     const word = healthOf('waiting', facts({ waitingOn: [{ number: 12, title: 'Schema' }] }));
     expect(word.title).toBe('Waits on #12 Schema');
+    expect(word.glyph).toBe('dashed');
   });
 
   it('names the day and the reason a step waits on a check-back', () => {
@@ -31,6 +32,7 @@ describe('healthOf', () => {
       }),
     );
     expect(word.title).toBe('Waits until 26 Oct: Five closes from evidence exist');
+    expect(word.glyph).toBe('clock');
   });
 
   it('says what a blocked step needs, and falls back to its note', () => {

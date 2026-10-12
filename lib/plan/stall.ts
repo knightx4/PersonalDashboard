@@ -253,7 +253,7 @@ export function unstickTurn(feature: { number: number; title: string }, runs: re
       'too big for one sitting, fix it, merge the fix to main, or split the step with plan.ts add.',
     '2. Waiting on data or time. Add a check-back on the step saying what has to exist: ' +
       '`plan.ts check-back "<what must exist>" --at <ISO time> --from <n>`. The step then reads ' +
-      '"Waiting on the check on <day>" and the runner leaves it until a session has checked.',
+      '"Waiting on <day>" and the runner leaves it until a session has checked.',
     '3. Waiting on another step: `plan.ts depends <n> --on <m>`.',
     '4. Waiting on the person to do something, such as setting a key or connecting an account: ' +
       '`plan.ts needs "<what to set>" --for <n>`. Waiting on them to decide: ' +
