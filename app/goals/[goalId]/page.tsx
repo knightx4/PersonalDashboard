@@ -53,7 +53,7 @@ import { flagsWaiting } from '@/lib/goals/flags';
 import { goalStatus, statusLine } from '@/lib/goals/goal-status';
 import { goalProgress } from '@/lib/goals/status';
 import { isCurrent, type GoalReview } from '@/lib/goals/reviews';
-import { loadLatestReviews } from '@/lib/goals/reviews-store';
+import { loadLatestReviews, loadReviewChange } from '@/lib/goals/reviews-store';
 import { closedSteps, GOAL_TABS, goalStages } from '@/lib/goals/goal-page';
 import { goalMatchText } from '@/lib/goals/related-notes';
 import { createVaultClient } from '@/lib/vault/auth/server';
@@ -360,7 +360,7 @@ export default async function GoalMapPage({
     (): ProgressEntry[] => [],
   );
   const suggestionIds = [map.goal.id, ...ownSteps(map.steps).map((step) => step.id)];
-  const [stepRuns, filesOf, brief, review, places, progressEntries, arrivals, pace, suggestions] = await Promise.all([
+  const [stepRuns, filesOf, brief, review, reviewChange, places, progressEntries, arrivals, pace, suggestions] = await Promise.all([
     loadStepRuns(client, stepIdsOn(map)).catch((): Record<string, GoalRun> => ({})),
     // The files the goal and its steps link to. A failed read leaves them
     // out rather than the page, as do the note and the verdict below.
@@ -371,6 +371,7 @@ export default async function GoalMapPage({
     loadLatestReviews(client)
       .then((reviews) => reviews.get(map.goal.id) ?? null)
       .catch((): GoalReview | null => null),
+    loadReviewChange(client, map.goal.id),
     // The areas the goal can be moved to (plan #1160). A failed read leaves
     // the menu out rather than the page.
     loadAreas(client)
@@ -483,6 +484,7 @@ export default async function GoalMapPage({
           line={line}
           review={review}
           current={review ? reviewCurrent(review) : false}
+          change={reviewChange}
           brief={brief}
           briefWhen={brief ? noteWhen(brief, account.timezone) : null}
           work={<DashWork items={work} />}

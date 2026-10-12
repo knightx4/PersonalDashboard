@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { reviewChangeLine } from '@/lib/goals/review-change';
+import { parseSnapshot } from '@/lib/progress-snapshot';
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
 import {
   activityTouches,
@@ -155,4 +157,32 @@ export async function loadGoalActivity(
     collections,
   });
   return goalActivity(itemRows, [...((readings.data ?? []) as ActivityReading[]), ...touches]);
+}
+
+/**
+ * The line saying what changed on a goal since the review before its latest
+ * (plan #1833), from the two newest reviews that carry a snapshot. Null when
+ * the goal has fewer than two, or the read fails.
+ */
+export async function loadReviewChange(
+  client: GoalsSupabaseClient,
+  goalId: string,
+): Promise<string | null> {
+  try {
+    const { data, error } = await client
+      .from('reviews')
+      .select('created_at, snapshot')
+      .eq('item_id', goalId)
+      .not('snapshot', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(2);
+    if (error || !Array.isArray(data) || data.length < 2) return null;
+    const [newest, previous] = (data as { created_at: string; snapshot: unknown }[]).map((row) => ({
+      createdAt: row.created_at,
+      snapshot: parseSnapshot(row.snapshot),
+    }));
+    return reviewChangeLine(newest, previous);
+  } catch {
+    return null;
+  }
 }
