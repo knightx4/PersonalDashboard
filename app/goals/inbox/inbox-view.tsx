@@ -98,6 +98,7 @@ export function GoalsInboxView({
                     preparable={canPrepare.has(item.id)}
                     onAside={(hidden) => setGone((current) => toggle(current, keyOf(item), hidden))}
                     onHanded={() => setGone((current) => toggle(current, keyOf(item), true))}
+                    onSnoozed={(hidden) => setGone((current) => toggle(current, keyOf(item), hidden))}
                   />
                 ))}
                 {group.dash.map((item) => (

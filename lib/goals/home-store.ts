@@ -20,6 +20,8 @@ import { loadLiveTree } from '@/lib/goals/steps-store';
 import { todayRanked, withPrepared, type TodayItem } from '@/lib/goals/today';
 import { loadTodayInput } from '@/lib/goals/today-store';
 import { loadGoalRunQuestions } from '@/lib/goals/run-answer';
+import { loadInboxSnoozes, loadRowStamps } from '@/lib/core/inbox-snooze-store';
+import { snoozeRefOf, withoutSnoozed } from '@/lib/goals/inbox-snooze';
 import type { RunQuestion } from '@/lib/core/run-questions';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -89,8 +91,9 @@ export async function loadHome(
     };
   });
   const holders = goalHolders({ goals, byGoal: tree.byGoal, onYou: ranked, runs, now });
+  const onYou = await withoutSnoozedRows(supabase, ranked, now);
   return {
-    onYou: ranked,
+    onYou,
     goals,
     working: runs.filter((run) => isGoing(run, now)),
     offers: dashOffers({ goals, byGoal: tree.byGoal, onYou: ranked, holders, runs, now }),
@@ -99,4 +102,22 @@ export async function loadHome(
     laterOn: laterLane({ goals: tree.goals, byGoal: tree.byGoal, today }),
     waitingRuns,
   };
+}
+
+/**
+ * What is on you less the rows snoozed to a later day (plan #1844), from one
+ * read of the snoozes. Everything that counts or lists the rows reads the
+ * result, so the Home, the Inbox and its badge agree. A failed read shows
+ * every row rather than hiding any.
+ */
+async function withoutSnoozedRows(client: Db, items: TodayItem[], now: number): Promise<TodayItem[]> {
+  try {
+    const snoozes = await loadInboxSnoozes(client);
+    const wanted = new Set(snoozes.map((s) => s.ref));
+    const refs = items.map((i) => snoozeRefOf(i.kind, i.id)).filter((r): r is string => !!r && wanted.has(r));
+    if (refs.length === 0) return items;
+    return withoutSnoozed(items, snoozes, await loadRowStamps(client, refs), new Date(now));
+  } catch {
+    return items;
+  }
 }
