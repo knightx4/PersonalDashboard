@@ -235,6 +235,10 @@ export function dailyRunText(input: {
           'waits_on_id. Follow .claude/skills/goals/SKILL.md, "Reviewing each goal".',
           '',
           ...review.flatMap((g) => [...reviewLines(g), '']),
+          // Every goal keeps a few suggestions on its page (plan #1739).
+          'Then give two suggested steps to each open goal whose Suggestions section is empty.',
+          'Follow .claude/skills/goals/SKILL.md, "Topping up a goal\'s suggestions".',
+          '',
         ]
       : []),
     ...(input.steps.length > 0
