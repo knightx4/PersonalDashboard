@@ -1,6 +1,10 @@
 import { EssaysView } from '@/app/learn/essays/essays-view';
 import { EssayView } from '@/app/learn/e/[id]/essay-view';
-import type { Essay, EssaySummary } from '@/lib/learn/essays/model';
+import { PlanSection } from '@/app/learn/s/[id]/plan';
+import { openingAsk } from '@/lib/learn/essays/interview';
+import type { Essay, EssayPin, EssaySummary } from '@/lib/learn/essays/model';
+import type { PlanUnit } from '@/lib/learn/lessons/plan-view';
+import type { ProjectView } from '@/lib/learn/lessons/project';
 import { ESSAY_VAULT_ERRORS } from '@/lib/learn/essays/vault';
 
 /**
@@ -76,7 +80,11 @@ const essay: Essay = {
     question: 'Why does money not wear out the way every other good does?',
     claim: 'Money holds its value only because it can become every other good.',
     reader: 'A friend who knows nothing about economics',
+    origin: 'Reading Walzer on spheres of justice, and noticing my savings were the only thing I owned that I expected to be worth the same next year.',
+    change: 'A good that held its value for centuries without anyone being able to swap it for everything else.',
+    pinned: [{ kind: 'reading', id: '00000000-0000-4000-8000-0000000000b1', title: 'Walzer - Spheres of Justice ch4' }],
   },
+  interview: { status: 'done' },
   wordTarget: 1200,
   publishedAt: null,
   updatedAt: '2026-10-12T14:20:00Z',
@@ -92,6 +100,107 @@ export function LearnEssayChangedSurface() {
     <EssayView
       essay={essay}
       initialVault={{ kind: 'failed', reason: 'changed', error: ESSAY_VAULT_ERRORS.changed }}
+    />
+  );
+}
+
+/** The brief unfolded above the draft (plan #1867), with an answer long enough to wrap. */
+export function LearnEssayBriefSurface() {
+  return <EssayView essay={essay} briefOpen />;
+}
+
+const goalPin: EssayPin = {
+  kind: 'goal',
+  id: '00000000-0000-4000-8000-0000000000c1',
+  title: 'Understand how central banks set interest rates and why it moves house prices',
+};
+
+const blank: Essay = {
+  id: '00000000-0000-4000-8000-000000000004',
+  path: 'Essays/Untitled essay.md',
+  noteId: null,
+  blobSha: null,
+  draftBody: '',
+  unsaved: false,
+  brief: { question: '', claim: '', reader: '', origin: '', change: '', pinned: [goalPin] },
+  interview: { status: 'asking', field: 'question', ask: openingAsk([goalPin]) },
+  wordTarget: null,
+  publishedAt: null,
+  updatedAt: '2026-10-12T15:00:00Z',
+};
+
+/** "Write about this" on a finished goal: the interview opens naming it (plan #1867). */
+export function LearnEssayInterviewSurface() {
+  return <EssayView essay={blank} />;
+}
+
+/** Three answers in, on the fourth question as Dash worded it. */
+export function LearnEssayInterviewLaterSurface() {
+  return (
+    <EssayView
+      essay={{
+        ...blank,
+        brief: {
+          ...blank.brief,
+          question: 'Why does a quarter-point rate rise move house prices more than it moves anything else?',
+          claim: 'Because a house is bought almost entirely with borrowed money, so its price is really a monthly payment.',
+          reader: 'My sister, who is buying her first flat next spring',
+        },
+        interview: {
+          status: 'asking',
+          field: 'origin',
+          ask: 'What did you see that made you think of a house price as a monthly payment rather than a price?',
+        },
+      }}
+    />
+  );
+}
+
+const finishedUnits: PlanUnit[] = [
+  {
+    id: 'u1',
+    ordinal: 1,
+    title: 'What a central bank controls',
+    covers: null,
+    outcome: null,
+    pieces: [
+      { id: 'p1', ordinal: 1, title: 'The policy rate and the rates banks charge', state: 'passed' },
+      { id: 'p2', ordinal: 2, title: 'Why a bank cannot set the long rate', state: 'passed' },
+    ],
+  },
+  {
+    id: 'u2',
+    ordinal: 2,
+    title: 'Rates and house prices',
+    covers: null,
+    outcome: null,
+    pieces: [
+      { id: 'p3', ordinal: 1, title: 'A house price as a monthly payment', state: 'passed' },
+      { id: 'p4', ordinal: 2, title: 'Why supply decides how far prices move', state: 'passed' },
+    ],
+  },
+];
+
+const passedProject: ProjectView = {
+  id: 'pr1',
+  title: 'Price a flat at three interest rates',
+  task: 'Work out what a buyer on a fixed income can pay for a flat at 3%, 4% and 5%, and say what that does to prices.',
+  data: null,
+  figures: [],
+  spreadsheetNote: null,
+  worked: 'At 3% the buyer can borrow about a fifth more than at 5%, and that is the price ceiling.',
+  passed: true,
+  latest: null,
+};
+
+/** A finished learning goal's plan, with "Write about this" (plan #1867). */
+export function LearnPlanFinishedSurface() {
+  return (
+    <PlanSection
+      subjectId="00000000-0000-4000-8000-0000000000d1"
+      units={finishedUnits}
+      project={passedProject}
+      goal={{ aimId: goalPin.id, name: goalPin.title }}
     />
   );
 }

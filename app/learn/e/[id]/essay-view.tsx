@@ -10,7 +10,14 @@ import { Card, CardSection } from '@/components/ui/card';
 import { InlineInput } from '@/components/ui/field';
 import { Meter } from '@/components/ui/meter';
 import { cn } from '@/lib/cn';
-import { countWords, essayTitle, wordCountLabel, type Essay } from '@/lib/learn/essays/model';
+import {
+  countWords,
+  essayTitle,
+  wordCountLabel,
+  type Essay,
+  type EssayBrief,
+  type EssayInterview,
+} from '@/lib/learn/essays/model';
 import { essayNoteBody } from '@/lib/learn/essays/note';
 import type { EssayVaultFailure } from '@/lib/learn/essays/vault';
 import {
@@ -21,6 +28,7 @@ import {
   type TargetState,
   type VaultSaveResult,
 } from './actions';
+import { EssayBriefFold, EssayInterviewCard } from './essay-brief';
 
 /** How long after the last keystroke the draft is saved. */
 const SAVE_AFTER_MS = 800;
@@ -354,19 +362,39 @@ function TargetForm({ id, target, onSet }: { id: string; target: number | null; 
  * word count stays at the foot, against the target when there is one, beside
  * where the essay was last saved.
  *
+ * A new essay opens on its interview (plan #1867), one question at a time
+ * above the draft; once it is done or skipped the brief sits folded there
+ * instead, and every answer can be edited in place.
+ *
  * The rail holds the length and the vault note (plan #1866); later steps add
  * the margin notes and what you studied. On a phone it follows the text, so
  * the vault note and its save are there too; focus mode is laptop only.
  *
- * `initialVault` is for the gallery, which draws a save that stopped.
+ * `initialVault` and `briefOpen` are for the gallery, which draws a save
+ * that stopped and the brief unfolded.
  */
-export function EssayView({ essay, initialVault = { kind: 'idle' } }: { essay: Essay; initialVault?: VaultState }) {
+export function EssayView({
+  essay,
+  initialVault = { kind: 'idle' },
+  briefOpen = false,
+}: {
+  essay: Essay;
+  initialVault?: VaultState;
+  briefOpen?: boolean;
+}) {
   const [doc, setDoc] = useState({ text: essay.draftBody, version: 0 });
   const [words, setWords] = useState(() => countWords(essay.draftBody));
   const [title, setTitle] = useState(() => essayTitle(essay.draftBody, essay.path));
   const [target, setTarget] = useState(essay.wordTarget);
   const [typing, setTyping] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [brief, setBrief] = useState(essay.brief);
+  const [interview, setInterview] = useState(essay.interview);
+  const onBrief = useCallback((next: EssayBrief, nextInterview: EssayInterview | null) => {
+    setBrief(next);
+    setInterview(nextInterview);
+  }, []);
+  const asking = interview?.status === 'asking' ? interview : null;
 
   // A reload puts the vault's version in a fresh editor.
   const onReloaded = useCallback(
@@ -439,6 +467,17 @@ export function EssayView({ essay, initialVault = { kind: 'idle' } }: { essay: E
           {focusMode ? 'Focus on' : 'Focus'}
         </Button>
       </div>
+      {asking ? (
+        <EssayInterviewCard essayId={essay.id} interview={asking} onChange={onBrief} />
+      ) : (
+        <EssayBriefFold
+          essayId={essay.id}
+          brief={brief}
+          onChange={onBrief}
+          defaultOpen={briefOpen}
+          className={quiet}
+        />
+      )}
       <Card padding="standard">
         <MarkdownEditor
           key={doc.version}
@@ -446,7 +485,7 @@ export function EssayView({ essay, initialVault = { kind: 'idle' } }: { essay: E
           label={`Essay: ${title}`}
           placeholder="Start with a title, like # Why money is the odd good out"
           focusMode={focusMode}
-          autoFocus={essay.draftBody === ''}
+          autoFocus={essay.draftBody === '' && !asking}
           onChange={onChange}
           onTyping={onTyping}
           onSaveNow={onSaveNow}

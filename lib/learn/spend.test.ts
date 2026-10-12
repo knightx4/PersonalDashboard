@@ -127,6 +127,7 @@ describe('the operation names', () => {
       'read-personality',
       'match-subjects',
       'embed-idea',
+      'word-essay-question',
     ]);
   });
 });

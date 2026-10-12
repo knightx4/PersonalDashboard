@@ -6,8 +6,10 @@ import {
   toSummary,
   type Essay,
   type EssayRow,
+  type EssayPin,
   type EssaySummary,
 } from './model';
+import { newEssayBrief } from './interview';
 import type { EssayVaultPatch, VaultEssay } from './vault';
 
 /**
@@ -35,11 +37,24 @@ export async function loadEssay(supabase: LearnSupabaseClient, id: string): Prom
   return data ? toEssay(data as EssayRow) : null;
 }
 
-/** A new, empty essay, returning its id. */
-export async function createEssay(supabase: LearnSupabaseClient, userId: string): Promise<string> {
+/**
+ * A new, empty essay, returning its id. Its brief holds the pins it was
+ * started from and the interview's first question (plan #1867).
+ */
+export async function createEssay(
+  supabase: LearnSupabaseClient,
+  userId: string,
+  pins: readonly EssayPin[] = [],
+): Promise<string> {
   const { data, error } = await supabase
     .from('essays')
-    .insert({ user_id: userId, path: NEW_ESSAY_PATH, draft_body: '', updated_at: new Date().toISOString() })
+    .insert({
+      user_id: userId,
+      path: NEW_ESSAY_PATH,
+      draft_body: '',
+      brief: newEssayBrief(pins),
+      updated_at: new Date().toISOString(),
+    })
     .select('id')
     .single();
   if (error || !data) throw new Error(`Could not start an essay: ${error?.message ?? 'no row came back'}`);
@@ -65,6 +80,29 @@ export async function saveDraft(
   if (error) throw new Error(error.message);
   if (!data) throw new Error('That essay is not there any more.');
   return { updatedAt };
+}
+
+/** The brief's jsonb as stored, for a write that changes part of it. */
+export async function loadBriefJson(supabase: LearnSupabaseClient, id: string): Promise<{ brief: unknown } | null> {
+  const { data, error } = await supabase.from('essays').select('brief').eq('id', id).maybeSingle();
+  if (error) throw new Error(`Could not read the essay: ${error.message}`);
+  return data ? { brief: (data as { brief: unknown }).brief } : null;
+}
+
+/** The whole brief, answers and interview together. */
+export async function saveBriefJson(
+  supabase: LearnSupabaseClient,
+  id: string,
+  brief: Record<string, unknown>,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('essays')
+    .update({ brief, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error('That essay is not there any more.');
 }
 
 /** The length the person is aiming at, or null to clear it. */

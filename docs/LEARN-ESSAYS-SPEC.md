@@ -70,7 +70,8 @@ anything like "That sounds interesting". The questions are fixed in kind:
 5. What would change your mind?
 
 Your answers, in your own words, become the **brief**: question, claim,
-reader, and the notes and readings you pinned. The brief sits above the
+reader, what made you think it, what would change your mind, and the notes
+and readings you pinned. The brief sits above the
 draft, folded, and every check reads it. You can skip the interview and fill
 the brief in yourself, or leave it empty.
 
@@ -308,7 +309,8 @@ and applied to the live project in the same sitting.
 
 - **`learn.essays`**: one row per essay. The vault note it is
   (`note_id`, `path`, `blob_sha`), the draft body as last typed, whether it
-  has unsaved changes, the brief (question, claim, reader, pinned items), the
+  has unsaved changes, the brief (the five answers, pinned items and where
+  the interview has got to), the
   word target, the authorship ranges, the published snapshot (`published_body`,
   `published_at`, `slug`), and timestamps. A **source** in the catalogue: it
   holds what the person wrote.

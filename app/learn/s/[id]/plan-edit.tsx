@@ -5,6 +5,7 @@ import { useFormStatus } from 'react-dom';
 import { Plus } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/field';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { addUnitToPlan, moveUnitInPlan, removeUnitFromPlan, type PlanEditState } from './actions';
@@ -96,42 +97,68 @@ function AddButton() {
   );
 }
 
-/** One line at the foot of the plan: a unit's name, added at the end. */
+/**
+ * The foot of the plan: "Add a unit", which opens one line for a unit's
+ * name, added at the end. Closed until pressed, so no empty box sits under
+ * the plan (law 14).
+ */
 export function AddUnitForm({ subjectId }: { subjectId: string }) {
+  const [open, setOpen] = useState(false);
   const [state, formAction] = useActionState<PlanEditState, FormData>(addUnitToPlan, {});
   const formRef = useRef<HTMLFormElement>(null);
   const submitted = useRef(false);
 
   useEffect(() => {
-    if (submitted.current && !state.error) formRef.current?.reset();
+    if (submitted.current && !state.error) {
+      formRef.current?.reset();
+      submitted.current = false;
+      setOpen(false);
+    }
   }, [state]);
 
-  return (
-    <form
-      ref={formRef}
-      action={(formData) => {
-        submitted.current = true;
-        return formAction(formData);
-      }}
-      className="mt-3"
-    >
-      <input type="hidden" name="subjectId" value={subjectId} />
-      <div className="flex flex-wrap items-center gap-2">
-        <Input
-          name="title"
-          required
-          maxLength={80}
-          placeholder="A unit to add, by name"
-          aria-label="A unit to add to the plan, by name"
-          className="min-w-0 flex-1"
-        />
-        <AddButton />
+  if (!open) {
+    return (
+      <div className="mt-3 flex items-center gap-2">
+        <Button type="button" variant="ghost" size="sm" className="min-h-11 lg:min-h-0" onClick={() => setOpen(true)}>
+          <Plus className="size-4" strokeWidth={2} aria-hidden />
+          Add a unit
+        </Button>
         <PaidHint action="app/learn/s/[id]/actions.ts#addUnitToPlan" what="Cost of writing what the unit covers" />
       </div>
-      <p className="mt-1 text-small text-ink-muted">
-        It goes at the end, where you can move it, and Dash writes what it covers. Its pieces are written when the plan reaches it.
-      </p>
-      {state.error && <p className="mt-2 text-ui text-danger">{state.error}</p>}
-    </form>
+    );
+  }
+
+  return (
+    <Card padding="standard" className="mt-3">
+      <form
+        ref={formRef}
+        action={(formData) => {
+          submitted.current = true;
+          return formAction(formData);
+        }}
+      >
+        <input type="hidden" name="subjectId" value={subjectId} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            name="title"
+            required
+            autoFocus
+            maxLength={80}
+            placeholder="A unit to add, by name"
+            aria-label="A unit to add to the plan, by name"
+            className="min-h-11 min-w-0 flex-1 lg:min-h-0"
+          />
+          <AddButton />
+          <PaidHint action="app/learn/s/[id]/actions.ts#addUnitToPlan" what="Cost of writing what the unit covers" />
+          <Button type="button" variant="ghost" size="sm" className="min-h-11 lg:min-h-0" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+        </div>
+        <p className="mt-2 text-small text-ink-muted">
+          It goes at the end, where you can move it, and Dash writes what it covers. Its pieces are written when the plan reaches it.
+        </p>
+        {state.error && <p className="mt-2 text-ui text-danger">{state.error}</p>}
+      </form>
+    </Card>
   );
 }

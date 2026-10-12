@@ -138,6 +138,8 @@ export const MODELS = {
   learnQuiz: HAIKU,
   /** lib/learn/survey/goal-idea.ts */
   learnSurveyGoalIdea: HAIKU,
+  /** lib/learn/essays/interview-model.ts, the next question of an essay's interview */
+  learnEssayInterview: SONNET,
   /** lib/learn/survey/idea.ts */
   learnSurveyIdea: HAIKU,
   /** lib/learn/vault/classify.ts */

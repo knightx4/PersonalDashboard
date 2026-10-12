@@ -6,12 +6,32 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { parseWordTarget } from '@/lib/learn/essays/model';
+import {
+  answeredBrief,
+  ANSWER_MAX,
+  editedBrief,
+  nextField,
+  PLAIN_ASKS,
+  skippedBrief,
+} from '@/lib/learn/essays/interview';
+import { askNextQuestion } from '@/lib/learn/essays/interview-model';
+import {
+  BRIEF_FIELDS,
+  parseWordTarget,
+  readBrief,
+  readInterview,
+  type BriefField,
+  type EssayBrief,
+  type EssayInterview,
+} from '@/lib/learn/essays/model';
 import { essayDay } from '@/lib/learn/essays/note';
+import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import {
   adoptNoteVersion,
+  loadBriefJson,
   loadVaultEssay,
   recordEssayNote,
+  saveBriefJson,
   saveDraft,
   saveWordTarget,
   takenEssaySlugs,
@@ -181,5 +201,104 @@ export async function reloadEssayFromVault(id: string, openedBlobSha: string | n
   } catch (error) {
     console.error('[essay reload]', error instanceof Error ? error.message : error);
     return { ok: false, error: 'The note could not be read from your vault. Try again in a moment.' };
+  }
+}
+
+export type BriefResult =
+  | { ok: true; brief: EssayBrief; interview: EssayInterview | null }
+  | { ok: false; error: string };
+
+const BriefInput = z.object({
+  id: z.string().uuid(),
+  field: z.enum(BRIEF_FIELDS),
+  value: z.string().max(ANSWER_MAX * 2, 'That is longer than a brief needs; keep it to a paragraph.'),
+});
+
+function briefResult(json: unknown): BriefResult {
+  return { ok: true, brief: readBrief(json), interview: readInterview(json) };
+}
+
+/**
+ * One answer in the interview a new essay opens with (plan #1867). The
+ * answer goes into the brief as typed, and Dash words the next question from
+ * what has been said so far, one Sonnet call; without a key, or when the
+ * call fails or its question breaks the rules, the spec's own question is
+ * asked instead, so the interview always moves on. A blank answer skips the
+ * question. An answer to a question the essay is no longer asking (another
+ * tab got there first) changes nothing and returns where it is.
+ */
+// latency: pending
+export async function answerEssayInterview(id: string, field: string, answer: string): Promise<BriefResult> {
+  const user = await requireUser();
+  const parsed = BriefInput.safeParse({ id, field, value: answer });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not keep that answer.' };
+  const supabase = await createLearnClient();
+  try {
+    const row = await loadBriefJson(supabase, parsed.data.id);
+    if (!row) return { ok: false, error: 'That essay is not there any more.' };
+    const interview = readInterview(row.brief);
+    if (interview?.status !== 'asking' || interview.field !== parsed.data.field) return briefResult(row.brief);
+
+    const following = nextField(parsed.data.field);
+    let next: { field: BriefField; ask: string } | null = null;
+    if (following) {
+      next = { field: following, ask: PLAIN_ASKS[following] };
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (apiKey) {
+        const sofar = readBrief(answeredBrief(row.brief, parsed.data.field, parsed.data.value, null));
+        const spend = collectSpend();
+        const asked = await askNextQuestion({
+          brief: sofar,
+          field: following,
+          anthropicApiKey: apiKey,
+          onSpend: spend.sink,
+        });
+        await recordLearnSpend(user.id, 'word-essay-question', spend.reports);
+        if (asked.ok) next = { field: following, ask: asked.ask };
+        else console.error('[essay interview]', asked.detail);
+      }
+    }
+    const brief = answeredBrief(row.brief, parsed.data.field, parsed.data.value, next);
+    await saveBriefJson(supabase, parsed.data.id, brief);
+    revalidatePath('/learn/essays');
+    return briefResult(brief);
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Could not keep that answer.' };
+  }
+}
+
+/** Skip the rest of the interview; what was answered stays in the brief. */
+// latency: pending
+export async function skipEssayInterview(id: string): Promise<BriefResult> {
+  await requireUser();
+  if (!z.string().uuid().safeParse(id).success) return { ok: false, error: 'Could not find that essay.' };
+  const supabase = await createLearnClient();
+  try {
+    const row = await loadBriefJson(supabase, id);
+    if (!row) return { ok: false, error: 'That essay is not there any more.' };
+    const brief = skippedBrief(row.brief);
+    await saveBriefJson(supabase, id, brief);
+    return briefResult(brief);
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Could not skip the interview.' };
+  }
+}
+
+/** One line of the brief, edited where it is read. */
+// latency: optimistic
+export async function saveEssayBriefField(id: string, field: string, value: string): Promise<BriefResult> {
+  await requireUser();
+  const parsed = BriefInput.safeParse({ id, field, value });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not save the brief.' };
+  const supabase = await createLearnClient();
+  try {
+    const row = await loadBriefJson(supabase, parsed.data.id);
+    if (!row) return { ok: false, error: 'That essay is not there any more.' };
+    const brief = editedBrief(row.brief, parsed.data.field, parsed.data.value);
+    await saveBriefJson(supabase, parsed.data.id, brief);
+    revalidatePath('/learn/essays');
+    return briefResult(brief);
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Could not save the brief.' };
   }
 }

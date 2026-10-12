@@ -128,8 +128,12 @@ import {
   LearnYoutubeVideoSurface,
 } from './learn-page-surfaces';
 import {
+  LearnEssayBriefSurface,
   LearnEssayChangedSurface,
+  LearnEssayInterviewLaterSurface,
+  LearnEssayInterviewSurface,
   LearnEssaySurface,
+  LearnPlanFinishedSurface,
   LearnEssaysEmptySurface,
   LearnEssaysSurface,
 } from './essay-surfaces';
@@ -6037,6 +6041,34 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnEssayChangedSurface />,
+  },
+  {
+    id: 'learn-essay-brief',
+    label: 'Essay · The brief unfolded',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayBriefSurface />,
+  },
+  {
+    id: 'learn-essay-interview',
+    label: 'Essay · Interview opening on a finished goal',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayInterviewSurface />,
+  },
+  {
+    id: 'learn-essay-interview-later',
+    label: 'Essay · Interview, fourth question',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayInterviewLaterSurface />,
+  },
+  {
+    id: 'learn-plan-finished',
+    label: 'Subject · A finished plan, ready to write about',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnPlanFinishedSurface />,
   },
 
   /* The News and Todo pages that had no picture (plan #1603). Fixtures in
