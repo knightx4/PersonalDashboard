@@ -205,6 +205,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   'read-personality': run(SONNET, 7_000, 1_200),
   // Every subject's name and up to three names from a chat in; a match each out.
   'match-subjects': background(run(HAIKU, 2_000, 200)),
+  // A few ideas' claims at about 65 tokens each. Counted as background
+  // although a press can cause it: at a millionth of a dollar no hint is
+  // worth showing beside the button.
+  'embed-idea': background(unit(VOYAGE_LITE, 200, 0)),
   // One Wikipedia section in, a card for each of up to three ideas out.
   'write-asked-card': run(SONNET, 4_000, 2_000),
   // One idea's claim and basis and what was written in; the marks and a

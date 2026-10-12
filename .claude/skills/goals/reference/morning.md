@@ -141,6 +141,16 @@ Give every open goal one verdict, taking the first that fits:
 - **on_track**: it is moving towards its done-when at a pace that gets there,
   and the next thing is yours or already under way.
 
+A goal's own date (`goals.items.due_on`) says how exact it is in
+`due_precision`: `day`, `month`, `quarter`, `half` or `year`. For anything but
+a day, `due_on` is the last day of that period, so read the goal as late only
+when `due_on` is before today, never earlier: a goal due "Q2 2027" is not
+overdue in May, and the reason says "by Q2 2027", not "by 30 Jun". Write the
+date the way the app does (`formatDueBy` in `lib/goals/due-precision.ts`:
+"by Mar 2027", "by Q2 2027", "by H1 2027", "by 2027"). Never move a goal's
+`due_on` to a day inside its period; the database refuses a date that is not
+the period's last day.
+
 Write one sentence on why and one on the next move. Both are read on the
 goal's line on the Goals home, so name the step or the question rather than
 describing the goal back to them. Put the next move's date in `next_on`
