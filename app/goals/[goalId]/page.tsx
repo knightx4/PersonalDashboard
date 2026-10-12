@@ -51,6 +51,7 @@ import { goalScopeRef, loadScopeDays, type ScopeDay } from '@/lib/goals/scope-da
 import { writtenWhen, type Brief } from '@/lib/goals/briefs';
 import { loadBrief } from '@/lib/goals/briefs-store';
 import { loadFilesOf } from '@/lib/goals/files-store';
+import { goalFileRows, stepTitlesIn } from '@/lib/goals/goal-files';
 import { flagsWaiting } from '@/lib/goals/flags';
 import { goalStatus, statusLine } from '@/lib/goals/goal-status';
 import { goalProgress } from '@/lib/goals/status';
@@ -223,22 +224,6 @@ function noteWhen(brief: Brief, timeZone: string): string {
   return writtenWhen(brief, timeZone, Date.now());
 }
 
-/** Every file on the goal and its steps, once each, the goal's own first. */
-function goalFiles(goalId: string, filesOf: Record<string, LinkedFile[]>): LinkedFile[] {
-  const seen = new Set<string>();
-  const out: LinkedFile[] = [];
-  const add = (files: LinkedFile[] | undefined) => {
-    for (const file of files ?? []) {
-      if (seen.has(file.fileId)) continue;
-      seen.add(file.fileId);
-      out.push(file);
-    }
-  };
-  add(filesOf[goalId]);
-  for (const [itemId, files] of Object.entries(filesOf)) if (itemId !== goalId) add(files);
-  return out;
-}
-
 /**
  * What Learn holds for a goal in the Learn area (plan #1491): its aim, its
  * plan and, for the Level 3 goal, the counts. Null for any other goal, and
@@ -400,7 +385,11 @@ export default async function GoalMapPage({
     today,
     flagsWaiting(flags, new Map([[map.goal.id, map.goal.title]])),
   );
-  const files = goalFiles(map.goal.id, filesOf);
+  const files = goalFileRows(
+    map.goal.id,
+    filesOf,
+    stepTitlesIn([map.steps, map.linked.map((entry) => entry.step)]),
+  );
   const shapeable = map.goal.status === 'open' || map.goal.status === 'proposed';
   const linkedAims = new Set(links?.aims.map((aim) => aim.aimId));
   const aimChoices = aims?.filter((aim) => !linkedAims.has(aim.id)) ?? null;

@@ -44,6 +44,9 @@ export async function loadFilesOf(
       title: file.title,
       summary: file.summary,
       updatedAt: file.updatedAt,
+      origin: file.origin,
+      madeBy: file.madeBy,
+      version: file.version,
     });
   }
   return out;

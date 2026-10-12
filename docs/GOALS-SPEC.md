@@ -968,6 +968,14 @@ which a line names the kinds of weekly help with **Change**. Then links to
 Learn and the job search, the Learn section, files, related vault notes, and
 the add lines for whatever is still empty.
 
+**Files** lists every file written for the goal or one of its steps, once
+each, the goal's own first, and says who wrote each and for which step
+("Written by Dash for “Compare the two cards’ rates” · version 2"). When Dash
+does a step by writing, it files what it wrote through `goals.file_result`
+(migrations-goals/0075, plan #1860), which keeps one file per step: working
+the step again makes a new version, and the earlier ones stay readable on
+the file's page. A new version is unread again (`core.files.read_at`).
+
 **Steps** holds the step tree, its tab counting the open steps. **Now** is
 the stages in hand (under "Stages" above), each a row with its open steps
 beneath it, and any open step outside the stages. A goal that is one list is

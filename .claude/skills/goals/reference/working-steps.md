@@ -32,13 +32,15 @@ Before each step, report it on the run row with `now_on` the step's title
    (`[transalt.org/volunteer](https://transalt.org/volunteer)`), not a bare
    name, and put the one the person should open first before any other: the
    page puts that link beside the finding.
-3. Decide where it lives. A short answer, a few lines that are read once,
-   goes in `result` whole. Anything longer, anything with a table, and
-   anything the person or a later step will come back to is a **file**
-   ("Files"): write the file, link it from the step, and put only its
-   summary in `result`, two or three sentences ending with the link. When a
-   file on the same question already exists (a step that updates last
-   month's breakdown), revise that file instead of writing a new one.
+3. File it. Whatever the step produced by writing, a list, a draft, a
+   note, a comparison or a plan, is a **file** under the goal ("Files"),
+   at any length: `goals.file_result` writes it, links it from the step and
+   the goal, and returns its id. The step's `result` is then the answer in
+   two or three sentences, ending with the link. Only a step whose whole
+   result is a fact or a yes or no ("The office is open on Saturdays") keeps
+   it in `result` alone. When the step is worked again, call the same
+   function for the same step: it makes a new version of the step's file
+   and keeps the old one, so never write a second file for it.
 
    Every person worth contacting and every open role in what you produced
    also goes to Jobs, as in "People and roles you find go to Jobs", whether
@@ -53,7 +55,7 @@ Before each step, report it on the run row with `now_on` the step's title
    set local goals.actor = 'claude';
    set local goals.run_id = '<the run id>';
    update goals.items
-   set result = '<what you produced, or the file''s summary and link>', result_url = null, status = 'done'
+   set result = '<the file''s summary and link, or the one fact>', result_url = null, status = 'done'
    where id = '<step id>' and user_id = '<user>' and kind = 'claude';
    ```
 
@@ -188,42 +190,52 @@ in as "People and roles you find go to Jobs" says.
 ## Files
 
 A file is a piece of writing kept as its own page (`core.files`, opened at
-`/goals/files/<id>`), for anything too long for a step's result or worth
-coming back to: a breakdown of their data, research, a comparison, a plan, a
+`/goals/files/<id>`) and listed on its goal's page with the step it was
+written for. Every step Dash does by writing files what it wrote, however
+short: a breakdown of their data, research, a comparison, a plan, a list, a
 draft. What goes in one is in [files.md](files.md); read it before you write
-your first file in a run. Files are in the `core` schema, which has no actor
-setting: `made_by = 'claude'` is what marks a file as yours.
+your first file in a run.
 
-Write it, link it from the step that asked for it, and link it from the goal
-when it bears on the goal as a whole, in one call:
+File it with `goals.file_result`, in the same call as the step's result:
 
 ```sql
 set local goals.actor = 'claude';
 set local goals.run_id = '<the run id>';
-with file as (
-  insert into core.files (user_id, title, summary, body, made_by, origin)
-  values ('<user>', 'Your applications by role family',
-          'FP&A and accounting answer and interview best; strategic finance is 43% of the volume at average conversion.',
-          '<the markdown>', 'claude', 'goals.items:<step id>')
-  returning id
-)
-insert into goals.links (user_id, item_id, kind, target_id)
-select '<user>', item_id, 'file', file.id
-from file, (values ('<step id>'::uuid), ('<goal id>'::uuid)) as items(item_id)
-returning target_id;
+select goals.file_result(
+  '<step id>',
+  'Your applications by role family',
+  'FP&A and accounting answer and interview best; strategic finance is 43% of the volume at average conversion.',
+  $f$<the markdown>$f$,
+  null  -- change_note: one sentence on what changed, when this is a new version
+);
 ```
+
+It returns the file's id. What it does:
+
+- It looks for the live file Dash wrote for that step (`origin` is
+  `goals.items:<step id>`). If there is one, it updates it, and the database
+  numbers the new version and keeps the old one, which stays readable from
+  the file's page. If there is none, it writes one with `made_by = 'claude'`.
+- It links the file from the step and from the goal above it, however deep
+  the step sits, bringing back a link that was archived.
+- A new version is unread again (`read_at` goes back to null), because what
+  is there now is not what they read.
+
+Pass the goal's own id instead of a step's for a file that bears on the goal
+as a whole and that no one step asked for.
 
 - `title` says what it is about, in the person's words, up to 200 characters.
 - `summary` is the answer in one or two sentences (up to 600 characters). It
   shows under the title wherever the file is listed.
-- `origin` is `goals.items:<id>` of the step that asked for it, or of the goal
-  when no one step did.
-- Link a step to its file with `goals.links` as above. The step's result then
-  ends with the link as markdown: `[Read the file](/goals/files/<id>)`.
+- The step's result ends with the link as markdown:
+  `[Read the file](/goals/files/<id>)`.
 
-**Revising.** Update the row. The database numbers the new version and keeps
-the old one; you never write `version` or `core.file_versions`. Set
-`change_note` in the same update to one sentence on what changed.
+**Revising.** Call `goals.file_result` again for the same step with the whole
+new text and a `change_note` of one sentence on what changed. You never write
+`version`, `read_at` or `core.file_versions`, and you never insert into
+`core.files` or link a file by hand for a step's own writing. A file on the
+same question that an earlier, different step wrote (last month's breakdown)
+is revised with a plain update, as below.
 
 Read the file's thread first. Comments the person wrote on it are in
 `core.thread_turns` (`select author, body, created_at from core.thread_turns
