@@ -18,6 +18,10 @@ export type EssayBrief = {
 export type Essay = {
   id: string;
   path: string;
+  /** The vault note, null until the first save to the vault (plan #1866). */
+  noteId: string | null;
+  /** The note's blob SHA when the editor opened it; the next vault save starts from it. */
+  blobSha: string | null;
   draftBody: string;
   /** True while the draft is ahead of the vault note. */
   unsaved: boolean;
@@ -41,11 +45,13 @@ export type EssaySummary = {
 
 /** The columns both reads select. */
 export const ESSAY_COLUMNS =
-  'id, path, draft_body, unsaved, brief, word_target, published_at, updated_at';
+  'id, path, note_id, blob_sha, draft_body, unsaved, brief, word_target, published_at, updated_at';
 
 export type EssayRow = {
   id: string;
   path: string;
+  note_id?: string | null;
+  blob_sha?: string | null;
   draft_body: string | null;
   unsaved: boolean | null;
   brief: unknown;
@@ -76,6 +82,8 @@ export function toEssay(row: EssayRow): Essay {
   return {
     id: row.id,
     path: row.path,
+    noteId: row.note_id ?? null,
+    blobSha: row.blob_sha ?? null,
     draftBody: row.draft_body ?? '',
     unsaved: row.unsaved ?? false,
     brief: readBrief(row.brief),

@@ -1,11 +1,25 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { parseWordTarget } from '@/lib/learn/essays/model';
-import { saveDraft, saveWordTarget } from '@/lib/learn/essays/store';
+import { essayDay } from '@/lib/learn/essays/note';
+import {
+  adoptNoteVersion,
+  loadVaultEssay,
+  recordEssayNote,
+  saveDraft,
+  saveWordTarget,
+  takenEssaySlugs,
+} from '@/lib/learn/essays/store';
+import { saveEssayToVault, type EssayVaultFailure } from '@/lib/learn/essays/vault';
+import { createVaultClient } from '@/lib/vault/auth/server';
+import { noteCreatePorts, noteSavePorts } from '@/lib/vault/db/ports';
+import { embedVaultNotes } from '@/lib/vault/notes/embed';
 
 /**
  * The editor's two writes (plan #1865). The draft saves as you type, so its
@@ -53,4 +67,119 @@ export async function setEssayWordTarget(_prev: TargetState, formData: FormData)
   }
   revalidatePath('/learn/essays');
   return { target: parsed.target };
+}
+
+export type VaultSaveResult =
+  | { ok: true; savedAt: string; path: string; blobSha: string }
+  | { ok: false; reason: EssayVaultFailure; error: string };
+
+const VaultInput = DraftInput.extend({
+  blobSha: z.string().trim().min(1).nullable(),
+  timeZone: z.string().max(64).nullable(),
+});
+
+/** How long the embedding after a save may run, as after a note edit. */
+const EMBED_AFTER_SAVE_MS = 20_000;
+
+/**
+ * Write the essay to the vault (plan #1866): the first save creates
+ * Essays/<title>.md, later ones save over it from the blob SHA the editor
+ * opened, one commit each. The decisions are in lib/learn/essays/vault.ts.
+ * The draft goes into the essay row in the same write, so the draft and the
+ * vault agree once it returns.
+ */
+// latency: pending
+export async function saveEssayToVaultAction(
+  id: string,
+  body: string,
+  blobSha: string | null,
+  timeZone: string | null,
+): Promise<VaultSaveResult> {
+  const user = await requireUser();
+  const parsed = VaultInput.safeParse({ id, body, blobSha, timeZone });
+  if (!parsed.success) {
+    return { ok: false, reason: 'error', error: parsed.error.issues[0]?.message ?? 'Could not save.' };
+  }
+  const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
+  const embed = () => {
+    after(async () => {
+      try {
+        await embedVaultNotes(vault, await createCoreClient(), {
+          userId: user.id,
+          deadline: Date.now() + EMBED_AFTER_SAVE_MS,
+        });
+      } catch (error) {
+        console.error('[essay vault] note embedding', error instanceof Error ? error.message : error);
+      }
+    });
+  };
+
+  const now = new Date();
+  try {
+    const result = await saveEssayToVault(
+      {
+        loadEssay: (essayId) => loadVaultEssay(supabase, essayId),
+        takenSlugs: (exceptId) => takenEssaySlugs(supabase, exceptId),
+        storeEssay: (essayId, patch) => recordEssayNote(supabase, essayId, patch),
+        create: noteCreatePorts({ supabase: vault, afterSave: embed }),
+        save: noteSavePorts({ supabase: vault, afterSave: embed }),
+        now: () => now,
+      },
+      {
+        id: parsed.data.id,
+        body: parsed.data.body,
+        blobSha: parsed.data.blobSha,
+        today: essayDay(now, parsed.data.timeZone),
+      },
+    );
+    if (!result.ok) return result;
+    revalidatePath('/learn/essays');
+    revalidatePath('/vault');
+    return { ok: true, savedAt: now.toISOString(), path: result.path, blobSha: result.blobSha };
+  } catch (error) {
+    console.error('[essay vault]', error instanceof Error ? error.message : error);
+    return { ok: false, reason: 'error', error: 'The essay could not be saved to your vault. Try again in a moment.' };
+  }
+}
+
+export type ReloadResult = { ok: true; body: string; blobSha: string } | { ok: false; error: string };
+
+/**
+ * After a save stopped because the note changed in Obsidian: take the
+ * vault's version as the draft, dropping what was typed here since. The
+ * vault's version is the one the last sync read; when that is still the one
+ * the editor opened, the newer one has not come in yet and nothing changes.
+ */
+// latency: pending
+export async function reloadEssayFromVault(id: string, openedBlobSha: string | null): Promise<ReloadResult> {
+  await requireUser();
+  if (!z.string().uuid().safeParse(id).success) return { ok: false, error: 'Could not find that essay.' };
+  const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
+  try {
+    const essay = await loadVaultEssay(supabase, id);
+    if (!essay) return { ok: false, error: 'That essay is not there any more.' };
+    if (!essay.noteId) return { ok: false, error: 'This essay has no note in your vault yet.' };
+    const { data, error } = await vault
+      .from('notes')
+      .select('path, body, blob_sha, deleted_at')
+      .eq('id', essay.noteId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    const note = data as { path: string; body: string; blob_sha: string; deleted_at: string | null } | null;
+    if (!note || note.deleted_at) {
+      return { ok: false, error: 'The note is not in your vault any more. Saving again writes a new one.' };
+    }
+    if (note.blob_sha === openedBlobSha) {
+      return {
+        ok: false,
+        error: 'Dash has not read the newer version from your vault yet. It comes in with the next sync; reload after that.',
+      };
+    }
+    await adoptNoteVersion(supabase, id, { path: note.path, body: note.body, blobSha: note.blob_sha });
+    revalidatePath('/learn/essays');
+    return { ok: true, body: note.body, blobSha: note.blob_sha };
+  } catch (error) {
+    console.error('[essay reload]', error instanceof Error ? error.message : error);
+    return { ok: false, error: 'The note could not be read from your vault. Try again in a moment.' };
+  }
 }

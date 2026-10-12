@@ -127,7 +127,12 @@ import {
   LearnYoutubePlaylistSurface,
   LearnYoutubeVideoSurface,
 } from './learn-page-surfaces';
-import { LearnEssaySurface, LearnEssaysEmptySurface, LearnEssaysSurface } from './essay-surfaces';
+import {
+  LearnEssayChangedSurface,
+  LearnEssaySurface,
+  LearnEssaysEmptySurface,
+  LearnEssaysSurface,
+} from './essay-surfaces';
 import { SchoolCourses } from '@/app/vault/education/course-list';
 import { educationGroups, educationCounts } from './education-fixtures';
 import { ReadingCard } from '@/components/learn/reading-card';
@@ -6025,6 +6030,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnEssaySurface />,
+  },
+  {
+    id: 'learn-essay-changed',
+    label: 'Essay · Note changed in Obsidian',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayChangedSurface />,
   },
 
   /* The News and Todo pages that had no picture (plan #1603). Fixtures in
