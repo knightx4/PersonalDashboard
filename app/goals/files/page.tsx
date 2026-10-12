@@ -5,11 +5,9 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
-import { authorLine } from '@/lib/files/files';
+import { authorLine, isUnread } from '@/lib/files/files';
 import { loadFiles } from '@/lib/files/store';
-import { createGoalsClient } from '@/lib/goals/auth/server';
 import { formatInstant } from '@/lib/goals/dates';
-import { loadUnreadFileIds } from '@/lib/goals/files-store';
 
 export const metadata = { title: 'Files' };
 export const dynamic = 'force-dynamic';
@@ -19,19 +17,15 @@ export const dynamic = 'force-dynamic';
  * is a longer piece kept as its own page, usually written by a run for a goal
  * step and linked from it; this is where they can all be found again once the
  * step is done. The ones still to read come first, under their own heading
- * (note 29321f82); if that cannot be read, the list is drawn as one.
+ * (note 29321f82): Dash's files whose newest version you have not opened
+ * (core.files.read_at, plan #1861).
  */
 export default async function FilesPage() {
   const user = await requireUser();
   const [account, core] = await Promise.all([loadAccountSettings(user.id), createCoreClient()]);
-  const [files, unread] = await Promise.all([
-    loadFiles(core),
-    createGoalsClient()
-      .then(loadUnreadFileIds)
-      .catch(() => new Set<string>()),
-  ]);
-  const toRead = files.filter((file) => unread.has(file.id));
-  const rest = files.filter((file) => !unread.has(file.id));
+  const files = await loadFiles(core);
+  const toRead = files.filter(isUnread);
+  const rest = files.filter((file) => !isUnread(file));
   const links = (list: typeof files) =>
     list.map((file) => ({
       fileId: file.id,
@@ -39,6 +33,7 @@ export default async function FilesPage() {
       summary: file.summary,
       meta: `${authorLine(file)} · ${formatInstant(file.updatedAt, account.timezone)}`,
       byDash: file.madeBy === 'claude',
+      unread: isUnread(file),
     }));
 
   return (
