@@ -90,7 +90,8 @@ export const goalStepsSource: AgendaSource = {
             at: null,
             link: { href: `/goals/${step.goalId}`, label: step.goalTitle },
             action: null,
-            detail: null,
+            // Why Dash sent it, under the row (plan #1736).
+            detail: step.reason ? `Dash: ${step.reason}` : null,
             completable: true,
           }),
         ),

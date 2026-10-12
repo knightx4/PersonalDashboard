@@ -73,8 +73,22 @@ describe('todoSteps', () => {
       ],
     );
     expect(out).toEqual([
-      { id: 'flagged', title: 'flagged', dueOn: '2026-10-01', startsOn: null, goalId: 'g', goalTitle: 'Goal g' },
-      { id: 'deep', title: 'deep', dueOn: null, startsOn: null, goalId: 'g', goalTitle: 'Goal g' },
+      { id: 'flagged', title: 'flagged', dueOn: '2026-10-01', startsOn: null, goalId: 'g', goalTitle: 'Goal g', reason: null },
+      { id: 'deep', title: 'deep', dueOn: null, startsOn: null, goalId: 'g', goalTitle: 'Goal g', reason: null },
+    ]);
+  });
+
+  it("carries Dash's reason for a step Dash sent, and none for one you sent", () => {
+    const out = run(
+      [goal('g')],
+      [
+        step('sent', 'g', { onTodo: true, onTodoBy: 'claude', onTodoReason: 'Due on the 13th' }),
+        step('mine', 'g', { onTodo: true, onTodoBy: 'me', onTodoReason: 'ignored' }),
+      ],
+    );
+    expect(out.map((s) => [s.id, s.reason])).toEqual([
+      ['sent', 'Due on the 13th'],
+      ['mine', null],
     ]);
   });
 

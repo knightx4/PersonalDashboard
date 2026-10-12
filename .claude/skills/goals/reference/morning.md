@@ -114,6 +114,69 @@ on: the tables its kept context comes from, and the `intent` sources in the
 catalogue. A new thoughts entry or a vault note can change a goal's next
 move. Write what matters as context, proposed, and say so in the reason.
 
+### Sending a step with a near date to Todo
+
+Todo holds only what was sent there (docs/GOALS-SPEC.md, "Goals without a
+deadline"; plan #1736). Do this after closing, merging and moving steps and
+before the verdicts, so a step you just closed is not sent. Put a step on
+Todo, as Dash, when it is one of these:
+
+- a step of the person's (`kind = 'mine'`, `open`) whose own `due_on` is
+  within seven days of today, a past date included, because it is the most
+  urgent. Only a `due_precision` of `day` counts: "by Q2 2027" is not near.
+- the next open step of the person's under an errand (`errand = true`) whose
+  `due_on` is within seven days. The next one is the first by `position` that
+  can start (`starts_on` empty or not after today) and is not waiting on a
+  dependency or a question. One step per errand.
+
+Never send an undated step, a step of yours (`claude`), a step in a parked
+or unapproved goal, an archived or dismissed one, or one already on Todo.
+**Never send a step the person took off.** `goals.history` holds it: a row on
+the step, `action = 'update'`, `actor = 'me'`, `old_values.on_todo = true`
+and `new_values.on_todo = false`. That check is in the query below, so run it
+rather than a looser one. The person pressing Take off Todo on a step you
+sent is the same row, and from then on it stays off whatever its date does.
+
+```sql
+select s.id, s.title, s.due_on, s.parent_id, s.errand
+  from goals.items s
+ where s.user_id = '<user>' and s.level = 'step' and s.kind = 'mine'
+   and s.status = 'open' and not s.on_todo
+   and s.archived_at is null and s.dismissed_at is null
+   and s.due_on is not null and s.due_precision = 'day'
+   and s.due_on <= current_date + 7
+   and (s.starts_on is null or s.starts_on <= current_date)
+   and not exists (
+     select 1 from goals.history h
+      where h.user_id = s.user_id and h.table_name = 'items' and h.row_id = s.id
+        and h.action = 'update' and h.actor = 'me'
+        and h.old_values ->> 'on_todo' = 'true' and h.new_values ->> 'on_todo' = 'false');
+```
+
+That lists the steps with their own date. For an errand, read its goal's
+`due_on` and pick the next step as above, then check it against the same
+history clause before sending it. Keep out any step in a goal that is not
+open and approved, and any under a dropped step.
+
+Send each with a reason of one line, in the person's terms, that says why now
+and names the date: "Due on the 13th", "Due tomorrow", "Due 3 days ago", "The
+next step of Sam's birthday, due on the 9th". 500 characters is the most the
+database takes; keep it to a sentence. `on_todo_by` is set to `claude` by the
+database from the actor, so write only `on_todo` and the reason:
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+select core.dash_before('goals.items:<id>');
+update goals.items set on_todo = true, on_todo_reason = 'Due on the 13th'
+ where id = '<id>' and user_id = '<user>';
+select core.record_dash_action('<user>', 'goals.items:<id>', 'update', 'send_step_to_todo',
+  $s$Dash sent "File the business taxes" to your Todo: due on the 13th.$s$);
+```
+
+The reason shows under the row on Todo and on the step. Name the steps sent
+in the run summary, with the reason, so the person can see what appeared.
+
 Give every open goal one verdict, taking the first that fits:
 
 - **met**: the done-when is met. This is the proposal to close the goal: the

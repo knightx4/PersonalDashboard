@@ -32,6 +32,8 @@ export type TodoStep = {
   startsOn: string | null;
   goalId: string;
   goalTitle: string;
+  /** Why Dash sent it, when Dash did (plan #1736); null for a step you sent. */
+  reason: string | null;
 };
 
 /** Whether Send to Todo means anything for this step. */
@@ -54,6 +56,7 @@ export function todoSteps(goals: Goal[], byGoal: Map<string, StepNode[]>): TodoS
             startsOn: node.waitsUntil ?? null,
             goalId: goal.id,
             goalTitle: goal.title,
+            reason: node.onTodoBy === 'claude' ? node.onTodoReason ?? null : null,
           });
         }
         walk(node.children);
