@@ -27,7 +27,9 @@ export function hitPoints(hit: SearchHit, query: string): number | null {
     score(hit.title, query) ?? -1,
     hit.match ? (score(`${hit.title} ${hit.match}`, query) ?? -1) - 1 : -1,
   );
-  return points >= 0 ? points : null;
+  if (points >= 0) return points;
+  if (query && hit.matchText?.toLowerCase().includes(query.toLowerCase())) return 0;
+  return null;
 }
 
 /**
