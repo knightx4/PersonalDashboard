@@ -204,24 +204,13 @@ import { DashTodaySurface } from './dash-today-surfaces';
 import { LogDoneSurface } from './log-done-surfaces';
 import { GoalSuggestionsSurface } from './goal-suggestions-surfaces';
 import { HomePageSurface } from './home-page-surfaces';
-import {
-  ClipStreamSurface,
-  ClipsEmptySurface,
-  SubjectClipsEmptySurface,
-  SubjectClipsSurface,
-} from './clip-surfaces';
+import { ClipStreamSurface, ClipsEmptySurface, SubjectClipsEmptySurface, SubjectClipsSurface } from './clip-surfaces';
 import {
   InspirationByVideoSurface,
   InspirationListSurface,
   InspirationUnreadSurface,
 } from './inspiration-surfaces';
-import {
-  PostsDraftingSurface,
-  PostsMatchedSurface,
-  PostsSurface,
-  PostsWriteSurface,
-  PostsXSurface,
-} from './posts-surfaces';
+import { PostsDraftingSurface, PostsMatchedSurface, PostsSurface, PostsWriteSurface, PostsXSurface } from './posts-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
@@ -595,10 +584,7 @@ const pipelineRows: PipelineRow[] = [
     lastActivityAt: '2026-09-06T11:00:00.000Z',
     coverage: { covered: 5, total: 5, gaps: 0, rate: 1 },
     // Already interviewing, so chance is left off and only fit shows.
-    scoreNote: {
-      fit: { value: 73, unsure: false, reason: '5 of 5 must-haves met by your evidence' },
-      chance: null,
-    },
+    scoreNote: { fit: { value: 73, unsure: false, reason: '5 of 5 must-haves met by your evidence' }, chance: null },
   }),
   pipelineRow({
     applicationId: 'p3',
@@ -607,17 +593,8 @@ const pipelineRows: PipelineRow[] = [
     status: 'acknowledged',
     source: 'referral',
     scoreNote: {
-      fit: {
-        value: 56,
-        unsure: true,
-        reason: 'Read from the title and level only, no description on file',
-      },
-      chance: {
-        value: 36,
-        band: 'medium',
-        unsure: true,
-        reason: '2 of 14 similar reached an interview, 3 still waiting',
-      },
+      fit: { value: 56, unsure: true, reason: 'Read from the title and level only, no description on file' },
+      chance: { value: 36, band: 'medium', unsure: true, reason: '2 of 14 similar reached an interview, 3 still waiting' },
     },
     daysSinceActivity: 9,
     lastActivityAt: '2026-08-31T09:00:00.000Z',
@@ -749,13 +726,7 @@ const companyPanels = {
           location: 'London',
           firstSeenAt: '2026-08-04T09:00:00.000Z',
           applications: [
-            {
-              id: 'a1',
-              attempt: 1,
-              status: 'in_process',
-              submittedAt: '2026-08-06T09:00:00.000Z',
-              outcome: null,
-            },
+            { id: 'a1', attempt: 1, status: 'in_process', submittedAt: '2026-08-06T09:00:00.000Z', outcome: null },
           ],
         },
         {
@@ -764,13 +735,7 @@ const companyPanels = {
           location: 'New York, NY',
           firstSeenAt: '2025-03-11T09:00:00.000Z',
           applications: [
-            {
-              id: 'a2',
-              attempt: 1,
-              status: 'rejected',
-              submittedAt: '2025-03-14T09:00:00.000Z',
-              outcome: 'rejected',
-            },
+            { id: 'a2', attempt: 1, status: 'rejected', submittedAt: '2025-03-14T09:00:00.000Z', outcome: 'rejected' },
           ],
         },
       ]}
@@ -978,6 +943,7 @@ const settings = {
   ],
 };
 
+
 /**
  * Material for the same person: a question bank with long and unanswered
  * questions across kinds, the two resumes and the evidence bank Settings used
@@ -1166,11 +1132,7 @@ const contact: ContactRow = {
 
 /** People to name as a referrer: one with the longest name, one with no company. */
 const referrerFixtures: ReferrerOption[] = [
-  {
-    id: 'contact-1',
-    name: 'Alexandra Montgomery-Fitzwilliam',
-    company: 'The Halloran-Achterberg group',
-  },
+  { id: 'contact-1', name: 'Alexandra Montgomery-Fitzwilliam', company: 'The Halloran-Achterberg group' },
   { id: 'contact-2', name: 'Priya Raman', company: 'Copperline' },
   { id: 'contact-3', name: 'Sam Okafor', company: null },
 ];
@@ -1313,37 +1275,10 @@ const todayPageReview: ReviewPeek = {
       title: 'Your application to Senior Backend Engineer, Core Banking Platform has been received',
       kind: 'Confirmation email',
     },
-    {
-      id: 'rv2',
-      title: 'Brightwell · Software Engineer, Treasury',
-      kind: 'New application from mail',
-    },
+    { id: 'rv2', title: 'Brightwell · Software Engineer, Treasury', kind: 'New application from mail' },
     { id: 'rv3', title: 'Quick chat this week?', kind: 'Recruiter outreach email' },
   ],
 };
-/** Jobs Today drawn from the sample rows, with the review queue given. */
-function JobsTodaySurface({ review }: { review: ReviewPeek }) {
-  return (
-    <TodayPage
-      review={review}
-      board={todayPageBoard}
-      summary={summariseSearch(
-        todayPageRows,
-        todayPageBoard.interviews.map((interview) => ({
-          id: interview.id,
-          scheduledAt: interview.scheduledAt,
-          timeKnown: interview.timeKnown,
-          groupId: interview.groupId,
-        })),
-        todayPageNow,
-      )}
-      live={liveByMove(todayPageRows, new Set(['p3']))}
-      since={todayPageSince}
-      timezone="Europe/London"
-    />
-  );
-}
-
 const todayPageSince: SinceView = {
   state: 'loaded',
   hint: 'Since 8 Sept, 18:40',
@@ -1627,48 +1562,12 @@ const calendarDays: CalendarDay[] = monthDays(CALENDAR_MONTH).map((day) => ({
  * The pictures are drawn as SVG data URLs so the gallery needs no storage.
  */
 const attachmentRows: AttachmentEntry[] = [
-  {
-    id: 'beach',
-    path: 'Attachments/Beach day.png',
-    sizeBytes: 812_000,
-    mimeType: 'image/png',
-    storagePath: 'u/c/beach',
-  },
-  {
-    id: 'plan',
-    path: 'Attachments/floor-plan.jpg',
-    sizeBytes: 240_000,
-    mimeType: 'image/jpeg',
-    storagePath: 'u/c/plan',
-  },
-  {
-    id: 'lease',
-    path: 'Money/lease.pdf',
-    sizeBytes: 380_000,
-    mimeType: 'application/pdf',
-    storagePath: 'u/c/lease',
-  },
-  {
-    id: 'memo',
-    path: 'Audio/voice memo.m4a',
-    sizeBytes: 2_100_000,
-    mimeType: 'audio/mp4',
-    storagePath: 'u/c/memo',
-  },
-  {
-    id: 'scan',
-    path: 'Scans/tax-return.pdf',
-    sizeBytes: 61_000_000,
-    mimeType: 'application/pdf',
-    storagePath: null,
-  },
-  {
-    id: 'receipt',
-    path: 'Attachments/receipt.webp',
-    sizeBytes: 90_000,
-    mimeType: 'image/webp',
-    storagePath: null,
-  },
+  { id: 'beach', path: 'Attachments/Beach day.png', sizeBytes: 812_000, mimeType: 'image/png', storagePath: 'u/c/beach' },
+  { id: 'plan', path: 'Attachments/floor-plan.jpg', sizeBytes: 240_000, mimeType: 'image/jpeg', storagePath: 'u/c/plan' },
+  { id: 'lease', path: 'Money/lease.pdf', sizeBytes: 380_000, mimeType: 'application/pdf', storagePath: 'u/c/lease' },
+  { id: 'memo', path: 'Audio/voice memo.m4a', sizeBytes: 2_100_000, mimeType: 'audio/mp4', storagePath: 'u/c/memo' },
+  { id: 'scan', path: 'Scans/tax-return.pdf', sizeBytes: 61_000_000, mimeType: 'application/pdf', storagePath: null },
+  { id: 'receipt', path: 'Attachments/receipt.webp', sizeBytes: 90_000, mimeType: 'image/webp', storagePath: null },
 ];
 
 function pictureUrl(width: number, height: number, sky: string, ground: string): string {
@@ -1677,18 +1576,8 @@ function pictureUrl(width: number, height: number, sky: string, ground: string):
 }
 
 const attachmentPictures: Record<string, string> = {
-  beach: pictureUrl(
-    1600,
-    900,
-    '#9cc7e4',
-    '#e8d3a3',
-  ) /* ui-ok: the photo's own colours, not the app's */,
-  plan: pictureUrl(
-    1200,
-    800,
-    '#f2f2ee',
-    '#c9c9c2',
-  ) /* ui-ok: the floor plan's own colours, not the app's */,
+  beach: pictureUrl(1600, 900, '#9cc7e4', '#e8d3a3'), /* ui-ok: the photo's own colours, not the app's */
+  plan: pictureUrl(1200, 800, '#f2f2ee', '#c9c9c2'), /* ui-ok: the floor plan's own colours, not the app's */
   lease: '#',
   memo: '#',
 };
@@ -2524,15 +2413,9 @@ const quickFullPage: QuickReadViewProps = {
  * forward one, on the latest day, is not.
  */
 const reviewLines: [string, number][] = [
-  [
-    'The rail strike planned for Thursday was called off at midnight after the union accepted a revised pay offer worth 5% over two years.',
-    4,
-  ],
+  ['The rail strike planned for Thursday was called off at midnight after the union accepted a revised pay offer worth 5% over two years.', 4],
   ['The Bank of England held rates at 4.75% and signalled one cut before the end of the year.', 3],
-  [
-    'Wildfires north of Athens forced 12,000 people from their homes as winds picked up overnight.',
-    2,
-  ],
+  ['Wildfires north of Athens forced 12,000 people from their homes as winds picked up overnight.', 2],
   ['A new study finds four-day-week trials kept output steady at 61 firms.', 1],
   ['Apple delayed its smart-home display to next spring.', 2],
   ['EU ministers agreed a common line on asylum returns after a nine-hour meeting.', 1],
@@ -2575,12 +2458,7 @@ const reviewFull: ReviewViewProps = {
  * signups, one with a long name and an address in place of a name. */
 const waitingSenders = new Map(
   [
-    {
-      id: 's1',
-      email: 'hello@theweekly.example',
-      name: 'The Weekly Digest of Slow Technology and Long Reading',
-      muted: false,
-    },
+    { id: 's1', email: 'hello@theweekly.example', name: 'The Weekly Digest of Slow Technology and Long Reading', muted: false },
     { id: 's2', email: 'letters@fieldnotes.example', name: null, muted: false },
     { id: 's3', email: 'news@harbour.example', name: 'Harbour Post', muted: false },
   ].map((sender) => [sender.id, sender] as const),
@@ -2595,27 +2473,9 @@ function NeedsConfirmingSurface() {
         timezone="Europe/London"
         senders={waitingSenders}
         signups={[
-          {
-            id: 'w1',
-            senderId: 's3',
-            subject: 'Confirm your subscription',
-            receivedAt: '2026-10-10T08:12:00Z',
-            confirmUrl: 'https://harbour.example/confirm?t=abc',
-          },
-          {
-            id: 'w2',
-            senderId: 's2',
-            subject: 'Please confirm',
-            receivedAt: '2026-10-08T17:40:00Z',
-            confirmUrl: 'https://fieldnotes.example/c/1',
-          },
-          {
-            id: 'w3',
-            senderId: 's1',
-            subject: 'One more step',
-            receivedAt: '2026-10-03T09:05:00Z',
-            confirmUrl: 'https://theweekly.example/confirm/9',
-          },
+          { id: 'w1', senderId: 's3', subject: 'Confirm your subscription', receivedAt: '2026-10-10T08:12:00Z', confirmUrl: 'https://harbour.example/confirm?t=abc' },
+          { id: 'w2', senderId: 's2', subject: 'Please confirm', receivedAt: '2026-10-08T17:40:00Z', confirmUrl: 'https://fieldnotes.example/c/1' },
+          { id: 'w3', senderId: 's1', subject: 'One more step', receivedAt: '2026-10-03T09:05:00Z', confirmUrl: 'https://theweekly.example/confirm/9' },
         ]}
       />
     </div>
@@ -2921,61 +2781,49 @@ function PreviewShell({ children }: { children?: React.ReactNode }) {
 }
 
 /** Recommended roles on an ordinary day: two scored, one short of the preferences, one not yet read. */
-const recommendedOpening = (over: Partial<OpenSuggestion>): OpenSuggestion =>
-  withSource({
-    id: 'op-1',
-    kind: 'apply',
-    headline: 'Deployment Strategist',
-    why: "Own onboarding, workflow design and renewals for private equity and banking deal teams using Mosaic's AI deal models. The $10B take-private work gives you standing with those users.",
-    move: "1. Lead with the take-private and acquisition work at EY. 2. Say you want the strategy side of deployment. 3. Find someone on Mosaic's deployment team for a referral.",
-    channel: null,
-    message: null,
-    url: 'https://jobs.ashbyhq.com/mosaic/1',
-    location: 'New York City, on-site',
-    companyName: 'Mosaic',
-    companySlug: 'mosaic',
-    personName: null,
-    personTitle: null,
-    sourceUrl: null,
-    searchQuery: null,
-    foundIn: "Search for roles like Concourse's, on request",
-    contact: null,
-    scores: {
-      workplace: { value: 'on_site', confidence: 0.95 },
-      seniority: { value: 'mid', confidence: 0.6 },
-      salary: { value: false, confidence: 0.9 },
-      fit: { value: 'partial', confidence: 0.6 },
-      red_flags: { value: false, confidence: 0.7 },
-      cover_letter: { value: false, confidence: 0.9 },
-      duplicate: { value: false, confidence: 1 },
-      closeness: { value: 2, confidence: 0.6 },
-    },
-    scoreNote: {
-      fit: {
-        value: 53,
-        unsure: true,
-        reason: "Probably a partial match, from Dash's short summary alone",
-      },
-      chance: {
-        value: 30,
-        band: 'medium',
-        unsure: true,
-        reason: '4 of 78 similar reached an interview, 5 still waiting',
-      },
-    },
-    origin: 'goal',
-    postingRead: false,
-    compMaxCents: null,
-    workMode: 'onsite',
-    misses: [],
-    createdAt: '2026-09-29T05:02:03Z',
-    ...over,
-  });
+const recommendedOpening = (over: Partial<OpenSuggestion>): OpenSuggestion => withSource({
+  id: 'op-1',
+  kind: 'apply',
+  headline: 'Deployment Strategist',
+  why: "Own onboarding, workflow design and renewals for private equity and banking deal teams using Mosaic's AI deal models. The $10B take-private work gives you standing with those users.",
+  move: "1. Lead with the take-private and acquisition work at EY. 2. Say you want the strategy side of deployment. 3. Find someone on Mosaic's deployment team for a referral.",
+  channel: null,
+  message: null,
+  url: 'https://jobs.ashbyhq.com/mosaic/1',
+  location: 'New York City, on-site',
+  companyName: 'Mosaic',
+  companySlug: 'mosaic',
+  personName: null,
+  personTitle: null,
+  sourceUrl: null,
+  searchQuery: null,
+  foundIn: "Search for roles like Concourse's, on request",
+  contact: null,
+  scores: {
+    workplace: { value: 'on_site', confidence: 0.95 },
+    seniority: { value: 'mid', confidence: 0.6 },
+    salary: { value: false, confidence: 0.9 },
+    fit: { value: 'partial', confidence: 0.6 },
+    red_flags: { value: false, confidence: 0.7 },
+    cover_letter: { value: false, confidence: 0.9 },
+    duplicate: { value: false, confidence: 1 },
+    closeness: { value: 2, confidence: 0.6 },
+  },
+  scoreNote: {
+    fit: { value: 53, unsure: true, reason: "Probably a partial match, from Dash's short summary alone" },
+    chance: { value: 30, band: 'medium', unsure: true, reason: '4 of 78 similar reached an interview, 5 still waiting' },
+  },
+  origin: 'goal',
+  postingRead: false,
+  compMaxCents: null,
+  workMode: 'onsite',
+  misses: [],
+  createdAt: '2026-09-29T05:02:03Z',
+  ...over,
+});
 
 /** The row's source, read from its origin, found_in and link as the loader reads them. */
-function withSource(
-  row: Omit<OpenSuggestion, 'source'> & { source?: OpenSuggestion['source'] },
-): OpenSuggestion {
+function withSource(row: Omit<OpenSuggestion, 'source'> & { source?: OpenSuggestion['source'] }): OpenSuggestion {
   return { ...row, source: row.source ?? openingSource(row) };
 }
 
@@ -2998,17 +2846,8 @@ const recommendedRoles: OpenSuggestion[] = [
       duplicate: { value: false, confidence: 1 },
     },
     scoreNote: {
-      fit: {
-        value: 56,
-        unsure: true,
-        reason: "Probably a partial match, from Dash's short summary alone",
-      },
-      chance: {
-        value: 31,
-        band: 'medium',
-        unsure: true,
-        reason: '4 of 78 similar reached an interview, 5 still waiting',
-      },
+      fit: { value: 56, unsure: true, reason: "Probably a partial match, from Dash's short summary alone" },
+      chance: { value: 31, band: 'medium', unsure: true, reason: '4 of 78 similar reached an interview, 5 still waiting' },
     },
     misses: ['On-site, not how you want to work'],
   }),
@@ -3033,12 +2872,7 @@ const recommendedRoles: OpenSuggestion[] = [
     },
     scoreNote: {
       fit: { value: 41, unsure: true, reason: 'Senior level, above most of your applications' },
-      chance: {
-        value: 20,
-        band: 'low',
-        unsure: false,
-        reason: 'Above your usual level, 5 of 88 similar reached an interview',
-      },
+      chance: { value: 20, band: 'low', unsure: false, reason: 'Above your usual level, 5 of 88 similar reached an interview' },
     },
   }),
   recommendedOpening({
@@ -3064,7 +2898,7 @@ const recommendedRoles: OpenSuggestion[] = [
     workMode: 'remote',
     url: 'https://jobs.ashbyhq.com/ledgerline/2',
     why: 'You want strategic finance close to the founders, and Ledgerline is building its first planning team after its seed round.',
-    move: '1. Read the posting at the link. 2. Save it here if it fits, which adds Ledgerline to your companies. 3. Apply on their own site.',
+    move: "1. Read the posting at the link. 2. Save it here if it fits, which adds Ledgerline to your companies. 3. Apply on their own site.",
     foundIn: 'Found on YC',
     origin: 'discovered',
     scores: null,
@@ -3078,8 +2912,8 @@ const recommendedRoles: OpenSuggestion[] = [
     location: 'New York or remote',
     workMode: null,
     url: 'https://northwind.example/careers',
-    why: 'Their post asks for an FP&A lead to build the board pack and pricing model, the two things your EY work covered.',
-    move: '1. Read the posting at the link. 2. Save it here if it fits, which adds Northwind Analytics to your companies. 3. Apply on their own site.',
+    why: "Their post asks for an FP&A lead to build the board pack and pricing model, the two things your EY work covered.",
+    move: "1. Read the posting at the link. 2. Save it here if it fits, which adds Northwind Analytics to your companies. 3. Apply on their own site.",
     foundIn: 'Found on Hacker News',
     origin: 'discovered',
     scores: null,
@@ -3089,15 +2923,7 @@ const recommendedRoles: OpenSuggestion[] = [
 
 const recommendedStats: OriginStats[] = [
   { origin: 'search', found: 8, saved: 5, applied: 2, interviews: 0, dismissed: 3, expired: 0 },
-  {
-    origin: 'discovered',
-    found: 10,
-    saved: 2,
-    applied: 1,
-    interviews: 0,
-    dismissed: 4,
-    expired: 0,
-  },
+  { origin: 'discovered', found: 10, saved: 2, applied: 1, interviews: 0, dismissed: 4, expired: 0 },
   { origin: 'goal', found: 41, saved: 4, applied: 1, interviews: 0, dismissed: 23, expired: 0 },
 ];
 
@@ -3129,8 +2955,7 @@ const recommendedPeople: OpenSuggestion[] = [
     why: 'She moved from EY Transaction Services to Mosaic last year and now runs deployment for the private equity accounts, the team behind the role you saved.',
     move: 'Message her on LinkedIn, name the take-private work you did together on, and ask for twenty minutes.',
     channel: 'linkedin',
-    message:
-      'Hi Priya, it has been a while since the take-private at EY. I saw the Deployment Strategist opening on your team and would value twenty minutes on what the work is really like.',
+    message: 'Hi Priya, it has been a while since the take-private at EY. I saw the Deployment Strategist opening on your team and would value twenty minutes on what the work is really like.',
     url: null,
     location: null,
     personName: 'Priya Raghunathan',
@@ -3169,8 +2994,7 @@ const discoveredCompanies: DiscoveredCompany[] = [
     website: 'https://liveflow.io',
     source: 'yc',
     description: 'AI-ERP and FP&A platform for finance teams.',
-    reason:
-      'Your modeling and CPA background fit finance teams as users, with real AI product work.',
+    reason: 'Your modeling and CPA background fit finance teams as users, with real AI product work.',
     score: 92,
     stage: 'Early',
     locations: ['New York, NY, USA'],
@@ -3185,8 +3009,7 @@ const discoveredCompanies: DiscoveredCompany[] = [
     website: 'https://column.com',
     source: 'hn',
     description: 'Column | Payment Ops, Deployment | San Francisco or Remote (US)',
-    reason:
-      'Banking infrastructure hiring payment operations, which fits your finance and operations interest.',
+    reason: 'Banking infrastructure hiring payment operations, which fits your finance and operations interest.',
     score: 81,
     stage: null,
     locations: ['San Francisco or Remote (US)'],
@@ -3214,8 +3037,7 @@ const discoveredCompanies: DiscoveredCompany[] = [
 
 const findView = {
   aim: {
-    targetTitles:
-      'Deployment Strategist, Strategic Finance, Forward Deployed Engineer, FP&A Manager',
+    targetTitles: 'Deployment Strategist, Strategic Finance, Forward Deployed Engineer, FP&A Manager',
     excludedIndustries: 'Crypto, Defense',
     gaps: [
       {
@@ -3229,11 +3051,7 @@ const findView = {
     suggestions: recommendedRoles,
     stats: recommendedStats,
     searchCostMicros: 4_200_000,
-    searchLine: {
-      running: false,
-      tone: 'plain' as const,
-      text: 'The search 2 hours ago found 3 new roles. Read 58 job boards, 12 postings worth a look.',
-    },
+    searchLine: { running: false, tone: 'plain' as const, text: 'The search 2 hours ago found 3 new roles. Read 58 job boards, 12 postings worth a look.' },
     pathname: '/jobs/find',
   },
   companies: {
@@ -3297,6 +3115,29 @@ const findView = {
   ],
 };
 
+/** Jobs Today drawn from the sample rows, with the review queue given. */
+function JobsTodaySurface({ review }: { review: ReviewPeek }) {
+  return (
+    <TodayPage
+      review={review}
+      board={todayPageBoard}
+      summary={summariseSearch(
+        todayPageRows,
+        todayPageBoard.interviews.map((interview) => ({
+          id: interview.id,
+          scheduledAt: interview.scheduledAt,
+          timeKnown: interview.timeKnown,
+          groupId: interview.groupId,
+        })),
+        todayPageNow,
+      )}
+      live={liveByMove(todayPageRows, new Set(['p3']))}
+      since={todayPageSince}
+      timezone="Europe/London"
+    />
+  );
+}
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
@@ -3348,7 +3189,11 @@ export const SURFACES: readonly Surface[] = [
     width: 'wide',
     // An application being written, which opens on its questions.
     render: () => (
-      <RoleDetailPanels {...rolePanels} status="drafting" defaultTab={defaultRoleTab('drafting')} />
+      <RoleDetailPanels
+        {...rolePanels}
+        status="drafting"
+        defaultTab={defaultRoleTab('drafting')}
+      />
     ),
   },
   {
@@ -3361,38 +3206,38 @@ export const SURFACES: readonly Surface[] = [
     // channel shows who referred you as well.
     render: () => (
       <div className="space-y-4">
-        <PageHeader
-          title="Senior Software Engineer, Platform"
-          description="The Halloran-Achterberg group · New York · Hybrid"
-          actions={
-            <div className="flex items-center gap-2">
-              <StatusPicker
-                applicationId="app-1"
-                status="in_process"
-                submittedAt="2026-07-31T12:00:00.000Z"
-              />
-              <ExcitementPicker applicationId="app-1" excitement={4} />
-            </div>
-          }
-        />
-        <DetailFacts>
-          <Property label="Applied" value="31 Jul 2026" />
-          <Property label="Confirmed" value="31 Jul 2026" />
-          <Property label="First human reply" value="6 Aug 2026" />
-          <Property
-            label="Channel"
-            value={
-              <ChannelPicker
-                applicationId="app-1"
-                source="referral"
-                referralContactId="contact-2"
-                contacts={referrerFixtures}
-              />
+          <PageHeader
+            title="Senior Software Engineer, Platform"
+            description="The Halloran-Achterberg group · New York · Hybrid"
+            actions={
+              <div className="flex items-center gap-2">
+                <StatusPicker
+                  applicationId="app-1"
+                  status="in_process"
+                  submittedAt="2026-07-31T12:00:00.000Z"
+                />
+                <ExcitementPicker applicationId="app-1" excitement={4} />
+              </div>
             }
           />
-          <Property label="Comp band" value="$180k–$220k" />
-          <Property label="Outcome" value="—" />
-        </DetailFacts>
+          <DetailFacts>
+            <Property label="Applied" value="31 Jul 2026" />
+            <Property label="Confirmed" value="31 Jul 2026" />
+            <Property label="First human reply" value="6 Aug 2026" />
+            <Property
+              label="Channel"
+              value={
+                <ChannelPicker
+                  applicationId="app-1"
+                  source="referral"
+                  referralContactId="contact-2"
+                  contacts={referrerFixtures}
+                />
+              }
+            />
+            <Property label="Comp band" value="$180k–$220k" />
+            <Property label="Outcome" value="—" />
+          </DetailFacts>
         <RoleDetailPanels {...rolePanels} defaultTab={defaultRoleTab('in_process')} />
       </div>
     ),
@@ -3590,9 +3435,7 @@ export const SURFACES: readonly Surface[] = [
               author: 'me',
               body: '@dash thanks, that settles it. I will hand #412 back myself.',
               createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000 - 5 * 60 * 1000).toISOString(),
-              acknowledgedAt: new Date(
-                Date.now() - 3 * 60 * 60 * 1000 - 5 * 60 * 1000 + 40_000,
-              ).toISOString(),
+              acknowledgedAt: new Date(Date.now() - 3 * 60 * 60 * 1000 - 5 * 60 * 1000 + 40_000).toISOString(),
             },
           ]}
         />
@@ -4278,11 +4121,7 @@ export const SURFACES: readonly Surface[] = [
         suggestions={recommendedRoles}
         stats={recommendedStats}
         searchCostMicros={4_200_000}
-        searchLine={{
-          running: false,
-          tone: 'plain',
-          text: 'The search 2 hours ago found 3 new roles. Read 58 job boards, 12 postings worth a look.',
-        }}
+        searchLine={{ running: false, tone: 'plain', text: 'The search 2 hours ago found 3 new roles. Read 58 job boards, 12 postings worth a look.' }}
       />
     ),
   },
@@ -4564,10 +4403,7 @@ export const SURFACES: readonly Surface[] = [
     width: 'narrow',
     render: () => (
       <NoteBody
-        markdown={toStandardMarkdown(attachmentNote, {
-          index: buildLinkIndex([]),
-          hrefFor: noteHref,
-        })}
+        markdown={toStandardMarkdown(attachmentNote, { index: buildLinkIndex([]), hrefFor: noteHref })}
         notePath="Home/Moving flat.md"
         attachments={buildAttachmentIndex(attachmentRows)}
         hrefForAttachment={(entry) => attachmentPictures[entry.id] ?? '#'}
@@ -4862,11 +4698,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => (
-      <AskDashSurface
-        open
-        page="/jobs/pipeline"
-        rows={{ ...FILTERED_PIPELINE, label: FILTERED_PIPELINE_LABEL }}
-      >
+      <AskDashSurface open page="/jobs/pipeline" rows={{ ...FILTERED_PIPELINE, label: FILTERED_PIPELINE_LABEL }}>
         <PreviewShell>
           <PipelinePage rows={pipelineRows} params={FILTERED_PIPELINE_PARAMS} />
         </PreviewShell>
@@ -4882,10 +4714,7 @@ export const SURFACES: readonly Surface[] = [
     module: 'jobs',
     width: 'page',
     render: () => (
-      <AskDashSurface
-        open
-        question="Add a todo to call the dentist on Friday, and a step to book the hygienist"
-      >
+      <AskDashSurface open question="Add a todo to call the dentist on Friday, and a step to book the hygienist">
         <PreviewShell />
       </AskDashSurface>
     ),
@@ -5437,13 +5266,7 @@ export const SURFACES: readonly Surface[] = [
     width: 'page',
     render: () => (
       <ReviewView
-        review={{
-          dayLabel: 'Tuesday 6 October',
-          writtenAt: '9:00\u00a0PM',
-          overview: null,
-          lines: [],
-          retrying: true,
-        }}
+        review={{ dayLabel: 'Tuesday 6 October', writtenAt: '9:00\u00a0PM', overview: null, lines: [], retrying: true }}
         earlier={{ href: '/news/review?day=2026-10-05', label: 'Mon 5 Oct' }}
         later={null}
         todayAt={null}
@@ -5490,8 +5313,7 @@ export const SURFACES: readonly Surface[] = [
     interaction: {
       kind: 'press',
       target: '[data-motion-demo="travel"]',
-      shows:
-        'A chip carrying the first words leaves "capture", crosses, and fades as it lands on "todo".',
+      shows: 'A chip carrying the first words leaves "capture", crosses, and fades as it lands on "todo".',
     },
     render: () => (
       <div className={cardVariants({ padding: 'standard' })}>
@@ -5507,8 +5329,7 @@ export const SURFACES: readonly Surface[] = [
     interaction: {
       kind: 'press',
       target: '[data-motion-demo="settle"]',
-      shows:
-        'A second row rises into the list with a little give, and "todo" swells once with "Todo · Today" beside it.',
+      shows: 'A second row rises into the list with a little give, and "todo" swells once with "Todo · Today" beside it.',
     },
     render: () => (
       <div className={cardVariants({ padding: 'standard' })}>
@@ -5524,8 +5345,7 @@ export const SURFACES: readonly Surface[] = [
     interaction: {
       kind: 'completion',
       target: '[data-motion-demo="clear"]',
-      shows:
-        "The last item leaves with a puff and the day's sigil draws in cell by cell in its place.",
+      shows: 'The last item leaves with a puff and the day\'s sigil draws in cell by cell in its place.',
     },
     render: () => (
       <div className={cardVariants({ padding: 'standard' })}>
@@ -5607,7 +5427,7 @@ export const SURFACES: readonly Surface[] = [
       kind: 'completion',
       target: '[data-motion-demo="got-through"]',
       shows:
-        "The last story goes, the day's sigil draws in, and the card below lifts in with Read counting up to 9 and Skipped to 4, the longest-read story and the two newsletters due next.",
+        'The last story goes, the day\'s sigil draws in, and the card below lifts in with Read counting up to 9 and Skipped to 4, the longest-read story and the two newsletters due next.',
     },
     render: () => (
       <div className={cardVariants({ padding: 'standard' })}>
@@ -5626,10 +5446,7 @@ export const SURFACES: readonly Surface[] = [
         summary={{
           read: 14,
           skipped: 6,
-          longest: {
-            headline: 'Why the rail strike was called off at midnight',
-            held: '4 minutes',
-          },
+          longest: { headline: 'Why the rail strike was called off at midnight', held: '4 minutes' },
           due: [{ from: 'The Morning Letter', when: 'tomorrow around 6:00\u00a0AM' }],
         }}
       />
@@ -5774,7 +5591,7 @@ export const SURFACES: readonly Surface[] = [
    * in dev-page-surfaces.tsx, week-surfaces.tsx and plan-surfaces.tsx. */
   {
     id: 'account',
-    label: 'Account · Settings across every workspace',
+    label: "Account · Settings across every workspace",
     module: 'dev',
     width: 'page',
     render: () => <AccountSurface />,
@@ -5813,37 +5630,34 @@ export const SURFACES: readonly Surface[] = [
       <AccountSurface
         tab="activity"
         onlyFirstToken
-        justMade={{
-          label: 'iPhone Shortcut',
-          token: 'dash_Zq3vN8kXo2Lr5TfWb9YcHs1PmAe7JuGd4KiVn0QxR6w',
-        }}
+        justMade={{ label: 'iPhone Shortcut', token: 'dash_Zq3vN8kXo2Lr5TfWb9YcHs1PmAe7JuGd4KiVn0QxR6w' }}
       />
     ),
   },
   {
     id: 'home-week',
-    label: 'Home · The week in review',
+    label: "Home · The week in review",
     module: 'goals',
     width: 'page',
     render: () => <WeekReviewSurface />,
   },
   {
     id: 'home-week-none',
-    label: 'Home · The week in review, before the first',
+    label: "Home · The week in review, before the first",
     module: 'goals',
     width: 'page',
     render: () => <WeekReviewNoneSurface />,
   },
   {
     id: 'dev-bugs',
-    label: 'Dev · Bugs and requests',
+    label: "Dev · Bugs and requests",
     module: 'dev',
     width: 'page',
     render: () => <DevBugsSurface />,
   },
   {
     id: 'dev-changelog',
-    label: 'Dev · Changelog',
+    label: "Dev · Changelog",
     module: 'dev',
     width: 'page',
     render: () => <DevChangelogSurface />,
@@ -5859,7 +5673,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'dev-ideas',
-    label: 'Dev · Ideas',
+    label: "Dev · Ideas",
     module: 'dev',
     width: 'page',
     render: () => <DevIdeasSurface />,
@@ -5913,7 +5727,7 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'dev-specs',
-    label: 'Dev · Specs',
+    label: "Dev · Specs",
     module: 'dev',
     width: 'page',
     render: () => <DevSpecsSurface />,
@@ -5943,42 +5757,42 @@ export const SURFACES: readonly Surface[] = [
   },
   {
     id: 'dev-spec',
-    label: 'Dev · One spec',
+    label: "Dev · One spec",
     module: 'dev',
     width: 'page',
     render: () => <DevSpecSurface />,
   },
   {
     id: 'dev-ui-review',
-    label: 'Dev · UI review',
+    label: "Dev · UI review",
     module: 'dev',
     width: 'page',
     render: () => <DevUiReviewSurface />,
   },
   {
     id: 'dev-usage',
-    label: 'Dev · Usage',
+    label: "Dev · Usage",
     module: 'dev',
     width: 'page',
     render: () => <DevUsageSurface />,
   },
   {
     id: 'dev-usage-empty',
-    label: 'Dev · Usage, nothing yet',
+    label: "Dev · Usage, nothing yet",
     module: 'dev',
     width: 'page',
     render: () => <DevUsageEmptySurface />,
   },
   {
     id: 'dev-modules',
-    label: 'Dev · Modules',
+    label: "Dev · Modules",
     module: 'dev',
     width: 'page',
     render: () => <DevModulesSurface />,
   },
   {
     id: 'dev-module',
-    label: 'Dev · Module',
+    label: "Dev · Module",
     module: 'dev',
     width: 'page',
     render: () => <DevModuleSurface />,
