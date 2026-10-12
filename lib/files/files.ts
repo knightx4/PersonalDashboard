@@ -24,6 +24,8 @@ export type FileListing = {
   origin: string | null;
   createdAt: string;
   updatedAt: string;
+  /** When they last opened it; null while the current version is unread (plan #1861). */
+  readAt: string | null;
 };
 
 /** One file as its page shows it. */
@@ -52,9 +54,12 @@ export type LinkedFile = {
   origin?: string | null;
   madeBy?: FileAuthor;
   version?: number;
+  /** When they last opened it; null while unread (plan #1861). */
+  readAt?: string | null;
 };
 
-export const LISTING_COLUMNS = 'id, title, summary, made_by, version, origin, created_at, updated_at';
+export const LISTING_COLUMNS =
+  'id, title, summary, made_by, version, origin, created_at, updated_at, read_at';
 export const DOC_COLUMNS = `${LISTING_COLUMNS}, body, change_note`;
 export const VERSION_COLUMNS = 'version, title, made_by, change_note, created_at';
 
@@ -67,6 +72,7 @@ export type ListingRow = {
   origin: string | null;
   created_at: string;
   updated_at: string;
+  read_at?: string | null;
 };
 
 export type DocRow = ListingRow & { body: string; change_note: string | null };
@@ -93,6 +99,7 @@ export function toListing(row: ListingRow): FileListing {
     origin: row.origin,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    readAt: row.read_at ?? null,
   };
 }
 
@@ -108,6 +115,15 @@ export function toVersion(row: VersionRow): FileVersion {
     changeNote: row.change_note,
     createdAt: row.created_at,
   };
+}
+
+/**
+ * Whether a file is still to read (plan #1861): Dash wrote it and the current
+ * version has not been opened. A file they wrote themselves is never unread.
+ * core.files.read_at is cleared by each new version (migration 0203).
+ */
+export function isUnread(file: { madeBy?: FileAuthor; readAt?: string | null }): boolean {
+  return file.madeBy === 'claude' && !file.readAt;
 }
 
 /** Where a file opens. */
