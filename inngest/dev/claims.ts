@@ -269,6 +269,17 @@ export async function releaseStaleClaims(
     );
     return new Set<string>();
   });
+  // A claim with a check-back still waiting on it was parked on purpose: the
+  // session left the step in progress until a run or a date it cannot hurry,
+  // which is what the plan skill tells it to do. The clock would otherwise
+  // hand the step back two hours later as though nobody were on it.
+  const checked = await claimsHeldByCheckBacks(supabase, expired).catch((err: unknown) => {
+    console.error(
+      `the check-backs on the stale claims could not be read: ${err instanceof Error ? err.message : 'failed'}`,
+    );
+    return new Set<string>();
+  });
+  for (const id of checked) held.add(id);
   const condemned = expired.filter(({ row }) => !held.has(row.id));
 
   // Asked once, for the whole condemned set, before anything is written.
@@ -407,6 +418,31 @@ async function claimsHeldByLines(
     if (claimHeldByRun({ status: run.status, lastLineAt: lines.get(run.id) ?? null })) {
       held.add(stepId);
     }
+  }
+  return held;
+}
+
+/**
+ * The claims with a check-back still waiting on the step itself, by step id.
+ * A failed read holds nothing, the same as `claimsHeldByLines`.
+ */
+async function claimsHeldByCheckBacks(
+  supabase: SupabaseClient,
+  claims: readonly StaleClaim[],
+): Promise<Set<string>> {
+  const held = new Set<string>();
+  if (claims.length === 0) return held;
+  const { data, error } = await supabase
+    .from('check_backs')
+    .select('plan_item_id')
+    .eq('status', 'waiting')
+    .in(
+      'plan_item_id',
+      claims.map((claim) => claim.row.id),
+    );
+  if (error) throw new Error(error.message);
+  for (const row of (data ?? []) as Array<{ plan_item_id: string | null }>) {
+    if (row.plan_item_id) held.add(row.plan_item_id);
   }
   return held;
 }
