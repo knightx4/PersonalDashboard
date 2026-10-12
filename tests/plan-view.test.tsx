@@ -181,8 +181,8 @@ describe('PlanView', () => {
     // numbers they had -- a filter does not renumber the plan.
     expect(html).toContain('#1.2');
     expect(html).toContain('#1.3');
-    // Its own number is still the handle, on the button that opens it.
-    expect(html).toContain('Open #3');
+    // The button that opens it names it the same way.
+    expect(html).toContain('Open #1.2');
     // The done schema step is not on the open view; the feature that holds
     // the open ones is.
     expect(html).not.toContain('Schema and RPCs');
@@ -210,7 +210,7 @@ describe('PlanView', () => {
     const html = render('open');
     expect(html).toContain('href="/dev/plan/1"');
     expect(html).not.toContain('href="/dev/plan/3"');
-    expect(html).toContain('Open #3');
+    expect(html).toContain('Open #1.2');
   });
 
   it('makes priority a word on the row you click, not a form you open', () => {
