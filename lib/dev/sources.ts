@@ -39,6 +39,16 @@ export const devSources: ModuleSources = {
       note: 'Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread.',
     },
     {
+      table: 'public.x_posts',
+      module: 'Dev',
+      holds: 'Every post on their X account read by the dashboard, including ones they wrote themselves, with its link and public numbers.',
+      weight: 'record',
+      search: ['text'],
+      title: 'text',
+      href: () => '/dev/posts',
+      note: 'created_at is when the post went up on X. kind is post, thread_reply (their own reply continuing a thread) or reply (to someone else). public_metrics holds likes, reposts, replies, quotes and impressions.',
+    },
+    {
       table: 'public.spec_interviews',
       module: 'Dev',
       holds: 'Interviews Dash held about one workspace of the app, or the app as a whole: what they use it for, what they do there and their routines, in their own answers.',
@@ -79,5 +89,10 @@ export const devSources: ModuleSources = {
     'public.ui_taste_removals',
     'public.ui_reviews',
     'public.vision_reviews',
-  ].map((table) => ({ table, reason: ABOUT_THE_APP, page: PAGES[table] })),
+    'public.x_accounts',
+  ].map((table) => ({
+    table,
+    reason: table === 'public.x_accounts' ? 'The X connection and its encrypted tokens.' : ABOUT_THE_APP,
+    page: PAGES[table],
+  })),
 };

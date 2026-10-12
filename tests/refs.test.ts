@@ -45,6 +45,7 @@ const FILL: Record<string, (user: string, id: string) => Record<string, unknown>
   'obsidian.transcripts': (user) => ({ storage_path: `${user}/a.pdf` }),
   'public.plan_items': () => ({ number: 4242 }),
   'public.social_posts': () => ({ body: '["x"]', draft: '["x"]' }),
+  'public.x_posts': () => ({ url: 'https://x.com/a/status/1' }),
   'todo.events': () => ({ starts_on: '2026-01-01', ends_on: '2026-01-02', starts_at: null, ends_at: null }),
   'todo.feed_events': () => ({ starts_on: '2026-01-01', ends_on: '2026-01-02', starts_at: null, ends_at: null }),
 };
