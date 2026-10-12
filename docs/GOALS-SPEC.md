@@ -456,8 +456,8 @@ are pushing, and the rest wait (goals migration 0070).
   the card again (`?plan=1`). On All goals each open goal that is not an
   errand has a target button that turns its focus on or off, and a focus
   goal's title carries the same target.
-- **Todo shows focus goals' next steps only** while a focus is chosen. See
-  "Todo" below for what still comes through from every goal.
+- **Focus does not reach Todo** since plan #1735: Todo holds only the steps
+  sent there, from any goal. What focus is for now is decision #1741.
 - **Dash works focus goals first.** The morning run lists their ready Claude
   steps before the rest, so `DAILY_STEP_LIMIT` spends its places on them and
   other goals' steps fill what is left (`readyClaudeSteps` in
@@ -472,53 +472,26 @@ This follows the rule in [TODO-SPEC.md](TODO-SPEC.md): an obligation is shown
 by whoever needs to show it and written by whoever owns it. A goal step is
 owned by Goals and is never copied into `todo.tasks`.
 
-Plan #1733 replaces the automatic lines below with steps sent to Todo by the
-person or by Dash. See "Goals without a deadline".
-
-- Each open goal's **next step of yours** is on Todo with nothing pressed
-  (plan #1266). It is one step per goal, the first of the next steps the
-  Goals home shows for it: open, nothing it waits on and nothing open under
-  it, its start date come, soonest due first and then tree order. So twelve
-  goals add at most twelve lines, and a parked or proposed goal, a step that
-  waits on another and a step for later put nothing there. A next step keeps
-  its own due date on Todo, overdue or not, and one with no date shows today.
-  The rule is `goalTodoSteps` in `lib/goals/todo.ts`.
-- **While a focus is chosen** (see "The week's focus"), only a goal in focus
-  puts its next step on Todo: a focus goal, or an errand due within seven
-  days. A step you pressed Show on Todo on, an open question and Dash's
-  results to read still come from every goal. Rhythms come only from goals
-  in focus (`focusRhythms`), and every rhythm's periods are still kept up to
-  date.
-- Each `mine` step also has a **Show on Todo** button, for any step beyond
-  the next one. Pressing it sets a flag on the step, and it stays on Todo
-  until it is closed; an undated one goes in Someday. A step that is both
-  flagged and a goal's next step is listed once, and shows today when it has
-  no date. The agenda source (`lib/todo/agenda/sources/goal-steps.ts`,
-  beside `job-reminders.ts`) reads both at query time.
+- **Todo holds only the goal steps sent there** (plan #1735). A step of
+  yours is on Todo when you pressed **Send to Todo** on it, or Dash put it
+  there. Nothing comes through by itself. Most goals have no deadline, and
+  a step from every goal each day made Todo a second copy of the Goals home.
+  The rule is `todoSteps` in
+  `lib/goals/todo.ts`, and the agenda source is
+  `lib/todo/agenda/sources/goal-steps.ts`, which reads it at query time.
+- Each `mine` step has **Send to Todo** in its menu, and **Take off Todo**
+  once it is there. Pressing it sets a flag on the step, and it stays on
+  Todo until it is closed or taken off; an undated one goes in "On you, no
+  date". A step for later shows on the day it starts.
 - Ticking the item on Todo closes the step in Goals, because it is the same
-  row, and the goal's next step after it takes its place. Dismissing or
-  deferring it on Todo writes only a dismissal, as for every other foreign
-  source. The dismissal is keyed by the step, so **Not this one** on a next
-  step hides that step only: the goal has no line on Todo until its next step
-  is a different one, because that one was closed, reordered or given a later
-  date.
-- Each **open question** the Goals home lists as waiting on you is on Todo
-  too, today (plan #1267): unanswered, not put aside, not under a step for
-  later, on an open goal. It has a button per lettered option, the
-  recommended one marked, and pressing one records that option as the answer
-  exactly as the option button on the goal page does. The question then
-  leaves Todo, and the re-shape run fires from the answer as it does for one
-  given here. A question whose options cannot be read shows as a link to it
-  on its goal. The rule is `todoQuestions` in `lib/goals/todo.ts`, from the
-  same pass of `dailyView` that picks the next steps.
-- When Dash has **finished work you have not read**, Todo shows one line
-  such as "Dash finished 2 things for you", linking to "What Dash did" on
-  the Goals home (plan #1268). The count is the home's results to read, Dash
-  steps with a result and no `reviewed_at` (`unreadDashResults` in
-  `lib/goals/todo.ts`), so marking a result read takes it off the count. At
-  zero the line is not there.
-- Rhythms for the current period appear on Todo on their own until the count
-  is met. There is no flag to set for those.
+  row. Dismissing or deferring it on Todo writes only a dismissal, as for
+  every other foreign source, keyed by the step.
+- **Left on the Goals home, not Todo**: each goal's next step, rhythms for
+  the current period, Dash's open questions, Dash's results to read, goals
+  and steps Dash proposed, and steps blocked on you. Each of these used to
+  reach Todo (plans #1266, #1267, #1268, #928 and #1473) and was taken off
+  by plan #1735. Home's Today reads the same agenda as Todo, so it shows
+  none of them either.
 - Dated items, such as an event you said you would attend, show on their date.
 
 Nothing is written to Google Calendar. Todo reads calendars through iCal feeds
@@ -1471,7 +1444,7 @@ Filed on the plan as a proposed feature. Each is one step.
 2. Areas and goals: add, edit, reorder, archive; fog on a goal.
 3. The step tree with sub-steps, the four kinds, and the full-tree view.
 4. The daily view, with the next items per goal and what is waiting on you.
-5. Show on Todo: the flag, the agenda source, ticking closes the step.
+5. Send to Todo: the flag, the agenda source, ticking closes the step.
 6. Rhythms: period rows, the at-risk line, the Todo item per period.
 7. Capture: the fast filing call, the filed list with Undo, captures kept.
 8. Readings: dated numbers against a goal, and a small chart of them.

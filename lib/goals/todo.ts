@@ -1,33 +1,25 @@
 /**
  * Which goal steps are on Todo (docs/GOALS-SPEC.md, "Todo"; plans #927 and
- * #1266).
+ * #1735).
  *
- * Two ways in. Each open goal's next step of yours is on Todo with nothing
- * pressed: the first of the next steps the Goals home shows for it (dailyView
- * in lib/goals/daily.ts), so a parked goal, a step that waits on another and
- * a step for later put nothing there. And any step you pressed Show on Todo on
- * is there too, as below. A step that is both is listed once.
+ * Only the steps sent there: you pressed Send to Todo on it, or Dash put it
+ * there. Nothing comes through on its own. A goal's next step, its rhythms,
+ * Dash's open questions and Dash's results to read stay on the Goals home,
+ * which is where most goals, having no deadline, are meant to be looked at
+ * (plan #1735 took them off Todo).
  *
- * While the person has chosen the week's focus (lib/goals/focus.ts), only a
- * goal in focus puts its next step there: a focus goal, or an errand due
- * within a week. A flagged step, a question and a dated errand still come
- * through from any goal, and so do the rhythms of goals in focus only
- * (focusRhythms).
- *
- * A step is on Todo while you have pressed Show on Todo on it and it is still
- * something to do: yours, open, and reachable through open steps from an open
- * goal. A step under a dropped branch or a goal you have not taken on yet
- * leaves Todo with it, the same way the Goals home leaves it out, and comes
- * back if that branch is reopened. A step whose start date has not come is
- * still listed, with that date, so Todo can hold it until the day. The flag itself is never cleared by this,
- * so reopening the step puts it back where you asked for it.
+ * A step is on Todo while it is flagged and still something to do: yours,
+ * open, and reachable through open steps from an open goal. A step under a
+ * dropped branch or a goal you have not taken on yet leaves Todo with it, the
+ * same way the Goals home leaves it out, and comes back if that branch is
+ * reopened. A step whose start date has not come is still listed, with that
+ * date, so Todo can hold it until the day. The flag itself is never cleared
+ * by this, so reopening the step puts it back where you asked for it.
  *
  * Pure, so the rule is tested without a database. The reads are in
  * lib/goals/steps-store.ts and the agenda source that shows the result is
  * lib/todo/agenda/sources/goal-steps.ts.
  */
-import { dailyView, type DailyView } from '@/lib/goals/daily';
-import { inFocus } from '@/lib/goals/focus';
 import type { Step, StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 
@@ -40,14 +32,9 @@ export type TodoStep = {
   startsOn: string | null;
   goalId: string;
   goalTitle: string;
-  /**
-   * Set when this is its goal's next step, which is on Todo without a press
-   * and shows today when it has no date. Absent on a step only flagged.
-   */
-  next?: true;
 };
 
-/** Whether Show on Todo means anything for this step. */
+/** Whether Send to Todo means anything for this step. */
 export function canShowOnTodo(step: Pick<Step, 'kind' | 'status'>): boolean {
   return step.kind === 'mine' && step.status === 'open';
 }
@@ -75,142 +62,4 @@ export function todoSteps(goals: Goal[], byGoal: Map<string, StepNode[]>): TodoS
     walk(byGoal.get(goal.id) ?? []);
   }
   return out;
-}
-
-/**
- * Everything Goals puts on Todo as steps: each open goal's next step of yours
- * (plan #1266) and the steps flagged with Show on Todo, one row per step.
- * While a focus is chosen, the next step comes only from goals in focus; a
- * flagged step comes from any goal, since it was asked for one at a time.
- *
- * The pick is dailyView's first next item for the goal, so Todo and the Goals
- * home never disagree about what is next. dailyView blanks an overdue due
- * date for the home; here the step keeps its own, so Todo can show it late.
- */
-export function goalTodoSteps(
-  goals: { goal: Goal; areaName: string }[],
-  byGoal: Map<string, StepNode[]>,
-  today: string,
-  view: DailyView = dailyView(goals, byGoal, today),
-): TodoStep[] {
-  const flagged = todoSteps(
-    goals.map((g) => g.goal),
-    byGoal,
-  );
-  const nodes = new Map<string, StepNode>();
-  const index = (list: StepNode[]) => {
-    for (const node of list) {
-      nodes.set(node.id, node);
-      index(node.children);
-    }
-  };
-  for (const roots of byGoal.values()) index(roots);
-
-  const all = goals.map((g) => g.goal);
-  const picks = new Map<string, TodoStep>();
-  for (const { goal, next } of view.goals) {
-    if (!inFocus(goal, all, today)) continue;
-    const node = next[0] && nodes.get(next[0].id);
-    if (!node) continue;
-    picks.set(node.id, {
-      id: node.id,
-      title: node.title,
-      dueOn: node.dueOn,
-      startsOn: null,
-      goalId: goal.id,
-      goalTitle: goal.title,
-      next: true,
-    });
-  }
-
-  const out = flagged.map((step) => (picks.has(step.id) ? { ...step, next: true as const } : step));
-  const listed = new Set(out.map((step) => step.id));
-  for (const pick of picks.values()) if (!listed.has(pick.id)) out.push(pick);
-  return out;
-}
-
-/**
- * The rhythms Todo lists while a focus is chosen: those of goals in focus.
- * With no focus chosen, every rhythm, as before.
- */
-export function focusRhythms<T extends { goalId: string }>(
-  rhythms: readonly T[],
-  goals: readonly Goal[],
-  today: string,
-): T[] {
-  const byId = new Map(goals.map((goal) => [goal.id, goal]));
-  return rhythms.filter((rhythm) => {
-    const goal = byId.get(rhythm.goalId);
-    return !goal || inFocus(goal, goals, today);
-  });
-}
-
-/**
- * A question Dash asked on a goal, for Todo to answer (plan #1267). The
- * options are read out of its detail by planOptions in lib/plan/options.ts,
- * where the Todo row does it, so a detail with no lettered set shows as a
- * link to the goal instead of buttons.
- */
-export type TodoQuestion = {
-  id: string;
-  title: string;
-  detail: string | null;
-  goalId: string;
-  goalTitle: string;
-};
-
-/**
- * The open questions the Goals home lists as waiting on you: unanswered, not
- * put aside, not under a step for later, on an open goal. They are dailyView's
- * `question` rows, so Todo and the Goals home ask the same questions.
- */
-export function todoQuestions(view: DailyView, byGoal: Map<string, StepNode[]>): TodoQuestion[] {
-  const details = new Map<string, string | null>();
-  const index = (list: StepNode[]) => {
-    for (const node of list) {
-      if (node.kind === 'decision') details.set(node.id, node.detail);
-      index(node.children);
-    }
-  };
-  for (const roots of byGoal.values()) index(roots);
-
-  return view.waiting.flatMap((row) =>
-    row.kind === 'question'
-      ? [
-          {
-            id: row.id,
-            title: row.title,
-            detail: details.get(row.id) ?? null,
-            goalId: row.goalId,
-            goalTitle: row.goalTitle,
-          },
-        ]
-      : [],
-  );
-}
-
-/**
- * Everything Goals puts on Todo from its trees, from one pass of dailyView:
- * the steps (goalTodoSteps) and Dash's open questions (todoQuestions).
- */
-export function goalsForTodo(
-  goals: { goal: Goal; areaName: string }[],
-  byGoal: Map<string, StepNode[]>,
-  today: string,
-): { steps: TodoStep[]; questions: TodoQuestion[] } {
-  const view = dailyView(goals, byGoal, today);
-  return {
-    steps: goalTodoSteps(goals, byGoal, today, view),
-    questions: todoQuestions(view, byGoal),
-  };
-}
-
-/**
- * How many of Dash's results are waiting to be read (plan #1268): the Goals
- * home's `review` rows, Dash steps with a result and no reviewed_at
- * (awaitsReview in lib/goals/daily.ts) on an open goal. Todo says the count
- * in one line and links to where they are read.
- */
-export function unreadDashResults(view: DailyView): number {
-  return view.waiting.filter((row) => row.kind === 'review').length;
 }
