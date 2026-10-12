@@ -69,6 +69,10 @@ import {
   takenEssaySlugs,
 } from '@/lib/learn/essays/store';
 import { searchStudy, type StudySearch } from '@/lib/learn/essays/study-store';
+import { deeperProblem, firstPassBasis, type EssayResearch } from '@/lib/learn/essays/research';
+import { JUDGE_MODEL, RESEARCH_MODEL, runDeeperPass, runFirstPass } from '@/lib/learn/essays/research-model';
+import { insertEssayResearch } from '@/lib/learn/essays/research-store';
+import { costMicrosFor, totalMicros, type SpendReport } from '@/lib/core/spend/pricing';
 import { essayFromVault, saveEssayToVault, type EssayVaultFailure } from '@/lib/learn/essays/vault';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { noteCreatePorts, noteSavePorts, openConnectedSource } from '@/lib/vault/db/ports';
@@ -747,4 +751,105 @@ export async function hideEssayStudyItem(id: string, key: string): Promise<{ ok:
     console.error('[essay study]', error instanceof Error ? error.message : error);
     return { ok: false, error: 'Could not hide that. Try again in a moment.' };
   }
+}
+
+export type ResearchResult = { ok: true; run: EssayResearch } | { ok: false; error: string };
+
+const ResearchInput = z.object({
+  id: z.string().uuid(),
+  level: z.enum(['first', 'deeper']),
+  doc: z.string().max(400_000),
+});
+
+/**
+ * Research the essay's question, at the level whose button was pressed (plan
+ * #1863.9; spec, "Research, when you ask"). Nothing runs without the press,
+ * and each button shows its price first.
+ *
+ * The first pass searches with the brief's question and what would change
+ * the writer's mind, and nothing else, so no vault text reaches a search.
+ * The deeper pass reads the draft as it is in the editor, has Haiku search
+ * and read up to five pages, and Sonnet mark each claim against them.
+ *
+ * Each run's real cost, from the API's usage, is recorded in the Learn spend
+ * ledger and kept on the run, which the card shows beside the result.
+ */
+// latency: pending
+export async function researchEssay(id: string, level: string, doc: string): Promise<ResearchResult> {
+  const user = await requireUser();
+  const parsed = ResearchInput.safeParse({ id, level, doc });
+  if (!parsed.success) return { ok: false, error: 'Could not start that research.' };
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { ok: false, error: 'Research needs the Anthropic key, which is not set on this deployment.' };
+
+  try {
+    const supabase = await createLearnClient();
+    const row = await loadBriefJson(supabase, parsed.data.id);
+    if (!row) return { ok: false, error: 'That essay is not there any more.' };
+    const brief = readBrief(row.brief);
+    const spend = collectSpend();
+
+    if (parsed.data.level === 'first') {
+      const basis = firstPassBasis(brief);
+      if (!basis) return { ok: false, error: 'Write the essay’s question in the brief first; the first pass searches with it.' };
+      const result = await runFirstPass({ basis, anthropicApiKey: apiKey, onSpend: spend.sink });
+      await recordLearnSpend(user.id, 'research-essay-question', spend.reports);
+      if (!result.ok) {
+        console.error('[essay research] first', result.detail);
+        return { ok: false, error: 'Dash could not find sources on that question. Try again in a moment.' };
+      }
+      const run = await insertEssayResearch(supabase, user.id, parsed.data.id, {
+        level: 'first',
+        question: brief.question,
+        queries: result.queries,
+        sources: result.sources,
+        findings: result.positions,
+        costMicros: runCost(spend.reports),
+        model: RESEARCH_MODEL,
+      });
+      return { ok: true, run };
+    }
+
+    const problem = deeperProblem(parsed.data.doc);
+    if (problem) return { ok: false, error: problem };
+    const result = await runDeeperPass({
+      question: brief.question,
+      draft: parsed.data.doc,
+      anthropicApiKey: apiKey,
+      onSpend: spend.sink,
+    });
+    await recordLearnSpend(
+      user.id,
+      'gather-essay-sources',
+      spend.reports.filter((report) => report.model !== JUDGE_MODEL),
+    );
+    await recordLearnSpend(
+      user.id,
+      'judge-essay-claims',
+      spend.reports.filter((report) => report.model === JUDGE_MODEL),
+    );
+    if (!result.ok) {
+      console.error('[essay research] deeper', result.detail);
+      return { ok: false, error: 'Dash could not check the draft against the web just now. Try again in a moment.' };
+    }
+    const run = await insertEssayResearch(supabase, user.id, parsed.data.id, {
+      level: 'deeper',
+      question: brief.question,
+      queries: result.queries,
+      sources: result.sources,
+      findings: result.claims,
+      costMicros: runCost(spend.reports),
+      model: `${RESEARCH_MODEL},${JUDGE_MODEL}`,
+    });
+    return { ok: true, run };
+  } catch (error) {
+    console.error('[essay research]', error instanceof Error ? error.message : error);
+    return { ok: false, error: 'Dash could not finish that research. Try again in a moment.' };
+  }
+}
+
+/** What a run cost in all, or null when a model it used has no price. */
+function runCost(reports: SpendReport[]): number | null {
+  const { micros, unpriced } = totalMicros(reports.map((report) => costMicrosFor(report.model, report.usage)));
+  return unpriced > 0 ? null : micros;
 }

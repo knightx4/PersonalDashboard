@@ -12,6 +12,7 @@ import {
   typewriterScroll,
 } from '@/lib/learn/essays/editor';
 import type { AuthorMark } from '@/lib/learn/essays/authorship';
+import { definitionInsert } from '@/lib/learn/essays/research';
 import {
   authorMarks,
   authorship,
@@ -59,6 +60,12 @@ export type MarkdownEditorHandle = {
    * person's, like a link they chose.
    */
   insert(text: string, quote?: { name: string }): void;
+  /**
+   * Put a footnote reference at the cursor, against the text before it, and
+   * its definition after the essay when it has none yet (plan #1863.9). Both
+   * are marked as quoted from the source, so neither counts as your words.
+   */
+  footnote(ref: string, definition: string | null, source: { name: string }): void;
 };
 
 /** From laptop width the essay page is the calm one; below it a plain editor. */
@@ -251,6 +258,21 @@ export function MarkdownEditor({
           selection: { anchor: at + insert.length },
           // No `input` event: an insert from the rail is not typing, so the tools stay.
           annotations: quote ? insertedBy.of({ author: 'quote', name: quote.name }) : undefined,
+          scrollIntoView: true,
+        });
+        editor.focus();
+      },
+      footnote(ref, definition, source) {
+        const editor = view.current;
+        if (!editor || !ref) return;
+        const at = editor.state.selection.main.to;
+        const end = editor.state.doc.length;
+        const tail = definition ? definitionInsert(editor.state.doc.toString(), definition) : '';
+        const changes = [{ from: at, insert: ref }, ...(tail ? [{ from: end, insert: tail }] : [])];
+        editor.dispatch({
+          changes,
+          selection: { anchor: at + ref.length },
+          annotations: insertedBy.of({ author: 'quote', name: source.name }),
           scrollIntoView: true,
         });
         editor.focus();

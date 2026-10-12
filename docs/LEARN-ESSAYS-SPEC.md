@@ -248,8 +248,22 @@ price before it runs. There are two levels.
 | | First pass | Deeper pass |
 |---|---|---|
 | What it does | Up to 4 web searches on the essay's question; 3 to 5 positions, each with sources | Up to 8 searches and 5 full pages read; each claim in your draft marked supported, opposed or mixed, with the quote |
-| Typical cost | $0.05 to $0.18 | $0.15 to $0.60, shown as "up to $0.60" |
-| Model | Haiku if it supports web search, otherwise Sonnet | Haiku gathers, Sonnet judges |
+| Typical cost | $0.05 to $0.20 | $0.15 to $0.60, shown as "up to $0.60" |
+| Model | Haiku, with the basic web search tool | Haiku gathers, Sonnet judges |
+
+**Haiku and web search** (checked 12 October 2026, plan #1863.9). Haiku
+takes the basic tools, `web_search_20250305` and `web_fetch_20250910`, but
+not the dynamic-filtering versions (`_20260209` and later), which need
+programmatic tool calling and are listed for Opus and Sonnet only. Jobs'
+company lookup has run the basic search on Haiku 4.5 since September, and
+Haiku 5.5's list of breaking changes does not touch the web tools, so the
+first pass runs on Haiku. Searches cost $10 a thousand on any model; web
+fetch costs only the tokens it reads. The first pass's guess is about $0.10:
+four searches ($0.04) and the search results, which every round of the
+server's loop reads again and which take the prompt past Haiku's
+100,000-token line to its long-prompt rate. On Sonnet the same run would be
+about $0.30. The $ hint shows the guess, marked uncertain, until five runs
+have been measured.
 
 - Searches use Anthropic's web search tool with `max_uses` as the hard cap.
   The deeper pass fetches pages with the web fetch tool and keeps their text,
@@ -258,7 +272,11 @@ price before it runs. There are two levels.
   citation ranges, never from text the model wrote about a source.
 - The count of supporting and opposing sources says it counts sources and
   does not weigh them.
-- Vault text never goes into a web search query.
+- Vault text never goes into a web search query. The first pass sends the
+  brief's question and what would change your mind, and nothing else. The
+  deeper pass has to read the draft to know its claims, and is told to
+  search in general terms and never paste a sentence of it; your other
+  notes, the pinned items and the origin answer are never sent.
 - Every run records its real cost from the API's usage, through the Learn
   spend record.
 

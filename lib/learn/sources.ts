@@ -216,6 +216,7 @@ export const learnSources: ModuleSources = {
   ],
   notSources: [
     { table: 'learn.essay_notes', reason: 'Margin notes Dash wrote on an essay; read through the essay.' },
+    { table: 'learn.essay_research', reason: 'Web research Dash ran on an essay when asked: pages it retrieved and what they said, not what the person wrote.' },
     { table: 'learn.area_check_articles', reason: 'Reference data for placing subjects.' },
     { table: 'learn.area_domains', reason: 'Reference data for placing subjects.' },
     { table: 'learn.area_fields', reason: 'Reference data for placing subjects; its embedding column is bookkeeping for the Idea Space map.' },

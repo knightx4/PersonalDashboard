@@ -221,6 +221,17 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // cache after a run's first call), and one paragraph in; at most one
   // finding out. Per paragraph the check reads.
   'check-essay-paragraph': unit(SONNET, 3_000, 200),
+  // An essay's first research pass (plan #1863.9): four searches at most.
+  // Search results come back as input and every round of the server's loop
+  // reads them again, so the prompt passes Haiku's 100,000-token line, past
+  // which the long-prompt rate applies, about $0.10 in all.
+  'research-essay-question': searching(run(HAIKU, 110_000, 5_000), 4),
+  // The deeper pass gathering: up to eight searches and five pages of about
+  // 6,000 tokens each, all read again on each round.
+  'gather-essay-sources': searching(run(HAIKU, 250_000, 6_000), 6),
+  // The five pages' kept text (about 5,000 tokens each) and the draft in; a
+  // heading and a sentence or two per claim out, for up to six claims.
+  'judge-essay-claims': run(SONNET, 30_000, 3_000),
   // One Wikipedia section in, a card for each of up to three ideas out.
   'write-asked-card': run(SONNET, 4_000, 2_000),
   // One idea's claim and basis and what was written in; the marks and a

@@ -1,5 +1,5 @@
 import { PaidCostsProvider } from '@/components/ui/paid-hint';
-import { MODELS, SONNET } from '@/lib/core/models';
+import { HAIKU, MODELS, SONNET } from '@/lib/core/models';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
 import { EssaysView } from '@/app/learn/essays/essays-view';
 import { EssayView } from '@/app/learn/e/[id]/essay-view';
@@ -12,6 +12,7 @@ import { ESSAY_VAULT_ERRORS } from '@/lib/learn/essays/vault';
 import { makeAnchor } from '@/lib/learn/essays/anchor';
 import type { EssayNote, EssayNotes } from '@/lib/learn/essays/notes-store';
 import type { StudyItem } from '@/lib/learn/essays/study';
+import type { EssayResearch } from '@/lib/learn/essays/research';
 import type { StudyState } from '@/app/learn/e/[id]/essay-study';
 
 /**
@@ -143,6 +144,28 @@ const studyCost: CostEstimate = {
   models: ['voyage-4-lite'],
 };
 
+/** A first research pass: four searches on Haiku, as the guess prices it (plan #1863.9). */
+const firstPassCost: CostEstimate = {
+  lowMicros: 54_000,
+  medianMicros: 107_500,
+  highMicros: 215_000,
+  runs: 0,
+  basis: 'guess',
+  per: 'run',
+  models: [HAIKU],
+};
+
+/** A deeper pass: Haiku gathering pages and Sonnet marking the claims. */
+const deeperPassCost: CostEstimate = {
+  lowMicros: 145_000,
+  medianMicros: 290_000,
+  highMicros: 580_000,
+  runs: 0,
+  basis: 'guess',
+  per: 'run',
+  models: [HAIKU, SONNET],
+};
+
 function WithCosts({ children }: { children: React.ReactNode }) {
   return (
     <PaidCostsProvider
@@ -151,6 +174,8 @@ function WithCosts({ children }: { children: React.ReactNode }) {
         'app/learn/e/[id]/actions.ts#runEssayCheck:model': checkCost,
         'app/learn/e/[id]/actions.ts#runEssayCheck:already-said': checkCost,
         'app/learn/e/[id]/actions.ts#findEssayStudy': studyCost,
+        'app/learn/e/[id]/actions.ts#researchEssay:first': firstPassCost,
+        'app/learn/e/[id]/actions.ts#researchEssay:deeper': deeperPassCost,
       }}
     >
       {children}
@@ -225,6 +250,107 @@ export function LearnEssaySurface() {
   return (
     <WithCosts>
       <EssayView essay={essay} study={STUDY_FOUND} />
+    </WithCosts>
+  );
+}
+
+/**
+ * Research on the essay (plan #1863.9): a first pass with four positions on
+ * the question, and a deeper pass with the draft's claims marked against the
+ * pages read, one of them mixed and one no page spoke to. The pages are
+ * invented, under example domains.
+ */
+const firstPass: EssayResearch = {
+  id: '00000000-0000-4000-8000-0000000000d1',
+  level: 'first',
+  question: essay.brief.question,
+  queries: [
+    'why money holds its value',
+    'money as a store of value history',
+    'gold store of value without exchange',
+    'hyperinflation demand for money collapse',
+  ],
+  sources: [
+    { url: 'https://history.example.org/money-and-trust', title: 'Money and trust: a short history', domain: 'history.example.org', text: null },
+    { url: 'https://econbrief.example.com/store-of-value', title: 'What makes a store of value?', domain: 'econbrief.example.com', text: null },
+    { url: 'https://goldreview.example.net/centuries', title: 'Gold across five centuries of prices', domain: 'goldreview.example.net', text: null },
+    { url: 'https://history.example.org/weimar', title: 'The Weimar inflation, week by week', domain: 'history.example.org', text: null },
+  ],
+  positions: [
+    {
+      title: 'Money keeps its value because everyone expects everyone else to accept it.',
+      summary:
+        'Historians of money describe its value as a shared expectation rather than a property of the coin or note, which is why it can vanish quickly.',
+      citations: [
+        { source: 0, quote: 'A coin is worth what the next person will give for it, and no more' },
+        { source: 3, quote: 'by November 1923 shopkeepers refused marks that had been good in the morning' },
+      ],
+    },
+    {
+      title: 'Money holds value only as long as its supply is kept scarce.',
+      summary: 'Economists who stress supply point to central banks and the fixed stock of gold as what stops money wearing out.',
+      citations: [{ source: 1, quote: 'a store of value must be costly to produce more of, or its holders will be diluted' }],
+    },
+    {
+      title: 'Gold shows a good can hold value for centuries without being money for everything.',
+      summary:
+        'Price series for gold suggest it kept its purchasing power over long periods even where it was not used to buy ordinary goods.',
+      citations: [
+        { source: 2, quote: 'an ounce bought roughly the same quantity of bread in 1600 as in 1900' },
+      ],
+    },
+  ],
+  claims: [],
+  costMicros: 64_000,
+  createdAt: '2026-10-12T14:40:00Z',
+};
+
+const deeperPass: EssayResearch = {
+  id: '00000000-0000-4000-8000-0000000000d2',
+  level: 'deeper',
+  question: essay.brief.question,
+  queries: ['money spheres Walzer criticism', 'gold purchasing power long run', 'hyperinflation flight from money'],
+  sources: [
+    { url: 'https://philosophy.example.org/walzer-spheres', title: 'Walzer’s spheres of justice, explained', domain: 'philosophy.example.org', text: null },
+    { url: 'https://goldreview.example.net/centuries', title: 'Gold across five centuries of prices', domain: 'goldreview.example.net', text: null },
+    { url: 'https://history.example.org/weimar', title: 'The Weimar inflation, week by week', domain: 'history.example.org', text: null },
+  ],
+  positions: [],
+  claims: [
+    {
+      claim: 'Money is the one good expected to hold its value while it sits unused.',
+      verdict: 'mixed',
+      supporting: 1,
+      opposing: 1,
+      citations: [
+        { source: 0, quote: 'money alone among goods is wanted for what it can become', stance: 'for' },
+        { source: 1, quote: 'gold, land and fine wine have each kept value over long periods without use', stance: 'against' },
+      ],
+    },
+    {
+      claim: 'When money cannot turn into other goods, nobody wants to hold it.',
+      verdict: 'supported',
+      supporting: 1,
+      opposing: 0,
+      citations: [{ source: 2, quote: 'wages were spent within the hour, before the next price list went up', stance: 'for' }],
+    },
+    {
+      claim: 'Walzer calls money the universal pander.',
+      verdict: 'unsourced',
+      supporting: 0,
+      opposing: 0,
+      citations: [],
+    },
+  ],
+  costMicros: 238_000,
+  createdAt: '2026-10-12T14:55:00Z',
+};
+
+/** Both passes run, their positions and claims under their buttons. */
+export function LearnEssayResearchSurface() {
+  return (
+    <WithCosts>
+      <EssayView essay={essay} study={STUDY_WAITING} research={{ first: firstPass, deeper: deeperPass }} />
     </WithCosts>
   );
 }

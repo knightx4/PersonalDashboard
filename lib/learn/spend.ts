@@ -330,6 +330,14 @@ export const LEARN_OPERATIONS = [
   // the check reads, or one for a check on the whole essay. Already Said
   // also finds the notes to compare with, under 'embed-note-match'.
   'check-essay-paragraph',
+  // Research on an essay, at the level whose button was pressed (plan
+  // #1863.9). The first pass is one Haiku call with up to four web searches.
+  // The deeper pass is one Haiku call with up to eight searches and five
+  // pages read, then one Sonnet call marking the draft's claims against the
+  // pages; apart, so each model's share can be read.
+  'research-essay-question',
+  'gather-essay-sources',
+  'judge-essay-claims',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
