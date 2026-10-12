@@ -624,6 +624,15 @@ const cardFiles = [
     fileId: 'f-rates',
     title: 'Which card to pay first',
     summary: 'Paying the 27% card first saves about $310 over paying the smaller balance first.',
+    meta: 'Written by Dash for “Compare the two cards’ rates” · version 2',
+    byDash: true,
+  },
+  {
+    fileId: 'f-letter',
+    title: 'A letter asking Chase to lower the rate on the Sapphire card',
+    summary: 'Asks for the rate to drop from 27% to the 19% offered to new cardholders, citing four years of on-time payments.',
+    meta: 'Written by Dash for “Draft the letter asking for a lower rate”',
+    byDash: true,
   },
 ];
 

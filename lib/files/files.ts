@@ -20,6 +20,8 @@ export type FileListing = {
   summary: string | null;
   madeBy: FileAuthor;
   version: number;
+  /** Where it came from, as `schema.table:ref`: usually the step that asked for it. */
+  origin: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -27,7 +29,6 @@ export type FileListing = {
 /** One file as its page shows it. */
 export type FileDoc = FileListing & {
   body: string;
-  origin: string | null;
   changeNote: string | null;
 };
 
@@ -47,10 +48,14 @@ export type LinkedFile = {
   title: string;
   summary: string | null;
   updatedAt: string;
+  /** The step or goal it was written for, as `goals.items:<id>` (plan #1860). */
+  origin?: string | null;
+  madeBy?: FileAuthor;
+  version?: number;
 };
 
-export const LISTING_COLUMNS = 'id, title, summary, made_by, version, created_at, updated_at';
-export const DOC_COLUMNS = `${LISTING_COLUMNS}, body, origin, change_note`;
+export const LISTING_COLUMNS = 'id, title, summary, made_by, version, origin, created_at, updated_at';
+export const DOC_COLUMNS = `${LISTING_COLUMNS}, body, change_note`;
 export const VERSION_COLUMNS = 'version, title, made_by, change_note, created_at';
 
 export type ListingRow = {
@@ -59,11 +64,12 @@ export type ListingRow = {
   summary: string | null;
   made_by: string;
   version: number;
+  origin: string | null;
   created_at: string;
   updated_at: string;
 };
 
-export type DocRow = ListingRow & { body: string; origin: string | null; change_note: string | null };
+export type DocRow = ListingRow & { body: string; change_note: string | null };
 
 export type VersionRow = {
   version: number;
@@ -84,13 +90,14 @@ export function toListing(row: ListingRow): FileListing {
     summary: row.summary,
     madeBy: author(row.made_by),
     version: row.version,
+    origin: row.origin,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
 export function toDoc(row: DocRow): FileDoc {
-  return { ...toListing(row), body: row.body, origin: row.origin, changeNote: row.change_note };
+  return { ...toListing(row), body: row.body, changeNote: row.change_note };
 }
 
 export function toVersion(row: VersionRow): FileVersion {

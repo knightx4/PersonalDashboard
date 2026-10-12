@@ -485,12 +485,12 @@ Each charge, bill, renewal notice or price change read from their mail, one per 
 
 ### `core.files` (Files)
 
-Longer pieces written for them and kept as pages: research notes, breakdowns of their data, plans, drafts.
+What Dash wrote for their goals, kept as pages under the goal: lists, drafts, notes, research, breakdowns of their data, plans.
 
 - Search: `title`, `summary`, `body`
 - Name a row by `title`; link it by `id`
 - Opens at `/goals/files/<id>`
-- Skip rows with archived_at set. made_by 'claude' is a run's work, 'you' is theirs. A goal or step links one through goals.links with kind 'file'. Read the file before redoing its work, and revise it rather than writing a second one on the same question. Before revising one, read its thread in core.thread_turns (ref 'core.files:<id>'): what they wrote there is what they want changed.
+- Skip rows with archived_at set. made_by 'claude' is a run's work, 'you' is theirs. A goal or step links one through goals.links with kind 'file'; origin 'goals.items:<id>' is the step it was written for, and each step has one file, revised in versions through goals.file_result. read_at is null while they have not read the current version. Read the file before redoing its work, and revise it rather than writing a second one on the same question. Before revising one, read its thread in core.thread_turns (ref 'core.files:<id>'): what they wrote there is what they want changed.
 
 ### `core.conversations` (Learn)
 
