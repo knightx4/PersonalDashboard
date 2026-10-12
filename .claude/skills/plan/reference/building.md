@@ -33,6 +33,8 @@ npx tsx scripts/plan.ts reopen <n>             # put it back to not started
 npx tsx scripts/plan.ts stopped <n> --reason "…" [--piece "…" --piece "…"]
                                                # ending the run with <n> neither closed
                                                # nor blocked: say why, in one line
+npx tsx scripts/plan.ts activity <n> --kind thought|action|question|error --body "…" [--option "…"]
+                                               # one line on your run, shown live on its page
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
                                                [--proposed] [--size s|m|l] [--from <n>]
@@ -51,6 +53,14 @@ npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
 Steps are named by number — the `#12` on the page. Numbers are never reused.
 
 ## The loop
+
+**Write run lines as you go.** The run's page shows what you write with
+`activity <n>`: `--kind action` right after claiming ("Claimed #n"), after each
+commit ("Committed <sha>: <subject>"), and as the last line ("Finished #n" or
+what stopped it); `--kind thought` before a long stretch of work; `--kind
+error` when something fails. A question that needs the person takes `--kind
+question` with one to ten `--option`s and parks the run as waiting on them.
+With no run fired at the step the command says so and writes nothing; carry on.
 
 1. **Claim it first.** `start <n>`, before reading anything. `start` refuses a
    proposal and refuses a decision, so claiming first is also the cheapest way
