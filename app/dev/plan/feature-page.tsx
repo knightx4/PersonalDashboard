@@ -63,7 +63,7 @@ import { PlanRow, PLAN_TREE_ACTIONS, usePlanRow } from './plan-row';
 import { type PlanCatalogEntry } from './plan-catalog';
 import { ASSIGNEE_LABEL, SIZE_LABEL, STATUS_LABEL, scopeLabel } from './step-forms';
 import { when } from './plan-run-status';
-import { FeatureUpdate } from './feature-update';
+import { FeatureUpdate, UpdateOverdue } from './feature-update';
 import { FeatureActivity } from './feature-activity';
 import { FeatureCompose } from './feature-compose';
 import type { PlanUpdate } from '@/lib/plan/updates';
@@ -104,6 +104,7 @@ export function FeaturePage({
   screenChanges,
   pictures,
   updates = [],
+  overdueDays = null,
   activity,
   comingBack = [],
   startEditing = false,
@@ -124,6 +125,8 @@ export function FeaturePage({
   pictures?: Readonly<Record<string, readonly PlanPicture[]>>;
   /** Dash's updates on the feature, newest first (plan #1666). */
   updates?: readonly PlanUpdate[];
+  /** Days since its last update when it is moving and a week overdue for one (plan #1834). */
+  overdueDays?: number | null;
   /** What the Activity tab reads beyond the plan (plan #1667). */
   activity?: {
     blockedAt: Readonly<Record<string, string>>;
@@ -452,7 +455,8 @@ export function FeaturePage({
       ) : (
         // As wide as the tabs, as Steps and Activity are (plan #1688).
         <div className="space-y-5">
-          {updates[0] && <FeatureUpdate update={updates[0]} />}
+          {overdueDays !== null && <UpdateOverdue days={overdueDays} />}
+          {updates[0] && <FeatureUpdate update={updates[0]} earlier={updates[1]} />}
           {/* The summary, the fog, the feature's own words, what it is done
               when, what it needs and what it waits on, on one card (plan
               #1686): none of it sits bare on the page. */}

@@ -252,6 +252,7 @@ export function PlanTableSurface() {
       finished={[]}
       summary={summarize(whole)}
       view="table"
+      overdueUpdates={{ 'goal-tree': 12 }}
       catalog={catalog}
       empty={false}
       canSend={false}
@@ -787,6 +788,15 @@ const featureUpdates: PlanUpdate[] = [
     stepsTotal: 7,
     session: 'cse_01V1aoCMYL7Ckkar3cKSLtFf',
     createdAt: '2026-10-07T18:00:00Z',
+    snapshot: {
+      v: 1,
+      open: 5,
+      done: 2,
+      total: 7,
+      blocked: 1,
+      openIds: ['s3', 's4', 's5', 's6', 's7'],
+      dueOn: null,
+    },
   },
   {
     id: 'update-1',
@@ -798,6 +808,15 @@ const featureUpdates: PlanUpdate[] = [
     stepsTotal: 7,
     session: 'cse_01V1aoCMYL7Ckkar3cKSLtFf',
     createdAt: '2026-10-07T09:05:00Z',
+    snapshot: {
+      v: 1,
+      open: 5,
+      done: 1,
+      total: 6,
+      blocked: 0,
+      openIds: ['s2', 's3', 's4', 's5', 's8'],
+      dueOn: null,
+    },
   },
 ];
 
@@ -884,6 +903,7 @@ function FeatureFixture({ editing = false }: { editing?: boolean }) {
       canSend
       lastRuns={{}}
       updates={featureUpdates}
+      overdueDays={9}
       activity={featureActivitySources}
       comingBack={featureComingBack}
       commitChecks={{
