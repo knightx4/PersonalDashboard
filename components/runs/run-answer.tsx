@@ -92,7 +92,7 @@ export function RunAnswer({
             autoFocus={choices.length > 0}
             placeholder={placeholder}
             aria-label={placeholder}
-            className="min-w-0 flex-1"
+            className="h-11 min-w-0 flex-1 sm:h-(--control-h)" /* ui-ok: 44px press target on a phone */
           />
           <Button type="submit" size="sm" pending={pending}>
             Answer
