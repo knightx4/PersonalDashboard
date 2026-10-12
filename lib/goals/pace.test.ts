@@ -5,6 +5,7 @@ import {
   activeDays,
   goalPace,
   lastActiveWords,
+  paceForGoal,
   paceHint,
   paceLine,
   paceWords,
@@ -162,5 +163,39 @@ describe('goalPace', () => {
     expect(paceWords(pace)).toBe('Every day');
     expect(lastActiveWords(pace)).toBe('Today');
     expect(paceLine(pace)).toBe('usually every day, last today');
+  });
+});
+
+describe('paceForGoal', () => {
+  it('keeps rows read for the whole account to the goal and the steps under it', () => {
+    const steps = [
+      {
+        id: 'clean',
+        kind: 'mine' as const,
+        status: 'open' as const,
+        children: [
+          { id: 'bath', kind: 'mine' as const, status: 'done' as const, closedAt: '2026-10-09T10:00:00Z', children: [] },
+        ],
+      },
+    ];
+    const pace = paceForGoal(
+      'goal',
+      steps,
+      {
+        progress: [
+          { itemId: 'clean', happenedOn: '2026-09-25' },
+          { itemId: 'goal', happenedOn: '2026-09-30' },
+          { itemId: 'other', happenedOn: '2026-10-01' },
+        ],
+        periods: [
+          { itemId: 'clean', startsOn: '2026-10-05', endsOn: '2026-10-12', count: 2, updatedAt: '2026-10-05T09:00:00Z' },
+          { itemId: 'other', startsOn: '2026-10-05', endsOn: '2026-10-12', count: 2, updatedAt: '2026-10-06T09:00:00Z' },
+        ],
+        captures: [],
+      },
+      TODAY,
+      TZ,
+    );
+    expect(pace).toMatchObject({ known: true, activeDays: 4, lastOn: '2026-10-09', daysSince: 2 });
   });
 });

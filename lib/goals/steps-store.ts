@@ -643,6 +643,11 @@ export async function accountToday(
   userId: string,
   now: number,
 ): Promise<string> {
+  return todayIn(await accountTimeZone(client, userId), new Date(now));
+}
+
+/** The account's time zone, for the same runs; UTC when the setting cannot be read. */
+export async function accountTimeZone(client: GoalsSupabaseClient, userId: string): Promise<string> {
   let zone: string | null = null;
   try {
     const { data } = await client
@@ -655,7 +660,7 @@ export async function accountToday(
   } catch {
     // Read as UTC, as the comment above says.
   }
-  return todayIn(zone ?? 'UTC', new Date(now));
+  return zone ?? 'UTC';
 }
 
 /**

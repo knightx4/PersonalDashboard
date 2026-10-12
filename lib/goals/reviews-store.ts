@@ -5,7 +5,9 @@ import {
   activityTouches,
   goalActivity,
   latestByGoal,
+  pacedGoalIds,
   REVIEW_COLUMNS,
+  standingReviews,
   toReview,
   type ActivityCollection,
   type ActivityItem,
@@ -15,6 +17,7 @@ import {
   type ActivityRecord,
   type GoalActivity,
   type GoalReview,
+  type PaceItemRow,
   type ReviewRow,
 } from '@/lib/goals/reviews';
 
@@ -33,6 +36,9 @@ export const REVIEWS_SHOWN_FOR_DAYS = 28;
 /**
  * The newest review of each goal from the last four weeks: the goal's
  * status. `isCurrent` in lib/goals/reviews.ts says whether it is today's.
+ * A goal judged on its pace keeps only a met or pace verdict
+ * (standingReviews; plan #1738), so a goal whose pace is not known yet shows
+ * no status rather than an old "Waiting on you".
  */
 export async function loadLatestReviews(
   client: GoalsSupabaseClient,
@@ -43,12 +49,39 @@ export async function loadLatestReviews(
     .select(REVIEW_COLUMNS)
     .gte('created_at', new Date(now - REVIEWS_SHOWN_FOR_DAYS * 24 * 60 * 60 * 1000).toISOString());
   if (userId) query = query.eq('user_id', userId);
-  const { data, error } = await query.order('created_at', { ascending: false });
+  const [{ data, error }, paced] = await Promise.all([
+    query.order('created_at', { ascending: false }),
+    loadPacedGoalIds(client, userId),
+  ]);
   if (error) throw new Error(`Could not read goal reviews: ${error.message}`);
   const reviews = ((data ?? []) as ReviewRow[])
     .map(toReview)
     .filter((r): r is GoalReview => r !== null);
-  return latestByGoal(reviews);
+  const latest = latestByGoal(reviews);
+  return paced ? standingReviews(latest, paced) : latest;
+}
+
+/**
+ * The goals judged on their pace (pacedGoalIds), or null when the items
+ * cannot be read, which leaves every review standing rather than failing
+ * the page.
+ */
+async function loadPacedGoalIds(
+  client: GoalsSupabaseClient,
+  userId: string | undefined,
+): Promise<Set<string> | null> {
+  try {
+    let query = client
+      .from('items')
+      .select('id, parent_id, level, status, due_on, errand, on_todo')
+      .is('archived_at', null);
+    if (userId) query = query.eq('user_id', userId);
+    const { data, error } = await query;
+    if (error || !Array.isArray(data)) return null;
+    return pacedGoalIds(data as unknown as PaceItemRow[]);
+  } catch {
+    return null;
+  }
 }
 
 /**
