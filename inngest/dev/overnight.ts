@@ -19,6 +19,7 @@ import { loadPlan } from '@/lib/plan/load';
 import {
   loadOvernightRun,
   OVERNIGHT_AT_ONCE,
+  featureSessionsAtOnce,
   overnightVerdict,
   recordOvernightFire,
   stopOvernightRun,
@@ -438,7 +439,13 @@ export type OvernightTick =
    * in the modules the running sessions are already in. `running` is how many
    * are going; `liveness` is `unknown` when any of them could not be read.
    */
-  | { act: 'waiting'; liveness: RunLiveness; running: number }
+  | {
+      act: 'waiting';
+      liveness: RunLiveness;
+      running: number;
+      /** The most this tick would keep going: four when goals had nothing to start. */
+      atOnce?: number;
+    }
   /**
    * Nothing was ready this minute, and the night was left running.
    *
@@ -487,7 +494,7 @@ export function tickNote(tick: OvernightTick): string | null {
       if (tick.liveness === 'unknown') {
         return 'Waiting. GitHub could not be asked whether a session is still going, so nothing new is started until it can.';
       }
-      if (tick.running >= OVERNIGHT_AT_ONCE) {
+      if (tick.running >= (tick.atOnce ?? OVERNIGHT_AT_ONCE)) {
         return `Waiting: ${tick.running} sessions are running, the most it starts at once.`;
       }
       return tick.running === 1
@@ -517,6 +524,12 @@ export function tickNote(tick: OvernightTick): string | null {
  */
 export type OvernightPorts = {
   now: number;
+  /**
+   * How many feature sessions to keep going this tick. `OVERNIGHT_AT_ONCE`
+   * when left out; the cron passes four when the goals half had nothing to
+   * start (`featureSessionsAtOnce`).
+   */
+  atOnce?: number;
   loadRun: () => Promise<OvernightRun | null>;
   loadSections: () => Promise<readonly PlanSection[]>;
   /** When each feature was last fired, by feature id. */
@@ -685,8 +698,9 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
 
   const inFlight = (await ports.runsInFlight(run)).filter((one) => !isOver(one.liveness));
   const unrecorded = inFlight.some((one) => one.featureId === null);
-  if (inFlight.length >= OVERNIGHT_AT_ONCE || unrecorded) {
-    return { act: 'waiting', liveness: waitingOn(inFlight), running: inFlight.length };
+  const atOnce = ports.atOnce ?? OVERNIGHT_AT_ONCE;
+  if (inFlight.length >= atOnce || unrecorded) {
+    return { act: 'waiting', liveness: waitingOn(inFlight), running: inFlight.length, atOnce };
   }
   const runningIds = inFlight.map((one) => one.featureId as string);
 
@@ -783,7 +797,12 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
         // With sessions going, what is ready may only be in their modules, and
         // one of them finishing changes that. Said as waiting on them.
         if (inFlight.length > 0 && refused.length === 0) {
-          return { act: 'waiting', liveness: waitingOn(inFlight), running: inFlight.length };
+          return {
+            act: 'waiting',
+            liveness: waitingOn(inFlight),
+            running: inFlight.length,
+            atOnce,
+          };
         }
         return { act: 'nothing-ready', reason };
       }
@@ -1147,8 +1166,9 @@ function portsFor(input: {
   userId: string;
   now: number;
   fetch?: typeof globalThis.fetch;
+  atOnce?: number;
 }): OvernightPorts {
-  const { supabase, userId, now } = input;
+  const { supabase, userId, now, atOnce } = input;
   let sections: readonly PlanSection[] | null = null;
   // Both fire readings come from one read of the account's feature runs.
   let fires: ReturnType<typeof featureFires> | null = null;
@@ -1160,6 +1180,7 @@ function portsFor(input: {
 
   return {
     now,
+    atOnce,
     loadRun: () => loadOvernightRun(supabase, userId),
     loadSections,
     lastFiredAt: async () => (await readFires()).last,
@@ -1372,14 +1393,23 @@ export async function runOvernightTick(
 
   for (const userId of users) {
     try {
-      const tick = await overnightTick(portsFor({ supabase, userId, now, fetch: input.fetch }));
-      results[userId] = tick;
-      if (tick.act === 'fired') fired += 1;
-      // After the features, so it reads the budget they left. It reads the
-      // row again and holds to the same verdict, and a failure in it is
+      // Goals first, so the feature half knows whether the goals seat is
+      // free. It reads the row and holds to the same verdict as the feature
+      // half, which is still what ends the night, and a failure in it is
       // reported beside the feature half rather than costing it.
       const goal = await goalsHalf(goalsNight, userId);
       goals[userId] = goal;
+      const tick = await overnightTick(
+        portsFor({
+          supabase,
+          userId,
+          now,
+          fetch: input.fetch,
+          atOnce: featureSessionsAtOnce(goalsIdle(goal)),
+        }),
+      );
+      results[userId] = tick;
+      if (tick.act === 'fired') fired += 1;
       const note = [tickNote(tick), goalsNightNote(goal)].filter(Boolean).join(' ');
       await recordTick(supabase, userId, now, note === '' ? null : note);
       // A tick that fires says so; a tick that waits used to say nothing at
@@ -1471,6 +1501,14 @@ export async function sweepQuietRuns(input: {
     console.log(`overnight: wrote back ${tally.finished} finished and ${tally.failed} failed run(s).`);
   }
   return tally;
+}
+
+/**
+ * The goals half had nothing to start and nothing going, so its seat can go to
+ * a fourth feature. A failure or a run still going keeps the seat for goals.
+ */
+export function goalsIdle(tick: GoalsNightTick): boolean {
+  return tick.act === 'nothing-ready' || tick.act === 'no-routine';
 }
 
 /** The goals half of one account's tick, with a failure turned into a result. */
