@@ -234,6 +234,11 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.plan_items = planItem.id;
 
+  // The trigger on plan_items wrote this user's history rows just now.
+  const [planHistory] = await admin<{ id: string }[]>`
+    select id::text from plan_history where user_id = ${userId} order by id limit 1`;
+  ids.plan_history = planHistory.id;
+
   const [planStep] = await admin<{ id: string }[]>`
     insert into plan_items (user_id, module, title, parent_id)
     values (${userId}, 'learn', ${`${tag} planned a sub-step`}, ${planItem.id})
