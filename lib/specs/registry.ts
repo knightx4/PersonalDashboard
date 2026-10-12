@@ -112,6 +112,14 @@ export const SPECS: readonly SpecDoc[] = [
     module: 'learn',
   },
   {
+    slug: 'learn-context',
+    title: 'Learn: what a card carries',
+    blurb:
+      'Every card, review and check arrives with where it came from, what it connects to and why it is here now, so Learn can borrow the scheduling of Math Academy without feeling like a queue of rows.',
+    file: 'LEARN-CONTEXT-SPEC.md',
+    module: 'learn',
+  },
+  {
     slug: 'learn',
     title: 'Learn: the reading queue',
     blurb:
