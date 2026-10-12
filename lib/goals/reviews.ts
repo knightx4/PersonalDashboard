@@ -25,6 +25,7 @@
  */
 import { paceLine, type GoalPace } from '@/lib/goals/pace';
 import type { Goal } from '@/lib/goals/tree';
+import { parseSnapshot, type ProgressSnapshot } from '@/lib/progress-snapshot';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -168,6 +169,8 @@ export type GoalReview = {
   waitsOnId: string | null;
   runId: string | null;
   createdAt: string;
+  /** What the goal's steps and due date were when this was written; null on rows from before plan #1832. */
+  snapshot?: ProgressSnapshot | null;
 };
 
 export type ReviewRow = {
@@ -181,10 +184,11 @@ export type ReviewRow = {
   waits_on_id: string | null;
   run_id: string | null;
   created_at: string;
+  snapshot?: unknown;
 };
 
 export const REVIEW_COLUMNS =
-  'id, item_id, verdict, reason, next_move, next_on, step_id, waits_on_id, run_id, created_at';
+  'id, item_id, verdict, reason, next_move, next_on, step_id, waits_on_id, run_id, created_at, snapshot';
 
 /** A row as the app reads it, or null for a verdict this code does not know. */
 export function toReview(row: ReviewRow): GoalReview | null {
@@ -200,6 +204,7 @@ export function toReview(row: ReviewRow): GoalReview | null {
     waitsOnId: row.waits_on_id ?? null,
     runId: row.run_id,
     createdAt: row.created_at,
+    snapshot: parseSnapshot(row.snapshot),
   };
 }
 

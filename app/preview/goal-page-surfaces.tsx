@@ -744,6 +744,7 @@ export function GoalTopSurface() {
             }}
             briefWhen="today"
             current
+            change="Since 8 Oct: 2 steps closed, 1 added, due date moved from 3 Nov to 20 Nov."
             review={cardsReview}
             ask={
               <GoalShaping
