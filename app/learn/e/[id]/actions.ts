@@ -57,8 +57,10 @@ import { essayDay } from '@/lib/learn/essays/note';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import {
   adoptNoteVersion,
+  hideStudyItem,
   loadBriefJson,
   loadCheckEssay,
+  loadStudyEssay,
   loadVaultEssay,
   recordEssayNote,
   saveBriefJson,
@@ -66,6 +68,7 @@ import {
   saveWordTarget,
   takenEssaySlugs,
 } from '@/lib/learn/essays/store';
+import { searchStudy, type StudySearch } from '@/lib/learn/essays/study-store';
 import { essayFromVault, saveEssayToVault, type EssayVaultFailure } from '@/lib/learn/essays/vault';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { noteCreatePorts, noteSavePorts, openConnectedSource } from '@/lib/vault/db/ports';
@@ -683,5 +686,65 @@ export async function moveEssayNotes(id: string, moves: NoteMove[]): Promise<{ o
   } catch (error) {
     console.error('[essay notes]', error instanceof Error ? error.message : error);
     return { ok: false };
+  }
+}
+
+export type StudyResult = ({ ok: true } & StudySearch) | { ok: false; error: string };
+
+const StudyInput = z.object({
+  id: z.string().uuid(),
+  // A paragraph, or the brief's question and answer; far past either.
+  text: z.string().max(8_000),
+});
+
+/**
+ * What you studied that bears on the paragraph you are writing (plan
+ * #1863.8; spec, "From your study"), or on the brief's question and answer
+ * for the interview's "What made you think this?". One embedding of the
+ * text, cached, searches your note passages and positions; readings, clips,
+ * card notes and the learning log are matched by the words they share with
+ * it. Pinned items come first.
+ */
+// latency: pending -- the panel keeps its last list until the new one arrives
+export async function findEssayStudy(id: string, text: string): Promise<StudyResult> {
+  const user = await requireUser();
+  const parsed = StudyInput.safeParse({ id, text });
+  if (!parsed.success) return { ok: false, error: 'Could not search with that text.' };
+  try {
+    const learn = await createLearnClient();
+    const essay = await loadStudyEssay(learn, parsed.data.id);
+    if (!essay) return { ok: false, error: 'That essay is not there any more.' };
+    const [vault, core] = await Promise.all([createVaultClient(), createCoreClient()]);
+    const found = await searchStudy({
+      learn,
+      vault,
+      core,
+      userId: user.id,
+      paragraph: parsed.data.text,
+      essayNoteId: essay.noteId,
+      pins: readBrief(essay.brief).pinned,
+      hidden: essay.hidden,
+    });
+    return { ok: true, ...found };
+  } catch (error) {
+    console.error('[essay study]', error instanceof Error ? error.message : error);
+    return { ok: false, error: 'Dash could not search your study just now.' };
+  }
+}
+
+const HideInput = z.object({ id: z.string().uuid(), key: z.string().min(1).max(600) });
+
+/** Hide one item from the study panel, for this essay only. */
+// latency: optimistic -- the item leaves the panel at once and comes back with the error if refused
+export async function hideEssayStudyItem(id: string, key: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireUser();
+  const parsed = HideInput.safeParse({ id, key });
+  if (!parsed.success) return { ok: false, error: 'Could not hide that.' };
+  try {
+    await hideStudyItem(await createLearnClient(), parsed.data.id, parsed.data.key);
+    return { ok: true };
+  } catch (error) {
+    console.error('[essay study]', error instanceof Error ? error.message : error);
+    return { ok: false, error: 'Could not hide that. Try again in a moment.' };
   }
 }

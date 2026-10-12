@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState, useTransition } from 'react';
+import { useEffect, useId, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -9,7 +9,15 @@ import { PaidHint } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
 import { askNumber, BRIEF_LABELS, nextField, PIN_LABELS } from '@/lib/learn/essays/interview';
 import { BRIEF_FIELDS, type BriefField, type EssayBrief, type EssayInterview } from '@/lib/learn/essays/model';
-import { answerEssayInterview, saveEssayBriefField, skipEssayInterview, type BriefResult } from './actions';
+import { briefSearchText, originLine, STUDY_KIND_LABELS, type StudyItem } from '@/lib/learn/essays/study';
+import {
+  answerEssayInterview,
+  findEssayStudy,
+  saveEssayBriefField,
+  skipEssayInterview,
+  type BriefResult,
+} from './actions';
+import { STUDY_ACTION, type StudyState } from './essay-study';
 
 type Asking = Extract<EssayInterview, { status: 'asking' }>;
 
@@ -28,15 +36,23 @@ function failed(result: BriefResult | undefined): string | null {
 export function EssayInterviewCard({
   essayId,
   interview,
+  brief,
   onChange,
+  initialFound,
 }: {
   essayId: string;
   interview: Asking;
+  /** The brief so far; "What made you think this?" searches your study with its question and answer. */
+  brief: EssayBrief;
   onChange: (brief: EssayBrief, interview: EssayInterview | null) => void;
+  /** What that search found, for the gallery, which never searches. */
+  initialFound?: StudyState;
 }) {
   const askId = useId();
   const errorId = useId();
   const [answer, setAnswer] = useState('');
+  const origin = interview.field === 'origin';
+  const found = useOriginStudy(essayId, origin ? briefSearchText(brief) : '', initialFound);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [skipping, startSkip] = useTransition();
@@ -103,6 +119,14 @@ export function EssayInterviewCard({
           aria-describedby={error ? errorId : undefined}
           disabled={busy}
         />
+        {origin && (
+          <OriginOffers
+            state={found}
+            onUse={(item) =>
+              setAnswer((now) => (now.trim() ? `${now.trimEnd()}\n${originLine(item)}` : originLine(item)))
+            }
+          />
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <Button type="submit" size="sm" variant="primary" pending={pending} disabled={busy || !answer.trim()}>
             {pending ? 'Keeping it…' : last ? 'Done' : 'Next'}
@@ -132,6 +156,87 @@ export function EssayInterviewCard({
         )}
       </form>
     </Card>
+  );
+}
+
+/** How many finds the fourth question offers. */
+const ORIGIN_OFFERS = 3;
+
+/**
+ * For "What made you think this?" (spec, "Starting an essay", question 4):
+ * one search of your study with the brief's question and answer, made once
+ * when the question comes up.
+ */
+function useOriginStudy(essayId: string, text: string, initial?: StudyState): StudyState {
+  const [answer, setAnswer] = useState<{ text: string; state: StudyState } | null>(null);
+  const frozen = initial !== undefined;
+  useEffect(() => {
+    if (frozen || !text.trim()) return;
+    let live = true;
+    findEssayStudy(essayId, text)
+      .catch(() => ({ ok: false as const, error: 'The connection dropped.' }))
+      .then((result) => {
+        if (!live) return;
+        setAnswer({
+          text,
+          state: result.ok
+            ? { kind: 'found', items: result.items, searched: result.searched, indexed: result.indexed }
+            : { kind: 'failed', items: [], error: result.error },
+        });
+      });
+    return () => {
+      live = false;
+    };
+  }, [essayId, text, frozen]);
+  if (initial) return initial;
+  if (!text.trim()) return { kind: 'waiting' };
+  return answer?.text === text ? answer.state : { kind: 'searching', items: [] };
+}
+
+/** What Dash found in your study, each with a button that adds it to your answer. */
+function OriginOffers({ state, onUse }: { state: StudyState; onUse: (item: StudyItem) => void }) {
+  if (state.kind === 'waiting') return null;
+  const items = state.items.slice(0, ORIGIN_OFFERS);
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-1">
+        <p className="text-small text-ink-muted">
+          {state.kind === 'searching' ? 'Looking in your study…' : 'From your study'}
+        </p>
+        <PaidHint action={STUDY_ACTION} what="Cost of searching your study" />
+      </div>
+      {state.kind === 'found' && items.length === 0 && (
+        <p className="text-small text-ink-muted">
+          Nothing you have studied is close to your question yet. Say what made you think it in your own words.
+        </p>
+      )}
+      {state.kind === 'failed' && <p className="text-small text-ink-muted">{state.error}</p>}
+      {items.length > 0 && (
+        <ul className="flex flex-col gap-2">
+          {items.map((item) => (
+            <li key={item.key} className="flex items-start justify-between gap-3">
+              <p className="min-w-0 text-ui text-ink">
+                <span className="text-ink-muted">{STUDY_KIND_LABELS[item.kind]}: </span>
+                <span className="font-medium">{item.title}</span>
+                {item.sentence && (
+                  <span className="mt-1 block border-l-2 border-border pl-3 text-ui text-ink">{item.sentence}</span>
+                )}
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="shrink-0"
+                onClick={() => onUse(item)}
+                aria-label={`Add ${item.title} to your answer`}
+              >
+                Add
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

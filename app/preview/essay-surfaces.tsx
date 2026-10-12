@@ -11,6 +11,8 @@ import type { ProjectView } from '@/lib/learn/lessons/project';
 import { ESSAY_VAULT_ERRORS } from '@/lib/learn/essays/vault';
 import { makeAnchor } from '@/lib/learn/essays/anchor';
 import type { EssayNote, EssayNotes } from '@/lib/learn/essays/notes-store';
+import type { StudyItem } from '@/lib/learn/essays/study';
+import type { StudyState } from '@/app/learn/e/[id]/essay-study';
 
 /**
  * The Essays list and the essay editor (plan #1865), from fixtures shaped like
@@ -130,6 +132,17 @@ const rephraseCost: CostEstimate = {
 /** About what one paragraph's check costs, as the Learn layout would give it. */
 const checkCost: CostEstimate = { ...rephraseCost, per: 'unit', lowMicros: 9_000, medianMicros: 12_000, highMicros: 18_000 };
 
+/** About what one study search costs: one small embedding, often cached. */
+const studyCost: CostEstimate = {
+  lowMicros: 0,
+  medianMicros: 6,
+  highMicros: 20,
+  runs: 0,
+  basis: 'guess',
+  per: 'run',
+  models: ['voyage-4-lite'],
+};
+
 function WithCosts({ children }: { children: React.ReactNode }) {
   return (
     <PaidCostsProvider
@@ -137,6 +150,7 @@ function WithCosts({ children }: { children: React.ReactNode }) {
         'app/learn/e/[id]/actions.ts#rephraseEssaySelection': rephraseCost,
         'app/learn/e/[id]/actions.ts#runEssayCheck:model': checkCost,
         'app/learn/e/[id]/actions.ts#runEssayCheck:already-said': checkCost,
+        'app/learn/e/[id]/actions.ts#findEssayStudy': studyCost,
       }}
     >
       {children}
@@ -144,10 +158,88 @@ function WithCosts({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** The panel before anything is searched; the gallery never searches. */
+const STUDY_WAITING: StudyState = { kind: 'waiting' };
+
+/**
+ * What the study panel finds for the first paragraph (plan #1863.8): the
+ * pinned reading first, then a passage from a note, a position from the
+ * vault map with its checked quote, a learning-log entry and a card note.
+ */
+const studyItems: StudyItem[] = [
+  {
+    key: 'reading:00000000-0000-4000-8000-0000000000b1',
+    kind: 'reading',
+    title: 'Walzer - Spheres of Justice ch4',
+    context: 'Chapter 4, pages 95 to 103',
+    sentence: 'Money is the universal pander, and it slips across every boundary the other spheres draw.',
+    href: '/learn/r/00000000-0000-4000-8000-0000000000b1',
+    link: null,
+    pinned: true,
+  },
+  {
+    key: 'passage:00000000-0000-4000-8000-0000000000e1:Why cash loses value',
+    kind: 'passage',
+    title: 'Inflation, savings and the strange patience of people who keep cash in a drawer for decades',
+    context: 'Economics › Why cash loses value',
+    sentence: 'A pound in a drawer loses about two pence a year, and almost nobody notices because nothing else they own keeps its value either.',
+    href: '/vault/notes/Economics/Inflation%20and%20savings.md',
+    link: 'Inflation and savings',
+    pinned: false,
+  },
+  {
+    key: 'position:00000000-0000-4000-8000-0000000000e2',
+    kind: 'position',
+    title: 'Money is a claim, not a thing',
+    context: 'Money keeps its value only while other people will take it in exchange.',
+    sentence: 'What we hold is a promise that someone else will want it tomorrow.',
+    href: '/vault/map/00000000-0000-4000-8000-0000000000e3',
+    link: 'Notes on Graeber',
+    pinned: false,
+  },
+  {
+    key: 'log:00000000-0000-4000-8000-0000000000e4',
+    kind: 'log',
+    title: 'Hyperinflation in Weimar Germany',
+    context: null,
+    sentence: 'Once prices doubled every few days, people spent wages within the hour rather than hold marks overnight.',
+    href: '/learn/s/00000000-0000-4000-8000-0000000000e5',
+    link: null,
+    pinned: false,
+  },
+  {
+    key: 'card:00000000-0000-4000-8000-0000000000e6',
+    kind: 'card',
+    title: 'Your note on Store of value',
+    context: null,
+    sentence: 'Bread spoils, coats wear thin, and money is the thing we use to carry value across the gap.',
+    href: '/learn/c/00000000-0000-4000-8000-0000000000e7',
+    link: null,
+    pinned: false,
+  },
+];
+
+const STUDY_FOUND: StudyState = { kind: 'found', items: studyItems, searched: true, indexed: true };
+
 export function LearnEssaySurface() {
   return (
     <WithCosts>
-      <EssayView essay={essay} />
+      <EssayView essay={essay} study={STUDY_FOUND} />
+    </WithCosts>
+  );
+}
+
+/**
+ * Nothing close enough yet, while the vault is still being split into
+ * passages (plan #1863.8): the panel says so rather than looking broken.
+ */
+export function LearnEssayStudyEmptySurface() {
+  return (
+    <WithCosts>
+      <EssayView
+        essay={{ ...essay, brief: { ...essay.brief, pinned: [] } }}
+        study={{ kind: 'found', items: [], searched: true, indexed: false }}
+      />
     </WithCosts>
   );
 }
@@ -158,13 +250,14 @@ export function LearnEssayChangedSurface() {
     <EssayView
       essay={essay}
       initialVault={{ kind: 'failed', reason: 'changed', error: ESSAY_VAULT_ERRORS.changed }}
+      study={STUDY_WAITING}
     />
   );
 }
 
 /** The brief unfolded above the draft (plan #1867), with an answer long enough to wrap. */
 export function LearnEssayBriefSurface() {
-  return <EssayView essay={essay} briefOpen />;
+  return <EssayView essay={essay} briefOpen study={STUDY_WAITING} />;
 }
 
 // The first paragraph, so the suggestion is inside a phone's first screen,
@@ -185,6 +278,7 @@ export function LearnEssayRephraseSurface() {
           text: 'Money alone we expect to keep its value in a drawer, which is *strange* once you look at it.',
           name: MODELS.learnEssayRephrase,
         }}
+        study={STUDY_WAITING}
       />
     </WithCosts>
   );
@@ -248,7 +342,7 @@ const essayNotes: EssayNotes = {
 export function LearnEssayNotesSurface() {
   return (
     <WithCosts>
-      <EssayView essay={essay} notes={essayNotes} initialNoteOpen={COUNTERPOINT_ID} />
+      <EssayView essay={essay} notes={essayNotes} initialNoteOpen={COUNTERPOINT_ID} study={STUDY_WAITING} />
     </WithCosts>
   );
 }
@@ -257,7 +351,7 @@ export function LearnEssayNotesSurface() {
 export function LearnEssayMarksSurface() {
   return (
     <WithCosts>
-      <EssayView essay={essay} initialAskMarks />
+      <EssayView essay={essay} initialAskMarks study={STUDY_WAITING} />
     </WithCosts>
   );
 }
@@ -285,32 +379,60 @@ const blank: Essay = {
 
 /** "Write about this" on a finished goal: the interview opens naming it (plan #1867). */
 export function LearnEssayInterviewSurface() {
-  return <EssayView essay={blank} />;
+  return <EssayView essay={blank} study={STUDY_WAITING} />;
 }
 
 /** Three answers in, on the fourth question as Dash worded it. */
 export function LearnEssayInterviewLaterSurface() {
   return (
-    <EssayView
-      essay={{
-        ...blank,
-        brief: {
-          ...blank.brief,
-          question:
-            'Why does a quarter-point rate rise move house prices more than it moves anything else?',
-          claim:
-            'Because a house is bought almost entirely with borrowed money, so its price is really a monthly payment.',
-          reader: 'My sister, who is buying her first flat next spring',
-        },
-        interview: {
-          status: 'asking',
-          field: 'origin',
-          ask: 'What did you see that made you think of a house price as a monthly payment rather than a price?',
-        },
-      }}
-    />
+    <WithCosts>
+      <EssayView
+        essay={{
+          ...blank,
+          brief: {
+            ...blank.brief,
+            question:
+              'Why does a quarter-point rate rise move house prices more than it moves anything else?',
+            claim:
+              'Because a house is bought almost entirely with borrowed money, so its price is really a monthly payment.',
+            reader: 'My sister, who is buying her first flat next spring',
+          },
+          interview: {
+            status: 'asking',
+            field: 'origin',
+            ask: 'What did you see that made you think of a house price as a monthly payment rather than a price?',
+          },
+        }}
+        study={STUDY_WAITING}
+        originStudy={{ kind: 'found', items: originItems, searched: true, indexed: true }}
+      />
+    </WithCosts>
   );
 }
+
+/** What Dash offers for "What made you think this?" (spec, question 4): two finds from the person's study. */
+const originItems: StudyItem[] = [
+  {
+    key: 'passage:00000000-0000-4000-8000-0000000000f1:Mortgage maths',
+    kind: 'passage',
+    title: 'Buying a flat',
+    context: 'Mortgage maths',
+    sentence: 'The agent never asked what we could pay for the flat, only what we could pay each month.',
+    href: '/vault/notes/Home/Buying%20a%20flat.md',
+    link: 'Buying a flat',
+    pinned: false,
+  },
+  {
+    key: 'log:00000000-0000-4000-8000-0000000000f2',
+    kind: 'log',
+    title: 'How the Bank of England sets Bank Rate',
+    context: null,
+    sentence: 'A quarter point on a 25-year mortgage changes the payment more than a year of wage growth does.',
+    href: null,
+    link: null,
+    pinned: false,
+  },
+];
 
 const finishedUnits: PlanUnit[] = [
   {

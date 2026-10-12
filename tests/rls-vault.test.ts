@@ -938,6 +938,14 @@ describe('note blocks, across users', () => {
     );
     expect(near).toHaveLength(0);
   });
+
+  it('finds no position of another user near a text (plan #1863.8)', async () => {
+    const near = await asUser(
+      userB,
+      (tx) => tx`select position_id from nearest_positions(${VECTOR}, null, 5, 0, null)`,
+    );
+    expect(near.map((row) => row.position_id)).not.toContain(positionA);
+  });
 });
 
 describe('note embeddings, across users', () => {
