@@ -7,7 +7,7 @@ import type { TodayItem, TodayKind } from './today';
  * yes or no to. The same three groups as the Inbox in Dev, so the two read
  * the same way.
  *
- * Every goal's rows are here, not only the week's focus goals: the Home's Do
+ * Every goal's rows are here, not only the ones with a due date: the Home's Do
  * next is the short list for today, and this is all of it.
  */
 
