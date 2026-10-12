@@ -37,7 +37,7 @@ const ctx = {
 };
 
 function todoStep(id: string, extra: Partial<TodoStep> = {}): TodoStep {
-  return { id, title: id, dueOn: null, startsOn: null, goalId: 'g', goalTitle: 'Goal', ...extra };
+  return { id, title: id, dueOn: null, startsOn: null, goalId: 'g', goalTitle: 'Goal', reason: null, ...extra };
 }
 
 describe('goalStepsSource', () => {
@@ -49,6 +49,12 @@ describe('goalStepsSource', () => {
 
   it('shows nothing when no step was sent and no event is on', async () => {
     expect(await goalStepsSource.fetch(ctx)).toEqual([]);
+  });
+
+  it("shows Dash's reason under a step Dash sent", async () => {
+    steps.push(todoStep('s1', { reason: 'Due on the 13th' }), todoStep('s2'));
+    const items = await goalStepsSource.fetch(ctx);
+    expect(items.map((item) => item.detail)).toEqual(['Dash: Due on the 13th', null]);
   });
 
   it('names the row behind every kind of item by a ref', async () => {
