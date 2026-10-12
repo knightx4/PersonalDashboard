@@ -319,6 +319,30 @@ describe('the Goals home', () => {
     expect(render({ done: null })).toContain('could not be read just now');
   });
 
+  it('counts the files Dash wrote that you have not opened, and lists the newest five (plan #1861)', () => {
+    const files = Array.from({ length: 7 }, (_, i) => ({
+      id: `f${i}`,
+      title: `File number ${i}`,
+      summary: null,
+      madeBy: 'claude' as const,
+      version: 1,
+      origin: null,
+      createdAt: '2026-10-12T09:00:00Z',
+      updatedAt: '2026-10-12T09:00:00Z',
+      readAt: null,
+    }));
+    const html = render({ filesToRead: files });
+    expect(html).toContain('Files to read');
+    expect(html).toMatch(/Files to read[\s\S]*?>7</);
+    expect(html).toContain('File number 4');
+    expect(html).not.toContain('File number 5');
+    expect(html).toContain('All 7 on Files');
+    expect(html.indexOf('Since your last visit')).toBeLessThan(html.indexOf('Files to read'));
+    expect(render({ filesToRead: files.slice(0, 2) })).toContain('All files');
+    expect(render({ filesToRead: [] })).not.toContain('Files to read');
+    expect(render({ filesToRead: null })).not.toContain('Files to read');
+  });
+
   it('offers goals Dash has left alone, and a new goal or errand once there is an area', () => {
     const offers = [
       { kind: 'goal' as const, goalId: 'g1', title: 'Pay off the debts', reason: 'Dash has not worked on it yet.' },

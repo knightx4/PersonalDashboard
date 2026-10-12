@@ -1,6 +1,9 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
+import { createCoreClient } from '@/lib/core/auth/server';
+import type { FileListing } from '@/lib/files/files';
+import { loadUnreadFiles } from '@/lib/files/store';
 import { isOwner } from '@/lib/dev/owner';
 import { writtenWhen, type Brief } from '@/lib/goals/briefs';
 import { loadBrief } from '@/lib/goals/briefs-store';
@@ -42,7 +45,7 @@ export default async function GoalsPage() {
   const account = await loadAccountSettings(user.id);
   const client = await createGoalsClient();
   const today = todayIn(account.timezone);
-  const [home, visit, brief, areas, owner] = await Promise.all([
+  const [home, visit, brief, areas, owner, filesToRead] = await Promise.all([
     // The same read the tab's Inbox badge counts from, once per request.
     loadHomeForRequest(user.id, today),
     recordVisit(client, { userId: user.id, today }),
@@ -52,6 +55,10 @@ export default async function GoalsPage() {
     loadAreas(client).catch(() => []),
     // Ask Dash starts a run, which only the owner's account may (shaping-actions.ts).
     isOwner({ user }),
+    // Dash's files not opened yet (plan #1861); a failed read leaves the line out.
+    createCoreClient()
+      .then(loadUnreadFiles)
+      .catch((): FileListing[] | null => null),
   ]);
   // A failed read says so in its section rather than failing the page.
   const done = await loadDoneSince(client, visit.previousVisitAt ?? visit.lastVisitAt).catch(
@@ -73,6 +80,7 @@ export default async function GoalsPage() {
         areas={areas.map((area) => ({ id: area.id, name: area.name, learn: area.learn }))}
         canRun={owner}
         awayFrom={awayFrom}
+        filesToRead={filesToRead}
       />
     </div>
   );

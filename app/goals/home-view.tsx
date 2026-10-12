@@ -1,12 +1,14 @@
 import Link from 'next/link';
 import { Flag } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
+import { FileLinks } from '@/components/files/file-links';
 import { PRESS_AREA } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
 import { DashMark } from '@/components/ui/dash-mark';
 import { Disclosure } from '@/components/ui/disclosure';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
+import { authorLine, type FileListing } from '@/lib/files/files';
 import { daysAway } from '@/lib/goals/catch-up';
 import { formatInstant } from '@/lib/goals/dates';
 import type { DoneSince } from '@/lib/goals/done-since';
@@ -47,7 +49,8 @@ import { GoalLanes } from './goal-lanes';
  *    Everything else on you is on the Inbox tab (app/goals/inbox), which
  *    Do next links to with its count.
  * 4. Lines that open in place: what Dash is on, what Dash did since your
- *    last visit (done-since-list.tsx), what you set aside, and Other goals.
+ *    last visit (done-since-list.tsx), the files Dash wrote that you have not
+ *    opened (plan #1861), what you set aside, and Other goals.
  *
  * The day you come back after five or more days away (lib/goals/catch-up.ts),
  * Dash's card says how long you were gone and the line for what Dash did
@@ -84,6 +87,8 @@ export type HomeViewProps = {
   awayFrom?: string | null;
   /** Runs waiting on your answer (plan #1824), counted into the Inbox link. */
   waitingRuns?: RunQuestion[];
+  /** Dash's files you have not opened, newest first (plan #1861); null when they could not be read. */
+  filesToRead?: FileListing[] | null;
 };
 
 export function HomeView({
@@ -102,6 +107,7 @@ export function HomeView({
   canRun = false,
   awayFrom = null,
   waitingRuns = [],
+  filesToRead = [],
 }: HomeViewProps) {
   if (goals.length === 0 && onYou.length === 0) {
     return (
@@ -172,7 +178,12 @@ export function HomeView({
         working={working}
         offers={offers}
         canRun={canRun}
-        since={<SinceLine done={done} timeZone={timeZone} open={away !== null} />}
+        since={
+          <>
+            <SinceLine done={done} timeZone={timeZone} open={away !== null} />
+            <FilesLine files={filesToRead} timeZone={timeZone} />
+          </>
+        }
       />
     </div>
   );
@@ -262,6 +273,41 @@ function SinceLine({
           className={cn(PRESS_AREA, 'text-accent underline-offset-2 hover:underline')}
         >
           Every run
+        </Link>
+      </p>
+    </FoldLine>
+  );
+}
+
+/** How many of the files to read the line lists before linking to the rest. */
+export const FILES_LINE_CAP = 5;
+
+/**
+ * The files Dash wrote that you have not opened (plan #1861), as one line
+ * with their count that opens to the newest few and the Files page. Not
+ * drawn when every file is read, or when they could not be read.
+ */
+function FilesLine({ files, timeZone }: { files: FileListing[] | null; timeZone: string }) {
+  if (!files || files.length === 0) return null;
+  const shown = files.slice(0, FILES_LINE_CAP);
+  return (
+    <FoldLine title="Files to read" meta={String(files.length)}>
+      <FileLinks
+        files={shown.map((file) => ({
+          fileId: file.id,
+          title: file.title,
+          summary: file.summary,
+          meta: `${authorLine(file)} · ${formatInstant(file.updatedAt, timeZone)}`,
+          byDash: true,
+          unread: true,
+        }))}
+      />
+      <p className="px-1 text-small">
+        <Link
+          href="/goals/files"
+          className={cn(PRESS_AREA, 'text-accent underline-offset-2 hover:underline')}
+        >
+          {files.length > shown.length ? `All ${files.length} on Files` : 'All files'}
         </Link>
       </p>
     </FoldLine>
