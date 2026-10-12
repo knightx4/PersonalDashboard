@@ -182,7 +182,7 @@ export function answerPortsFor(input: { supabase: Db; now: number }): AnswerPort
       const earliest = candidates
         .map((item) => historyLines(item.comment).at(-1)?.date ?? '9999-12-31')
         .sort()[0];
-      const [rounds, runRows] = await Promise.all([
+      const [rounds, runRows, unblocks] = await Promise.all([
         supabase
           .from('ui_checks')
           .select('step, created_at')
@@ -196,9 +196,25 @@ export function answerPortsFor(input: { supabase: Db; now: number }): AnswerPort
           .neq('status', 'failed')
           .not('plan_item_id', 'is', null)
           .gte('created_at', `${earliest}T00:00:00Z`),
+        // The exact time each answer lifted its block (plan #1830).
+        supabase
+          .from('plan_history')
+          .select('item_id, created_at')
+          .eq('user_id', userId)
+          .eq('action', 'update')
+          .eq('old_status', 'blocked')
+          .neq('new_status', 'blocked')
+          .in('item_id', candidates.map((item) => item.id))
+          .gte('created_at', `${earliest}T00:00:00Z`),
       ]);
       if (rounds.error) throw new Error(rounds.error.message);
       if (runRows.error) throw new Error(runRows.error.message);
+      if (unblocks.error) throw new Error(unblocks.error.message);
+
+      const unblockedAt = new Map<string, string[]>();
+      for (const row of (unblocks.data ?? []) as Array<{ item_id: string; created_at: string }>) {
+        unblockedAt.set(row.item_id, [...(unblockedAt.get(row.item_id) ?? []), row.created_at]);
+      }
 
       const acceptedAt = new Map<number, string[]>();
       for (const row of (rounds.data ?? []) as Array<{ step: number; created_at: string }>) {
@@ -216,6 +232,7 @@ export function answerPortsFor(input: { supabase: Db; now: number }): AnswerPort
           .filter((turn) => turn.author === 'me')
           .map((turn) => ({ body: turn.body, createdAt: turn.createdAt })),
         acceptedAt: acceptedAt.get(item.number) ?? [],
+        unblockedAt: unblockedAt.get(item.id) ?? [],
       }));
       const runs: AnswerRun[] = (
         (runRows.data ?? []) as Array<{ plan_item_id: string; created_at: string }>
