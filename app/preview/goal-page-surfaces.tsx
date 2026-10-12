@@ -39,6 +39,7 @@ import { closedSteps, goalStages } from '@/lib/goals/goal-page';
 import { goalProgress } from '@/lib/goals/status';
 import { goalMapWith } from './goal-surfaces';
 import { SetTab } from './set-tab';
+import { GOAL_RUN_QUESTION } from './run-lines-surfaces';
 
 /**
  * The Goals home, All goals, the top of a goal page and an information step,
@@ -414,7 +415,7 @@ export function GoalsInboxSurface() {
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader title="Inbox" />
       <GoalsInboxView
-        groups={goalInboxGroups(home.onYou, home.dash ?? [])}
+        groups={goalInboxGroups(home.onYou, home.dash ?? [], [GOAL_RUN_QUESTION])}
         laterOn={home.laterOn ?? []}
         preparable={home.preparable ?? []}
         canRun

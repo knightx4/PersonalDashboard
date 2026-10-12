@@ -33,6 +33,8 @@ import { RAISED_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { InboxOverview, inboxAnchor, type InboxCell } from '@/components/inbox/overview';
 import { isRunnerSource } from '@/lib/plan/stall';
+import { RunQuestionCard } from '@/components/runs/run-question-card';
+import { answerPlanRunAction } from '@/app/dev/plan/run-actions';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -437,6 +439,8 @@ export function RaisedView({
                     specTitle={entry.spec.specTitle}
                     foldDiff
                   />
+                ) : entry.kind === 'run' ? (
+                  <RunQuestionCard key={entry.id} question={entry.question} action={answerPlanRunAction} />
                 ) : (
                   <RaiseCard key={entry.id} row={entry.raise} titles={titles} />
                 ),

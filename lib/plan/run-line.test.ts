@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RUN_LINE_MAX, runLine, statusAfterLine } from './run-line';
+import { RUN_LINE_MAX, runLine, runResponse, statusAfterLine } from './run-line';
 
 describe('runLine', () => {
   it('accepts an action', () => {
@@ -36,5 +36,30 @@ describe('statusAfterLine', () => {
   it('leaves an ended run alone', () => {
     expect(statusAfterLine('finished', 'action')).toBe('finished');
     expect(statusAfterLine('failed', 'question')).toBe('failed');
+  });
+});
+
+describe('runResponse', () => {
+  it('prints the answer to the newest question', () => {
+    const said = runResponse([
+      { kind: 'question', body: 'Stay or close?' },
+      { kind: 'response', body: 'Stay' },
+    ]);
+    expect(said).toContain('Answered: Stay');
+    expect(said).toContain('Stay or close?');
+  });
+
+  it('says there is no answer yet, and how to stop if nothing is left', () => {
+    const said = runResponse([
+      { kind: 'question', body: 'A?' },
+      { kind: 'response', body: 'Yes' },
+      { kind: 'question', body: 'B?' },
+    ]);
+    expect(said).toMatch(/^No answer yet to: B\?/);
+    expect(said).toContain('stopped <n>');
+  });
+
+  it('says when nothing was asked', () => {
+    expect(runResponse([{ kind: 'action', body: 'Claimed' }])).toBe('This run has asked nothing.');
   });
 });

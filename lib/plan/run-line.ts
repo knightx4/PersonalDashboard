@@ -51,6 +51,31 @@ export function runLine(
 }
 
 /**
+ * What `plan.ts response <n>` prints (plan #1824): the person's answer to the
+ * run's newest question, or that there is none yet and what to do about it.
+ * The lines are the run's, oldest first.
+ */
+export function runResponse(lines: readonly { kind: string; body: string }[]): string {
+  let asked = -1;
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (lines[index].kind === 'question') {
+      asked = index;
+      break;
+    }
+  }
+  if (asked < 0) return 'This run has asked nothing.';
+  const question = lines[asked].body;
+  const answer = lines.slice(asked + 1).find((line) => line.kind === 'response');
+  if (answer) return `Answered: ${answer.body}\n(The question was: ${question})`;
+  return (
+    `No answer yet to: ${question}\n` +
+    'Carry on with whatever does not depend on it and check again. If nothing is left, end the ' +
+    'run with `stopped <n> --reason "Waiting on your answer: …"`; the answer then starts a new ' +
+    'run with it in the brief.'
+  );
+}
+
+/**
  * The run's status after the line. A question parks the run on the person;
  * any other line from the session means it is working again, which clears a
  * wait or a stale mark. A finished or failed run keeps its status.

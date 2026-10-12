@@ -61,6 +61,8 @@
  *                                [--option "…" ...]   # one line on the run fired at <n> (or
  *                                # the feature above it), shown live on the run's page; a
  *                                # question takes 1-10 options and parks the run on you
+ *   npx tsx scripts/plan.ts response <n>   # your answer to the run's last question, or
+ *                                # "No answer yet"; what a session that asked reads back
  *   npx tsx scripts/plan.ts fog <n> --note "what cannot be seen yet" | --clear
  *                                # one patch per feature, about finishing it
  *   npx tsx scripts/plan.ts update <feature> --health on_track|at_risk|blocked --body "…"
@@ -97,7 +99,7 @@ import { uiCheckRefusal, type CheckRound } from '../lib/plan/ui-check-guard';
 import { stepScreenInputs } from '../lib/plan/ui-check-local';
 import type { VisionBodies } from '../lib/specs/vision';
 import { closeRefusal, commitOnMain } from '../lib/plan/github';
-import { runLine, statusAfterLine } from '../lib/plan/run-line';
+import { runLine, runResponse, statusAfterLine } from '../lib/plan/run-line';
 import { runForStop, stopColumns, stopLine, stopRefusal } from '../lib/plan/stop-reason';
 import { branchesContaining } from '../lib/plan/branches';
 import {
@@ -1312,6 +1314,42 @@ async function main(): Promise<void> {
         await sql`update plan_runs set status = ${next} where id = ${run.id} and user_id = ${userId}`;
       }
       console.log(`#${item.number} run line (${line.kind}): ${line.body}`);
+      return;
+    }
+
+    // The person's answer to the question the run asked (plan #1824): what a
+    // session that asked with `activity --kind question` reads back to carry
+    // on. Prints the answer, or says there is none yet.
+    if (command === 'response') {
+      const chain = await sql<{ id: string }[]>`
+        with recursive chain as (
+          select id, parent_id from plan_items where id = ${item.id} and user_id = ${userId}
+          union all
+          select p.id, p.parent_id from plan_items p
+          join chain on p.id = chain.parent_id
+          where p.user_id = ${userId}
+        )
+        select id from chain`;
+      const ids = chain.map((row) => row.id);
+      const rows = await sql<{ id: string; plan_item_id: string; status: string; created_at: Date }[]>`
+        select id, plan_item_id, status, created_at from plan_runs
+        where user_id = ${userId} and plan_item_id in ${sql(ids)}`;
+      const run = runForStop(
+        rows.map((row) => ({
+          id: row.id,
+          planItemId: row.plan_item_id,
+          status: row.status,
+          createdAt: row.created_at.toISOString(),
+        })),
+        ids,
+      );
+      if (!run) fail(`No run was fired at #${item.number} or above it, so nothing was asked.`);
+      const lines = await sql<{ kind: string; body: string; created_at: Date }[]>`
+        select kind, body, created_at from core.run_activities
+        where user_id = ${userId} and run_id = ${run.id}
+        order by created_at`;
+      const heard = runResponse(lines.map((line) => ({ kind: line.kind, body: line.body })));
+      console.log(heard);
       return;
     }
 
