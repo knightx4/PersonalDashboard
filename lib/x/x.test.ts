@@ -62,6 +62,7 @@ function account(over: Partial<XAccountRow> = {}): XAccountRow {
     status: 'active',
     last_synced_at: null,
     newest_post_id: null,
+    read_problem: null,
     created_at: '2026-10-12T00:00:00Z',
     ...over,
   };
@@ -195,6 +196,7 @@ describe('what the tab shows', () => {
       state: 'connected',
       handle: 'selvey',
       lastSyncedAt: null,
+      problem: null,
     });
   });
 

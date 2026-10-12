@@ -22,6 +22,7 @@ import { decryptToken } from '@/lib/crypto/tokens';
 import { loadXAccount } from '@/lib/x/account';
 import { isXOAuthConfigured, xClient, xOAuthEnv } from '@/lib/x/env';
 import { revokeXToken } from '@/lib/x/oauth';
+import { runXRead, xRunMessage } from '@/lib/x/read';
 
 /**
  * The Posts tab's writes (plan #1419). Each one refuses anybody but the
@@ -461,4 +462,32 @@ export async function disconnectX(): Promise<{ ok: boolean; error?: string }> {
 
   revalidatePath(POSTS_PATH);
   return { ok: true };
+}
+
+/**
+ * Check X now (plan #1819): the daily read, run on demand for the person's
+ * account. A first read pages through every post X returns, which takes a
+ * minute or so; later ones are a request or two. A read X stops (rate limit,
+ * no credit) answers with the line the tab also keeps showing.
+ */
+// latency: pending -- reads X, a second to a minute
+export async function checkX(): Promise<{ ok: boolean; error?: string; message?: string }> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+  if (!isXOAuthConfigured()) return { ok: false, error: 'The X keys are not set yet.' };
+
+  const env = xOAuthEnv();
+  try {
+    const result = await runXRead(supabase, user.id, {
+      trigger: 'manual',
+      client: xClient(env),
+      encryptionKey: env.TOKEN_ENCRYPTION_KEY,
+    });
+    revalidatePath(POSTS_PATH);
+    const said = xRunMessage(result);
+    return said.ok ? { ok: true, message: said.text } : { ok: false, error: said.text };
+  } catch {
+    revalidatePath(POSTS_PATH);
+    return { ok: false, error: 'Something went wrong reading X. Try again in a minute.' };
+  }
 }

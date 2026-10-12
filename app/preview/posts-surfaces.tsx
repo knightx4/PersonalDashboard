@@ -117,7 +117,8 @@ export function PostsDraftingSurface() {
  * keys not set (pointing at setup step #1816), not connected, X stopped
  * accepting the sign-in, and connected with a fifteen-character handle, the
  * longest X allows. The lines a cancelled and a refused sign-in leave sit in
- * the second and third.
+ * the second and third. Connected, the row offers Check X now (plan #1819);
+ * the last one shows the line a read X stopped at its rate limit leaves.
  */
 export function PostsXSurface() {
   return (
@@ -126,6 +127,15 @@ export function PostsXSurface() {
       <XConnection view={{ state: 'none' }} notice={xConnectNotice('denied')} />
       <XConnection view={{ state: 'disconnected', handle: 'selveyknight' }} notice={xConnectNotice('exchange')} />
       <XConnection view={{ state: 'connected', handle: 'selveyknightdev', lastSyncedAt: null }} />
+      <XConnection
+        view={{
+          state: 'connected',
+          handle: 'selveybuilds',
+          lastSyncedAt: '2026-10-11T12:00:00Z',
+          problem:
+            'X’s rate limit was reached, so the read stopped. The next read picks up where this one stopped.',
+        }}
+      />
     </div>
   );
 }
