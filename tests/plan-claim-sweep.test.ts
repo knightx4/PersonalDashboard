@@ -27,8 +27,7 @@ import { QUIET_AFTER_MINUTES } from '@/lib/plan/liveness';
 type Row = Record<string, unknown>;
 
 const NOW = new Date('2026-03-02T12:00:00Z');
-const minutesAgo = (minutes: number) =>
-  new Date(NOW.getTime() - minutes * 60_000).toISOString();
+const minutesAgo = (minutes: number) => new Date(NOW.getTime() - minutes * 60_000).toISOString();
 
 /**
  * Enough of the query builder for the reads and the updates it makes.
@@ -38,7 +37,12 @@ const minutesAgo = (minutes: number) =>
  * The runs are a second table and read-only: the sweep asks which run holds
  * each condemned step and writes nothing back to `plan_runs`.
  */
-function stubClient(rows: Row[], runs: Row[] = [], blocks: Record<string, string> = {}) {
+function stubClient(
+  rows: Row[],
+  runs: Row[] = [],
+  blocks: Record<string, string> = {},
+  checkBacks: Row[] = [],
+) {
   const updates: Array<{ id: unknown; patch: Row }> = [];
   const asked: string[] = [];
 
@@ -76,7 +80,19 @@ function stubClient(rows: Row[], runs: Row[] = [], blocks: Record<string, string
     select: () => ({ in: () => ({ order: async () => ({ data: runs, error: null }) }) }),
   });
 
-  const from = (table: string) => (table === 'plan_runs' ? runReads() : builder());
+  // `check_backs`: the waiting ones, whatever the filter, since the stub's
+  // rows are only ever the waiting ones on the claims under test.
+  const checkBackReads = () => {
+    const self = {
+      select: () => self,
+      eq: () => self,
+      in: async () => ({ data: checkBacks, error: null }),
+    };
+    return self;
+  };
+
+  const from = (table: string) =>
+    table === 'plan_runs' ? runReads() : table === 'check_backs' ? checkBackReads() : builder();
 
   // `plan_subtree_blocked_at`: the newest block under the step, which the
   // sweep asks about only once a run has saved the claim.
@@ -169,6 +185,19 @@ describe('releaseStaleClaims', () => {
     );
   });
 
+  it('keeps a claim a check-back is waiting on, however old', async () => {
+    const { supabase, updates } = stubClient([claim({ started_at: minutesAgo(60 * 30) })], [], {}, [
+      { plan_item_id: 'a' },
+    ]);
+
+    await expect(releaseStaleClaims(supabase, NOW)).resolves.toEqual({
+      released: 0,
+      steps: [],
+      kept: [42],
+    });
+    expect(updates).toHaveLength(0);
+  });
+
   it('takes back the stale claims and leaves the live ones', async () => {
     const { supabase } = stubClient([
       claim({ id: 'a', number: 1, started_at: minutesAgo(5) }),
@@ -205,7 +234,9 @@ describe('releaseStaleClaims against what the run pushed', () => {
     const { supabase, updates, rows } = stubClient([condemned()], [run()]);
 
     await expect(
-      releaseStaleClaims(supabase, NOW, { fetch: pushed({ ref: 'claude/one', minutes: 6 }) as never }),
+      releaseStaleClaims(supabase, NOW, {
+        fetch: pushed({ ref: 'claude/one', minutes: 6 }) as never,
+      }),
     ).resolves.toEqual({ released: 0, steps: [], kept: [42] });
     expect(updates).toHaveLength(0);
     expect(rows[0].status).toBe('in_progress');
@@ -229,7 +260,9 @@ describe('releaseStaleClaims against what the run pushed', () => {
     const { supabase, updates } = stubClient([condemned()], [run()]);
 
     await expect(
-      releaseStaleClaims(supabase, NOW, { fetch: pushed({ ref: 'claude/one', minutes: 180 }) as never }),
+      releaseStaleClaims(supabase, NOW, {
+        fetch: pushed({ ref: 'claude/one', minutes: 180 }) as never,
+      }),
     ).resolves.toEqual({ released: 1, steps: [42], kept: [] });
     expect(updates[0].patch.comment).toBe(
       'Claim expired 2026-03-02: nothing had touched it for 2h 40m, so it went back to not started.',
@@ -309,7 +342,9 @@ describe('releaseStaleClaims against what the run pushed', () => {
     const { supabase } = stubClient([condemned()], [run({ status: 'failed' })]);
 
     await expect(
-      releaseStaleClaims(supabase, NOW, { fetch: pushed({ ref: 'claude/one', minutes: 6 }) as never }),
+      releaseStaleClaims(supabase, NOW, {
+        fetch: pushed({ ref: 'claude/one', minutes: 6 }) as never,
+      }),
     ).resolves.toEqual({ released: 1, steps: [42], kept: [] });
   });
 
@@ -321,7 +356,9 @@ describe('releaseStaleClaims against what the run pushed', () => {
     const { supabase, updates } = stubClient([condemned()], [run()], { a: minutesAgo(20) });
 
     await expect(
-      releaseStaleClaims(supabase, NOW, { fetch: pushed({ ref: 'claude/one', minutes: 6 }) as never }),
+      releaseStaleClaims(supabase, NOW, {
+        fetch: pushed({ ref: 'claude/one', minutes: 6 }) as never,
+      }),
     ).resolves.toEqual({ released: 1, steps: [42], kept: [] });
     expect(updates[0].patch.status).toBe('not_started');
   });
@@ -335,7 +372,9 @@ describe('releaseStaleClaims against what the run pushed', () => {
     });
 
     await expect(
-      releaseStaleClaims(supabase, NOW, { fetch: pushed({ ref: 'claude/one', minutes: 6 }) as never }),
+      releaseStaleClaims(supabase, NOW, {
+        fetch: pushed({ ref: 'claude/one', minutes: 6 }) as never,
+      }),
     ).resolves.toEqual({ released: 0, steps: [], kept: [42] });
     expect(updates).toHaveLength(0);
   });
