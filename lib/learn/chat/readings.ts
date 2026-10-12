@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { embedIdeaClaims } from '@/lib/learn/embed/idea-embedding';
 import type { ReferenceCandidate } from '@/lib/learn/import/parse-heuristic';
 import { resolveOneReference } from '@/lib/learn/import/resolve';
 import type { ResolvedSource } from '@/lib/learn/import/resolve-payload';
@@ -496,14 +497,20 @@ export async function logChatSession(
   const fresh = input.ideas.filter((idea) => !known.has(idea.name.toLowerCase()));
   if (fresh.length > 0) {
     const basis = `Met in a conversation about ${input.topic}. Not tested yet.`.slice(0, 500);
+    const vectors = await embedIdeaClaims(
+      learn,
+      userId,
+      fresh.map((idea) => idea.claim),
+    );
     const { error: insertError } = await learn.from('concepts').insert(
-      fresh.map((idea) => ({
+      fresh.map((idea, index) => ({
         user_id: userId,
         subject_id: input.subject!.id,
         name: idea.name,
         claim: idea.claim,
         basis,
         origin: 'conversation',
+        ...vectors[index],
       })),
     );
     if (insertError) throw failed('Adding the ideas to the subject', insertError);

@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { addChatReadings, findReadings, logChatSession, markChatReadingRead } from './readings';
+
+// Each idea is saved with its claim's embedding (plan #1853).
+vi.mock('@/lib/learn/embed/idea-embedding', () => import('@/tests/stubs/idea-embedding'));
 import { cleanSubjectNames, resolveChatSubjects } from './subjects';
 
 /**
@@ -238,7 +241,14 @@ describe('logChatSession', () => {
     expect(logged).toEqual({ id: 'log1', conceptsAdded: 1, conceptsKnown: 1 });
     const concepts = queries.find((query) => query.table === 'concepts' && query.op === 'insert')!.values;
     expect(concepts).toEqual([
-      expect.objectContaining({ user_id: 'me', subject_id: 's2', name: 'Reading failures', origin: 'conversation' }),
+      expect.objectContaining({
+        user_id: 'me',
+        subject_id: 's2',
+        name: 'Reading failures',
+        origin: 'conversation',
+        embedding: 'vector of Reading failed cases teaches more than the score.',
+        embedding_model: 'voyage-4-lite',
+      }),
     ]);
     expect(queries.some((query) => query.table === 'concept_state')).toBe(false);
   });

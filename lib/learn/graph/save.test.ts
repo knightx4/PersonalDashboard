@@ -22,6 +22,9 @@ vi.mock('@/lib/learn/areas/place-track', () => ({
   placeTrackAfterResponse: (...args: unknown[]) => placeTrackAfterResponse(...args),
 }));
 
+// Each idea is saved with its claim's embedding (plan #1853).
+vi.mock('@/lib/learn/embed/idea-embedding', () => import('@/tests/stubs/idea-embedding'));
+
 type Insert = { table: string; rows: unknown };
 
 /**
@@ -113,6 +116,19 @@ const rowsFor = (inserts: Insert[], table: string) =>
   inserts.filter((insert) => insert.table === table).flatMap((insert) => insert.rows as never[]);
 
 describe('saving an approved chain', () => {
+  it('saves each new concept with the embedding of its own claim', async () => {
+    const { client, inserts } = clientReturningIds('subject-1');
+    await saveChain(client, 'user-1', CHAIN, 'how rates reach prices');
+
+    expect(rowsFor(inserts, 'concepts')).toEqual([
+      expect.objectContaining({
+        claim: 'The gain goes, the inflation stays.',
+        embedding: 'vector of The gain goes, the inflation stays.',
+        embedding_model: 'voyage-4-lite',
+      }),
+    ]);
+  });
+
   it('inserts only the concepts that are new', async () => {
     const { client, inserts } = clientReturningIds('subject-1');
     const saved = await saveChain(client, 'user-1', CHAIN, 'how rates reach prices');

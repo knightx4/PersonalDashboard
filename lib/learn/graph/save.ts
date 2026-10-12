@@ -3,6 +3,7 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { placeTrackAfterResponse, type TrackTheme } from '@/lib/learn/areas/place-track';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { embedIdeaClaims } from '@/lib/learn/embed/idea-embedding';
 import type { ProposedChain } from '@/lib/learn/graph/chain-payload';
 
 /**
@@ -177,10 +178,16 @@ export async function saveChainInto(
   const conceptIds: string[] = [];
   const fresh = chain.nodes.filter((node) => !node.existingId);
   if (fresh.length > 0) {
+    // Embedded before the insert so each idea is saved with its vector.
+    const vectors = await embedIdeaClaims(
+      supabase,
+      userId,
+      fresh.map((node) => node.claim),
+    );
     const { data, error } = await supabase
       .from('concepts')
       .insert(
-        fresh.map((node) => ({
+        fresh.map((node, index) => ({
           user_id: userId,
           subject_id: subjectId,
           name: node.name,
@@ -199,6 +206,7 @@ export async function saveChainInto(
           ...(node.separatingQuestion ? { separating_question: node.separatingQuestion } : {}),
           ...(node.costIfWrong ? { cost_if_wrong: node.costIfWrong } : {}),
           ...(node.verdict ? { judge_verdict: node.verdict } : {}),
+          ...vectors[index],
         })),
       )
       .select('id, name');
