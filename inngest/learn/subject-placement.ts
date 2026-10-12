@@ -66,6 +66,15 @@ type PlacementColumns = {
   placement_model: string | null;
 };
 
+/**
+ * A name as the model's reply is matched on. The model hands a name back with
+ * its spacing tidied, so a subject saved as "a  note " (two spaces, one at the
+ * end) was never matched and was asked about again every hour.
+ */
+export function nameKey(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
 async function pendingSubjects(learn: LearnSupabaseClient): Promise<SubjectRow[]> {
   const rows: SubjectRow[] = [];
   for (let from = 0; ; from += PAGE) {
@@ -211,9 +220,9 @@ export async function runSubjectPlacement(deadline: number): Promise<SubjectPlac
         summary.failed.push(result.detail);
         continue;
       }
-      const byName = new Map(batch.subjects.map((subject) => [subject.name.toLowerCase(), subject]));
+      const byName = new Map(batch.subjects.map((subject) => [nameKey(subject.name), subject]));
       for (const placement of result.placements) {
-        const subject = byName.get(placement.title.toLowerCase());
+        const subject = byName.get(nameKey(placement.title));
         if (!subject) continue;
         const ok = await writePlacement(learn, subject, {
           field_id: placement.field ? (fieldIds.get(placement.field) ?? null) : null,
