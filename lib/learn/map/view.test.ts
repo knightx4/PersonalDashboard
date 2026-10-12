@@ -31,15 +31,15 @@ describe('the address', () => {
   });
 
   it('leaves defaults out of the address and round-trips the rest', () => {
-    expect(mapHref(DEFAULT_PARAMS)).toBe('/learn/know/space');
+    expect(mapHref(DEFAULT_PARAMS)).toBe('/learn/space');
     const href = mapHref(DEFAULT_PARAMS, { layout: 'axes', labels: true, idea: 'x1' });
-    expect(href).toBe('/learn/know/space?layout=axes&labels=on&idea=x1');
+    expect(href).toBe('/learn/space?layout=axes&labels=on&idea=x1');
     const search = Object.fromEntries(new URL(href, 'http://h').searchParams);
     expect(parseMapParams(search)).toEqual({ ...DEFAULT_PARAMS, layout: 'axes', labels: true, idea: 'x1' });
   });
 
   it('closes an idea by setting it to null', () => {
-    expect(mapHref({ ...DEFAULT_PARAMS, idea: 'x1' }, { idea: null })).toBe('/learn/know/space');
+    expect(mapHref({ ...DEFAULT_PARAMS, idea: 'x1' }, { idea: null })).toBe('/learn/space');
   });
 });
 

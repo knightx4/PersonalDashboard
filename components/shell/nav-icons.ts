@@ -35,6 +35,7 @@ import {
   Megaphone,
   Map,
   Network,
+  Orbit,
   MessageSquareText,
   MonitorPlay,
   Receipt,
@@ -144,6 +145,8 @@ export const NAV_ICONS = {
   // Now: the feed, what is waiting, and the practice questions (plan #1486).
   readNow: BookOpenCheck,
   know: Network,
+  // Idea Space: your ideas as points around what they are about (plan #1857).
+  ideaSpace: Orbit,
   // Goals: the things you want to learn and how well (plan #897).
   goals: Target,
   // Videos: your list, its clips and the YouTube library on one page (plan

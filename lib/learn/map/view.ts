@@ -9,7 +9,7 @@ import type { Point } from './layout';
  * colour means, whether the field names are on, and which idea is open.
  */
 
-export const SPACE_HREF = '/learn/know/space';
+export const SPACE_HREF = '/learn/space';
 
 export type MapLayout = 'neighbours' | 'axes';
 export type MapColour = 'state' | 'domain';
