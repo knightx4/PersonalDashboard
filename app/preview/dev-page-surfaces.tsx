@@ -44,6 +44,7 @@ import { ruleStates } from '@/lib/specs/rule-states';
 import type { ChangelogEntry } from '@/lib/changelog/entries';
 import type { RaisedQueue, RaisedRow } from '@/lib/raised/load';
 import type { WaitingGroup, WaitingRow } from '@/lib/plan/waiting';
+import { PLAN_RUN_QUESTION } from './run-lines-surfaces';
 import type { Conversation } from '@/lib/comments/recent';
 import type { ConnectedApp } from '@/lib/connector/apps';
 
@@ -731,6 +732,8 @@ const groups: WaitingGroup[] = [
     key: 'questions',
     title: 'Questions for you',
     entries: [
+      // A run held on a question it asked partway (plan #1824).
+      { kind: 'run', id: PLAN_RUN_QUESTION.runId, question: PLAN_RUN_QUESTION },
       {
         kind: 'plan',
         id: 'w2',
@@ -831,10 +834,7 @@ export function DevRaisedSurface() {
 export function DevInboxSurface() {
   return column(
     <>
-      <PageHeader
-        title="Inbox"
-        description="Everything waiting on you: jobs to go and do, questions to answer, and proposals to say yes to. Answer one and the next run reads it."
-      />
+      <PageHeader title="Inbox" />
       <RaisedView queue={raisedQueue} groups={groups} />
     </>,
   );

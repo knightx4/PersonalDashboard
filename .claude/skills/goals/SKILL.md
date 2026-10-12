@@ -135,6 +135,28 @@ person is `kind` `question` with `options` set to a JSON array of one to ten
 choices, followed by `update goals.runs set status = 'awaiting_input'`; when
 you carry on, set the status back to `started`.
 
+The question shows on the run's page and in the Goals inbox, each choice a
+press (plan #1824). Ask there only what has to be settled before this run can
+finish; a question that can wait for a later run is still a decision step.
+After asking, work on whatever does not depend on the answer, and check for it:
+
+```sql
+select a.body as answer
+from core.run_activities q
+join core.run_activities a
+  on a.run_id = q.run_id and a.kind = 'response' and a.created_at > q.created_at
+where q.run_id = '<run id>' and q.kind = 'question'
+order by q.created_at desc, a.created_at asc
+limit 1;
+```
+
+No row means no answer yet. Answering sets the run back to `started` for
+you. If nothing is left to do without the answer, stop waiting: write
+`update goals.runs set ended_at = now() where id = '<run id>'`, leaving the
+status `awaiting_input`, and end the session. The answer then starts a new
+run whose brief opens with the question, the answer and your lines so far.
+Never write a `response` line yourself; it is the person's.
+
 Report when you start mapping a goal, at each step of a morning run, at each
 step of a phase, and at least every 15 minutes during anything long, such as
 reading a long Gmail thread or researching one step. `now_on` is a short

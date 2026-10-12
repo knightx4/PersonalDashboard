@@ -34,7 +34,7 @@ import { cn } from '@/lib/cn';
 import { LiveRunLines } from '@/components/runs/live-run-lines';
 import { AcknowledgeRun } from '@/components/runs/acknowledge-run';
 import type { RunLinesState } from '@/components/runs/run-lines';
-import { acknowledgePlanRunAction } from './run-actions';
+import { acknowledgePlanRunAction, answerPlanRunAction } from './run-actions';
 
 export function when(iso: string | null): string | null {
   return iso ? iso.slice(0, 10) : null;
@@ -211,6 +211,7 @@ export function RunWork({
               <AcknowledgeRun runId={run.id} action={acknowledgePlanRunAction} />
             ) : undefined
           }
+          answer={answerPlanRunAction}
         />
       )}
     </div>

@@ -25,6 +25,7 @@ import type { DashLaneItem, LaterLaneItem } from '@/lib/goals/lanes';
 import type { RunListing } from '@/lib/goals/runs';
 import { TODAY_CAP, type TodayItem } from '@/lib/goals/today';
 import { goalInboxCount } from '@/lib/goals/inbox';
+import type { RunQuestion } from '@/lib/core/run-questions';
 import { AskDash } from './ask-dash';
 import { DoneSinceList } from './done-since-list';
 import { FoldLine } from './fold-line';
@@ -81,6 +82,8 @@ export type HomeViewProps = {
   canRun?: boolean;
   /** The visit before the time away, on the day you came back from it; otherwise null. */
   awayFrom?: string | null;
+  /** Runs waiting on your answer (plan #1824), counted into the Inbox link. */
+  waitingRuns?: RunQuestion[];
 };
 
 export function HomeView({
@@ -98,6 +101,7 @@ export function HomeView({
   laterOn = [],
   canRun = false,
   awayFrom = null,
+  waitingRuns = [],
 }: HomeViewProps) {
   if (goals.length === 0 && onYou.length === 0) {
     return (
@@ -159,7 +163,7 @@ export function HomeView({
 
       <GoalLanes
         doNext={doNext}
-        inboxCount={goalInboxCount(onYou, dash)}
+        inboxCount={goalInboxCount(onYou, dash, waitingRuns)}
         otherGoals={otherGoals}
         todayOn={todayOn}
         preparable={preparable}
