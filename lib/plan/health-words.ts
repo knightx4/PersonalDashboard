@@ -179,7 +179,10 @@ export function healthOf(
         (check) => `Waits until ${checkDay(check.dueAt)}: ${check.title.replace(/[.]+$/, '')}`,
       ),
     ].filter(Boolean);
-    return { ...base, title: parts.join('. ') };
+    // Put down until a day rather than held up by another step: the clock,
+    // not the dashed hexagon, so the two waits read apart (note 5025f689).
+    const onlyADay = facts.waitingOn.length === 0 && (facts.waitsUntil?.length ?? 0) > 0;
+    return { ...base, glyph: onlyADay ? 'clock' : base.glyph, title: parts.join('. ') };
   }
   return base;
 }
