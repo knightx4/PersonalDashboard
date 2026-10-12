@@ -37,6 +37,9 @@ import {
   type Goal,
 } from '@/lib/goals/tree';
 import { cn } from '@/lib/cn';
+import { reopenedGoal } from '@/lib/goals/optimistic';
+import { useOptimisticWrite } from '@/lib/use-optimistic-write';
+import { OrderedSiblings, useMoveSelf, type SiblingMove } from '@/lib/use-sibling-order';
 import { approveGoalAction } from './[goalId]/shaping-actions';
 import {
   addArea,
@@ -135,6 +138,22 @@ function moveItems(
       formFields: { id, direction: 'down' },
     },
   ];
+}
+
+/** Move up or Move down on a goal, as the form its action reads. */
+async function writeGoalMove(move: SiblingMove) {
+  const form = new FormData();
+  form.set('id', move.id);
+  form.set('direction', move.direction);
+  return moveGoalAction(form);
+}
+
+/** Reopen or Take it back up, as the form its action reads. */
+async function writeReopen(id: string) {
+  const form = new FormData();
+  form.set('id', id);
+  form.set('move', 'reopen');
+  return settleGoalAction({}, form);
 }
 
 /** What each view says when it has no goal to show. */
@@ -438,16 +457,22 @@ function AreaSection({
         {goalCount > 0 && (
           <Card>
             <ul className="divide-y divide-border">
-              {area.goals.map((goal, i) => (
-                <GoalRow
-                  key={goal.id}
-                  goal={goal}
-                  index={i}
-                  count={goalCount}
-                  steps={progress[goal.id]}
-                  places={places}
-                />
-              ))}
+              {/* The goals in the order the list holds, so Move up swaps a
+                  goal before the server has answered (plan #1851). */}
+              <OrderedSiblings items={area.goals} write={writeGoalMove}>
+                {(ordered) =>
+                  ordered.map((goal, i) => (
+                    <GoalRow
+                      key={goal.id}
+                      goal={goal}
+                      index={i}
+                      count={goalCount}
+                      steps={progress[goal.id]}
+                      places={places}
+                    />
+                  ))
+                }
+              </OrderedSiblings>
             </ul>
           </Card>
         )}
@@ -462,7 +487,7 @@ function AreaSection({
 }
 
 function GoalRow({
-  goal,
+  goal: served,
   index,
   count,
   steps,
@@ -474,10 +499,17 @@ function GoalRow({
   steps: GoalProgressData | undefined;
   places: Place[];
 }) {
+  // Reopen and Take it back up open the goal on the row when pressed, and
+  // put it back with the reason in a toast if refused (plan #1851).
+  const { shown: goal, run: reopen } = useOptimisticWrite<Goal, 'reopen'>({
+    value: served,
+    apply: (current) => reopenedGoal(current),
+    write: () => writeReopen(served.id),
+  });
+  const moveSelf = useMoveSelf(served.id, writeGoalMove);
   const [editState, edit, editing] = useActionState(editGoal, initial);
   // Fog is shown when the goal has some, or once you choose to add it.
   const [addingFog, setAddingFog] = useState(false);
-  const menuAction = useMenuAction();
   const toast = useToast();
   const showFog = goal.fog !== null || addingFog;
 
@@ -512,7 +544,18 @@ function GoalRow({
   const items: ActionMenuItem[] = archived
     ? [{ id: 'restore', label: 'Restore goal', formAction: restore, formFields: { id: goal.id } }]
     : [
-        ...moveItems(menuAction(moveGoalAction), goal.id, index, count),
+        {
+          id: 'up',
+          label: 'Move up',
+          disabled: index === 0,
+          onSelect: () => moveSelf('up'),
+        },
+        {
+          id: 'down',
+          label: 'Move down',
+          disabled: index === count - 1,
+          onSelect: () => moveSelf('down'),
+        },
         ...(showFog
           ? []
           : [
@@ -604,7 +647,7 @@ function GoalRow({
           <SettleProposedGoal goalId={goal.id} onTurnDown={archive} />
         )}
         {!archived && (goal.status === 'parked' || goal.status === 'done') && (
-          <TakeBackUp goalId={goal.id} status={goal.status} />
+          <TakeBackUp status={goal.status} onReopen={() => reopen('reopen')} />
         )}
         {editState.error && <p className="px-1 text-small text-danger">{editState.error}</p>}
       </div>
@@ -650,24 +693,20 @@ function SettleProposedGoal({
  * (plan #1084). Taking it back up opens it again and counts as keeping it
  * open, so it is not offered for parking again for three weeks.
  */
-function TakeBackUp({ goalId, status }: { goalId: string; status: 'parked' | 'done' }) {
-  const [state, reopen, reopening] = useActionState(settleGoalAction, initial);
+function TakeBackUp({
+  status,
+  onReopen,
+}: {
+  status: 'parked' | 'done';
+  onReopen: () => void;
+}) {
   return (
-    <form action={reopen} className="flex flex-wrap items-center gap-2 px-1 pt-1">
-      <input type="hidden" name="id" value={goalId} />
+    <div className="flex flex-wrap items-center gap-2 px-1 pt-1">
       <span className="text-small text-ink-muted">{status === 'parked' ? 'Parked' : 'Closed'}</span>
-      <Button
-        type="submit"
-        name="move"
-        value="reopen"
-        size="sm"
-        variant="ghost"
-        pending={reopening}
-      >
+      <Button type="button" size="sm" variant="ghost" onClick={onReopen}>
         {status === 'parked' ? 'Take it back up' : 'Reopen'}
       </Button>
-      {state.error && <span className="text-small text-danger">{state.error}</span>}
-    </form>
+    </div>
   );
 }
 

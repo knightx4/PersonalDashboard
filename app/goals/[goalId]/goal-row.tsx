@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Repeat } from 'lucide-react';
 import { RowIconButton } from '@/components/plan-tree/row-icon-button';
@@ -19,7 +19,15 @@ import type { LinkedFile } from '@/lib/files/files';
 import { awaitsReview } from '@/lib/goals/daily';
 import type { PrepTarget, StepPrep } from '@/lib/goals/goal-page';
 import { askDash, offersAsk } from '@/lib/goals/handover';
+import { withStepStatus, type StepStatusChange } from '@/lib/goals/optimistic';
 import { staysOpen, type GoalRowNode } from '@/lib/goals/plan-rows';
+import { useOptimisticWrite } from '@/lib/use-optimistic-write';
+import {
+  SiblingMoveProvider,
+  useMoveSelf,
+  useSiblingOrder,
+  type SiblingMove,
+} from '@/lib/use-sibling-order';
 import {
   PROGRESS_ESTIMATE_WORDS,
   amountWords,
@@ -368,6 +376,22 @@ function askDashLabel(step: GoalRowNode['step']): string {
   return prepared ? 'Ask Dash again' : 'Ask Dash';
 }
 
+/** Move up or Move down, as the form its action reads. */
+export async function writeStepMove(move: SiblingMove) {
+  const form = new FormData();
+  form.set('id', move.id);
+  form.set('direction', move.direction);
+  return moveStepAction(form);
+}
+
+/** A status from the health menu, as the form its action reads. */
+async function writeStepStatus(id: string, status: StepStatusChange) {
+  const form = new FormData();
+  form.set('id', id);
+  form.set('status', status);
+  return setGoalStepStatus({}, form);
+}
+
 const STATUS_WORDS = [
   ['not_started', 'Open'],
   ['blocked', 'Blocked'],
@@ -376,7 +400,7 @@ const STATUS_WORDS = [
 ] as const;
 
 export function GoalRow({
-  node,
+  node: served,
   trail,
   context,
   index,
@@ -407,6 +431,29 @@ export function GoalRow({
    */
   page?: boolean;
 }) {
+  // Status and order change on the row when pressed and come back if the
+  // write is refused, with the reason in a toast (plan #1851). `served` is
+  // what the server sent; `node` is that with the change in flight laid over
+  // it, and is what the rest of the row reads.
+  const { shown: statusInFlight, run: changeStatus } = useOptimisticWrite<
+    StepStatusChange | null,
+    StepStatusChange
+  >({
+    value: null,
+    apply: (_current, change) => change,
+    write: (change) => writeStepStatus(served.id, change),
+  });
+  // The steps beneath draw in the order their list holds, so Move up on one
+  // of them swaps it here before the server has answered.
+  const children = useSiblingOrder(served.children, writeStepMove);
+  const moveSelf = useMoveSelf(served.id, writeStepMove);
+  const node = useMemo(
+    () => ({
+      ...(statusInFlight ? withStepStatus(served, statusInFlight) : served),
+      children: children.ordered as GoalRowNode[],
+    }),
+    [served, statusInFlight, children.ordered],
+  );
   const { step } = node;
   const row = useTreeRow(node, {
     searching: false,
@@ -527,8 +574,7 @@ export function GoalRow({
                   id: status,
                   label,
                   disabled: status === node.status,
-                  formAction: tree(setGoalStepStatus),
-                  formFields: { id: step.id, status },
+                  onSelect: () => changeStatus(status),
                 },
         ),
       ];
@@ -599,7 +645,6 @@ export function GoalRow({
   // press's message said and more, so the message gives way to it. A refusal
   // is still said: it started nothing.
   const pressNote = askState.error ?? (run?.running ? undefined : askState.message);
-  const move = menuAction(moveStepAction);
   const menu: ActionMenuItem[] = [
     ...askItems,
     ...rhythmItems,
@@ -620,15 +665,13 @@ export function GoalRow({
             id: 'up',
             label: 'Move up',
             disabled: index === 0,
-            formAction: move,
-            formFields: { id: step.id, direction: 'up' },
+            onSelect: () => moveSelf('up'),
           },
           {
             id: 'down',
             label: 'Move down',
             disabled: index === count - 1,
-            formAction: move,
-            formFields: { id: step.id, direction: 'down' },
+            onSelect: () => moveSelf('down'),
           },
         ]),
     {
@@ -687,6 +730,7 @@ export function GoalRow({
           : null;
 
   return (
+    <SiblingMoveProvider move={children.move}>
     <TreeRow
       node={node}
       trail={trail}
@@ -977,5 +1021,6 @@ export function GoalRow({
         );
       }}
     />
+    </SiblingMoveProvider>
   );
 }

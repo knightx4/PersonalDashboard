@@ -65,6 +65,17 @@ tagged `// latency: optimistic`, and the two assignee buttons above are no
 longer submit controls. Writes that start a run or send to Dash, such as
 `sendPlanItemToClaude`, stay pending.
 
+Plan #1851 did the same for the goal rows on All goals and an area's page and
+the step rows on a goal's page and a step's own page. Open, Done and Dropped
+in a step's health menu, Move up and Move down on a step or a goal, and Reopen
+or Take it back up on a parked or closed goal change the row when pressed, and
+a refused write puts it back with the reason in a toast. `setGoalStepStatus`,
+`moveStepAction`, `moveGoalAction` and `settleGoalAction` are tagged
+`// latency: optimistic`. The goal rows' reorder goes through
+`lib/use-sibling-order.tsx`, which takes the write as an argument. Blocked
+still opens a box for what the step needs, Ask Dash still waits for its run to
+start, and the close and park answers on Today still wait for the server.
+
 ## Disabled while pending, label fixed
 
 The pending flag is already in scope at every one of these; it reaches

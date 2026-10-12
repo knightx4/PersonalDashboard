@@ -148,7 +148,7 @@ export async function countRhythmAction(form: FormData): Promise<StepActionState
   return saved();
 }
 
-// latency: pending
+// latency: optimistic -- the step row swaps with its neighbour at once and goes back, with the reason in a toast, if refused
 export async function moveStepAction(form: FormData): Promise<StepActionState> {
   await requireUser();
   const id = Id.safeParse(form.get('id'));
