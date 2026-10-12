@@ -94,7 +94,7 @@ export function PostsSurface() {
     posts: ROWS.map((row) => socialPostFromRow(row)),
     steps: STEPS,
     notes: [],
-    run: { id: 'r1', status: 'finished', createdAt: '2026-10-02T07:55:00Z', error: null, drafts: 2 },
+    run: { id: 'r1', status: 'finished', createdAt: '2026-10-02T07:55:00Z', error: null, note: null, drafts: 2 },
     now: NOW,
   });
   return (
@@ -162,7 +162,7 @@ export function PostsMatchedSurface() {
     ],
     steps: STEPS,
     notes: [],
-    run: { id: 'r1', status: 'finished', createdAt: '2026-10-02T07:55:00Z', error: null, drafts: 2 },
+    run: { id: 'r1', status: 'finished', createdAt: '2026-10-02T07:55:00Z', error: null, note: null, drafts: 2 },
     now: NOW,
     x: { candidates: [CANDIDATE], listed: ON_X, total: 212 },
   });
@@ -190,7 +190,26 @@ export function PostsDraftingSurface() {
     posts: [],
     steps: [],
     notes: [],
-    run: { id: 'r2', status: 'started', createdAt: '2026-10-02T11:50:00Z', error: null, drafts: 0 },
+    run: { id: 'r2', status: 'started', createdAt: '2026-10-02T11:50:00Z', error: null, note: null, drafts: 0 },
+    now: NOW,
+  });
+  return <PostsScreen page={page} x={{ state: 'none' }} />;
+}
+
+/** An ask Dash declined: the run finished, wrote nothing, and left a note. */
+export function PostsNoDraftSurface() {
+  const page = buildPostsPage({
+    posts: [],
+    steps: [],
+    notes: [],
+    run: {
+      id: 'r3',
+      status: 'finished',
+      createdAt: '2026-10-02T11:50:00Z',
+      error: null,
+      note: 'Nothing that shipped since the last post is about the gate, so there is nothing to cite.',
+      drafts: 0,
+    },
     now: NOW,
   });
   return <PostsScreen page={page} x={{ state: 'none' }} />;

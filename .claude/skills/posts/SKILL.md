@@ -94,13 +94,17 @@ notes quote what the person saw, which can carry their rows.
 
 When the turn names one step, read only that step. It still has to be `dev`
 or null and pass the source check below; if it does not, write no draft and
-say why in your reply.
+say why in the run's note.
 
 When the turn quotes an ask the person typed on the Posts tab, write one draft
-about that. Search the window above for the steps and closed notes it is
-about and cite them, as for any draft. The ask chooses the subject and changes
-none of the rules: if it needs another workspace's data, or nothing shipped
-bears on it, write no draft and say why in your reply.
+about that. The ask chooses the subject, and it opens the workspace it is
+about (`docs/X-POSTS.md`, "Asks"): an ask about the vault may cite vault
+steps, so drop the `module` filter for that one workspace, search all of
+`plan_items` rather than the window when the window holds nothing about it,
+and pass the workspace in `"workspaces"` in the check file. Every other rule
+holds for the post: it describes what the workspace does, never what the
+person keeps in it. If nothing shipped bears on the ask, write no draft and
+say why in the run's note.
 
 ## 4. Gather the terms to keep out
 
@@ -135,9 +139,13 @@ npx tsx scripts/posts-check.ts /tmp/posts.json
 {
   "avoid": ["…"],
   "sources": [{ "label": "#1234", "module": "dev", "text": "title, detail, close note" }],
-  "drafts": [{ "angle": "…", "posts": ["…"] }]
+  "drafts": [{ "angle": "…", "posts": ["…"] }],
+  "workspaces": []
 }
 ```
+
+`workspaces` stays empty unless the turn quotes an ask, and then names only
+the workspace the ask is about.
 
 A `FAIL` draft is dropped, not edited around. So is a draft citing a source
 the check refuses. A `~` warning means a post is within twenty characters of
@@ -154,6 +162,11 @@ A draft about something you can see goes out with a picture of it. The
 picture comes from the Surfaces gallery (`/preview`), which renders the real
 components with typed sample data, so it never shows the person's rows. Never
 photograph a page of the running app, and never write a fixture in this run.
+
+An ask that says real data is fine changes the picture only through the
+person: a run cannot sign in to the app, so it still attaches the gallery
+picture if one fits, and the note says they can replace it with their own
+screenshot using Add an image on the draft.
 
 **Choose the surface.** Every surface is an entry in `SURFACES` in
 `app/preview/surfaces.tsx` (some render from the `*-surfaces.tsx` files beside
@@ -228,6 +241,18 @@ Then mark the run finished, which is what turns the button back on:
 
 ```sql
 update plan_runs set status = 'finished' where id = '<run id>';
+```
+
+When you insert no draft, or the drafts left something for the person to do
+(such as swapping in their own screenshot), write it in `note` in the same
+update. The Posts tab shows a run with no drafts under the button with this
+note, and nothing else the run says reaches the person. One or two plain
+sentences, as Dash, at most 1000 characters:
+
+```sql
+update plan_runs set status = 'finished',
+  note = 'Nothing shipped since the last post is about the gate, so there is nothing to cite.'
+where id = '<run id>';
 ```
 
 ## What to reply

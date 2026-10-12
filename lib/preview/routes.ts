@@ -163,6 +163,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-inspiration-unread': ['/dev/inspiration'],
   'dev-posts': ['/dev/posts'],
   'dev-posts-drafting': ['/dev/posts'],
+  'dev-posts-no-draft': ['/dev/posts'],
   'dev-posts-write': ['/dev/posts'],
   'dev-posts-x': ['/dev/posts'],
   'dev-posts-matched': ['/dev/posts'],
