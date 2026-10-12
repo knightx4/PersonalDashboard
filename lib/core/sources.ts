@@ -117,6 +117,7 @@ export const coreSources: ModuleSources = {
     { table: 'core.model_spend', reason: 'Model cost accounting.' },
     { table: 'core.people', reason: 'Who a shopping order was for.' },
     { table: 'core.push_subscriptions', reason: 'Browsers that accepted notifications, for sending the morning brief.' },
+    { table: 'core.run_activities', reason: 'What each Dash run did, line by line, for its run page; the rows a run wrote are sources in their own modules.' },
     { table: 'core.saved_views', reason: 'Saved list filters.' },
     { table: 'core.sync_jobs', reason: 'Sync bookkeeping.' },
     { table: 'core.watch_readings', reason: 'Each reading a watch took, for its trend and alerts; the watch itself is the source.' },

@@ -2,9 +2,10 @@
  * What each of the runner's four slots is doing.
  *
  * The runner keeps up to `OVERNIGHT_AT_ONCE` feature sessions going, one per
- * module, and one goals run beside them. The runner card draws one Dash for
- * each of those four, and this file says which of three things each Dash is
- * doing so the card has nothing to work out.
+ * module, and one goals run beside them. When goals has nothing to start, a
+ * fourth feature takes its seat (`OVERNIGHT_AT_ONCE_GOALS_IDLE`). The runner
+ * card draws one Dash for each seat, and this file says which of three things
+ * each Dash is doing so the card has nothing to work out.
  *
  * Pure, and not `server-only`: the card is drawn in the browser from rows the
  * page already loaded, the same split `overnight.ts` makes.
@@ -17,8 +18,9 @@
  * fired and holds it until it ends. The same input always gives the same
  * answer, and nothing has to be remembered between renders.
  */
+import type { FeatureProgress } from '@/lib/digest/night';
 import { elapsedSince } from './elapsed';
-import { OVERNIGHT_AT_ONCE, overnightStanding, type OvernightRun } from './overnight';
+import { OVERNIGHT_AT_ONCE_GOALS_IDLE, overnightStanding, type OvernightRun } from './overnight';
 
 /** A feature session the runner (or a hand) fired, going or over. */
 export type SlotSession = {
@@ -36,6 +38,8 @@ export type SlotSession = {
   module: string | null;
   /** What the run last did, one short phrase, or null when nothing is known. */
   doing: string | null;
+  /** How far through the feature the plan is, or null when it is not known. */
+  progress?: FeatureProgress | null;
 };
 
 /** The goals run, when one is going. */
@@ -58,6 +62,8 @@ export type SlotWork = {
   since: string;
   /** How long it has been going, in the app's coarse words. Null before mount. */
   elapsed: string | null;
+  /** Steps done under the feature, out of all of them. Null for goals or when unknown. */
+  progress: FeatureProgress | null;
 };
 
 export type RunnerSlot =
@@ -65,7 +71,7 @@ export type RunnerSlot =
   | { slot: SlotId; label: string; state: 'working'; work: SlotWork }
   | { slot: SlotId; label: string; state: 'asleep'; reason: string };
 
-export type SlotId = 'feature-1' | 'feature-2' | 'feature-3' | 'goals';
+export type SlotId = 'feature-1' | 'feature-2' | 'feature-3' | 'feature-4' | 'goals';
 
 export type RunnerSlotsInput = {
   run: OvernightRun | null;
@@ -85,6 +91,7 @@ const LABELS: Record<SlotId, string> = {
   'feature-1': 'Feature 1',
   'feature-2': 'Feature 2',
   'feature-3': 'Feature 3',
+  'feature-4': 'Feature 4',
   goals: 'Goals',
 };
 
@@ -97,7 +104,7 @@ function at(stamp: string): number {
  * The slot each session held, by session id.
  *
  * Replays fires and ends in time order, an end before a fire at the same
- * instant. A session fired when all three slots are taken (one fired by hand
+ * instant. A session fired when all four slots are taken (one fired by hand
  * beside the night's) has no slot and is left out.
  */
 export function assignSlots(sessions: readonly SlotSession[]): Map<string, number> {
@@ -117,7 +124,7 @@ export function assignSlots(sessions: readonly SlotSession[]): Map<string, numbe
       a.session.id.localeCompare(b.session.id),
   );
 
-  const held: Array<string | null> = Array.from({ length: OVERNIGHT_AT_ONCE }, () => null);
+  const held: Array<string | null> = Array.from({ length: OVERNIGHT_AT_ONCE_GOALS_IDLE }, () => null);
   const assigned = new Map<string, number>();
   for (const event of events) {
     if (event.fire) {
@@ -140,6 +147,7 @@ function workOf(
     title?: string | null;
     module: string | null;
     doing: string | null;
+    progress?: FeatureProgress | null;
   },
   now: number,
 ): SlotWork {
@@ -152,11 +160,17 @@ function workOf(
     since: src.firedAt,
     // 0 is the clock's pre-mount value: say nothing rather than "just now".
     elapsed: now === 0 ? null : elapsedSince(src.firedAt, now),
+    progress: src.progress ?? null,
   };
 }
 
 /**
- * The four slots, feature 1 to 3 and then goals.
+ * The slots, feature 1 to 3 and then the goals seat.
+ *
+ * The goals seat is one row. It shows the fourth feature while one is going
+ * and goals has nothing on, and goals otherwise. In the moment both are going
+ * (a goals step became ready after the fourth feature started) there are two
+ * rows, feature 4 above goals, until the feature ends.
  *
  * Off (no row, or a night that ended) is idle all round. On or held, a slot
  * with a run going is working: a held runner starts nothing new, but what was
@@ -186,6 +200,17 @@ export function runnerSlots(input: RunnerSlotsInput): RunnerSlot[] {
     if (session) return { slot, label, state: 'working', work: workOf(session, now) };
     return sleeps ? { slot, label, state: 'asleep', reason } : { slot, label, state: 'idle' };
   });
+
+  const fourth = on ? going.get(FEATURE_SLOTS.length) : undefined;
+  if (fourth) {
+    slots.push({
+      slot: 'feature-4',
+      label: LABELS['feature-4'],
+      state: 'working',
+      work: workOf(fourth, now),
+    });
+    if (!goalRun) return slots;
+  }
 
   const label = LABELS.goals;
   if (!on) {

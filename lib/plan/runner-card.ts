@@ -145,21 +145,26 @@ export function runnerCard(input: {
       const key = `${fire.planItemId}@${fire.at}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const item = itemById.get(fire.planItemId);
-      if (!item) continue;
+      const fired = itemById.get(fire.planItemId);
+      if (!fired) continue;
+      // The top-level feature, even when a step under it was sent by hand.
+      let item = fired;
+      for (let hops = 0; item.parentId && hops < 20; hops += 1) {
+        const parent = itemById.get(item.parentId);
+        if (!parent) break;
+        item = parent;
+      }
       const isGoing = goingAt.has(key);
-      const line = isGoing ? on.find((l) => l.ref === `#${item.number}`) : undefined;
-      const step = line?.step ?? null;
       sessions.push({
         id: ('id' in fire && fire.id) || key,
         firedAt: fire.at,
         endedAt: isGoing
           ? null
           : (('writtenBackAt' in fire && fire.writtenBackAt) || new Date(now).toISOString()),
-        // The step its session has claimed, or the feature until it claims one.
-        step: step
-          ? { number: item.number, title: step.title, ref: step.ref }
-          : { number: item.number, title: oneLine(item.title), ref: `#${item.number}` },
+        // The feature, not the step under it the session has claimed: the
+        // Dash's line pairs it with progress through the whole feature.
+        step: { number: item.number, title: oneLine(item.title), ref: `#${item.number}` },
+        progress: isGoing ? featureProgress(items, `#${item.number}`) : null,
         module: moduleName(item.module),
         doing: null,
       });

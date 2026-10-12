@@ -862,7 +862,13 @@ export function GoalRow({
               For {prepares.title}
             </Link>
           )}
-          {onTodo && <span>On Todo</span>}
+          {onTodo && (
+            <span>
+              {step.onTodoBy === 'claude' && step.onTodoReason
+                ? `On Todo, from Dash: ${step.onTodoReason}`
+                : 'On Todo'}
+            </span>
+          )}
           {links.map((link) => (
             <Link key={link.linkId} href={`/goals/${link.goalId}`} className="underline">
               Also {link.title}

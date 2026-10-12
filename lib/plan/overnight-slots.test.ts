@@ -141,10 +141,47 @@ describe('runnerSlots', () => {
     expect(map.get('b')).toBe(0);
   });
 
-  it('leaves out a fourth session fired while three are going', () => {
-    const map = assignSlots([session('a', 0), session('b', 1), session('c', 2), session('d', 3)]);
-    expect(map.has('d')).toBe(false);
-    expect(map.size).toBe(3);
+  it('leaves out a fifth session fired while four are going', () => {
+    const map = assignSlots([
+      session('a', 0),
+      session('b', 1),
+      session('c', 2),
+      session('d', 3),
+      session('e', 4),
+    ]);
+    expect(map.get('d')).toBe(3);
+    expect(map.has('e')).toBe(false);
+    expect(map.size).toBe(4);
+  });
+
+  it('puts a fourth feature in the goals seat while goals has nothing on', () => {
+    const four = [session('a', 0), session('b', 1), session('c', 2), session('d', 3)];
+    const slots = runnerSlots({ run: night(), sessions: four, goalRun: null, now: T0 + 60 * 60_000 });
+    expect(slots.map((s) => s.slot)).toEqual(['feature-1', 'feature-2', 'feature-3', 'feature-4']);
+    expect(states(slots)).toEqual(['working', 'working', 'working', 'working']);
+  });
+
+  it('shows both the fourth feature and goals when a goals run starts beside it', () => {
+    const four = [session('a', 0), session('b', 1), session('c', 2), session('d', 3)];
+    const slots = runnerSlots({
+      run: night(),
+      sessions: four,
+      goalRun: { startedAt: at(5), title: 'Book the dentist', doing: null },
+      now: T0 + 60 * 60_000,
+    });
+    expect(slots.map((s) => s.slot)).toEqual([
+      'feature-1',
+      'feature-2',
+      'feature-3',
+      'feature-4',
+      'goals',
+    ]);
+  });
+
+  it('carries a session\'s feature progress onto its work', () => {
+    const one: SlotSession = { ...session('a', 1), progress: { done: 2, total: 5 } };
+    const slots = runnerSlots({ run: night(), sessions: [one], goalRun: null, now: T0 + 60_000 });
+    expect(slots[0]).toMatchObject({ state: 'working', work: { progress: { done: 2, total: 5 } } });
   });
 
   it('lets a held runner finish what is going and sleeps nothing', () => {

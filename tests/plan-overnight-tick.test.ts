@@ -13,7 +13,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
-import { budgetSpentReason, OVERNIGHT_TIME_UP, type OvernightRun } from '@/lib/plan/overnight';
+import { budgetSpentReason, featureSessionsAtOnce, OVERNIGHT_TIME_UP, type OvernightRun } from '@/lib/plan/overnight';
 import { OVERNIGHT_NOTHING_READY } from '@/lib/plan/overnight-choice';
 import {
   chooseOvernightFire,
@@ -22,6 +22,7 @@ import {
   overnightTick,
   featureRunLiveness,
   featureRunsInFlight,
+  goalsIdle,
   fileStalls,
   heldRaise,
   OVERNIGHT_NO_PROGRESS,
@@ -516,12 +517,56 @@ describe('overnightTick', () => {
         ],
       });
 
-      await expect(overnightTick(p)).resolves.toEqual({ act: 'waiting', liveness, running: 3 });
+      await expect(overnightTick(p)).resolves.toEqual({
+        act: 'waiting',
+        liveness,
+        running: 3,
+        atOnce: 3,
+      });
       // The tree is not read: every slot is taken. The claims are still
       // swept, because the ones that go stale belong to other sessions and
       // the night spends most of its ticks here.
       expect(calls).toMatchObject({ sections: 0, swept: 1, fired: [], recorded: [], stopped: [] });
     }
+  });
+
+  it('keeps a fourth session going when goals has nothing to start', async () => {
+    const three = [
+      { featureId: 'a', liveness: 'working' as const },
+      { featureId: 'b', liveness: 'working' as const },
+      { featureId: 'c', liveness: 'working' as const },
+    ];
+    const { ports: p, calls } = ports({
+      atOnce: featureSessionsAtOnce(true),
+      loadRun: async () => night({ lastFiredAt: '2026-09-17T23:30:00.000Z' }),
+      runsInFlight: async () => three,
+    });
+    await overnightTick(p);
+    // Three going is not full with goals idle, so the tree is read.
+    expect(calls.sections).toBe(1);
+
+    const full = ports({
+      atOnce: featureSessionsAtOnce(true),
+      loadRun: async () => night({ lastFiredAt: '2026-09-17T23:30:00.000Z' }),
+      runsInFlight: async () => [...three, { featureId: 'd', liveness: 'working' as const }],
+    });
+    await expect(overnightTick(full.ports)).resolves.toEqual({
+      act: 'waiting',
+      liveness: 'working',
+      running: 4,
+      atOnce: 4,
+    });
+    expect(tickNote({ act: 'waiting', liveness: 'working', running: 4, atOnce: 4 })).toBe(
+      'Waiting: 4 sessions are running, the most it starts at once.',
+    );
+  });
+
+  it('gives the goals seat to a feature only when goals had nothing to start', () => {
+    expect(goalsIdle({ act: 'nothing-ready' })).toBe(true);
+    expect(goalsIdle({ act: 'no-routine' })).toBe(true);
+    expect(goalsIdle({ act: 'waiting' })).toBe(false);
+    expect(goalsIdle({ act: 'failed', error: 'x' })).toBe(false);
+    expect(featureSessionsAtOnce(false)).toBe(3);
   });
 
   it('will not fire while a fire it made left no record', async () => {
@@ -534,6 +579,7 @@ describe('overnightTick', () => {
       act: 'waiting',
       liveness: 'unknown',
       running: 1,
+      atOnce: 3,
     });
     expect(calls.fired).toEqual([]);
     expect(calls.swept).toBe(1);
@@ -591,6 +637,7 @@ describe('overnightTick', () => {
       act: 'waiting',
       liveness: 'working',
       running: 1,
+      atOnce: 3,
     });
     expect(calls).toMatchObject({ fired: [], recorded: [], stopped: [] });
   });

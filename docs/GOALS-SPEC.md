@@ -409,7 +409,11 @@ have a due date. What changes is what asks for attention.
   stalled and waiting on a date apply to goals with a due date, errands and
   goals with a step on Todo. Any other goal gets **Keeping its pace**, or
   **Slower than usual** once the current gap is more than one and a half
-  times its usual one, and no verdict while its pace is unknown.
+  times its usual one, and no verdict while its pace is unknown. The morning
+  brief gives each such goal its pace and the verdict it reads as, and the
+  pages show only a met or pace verdict on it, so an older "Waiting on you"
+  stops showing the day the goal loses its date or its step on Todo
+  (`judgedOnPace` and `standingReviews` in `lib/goals/reviews.ts`).
 - **Every goal has suggestions** (#1739). The weekly run keeps two to four
   things the person could do next on each open goal, including suggested
   steps drawn from its map and its log, beside the events and reading it
@@ -1002,7 +1006,10 @@ in place to be answered; a proposal or a result is a link to its row on the
 Steps tab (`stepAnchor` in `lib/goals/goal-page.ts`). Your own ready steps
 are not listed there, since they are the open rows on Steps and the status
 line counts them. Below that is what feeds the goal rather than being its
-work: context from the other modules, the kinds of weekly help, links to
+work: context from the other modules, then **Suggestions** on an open goal
+(plan #1739): a few suggested steps, each with **Add as step** and **Not for
+me**, and the events or reading the goal asks for, with **Going**, beneath
+which a line names the kinds of weekly help with **Change**. Then links to
 Learn and the job search, the Learn section, files, related vault notes, and
 the add lines for whatever is still empty.
 
