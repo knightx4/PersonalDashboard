@@ -502,6 +502,15 @@ Posts about building this app that Dash drafted for X, and which ones they poste
 - Opens at `/dev/posts`
 - Only rows with status posted are things they did; suggested and dropped rows are Dash’s drafts. body is a jsonb array, one string per post in a thread.
 
+### `public.x_posts` (Dev)
+
+Every post on their X account read by the dashboard, including ones they wrote themselves, with its link and public numbers.
+
+- Search: `text`
+- Name a row by `text`; link it by `id`
+- Opens at `/dev/posts`
+- created_at is when the post went up on X. kind is post, thread_reply (their own reply continuing a thread) or reply (to someone else). public_metrics holds likes, reposts, replies, quotes and impressions.
+
 ## Mentions (leads only)
 
 ### `learn.phrase_explanations` (Learn)

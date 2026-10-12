@@ -313,6 +313,18 @@ async function seedEverything(userId: string, tag: string): Promise<SeedIds> {
     returning id`;
   ids.social_posts = socialPost.id;
 
+  const [xAccount] = await admin<{ id: string }[]>`
+    insert into x_accounts (user_id, x_user_id, handle)
+    values (${userId}, ${`${tag}-x`}, ${`${tag}handle`})
+    returning id`;
+  ids.x_accounts = xAccount.id;
+
+  const [xPost] = await admin<{ id: string }[]>`
+    insert into x_posts (user_id, x_post_id, text, created_at, url)
+    values (${userId}, ${`${tag}-1`}, ${`${tag} posted`}, now(), ${'https://x.com/a/status/1'})
+    returning id`;
+  ids.x_posts = xPost.id;
+
   const [commitCheck] = await admin<{ id: string }[]>`
     insert into plan_commit_checks (user_id, commit_sha, merge_sha, conclusion)
     values (${userId}, ${'abc1234'}, ${'def5678'}, 'passed')
