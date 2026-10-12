@@ -35,7 +35,7 @@ function saved(message: string): TreeActionState {
 }
 
 /** Open, done, dropped or blocked. Blocking here may carry an `ask`. */
-// latency: pending
+// latency: optimistic -- a step row shows the new status at once and takes it back, with the reason in a toast, if refused
 export async function setGoalStepStatus(
   _prev: TreeActionState,
   form: FormData,

@@ -26,7 +26,8 @@ import {
 import { latestBeneath, type ItemProgress } from '@/lib/goals/progress';
 import { countAside, type StepRunView } from '@/lib/goals/shaping';
 import type { GoalMap } from '@/lib/goals/steps-store';
-import { FinishedFold, GoalRow, type GoalRowContext } from './goal-row';
+import { SiblingMoveProvider, useSiblingOrder } from '@/lib/use-sibling-order';
+import { FinishedFold, GoalRow, writeStepMove, type GoalRowContext } from './goal-row';
 import { StepComposer } from './step-parts';
 import { StepFinder } from './step-finder';
 import type { InformationSeam } from './information-step';
@@ -117,6 +118,11 @@ export function StepTree({
     canRun,
   });
 
+  // The goal's own steps in the order their list holds, so Move up on one
+  // swaps it before the server has answered (plan #1851).
+  const order = useSiblingOrder(own.rows, writeStepMove);
+  const rows = order.ordered as GoalRowNode[];
+
   const stages = useMemo(
     () => (given === undefined ? goalStages(map.steps) : given),
     [given, map.steps],
@@ -128,13 +134,13 @@ export function StepTree({
   const inNow: Placed[] = [];
   const onMap: Placed[] = [];
   const finished: GoalRowNode[] = [];
-  for (const row of own.rows) {
+  for (const row of rows) {
     const stage = stageOf.get(row.id);
     if (stage) (now.has(row.id) ? inNow : onMap).push({ row, stage });
     else if (staysOpen(row.step, readElsewhere)) inNow.push({ row });
     else finished.push(row);
   }
-  const substeps = own.rows.filter((row) => row.kind !== 'decision');
+  const substeps = rows.filter((row) => row.kind !== 'decision');
   const rowOf = ({ row, stage }: Placed, folded = false) => (
     <GoalRow
       key={row.id}
@@ -181,6 +187,7 @@ export function StepTree({
   }
 
   return (
+    <SiblingMoveProvider move={order.move}>
     <div className="space-y-6">
       <StepFinder goalId={map.goal.id} steps={map.steps} />
       <section aria-labelledby="now-heading" className="space-y-2">
@@ -264,6 +271,7 @@ export function StepTree({
         </section>
       )}
     </div>
+    </SiblingMoveProvider>
   );
 }
 
