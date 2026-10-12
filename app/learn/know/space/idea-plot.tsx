@@ -3,7 +3,15 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { cn } from '@/lib/cn';
-import { anchorAt, hueFill, mapHref, type AreaLabel, type MapColour, type MapParams, type StateMark } from '@/lib/learn/map/view';
+import {
+  anchorAt,
+  hueFill,
+  mapHref,
+  type AreaLabel,
+  type MapColour,
+  type MapParams,
+  type StateMark,
+} from '@/lib/learn/map/view';
 
 /**
  * The Idea Space map itself (plan #1857): every embedded idea as a mark, in
@@ -44,7 +52,8 @@ export type PlotArea = AreaLabel & {
 const REACH_PX = 22;
 
 /** One unit of the 0–100 frame is drawn at this scale per width. */
-const MARK_SCALE = '[transform-box:fill-box] origin-center scale-[1.1] sm:scale-[0.7] lg:scale-[0.55]';
+const MARK_SCALE =
+  '[transform-box:fill-box] origin-center scale-[1.1] sm:scale-[0.7] lg:scale-[0.55]';
 
 export function IdeaPlot({
   dots,
@@ -63,7 +72,7 @@ export function IdeaPlot({
   const selectedId = picked === undefined ? params.idea : picked;
 
   const byId = new Map(dots.map((dot) => [dot.id, dot]));
-  const selected = selectedId ? byId.get(selectedId) ?? null : null;
+  const selected = selectedId ? (byId.get(selectedId) ?? null) : null;
   const near = new Set(selected?.neighbours ?? []);
 
   const nearest = (event: React.PointerEvent<HTMLDivElement>): PlotDot | null => {
@@ -99,12 +108,20 @@ export function IdeaPlot({
 
   const shown = pointing && pointing !== selectedId ? byId.get(pointing) : null;
   // Drawn in this order so the dots that say most sit on top.
-  const order: Record<StateMark, number> = { unseen: 0, 'getting-there': 1, known: 2, 'mixed-up': 3 };
+  const order: Record<StateMark, number> = {
+    unseen: 0,
+    'getting-there': 1,
+    known: 2,
+    'mixed-up': 3,
+  };
   const drawn = [...dots].sort((a, b) => order[a.mark] - order[b.mark]);
 
   return (
     <div
-      className={cn('relative aspect-square w-full overflow-hidden', dots.length > 0 && 'cursor-pointer')}
+      className={cn(
+        'relative aspect-square w-full overflow-hidden',
+        dots.length > 0 && 'cursor-pointer',
+      )}
       onPointerUp={pick}
       onPointerMove={point}
       onPointerLeave={() => setPointing(null)}
@@ -158,7 +175,9 @@ export function IdeaPlot({
           <g key={dot.id} transform={`translate(${dot.left} ${dot.top})`}>
             <g className={MARK_SCALE}>
               <Mark dot={dot} colour={params.colour} />
-              {near.has(dot.id) && <circle r={1.6} fill="none" className="stroke-accent" strokeWidth={0.35} />}
+              {near.has(dot.id) && (
+                <circle r={1.6} fill="none" className="stroke-accent" strokeWidth={0.35} />
+              )}
             </g>
           </g>
         ))}
@@ -195,13 +214,18 @@ export function IdeaPlot({
           left={selected.left}
           top={selected.top}
           above
-          className="bg-raised text-ui font-medium text-ink shadow-sm ring-1 ring-border"
+          className="bg-raised text-ui font-medium text-ink ring-1 ring-border"
         >
           {selected.name}
         </MapName>
       )}
       {shown && (
-        <MapName left={shown.left} top={shown.top} above className="bg-raised text-ui text-ink shadow-sm ring-1 ring-border">
+        <MapName
+          left={shown.left}
+          top={shown.top}
+          above
+          className="bg-raised text-ui text-ink ring-1 ring-border"
+        >
           {shown.name}
         </MapName>
       )}
