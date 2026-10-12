@@ -219,4 +219,16 @@ describe('what the tab says', () => {
     });
     expect(xRunMessage({ state: 'busy' }).ok).toBe(false);
   });
+
+  it('says what the match did after the read (plan #1820)', () => {
+    expect(
+      xRunMessage({ state: 'read', postsRead: 4, newPosts: 2, problem: null, matched: { posted: 1, asking: 2 } }).text,
+    ).toBe('Read 2 new posts. Marked 1 draft posted. 2 drafts ask whether a post is them.');
+    expect(
+      xRunMessage({ state: 'read', postsRead: 1, newPosts: 0, problem: null, matched: { posted: 0, asking: 1 } }).text,
+    ).toBe('Nothing new on X. 1 draft asks whether a post is it.');
+    expect(
+      xRunMessage({ state: 'read', postsRead: 1, newPosts: 1, problem: null, matched: { posted: 0, asking: 0 } }).text,
+    ).toBe('Read 1 new post.');
+  });
 });
