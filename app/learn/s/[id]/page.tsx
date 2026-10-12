@@ -406,7 +406,7 @@ export default async function SubjectPage({
         </p>
       )}
 
-      {plan && !showEverything && <PlanSection subjectId={id} units={plan} project={project} />}
+      {plan && !showEverything && <PlanSection subjectId={id} units={plan} project={project} goal={planGoal} />}
 
       {units.length === 0 ? (
         <WriteCurriculum subjectId={id} />

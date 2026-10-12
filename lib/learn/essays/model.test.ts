@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { Text } from '@codemirror/state';
-import { countWords, essayTitle, parseWordTarget, readBrief, toSummary, wordCountLabel } from './model';
+import {
+  countWords,
+  essayTitle,
+  parseWordTarget,
+  readBrief,
+  readInterview,
+  toSummary,
+  wordCountLabel,
+} from './model';
 import { paragraphAround } from './editor';
 
 describe('essayTitle', () => {
@@ -58,9 +66,34 @@ describe('parseWordTarget', () => {
 
 describe('readBrief and toSummary', () => {
   it('reads a partial or malformed brief as empty strings', () => {
-    expect(readBrief({ question: 'Why?', pinned: [] })).toEqual({ question: 'Why?', claim: '', reader: '' });
-    expect(readBrief(null)).toEqual({ question: '', claim: '', reader: '' });
-    expect(readBrief([1])).toEqual({ question: '', claim: '', reader: '' });
+    const empty = { question: '', claim: '', reader: '', origin: '', change: '', pinned: [] };
+    expect(readBrief({ question: 'Why?', pinned: [] })).toEqual({ ...empty, question: 'Why?' });
+    expect(readBrief(null)).toEqual(empty);
+    expect(readBrief([1])).toEqual(empty);
+  });
+
+  it('keeps well-formed pins and drops the rest', () => {
+    const brief = readBrief({
+      pinned: [
+        { kind: 'goal', id: 'g1', title: 'Microeconomics' },
+        { kind: 'video', id: 'v1', title: 'Not a kind' },
+        { kind: 'reading', id: '', title: 'No id' },
+        'nonsense',
+      ],
+    });
+    expect(brief.pinned).toEqual([{ kind: 'goal', id: 'g1', title: 'Microeconomics' }]);
+  });
+
+  it('reads the interview, and none when it is missing or malformed', () => {
+    expect(readInterview({ interview: { status: 'asking', field: 'claim', ask: 'And your answer?' } })).toEqual({
+      status: 'asking',
+      field: 'claim',
+      ask: 'And your answer?',
+    });
+    expect(readInterview({ interview: { status: 'done' } })).toEqual({ status: 'done' });
+    expect(readInterview({ interview: { status: 'asking', field: 'mood', ask: 'How?' } })).toBeNull();
+    expect(readInterview({ interview: { status: 'asking', field: 'claim', ask: ' ' } })).toBeNull();
+    expect(readInterview({})).toBeNull();
   });
 
   it('summarises a row', () => {

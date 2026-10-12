@@ -209,6 +209,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // although a press can cause it: at a millionth of a dollar no hint is
   // worth showing beside the button.
   'embed-idea': background(unit(VOYAGE_LITE, 200, 0)),
+  // The interview's rules, the brief so far and the kind of question in; one
+  // sentence out.
+  'word-essay-question': run(SONNET, 900, 60),
   // One Wikipedia section in, a card for each of up to three ideas out.
   'write-asked-card': run(SONNET, 4_000, 2_000),
   // One idea's claim and basis and what was written in; the marks and a

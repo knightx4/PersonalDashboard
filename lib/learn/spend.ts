@@ -314,6 +314,10 @@ export const LEARN_OPERATIONS = [
   // rewritten claim (plan #1853). One Voyage call per write, about 65 tokens
   // an idea, recorded against the idea's owner by whatever client wrote it.
   'embed-idea',
+  // The next question of a new essay's interview (plan #1867): one Sonnet
+  // call per answer, four at most an essay, since the first question is
+  // written without one.
+  'word-essay-question',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

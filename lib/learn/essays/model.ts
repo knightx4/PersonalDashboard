@@ -7,12 +7,42 @@
  * in the gallery from fixtures.
  */
 
-/** The brief, in the person's own words (spec, "Starting an essay"). */
+/**
+ * The brief, in the person's own words (spec, "Starting an essay"): the five
+ * answers the interview asks for (plan #1867), and what they pinned to it.
+ */
 export type EssayBrief = {
   question: string;
   claim: string;
   reader: string;
+  /** What made them think it. */
+  origin: string;
+  /** What would change their mind. */
+  change: string;
+  pinned: EssayPin[];
 };
+
+/** The kinds of thing an essay can be started from, and pinned to its brief. */
+export const PIN_KINDS = ['goal', 'reading', 'theme', 'log'] as const;
+export type PinKind = (typeof PIN_KINDS)[number];
+
+/** Something pinned to the brief: what "Write about this" started the essay from. */
+export type EssayPin = { kind: PinKind; id: string; title: string };
+
+/** The five answers, in the order the interview asks for them. */
+export const BRIEF_FIELDS = ['question', 'claim', 'reader', 'origin', 'change'] as const;
+export type BriefField = (typeof BRIEF_FIELDS)[number];
+
+/**
+ * Where the interview that fills the brief has got to (plan #1867), kept in
+ * the brief's jsonb under `interview`. `asking` holds the field the next
+ * answer fills and the question Dash put for it; an essay with no interview
+ * (started before it existed) reads as null.
+ */
+export type EssayInterview =
+  | { status: 'asking'; field: BriefField; ask: string }
+  | { status: 'done' }
+  | { status: 'skipped' };
 
 /** One essay as the editor needs it. */
 export type Essay = {
@@ -26,6 +56,8 @@ export type Essay = {
   /** True while the draft is ahead of the vault note. */
   unsaved: boolean;
   brief: EssayBrief;
+  /** The interview, or null once there is none to show. */
+  interview: EssayInterview | null;
   /** The length aimed at, 200 to 2,000 words, or null for none. */
   wordTarget: number | null;
   publishedAt: string | null;
@@ -72,10 +104,45 @@ function text(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
+function object(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function readPins(value: unknown): EssayPin[] {
+  if (!Array.isArray(value)) return [];
+  const pins: EssayPin[] = [];
+  for (const item of value) {
+    const pin = object(item);
+    const kind = pin.kind;
+    if (typeof kind !== 'string' || !(PIN_KINDS as readonly string[]).includes(kind)) continue;
+    if (!text(pin.id) || !text(pin.title)) continue;
+    pins.push({ kind: kind as PinKind, id: text(pin.id), title: text(pin.title) });
+  }
+  return pins;
+}
+
 /** The brief from its jsonb, with anything missing or of the wrong type read as empty. */
 export function readBrief(value: unknown): EssayBrief {
-  const brief = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-  return { question: text(brief.question), claim: text(brief.claim), reader: text(brief.reader) };
+  const brief = object(value);
+  return {
+    question: text(brief.question),
+    claim: text(brief.claim),
+    reader: text(brief.reader),
+    origin: text(brief.origin),
+    change: text(brief.change),
+    pinned: readPins(brief.pinned),
+  };
+}
+
+/** The interview from the brief's jsonb; null when there is none or it is not one this code wrote. */
+export function readInterview(value: unknown): EssayInterview | null {
+  const interview = object(object(value).interview);
+  if (interview.status === 'done' || interview.status === 'skipped') return { status: interview.status };
+  if (interview.status !== 'asking') return null;
+  const field = interview.field;
+  if (typeof field !== 'string' || !(BRIEF_FIELDS as readonly string[]).includes(field)) return null;
+  if (!text(interview.ask).trim()) return null;
+  return { status: 'asking', field: field as BriefField, ask: text(interview.ask) };
 }
 
 export function toEssay(row: EssayRow): Essay {
@@ -87,6 +154,7 @@ export function toEssay(row: EssayRow): Essay {
     draftBody: row.draft_body ?? '',
     unsaved: row.unsaved ?? false,
     brief: readBrief(row.brief),
+    interview: readInterview(row.brief),
     wordTarget: row.word_target,
     publishedAt: row.published_at,
     updatedAt: row.updated_at,
