@@ -285,6 +285,10 @@ home and out of the runs until the person takes it back up. That offer is
 the app's, from what was last done, so there is nothing to write for it.
 A parked goal is not in the brief.
 
+Each row also keeps a `snapshot` of the goal's steps and due date (plan #1832:
+open, done, total, blocked, the open step ids, `dueOn`). A trigger fills it, so
+the inserts above stay as they are; never write step text into it.
+
 One row per goal per run, except a goal judged on its pace with its pace
 unknown, which gets none. Rows are never updated: tomorrow's run adds a new
 one, and the pages show the newest. The run summary gives the count of each

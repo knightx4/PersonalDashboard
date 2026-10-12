@@ -209,7 +209,7 @@ import {
   InspirationListSurface,
   InspirationUnreadSurface,
 } from './inspiration-surfaces';
-import { PostsDraftingSurface, PostsSurface, PostsWriteSurface, PostsXSurface } from './posts-surfaces';
+import { PostsDraftingSurface, PostsMatchedSurface, PostsSurface, PostsWriteSurface, PostsXSurface } from './posts-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
@@ -4886,6 +4886,16 @@ export const SURFACES: readonly Surface[] = [
     render: () => <PostsXSurface />,
   },
   {
+    /* The tab once X has been read (plan #1820): a draft asking "Is this
+     * it?" about a post that reads close to it, one the match marked posted,
+     * and Posted on X, the posts that match no draft, opened. */
+    id: 'dev-posts-matched',
+    label: 'Dev · Posts, matched to X',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsMatchedSurface />,
+  },
+  {
     /* Home as a whole page on the main-plus-rail pattern (plan #1627): the
      * header, briefs, Today and Updates in the main column, and Watching,
      * what Dash did, the week and the workspaces in the rail. Inside the
@@ -5781,6 +5791,12 @@ export const SURFACES: readonly Surface[] = [
     label: 'Runs · Dash’s lines as it works',
     module: 'goals',
     width: 'page',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="run-line"]',
+      shows:
+        'Dash’s mark in the first card’s header keeps working while a new line, “Kept stale runs open until acknowledged, and committed 7d2e5a1.”, rises into the foot of the list beneath it and the button above goes quiet.',
+    },
     render: () => <RunLinesSurface />,
   },
   {

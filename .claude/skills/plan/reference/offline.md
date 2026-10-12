@@ -144,6 +144,9 @@ where id = '…';
 -- and substeps, decisions, setup jobs and dropped steps left out: done now,
 -- done when its last update was written (or a day ago, for its first), and
 -- the total. lib/plan/updates.ts `updateCounts` is the rule; this is it in SQL.
+-- The row's `snapshot` (open, done, total, blocked and the open step ids;
+-- plan #1832) is filled by a trigger when the insert gives none, so nothing
+-- here writes it.
 with recursive beneath as (
   select id, kind, status, completed_at from plan_items
   where parent_id = '<the feature id>' and user_id = '…'
