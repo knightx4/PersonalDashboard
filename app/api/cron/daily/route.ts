@@ -12,6 +12,7 @@ import { runGoalsDaily } from '@/inngest/goals/daily';
 import { runGoalsQuietSweep } from '@/inngest/goals/quiet-runs';
 import { runGoalsRhythms } from '@/inngest/goals/rhythms';
 import { runGoalsWeekly } from '@/inngest/goals/weekly';
+import { runLearnEmbeddingsDaily } from '@/inngest/learn/embeddings-daily';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
 // allowed to take, and a route that ends first takes the hand-off with it.
@@ -84,6 +85,8 @@ export async function GET(request: NextRequest) {
     // and any other idea still unscored get Jev's score the same morning
     // (plan #1327).
     { name: 'idea-scores', run: () => runIdeaScoreCatchUp() },
+    // Last, and bounded: Learn ideas saved without a vector get one (plan #1854).
+    { name: 'learn-embeddings', run: () => runLearnEmbeddingsDaily() },
   ];
 
   const results: Record<string, unknown> = {};
