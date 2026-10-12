@@ -201,13 +201,38 @@ export const MOMENTS: readonly Moment[] = [
     workspace: 'dash',
     name: 'Dash at work',
     trigger: 'Asking Dash something, or a run it is doing.',
-    sees: 'Its mark comes alive in the shape of the work, and each lookup appears in the thread as Dash makes it. When Dash only acknowledges a comment, the mark comes to rest beside it and the seen mark appears in place of a reply.',
+    sees: 'Its mark comes alive in the shape of the work, and each lookup appears in the thread as Dash makes it. On a run’s page the mark in the card’s header works while the run is going, thinking or writing as the latest line says, and each new line rises in at the foot of the list as it is written. When Dash only acknowledges a comment, the mark comes to rest beside it and the seen mark appears in place of a reply.',
     reducedMotion:
-      'The mark holds the still shape for that kind of work, and the lookups still appear one by one. An acknowledged comment goes straight to the resting mark and the seen mark.',
+      'The mark holds the still shape for that kind of work, and the lookups and run lines still appear one by one. An acknowledged comment goes straight to the resting mark and the seen mark.',
     state: {
       built: 'yes',
       where:
-        'DashMark in components/ui/dash-mark.tsx, the lookup lines in components/talk/lookup-lines.tsx, and the seen ending in components/thread/thread.tsx.',
+        'DashMark in components/ui/dash-mark.tsx, the lookup lines in components/talk/lookup-lines.tsx, the seen ending in components/thread/thread.tsx, and a run’s lines in components/runs/run-lines.tsx (the mark follows the run; lines heard from Realtime carry run-line-in, added by components/runs/live-run-lines.tsx). Played in the gallery at /preview?s=run-lines.',
+    },
+  },
+  {
+    workspace: 'dash',
+    name: 'Dash asks and waits',
+    trigger: 'A run asking you a question and holding until you answer.',
+    sees: 'The question rises in as a line, the mark stops working and stands level, the state line turns to a question mark reading “Waiting on your answer”, and the choices are presses. Pressing one swaps them for “Sent. Dash carries on with your answer.”, and the mark takes up work again once the run goes on.',
+    reducedMotion:
+      'The question, the question mark and the presses are there at once, and the mark stands level without blinking.',
+    state: {
+      built: 'yes',
+      where:
+        'RunLinesView in components/runs/run-lines.tsx with RunAnswer in components/runs/run-answer.tsx, and the question in the inbox by components/runs/run-question-card.tsx. Drawn in the gallery at /preview?s=run-lines.',
+    },
+  },
+  {
+    workspace: 'dash',
+    name: 'A run gone quiet',
+    trigger: 'A run that has stopped writing lines and stays open.',
+    sees: 'The mark falls asleep with its z drifting up, the state line turns to the caution cross reading “Dash has stopped writing lines”, and Acknowledge sits beside it until you press it.',
+    reducedMotion: 'The mark is shown asleep and the cross and Acknowledge are the same, with nothing drifting.',
+    state: {
+      built: 'yes',
+      where:
+        'RunLinesView in components/runs/run-lines.tsx with AcknowledgeRun in components/runs/acknowledge-run.tsx. Drawn in the gallery at /preview?s=run-lines.',
     },
   },
 ];

@@ -121,6 +121,20 @@ where id = '<the stopped step>';
 insert into core.run_activities (user_id, run_table, run_id, kind, body)
 values ('…', 'plan_runs', '<the run id>', 'action', $l$Claimed #n$l$);
 
+-- response: the person's answer to the run's newest question (plan #1824),
+-- what `plan.ts response <n>` prints. No row back means no answer yet. The
+-- answer is theirs: a session never writes a 'response' line.
+select a.body as answer, q.body as question
+from core.run_activities q
+left join core.run_activities a
+  on a.run_id = q.run_id and a.kind = 'response' and a.created_at > q.created_at
+where q.run_id = '<the run id>' and q.kind = 'question'
+order by q.created_at desc, a.created_at asc
+limit 1;
+-- A session with nothing left to do without the answer ends with `stopped`
+-- (below), reason 'Waiting on your answer: <the question>'. The run keeps
+-- awaiting_input, and answering it starts a new run with the answer in its brief.
+
 -- start (never on a proposed step, never on a decision, never on a setup step)
 update plan_items set status = 'in_progress' where id = '…';
 
@@ -140,6 +154,9 @@ where id = '…';
 -- and substeps, decisions, setup jobs and dropped steps left out: done now,
 -- done when its last update was written (or a day ago, for its first), and
 -- the total. lib/plan/updates.ts `updateCounts` is the rule; this is it in SQL.
+-- The row's `snapshot` (open, done, total, blocked and the open step ids;
+-- plan #1832) is filled by a trigger when the insert gives none, so nothing
+-- here writes it.
 with recursive beneath as (
   select id, kind, status, completed_at from plan_items
   where parent_id = '<the feature id>' and user_id = '…'

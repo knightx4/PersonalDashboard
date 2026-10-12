@@ -195,7 +195,15 @@ export function workIsEmpty(work: RunWork): boolean {
 
 /** `2026-09-17T14:02:11Z` as `2026-09-17 14:02`, the stamp the badge uses. */
 function stamp(iso: string): string {
-  return iso.replace('T', ' ').slice(0, 16);
+  // Twelve-hour, in UTC as the stored stamp is, so the server and the browser
+  // draw the same words.
+  const at = new Date(iso);
+  if (!Number.isFinite(at.getTime())) return iso;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const hours = at.getUTCHours();
+  const minutes = String(at.getUTCMinutes()).padStart(2, '0');
+  const half = hours < 12 ? 'AM' : 'PM';
+  return `${at.getUTCDate()} ${months[at.getUTCMonth()]} ${at.getUTCFullYear()}, ${hours % 12 || 12}:${minutes} ${half}`;
 }
 
 /**
@@ -211,11 +219,14 @@ function ago(iso: string, now: number): string | null {
 }
 
 /** Which run this is and when it started. */
-export function runStartedLine(work: RunWork, now: number): string {
+export function runStartedLine(work: RunWork, now: number, quiet = false): string {
   const label = RUN_JOB_LABEL[work.job];
   const when = stamp(work.startedAt);
   if (work.status === 'failed') return `${label} started ${when} and stopped.`;
   if (work.status === 'finished') return `${label} started ${when} and finished.`;
+  // A run gone quiet is not "going": the line under this one says when it
+  // was last heard from (plan #1825).
+  if (quiet) return `${label} started ${when}.`;
   const going = ago(work.startedAt, now);
   return going ? `${label} started ${when}, going ${going}.` : `${label} started ${when}.`;
 }

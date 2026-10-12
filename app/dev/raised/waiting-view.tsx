@@ -1,5 +1,7 @@
 'use client';
 
+import { BackFromSnoozeMark, SnoozeMenu } from '@/components/inbox/snooze';
+import { planRowRef } from '@/lib/dev/inbox-snoozes';
 import Link from 'next/link';
 import { useActionState, useState } from 'react';
 import {
@@ -69,7 +71,16 @@ const PLACEHOLDER: Record<WaitingRow['health'], string> = {
  * waiting on me" is one question and answering it in two places is how the
  * second place stops being read.
  */
-export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRefTitles }) {
+export function WaitingCard({
+  row,
+  titles,
+  snooze,
+}: {
+  row: WaitingRow;
+  titles?: PlanRefTitles;
+  /** Present when the row can be snoozed (plan #1843); `back` marks one whose snooze ran out. */
+  snooze?: { back: boolean };
+}) {
   const setup = row.health === 'setup';
   const question = row.health === 'unanswered';
   const blocked = row.health === 'blocked';
@@ -101,11 +112,14 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
         >
           #{row.number} {row.title}
         </Link>
-        <StateLabel
-          glyph={PLAN_HEALTH_GLYPHS[row.health]}
-          word={WAITING_WORD[row.health]}
-          tone={TONE[row.health]}
-        />
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {snooze?.back && <BackFromSnoozeMark />}
+          <StateLabel
+            glyph={PLAN_HEALTH_GLYPHS[row.health]}
+            word={WAITING_WORD[row.health]}
+            tone={TONE[row.health]}
+          />
+        </span>
       </div>
 
       {/* The title above is the one-line summary and this is what you have to
@@ -146,9 +160,12 @@ export function WaitingCard({ row, titles }: { row: WaitingRow; titles?: PlanRef
       />
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-micro text-ink-ghost">
-          {row.module ? planScopeLabel(row.module) : 'Everything'}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-micro text-ink-ghost">
+            {row.module ? planScopeLabel(row.module) : 'Everything'}
+          </p>
+          {snooze && <SnoozeMenu snoozeRef={planRowRef(row.id)} />}
+        </div>
         {(setup || blockedJob) && (
           <div className="flex flex-wrap items-center gap-2">
             {where &&

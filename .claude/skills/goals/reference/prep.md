@@ -34,9 +34,11 @@ step's brief does. They will do the step; you write what they need to do it.
 
    `result_url` is for when it also lives somewhere with a link. Change
    nothing else: the step stays `mine` and `open`, and ticking it is theirs.
-   Preparing it again replaces the earlier text. Something long, such as a
-   full application pack or a month's budget, goes in a file linked from the
-   step, as in "The morning run", with the short version in `result`.
+   Preparing it again replaces the earlier text. What you wrote for it, such
+   as a draft, a list, a full application pack or a month's budget, is filed
+   under the goal with `goals.file_result('<step id>', …)`, as in "Files" in
+   working-steps.md, with the short version and the link in `result`.
+   Preparing it again makes a new version of the same file.
    A person to contact or an open role named in it goes to Jobs too, as in
    "People and roles you find go to Jobs".
 4. Close the run row with a summary that says what you prepared and anything

@@ -1957,3 +1957,57 @@ describe('healthOf, on a claim read against its run', () => {
     expect(healthOf(section.nodes[0], liveness)).toBe('abandoned');
   });
 });
+
+// A step needing something that does not exist yet, such as two weeks of data,
+// waits on the check-back a session left for it (#1073's #1135 went out three
+// times while it waited).
+describe('waiting on a check-back', () => {
+  const check = (planItemId: string, dueAt = '2026-10-26T06:00:00.000Z') => ({
+    id: `check-${planItemId}`,
+    planItemId,
+    title: 'Five closes from evidence exist',
+    dueAt,
+  });
+  const build = (checkWaits: ReturnType<typeof check>[], status: PlanStatus = 'not_started') =>
+    shopping(
+      buildPlanTree({
+        items: [item({ id: 'feature' }), item({ id: 'step', parentId: 'feature', status })],
+        dependencies: [],
+        checkWaits,
+      }),
+    );
+  const stepOf = (section: ReturnType<typeof shopping>) => findNode([section], 'step')!;
+
+  it('holds the step, reads as waiting, and is not handed to the runner', () => {
+    const section = build([check('step')]);
+    const step = stepOf(section);
+    expect(step.waitsUntil).toHaveLength(1);
+    expect(step.ready).toBe(false);
+    expect(healthOf(step)).toBe('waiting');
+    expect(moveOf(step)).toBe('waiting');
+    expect(workOrder([section], { only: 'runner' })).toEqual([]);
+  });
+
+  it('carries down from a feature to its steps', () => {
+    const step = stepOf(build([check('feature')]));
+    expect(step.waitsUntil.map((one) => one.id)).toEqual(['check-feature']);
+    expect(step.ready).toBe(false);
+  });
+
+  it('reads a step a session put down to wait as waiting, not underway', () => {
+    expect(healthOf(stepOf(build([check('step')], 'in_progress')))).toBe('waiting');
+  });
+
+  it('holds nothing on a step that is already done', () => {
+    expect(stepOf(build([check('step')], 'done')).waitsUntil).toEqual([]);
+  });
+
+  it('leaves a step with no check-back ready', () => {
+    expect(stepOf(build([])).ready).toBe(true);
+  });
+
+  it('counts it apart from the rest of the waiting, for the clock', () => {
+    expect(build([check('step')]).tally).toMatchObject({ waiting: 1, checkingBack: 1 });
+    expect(build([]).tally).toMatchObject({ waiting: 0, checkingBack: 0 });
+  });
+});

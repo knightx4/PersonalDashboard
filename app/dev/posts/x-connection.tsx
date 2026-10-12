@@ -1,6 +1,7 @@
 'use client';
 
-import { buttonVariants } from '@/components/ui/button';
+import { useState, useTransition } from 'react';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
 import Link from '@/components/ui/link';
@@ -8,7 +9,7 @@ import { cn } from '@/lib/cn';
 import { planHref } from '@/lib/search/sources/dev-map';
 import type { XConnectionView, XConnectNotice } from '@/lib/x/account';
 import { X_CONNECT_PATH } from '@/lib/x/routes';
-import { disconnectX } from './actions';
+import { checkX, disconnectX } from './actions';
 
 /**
  * The X connection on the Posts tab (plan #1818): who the dashboard reads
@@ -18,6 +19,10 @@ import { disconnectX } from './actions';
  *
  * Connect X is a plain link to /api/x/connect, since the round trip leaves
  * the app for X and comes back to this tab.
+ *
+ * Connected, the row offers Check X now (plan #1819), the daily read run on
+ * demand, and says why the last read stopped when X stopped it: a rate
+ * limit, no credit left, or a refusal.
  */
 
 function ConnectLink({ label }: { label: string }) {
@@ -26,6 +31,25 @@ function ConnectLink({ label }: { label: string }) {
     <a href={X_CONNECT_PATH} className={buttonVariants({ variant: 'secondary' })}>
       {label}
     </a>
+  );
+}
+
+/** Check X now: the read, on demand, with what it found said beneath the row. */
+function CheckX({ onResult }: { onResult: (r: { ok: boolean; text: string }) => void }) {
+  const [pending, start] = useTransition();
+  return (
+    <Button
+      variant="secondary"
+      pending={pending}
+      onClick={() =>
+        start(async () => {
+          const r = await checkX();
+          onResult({ ok: r.ok, text: (r.ok ? r.message : r.error) ?? '' });
+        })
+      }
+    >
+      {pending ? 'Checking X…' : 'Check X now'}
+    </Button>
   );
 }
 
@@ -42,8 +66,10 @@ export function XConnection({
   view: XConnectionView;
   notice?: XConnectNotice | null;
 }) {
+  const [checked, setChecked] = useState<{ ok: boolean; text: string } | null>(null);
   let body: React.ReactNode;
   let action: React.ReactNode = null;
+  let problem: string | null = null;
 
   switch (view.state) {
     case 'unconfigured':
@@ -86,16 +112,21 @@ export function XConnection({
           <p className="text-small text-ink-muted">{lastRead(view.lastSyncedAt)}</p>
         </>
       );
+      // What Check X now just said replaces the stored line it answers.
+      problem = checked ? null : (view.problem ?? null);
       action = (
-        <ConfirmStep
-          action={disconnectX}
-          prompt="Removes the X sign-in. Posts already read stay."
-          confirmLabel="Disconnect"
-          pendingLabel="Disconnecting…"
-          variant="ghost"
-        >
-          Disconnect
-        </ConfirmStep>
+        <div className="flex flex-wrap items-center gap-2">
+          <CheckX onResult={setChecked} />
+          <ConfirmStep
+            action={disconnectX}
+            prompt="Removes the X sign-in. Posts already read stay."
+            confirmLabel="Disconnect"
+            pendingLabel="Disconnecting…"
+            variant="ghost"
+          >
+            Disconnect
+          </ConfirmStep>
+        </div>
       );
       break;
   }
@@ -106,6 +137,12 @@ export function XConnection({
         <div className="min-w-0 space-y-0.5">{body}</div>
         {action}
       </div>
+      {problem && <p className="text-small text-caution">{problem}</p>}
+      {checked && (
+        <p role={checked.ok ? 'status' : 'alert'} className={cn('text-small', checked.ok ? 'text-ink-muted' : 'text-caution')}>
+          {checked.text}
+        </p>
+      )}
       {notice && (
         <p
           role={notice.tone === 'problem' ? 'alert' : 'status'}

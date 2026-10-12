@@ -1,7 +1,30 @@
 import 'server-only';
 
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
+import { readLastLines } from '@/lib/core/run-liveness';
 import { GOAL_RUNS_SHOWN, toRunListings, type RunListing, type RunRowWithItem } from '@/lib/goals/runs';
+
+/**
+ * The listings with when each run not yet ended last wrote a line (plan
+ * #1825), so a stale run can say when it was last heard from and a started
+ * one is read from its lines. Ended runs are not asked about.
+ */
+async function withLastLines(client: GoalsSupabaseClient, runs: RunListing[]): Promise<RunListing[]> {
+  const going = runs.filter((run) => run.status !== 'done' && run.status !== 'failed');
+  if (going.length === 0) return runs;
+  let lines: Map<string, string>;
+  try {
+    lines = await readLastLines(
+      client.schema('core') as never,
+      'goals.runs',
+      going.map((run) => run.id),
+    );
+  } catch {
+    // The clock rules read the run as they did before there were lines.
+    return runs;
+  }
+  return runs.map((run) => (lines.has(run.id) ? { ...run, lastLineAt: lines.get(run.id) ?? null } : run));
+}
 
 /**
  * Every run in goals.runs with the goal or step it was on (plan #1012),
@@ -24,7 +47,7 @@ export async function loadRuns(client: GoalsSupabaseClient): Promise<RunListing[
     .order('created_at', { ascending: false })
     .limit(RUNS_LIMIT);
   if (error) throw new Error(`Could not read runs: ${error.message}`);
-  return toRunListings((data ?? []) as unknown as RunRowWithItem[]);
+  return withLastLines(client, toRunListings((data ?? []) as unknown as RunRowWithItem[]));
 }
 
 /** One run with the item it was on, for its own page (plan #1013); null when it is not yours or not there. */
@@ -36,7 +59,8 @@ export async function loadRun(client: GoalsSupabaseClient, id: string): Promise<
     .maybeSingle();
   if (error) throw new Error(`Could not read the run: ${error.message}`);
   if (!data) return null;
-  return toRunListings([data as unknown as RunRowWithItem])[0] ?? null;
+  const [run] = await withLastLines(client, toRunListings([data as unknown as RunRowWithItem]));
+  return run ?? null;
 }
 
 /**
@@ -56,7 +80,7 @@ export async function loadGoalRuns(
     .order('created_at', { ascending: false })
     .limit(GOAL_RUNS_SHOWN + 1);
   if (error) throw new Error(`Could not read the goal's runs: ${error.message}`);
-  const runs = toRunListings((data ?? []) as unknown as RunRowWithItem[]);
+  const runs = await withLastLines(client, toRunListings((data ?? []) as unknown as RunRowWithItem[]));
   return { runs: runs.slice(0, GOAL_RUNS_SHOWN), more: runs.length > GOAL_RUNS_SHOWN };
 }
 
@@ -75,7 +99,7 @@ export async function loadRunsEndedSince(
     .order('ended_at', { ascending: false })
     .limit(RUNS_LIMIT);
   if (error) throw new Error(`Could not read the runs since your last visit: ${error.message}`);
-  return toRunListings((data ?? []) as unknown as RunRowWithItem[]);
+  return withLastLines(client, toRunListings((data ?? []) as unknown as RunRowWithItem[]));
 }
 
 /** Runs still marked started, for the Status panel on Dash; `runOutcome` says which are really going. */
@@ -87,7 +111,7 @@ export async function loadStartedGoalRuns(client: GoalsSupabaseClient): Promise<
     .order('created_at', { ascending: false })
     .limit(GOAL_RUNS_SHOWN);
   if (error) throw new Error(`Could not read the goal runs going: ${error.message}`);
-  return toRunListings((data ?? []) as unknown as RunRowWithItem[]);
+  return withLastLines(client, toRunListings((data ?? []) as unknown as RunRowWithItem[]));
 }
 
 /**
@@ -105,5 +129,5 @@ export async function loadRunsStartedSince(
     .order('created_at', { ascending: false })
     .limit(RUNS_LIMIT);
   if (error) throw new Error(`Could not read recent runs: ${error.message}`);
-  return toRunListings((data ?? []) as unknown as RunRowWithItem[]);
+  return withLastLines(client, toRunListings((data ?? []) as unknown as RunRowWithItem[]));
 }

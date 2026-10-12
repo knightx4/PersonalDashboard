@@ -24,7 +24,6 @@ import {
   featureRunsInFlight,
   goalsIdle,
   fileStalls,
-  heldRaise,
   OVERNIGHT_NO_PROGRESS,
   personAnsweredSince,
   outsideRunning,
@@ -402,60 +401,35 @@ describe('overnightTick', () => {
     });
     const tick = await overnightTick(spent.ports);
     expect(tick.act === 'nothing-ready' && tick.reason).toContain(
-      'closed nothing in its last two sessions. The button to send it again is on /dev/inbox.',
+      'closed nothing in its last two sessions. A session is sent to find out why.',
     );
     expect(spent.calls.fired).toEqual([]);
   });
 
-  it('raises a feature held for good once a tick, with the fire that closed nothing', async () => {
-    const raised: Array<{ id: string; lastFiredAt: string }> = [];
-    const { ports: p } = ports({
+  it('lets a feature out of the in-night guard once its diagnosis has ended', async () => {
+    const held = ports({
       now: Date.parse('2026-09-18T13:00:00.000Z'),
       loadRun: async () => night({ startedAt: '2026-09-17T23:00:00.000Z', stopBy: null }),
       lastFiredAt: async () => ({ feature: '2026-09-18T06:00:00.000Z' }),
       previousFiredAt: async () => ({ feature: '2026-09-17T23:30:00.000Z' }),
-      raiseHeld: async (held) => {
-        raised.push(...held.map((one) => ({ id: one.id, lastFiredAt: one.lastFiredAt })));
-      },
     });
+    await expect(overnightTick(held.ports)).resolves.toMatchObject({ act: 'nothing-ready' });
 
-    await overnightTick(p);
-
-    expect(raised).toEqual([{ id: 'feature', lastFiredAt: '2026-09-18T06:00:00.000Z' }]);
+    const released = ports({
+      now: Date.parse('2026-09-18T13:00:00.000Z'),
+      loadRun: async () => night({ startedAt: '2026-09-17T23:00:00.000Z', stopBy: null }),
+      lastFiredAt: async () => ({ feature: '2026-09-18T06:00:00.000Z' }),
+      previousFiredAt: async () => ({ feature: '2026-09-17T23:30:00.000Z' }),
+      stalls: async () => ({ held: [], released: ['feature'] }),
+    });
+    await expect(overnightTick(released.ports)).resolves.toMatchObject({ act: 'fired' });
+    expect(released.calls.fired).toEqual([{ feature: 'feature', step: 'step' }]);
   });
 
-  it('raises nothing for a feature waiting out its six hours', async () => {
-    const raiseHeld = vi.fn(async () => {});
-    const { ports: p } = ports({
-      loadRun: async () => night({ startedAt: '2026-09-17T23:00:00.000Z' }),
-      lastFiredAt: async () => ({ feature: '2026-09-17T23:30:00.000Z' }),
-      raiseHeld,
-    });
-
-    await overnightTick(p);
-
-    expect(raiseHeld).not.toHaveBeenCalled();
-  });
-
-  it('still fires another feature when the raise cannot be filed', async () => {
-    const { ports: p, calls } = ports({
-      now: Date.parse('2026-09-18T01:00:00.000Z'),
-      loadSections: async () => tree(twoFeatures()),
-      lastFiredAt: async () => ({ first: '2026-09-17T23:10:00.000Z' }),
-      previousFiredAt: async () => ({ first: '2026-09-17T23:05:00.000Z' }),
-      raiseHeld: async () => {
-        throw new Error('raised_items is unreadable');
-      },
-    });
-
-    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired' });
-    expect(calls.fired).toEqual([{ feature: 'second', step: 'second-step' }]);
-  });
-
-  it('passes over a feature its stall raise holds and fires the next', async () => {
+  it('passes over a feature a diagnosis or raise holds and fires the next', async () => {
     const { ports: p, calls } = ports({
       loadSections: async () => tree(twoFeatures()),
-      stalls: async () => ['first'],
+      stalls: async () => ({ held: ['first'], released: [] }),
     });
 
     await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired' });
@@ -867,26 +841,6 @@ describe('personAnsweredSince', () => {
   });
 });
 
-describe('heldRaise', () => {
-  it('asks in one line whether to send the feature again, and a yes sends it', () => {
-    const raise = heldRaise({
-      id: 'feature-uuid',
-      number: 1660,
-      title: 'Quick notes in the vault',
-      module: 'vault',
-      lastFiredAt: '2026-10-10T03:00:00.000Z',
-      retryAt: null,
-    });
-
-    expect(raise.ask).toBe('Send #1660 Quick notes in the vault to a session again?');
-    expect(raise.consequence).toMatchObject({ name: 'send_step', text: '#1660' });
-    expect(raise.module).toBe('vault');
-    // One per fire that closed nothing: the source names both.
-    expect(raise.source).toBe('overnight held feature-uuid after 2026-10-10T03:00:00.000Z');
-    expect(raise.source).not.toContain('#');
-  });
-});
-
 describe('overnightRefusedReason', () => {
   it('names each refusal once, with a full stop', () => {
     expect(
@@ -1082,11 +1036,13 @@ describe('fileStalls', () => {
 
   /**
    * plan_runs and raised_items as chains that answer every read with the
-   * given rows, and record what is inserted. The filters are left to the
-   * real query; what is checked is what the tick does with the answer.
+   * given rows, and record what is inserted and dismissed. The filters are
+   * left to the real query; what is checked is what the tick does with the
+   * answer.
    */
   function db(runs: Row[], raises: Row[]) {
     const inserted: Row[] = [];
+    const dismissed: string[] = [];
     const from = (table: string) => {
       const rows = table === 'plan_runs' ? runs : raises;
       const answer = { data: rows, error: null };
@@ -1097,6 +1053,7 @@ describe('fileStalls', () => {
         not: () => chain,
         order: () => chain,
         limit: async () => answer,
+        or: async () => ({ data: rows.filter((row) => row.status === 'open'), error: null }),
         like: (_column: string, pattern: string) =>
           Promise.resolve({
             data: rows.filter((row) =>
@@ -1108,15 +1065,24 @@ describe('fileStalls', () => {
           inserted.push(row);
           return { error: null };
         },
+        update: () => ({
+          eq: () => ({
+            in: async (_column: string, ids: string[]) => {
+              dismissed.push(...ids);
+              return { error: null };
+            },
+          }),
+        }),
       };
       return chain;
     };
-    return { supabase: { from } as never, inserted };
+    return { supabase: { from } as never, inserted, dismissed };
   }
 
   const sections = () => tree([item({ id: 'feature', number: 1801 }), item({ id: 'step', parentId: 'feature' })]);
   const failed = (id: string, at: string, over: Row = {}) => ({
     id,
+    job: 'feature',
     plan_item_id: 'step',
     status: 'failed',
     created_at: at,
@@ -1125,19 +1091,61 @@ describe('fileStalls', () => {
     error: null,
     ...over,
   });
+  const unstick = (at: string, over: Row = {}) => ({
+    id: `u-${at}`,
+    job: 'unstick',
+    plan_item_id: 'feature',
+    status: 'failed',
+    created_at: at,
+    stop_reason: null,
+    stop_pieces: null,
+    error: 'Nothing at or beneath the feature changed while it ran.',
+    ...over,
+  });
+  const NOON = Date.parse('2026-10-11T12:00:00.000Z');
+  const R2 = '2026-10-11T10:00:00.000Z';
+  const R1 = '2026-10-10T10:00:00.000Z';
 
-  it('raises a feature whose last two runs closed nothing, quoting why, and holds it', async () => {
+  it('sends a diagnosis at a feature whose last two runs closed nothing, and asks nothing yet', async () => {
+    const { supabase, inserted } = db([failed('r2', R2), failed('r1', R1)], []);
+    const diagnose = vi.fn(async () => ({ ok: true }));
+
+    const verdict = await fileStalls({ supabase, userId: 'u', sections: sections(), now: NOON, diagnose });
+
+    expect(diagnose).toHaveBeenCalledTimes(1);
+    expect(verdict).toEqual({ held: ['feature'], released: [] });
+    expect(inserted).toEqual([]);
+  });
+
+  it('holds the feature while its diagnosis runs, and releases it once the diagnosis has ended', async () => {
+    const running = db([unstick('2026-10-11T11:00:00.000Z', { status: 'started', error: null }), failed('r2', R2), failed('r1', R1)], []);
+    const diagnose = vi.fn(async () => ({ ok: true }));
+    expect(await fileStalls({ supabase: running.supabase, userId: 'u', sections: sections(), now: NOON, diagnose })).toEqual({
+      held: ['feature'],
+      released: [],
+    });
+
+    const ended = db([unstick('2026-10-11T11:00:00.000Z', { status: 'finished', error: null }), failed('r2', R2), failed('r1', R1)], []);
+    expect(await fileStalls({ supabase: ended.supabase, userId: 'u', sections: sections(), now: NOON, diagnose })).toEqual({
+      held: [],
+      released: ['feature'],
+    });
+    expect(diagnose).not.toHaveBeenCalled();
+  });
+
+  it('raises a feature a diagnosis did not get moving, quoting what it found, and holds it', async () => {
     const { supabase, inserted } = db(
       [
-        failed('r2', '2026-10-11T10:00:00.000Z', { stop_reason: 'Main was red.' }),
-        failed('r1', '2026-10-10T10:00:00.000Z'),
+        failed('r2', R2, { stop_reason: 'Main was red.' }),
+        unstick('2026-10-10T12:00:00.000Z', { stop_reason: 'The migration was applied; it should run now.' }),
+        failed('r1', R1),
       ],
       [],
     );
 
-    const held = await fileStalls({ supabase, userId: 'u', sections: sections(), now: Date.parse('2026-10-11T12:00:00.000Z') });
+    const verdict = await fileStalls({ supabase, userId: 'u', sections: sections(), now: NOON });
 
-    expect(held).toEqual(['feature']);
+    expect(verdict.held).toEqual(['feature']);
     expect(inserted).toHaveLength(1);
     expect(inserted[0]).toMatchObject({
       user_id: 'u',
@@ -1146,6 +1154,31 @@ describe('fileStalls', () => {
       consequence: { name: 'send_step', text: '#1801' },
     });
     expect(String(inserted[0].detail)).toContain('"Main was red."');
+    expect(String(inserted[0].detail)).toContain(
+      'A session sent to find out why said: "The migration was applied; it should run now."',
+    );
+  });
+
+  // #1073: its one open step waited on a check-back for two weeks of data.
+  it('neither diagnoses nor raises a feature whose open steps all wait, and puts its raise away', async () => {
+    const waiting = () =>
+      buildPlanTree({
+        items: [item({ id: 'feature', number: 1801 }), item({ id: 'step', parentId: 'feature' })],
+        dependencies: [],
+        checkWaits: [{ id: 'c1', planItemId: 'step', title: 'Five closes exist', dueAt: '2026-10-26T06:00:00.000Z' }],
+      });
+    const { supabase, inserted, dismissed } = db(
+      [failed('r2', R2), failed('r1', R1)],
+      [{ id: 'raise-1', source: 'stalled feature runs r2 r1', status: 'open', created_at: R2, answered_at: null }],
+    );
+    const diagnose = vi.fn(async () => ({ ok: true }));
+
+    const verdict = await fileStalls({ supabase, userId: 'u', sections: waiting(), now: NOON, diagnose });
+
+    expect(diagnose).not.toHaveBeenCalled();
+    expect(inserted).toEqual([]);
+    expect(verdict).toEqual({ held: [], released: [] });
+    expect(dismissed).toEqual(['raise-1']);
   });
 
   // #1804: the split is only asked of a feature with no steps of its own.
@@ -1153,27 +1186,29 @@ describe('fileStalls', () => {
     const pieces = { stop_reason: 'Too big.', stop_pieces: ['Read the runs', 'Write the raise'] };
     const bare = () => tree([item({ id: 'feature', number: 1801 })]);
     const runs = [
-      failed('r2', '2026-10-11T10:00:00.000Z', { plan_item_id: 'feature', ...pieces }),
-      failed('r1', '2026-10-10T10:00:00.000Z', { plan_item_id: 'feature' }),
+      failed('r2', R2, { plan_item_id: 'feature', ...pieces }),
+      unstick('2026-10-10T12:00:00.000Z'),
+      failed('r1', R1, { plan_item_id: 'feature' }),
     ];
 
     const lone = db(runs, []);
-    await fileStalls({ supabase: lone.supabase, userId: 'u', sections: bare(), now: MIDNIGHT });
+    await fileStalls({ supabase: lone.supabase, userId: 'u', sections: bare(), now: NOON });
     expect(lone.inserted[0]).toMatchObject({
       ask: expect.stringMatching(/^Split #1801 .* into 2 steps\?$/),
       consequence: { name: 'split_feature', text: '#1801' },
     });
 
-    const stepped = db(runs.map((run) => ({ ...run, plan_item_id: 'step' })), []);
-    await fileStalls({ supabase: stepped.supabase, userId: 'u', sections: sections(), now: MIDNIGHT });
+    const stepped = db(runs.map((run) => (run.job === 'unstick' ? run : { ...run, plan_item_id: 'step' })), []);
+    await fileStalls({ supabase: stepped.supabase, userId: 'u', sections: sections(), now: NOON });
     expect(stepped.inserted[0]).toMatchObject({ consequence: { name: 'send_step' } });
   });
 
   it('adds no second raise while the first is open', async () => {
     const { supabase, inserted } = db(
-      [failed('r3', '2026-10-12T10:00:00.000Z'), failed('r2', '2026-10-11T10:00:00.000Z')],
+      [failed('r3', '2026-10-12T10:00:00.000Z'), unstick('2026-10-11T12:00:00.000Z'), failed('r2', R2)],
       [
         {
+          id: 'raise-1',
           source: 'stalled feature runs r2 r1',
           status: 'open',
           created_at: '2026-10-11T11:00:00.000Z',
@@ -1182,26 +1217,22 @@ describe('fileStalls', () => {
       ],
     );
 
-    const held = await fileStalls({ supabase, userId: 'u', sections: sections(), now: MIDNIGHT });
+    const verdict = await fileStalls({ supabase, userId: 'u', sections: sections(), now: MIDNIGHT });
 
     expect(inserted).toEqual([]);
     // Sent by hand since the raise, so the raise no longer holds it.
-    expect(held).toEqual([]);
+    expect(verdict.held).toEqual([]);
   });
 
-  it('raises nothing for a feature whose newest run closed a step', async () => {
-    const { supabase, inserted } = db(
-      [
-        failed('r2', '2026-10-11T10:00:00.000Z', { status: 'finished' }),
-        failed('r1', '2026-10-10T10:00:00.000Z'),
-      ],
-      [],
-    );
+  it('does nothing for a feature whose newest run closed a step', async () => {
+    const { supabase, inserted } = db([failed('r2', R2, { status: 'finished' }), failed('r1', R1)], []);
+    const diagnose = vi.fn(async () => ({ ok: true }));
 
-    const held = await fileStalls({ supabase, userId: 'u', sections: sections(), now: MIDNIGHT });
+    const verdict = await fileStalls({ supabase, userId: 'u', sections: sections(), now: MIDNIGHT, diagnose });
 
+    expect(diagnose).not.toHaveBeenCalled();
     expect(inserted).toEqual([]);
-    expect(held).toEqual([]);
+    expect(verdict).toEqual({ held: [], released: [] });
   });
 });
 
@@ -1351,6 +1382,11 @@ describe('sweepQuietRuns', () => {
             }
             return chain;
           },
+          // Started and stale runs, read by status (plan #1825).
+          in: async (column: string) =>
+            column === 'status'
+              ? { data: started.filter((row) => row.user_id === userId), error: null }
+              : { data: [], error: null },
           limit: async () => ({ data: started, error: null }),
           update: (values: Record<string, unknown>) => ({
             eq: async (_column: string, id: string) => {

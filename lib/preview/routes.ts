@@ -50,6 +50,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-plan-critic-stop': ['/dev/plan'],
   'dev-plan-screen-change': ['/dev/plan'],
   'dev-plan-send-back': ['/dev/plan'],
+  'scope-burn-up': ['/goals/[goalId]', '/dev/plan/[number]'],
   'dev-plan-feature': ['/dev/plan/[number]'],
   'dev-plan-feature-steps': ['/dev/plan/[number]'],
   'dev-plan-feature-activity': ['/dev/plan/[number]'],
@@ -99,6 +100,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-roles-table': ['/jobs/pipeline'],
   'jobs-pipeline-filtered': ['/jobs/pipeline'],
   'jobs-today': ['/jobs'],
+  'jobs-today-clear': ['/jobs'],
   'jobs-insights': ['/jobs/analytics'],
   'todo-calendar-month': ['/todo/calendar'],
   'todo-feed-event': ['/todo/calendar'],
@@ -163,6 +165,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-posts-drafting': ['/dev/posts'],
   'dev-posts-write': ['/dev/posts'],
   'dev-posts-x': ['/dev/posts'],
+  'dev-posts-matched': ['/dev/posts'],
   'home-page': ['/home'],
   'home-watching': ['/home'],
   'home-dash-today': ['/home'],
@@ -260,6 +263,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-modules': ['/dev/modules'],
   'dev-module': ['/dev/modules/[id]'],
   'goals-run': ['/goals/runs/[runId]'],
+  'run-lines': ['/goals/runs/[runId]', '/dev/plan/[number]'],
   'jobs-activity': ['/jobs/activity'],
   'jobs-analytics': ['/jobs/analytics'],
   'jobs-answers': ['/jobs/answers'],
@@ -354,6 +358,14 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'dash-mark': ['components/ui/dash-mark.tsx'],
   // The runner's card with its four Dashes, running and off (plan #1704).
   'dev-runner-crew': ['app/dev/plan/overnight-control.tsx', 'app/dev/plan/runner-crew.tsx'],
+  // A run's lines in every state, on a plan step and a goal run (plan #1826).
+  'run-lines': [
+    'components/runs/run-lines.tsx',
+    'components/runs/live-run-lines.tsx',
+    'components/runs/acknowledge-run.tsx',
+    // The presses that answer a waiting question (plan #1824).
+    'components/runs/run-answer.tsx',
+  ],
 };
 
 /** The surface that stands for a shared component, or null for any other file. */

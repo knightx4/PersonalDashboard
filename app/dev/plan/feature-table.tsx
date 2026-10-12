@@ -52,7 +52,14 @@ function Percent({ row }: { row: FeatureRow }) {
  * is, on one line under the title, and the rest of the columns go; the
  * feature page has them.
  */
-export function FeatureTable({ groups }: { groups: readonly FeatureGroup[] }) {
+export function FeatureTable({
+  groups,
+  overdue = {},
+}: {
+  groups: readonly FeatureGroup[];
+  /** Days since the last update, for each feature a week overdue for one (plan #1834). */
+  overdue?: Record<string, number>;
+}) {
   const count = featureCount(groups);
 
   return (
@@ -89,6 +96,15 @@ export function FeatureTable({ groups }: { groups: readonly FeatureGroup[] }) {
                       {stepRef(row.node)}
                     </span>
                     {row.node.title}
+                    {overdue[row.node.id] !== undefined && (
+                      <StateLabel
+                        tone="caution"
+                        glyph="dashed"
+                        word="Update overdue"
+                        title={`${overdue[row.node.id]} days since the last update`}
+                        className="ml-2 align-middle font-normal"
+                      />
+                    )}
                     {/* The phone's one line under the title: health and how
                         far through, which is what the dropped columns leave. */}
                     <span className="mt-1 flex items-center gap-3 text-small font-normal md:hidden">

@@ -46,14 +46,17 @@ import { addDays, todayIn } from '@/lib/todo/tasks/model';
 import { FileLinks } from '@/components/files/file-links';
 import type { LinkedFile } from '@/lib/files/files';
 import { createCoreClient } from '@/lib/core/auth/server';
+import { BurnUpChart } from '@/components/ui/burn-up-chart';
+import { goalScopeRef, loadScopeDays, type ScopeDay } from '@/lib/goals/scope-days';
 import { writtenWhen, type Brief } from '@/lib/goals/briefs';
 import { loadBrief } from '@/lib/goals/briefs-store';
 import { loadFilesOf } from '@/lib/goals/files-store';
+import { goalFileRows, stepTitlesIn } from '@/lib/goals/goal-files';
 import { flagsWaiting } from '@/lib/goals/flags';
 import { goalStatus, statusLine } from '@/lib/goals/goal-status';
 import { goalProgress } from '@/lib/goals/status';
 import { isCurrent, type GoalReview } from '@/lib/goals/reviews';
-import { loadLatestReviews } from '@/lib/goals/reviews-store';
+import { loadLatestReviews, loadReviewChange } from '@/lib/goals/reviews-store';
 import { closedSteps, GOAL_TABS, goalStages } from '@/lib/goals/goal-page';
 import { goalMatchText } from '@/lib/goals/related-notes';
 import { createVaultClient } from '@/lib/vault/auth/server';
@@ -221,22 +224,6 @@ function noteWhen(brief: Brief, timeZone: string): string {
   return writtenWhen(brief, timeZone, Date.now());
 }
 
-/** Every file on the goal and its steps, once each, the goal's own first. */
-function goalFiles(goalId: string, filesOf: Record<string, LinkedFile[]>): LinkedFile[] {
-  const seen = new Set<string>();
-  const out: LinkedFile[] = [];
-  const add = (files: LinkedFile[] | undefined) => {
-    for (const file of files ?? []) {
-      if (seen.has(file.fileId)) continue;
-      seen.add(file.fileId);
-      out.push(file);
-    }
-  };
-  add(filesOf[goalId]);
-  for (const [itemId, files] of Object.entries(filesOf)) if (itemId !== goalId) add(files);
-  return out;
-}
-
 /**
  * What Learn holds for a goal in the Learn area (plan #1491): its aim, its
  * plan and, for the Level 3 goal, the counts. Null for any other goal, and
@@ -348,6 +335,9 @@ export default async function GoalMapPage({
   // (plan #1044), so a reload shows it going. A failed read leaves the lines
   // out rather than the page.
   const [core, vault] = await Promise.all([createCoreClient(), createVaultClient()]);
+  // The saved step counts behind the burn-up chart (plan #1837). A failed
+  // read leaves the chart out rather than the page.
+  const scopeDays = loadScopeDays(core, goalScopeRef(map.goal.id)).catch((): ScopeDay[] => []);
   const related = relatedNotes(
     vault,
     user.id,
@@ -360,7 +350,7 @@ export default async function GoalMapPage({
     (): ProgressEntry[] => [],
   );
   const suggestionIds = [map.goal.id, ...ownSteps(map.steps).map((step) => step.id)];
-  const [stepRuns, filesOf, brief, review, places, progressEntries, arrivals, pace, suggestions] = await Promise.all([
+  const [stepRuns, filesOf, brief, review, reviewChange, places, progressEntries, arrivals, pace, suggestions] = await Promise.all([
     loadStepRuns(client, stepIdsOn(map)).catch((): Record<string, GoalRun> => ({})),
     // The files the goal and its steps link to. A failed read leaves them
     // out rather than the page, as do the note and the verdict below.
@@ -371,6 +361,7 @@ export default async function GoalMapPage({
     loadLatestReviews(client)
       .then((reviews) => reviews.get(map.goal.id) ?? null)
       .catch((): GoalReview | null => null),
+    loadReviewChange(client, map.goal.id),
     // The areas the goal can be moved to (plan #1160). A failed read leaves
     // the menu out rather than the page.
     loadAreas(client)
@@ -394,7 +385,11 @@ export default async function GoalMapPage({
     today,
     flagsWaiting(flags, new Map([[map.goal.id, map.goal.title]])),
   );
-  const files = goalFiles(map.goal.id, filesOf);
+  const files = goalFileRows(
+    map.goal.id,
+    filesOf,
+    stepTitlesIn([map.steps, map.linked.map((entry) => entry.step)]),
+  );
   const shapeable = map.goal.status === 'open' || map.goal.status === 'proposed';
   const linkedAims = new Set(links?.aims.map((aim) => aim.aimId));
   const aimChoices = aims?.filter((aim) => !linkedAims.has(aim.id)) ?? null;
@@ -467,6 +462,7 @@ export default async function GoalMapPage({
   // closed goal too.
   const runs = shapingView?.runs ?? runRowsOf(history, account.timezone);
 
+  const burnUpDays = await scopeDays;
   const overview = (
     <div className="space-y-6">
       <GoalDoneWhen goal={map.goal}>
@@ -483,6 +479,7 @@ export default async function GoalMapPage({
           line={line}
           review={review}
           current={review ? reviewCurrent(review) : false}
+          change={reviewChange}
           brief={brief}
           briefWhen={brief ? noteWhen(brief, account.timezone) : null}
           work={<DashWork items={work} />}
@@ -495,6 +492,7 @@ export default async function GoalMapPage({
         {!numberEmpty && <GoalNumber {...number} />}
         <WaitingOnYou rows={status.yourMove} flags={flags} questions={questions} />
       </div>
+      <BurnUpChart days={burnUpDays} />
       <GoalContext items={shownItems} />
       {map.goal.status === 'open' && (
         <GoalSuggestions

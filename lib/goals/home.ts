@@ -1,9 +1,9 @@
 /**
  * The Goals home (plan #1077, under #1072): a one-sentence summary, Do next
- * from the week's focus goals, the other goals one line each, and what Dash
+ * from steps on Todo and goals with a due date, the other goals one line each, and what Dash
  * did since your last visit.
  *
- * This file is the goal lines, the summary, which goals are in focus, and
+ * This file is the goal lines, the summary, and
  * the split of what is on you into Do next and the rest. The ranking is
  * lib/goals/today.ts and what Dash did is lib/goals/done-since.ts; the reads
  * are in lib/goals/home-store.ts.
@@ -11,7 +11,6 @@
  * Pure, so the wording is tested without a database.
  */
 import { areaHref } from '@/lib/goals/all-goals';
-import { inFocus } from '@/lib/goals/focus';
 import type { NextItem } from '@/lib/goals/daily';
 import type { GoalReview, Verdict } from '@/lib/goals/reviews';
 import type { GoalProgress } from '@/lib/goals/status';
@@ -192,17 +191,14 @@ export function nextVisitDays(days: readonly string[], today: string): string[] 
 }
 
 // ---------------------------------------------------------------------------
-// Do next and Other goals: what the home lists from the week's focus goals.
+// Do next and Other goals: what the home lists from Todo and from dated goals.
 // ---------------------------------------------------------------------------
-
-// Which goals are in focus is lib/goals/focus.ts's inFocus, the rule Todo and
-// Dash's runs read too.
 
 /**
  * The kinds of thing on you that Do next takes from any goal. A question, a
  * flag, or proposed steps or goals waiting on your approval hold up work
- * wherever they are, so they are not left out because their goal is not one
- * of this week's.
+ * wherever they are, so they are not left out because their goal has no due
+ * date.
  */
 export const ANY_GOAL_KINDS: ReadonlySet<TodayKind> = new Set<TodayKind>([
   'question',
@@ -213,7 +209,7 @@ export const ANY_GOAL_KINDS: ReadonlySet<TodayKind> = new Set<TodayKind>([
 ]);
 
 export type HomeLists = {
-  /** The first `cap` of what is on you in the week's goals, ranked. */
+  /** The first `cap` of what is on you from Todo and from goals with a due date, ranked. */
   doNext: TodayItem[];
   /** The rest of it, in the same order, folded under Later. */
   rest: TodayItem[];
@@ -224,26 +220,25 @@ export type HomeLists = {
 /**
  * Splits everything ranked as on you (todayRanked) into Do next, the first
  * `cap` (TODAY_CAP, passed in so this file stays free of the ranking's
- * imports in the browser), and the rest, keeping what belongs to a goal in focus and anything of
- * ANY_GOAL_KINDS. Other goals is every goal out of focus, plus an errand
- * with no row in Do next, so a dated errand always shows somewhere.
+ * imports in the browser), and the rest. Kept are the steps on Todo, anything
+ * that belongs to a goal with a due date, and anything of ANY_GOAL_KINDS.
+ * Other goals is every goal with no due date, plus an errand with no row in
+ * Do next, so a dated errand always shows somewhere.
  */
 export function homeLists(
   ranked: readonly TodayItem[],
   goals: readonly HomeGoal[],
-  today: string | undefined,
   cap: number,
 ): HomeLists {
-  const all = goals.map((line) => line.goal);
-  const focused = new Set(
-    all.filter((goal) => inFocus(goal, all, today)).map((goal) => goal.id),
+  const dated = new Set(goals.filter((line) => line.goal.dueOn).map((line) => line.goal.id));
+  const kept = ranked.filter(
+    (item) => ANY_GOAL_KINDS.has(item.kind) || item.onTodo === true || dated.has(item.goalId),
   );
-  const kept = ranked.filter((item) => ANY_GOAL_KINDS.has(item.kind) || focused.has(item.goalId));
   const doNext = kept.slice(0, cap);
   const listed = new Set(doNext.map((item) => item.goalId));
   const { errands, others } = splitErrands(goals);
   const otherGoals = [...errands, ...others].filter(
-    (line) => !focused.has(line.goal.id) || (line.goal.errand && !listed.has(line.goal.id)),
+    (line) => !dated.has(line.goal.id) || (line.goal.errand && !listed.has(line.goal.id)),
   );
   return { doNext, rest: kept.slice(cap), otherGoals };
 }

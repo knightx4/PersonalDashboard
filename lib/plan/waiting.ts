@@ -25,6 +25,7 @@ import {
   type PlanSection,
 } from './tree';
 import type { DevComment } from '@/lib/comments/load';
+import type { RunQuestion } from '@/lib/core/run-questions';
 import type { SpendSink } from '@/lib/core/spend/pricing';
 import { decideWithJev } from '@/lib/jev/decide';
 import type { RaisedQueue, RaisedRow } from '@/lib/raised/load';
@@ -207,7 +208,9 @@ export type WaitingGroupKey = 'actions' | 'questions' | 'approve';
 export type WaitingEntry =
   | { kind: 'plan'; id: string; row: WaitingRow }
   | { kind: 'raise'; id: string; raise: RaisedRow }
-  | { kind: 'spec'; id: string; spec: WaitingSpecChange };
+  | { kind: 'spec'; id: string; spec: WaitingSpecChange }
+  /** A run held on a question it asked partway (plan #1824). */
+  | { kind: 'run'; id: string; question: RunQuestion };
 
 /**
  * A change to a spec waiting on your yes (plan #1506), with the spec's title
@@ -368,12 +371,20 @@ export function waitingGroups(
   rows: WaitingRow[] = waitingOnYou(sections),
   /** Proposed changes to specs; only a yes or a no finishes one. */
   specChanges: readonly WaitingSpecChange[] = [],
+  /** Runs waiting on your answer to a question they asked partway. */
+  runQuestions: readonly RunQuestion[] = [],
 ): WaitingGroup[] {
   const entries: Record<WaitingGroupKey, WaitingEntry[]> = {
     actions: [],
     questions: [],
     approve: [],
   };
+
+  // First among the questions: a run is held until it hears back, where a
+  // blocked step or a raise waits as long as you like.
+  for (const question of runQuestions) {
+    entries.questions.push({ kind: 'run', id: question.runId, question });
+  }
 
   for (const row of rows) {
     entries[planGroupOf(row)].push({ kind: 'plan', id: row.id, row });

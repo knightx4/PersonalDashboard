@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cleanThread, parsePostedUrl, postImageSrc, socialPostFromRow, threadCopyText } from './posts';
-import { buildPostsPage } from './posts-page';
+import { buildPostsPage, xPostsShown } from './posts-page';
 
 /** The helpers the Posts tab writes through, and the page it draws (plan #1419). */
 
@@ -61,6 +61,38 @@ describe('buildPostsPage', () => {
       created_at: '2026-10-01T09:00:00Z',
       ...extra,
     });
+
+  it('asks about a candidate on a waiting draft only, and lists the posts on X (plan #1820)', () => {
+    const stored = (id: string) => ({
+      xPostId: id,
+      text: `post ${id}`,
+      url: `https://x.com/me/status/${id}`,
+      createdAt: '2026-10-01T10:00:00Z',
+      threadPosts: 1,
+    });
+    const page = buildPostsPage({
+      posts: [
+        row('a', 'suggested', { x_candidate_id: '7' }),
+        row('b', 'posted', { posted_at: '2026-10-02T09:00:00Z', posted_url: 'https://x.com/1', x_candidate_id: '7' }),
+      ],
+      steps: [],
+      notes: [],
+      run: null,
+      now: Date.parse('2026-10-02T12:00:00Z'),
+      x: { candidates: [stored('7')], listed: [stored('8'), stored('9')], total: 60 },
+    });
+    expect(page.suggested[0].candidate?.xPostId).toBe('7');
+    expect(page.posted[0].candidate).toBeNull();
+    expect(page.onX.posts.map((p) => p.xPostId)).toEqual(['8', '9']);
+    expect(page.onX.total).toBe(60);
+  });
+
+  it('lists the posts on X in whole pages of fifty, up to what X returns', () => {
+    expect(xPostsShown(null)).toBe(50);
+    expect(xPostsShown('70')).toBe(100);
+    expect(xPostsShown('nonsense')).toBe(50);
+    expect(xPostsShown('99999')).toBe(3200);
+  });
 
   it('splits by status and links the steps in number order, leaving out a deleted one', () => {
     const page = buildPostsPage({

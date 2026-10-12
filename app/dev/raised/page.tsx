@@ -5,6 +5,8 @@ import { planRefTitles } from '@/lib/plan/load';
 import { loadPlanForRequest } from '@/lib/plan/request-plan';
 import { buildPlanTree, flattenSections } from '@/lib/plan/tree';
 import { waitingOnYou } from '@/lib/plan/waiting';
+import { loadSnoozeState } from '@/lib/core/inbox-snoozes-server';
+import { planRowRef, raiseRef, withoutSnoozed } from '@/lib/dev/inbox-snoozes';
 import { loadDigest } from '@/lib/digest/load';
 import { loadConversations } from '@/lib/comments/recent';
 import { loadFeatureFires, loadLastRuns, loadStartedRuns } from '@/lib/plan/runs';
@@ -104,6 +106,7 @@ export default async function DevRaisedPage() {
     mainCheck,
     recentScreens,
     autoApprove,
+    snoozes,
   ] = await Promise.all([
     loadRaised(supabase, user.id),
     loadDigest(supabase, user.id),
@@ -143,6 +146,8 @@ export default async function DevRaisedPage() {
     loadRecentScreenChanges(supabase, user.id, new Date(now - SHIPPED_WINDOW_MS).toISOString()),
     // The runner's auto approve switch, drawn on its row.
     loadAutoApprove(supabase, user.id),
+    // Snoozed rows are out of the chip as they are out of the Inbox (plan #1843).
+    loadSnoozeState(supabase, user.id),
   ]);
 
   // The tree once, for the two things below that read it: how much is
@@ -156,7 +161,10 @@ export default async function DevRaisedPage() {
   );
   // Counted the way the tab's badge is (app/dev/layout.tsx), so the chip and
   // the badge never disagree.
-  const onYou = queue.open.length + waitingOnYou(sections).length + specChanges;
+  const onYou =
+    withoutSnoozed(queue.open, (raise) => raiseRef(raise.id), snoozes).length +
+    withoutSnoozed(waitingOnYou(sections), (row) => planRowRef(row.id), snoozes).length +
+    specChanges;
 
   // The runner's card, read by the same function the plan page reads it with.
   const card = runnerCard({

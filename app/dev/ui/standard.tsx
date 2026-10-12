@@ -397,7 +397,11 @@ const PLAN_STATES = [
     'Setup',
     'A job that was always yours -- an account, a key. Barred like a blocked step, because it stops the same work.',
   ],
-  ['waiting', 'Waiting', 'Waits on another step. Dashed, like an application nobody answered.'],
+  [
+    'waiting',
+    'Waiting',
+    'Waits on another step. Dashed, like an application nobody answered. A step put down until a check-back falls due draws the clock instead.',
+  ],
   ['dropped', 'Dropped', 'Decided against. The same shape as a withdrawal.'],
 ] as const satisfies readonly (readonly [PlanHealth, string, string])[];
 

@@ -15,7 +15,11 @@
  */
 import type { StepNode } from '@/lib/goals/steps';
 
-export type GoalRunStatus = 'started' | 'done' | 'failed';
+/**
+ * A goals.runs status. awaiting_input and stale came with run lines (plan
+ * #1822): the run asked you something, or stopped writing lines.
+ */
+export type GoalRunStatus = 'started' | 'awaiting_input' | 'stale' | 'done' | 'failed';
 
 /** One goals.runs row, as the goal page needs it. */
 export type GoalRun = {
@@ -54,8 +58,13 @@ export function runIsQuiet(run: { createdAt: string; lastSeenAt?: string | null 
   return now - lastHeardAt(run) >= RUN_QUIET_MS;
 }
 
-/** Whether a run is still taken to be going, so a second press is refused. */
+/**
+ * Whether a run is still taken to be going, so a second press is refused. A
+ * run waiting on your answer is still open (plan #1824): answering it carries
+ * it on, and a second run beside it would work the same goal twice.
+ */
 export function runInFlight(run: GoalRun | null, now: number): boolean {
+  if (run?.status === 'awaiting_input') return true;
   if (!run || run.status !== 'started') return false;
   return !runIsQuiet(run, now);
 }

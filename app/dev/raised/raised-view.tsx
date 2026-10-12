@@ -32,6 +32,16 @@ import { RAISED_HEALTH_WORD } from '@/lib/dev/words';
 import { RAISED_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { InboxOverview, inboxAnchor, type InboxCell } from '@/components/inbox/overview';
+import { isRunnerSource } from '@/lib/plan/stall';
+import {
+  BackFromSnoozeMark,
+  SnoozedList,
+  SnoozeMenu,
+  type SnoozedItem,
+} from '@/components/inbox/snooze';
+import { planRowRef, raiseRef } from '@/lib/dev/inbox-snoozes';
+import { RunQuestionCard } from '@/components/runs/run-question-card';
+import { answerPlanRunAction } from '@/app/dev/plan/run-actions';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -220,7 +230,16 @@ function Decide({ row }: { row: RaisedRow }) {
   );
 }
 
-function RaiseCard({ row, titles }: { row: RaisedRow; titles?: PlanRefTitles }) {
+function RaiseCard({
+  row,
+  titles,
+  snooze,
+}: {
+  row: RaisedRow;
+  titles?: PlanRefTitles;
+  /** Present when an open raise can be snoozed (plan #1843). */
+  snooze?: { back: boolean };
+}) {
   const [dismissState, dismissAction, dismissPending] = useActionState(
     dismissRaise,
     {} as RaisedActionState,
@@ -248,6 +267,7 @@ function RaiseCard({ row, titles }: { row: RaisedRow; titles?: PlanRefTitles }) 
         </span>
         <span className="tabular text-small text-ink-muted">{row.createdAt.slice(0, 10)}</span>
         <StatusLabel row={row} />
+        {snooze?.back && <BackFromSnoozeMark />}
         <CommentCount count={row.thread.length} />
       </div>
 
@@ -278,8 +298,14 @@ function RaiseCard({ row, titles }: { row: RaisedRow; titles?: PlanRefTitles }) 
       )}
 
       {/* Which run raised it. Without this a raise is a voice from nowhere, and
-          the first thing you want to know is what it was doing at the time. */}
-      {row.source && <p className="text-small text-ink-muted">Raised by {row.source}</p>}
+          the first thing you want to know is what it was doing at the time.
+          The runner's own sources are ids that mean nothing to read, so it is
+          named instead. */}
+      {row.source && (
+        <p className="text-small text-ink-muted">
+          Raised by {isRunnerSource(row.source) ? 'the overnight runner' : row.source}
+        </p>
+      )}
 
       {/* One thread, two ways into it. The buttons answer the ask it named;
           what you write here is an answer in your own words, and it starts a
@@ -298,12 +324,15 @@ function RaiseCard({ row, titles }: { row: RaisedRow; titles?: PlanRefTitles }) 
 
       <div className="flex flex-wrap items-center gap-2">
         {row.status === 'open' ? (
-          <form action={dismissAction}>
-            <input type="hidden" name="id" value={row.id} />
-            <Button type="submit" size="sm" variant="ghost" pending={dismissPending}>
-              Dismiss
-            </Button>
-          </form>
+          <>
+            <form action={dismissAction}>
+              <input type="hidden" name="id" value={row.id} />
+              <Button type="submit" size="sm" variant="ghost" pending={dismissPending}>
+                Dismiss
+              </Button>
+            </form>
+            {snooze && <SnoozeMenu snoozeRef={raiseRef(row.id)} />}
+          </>
         ) : (
           <>
             {canClose && (
@@ -356,6 +385,7 @@ export function RaisedView({
   queue,
   groups,
   titles,
+  snooze,
 }: {
   queue: RaisedQueue;
   /**
@@ -367,7 +397,14 @@ export function RaisedView({
   groups: readonly WaitingGroup[];
   /** What each step number in a raise is called, for the hover text. */
   titles?: PlanRefTitles;
+  /**
+   * Snoozing (plan #1843): the refs whose snooze ran out today, for the mark,
+   * and what is snoozed now, for the list at the foot. Left out, the rows
+   * offer no snooze.
+   */
+  snooze?: { back: readonly string[]; snoozed: readonly SnoozedItem[] };
 }) {
+  const back = new Set(snooze?.back);
   const filled = groups.filter((group) => group.entries.length > 0);
   const cells: InboxCell[] = filled.map((group) => ({
     key: group.key,
@@ -422,7 +459,12 @@ export function RaisedView({
                   entry rather than off which list it arrived in. */}
               {group.entries.map((entry) =>
                 entry.kind === 'plan' ? (
-                  <WaitingCard key={entry.id} row={entry.row} titles={titles} />
+                  <WaitingCard
+                    key={entry.id}
+                    row={entry.row}
+                    titles={titles}
+                    snooze={snooze && { back: back.has(planRowRef(entry.row.id)) }}
+                  />
                 ) : entry.kind === 'spec' ? (
                   <SpecChangeCard
                     key={entry.id}
@@ -430,8 +472,15 @@ export function RaisedView({
                     specTitle={entry.spec.specTitle}
                     foldDiff
                   />
+                ) : entry.kind === 'run' ? (
+                  <RunQuestionCard key={entry.id} question={entry.question} action={answerPlanRunAction} />
                 ) : (
-                  <RaiseCard key={entry.id} row={entry.raise} titles={titles} />
+                  <RaiseCard
+                    key={entry.id}
+                    row={entry.raise}
+                    titles={titles}
+                    snooze={snooze && { back: back.has(raiseRef(entry.raise.id)) }}
+                  />
                 ),
               )}
             </ul>
@@ -454,6 +503,8 @@ export function RaisedView({
           </SectionFold>
         </div>
       )}
+
+      {snooze && <SnoozedList items={snooze.snoozed} />}
 
       {/* Shut, where the others open: this one is history rather than work. */}
       {queue.closed.length > 0 && (

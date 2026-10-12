@@ -1,9 +1,9 @@
 'use client';
 
-import { useActionState, useEffect } from 'react';
+import { useActionState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { useRunRefresh } from '@/components/runs/use-run-refresh';
 import { cn } from '@/lib/cn';
 import { CostHint } from '@/components/ui/cost-hint';
 import type { CostEstimate } from '@/lib/core/spend/estimate-types';
@@ -11,9 +11,6 @@ import type { AreaRunView } from '@/lib/goals/shaping';
 import { planAreaAction, type GoalsActionState } from './actions';
 
 const initial: GoalsActionState = {};
-
-/** How often the page looks again while a run is going, as on a goal's page. */
-const RUN_POLL_MS = 15_000;
 
 /**
  * Plan this area: Claude proposes the goals an area needs, from what you
@@ -40,13 +37,8 @@ export function AreaPlanner({
   /** The usual cost of one area plan, shown beside the button; none draws no hint. */
   cost?: CostEstimate | null;
 }) {
-  const router = useRouter();
   const running = run?.running ?? null;
-  useEffect(() => {
-    if (!running) return;
-    const timer = setInterval(() => router.refresh(), RUN_POLL_MS);
-    return () => clearInterval(timer);
-  }, [running, router]);
+  useRunRefresh(Boolean(running));
   const [state, plan, starting] = useActionState(planAreaAction, initial);
 
   if (!canRun && !run) return null;

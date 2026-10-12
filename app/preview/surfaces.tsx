@@ -1,4 +1,5 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
+import { BurnUpSurface } from './burn-up-surfaces';
 import { filterPipeline, parsePipeline } from '@/lib/jobs/pipeline-view';
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
@@ -209,7 +210,7 @@ import {
   InspirationListSurface,
   InspirationUnreadSurface,
 } from './inspiration-surfaces';
-import { PostsDraftingSurface, PostsSurface, PostsWriteSurface, PostsXSurface } from './posts-surfaces';
+import { PostsDraftingSurface, PostsMatchedSurface, PostsSurface, PostsWriteSurface, PostsXSurface } from './posts-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
@@ -249,6 +250,7 @@ import {
   JobsThoughtsSurface,
 } from './jobs-page-surfaces';
 import { GoalRunSurface, MailMessageSurface } from './mail-run-surfaces';
+import { RunLinesSurface } from './run-lines-surfaces';
 import {
   AccountSurface,
   DevBugsSurface,
@@ -3113,6 +3115,29 @@ const findView = {
   ],
 };
 
+/** Jobs Today drawn from the sample rows, with the review queue given. */
+function JobsTodaySurface({ review }: { review: ReviewPeek }) {
+  return (
+    <TodayPage
+      review={review}
+      board={todayPageBoard}
+      summary={summariseSearch(
+        todayPageRows,
+        todayPageBoard.interviews.map((interview) => ({
+          id: interview.id,
+          scheduledAt: interview.scheduledAt,
+          timeKnown: interview.timeKnown,
+          groupId: interview.groupId,
+        })),
+        todayPageNow,
+      )}
+      live={liveByMove(todayPageRows, new Set(['p3']))}
+      since={todayPageSince}
+      timezone="Europe/London"
+    />
+  );
+}
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
@@ -3519,6 +3544,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanOpenedSurface />,
+  },
+  {
+    /* The burn-up chart on a goal's or feature's Overview (plan #1837): a
+     * month with scope added twice, a three-day run, and two days, which
+     * draw nothing. */
+    id: 'scope-burn-up',
+    label: 'Steps over time · burn-up chart',
+    module: 'goals',
+    width: 'page',
+    render: () => <BurnUpSurface />,
   },
   {
     /* A feature's own page (plan #1664): breadcrumbs, the Overview tab with
@@ -4117,25 +4152,16 @@ export const SURFACES: readonly Surface[] = [
     label: 'Today',
     module: 'jobs',
     width: 'wide',
-    render: () => (
-      <TodayPage
-        review={todayPageReview}
-        board={todayPageBoard}
-        summary={summariseSearch(
-          todayPageRows,
-          todayPageBoard.interviews.map((interview) => ({
-            id: interview.id,
-            scheduledAt: interview.scheduledAt,
-            timeKnown: interview.timeKnown,
-            groupId: interview.groupId,
-          })),
-          todayPageNow,
-        )}
-        live={liveByMove(todayPageRows, new Set(['p3']))}
-        since={todayPageSince}
-        timezone="Europe/London"
-      />
-    ),
+    render: () => <JobsTodaySurface review={todayPageReview} />,
+  },
+  {
+    /* The same page with nothing waiting to be checked, so the review strip
+     * does not draw: the picture for a post about Today. */
+    id: 'jobs-today-clear',
+    label: 'Today · nothing to check',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <JobsTodaySurface review={{ count: 0, items: [] }} />,
   },
   {
     /* Analytics: how far each channel's applications got (plan #1595). */
@@ -4883,6 +4909,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PostsXSurface />,
+  },
+  {
+    /* The tab once X has been read (plan #1820): a draft asking "Is this
+     * it?" about a post that reads close to it, one the match marked posted,
+     * and Posted on X, the posts that match no draft, opened. */
+    id: 'dev-posts-matched',
+    label: 'Dev · Posts, matched to X',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsMatchedSurface />,
   },
   {
     /* Home as a whole page on the main-plus-rail pattern (plan #1627): the
@@ -5770,6 +5806,23 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalRunSurface />,
+  },
+  {
+    /* A run's lines as Dash writes them (plan #1826), on a plan step's run
+     * and on a goal run's page: going, waiting on you, gone quiet with its
+     * Acknowledge press, just started, and with the live connection lost.
+     * Fixtures in run-lines-surfaces.tsx. */
+    id: 'run-lines',
+    label: 'Runs · Dash’s lines as it works',
+    module: 'goals',
+    width: 'page',
+    interaction: {
+      kind: 'press',
+      target: '[data-motion-demo="run-line"]',
+      shows:
+        'Dash’s mark in the first card’s header keeps working while a new line, “Kept stale runs open until acknowledged, and committed 7d2e5a1.”, rises into the foot of the list beneath it and the button above goes quiet.',
+    },
+    render: () => <RunLinesSurface />,
   },
   {
     id: 'jobs-activity',

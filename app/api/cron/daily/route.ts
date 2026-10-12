@@ -12,7 +12,9 @@ import { runGoalsDaily } from '@/inngest/goals/daily';
 import { runGoalsQuietSweep } from '@/inngest/goals/quiet-runs';
 import { runGoalsRhythms } from '@/inngest/goals/rhythms';
 import { runGoalsWeekly } from '@/inngest/goals/weekly';
+import { runScopeDays } from '@/inngest/goals/scope-days';
 import { runLearnEmbeddingsDaily } from '@/inngest/learn/embeddings-daily';
+import { runXReadsForAll } from '@/inngest/x/read';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
 // allowed to take, and a route that ends first takes the hand-off with it.
@@ -79,12 +81,18 @@ export async function GET(request: NextRequest) {
     { name: 'goals-rhythms', run: () => runGoalsRhythms() },
     { name: 'goals-daily', run: () => runGoalsDaily() },
     { name: 'goals-weekly', run: () => runGoalsWeekly() },
+    // After the goals stages: the counts are of the steps as they stand once
+    // the morning's closing is done (plan #1836).
+    { name: 'scope-days', run: () => runScopeDays() },
     { name: 'plan-claims', run: () => runClaimSweep() },
     { name: 'dev-digest', run: () => runDevDigest() },
     // After the digest, which files ideas overnight without triage, so they
     // and any other idea still unscored get Jev's score the same morning
     // (plan #1327).
     { name: 'idea-scores', run: () => runIdeaScoreCatchUp() },
+    // The person's own X posts, newest since the last read (plan #1819).
+    // Before the embeddings so a slow model call cannot crowd it out.
+    { name: 'x-posts', run: () => runXReadsForAll() },
     // Last, and bounded: Learn ideas saved without a vector get one (plan #1854).
     { name: 'learn-embeddings', run: () => runLearnEmbeddingsDaily() },
   ];

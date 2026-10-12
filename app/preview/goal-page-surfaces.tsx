@@ -37,8 +37,11 @@ import { GoalDetail, GoalDoneWhen } from '@/app/goals/[goalId]/goal-detail';
 import { GoalActivity } from '@/app/goals/[goalId]/goal-activity';
 import { closedSteps, goalStages } from '@/lib/goals/goal-page';
 import { goalProgress } from '@/lib/goals/status';
+import { BurnUpChart } from '@/components/ui/burn-up-chart';
+import { MONTH_DAYS } from './burn-up-surfaces';
 import { goalMapWith } from './goal-surfaces';
 import { SetTab } from './set-tab';
+import { GOAL_RUN_QUESTION } from './run-lines-surfaces';
 
 /**
  * The Goals home, All goals, the top of a goal page and an information step,
@@ -160,6 +163,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       action: 'Answer',
       unblocks: 3,
       on: null,
+      backFromSnooze: true,
     },
     {
       kind: 'step',
@@ -414,7 +418,7 @@ export function GoalsInboxSurface() {
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader title="Inbox" />
       <GoalsInboxView
-        groups={goalInboxGroups(home.onYou, home.dash ?? [])}
+        groups={goalInboxGroups(home.onYou, home.dash ?? [], [GOAL_RUN_QUESTION])}
         laterOn={home.laterOn ?? []}
         preparable={home.preparable ?? []}
         canRun
@@ -620,6 +624,15 @@ const cardFiles = [
     fileId: 'f-rates',
     title: 'Which card to pay first',
     summary: 'Paying the 27% card first saves about $310 over paying the smaller balance first.',
+    meta: 'Written by Dash for “Compare the two cards’ rates” · version 2',
+    byDash: true,
+  },
+  {
+    fileId: 'f-letter',
+    title: 'A letter asking Chase to lower the rate on the Sapphire card',
+    summary: 'Asks for the rate to drop from 27% to the 19% offered to new cardholders, citing four years of on-time payments.',
+    meta: 'Written by Dash for “Draft the letter asking for a lower rate”',
+    byDash: true,
   },
 ];
 
@@ -743,6 +756,7 @@ export function GoalTopSurface() {
             }}
             briefWhen="today"
             current
+            change="Since 8 Oct: 2 steps closed, 1 added, due date moved from 3 Nov to 20 Nov."
             review={cardsReview}
             ask={
               <GoalShaping
@@ -799,6 +813,7 @@ export function GoalTopSurface() {
             questions={{ which }}
           />
         </div>
+        <BurnUpChart days={MONTH_DAYS} />
         <GoalSuggestions
           goalId={cards.id}
           suggestions={CARD_SUGGESTIONS}

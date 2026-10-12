@@ -2,7 +2,9 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadRaised } from '@/lib/raised/load';
 import { planRefTitles } from '@/lib/plan/load';
+import { stepRef } from '@/lib/plan/ref';
 import { loadPlanForRequest } from '@/lib/plan/request-plan';
+import { loadPlanRunQuestions } from '@/lib/plan/run-answer';
 import { buildPlanTree, flattenSections, type PlanSection } from '@/lib/plan/tree';
 import { sortAsksWithJev, waitingGroups, waitingOnYou } from '@/lib/plan/waiting';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -11,7 +13,10 @@ import { recordSpendReports } from '@/lib/core/spend/record';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import { loadOpenSpecChanges } from '@/lib/specs/changes';
 import { specBySlug } from '@/lib/specs/registry';
+import type { SnoozeState } from '@/lib/core/inbox-snoozes';
 import { RaisedView } from '@/app/dev/raised/raised-view';
+import { loadSnoozeState } from '@/lib/core/inbox-snoozes-server';
+import { planRowRef, raiseRef, snoozedItems, withoutSnoozed } from '@/lib/dev/inbox-snoozes';
 
 export const metadata = { title: 'Inbox' };
 
@@ -21,8 +26,13 @@ export const metadata = { title: 'Inbox' };
  * by row inside sortAsksWithJev and wholesale here if the account setting or
  * the ledger cannot be reached.
  */
-async function readWaitingRows(sections: readonly PlanSection[], userId: string) {
-  const rows = waitingOnYou(sections);
+async function readWaitingRows(
+  sections: readonly PlanSection[],
+  userId: string,
+  snoozes: SnoozeState,
+) {
+  // Snoozed rows are left out before Jev is asked about them (plan #1843).
+  const rows = withoutSnoozed(waitingOnYou(sections), (row) => planRowRef(row.id), snoozes);
   try {
     const core = await createCoreClient();
     const spend: SpendReport[] = [];
@@ -54,31 +64,46 @@ async function readWaitingRows(sections: readonly PlanSection[], userId: string)
 export default async function DevInboxPage() {
   const user = await requireUser();
   const supabase = await createClient();
-  const [queue, plan, specChanges] = await Promise.all([
+  const [queue, plan, specChanges, runQuestions, snoozes] = await Promise.all([
     loadRaised(supabase, user.id),
     loadPlanForRequest(user.id),
     loadOpenSpecChanges(supabase, user.id),
+    // Runs held on a question they asked partway (plan #1824).
+    loadPlanRunQuestions(supabase, user.id),
+    // Rows put aside until a later day (plan #1843), in one query.
+    loadSnoozeState(supabase, user.id),
   ]);
 
   const sections = buildPlanTree(plan);
   const groups = waitingGroups(
     sections,
-    queue,
-    await readWaitingRows(sections, user.id),
+    { open: withoutSnoozed(queue.open, (raise) => raiseRef(raise.id), snoozes) },
+    await readWaitingRows(sections, user.id, snoozes),
     specChanges.map((change) => ({ change, specTitle: specBySlug(change.spec)?.title ?? null })),
+    runQuestions,
   );
 
   // What every "#494" on this page is called, built once rather than looked up
   // where each one is drawn.
   const titles = planRefTitles(plan, flattenSections(sections));
 
+  // What the list at the foot calls each snoozed row.
+  const numbered = new Map(flattenSections(sections).map((step) => [planRowRef(step.id), step]));
+  const raised = new Map(queue.open.map((raise) => [raiseRef(raise.id), raise]));
+  const snoozed = snoozedItems(snoozes, (ref) => {
+    const step = numbered.get(ref);
+    return step ? `${stepRef(step)} ${step.title}` : (raised.get(ref)?.title ?? null);
+  });
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader
-        title="Inbox"
-        description="Everything waiting on you: jobs to go and do, questions to answer, and proposals to say yes to. Answer one and the next run reads it."
+      <PageHeader title="Inbox" />
+      <RaisedView
+        queue={queue}
+        groups={groups}
+        titles={titles}
+        snooze={{ back: [...snoozes.back], snoozed }}
       />
-      <RaisedView queue={queue} groups={groups} titles={titles} />
     </div>
   );
 }

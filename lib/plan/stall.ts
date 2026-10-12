@@ -30,7 +30,11 @@
  *   raise's source names, writes them as ready steps and sends the first, and
  *   that run releases the hold the same way.
  */
+import { checkDay } from './check-backs';
+import { isClosed, isDismissed } from './load';
 import type { RunJob } from './run-end';
+import { stepRef } from './ref';
+import { flatten, isWaiting, isWaitingOnThePerson, type PlanNode } from './tree';
 
 /** The jobs whose runs build steps, and so can close one. */
 export const STALL_JOBS: readonly RunJob[] = ['step', 'feature'];
@@ -66,6 +70,57 @@ export type StallFeature = {
   title: string;
   module: string | null;
 };
+
+/** A step a raise names as the one its feature is stuck on. */
+export type StuckStep = { number: number; outline?: string | null; title: string };
+
+/**
+ * The step a feature's sessions were stuck on: its first build row that is
+ * neither done nor dropped, or null. Naming it lets the person see at a glance
+ * whether the step waits on something no session can supply, such as two
+ * weeks of data still to collect.
+ */
+export function stuckStep(feature: {
+  children: readonly { kind: string; status: string; number: number; outline?: string; title: string }[];
+}): StuckStep | null {
+  const row = feature.children.find(
+    (child) => child.kind === 'build' && child.status !== 'done' && child.status !== 'dropped',
+  );
+  return row ? { number: row.number, outline: row.outline ?? null, title: row.title } : null;
+}
+
+/**
+ * Whether a raise's `source` is one of the runner's own (a held or stalled
+ * feature), whose ids mean nothing to read. The raise page names the runner
+ * instead of printing them.
+ */
+export function isRunnerSource(source: string | null | undefined): boolean {
+  return raiseFeatureId(source) !== null;
+}
+
+/** The title every raise about a stuck feature carries. */
+export function stuckTitle(named: string): string {
+  return cut(`${named}: two sessions in a row finished nothing`, 200);
+}
+
+/** The one question a raise about a stuck feature asks when there is no split. */
+export function stuckAsk(named: string): string {
+  return cut(`Try ${named} again?`, 500);
+}
+
+/**
+ * The paragraph naming the step a feature is stuck on, with the reason the
+ * person most often needs: that a step waiting on time or on them will stop
+ * the same way if it is sent again. Empty with no step to name.
+ */
+export function stuckLine(step: StuckStep | null | undefined): string {
+  if (!step) return '';
+  return (
+    `The step it is stuck on is ${stepRef(step)} ${step.title}. If that step waits on something ` +
+    'that has not happened yet, such as data still to collect or a setup only you can do, ' +
+    'trying again will stop the same way. Close with a reason in that case.'
+  );
+}
 
 /** The two prefixes a raise about a held feature is filed under. */
 const HELD_PREFIX = 'overnight held ';
@@ -149,6 +204,103 @@ export function raiseHolds(
   return !newestRunAt || new Date(newestRunAt).getTime() <= since;
 }
 
+/**
+ * Why nothing under a feature can be worked now, when every open step beneath
+ * it waits on another step or on a check-back, or null when one can be. A
+ * feature with no steps is its own work and is never refused here.
+ */
+export function waitingSteps(node: PlanNode): string | null {
+  const beneath = flatten(node.children).filter(
+    (step) =>
+      !isClosed(step.status) &&
+      step.status !== 'proposed' &&
+      !isDismissed(step) &&
+      step.children.every((child) => isClosed(child.status) || isDismissed(child)),
+  );
+  if (beneath.length === 0) return null;
+  if (beneath.some((step) => !isWaiting(step) && !isWaitingOnThePerson(step))) return null;
+  const said = beneath.slice(0, 3).map((step) => {
+    const check = step.waitsUntil[step.waitsUntil.length - 1];
+    if (check) return `${stepRef(step)} waits until ${checkDay(check.dueAt)} (${check.title.replace(/[.]+$/, '')})`;
+    if (step.waitingOn.length > 0) return `${stepRef(step)} waits on ${stepRef(step.waitingOn[0])}`;
+    return `${stepRef(step)} waits on you`;
+  });
+  return `Nothing under ${stepRef(node)} can be worked now: ${said.join('; ')}.`;
+}
+
+/**
+ * The turn a stall diagnosis is sent with (`unstick` runs).
+ *
+ * Sending a stalled feature again as it stands reached the same wall each
+ * time. This run is told to find the wall and leave every open step either
+ * workable or carrying the blocker that says what it waits on, in the same
+ * places every other wait shows: a check-back for data or time, a dependency
+ * for another step, a setup job or a question for the person.
+ */
+export function unstickTurn(feature: { number: number; title: string }, runs: readonly StallRun[]): string {
+  const n = feature.number;
+  return [
+    `Find out why plan feature #${n}, "${feature.title}", has stalled, and fix it, following ` +
+      '.claude/skills/plan/reference/unsticking.md. This is not the build job: do not build steps.',
+    '',
+    'The last two sessions sent at it closed nothing. What each ended with, newest first:',
+    ...runs.slice(0, STALL_RUNS).map(runLine),
+    '',
+    'Read the feature, each open step beneath it, their threads and check-backs, and the code ' +
+      'and data each step needs. Then leave every open step in exactly one of these states:',
+    '',
+    '1. Workable now. If something in the repository or the database stood in the way, such as ' +
+      'a broken script, a migration not applied, an acceptance line that cannot be met or a step ' +
+      'too big for one sitting, fix it, merge the fix to main, or split the step with plan.ts add.',
+    '2. Waiting on data or time. Add a check-back on the step saying what has to exist: ' +
+      '`plan.ts check-back "<what must exist>" --at <ISO time> --from <n>`. The step then reads ' +
+      '"Waiting on <day>" and the runner leaves it until a session has checked.',
+    '3. Waiting on another step: `plan.ts depends <n> --on <m>`.',
+    '4. Waiting on the person to do something, such as setting a key or connecting an account: ' +
+      '`plan.ts needs "<what to set>" --for <n>`. Waiting on them to decide: ' +
+      '`plan.ts block <n> --ask "<the question>"`. Either shows under On you.',
+    '5. No longer worth doing: `plan.ts drop <n> --note "<why>"`.',
+    '',
+    'A step left as it was, with nothing recorded, means this run failed. Before you finish, ' +
+      `write one line on what you found with \`plan.ts stopped ${n} --reason "<what you found ` +
+      'and what you changed>"`.',
+  ].join('\n');
+}
+
+/**
+ * What the tick does about a feature whose last two build runs closed
+ * nothing, given the stall diagnoses sent at it.
+ *
+ * - `none`: not stalled, or nothing beneath it can be worked now. A feature
+ *   whose open steps all wait is shown waiting on the plan and never chosen,
+ *   so there is nothing to diagnose or ask.
+ * - `diagnose`: no diagnosis since the stall began; send one and hold it.
+ * - `hold`: a diagnosis is still running.
+ * - `release`: a diagnosis has ended since the newest build run; the runner
+ *   may try the feature once more.
+ * - `raise`: a diagnosis ran within this stall and a build after it still
+ *   closed nothing. Only now is the person asked.
+ */
+export type StallMove = 'none' | 'diagnose' | 'hold' | 'release' | 'raise';
+
+/** A stall diagnosis run, as the stall check reads it. */
+export type UnstickRun = { createdAt: string; status: string; stopReason: string | null };
+
+export function stallMove(
+  runs: readonly StallRun[],
+  unsticks: readonly UnstickRun[],
+  workable: boolean,
+): StallMove {
+  if (!isStalled(runs) || !workable) return 'none';
+  const newest = new Date(runs[0].createdAt).getTime();
+  const began = new Date(runs[STALL_RUNS - 1].createdAt).getTime();
+  const within = unsticks.filter((run) => new Date(run.createdAt).getTime() > began);
+  if (within.length === 0) return 'diagnose';
+  if (within.some((run) => run.status === 'started')) return 'hold';
+  if (within.some((run) => new Date(run.createdAt).getTime() > newest)) return 'release';
+  return 'raise';
+}
+
 /** The action a Yes takes on a raise that splits a feature (#1804). */
 export const SPLIT_ACTION = 'split_feature';
 
@@ -224,8 +376,8 @@ function day(at: string): string {
 /** One run's line in the raise: its own reason, or what the app noted. */
 function runLine(run: StallRun): string {
   if (run.stopReason) return `- ${day(run.createdAt)}: "${run.stopReason}"`;
-  if (run.error) return `- ${day(run.createdAt)}: the session said nothing; the app noted "${cut(run.error, 300)}"`;
-  return `- ${day(run.createdAt)}: the session said nothing.`;
+  if (run.error) return `- ${day(run.createdAt)}: the session left no note. ${cut(run.error, 300)}`;
+  return `- ${day(run.createdAt)}: the session left no note.`;
 }
 
 /**
@@ -247,6 +399,9 @@ export function stallRaise(
   feature: StallFeature,
   runs: readonly StallRun[],
   steps: number,
+  stuck: StuckStep | null = null,
+  /** What a stall diagnosis sent at it found, when one said. */
+  found: string | null = null,
 ): StallRaise {
   const named = `#${feature.number} ${feature.title}`;
   const two = runs.slice(0, STALL_RUNS);
@@ -263,27 +418,34 @@ export function stallRaise(
   };
   const source = `${STALL_PREFIX}${feature.id} runs ${two.map((run) => run.id).join(' ')}`;
   const after =
-    'Yes sends it again now. No leaves it held until you send it from its row on /dev/plan.';
+    'Yes tries it again now. Close with a reason keeps it paused until you send it from its ' +
+    'row on /dev/plan. Dismiss lets the overnight runner pick it up again on its own.';
+  const stuckText = stuckLine(stuck);
+
+  const lines = [
+    `Dash sent two sessions at ${named} and neither finished a step, so the overnight runner ` +
+      'has paused it rather than keep spending sessions on it. What each session ended with, newest first:',
+    '',
+    ...two.map(runLine),
+  ];
+  if (found) {
+    lines.push('', `A session sent to find out why said: "${cut(found, 300)}" The build after it still finished nothing.`);
+  } else if (stuckText) {
+    lines.push('', stuckText);
+  }
 
   if (!reason) {
+    lines.push('', after);
     return {
       module: feature.module,
-      title: cut(`${named} is held: its last two sessions closed nothing`, 200),
-      ask: cut(`Send ${named} to a session again?`, 500),
-      detail:
-        `The last two sessions sent at ${named} closed no step and neither said why, so the ` +
-        `overnight runner stopped sending it. ${after} The blocked steps and threads under it ` +
-        'say where the sessions stopped.',
+      title: stuckTitle(named),
+      ask: stuckAsk(named),
+      detail: cut(lines.join('\n'), 4000),
       consequence,
       source,
     };
   }
 
-  const lines = [
-    `The last two sessions sent at ${named} closed no step, so the overnight runner holds it. Why they stopped, newest first:`,
-    '',
-    ...two.map(runLine),
-  ];
   if (pieces && split) {
     lines[0] = `This covers ${pieces.length} pieces of work. ${lines[0]}`;
     lines.push(
@@ -291,13 +453,13 @@ export function stallRaise(
       `The last session found it too big for one sitting and would split it into these ${pieces.length} steps:`,
       ...pieces.map((piece, index) => `${index + 1}. ${piece}`),
       '',
-      'Yes writes them as steps under it, ready to build, and sends the first. No leaves it ' +
-        'held until you send it from its row on /dev/plan. To change something first, say ' +
-        'what in your answer.',
+      'Yes writes them as steps under it, ready to build, and sends the first. Close with a ' +
+        'reason keeps it paused until you send it from its row on /dev/plan. To change ' +
+        'something first, say what in your answer.',
     );
     return {
       module: feature.module,
-      title: cut(`${named} closed nothing in two sessions`, 200),
+      title: stuckTitle(named),
       ask: cut(`Split ${named} into ${pieces.length} steps?`, 500),
       detail: cut(lines.join('\n'), 4000),
       consequence,
@@ -319,7 +481,7 @@ export function stallRaise(
 
   return {
     module: feature.module,
-    title: cut(`${named} closed nothing in two sessions`, 200),
+    title: stuckTitle(named),
     ask: cut(ask, 500),
     detail: cut(lines.join('\n'), 4000),
     consequence,

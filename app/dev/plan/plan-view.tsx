@@ -445,6 +445,7 @@ export function PlanView({
   runRaises = [],
   keyRefusal = null,
   liveness,
+  overdueUpdates,
   commitChecks,
   overhaulProgress = {},
   criticStops = {},
@@ -482,6 +483,8 @@ export function PlanView({
   keyRefusal?: string | null;
   /** The claims read against their runs, at the clock the page rendered with. */
   liveness?: PlanLiveness;
+  /** Days since the last update, for each feature a week overdue for one (plan #1834). */
+  overdueUpdates?: Record<string, number>;
   /** What CI said about each commit a step shipped in, by the commit's sha. */
   commitChecks: Record<string, CommitCheck>;
   /** Each overhaul's rule counts, by its plan item id. Absent: none to show. */
@@ -621,7 +624,7 @@ export function PlanView({
           collapsed module marooned between two large gaps. Between sections
           the right distance is smaller than that, and now that each one is a
           card it is the gap between cards rather than between headings. */}
-      {view === 'table' && tableGroups.length > 0 && <FeatureTable groups={tableGroups} />}
+      {view === 'table' && tableGroups.length > 0 && <FeatureTable groups={tableGroups} overdue={overdueUpdates} />}
 
       <div className={cn('space-y-3', view === 'table' && 'hidden')}>
         {view !== 'table' && shown.map((section) => {

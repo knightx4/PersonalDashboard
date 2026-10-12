@@ -1131,7 +1131,8 @@ describe('what an opened step says its run has done', () => {
   it('names the run and when it started, not only that something is underway', () => {
     const html = drawRun(null);
     expect(html).toContain('Its run');
-    expect(html).toContain(`A feature batch started ${FIRED.replace('T', ' ').slice(0, 16)}`);
+    // Twelve-hour, in UTC (plan #1825).
+    expect(html).toContain('A feature batch started 17 Sep 2026, 11');
   });
 
   it('lists what it pushed, what it closed and what it raised', () => {

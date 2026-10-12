@@ -26,3 +26,24 @@ export async function loadFeatureUpdates(
     .map(planUpdateFromRow)
     .filter((update): update is PlanUpdate => update !== null);
 }
+
+/**
+ * When each feature last had an update, by feature id (plan #1834). Empty
+ * when there are none and when the read fails.
+ */
+export async function loadLatestUpdateTimes(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<Record<string, string>> {
+  const { data, error } = await supabase
+    .from('plan_updates')
+    .select('feature_id, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error || !data) return {};
+  const latest: Record<string, string> = {};
+  for (const row of data as { feature_id: string; created_at: string }[]) {
+    if (!(row.feature_id in latest)) latest[row.feature_id] = row.created_at;
+  }
+  return latest;
+}

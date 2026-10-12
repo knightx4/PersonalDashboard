@@ -23,6 +23,7 @@ import { decryptToken } from '@/lib/crypto/tokens';
 import { loadXAccount } from '@/lib/x/account';
 import { isXOAuthConfigured, xClient, xOAuthEnv } from '@/lib/x/env';
 import { revokeXToken } from '@/lib/x/oauth';
+import { runXRead, xRunMessage } from '@/lib/x/read';
 
 /**
  * The Posts tab's writes (plan #1419). Each one refuses anybody but the
@@ -376,7 +377,7 @@ export async function markPostPosted(
 
   const { data, error } = await supabase
     .from('social_posts')
-    .update({ status: 'posted', posted_url: link.url, posted_at: new Date().toISOString() })
+    .update({ status: 'posted', posted_url: link.url, posted_at: new Date().toISOString(), x_candidate_id: null })
     .eq('user_id', user.id)
     .eq('id', id.data)
     .eq('status', 'suggested')
@@ -386,6 +387,95 @@ export async function markPostPosted(
 
   revalidatePath(POSTS_PATH);
   return { message: 'Marked posted.' };
+}
+
+/**
+ * "Is this it?", yes (plan #1820): mark the draft posted with the post a near
+ * match offered, its link and the day it went up. Only while the draft is
+ * still waiting or dropped, still asks about that post, and has no link of
+ * its own.
+ */
+// latency: pending
+export async function confirmXMatch(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = idSchema.safeParse(formData.get('id'));
+  const xPostId = String(formData.get('x_post_id') ?? '');
+  if (!id.success || !/^\d+$/.test(xPostId)) return { error: 'Missing post.' };
+
+  const { data: post, error: postError } = await supabase
+    .from('x_posts')
+    .select('x_post_id, url, created_at')
+    .eq('user_id', user.id)
+    .eq('x_post_id', xPostId)
+    .maybeSingle();
+  if (postError) return { error: postError.message };
+  if (!post) return { error: 'That post is no longer stored.' };
+
+  const { data, error } = await supabase
+    .from('social_posts')
+    .update({
+      status: 'posted',
+      posted_url: post.url,
+      posted_at: post.created_at,
+      dropped_at: null,
+      x_post_id: post.x_post_id,
+      x_candidate_id: null,
+    })
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('x_candidate_id', xPostId)
+    .in('status', ['suggested', 'dropped'])
+    .is('posted_url', null)
+    .select('id');
+  if (error) return { error: error.message };
+  if (!data?.length) return { error: 'This draft is no longer asking about that post.' };
+
+  revalidatePath(POSTS_PATH);
+  return { message: 'Marked posted.' };
+}
+
+/**
+ * "Is this it?", no (plan #1820): stop asking, and never offer that post for
+ * this draft again. The post is then listed under Posted on X.
+ */
+// latency: pending
+export async function dismissXMatch(
+  _prev: PostsActionState,
+  formData: FormData,
+): Promise<PostsActionState> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const id = idSchema.safeParse(formData.get('id'));
+  const xPostId = String(formData.get('x_post_id') ?? '');
+  if (!id.success || !/^\d+$/.test(xPostId)) return { error: 'Missing post.' };
+
+  const { data: row, error: readError } = await supabase
+    .from('social_posts')
+    .select('x_dismissed_ids')
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('x_candidate_id', xPostId)
+    .maybeSingle();
+  if (readError) return { error: readError.message };
+  if (!row) return { error: 'This draft is no longer asking about that post.' };
+
+  const dismissed = Array.isArray(row.x_dismissed_ids) ? (row.x_dismissed_ids as string[]) : [];
+  const { error } = await supabase
+    .from('social_posts')
+    .update({ x_candidate_id: null, x_dismissed_ids: [...new Set([...dismissed, xPostId])] })
+    .eq('user_id', user.id)
+    .eq('id', id.data)
+    .eq('x_candidate_id', xPostId);
+  if (error) return { error: error.message };
+
+  revalidatePath(POSTS_PATH);
+  return { message: 'Not that one.' };
 }
 
 /**
@@ -471,4 +561,32 @@ export async function disconnectX(): Promise<{ ok: boolean; error?: string }> {
 
   revalidatePath(POSTS_PATH);
   return { ok: true };
+}
+
+/**
+ * Check X now (plan #1819): the daily read, run on demand for the person's
+ * account. A first read pages through every post X returns, which takes a
+ * minute or so; later ones are a request or two. A read X stops (rate limit,
+ * no credit) answers with the line the tab also keeps showing.
+ */
+// latency: pending -- reads X, a second to a minute
+export async function checkX(): Promise<{ ok: boolean; error?: string; message?: string }> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+  if (!isXOAuthConfigured()) return { ok: false, error: 'The X keys are not set yet.' };
+
+  const env = xOAuthEnv();
+  try {
+    const result = await runXRead(supabase, user.id, {
+      trigger: 'manual',
+      client: xClient(env),
+      encryptionKey: env.TOKEN_ENCRYPTION_KEY,
+    });
+    revalidatePath(POSTS_PATH);
+    const said = xRunMessage(result);
+    return said.ok ? { ok: true, message: said.text } : { ok: false, error: said.text };
+  } catch {
+    revalidatePath(POSTS_PATH);
+    return { ok: false, error: 'Something went wrong reading X. Try again in a minute.' };
+  }
 }

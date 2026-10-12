@@ -34,6 +34,7 @@ import {
   isResolvingAnswers,
   readingColumns,
   readingFor,
+  endsRun,
   runEnd,
   runQuietNote,
   storedReading,
@@ -53,6 +54,8 @@ import {
   noWorkNote,
   readsWork,
   reshapeWork,
+  unstickWork,
+  beneath,
   within,
   workedEnd,
   workWindow,
@@ -61,6 +64,7 @@ import {
   type WorkRow,
 } from './run-work';
 import { readAll } from '@/lib/learn/db/read-all';
+import { lineSilent, readLastLines } from '@/lib/core/run-liveness';
 import {
   abandonedClaim,
   FEATURE_IDLE_AFTER_MINUTES,
@@ -222,15 +226,21 @@ export async function endQuietRuns(input: {
    * `readRunWork` unless a test hands one in.
    */
   readWork?: (runs: readonly QuietRun[], now: number) => Promise<Map<string, RunWork>>;
-}): Promise<{ finished: number; failed: number; error: string | null }> {
+  /**
+   * The newest line time of each run that has written one (plan #1825).
+   * `readLastLines` on the core schema unless a test hands one in.
+   */
+  readLines?: (runIds: readonly string[]) => Promise<Map<string, string>>;
+}): Promise<{ finished: number; failed: number; stale: number; error: string | null }> {
   const now = input.now ?? Date.now();
-  const nothing = { finished: 0, failed: 0 };
+  const nothing = { finished: 0, failed: 0, stale: 0 };
 
+  // Started runs, and stale ones, which a closed step can still finish.
   const { data: rows, error } = await input.supabase
     .from('plan_runs')
-    .select('id, plan_item_id, created_at, routine_id, job')
+    .select('id, plan_item_id, created_at, routine_id, job, status')
     .eq('user_id', input.userId)
-    .eq('status', 'started');
+    .in('status', ['started', 'stale']);
   if (error) {
     console.error(`plan_runs could not be read to end quiet runs: ${error.message}`);
     return { ...nothing, error: error.message };
@@ -238,6 +248,19 @@ export async function endQuietRuns(input: {
 
   const started = (rows ?? []) as QuietRun[];
   if (started.length === 0) return { ...nothing, error: null };
+
+  // A run that writes lines is judged by its newest one (plan #1825); a run
+  // with none keeps the clock and the pushes below. A failed read leaves every
+  // run to those, as before there were lines.
+  let lines = new Map<string, string>();
+  try {
+    lines = await (input.readLines ??
+      ((ids) => readLastLines(input.supabase.schema('core') as never, 'plan_runs', ids)))(
+      started.map((row) => row.id),
+    );
+  } catch (err) {
+    console.error(`the runs' last lines could not be read: ${err instanceof Error ? err.message : 'failed'}`);
+  }
 
   // Only the steps these runs name, and only the two columns that say one is
   // over: it closed, or it stopped to ask a question. #679.
@@ -280,11 +303,32 @@ export async function endQuietRuns(input: {
   const elsewhere = projectRoutineIds();
   const finished: string[] = [];
   const ended: Array<{ id: string; note: string }> = [];
+  const silent: string[] = [];
   for (const row of started) {
     const step = (row.plan_item_id ? stamps.get(row.plan_item_id) : null) ?? {
       completedAt: null,
       blockedAt: null,
     };
+
+    const lastLine = lines.get(row.id) ?? null;
+    if (lastLine) {
+      // Lines replace the clock. The step closing or stopping on a question,
+      // or the job's trail saying it is over, still finishes the run; silence
+      // only ever marks it stale, which the person acknowledges to end it.
+      const done = readsWork(row.job) ? (work.get(row.id) ?? null) : null;
+      if (
+        endsRun(step.completedAt, row.created_at) ||
+        endsRun(step.blockedAt, row.created_at) ||
+        done?.over
+      ) {
+        finished.push(row.id);
+      } else if (row.status !== 'stale' && lineSilent(lastLine, now)) {
+        silent.push(row.id);
+      }
+      continue;
+    }
+    // A stale run with no lines was marked by hand; the clock leaves it be.
+    if (row.status === 'stale') continue;
     const listed =
       input.pushesSince === undefined || new Date(row.created_at).getTime() >= input.pushesSince;
 
@@ -335,8 +379,17 @@ export async function endQuietRuns(input: {
       .update({ status: 'failed', error: row.note })
       .eq('id', row.id);
   }
+  // Only a run still started: a line written since the read moved nothing,
+  // but one that asked a question since is awaiting_input and stays so.
+  if (silent.length > 0) {
+    await input.supabase
+      .from('plan_runs')
+      .update({ status: 'stale' })
+      .in('id', silent)
+      .eq('status', 'started');
+  }
 
-  return { finished: finished.length, failed: ended.length, error: null };
+  return { finished: finished.length, failed: ended.length, stale: silent.length, error: null };
 }
 
 /** A run still marked started, as the sweep reads it. */
@@ -347,6 +400,8 @@ export type QuietRun = {
   routine_id: string | null;
   /** Missing on rows read through an older select. */
   job?: string | null;
+  /** `started` or `stale`; missing on rows read through an older select. */
+  status?: string;
 };
 
 /**
@@ -403,7 +458,7 @@ export async function readRunWork(
   }
 
   let planRows: WorkRow[] = [];
-  if (needs('feature', 'overhaul', 'reshape')) {
+  if (needs('feature', 'overhaul', 'reshape', 'unstick')) {
     type Row = {
       id: string;
       parent_id: string | null;
@@ -434,6 +489,22 @@ export async function readRunWork(
       blockedAt: row.blocked_at,
       position: row.position,
     }));
+  }
+
+  // Check-backs written on plan rows since the oldest run: how a stall
+  // diagnosis records that a step waits on data or time.
+  let checksAdded: Array<{ planItemId: string; createdAt: string }> = [];
+  if (needs('unstick')) {
+    const { data, error } = await supabase
+      .from('check_backs')
+      .select('plan_item_id, created_at')
+      .eq('user_id', userId)
+      .not('plan_item_id', 'is', null)
+      .gte('created_at', earliest);
+    if (error) throw new Error(`check_backs: ${error.message}`);
+    checksAdded = ((data ?? []) as Array<{ plan_item_id: string; created_at: string }>).map(
+      (row) => ({ planItemId: row.plan_item_id, createdAt: row.created_at }),
+    );
   }
 
   // Top-level rows written since the oldest run: what a shaping run proposes,
@@ -480,6 +551,15 @@ export async function readRunWork(
       out.set(run.id, { done: done.length });
     } else if (run.job === 'reshape' && run.plan_item_id) {
       out.set(run.id, reshapeWork(planRows, run.plan_item_id, window, topLevel));
+    } else if (run.job === 'unstick' && run.plan_item_id) {
+      const under = new Set([
+        run.plan_item_id,
+        ...beneath(planRows, run.plan_item_id).map((row) => row.id),
+      ]);
+      const checks = checksAdded.filter(
+        (row) => under.has(row.planItemId) && within(row.createdAt, window),
+      ).length;
+      out.set(run.id, unstickWork(planRows, run.plan_item_id, window, checks));
     } else if ((run.job === 'feature' || run.job === 'overhaul') && run.plan_item_id) {
       out.set(
         run.id,
@@ -827,7 +907,7 @@ export async function loadLastRuns(supabase: Db, userId: string): Promise<Record
   const { data, error } = await supabase
     .from('plan_runs')
     .select(
-      'plan_item_id, status, error, created_at, job, github_checked_at, last_push_at, last_push_sha, last_push_subject, github_error, stop_reason, stop_pieces',
+      'id, plan_item_id, status, error, created_at, job, github_checked_at, last_push_at, last_push_sha, last_push_subject, github_error, stop_reason, stop_pieces',
     )
     .eq('user_id', userId)
     .not('plan_item_id', 'is', null)
@@ -838,8 +918,10 @@ export async function loadLastRuns(supabase: Db, userId: string): Promise<Record
   }
 
   const last: Record<string, LastRun> = {};
+  const newestId = new Map<string, string>();
   for (const row of (data ?? []) as Array<
     {
+      id: string;
       plan_item_id: string;
       status: string;
       error: string | null;
@@ -850,8 +932,11 @@ export async function loadLastRuns(supabase: Db, userId: string): Promise<Record
     } & Partial<RunReadingColumns>
   >) {
     if (last[row.plan_item_id]) continue;
+    newestId.set(row.plan_item_id, row.id);
     last[row.plan_item_id] = {
+      id: row.id,
       status: row.status === 'finished' || row.status === 'failed' ? row.status : 'started',
+      waiting: row.status === 'awaiting_input' || row.status === 'stale' ? row.status : null,
       createdAt: row.created_at,
       error: row.error,
       job: row.job as RunJob,
@@ -859,6 +944,19 @@ export async function loadLastRuns(supabase: Db, userId: string): Promise<Record
       stopReason: row.stop_reason ?? null,
       stopPieces: row.stop_pieces ?? null,
     };
+  }
+
+  // When each run not yet ended last wrote a line (plan #1825), so a stale
+  // run can say when it was last heard from. Only the newest run per step,
+  // and only those still going, so this is a handful at most.
+  const going = new Map<string, string>();
+  for (const [stepId, runId] of newestId) {
+    const status = last[stepId].status;
+    if (status !== 'finished' && status !== 'failed') going.set(stepId, runId);
+  }
+  if (going.size > 0) {
+    const lines = await readLastLines(supabase.schema('core') as never, 'plan_runs', [...going.values()]);
+    for (const [stepId, runId] of going) last[stepId].lastLineAt = lines.get(runId) ?? null;
   }
   return last;
 }

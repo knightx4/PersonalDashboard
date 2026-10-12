@@ -26,6 +26,7 @@ import { useClockNow } from '@/lib/use-clock-now';
 import { Button } from '@/components/ui/button';
 import { FieldError, FieldHint } from '@/components/ui/field';
 import { PLAN_PRIORITIES, PLAN_PRIORITY_LABEL, PLAN_STATUSES, isClosed } from '@/lib/plan/load';
+import { checkWaitName } from '@/lib/plan/check-backs';
 import {
   flatten,
   healthOf as planHealthOf,
@@ -450,6 +451,7 @@ function healthFactsOf(node: PlanNode, outlines: OutlineIndex): HealthFacts {
     blockAsk: readable(node.blockAsk),
     comment: readable(node.comment),
     waitingOn: node.waitingOn,
+    waitsUntil: node.waitsUntil,
   };
 }
 
@@ -460,7 +462,13 @@ function healthOf(node: PlanNode, liveness: PlanLiveness | undefined, outlines: 
 function moveFor(node: PlanNode, context?: MoveContext) {
   // A step held up by exactly one other says which, by its outline: "Waiting
   // on #1450.3". More than one, and the tooltip and the Needs line name them.
-  const waitingOn = node.waitingOn.length === 1 ? stepRef(node.waitingOn[0]) : undefined;
+  // Waiting only on a check-back, it names the day: "Waiting on 26 Oct".
+  const waitingOn =
+    node.waitingOn.length === 1
+      ? stepRef(node.waitingOn[0])
+      : node.waitingOn.length === 0 && node.waitsUntil.length > 0
+        ? checkWaitName(node.waitsUntil)
+        : undefined;
   return moveWordsFor(planMoveOf(node, context), ownMoveWord(node, context), waitingOn);
 }
 
@@ -1341,7 +1349,7 @@ export function usePlanRow({
           />
         )
       ) : (
-        <MoveLabel move={move.move} title={move.title} />
+        <MoveLabel move={move.move} title={move.title} className="max-w-full" wordClassName="whitespace-normal" />
       )
     ) : null,
     statusMenu,

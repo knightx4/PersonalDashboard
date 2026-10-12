@@ -42,13 +42,17 @@ export type SocialPost = {
   droppedAt: string | null;
   /** The `plan_runs` row whose run drafted it. */
   runId: string | null;
+  /** The X post this draft was matched to (plan #1820). */
+  xPostId: string | null;
+  /** The X post a near match asks about ("Is this it?"). */
+  xCandidateId: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
 export const SOCIAL_POST_COLUMNS =
   'id, platform, angle, status, draft, body, source_plan_item_ids, source_feedback_ids, ' +
-  'image_paths, posted_url, posted_at, dropped_at, run_id, created_at, updated_at';
+  'image_paths, posted_url, posted_at, dropped_at, run_id, x_post_id, x_candidate_id, created_at, updated_at';
 
 function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
@@ -72,6 +76,8 @@ export function socialPostFromRow(row: Record<string, unknown>): SocialPost {
     postedAt: (row.posted_at as string | null) ?? null,
     droppedAt: (row.dropped_at as string | null) ?? null,
     runId: (row.run_id as string | null) ?? null,
+    xPostId: (row.x_post_id as string | null) ?? null,
+    xCandidateId: (row.x_candidate_id as string | null) ?? null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at ?? row.created_at),
   };

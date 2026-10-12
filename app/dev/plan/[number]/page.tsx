@@ -1,6 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { loadScopeDays, planScopeRef, type ScopeDay } from '@/lib/goals/scope-days';
 import { loadPlan } from '@/lib/plan/load';
 import { endQuietRuns, loadLastRuns, loadRunRaises } from '@/lib/plan/runs';
 import { loadCommitChecks } from '@/lib/plan/ci';
@@ -9,6 +11,8 @@ import { loadCriticStops } from '@/lib/plan/critic-stop-load';
 import { loadScreenChanges } from '@/lib/plan/screen-change-load';
 import { loadPlanPictures } from '@/lib/plan/pictures-load';
 import { loadFeatureUpdates } from '@/lib/plan/updates-load';
+import { featureRow } from '@/lib/plan/feature-table';
+import { updateOverdueDaysNow } from '@/lib/plan/updates';
 import { loadActivitySources } from '@/lib/plan/activity-load';
 import { buildPlanTree, flatten, planLiveness } from '@/lib/plan/tree';
 import { findFeature, stepRedirect } from '@/lib/plan/feature-page';
@@ -88,7 +92,7 @@ export default async function FeatureRoute({ params }: { params: Params }) {
 
   const { feature, module, moduleLabel } = found;
   const beneath = flatten([feature]);
-  const [overhaulProgress, criticStops, updates, activity, checkBacks] = await Promise.all([
+  const [overhaulProgress, criticStops, updates, activity, checkBacks, scopeDays] = await Promise.all([
     loadOverhaulProgress(
       supabase,
       user.id,
@@ -112,6 +116,11 @@ export default async function FeatureRoute({ params }: { params: Params }) {
         'plan_item_id',
         beneath.map((node) => node.id),
       ),
+    // The saved step counts behind the burn-up chart (plan #1837). A failed
+    // read leaves the chart out rather than the page.
+    createCoreClient()
+      .then((core) => loadScopeDays(core, planScopeRef(feature.id)))
+      .catch((): ScopeDay[] => []),
   ]);
   const comingBack = placeCheckBacks(
     (checkBacks.data ?? []).map((row) => checkBackFrom(row as Record<string, unknown>)),
@@ -125,6 +134,12 @@ export default async function FeatureRoute({ params }: { params: Params }) {
     ? Boolean(projectRoutine(project).id && projectRoutine(project).token)
     : Boolean(planRoutine().token);
 
+  const overdueDays = updateOverdueDaysNow(
+    feature,
+    featureRow(feature, liveness).health,
+    updates[0]?.createdAt,
+  );
+
   return (
     <FeaturePage
       feature={feature}
@@ -135,6 +150,7 @@ export default async function FeatureRoute({ params }: { params: Params }) {
       lastRuns={lastRuns}
       runRaises={runRaises}
       liveness={liveness}
+      overdueDays={overdueDays}
       commitChecks={commitChecks}
       overhaulProgress={overhaulProgress}
       criticStops={criticStops}
@@ -143,6 +159,7 @@ export default async function FeatureRoute({ params }: { params: Params }) {
       updates={updates}
       activity={activity}
       comingBack={comingBack}
+      scopeDays={scopeDays}
     />
   );
 }

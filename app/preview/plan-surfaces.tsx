@@ -5,6 +5,7 @@ import { SendScreenBack } from '@/app/dev/plan/send-back';
 import { FeaturePage } from '@/app/dev/plan/feature-page';
 import type { PlanUpdate } from '@/lib/plan/updates';
 import { catalogOf } from '@/app/dev/plan/plan-catalog';
+import { MONTH_DAYS } from './burn-up-surfaces';
 import { SetTab } from './set-tab';
 import { ScreenChanges } from '@/components/dev/screen-change';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
@@ -22,7 +23,8 @@ import { placeCheckBacks } from '@/lib/plan/check-backs';
  * and the check that nothing moved is that these shots do not change. Every
  * state a row can be in is somewhere in the tree -- a feature with fog, one
  * with a question beneath it, a proposal, a block, a setup job, a step
- * waiting on another, a finished step and a dropped one.
+ * waiting on another, one waiting on a check-back, a finished step and a
+ * dropped one.
  *
  * No clock anywhere in it. A step underway carries no start time, because the
  * row would print how long it has been going and two shots taken minutes
@@ -101,6 +103,12 @@ const items: PlanItem[] = [
     id: 'words',
     parentId: 'shared',
     title: 'Move plan health and move wording into a pure module',
+    size: 's',
+  }),
+  item({
+    id: 'checked-later',
+    parentId: 'goal-tree',
+    title: 'Read how the first week of goal steps went',
     size: 's',
   }),
   item({
@@ -193,6 +201,10 @@ const items: PlanItem[] = [
 const whole = buildPlanTree({
   items,
   dependencies: [dep('render', 'shared'), dep('blocked-steps', 'shared')],
+  // Put down until a day, so the tree draws the clock beside the dashed wait.
+  checkWaits: [
+    { id: 'check-week', planItemId: 'checked-later', title: 'A week of goal steps exists.', dueAt: '2026-10-26T06:00:00Z' },
+  ],
 });
 
 const catalog = catalogOf(whole);
@@ -241,6 +253,7 @@ export function PlanTableSurface() {
       finished={[]}
       summary={summarize(whole)}
       view="table"
+      overdueUpdates={{ 'goal-tree': 12 }}
       catalog={catalog}
       empty={false}
       canSend={false}
@@ -249,6 +262,23 @@ export function PlanTableSurface() {
     />
   );
 }
+
+/**
+ * A run that went quiet (plan #1825), behind a step being worked: its account
+ * says when it was last heard from, and its lines carry Acknowledge.
+ */
+const openedRuns: Record<string, LastRun> = {
+  shared: {
+    id: '0b6f8a4e-2c1d-4e5f-9a7b-3c2d1e0f9a8b',
+    status: 'started',
+    waiting: 'stale',
+    createdAt: '2026-09-01T08:10:00Z',
+    error: null,
+    job: 'feature',
+    reading: null,
+    lastLineAt: '2026-09-01T08:52:00Z',
+  },
+};
 
 /**
  * Two features with every row opened: the panel behind a row, which is where
@@ -273,7 +303,7 @@ export function PlanOpenedSurface() {
       catalog={catalog}
       empty={false}
       canSend={false}
-      lastRuns={{}}
+      lastRuns={openedRuns}
       commitChecks={{}}
       unfolded
       opened
@@ -759,6 +789,15 @@ const featureUpdates: PlanUpdate[] = [
     stepsTotal: 7,
     session: 'cse_01V1aoCMYL7Ckkar3cKSLtFf',
     createdAt: '2026-10-07T18:00:00Z',
+    snapshot: {
+      v: 1,
+      open: 5,
+      done: 2,
+      total: 7,
+      blocked: 1,
+      openIds: ['s3', 's4', 's5', 's6', 's7'],
+      dueOn: null,
+    },
   },
   {
     id: 'update-1',
@@ -770,6 +809,15 @@ const featureUpdates: PlanUpdate[] = [
     stepsTotal: 7,
     session: 'cse_01V1aoCMYL7Ckkar3cKSLtFf',
     createdAt: '2026-10-07T09:05:00Z',
+    snapshot: {
+      v: 1,
+      open: 5,
+      done: 1,
+      total: 6,
+      blocked: 0,
+      openIds: ['s2', 's3', 's4', 's5', 's8'],
+      dueOn: null,
+    },
   },
 ];
 
@@ -856,8 +904,10 @@ function FeatureFixture({ editing = false }: { editing?: boolean }) {
       canSend
       lastRuns={{}}
       updates={featureUpdates}
+      overdueDays={9}
       activity={featureActivitySources}
       comingBack={featureComingBack}
+      scopeDays={MONTH_DAYS}
       commitChecks={{
         '79074ffd': {
           mergeSha: '79074ffd',
