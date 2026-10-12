@@ -120,6 +120,79 @@ describe('linking a file from a goal', () => {
   });
 });
 
+describe('being read (plan #1860)', () => {
+  it('keeps its place in the list when read, and is unread again at a new version', async () => {
+    const id = await newFile(userA);
+    const [before] = await admin<{ updated_at: Date }[]>`select updated_at from core.files where id = ${id}`;
+
+    await asUser(userA, (tx) => tx`update core.files set read_at = now() where id = ${id}`);
+    const [read] = await admin<{ updated_at: Date; read_at: Date | null; version: number }[]>`
+      select updated_at, read_at, version from core.files where id = ${id}`;
+    expect(read.read_at).not.toBeNull();
+    expect(read.updated_at).toEqual(before.updated_at);
+    expect(read.version).toBe(1);
+
+    await admin`update core.files set body = 'A second version.' where id = ${id}`;
+    const [revised] = await admin<{ read_at: Date | null; version: number }[]>`
+      select read_at, version from core.files where id = ${id}`;
+    expect(revised).toEqual({ read_at: null, version: 2 });
+  });
+});
+
+describe('filing what Dash writes for a step (plan #1860)', () => {
+  let step = '';
+  let subStep = '';
+
+  beforeAll(async () => {
+    const [row] = await admin<{ id: string }[]>`
+      insert into goals.items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${goalA}, 'claude', 'List the firms hiring FP&A') returning id`;
+    step = row.id;
+    const [sub] = await admin<{ id: string }[]>`
+      insert into goals.items (user_id, level, parent_id, kind, title)
+      values (${userA}, 'step', ${step}, 'claude', 'Draft the note to Dana') returning id`;
+    subStep = sub.id;
+  });
+
+  it('files it under the step and its goal, and makes a new version when the step is worked again', async () => {
+    const [{ id: first }] = await admin<{ id: string }[]>`
+      select goals.file_result(${step}, 'Firms hiring FP&A', 'Six firms are hiring.', '1. Acme', null) as id`;
+    const links = await admin<{ item_id: string }[]>`
+      select item_id from goals.links where kind = 'file' and target_id = ${first} order by item_id`;
+    expect(links.map((l) => l.item_id).sort()).toEqual([goalA, step].sort());
+
+    const [{ id: again }] = await admin<{ id: string }[]>`
+      select goals.file_result(${step}, 'Firms hiring FP&A', 'Seven firms are hiring.', '1. Acme\n2. Brill', 'Added Brill.') as id`;
+    expect(again).toBe(first);
+    const [file] = await admin<{ version: number; change_note: string | null; origin: string }[]>`
+      select version, change_note, origin from core.files where id = ${first}`;
+    expect(file).toEqual({ version: 2, change_note: 'Added Brill.', origin: `goals.items:${step}` });
+    const versions = await admin<{ body: string }[]>`
+      select body from core.file_versions where file_id = ${first} order by version`;
+    expect(versions.map((v) => v.body)).toEqual(['1. Acme', '1. Acme\n2. Brill']);
+    const [{ count }] = await admin<{ count: number }[]>`
+      select count(*)::int as count from goals.links where kind = 'file' and target_id = ${first}`;
+    expect(count).toBe(2);
+  });
+
+  it('finds the goal however deep the step sits, and brings back an archived link', async () => {
+    const [{ id }] = await admin<{ id: string }[]>`
+      select goals.file_result(${subStep}, 'A note to Dana', null, 'Hi Dana,', null) as id`;
+    await admin`update goals.links set archived_at = now() where target_id = ${id} and item_id = ${goalA}`;
+    await admin`select goals.file_result(${subStep}, 'A note to Dana', null, 'Hi Dana, thanks.', null)`;
+    const links = await admin<{ item_id: string; archived_at: Date | null }[]>`
+      select item_id, archived_at from goals.links where kind = 'file' and target_id = ${id}`;
+    expect(links.map((l) => l.item_id).sort()).toEqual([goalA, subStep].sort());
+    expect(links.every((l) => l.archived_at === null)).toBe(true);
+  });
+
+  it('cannot be called from a signed-in session', async () => {
+    await expect(
+      asUser(userA, (tx) => tx`select goals.file_result(${step}, 'x', null, 'y', null)`),
+    ).rejects.toThrow(/permission denied/);
+  });
+});
+
 describe('Claude’s note on a goal', () => {
   it('is read by its owner only, and written by no signed-in session', async () => {
     await admin`insert into goals.briefs (user_id, item_id, body) values (${userA}, ${goalA}, 'Two steps closed this week.')`;
