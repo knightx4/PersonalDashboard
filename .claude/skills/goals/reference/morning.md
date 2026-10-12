@@ -309,3 +309,33 @@ unknown, which gets none. Rows are never updated: tomorrow's run adds a new
 one, and the pages show the newest. The run summary gives the count of each
 verdict, names the stalled goals and the met ones, and counts the goals left
 without a row because their pace is unknown.
+
+### Topping up a goal's suggestions
+
+After the review, find the open goals whose Suggestions section is empty
+(plan #1739): no suggestion on the goal or its steps still waiting for an
+answer, or marked going and not yet past.
+
+```sql
+with recursive tree as (
+  select id as goal_id, id from goals.items
+  where user_id = '<user>' and level = 'goal' and status = 'open' and archived_at is null
+  union all
+  select t.goal_id, i.id from goals.items i join tree t on i.parent_id = t.id
+  where i.level = 'step'
+)
+select g.id, g.title
+from goals.items g
+where g.user_id = '<user>' and g.level = 'goal' and g.status = 'open'
+  and g.archived_at is null
+  and not exists (
+    select 1 from goals.suggestions s join tree t on t.id = s.item_id
+    where t.goal_id = g.id
+      and s.accepted_step_id is null and s.attended is null
+      and (s.reaction is null or (s.reaction = 'going' and s.kind <> 'step'))
+      and (s.happens_on is null or s.happens_on >= current_date)
+  );
+```
+
+Give each one two suggested steps, as in "Suggesting steps" (`weekly.md`),
+with `run_id` this run. The summary names the goals you topped up.

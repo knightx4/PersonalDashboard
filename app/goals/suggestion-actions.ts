@@ -6,7 +6,11 @@ import { requireUser } from '@/lib/auth/server';
 import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { parseYourReaction } from '@/lib/goals/suggestions';
-import { reactToSuggestion, recordAttended } from '@/lib/goals/suggestions-store';
+import {
+  acceptStepSuggestion,
+  reactToSuggestion,
+  recordAttended,
+} from '@/lib/goals/suggestions-store';
 import { undismiss } from '@/lib/todo/agenda/dismissals';
 import { todayIn } from '@/lib/todo/tasks/model';
 
@@ -17,7 +21,7 @@ import { todayIn } from '@/lib/todo/tasks/model';
  * source reads the rows marked going, so nothing is copied into todo.tasks.
  */
 
-export type SuggestionActionState = { error?: string; done?: number };
+export type SuggestionActionState = { error?: string; done?: number; stepId?: string };
 
 const Id = z.string().uuid();
 
@@ -77,4 +81,28 @@ export async function recordAttendedAction(
   revalidatePath('/todo', 'layout');
   revalidatePath('/home');
   return { done: Date.now() };
+}
+
+/**
+ * Add as step, on a goal's Suggestions section (plan #1739): the suggested
+ * step becomes a step of yours on the goal, and nothing more. It is not put
+ * on Todo; Send to Todo on the step does that.
+ */
+// latency: pending
+export async function addSuggestedStepAction(
+  _prev: SuggestionActionState,
+  form: FormData,
+): Promise<SuggestionActionState> {
+  const user = await requireUser();
+  const id = Id.safeParse(form.get('id'));
+  if (!id.success) return { error: 'Could not tell which suggestion that was.' };
+  let stepId: string | null;
+  try {
+    stepId = await acceptStepSuggestion(await createGoalsClient(), user.id, id.data);
+  } catch {
+    return { error: 'The step could not be added. Try again.' };
+  }
+  if (!stepId) return { error: 'That suggestion is gone. Reload to see the list.' };
+  revalidatePath('/goals', 'layout');
+  return { done: Date.now(), stepId };
 }
