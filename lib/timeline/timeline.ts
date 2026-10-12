@@ -1,6 +1,7 @@
 import type { ModuleId } from '@/lib/modules';
 import { sourceHref } from '@/lib/sources/catalogue';
 import { noteHref } from '@/lib/vault/paths';
+import { stepHref } from '@/lib/goals/all-goals';
 
 /**
  * One timeline of what you did across the modules (plan #1117): the rows of
@@ -128,7 +129,7 @@ export function timelineHref(event: Pick<TimelineEvent, 'source_table' | 'source
       return sourceHref('learn.readings', event.source_id) ?? '/learn';
     case 'goals.items':
       if (!ref) return '/goals/all';
-      return ref === event.source_id ? `/goals/${ref}` : `/goals/${ref}#step-${event.source_id}`;
+      return ref === event.source_id ? `/goals/${ref}` : stepHref(ref, event.source_id);
     default:
       return '/';
   }

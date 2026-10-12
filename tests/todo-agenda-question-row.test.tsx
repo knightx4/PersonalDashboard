@@ -26,7 +26,7 @@ const question: AgendaItem = {
   title: 'Which bank?',
   day: '2026-09-29',
   at: null,
-  link: { href: '/goals/g#step-q1', label: 'Open a savings account' },
+  link: { href: '/goals/g/s/q1', label: 'Open a savings account' },
   action: null,
   detail: 'Waiting on your answer',
   completable: false,
@@ -55,6 +55,6 @@ describe('AgendaItemRow for a question', () => {
   it('draws no buttons for a question without options, only the link to it', () => {
     const html = renderToStaticMarkup(<AgendaItemRow timezone="UTC" item={question} />);
     expect(html).not.toContain('Answer with');
-    expect(html).toContain('href="/goals/g#step-q1"');
+    expect(html).toContain('href="/goals/g/s/q1"');
   });
 });

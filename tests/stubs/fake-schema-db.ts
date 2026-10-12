@@ -17,7 +17,8 @@ import type { AskSchema, SchemaClient } from '@/lib/ask/db';
  * The shared thread store (lib/thread/store.ts) is there too: `schema(name)`
  * hands back that schema's client, core.thread_turns is the same list as
  * core.conversation_turns (a thread's turns carry `ref` and `author`), `like`
- * matches a trailing `%`, and `rpc('add_thread_turn', ...)` adds a turn.
+ * matches a trailing `%`, and `rpc('add_thread_turn', ...)` adds a turn,
+ * starting the row's conversation in core.conversations when it has none.
  */
 
 type Row = Record<string, unknown>;
@@ -36,11 +37,43 @@ export function fakeSchemaDb(tables: FakeTables, now = '2026-10-03T08:00:00Z') {
     return {
       schema: (name: string) => client(name),
       rpc(name: string, args: Row) {
+        if (schema === 'core' && name === 'acknowledge_thread_turn') {
+          // Only the person's own comment under that row takes the mark.
+          const conversation = (tables['core.conversations'] ?? []).find(
+            (c) => c.user_id === args.p_user_id && c.subject_kind === 'row' && c.subject_ref === args.p_ref,
+          );
+          const turn = (tables['core.conversation_turns'] ?? []).find(
+            (t) =>
+              t.id === args.p_turn &&
+              t.user_id === args.p_user_id &&
+              t.role === 'user' &&
+              conversation !== undefined &&
+              t.conversation_id === conversation.id,
+          );
+          if (!turn) {
+            return Promise.resolve({
+              data: null,
+              error: { message: `acknowledge_thread_turn: ${String(args.p_turn)} is not a comment of yours under ${String(args.p_ref)}` },
+            });
+          }
+          turn.acknowledged_at ??= now;
+          return Promise.resolve({ data: turn.acknowledged_at, error: null });
+        }
         if (schema !== 'core' || name !== 'add_thread_turn') {
           return Promise.resolve({ data: null, error: { message: `no function ${schema}.${name}` } });
         }
+        // One conversation per account and row, as core.conversations keeps.
+        const conversations = (tables['core.conversations'] ??= []);
+        let conversation = conversations.find(
+          (c) => c.user_id === args.p_user_id && c.subject_kind === 'row' && c.subject_ref === args.p_ref,
+        );
+        if (!conversation) {
+          conversation = { id: fakeId(), user_id: args.p_user_id, subject_kind: 'row', subject_ref: args.p_ref, created_at: now };
+          conversations.push(conversation);
+        }
         const row = {
           id: fakeId(),
+          conversation_id: conversation.id,
           user_id: args.p_user_id,
           ref: args.p_ref,
           author: args.p_author,

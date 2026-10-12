@@ -71,3 +71,19 @@ export function claimExpiredNote(
     said.endsWith('.') ? said : `${said}.`
   }`;
 }
+
+/**
+ * Whether the run behind a claim holds it by its lines (plan #1825).
+ *
+ * A run that writes lines says itself whether it is alive, so the clock does
+ * not take its claim back: while the run is started, waiting on your answer or
+ * stale, the claim stands. A stale run is ended only by your acknowledging it,
+ * and the claim is then released on the clock as before. A run with no lines,
+ * or no run at all, holds nothing here and the clock and the pushes decide.
+ */
+export function claimHeldByRun(
+  run: { status: string; lastLineAt: string | null } | null | undefined,
+): boolean {
+  if (!run?.lastLineAt) return false;
+  return run.status === 'started' || run.status === 'awaiting_input' || run.status === 'stale';
+}

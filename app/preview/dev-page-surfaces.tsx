@@ -1,15 +1,29 @@
 import { PageHeader } from '@/components/shell/page-header';
+import type { AccountTab } from '@/app/account/tabs';
 import { FeedbackQueueView } from '@/components/feedback/feedback-queue';
 import { OtherUsersFeedback } from '@/components/feedback/other-users';
 import { IdeasView } from '@/app/dev/ideas/ideas-view';
 import { UsageScreen } from '@/app/dev/usage/usage-view';
 import { ReviewView, type Standing } from '@/app/dev/ui/review/review-view';
 import { SpecsView } from '@/app/dev/specs/specs-view';
+import type { InterviewCardView } from '@/lib/specs/interview-view';
+import type { VisionReview } from '@/lib/specs/vision-review';
+import type { DevComment } from '@/lib/comments/load';
 import { SpecDocView } from '@/app/dev/specs/[slug]/spec-doc-view';
 import { ChangelogView } from '@/app/dev/changelog/changelog-view';
+import type { ScreenChangeView } from '@/lib/plan/screen-change';
+import { phoneShot } from './plan-surfaces';
 import { RaisedView } from '@/app/dev/raised/raised-view';
 import { ConversationsView } from '@/app/dev/raised/conversations-view';
+import { StatusPanel } from '@/app/dev/raised/status-panel';
+import { OvernightControl } from '@/app/dev/plan/overnight-control';
+import type { OvernightRun } from '@/lib/plan/overnight';
+import type { DigestNight } from '@/lib/digest/night';
+import { NowStrip } from '@/app/dev/raised/now-strip';
+import { AskBox } from '@/app/dev/raised/ask-box';
+import { CheckBacksPanel } from '@/app/dev/raised/check-backs-panel';
 import { AccountView } from '@/app/account/view';
+import type { CaptureTokenListing } from '@/lib/capture/tokens';
 import {
   isOutstanding,
   sortOutstanding,
@@ -18,6 +32,9 @@ import {
   type OtherFeedbackRow,
 } from '@/lib/feedback/load';
 import type { IdeaList, IdeaRow } from '@/lib/ideas/load';
+import type { Triage } from '@/lib/feedback/triage';
+import type { Attachment } from '@/lib/attachments/store';
+import { functionSpendRows } from '@/lib/usage/function-spend';
 import { usageReport } from '@/lib/usage/report';
 import type { UiReview } from '@/lib/ui-review/load';
 import { specBySlug } from '@/lib/specs/registry';
@@ -27,6 +44,7 @@ import { ruleStates } from '@/lib/specs/rule-states';
 import type { ChangelogEntry } from '@/lib/changelog/entries';
 import type { RaisedQueue, RaisedRow } from '@/lib/raised/load';
 import type { WaitingGroup, WaitingRow } from '@/lib/plan/waiting';
+import { PLAN_RUN_QUESTION } from './run-lines-surfaces';
 import type { Conversation } from '@/lib/comments/recent';
 import type { ConnectedApp } from '@/lib/connector/apps';
 
@@ -56,12 +74,56 @@ function note(over: Partial<FeedbackRow> & Pick<FeedbackRow, 'id' | 'body'>): Fe
   };
 }
 
+/**
+ * A file filed with a note (plan #1713). The href is a picture the site
+ * already serves, standing in for /attachments/<id>, which signs a link to
+ * the private bucket and has nothing to sign here.
+ */
+function file(id: string, name: string, contentType: string, size: number, href: string): Attachment {
+  return {
+    id,
+    ref: `public.feedback_items:${id}`,
+    path: `preview/${id}-${name}`,
+    name,
+    contentType,
+    size,
+    createdAt: '2026-10-03T14:00:00Z',
+    href,
+  };
+}
+
+/**
+ * Jev's triage as filed (plan #1179), with the fix-or-plan answer (plan
+ * #1674): sure on the first, unsure of the route on the second.
+ */
+function triage(over: Partial<Triage>): Triage {
+  return {
+    at: '2026-10-03T14:00:02Z',
+    kind: null,
+    module: null,
+    priority: null,
+    route: null,
+    duplicate: { value: null, confidence: 0.95 },
+    ...over,
+  };
+}
+
 const notes: FeedbackRow[] = [
   note({
     id: 'n1',
     body: 'The plan page scrolls sideways on my phone when a step title is long and has a link in it',
     pagePath: '/dev/plan',
     priority: 1,
+    triage: triage({
+      kind: { value: 'bug', confidence: 0.97 },
+      module: { value: 'dev', confidence: 0.92 },
+      priority: { value: 1, confidence: 0.85 },
+      route: { value: 'fix', confidence: 0.9 },
+    }),
+    attachments: [
+      file('a1', 'plan-scrolls-sideways.png', 'image/png', 412_000, '/posts/2026-10-09-dev-plan-tree.png'),
+      file('a2', 'goals-page.png', 'image/png', 388_000, '/posts/2026-10-09-goals-page-steps.png'),
+    ],
   }),
   note({
     id: 'n2',
@@ -69,6 +131,12 @@ const notes: FeedbackRow[] = [
     body: 'Let me snooze a todo to next Monday from the swipe, without opening it',
     pagePath: '/todo',
     createdAt: '2026-10-02T09:30:00Z',
+    triage: triage({
+      kind: { value: 'feature', confidence: 0.95 },
+      module: { value: 'todo', confidence: 0.96 },
+      priority: { value: 2, confidence: 0.6 },
+      route: { value: 'plan', confidence: 0.62 },
+    }),
   }),
   note({
     id: 'n3',
@@ -76,6 +144,9 @@ const notes: FeedbackRow[] = [
     body: 'Receipts from the Apple Store come in without a total',
     pagePath: '/shopping/orders',
     resolutionNote: 'Needs a sample receipt: the two in the inbox are both refunds.',
+    attachments: [
+      file('a3', 'Apple Store receipt, 14 September 2026, order W1234567890.pdf', 'application/pdf', 96_000, '#'),
+    ],
     createdAt: '2026-09-29T18:00:00Z',
   }),
   note({
@@ -119,10 +190,7 @@ const others: OtherFeedbackRow[] = [
 export function DevBugsSurface() {
   return column(
     <>
-      <PageHeader
-        title="Bugs and requests"
-        description="Everything captured from the header button, from any workspace. Say “knock out the notes” in a session to have them worked top to bottom."
-      />
+      <PageHeader title="Bugs and requests" />
       <FeedbackQueueView queue={queue} kind={null} />
       <OtherUsersFeedback rows={others} />
     </>,
@@ -152,6 +220,12 @@ const ideas: IdeaList = {
       id: 'i1',
       module: 'shopping',
       body: 'Read receipts from photos of paper receipts, the way order emails are read',
+      triage: triage({
+        kind: { value: 'feature', confidence: 0.98 },
+        module: { value: 'shopping', confidence: 0.94 },
+        priority: { value: 3, confidence: 0.82 },
+        route: { value: 'plan', confidence: 0.93 },
+      }),
       score: { value: 74, confidence: 0.9, at: '2026-09-30T09:01:00Z' },
     }),
     idea({
@@ -190,9 +264,22 @@ export function DevIdeasSurface() {
     <>
       <PageHeader
         title="Ideas"
-        description="Long-term ideas, for the app as a whole or for one workspace. Nothing here does anything on its own — it is a place to put the thought."
       />
       <IdeasView ideas={ideas} grouping="workspace" sort="score" />
+    </>,
+  );
+}
+
+/** The page with nothing written down, which is where the explanation lives. */
+export function DevIdeasEmptySurface() {
+  return column(
+    <>
+      <PageHeader title="Ideas" />
+      <IdeasView
+        ideas={{ mine: [], suggested: [], lowScored: [], shaped: [], dismissed: [] }}
+        grouping="workspace"
+        sort="score"
+      />
     </>,
   );
 }
@@ -209,15 +296,35 @@ const report = usageReport(
     { route: '/vault/map', workspace: 'vault', opens7: 0, opens30: 0, lastOpened: '2026-08-12T10:00:00Z' },
     { route: '/shopping/returns', workspace: 'shopping', opens7: 0, opens30: 0, lastOpened: null },
   ],
-  [
-    { module: 'news', spend7: 1_840_000, spend30: 7_310_000, calls30: 412, unpriced30: 0 },
-    { module: 'learn', spend7: 960_000, spend30: 5_020_000, calls30: 230, unpriced30: 3 },
-    { module: 'core', spend7: 410_000, spend30: 1_900_000, calls30: 96, unpriced30: 0 },
-  ],
 );
 
+// Raw ledger rows, put through the loader's own rule so the labels and the
+// order are what the page gets: a workspace, `core`, a module that is no
+// workspace, an operation no list declares, and unpriced calls.
+const functions = functionSpendRows([
+  { module: 'news', operation: 'digest-issue', spend_7: 1_840_000, spend_30: 7_310_000, calls_30: 412, unpriced_30: 0 },
+  { module: 'jobs', operation: 'write-interview-prep', spend_7: 1_120_000, spend_30: 5_960_000, calls_30: 38, unpriced_30: 0 },
+  { module: 'learn', operation: 'plan-topic', spend_7: 960_000, spend_30: 5_020_000, calls_30: 230, unpriced_30: 3 },
+  { module: 'core', operation: 'ask-dash', spend_7: 410_000, spend_30: 1_900_000, calls_30: 96, unpriced_30: 0 },
+  { module: 'jobs', operation: 'suggest-outreach', spend_7: 0, spend_30: 840_000, calls_30: 4, unpriced_30: 0 },
+  { module: 'jobs', operation: 'classify-job-email', spend_7: 12_000, spend_30: 61_000, calls_30: 1, unpriced_30: 0 },
+  {
+    module: 'website',
+    operation: 'draft-weekly-changelog-summary-for-the-public-site',
+    spend_7: 0,
+    spend_30: 0,
+    calls_30: 2,
+    unpriced_30: 2,
+  },
+]);
+
 export function DevUsageSurface() {
-  return <UsageScreen report={report} now={new Date('2026-10-04T12:00:00Z')} />;
+  return <UsageScreen report={report} functions={functions} now={new Date('2026-10-04T12:00:00Z')} />;
+}
+
+/** The tab before any model call has been made and before any page was opened. */
+export function DevUsageEmptySurface() {
+  return <UsageScreen report={usageReport([])} functions={[]} now={new Date('2026-10-04T12:00:00Z')} />;
 }
 
 // ---- UI review ------------------------------------------------------------
@@ -255,10 +362,7 @@ const standings: Standing[] = [
 export function DevUiReviewSurface() {
   return column(
     <>
-      <PageHeader
-        title="Review"
-        description="One module at a time: what the gate counts, what there is to look at, and what the last pass found."
-      />
+      <PageHeader title="Review" />
       <ReviewView standings={standings} only={null} />
     </>,
   );
@@ -285,6 +389,122 @@ export function DevSpecsSurface() {
       edits={{}}
       changes={[]}
       audit={{ auditAt: null, findings: [] }}
+    />
+  );
+}
+
+// ---- Specs: Dash's interview (plan #1641) --------------------------------
+
+const SPECS_VISIONS = {
+  app: {
+    module: 'app' as const,
+    body: 'It should make working with an AI builder easy, and the app it builds should be one I use every day.',
+    updatedAt: '2026-09-20T09:00:00Z',
+  },
+  jobs: {
+    module: 'jobs' as const,
+    body: 'Every application from first lead to offer in one place, so nothing falls through between an email and an interview.',
+    updatedAt: '2026-09-18T09:00:00Z',
+  },
+};
+
+function turn(id: string, author: 'me' | 'claude', body: string, createdAt: string): DevComment {
+  return { id, author, body, createdAt };
+}
+
+const JOBS_TURNS: DevComment[] = [
+  turn('q1', 'claude', 'When an application goes quiet for two weeks, what do you want the app to do about it?', '2026-10-07T09:00:00Z'),
+  turn('a1', 'me', 'Tell me on Home that it has gone quiet and offer a follow-up email I can send in one press. Nothing automatic: I want to choose who gets chased.', '2026-10-07T09:02:00Z'),
+  turn('q2', 'claude', 'You keep the cover letters in the vault today. Should a role page show the letter you sent for it, or only link to the vault?', '2026-10-07T09:02:30Z'),
+  turn('a2', 'me', 'Show it on the role. I never open the vault while I am looking at a role.', '2026-10-07T09:04:00Z'),
+  turn('q3', 'claude', 'Which matters more on the pipeline board: the stage each role is at, or how long it has been since you last heard back?', '2026-10-07T09:04:30Z'),
+];
+
+function interviewView(over: Partial<InterviewCardView>): InterviewCardView {
+  return {
+    id: 'i1',
+    module: 'jobs',
+    status: 'open',
+    move: 'answer',
+    questionLimit: 12,
+    asked: 1,
+    answered: 0,
+    turns: JOBS_TURNS.slice(0, 1),
+    summary: null,
+    finishedAt: null,
+    visionHref: null,
+    specChangeHref: null,
+    ...over,
+  };
+}
+
+function SpecsWithInterview({
+  view,
+  edits = {},
+}: {
+  view: InterviewCardView;
+  edits?: Partial<Record<'jobs', VisionReview>>;
+}) {
+  return (
+    <SpecsView
+      counts={{ 'ui-quality': 4, plan: 1 }}
+      visions={SPECS_VISIONS}
+      edits={edits}
+      changes={[]}
+      audit={{ auditAt: null, findings: [] }}
+      interviews={{ jobs: view }}
+      openInterviews
+    />
+  );
+}
+
+/** Just started: Dash's first question, and nothing answered yet. */
+export function DevSpecsInterviewEmptySurface() {
+  return <SpecsWithInterview view={interviewView({})} />;
+}
+
+/** Halfway: two answers in and the third question waiting. */
+export function DevSpecsInterviewHalfSurface() {
+  return <SpecsWithInterview view={interviewView({ asked: 3, answered: 2, turns: JOBS_TURNS })} />;
+}
+
+const DRAFTED_EDIT: VisionReview = {
+  id: 'v1',
+  module: 'jobs',
+  reviewId: 'i1',
+  sessionId: null,
+  outcome: 'edit',
+  visionBody: SPECS_VISIONS.jobs.body,
+  proposedBody:
+    'Every application from first lead to offer in one place. When one goes quiet the app says so on Home and offers a follow-up to send, and each role shows the letter that went with it.',
+  note: 'From your interview about Job search on 7 October. You want quiet applications raised, not chased for you.',
+  evidenceIds: [],
+  evidence: [],
+  status: 'pending',
+  decidedAt: null,
+  createdAt: '2026-10-07T09:20:00Z',
+};
+
+/** Drafted: the vision edit waits above, and the spec change has been decided. */
+export function DevSpecsInterviewDraftedSurface() {
+  return (
+    <SpecsWithInterview
+      edits={{ jobs: DRAFTED_EDIT }}
+      view={interviewView({
+        status: 'drafted',
+        move: null,
+        asked: 3,
+        answered: 3,
+        turns: [
+          ...JOBS_TURNS,
+          turn('a3', 'me', 'How long since I heard back. The stage I already know.', '2026-10-07T09:06:00Z'),
+        ],
+        summary:
+          'You want the app to notice when an application goes quiet and offer a follow-up, to keep each letter on its role, and to sort the board by how long since you heard back.',
+        finishedAt: '2026-10-07T09:20:00Z',
+        visionHref: '/dev/specs#vision-jobs',
+        specChangeHref: null,
+      })}
     />
   );
 }
@@ -411,6 +631,54 @@ export function DevChangelogSurface() {
   return <ChangelogView entries={changelog} grouping="issue" query="" workspace={null} />;
 }
 
+/**
+ * The changelog by day with the screens two steps changed (plan #1541): the
+ * after picture under each line, without opening it. One step changed two
+ * surfaces, one changed one, and the note changed none.
+ */
+const changelogScreens: Record<number, ScreenChangeView[]> = {
+  1539: [
+    {
+      surface: 'dev-surfaces',
+      round: 2,
+      verdict: 'pass',
+      checkedAt: '2026-10-04T01:00:00Z',
+      before: phoneShot(true),
+      after: phoneShot(false),
+    },
+    {
+      surface: 'dev-surfaces-a-very-long-surface-name-empty',
+      round: 1,
+      verdict: 'pass',
+      checkedAt: '2026-10-04T01:05:00Z',
+      before: null,
+      after: phoneShot(false),
+    },
+  ],
+  1440: [
+    {
+      surface: 'todo-day-close',
+      round: 4,
+      verdict: 'accepted',
+      checkedAt: '2026-10-02T10:30:00Z',
+      before: phoneShot(true),
+      after: phoneShot(false),
+    },
+  ],
+};
+
+export function DevChangelogScreensSurface() {
+  return (
+    <ChangelogView
+      entries={changelog}
+      grouping="day"
+      query=""
+      workspace={null}
+      screens={changelogScreens}
+    />
+  );
+}
+
 // ---- Dev home: what is waiting on you --------------------------------------
 
 function waiting(over: Partial<WaitingRow> & Pick<WaitingRow, 'id' | 'number' | 'title' | 'health'>): WaitingRow {
@@ -464,6 +732,8 @@ const groups: WaitingGroup[] = [
     key: 'questions',
     title: 'Questions for you',
     entries: [
+      // A run held on a question it asked partway (plan #1824).
+      { kind: 'run', id: PLAN_RUN_QUESTION.runId, question: PLAN_RUN_QUESTION },
       {
         kind: 'plan',
         id: 'w2',
@@ -506,16 +776,97 @@ const conversations: Conversation[] = [
   },
 ];
 
+const NOW = Date.parse('2026-10-06T08:00:00Z');
+
 export function DevRaisedSurface() {
   return column(
     <>
-      <PageHeader
-        title="Home"
-        description="What happened in the last day, the questions waiting on you, and every conversation you have had with Dash. Answer a question and the next run reads it; reply to a conversation and it goes back on the row it was started on."
+      <PageHeader title="Home" />
+      <div className="space-y-3">
+        <NowStrip
+          run={null}
+          ready={3}
+          openNotes={12}
+          mainCheck={{
+            sha: 'abc1234',
+            conclusion: 'passed',
+            checkedAt: '2026-10-06T07:55:00Z',
+            error: null,
+            reason: null,
+            runUrl: null,
+            deployState: null,
+            deployUrl: null,
+            deployError: null,
+            unapplied: [],
+            migrationsError: null,
+          }}
+          inbox={3}
+        />
+        <AskBox />
+      </div>
+      <CheckBacksPanel
+        now={NOW}
+        rows={[
+          {
+            id: 'cb1',
+            userId: 'u1',
+            planItemId: 'p611',
+            step: { id: 'p611', number: 611, outline: '608.3', title: 'Send the weekly digest' },
+            outcome: null,
+            closedAt: null,
+            createdAt: '2026-10-05T09:00:00Z',
+            title: 'Check the weekly digest email went out',
+            detail: 'Plan #611 sends it on Monday mornings; look for the send in Resend.',
+            dueAt: '2026-10-07T09:00:00Z',
+            status: 'waiting',
+            source: 'plan #611',
+            wake: true,
+            wokeAt: null,
+          },
+        ]}
       />
-      <RaisedView queue={raisedQueue} groups={groups} />
-      <ConversationsView conversations={conversations} />
+      <ConversationsView conversations={conversations} now={NOW} />
     </>,
+  );
+}
+
+/** The Inbox tab in Dev: the overview, then a job, a question and a raise. */
+export function DevInboxSurface() {
+  return column(
+    <>
+      <PageHeader title="Inbox" />
+      <RaisedView queue={raisedQueue} groups={groups} />
+    </>,
+  );
+}
+
+/**
+ * The Status panel at the top of Home in Dev: the plan runner resting with
+ * three features ready, and the notes routine with twelve notes open. Dash's
+ * mark sits under Plan (note 076e7744).
+ */
+export function DevRaisedStatusSurface() {
+  return column(
+    <StatusPanel
+      run={null}
+      canSend
+      card={{
+        night: null,
+        on: [],
+        progress: null,
+        push: null,
+        ready: 3,
+        readySteps: 9,
+        next: [],
+        sessions: [],
+      }}
+      goals={null}
+      openNotes={12}
+      notesLastRun={null}
+      vision={null}
+      autoApprove={false}
+      now={Date.parse('2026-10-06T08:00:00Z')}
+    />,
   );
 }
 
@@ -549,11 +900,53 @@ const apps: ConnectedApp[] = [
   },
 ];
 
-export function AccountSurface() {
+/** Capture tokens (plan #1705): one in use, one never used with the longest name, one revoked. */
+const captureTokens: CaptureTokenListing[] = [
+  {
+    id: 'ct1',
+    label: 'iPhone Shortcut',
+    createdAt: '2026-10-01T09:00:00Z',
+    lastUsedAt: '2026-10-08T07:42:00Z',
+    revokedAt: null,
+  },
+  {
+    id: 'ct2',
+    label: 'Zapier: starred Gmail messages to the vault reading list',
+    createdAt: '2026-10-05T18:30:00Z',
+    lastUsedAt: null,
+    revokedAt: null,
+  },
+  {
+    id: 'ct3',
+    label: 'Old iPad',
+    createdAt: '2026-09-02T12:00:00Z',
+    lastUsedAt: '2026-09-20T21:10:00Z',
+    revokedAt: '2026-10-01T09:01:00Z',
+  },
+];
+
+/**
+ * Account on one of its tabs (plan #1628). The tab is chosen here rather than
+ * from the address, since the page reads it on the server; `account` is the
+ * page as it opens, and `account-notifications` where Dash's link sends you
+ * when push is off.
+ */
+export function AccountSurface({
+  tab = 'you',
+  justMade,
+  onlyFirstToken,
+}: {
+  tab?: AccountTab;
+  /** A capture token as it shows straight after it is made (plan #1705). */
+  justMade?: { label: string; token: string };
+  /** Only the newest capture token, as the list reads once the first is made. */
+  onlyFirstToken?: boolean;
+}) {
   return column(
     <>
-      <p className="text-body text-ink-muted">Settings that hold across every workspace.</p>
       <AccountView
+        tab={tab}
+        opensOn={tab}
         email="christopher.kloughton@example.com"
         settings={{
           displayName: 'Chris',
@@ -564,7 +957,115 @@ export function AccountSurface() {
         isOwner
         vapidPublicKey={null}
         connected={{ apps, failed: null, connectorAddress: 'https://dash.example.com/api/mcp' }}
+        capture={{ tokens: onlyFirstToken ? [{ ...captureTokens[0], createdAt: '2026-10-09T15:30:00Z', lastUsedAt: null }] : captureTokens, failed: null, justMade, address: 'https://dash.example.com/api/capture' }}
       />
+    </>,
+  );
+}
+
+// ---- The runner's four Dashes (plan #1704) -------------------------------
+
+/** An instant `minutes` before the preview renders, so the clocks read sensibly. */
+function minutesAgo(minutes: number): string {
+  return new Date(Date.now() - minutes * 60_000).toISOString();
+}
+
+/**
+ * The runner card on /dev/plan in the two states the person asked to see: a
+ * night running with two feature sessions, a goal run and one slot asleep
+ * with the tick's reason, and the runner off with all four Dashes idle. The
+ * longest titles the plan has had, so the lines are seen cut.
+ */
+export function DevRunnerCrewSurface() {
+  const started = minutesAgo(130);
+  const run: OvernightRun = {
+    id: 'run-1',
+    running: true,
+    paused: false,
+    featuresBudget: 6,
+    featuresLeft: 3,
+    stopBy: null,
+    startedAt: started,
+    lastFiredAt: minutesAgo(31),
+    endedAt: null,
+    endedReason: null,
+    lastTickAt: minutesAgo(2),
+    lastTickNote: 'Waiting: 2 sessions are running, and nothing else is ready outside their modules.',
+    createdAt: started,
+    updatedAt: minutesAgo(2),
+  };
+  const night: DigestNight = {
+    standing: 'running',
+    startedAt: started,
+    endedAt: null,
+    endedReason: null,
+    featuresBudget: 6,
+    featuresLeft: 3,
+    features: [
+      { ref: '#1700', title: 'Four Dashes on the runner card, one for each thing it can run at once', at: minutesAgo(31) },
+    ],
+    lastFire: {
+      ref: '#1700',
+      title: 'Four Dashes on the runner card, one for each thing it can run at once',
+      at: minutesAgo(31),
+    },
+    closed: [],
+    blocked: [],
+  };
+  return column(
+    <>
+      <OvernightControl
+        run={run}
+        canSend
+        night={night}
+        push={null}
+        ready={2}
+        sessions={[
+          {
+            id: 's1',
+            firedAt: minutesAgo(31),
+            endedAt: null,
+            step: {
+              number: 1700,
+              ref: '#1700.4',
+              title: 'Show the four Dashes on the runner card, each in its own hat',
+            },
+            module: 'Dev',
+            doing: null,
+          },
+          {
+            id: 's2',
+            firedAt: minutesAgo(14),
+            endedAt: null,
+            step: { number: 1688, title: 'Returns list on Shopping' },
+            module: 'Shopping',
+            doing: null,
+          },
+        ]}
+        on={[
+          {
+            ref: '#1700',
+            title: 'Four Dashes on the runner card',
+            at: minutesAgo(31),
+            step: null,
+            progress: { done: 3, total: 4 },
+          },
+        ]}
+        goals={{
+          on: [
+            {
+              id: 'g1',
+              doing: 'Mapping the goal',
+              title: 'Run a half marathon',
+              at: minutesAgo(6),
+              nowOn: 'Reading Gmail for race dates',
+            },
+          ],
+          readySteps: 0,
+          toMap: 0,
+        }}
+      />
+      <OvernightControl run={null} canSend night={null} push={null} ready={2} />
     </>,
   );
 }

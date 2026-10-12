@@ -12,7 +12,9 @@
  * Pure. The page passes in the goal's tree and flags.
  */
 import { dailyView, type WaitingItem } from '@/lib/goals/daily';
+import { formatDueBy, type DuePrecision } from '@/lib/goals/due-precision';
 import { formatDay } from '@/lib/goals/dates';
+import { stepAnchor } from '@/lib/goals/goal-page';
 import type { StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 
@@ -60,7 +62,7 @@ function plural(n: number, one: string, many: string): string {
 function waitingRow(item: WaitingItem, steps: readonly StepNode[]): StatusRow | null {
   switch (item.kind) {
     case 'question':
-      return { id: item.id, kind: 'question', label: 'Answer', title: item.title, href: `#step-${item.id}` };
+      return { id: item.id, kind: 'question', label: 'Answer', title: item.title, href: stepAnchor(item.id) };
     case 'flag':
       return { id: item.id, kind: 'flag', label: 'Dash flagged', title: item.title, href: `#flag-${item.id}` };
     case 'breakdown': {
@@ -70,13 +72,13 @@ function waitingRow(item: WaitingItem, steps: readonly StepNode[]): StatusRow | 
         kind: 'approve',
         label: 'Approve',
         title: plural(item.count, 'proposed step', 'proposed steps'),
-        href: first ? `#step-${first}` : '#claude-heading',
+        href: first ? stepAnchor(first) : '#claude-heading',
       };
     }
     case 'plan':
       return { id: item.id, kind: 'approve', label: 'Approve', title: 'This goal, which Dash proposed', href: '#claude-heading' };
     case 'review':
-      return { id: item.id, kind: 'read', label: 'Read Dash’s result', title: item.title, href: `#step-${item.id}` };
+      return { id: item.id, kind: 'read', label: 'Read Dash’s result', title: item.title, href: stepAnchor(item.id) };
     case 'context':
       return {
         id: item.id,
@@ -115,7 +117,7 @@ export function goalStatus(
     kind: 'do',
     label: item.dueOn ? `Do by ${formatDay(item.dueOn)}` : 'Do',
     title: item.title,
-    href: `#step-${item.id}`,
+    href: stepAnchor(item.id),
   }));
   return {
     yourMove: [...waiting, ...doRows],
@@ -135,4 +137,45 @@ export function claudeLine(view: Pick<GoalStatusView, 'claudeReady' | 'claudeHel
     parts.push(`${plural(view.claudeHeld, 'Dash step waits', 'Dash steps wait')} for your approval`);
   }
   return parts.length > 0 ? `${parts.join('. ')}.` : null;
+}
+
+/**
+ * The one line under the goal's title that says where it stands, from what
+ * the page has already read: "3 on you · Dash on 1 · due 31 Oct". How many
+ * things are on you (everything Waiting on you lists, and every step of
+ * yours that is ready), how many runs Dash has going on the goal or else how
+ * many of its steps the next run will work, the goal's due date, and its
+ * usual pace (plan #1737: "usually every 5 days, last 2 days ago"), or,
+ * where no pace is given, the day anything on it last moved.
+ */
+export function statusLine(
+  view: Pick<GoalStatusView, 'yourMove' | 'moreSteps' | 'claudeReady'>,
+  {
+    running = 0,
+    dueOn = null,
+    duePrecision = 'day',
+    lastProgressOn = null,
+    pace = null,
+  }: {
+    running?: number;
+    dueOn?: string | null;
+    duePrecision?: DuePrecision;
+    lastProgressOn?: string | null;
+    /** The goal's pace in words, from `paceLine` in lib/goals/pace.ts. */
+    pace?: string | null;
+  } = {},
+): string {
+  const onYou = view.yourMove.length + view.moreSteps;
+  return [
+    onYou > 0 ? `${onYou} on you` : 'Nothing on you',
+    running > 0
+      ? `Dash on ${running}`
+      : view.claudeReady > 0
+        ? `${plural(view.claudeReady, 'step', 'steps')} ready for Dash`
+        : null,
+    dueOn ? formatDueBy(dueOn, duePrecision) : null,
+    pace ?? (lastProgressOn ? `last progress ${formatDay(lastProgressOn)}` : null),
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }

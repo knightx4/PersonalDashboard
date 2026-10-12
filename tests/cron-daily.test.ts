@@ -125,6 +125,9 @@ vi.mock('@/inngest/goals/daily', () => ({
 vi.mock('@/inngest/goals/scope-days', () => ({
   runScopeDays: vi.fn(async () => ({ written: 23 })),
 }));
+vi.mock('@/inngest/goals/rhythms', () => ({
+  runGoalsRhythms: vi.fn(async () => ({ rhythms: 9 })),
+}));
 vi.mock('@/inngest/goals/quiet-runs', () => ({
   runGoalsQuietSweep: vi.fn(async () => ({ closed: ['run-0'] })),
 }));
@@ -150,6 +153,7 @@ const { runClaimSweep } = await import('@/inngest/dev/claims');
 const { runGoalsDaily } = await import('@/inngest/goals/daily');
 const { runGoalsWeekly } = await import('@/inngest/goals/weekly');
 const { runGoalsQuietSweep } = await import('@/inngest/goals/quiet-runs');
+const { runGoalsRhythms } = await import('@/inngest/goals/rhythms');
 const { runDevDigest } = await import('@/inngest/dev/digest');
 const { runIdeaScoreCatchUp } = await import('@/inngest/dev/idea-scores');
 
@@ -218,6 +222,10 @@ describe('the daily cron route', () => {
 
     // Each open goal and feature gets its step counts for the day (plan #1836).
     expect(body.results['scope-days']).toEqual({ written: 23 });
+
+    // Rhythm periods close every morning, whether or not a page is opened.
+    expect(runGoalsRhythms).toHaveBeenCalled();
+    expect(body.results['goals-rhythms']).toEqual({ rhythms: 9 });
 
     // The claim sweep runs before the digest, so the summary reports the rows
     // it has already corrected rather than the ones it is about to.

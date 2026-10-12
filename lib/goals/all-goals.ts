@@ -28,6 +28,21 @@ export function allGoalsViewOf(param: string | string[] | undefined): AllGoalsVi
   return requested && isAllGoalsView(requested) ? requested : (DEFAULT_GOAL_VIEW as AllGoalsView);
 }
 
+/**
+ * Where an area is: its own page (plan #1619), which lists its goals, the
+ * goals Dash proposed for it and its rhythms with the editing All goals
+ * offers. An area with no open goal shows nothing under Open, the default
+ * view, so it is opened under Everything.
+ */
+export function areaHref(areaId: string, { open = true }: { open?: boolean } = {}): string {
+  return `/goals/area/${areaId}${open ? '' : '?view=all'}`;
+}
+
+/** A step's own page (plan #1620), under the goal it belongs to. A sub-step's is the same. */
+export function stepHref(goalId: string, stepId: string): string {
+  return `/goals/${goalId}/s/${stepId}`;
+}
+
 /** How many things on you each goal holds, keyed by goal id, from the Today list. */
 export function onYouByGoal(items: readonly { goalId: string }[]): Map<string, number> {
   const counts = new Map<string, number>();
@@ -73,15 +88,25 @@ export function areasInView(
   onYou: ReadonlyMap<string, number>,
 ): AreaInView[] {
   return areas.flatMap((area) => {
-    const shown = area.goals.filter((goal) => goalInView(goal, view, onYou));
-    const goals = [
-      ...shown.filter((goal) => !goal.archivedAt),
-      ...shown.filter((goal) => goal.archivedAt),
-    ];
-    const liveCount = area.goals.filter((goal) => !goal.archivedAt).length;
-    const hide = goals.length === 0 && (view === 'you' || area.goals.length > 0);
-    return hide ? [] : [{ ...area, goals, liveCount }];
+    const shown = areaInView(area, view, onYou);
+    const hide = shown.goals.length === 0 && (view === 'you' || area.goals.length > 0);
+    return hide ? [] : [shown];
   });
+}
+
+/**
+ * One area narrowed to a view, kept even when none of its goals is in it:
+ * the area's own page draws it whatever the view leaves.
+ */
+export function areaInView(
+  area: AreaWithGoals,
+  view: AllGoalsView,
+  onYou: ReadonlyMap<string, number>,
+): AreaInView {
+  const shown = area.goals.filter((goal) => goalInView(goal, view, onYou));
+  const goals = [...shown.filter((goal) => !goal.archivedAt), ...shown.filter((goal) => goal.archivedAt)];
+  const liveCount = area.goals.filter((goal) => !goal.archivedAt).length;
+  return { ...area, goals, liveCount };
 }
 
 /** How many goals each view holds, for the chips. */

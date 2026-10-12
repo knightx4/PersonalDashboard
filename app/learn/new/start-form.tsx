@@ -22,7 +22,7 @@ import { startTrack, type NewTrackState } from './actions';
 function StartButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" disabled={pending}>
+    <Button type="submit" variant="secondary" pending={pending}>
       {pending ? 'Starting…' : 'Start the topic'}
     </Button>
   );
@@ -32,19 +32,17 @@ export function StartForm() {
   const [state, formAction] = useActionState<NewTrackState, FormData>(startTrack, {});
 
   return (
-    <form action={formAction}>
+    <form action={formAction} className="space-y-4">
       <Field
         label="What do you want to learn about?"
         id="start-title"
-        hint="The broad thing. You add the specific parts on the next screen."
       >
         <Input id="start-title" name="title" required maxLength={300} placeholder="Central banking" />
       </Field>
 
       <Field
-        label="Anything particular you are trying to work out?"
+        label="Anything particular you are trying to work out? (optional)"
         id="start-question"
-        hint="Optional. It is what each source gets aimed at later, so a specific one is worth writing."
       >
         <Textarea
           id="start-question"

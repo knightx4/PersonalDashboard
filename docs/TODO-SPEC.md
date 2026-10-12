@@ -165,10 +165,8 @@ Listing these because they will otherwise get invented.
 | A job reminder | `job_search.reminders` | nothing new | `completed_at` on the job row | `due_at` on the job row, moved forward |
 | A return deadline | `public.orders` (derived) | nothing | not possible -- it is a date, not a task | a row in `todo.dismissals` |
 | A note checkbox | your vault | **nothing, ever** | not possible | deferred entirely; see below |
-| A goal's next step, or a step flagged Show on Todo | `goals.items` | nothing new | `status` on the step, set to done | a row in `todo.dismissals` |
-| An open question on a goal | `goals.items` | nothing new | answered, not finished: the option pressed goes in `resolution` | a row in `todo.dismissals` |
+| A goal step sent to Todo, by you or by Dash | `goals.items` | nothing new | `status` on the step, set to done | a row in `todo.dismissals` |
 | A plan question, proposal, block or setup job on you | `public.plan_items` | nothing | answered or approved on the plan | a row in `todo.dismissals` |
-| A goal or goal steps Dash proposed, or a goal step blocked on you | `goals.items` | nothing | approved or unblocked on the goal | a row in `todo.dismissals` |
 | A question Dash raised | `public.raised_items` | nothing | answered on the Dash tab or its goal | a row in `todo.dismissals` |
 | A thread where Dash spoke last and asked something | `core.conversations` | nothing | your reply in the thread | a row in `todo.dismissals` |
 
@@ -1120,6 +1118,16 @@ confident and the code disagreed.
   (`lib/todo/agenda/dash-results.ts`) rather than through a source, since it
   is a count with nothing to tick. The line is absent at zero, when the Goals
   workspace is off, and when the read fails.
+- **Todo holds only the goal steps sent to it** (plan #1735). The three
+  entries above are undone, along with the goal-waiting source of plan #1473.
+  Most goals have no deadline, and a step, rhythm or question from every
+  goal each day made Todo a second copy of the Goals home. The goal-steps source now lists a step of yours only when
+  you pressed Send to Todo on it or Dash put it there, plus events you said
+  you would go to. A goal's next step, its rhythms, Dash's questions, Dash's
+  results to read, goals and steps Dash proposed, and steps blocked on you
+  all stay on the Goals home, which already shows each of them. Home's Today
+  reads the same agenda, so it follows. The step menu's Show on Todo is now
+  Send to Todo, beside Take off Todo.
 
 ## What this unlocks (not v1)
 

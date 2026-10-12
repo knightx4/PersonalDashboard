@@ -10,8 +10,11 @@ import { runDevDigest } from '@/inngest/dev/digest';
 import { runIdeaScoreCatchUp } from '@/inngest/dev/idea-scores';
 import { runGoalsDaily } from '@/inngest/goals/daily';
 import { runGoalsQuietSweep } from '@/inngest/goals/quiet-runs';
+import { runGoalsRhythms } from '@/inngest/goals/rhythms';
 import { runGoalsWeekly } from '@/inngest/goals/weekly';
 import { runScopeDays } from '@/inngest/goals/scope-days';
+import { runLearnEmbeddingsDaily } from '@/inngest/learn/embeddings-daily';
+import { runXReadsForAll } from '@/inngest/x/read';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
 // allowed to take, and a route that ends first takes the hand-off with it.
@@ -40,7 +43,10 @@ export const maxDuration = 300;
  * run, it fires the same routine to research city events. There is no second
  * cron for it because the Hobby plan allows one. The quiet-run sweep
  * (plan #1002) goes first of the three, so a run that died yesterday is
- * closed before the morning run reads what is still going.
+ * closed before the morning run reads what is still going. The rhythm sync
+ * comes next: it closes yesterday's ended periods and writes the counts a
+ * rhythm reads from Jobs or the calendar, after the inbox has filed the
+ * night's applications, so the morning run reads this morning's counts.
  *
  * The claim sweep and the digest are both about the dev pages, and they are in
  * that order because the sweep corrects rows the digest then reports: a step
@@ -72,6 +78,7 @@ export async function GET(request: NextRequest) {
     { name: 'jd-backfill', run: () => runJdBackfill() },
     { name: 'vault', run: () => runVaultSyncForAll() },
     { name: 'goals-quiet-runs', run: () => runGoalsQuietSweep() },
+    { name: 'goals-rhythms', run: () => runGoalsRhythms() },
     { name: 'goals-daily', run: () => runGoalsDaily() },
     { name: 'goals-weekly', run: () => runGoalsWeekly() },
     // After the goals stages: the counts are of the steps as they stand once
@@ -83,6 +90,11 @@ export async function GET(request: NextRequest) {
     // and any other idea still unscored get Jev's score the same morning
     // (plan #1327).
     { name: 'idea-scores', run: () => runIdeaScoreCatchUp() },
+    // The person's own X posts, newest since the last read (plan #1819).
+    // Before the embeddings so a slow model call cannot crowd it out.
+    { name: 'x-posts', run: () => runXReadsForAll() },
+    // Last, and bounded: Learn ideas saved without a vector get one (plan #1854).
+    { name: 'learn-embeddings', run: () => runLearnEmbeddingsDaily() },
   ];
 
   const results: Record<string, unknown> = {};

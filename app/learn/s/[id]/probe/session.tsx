@@ -51,7 +51,7 @@ function Bar({ percent }: { percent: number }) {
       <p className="mt-1 text-small text-ink-muted">
         {percent === 0
           ? 'Nothing answered yet.'
-          : `${percent}% of what this can find out — it measures what has been learned about you, not how many questions you have answered.`}
+          : `${percent}% of what this can find out`}
       </p>
     </div>
   );
@@ -61,7 +61,7 @@ function AskButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
   return (
     <span className="inline-flex items-center gap-1">
-      <Button type="submit" variant="secondary" disabled={pending}>
+      <Button type="submit" variant="secondary" pending={pending}>
         {pending ? 'Writing a question…' : label}
       </Button>
       <PaidHint
@@ -83,7 +83,7 @@ function AskButton({ label }: { label: string }) {
 function KnownButton({ declare }: { declare: (formData: FormData) => void }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="ghost" formAction={declare} formNoValidate disabled={pending}>
+    <Button type="submit" variant="ghost" formAction={declare} formNoValidate pending={pending}>
       I already know this
     </Button>
   );

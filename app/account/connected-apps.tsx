@@ -33,8 +33,7 @@ export function ConnectedAppsSection({
     <section className={cardVariants({ padding: 'standard' })}>
       <h2 className="text-body font-semibold text-ink">Connected apps</h2>
       <p className="mt-0.5 text-ui text-ink-muted">
-        Apps you have allowed to read your dashboard, and every lookup they made. The newest 100 are
-        listed, including those from apps you have since removed.
+        The newest 100 calls are listed, including those from apps you have since removed.
       </p>
 
       {failed && (

@@ -91,12 +91,12 @@ export const MOMENTS: readonly Moment[] = [
     workspace: 'home',
     name: 'The first visit of the day',
     trigger: 'Opening Home for the first time on a new day.',
-    sees: 'The greeting, the brief and Today arrive one after another rather than all at once.',
-    reducedMotion: 'All three are there at once.',
+    sees: 'The greeting, the brief, Today and the rail beside it arrive one after another rather than all at once.',
+    reducedMotion: 'All of it is there at once.',
     state: {
       built: 'yes',
       where:
-        'HomeArrival in app/home/arrival.tsx round the column on /home, played when the home_arrived cookie has not seen today (lib/home/first-visit.ts).',
+        'HomeArrival in app/home/arrival.tsx round both columns on /home (the rail rises with Today, in HomeColumns), played when the home_arrived cookie has not seen today (lib/home/first-visit.ts).',
     },
     demo: 'motion-home-arrival',
   },
@@ -122,7 +122,7 @@ export const MOMENTS: readonly Moment[] = [
     state: {
       built: 'yes',
       where:
-        'playForward in components/jobs/pipeline/moments.ts, on a drag across the board in components/jobs/pipeline/board.tsx, travelling with travelElement in components/motion/travel.ts; lib/jobs/board-moment.ts says which moves count.',
+        'playForward in components/jobs/pipeline/moments.ts, on a drag across the board in components/jobs/pipeline/board.tsx, gliding the board into its new state with glideBoard and naming the column with settle in components/motion/settle.ts; lib/jobs/board-moment.ts says which moves count. Played in the gallery at /preview?s=jobs-moment-forward.',
     },
   },
   {
@@ -133,7 +133,7 @@ export const MOMENTS: readonly Moment[] = [
     reducedMotion: 'The role is in Offer at once, with “Offer · ” and the company beside it.',
     state: {
       built: 'yes',
-      where: 'playOffer in components/jobs/pipeline/moments.ts, played by the board in components/jobs/pipeline/board.tsx.',
+      where: 'playOffer in components/jobs/pipeline/moments.ts, played by the board in components/jobs/pipeline/board.tsx. Played in the gallery at /preview?s=jobs-moment-offer.',
     },
   },
   {
@@ -145,18 +145,19 @@ export const MOMENTS: readonly Moment[] = [
     state: {
       built: 'yes',
       where:
-        'fadeInPlace in components/jobs/pipeline/moments.ts on the card’s reject button, with the line from stillOpenLine in lib/jobs/board-moment.ts above the board.',
+        'fadeInPlace in components/jobs/pipeline/moments.ts on the card’s reject button, the lane closing up with glideBoard, and the line from stillOpenLine in lib/jobs/board-moment.ts in a toast once the write is through. Played in the gallery at /preview?s=jobs-moment-reject.',
     },
   },
   {
     workspace: 'goals',
     name: 'A goal closing',
-    trigger: 'Closing a goal on its page.',
-    sees: 'One hexagon ring grows out of the status glyph, then the steps fold into one line.',
+    trigger: 'Closing a goal on its page, or a step on its own page.',
+    sees: 'One hexagon ring grows out of the status glyph. On a goal’s page the steps then fold into one line when the Steps tab is open; on Overview the ring plays alone and the steps are folded when you open the tab. On a step’s page its finished sub-steps are already folded.',
     reducedMotion: 'The solid hexagon and the folded line appear at once.',
     state: {
       built: 'yes',
-      where: 'GoalGlyph and GoalStepsFold in app/goals/[goalId]/goal-close.tsx.',
+      where:
+        'GoalGlyph and GoalStepsFold in app/goals/[goalId]/goal-close.tsx; on a step’s page, StepCloseRing in app/goals/[goalId]/s/[stepId]/step-close.tsx.',
     },
     demo: 'motion-goal-close',
   },
@@ -169,7 +170,7 @@ export const MOMENTS: readonly Moment[] = [
     state: {
       built: 'yes',
       where:
-        'useDashArrival in app/goals/[goalId]/dash-arrival.ts on the step’s row, for the steps loadDashArrivals in lib/goals/dash-arrivals-store.ts finds Dash closed.',
+        'useDashArrival in app/goals/[goalId]/dash-arrival.ts on the step’s row, on the goal page’s Steps tab and on the step’s own page, for the steps loadDashArrivals in lib/goals/dash-arrivals-store.ts finds Dash closed.',
     },
   },
   {
@@ -193,20 +194,45 @@ export const MOMENTS: readonly Moment[] = [
     state: {
       built: 'yes',
       where:
-        'OnTimeSavingsFigure in app/shopping/returns/on-time-savings.tsx, under the header on /shopping/returns, with the year of on-time refunds summed by lib/returns/savings.ts.',
+        'OnTimeSavingsFigure in app/shopping/returns/on-time-savings.tsx, under the count at the foot of /shopping/returns, with the year of on-time refunds summed by lib/returns/savings.ts.',
     },
   },
   {
     workspace: 'dash',
     name: 'Dash at work',
     trigger: 'Asking Dash something, or a run it is doing.',
-    sees: 'Its mark comes alive in the shape of the work, and each lookup appears in the thread as Dash makes it.',
+    sees: 'Its mark comes alive in the shape of the work, and each lookup appears in the thread as Dash makes it. On a run’s page the mark in the card’s header works while the run is going, thinking or writing as the latest line says, and each new line rises in at the foot of the list as it is written. When Dash only acknowledges a comment, the mark comes to rest beside it and the seen mark appears in place of a reply.',
     reducedMotion:
-      'The mark holds the still shape for that kind of work, and the lookups still appear one by one.',
+      'The mark holds the still shape for that kind of work, and the lookups and run lines still appear one by one. An acknowledged comment goes straight to the resting mark and the seen mark.',
     state: {
       built: 'yes',
       where:
-        'DashMark in components/ui/dash-mark.tsx, and the lookup lines in components/talk/lookup-lines.tsx.',
+        'DashMark in components/ui/dash-mark.tsx, the lookup lines in components/talk/lookup-lines.tsx, the seen ending in components/thread/thread.tsx, and a run’s lines in components/runs/run-lines.tsx (the mark follows the run; lines heard from Realtime carry run-line-in, added by components/runs/live-run-lines.tsx). Played in the gallery at /preview?s=run-lines.',
+    },
+  },
+  {
+    workspace: 'dash',
+    name: 'Dash asks and waits',
+    trigger: 'A run asking you a question and holding until you answer.',
+    sees: 'The question rises in as a line, the mark stops working and stands level, the state line turns to a question mark reading “Waiting on your answer”, and the choices are presses. Pressing one swaps them for “Sent. Dash carries on with your answer.”, and the mark takes up work again once the run goes on.',
+    reducedMotion:
+      'The question, the question mark and the presses are there at once, and the mark stands level without blinking.',
+    state: {
+      built: 'yes',
+      where:
+        'RunLinesView in components/runs/run-lines.tsx with RunAnswer in components/runs/run-answer.tsx, and the question in the inbox by components/runs/run-question-card.tsx. Drawn in the gallery at /preview?s=run-lines.',
+    },
+  },
+  {
+    workspace: 'dash',
+    name: 'A run gone quiet',
+    trigger: 'A run that has stopped writing lines and stays open.',
+    sees: 'The mark falls asleep with its z drifting up, the state line turns to the caution cross reading “Dash has stopped writing lines”, and Acknowledge sits beside it until you press it.',
+    reducedMotion: 'The mark is shown asleep and the cross and Acknowledge are the same, with nothing drifting.',
+    state: {
+      built: 'yes',
+      where:
+        'RunLinesView in components/runs/run-lines.tsx with AcknowledgeRun in components/runs/acknowledge-run.tsx. Drawn in the gallery at /preview?s=run-lines.',
     },
   },
 ];

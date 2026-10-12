@@ -43,6 +43,7 @@ import {
   askAboutCard,
   deleteCardNote,
   dismissCard,
+  generateSubjectCards,
   loadMoreCards,
   makeTrackOfCard,
   openCardSource,
@@ -98,11 +99,24 @@ const SWIPE_LABEL: Record<SwipeAction, string> = {
 
 type MadeTrack = NonNullable<NewTrackResult['track']>;
 
+/**
+ * What a subject's deck says once nothing of it is left to show (plan #1698).
+ * The header above already names the subject, so this does not. Its cards are
+ * its lessons, which are written as you work through the subject rather than
+ * from what you write about; Generate more under it writes the next ones
+ * while you wait (note 43b8d7ac).
+ */
+function subjectEmpty(passed: number): string {
+  const start = passed === 0 ? 'Nothing here is ready.' : 'You are through every card here.';
+  return `${start} Generate more writes this subject's next lessons now, in a minute or two. Cards you skipped come back in three days.`;
+}
+
 export function LearnNowFeed({
   first,
   firstRelated,
   ready: firstReady,
   low,
+  subjectId = null,
 }: {
   first: FeedCard[];
   /**
@@ -114,6 +128,11 @@ export function LearnNowFeed({
   ready: number;
   /** Below this many ready cards, loading more starts a top-up. */
   low: number;
+  /**
+   * The subject this deck is narrowed to (plan #1698), whose cards alone it
+   * loads. Null for the whole deck.
+   */
+  subjectId?: string | null;
 }) {
   const [deck, setDeck] = useState(first);
   const [ready, setReady] = useState(firstReady);
@@ -131,7 +150,7 @@ export function LearnNowFeed({
     busy.current = true;
     setLoading(true);
     try {
-      const more = await loadMoreCards(loaded.current);
+      const more = await loadMoreCards(loaded.current, subjectId);
       loaded.current = [...loaded.current, ...more.cards.map((card) => card.id)];
       setDeck((current) => appendCards(current, more.cards));
       setReady(more.ready);
@@ -143,7 +162,31 @@ export function LearnNowFeed({
       busy.current = false;
       setLoading(false);
     }
-  }, []);
+  }, [subjectId]);
+
+  const [generating, setGenerating] = useState(false);
+  const [generated, setGenerated] = useState<string | null>(null);
+  /** Generate more on an empty subject deck (note 43b8d7ac). */
+  const generate = useCallback(async () => {
+    if (!subjectId || busy.current) return;
+    busy.current = true;
+    setGenerating(true);
+    setGenerated(null);
+    setError(null);
+    try {
+      const made = await generateSubjectCards(subjectId, loaded.current);
+      loaded.current = [...loaded.current, ...made.cards.map((card) => card.id)];
+      setDeck((current) => appendCards(current, made.cards));
+      setReady(made.ready);
+      setGenerated(made.message);
+      if (made.cards.length > 0) setEnded(false);
+    } catch {
+      setGenerated('Could not write more for this subject just now. Try again in a moment.');
+    } finally {
+      busy.current = false;
+      setGenerating(false);
+    }
+  }, [subjectId]);
 
   // Keep the deck stocked: ask for more while a few cards are still ahead.
   useEffect(() => {
@@ -314,23 +357,38 @@ export function LearnNowFeed({
           ) : (
             <div className="space-y-3">
               <p className="text-ui text-ink-muted">
-                {end === 'writing'
+                {subjectId
+                  ? subjectEmpty(passed)
+                  : end === 'writing'
                   ? passed === 0
                     ? 'No cards are ready yet. New ones are being written from what you write about, a few minutes each.'
                     : 'You are through every card ready now. More are being written, a few minutes each.'
                   : 'You are through every card ready now. Cards you skipped come back in three days, and ones you want to work on in two.'}
               </p>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  setEnded(false);
-                  setError(null);
-                  void loadMore();
-                }}
-              >
-                Check again
-              </Button>
+              {subjectId ? (
+                <>
+                  {generated && (
+                    <p className="text-ui text-ink-muted" aria-live="polite">
+                      {generated}
+                    </p>
+                  )}
+                  <Button type="button" variant="secondary" pending={generating} onClick={generate}>
+                    {generating ? 'Writing lessons…' : 'Generate more'}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setEnded(false);
+                    setError(null);
+                    void loadMore();
+                  }}
+                >
+                  Check again
+                </Button>
+              )}
             </div>
           )}
         </Card>
@@ -706,6 +764,15 @@ function DeckCard({
                 end={card.video.end}
                 className="mt-1.5"
               />
+              {/* What the clip says and why it is on this card (note
+                  cde86a10), once the top-up has written it. */}
+              {card.video.note && (
+                <div className="mt-2 rounded-control bg-sunken px-3 py-2.5">
+                  <h4 className="text-small font-semibold text-ink-muted">In this video</h4>
+                  <p className="mt-1 text-body text-ink">{card.video.note.said}</p>
+                  <p className="mt-1 text-small text-ink-muted">{card.video.note.why}</p>
+                </div>
+              )}
             </section>
           )}
 

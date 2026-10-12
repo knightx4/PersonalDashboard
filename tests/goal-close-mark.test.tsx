@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { GoalGlyph, GoalStepsFold } from '@/app/goals/[goalId]/goal-close';
 import { goalGlyph } from '@/lib/goals/status';
+import { StepCloseRing } from '@/app/goals/[goalId]/s/[stepId]/step-close';
 
 describe('goalGlyph', () => {
   it('fills an open goal a quarter at a time and keeps solid for the close', () => {
@@ -56,5 +57,20 @@ describe('a goal page loaded with the goal already closed', () => {
     expect(html).not.toContain('<details');
     expect(html).not.toContain('goal-fold');
     expect(html).toContain('the steps');
+  });
+});
+
+describe('a step page loaded with the step already done (plan #1623)', () => {
+  it('draws no ring, open or done, since only a close made while you watch plays it', () => {
+    for (const closed of [true, false]) {
+      const html = renderToStaticMarkup(
+        <StepCloseRing closed={closed}>
+          <p>the step</p>
+        </StepCloseRing>,
+      );
+      expect(html).toContain('the step');
+      expect(html).not.toContain('data-step-ring');
+      expect(html).not.toContain('goal-ring');
+    }
   });
 });

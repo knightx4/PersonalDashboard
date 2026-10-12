@@ -1,25 +1,22 @@
 /**
- * Hand a screen to the person after a third failed critic round (plan #1609).
+ * Settle a screen after a third failed critic round (plan #1609).
  *
- *   npm run ui-stop -- <step or note id> [--branch <name>]
+ *   npm run ui-stop -- <step or note id>
  *
  * Reads the step's recorded verdicts in `.preview-shots/checks/`, takes each
  * surface's latest round, and for every surface stopped on a failed round 3
- * (or 6, 9 after a redirect) prints:
+ * (or 6, 9) prints the last fixes in full and how to settle it.
  *
- *   - the ask to block the step or note with (`criticStopAsk`), naming each
- *     surface, how many fixes are open, where the shots are and the branch;
- *   - the last fixes in full, for the report;
- *   - for a step, the `plan.ts block` command and the statement for the
- *     Supabase connector that write the block.
+ * The person is not asked (their answer of 12 October 2026, which replaces
+ * decision #1535's A): the builder settles the screen itself with
+ * `npm run ui-guard -- <step> --settle "<why>"`, merges and closes the step,
+ * and lists the open fixes in the close note, where they can overrule it. A
+ * note closes the same way, with the open fixes in its reason.
  *
- * It writes nothing itself. The branch defaults to the checked-out one; push
- * it before blocking, so the work outlives the session. Exits 1 when no
- * surface is stopped, since then there is nothing to hand over.
+ * It writes nothing itself. Exits 1 when no surface is stopped.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
-import { criticStopAsk, criticStopBlockSql, stoppedSurfaces, type StopRound } from '../lib/plan/ui-check-stop';
+import { stoppedSurfaces, surfaceLabels, type StopRound } from '../lib/plan/ui-check-stop';
 import { ownerKey, parseOwner, parseVerdict, type CriticVerdict } from '../lib/preview/ui-checks';
 
 const DIR = '.preview-shots/checks';
@@ -29,11 +26,6 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-function arg(flag: string): string | null {
-  const i = process.argv.indexOf(flag);
-  return i >= 0 ? (process.argv[i + 1] ?? null) : null;
-}
-
 /** The recorder uploads the shots only where it has the service key (scripts/ui-check.ts). */
 function shotsUploaded(): boolean {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -41,8 +33,8 @@ function shotsUploaded(): boolean {
 }
 
 function main(): void {
-  const ownerArg = process.argv.slice(2).find((a, i, all) => !a.startsWith('--') && all[i - 1] !== '--branch');
-  if (!ownerArg) fail('Usage: npm run ui-stop -- <step or note id> [--branch <name>]');
+  const ownerArg = process.argv.slice(2).find((a) => !a.startsWith('--'));
+  if (!ownerArg) fail('Usage: npm run ui-stop -- <step or note id>');
   let owner;
   try {
     owner = parseOwner(ownerArg);
@@ -50,8 +42,6 @@ function main(): void {
     fail((error as Error).message);
   }
   const key = ownerKey(owner);
-  const branch = arg('--branch') ?? execFileSync('git', ['branch', '--show-current'], { encoding: 'utf8' }).trim();
-  if (!branch) fail('Not on a branch: pass --branch <name>.');
 
   if (!existsSync(DIR)) fail(`No rounds recorded in ${DIR}.`);
   const pattern = new RegExp(`^${key.replace(/[^0-9a-z-]/gi, '')}--([a-z0-9][a-z0-9-]*)--r(\\d+)\\.json$`);
@@ -73,25 +63,34 @@ function main(): void {
     fixes: v.fixes,
     shots: uploaded ? ['uploaded'] : [],
   }));
-  const stopped = stoppedSurfaces(rounds);
+  // Each screen is named as the gallery names it, so the ask reads without the step in mind.
+  const gallery = readdirSync('app/preview')
+    .filter((name) => name.endsWith('.tsx'))
+    .map((name) => readFileSync(`app/preview/${name}`, 'utf8'))
+    .join('\n');
+  const labels = surfaceLabels(gallery);
+  const stopped = stoppedSurfaces(rounds).map((s) => ({ ...s, label: labels.get(s.surface) }));
   if (stopped.length === 0) fail(`No surface of ${ownerArg} is stopped on a failed third round.`);
 
-  const ask = criticStopAsk({ owner: key, surfaces: stopped, branch });
-  console.log(`Ask:\n${ask}\n`);
   for (const s of stopped) {
     const v = verdicts.find((x) => x.surface === s.surface && x.round === s.round)!;
-    console.log(`${s.surface}, round ${s.round}: shots ${DIR}/${key}--${s.surface}--r${s.round}--*.png`);
+    const name = s.label ? `${s.label} (${s.surface})` : s.surface;
+    console.log(`${name}, round ${s.round}: shots ${DIR}/${key}--${s.surface}--r${s.round}--*.png`);
     for (const f of v.fixes) console.log(`  - [${f.shot}] ${f.where}: ${f.problem} (${f.breaks}) -> ${f.change}`);
   }
+  const open = stopped.reduce((n, s) => n + s.fixes, 0);
+  const why = `the critic stopped at round ${stopped[0].round} with ${open} fix${open === 1 ? '' : 'es'} open on ${stopped
+    .map((s) => s.surface)
+    .join(', ')}`;
   if (owner.step === null) {
-    console.log('\nA note: block it with this ask as its note (notes skill, "Surfaces").');
+    console.log(
+      `\nA note: do not block it. Close it on the fix, and list the open fixes above in its reason (${why}).`,
+    );
     return;
   }
-  console.log(`\nPush ${branch}, then block the step. With DATABASE_URL:\n`);
-  console.log(`npx tsx scripts/plan.ts block ${owner.step} --ask ${JSON.stringify(ask)}\n`);
-  console.log('Without it, through the Supabase connector:\n');
-  const date = new Date().toISOString().slice(0, 10);
-  console.log(criticStopBlockSql({ step: owner.step, ask, date }));
+  console.log('\nDo not block the step or ask the person. Settle the screen yourself:\n');
+  console.log(`npm run ui-guard -- ${owner.step} --settle ${JSON.stringify(why)}\n`);
+  console.log('Then merge and close the step, listing the open fixes above in the close note.');
 }
 
 main();

@@ -46,7 +46,7 @@ export default function ResetPasswordPage() {
           </p>
         )}
 
-        <Button type="submit" className="w-full" disabled={pending}>
+        <Button type="submit" className="w-full" pending={pending}>
           {pending ? 'One moment…' : 'Send reset link'}
         </Button>
       </form>

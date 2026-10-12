@@ -48,6 +48,7 @@ export function DisplayMenu({
   label = 'Display',
   align = 'end',
   className,
+  wordClassName,
 }: {
   menu: ListDisplayMenu;
   /** The button's word. Overridable for a page where "Display" means something else. */
@@ -59,6 +60,8 @@ export function DisplayMenu({
    */
   align?: 'start' | 'end';
   className?: string;
+  /** Classes for the word alone, such as hiding it on a phone where the header's line is full. */
+  wordClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -79,7 +82,7 @@ export function DisplayMenu({
         className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'gap-1.5')}
       >
         <SlidersHorizontal className="size-3.5" strokeWidth={2} aria-hidden />
-        {label}
+        <span className={wordClassName}>{label}</span>
         {/* A property turned off leaves nothing behind on the rows to say so,
           * so the count is on the button rather than only inside the panel. */}
         {menu.hiddenCount > 0 && (

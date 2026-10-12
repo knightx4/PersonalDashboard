@@ -4,9 +4,10 @@ import { MODULES, isModuleId, type ModuleId } from '@/lib/modules';
 /**
  * Triage for a note or an idea at the moment it is filed (plan #1179).
  *
- * Four questions go to Jev in one request about the text just filed: bug or
- * request, which workspace, how soon, and whether an open note or idea
- * already says the same thing. The answers are stored on the row as
+ * Five questions go to Jev in one request about the text just filed: bug or
+ * request, which workspace, how soon, whether it is a fix or something to
+ * plan (plan #1674), and whether an open note or idea already says the same
+ * thing. The answers are stored on the row as
  * `triage` (migration 0121) and shown in the header panel under "saved",
  * so the note arrives sorted instead of waiting for the notes routine.
  *
@@ -21,6 +22,8 @@ import { MODULES, isModuleId, type ModuleId } from '@/lib/modules';
  */
 
 export type TriageKind = 'bug' | 'feature';
+/** Whether a note is one change a session can finish, or work to plan first. */
+export type TriageRoute = 'fix' | 'plan';
 export type TriagePriority = 1 | 2 | 3;
 /** A workspace, or `app` for the app as a whole. */
 export type TriageModule = ModuleId | 'app';
@@ -45,6 +48,11 @@ export type Triage = {
   kind: TriageAnswer<TriageKind> | null;
   module: TriageAnswer<TriageModule> | null;
   priority: TriageAnswer<TriagePriority> | null;
+  /**
+   * Fix or plan (plan #1674). Absent on a row triaged before the question
+   * existed, null when Jev gave no usable answer.
+   */
+  route?: TriageAnswer<TriageRoute> | null;
   /** `value: null` is Jev saying none of the open items is the same. */
   duplicate: TriageAnswer<TriageMatch | null> | null;
 };
@@ -70,14 +78,58 @@ export const TRIAGE_KIND_OPTIONS: Readonly<Record<TriageKind, string>> = {
 
 export const TRIAGE_PRIORITY_OPTIONS = {
   next: 'Do it next: something used every day is broken or blocked, or data is being lost or shown wrongly.',
-  normal: 'Normal: worth doing soon, but nothing stops working without it.',
-  someday: 'Someday: a nice-to-have, a polish, or a thought for later.',
+  normal:
+    'Normal: worth doing soon, but nothing stops working without it, such as a small fix to how something used often looks, moves or responds.',
+  someday: 'Someday: a nice-to-have, or a thought for later.',
 } as const;
 
 const PRIORITY_OF: Record<keyof typeof TRIAGE_PRIORITY_OPTIONS, TriagePriority> = {
   next: 1,
   normal: 2,
   someday: 3,
+};
+
+/**
+ * A page opened this many times in the last 30 days is one the person uses
+ * most days, roughly every third day (plan #1643). Jev reads only the note's
+ * text and cannot see how often its page is used, so a note it files as
+ * Someday about such a page is stored as Normal instead: small polish on a
+ * busy page should not sink to the bottom of Dev. One number, so it is easy
+ * to change; the re-sort of older notes (#1645) reads it too.
+ */
+export const BUSY_PAGE_OPENS_30 = 10;
+
+/** Whether a page with this many opens in 30 days counts as busy. Null is unknown, read as not busy. */
+export function isBusyPage(opens30: number | null): boolean {
+  return opens30 !== null && opens30 >= BUSY_PAGE_OPENS_30;
+}
+
+/**
+ * The priority a note is stored with for Jev's answer: Someday becomes Normal
+ * when the note's page is busy, and every other answer stands as given.
+ */
+export function storedPriority(value: TriagePriority, opens30: number | null): TriagePriority {
+  return value === PRIORITY_OF.someday && isBusyPage(opens30) ? PRIORITY_OF.normal : value;
+}
+
+/**
+ * The columns a note's triage sets beside `triage` itself: `priority` and
+ * `kind` when Jev is sure of them, since nobody has set either yet. The
+ * stored triage keeps Jev's own answer; only the column is moved up for a
+ * busy page. `opens30` is the note's page's opens in the last 30 days.
+ */
+export function noteColumns(triage: Triage, opens30: number | null): Record<string, unknown> {
+  const columns: Record<string, unknown> = {};
+  if (triage.priority && isSure(triage.priority)) {
+    columns.priority = storedPriority(triage.priority.value, opens30);
+  }
+  if (triage.kind && isSure(triage.kind)) columns.kind = triage.kind.value;
+  return columns;
+}
+
+export const TRIAGE_ROUTE_OPTIONS: Readonly<Record<TriageRoute, string>> = {
+  fix: 'A fix: one change in one place that a session can finish and verify in a sitting.',
+  plan: 'A plan: it needs a new screen, a migration, work across workspaces, or a choice of the person\'s before it can be built.',
 };
 
 /** Each workspace in its own words, and the app as a whole. */
@@ -105,6 +157,13 @@ export const TRIAGE_PRIORITY_QUESTION = {
   type: 'choice',
   question: 'How soon should this note about the app be worked on?',
   options: TRIAGE_PRIORITY_OPTIONS,
+} as const;
+
+export const TRIAGE_ROUTE_QUESTION = {
+  type: 'choice',
+  question:
+    'Is this note about the app one fix a session can finish in a sitting, or work that needs planning first?',
+  options: TRIAGE_ROUTE_OPTIONS,
 } as const;
 
 /** The label Jev answers with when no open item matches. */
@@ -187,6 +246,7 @@ export function readTriage(
     kind?: ChoiceResult;
     module?: ChoiceResult;
     priority?: ChoiceResult;
+    route?: ChoiceResult;
     duplicate?: ChoiceResult;
   },
   keys: ReadonlyMap<string, TriageCandidate>,
@@ -195,6 +255,7 @@ export function readTriage(
   const kind = answered(answers.kind);
   const scope = answered(answers.module);
   const priority = answered(answers.priority);
+  const route = answered(answers.route);
   const duplicate = answered(answers.duplicate);
 
   let match: TriageAnswer<TriageMatch | null> | null = null;
@@ -228,6 +289,10 @@ export function readTriage(
             confidence: priority.confidence,
           }
         : null,
+    route:
+      route && (route.choice === 'fix' || route.choice === 'plan')
+        ? { value: route.choice, confidence: route.confidence }
+        : null,
     duplicate: match,
   };
 }
@@ -255,6 +320,7 @@ export function triageFrom(value: unknown): Triage | null {
       (v) => typeof v === 'string' && (v === 'app' || isModuleId(v)),
     ),
     priority: answer<TriagePriority>(raw.priority, (v) => v === 1 || v === 2 || v === 3),
+    route: answer<TriageRoute>(raw.route, (v) => v === 'fix' || v === 'plan'),
     duplicate: answer<TriageMatch | null>(
       raw.duplicate,
       (v) =>
@@ -268,6 +334,7 @@ export function triageFrom(value: unknown): Triage | null {
 }
 
 const KIND_LABEL: Record<TriageKind, string> = { bug: 'Bug', feature: 'Request' };
+const ROUTE_LABEL: Record<TriageRoute, string> = { fix: 'Fix', plan: 'Plan' };
 const PRIORITY_LABEL: Record<TriagePriority, string> = { 1: 'Next', 2: 'Normal', 3: 'Someday' };
 
 function moduleLabel(value: TriageModule): string {
@@ -277,7 +344,7 @@ function moduleLabel(value: TriageModule): string {
 
 /** One stored triage as the person reads it. */
 export type TriageView = {
-  /** Type, workspace and priority, each with "?" when unsure. */
+  /** Type, workspace, priority and fix or plan, each with "?" when unsure. */
   parts: string[];
   /** The open item it reads as a rewrite of, when Jev is sure of it. */
   match: TriageMatch | null;
@@ -295,6 +362,7 @@ export function triageView(triage: Triage | null): TriageView | null {
   part(triage.kind, (v) => KIND_LABEL[v]);
   part(triage.module, moduleLabel);
   part(triage.priority, (v) => PRIORITY_LABEL[v], 'Priority: ');
+  part(triage.route ?? null, (v) => ROUTE_LABEL[v]);
   const dup = triage.duplicate?.value ?? null;
   const sure = isSure(triage.duplicate);
   if (parts.length === 0 && !dup) return null;
