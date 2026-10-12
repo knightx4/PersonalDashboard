@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { freshXAccessToken, loadXAccount, XDisconnectedError } from './account';
+import { matchXPosts, type MatchResult } from './match';
 import type { XClient } from './oauth';
 
 /**
@@ -397,7 +398,14 @@ export type XRunResult =
   | { state: 'not_connected' }
   | { state: 'busy' }
   | { state: 'disconnected'; problem: string }
-  | { state: 'read'; postsRead: number; newPosts: number; problem: string | null };
+  | {
+      state: 'read';
+      postsRead: number;
+      newPosts: number;
+      problem: string | null;
+      /** What matching the stored posts to drafts did (plan #1820); null when it failed. */
+      matched?: MatchResult | null;
+    };
 
 /**
  * Read one person's connected account and record how it went on their
@@ -479,11 +487,24 @@ export async function runXRead(
         read_problem_at: null,
       });
     }
+
+    // Match what is stored to the drafts after every read, a stopped one
+    // included, since what it stored before stopping is kept (plan #1820).
+    // A match that fails is logged and tried again on the next read; the
+    // read itself went through.
+    let matched: MatchResult | null = null;
+    try {
+      matched = await matchXPosts(db, userId);
+    } catch (err) {
+      console.error('x match', err);
+    }
+
     return {
       state: 'read',
       postsRead: result.postsRead,
       newPosts: result.newPosts,
       problem: result.stop?.problem ?? null,
+      matched,
     };
   } catch (err) {
     const problem = 'Something went wrong reading X, so the read stopped. The next read tries again.';
@@ -502,12 +523,26 @@ export function xRunMessage(result: XRunResult): { ok: boolean; text: string } {
       return { ok: false, text: 'A read of X is already going. Give it a minute.' };
     case 'disconnected':
       return { ok: false, text: result.problem };
-    case 'read':
+    case 'read': {
       if (result.problem) return { ok: false, text: result.problem };
-      if (result.newPosts === 0) return { ok: true, text: 'Nothing new on X.' };
-      return {
-        ok: true,
-        text: result.newPosts === 1 ? 'Read 1 new post.' : `Read ${result.newPosts} new posts.`,
-      };
+      const read =
+        result.newPosts === 0
+          ? 'Nothing new on X.'
+          : result.newPosts === 1
+            ? 'Read 1 new post.'
+            : `Read ${result.newPosts} new posts.`;
+      return { ok: true, text: [read, ...matchLines(result.matched)].join(' ') };
+    }
   }
+}
+
+/** What the match did, in the words Check X now adds after the read. */
+function matchLines(matched: MatchResult | null | undefined): string[] {
+  if (!matched) return [];
+  const lines: string[] = [];
+  if (matched.posted === 1) lines.push('Marked 1 draft posted.');
+  else if (matched.posted > 1) lines.push(`Marked ${matched.posted} drafts posted.`);
+  if (matched.asking === 1) lines.push('1 draft asks whether a post is it.');
+  else if (matched.asking > 1) lines.push(`${matched.asking} drafts ask whether a post is them.`);
+  return lines;
 }
