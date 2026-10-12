@@ -18,6 +18,10 @@ import {
   POST_IMAGES_BUCKET,
 } from '@/lib/dev/posts';
 import { startPostsRun } from '@/lib/dev/posts-run';
+import { decryptToken } from '@/lib/crypto/tokens';
+import { loadXAccount } from '@/lib/x/account';
+import { isXOAuthConfigured, xClient, xOAuthEnv } from '@/lib/x/env';
+import { revokeXToken } from '@/lib/x/oauth';
 
 /**
  * The Posts tab's writes (plan #1419). Each one refuses anybody but the
@@ -423,4 +427,38 @@ export async function restorePost(
 
   revalidatePath(POSTS_PATH);
   return { message: 'Back with the drafts.' };
+}
+
+/**
+ * Disconnect X (plan #1818): remove the connection and its tokens. X is
+ * asked to revoke the refresh token first, best effort, so the grant does not
+ * outlive the row; the row goes whether or not X answers. Posts already read
+ * stay in x_posts, and Connect X starts a fresh sign-in.
+ */
+// latency: pending -- one call to X, then a delete
+export async function disconnectX(): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+
+  const account = await loadXAccount(supabase, user.id);
+  if (!account) {
+    revalidatePath(POSTS_PATH);
+    return { ok: true };
+  }
+
+  if (isXOAuthConfigured() && account.refresh_token) {
+    const env = xOAuthEnv();
+    try {
+      const token = decryptToken(account.refresh_token, env.TOKEN_ENCRYPTION_KEY);
+      await revokeXToken(xClient(env), token, 'refresh_token');
+    } catch (err) {
+      console.error('x revoke', err);
+    }
+  }
+
+  const { error } = await supabase.from('x_accounts').delete().eq('user_id', user.id).eq('id', account.id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(POSTS_PATH);
+  return { ok: true };
 }
