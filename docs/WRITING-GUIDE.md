@@ -7,6 +7,11 @@ comments on the dev pages, and replies from Dash.
 It started as a rubric for spotting AI slop after the fact. It is more useful
 applied while writing, which is what it is for here.
 
+Code scores two of these kinds of writing: plan rows (`scripts/plan.ts`) and
+Dash's comment replies. The check in `lib/writing/check.ts` warns on six
+patterns and never refuses a write. Commit messages, specs and Ask Dash replies
+rely on a session reading this guide.
+
 ## Reward
 
 - Direct, precise language that communicates ideas without unnecessary
