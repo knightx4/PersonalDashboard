@@ -208,7 +208,7 @@ import {
   InspirationListSurface,
   InspirationUnreadSurface,
 } from './inspiration-surfaces';
-import { PostsDraftingSurface, PostsSurface, PostsWriteSurface } from './posts-surfaces';
+import { PostsDraftingSurface, PostsSurface, PostsWriteSurface, PostsXSurface } from './posts-surfaces';
 import {
   GoalBareSurface,
   GoalLinkingSurface,
@@ -4872,6 +4872,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PostsWriteSurface />,
+  },
+  {
+    /* The X connection (plan #1818) in each state it can be in: keys not
+     * set, not connected, X stopped accepting the sign-in, connected with
+     * the longest handle X allows, and the lines a failed round trip leaves. */
+    id: 'dev-posts-x',
+    label: 'Dev · Posts, the X connection',
+    module: 'dev',
+    width: 'page',
+    render: () => <PostsXSurface />,
   },
   {
     /* Home as a whole page on the main-plus-rail pattern (plan #1627): the
