@@ -251,6 +251,23 @@ export function PlanTableSurface() {
 }
 
 /**
+ * A run that went quiet (plan #1825), behind a step being worked: its account
+ * says when it was last heard from, and its lines carry Acknowledge.
+ */
+const openedRuns: Record<string, LastRun> = {
+  shared: {
+    id: '0b6f8a4e-2c1d-4e5f-9a7b-3c2d1e0f9a8b',
+    status: 'started',
+    waiting: 'stale',
+    createdAt: '2026-09-01T08:10:00Z',
+    error: null,
+    job: 'feature',
+    reading: null,
+    lastLineAt: '2026-09-01T08:52:00Z',
+  },
+};
+
+/**
  * Two features with every row opened: the panel behind a row, which is where
  * the detail, the questions, the dependencies and the thread are drawn.
  */
@@ -273,7 +290,7 @@ export function PlanOpenedSurface() {
       catalog={catalog}
       empty={false}
       canSend={false}
-      lastRuns={{}}
+      lastRuns={openedRuns}
       commitChecks={{}}
       unfolded
       opened

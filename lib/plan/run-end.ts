@@ -177,6 +177,11 @@ export type LastRun = {
   stopReason?: string | null;
   /** The pieces a session that found the work too big would split it into. */
   stopPieces?: string[] | null;
+  /**
+   * When the run last wrote a line (plan #1825), or null when it has written
+   * none. Read only for a run that has not ended.
+   */
+  lastLineAt?: string | null;
 };
 
 /** The five columns a stored reading is spread across. */
@@ -404,12 +409,27 @@ export function runQuietNote(createdAt: string, now: number): string {
  * a run the cutoff caught only says how long it was quiet.
  */
 export function lastRunLine(
-  run: Pick<LastRun, 'status' | 'createdAt' | 'error' | 'stopReason'>,
+  run: Pick<LastRun, 'status' | 'createdAt' | 'error' | 'stopReason' | 'lastLineAt' | 'waiting'>,
   now: number,
 ): string {
   if (run.status === 'finished') return 'Last run finished';
+  if (run.status === 'started' && run.waiting === 'stale') {
+    return now === 0
+      ? 'Last run went quiet'
+      : `Last run went quiet: last heard from ${elapsedSince(run.lastLineAt ?? run.createdAt, now)} ago`;
+  }
+  if (run.status === 'started' && run.waiting === 'awaiting_input') return 'Last run is waiting on your answer';
   if (run.status === 'failed') {
     return `Last run stopped: ${run.stopReason ?? run.error ?? 'no reason recorded'}`;
   }
   return now === 0 ? 'A run is going' : `A run has been going ${elapsedSince(run.createdAt, now)}`;
+}
+
+/**
+ * When a stale run was last heard from (plan #1825), for the opened row's
+ * account of its run: its newest line, or its start if the line was not read.
+ */
+export function staleLine(run: Pick<LastRun, 'createdAt' | 'lastLineAt'>, now: number): string {
+  if (now === 0) return 'Gone quiet.';
+  return `Gone quiet: last heard from ${elapsedSince(run.lastLineAt ?? run.createdAt, now)} ago.`;
 }

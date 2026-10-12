@@ -10,6 +10,7 @@
  *
  * Pure: the sweep reads the started rows and writes the closes.
  */
+import { lineSilent } from '@/lib/core/run-liveness';
 import { quietRunError, runIsQuiet } from '@/lib/goals/shaping';
 
 /** A started goals.runs row, as the sweep reads it. */
@@ -29,9 +30,18 @@ export type QuietRunClose = {
   error: string;
 };
 
-/** The started runs to close, each with the error it is closed with. */
-export function quietRuns(rows: readonly StartedRunRow[], now: number): QuietRunClose[] {
+/**
+ * The started runs to close, each with the error it is closed with. A run
+ * that has written a line (in `lines`, by run id) is never closed here: its
+ * lines decide, in `silentRuns` below (plan #1825).
+ */
+export function quietRuns(
+  rows: readonly StartedRunRow[],
+  now: number,
+  lines: ReadonlyMap<string, string> = new Map(),
+): QuietRunClose[] {
   return rows
+    .filter((row) => !lines.has(row.id))
     .filter((row) => runIsQuiet({ createdAt: row.created_at, lastSeenAt: row.last_seen_at }, now))
     .map((row) => ({
       id: row.id,
@@ -39,4 +49,24 @@ export function quietRuns(rows: readonly StartedRunRow[], now: number): QuietRun
       lastSeenAt: row.last_seen_at,
       error: quietRunError({ nowOn: row.now_on }),
     }));
+}
+
+/**
+ * The started runs that write lines and have gone silent: nothing heard for
+ * RUN_SILENT_MINUTES since the later of their newest line and their last
+ * report (plan #1825). The sweep marks these stale rather than closing them;
+ * the person acknowledges a stale run to end it.
+ */
+export function silentRuns(
+  rows: readonly StartedRunRow[],
+  lines: ReadonlyMap<string, string>,
+  now: number,
+): StartedRunRow[] {
+  return rows.filter((row) => {
+    const line = lines.get(row.id);
+    if (!line) return false;
+    const heard =
+      row.last_seen_at && Date.parse(row.last_seen_at) > Date.parse(line) ? row.last_seen_at : line;
+    return lineSilent(heard, now) === true;
+  });
 }

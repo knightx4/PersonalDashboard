@@ -15,7 +15,7 @@ import { CircleAlert } from 'lucide-react';
 import { useClockNow } from '@/lib/use-clock-now';
 import { elapsedSince } from '@/lib/plan/elapsed';
 import { type ClaimLiveness } from '@/lib/plan/liveness';
-import { lastRunLine, type LastRun } from '@/lib/plan/run-end';
+import { lastRunLine, staleLine, type LastRun } from '@/lib/plan/run-end';
 import {
   closedLine,
   nothingToShowLine,
@@ -188,7 +188,10 @@ export function RunWork({
   return (
     <div>
       <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Its run</p>
-      <p className="text-ui text-ink">{runStartedLine(work, now)}</p>
+      <p className="text-ui text-ink">{runStartedLine(work, now, run.waiting === 'stale')}</p>
+      {/* When a run that went quiet was last heard from (plan #1825); its
+          Acknowledge sits with its lines below. */}
+      {run.waiting === 'stale' && <p className="text-ui text-caution">{staleLine(run, now)}</p>}
       {work.push && <p className="text-ui text-ink-muted">{pushLine(work.push, now)}</p>}
       {closed && <p className="text-ui text-ink-muted">{closed}</p>}
       {raised && <p className="text-ui text-ink-muted">{raised}</p>}

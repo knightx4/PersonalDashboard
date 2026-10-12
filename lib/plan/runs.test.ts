@@ -195,11 +195,14 @@ describe('endQuietRuns', () => {
           return { select: () => ({ in: async () => ({ data: steps, error: null }) }) };
         }
         return {
-          select: () => ({ eq: () => ({ eq: async () => ({ data: runs, error: null }) }) }),
+          select: () => ({ eq: () => ({ in: async () => ({ data: runs, error: null }) }) }),
           update: (values: Record<string, unknown>) => ({
-            in: async (_column: string, ids: string[]) => {
+            in: (_column: string, ids: string[]) => {
               updates.push({ values, ids });
-              return { error: null };
+              // The stale write narrows to started rows with one more `eq`.
+              return Object.assign(Promise.resolve({ error: null }), {
+                eq: async () => ({ error: null }),
+              });
             },
             eq: async (_column: string, id: string) => {
               updates.push({ values, ids: [id] });
@@ -224,7 +227,7 @@ describe('endQuietRuns', () => {
       pushes: pushes({ ref: 'claude/one', minutes: 4 }),
     });
 
-    expect(result).toEqual({ finished: 0, failed: 0, error: null });
+    expect(result).toEqual({ finished: 0, failed: 0, stale: 0, error: null });
     expect(updates).toEqual([]);
   });
 
@@ -243,7 +246,7 @@ describe('endQuietRuns', () => {
       pushesSince: NOW - 5 * 60_000,
     });
 
-    expect(result).toEqual({ finished: 0, failed: 0, error: null });
+    expect(result).toEqual({ finished: 0, failed: 0, stale: 0, error: null });
     expect(updates).toEqual([]);
   });
 
@@ -333,7 +336,7 @@ describe('endQuietRuns', () => {
       readWork: async () => new Map([['run-1', { done: 10 }]]),
     });
 
-    expect(result).toEqual({ finished: 1, failed: 0, error: null });
+    expect(result).toEqual({ finished: 1, failed: 0, stale: 0, error: null });
     expect(updates).toEqual([{ values: { status: 'finished', error: null }, ids: ['run-1'] }]);
   });
 
@@ -370,7 +373,7 @@ describe('endQuietRuns', () => {
       readWork: async () => new Map([['run-1', { done: 0 }]]),
     });
 
-    expect(result).toEqual({ finished: 0, failed: 0, error: null });
+    expect(result).toEqual({ finished: 0, failed: 0, stale: 0, error: null });
     expect(updates).toEqual([]);
   });
 
@@ -406,7 +409,7 @@ describe('endQuietRuns', () => {
       readWork: async () => new Map([['run-1', { done: 2, busy: true }]]),
     });
 
-    expect(result).toEqual({ finished: 0, failed: 0, error: null });
+    expect(result).toEqual({ finished: 0, failed: 0, stale: 0, error: null });
     expect(updates).toEqual([]);
   });
 
@@ -428,6 +431,94 @@ describe('endQuietRuns', () => {
     expect(result.failed).toBe(1);
     expect(updates[0].values.error).toBe('Nothing was heard from this run for 5h.');
     quiet.mockRestore();
+  });
+
+  describe('a run that writes lines (plan #1825)', () => {
+    const lines = (entries: Record<string, string>) => async () => new Map(Object.entries(entries));
+
+    it('is never ended on the clock while its last line is under 30 minutes old', async () => {
+      const { supabase, updates } = db([
+        { id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(60 * 10) },
+      ]);
+
+      const result = await endQuietRuns({
+        supabase: supabase as never,
+        userId: 'user-1',
+        now: NOW,
+        readLines: lines({ 'run-1': minutesAgo(29) }),
+      });
+
+      expect(result).toEqual({ finished: 0, failed: 0, stale: 0, error: null });
+      expect(updates).toEqual([]);
+    });
+
+    it('is marked stale, not failed, once its last line is 30 minutes old', async () => {
+      const { supabase, updates } = db([
+        { id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(40) },
+      ]);
+
+      const result = await endQuietRuns({
+        supabase: supabase as never,
+        userId: 'user-1',
+        now: NOW,
+        readLines: lines({ 'run-1': minutesAgo(30) }),
+      });
+
+      expect(result).toEqual({ finished: 0, failed: 0, stale: 1, error: null });
+      expect(updates).toEqual([{ values: { status: 'stale' }, ids: ['run-1'] }]);
+    });
+
+    it('stays stale however long it is silent, until it is acknowledged', async () => {
+      const { supabase, updates } = db([
+        { id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(60 * 30), status: 'stale' } as never,
+      ]);
+
+      const result = await endQuietRuns({
+        supabase: supabase as never,
+        userId: 'user-1',
+        now: NOW,
+        readLines: lines({ 'run-1': minutesAgo(60 * 29) }),
+      });
+
+      expect(result).toEqual({ finished: 0, failed: 0, stale: 0, error: null });
+      expect(updates).toEqual([]);
+    });
+
+    it('finishes when its step closes, stale or not', async () => {
+      const { supabase, updates } = db(
+        [
+          { id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(90), status: 'stale' } as never,
+          { id: 'run-2', plan_item_id: 'step-2', created_at: minutesAgo(20) },
+        ],
+        [
+          { id: 'step-1', completed_at: minutesAgo(10) },
+          { id: 'step-2', completed_at: minutesAgo(5) },
+        ],
+      );
+
+      const result = await endQuietRuns({
+        supabase: supabase as never,
+        userId: 'user-1',
+        now: NOW,
+        readLines: lines({ 'run-1': minutesAgo(60), 'run-2': minutesAgo(6) }),
+      });
+
+      expect(result).toEqual({ finished: 2, failed: 0, stale: 0, error: null });
+      expect(updates).toEqual([{ values: { status: 'finished', error: null }, ids: ['run-1', 'run-2'] }]);
+    });
+
+    it('leaves a run with no lines to the clock', async () => {
+      const { supabase } = db([{ id: 'run-1', plan_item_id: 'step-1', created_at: minutesAgo(60 * 3) }]);
+
+      const result = await endQuietRuns({
+        supabase: supabase as never,
+        userId: 'user-1',
+        now: NOW,
+        readLines: lines({}),
+      });
+
+      expect(result).toEqual({ finished: 0, failed: 1, stale: 0, error: null });
+    });
   });
 });
 
