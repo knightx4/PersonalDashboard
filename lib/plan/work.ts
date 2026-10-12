@@ -188,11 +188,14 @@ function ago(iso: string, now: number): string | null {
 }
 
 /** Which run this is and when it started. */
-export function runStartedLine(work: RunWork, now: number): string {
+export function runStartedLine(work: RunWork, now: number, quiet = false): string {
   const label = RUN_JOB_LABEL[work.job];
   const when = stamp(work.startedAt);
   if (work.status === 'failed') return `${label} started ${when} and stopped.`;
   if (work.status === 'finished') return `${label} started ${when} and finished.`;
+  // A run gone quiet is not "going": the line under this one says when it
+  // was last heard from (plan #1825).
+  if (quiet) return `${label} started ${when}.`;
   const going = ago(work.startedAt, now);
   return going ? `${label} started ${when}, going ${going}.` : `${label} started ${when}.`;
 }

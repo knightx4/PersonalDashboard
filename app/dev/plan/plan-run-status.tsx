@@ -188,7 +188,7 @@ export function RunWork({
   return (
     <div>
       <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Its run</p>
-      <p className="text-ui text-ink">{runStartedLine(work, now)}</p>
+      <p className="text-ui text-ink">{runStartedLine(work, now, run.waiting === 'stale')}</p>
       {/* When a run that went quiet was last heard from (plan #1825); its
           Acknowledge sits with its lines below. */}
       {run.waiting === 'stale' && <p className="text-ui text-caution">{staleLine(run, now)}</p>}

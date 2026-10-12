@@ -177,6 +177,12 @@ describe('the line that names the run', () => {
     );
   });
 
+  it('does not call a run that went quiet going (plan #1825)', () => {
+    expect(runStartedLine(runWork({ run: run(), steps: [], raises: [] }), NOW, true)).toBe(
+      'A step run started 17 Sep 2026, 11:20 AM.',
+    );
+  });
+
   it('names a feature batch and a re-shape as themselves', () => {
     expect(
       runStartedLine(runWork({ run: run({ job: 'feature' }), steps: [], raises: [] }), NOW),
