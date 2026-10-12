@@ -1,5 +1,7 @@
 import { PostsScreen } from '@/app/dev/posts/posts-view';
 import { WritePost } from '@/app/dev/posts/write-post';
+import { XConnection } from '@/app/dev/posts/x-connection';
+import { xConnectNotice } from '@/lib/x/account';
 import { socialPostFromRow } from '@/lib/dev/posts';
 import { buildPostsPage } from '@/lib/dev/posts-page';
 
@@ -91,7 +93,12 @@ export function PostsSurface() {
     run: { id: 'r1', status: 'finished', createdAt: '2026-10-02T07:55:00Z', error: null, drafts: 2 },
     now: NOW,
   });
-  return <PostsScreen page={page} />;
+  return (
+    <PostsScreen
+      page={page}
+      x={{ state: 'connected', handle: 'selveyknight', lastSyncedAt: '2026-10-02T06:00:00Z' }}
+    />
+  );
 }
 
 export function PostsDraftingSurface() {
@@ -102,7 +109,25 @@ export function PostsDraftingSurface() {
     run: { id: 'r2', status: 'started', createdAt: '2026-10-02T11:50:00Z', error: null, drafts: 0 },
     now: NOW,
   });
-  return <PostsScreen page={page} />;
+  return <PostsScreen page={page} x={{ state: 'none' }} />;
+}
+
+/**
+ * The X connection (plan #1818) in each of its states, one under another:
+ * keys not set (pointing at setup step #1816), not connected, X stopped
+ * accepting the sign-in, and connected with a fifteen-character handle, the
+ * longest X allows. The lines a cancelled and a refused sign-in leave sit in
+ * the second and third.
+ */
+export function PostsXSurface() {
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <XConnection view={{ state: 'unconfigured', setupStep: 1816 }} />
+      <XConnection view={{ state: 'none' }} notice={xConnectNotice('denied')} />
+      <XConnection view={{ state: 'disconnected', handle: 'selveyknight' }} notice={xConnectNotice('exchange')} />
+      <XConnection view={{ state: 'connected', handle: 'selveyknightdev', lastSyncedAt: null }} />
+    </div>
+  );
 }
 
 /** Write your own, opened: the compose box a post the person writes goes in. */
