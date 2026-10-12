@@ -15,7 +15,8 @@ import type { DashWriteContext, DashWriteResult, DashWriteTool } from './registr
 import { addThreadTurn } from '@/lib/thread/store';
 import { stepHref } from '@/lib/goals/all-goals';
 import { ensureCompany } from '@/lib/jobs/companies/ensure';
-import { detectPosting } from '@/lib/jobs/ats/detect';
+import { detectPosting, isBoardVendor } from '@/lib/jobs/ats/detect';
+import { companyFromBoardToken } from '@/lib/jobs/ats/company';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { BULK_MAX, changeItems, ITEM_CHANGES } from './bulk-items';
 import { moveRoles, ROLE_STAGES } from './bulk-roles';
@@ -660,6 +661,11 @@ async function addJobLead(ctx: DashWriteContext, args: Args): Promise<DashWriteR
         atsJobId = outcome.posting.atsJobId;
       }
       if (!companyName) companyName = outcome.posting.company?.trim() ?? '';
+    }
+    // A board's API leaves the employer out, and its slug in the link names it.
+    if (!companyName) {
+      const board = detectPosting(url);
+      if (isBoardVendor(board.vendor)) companyName = companyFromBoardToken(board.boardToken) ?? '';
     }
   }
   if (!title) {

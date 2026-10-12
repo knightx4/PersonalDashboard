@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { cleanCompanyName, companyFromHost, companyFromPage, companyFromTitle, stripCompanyFromTitle } from './company';
+import { cleanCompanyName, companyFromBoardToken, companyFromHost, companyFromPage, companyFromTitle, stripCompanyFromTitle } from './company';
 
 const page = (head: string) => `<html><head>${head}</head><body></body></html>`;
 
@@ -109,5 +109,20 @@ describe('generic.fetchPosting company', () => {
   it('falls back to the domain of the employer’s own site', async () => {
     const posting = await readWith(body('<title>Data Analyst</title>'));
     expect(posting).toMatchObject({ title: 'Data Analyst', company: 'UBS' });
+  });
+});
+
+describe('companyFromBoardToken', () => {
+  it('names the employer from a board slug, keeping one already cased', () => {
+    expect(companyFromBoardToken('sent')).toBe('Sent');
+    expect(companyFromBoardToken('the-browser-company')).toBe('The Browser Company');
+    expect(companyFromBoardToken('OpenAI')).toBe('OpenAI');
+    expect(companyFromBoardToken('Acme%20Labs')).toBe('Acme Labs');
+  });
+
+  it('gives nothing for no slug or one that is only a site label', () => {
+    expect(companyFromBoardToken(null)).toBeNull();
+    expect(companyFromBoardToken('careers')).toBeNull();
+    expect(companyFromBoardToken('a/b')).toBeNull();
   });
 });

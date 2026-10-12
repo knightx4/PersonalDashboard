@@ -322,10 +322,18 @@ describe('add_job_lead', () => {
     expect(tables['job_search.companies']).toEqual([expect.objectContaining({ name: 'Acme' })]);
   });
 
-  it('still asks for the company when the page names none, and saves nothing', async () => {
-    const result = await apply('add_job_lead', { url: POSTING }, reading('Data analyst'));
+  it('names the company from the board in the link when the posting leaves it out', async () => {
+    const ASHBY = 'https://jobs.ashbyhq.com/sent/7216d2e7-f588-48f4-8794-3d5cd47050c0/application';
+    const result = ok(await apply('add_job_lead', { url: ASHBY }, reading('Data analyst')));
+    expect(tables['job_search.companies']).toEqual([expect.objectContaining({ name: 'Sent', user_id: ME })]);
+    expect(result).toMatchObject({ summary: 'Dash saved Data analyst at Sent to your leads.' });
+  });
+
+  it('still asks for the company when neither the page nor the link names one, and saves nothing', async () => {
+    const BARE = 'https://example.com/careers/123';
+    const result = await apply('add_job_lead', { url: BARE }, reading('Data analyst'));
     expect(!result.ok && result.error).toContain('Ask them which company "Data analyst" is at');
-    expect(tables['job_search.roles'].some((r) => r.jd_url === POSTING)).toBe(false);
+    expect(tables['job_search.roles'].some((r) => r.jd_url === BARE)).toBe(false);
   });
 
   it('asks for the title when the link cannot be read, and saves nothing', async () => {
