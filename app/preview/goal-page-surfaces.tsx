@@ -14,6 +14,7 @@ import { FileBody } from '@/components/files/file-body';
 import { FileLinks } from '@/components/files/file-links';
 import { GoalNumber } from '@/app/goals/[goalId]/goal-number';
 import { WaitingOnYou } from '@/app/goals/[goalId]/goal-flags';
+import { GoalLogDone } from '@/app/goals/[goalId]/goal-log-done';
 import { GoalFog, GoalShaping } from '@/app/goals/[goalId]/goal-shaping';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
 import type { InformationSeam } from '@/app/goals/[goalId]/information-step';
@@ -719,6 +720,7 @@ export function GoalTopSurface() {
               />
             }
           />
+          <GoalLogDone goalId={cards.id} />
           <GoalNumber goalId={cards.id} unit="$" target={0} readings={readings} today={TODAY} />
           <WaitingOnYou
             rows={[

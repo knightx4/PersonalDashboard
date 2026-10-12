@@ -57,11 +57,20 @@ export const REACTION_LABELS: Record<Reaction, string> = {
   ignored: 'No answer',
 };
 
+/** A suggestion's kind: a kind of weekly help, or a step Dash suggests (goals migration 0071). */
+export type SuggestionKind = HelpKind | 'step';
+
+export function isSuggestionKind(value: unknown): value is SuggestionKind {
+  return value === 'step' || isHelpKind(value);
+}
+
 export type Suggestion = {
   id: string;
   itemId: string | null;
   /** The kind of help it is. Rows from before plan #1028 were all events. */
-  kind: HelpKind;
+  kind: SuggestionKind;
+  /** The step an accepted step suggestion became. */
+  acceptedStepId: string | null;
   title: string;
   detail: string | null;
   url: string | null;
@@ -79,6 +88,7 @@ export type SuggestionRow = {
   id: string;
   item_id: string | null;
   kind: string;
+  accepted_step_id?: string | null;
   title: string;
   detail: string | null;
   url: string | null;
@@ -92,13 +102,14 @@ export type SuggestionRow = {
 };
 
 export const SUGGESTION_COLUMNS =
-  'id, item_id, kind, title, detail, url, place, source, happens_on, starts_at, reaction, attended, created_at';
+  'id, item_id, kind, accepted_step_id, title, detail, url, place, source, happens_on, starts_at, reaction, attended, created_at';
 
 export function toSuggestion(row: SuggestionRow): Suggestion {
   return {
     id: row.id,
     itemId: row.item_id,
-    kind: isHelpKind(row.kind) ? row.kind : 'events',
+    kind: isSuggestionKind(row.kind) ? row.kind : 'events',
+    acceptedStepId: row.accepted_step_id ?? null,
     title: row.title,
     detail: row.detail,
     url: row.url,

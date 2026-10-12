@@ -2,9 +2,9 @@
  * The week's focus (docs/GOALS-SPEC.md, "The week's focus"; goals 0070).
  *
  * Each week the person picks the two or three goals they are pushing. While
- * any open goal has focus, only those goals put their next step on Todo, and
- * Dash works their steps before anyone else's. When none has it, every goal
- * counts, as before focus existed.
+ * any open goal has focus, Dash works their steps before anyone else's. When
+ * none has it, every goal counts, as before focus existed. Focus no longer
+ * touches Todo, which holds only the steps sent there (plan #1735).
  *
  * An errand is the exception: it has a date it is due by, so one due within
  * a week counts as in focus whether or not it was picked. Errands are not

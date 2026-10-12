@@ -37,6 +37,8 @@ export const VERDICTS = [
   'waiting_on_date',
   'waiting_on_goal',
   'met',
+  'pace_holding',
+  'pace_slipping',
 ] as const;
 export type Verdict = (typeof VERDICTS)[number];
 
@@ -47,6 +49,8 @@ export const VERDICT_LABELS: Record<Verdict, string> = {
   waiting_on_date: 'Waiting on a date',
   waiting_on_goal: 'Waiting on another goal',
   met: 'Done-when met',
+  pace_holding: 'Keeping its pace',
+  pace_slipping: 'Slower than usual',
 };
 
 /**

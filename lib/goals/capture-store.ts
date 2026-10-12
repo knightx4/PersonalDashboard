@@ -273,6 +273,21 @@ async function carryOut(
         kind: action.stepKind,
       });
       if (!id) return null;
+      // Finished work goes in closed (plan #1740). If the close does not
+      // land the step still stands, open, and the line says only that it
+      // was added.
+      if (action.done) {
+        const closed = await setStepStatus(client, id, 'done');
+        return { kind: 'add_step', ref: `goals.items:${id}`, op: 'insert', entry: {
+          kind: 'add',
+          step_id: id,
+          title: action.title,
+          step_kind: action.stepKind,
+          goal_title: action.goal.title,
+          ...(closed ? { done: true } : {}),
+          undone_at: null,
+        } };
+      }
       // Work already done on it is logged at once, so it starts under way
       // (plan #1278). If the entry cannot be written the step still stands
       // and the line says only that it was added.
