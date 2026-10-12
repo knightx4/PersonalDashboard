@@ -321,6 +321,10 @@ export const LEARN_OPERATIONS = [
   // Rephrase on a selection in an essay (plan #1868): one Sonnet call per
   // press, rewording the selected text only.
   'rephrase-essay-selection',
+  // A named check on an essay (plan #1869): one Sonnet call per paragraph
+  // the check reads, or one for a check on the whole essay. Already Said
+  // also finds the notes to compare with, under 'embed-note-match'.
+  'check-essay-paragraph',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

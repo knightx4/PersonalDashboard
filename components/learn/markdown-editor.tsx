@@ -20,6 +20,13 @@ import {
   suggestionField,
   type Suggestion,
 } from '@/lib/learn/essays/authorship-editor';
+import {
+  essayNotes,
+  noteRanges,
+  setActiveNote,
+  setNoteRanges,
+  type NoteRange,
+} from '@/lib/learn/essays/notes-editor';
 
 /** The selected text, as the Rephrase button asks for it. */
 export type EditorSelection = { from: number; to: number; text: string; doc: string };
@@ -36,6 +43,14 @@ export type MarkdownEditorHandle = {
   suggest(suggestion: Suggestion, original: string): boolean;
   /** Replace who-wrote-what outright: clearing the marks. */
   setMarks(marks: AuthorMark[]): void;
+  /** The text as it is now. */
+  doc(): string;
+  /** Replace the margin notes' places in the text (plan #1869). */
+  setNotes(ranges: NoteRange[]): void;
+  /** Where each note's text is now, after the edits since. */
+  notes(): NoteRange[];
+  /** Highlight one note's text, or none. */
+  showNote(id: string | null): void;
 };
 
 /** From laptop width the essay page is the calm one; below it a plain editor. */
@@ -59,6 +74,8 @@ export function MarkdownEditor({
   initialDoc,
   initialMarks = [],
   initialSuggestion = null,
+  initialNotes = [],
+  onOpenNote,
   handle,
   label,
   placeholder,
@@ -74,6 +91,10 @@ export function MarkdownEditor({
   initialMarks?: AuthorMark[];
   /** A suggestion already showing, for the gallery. */
   initialSuggestion?: Suggestion | null;
+  /** Where the margin notes sit in `initialDoc` (plan #1869). */
+  initialNotes?: NoteRange[];
+  /** A note's marker in the margin was pressed. */
+  onOpenNote?: (id: string) => void;
   handle?: Ref<MarkdownEditorHandle>;
   /** What a screen reader calls the editor. */
   label: string;
@@ -93,15 +114,16 @@ export function MarkdownEditor({
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const focus = useRef(new Compartment());
-  const callbacks = useRef({ onChange, onTyping, onSaveNow, onSelect });
+  const callbacks = useRef({ onChange, onTyping, onSaveNow, onSelect, onOpenNote });
   // Written after render, never during it, so the editor always calls the
   // newest callbacks without being rebuilt for them.
   useEffect(() => {
-    callbacks.current = { onChange, onTyping, onSaveNow, onSelect };
+    callbacks.current = { onChange, onTyping, onSaveNow, onSelect, onOpenNote };
   });
   const firstDoc = useRef(initialDoc);
   const firstMarks = useRef(initialMarks);
   const firstSuggestion = useRef(initialSuggestion);
+  const firstNotes = useRef(initialNotes);
   const firstFocus = useRef(focusMode);
   const firstAutoFocus = useRef(autoFocus);
   const firstLabel = useRef(label);
@@ -142,6 +164,7 @@ export function MarkdownEditor({
           typewriterScroll(wide),
           focus.current.of(firstFocus.current ? focusParagraph : []),
           authorship(firstMarks.current, firstSuggestion.current),
+          essayNotes(firstNotes.current, (id) => callbacks.current.onOpenNote?.(id)),
           EditorView.updateListener.of((update) => {
             if (update.selectionSet || update.docChanged) {
               const selected = !update.state.selection.main.empty;
@@ -189,6 +212,18 @@ export function MarkdownEditor({
       },
       setMarks(marks) {
         view.current?.dispatch({ effects: setMarks.of(marks) });
+      },
+      doc() {
+        return view.current?.state.doc.toString() ?? '';
+      },
+      setNotes(ranges) {
+        view.current?.dispatch({ effects: setNoteRanges.of(ranges) });
+      },
+      notes() {
+        return view.current?.state.field(noteRanges).ranges ?? [];
+      },
+      showNote(id) {
+        view.current?.dispatch({ effects: setActiveNote.of(id) });
       },
     }),
     [],

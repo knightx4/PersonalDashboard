@@ -317,9 +317,10 @@ and applied to the live project in the same sitting.
   `published_at`, `slug`), and timestamps. A **source** in the catalogue: it
   holds what the person wrote.
 - **`learn.essay_notes`**: margin notes. The essay, the check that raised it,
-  the rung, the body, the anchor (quote, prefix, suffix, offset hint), and
-  whether it is open, done, dismissed or detached. Not a source: Dash wrote
-  it.
+  the rung, the body, what it says at rungs 1 to 3 and why it was raised
+  (so Help needs no second call), the anchor (quote, prefix, suffix, offset
+  hint), and whether it is open, waiting for one of the three open places,
+  done, dismissed or detached. Not a source: Dash wrote it.
 - **`learn.essay_research`**: research runs. The essay, the level, the
   questions searched, the sources with their kept text, the citations, the
   per-claim counts, and the cost. Not a source: it is what Dash retrieved.

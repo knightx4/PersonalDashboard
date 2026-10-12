@@ -64,13 +64,18 @@ export function usableRephrase(reply: string, selection: string): string | null 
   return `${lead}${text}${trail}`;
 }
 
-/** The user turn: the brief's claim and reader, the text around, and the selection to reword. */
+/**
+ * The user turn: the brief's claim and reader, the text around, and the
+ * selection to reword. `guidance` is a margin note's hint when the rewording
+ * is that note's rung 4 (plan #1869).
+ */
 export function describeRephrase(input: {
   claim: string;
   reader: string;
   before: string;
   selection: string;
   after: string;
+  guidance?: string;
 }): string {
   const parts: string[] = [];
   if (input.claim.trim()) parts.push(`The essay's claim, in the writer's words: ${input.claim.trim()}`);
@@ -78,6 +83,9 @@ export function describeRephrase(input: {
   parts.push(`<before>\n${input.before}\n</before>`);
   parts.push(`<selected>\n${input.selection.trim()}\n</selected>`);
   parts.push(`<after>\n${input.after}\n</after>`);
+  if (input.guidance?.trim()) {
+    parts.push(`What a check noticed about the selected text, which the rewording should answer: ${input.guidance.trim()}`);
+  }
   parts.push('Reword the selected text only.');
   return parts.join('\n\n');
 }

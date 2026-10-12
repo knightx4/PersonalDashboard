@@ -42,6 +42,8 @@ export async function rephraseSelection(input: {
   after: string;
   claim: string;
   reader: string;
+  /** A margin note's hint, when this is the note's suggested wording (plan #1869). */
+  guidance?: string;
   anthropicApiKey: string;
   client?: Anthropic;
   onSpend?: SpendSink;

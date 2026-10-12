@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useCallback, useEffect, useRef, useState } from 'react';
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, ChevronLeft } from 'lucide-react';
 import { MainRail } from '@/components/patterns/main-rail';
@@ -20,6 +20,8 @@ import {
   type EssayInterview,
 } from '@/lib/learn/essays/model';
 import { essayNoteBody } from '@/lib/learn/essays/note';
+import { essayParagraphs } from '@/lib/learn/essays/checks';
+import type { EssayNotes } from '@/lib/learn/essays/notes-store';
 import {
   draftMarksJson,
   yourWords,
@@ -38,6 +40,7 @@ import {
   type VaultSaveResult,
 } from './actions';
 import { EssayBriefFold, EssayInterviewCard } from './essay-brief';
+import { EssayNotesCard, noteRangesIn, useEssayNotes } from './essay-notes';
 
 /** How long after the last keystroke the draft is saved. */
 const SAVE_AFTER_MS = 800;
@@ -47,6 +50,8 @@ const RETRY_AFTER_MS = 5000;
 const VAULT_AFTER_MS = 5 * 60_000;
 
 const SETTINGS_HREF = '/vault/settings';
+
+const NO_NOTES: EssayNotes = { notes: [], stopped: [] };
 
 type SaveState =
   | { kind: 'saved'; at: string | null }
@@ -409,9 +414,14 @@ function TargetForm({ id, target, onSet }: { id: string; target: number | null; 
  * Accepted text is marked as Dash's, and the rail says what share of the
  * words are yours.
  *
- * `initialVault`, `briefOpen`, `initialSuggestion` and `initialAskMarks` are
- * for the gallery, which draws a save that stopped, the brief unfolded, a
- * suggestion waiting and the question after a reload.
+ * The rail opens with the checks and the margin notes they raised (plan
+ * #1869, essay-notes.tsx); each open note is a marker in the editor's right
+ * margin. On a phone they follow the text, above the length and the vault.
+ *
+ * `initialVault`, `briefOpen`, `initialSuggestion`, `initialAskMarks` and
+ * `initialNoteOpen` are for the gallery, which draws a save that stopped,
+ * the brief unfolded, a suggestion waiting, the question after a reload and
+ * a note opened.
  */
 export function EssayView({
   essay,
@@ -419,12 +429,17 @@ export function EssayView({
   briefOpen = false,
   initialSuggestion = null,
   initialAskMarks = false,
+  notes = NO_NOTES,
+  initialNoteOpen = null,
 }: {
   essay: Essay;
   initialVault?: VaultState;
   briefOpen?: boolean;
   initialSuggestion?: Suggestion | null;
   initialAskMarks?: boolean;
+  /** The margin notes, found again in the draft on load (plan #1869). */
+  notes?: EssayNotes;
+  initialNoteOpen?: string | null;
 }) {
   const [doc, setDoc] = useState({ text: essay.draftBody, marks: essay.marks, version: 0 });
   const [words, setWords] = useState(() => countWords(essay.draftBody));
@@ -435,6 +450,10 @@ export function EssayView({
     kind: 'idle',
   });
   const editor = useRef<MarkdownEditorHandle>(null);
+  const [paragraphs, setParagraphs] = useState(() => essayParagraphs(essay.draftBody).length);
+  const noteApi = useEssayNotes(essay.id, notes, editor, initialNoteOpen);
+  const placedNotes = noteApi.notes;
+  const initialNotes = useMemo(() => noteRangesIn(doc.text, placedNotes), [doc, placedNotes]);
   const [title, setTitle] = useState(() => essayTitle(essay.draftBody, essay.path));
   const [target, setTarget] = useState(essay.wordTarget);
   const [typing, setTyping] = useState(false);
@@ -467,6 +486,7 @@ export function EssayView({
   const onChange = useCallback(
     (text: string, marks: AuthorMark[]) => {
       setWords(countWords(text));
+      setParagraphs(essayParagraphs(text).length);
       setShare(yourWords(text, marks).percent);
       setTitle(essayTitle(text, essay.path));
       change({ text, marks });
@@ -502,6 +522,12 @@ export function EssayView({
         : { kind: 'failed', error: 'That text changed while Dash was rewording it. Select it again and ask again.' },
     );
   }, [essay.id]);
+
+  // Once a draft save lands, the notes' new places go with it.
+  const keepPlaces = noteApi.keepPlaces;
+  useEffect(() => {
+    if (draft.kind === 'saved' && draft.at) keepPlaces();
+  }, [draft, keepPlaces]);
 
   const clearMarks = useCallback(() => {
     editor.current?.setMarks([]);
@@ -606,6 +632,8 @@ export function EssayView({
           initialDoc={doc.text}
           initialMarks={doc.marks}
           initialSuggestion={doc.version === 0 ? initialSuggestion : null}
+          initialNotes={initialNotes}
+          onOpenNote={noteApi.open}
           label={`Essay: ${title}`}
           placeholder="Start with a title, like # Why money is the odd good out"
           focusMode={focusMode}
@@ -632,7 +660,8 @@ export function EssayView({
   );
 
   const rail = (
-    <div className={quiet}>
+    <div className={cn('flex flex-col gap-4', quiet)}>
+      <EssayNotesCard api={noteApi} paragraphs={paragraphs} />
       <Card padding="none">
         <CardSection title="Length">
           {target !== null && (

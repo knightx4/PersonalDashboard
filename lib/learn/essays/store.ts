@@ -92,6 +92,18 @@ export async function loadBriefJson(supabase: LearnSupabaseClient, id: string): 
   return data ? { brief: (data as { brief: unknown }).brief } : null;
 }
 
+/** What a check reads besides the text: the brief, and the note to leave out of Already Said (plan #1869). */
+export async function loadCheckEssay(
+  supabase: LearnSupabaseClient,
+  id: string,
+): Promise<{ brief: unknown; noteId: string | null } | null> {
+  const { data, error } = await supabase.from('essays').select('brief, note_id').eq('id', id).maybeSingle();
+  if (error) throw new Error(`Could not read the essay: ${error.message}`);
+  if (!data) return null;
+  const row = data as { brief: unknown; note_id: string | null };
+  return { brief: row.brief, noteId: row.note_id };
+}
+
 /** The whole brief, answers and interview together. */
 export async function saveBriefJson(
   supabase: LearnSupabaseClient,
