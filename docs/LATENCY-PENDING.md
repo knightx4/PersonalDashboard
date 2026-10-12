@@ -41,8 +41,6 @@ button.
 | `app/dev/plan/plan-view.tsx:1054` | Answer / Record the new answer | `answerPlanDecision` |
 | `app/dev/plan/plan-view.tsx:1079` | Withdraw | `setPlanItemStatus` |
 | `app/dev/plan/plan-view.tsx:2212` | icon only, "Send #n to Claude" | `sendPlanItemToClaude` |
-| `app/dev/plan/plan-view.tsx:2220` | icon only, "Hand to Claude" | `setPlanItemAssignee` |
-| `app/dev/plan/plan-view.tsx:2387` | Hand to Claude / Take back from Claude | `setPlanItemAssignee` |
 | `app/dev/raised/raised-view.tsx:121` | Answer / Reply | `answerRaise` |
 | `app/dev/raised/raised-view.tsx:183` | Dismiss | `dismissRaise` |
 | `app/dev/raised/raised-view.tsx:190` | Reopen | `reopenRaise` |
@@ -52,9 +50,20 @@ button.
 | `app/dev/ui/review/review-view.tsx:149` | Put it back | `decideUiFinding` |
 | `app/jobs/(app)/roles/[id]/panels.tsx:556` | Add | `addReminder`, through `useTransition` |
 
-The two plan rows at 2212 and 2220 are `RowIconButton`, which is an icon and an
-`sr-only` label. It has no words to swap, so it needs a spinner or a changed
-icon rather than a string.
+The plan row at 2212 is a `RowIconButton`, which is an icon and an `sr-only`
+label. It has no words to swap, so it needs a spinner or a changed icon rather
+than a string.
+
+## Moved to the optimistic tier
+
+Plan #1850 took the plan row's own controls off this list. Status, priority,
+assignee and reorder on `/dev/plan` now change the row when pressed, through
+`useOptimisticWrite`, and a refused write puts the row back and gives the
+reason in a toast. Their actions, `setPlanItemStatus`, `setPlanItemPriority`,
+`setPlanItemAssignee` and `movePlanItem` in `app/dev/plan/actions.ts`, are
+tagged `// latency: optimistic`, and the two assignee buttons above are no
+longer submit controls. Writes that start a run or send to Dash, such as
+`sendPlanItemToClaude`, stay pending.
 
 ## Disabled while pending, label fixed
 
