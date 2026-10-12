@@ -768,7 +768,9 @@ export function TreeRow<E extends TreeCatalogEntry>({
           )
         ) : (
           <>
-            <span className="hidden min-w-0 truncate text-small sm:block sm:leading-7">{move}</span>
+            {/* Wraps rather than clips: "Waiting on 26 Oct" is wider than the
+                column, and a cut word lost the day it waits for (note 5025f689). */}
+            <span className="hidden min-w-0 break-words text-small sm:block sm:leading-7">{move}</span>
 
             <span className="hidden truncate text-small sm:block sm:leading-7">{priority}</span>
 

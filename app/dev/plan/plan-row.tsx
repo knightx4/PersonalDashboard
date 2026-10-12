@@ -452,8 +452,7 @@ function healthOf(node: PlanNode, liveness?: PlanLiveness) {
 function moveFor(node: PlanNode, context?: MoveContext) {
   // A step held up by exactly one other says which, by number: "Waiting on
   // #1453". More than one, and the tooltip and the Needs line name them.
-  // Waiting only on a check-back, it names the day: "Waiting on the check on
-  // 26 Oct".
+  // Waiting only on a check-back, it names the day: "Waiting on 26 Oct".
   const waitingOn =
     node.waitingOn.length === 1
       ? `#${node.waitingOn[0].number}`
@@ -1336,7 +1335,7 @@ export function usePlanRow({
           />
         )
       ) : (
-        <MoveLabel move={move.move} title={move.title} />
+        <MoveLabel move={move.move} title={move.title} className="max-w-full" wordClassName="whitespace-normal" />
       )
     ) : null,
     statusMenu,
