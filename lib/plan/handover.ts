@@ -43,6 +43,7 @@ import {
   type PlanNode,
   type PlanSection,
 } from './tree';
+import { stepRef } from './ref';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, 'public'>;
@@ -87,6 +88,8 @@ export type HandOverResult =
   | {
       ok: true;
       number: number;
+      /** Where it sits ("1073.4"): what a message about it names it by. */
+      outline: string;
       title: string;
       /** Rows beneath it that went with it, at any depth. */
       beneath: number;
@@ -142,7 +145,7 @@ export async function handStepToClaude(input: {
   if (!node) return { ok: false, error: 'That step no longer exists.' };
 
   if (node.status === 'proposed') {
-    return { ok: false, error: `#${node.number} is only a proposal. Approve it first.` };
+    return { ok: false, error: `${stepRef(node)} is only a proposal. Approve it first.` };
   }
 
   // A blocked step says which kind of block refused the press: the sentence
@@ -156,7 +159,7 @@ export async function handStepToClaude(input: {
       error:
         node.status === 'blocked'
           ? blockRefusal(node)
-          : `#${node.number} is a question. Answer it and the plan moves; a session sent at it would be answering it for you.`,
+          : `${stepRef(node)} is a question. Answer it and the plan moves; a session sent at it would be answering it for you.`,
     };
   }
 
@@ -188,7 +191,7 @@ export async function handStepToClaude(input: {
   if (await reshapeUnderway(supabase, userId, feature.id, now)) {
     return {
       ok: false,
-      error: `#${feature.number} is being re-read against the answers under it. Wait for that to finish -- what it proposes may change this step.`,
+      error: `${stepRef(feature)} is being re-read against the answers under it. Wait for that to finish -- what it proposes may change this step.`,
     };
   }
 
@@ -205,6 +208,7 @@ export async function handStepToClaude(input: {
   // page cannot disagree about which press gets asked about.
   const own = sendOverClaim({
     number: node.number,
+    outline: node.outline,
     liveness: liveness[node.id] ?? null,
     run: runs[node.id],
     now,
@@ -228,6 +232,7 @@ export async function handStepToClaude(input: {
       error: underwayRefusal({
         press: 'step',
         number: other.number,
+        outline: other.outline,
         title: other.title,
         liveness: liveness[other.id] ?? null,
         run: runs[other.id],
@@ -294,24 +299,27 @@ export async function handStepToClaude(input: {
   if (!builder.ok) return { ok: false, error: builder.error };
 
   const alone = flatten([node]).length === 1;
+  // Named by its outline, the way the plan page heads the row, so what the
+  // session says back and writes into the plan reads the same as the page.
+  const named = stepRef(node);
   const visions = await loadVisionBodies(supabase, userId);
   const text = builder.project
     ? projectPreamble(builder.project) +
-      `Build plan step #${node.number}, "${node.title}"${alone ? '' : ', and the steps beneath it'}. ` +
+      `Build plan step ${named}, "${node.title}"${alone ? '' : ', and the steps beneath it'}. ` +
       'The brief is below; it is the plan as the app holds it right now, and the plan is the ' +
-      'source of truth -- claim the step, build it, verify, commit with the step number in ' +
+      'source of truth -- claim the step, build it, verify, commit with the step\'s outline in ' +
       'the subject, and close it with a note.\n\n' +
       `${QUESTION_RULE}\n\n` +
       planBrief(sections, node, { thread: true, liveness, visions })
     : alone
-    ? `Build plan step #${node.number}, "${node.title}", following ` +
+    ? `Build plan step ${named}, "${node.title}", following ` +
       '.claude/skills/plan/reference/building.md. The brief is below; it is the plan as the ' +
       'app holds it right now, and the plan is the source of truth -- claim the step, build ' +
-      'it, verify, commit with the step number in the subject, and close it with a note. ' +
+      'it, verify, commit with the step\'s outline in the subject, and close it with a note. ' +
       'Merge it to main when it is closed.\n\n' +
       `${QUESTION_RULE}\n\n` +
       planBrief(sections, node, { thread: true, liveness, visions })
-    : `Build plan step #${node.number}, "${node.title}", and the steps beneath it, following ` +
+    : `Build plan step ${named}, "${node.title}", and the steps beneath it, following ` +
       '.claude/skills/plan/SKILL.md -- the Building section, which has more than one step to ' +
       'build and so is orchestrated: send each step to its own subagent and keep your own ' +
       'context for the batch. The brief is below; it is the plan as the app holds it right ' +
@@ -332,6 +340,7 @@ export async function handStepToClaude(input: {
   return {
     ok: true,
     number: node.number,
+    outline: node.outline,
     title: node.title,
     // The brief carries the step's whole subtree under "## Steps", so sending
     // a higher-level row sends rather more than the row that was clicked.
@@ -346,6 +355,8 @@ export type FeatureHandOver =
   | {
       ok: true;
       number: number;
+      /** Where it sits ("1073.4"): what a message about it names it by. */
+      outline: string;
       title: string;
       /** Open steps beneath it that went with it, at any depth. */
       steps: number;
@@ -409,7 +420,7 @@ export async function handFeatureToClaude(input: {
   if (node.status === 'proposed') {
     return {
       ok: false,
-      error: `#${node.number} is only a proposal. Approve it first.`,
+      error: `${stepRef(node)} is only a proposal. Approve it first.`,
       refused: true,
     };
   }
@@ -422,7 +433,7 @@ export async function handFeatureToClaude(input: {
   if (await reshapeUnderway(supabase, userId, node.id, now)) {
     return {
       ok: false,
-      error: `#${node.number} is being re-read against the answers under it. Wait for that to finish -- what it proposes may change these steps.`,
+      error: `${stepRef(node)} is being re-read against the answers under it. Wait for that to finish -- what it proposes may change these steps.`,
       refused: true,
     };
   }
@@ -440,6 +451,7 @@ export async function handFeatureToClaude(input: {
       error: underwayRefusal({
         press: 'feature',
         number: running.number,
+        outline: running.outline,
         title: running.title,
         liveness: liveness[running.id] ?? null,
         run: runs[running.id],
@@ -501,15 +513,15 @@ export async function handFeatureToClaude(input: {
   const visions = await loadVisionBodies(supabase, userId);
   const text =
     (builder.project ? projectPreamble(builder.project) : '') +
-    `Work plan feature #${node.number}, "${node.title}", to completion, following ` +
+    `Work plan feature ${stepRef(node)}, "${node.title}", to completion, following ` +
     '.claude/skills/plan/SKILL.md. This is a batch, so it is orchestrated: send each step ' +
     "to its own subagent, in the order the plan gives, and do not read the steps' source " +
     'files or make the edits yourself. Keep the carry-forward between them. Stop at the ' +
     'first step that needs a decision from me: block it with the exact question rather ' +
     'than guessing, and do not skip past it to a later step that depends on it. Merge ' +
     'each step to main as it closes, before you send the next one. The Building section ' +
-    'says how. Report every step you closed, by number and ' +
-    'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
+    'says how. Report every step you closed by its outline, the 1073.4 the plan page ' +
+    'heads it with, and its title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
     'the plan is the source of truth.\n\n' +
     planBrief(sections, node, { thread: true, liveness, visions });
 
@@ -526,6 +538,7 @@ export async function handFeatureToClaude(input: {
   return {
     ok: true,
     number: node.number,
+    outline: node.outline,
     title: node.title,
     steps: open.length - 1,
     detail: result.detail,

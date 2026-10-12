@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { numberFromRef, readableRefs, refFor, stepRef, storableRefs } from './ref';
+import { numberFromRef, readableRefs, refFor, stepRef } from './ref';
 
 const outlines = new Map([
   [1073, '1073'],
@@ -28,23 +28,6 @@ describe('readableRefs', () => {
     expect(readableRefs('#10845 #1073.4 PR #1084 issue #1084 #42', outlines)).toBe(
       '#10845 #1073.4 PR #1084 issue #1084 #42',
     );
-  });
-});
-
-describe('storableRefs', () => {
-  it('turns written outlines back into numbers', () => {
-    expect(storableRefs('Built on #1073.4.1 after #1073.4.', outlines)).toBe(
-      'Built on #1090 after #1084.',
-    );
-  });
-
-  it('round-trips with readableRefs', () => {
-    const stored = 'Needs #1084, then #1090.';
-    expect(storableRefs(readableRefs(stored, outlines), outlines)).toBe(stored);
-  });
-
-  it('keeps an outline that names nothing', () => {
-    expect(storableRefs('#1073.9', outlines)).toBe('#1073.9');
   });
 });
 

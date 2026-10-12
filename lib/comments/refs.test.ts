@@ -67,6 +67,24 @@ describe('splitOnRefs', () => {
   it('reads two references with nothing but a space between them', () => {
     expect(refs('#1 #2')).toEqual([1, 2]);
   });
+
+  it('reads a step written by its outline back to its number through the titles', () => {
+    const titles = { 1084: { title: 'Name steps by outline', outline: '1073.4' }, 1073: { title: 'Plan', outline: '1073' } };
+    expect(splitOnRefs('see #1073.4. Then #1073.', titles)).toEqual([
+      { text: 'see ', ref: null },
+      { text: '#1073.4', ref: 1084 },
+      { text: '. Then ', ref: null },
+      { text: '#1073', ref: 1073 },
+      { text: '.', ref: null },
+    ]);
+  });
+
+  it('leaves an outline it cannot place as words, rather than linking the feature', () => {
+    expect(refs('see #1073.4')).toEqual([]);
+    expect(splitOnRefs('see #1073.9', { 1084: { title: 'x', outline: '1073.4' } })).toEqual([
+      { text: 'see #1073.9', ref: null },
+    ]);
+  });
 });
 
 describe('planRefHref', () => {

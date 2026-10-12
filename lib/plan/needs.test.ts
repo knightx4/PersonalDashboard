@@ -105,6 +105,17 @@ describe('needsLines', () => {
     expect(lines).toHaveLength(2);
   });
 
+  it('names the steps by their outlines when it has them', () => {
+    const lines = needsLines({
+      ...outcome,
+      setupOutline: '494.3',
+      parentOutline: '494',
+      waitingOutline: '494.2',
+    });
+    expect(lines[0]).toBe('#494.3 for you to set up, under #494: Set GITHUB_TOKEN in Vercel');
+    expect(lines[1]).toBe('#494.2 waits on #494.3.');
+  });
+
   it('says so when the stopped step came off blocked', () => {
     const lines = needsLines({ ...outcome, released: true });
     expect(lines.join('\n')).toContain('back to not started');

@@ -207,6 +207,25 @@ describe('buildPlanTree', () => {
     expect(countMatches(searchSections(sections, '#307'))).toBe(1);
   });
 
+  it('takes a hashed outline as that step exactly, as it does a hashed number', () => {
+    const steps = Array.from({ length: 11 }, (_, i) =>
+      item({ id: `s${i + 1}`, number: 401 + i, title: `Step ${i + 1}`, parentId: 'feature', position: i }),
+    );
+    const sections = tree([
+      item({ id: 'feature', number: 400, title: 'The feature', detail: 'Mentions #400.1 in passing' }),
+      ...steps,
+    ]);
+
+    // #400.1 is the first step, not #400.10 or #400.11, and not the feature
+    // whose detail happens to mention it.
+    expect(countMatches(searchSections(sections, '#400.1'))).toBe(1);
+    expect(flattenSections(searchSections(sections, '#400.1')).find((n) => n.matches)?.title).toBe(
+      'Step 1',
+    );
+    expect(countMatches(searchSections(sections, '#400.9'))).toBe(1);
+    expect(countMatches(searchSections(sections, '#400.12'))).toBe(0);
+  });
+
   it('nests steps under their parent, to any depth', () => {
     const sections = tree([
       item({ id: 'feature' }),

@@ -90,4 +90,15 @@ describe('buildPostsPage', () => {
     expect(card.day).toBe('1 Oct');
     expect(page.posted[0]!.day).toBe('2 Oct');
   });
+
+  it('labels a cited step by its outline when the plan places it, linking by number', () => {
+    const page = buildPostsPage({
+      posts: [row('a', 'suggested', { source_plan_item_ids: ['s1'], source_feedback_ids: [] })],
+      steps: [{ id: 's1', number: 1084, title: 'Name steps by outline', outline: '1073.4' }],
+      notes: [],
+      run: null,
+      now: Date.parse('2026-10-02T12:00:00Z'),
+    });
+    expect(page.suggested[0]!.sources[0]).toMatchObject({ label: '#1073.4', href: '/dev/plan?view=all&q=%231084' });
+  });
 });

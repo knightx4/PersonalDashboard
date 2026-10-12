@@ -72,6 +72,28 @@ import {
 import { PASSING_VERDICTS } from '@/lib/plan/ui-check-guard';
 import { appendCommentLine, sentBackLine } from '@/lib/plan/screen-change';
 import { answerAccepts } from '@/lib/plan/answer-accepts';
+import { stepRef } from '@/lib/plan/ref';
+
+/**
+ * A step as the person reads it, `#1073.4`, for a press that read only its
+ * row. The outline is worked out by the plan_item_outlines view (migration
+ * 0197); when that cannot be read the message names the number instead.
+ */
+async function refOfStep(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any, any, any>,
+  userId: string,
+  id: string,
+  number: number,
+): Promise<string> {
+  const { data } = await supabase
+    .from('plan_item_outlines')
+    .select('outline')
+    .eq('user_id', userId)
+    .eq('id', id)
+    .maybeSingle();
+  return stepRef({ number, outline: (data as { outline?: string } | null)?.outline ?? null });
+}
 
 export type PlanActionState = {
   error?: string;
@@ -515,7 +537,7 @@ export async function setPlanItemStatus(
   // right now" said about the gap itself, recorded and findable.
   if (status.data === 'done' && current?.fog && !current.fog_dismissed_at) {
     return {
-      error: `#${current.number} still says part of it is not specified. Write the steps that patch covers, or clear it, then close this.`,
+      error: `${await refOfStep(supabase, user.id, id.data, current.number)} still says part of it is not specified. Write the steps that patch covers, or clear it, then close this.`,
     };
   }
 
@@ -607,16 +629,17 @@ export async function dismissPlanDecision(
     .eq('id', id.data)
     .maybeSingle();
   if (!current) return { error: 'That step no longer exists.' };
+  const ref = await refOfStep(supabase, user.id, id.data, current.number);
 
   if (aside && current.kind !== 'decision') {
     return {
       error:
-        `#${current.number} is a step, not a question. ` +
+        `${ref} is a step, not a question. ` +
         'A step you are not doing is dropped, with the reason.',
     };
   }
   if (aside && isClosed(current.status as PlanStatus)) {
-    return { error: `#${current.number} is already settled.` };
+    return { error: `${ref} is already settled.` };
   }
 
   const { error } = await supabase
@@ -629,8 +652,8 @@ export async function dismissPlanDecision(
   revalidatePlan();
   return {
     message: aside
-      ? `#${current.number} put aside. It is under Dismissed when you want it.`
-      : `#${current.number} is back.`,
+      ? `${ref} put aside. It is under Dismissed when you want it.`
+      : `${ref} is back.`,
   };
 }
 
@@ -665,7 +688,8 @@ export async function dismissPlanFog(
     .eq('id', id.data)
     .maybeSingle();
   if (!current) return { error: 'That step no longer exists.' };
-  if (!current.fog) return { error: `#${current.number} says nothing is unspecified.` };
+  const ref = await refOfStep(supabase, user.id, id.data, current.number);
+  if (!current.fog) return { error: `${ref} says nothing is unspecified.` };
 
   const { error } = await supabase
     .from('plan_items')
@@ -677,8 +701,8 @@ export async function dismissPlanFog(
   revalidatePlan();
   return {
     message: aside
-      ? `#${current.number}'s fog put aside. It is under Dismissed when you want it.`
-      : `#${current.number}'s fog is back.`,
+      ? `${ref}'s fog put aside. It is under Dismissed when you want it.`
+      : `${ref}'s fog is back.`,
   };
 }
 
@@ -1023,7 +1047,7 @@ export async function answerPlanDecision(
 
   if (stillOpen > 0) {
     return {
-      message: `Answered. ${stillOpen} more ${stillOpen === 1 ? 'question' : 'questions'} under #${feature.number}; the re-shape starts when the last one is answered.`,
+      message: `Answered. ${stillOpen} more ${stillOpen === 1 ? 'question' : 'questions'} under ${stepRef(feature)}; the re-shape starts when the last one is answered.`,
     };
   }
   if (feature.status === 'proposed' || feature.children.length === 0) {
@@ -1041,7 +1065,7 @@ export async function answerPlanDecision(
   );
   return {
     message: started.ok
-      ? `Answered, and re-shaping #${feature.number} against everything settled under it.`
+      ? `Answered, and re-shaping ${stepRef(feature)} against everything settled under it.`
       : `Answered. The re-shape did not start: ${started.error}`,
   };
 }
@@ -1129,7 +1153,7 @@ async function sendAnswered(
 ): Promise<string> {
   try {
     const sent = await handStepToClaude({ supabase, userId, id });
-    if (sent.ok) return `Sent #${sent.number} to a session${purpose ? ` ${purpose}` : ''}.`;
+    if (sent.ok) return `Sent ${stepRef(sent)} to a session${purpose ? ` ${purpose}` : ''}.`;
     return `It could not be sent to a session yet (${sent.error.replace(/[.\s]+$/, '')}), so the plan's clock tries again within a few minutes.`;
   } catch (failed) {
     const why = failed instanceof Error ? failed.message : 'the send failed';
@@ -1380,7 +1404,9 @@ export async function sendScreenBack(
   revalidatePlan();
   revalidatePath('/dev/changelog');
   revalidatePath('/dev/surfaces');
-  return { message: `Sent back. #${current.number} is open again with your words on it.` };
+  return {
+    message: `Sent back. ${await refOfStep(supabase, user.id, id.data, current.number)} is open again with your words on it.`,
+  };
 }
 
 /** Deleting a step takes its sub-steps with it; the confirm says how many. */
@@ -1497,8 +1523,8 @@ export async function sendPlanItemToClaude(
   return {
     message:
       sent.beneath === 0
-        ? `Sent #${sent.number}. ${sent.detail}`
-        : `Sent #${sent.number}, with ${sent.beneath} ${sent.beneath === 1 ? 'step' : 'steps'} beneath it. ${sent.detail}`,
+        ? `Sent ${stepRef(sent)}. ${sent.detail}`
+        : `Sent ${stepRef(sent)}, with ${sent.beneath} ${sent.beneath === 1 ? 'step' : 'steps'} beneath it. ${sent.detail}`,
   };
 }
 
@@ -1537,7 +1563,7 @@ export async function sendPlanFeatureToClaude(
   revalidatePlan();
 
   return {
-    message: `Sent #${sent.number} and its ${sent.steps === 1 ? 'step' : `${sent.steps} steps`}. ${sent.detail}`,
+    message: `Sent ${stepRef(sent)} and its ${sent.steps === 1 ? 'step' : `${sent.steps} steps`}. ${sent.detail}`,
   };
 }
 
@@ -1585,21 +1611,24 @@ async function startReshape(
   // from. Nesting it was the bug: a feature reading "Done" quietly grew a
   // proposal inside it, which reads as the feature having re-opened itself.
   const closed = isClosed(node.status);
+  // Named by its outline, as the page reads it, in the instruction and in the
+  // line a raised feature writes back to it.
+  const ref = stepRef(node);
   const where = closed
     ? 'as a NEW top-level feature (no --parent), because ' +
-      `#${node.number} has already shipped and a closed feature takes no new rows`
+      `${ref} has already shipped and a closed feature takes no new rows`
     : 'beneath the feature';
 
   const text =
-    `Re-shape plan feature #${node.number}, "${node.title}", following ` +
+    `Re-shape plan feature ${ref}, "${node.title}", following ` +
     '.claude/skills/plan/reference/reshaping.md. This is the re-shape job, not the build job: read the ' +
     'feature against every answer settled beneath it and against what the code now says, ' +
     'and write what has changed.\n\n' +
     (closed
-      ? `#${node.number} is ${node.status}. It is finished, and nothing new may be added ` +
+      ? `${ref} is ${node.status}. It is finished, and nothing new may be added ` +
         'inside it -- not a step, not a decision, not a graduated fog step. Anything this ' +
         're-shape turns up is new work: raise it as its own top-level feature whose detail ' +
-        `opens by saying it came out of #${node.number}, and put the steps and questions ` +
+        `opens by saying it came out of ${ref}, and put the steps and questions ` +
         'under that. The only write this re-shape makes to the closed feature itself is ' +
         `clearing its fog patch (plan.ts fog ${node.number} --clear), and only once the new ` +
         'feature that dispels it exists. If nothing has changed, say so and write nothing.\n\n'
@@ -1656,15 +1685,16 @@ export async function reshapePlanFeature(
   const sections = buildPlanTree(data);
   const node = findNode(sections, id.data);
   if (!node) return { error: 'That step no longer exists.' };
+  const ref = stepRef(node);
 
   if (node.status === 'proposed') {
     return {
-      error: `#${node.number} is only a proposal. There is nothing agreed here to re-shape yet.`,
+      error: `${ref} is only a proposal. There is nothing agreed here to re-shape yet.`,
     };
   }
   if (node.children.length === 0) {
     return {
-      error: `#${node.number} is a step, not a feature. A re-shape re-reads a feature against what has been settled beneath it, and nothing is beneath this one.`,
+      error: `${ref} is a step, not a feature. A re-shape re-reads a feature against what has been settled beneath it, and nothing is beneath this one.`,
     };
   }
 
@@ -1675,7 +1705,7 @@ export async function reshapePlanFeature(
   // row the first one wrote.
   if (await reshapeUnderway(supabase, user.id, node.id, Date.now())) {
     return {
-      error: `#${node.number} is already being re-read. Wait for that to finish rather than starting a second one over the top of it.`,
+      error: `${ref} is already being re-read. Wait for that to finish rather than starting a second one over the top of it.`,
     };
   }
 
@@ -1693,7 +1723,7 @@ export async function reshapePlanFeature(
   if (!result.ok) return { error: result.error };
   return {
     message:
-      `Re-shaping #${node.number} against ` +
+      `Re-shaping ${ref} against ` +
       `${answered === 0 ? 'no answers yet' : `${answered} ${answered === 1 ? 'answer' : 'answers'}`}` +
       `${node.fog ? ' and its fog' : ''}. ${result.detail}`,
   };
@@ -1750,7 +1780,7 @@ export async function workPlanOverhaul(
   });
   revalidatePlan();
   if (!result.ok) return { error: result.error };
-  return { message: `Started the overhaul routine on #${node.number}. ${result.detail}` };
+  return { message: `Started the overhaul routine on ${stepRef(node)}. ${result.detail}` };
 }
 
 /**

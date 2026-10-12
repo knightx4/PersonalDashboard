@@ -51,6 +51,7 @@ import { GotThroughDemo } from './got-through-demo';
 import { HomeArrivalDemo } from './home-arrival-demo';
 import { ClearDemo } from './clear-demo';
 import { MOMENT_WORKSPACES, MOMENTS, MOMENTS_PER_WORKSPACE, type Moment } from './moments';
+import { refFor, type OutlineIndex } from '@/lib/plan/ref';
 import { LAW_GROUPS } from './laws';
 import { TasteList } from './taste-list';
 import { PATTERNS } from './patterns';
@@ -158,14 +159,15 @@ function Rows({
 }
 
 /** One moment: its name and state, then what sets it off, what you see, and the reduced-motion version. */
-function MomentRow({ moment }: { moment: Moment }) {
+function MomentRow({ moment, outlines }: { moment: Moment; outlines: OutlineIndex }) {
   const { state } = moment;
+  // The step is kept by number in ./moments.ts and named by its outline.
   const status =
     state.built === 'yes'
       ? 'Built'
       : state.built === 'partly'
-        ? `Partly built · rest in #${state.step}`
-        : `Not built · #${state.step}`;
+        ? `Partly built · rest in ${refFor(state.step, outlines)}`
+        : `Not built · ${refFor(state.step, outlines)}`;
   return (
     <li className="row-pad space-y-0.5">
       <p className="flex flex-wrap items-baseline justify-between gap-x-3">
@@ -654,6 +656,8 @@ function AnatomyFrames({ id, label }: { id: string; label: string }) {
   );
 }
 
+const NO_OUTLINES: OutlineIndex = new Map();
+
 /**
  * The page itself, with the one part that reads the record passed in, so
  * the gallery can draw it with fixtures (app/preview/surfaces.tsx).
@@ -661,10 +665,16 @@ function AnatomyFrames({ id, label }: { id: string; label: string }) {
 export function UiStandard({
   corrections,
   removedTaste,
+  outlines = NO_OUTLINES,
 }: {
   corrections: readonly CorrectionWeek[] | null;
   /** Ids of the preferences the person removed (`public.ui_taste_removals`). */
   removedTaste: readonly string[];
+  /**
+   * Each plan step's outline by number, so a moment names the step that
+   * builds it as the plan page heads the row. Without it, by number.
+   */
+  outlines?: OutlineIndex;
 }) {
   return (
     <div className="mx-auto max-w-3xl space-y-8 pb-16">
@@ -1668,7 +1678,7 @@ export function UiStandard({
             >
               <ul className="divide-y divide-border">
                 {moments.map((moment) => (
-                  <MomentRow key={moment.name} moment={moment} />
+                  <MomentRow key={moment.name} moment={moment} outlines={outlines} />
                 ))}
               </ul>
             </CardSection>

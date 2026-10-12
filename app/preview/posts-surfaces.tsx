@@ -79,10 +79,10 @@ const ROWS = [
 ];
 
 const STEPS = [
-  { id: 's1', number: 917, title: 'Price every paid press in Learn' },
-  { id: 's2', number: 918, title: 'Price the paid presses in the other workspaces' },
-  { id: 's3', number: 1201, title: 'Run the gate before pushing to main' },
-  { id: 's4', number: 1330, title: 'Open every brief with its vision' },
+  { id: 's1', number: 917, title: 'Price every paid press in Learn', outline: '905.3' },
+  { id: 's2', number: 918, title: 'Price the paid presses in the other workspaces', outline: '905.4' },
+  { id: 's3', number: 1201, title: 'Run the gate before pushing to main', outline: '1188.2' },
+  { id: 's4', number: 1330, title: 'Open every brief with its vision', outline: '1319.6' },
 ];
 
 export function PostsSurface() {

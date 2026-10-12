@@ -1,13 +1,13 @@
 /**
  * How a plan step is named to the person, and how a name is read back.
  *
- * A step has two numbers. `number` (#1084) is its identity: commits, notes,
- * raises and comments point at it, so it never moves. `outline` (1073.4) is
- * where it sits, the fourth step under feature #1073, and it is what the row
- * on the page heads itself with. Naming a step by one in one place and the
- * other somewhere else left the person translating between them, so
- * everything they read uses the outline, and the number stays underneath as
- * what gets stored.
+ * A step has two numbers. `number` (#1084) is its identity in the database.
+ * `outline` (1073.4) is where it sits, the fourth step under feature #1073,
+ * and it is what the row on the page heads itself with. Naming a step by one
+ * in one place and the other somewhere else left the person translating
+ * between them, so from 12 October 2026 everything names a step by its
+ * outline, in what is shown and in what is written down. Text from before
+ * then still says `#1084`, and `readableRefs` shows it with the outline.
  *
  * The outline of a top-level feature is its number, so a feature reads the
  * same either way.
@@ -47,7 +47,6 @@ export function refFor(number: number, outlines: OutlineIndex): string {
 // A `#1084` that is a whole reference: not part of `#10845` or `#1084.2`, and
 // not a pull request or issue, which number their own way.
 const STORED = /(?<!\b(?:PR|pr|pull request|issue|Issue)\s?)#(\d+)(?!\.?\d|\w)/g;
-const READ = /#(\d+(?:\.\d+)+)(?!\.?\d|\w)/g;
 
 /**
  * Stored text as the person should read it: every `#1084` that is a step
@@ -58,20 +57,6 @@ export function readableRefs(text: string, outlines: OutlineIndex): string {
   return text.replace(STORED, (whole, digits: string) => {
     const outline = outlines.get(Number(digits));
     return outline ? `#${outline}` : whole;
-  });
-}
-
-/**
- * Written text as it should be stored: every `#1073.4` becomes the `#1084`
- * it names today, so the reference survives the steps being reordered. An
- * outline that names no step is left as written.
- */
-export function storableRefs(text: string, outlines: OutlineIndex): string {
-  const byOutline = new Map<string, number>();
-  for (const [number, outline] of outlines) byOutline.set(outline, number);
-  return text.replace(READ, (whole, outline: string) => {
-    const number = byOutline.get(outline);
-    return number === undefined ? whole : `#${number}`;
   });
 }
 

@@ -413,11 +413,12 @@ export async function readRunWork(
       updated_at: string;
       completed_at: string | null;
       blocked_at: string | null;
+      position: number;
     };
     const rows = await readAll<Row>((from, to) =>
       supabase
         .from('plan_items')
-        .select('id, parent_id, number, status, created_at, updated_at, completed_at, blocked_at')
+        .select('id, parent_id, number, position, status, created_at, updated_at, completed_at, blocked_at')
         .eq('user_id', userId)
         .order('id', { ascending: true })
         .range(from, to),
@@ -431,6 +432,7 @@ export async function readRunWork(
       updatedAt: row.updated_at,
       completedAt: row.completed_at,
       blockedAt: row.blocked_at,
+      position: row.position,
     }));
   }
 

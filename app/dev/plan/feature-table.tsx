@@ -14,6 +14,7 @@ import {
 } from '@/lib/plan/feature-table';
 import { healthOf as healthWordsOf } from '@/lib/plan/health-words';
 import { PLAN_PRIORITY_LABEL } from '@/lib/plan/load';
+import { stepRef } from '@/lib/plan/ref';
 import { isClaudes } from '@/lib/plan/tree';
 
 /** Seven columns: the colSpan of a module's heading row. */
@@ -85,7 +86,7 @@ export function FeatureTable({ groups }: { groups: readonly FeatureGroup[] }) {
                 <TR key={row.node.id} href={featureHref(row.node.number)}>
                   <TD primary className="max-md:block max-md:[&>a]:block max-md:[&>a]:min-h-11">
                     <span className="mr-1.5 tabular font-normal text-ink-muted">
-                      #{row.node.number}
+                      {stepRef(row.node)}
                     </span>
                     {row.node.title}
                     {/* The phone's one line under the title: health and how
@@ -118,7 +119,7 @@ export function FeatureTable({ groups }: { groups: readonly FeatureGroup[] }) {
                         <Meter
                           value={row.percent}
                           max={100}
-                          label={`#${row.node.number}: ${row.percent}% done`}
+                          label={`${stepRef(row.node)}: ${row.percent}% done`}
                           fill="bg-positive"
                           className="w-12"
                         />

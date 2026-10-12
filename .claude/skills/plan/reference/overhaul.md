@@ -167,7 +167,7 @@ diff (`git diff origin/main...<the step's commit>`) and check four things:
 - A phase 2 step leaves its workspace fully on the new pieces.
 - Every decision the subagent reported has a Design log line in the step's
   commit. Write the lines yourself and amend or add a commit against that
-  step's number.
+  step's outline.
 
 A step that fails the review does not merge. Send it back to a subagent
 with what failed, or fix it yourself, then review it again.

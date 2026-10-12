@@ -51,6 +51,7 @@ import { nextPlanPosition } from '@/lib/plan/position';
 import { sessionStamp } from '@/lib/plan/origin';
 import type { PlanScope } from '@/lib/plan/projects';
 import { SPLIT_ACTION, splitPieces, stallRunIds } from '@/lib/plan/stall';
+import { numberFromRef, refFor, type OutlineIndex } from '@/lib/plan/ref';
 import { readSubjectOrNull, recordDashAction, type DashActionDeps } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
 import { TARGET_PATH, type CommentTarget } from './load';
@@ -704,8 +705,8 @@ function rewritten(what: string, now: string, was: string | null): string {
  * a row at the top of its plan, which is sent as a feature.
  */
 async function stepNamed(input: ActInput): Promise<{ id: string; feature: boolean } | null> {
-  const number = Number(input.action.text?.trim().replace(/^#/, ''));
-  if (!Number.isInteger(number) || number <= 0) return null;
+  const number = await numberNamed(input);
+  if (number === null) return null;
 
   const { data } = await input.supabase
     .from('plan_items')
@@ -715,6 +716,36 @@ async function stepNamed(input: ActInput): Promise<{ id: string; feature: boolea
     .maybeSingle();
   const row = data as { id: string; parent_id?: string | null } | null;
   return row ? { id: row.id, feature: row.parent_id === null } : null;
+}
+
+/**
+ * Every plan step's outline by its number, from the `plan_item_outlines` view
+ * (migration 0197), so what the thread says names a step as the plan page
+ * heads it: `#1073.4`, not `#1084`. A read that fails gives an empty index,
+ * and the sentence falls back to the number.
+ */
+async function outlinesOf(input: ActInput): Promise<OutlineIndex> {
+  const index = new Map<number, string>();
+  try {
+    const { data, error } = await input.supabase
+      .from('plan_item_outlines')
+      .select('number, outline')
+      .eq('user_id', input.userId);
+    if (!error) {
+      for (const row of (data ?? []) as { number: number; outline: string }[]) index.set(Number(row.number), row.outline);
+    }
+  } catch {
+    // Named by number instead, which still finds the step.
+  }
+  return index;
+}
+
+/** The step a raise's text names: `#1073.4` by its outline, or `#1084` by its number. */
+async function numberNamed(input: ActInput): Promise<number | null> {
+  const text = input.action.text?.trim() ?? '';
+  if (!text) return null;
+  const number = numberFromRef(text, text.includes('.') ? await outlinesOf(input) : new Map());
+  return number !== null && Number.isInteger(number) && number > 0 ? number : null;
 }
 
 /**
@@ -747,7 +778,7 @@ async function sendStep(input: ActInput): Promise<ActOutcome> {
     const open = batch.steps === 1 ? 'one open step' : `${batch.steps} open steps`;
     return {
       ok: true,
-      said: `Sent #${batch.number} ${batch.title} to be built, with ${open}. ${batch.detail}`,
+      said: `Sent ${refFor(batch.number, await outlinesOf(input))} ${batch.title} to be built, with ${open}. ${batch.detail}`,
     };
   }
 
@@ -764,7 +795,7 @@ async function sendStep(input: ActInput): Promise<ActOutcome> {
       : `, with the ${sent.beneath === 1 ? 'step' : `${sent.beneath} steps`} beneath it`;
   return {
     ok: true,
-    said: `Sent #${sent.number} ${sent.title} to be built${withThem}. ${sent.detail}`,
+    said: `Sent ${refFor(sent.number, await outlinesOf(input))} ${sent.title} to be built${withThem}. ${sent.detail}`,
   };
 }
 
@@ -818,9 +849,11 @@ async function buildStep(input: ActInput): Promise<ActOutcome> {
   if (!written) return { ok: false, why: 'I could not add that step, so nothing was started.' };
   // Recorded before the hand-over, as written: once a session takes it the
   // row has moved on, and the record rightly will not take it back.
-  await recordAdded(input, 'build_step', 'plan_items', written.id, `Added #${written.number}: ${row.title}`);
+  const outlines = await outlinesOf(input);
+  const name = refFor(written.number, outlines);
+  await recordAdded(input, 'build_step', 'plan_items', written.id, `Added ${name}: ${row.title}`);
 
-  const opening = `Added #${written.number} ${placeOf(row)}`;
+  const opening = `Added ${name} ${placeOf(row)}`;
   const sent = await handStepToClaude({
     supabase: input.supabase,
     userId: input.userId,
@@ -860,8 +893,8 @@ async function buildStep(input: ActInput): Promise<ActOutcome> {
  * the hand-over refuses, the steps stay written and the thread says so.
  */
 async function splitFeature(input: ActInput): Promise<ActOutcome> {
-  const number = Number(input.action.text?.trim().replace(/^#/, ''));
-  if (!Number.isInteger(number) || number <= 0) {
+  const number = await numberNamed(input);
+  if (number === null) {
     return { ok: false, why: 'This raise does not name a feature by number, so nothing was split.' };
   }
 
@@ -945,11 +978,14 @@ async function splitFeature(input: ActInput): Promise<ActOutcome> {
     .slice()
     .sort((a, b) => a.position - b.position);
   if (written.length === 0) return { ok: false, why: `I could not split #${number}, so nothing was started.` };
+  // Read after the insert, so the new steps have their places.
+  const outlines = await outlinesOf(input);
+  const name = (n: number) => refFor(n, outlines);
   for (const row of written) {
-    await recordAdded(input, 'add_step', 'plan_items', row.id, `Added #${row.number} under #${number}: ${row.title}`);
+    await recordAdded(input, 'add_step', 'plan_items', row.id, `Added ${name(row.number)} under ${name(number)}: ${row.title}`);
   }
 
-  const list = written.map((row) => `#${row.number} ${row.title}`).join('\n');
+  const list = written.map((row) => `${name(row.number)} ${row.title}`).join('\n');
   const opening = `Split #${number} ${feature.title} into ${written.length} steps, ready to build`;
   const sent = await handStepToClaude({ supabase: input.supabase, userId: input.userId, id: written[0].id });
   if (!sent.ok) {
@@ -961,7 +997,7 @@ async function splitFeature(input: ActInput): Promise<ActOutcome> {
   }
   return {
     ok: true,
-    said: `${opening}, and sent #${written[0].number} to be built. ${sent.detail}\n\n${list}`,
+    said: `${opening}, and sent ${name(written[0].number)} to be built. ${sent.detail}\n\n${list}`,
     redraw: '/dev/plan',
   };
 }

@@ -221,9 +221,10 @@ describe('nightFrom', () => {
       since: SINCE,
     });
 
+    // Named by its place under the feature, as the plan page heads the row.
     expect(night?.closed).toEqual([
       {
-        ref: `#${closed.number}`,
+        ref: `#${feature.number}.1`,
         title: 'Store what the runner is doing',
         feature: { ref: `#${feature.number}`, title: 'One tab for your day' },
         ask: null,

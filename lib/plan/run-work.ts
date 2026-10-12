@@ -145,7 +145,39 @@ export type WorkRow = {
   updatedAt: string;
   completedAt: string | null;
   blockedAt: string | null;
+  /** Its place among its siblings, which the outline is counted by. */
+  position?: number;
 };
+
+/**
+ * Where a row sits ("1073.4"), counted the way `buildPlanTree` counts it:
+ * a top-level row is its number, and a child is its parent's outline and its
+ * place among its siblings by position, then age, then number. Null when a
+ * row on the way up has no number.
+ */
+export function outlineOf(rows: readonly WorkRow[], id: string): string | null {
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const row = byId.get(id);
+  if (!row) return null;
+  if (!row.parentId || !byId.has(row.parentId)) {
+    return row.number === null ? null : String(row.number);
+  }
+  const above = outlineOf(rows, row.parentId);
+  if (above === null) return null;
+  const siblings = rows
+    .filter((other) => other.parentId === row.parentId)
+    .sort(
+      (a, b) =>
+        (a.position ?? 0) - (b.position ?? 0) ||
+        a.createdAt.localeCompare(b.createdAt) ||
+        (a.number ?? 0) - (b.number ?? 0),
+    );
+  return `${above}.${siblings.findIndex((other) => other.id === id) + 1}`;
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 /** Every row beneath a root, not counting the root. */
 export function beneath(rows: readonly WorkRow[], root: string): WorkRow[] {
@@ -205,7 +237,7 @@ export function featureWork(
  * A re-shape of a feature that has already closed writes nothing inside it
  * and raises a new top-level feature whose detail names it instead, so those
  * are counted too: `named` is the top-level rows written in the window whose
- * detail mentions the feature's number.
+ * detail names the feature, by its number or its outline.
  */
 export function reshapeWork(
   rows: readonly WorkRow[],
@@ -217,15 +249,21 @@ export function reshapeWork(
   const written = under.filter(
     (row) => within(row.createdAt, window) || (row.status === 'dropped' && within(row.updatedAt, window)),
   ).length;
+  // Named by its number in older text and by its outline in newer, and not
+  // by a step under it: `#1073` does not name 1073 when it is `#1073.4`.
   const number = rows.find((row) => row.id === root)?.number ?? null;
+  const outline = outlineOf(rows, root);
+  const refs = [number === null ? null : String(number), outline].filter(
+    (ref): ref is string => ref !== null,
+  );
+  const pattern = refs.length
+    ? new RegExp(`#(?:${[...new Set(refs)].map(escapeRegExp).join('|')})(?!\\.?\\d)`)
+    : null;
   const raised =
-    number === null
+    pattern === null
       ? 0
-      : named.filter(
-          (row) =>
-            within(row.createdAt, window) &&
-            new RegExp(`#${number}(?!\\d)`).test(row.detail ?? ''),
-        ).length;
+      : named.filter((row) => within(row.createdAt, window) && pattern.test(row.detail ?? ''))
+          .length;
   return { done: written + raised };
 }
 

@@ -20,6 +20,7 @@
  */
 import { elapsedSince } from './elapsed';
 import { refusalStanding } from './liveness';
+import { numberFromRef, stepRef, type OutlineIndex } from './ref';
 import { RUN_JOB_LABEL, type LastRun, type RunJob, type RunStatus, type StoredRunReading } from './run-end';
 
 /**
@@ -32,6 +33,8 @@ import { RUN_JOB_LABEL, type LastRun, type RunJob, type RunStatus, type StoredRu
  */
 export type StepClosure = {
   number: number;
+  /** Where it sits ("1073.4"), which is how it is named and how newer text names it. */
+  outline?: string | null;
   title: string;
   status: string;
   completedAt: string | null;
@@ -50,10 +53,31 @@ export type RunRaise = {
   createdAt: string;
 };
 
-/** The steps named in a raise's source, `plan #501 re-shape` being two words and one number. */
-export function sourceNumbers(source: string | null | undefined): number[] {
+/**
+ * The steps named in a raise's source, `plan #501 re-shape` being two words
+ * and one number.
+ *
+ * Newer sources name a step by its outline, `plan #1073.4`, and an outline is
+ * looked up in `outlines` to the step it names today. One the index does not
+ * know names no step here and is skipped; without an index only the old
+ * `#501` form is read.
+ */
+export function sourceNumbers(
+  source: string | null | undefined,
+  outlines?: OutlineIndex,
+): number[] {
   if (!source) return [];
-  return [...source.matchAll(/#(\d+)/g)].map((match) => Number(match[1]));
+  const numbers: number[] = [];
+  for (const match of source.matchAll(/#(\d+(?:\.\d+)*)/g)) {
+    const ref = match[1];
+    if (!ref.includes('.')) {
+      numbers.push(Number(ref));
+      continue;
+    }
+    const number = outlines ? numberFromRef(ref, outlines) : null;
+    if (number !== null) numbers.push(number);
+  }
+  return numbers;
 }
 
 function at(iso: string | null | undefined): number {
@@ -95,6 +119,8 @@ export function raisesFiledSince(
   raises: readonly RunRaise[],
   numbers: readonly number[],
   startedAt: string,
+  /** The outlines of those steps, so a source naming `#1073.4` is read too. */
+  outlines?: OutlineIndex,
 ): RunRaise[] {
   const fired = at(startedAt);
   if (!Number.isFinite(fired) || numbers.length === 0) return [];
@@ -103,7 +129,7 @@ export function raisesFiledSince(
     .filter((raise) => {
       const filed = at(raise.createdAt);
       if (!Number.isFinite(filed) || filed < fired) return false;
-      return sourceNumbers(raise.source).some((number) => wanted.has(number));
+      return sourceNumbers(raise.source, outlines).some((number) => wanted.has(number));
     })
     .sort((a, b) => at(a.createdAt) - at(b.createdAt));
 }
@@ -153,6 +179,11 @@ export function runWork(input: {
       input.raises,
       input.steps.map((step) => step.number),
       run.createdAt,
+      new Map(
+        input.steps.flatMap((step) =>
+          step.outline ? [[step.number, step.outline] as [number, string]] : [],
+        ),
+      ),
     ),
   };
 }
@@ -215,7 +246,7 @@ export function pushLine(push: NonNullable<StoredRunReading['lastPush']>, now: n
 export function closedLine(work: RunWork): string | null {
   if (work.closed.length === 0) return null;
   const steps = work.closed
-    .map((step) => `#${step.number} ${step.title}${step.status === 'dropped' ? ' (dropped)' : ''}`)
+    .map((step) => `${stepRef(step)} ${step.title}${step.status === 'dropped' ? ' (dropped)' : ''}`)
     .join(', ');
   return `Closed ${steps}`;
 }

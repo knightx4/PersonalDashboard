@@ -100,6 +100,16 @@ describe('criticStopAsk', () => {
     expect(isCriticStopAsk(null)).toBe(false);
   });
 
+  it('names a step by its outline, and keeps the number in the shots path', () => {
+    const stepAsk = criticStopAsk({
+      owner: 1609,
+      outline: '1590.3',
+      surfaces: [{ surface: 's', round: 3, fixes: 1, uploaded: true }],
+    });
+    expect(stepAsk).toContain("#1590.3's screen");
+    expect(stepAsk).toContain('ui-shots under 1609/s/r3');
+  });
+
   it('names a note by its id', () => {
     const note = criticStopAsk({
       owner: '0b6f0f5e-1111-4222-8333-944444444444',
@@ -114,6 +124,15 @@ describe('criticStopAsk', () => {
 });
 
 describe('criticStopBlockSql', () => {
+  it('names the step by its outline in the recorded action, and matches on the number', () => {
+    const sql = criticStopBlockSql({ step: 1609, outline: '1590.3', ask: 'x', date: '2026-10-04' });
+    expect(sql).toContain('Dash stopped step #1590.3');
+    expect(sql).toContain('number = 1609');
+    expect(() =>
+      criticStopBlockSql({ step: 1609, outline: "1'; drop", ask: 'x', date: '2026-10-04' }),
+    ).toThrow();
+  });
+
   it('blocks on the person with the ask, and records it', () => {
     const sql = criticStopBlockSql({ step: 1609, ask: "#1609's screen", date: '2026-10-04' });
     expect(sql).toContain("status = 'blocked', block_ask = $a$#1609's screen$a$, block_kind = 'outside'");
