@@ -5,6 +5,7 @@ import { SendScreenBack } from '@/app/dev/plan/send-back';
 import { FeaturePage } from '@/app/dev/plan/feature-page';
 import type { PlanUpdate } from '@/lib/plan/updates';
 import { catalogOf } from '@/app/dev/plan/plan-catalog';
+import { MONTH_DAYS } from './burn-up-surfaces';
 import { SetTab } from './set-tab';
 import { ScreenChanges } from '@/components/dev/screen-change';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
@@ -906,6 +907,7 @@ function FeatureFixture({ editing = false }: { editing?: boolean }) {
       overdueDays={9}
       activity={featureActivitySources}
       comingBack={featureComingBack}
+      scopeDays={MONTH_DAYS}
       commitChecks={{
         '79074ffd': {
           mergeSha: '79074ffd',

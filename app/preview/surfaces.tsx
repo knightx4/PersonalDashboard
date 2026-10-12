@@ -1,4 +1,5 @@
 import { askListFilter, askListLabel } from '@/lib/ask/list-filter';
+import { BurnUpSurface } from './burn-up-surfaces';
 import { filterPipeline, parsePipeline } from '@/lib/jobs/pipeline-view';
 import { RoleDetailPanels, type PanelProps } from '@/app/jobs/(app)/roles/[id]/panels';
 import type { DiscoveredCompany } from '@/lib/jobs/discover/watchlist-view';
@@ -3520,6 +3521,16 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <PlanOpenedSurface />,
+  },
+  {
+    /* The burn-up chart on a goal's or feature's Overview (plan #1837): a
+     * month with scope added twice, a three-day run, and two days, which
+     * draw nothing. */
+    id: 'scope-burn-up',
+    label: 'Steps over time · burn-up chart',
+    module: 'goals',
+    width: 'page',
+    render: () => <BurnUpSurface />,
   },
   {
     /* A feature's own page (plan #1664): breadcrumbs, the Overview tab with
