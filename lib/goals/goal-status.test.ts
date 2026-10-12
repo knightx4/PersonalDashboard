@@ -119,7 +119,7 @@ describe('statusLine', () => {
         { yourMove: [row, row], moreSteps: 1, claudeReady: 4 },
         { running: 1, dueOn: '2026-10-31', lastProgressOn: '2026-10-03' },
       ),
-    ).toBe('3 on you · Dash on 1 · due 31 Oct · last progress 3 Oct');
+    ).toBe('3 on you · Dash on 1 · by 31 Oct 2026 · last progress 3 Oct');
   });
 
   it('says how many steps are ready for Dash when no run is going, and when nothing is on you', () => {

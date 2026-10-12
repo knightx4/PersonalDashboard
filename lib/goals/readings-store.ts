@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
+import type { DuePrecision } from '@/lib/goals/due-precision';
 import type { NumberFrom, NumberFromHow, Reading } from '@/lib/goals/readings';
 
 /**
@@ -46,7 +47,12 @@ export async function loadReadings(client: GoalsSupabaseClient, goalId: string):
 export async function setGoalMeasure(
   client: GoalsSupabaseClient,
   goalId: string,
-  measure: { unit: string | null; target: number | null; dueOn?: string | null },
+  measure: {
+    unit: string | null;
+    target: number | null;
+    dueOn?: string | null;
+    duePrecision?: DuePrecision;
+  },
 ): Promise<boolean> {
   const { data, error } = await client
     .from('items')
@@ -54,7 +60,11 @@ export async function setGoalMeasure(
       unit: measure.unit,
       target: measure.unit ? measure.target : null,
       // Left alone unless the form sent it (plan #1025).
-      ...(measure.dueOn !== undefined ? { due_on: measure.dueOn } : {}),
+      // The precision goes in the same write, since the database refuses a
+      // date that is not the end of its period.
+      ...(measure.dueOn !== undefined
+        ? { due_on: measure.dueOn, due_precision: measure.duePrecision ?? 'day' }
+        : {}),
     })
     .eq('id', goalId)
     .eq('level', 'goal')

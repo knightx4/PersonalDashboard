@@ -12,6 +12,7 @@
  * Pure. The page passes in the goal's tree and flags.
  */
 import { dailyView, type WaitingItem } from '@/lib/goals/daily';
+import { formatDueBy, type DuePrecision } from '@/lib/goals/due-precision';
 import { formatDay } from '@/lib/goals/dates';
 import { stepAnchor } from '@/lib/goals/goal-page';
 import type { StepNode } from '@/lib/goals/steps';
@@ -152,11 +153,13 @@ export function statusLine(
   {
     running = 0,
     dueOn = null,
+    duePrecision = 'day',
     lastProgressOn = null,
     pace = null,
   }: {
     running?: number;
     dueOn?: string | null;
+    duePrecision?: DuePrecision;
     lastProgressOn?: string | null;
     /** The goal's pace in words, from `paceLine` in lib/goals/pace.ts. */
     pace?: string | null;
@@ -170,7 +173,7 @@ export function statusLine(
       : view.claudeReady > 0
         ? `${plural(view.claudeReady, 'step', 'steps')} ready for Dash`
         : null,
-    dueOn ? `due ${formatDay(dueOn)}` : null,
+    dueOn ? formatDueBy(dueOn, duePrecision) : null,
     pace ?? (lastProgressOn ? `last progress ${formatDay(lastProgressOn)}` : null),
   ]
     .filter(Boolean)
