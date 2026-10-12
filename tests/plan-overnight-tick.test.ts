@@ -831,7 +831,7 @@ describe('heldRaise', () => {
       retryAt: null,
     });
 
-    expect(raise.ask).toBe('Send #1660 Quick notes in the vault to a session again?');
+    expect(raise.ask).toBe('Try #1660 Quick notes in the vault again?');
     expect(raise.consequence).toMatchObject({ name: 'send_step', text: '#1660' });
     expect(raise.module).toBe('vault');
     // One per fire that closed nothing: the source names both.

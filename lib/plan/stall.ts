@@ -67,6 +67,57 @@ export type StallFeature = {
   module: string | null;
 };
 
+/** A step a raise names as the one its feature is stuck on. */
+export type StuckStep = { number: number; title: string };
+
+/**
+ * The step a feature's sessions were stuck on: its first build row that is
+ * neither done nor dropped, or null. Naming it lets the person see at a glance
+ * whether the step waits on something no session can supply, such as two
+ * weeks of data still to collect.
+ */
+export function stuckStep(feature: {
+  children: readonly { kind: string; status: string; number: number; title: string }[];
+}): StuckStep | null {
+  const row = feature.children.find(
+    (child) => child.kind === 'build' && child.status !== 'done' && child.status !== 'dropped',
+  );
+  return row ? { number: row.number, title: row.title } : null;
+}
+
+/**
+ * Whether a raise's `source` is one of the runner's own (a held or stalled
+ * feature), whose ids mean nothing to read. The raise page names the runner
+ * instead of printing them.
+ */
+export function isRunnerSource(source: string | null | undefined): boolean {
+  return raiseFeatureId(source) !== null;
+}
+
+/** The title every raise about a stuck feature carries. */
+export function stuckTitle(named: string): string {
+  return cut(`${named}: two sessions in a row finished nothing`, 200);
+}
+
+/** The one question a raise about a stuck feature asks when there is no split. */
+export function stuckAsk(named: string): string {
+  return cut(`Try ${named} again?`, 500);
+}
+
+/**
+ * The paragraph naming the step a feature is stuck on, with the reason the
+ * person most often needs: that a step waiting on time or on them will stop
+ * the same way if it is sent again. Empty with no step to name.
+ */
+export function stuckLine(step: StuckStep | null | undefined): string {
+  if (!step) return '';
+  return (
+    `The step it is stuck on is #${step.number} ${step.title}. If that step waits on something ` +
+    'that has not happened yet, such as data still to collect or a setup only you can do, ' +
+    'trying again will stop the same way. Close with a reason in that case.'
+  );
+}
+
 /** The two prefixes a raise about a held feature is filed under. */
 const HELD_PREFIX = 'overnight held ';
 const STALL_PREFIX = 'stalled ';
@@ -224,8 +275,8 @@ function day(at: string): string {
 /** One run's line in the raise: its own reason, or what the app noted. */
 function runLine(run: StallRun): string {
   if (run.stopReason) return `- ${day(run.createdAt)}: "${run.stopReason}"`;
-  if (run.error) return `- ${day(run.createdAt)}: the session said nothing; the app noted "${cut(run.error, 300)}"`;
-  return `- ${day(run.createdAt)}: the session said nothing.`;
+  if (run.error) return `- ${day(run.createdAt)}: the session left no note. ${cut(run.error, 300)}`;
+  return `- ${day(run.createdAt)}: the session left no note.`;
 }
 
 /**
@@ -247,6 +298,7 @@ export function stallRaise(
   feature: StallFeature,
   runs: readonly StallRun[],
   steps: number,
+  stuck: StuckStep | null = null,
 ): StallRaise {
   const named = `#${feature.number} ${feature.title}`;
   const two = runs.slice(0, STALL_RUNS);
@@ -263,27 +315,30 @@ export function stallRaise(
   };
   const source = `${STALL_PREFIX}${feature.id} runs ${two.map((run) => run.id).join(' ')}`;
   const after =
-    'Yes sends it again now. No leaves it held until you send it from its row on /dev/plan.';
+    'Yes tries it again now. Close with a reason keeps it paused until you send it from its ' +
+    'row on /dev/plan. Dismiss lets the overnight runner pick it up again on its own.';
+  const stuckText = stuckLine(stuck);
+
+  const lines = [
+    `Dash sent two sessions at ${named} and neither finished a step, so the overnight runner ` +
+      'has paused it rather than keep spending sessions on it. What each session ended with, newest first:',
+    '',
+    ...two.map(runLine),
+  ];
+  if (stuckText) lines.push('', stuckText);
 
   if (!reason) {
+    lines.push('', after);
     return {
       module: feature.module,
-      title: cut(`${named} is held: its last two sessions closed nothing`, 200),
-      ask: cut(`Send ${named} to a session again?`, 500),
-      detail:
-        `The last two sessions sent at ${named} closed no step and neither said why, so the ` +
-        `overnight runner stopped sending it. ${after} The blocked steps and threads under it ` +
-        'say where the sessions stopped.',
+      title: stuckTitle(named),
+      ask: stuckAsk(named),
+      detail: cut(lines.join('\n'), 4000),
       consequence,
       source,
     };
   }
 
-  const lines = [
-    `The last two sessions sent at ${named} closed no step, so the overnight runner holds it. Why they stopped, newest first:`,
-    '',
-    ...two.map(runLine),
-  ];
   if (pieces && split) {
     lines[0] = `This covers ${pieces.length} pieces of work. ${lines[0]}`;
     lines.push(
@@ -291,13 +346,13 @@ export function stallRaise(
       `The last session found it too big for one sitting and would split it into these ${pieces.length} steps:`,
       ...pieces.map((piece, index) => `${index + 1}. ${piece}`),
       '',
-      'Yes writes them as steps under it, ready to build, and sends the first. No leaves it ' +
-        'held until you send it from its row on /dev/plan. To change something first, say ' +
-        'what in your answer.',
+      'Yes writes them as steps under it, ready to build, and sends the first. Close with a ' +
+        'reason keeps it paused until you send it from its row on /dev/plan. To change ' +
+        'something first, say what in your answer.',
     );
     return {
       module: feature.module,
-      title: cut(`${named} closed nothing in two sessions`, 200),
+      title: stuckTitle(named),
       ask: cut(`Split ${named} into ${pieces.length} steps?`, 500),
       detail: cut(lines.join('\n'), 4000),
       consequence,
@@ -319,7 +374,7 @@ export function stallRaise(
 
   return {
     module: feature.module,
-    title: cut(`${named} closed nothing in two sessions`, 200),
+    title: stuckTitle(named),
     ask: cut(ask, 500),
     detail: cut(lines.join('\n'), 4000),
     consequence,

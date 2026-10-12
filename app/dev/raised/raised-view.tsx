@@ -32,6 +32,7 @@ import { RAISED_HEALTH_WORD } from '@/lib/dev/words';
 import { RAISED_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { InboxOverview, inboxAnchor, type InboxCell } from '@/components/inbox/overview';
+import { isRunnerSource } from '@/lib/plan/stall';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -278,8 +279,14 @@ function RaiseCard({ row, titles }: { row: RaisedRow; titles?: PlanRefTitles }) 
       )}
 
       {/* Which run raised it. Without this a raise is a voice from nowhere, and
-          the first thing you want to know is what it was doing at the time. */}
-      {row.source && <p className="text-small text-ink-muted">Raised by {row.source}</p>}
+          the first thing you want to know is what it was doing at the time.
+          The runner's own sources are ids that mean nothing to read, so it is
+          named instead. */}
+      {row.source && (
+        <p className="text-small text-ink-muted">
+          Raised by {isRunnerSource(row.source) ? 'the overnight runner' : row.source}
+        </p>
+      )}
 
       {/* One thread, two ways into it. The buttons answer the ask it named;
           what you write here is an answer in your own words, and it starts a

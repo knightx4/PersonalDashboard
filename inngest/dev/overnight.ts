@@ -35,8 +35,13 @@ import {
   shouldRaiseStall,
   stallRaise,
   STALL_JOBS,
+  stuckAsk,
+  stuckLine,
+  stuckStep,
+  stuckTitle,
   type FeatureRaise,
   type StallRun,
+  type StuckStep,
 } from '@/lib/plan/stall';
 import { endQuietRuns } from '@/lib/plan/runs';
 import { subtreeBlockedAt, subtreeClosedAt, subtreeTrail } from '@/lib/plan/subtree';
@@ -323,6 +328,8 @@ export type PassedOver = {
   lastFiredAt: string;
   /** When the one retry is due, or null when the retry has been spent. */
   retryAt: string | null;
+  /** The step its sessions were stuck on (`stuckStep`), for the raise. */
+  stuckOn?: StuckStep | null;
 };
 
 /** What the tick's chooser says, with the features it passed over on the way. */
@@ -356,7 +363,9 @@ export function heldBack(
     module: feature.module,
     lastFiredAt: last,
   };
-  if (previous && closedNothingSince(feature, previous)) return { ...said, retryAt: null };
+  if (previous && closedNothingSince(feature, previous)) {
+    return { ...said, retryAt: null, stuckOn: stuckStep(feature) };
+  }
   const retry = new Date(last).getTime() + OVERNIGHT_RETRY_AFTER_MINUTES * 60_000;
   if (now >= retry) return null;
   return { ...said, retryAt: new Date(retry).toISOString() };
@@ -409,14 +418,20 @@ export function heldRaise(one: PassedOver): {
   source: string;
 } {
   const named = `#${one.number} ${one.title}`;
+  const stuck = stuckLine(one.stuckOn);
   return {
     module: one.module,
-    title: `${named} is held: its last two sessions closed nothing`.slice(0, 200),
-    ask: `Send ${named} to a session again?`.slice(0, 500),
-    detail:
-      `The overnight runner sent ${named} twice and neither session closed a step, so it ` +
-      'stopped sending it. Yes sends it again now. No leaves it held until you send it from ' +
-      'its row on /dev/plan. The blocked steps and threads under it say where the sessions stopped.',
+    title: stuckTitle(named),
+    ask: stuckAsk(named),
+    detail: [
+      `The overnight runner sent ${named} to two sessions and neither finished a step, so it ` +
+        'has paused it rather than keep spending sessions on it.',
+      stuck,
+      'Yes tries it again now. Close with a reason keeps it paused until you send it from its ' +
+        'row on /dev/plan.',
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
     consequence: {
       name: 'send_step',
       text: `#${one.number}`,
@@ -877,6 +892,45 @@ type StallRunRow = {
   error: string | null;
 };
 
+/**
+ * Dismiss the open raises about features that are done or dropped. A failure
+ * is logged: a stale raise costs a glance, and the tick has work to do.
+ */
+async function dismissFinished(
+  supabase: Db,
+  userId: string,
+  finished: ReadonlySet<string>,
+): Promise<void> {
+  if (finished.size === 0) return;
+  const { data, error } = await supabase
+    .from('raised_items')
+    .select('id, source')
+    .eq('user_id', userId)
+    .eq('status', 'open')
+    .or('source.like.overnight held *,source.like.stalled *');
+  if (error) {
+    console.error(`the raises about finished features could not be read: ${error.message}`);
+    return;
+  }
+  const stale = ((data ?? []) as { id: string; source: string | null }[])
+    .filter((row) => {
+      const feature = raiseFeatureId(row.source);
+      return feature !== null && finished.has(feature);
+    })
+    .map((row) => row.id);
+  if (stale.length === 0) return;
+  const { error: writeError } = await supabase
+    .from('raised_items')
+    .update({ status: 'dismissed' })
+    .eq('user_id', userId)
+    .in('id', stale);
+  if (writeError) {
+    console.error(`the raises about finished features could not be dismissed: ${writeError.message}`);
+  } else {
+    console.log(`overnight: dismissed ${stale.length} raise(s) about finished features.`);
+  }
+}
+
 type HeldRaiseRow = {
   source: string | null;
   status: string;
@@ -901,14 +955,18 @@ export async function fileStalls(input: {
 }): Promise<string[]> {
   const { supabase, userId, sections } = input;
 
-  // The approved features, and every row beneath each, by id.
+  // The approved features, and every row beneath each, by id. The finished
+  // ones are kept apart so a raise still open about one can be put away.
   const features = new Map<string, PlanNode>();
   const featureOf = new Map<string, string>();
+  const finished = new Set<string>();
   for (const section of sections) {
     for (const node of section.nodes) {
-      if (node.status === 'done' || node.status === 'dropped' || node.status === 'proposed') {
+      if (node.status === 'done' || node.status === 'dropped') {
+        finished.add(node.id);
         continue;
       }
+      if (node.status === 'proposed') continue;
       features.set(node.id, node);
       for (const row of flatten([node])) featureOf.set(row.id, node.id);
     }
@@ -938,6 +996,11 @@ export async function fileStalls(input: {
   const readError = runRead.error ?? heldRead.error ?? stallRead.error;
   if (readError) throw new Error(readError.message);
 
+  // A raise asking to send a feature that has since been finished asks
+  // nothing: #1104 was done on 11 October with its "send it again?" still
+  // open. Dismissed rather than answered, since nobody answered it.
+  await dismissFinished(supabase, userId, finished);
+
   const runs: StallRun[] = ((runRead.data ?? []) as StallRunRow[]).map((row) => ({
     id: row.id,
     planItemId: row.plan_item_id,
@@ -966,7 +1029,7 @@ export async function fileStalls(input: {
     if (shouldRaiseStall(last, filed)) {
       const { error } = await supabase
         .from('raised_items')
-        .insert({ user_id: userId, ...stallRaise(feature, last, featureSteps(feature)), status: 'open' });
+        .insert({ user_id: userId, ...stallRaise(feature, last, featureSteps(feature), stuckStep(feature)), status: 'open' });
       if (error) {
         console.error(`#${feature.number} could not be raised as stalled: ${error.message}`);
       } else {

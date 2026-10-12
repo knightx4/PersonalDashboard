@@ -14,6 +14,8 @@ import {
   runsByFeature,
   shouldRaiseStall,
   stallRaise,
+  stuckStep,
+  isRunnerSource,
   type FeatureRaise,
   type StallRun,
 } from './stall';
@@ -133,11 +135,55 @@ describe('raiseFeatureId', () => {
   });
 });
 
+describe('stuckStep', () => {
+  it('names the first build step not yet done or dropped', () => {
+    expect(
+      stuckStep({
+        children: [
+          { kind: 'build', status: 'done', number: 1, title: 'Done' },
+          { kind: 'decision', status: 'not_started', number: 2, title: 'A question' },
+          { kind: 'build', status: 'dropped', number: 3, title: 'Dropped' },
+          { kind: 'build', status: 'in_progress', number: 4, title: 'Tune it from two weeks of undos' },
+        ],
+      }),
+    ).toEqual({ number: 4, title: 'Tune it from two weeks of undos' });
+    expect(stuckStep({ children: [] })).toBeNull();
+  });
+});
+
+describe('isRunnerSource', () => {
+  it('tells the runner id sources from a readable one', () => {
+    expect(isRunnerSource('stalled f1 runs r2 r1')).toBe(true);
+    expect(isRunnerSource('overnight held f1 after 2026-10-11T10:00:00Z')).toBe(true);
+    expect(isRunnerSource('plan #12')).toBe(false);
+    expect(isRunnerSource(null)).toBe(false);
+  });
+});
+
 describe('stallRaise', () => {
+  it('says what each session ended with and names the step it is stuck on', () => {
+    const raise = stallRaise(
+      FEATURE,
+      [
+        { ...NEWER, error: 'Nothing was pushed in the 32m after this run started.' },
+        OLDER,
+      ],
+      5,
+      { number: 1135, title: 'Tune which evidence closes a step from two weeks of undos' },
+    );
+    expect(raise.detail).toContain(
+      '- 2026-10-11: the session left no note. Nothing was pushed in the 32m after this run started.',
+    );
+    expect(raise.detail).toContain(
+      'The step it is stuck on is #1135 Tune which evidence closes a step from two weeks of undos.',
+    );
+    expect(raise.detail).not.toContain('neither said why');
+  });
+
   it('asks to send it again when neither session said why', () => {
     const raise = stallRaise(FEATURE, [NEWER, OLDER], 0);
-    expect(raise.title).toBe('#1801 Raise a stalled feature is held: its last two sessions closed nothing');
-    expect(raise.ask).toBe('Send #1801 Raise a stalled feature to a session again?');
+    expect(raise.title).toBe('#1801 Raise a stalled feature: two sessions in a row finished nothing');
+    expect(raise.ask).toBe('Try #1801 Raise a stalled feature again?');
     expect(raise.consequence).toMatchObject({ name: 'send_step', text: '#1801' });
     expect(raise.source).toBe('stalled f1 runs r2 r1');
   });
@@ -152,7 +198,7 @@ describe('stallRaise', () => {
     );
     expect(raise.detail).toContain('- 2026-10-11: "Main was red from another merge."');
     expect(raise.detail).toContain(
-      '- 2026-10-10: the session said nothing; the app noted "Nothing was heard from this run for 2h."',
+      '- 2026-10-10: the session left no note. Nothing was heard from this run for 2h.',
     );
     expect(raise.consequence.name).toBe('send_step');
   });
