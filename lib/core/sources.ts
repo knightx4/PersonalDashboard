@@ -107,6 +107,7 @@ export const coreSources: ModuleSources = {
     { table: 'core.day_briefs', reason: 'The morning brief: up to three picks from the agenda, replies, bills, goals and Dash\'s results, derived each day.' },
     { table: 'core.drafted_messages', reason: 'Follow-ups and return requests Dash wrote from the pipeline and orders, waiting to be sent.' },
     { table: 'core.email_accounts', reason: 'Mailbox connections and their tokens.' },
+    { table: 'core.inbox_snoozes', reason: 'Inbox rows put aside until a later day, keyed by the row they hide; a setting of the inbox, not something they wrote.' },
     { table: 'core.inbox_catch_ups', reason: 'Sync bookkeeping.' },
     { table: 'core.page_views', reason: 'Which pages they opened and when, by route pattern, for the Usage tab in Dev and the vision review.' },
     { table: 'core.page_view_days', reason: 'Daily counts of page opens older than 180 days, rolled up from core.page_views.' },
