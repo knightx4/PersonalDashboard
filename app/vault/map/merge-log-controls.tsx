@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Button } from '@/components/ui/button';
+import { ConfirmStep } from '@/components/ui/confirm-step';
 import { FieldError, InlineInput } from '@/components/ui/field';
 import { renameTheme, undoMerge } from './actions';
+import { MERGE_NAME } from './merge-name';
 
 /**
  * The two things a merge log row lets you do (plan #821): undo the merge, and
@@ -12,28 +13,20 @@ import { renameTheme, undoMerge } from './actions';
  */
 
 export function UndoMergeButton({ mergeId }: { mergeId: string }) {
-  const [pending, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-
   return (
-    <span className="flex flex-col items-end gap-1">
-      <Button
-        type="button"
-        variant="secondary"
-        size="sm"
-        pending={pending}
-        onClick={() =>
-          start(async () => {
-            setError(null);
-            const result = await undoMerge(mergeId);
-            if (result.error) setError(result.error);
-          })
-        }
-      >
-        {pending ? 'Undoing…' : 'Undo'}
-      </Button>
-      {error && <FieldError>{error}</FieldError>}
-    </span>
+    <ConfirmStep
+      variant="secondary"
+      confirmVariant="primary"
+      confirmLabel="Undo merge"
+      pendingLabel="Undoing…"
+      prompt="Puts both sides back as they were. The map will not merge that pair again."
+      onConfirm={async () => {
+        const result = await undoMerge(mergeId);
+        if (result.error) throw new Error(result.error);
+      }}
+    >
+      Undo
+    </ConfirmStep>
   );
 }
 
@@ -83,7 +76,7 @@ export function SurvivorName({ themeId, name }: { themeId: string; name: string 
             setError(null);
           }
         }}
-        className="font-medium"
+        className={`${MERGE_NAME} -ml-[5px]`}
       />
       {pending && <span className="block px-1 text-small text-ink-muted">Renaming…</span>}
       {error && <FieldError>{error}</FieldError>}

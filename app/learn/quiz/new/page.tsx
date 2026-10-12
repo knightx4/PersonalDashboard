@@ -14,10 +14,7 @@ export const dynamic = 'force-dynamic';
 export default function NewQuizPage() {
   return (
     <>
-      <PageHeader
-        title="New quiz"
-        description="Pick a few notes, paste anything else, and say what you are preparing for. The questions get written from that material and answered in your own words."
-      />
+      <PageHeader title="New quiz" />
 
       <div className="max-w-2xl">
         <QuizForm maxPasteChars={MAX_PASTE_CHARS} />

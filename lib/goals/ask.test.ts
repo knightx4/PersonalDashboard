@@ -233,7 +233,7 @@ describe('the goal thread on the shared loop', () => {
   it('offers the lookups, the writes and the goal\'s own tools, on Sonnet', async () => {
     script(answerCall('Start with the servicer.'));
     await askDashOnGoal(input({ question: 'what first?' }));
-    expect(model.sent[0].model).toBe('claude-sonnet-5');
+    expect(model.sent[0].model).toBe('claude-sonnet-5-5');
     const names = model.sent[0].tools.map((t) => t.name);
     expect(names).toEqual(
       expect.arrayContaining(['search', 'goal_status', 'add_todo', 'close_goal_step', 'file_goal_record', 'schedule_goal_step', 'take_step', 'pass_to_routine']),

@@ -14,7 +14,7 @@ import { ClipsEmpty } from '@/app/learn/clips/empty';
  *
  * The player is only mounted when the URL asks for it. The page opening is
  * the session the picker counts two clips a video against, so a visit to the
- * list should not start one, and below lg the player covers the whole screen.
+ * list should not start one.
  */
 
 /** Where the old Clips tab, and the Watch as clips button, now land. */
@@ -23,15 +23,19 @@ export const CLIPS_HREF = '/learn/videos?open=clips#clips';
 export function ClipsSection({
   progress,
   player,
+  count,
 }: {
+  /** Clips cut so far; with none, and the player not open, the fold is left out. */
+  count: number;
   /** What is cut, what is left and when the next batch comes. */
   progress: string;
-  /** The clips to play and the session they belong to, when the player is open. */
-  player: { clips: PlayerClip[]; startedAt: string } | null;
+  /** The clips to play, when the player is open. */
+  player: { clips: PlayerClip[] } | null;
 }) {
+  if (count === 0 && player === null) return null;
   return (
     <div id="clips" className="mt-8 scroll-mt-6">
-      <SectionFold title="Clips" defaultOpen={player !== null}>
+      <SectionFold title="Clips" count={count} defaultOpen={player !== null}>
         <p className="text-small tabular-nums text-ink-muted">{progress}</p>
         {player === null ? (
           <div>
@@ -43,7 +47,7 @@ export function ClipsSection({
         ) : player.clips.length === 0 ? (
           <ClipsEmpty />
         ) : (
-          <ClipStream initial={player.clips} startedAt={player.startedAt} />
+          <ClipStream initial={player.clips} />
         )}
       </SectionFold>
     </div>

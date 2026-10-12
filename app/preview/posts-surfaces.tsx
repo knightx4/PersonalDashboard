@@ -1,6 +1,11 @@
-import { PostsScreen } from '@/app/dev/posts/posts-view';
+import { PostList, PostsScreen } from '@/app/dev/posts/posts-view';
+import { XPostList } from '@/app/dev/posts/x-posts';
+import { SectionFold } from '@/components/ui/disclosure';
+import { WritePost } from '@/app/dev/posts/write-post';
+import { XConnection } from '@/app/dev/posts/x-connection';
+import { xConnectNotice } from '@/lib/x/account';
 import { socialPostFromRow } from '@/lib/dev/posts';
-import { buildPostsPage } from '@/lib/dev/posts-page';
+import { buildPostsPage, type XStoredPost } from '@/lib/dev/posts-page';
 
 /**
  * Dev's Posts tab (plan #1419) in the surface gallery: two drafts waiting,
@@ -19,6 +24,8 @@ const base = {
   posted_at: null,
   dropped_at: null,
   run_id: 'r1',
+  x_post_id: null,
+  x_candidate_id: null,
 };
 
 const ROWS = [
@@ -90,7 +97,92 @@ export function PostsSurface() {
     run: { id: 'r1', status: 'finished', createdAt: '2026-10-02T07:55:00Z', error: null, drafts: 2 },
     now: NOW,
   });
-  return <PostsScreen page={page} />;
+  return (
+    <PostsScreen
+      page={page}
+      x={{ state: 'connected', handle: 'selveyknight', lastSyncedAt: '2026-10-02T06:00:00Z' }}
+    />
+  );
+}
+
+/* -------------------------------------------------------------------------
+ * Matched to X (plan #1820)
+ * ---------------------------------------------------------------------- */
+
+/** The post a near match asks about: the draft below, reworded on X. */
+const CANDIDATE: XStoredPost = {
+  xPostId: '1844000000000000001',
+  text: 'Every button in my app that calls a model now shows what one press costs, based on what it cost before. A test walks each server action and fails the merge if one reaches a model with no hint by its button.',
+  url: 'https://x.com/selveyknight/status/1844000000000000001',
+  createdAt: '2026-10-01T17:20:00Z',
+  threadPosts: 2,
+};
+
+/** Posts on X that match no draft: a thread, a long post past 280, a short one. */
+const ON_X: XStoredPost[] = [
+  {
+    xPostId: '1844000000000000003',
+    text: 'Spent the morning teaching the dashboard to read my own posts back from X. The first read pages through every post X will return, which is the latest 3,200, and costs about three dollars once.',
+    url: 'https://x.com/selveyknight/status/1844000000000000003',
+    createdAt: '2026-10-02T08:10:00Z',
+    threadPosts: 3,
+  },
+  {
+    xPostId: '1844000000000000002',
+    text: 'A long one, the kind X keeps as a note: the dashboard now has a gate that runs the same checks CI runs before anything reaches main. Types, the build, lint, contrast, the design rules and the whole test suite against a local database. It takes about three minutes, and main has not stayed red since. The trick was making it the only way to push, so nobody has to remember it. Every session runs it after merging main into its branch, and pushes only when it ends with all clear. When another session broke main, the next one to merge finds out first and fixes it, because what it pushes is main. Seven failures in fourteen hours was the day that made it worth the three minutes, and it has paid for itself many times over since then. https://example.com/gate',
+    url: 'https://x.com/selveyknight/status/1844000000000000002',
+    createdAt: '2026-09-28T19:45:00Z',
+    threadPosts: 1,
+  },
+  {
+    xPostId: '1843000000000000009',
+    text: 'Shipped.',
+    url: 'https://x.com/selveyknight/status/1843000000000000009',
+    createdAt: '2026-09-12T10:00:00Z',
+    threadPosts: 1,
+  },
+];
+
+/**
+ * The tab once X has been read: a waiting draft asking "Is this it?" about a
+ * post that reads close to it, one marked posted by the match, and the
+ * posts on X that match no draft, with more to show than are listed. The
+ * Posted and Posted on X folds are drawn open, as the tab draws them when
+ * nothing is waiting, so their rows can be seen.
+ */
+export function PostsMatchedSurface() {
+  const page = buildPostsPage({
+    posts: [
+      socialPostFromRow({ ...ROWS[0], x_candidate_id: CANDIDATE.xPostId, image_paths: [] }),
+      socialPostFromRow({
+        ...ROWS[2],
+        x_post_id: '1843000000000000100',
+        posted_url: 'https://x.com/selveyknight/status/1843000000000000100',
+      }),
+    ],
+    steps: STEPS,
+    notes: [],
+    run: { id: 'r1', status: 'finished', createdAt: '2026-10-02T07:55:00Z', error: null, drafts: 2 },
+    now: NOW,
+    x: { candidates: [CANDIDATE], listed: ON_X, total: 212 },
+  });
+  return (
+    <div className="space-y-6">
+      {/* The two folds are drawn below, open, in the place the tab draws them closed. */}
+      <PostsScreen
+        page={{ ...page, posted: [], onX: { posts: [], total: 0 } }}
+        x={{ state: 'connected', handle: 'selveyknight', lastSyncedAt: '2026-10-02T12:00:00Z' }}
+      />
+      <div className="mx-auto max-w-3xl space-y-6">
+        <SectionFold title="Posted" count={page.posted.length}>
+          <PostList cards={page.posted} />
+        </SectionFold>
+        <SectionFold title="Posted on X" count={page.onX.total}>
+          <XPostList posts={page.onX.posts} total={page.onX.total} />
+        </SectionFold>
+      </div>
+    </div>
+  );
 }
 
 export function PostsDraftingSurface() {
@@ -101,5 +193,42 @@ export function PostsDraftingSurface() {
     run: { id: 'r2', status: 'started', createdAt: '2026-10-02T11:50:00Z', error: null, drafts: 0 },
     now: NOW,
   });
-  return <PostsScreen page={page} />;
+  return <PostsScreen page={page} x={{ state: 'none' }} />;
+}
+
+/**
+ * The X connection (plan #1818) in each of its states, one under another:
+ * keys not set (pointing at setup step #1816), not connected, X stopped
+ * accepting the sign-in, and connected with a fifteen-character handle, the
+ * longest X allows. The lines a cancelled and a refused sign-in leave sit in
+ * the second and third. Connected, the row offers Check X now (plan #1819);
+ * the last one shows the line a read X stopped at its rate limit leaves.
+ */
+export function PostsXSurface() {
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <XConnection view={{ state: 'unconfigured', setupStep: 1816 }} />
+      <XConnection view={{ state: 'none' }} notice={xConnectNotice('denied')} />
+      <XConnection view={{ state: 'disconnected', handle: 'selveyknight' }} notice={xConnectNotice('exchange')} />
+      <XConnection view={{ state: 'connected', handle: 'selveyknightdev', lastSyncedAt: null }} />
+      <XConnection
+        view={{
+          state: 'connected',
+          handle: 'selveybuilds',
+          lastSyncedAt: '2026-10-11T12:00:00Z',
+          problem:
+            'X’s rate limit was reached, so the read stopped. The next read picks up where this one stopped.',
+        }}
+      />
+    </div>
+  );
+}
+
+/** Write your own, opened: the compose box a post the person writes goes in. */
+export function PostsWriteSurface() {
+  return (
+    <div className="mx-auto max-w-3xl">
+      <WritePost defaultOpen />
+    </div>
+  );
 }

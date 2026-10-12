@@ -7,16 +7,30 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { FieldError, Input, Textarea } from '@/components/ui/field';
 import { StateLabel } from '@/components/dev/state-label';
 import { cn } from '@/lib/cn';
-import { MAX_THREAD_POSTS, threadCopyText, X_POST_LIMIT, xLength } from '@/lib/dev/posts';
+import {
+  isUploadedPostImage,
+  MAX_ANGLE,
+  MAX_POST_IMAGES,
+  MAX_THREAD_POSTS,
+  threadCopyText,
+  X_POST_LIMIT,
+  xLength,
+} from '@/lib/dev/posts';
 import type { PostCard } from '@/lib/dev/posts-page';
 import {
+  addPostImage,
+  confirmXMatch,
+  dismissXMatch,
   dropPost,
+  editPostAngle,
   editPostBody,
   markPostPosted,
+  removePostImage,
   restorePost,
   type PostsActionState,
 } from './actions';
 import { LinkedText } from '@/components/ui/linked-text';
+import { AddImage } from './add-image';
 
 /**
  * One draft on the Posts tab (plan #1419): its angle, its post and any thread
@@ -54,7 +68,7 @@ function useCopy() {
 }
 
 /** "243/280", or "12 over" in red once it is past the limit. */
-function Counter({ text, id }: { text: string; id?: string }) {
+export function Counter({ text, id }: { text: string; id?: string }) {
   const length = xLength(text);
   const over = length - X_POST_LIMIT;
   return (
@@ -122,6 +136,66 @@ function PostEditor({
   );
 }
 
+/**
+ * The angle, the one line saying what a draft is about. Text until clicked,
+ * like the posts under it; Enter or Save writes it, Escape puts it back.
+ */
+function Angle({ id, angle, editable }: { id: string; angle: string; editable: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const [state, action, pending] = useActionState(
+    async (prev: PostsActionState, formData: FormData) => {
+      const next = await editPostAngle(prev, formData);
+      if (!next.error) setEditing(false);
+      return next;
+    },
+    {} as PostsActionState,
+  );
+
+  if (!editable) return <h3 className="min-w-0 flex-1 text-ui font-semibold text-ink">{angle}</h3>;
+  if (!editing) {
+    return (
+      <h3 className="min-w-0 flex-1 text-ui font-semibold text-ink">
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          aria-label="Edit what this draft is about"
+          // ui-ok: the angle of a waiting draft is the button that opens its editor, as the posts are.
+          className="-mx-1 rounded-control px-1 text-left hover:bg-sunken focus-visible:outline-2"
+        >
+          {angle}
+        </button>
+      </h3>
+    );
+  }
+  return (
+    <form action={action} className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+      <input type="hidden" name="id" value={id} />
+      <Input
+        name="angle"
+        required
+        autoFocus
+        defaultValue={angle}
+        maxLength={MAX_ANGLE}
+        aria-label="What this draft is about"
+        aria-invalid={state.error ? true : undefined}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setEditing(false);
+        }}
+        className="min-w-0 flex-1 basis-60"
+      />
+      <Button type="submit" size="sm" pending={pending}>
+        {pending ? 'Saving…' : 'Save'}
+      </Button>
+      <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={pending}>
+        Cancel
+      </Button>
+      <div className="basis-full">
+        <FieldError>{state.error}</FieldError>
+      </div>
+    </form>
+  );
+}
+
 function MarkPosted({ id, onCancel }: { id: string; onCancel: () => void }) {
   const [state, action, pending] = useActionState(markPostPosted, {} as PostsActionState);
   return (
@@ -141,7 +215,7 @@ function MarkPosted({ id, onCancel }: { id: string; onCancel: () => void }) {
       <Button type="submit" size="sm" pending={pending}>
         {pending ? 'Saving…' : 'Mark posted'}
       </Button>
-      <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={pending}>
+      <Button type="button" size="sm" variant="ghost" onClick={onCancel} pending={pending}>
         Cancel
       </Button>
       <div className="basis-full">
@@ -188,6 +262,56 @@ function SuggestedActions({ card }: { card: PostCard }) {
   );
 }
 
+/**
+ * "Is this it?" (plan #1820): a post on X that reads close to this draft but
+ * not close enough to mark it posted unasked. Yes, this is it marks the draft posted with
+ * that post's link; No stops asking, and the post is listed under Posted on X.
+ */
+function IsThisIt({ postId, candidate }: { postId: string; candidate: NonNullable<PostCard['candidate']> }) {
+  const [confirmed, confirm, confirming] = useActionState(confirmXMatch, {} as PostsActionState);
+  const [dismissed, dismiss, dismissing] = useActionState(dismissXMatch, {} as PostsActionState);
+  const busy = confirming || dismissing;
+  return (
+    <section aria-label="Is this it?" className="flex flex-col gap-2 rounded-control bg-sunken px-3 py-2.5">
+      <p className="text-small text-ink">
+        <span className="font-semibold">Is this it?</span>{' '}
+        <span className="text-ink-muted">
+          Posted on X on {candidate.day}
+          {candidate.threadPosts > 1 ? `, the first of a thread of ${candidate.threadPosts}` : ''}.
+        </span>
+      </p>
+      <p className="line-clamp-6 whitespace-pre-wrap break-words text-body text-ink">
+        <LinkedText text={candidate.text} />
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <form action={confirm}>
+          <input type="hidden" name="id" value={postId} />
+          <input type="hidden" name="x_post_id" value={candidate.xPostId} />
+          <Button type="submit" size="sm" variant="secondary" pending={confirming} disabled={busy}>
+            {confirming ? 'Saving…' : 'Yes, this is it'}
+          </Button>
+        </form>
+        <form action={dismiss}>
+          <input type="hidden" name="id" value={postId} />
+          <input type="hidden" name="x_post_id" value={candidate.xPostId} />
+          <Button type="submit" size="sm" variant="ghost" pending={dismissing} disabled={busy}>
+            {dismissing ? 'Saving…' : 'No, not this one'}
+          </Button>
+        </form>
+        <a
+          href={candidate.url}
+          target="_blank"
+          rel="noreferrer"
+          className="press-area text-small font-medium text-accent hover:underline"
+        >
+          Open on X
+        </a>
+      </div>
+      <FieldError>{confirmed.error ?? dismissed.error}</FieldError>
+    </section>
+  );
+}
+
 function RestoreButton({ id }: { id: string }) {
   const [state, action, pending] = useActionState(restorePost, {} as PostsActionState);
   return (
@@ -212,7 +336,7 @@ function StatusLine({ card }: { card: PostCard }) {
             href={post.postedUrl}
             target="_blank"
             rel="noreferrer"
-            className="text-small font-medium text-accent hover:underline"
+            className="press-area text-small font-medium text-accent hover:underline"
           >
             Open on X
           </a>
@@ -222,6 +346,58 @@ function StatusLine({ card }: { card: PostCard }) {
   }
   if (post.status === 'dropped') return <StateLabel glyph="slash" word={`Dropped ${day}`} tone="ghost" />;
   return <span className="tabular text-small text-ink-muted">Drafted {day}</span>;
+}
+
+/**
+ * One image on a draft: the picture, Save image for attaching it on X, and on
+ * a waiting draft a Remove. An upload is saved through the signing route with
+ * `download`, since a link to another host ignores the download attribute.
+ */
+function PostImage({
+  postId,
+  image,
+  editable,
+}: {
+  postId: string;
+  image: PostCard['images'][number];
+  editable: boolean;
+}) {
+  const [state, remove, removing] = useActionState(removePostImage, {} as PostsActionState);
+  const uploaded = isUploadedPostImage(image.path);
+  return (
+    <div className="flex max-w-full flex-col items-start gap-1">
+      <a href={image.src} target="_blank" rel="noreferrer" className="block max-w-full">
+        {/* eslint-disable-next-line @next/next/no-img-element -- an image the person saves to post; the image optimiser would hand them a resized copy */}
+        <img
+          src={image.src}
+          alt="Image to post with this draft"
+          loading="lazy"
+          className="max-h-64 max-w-full rounded-sm bg-sunken object-contain"
+        />
+      </a>
+      <div className="flex flex-wrap items-center gap-1">
+        {/* The file itself, at full size, to attach on X. */}
+        <a
+          href={uploaded ? `${image.src}&download` : image.src}
+          download
+          className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+        >
+          <Download className="size-3.5" aria-hidden />
+          Save image
+        </a>
+        {editable && (
+          <form action={remove}>
+            <input type="hidden" name="id" value={postId} />
+            <input type="hidden" name="path" value={image.path} />
+            <Button type="submit" size="sm" variant="ghost" pending={removing}>
+              {removing ? 'Removing…' : 'Remove'}
+            </Button>
+          </form>
+        )}
+      </div>
+      <FieldError>{state.error}</FieldError>
+    </div>
+  );
 }
 
 export function PostItem({ card }: { card: PostCard }) {
@@ -246,7 +422,7 @@ export function PostItem({ card }: { card: PostCard }) {
   return (
     <li id={`post-${post.id}`} className="flex scroll-mt-bar flex-col gap-2 px-4 py-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 className="min-w-0 flex-1 text-ui font-semibold text-ink">{post.angle}</h3>
+        <Angle id={post.id} angle={post.angle} editable={editable} />
         <StatusLine card={card} />
       </div>
 
@@ -323,26 +499,27 @@ export function PostItem({ card }: { card: PostCard }) {
         </div>
       )}
 
-      {card.images.length > 0 && (
-        <div className="flex flex-wrap gap-3">
-          {card.images.map((src) => (
-            <div key={src} className="flex max-w-full flex-col items-start gap-1">
-              <a href={src} target="_blank" rel="noreferrer" className="block max-w-full">
-                {/* eslint-disable-next-line @next/next/no-img-element -- a screenshot the person saves to post; the image optimiser would hand them a resized copy */}
-                <img
-                  src={src}
-                  alt="Screenshot to post with this draft"
-                  loading="lazy"
-                  className="max-h-64 max-w-full rounded-sm bg-sunken object-contain"
-                />
-              </a>
-              {/* The file itself, at full size, to attach on X. */}
-              <a href={src} download className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
-                <Download className="size-3.5" aria-hidden />
-                Save image
-              </a>
+      {(card.images.length > 0 || editable) && (
+        <div className="flex flex-col gap-2">
+          {card.images.length > 0 && (
+            <div className="flex flex-wrap gap-3">
+              {card.images.map((image) => (
+                <PostImage key={image.path} postId={post.id} image={image} editable={editable} />
+              ))}
             </div>
-          ))}
+          )}
+          {editable && card.images.length < MAX_POST_IMAGES && (
+            <AddImage
+              room={MAX_POST_IMAGES - card.images.length}
+              onUploaded={async (path) => {
+                const form = new FormData();
+                form.set('id', post.id);
+                form.set('path', path);
+                const result = await addPostImage({}, form);
+                return result.error;
+              }}
+            />
+          )}
         </div>
       )}
 
@@ -363,6 +540,8 @@ export function PostItem({ card }: { card: PostCard }) {
           ))}
         </p>
       )}
+
+      {card.candidate && editing === null && <IsThisIt postId={post.id} candidate={card.candidate} />}
 
       {editable && editing === null && <SuggestedActions card={card} />}
       {post.status === 'dropped' && <RestoreButton id={post.id} />}

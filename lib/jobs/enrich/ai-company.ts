@@ -60,7 +60,7 @@ export async function lookupCompanyOnline(
   try {
     response = await client.messages.create({
       model: MODEL,
-      max_tokens: 1024,
+      max_tokens: 4_000, // room for Haiku 5.5's thinking as well as the answer
       system: SYSTEM,
       tools: [
         {

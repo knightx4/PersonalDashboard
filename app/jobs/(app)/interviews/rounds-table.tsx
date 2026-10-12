@@ -80,13 +80,16 @@ export function RoundsTable({
         * label/value lines of which two read "—". Paired up, they are one line
         * each at both widths.
         */}
-      <Table>
+      {/* Fixed widths, the same in every table on the page, so Upcoming and
+          Past start each column at one edge and the longest date and time
+          ("11 Sept, 2:30 PM BST") fits on one line. */}
+      <Table className="md:table-fixed">
         <THead>
           <TR>
-            <TH>When</TH>
+            <TH className="md:w-52">When</TH>
             <TH>Pursuit</TH>
-            <TH>Round</TH>
-            <TH>Debrief</TH>
+            <TH className="md:w-56">Round</TH>
+            <TH className="md:w-24">Debrief</TH>
           </TR>
         </THead>
         <TBody>
@@ -116,8 +119,11 @@ export function RoundsTable({
               </TD>
               <TD muted className="max-md:block max-md:text-left">
                 {roundAndKind(row)}
+                {/* On a phone the debrief is a word on this line, not a line
+                    of its own that says "—" for most rounds. */}
+                {row.notes && <span className="md:hidden"> · debrief written</span>}
               </TD>
-              <TD label="Debrief" muted>
+              <TD label="Debrief" muted className="max-md:hidden">
                 {row.notes ? 'written' : '—'}
               </TD>
             </TR>

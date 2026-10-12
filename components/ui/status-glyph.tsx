@@ -4,7 +4,7 @@ import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 /**
  * The status glyphs, drawn.
  *
- * One hexagon, eleven ways. A ladder is the hexagon filled further round from
+ * One hexagon, twelve ways. A ladder is the hexagon filled further round from
  * twelve o'clock as it advances — empty, a quarter, a half, three quarters,
  * solid — and everything that is not on a ladder is the same hexagon with a
  * mark struck through or set inside it. Which glyph a status gets is in
@@ -127,6 +127,12 @@ function Marks({ glyph }: { glyph: GlyphName }) {
           <path d="M9.4 9.8 Q9.4 6.9 12 6.9 Q14.6 6.9 14.6 9.7 Q14.6 11.7 12 12.9 L12 14.1" />
           <rect x={10.8} y={15.9} width={2.4} height={2.4} fill="currentColor" stroke="none" />
         </g>
+      );
+    case 'clock':
+      // The hexagon is the face, so the hands alone make it a clock: one to
+      // twelve and one to three, straight like every other mark in the set.
+      return (
+        <polyline points="12,6.6 12,12 16,12" strokeWidth={MARK_STROKE} strokeLinecap="square" />
       );
     case 'slash':
       return (

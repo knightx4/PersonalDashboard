@@ -36,7 +36,7 @@ const netflix: RecurringExtraction = {
 
 function haikuSays(reading: RecurringHaikuReading) {
   return vi.fn(async (input: RecurringHaikuInput) => {
-    input.onSpend?.({ model: 'claude-haiku-4-5-20251001', usage: { inputTokens: 2500, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 150 } });
+    input.onSpend?.({ model: 'claude-haiku-5-5', usage: { inputTokens: 2500, cachedInputTokens: 0, cacheWriteTokens: 0, outputTokens: 150 } });
     return reading;
   });
 }
@@ -69,7 +69,7 @@ describe('extractRecurringFromEmail with Jev', () => {
 
     expect(result).toMatchObject({ ok: true, source: 'llm', value: { payee: 'Netflix', event: 'charge', amountCents: 1549 } });
     expect(haiku).toHaveBeenCalledTimes(1);
-    expect(spend.map((r) => r.model)).toEqual(['jev-1.13.0', 'claude-haiku-4-5-20251001']);
+    expect(spend.map((r) => r.model)).toEqual(['jev-1.13.0', 'claude-haiku-5-5']);
   });
 
   it('files nothing and skips Haiku when Jev is sure it is not a recurring payment', async () => {
@@ -94,7 +94,7 @@ describe('extractRecurringFromEmail with Jev', () => {
     const spend: SpendReport[] = [];
     const result = await read({ jev: jevDown, haiku: haikuSays({ ok: true, value: netflix }), spend });
     expect(result).toMatchObject({ ok: true, source: 'llm', value: { event: 'renewal_notice' } });
-    expect(spend.map((r) => r.model)).toEqual(['claude-haiku-4-5-20251001']);
+    expect(spend.map((r) => r.model)).toEqual(['claude-haiku-5-5']);
   });
 
   it('never calls Jev for an account that has not opted in', async () => {

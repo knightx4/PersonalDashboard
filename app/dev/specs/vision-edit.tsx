@@ -108,10 +108,10 @@ export function VisionEditPanel({
 
       <form className="flex flex-wrap items-center gap-2">
         <input type="hidden" name="id" value={edit.id} />
-        <Button type="submit" size="sm" formAction={accept} disabled={pending}>
+        <Button type="submit" size="sm" formAction={accept} pending={pending}>
           {accepting ? 'Accepting…' : 'Accept'}
         </Button>
-        <Button type="submit" size="sm" variant="ghost" formAction={dismiss} disabled={pending}>
+        <Button type="submit" size="sm" variant="ghost" formAction={dismiss} pending={pending}>
           {dismissing ? 'Dismissing…' : 'Dismiss'}
         </Button>
         <FieldError>{accepted.error ?? dismissed.error}</FieldError>

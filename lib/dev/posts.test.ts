@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { checkDraft, sourceProblems } from './post-check';
 import {
+  angleFromPost,
+  isUploadedPostImage,
+  ownsPostImagePath,
+  postImagePath,
+  postImageSrc,
   POSTS_RUN_HOLD_MINUTES,
   postsRunState,
   postsRunText,
@@ -173,5 +178,44 @@ describe('socialPostFromRow and sortPosts', () => {
     const suggested = socialPostFromRow({ ...base, id: '2', status: 'suggested' });
     expect(posted.sourceFeedbackIds).toEqual([]);
     expect(sortPosts([posted, suggested]).map((p) => p.id)).toEqual(['2', '1']);
+  });
+});
+
+describe('angleFromPost', () => {
+  it('takes the first sentence of a post the person wrote', () => {
+    expect(angleFromPost('Todo is one list. It has a calendar too.')).toBe('Todo is one list.');
+  });
+
+  it('keeps a post with no full stop whole, on one line', () => {
+    expect(angleFromPost('  a quick note\nabout the plan  ')).toBe('a quick note about the plan');
+  });
+
+  it('cuts a long first sentence at a word, under 120 characters', () => {
+    const long = EXAMPLE.replace('. ', ', and ');
+    const angle = angleFromPost(long);
+    expect(angle.length).toBeLessThanOrEqual(121);
+    expect(angle.endsWith('…')).toBe(true);
+    expect(long.startsWith(angle.slice(0, -1))).toBe(true);
+  });
+});
+
+describe('post image paths', () => {
+  const user = '0b1c2d3e-0000-4000-8000-000000000001';
+  const id = '9f8e7d6c-0000-4000-8000-000000000002';
+
+  it('keeps an upload in your own folder under a fresh id', () => {
+    const path = postImagePath(user, id, 'My screen shot (1).PNG');
+    expect(path).toBe(`${user}/${id}-My-screen-shot-1-.PNG`);
+    expect(ownsPostImagePath(user, path)).toBe(true);
+    expect(ownsPostImagePath('someone-else', path)).toBe(false);
+    expect(isUploadedPostImage(path)).toBe(true);
+  });
+
+  it('draws an upload through the signing route and a committed shot as it is', () => {
+    const path = postImagePath(user, id, 'shot.png');
+    expect(postImageSrc(path)).toBe(`/dev/posts/image?path=${encodeURIComponent(path)}`);
+    expect(postImageSrc('/posts/2026-10-09-home-page.png')).toBe('/posts/2026-10-09-home-page.png');
+    expect(postImageSrc('//elsewhere.example/x.png')).toBeNull();
+    expect(isUploadedPostImage('/posts/2026-10-09-home-page.png')).toBe(false);
   });
 });

@@ -11,12 +11,6 @@
   "ask-dash-changes": {
     "targets": 1
   },
-  "ask-dash-new": {
-    "targets": 2
-  },
-  "ask-dash-page": {
-    "targets": 2
-  },
   "ask-made-changes": {
     "targets": 3
   },
@@ -26,69 +20,45 @@
   "dev-inspiration-list": {
     "targets": 1
   },
-  "dev-posts": {
-    "targets": 1
-  },
-  "dev-surfaces": {
-    "targets": 2
-  },
   "dev-ui": {
     "targets": 55,
     "contrast": 11
   },
   "goals-all": {
-    "targets": 19
+    "targets": 3
   },
   "goals-home": {
-    "targets": 15
+    "targets": 1
   },
   "goals-info-list": {
-    "targets": 9
+    "targets": 4
   },
   "goals-info-list-open": {
-    "targets": 10
+    "targets": 5
   },
   "goals-info-one": {
-    "targets": 6
+    "targets": 1
   },
   "goals-page-linking": {
     "targets": 1
   },
   "goals-page-top": {
-    "targets": 6
+    "targets": 2
   },
   "goals-steps-opened": {
-    "targets": 50
-  },
-  "home-watching": {
-    "targets": 3
-  },
-  "jobs-company": {
-    "targets": 8
+    "targets": 4
   },
   "jobs-contact": {
-    "targets": 7
+    "targets": 4
   },
   "jobs-contacts": {
-    "targets": 9
+    "targets": 1
   },
   "jobs-interviews": {
     "targets": 4
   },
-  "jobs-pipeline-board": {
-    "targets": 11,
-    "contrast": 4
-  },
   "jobs-pipeline-dense": {
     "targets": 9
-  },
-  "jobs-pipeline-list": {
-    "targets": 11,
-    "contrast": 4
-  },
-  "jobs-recommended-roles": {
-    "targets": 13,
-    "contrast": 12
   },
   "jobs-review": {
     "targets": 3
@@ -105,14 +75,8 @@
   "jobs-role-timeline": {
     "targets": 2
   },
-  "jobs-roles-table": {
-    "targets": 21
-  },
   "jobs-settings": {
-    "targets": 4
-  },
-  "learn-clips": {
-    "targets": 2
+    "targets": 1
   },
   "learn-course-check": {
     "targets": 4
@@ -131,42 +95,27 @@
     "targets": 4
   },
   "news-issue-digest": {
-    "targets": 3
+    "targets": 2
   },
   "news-issue-digest-no-pictures": {
-    "targets": 3
-  },
-  "news-issue-essay": {
-    "targets": 1
-  },
-  "news-issue-failed": {
-    "targets": 1
-  },
-  "news-issue-original": {
-    "targets": 1
+    "targets": 2
   },
   "news-quick-caught-up": {
-    "sideways": 1,
     "targets": 3
   },
   "news-quick-essay": {
-    "sideways": 1,
     "targets": 4
   },
   "news-quick-in-shell": {
-    "sideways": 1,
     "targets": 8
   },
   "news-quick-page": {
-    "sideways": 1,
     "targets": 8
   },
   "news-quick-page-full": {
-    "sideways": 1,
     "targets": 8
   },
   "news-quick-story": {
-    "sideways": 1,
     "targets": 8
   },
   "news-saved": {

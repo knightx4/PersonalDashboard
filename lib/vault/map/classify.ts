@@ -94,7 +94,7 @@ export function haikuForMap(client: Anthropic): MapHaiku {
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, MODEL),
       messages: [{ role: 'user', content: [`Title: ${title}`, '', sampleFor(body)].join('\n') }],
     });
 

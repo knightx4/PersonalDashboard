@@ -23,7 +23,7 @@ export function useMoveSibling(): MoveSibling | null {
   return useContext(SiblingMoveContext);
 }
 
-async function writeMove(move: SiblingMove) {
+export async function writeMove(move: SiblingMove) {
   const formData = new FormData();
   formData.set('id', move.id);
   formData.set('direction', move.direction);

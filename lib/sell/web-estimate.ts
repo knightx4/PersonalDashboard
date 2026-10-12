@@ -70,12 +70,14 @@ export async function estimateResalePrice(
   try {
     response = await client.messages.create({
       model: MODEL,
-      max_tokens: 1024,
+      max_tokens: 4_000, // room for Haiku 5.5's thinking as well as the answer
       system: SYSTEM,
       tools: [
         // Server-side web search: Anthropic runs it, results come back inline.
+        // The basic variant, as in lib/jobs/enrich/ai-company.ts: the
+        // dynamic-filtering 20260209 one is documented for Opus and Sonnet only.
         {
-          type: 'web_search_20260209',
+          type: 'web_search_20250305',
           name: 'web_search',
           max_uses: MAX_SEARCHES,
         } as unknown as Anthropic.Tool,

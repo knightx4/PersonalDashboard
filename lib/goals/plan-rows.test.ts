@@ -14,6 +14,7 @@ import {
   goalViewOf,
   numberSteps,
   outlineSteps,
+  staysOpen,
   viewGoalRows,
   whoIsOn,
   type GoalRowNode,
@@ -397,5 +398,24 @@ describe('goalViewOf and goalViewHref', () => {
   it('keeps Open on the bare path', () => {
     expect(goalViewHref('/goals/g', 'open')).toBe('/goals/g');
     expect(goalViewHref('/goals/g', 'you')).toBe('/goals/g?view=you');
+  });
+});
+
+describe('staysOpen', () => {
+  const [open, done, unread, read, prep] = tree([
+    step('open', 'g'),
+    step('done', 'g', { status: 'done' }),
+    step('unread', 'g', { kind: 'claude', status: 'done', result: 'Found.' }),
+    step('read', 'g', { kind: 'claude', status: 'done', result: 'Found.', reviewedAt: '2026-10-01' }),
+    step('prep', 'g', { kind: 'claude', status: 'done', result: 'A draft.', preparesId: 'open' }),
+  ]);
+
+  it('keeps open steps and unread results among the open ones, and folds the rest', () => {
+    expect([open, done, unread, read].map((node) => staysOpen(node))).toEqual([true, false, true, false]);
+  });
+
+  it('folds an unread prep result whose draft is read on the step it prepares', () => {
+    expect(staysOpen(prep)).toBe(true);
+    expect(staysOpen(prep, new Set(['prep']))).toBe(false);
   });
 });

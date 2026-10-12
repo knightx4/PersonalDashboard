@@ -243,6 +243,11 @@ describe('read_dev_row', () => {
       { id: OPEN_QUESTION, user_id: ME, number: 1251, title: 'Which name?', kind: 'decision', status: 'not_started', resolution: null, detail: 'A — one.\nB — two.', parent_id: STEP, position: 2, dismissed_at: null },
       { id: DISMISSED_STEP, user_id: ME, number: 1252, title: 'Put aside', kind: 'build', status: 'not_started', parent_id: FEATURE, position: 3, dismissed_at: at },
     ],
+    plan_runs: [
+      { user_id: ME, plan_item_id: STEP, status: 'failed', error: 'Nothing was heard from this run for 2h.', stop_reason: null, stop_pieces: null, created_at: '2026-09-02T10:00:00Z' },
+      { user_id: ME, plan_item_id: STEP, status: 'failed', error: 'Too big for one sitting.', stop_reason: 'Too big for one sitting.', stop_pieces: ['Read a note', 'Read a raise'], created_at: '2026-09-03T10:00:00Z' },
+      { user_id: THEM, plan_item_id: STEP, status: 'failed', error: 'Not yours.', stop_reason: null, stop_pieces: null, created_at: '2026-09-04T10:00:00Z' },
+    ],
     raised_items: [
       { id: RAISE, user_id: ME, title: 'Migration 0019 is unapplied', detail: 'The Learn page reads a column.', ask: 'Apply it?', status: 'answered', source: 'plan #12', outcome: null, module: 'learn', created_at: at, goal_id: null },
       { id: DISMISSED_RAISE, user_id: ME, title: 'Old', detail: null, ask: 'No?', status: 'dismissed', source: null, outcome: null, module: null, created_at: at, goal_id: null },
@@ -312,16 +317,26 @@ describe('read_dev_row', () => {
     }
   });
 
+  it('reads the sessions sent at a step, newest first, with why each stopped', async () => {
+    const result = await read({ kind: 'step', ref: '#1248' });
+    expect(result.ok && result.rows[0].detail?.sessions).toBe(
+      '[2026-09-03] failed. The session said why it stopped: Too big for one sitting. It would split the work into: Read a note; Read a raise.\n' +
+        "[2026-09-02] failed. The app's note: Nothing was heard from this run for 2h.",
+    );
+    const feature = await read({ kind: 'step', ref: '#1319' });
+    expect(feature.ok && feature.rows[0].detail?.sessions).toBeNull();
+  });
+
   it('links an open question to its card on the Dash tab, and reads it as a step', async () => {
     const result = await read({ kind: 'plan', ref: '#1251' });
-    expect(result.ok && result.rows[0].href).toBe(`/dev/raised#waiting-${OPEN_QUESTION}`);
+    expect(result.ok && result.rows[0].href).toBe(`/dev/inbox#waiting-${OPEN_QUESTION}`);
   });
 
   it('reads a raise, which Dash raised', async () => {
     const result = await read({ kind: 'public.raised_items', ref: RAISE });
     expect(result.ok && result.rows[0]).toMatchObject({
       title: 'Migration 0019 is unapplied',
-      href: `/dev/raised#raise-${RAISE}`,
+      href: `/dev/inbox#raise-${RAISE}`,
       detail: { raised_by: 'Dash', ask: 'Apply it?', comments: '[2026-09-01, me] Go ahead.' },
     });
   });
@@ -471,7 +486,7 @@ describe('find_dev_text', () => {
       ['public.raised_items', RAISE, 'raise', 'Dash'],
       ['public.ideas', RANK_IDEA, 'comment', 'Dash'],
     ]);
-    expect(result.rows[2].href).toBe(`/dev/raised#raise-${RAISE}`);
+    expect(result.rows[2].href).toBe(`/dev/inbox#raise-${RAISE}`);
     expect(result.rows[1].detail?.field).toBe('resolution');
   });
 

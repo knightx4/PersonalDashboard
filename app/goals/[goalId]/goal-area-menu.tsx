@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ChipInput } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { completionMoment } from '@/components/motion/complete';
-import { formatDay } from '@/lib/goals/dates';
+import { formatDue, type DuePrecision } from '@/lib/goals/due-precision';
 import type { GoalStatus } from '@/lib/goals/tree';
 import { editGoal, settleGoalAction } from '../actions';
 import { useMoveToItems, type Place } from '../move-goal';
@@ -29,6 +29,7 @@ export function GoalAreaMenu({
     areaId: string;
     errand: boolean;
     dueOn: string | null;
+    duePrecision?: DuePrecision;
     status: GoalStatus;
   };
   places: Place[];
@@ -39,11 +40,12 @@ export function GoalAreaMenu({
   const [due, setDue] = useState(goal.dueOn ?? '');
   const [pending, startTransition] = useTransition();
 
-  async function setErrand(errand: boolean, dueOn: string | null) {
+  async function setErrand(errand: boolean, dueOn: string | null, precision?: DuePrecision) {
     const form = new FormData();
     form.set('id', goal.id);
     form.set('errand', String(errand));
     if (dueOn) form.set('due', dueOn);
+    if (dueOn && precision) form.set('duePrecision', precision);
     const result = await editGoal({}, form);
     if (result.error) {
       toast({ text: result.error });
@@ -58,8 +60,8 @@ export function GoalAreaMenu({
     : goal.dueOn
       ? {
           id: 'errand-on',
-          label: `Make it an errand, due ${formatDay(goal.dueOn)}`,
-          onSelect: () => void setErrand(true, goal.dueOn),
+          label: `Make it an errand, due ${formatDue(goal.dueOn, goal.duePrecision)}`,
+          onSelect: () => void setErrand(true, goal.dueOn, goal.duePrecision),
         }
       : { id: 'errand-on', label: 'Make it an errand…', onSelect: () => setAsking(true) };
 

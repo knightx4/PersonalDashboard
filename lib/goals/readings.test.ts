@@ -55,6 +55,20 @@ describe('parseMeasureFields', () => {
     });
   });
 
+  it('stores the last day of the period a date is set to', () => {
+    expect(
+      parseMeasureFields(form({ unit: '$', target: '0', dueOn: '2027-04-01', duePrecision: 'quarter' })),
+    ).toEqual({
+      ok: true,
+      value: { unit: '$', target: 0, dueOn: '2027-06-30', duePrecision: 'quarter' },
+    });
+    const day = parseMeasureFields(form({ unit: '$', target: '0', dueOn: '2027-04-01' }));
+    expect(day.ok && day.value.duePrecision).toBe('day');
+    const cleared = parseMeasureFields(form({ unit: '$', target: '0', dueOn: '', duePrecision: 'year' }));
+    expect(cleared.ok && cleared.value).toMatchObject({ dueOn: null, duePrecision: 'day' });
+    expect(parseMeasureFields(form({ unit: '$', dueOn: '2027-04-01', duePrecision: 'week' })).ok).toBe(false);
+  });
+
   it('clears the target with the unit', () => {
     expect(parseMeasureFields(form({ unit: '', target: '225' }))).toEqual({
       ok: true,
@@ -271,11 +285,11 @@ describe('when the target will be reached (plan #1025)', () => {
   it('reads the due date from the measure line, and leaves it alone when not sent', () => {
     expect(parseMeasureFields(form({ unit: '$', target: '0', dueOn: '2028-01-31' }))).toEqual({
       ok: true,
-      value: { unit: '$', target: 0, dueOn: '2028-01-31' },
+      value: { unit: '$', target: 0, dueOn: '2028-01-31', duePrecision: 'day' },
     });
     expect(parseMeasureFields(form({ unit: '$', target: '0', dueOn: '' }))).toEqual({
       ok: true,
-      value: { unit: '$', target: 0, dueOn: null },
+      value: { unit: '$', target: 0, dueOn: null, duePrecision: 'day' },
     });
     const untouched = parseMeasureFields(form({ unit: '$', target: '0' }));
     expect(untouched.ok && 'dueOn' in untouched.value).toBe(false);

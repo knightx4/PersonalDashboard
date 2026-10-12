@@ -1,14 +1,19 @@
 import Link from 'next/link';
-import { AlertCircle, Mail, RefreshCw } from 'lucide-react';
+import { AlertCircle, Mail } from 'lucide-react';
 import { Banner } from '@/components/ui/banner';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { publicEnv } from '@/lib/env';
 import { isGmailOAuthConfigured } from '@/lib/email/gmail-env';
-import { disconnectInbox } from './actions';
-import { InboxSyncButton, type InboxSyncProgress } from './inbox-sync-button';
+import { InboxControls, type InboxSyncProgress } from './inbox-sync-button';
 import { InboxPerson } from './inbox-person';
 import type { Person } from '@/lib/people/load';
-import { formatClock } from '@/lib/clock';
+
+/** The day an inbox last synced, as the rest of the page writes dates: "7 Oct 2026". */
+const SYNCED_DAY = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
 
 type Account = {
   id: string;
@@ -18,6 +23,8 @@ type Account = {
   backfill_completed_at?: string | null;
   person_id?: string | null;
 };
+
+const CONNECT_HREF = '/api/auth/gmail/connect?return_to=%2Fsettings';
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'Connected',
@@ -123,54 +130,42 @@ export function InboxSection({
               inside it was a second one. Law 11. */}
           <ul className="divide-y divide-border">
             {accounts.map((account) => (
-              <li key={account.id} className="row-pad flex flex-col gap-3">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="truncate text-body font-medium text-ink">{account.email_address}</p>
-                    <p className="text-small text-ink-muted">
-                      {STATUS_LABEL[account.status] ?? account.status}
-                      {account.last_synced_at
-                        ? ` · Last synced ${formatClock(account.last_synced_at, { day: 'numeric', month: 'short', year: 'numeric' }, undefined)}`
-                        : ' · Not synced yet'}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap gap-2">
-                    {account.status === 'needs_reauth' && configured && (
-                      <Link
-                        href="/api/auth/gmail/connect?return_to=%2Fsettings"
-                        className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                      >
-                        <RefreshCw className="size-3.5" strokeWidth={1.75} />
-                        Reconnect
-                      </Link>
-                    )}
-                    <form action={disconnectInbox}>
-                      <input type="hidden" name="id" value={account.id} />
-                      <Button variant="ghost" size="sm" type="submit">
-                        Disconnect
-                      </Button>
-                    </form>
-                  </div>
-                </div>
-                <InboxPerson
+              <li key={account.id} className="row-pad">
+                <InboxControls
                   accountId={account.id}
-                  people={people}
-                  personId={account.person_id ?? null}
-                />
-
-                {account.status === 'active' && (
-                  <InboxSyncButton
+                  email={account.email_address}
+                  status={account.status}
+                  reconnectHref={
+                    account.status === 'needs_reauth' && configured ? CONNECT_HREF : undefined
+                  }
+                  initialJob={latestJobs[account.id] ?? null}
+                  backfillCompleted={Boolean(account.backfill_completed_at)}
+                  heading={
+                    <>
+                      <p className="truncate text-body font-medium text-ink">
+                        {account.email_address}
+                      </p>
+                      <p className="text-small text-ink-muted">
+                        {STATUS_LABEL[account.status] ?? account.status}
+                        {account.last_synced_at
+                          ? ` · Synced ${SYNCED_DAY.format(new Date(account.last_synced_at))}`
+                          : ' · Not synced yet'}
+                      </p>
+                    </>
+                  }
+                >
+                  <InboxPerson
                     accountId={account.id}
-                    initialJob={latestJobs[account.id] ?? null}
-                    backfillCompleted={Boolean(account.backfill_completed_at)}
+                    people={people}
+                    personId={account.person_id ?? null}
                   />
-                )}
+                </InboxControls>
               </li>
             ))}
           </ul>
           {configured && (
             <Link
-              href="/api/auth/gmail/connect?return_to=%2Fsettings"
+              href={CONNECT_HREF}
               className={buttonVariants({ variant: 'secondary', size: 'sm' })}
             >
               <Mail className="size-4" strokeWidth={1.75} />
@@ -181,12 +176,13 @@ export function InboxSection({
       ) : (
         <div className="space-y-3 text-body text-ink-muted">
           <p>
-            No inbox connected. The app works without one — you can add orders by hand. Connect Gmail
-            to import order confirmations from one or more inboxes.
+            No inbox connected. The app works without one, and you can add orders by hand. Connect
+            Gmail to import order confirmations from one or more inboxes: access is read-only, and
+            only the order details are kept, never the email itself.
           </p>
           {configured ? (
             <Link
-              href="/api/auth/gmail/connect?return_to=%2Fsettings"
+              href={CONNECT_HREF}
               className={buttonVariants({ variant: 'primary', size: 'sm' })}
             >
               <Mail className="size-4" strokeWidth={1.75} />
@@ -202,14 +198,6 @@ export function InboxSection({
         </div>
       )}
 
-      {accounts.length > 0 && configured && (
-        <p className="mt-3 text-small text-ink-muted">
-          We request read-only Gmail access on each inbox you connect. Email bodies are never
-          stored — only parsed order metadata. For accurate product names and line items, set{' '}
-          <code className="text-micro">ANTHROPIC_API_KEY</code> on Vercel (Haiku). Without it
-          we still import totals from a simpler heuristic parser.
-        </p>
-      )}
     </section>
   );
 }

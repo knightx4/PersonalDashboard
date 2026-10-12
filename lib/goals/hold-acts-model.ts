@@ -29,7 +29,7 @@ export async function writeActsSentence(
   try {
     const response = await client.messages.create({
       model: ACTS_SENTENCE_MODEL,
-      max_tokens: 200,
+      max_tokens: 2_000, // room for Haiku 5.5's thinking as well as the answer
       system: ACTS_SENTENCE_SYSTEM,
       messages: [{ role: 'user', content: actsSentenceMessage(step) }],
     });

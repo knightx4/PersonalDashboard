@@ -85,7 +85,7 @@ export async function markAgainstPoints(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL),
+      tool_choice: forceTool(TOOL, MARK_POINTS_MODEL),
       messages: [
         {
           role: 'user',

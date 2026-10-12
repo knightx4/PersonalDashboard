@@ -44,10 +44,13 @@ import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { isModuleId, MODULES, type ModuleId } from '@/lib/modules';
-import { handStepToClaude } from '@/lib/plan/handover';
+import { handFeatureToClaude, handStepToClaude } from '@/lib/plan/handover';
 import { countChangedLines, diffFits, MAX_CHANGED_LINES, rebaseDiff } from '@/lib/specs/changes';
 import { readSpec, specBySlug } from '@/lib/specs/registry';
 import { nextPlanPosition } from '@/lib/plan/position';
+import { sessionStamp } from '@/lib/plan/origin';
+import type { PlanScope } from '@/lib/plan/projects';
+import { SPLIT_ACTION, splitPieces, stallRunIds } from '@/lib/plan/stall';
 import { readSubjectOrNull, recordDashAction, type DashActionDeps } from '@/lib/core/dash-actions';
 import { toRef } from '@/lib/core/refs';
 import { TARGET_PATH, type CommentTarget } from './load';
@@ -229,6 +232,12 @@ export async function carryOut(input: ActInput): Promise<ActOutcome> {
     case 'build_step':
       return buildStep(input);
     default:
+      // Not in ACTIONS, so the CLI cannot file it: only the overnight tick
+      // writes it, on a stall raise (#1804). Asked for on any other row it is
+      // handed on like the rest below.
+      if (input.action.name === SPLIT_ACTION && input.target === 'raise') {
+        return splitFeature(input);
+      }
       if (isReserved(input.action.name)) {
         return {
           ok: false,
@@ -691,19 +700,21 @@ function rewritten(what: string, now: string, was: string | null): string {
  * A comment on a step means that step. A raise means whichever step its
  * consequence named, because a raise whose answer is "build #342" has no step
  * of its own to point at. The number is looked up under the caller's own id,
- * so a number belonging to somebody else finds nothing.
+ * so a number belonging to somebody else finds nothing. `feature` is true for
+ * a row at the top of its plan, which is sent as a feature.
  */
-async function stepNamed(input: ActInput): Promise<string | null> {
+async function stepNamed(input: ActInput): Promise<{ id: string; feature: boolean } | null> {
   const number = Number(input.action.text?.trim().replace(/^#/, ''));
   if (!Number.isInteger(number) || number <= 0) return null;
 
   const { data } = await input.supabase
     .from('plan_items')
-    .select('id')
+    .select('id, parent_id')
     .eq('user_id', input.userId)
     .eq('number', number)
     .maybeSingle();
-  return (data as { id: string } | null)?.id ?? null;
+  const row = data as { id: string; parent_id?: string | null } | null;
+  return row ? { id: row.id, feature: row.parent_id === null } : null;
 }
 
 /**
@@ -716,12 +727,27 @@ async function stepNamed(input: ActInput): Promise<string | null> {
  * thread says, so a comment that started nothing says why.
  */
 async function sendStep(input: ActInput): Promise<ActOutcome> {
-  const id = input.target === 'step' ? input.id : await stepNamed(input);
-  if (!id) {
+  const named = input.target === 'step' ? { id: input.id, feature: false } : await stepNamed(input);
+  if (!named) {
     return {
       ok: false,
       why:
         'This is not a plan step and nothing here names one by number, so nothing was started.',
+    };
+  }
+  const id = named.id;
+
+  // A feature named by number is sent the way the plan page's Send and the
+  // overnight runner send one, as a feature run. The runner reads those runs
+  // to decide which features it holds, so the yes on its "send it again" raise
+  // counts as the new attempt it is.
+  if (named.feature) {
+    const batch = await handFeatureToClaude({ supabase: input.supabase, userId: input.userId, id });
+    if (!batch.ok) return { ok: false, why: `I did not send it: ${batch.error}` };
+    const open = batch.steps === 1 ? 'one open step' : `${batch.steps} open steps`;
+    return {
+      ok: true,
+      said: `Sent #${batch.number} ${batch.title} to be built, with ${open}. ${batch.detail}`,
     };
   }
 
@@ -813,6 +839,129 @@ async function buildStep(input: ActInput): Promise<ActOutcome> {
   return {
     ok: true,
     said: `${opening} and sent it to be built. ${sent.detail}\n\n${wordingOf(row)}`,
+    redraw: '/dev/plan',
+  };
+}
+
+/**
+ * Split a stalled feature into the steps its last session named, and send
+ * the first (#1804).
+ *
+ * Only ever the Yes on a stall raise, which asked "Split #N … into N steps?"
+ * (lib/plan/stall.ts). The pieces are read back off the runs the raise's
+ * source names rather than carried in the consequence, so what is written is
+ * what the session recorded. The feature is already approved, so the steps go
+ * in ready to build, each stamped with the session that named them, which is
+ * what lets the plan page offer to drop one in a press.
+ *
+ * A feature that has gained steps since the raise is not split again: a
+ * second set beside the first is two plans for one feature. Sending the first
+ * step fires a run at the feature, which is what lifts the overnight hold. If
+ * the hand-over refuses, the steps stay written and the thread says so.
+ */
+async function splitFeature(input: ActInput): Promise<ActOutcome> {
+  const number = Number(input.action.text?.trim().replace(/^#/, ''));
+  if (!Number.isInteger(number) || number <= 0) {
+    return { ok: false, why: 'This raise does not name a feature by number, so nothing was split.' };
+  }
+
+  const [{ data: raiseRow }, { data: featureRow }] = await Promise.all([
+    input.supabase.from('raised_items').select('source').eq('id', input.id).maybeSingle(),
+    input.supabase
+      .from('plan_items')
+      .select('id, number, title, module, parent_id')
+      .eq('user_id', input.userId)
+      .eq('number', number)
+      .maybeSingle(),
+  ]);
+  const feature = featureRow as {
+    id: string;
+    number: number;
+    title: string;
+    module: string | null;
+    parent_id: string | null;
+  } | null;
+  if (!feature || feature.parent_id !== null) {
+    return { ok: false, why: `#${number} is not a feature on the plan, so nothing was split.` };
+  }
+
+  const runIds = stallRunIds((raiseRow as { source: string | null } | null)?.source);
+  const { data: runRows } = runIds.length
+    ? await input.supabase
+        .from('plan_runs')
+        .select('id, stop_pieces, external_id')
+        .eq('user_id', input.userId)
+        .in('id', runIds)
+    : { data: [] };
+  const found = splitPieces(
+    runIds,
+    ((runRows ?? []) as { id: string; stop_pieces: string[] | null; external_id: string | null }[]).map(
+      (row) => ({ id: row.id, stopPieces: row.stop_pieces, session: row.external_id }),
+    ),
+  );
+  if (!found) {
+    return {
+      ok: false,
+      why: `The runs this raise names left no pieces to split #${number} into, so nothing was written.`,
+    };
+  }
+
+  const { data: existing } = await input.supabase
+    .from('plan_items')
+    .select('id')
+    .eq('user_id', input.userId)
+    .eq('parent_id', feature.id)
+    .eq('kind', 'build')
+    .neq('status', 'dropped')
+    .limit(1);
+  if ((existing ?? []).length > 0) {
+    return {
+      ok: false,
+      why: `#${number} has steps of its own now, so I did not split it again. Send it from its row on /dev/plan.`,
+    };
+  }
+
+  const scope = feature.module as PlanScope | null;
+  const first = await nextPlanPosition(input.supabase, input.userId, scope, feature.id);
+  const stamp = sessionStamp({ session: found.session, date: new Date().toISOString().slice(0, 10) });
+  const { data: inserted, error } = await input.supabase
+    .from('plan_items')
+    .insert(
+      found.pieces.map((piece, index) => ({
+        user_id: input.userId,
+        module: feature.module,
+        parent_id: feature.id,
+        title: piece.slice(0, MAX_TITLE),
+        status: 'not_started',
+        kind: 'build',
+        position: first + index * 10,
+        comment: stamp,
+      })),
+    )
+    .select('id, number, title, position');
+  if (error) return { ok: false, why: `I could not split #${number}: ${error.message}` };
+
+  const written = ((inserted ?? []) as { id: string; number: number; title: string; position: number }[])
+    .slice()
+    .sort((a, b) => a.position - b.position);
+  if (written.length === 0) return { ok: false, why: `I could not split #${number}, so nothing was started.` };
+  for (const row of written) {
+    await recordAdded(input, 'add_step', 'plan_items', row.id, `Added #${row.number} under #${number}: ${row.title}`);
+  }
+
+  const list = written.map((row) => `#${row.number} ${row.title}`).join('\n');
+  const opening = `Split #${number} ${feature.title} into ${written.length} steps, ready to build`;
+  const sent = await handStepToClaude({ supabase: input.supabase, userId: input.userId, id: written[0].id });
+  if (!sent.ok) {
+    return {
+      ok: true,
+      said: `${opening}, but I did not start the first: ${sent.error} They are on the plan to send when that clears.\n\n${list}`,
+      redraw: '/dev/plan',
+    };
+  }
+  return {
+    ok: true,
+    said: `${opening}, and sent #${written[0].number} to be built. ${sent.detail}\n\n${list}`,
     redraw: '/dev/plan',
   };
 }

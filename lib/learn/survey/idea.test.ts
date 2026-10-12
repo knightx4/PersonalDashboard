@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ideaFromThemeNotes, noteExcerpt, SURVEY_NOTE_CHARS, writeSurveyIdea } from './idea';
 
+// Each idea is saved with its claim's embedding (plan #1853).
+vi.mock('@/lib/learn/embed/idea-embedding', () => import('@/tests/stubs/idea-embedding'));
+
 /**
  * Writing the idea a survey question tests, against stub clients.
  *
@@ -128,6 +131,10 @@ describe('writeSurveyIdea', () => {
     ]);
     expect(learn.concepts).toHaveLength(1);
     const concept = learn.concepts[0];
+    expect(concept).toMatchObject({
+      embedding: `vector of ${IDEA.claim}`,
+      embedding_model: 'voyage-4-lite',
+    });
     expect(concept).toMatchObject({
       user_id: USER,
       subject_id: learn.subjects[0].id,

@@ -30,7 +30,7 @@ import { approveChain, proposeGoal, type ApproveState, type ProposeState } from 
 function AskButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+    <Button type="submit" size="sm" variant="secondary" pending={pending}>
       <Sparkles className="size-4" strokeWidth={2} aria-hidden />
       {pending ? 'Laying it out…' : 'Lay out the chain'}
     </Button>
@@ -40,7 +40,7 @@ function AskButton() {
 function ApproveButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" pending={pending}>
       {pending ? 'Saving…' : 'Approve and save'}
     </Button>
   );
@@ -218,11 +218,7 @@ export function GoalForm({
         </p>
       )}
 
-      <p className="mt-2 text-small text-ink-muted">
-        As specific as you can make it: a narrow question gets a short chain that is right. It lays
-        out what you would have to understand first, in order, and saves nothing until you have read
-        it.
-      </p>
+      <p className="mt-2 text-small text-ink-muted">A narrow question gets a short chain.</p>
     </form>
   );
 }

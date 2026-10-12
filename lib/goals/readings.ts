@@ -10,6 +10,7 @@
  */
 
 import type { CollectionField, FieldType } from '@/lib/goals/collections';
+import { isDuePrecision, periodEnd, type DuePrecision } from '@/lib/goals/due-precision';
 
 /** The limits the table's checks set (supabase/migrations-goals/0004 and 0001). */
 export const UNIT_MAX = 40;
@@ -60,7 +61,12 @@ export function parseNumber(raw: unknown): number | null {
  */
 export function parseMeasureFields(
   get: (key: string) => unknown,
-): Parsed<{ unit: string | null; target: number | null; dueOn?: string | null }> {
+): Parsed<{
+  unit: string | null;
+  target: number | null;
+  dueOn?: string | null;
+  duePrecision?: DuePrecision;
+}> {
   const unit = clean(get('unit'));
   if (!unit) return { ok: true, value: { unit: null, target: null } };
   if (unit.length > UNIT_MAX) {
@@ -76,7 +82,16 @@ export function parseMeasureFields(
       return { ok: false, error: 'The due date is not a date.' };
     }
   }
-  const withDue = dueOn === undefined ? {} : { dueOn };
+  // How exact the date is (plan #1840). The date stored is the last day of
+  // that period; no date is a day.
+  const rawPrecision = clean(get('duePrecision')) ?? 'day';
+  if (!isDuePrecision(rawPrecision)) return { ok: false, error: 'The due date is not a date.' };
+  const withDue =
+    dueOn === undefined
+      ? {}
+      : dueOn
+        ? { dueOn: periodEnd(dueOn, rawPrecision), duePrecision: rawPrecision }
+        : { dueOn, duePrecision: 'day' as const };
   const rawTarget = clean(get('target'));
   if (!rawTarget) return { ok: true, value: { unit, target: null, ...withDue } };
   const target = parseNumber(rawTarget);
@@ -261,17 +276,19 @@ export function spanWords(days: number): string {
 export function projectionLine(
   projection: Projection,
   formatDay: (isoDate: string) => string,
+  /** How the due date is said when it is not a day: "the end of Q2 2027". */
+  dueWords?: string,
 ): string {
   if (projection.kind === 'not-closing') {
     return 'Not closing on the target at the recent pace';
   }
   const reach = `At this pace, target reached ${formatDay(projection.reachOn)}`;
   if (projection.dueOn === null || projection.daysEarly === null) return reach;
-  const due = formatDay(projection.dueOn);
+  const due = dueWords ?? `the due date of ${formatDay(projection.dueOn)}`;
   if (projection.daysEarly === 0) return `${reach}, on the due date`;
   return projection.daysEarly > 0
-    ? `${reach}: ahead, ${spanWords(projection.daysEarly)} before the due date of ${due}`
-    : `${reach}: behind, ${spanWords(projection.daysEarly)} after the due date of ${due}`;
+    ? `${reach}: ahead, ${spanWords(projection.daysEarly)} before ${due}`
+    : `${reach}: behind, ${spanWords(projection.daysEarly)} after ${due}`;
 }
 
 // ---------------------------------------------------------------------------

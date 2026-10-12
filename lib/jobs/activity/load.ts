@@ -1,6 +1,10 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import type { CoreSupabaseClient } from '@/lib/core/db/schema-name';
-import { APPLICATION_EVENT_KINDS, type ApplicationEventKind } from '@/lib/jobs/pipeline';
+import {
+  APPLICATION_EVENT_KINDS,
+  type ApplicationEventKind,
+  type ApplicationStatus,
+} from '@/lib/jobs/pipeline';
 
 /**
  * What has changed lately, and what changed it.
@@ -74,6 +78,37 @@ const EVENT_TONE: Record<ApplicationEventKind, ActivityTone> = {
 /** `kind` arrives as a plain string from the database. */
 function toneOfKind(kind: string): ActivityTone {
   return EVENT_TONE[kind as ApplicationEventKind] ?? 'muted';
+}
+
+/**
+ * The pipeline stage each kind of event belongs to, for the glyph its row
+ * leads with (plan #1755).
+ *
+ * The stage the event is evidence of, not the role's stage today: an
+ * interview booked three weeks ago still reads as the interview stage on the
+ * day it landed. A note or a status override says nothing about a stage of
+ * its own, so it has none and its row carries no glyph.
+ */
+const EVENT_STAGE: Record<ApplicationEventKind, ApplicationStatus | null> = {
+  submitted: 'submitted',
+  confirmation: 'acknowledged',
+  recruiter_reply: 'in_process',
+  screen_scheduled: 'in_process',
+  assessment_sent: 'in_process',
+  assessment_submitted: 'in_process',
+  interview_scheduled: 'in_process',
+  interview_completed: 'in_process',
+  offer: 'offer',
+  rejection: 'rejected',
+  withdrawal: 'withdrawn',
+  follow_up_sent: 'submitted',
+  status_override: null,
+  note: null,
+};
+
+/** `kind` arrives as a plain string from the database. */
+export function stageOfKind(kind: string): ApplicationStatus | null {
+  return EVENT_STAGE[kind as ApplicationEventKind] ?? null;
 }
 
 /**
@@ -157,6 +192,8 @@ export type ActivityEntry = {
   /** Who it happened to: "Canonical · Engineering Manager". */
   subject: string | null;
   tone: ActivityTone;
+  /** The pipeline stage the event is evidence of; null for a note. */
+  stage: ApplicationStatus | null;
   detail: string | null;
   roleId: string | null;
 };
@@ -259,6 +296,7 @@ export function activityEntries(input: {
     label: 'New role',
     subject: nameOf(row.roles),
     tone: 'info',
+    stage: 'lead',
     detail: null,
     roleId: row.roles.id,
   }));
@@ -270,6 +308,7 @@ export function activityEntries(input: {
     label: row.kind.replace(/_/g, ' '),
     subject: nameOf(row.applications.roles),
     tone: toneOfKind(row.kind),
+    stage: stageOfKind(row.kind),
     detail: row.summary,
     roleId: row.applications.roles.id,
   }));

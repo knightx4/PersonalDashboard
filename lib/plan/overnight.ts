@@ -43,6 +43,22 @@ export const OVERNIGHT_FEATURE_CAP = 100;
  */
 export const OVERNIGHT_AT_ONCE = 3;
 
+/**
+ * How many feature sessions the runner keeps going while the goals half has
+ * nothing to work on.
+ *
+ * The goals run takes the fourth seat when it has a step or a map to start.
+ * On a tick where it has none, that seat would sit empty, so a fourth feature
+ * takes it. A goals run that becomes ready later still starts; the fourth
+ * feature is just not replaced when it ends.
+ */
+export const OVERNIGHT_AT_ONCE_GOALS_IDLE = 4;
+
+/** The feature-session limit for a tick, given whether goals had nothing to start. */
+export function featureSessionsAtOnce(goalsIdle: boolean): number {
+  return goalsIdle ? OVERNIGHT_AT_ONCE_GOALS_IDLE : OVERNIGHT_AT_ONCE;
+}
+
 /** The night as the app reads it. One of these per account, or none. */
 export type OvernightRun = {
   id: string;
