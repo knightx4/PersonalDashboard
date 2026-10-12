@@ -17,9 +17,23 @@
  */
 import { STALLED_AFTER_MINUTES, elapsedSince } from './elapsed';
 
-/** What a run ends as. `started` is the third state, and the one it begins in. */
+/**
+ * What a run ends as. `started` is the state it begins in; `awaiting_input`
+ * (it asked a question) and `stale` (it stopped writing lines, plan #1825)
+ * are the two it can sit in before it ends.
+ */
 export type RunEnd = 'finished' | 'failed';
-export type RunStatus = 'started' | RunEnd;
+export type RunStatus = 'started' | 'awaiting_input' | 'stale' | RunEnd;
+
+/** A status read off a row, with anything unknown read as still going. */
+export function runStatusOf(value: string): RunStatus {
+  return value === 'finished' ||
+    value === 'failed' ||
+    value === 'stale' ||
+    value === 'awaiting_input'
+    ? value
+    : 'started';
+}
 
 /**
  * Which press started the run.
@@ -150,6 +164,8 @@ export type StoredRunReading = {
 
 /** The last run against one step, as the plan page reads it. */
 export type LastRun = {
+  /** The plan_runs row, so a stale run can be acknowledged. Absent on older reads. */
+  id?: string;
   status: RunStatus;
   createdAt: string;
   /** Why it did not finish. Null on every run that is going or that did. */
@@ -165,6 +181,11 @@ export type LastRun = {
   stopReason?: string | null;
   /** The pieces a session that found the work too big would split it into. */
   stopPieces?: string[] | null;
+  /**
+   * When the run last wrote a line (plan #1825), or null when it has written
+   * none. Read only for a run that has not ended.
+   */
+  lastLineAt?: string | null;
 };
 
 /** The five columns a stored reading is spread across. */
@@ -392,12 +413,27 @@ export function runQuietNote(createdAt: string, now: number): string {
  * a run the cutoff caught only says how long it was quiet.
  */
 export function lastRunLine(
-  run: Pick<LastRun, 'status' | 'createdAt' | 'error' | 'stopReason'>,
+  run: Pick<LastRun, 'status' | 'createdAt' | 'error' | 'stopReason' | 'lastLineAt'>,
   now: number,
 ): string {
   if (run.status === 'finished') return 'Last run finished';
+  if (run.status === 'stale') {
+    return now === 0
+      ? 'Last run went silent'
+      : `Last run went silent: last heard from ${elapsedSince(run.lastLineAt ?? run.createdAt, now)} ago`;
+  }
+  if (run.status === 'awaiting_input') return 'Last run is waiting on your answer';
   if (run.status === 'failed') {
     return `Last run stopped: ${run.stopReason ?? run.error ?? 'no reason recorded'}`;
   }
   return now === 0 ? 'A run is going' : `A run has been going ${elapsedSince(run.createdAt, now)}`;
+}
+
+/**
+ * When a stale run was last heard from (plan #1825), for the opened row's
+ * account of its run: its newest line, or its start if the line was not read.
+ */
+export function staleLine(run: Pick<LastRun, 'createdAt' | 'lastLineAt'>, now: number): string {
+  if (now === 0) return 'Gone silent.';
+  return `Gone silent: last heard from ${elapsedSince(run.lastLineAt ?? run.createdAt, now)} ago.`;
 }

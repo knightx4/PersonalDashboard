@@ -10,12 +10,12 @@
  * rest of that session. These components are read together and touched
  * together, and none of them is used anywhere else.
  */
-import { useMemo } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { CircleAlert } from 'lucide-react';
 import { useClockNow } from '@/lib/use-clock-now';
 import { elapsedSince } from '@/lib/plan/elapsed';
 import { type ClaimLiveness } from '@/lib/plan/liveness';
-import { lastRunLine, type LastRun } from '@/lib/plan/run-end';
+import { lastRunLine, staleLine, type LastRun } from '@/lib/plan/run-end';
 import {
   closedLine,
   nothingToShowLine,
@@ -31,6 +31,7 @@ import { checkLine, checkWord, type CommitCheck } from '@/lib/plan/checks';
 import type { PlanNode } from '@/lib/plan/tree';
 import { subtreeOf, type PlanCatalogEntry } from './plan-catalog';
 import { cn } from '@/lib/cn';
+import { acknowledgePlanRun } from './run-actions';
 
 export function when(iso: string | null): string | null {
   return iso ? iso.slice(0, 10) : null;
@@ -131,11 +132,44 @@ export function CheckMark({ check }: { check: CommitCheck | undefined }) {
  */
 export function LastRunLine({ run }: { run: LastRun }) {
   const now = useClockNow();
+  const stale = run.status === 'stale';
 
   return (
-    <span className={run.status === 'failed' ? 'text-caution' : undefined}>
+    <span className={run.status === 'failed' || stale ? 'text-caution' : undefined}>
       {lastRunLine(run, now)}
+      {stale && run.id && <AcknowledgeRun runId={run.id} />}
     </span>
+  );
+}
+
+/**
+ * Acknowledge on a run that went silent (plan #1825), which ends it. A silent
+ * run is not closed by a timer any more, so it waits here for you to say you
+ * have seen it. A plain text button, since it sits inside the row's meta line.
+ */
+function AcknowledgeRun({ runId }: { runId: string }) {
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <>
+      {' · '}
+      <button
+        type="button"
+        disabled={pending}
+        aria-busy={pending}
+        onClick={() =>
+          start(async () => {
+            const result = await acknowledgePlanRun(runId);
+            setError(result.error ?? null);
+          })
+        }
+        className="press-area font-medium text-ink underline underline-offset-2 hover:text-accent disabled:opacity-60"
+      >
+        {pending ? 'Ending…' : 'Acknowledge'}
+      </button>
+      {error && <span role="alert">{` ${error}`}</span>}
+    </>
   );
 }
 
@@ -185,6 +219,12 @@ export function RunWork({
     <div>
       <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Its run</p>
       <p className="text-ui text-ink">{runStartedLine(work, now)}</p>
+      {run.status === 'stale' && (
+        <p className="text-ui text-caution">
+          {staleLine(run, now)}
+          {run.id && <AcknowledgeRun runId={run.id} />}
+        </p>
+      )}
       {work.push && <p className="text-ui text-ink-muted">{pushLine(work.push, now)}</p>}
       {closed && <p className="text-ui text-ink-muted">{closed}</p>}
       {raised && <p className="text-ui text-ink-muted">{raised}</p>}

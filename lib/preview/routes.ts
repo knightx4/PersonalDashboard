@@ -260,6 +260,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-modules': ['/dev/modules'],
   'dev-module': ['/dev/modules/[id]'],
   'goals-run': ['/goals/runs/[runId]'],
+  'goals-run-stale': ['/goals/runs/[runId]'],
   'jobs-activity': ['/jobs/activity'],
   'jobs-analytics': ['/jobs/analytics'],
   'jobs-answers': ['/jobs/answers'],

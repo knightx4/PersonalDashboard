@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { requireUser } from '@/lib/auth/server';
+import { createClient, requireUser } from '@/lib/auth/server';
+import { acknowledgeStaleRun } from '@/lib/core/run-ack';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { undoRunChange } from '@/lib/goals/run-changes-store';
 
@@ -51,4 +52,20 @@ export async function undoRunChangeAction(
   } catch {
     return { error: 'That could not be undone. Try again.' };
   }
+}
+
+/**
+ * Acknowledge a goal run that went silent, which ends it (plan #1825). A run
+ * that stops writing lines is marked stale rather than closed, and waits for
+ * this.
+ */
+// latency: pending
+export async function acknowledgeGoalRunAction(runId: string): Promise<{ error?: string }> {
+  await requireUser();
+  if (!z.string().uuid().safeParse(runId).success) return { error: 'Could not tell which run that was.' };
+  const { ended, error } = await acknowledgeStaleRun(await createClient(), 'goals.runs', runId);
+  if (error) return { error: 'The run could not be ended. Try again.' };
+  revalidatePath('/goals', 'layout');
+  if (!ended) return { error: 'That run is no longer silent. Reload to see where it stands.' };
+  return {};
 }

@@ -75,6 +75,24 @@ describe('runOutcome', () => {
     );
   });
 
+  it('reads a run that writes lines from its newest line (plan #1825)', () => {
+    const line = new Date(start + 3 * 60 * 60 * 1000).toISOString();
+    const at = Date.parse(line);
+    const run = { status: 'started' as const, createdAt: created, lastLineAt: line };
+    expect(runOutcome(run, at + 29 * 60_000)).toBe('running');
+    expect(runOutcome(run, at + 30 * 60_000)).toBe('stale');
+    expect(runOutcome({ status: 'stale', createdAt: created }, start)).toBe('stale');
+    expect(runOutcome({ status: 'awaiting_input', createdAt: created }, start)).toBe('waiting');
+  });
+
+  it('says when a stale run was last heard from', () => {
+    const line = new Date(start + 60 * 60 * 1000).toISOString();
+    const [listing] = toRunListings([row({ status: 'stale' })]);
+    const { outcome, meta } = runMeta({ ...listing, createdAt: created, lastLineAt: line }, Date.parse(line) + 40 * 60_000, 'UTC');
+    expect(outcome).toBe('stale');
+    expect(meta).toMatch(/^Went silent · last heard from 40 minutes ago · /);
+  });
+
   it('passes done and failed through', () => {
     expect(runOutcome({ status: 'done', createdAt: created }, start)).toBe('done');
     expect(runOutcome({ status: 'failed', createdAt: created }, start)).toBe('failed');

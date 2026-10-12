@@ -251,6 +251,33 @@ export function PlanTableSurface() {
 }
 
 /**
+ * Two runs that went silent (plan #1825): one behind a step being worked,
+ * whose account of its run says when it was last heard from, and one fired at
+ * a step nobody claimed, which says it on the row's meta line. Both carry
+ * Acknowledge, which ends the run.
+ */
+const openedRuns: Record<string, LastRun> = {
+  shared: {
+    id: '0b6f8a4e-2c1d-4e5f-9a7b-3c2d1e0f9a8b',
+    status: 'stale',
+    createdAt: '2026-09-01T08:10:00Z',
+    error: null,
+    job: 'feature',
+    reading: null,
+    lastLineAt: '2026-09-01T08:52:00Z',
+  },
+  render: {
+    id: '7d3e9c1b-5a4f-4b2e-8c6d-1f0e9d8c7b6a',
+    status: 'stale',
+    createdAt: '2026-09-01T07:30:00Z',
+    error: null,
+    job: 'step',
+    reading: null,
+    lastLineAt: '2026-09-01T07:34:00Z',
+  },
+};
+
+/**
  * Two features with every row opened: the panel behind a row, which is where
  * the detail, the questions, the dependencies and the thread are drawn.
  */
@@ -273,7 +300,7 @@ export function PlanOpenedSurface() {
       catalog={catalog}
       empty={false}
       canSend={false}
-      lastRuns={{}}
+      lastRuns={openedRuns}
       commitChecks={{}}
       unfolded
       opened

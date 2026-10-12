@@ -1,7 +1,8 @@
 import 'server-only';
 
 import type { GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
-import { quietRuns, type StartedRunRow } from '@/lib/goals/run-sweep';
+import { readLastLines } from '@/lib/core/run-liveness';
+import { quietRuns, silentRuns, type StartedRunRow } from '@/lib/goals/run-sweep';
 import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
 
 /**
@@ -15,7 +16,7 @@ import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
  * the read and the write keeps its run.
  */
 
-export type GoalsQuietSweepResult = { closed: string[] };
+export type GoalsQuietSweepResult = { closed: string[]; stale: string[] };
 
 /** Far past the number of runs that can be going at once. */
 const STARTED_LIMIT = 500;
@@ -34,8 +35,34 @@ export async function runGoalsQuietSweep(deps?: {
     .limit(STARTED_LIMIT);
   if (error) throw new Error(`Could not read started goal runs: ${error.message}`);
 
+  const rows = (data ?? []) as StartedRunRow[];
+  // A run that writes lines is judged by its newest one and marked stale when
+  // silent, never closed here (plan #1825). A failed read leaves every run to
+  // the 45-minute rule, as before there were lines.
+  const lines = await readLastLines(
+    client.schema('core') as never,
+    'goals.runs',
+    rows.map((row) => row.id),
+  );
+
+  const stale: string[] = [];
+  for (const row of silentRuns(rows, lines, now)) {
+    const update = client
+      .from('runs')
+      .update({ status: 'stale' })
+      .eq('id', row.id)
+      .eq('user_id', row.user_id)
+      .eq('status', 'started');
+    const written = await (row.last_seen_at === null
+      ? update.is('last_seen_at', null)
+      : update.eq('last_seen_at', row.last_seen_at)
+    ).select('id');
+    if (written.error) throw new Error(`Could not mark goal run ${row.id} stale: ${written.error.message}`);
+    if ((written.data ?? []).length > 0) stale.push(row.id);
+  }
+
   const closed: string[] = [];
-  for (const close of quietRuns((data ?? []) as StartedRunRow[], now)) {
+  for (const close of quietRuns(rows, now, lines)) {
     const update = client
       .from('runs')
       .update({ status: 'failed', error: close.error, ended_at: new Date(now).toISOString() })
@@ -49,5 +76,5 @@ export async function runGoalsQuietSweep(deps?: {
     if (written.error) throw new Error(`Could not close goal run ${close.id}: ${written.error.message}`);
     if ((written.data ?? []).length > 0) closed.push(close.id);
   }
-  return { closed };
+  return { closed, stale };
 }

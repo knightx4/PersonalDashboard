@@ -173,7 +173,7 @@ describe('what a run has to show', () => {
 describe('the line that names the run', () => {
   it('says which press started it, when, and how long it has been going', () => {
     expect(runStartedLine(runWork({ run: run(), steps: [], raises: [] }), NOW)).toBe(
-      `A step run started ${FIRED.replace('T', ' ').slice(0, 16)}, going 40m.`,
+      'A step run started 17 Sep 2026, 11:20 AM, going 40m.',
     );
   });
 

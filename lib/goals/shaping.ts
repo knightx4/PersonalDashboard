@@ -15,7 +15,8 @@
  */
 import type { StepNode } from '@/lib/goals/steps';
 
-export type GoalRunStatus = 'started' | 'done' | 'failed';
+/** awaiting_input: asked you a question; stale: stopped writing lines (plan #1825). */
+export type GoalRunStatus = 'started' | 'awaiting_input' | 'stale' | 'done' | 'failed';
 
 /** One goals.runs row, as the goal page needs it. */
 export type GoalRun = {

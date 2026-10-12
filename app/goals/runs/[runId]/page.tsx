@@ -9,9 +9,10 @@ import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { loadItemHrefs, loadRunChanges } from '@/lib/goals/run-changes-store';
 import { areaHref } from '@/lib/goals/all-goals';
-import { JOB_LABELS, runMeta, type RunListing } from '@/lib/goals/runs';
+import { JOB_LABELS, runMeta, staleFacts, type RunListing } from '@/lib/goals/runs';
 import { loadRun } from '@/lib/goals/runs-store';
 import { RunChanges } from './run-changes';
+import { AcknowledgeRun } from './acknowledge-run';
 import { LinkedText } from '@/components/ui/linked-text';
 
 export const metadata = { title: 'Run' };
@@ -26,7 +27,12 @@ export const dynamic = 'force-dynamic';
 
 /** Outside the component because it reads the clock. */
 function headerLine(run: RunListing, timeZone: string) {
-  return runMeta(run, Date.now(), timeZone);
+  return runMeta(run, Date.now(), timeZone, { stalePanel: true });
+}
+
+/** Outside the component for the same reason (plan #1825). */
+function staleLine(run: RunListing, timeZone: string) {
+  return staleFacts(run, Date.now(), timeZone);
 }
 
 export default async function GoalRunPage({ params }: { params: Promise<{ runId: string }> }) {
@@ -105,6 +111,9 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
           </Link>
         }
       />
+      {run.status === 'stale' && (
+        <AcknowledgeRun runId={run.id} {...staleLine(run, account.timezone)} />
+      )}
       {failed ? (
         <p className="text-small break-words whitespace-pre-wrap text-danger">
           <LinkedText text={run.error ?? 'No reason was recorded.'} />

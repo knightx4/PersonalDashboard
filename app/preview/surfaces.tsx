@@ -248,7 +248,7 @@ import {
   JobsOnboardingSurface,
   JobsThoughtsSurface,
 } from './jobs-page-surfaces';
-import { GoalRunSurface, MailMessageSurface } from './mail-run-surfaces';
+import { GoalRunStaleSurface, GoalRunSurface, MailMessageSurface } from './mail-run-surfaces';
 import {
   AccountSurface,
   DevBugsSurface,
@@ -5770,6 +5770,14 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalRunSurface />,
+  },
+  {
+    /* A goal run that went silent (plan #1825), waiting for Acknowledge. */
+    id: 'goals-run-stale',
+    label: 'Goals · A run that went silent',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalRunStaleSurface />,
   },
   {
     id: 'jobs-activity',
