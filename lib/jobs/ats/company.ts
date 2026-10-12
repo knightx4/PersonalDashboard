@@ -142,6 +142,26 @@ export function companyFromHost(url: string): string | null {
   return words.map((word) => word[0].toUpperCase() + word.slice(1)).join(' ');
 }
 
+/**
+ * The employer a job board's slug names: jobs.ashbyhq.com/sent gives Sent,
+ * boards.greenhouse.io/the-browser-company gives The Browser Company. Board
+ * APIs return the posting without its employer, and the slug is the board's
+ * own name for it. A slug already cased, such as OpenAI, is kept as written.
+ */
+export function companyFromBoardToken(token: string | null | undefined): string | null {
+  if (!token) return null;
+  let raw: string;
+  try {
+    raw = decodeURIComponent(token);
+  } catch {
+    raw = token;
+  }
+  const words = raw.split(/[-_\s]+/).filter(Boolean);
+  if (!words.length || words.some((word) => !/^[\p{L}\p{N}.&']+$/u.test(word))) return null;
+  const name = words.map((word) => (/\p{Lu}/u.test(word) ? word : word[0].toUpperCase() + word.slice(1))).join(' ');
+  return cleanCompanyName(name);
+}
+
 export type CompanySource = 'jobposting' | 'site_name' | 'title' | 'domain';
 
 /** The company a page names, and which source it came from; null when the page names none. */
