@@ -174,12 +174,12 @@ export function healthOf(
   if (health === 'blocked') return { ...base, title: facts.blockAsk ?? facts.comment ?? undefined };
   if (health === 'waiting') {
     const parts = [
-      facts.waitingOn.length > 0 ? `Waits on ${facts.waitingOn.map(named).join(', ')}.` : '',
+      facts.waitingOn.length > 0 ? `Waits on ${facts.waitingOn.map(named).join(', ')}` : '',
       ...(facts.waitsUntil ?? []).map(
-        (check) => `Waits until ${checkDay(check.dueAt)}: ${check.title.replace(/[.]+$/, '')}.`,
+        (check) => `Waits until ${checkDay(check.dueAt)}: ${check.title.replace(/[.]+$/, '')}`,
       ),
     ].filter(Boolean);
-    return { ...base, title: parts.join(' ') };
+    return { ...base, title: parts.join('. ') };
   }
   return base;
 }

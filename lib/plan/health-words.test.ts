@@ -23,6 +23,16 @@ describe('healthOf', () => {
     expect(word.title).toBe('Waits on #12 Schema');
   });
 
+  it('names the day and the reason a step waits on a check-back', () => {
+    const word = healthOf(
+      'waiting',
+      facts({
+        waitsUntil: [{ title: 'Five closes from evidence exist.', dueAt: '2026-10-26T06:00:00.000Z' }],
+      }),
+    );
+    expect(word.title).toBe('Waits until 26 Oct: Five closes from evidence exist');
+  });
+
   it('says what a blocked step needs, and falls back to its note', () => {
     expect(healthOf('blocked', facts({ blockAsk: 'Which account?' })).title).toBe('Which account?');
     expect(healthOf('blocked', facts({ comment: 'A note' })).title).toBe('A note');

@@ -177,9 +177,9 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
     neither closed nor blocked writes one line on why before it stops:
     `stopped <n> --reason "…"`. The line goes on the run the step was sent
     as, ends it, and shows on the plan page after "Last run stopped". When
-    two runs on a feature close nothing, the app raises the feature quoting
-    these lines (#1801), so write what the next session or the person would
-    need: "Too big for one sitting: the export, the import and the page are
+    two runs on a feature close nothing, the app sends a session to find out
+    why (`unsticking.md`) and quotes these lines to it, and to the person if
+    that does not get it moving, so write what they would need: "Too big for one sitting: the export, the import and the page are
     three pieces of work", not "ran out of time". If the step is too big,
     add the pieces you would split it into, in order, one `--piece` each
     (two to twenty), titled as steps. Working offline, the SQL is in
@@ -484,9 +484,12 @@ Recommend A: the nesting is one column and nobody has asked for it."
 
 A block is for something the person does. `block` refuses an ask that says
 nothing is needed from them (without `--on-steps`), because a blocked step is
-listed under what they have to do. A step that only waits on time or a
-scheduled run stays `in_progress` with `check-back "<what to look at>" --after
-2h --from <n>`, which shows it as waiting on.
+listed under what they have to do. A step that waits on data that does not
+exist yet, on time, or on a scheduled run gets `check-back "<what has to exist>"
+--at <ISO time> --from <n>`. The check-back holds the step: the plan shows it as
+"Waiting on the check on <day>", and the runner does not send it until a session
+has done the check. Never leave such a step `in_progress` without one, and never
+block it on the person, since there is nothing for them to do.
 
 A step that should not be done is `drop <n> --note "why"`; say "out of scope:
 …" when that is the reason, since there is no status for it. Never delete a

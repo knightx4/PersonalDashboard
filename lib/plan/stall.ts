@@ -227,6 +227,79 @@ export function waitingSteps(node: PlanNode): string | null {
   return `Nothing under #${node.number} can be worked now: ${said.join('; ')}.`;
 }
 
+/**
+ * The turn a stall diagnosis is sent with (`unstick` runs).
+ *
+ * Sending a stalled feature again as it stands reached the same wall each
+ * time. This run is told to find the wall and leave every open step either
+ * workable or carrying the blocker that says what it waits on, in the same
+ * places every other wait shows: a check-back for data or time, a dependency
+ * for another step, a setup job or a question for the person.
+ */
+export function unstickTurn(feature: { number: number; title: string }, runs: readonly StallRun[]): string {
+  const n = feature.number;
+  return [
+    `Find out why plan feature #${n}, "${feature.title}", has stalled, and fix it, following ` +
+      '.claude/skills/plan/reference/unsticking.md. This is not the build job: do not build steps.',
+    '',
+    'The last two sessions sent at it closed nothing. What each ended with, newest first:',
+    ...runs.slice(0, STALL_RUNS).map(runLine),
+    '',
+    'Read the feature, each open step beneath it, their threads and check-backs, and the code ' +
+      'and data each step needs. Then leave every open step in exactly one of these states:',
+    '',
+    '1. Workable now. If something in the repository or the database stood in the way, such as ' +
+      'a broken script, a migration not applied, an acceptance line that cannot be met or a step ' +
+      'too big for one sitting, fix it, merge the fix to main, or split the step with plan.ts add.',
+    '2. Waiting on data or time. Add a check-back on the step saying what has to exist: ' +
+      '`plan.ts check-back "<what must exist>" --at <ISO time> --from <n>`. The step then reads ' +
+      '"Waiting on the check on <day>" and the runner leaves it until a session has checked.',
+    '3. Waiting on another step: `plan.ts depends <n> --on <m>`.',
+    '4. Waiting on the person to do something, such as setting a key or connecting an account: ' +
+      '`plan.ts needs "<what to set>" --for <n>`. Waiting on them to decide: ' +
+      '`plan.ts block <n> --ask "<the question>"`. Either shows under On you.',
+    '5. No longer worth doing: `plan.ts drop <n> --note "<why>"`.',
+    '',
+    'A step left as it was, with nothing recorded, means this run failed. Before you finish, ' +
+      `write one line on what you found with \`plan.ts stopped ${n} --reason "<what you found ` +
+      'and what you changed>"`.',
+  ].join('\n');
+}
+
+/**
+ * What the tick does about a feature whose last two build runs closed
+ * nothing, given the stall diagnoses sent at it.
+ *
+ * - `none`: not stalled, or nothing beneath it can be worked now. A feature
+ *   whose open steps all wait is shown waiting on the plan and never chosen,
+ *   so there is nothing to diagnose or ask.
+ * - `diagnose`: no diagnosis since the stall began; send one and hold it.
+ * - `hold`: a diagnosis is still running.
+ * - `release`: a diagnosis has ended since the newest build run; the runner
+ *   may try the feature once more.
+ * - `raise`: a diagnosis ran within this stall and a build after it still
+ *   closed nothing. Only now is the person asked.
+ */
+export type StallMove = 'none' | 'diagnose' | 'hold' | 'release' | 'raise';
+
+/** A stall diagnosis run, as the stall check reads it. */
+export type UnstickRun = { createdAt: string; status: string; stopReason: string | null };
+
+export function stallMove(
+  runs: readonly StallRun[],
+  unsticks: readonly UnstickRun[],
+  workable: boolean,
+): StallMove {
+  if (!isStalled(runs) || !workable) return 'none';
+  const newest = new Date(runs[0].createdAt).getTime();
+  const began = new Date(runs[STALL_RUNS - 1].createdAt).getTime();
+  const within = unsticks.filter((run) => new Date(run.createdAt).getTime() > began);
+  if (within.length === 0) return 'diagnose';
+  if (within.some((run) => run.status === 'started')) return 'hold';
+  if (within.some((run) => new Date(run.createdAt).getTime() > newest)) return 'release';
+  return 'raise';
+}
+
 /** The action a Yes takes on a raise that splits a feature (#1804). */
 export const SPLIT_ACTION = 'split_feature';
 
@@ -326,6 +399,8 @@ export function stallRaise(
   runs: readonly StallRun[],
   steps: number,
   stuck: StuckStep | null = null,
+  /** What a stall diagnosis sent at it found, when one said. */
+  found: string | null = null,
 ): StallRaise {
   const named = `#${feature.number} ${feature.title}`;
   const two = runs.slice(0, STALL_RUNS);
@@ -352,7 +427,11 @@ export function stallRaise(
     '',
     ...two.map(runLine),
   ];
-  if (stuckText) lines.push('', stuckText);
+  if (found) {
+    lines.push('', `A session sent to find out why said: "${cut(found, 300)}" The build after it still finished nothing.`);
+  } else if (stuckText) {
+    lines.push('', stuckText);
+  }
 
   if (!reason) {
     lines.push('', after);

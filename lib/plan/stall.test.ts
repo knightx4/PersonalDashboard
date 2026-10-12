@@ -13,12 +13,17 @@ import {
   raiseHolds,
   runsByFeature,
   shouldRaiseStall,
+  stallMove,
   stallRaise,
   stuckStep,
+  unstickTurn,
   isRunnerSource,
   type FeatureRaise,
   type StallRun,
+  waitingSteps,
 } from './stall';
+import type { PlanCheckWait, PlanItem } from './load';
+import { buildPlanTree, findNode } from './tree';
 
 function run(over: Partial<StallRun> & { id: string; createdAt: string }): StallRun {
   return {
@@ -297,5 +302,93 @@ describe('splitPieces', () => {
     });
     expect(splitPieces(['r2'], [{ id: 'r2', stopPieces: ['Only one'], session: null }])).toBeNull();
     expect(splitPieces([], [older])).toBeNull();
+  });
+});
+
+describe('stallMove', () => {
+  const STALLED = [NEWER, OLDER];
+  const diagnosis = (createdAt: string, status = 'failed') => ({ createdAt, status, stopReason: null });
+
+  it('diagnoses a stall nothing has looked at yet', () => {
+    expect(stallMove(STALLED, [], true)).toBe('diagnose');
+    // One from before the stall began does not count.
+    expect(stallMove(STALLED, [diagnosis('2026-10-09T10:00:00.000Z')], true)).toBe('diagnose');
+  });
+
+  it('holds while the diagnosis runs, and releases once it has ended', () => {
+    expect(stallMove(STALLED, [diagnosis('2026-10-11T11:00:00.000Z', 'started')], true)).toBe('hold');
+    expect(stallMove(STALLED, [diagnosis('2026-10-11T11:00:00.000Z')], true)).toBe('release');
+  });
+
+  it('raises once a build after the diagnosis still closed nothing', () => {
+    expect(stallMove(STALLED, [diagnosis('2026-10-10T12:00:00.000Z')], true)).toBe('raise');
+  });
+
+  it('does nothing for a feature that is not stalled, or whose steps all wait', () => {
+    expect(stallMove([{ ...NEWER, status: 'finished' }, OLDER], [], true)).toBe('none');
+    expect(stallMove(STALLED, [], false)).toBe('none');
+  });
+});
+
+describe('unstickTurn', () => {
+  it('quotes what each run ended with and names the blockers to write', () => {
+    const turn = unstickTurn(FEATURE, [{ ...NEWER, error: 'Nothing was pushed in the 32m after this run started.' }, OLDER]);
+    expect(turn).toContain('Find out why plan feature #1801, "Raise a stalled feature", has stalled');
+    expect(turn).toContain('- 2026-10-11: the session left no note. Nothing was pushed in the 32m after this run started.');
+    expect(turn).toContain('plan.ts check-back');
+    expect(turn).toContain('plan.ts needs');
+    expect(turn).toContain('plan.ts stopped 1801 --reason');
+  });
+});
+
+describe('waitingSteps', () => {
+  const row = (id: string, number: number, parentId: string | null, status = 'not_started') =>
+    ({
+      id,
+      number,
+      module: 'dev',
+      parentId,
+      title: `Step ${number}`,
+      detail: null,
+      acceptance: null,
+      status,
+      kind: 'build',
+      track: 'feature',
+      fog: null,
+      resolution: null,
+      dismissedAt: null,
+      fogDismissedAt: null,
+      comment: null,
+      blockAsk: null,
+      blockKind: null,
+      thread: [],
+      priority: 2,
+      size: null,
+      assignee: null,
+      commitSha: null,
+      position: number,
+      startedAt: null,
+      completedAt: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    }) as PlanItem;
+  const feature = (checkWaits: PlanCheckWait[]) =>
+    findNode(
+      buildPlanTree({
+        items: [row('f', 1073, null), row('a', 1081, 'f', 'done'), row('s', 1135, 'f')],
+        dependencies: [],
+        checkWaits,
+      }),
+      'f',
+    )!;
+
+  it('says why nothing under a feature can be worked when every open step waits', () => {
+    expect(
+      waitingSteps(feature([{ id: 'c', planItemId: 's', title: 'Five closes exist.', dueAt: '2026-10-26T06:00:00.000Z' }])),
+    ).toBe('Nothing under #1073 can be worked now: #1135 waits until 26 Oct (Five closes exist).');
+  });
+
+  it('lets a feature through with a step that can be worked', () => {
+    expect(waitingSteps(feature([]))).toBeNull();
   });
 });
