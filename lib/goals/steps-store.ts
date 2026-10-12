@@ -94,7 +94,6 @@ type ItemRow = {
   prepares_id?: string | null;
   prep_checked_at?: string | null;
   errand?: boolean;
-  focus?: boolean;
   created_at?: string | null;
   closed_at?: string | null;
   estimated_total?: number | string | null;
@@ -128,7 +127,7 @@ const ITEM_COLUMNS =
   'resolution, ' +
   'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, count_source, count_match, on_todo, on_todo_by, on_todo_reason, result, ' +
   'result_url, reviewed_at, unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
-  'kept_open_at, prepares_id, prep_checked_at, errand, focus, created_at, closed_at, estimated_total, total_unit';
+  'kept_open_at, prepares_id, prep_checked_at, errand, created_at, closed_at, estimated_total, total_unit';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -188,7 +187,6 @@ const toGoal = (row: ItemRow): Goal => ({
   proposedHelpKinds: readHelpKinds(row.proposed_help_kinds),
   keptOpenAt: row.kept_open_at ?? null,
   errand: row.errand ?? false,
-  focus: row.focus ?? false,
   createdAt: row.created_at ?? null,
   closedAt: row.closed_at ?? null,
 });

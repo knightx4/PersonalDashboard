@@ -38,15 +38,14 @@ import { GoalLanes } from './goal-lanes';
  *    of Dash's morning note (goals.briefs) with More for the rest, and Ask
  *    Dash, which goes to a goal or starts a new goal or errand
  *    (ask-dash.tsx).
- * 2. The week's focus goals by name (`focusLine`) and the card that plans
- *    the week (`planWeek`), both drawn by the page when it has them.
- * 3. A button to each area's page (note d79a0005), directly above
- * 4. Do next: at most five things on you from the week's goals, with Dash's
+ * 2. A button to each area's page (note d79a0005), directly above
+ * 3. Do next: at most five things on you from Todo and from goals with a
+ *    due date, with Dash's
  *    draft beside the step it is for (goal-lanes.tsx, homeLists in
  *    lib/goals/home.ts).
  *    Everything else on you is on the Inbox tab (app/goals/inbox), which
  *    Do next links to with its count.
- * 5. Lines that open in place: what Dash is on, what Dash did since your
+ * 4. Lines that open in place: what Dash is on, what Dash did since your
  *    last visit (done-since-list.tsx), what you set aside, and Other goals.
  *
  * The day you come back after five or more days away (lib/goals/catch-up.ts),
@@ -82,10 +81,6 @@ export type HomeViewProps = {
   canRun?: boolean;
   /** The visit before the time away, on the day you came back from it; otherwise null. */
   awayFrom?: string | null;
-  /** The week's focus goals by name, under Dash's card; nothing is drawn without it. */
-  focusLine?: React.ReactNode;
-  /** The card that plans the week, above Do next; nothing is drawn without it. */
-  planWeek?: React.ReactNode;
 };
 
 export function HomeView({
@@ -103,8 +98,6 @@ export function HomeView({
   laterOn = [],
   canRun = false,
   awayFrom = null,
-  focusLine,
-  planWeek,
 }: HomeViewProps) {
   if (goals.length === 0 && onYou.length === 0) {
     return (
@@ -120,7 +113,7 @@ export function HomeView({
   const summary = homeSummary(goals);
   const away = awayFrom && todayOn ? daysAway(awayFrom, todayOn) : null;
   const { errands } = splitErrands(goals);
-  const { doNext, otherGoals } = homeLists(onYou, goals, todayOn, TODAY_CAP);
+  const { doNext, otherGoals } = homeLists(onYou, goals, TODAY_CAP);
   const note = brief ? briefParts(brief.body) : null;
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -161,9 +154,6 @@ export function HomeView({
           />
         </Card>
       </section>
-
-      {focusLine}
-      {planWeek}
 
       <AreaButtons buttons={areaButtons(areas, goals)} />
 

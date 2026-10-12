@@ -103,6 +103,14 @@ values ('…', '<the stopped step>', '<the setup step>');
 update plan_items set status = 'not_started', block_ask = null, block_kind = null
 where id = '<the stopped step>';
 
+-- activity: a line on the run fired at the step or a row above it (the same
+-- run `stopped` finds). Kind is thought, action, question or error; options
+-- only on a question, a JSON array of one to ten. A question also sets the
+-- run to awaiting_input; any other line sets awaiting_input or stale back to
+-- started.
+insert into core.run_activities (user_id, run_table, run_id, kind, body)
+values ('…', 'plan_runs', '<the run id>', 'action', $l$Claimed #n$l$);
+
 -- start (never on a proposed step, never on a decision, never on a setup step)
 update plan_items set status = 'in_progress' where id = '…';
 
