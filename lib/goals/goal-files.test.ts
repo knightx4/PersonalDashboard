@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LinkedFile } from '@/lib/files/files';
-import { goalFileMeta, goalFileRows, stepTitlesIn } from './goal-files';
+import { goalFileMeta, goalFileRows, stepTitlesIn, unreadWords } from './goal-files';
 
 const GOAL = '11111111-1111-4111-8111-111111111111';
 const STEP = '22222222-2222-4222-8222-222222222222';
@@ -58,5 +58,26 @@ describe('the files on a goal page (plan #1860)', () => {
 
   it('says when the person wrote it', () => {
     expect(goalFileMeta({ madeBy: 'you', version: 2 }, null)).toBe('Written by you · version 2');
+  });
+
+  it('marks the files Dash wrote that have not been opened, and counts them (plan #1861)', () => {
+    const rows = goalFileRows(
+      GOAL,
+      {
+        [STEP]: [
+          file('new', `goals.items:${STEP}`, { readAt: null }),
+          file('read', `goals.items:${STEP}`, { readAt: '2026-10-12T10:00:00Z' }),
+          file('mine', `goals.items:${STEP}`, { madeBy: 'you', readAt: null }),
+        ],
+      },
+      titles,
+    );
+    expect(rows.map((row) => [row.fileId, row.unread])).toEqual([
+      ['new', true],
+      ['read', false],
+      ['mine', false],
+    ]);
+    expect(unreadWords(rows)).toBe('1 not read');
+    expect(unreadWords(rows.filter((row) => !row.unread))).toBeNull();
   });
 });

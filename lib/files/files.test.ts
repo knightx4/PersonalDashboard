@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { authorLine, fileHref, fileVersionHref, originItemId, parseVersion, toDoc } from './files';
+import { authorLine, fileHref, fileVersionHref, isUnread, originItemId, parseVersion, toDoc, toListing } from './files';
 
 describe('files', () => {
   it('reads a row, treating any author but Dash as the person', () => {
@@ -17,6 +17,23 @@ describe('files', () => {
     });
     expect(doc).toMatchObject({ madeBy: 'claude', version: 2, changeNote: 'Added FP&A' });
     expect(toDoc({ ...rowOf(doc), made_by: 'someone' }).madeBy).toBe('you');
+  });
+
+  it('is unread while Dash wrote it and its newest version has not been opened (plan #1861)', () => {
+    const row = {
+      id: 'f',
+      title: 'Firms hiring',
+      summary: null,
+      made_by: 'claude',
+      version: 1,
+      origin: null,
+      created_at: '2026-10-12T09:00:00Z',
+      updated_at: '2026-10-12T09:00:00Z',
+    };
+    expect(toListing(row).readAt).toBeNull();
+    expect(isUnread(toListing(row))).toBe(true);
+    expect(isUnread(toListing({ ...row, read_at: '2026-10-12T10:00:00Z' }))).toBe(false);
+    expect(isUnread(toListing({ ...row, made_by: 'you' }))).toBe(false);
   });
 
   it('opens a file and one of its versions under Goals', () => {

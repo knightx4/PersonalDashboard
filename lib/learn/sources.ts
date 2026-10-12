@@ -218,7 +218,7 @@ export const learnSources: ModuleSources = {
     { table: 'learn.essay_notes', reason: 'Margin notes Dash wrote on an essay; read through the essay.' },
     { table: 'learn.area_check_articles', reason: 'Reference data for placing subjects.' },
     { table: 'learn.area_domains', reason: 'Reference data for placing subjects.' },
-    { table: 'learn.area_fields', reason: 'Reference data for placing subjects.' },
+    { table: 'learn.area_fields', reason: 'Reference data for placing subjects; its embedding column is bookkeeping for the Idea Space map.' },
     { table: 'learn.catalogue_course_items', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.catalogue_items', reason: 'The shared course catalogue, not theirs.' },
     { table: 'learn.catalogue_judgements', reason: 'Model judgements on catalogue items.' },

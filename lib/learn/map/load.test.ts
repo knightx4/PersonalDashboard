@@ -54,7 +54,10 @@ const ROWS = {
     { id: 's1', name: 'SaaS metrics', field_id: 'f1', domain_id: null },
     { id: 's2', name: 'Excel modelling', field_id: null, domain_id: 'd2' },
   ],
-  area_fields: [{ id: 'f1', name: 'Finance', domain_id: 'd1' }],
+  area_fields: [
+    { id: 'f1', name: 'Finance', domain_id: 'd1', embedding: stored(0, 0.1) },
+    { id: 'f2', name: 'Unembedded', domain_id: 'd2', embedding: null },
+  ],
   area_domains: [
     { id: 'd1', name: 'Business' },
     { id: 'd2', name: 'Tools' },
@@ -68,6 +71,10 @@ describe('loadIdeaMap', () => {
 
     expect(view.ideas.map((i) => i.id)).toEqual(['i1', 'i2', 'i3']);
     expect(view.missing).toBe(2);
+    expect(view.areas.fields.map((f) => f.id)).toEqual(['f1']);
+    expect(view.areas.fieldsMissing).toBe(1);
+    expect(view.areas.fields[0]).toMatchObject({ name: 'Finance', ideaCount: 2 });
+    expect(view.areas.domains.map((d) => d.id)).toEqual(['d1']);
 
     const [churn, retention, ranges] = view.ideas;
     expect(churn).toMatchObject({

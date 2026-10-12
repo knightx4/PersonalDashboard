@@ -45,6 +45,7 @@ import type { OverhaulProgress } from '@/lib/plan/overhaul-progress';
 import { type PlanCatalogEntry } from './plan-catalog';
 import { cn } from '@/lib/cn';
 import { PlanRow } from './plan-row';
+import { OrderedSiblings } from './sibling-order';
 import { AddFeature, NewFeature } from './feature-compose';
 import type { PlanScope } from '@/lib/plan/projects';
 import { ColumnHeader } from '@/components/plan-tree/grid';
@@ -694,7 +695,7 @@ export function PlanView({
               {section.nodes.length > 0 && (
                 <ul className="divide-y divide-border">
                   <ColumnHeader />
-                  {section.nodes.map((node) => (
+                  <OrderedSiblings items={section.nodes}>{(ordered) => ordered.map((node) => (
                     <PlanRow
                       key={node.id}
                       node={node}
@@ -714,7 +715,7 @@ export function PlanView({
                       unfolded={unfolded}
                       opened={opened}
                     />
-                  ))}
+                  ))}</OrderedSiblings>
                 </ul>
               )}
 
@@ -780,7 +781,7 @@ export function PlanView({
           </summary>
           <ul className="divide-y divide-border">
             <ColumnHeader />
-            {found.map((node) => (
+            <OrderedSiblings items={found}>{(ordered) => ordered.map((node) => (
               <PlanRow
                 key={node.id}
                 node={node}
@@ -800,7 +801,7 @@ export function PlanView({
                 unfolded={unfolded}
                 opened={opened}
               />
-            ))}
+            ))}</OrderedSiblings>
           </ul>
         </details>
       )}
