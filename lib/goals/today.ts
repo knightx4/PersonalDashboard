@@ -90,6 +90,8 @@ export type TodayItem = {
   url?: string;
   /** For a step of yours: what Dash prepared for it, when there is something (withPrepared). */
   prepared?: Prepared;
+  /** For a step of yours: whether it is on Todo, sent there by you or by Dash. */
+  onTodo?: boolean;
 };
 
 /** What Dash wrote for a step of yours: a draft, a script or a checklist. */
@@ -290,7 +292,15 @@ export function todayCandidates(input: TodayInput): Candidate[] {
           const on = node.dueOn === null ? null : node.dueOn < today ? today : node.dueOn;
           const plain = unblocks === 0 && on === null;
           if (!plain || !plainTaken) {
-            add({ ...base, kind: 'step', title: node.title, detail: null, unblocks, on });
+            add({
+              ...base,
+              kind: 'step',
+              title: node.title,
+              detail: null,
+              unblocks,
+              on,
+              ...(node.onTodo && { onTodo: true }),
+            });
             if (plain) plainTaken = true;
           }
         }

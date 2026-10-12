@@ -163,7 +163,7 @@ export function GoalLanes({
         <Card>
           {mine.length === 0 ? (
             <p className="card-pad-x row-pad text-small text-ink-muted">
-              Nothing is waiting on you in this week’s goals.
+              Nothing is waiting on you from Todo or your dated goals.
             </p>
           ) : (
             <ul className="divide-y divide-border">{mine.map(row)}</ul>
