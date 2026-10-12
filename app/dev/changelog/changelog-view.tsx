@@ -3,6 +3,7 @@ import { ChevronRight, History } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
+import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ModuleMark } from '@/components/ui/module-mark';
 import {
@@ -19,8 +20,11 @@ import {
   type ChangelogModuleFilter,
 } from '@/lib/changelog/entries';
 import { cn } from '@/lib/cn';
+import { ScreenAfters } from '@/components/dev/screen-change';
+import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import { sourceProblems } from '@/lib/dev/post-check';
 import { moduleById } from '@/lib/modules';
+import { ViewChips } from '@/components/plan-tree/view-chips';
 import { PostAbout } from './post-about';
 
 /**
@@ -32,11 +36,14 @@ export function ChangelogView({
   grouping,
   query,
   workspace,
+  screens = {},
 }: {
   entries: ChangelogEntry[];
   grouping: ChangelogGrouping;
   query: string;
   workspace: ChangelogModuleFilter | null;
+  /** Each plan step's changed screens, by step number (plan #1541). Most steps have none. */
+  screens?: Readonly<Record<number, readonly ScreenChangeView[]>>;
 }) {
   // The options are built from everything that shipped, not from what is on
   // screen: a filter that removed every other workspace from the row would
@@ -44,6 +51,10 @@ export function ChangelogView({
   const modules = changelogModules(entries);
   const matched = filterChangelog(filterChangelogByModule(entries, workspace), query);
   const groups = groupChangelog(matched, grouping);
+  const workspaceViews: WorkspaceView[] = [ALL, ...modules];
+  const workspaceLabels = Object.fromEntries(
+    workspaceViews.map((candidate) => [candidate, workspaceLabel(candidate)]),
+  ) as Record<WorkspaceView, string>;
 
   /**
    * A link for the grouping row and the workspace row, keeping everything else.
@@ -69,10 +80,9 @@ export function ChangelogView({
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title="Changelog"
-        description="What has shipped, newest first — a line per feature. Open one for the steps and notes underneath it, and the commit that did each."
-      />
+      {/* No paragraph under the heading: the rows say what they are, and a
+          chevron on each says it opens (plan #1745). */}
+      <PageHeader title="Changelog" />
 
       {entries.length > 0 && (
         <div className="mb-4 flex flex-col gap-2">
@@ -96,24 +106,17 @@ export function ChangelogView({
 
           {/* Only worth a row when there is more than one thing to choose
               between: one workspace and an "Everything" beside it is two
-              controls that do the same thing (law 15). */}
+              controls that do the same thing (law 15). One line at phone
+              width: four chips fit, so past four the rest go under More
+              (plan #1745). */}
           {modules.length > 1 && (
-            <nav aria-label="Workspace" className="flex flex-wrap items-center gap-x-1 gap-y-2">
-              <ModuleFilter href={href({ module: null })} current={workspace === null} label="Everything" />
-              {modules.map((candidate) => (
-                <ModuleFilter
-                  key={candidate}
-                  href={href({ module: candidate })}
-                  current={candidate === workspace}
-                  module={candidate}
-                  label={
-                    candidate === 'app'
-                      ? 'The app as a whole'
-                      : (moduleById(candidate)?.label ?? candidate)
-                  }
-                />
-              ))}
-            </nav>
+            <ViewChips<WorkspaceView>
+              view={workspace ?? ALL}
+              chips={workspaceViews.slice(0, workspaceViews.length > 4 ? 3 : 4)}
+              menu={workspaceViews.length > 4 ? workspaceViews.slice(3) : []}
+              labels={workspaceLabels}
+              hrefOf={(candidate) => href({ module: candidate === ALL ? null : candidate })}
+            />
           )}
 
           {/* Last in the block, so it sits directly above the list it narrows.
@@ -138,75 +141,63 @@ export function ChangelogView({
           action={{ label: 'The plan', href: '/dev/plan' }}
         />
       ) : (
-        /* A heading and its entries, not a card per day. The changelog is
-         * scrolled by definition -- it only grows -- so law 13 makes it a
-         * list, and a card per group was a border and eight pixels of margin
-         * around every day of work. */
-        <div className="space-y-5">
-          {groups.map((group) =>
-            /* By issue, a feature is one line until it is asked to be more.
-               Its steps are the detail underneath. A group that is its own
-               heading -- a note, a feature that shipped by itself -- has
-               nothing to open and stays a plain line. */
-            group.kind === 'issue' && !isItsOwnHeading(group) ? (
-              <IssueSummary key={group.key} group={group} />
-            ) : (
-              <section key={group.key}>
-                {/* A group of one whose heading is its own entry -- a note, or a
-                    feature that shipped by itself -- gets no heading: it would
-                    be the same sentence twice, which is law 15. */}
-                {!isItsOwnHeading(group) && <GroupHeading group={group} />}
-                <ul className="divide-y divide-border">
-                  {group.entries.map((entry) => (
-                    <Entry key={entry.key} entry={entry} inGroup={group.kind} />
-                  ))}
-                </ul>
-              </section>
-            ),
-          )}
+        /* One card holding every group, not a card per day: the changelog
+         * only grows, so law 13 makes it a list, and a card per group was a
+         * border and eight pixels of margin around every day of work. One
+         * surface under the rows is the list pattern's (plan #1745). */
+        <div className="space-y-3">
+          <Card padding="dense" className="divide-y divide-border">
+            {groups.map((group) => (
+              <div key={group.key} className="py-1 first:pt-0 last:pb-0">
+                {/* By issue, a feature is one line until it is asked to be
+                    more. Its steps are the detail underneath. A group that is
+                    its own heading -- a note, a feature that shipped by
+                    itself -- has nothing to open and stays a plain line. */}
+                {group.kind === 'issue' && !isItsOwnHeading(group) ? (
+                  <IssueSummary group={group} screens={screens} />
+                ) : (
+                  <section>
+                    {/* A group of one whose heading is its own entry gets no
+                        heading: it would be the same sentence twice, which is
+                        law 15. */}
+                    {!isItsOwnHeading(group) && <GroupHeading group={group} />}
+                    <ul className="divide-y divide-border">
+                      {group.entries.map((entry) => (
+                        <Entry
+                          key={entry.key}
+                          entry={entry}
+                          inGroup={group.kind}
+                          screens={screensOf(screens, entry)}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                )}
+              </div>
+            ))}
+          </Card>
+          {/* The count closes the list, under the card, as on every list page. */}
+          <p className="text-micro text-ink-ghost">
+            {matched.length} {matched.length === 1 ? 'change' : 'changes'}
+          </p>
         </div>
       )}
     </div>
   );
 }
 
+/** "Everything" in the workspace row: no workspace, rather than the app's own. */
+const ALL = 'all';
+type WorkspaceView = ChangelogModuleFilter | typeof ALL;
+
 /**
- * One workspace to narrow to.
- *
- * The same chip as the grouping row above it, carrying the workspace's mark —
- * the mark is how the lines underneath are already labelled, so the chip and
- * the rows it leaves on screen say the same thing the same way. It is
- * decoration to a screen reader, which reads the label beside it.
+ * A workspace chip's label. Short, so four fit on one line at phone width:
+ * the app as a whole is "Whole app" here, and spelt out under an opened line.
  */
-function ModuleFilter({
-  href,
-  current,
-  module,
-  label,
-}: {
-  href: string;
-  current: boolean;
-  /** Absent on "Everything", which is no workspace rather than the app's own. */
-  module?: ChangelogModuleFilter;
-  label: string;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-current={current ? 'page' : undefined}
-      className={cn(
-        'press press-area flex items-center gap-1.5 rounded-full px-2.5 py-1 text-small font-medium transition-colors',
-        current
-          ? 'bg-accent text-surface'
-          : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-      )}
-    >
-      {module && (
-        <ModuleMark module={module === 'app' ? null : module} size="sm" className="shrink-0" />
-      )}
-      {label}
-    </Link>
-  );
+function workspaceLabel(candidate: WorkspaceView): string {
+  if (candidate === ALL) return 'Everything';
+  if (candidate === 'app') return 'Whole app';
+  return moduleById(candidate)?.label ?? candidate;
 }
 
 /**
@@ -250,26 +241,36 @@ function splitIssue(group: ChangelogGroup): { self: ChangelogEntry | null; steps
  * `details` rather than state, so the page still opens and reads with no
  * JavaScript at all, which is the rest of this page's bargain (law 5).
  */
-function IssueSummary({ group }: { group: ChangelogGroup }) {
+function IssueSummary({
+  group,
+  screens,
+}: {
+  group: ChangelogGroup;
+  screens: Readonly<Record<number, readonly ScreenChangeView[]>>;
+}) {
   const newest = group.entries.reduce((at, entry) => (entry.at > at ? entry.at : at), '');
   const { self, steps } = splitIssue(group);
+  // A feature whose lines all belong to one workspace carries its mark, the
+  // same as each of those lines would; a feature across several leaves the
+  // slot empty rather than picking one.
+  const workspaces = new Set(group.entries.map((entry) => entry.module));
+  const mark = workspaces.size === 1 ? [...workspaces][0] : undefined;
 
   return (
     <details className="group">
-      <summary className="row-pad -mx-2 flex cursor-pointer list-none items-baseline gap-1.5 rounded-lg px-2 hover:bg-sunken [&::-webkit-details-marker]:hidden">
-        <ChevronRight
-          className="size-3.5 shrink-0 self-center text-ink-ghost transition-transform duration-quick group-open:rotate-90"
-          strokeWidth={1.75}
-          aria-hidden
-        />
-        {group.number !== null && (
-          <span className="tabular shrink-0 text-small text-ink-ghost">#{group.number}</span>
-        )}
-        {/* One line, like every row under it. */}
-        <span className="min-w-0 flex-1 truncate text-ui font-medium text-ink">{group.label}</span>
-        <span className="shrink-0 text-micro text-ink-ghost">
-          {steps.length} {steps.length === 1 ? 'change' : 'changes'}
-          {newest && ` · ${formatDay(newest.slice(0, 10))}`}
+      <summary className={ROW}>
+        <RowLead open="group-open:rotate-90" module={mark} number={group.number} />
+        {/* The title has the line to itself on a phone, with the count and
+            the day quietly underneath; from the small breakpoint up there is
+            room for both on one line (plan #1745). */}
+        <span className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-baseline sm:gap-3">
+          <span className="line-clamp-2 break-words text-ui leading-6 font-medium text-ink sm:truncate">
+            {group.label}
+          </span>
+          <span className="shrink-0 text-micro text-ink-ghost sm:ml-auto">
+            {steps.length} {steps.length === 1 ? 'change' : 'changes'}
+            {newest && ` · ${formatShortDay(newest.slice(0, 10))}`}
+          </span>
         </span>
       </summary>
       <div className="mt-1 border-l-2 border-border pl-3">
@@ -284,11 +285,58 @@ function IssueSummary({ group }: { group: ChangelogGroup }) {
         )}
         <ul className="divide-y divide-border">
           {steps.map((entry) => (
-            <Entry key={entry.key} entry={entry} inGroup={group.kind} />
+            <Entry
+              key={entry.key}
+              entry={entry}
+              inGroup={group.kind}
+              screens={screensOf(screens, entry)}
+            />
           ))}
         </ul>
       </div>
     </details>
+  );
+}
+
+/**
+ * Every row's summary, a feature's and a line's alike, so the two kinds sit on
+ * one edge. The negative margin lets the hover reach past the text without
+ * moving it.
+ */
+const ROW =
+  'row-pad -mx-2 flex cursor-pointer list-none items-start gap-2 rounded-lg px-2 hover:bg-sunken [&::-webkit-details-marker]:hidden';
+
+/**
+ * The slots in front of a row's title, the same three in the same order on
+ * every row: the chevron, the workspace's mark and the number. A row without
+ * a mark or a number keeps the space, so every title starts on one edge
+ * (plan #1745). `module` undefined is no mark; null is the app's own.
+ */
+function RowLead({
+  open,
+  module,
+  number,
+}: {
+  /** The rotate class for the `details` this row opens. */
+  open: string;
+  module: ChangelogEntry['module'] | undefined;
+  number: number | null;
+}) {
+  return (
+    <>
+      <span className="flex h-6 w-3.5 shrink-0 items-center" aria-hidden>
+        <ChevronRight
+          className={cn('size-3.5 text-ink-ghost transition-transform duration-quick', open)}
+          strokeWidth={1.75}
+        />
+      </span>
+      <span className="flex size-6 shrink-0 items-center">
+        {module !== undefined && <ModuleMark module={module} size="sm" />}
+      </span>
+      <span className="tabular h-6 w-12 shrink-0 text-small leading-6 text-ink-ghost">
+        {number !== null && `#${number}`}
+      </span>
+    </>
   );
 }
 
@@ -322,33 +370,31 @@ function GroupHeading({ group }: { group: ChangelogGroup }) {
 function Entry({
   entry,
   inGroup,
+  screens,
 }: {
   entry: ChangelogEntry;
   /** What the heading above already said, so the line does not repeat it. */
   inGroup: ChangelogGroup['kind'];
+  /** The screens this step changed, drawn under the line as they look now. */
+  screens: readonly ScreenChangeView[];
 }) {
   const workspace = moduleById(entry.module)?.label ?? 'The app as a whole';
 
   return (
     <li>
       <details className="group/entry">
-        <summary className="row-pad flex cursor-pointer list-none items-baseline gap-3 hover:bg-sunken [&::-webkit-details-marker]:hidden">
-          <ChevronRight
-            className="size-3 shrink-0 self-center text-ink-ghost transition-transform duration-quick group-open/entry:rotate-90"
-            strokeWidth={1.75}
-            aria-hidden
-          />
-          <ModuleMark module={entry.module} size="sm" className="shrink-0 self-center" />
-          {entry.number !== null && (
-            <span className="tabular shrink-0 text-small text-ink-ghost">#{entry.number}</span>
-          )}
-          {/* One line, truncated. A note's title is the whole thing somebody
-              typed on a phone, so the untruncated version is three lines and
-              the list stops being scannable. What was cut is one click away. */}
-          <span className="min-w-0 flex-1 truncate text-ui text-ink">{entry.title}</span>
+        <summary className={ROW}>
+          <RowLead open="group-open/entry:rotate-90" module={entry.module} number={entry.number} />
+          {/* Two lines at most on a phone and one from the small breakpoint
+              up. A note's title is the whole thing somebody typed on a phone,
+              so the untruncated version is three lines and the list stops
+              being scannable. What was cut is one click away. */}
+          <span className="line-clamp-2 min-w-0 flex-1 break-words text-ui leading-6 text-ink sm:truncate">
+            {entry.title}
+          </span>
         </summary>
 
-        <div className="row-pad flex flex-col gap-1 pt-0 pl-9">
+        <div className="row-pad flex flex-col gap-1 pt-0 pr-2 pl-[1.875rem]">
           {/* The title again, whole. The line above is cut to keep the list one
               row per thing, and the first job of opening a row is to read the
               part that did not fit. */}
@@ -377,8 +423,25 @@ function Entry({
           {postable(entry) && entry.number !== null && <PostAbout number={entry.number} />}
         </div>
       </details>
+      {/* Outside the fold, so a line that changed a screen shows the screen
+          without being opened: the picture is what you came to see (plan
+          #1541). Only the after; the before is on the step's plan row. */}
+      {screens.length > 0 && (
+        <div className="pb-2 pl-[1.875rem]">
+          <ScreenAfters changes={screens} />
+        </div>
+      )}
     </li>
   );
+}
+
+/** A plan line's changed screens; a note's line has none. */
+function screensOf(
+  screens: Readonly<Record<number, readonly ScreenChangeView[]>>,
+  entry: ChangelogEntry,
+): readonly ScreenChangeView[] {
+  if (entry.source !== 'plan' || entry.number === null) return [];
+  return screens[entry.number] ?? [];
 }
 
 /**
@@ -413,4 +476,16 @@ function formatDay(day: string): string {
     year: 'numeric',
     timeZone: 'UTC',
   }).format(new Date(`${day}T00:00:00Z`));
+}
+
+/** "4 Oct" for a summary line, with the year only when it is not this one. */
+function formatShortDay(day: string): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  const thisYear = date.getUTCFullYear() === new Date().getUTCFullYear();
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: thisYear ? undefined : 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
 }

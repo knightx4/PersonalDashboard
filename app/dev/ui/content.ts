@@ -384,7 +384,7 @@ export const DATA_DISPLAY: readonly Row[] = [
   [
     'FigureDelta',
     'Names the period it compares against, or says there is none.',
-    'Green only where money came back, so a falling spend is the only delta that earns it; a rising one is plain ink, a fact rather than an alarm. With nothing to compare against it reads “No prior period to compare”.',
+    'Plain ink either way, with an arrow and the sign for the direction: green is kept for money that came back, and a falling spend is not that. With nothing to compare against it reads “No prior period to compare”.',
   ],
   [
     'Sparkline',

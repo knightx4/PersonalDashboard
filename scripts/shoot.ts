@@ -78,7 +78,13 @@ const MAX_AREA = 14_000_000;
 const ALL_WIDTHS = [
   { name: 'phone', width: 390, height: 844 },
   { name: 'laptop', width: 1280, height: 900 },
+  // A post's picture on X: a 16:9 window, shot as the screen shows it rather
+  // than stretched to the whole page, so it lands horizontal in the timeline.
+  { name: 'landscape', width: 1440, height: 810 },
 ] as const;
+
+/** Sizes shot as the window shows them, never grown to the page's length. */
+const WINDOW_ONLY: ReadonlySet<string> = new Set(['landscape']);
 
 /**
  * Both widths unless told otherwise. A posts run (.claude/skills/posts) wants
@@ -90,7 +96,9 @@ const WIDTHS = (() => {
   const asked = process.env.SHOOT_WIDTHS?.split(',')
     .map((value) => value.trim())
     .filter(Boolean);
-  if (!asked || asked.length === 0) return ALL_WIDTHS;
+  if (!asked || asked.length === 0) {
+    return ALL_WIDTHS.filter((size) => !WINDOW_ONLY.has(size.name));
+  }
   const known = ALL_WIDTHS.filter((size) => asked.includes(size.name));
   if (known.length !== asked.length) {
     throw new Error(`SHOOT_WIDTHS: use ${ALL_WIDTHS.map((size) => size.name).join(' or ')}`);
@@ -106,6 +114,12 @@ const WIDTHS = (() => {
  */
 const HIDE_DEV_BADGE =
   "document.querySelectorAll('nextjs-portal').forEach(function(e){e.remove()});";
+
+/** True when something visible is fixed to the bottom half of the screen, such as Quick read's Next row. */
+const HAS_PINNED_ROW = `[...document.querySelectorAll('body *')].some(function(e){
+  var s=getComputedStyle(e);if(s.position!=='fixed'&&s.position!=='sticky')return false;
+  if(s.display==='none'||s.visibility==='hidden')return false;
+  var b=e.getBoundingClientRect();return b.height>0&&b.width>0&&b.top>innerHeight/2;})`;
 
 /**
  * Light and dark with no colour by default: the two poles, and a surface right
@@ -125,6 +139,26 @@ const HIDE_DEV_BADGE =
  * and each strip is a second of frames.
  */
 const RECORD = process.argv.includes('--record');
+
+/**
+ * The page to stand the surface on, inside the whole shell: sidebar, top bar
+ * and all (app/preview/shell-frame.tsx). A posts run sets it on every picture,
+ * since a screenshot going on X should look like the app rather than a panel
+ * cut out of it:
+ *
+ *   SHOOT_SHELL=/shopping/dashboard SHOOT_WIDTHS=laptop npm run shoot -- shopping-dashboard
+ */
+const SHELL = process.env.SHOOT_SHELL?.trim() || null;
+
+/**
+ * How much taller the window has to be to show the whole page. From lg up the
+ * shell scrolls its pane rather than the window, so a full-page capture stops
+ * at the window's foot; the window is grown by whatever the tallest scrolling
+ * box still hides.
+ */
+const HIDDEN_HEIGHT = `[...document.querySelectorAll('body *')].reduce(function(most,e){
+  var s=getComputedStyle(e);if(s.overflowY!=='auto'&&s.overflowY!=='scroll')return most;
+  return Math.max(most,e.scrollHeight-e.clientHeight);},0)`;
 
 const THEMES = (process.env.SHOOT_THEMES ?? (RECORD ? 'light' : 'light,dark'))
   .split(',')
@@ -146,6 +180,17 @@ function slug(theme: Theme): string {
 const applyExpression = themeExpression;
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Resolves once every srcdoc frame has an inline height, or after three seconds. */
+const FRAMES_MEASURED = `new Promise((done) => {
+  const start = Date.now();
+  const check = () => {
+    const frames = [...document.querySelectorAll('iframe[srcdoc]')];
+    if (frames.every((f) => f.style.height) || Date.now() - start > 3000) done(true);
+    else setTimeout(check, 100);
+  };
+  check();
+})`;
 
 type Send = (method: string, params?: Record<string, unknown>) => Promise<Record<string, string>>;
 
@@ -269,13 +314,39 @@ async function main() {
           mobile: size.name === 'phone',
         });
         await send('Page.navigate', {
-          url: `http://localhost:${PORT}/preview?s=${surfaceId}`,
+          url:
+            `http://localhost:${PORT}/preview?s=${surfaceId}` +
+            (SHELL ? `&shell=${encodeURIComponent(SHELL)}` : ''),
         });
         await wait(2200);
         await send('Runtime.evaluate', {
           expression: applyExpression(theme) + HIDE_DEV_BADGE,
         });
         await wait(400);
+        // A newsletter frame (app/news/i/[id]/issue-frame.tsx) is 70vh until
+        // it has measured itself, and a full-page capture stretches the
+        // viewport, so a shot taken before the measurement arrives showed a
+        // frame running to the bottom of the page on some takes and not others
+        // (plan #1622). Wait, up to three seconds, for every frame to have its
+        // own height.
+        await send('Runtime.evaluate', {
+          expression: FRAMES_MEASURED,
+          awaitPromise: true,
+        });
+
+        const windowOnly = WINDOW_ONLY.has(size.name);
+        if (SHELL && !windowOnly) {
+          const hidden = (await evaluate<number>(send, HIDDEN_HEIGHT)) ?? 0;
+          if (hidden > 0) {
+            await send('Emulation.setDeviceMetricsOverride', {
+              width: size.width,
+              height: size.height + hidden,
+              deviceScaleFactor: 2,
+              mobile: size.name === 'phone',
+            });
+            await wait(400);
+          }
+        }
 
         // Measure before capturing, and drop to 1x if a 2x shot would exceed
         // what this browser can allocate. See MAX_SIDE / MAX_AREA above: over
@@ -284,9 +355,11 @@ async function main() {
           expression: 'document.documentElement.scrollHeight',
           returnByValue: true,
         });
-        const pageHeight = Number(
-          (measured as unknown as { result?: { value?: number } }).result?.value ?? size.height,
-        );
+        const pageHeight = windowOnly
+          ? size.height
+          : Number(
+              (measured as unknown as { result?: { value?: number } }).result?.value ?? size.height,
+            );
         const fits = (factor: number) =>
           size.width * factor <= MAX_SIDE &&
           pageHeight * factor <= MAX_SIDE &&
@@ -304,12 +377,42 @@ async function main() {
 
         const { data } = await send('Page.captureScreenshot', {
           format: 'png',
-          captureBeyondViewport: true,
+          captureBeyondViewport: !windowOnly,
         });
         const name = `${surfaceId}--${size.name}-${slug(theme)}.png`;
         writeFileSync(join(OUT, name), Buffer.from(data, 'base64'));
         console.log(`  ${name}`);
         shot += 1;
+
+        // The full-page capture stretches the window to the page, so a row
+        // fixed to the foot of the screen is drawn partway down the content
+        // rather than where a phone shows it (plan #1566). A phone page taller
+        // than the screen with such a row is shot once more, at the phone's
+        // own height and scrolled to the end, as `--phone-<theme>-end.png`.
+        if (size.name === 'phone' && pageHeight > size.height) {
+          await send('Emulation.setDeviceMetricsOverride', {
+            width: size.width,
+            height: size.height,
+            deviceScaleFactor: 2,
+            mobile: true,
+          });
+          await wait(300);
+          const pinned = await send('Runtime.evaluate', {
+            expression: HAS_PINNED_ROW,
+            returnByValue: true,
+          });
+          if ((pinned as unknown as { result?: { value?: boolean } }).result?.value) {
+            await send('Runtime.evaluate', {
+              expression: 'window.scrollTo(0, document.documentElement.scrollHeight)',
+            });
+            await wait(400);
+            const end = await send('Page.captureScreenshot', { format: 'png' });
+            const endName = `${surfaceId}--${size.name}-${slug(theme)}-end.png`;
+            writeFileSync(join(OUT, endName), Buffer.from(end.data, 'base64'));
+            console.log(`  ${endName}`);
+            shot += 1;
+          }
+        }
       }
     }
   }
@@ -361,7 +464,15 @@ function placeFinger(point: { x: number; y: number } | null): string {
     : `(function(){var d=document.getElementById('${FINGER_ID}');if(d)d.style.display='none';})()`;
 }
 
-/** Plays one input event through CDP: touch for a swipe, mouse for a press. */
+/**
+ * Plays one input event through CDP: touch for a swipe, mouse for a press.
+ *
+ * From the third move of a drag on, Chrome held each touchmove back until the
+ * next input arrived, so the page got every move one frame late and the strip
+ * showed the card trailing the finger by a whole step (plan #1566). Each move
+ * is now followed by a copy of itself half a pixel lower: the copy is the one
+ * held, and the real move reaches the page in its own frame.
+ */
 async function dispatch(send: Send, event: InputEvent): Promise<void> {
   if (event.device === 'touch') {
     const type =
@@ -370,6 +481,12 @@ async function dispatch(send: Send, event: InputEvent): Promise<void> {
       type,
       touchPoints: event.phase === 'up' ? [] : [{ x: event.x, y: event.y }],
     });
+    if (event.phase === 'move') {
+      await send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ x: event.x, y: event.y + 0.5 }],
+      });
+    }
     return;
   }
   if (event.phase === 'down') {

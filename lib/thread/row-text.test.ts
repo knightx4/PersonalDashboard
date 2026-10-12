@@ -11,7 +11,7 @@ describe('rowText', () => {
       archived_at: null,
       embedding: Array.from({ length: 100 }, () => 0.1),
     });
-    expect(text).toContain('A row of core.files: Longer pieces written for them');
+    expect(text).toContain('A row of core.files: What Dash wrote for their goals');
     expect(text).toContain('Called: Lisbon costs');
     expect(text).toContain('### body\n\nRent is high.');
     expect(text).not.toContain('### user_id');

@@ -73,7 +73,9 @@ export function GoalStepsFold({
 
   useEffect(() => {
     if (!folding) return;
-    const timer = window.setTimeout(() => setFolded(true), GOAL_FOLD_DONE_MS);
+    // The fold's own end swaps in the line (onAnimationEnd below); this is
+    // only for a fold that never plays, such as in a tab nobody is looking at.
+    const timer = window.setTimeout(() => setFolded(true), GOAL_FOLD_DONE_MS + 5000);
     return () => window.clearTimeout(timer);
   }, [folding]);
 
@@ -84,5 +86,33 @@ export function GoalStepsFold({
       </Disclosure>
     );
   }
-  return <div className={cn(folding && 'goal-fold')}>{children}</div>;
+  // The same wrappers before and while it folds, so the steps keep their
+  // state; only the fold clips them while their height closes up. The
+  // folded line opens above them over the same span, so the steps fold into
+  // it and the tab is never empty between the two.
+  return (
+    <div>
+      {folding && (
+        <div className="goal-fold-in grid grid-cols-[minmax(0,1fr)]" inert>
+          <div className="min-h-0 overflow-hidden">
+            <Disclosure title="Steps" meta={meta} className="px-1">
+              {null}
+            </Disclosure>
+          </div>
+        </div>
+      )}
+      {/* Clipped while it folds, so the steps' lift does not pass over the
+          line above them; never otherwise, since a step's menu opens past it. */}
+      <div className={cn(folding && 'overflow-hidden')}>
+        <div
+          className={cn('grid grid-cols-[minmax(0,1fr)] grid-rows-[1fr]', folding && 'goal-fold')}
+          onAnimationEnd={(event) => {
+            if (folding && event.target === event.currentTarget) setFolded(true);
+          }}
+        >
+          <div className={cn('min-h-0', folding && 'overflow-hidden')}>{children}</div>
+        </div>
+      </div>
+    </div>
+  );
 }

@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/cn';
 import { Select } from '@/components/ui/field';
-import type { Person } from '@/lib/people/load';
+import { PERSON_DOT_CLASS, type Person } from '@/lib/people/load';
 import { assignInboxToPerson } from './people-actions';
 
 /**
@@ -13,6 +15,10 @@ import { assignInboxToPerson } from './people-actions';
  * labelling a single order by hand. Changing it also re-labels what this
  * mailbox has already imported, so setting the people up after the first sync
  * works the way you would expect rather than leaving that sync unattributed.
+ *
+ * Read as the owner's dot and name; pressing it opens the choice of person, so
+ * no form field is drawn around a value nobody is changing (plan #1788, law
+ * 14).
  *
  * Its own file because the inbox section is a server component -- it reads the
  * Gmail environment -- and this needs local state.
@@ -27,6 +33,7 @@ export function InboxPerson({
   personId: string | null;
 }) {
   const [value, setValue] = useState(personId ?? '');
+  const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -38,34 +45,22 @@ export function InboxPerson({
     );
   }
 
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <label htmlFor={`person-${accountId}`} className="text-small text-ink-muted">
-        Whose inbox
-      </label>
+  const owner = people.find((person) => person.id === value) ?? null;
 
-      {/*
-        Called out rather than left as a quiet "Nobody" in the dropdown. This
-        is the one step in setting up a second mailbox that is easy to skip,
-        and skipping it means everything that inbox imports arrives unlabelled
-        -- which reads as the feature not working rather than as a setting not
-        set. Assigning it later does relabel the back catalogue, but only if
-        you notice.
-      */}
-      {!value && (
-        <span className="rounded-full bg-caution-tint px-2 py-0.5 text-micro font-medium text-caution">
-          Not assigned
-        </span>
-      )}
+  if (editing) {
+    return (
       <Select
-        id={`person-${accountId}`}
+        aria-label="Whose inbox"
         value={value}
         disabled={pending}
+        autoFocus
         className="w-auto min-w-40"
+        onBlur={() => setEditing(false)}
         onChange={(event) => {
           const next = event.target.value;
           setValue(next);
           setSaved(null);
+          setEditing(false);
           startTransition(async () => {
             const result = await assignInboxToPerson({ accountId, personId: next });
             setSaved(result.error ?? 'Saved, and past orders relabelled.');
@@ -79,6 +74,37 @@ export function InboxPerson({
           </option>
         ))}
       </Select>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        aria-label={`Whose inbox: ${owner?.name ?? 'not assigned'}. Change`}
+        className="press -ml-1.5 inline-flex min-w-0 items-center gap-1.5 rounded-control px-1.5 py-0.5 text-ui text-ink hover:bg-sunken"
+      >
+        {owner ? (
+          <>
+            <span
+              className={cn('size-2.5 shrink-0 rounded-full', PERSON_DOT_CLASS[owner.colour])}
+              aria-hidden
+            />
+            <span className="truncate">{owner.name}</span>
+          </>
+        ) : (
+          // Called out rather than left as a quiet "Nobody". This is the one
+          // step in setting up a second mailbox that is easy to skip, and
+          // skipping it means everything that inbox imports arrives
+          // unlabelled -- which reads as the feature not working rather than
+          // as a setting not set.
+          <span className="rounded-full bg-caution-tint px-2 py-0.5 text-micro font-medium text-caution">
+            Not assigned
+          </span>
+        )}
+        <ChevronDown className="size-3.5 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
+      </button>
       {pending && <span className="text-small text-ink-muted">Saving…</span>}
       {!pending && saved && <span className="text-small text-ink-muted">{saved}</span>}
     </div>

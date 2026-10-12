@@ -75,6 +75,33 @@ describe('runOutcome', () => {
     );
   });
 
+  it('reads a run that writes lines from its newest line (plan #1825)', () => {
+    const line = new Date(start + 3 * 60 * 60 * 1000).toISOString();
+    const at = Date.parse(line);
+    const run = { status: 'started' as const, createdAt: created, lastLineAt: line };
+    expect(runOutcome(run, at + 29 * 60_000)).toBe('running');
+    // Past the 45-minute mark, but its lines decide and the sweep marks it.
+    expect(runOutcome(run, at + 60 * 60_000)).toBe('running');
+    expect(runOutcome({ status: 'stale', createdAt: created }, start)).toBe('stale');
+    expect(runOutcome({ status: 'awaiting_input', createdAt: created }, start)).toBe('waiting');
+  });
+
+  it('says when a stale run was last heard from', () => {
+    const line = new Date(start + 60 * 60 * 1000).toISOString();
+    const [listing] = toRunListings([row({ status: 'stale' })]);
+    const { outcome, meta } = runMeta({ ...listing, createdAt: created, lastLineAt: line }, Date.parse(line) + 40 * 60_000, 'UTC');
+    expect(outcome).toBe('stale');
+    expect(meta).toMatch(/^Gone quiet · last heard from 40 minutes ago · /);
+  });
+
+  it('reads a run waiting on you and a run gone quiet from their status, whatever the clock says', () => {
+    const late = start + RUN_QUIET_MS * 3;
+    expect(runOutcome({ status: 'awaiting_input', createdAt: created }, late)).toBe('waiting');
+    expect(runOutcome({ status: 'stale', createdAt: created }, start)).toBe('stale');
+    const [listing] = toRunListings([row({ status: 'stale' })]);
+    expect(listing.status).toBe('stale');
+  });
+
   it('passes done and failed through', () => {
     expect(runOutcome({ status: 'done', createdAt: created }, start)).toBe('done');
     expect(runOutcome({ status: 'failed', createdAt: created }, start)).toBe('failed');
@@ -128,8 +155,8 @@ describe('goalRunRows', () => {
     );
     expect(rows.map((r) => [r.id, r.label, r.text])).toEqual([
       ['third', 'After your answers', 'Asked which card.'],
-      ['second', 'Work on this', 'Added two steps.'],
-      ['first', 'Work on this', 'Mapped it.'],
+      ['second', 'Asked Dash about the goal', 'Added two steps.'],
+      ['first', 'Asked Dash about the goal', 'Mapped it.'],
     ]);
     expect(rows[0].meta).toContain('Finished');
     expect(rows[0].meta).toContain('took 12 min');

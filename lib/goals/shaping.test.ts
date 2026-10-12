@@ -98,6 +98,11 @@ describe('runs', () => {
     expect(runInFlight(run({ status: 'done' }), NOW)).toBe(false);
   });
 
+  it('keeps a run waiting on your answer open, however long it waits (plan #1824)', () => {
+    const old = new Date(NOW - 3 * RUN_QUIET_MS).toISOString();
+    expect(runInFlight(run({ status: 'awaiting_input', createdAt: old }), NOW)).toBe(true);
+  });
+
   it('measures quiet from the last report, so a long run that keeps reporting stays going', () => {
     const long = run({ createdAt: '2026-09-24T09:00:00Z', lastSeenAt: '2026-09-24T11:50:00Z' });
     expect(runInFlight(long, NOW)).toBe(true);

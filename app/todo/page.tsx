@@ -6,9 +6,9 @@ import { loadRowThreads } from '@/lib/thread/store';
 import { THREAD_TABLES, threadRef } from '@/lib/thread/subjects';
 import { workingRefsForPage } from '@/lib/talk/handoffs';
 import { loadAgenda } from '@/lib/todo/agenda/load';
-import { loadDashResultsCount } from '@/lib/todo/agenda/dash-results';
 import { dayClosed, doneToday } from '@/lib/todo/agenda/day-close';
 import { loadDoneSinceMidnight } from '@/lib/todo/tasks/load';
+import { loadTaskFiles } from '@/lib/todo/tasks/files';
 import { BUCKET_LABELS, todayIn } from '@/lib/todo/tasks/model';
 import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
@@ -19,7 +19,6 @@ import { DayClosed } from '@/components/todo/day-closed';
 import { AddTask } from '@/components/todo/task-form';
 import { TaskRow } from '@/components/todo/task-row';
 import { AgendaItemRow } from '@/components/todo/agenda-item-row';
-import { DashResultsLine } from '@/components/todo/dash-results-line';
 import { formatClock } from '@/lib/clock';
 
 export const metadata = { title: 'Agenda' };
@@ -37,9 +36,8 @@ export const metadata = { title: 'Agenda' };
  */
 export default async function TodoPage() {
   const user = await requireUser();
-  const [agenda, dashResults, working] = await Promise.all([
+  const [agenda, working] = await Promise.all([
     loadAgenda(user.id),
-    loadDashResultsCount(user.id),
     // What an Ask Dash hand-off is working on (plan #1568).
     workingRefsForPage(user.id),
   ]);
@@ -63,9 +61,13 @@ export default async function TodoPage() {
   const taskIds = agenda.piles.flatMap(({ entries }) =>
     entries.flatMap((entry) => (entry.kind === 'task' && entry.task ? [entry.task.id] : [])),
   );
-  const threads = await createClient()
-    .then((client) => loadRowThreads(client, THREAD_TABLES.task, taskIds, { userId: user.id }))
-    .catch(() => new Map<string, DevComment[]>());
+  // And the files each holds (plan #1714), read alongside.
+  const [threads, files] = await Promise.all([
+    createClient()
+      .then((client) => loadRowThreads(client, THREAD_TABLES.task, taskIds, { userId: user.id }))
+      .catch(() => new Map<string, DevComment[]>()),
+    loadTaskFiles(taskIds),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -87,10 +89,6 @@ export default async function TodoPage() {
           {agenda.failed.length > 1 ? 'them' : 'it'} is missing from this page.
         </Banner>
       )}
-
-      {/* Dash's finished work you have not read, as one line to where it is
-          read on the Goals home (plan #1268). Absent at zero. */}
-      <DashResultsLine count={dashResults} className="mt-4 px-1" />
 
       {/* Ticking the last thing due today closes the day: the done tasks
           fold into a pile, the sigil draws in and a line gives the count
@@ -195,6 +193,7 @@ export default async function TodoPage() {
                             items={entry.children}
                             working={working}
                             thread={threads.get(threadRef('task', entry.task.id))}
+                            files={files.get(entry.task.id)}
                           />
                         ) : entry.item ? (
                           <AgendaItemRow

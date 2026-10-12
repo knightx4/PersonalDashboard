@@ -256,7 +256,7 @@ and for now says so. Paste with no question works fine and is the common case.
 Free text to candidate references. Same shape as `lib/books/paste-list.ts`,
 which already does exactly this job for a pasted list of owned books and is
 the pattern to copy rather than reinvent: Haiku
-(`claude-haiku-4-5-20251001`), a tool call, a `zod` schema, and a
+(`claude-haiku-5-5`), a tool call, a `zod` schema, and a
 line-heuristic fallback when `ANTHROPIC_API_KEY` is unset so the module is
 developable without one.
 
@@ -447,6 +447,16 @@ custom connector in Claude, so "add those to my learn queue" works mid
 conversation. The engine is identical to the paste box's; this is transport
 and OAuth. Fifteen seconds saved per use, which is worth a week only after the
 engine is something you use.
+
+Built in October 2026 as feature #1805. Three changes differ from the paste
+box. The chat sends the works already split apart, so nothing is parsed
+here. There is no confirm step: each reading is listed on Home with an Undo
+instead. A reading relates to its subjects through `learn.reading_subjects`
+and goes on one "From your conversations" list rather than a list of its
+own. Where each work can be read is looked up after the reply, and the
+hourly tick finishes any lookup that did not run. The connector can also log
+what a conversation covered (`learn.learning_log`), whose ideas enter the
+subject's graph untested, and mark a reading read.
 
 **Slice 4 — generation from a question.** A track from a question with no
 paste — the app plays the role the chat played. Deferred until last among the

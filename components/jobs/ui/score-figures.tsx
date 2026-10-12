@@ -73,7 +73,9 @@ export function ScoreReasons({ note, className }: { note: ScoreNote | null | und
 /**
  * Both figures in micro type under a pipeline card's company, wrapping
  * rather than cut off on a narrow card. The reasons go in its tooltip: a
- * card has no room for two more lines.
+ * card has no room for two more lines. An unsure figure says so with the
+ * question mark its text carries; it is not drawn fainter as well, which put
+ * micro type under the contrast it needs (plan #1596).
  */
 export function ScoreLine({ note }: { note: ScoreNote | null | undefined }) {
   if (!note) return null;
@@ -85,9 +87,9 @@ export function ScoreLine({ note }: { note: ScoreNote | null | undefined }) {
   ].filter(Boolean);
   return (
     <p className="flex flex-wrap gap-x-2 text-micro text-ink-muted" title={reasons.join('\n') || undefined}>
-      {fit && <span className={cn('tabular', note.fit?.unsure && 'opacity-70')}>{FIT_SCORE_LABEL} {fit}</span>}
+      {fit && <span className="tabular">{FIT_SCORE_LABEL} {fit}</span>}
       {chance && (
-        <span className={cn(note.chance?.unsure && 'opacity-70')}>
+        <span>
           {CHANCE_LABEL}: {chance.toLowerCase()}
         </span>
       )}

@@ -33,7 +33,6 @@ export const SOURCE_IDS = [
   'drafts',
   'applications',
   'plan_steps',
-  'goal_waiting',
   'raised',
   'threads',
 ] as const;
@@ -178,7 +177,7 @@ export interface AgendaSource {
   /**
    * Runs without a switch on the Todo settings page. For a source where every
    * item was already asked for one at a time -- a goal step is on Todo because
-   * you pressed "Show on Todo" on it -- so a second, source-wide switch could
+   * you pressed "Send to Todo" on it -- so a second, source-wide switch could
    * only ever hide what you had just asked to see. Also for a source of moves
    * that are on you (applications on you, plan #1475): the list is where
    * everything on you shows, and a switch could only hide part of it.

@@ -3,7 +3,7 @@ import { StatusGlyph } from '@/components/ui/status-glyph';
 import { TONE_TEXT, type DevTone } from '@/components/dev/state-label';
 import { HEALTH, TONE_DOT } from '@/lib/plan/health-words';
 import { PLAN_HEALTHS, type PlanBand, type PlanProgress, type PlanTally } from '@/lib/plan/tree';
-import { PLAN_HEALTH_GLYPHS } from '@/lib/status-glyphs';
+import { PLAN_HEALTH_GLYPHS, type StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { cn } from '@/lib/cn';
 
 /**
@@ -90,23 +90,26 @@ export function Progress({
 const TALLY_HEALTHS = PLAN_HEALTHS.filter((health) => health !== 'answered');
 
 export function SectionTally({ tally, label }: { tally: PlanTally; label: string }) {
-  const present = TALLY_HEALTHS.filter((health) => tally[health] > 0);
-  if (present.length === 0) return null;
+  // The steps put down until a check-back are counted apart from the rest of
+  // the waiting, under the clock their rows draw (note 5025f689).
+  const counts = TALLY_HEALTHS.flatMap((health): { key: string; glyph: GlyphName; tone: string; word: string; n: number }[] => {
+    const tone = TONE_TEXT[HEALTH[health].tone];
+    const word = HEALTH[health].word;
+    if (health !== 'waiting') return [{ key: health, glyph: PLAN_HEALTH_GLYPHS[health], tone, word, n: tally[health] }];
+    return [
+      { key: health, glyph: PLAN_HEALTH_GLYPHS.waiting, tone, word, n: tally.waiting - tally.checkingBack },
+      { key: 'checking-back', glyph: 'clock', tone, word: 'Waiting on a check-back', n: tally.checkingBack },
+    ];
+  }).filter((count) => count.n > 0);
+  if (counts.length === 0) return null;
 
   return (
     <span className="flex items-center gap-2.5" aria-label={`${label} by state`}>
-      {present.map((health) => (
-        <span
-          key={health}
-          className="flex items-center gap-1"
-          title={`${tally[health]} ${HEALTH[health].word.toLowerCase()}`}
-        >
-          <StatusGlyph
-            glyph={PLAN_HEALTH_GLYPHS[health]}
-            className={TONE_TEXT[HEALTH[health].tone]}
-          />
-          <span className="tabular text-small text-ink-muted">{tally[health]}</span>
-          <span className="sr-only">{HEALTH[health].word}</span>
+      {counts.map((count) => (
+        <span key={count.key} className="flex items-center gap-1" title={`${count.n} ${count.word.toLowerCase()}`}>
+          <StatusGlyph glyph={count.glyph} className={count.tone} />
+          <span className="tabular text-small text-ink-muted">{count.n}</span>
+          <span className="sr-only">{count.word}</span>
         </span>
       ))}
     </span>

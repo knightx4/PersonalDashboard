@@ -13,7 +13,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { PlanDependency, PlanItem } from '@/lib/plan/load';
-import { budgetSpentReason, OVERNIGHT_TIME_UP, type OvernightRun } from '@/lib/plan/overnight';
+import { budgetSpentReason, featureSessionsAtOnce, OVERNIGHT_TIME_UP, type OvernightRun } from '@/lib/plan/overnight';
 import { OVERNIGHT_NOTHING_READY } from '@/lib/plan/overnight-choice';
 import {
   chooseOvernightFire,
@@ -22,7 +22,10 @@ import {
   overnightTick,
   featureRunLiveness,
   featureRunsInFlight,
+  goalsIdle,
+  fileStalls,
   OVERNIGHT_NO_PROGRESS,
+  personAnsweredSince,
   outsideRunning,
   runOvernightTick,
   sweepQuietRuns,
@@ -216,8 +219,22 @@ describe('chooseOvernightFire', () => {
 
     expect(choice).toMatchObject({ act: 'end', reason: OVERNIGHT_NO_PROGRESS });
     expect(choice.act === 'end' && 'passedOver' in choice && choice.passedOver).toEqual([
-      { number: expect.any(Number), title: 'Step first', retryAt: '2026-09-18T04:00:00.000Z' },
-      { number: expect.any(Number), title: 'Step second', retryAt: '2026-09-18T04:00:00.000Z' },
+      {
+        id: 'first',
+        number: expect.any(Number),
+        title: 'Step first',
+        module: 'shopping',
+        lastFiredAt: HOUR_AGO,
+        retryAt: '2026-09-18T04:00:00.000Z',
+      },
+      {
+        id: 'second',
+        number: expect.any(Number),
+        title: 'Step second',
+        module: 'shopping',
+        lastFiredAt: HOUR_AGO,
+        retryAt: '2026-09-18T04:00:00.000Z',
+      },
     ]);
   });
 
@@ -234,6 +251,57 @@ describe('chooseOvernightFire', () => {
   it('holds it for the rest of the run once that retry has closed nothing too', () => {
     const choice = chooseOvernightFire(
       tree(twoFeatures()),
+      night(),
+      MIDNIGHT,
+      { first: SEVEN_HOURS_AGO },
+      { first: YESTERDAY },
+    );
+
+    expect(choice.act === 'fire' && choice.feature.id).toBe('second');
+    // Named on the fire too, so the tick can raise it on the same turn.
+    expect(choice.passedOver).toMatchObject([{ id: 'first', retryAt: null }]);
+  });
+
+  // The person answered something beneath a held feature: whatever stopped its
+  // sessions may be settled, so it goes again rather than waiting for morning.
+  it.each([
+    ['a turn of theirs on a thread', { thread: [{ id: 't', author: 'me' as const, body: 'It is fine.', createdAt: '2026-09-17T20:00:00.000Z' }] }],
+    ['an Answered line dated the day of the fire', { comment: 'Blocked 2026-09-17: Which one?\n\nAnswered 2026-09-17: The list.' }],
+    ['an Accepted line dated after it', { comment: 'Accepted 2026-09-18: the screen as it is.' }],
+  ])('releases a feature held for good once the person has answered since: %s', (_, said) => {
+    const sections = tree([
+      item({ id: 'first', priority: 1 }),
+      item({ id: 'first-step', parentId: 'first', priority: 1, status: 'blocked', blockKind: 'outside', ...said }),
+      item({ id: 'first-next', parentId: 'first', priority: 1 }),
+    ]);
+
+    const choice = chooseOvernightFire(
+      sections,
+      night(),
+      MIDNIGHT,
+      { first: SEVEN_HOURS_AGO },
+      { first: YESTERDAY },
+    );
+
+    expect(choice.act === 'fire' && choice.feature.id).toBe('first');
+  });
+
+  it('keeps it held when what the person said came before the fire', () => {
+    const sections = tree([
+      item({ id: 'first', priority: 1 }),
+      item({
+        id: 'first-step',
+        parentId: 'first',
+        priority: 1,
+        comment: 'Answered 2026-09-16: The list.',
+        thread: [{ id: 't', author: 'me', body: 'The list.', createdAt: '2026-09-16T09:00:00.000Z' }],
+      }),
+      item({ id: 'second', priority: 3 }),
+      item({ id: 'second-step', parentId: 'second', priority: 3 }),
+    ]);
+
+    const choice = chooseOvernightFire(
+      sections,
       night(),
       MIDNIGHT,
       { first: SEVEN_HOURS_AGO },
@@ -333,9 +401,50 @@ describe('overnightTick', () => {
     });
     const tick = await overnightTick(spent.ports);
     expect(tick.act === 'nothing-ready' && tick.reason).toContain(
-      'closed nothing in its last two sessions, so it waits for you.',
+      'closed nothing in its last two sessions. A session is sent to find out why.',
     );
     expect(spent.calls.fired).toEqual([]);
+  });
+
+  it('lets a feature out of the in-night guard once its diagnosis has ended', async () => {
+    const held = ports({
+      now: Date.parse('2026-09-18T13:00:00.000Z'),
+      loadRun: async () => night({ startedAt: '2026-09-17T23:00:00.000Z', stopBy: null }),
+      lastFiredAt: async () => ({ feature: '2026-09-18T06:00:00.000Z' }),
+      previousFiredAt: async () => ({ feature: '2026-09-17T23:30:00.000Z' }),
+    });
+    await expect(overnightTick(held.ports)).resolves.toMatchObject({ act: 'nothing-ready' });
+
+    const released = ports({
+      now: Date.parse('2026-09-18T13:00:00.000Z'),
+      loadRun: async () => night({ startedAt: '2026-09-17T23:00:00.000Z', stopBy: null }),
+      lastFiredAt: async () => ({ feature: '2026-09-18T06:00:00.000Z' }),
+      previousFiredAt: async () => ({ feature: '2026-09-17T23:30:00.000Z' }),
+      stalls: async () => ({ held: [], released: ['feature'] }),
+    });
+    await expect(overnightTick(released.ports)).resolves.toMatchObject({ act: 'fired' });
+    expect(released.calls.fired).toEqual([{ feature: 'feature', step: 'step' }]);
+  });
+
+  it('passes over a feature a diagnosis or raise holds and fires the next', async () => {
+    const { ports: p, calls } = ports({
+      loadSections: async () => tree(twoFeatures()),
+      stalls: async () => ({ held: ['first'], released: [] }),
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired' });
+    expect(calls.fired).toEqual([{ feature: 'second', step: 'second-step' }]);
+  });
+
+  it('still fires when the stalls cannot be read', async () => {
+    const { ports: p, calls } = ports({
+      stalls: async () => {
+        throw new Error('plan_runs is unreadable');
+      },
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired' });
+    expect(calls.fired).toEqual([{ feature: 'feature', step: 'step' }]);
   });
 
   it('fires a run with no cap without counting anything down', async () => {
@@ -382,12 +491,56 @@ describe('overnightTick', () => {
         ],
       });
 
-      await expect(overnightTick(p)).resolves.toEqual({ act: 'waiting', liveness, running: 3 });
+      await expect(overnightTick(p)).resolves.toEqual({
+        act: 'waiting',
+        liveness,
+        running: 3,
+        atOnce: 3,
+      });
       // The tree is not read: every slot is taken. The claims are still
       // swept, because the ones that go stale belong to other sessions and
       // the night spends most of its ticks here.
       expect(calls).toMatchObject({ sections: 0, swept: 1, fired: [], recorded: [], stopped: [] });
     }
+  });
+
+  it('keeps a fourth session going when goals has nothing to start', async () => {
+    const three = [
+      { featureId: 'a', liveness: 'working' as const },
+      { featureId: 'b', liveness: 'working' as const },
+      { featureId: 'c', liveness: 'working' as const },
+    ];
+    const { ports: p, calls } = ports({
+      atOnce: featureSessionsAtOnce(true),
+      loadRun: async () => night({ lastFiredAt: '2026-09-17T23:30:00.000Z' }),
+      runsInFlight: async () => three,
+    });
+    await overnightTick(p);
+    // Three going is not full with goals idle, so the tree is read.
+    expect(calls.sections).toBe(1);
+
+    const full = ports({
+      atOnce: featureSessionsAtOnce(true),
+      loadRun: async () => night({ lastFiredAt: '2026-09-17T23:30:00.000Z' }),
+      runsInFlight: async () => [...three, { featureId: 'd', liveness: 'working' as const }],
+    });
+    await expect(overnightTick(full.ports)).resolves.toEqual({
+      act: 'waiting',
+      liveness: 'working',
+      running: 4,
+      atOnce: 4,
+    });
+    expect(tickNote({ act: 'waiting', liveness: 'working', running: 4, atOnce: 4 })).toBe(
+      'Waiting: 4 sessions are running, the most it starts at once.',
+    );
+  });
+
+  it('gives the goals seat to a feature only when goals had nothing to start', () => {
+    expect(goalsIdle({ act: 'nothing-ready' })).toBe(true);
+    expect(goalsIdle({ act: 'no-routine' })).toBe(true);
+    expect(goalsIdle({ act: 'waiting' })).toBe(false);
+    expect(goalsIdle({ act: 'failed', error: 'x' })).toBe(false);
+    expect(featureSessionsAtOnce(false)).toBe(3);
   });
 
   it('will not fire while a fire it made left no record', async () => {
@@ -400,6 +553,7 @@ describe('overnightTick', () => {
       act: 'waiting',
       liveness: 'unknown',
       running: 1,
+      atOnce: 3,
     });
     expect(calls.fired).toEqual([]);
     expect(calls.swept).toBe(1);
@@ -457,6 +611,7 @@ describe('overnightTick', () => {
       act: 'waiting',
       liveness: 'working',
       running: 1,
+      atOnce: 3,
     });
     expect(calls).toMatchObject({ fired: [], recorded: [], stopped: [] });
   });
@@ -658,6 +813,34 @@ describe('overnightTick', () => {
   });
 });
 
+describe('personAnsweredSince', () => {
+  const feature = (over: Partial<PlanItem>) =>
+    findNode(tree([item({ id: 'f' }), item({ id: 's', parentId: 'f', ...over })]), 'f')!;
+
+  it('counts the person on a thread, and not Dash', () => {
+    const at = '2026-10-09T10:00:00.000Z';
+    expect(
+      personAnsweredSince(
+        feature({ thread: [{ id: 't', author: 'claude', body: 'Blocked.', createdAt: '2026-10-09T11:00:00.000Z' }] }),
+        at,
+      ),
+    ).toBe(false);
+    expect(
+      personAnsweredSince(
+        feature({ thread: [{ id: 't', author: 'me', body: 'yes', createdAt: '2026-10-09T11:00:00.000Z' }] }),
+        at,
+      ),
+    ).toBe(true);
+  });
+
+  it('reads a dated line on the day of the fire as newer, and one the day before as older', () => {
+    const at = '2026-10-09T23:00:00.000Z';
+    expect(personAnsweredSince(feature({ comment: 'Answered 2026-10-09: It is fine.' }), at)).toBe(true);
+    expect(personAnsweredSince(feature({ comment: 'Answered 2026-10-08: It is fine.' }), at)).toBe(false);
+    expect(personAnsweredSince(feature({ comment: 'Blocked 2026-10-10: Which one?' }), at)).toBe(false);
+  });
+});
+
 describe('overnightRefusedReason', () => {
   it('names each refusal once, with a full stop', () => {
     expect(
@@ -732,6 +915,33 @@ describe('runOvernightTick', () => {
       head_sha: HEAD,
       conclusion: 'passed',
     });
+    vi.unstubAllEnvs();
+  });
+
+  it('sends answered steps on a tick with no night running', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase } = quietNight();
+    const answers = vi.fn(async () => ({
+      u1: { act: 'sent' as const, step: 1600, refused: [] },
+    }));
+
+    const summary = await runOvernightTick({ supabase, now: NOW, fetch: green() as never, answers });
+
+    expect(summary.accounts).toBe(0);
+    expect(answers).toHaveBeenCalledTimes(1);
+    expect(summary.answered).toEqual({ u1: { act: 'sent', step: 1600, refused: [] } });
+    vi.unstubAllEnvs();
+  });
+
+  it('finishes the tick when the answered-step pass breaks', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase } = quietNight();
+    const answers = vi.fn(async () => Promise.reject(new Error('plan_items unreadable')));
+
+    const summary = await runOvernightTick({ supabase, now: NOW, fetch: green() as never, answers });
+
+    expect(summary.answered).toEqual({});
+    expect(summary.main.conclusion).toBe('passed');
     vi.unstubAllEnvs();
   });
 
@@ -818,6 +1028,211 @@ describe('outsideRunning', () => {
     const sections = tree([item({ id: 'todo-a', module: 'todo' })]);
     const ids = outsideRunning(sections, ['gone']).flatMap((one) => one.nodes.map((n) => n.id));
     expect(ids).toEqual(['todo-a']);
+  });
+});
+
+describe('fileStalls', () => {
+  type Row = Record<string, unknown>;
+
+  /**
+   * plan_runs and raised_items as chains that answer every read with the
+   * given rows, and record what is inserted and dismissed. The filters are
+   * left to the real query; what is checked is what the tick does with the
+   * answer.
+   */
+  function db(runs: Row[], raises: Row[]) {
+    const inserted: Row[] = [];
+    const dismissed: string[] = [];
+    const from = (table: string) => {
+      const rows = table === 'plan_runs' ? runs : raises;
+      const answer = { data: rows, error: null };
+      const chain: Record<string, unknown> = {
+        select: () => chain,
+        eq: () => chain,
+        in: () => chain,
+        not: () => chain,
+        order: () => chain,
+        limit: async () => answer,
+        or: async () => ({ data: rows.filter((row) => row.status === 'open'), error: null }),
+        like: (_column: string, pattern: string) =>
+          Promise.resolve({
+            data: rows.filter((row) =>
+              String(row.source).startsWith(pattern.replace(/%$/, '')),
+            ),
+            error: null,
+          }),
+        insert: async (row: Row) => {
+          inserted.push(row);
+          return { error: null };
+        },
+        update: () => ({
+          eq: () => ({
+            in: async (_column: string, ids: string[]) => {
+              dismissed.push(...ids);
+              return { error: null };
+            },
+          }),
+        }),
+      };
+      return chain;
+    };
+    return { supabase: { from } as never, inserted, dismissed };
+  }
+
+  const sections = () => tree([item({ id: 'feature', number: 1801 }), item({ id: 'step', parentId: 'feature' })]);
+  const failed = (id: string, at: string, over: Row = {}) => ({
+    id,
+    job: 'feature',
+    plan_item_id: 'step',
+    status: 'failed',
+    created_at: at,
+    stop_reason: null,
+    stop_pieces: null,
+    error: null,
+    ...over,
+  });
+  const unstick = (at: string, over: Row = {}) => ({
+    id: `u-${at}`,
+    job: 'unstick',
+    plan_item_id: 'feature',
+    status: 'failed',
+    created_at: at,
+    stop_reason: null,
+    stop_pieces: null,
+    error: 'Nothing at or beneath the feature changed while it ran.',
+    ...over,
+  });
+  const NOON = Date.parse('2026-10-11T12:00:00.000Z');
+  const R2 = '2026-10-11T10:00:00.000Z';
+  const R1 = '2026-10-10T10:00:00.000Z';
+
+  it('sends a diagnosis at a feature whose last two runs closed nothing, and asks nothing yet', async () => {
+    const { supabase, inserted } = db([failed('r2', R2), failed('r1', R1)], []);
+    const diagnose = vi.fn(async () => ({ ok: true }));
+
+    const verdict = await fileStalls({ supabase, userId: 'u', sections: sections(), now: NOON, diagnose });
+
+    expect(diagnose).toHaveBeenCalledTimes(1);
+    expect(verdict).toEqual({ held: ['feature'], released: [] });
+    expect(inserted).toEqual([]);
+  });
+
+  it('holds the feature while its diagnosis runs, and releases it once the diagnosis has ended', async () => {
+    const running = db([unstick('2026-10-11T11:00:00.000Z', { status: 'started', error: null }), failed('r2', R2), failed('r1', R1)], []);
+    const diagnose = vi.fn(async () => ({ ok: true }));
+    expect(await fileStalls({ supabase: running.supabase, userId: 'u', sections: sections(), now: NOON, diagnose })).toEqual({
+      held: ['feature'],
+      released: [],
+    });
+
+    const ended = db([unstick('2026-10-11T11:00:00.000Z', { status: 'finished', error: null }), failed('r2', R2), failed('r1', R1)], []);
+    expect(await fileStalls({ supabase: ended.supabase, userId: 'u', sections: sections(), now: NOON, diagnose })).toEqual({
+      held: [],
+      released: ['feature'],
+    });
+    expect(diagnose).not.toHaveBeenCalled();
+  });
+
+  it('raises a feature a diagnosis did not get moving, quoting what it found, and holds it', async () => {
+    const { supabase, inserted } = db(
+      [
+        failed('r2', R2, { stop_reason: 'Main was red.' }),
+        unstick('2026-10-10T12:00:00.000Z', { stop_reason: 'The migration was applied; it should run now.' }),
+        failed('r1', R1),
+      ],
+      [],
+    );
+
+    const verdict = await fileStalls({ supabase, userId: 'u', sections: sections(), now: NOON });
+
+    expect(verdict.held).toEqual(['feature']);
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]).toMatchObject({
+      user_id: 'u',
+      status: 'open',
+      source: 'stalled feature runs r2 r1',
+      consequence: { name: 'send_step', text: '#1801' },
+    });
+    expect(String(inserted[0].detail)).toContain('"Main was red."');
+    expect(String(inserted[0].detail)).toContain(
+      'A session sent to find out why said: "The migration was applied; it should run now."',
+    );
+  });
+
+  // #1073: its one open step waited on a check-back for two weeks of data.
+  it('neither diagnoses nor raises a feature whose open steps all wait, and puts its raise away', async () => {
+    const waiting = () =>
+      buildPlanTree({
+        items: [item({ id: 'feature', number: 1801 }), item({ id: 'step', parentId: 'feature' })],
+        dependencies: [],
+        checkWaits: [{ id: 'c1', planItemId: 'step', title: 'Five closes exist', dueAt: '2026-10-26T06:00:00.000Z' }],
+      });
+    const { supabase, inserted, dismissed } = db(
+      [failed('r2', R2), failed('r1', R1)],
+      [{ id: 'raise-1', source: 'stalled feature runs r2 r1', status: 'open', created_at: R2, answered_at: null }],
+    );
+    const diagnose = vi.fn(async () => ({ ok: true }));
+
+    const verdict = await fileStalls({ supabase, userId: 'u', sections: waiting(), now: NOON, diagnose });
+
+    expect(diagnose).not.toHaveBeenCalled();
+    expect(inserted).toEqual([]);
+    expect(verdict).toEqual({ held: [], released: [] });
+    expect(dismissed).toEqual(['raise-1']);
+  });
+
+  // #1804: the split is only asked of a feature with no steps of its own.
+  it('asks to split a feature with no steps into the pieces its session left', async () => {
+    const pieces = { stop_reason: 'Too big.', stop_pieces: ['Read the runs', 'Write the raise'] };
+    const bare = () => tree([item({ id: 'feature', number: 1801 })]);
+    const runs = [
+      failed('r2', R2, { plan_item_id: 'feature', ...pieces }),
+      unstick('2026-10-10T12:00:00.000Z'),
+      failed('r1', R1, { plan_item_id: 'feature' }),
+    ];
+
+    const lone = db(runs, []);
+    await fileStalls({ supabase: lone.supabase, userId: 'u', sections: bare(), now: NOON });
+    expect(lone.inserted[0]).toMatchObject({
+      ask: expect.stringMatching(/^Split #1801 .* into 2 steps\?$/),
+      consequence: { name: 'split_feature', text: '#1801' },
+    });
+
+    const stepped = db(runs.map((run) => (run.job === 'unstick' ? run : { ...run, plan_item_id: 'step' })), []);
+    await fileStalls({ supabase: stepped.supabase, userId: 'u', sections: sections(), now: NOON });
+    expect(stepped.inserted[0]).toMatchObject({ consequence: { name: 'send_step' } });
+  });
+
+  it('adds no second raise while the first is open', async () => {
+    const { supabase, inserted } = db(
+      [failed('r3', '2026-10-12T10:00:00.000Z'), unstick('2026-10-11T12:00:00.000Z'), failed('r2', R2)],
+      [
+        {
+          id: 'raise-1',
+          source: 'stalled feature runs r2 r1',
+          status: 'open',
+          created_at: '2026-10-11T11:00:00.000Z',
+          answered_at: null,
+        },
+      ],
+    );
+
+    const verdict = await fileStalls({ supabase, userId: 'u', sections: sections(), now: MIDNIGHT });
+
+    expect(inserted).toEqual([]);
+    // Sent by hand since the raise, so the raise no longer holds it.
+    expect(verdict.held).toEqual([]);
+  });
+
+  it('does nothing for a feature whose newest run closed a step', async () => {
+    const { supabase, inserted } = db([failed('r2', R2, { status: 'finished' }), failed('r1', R1)], []);
+    const diagnose = vi.fn(async () => ({ ok: true }));
+
+    const verdict = await fileStalls({ supabase, userId: 'u', sections: sections(), now: MIDNIGHT, diagnose });
+
+    expect(diagnose).not.toHaveBeenCalled();
+    expect(inserted).toEqual([]);
+    expect(verdict).toEqual({ held: [], released: [] });
   });
 });
 
@@ -967,6 +1382,11 @@ describe('sweepQuietRuns', () => {
             }
             return chain;
           },
+          // Started and stale runs, read by status (plan #1825).
+          in: async (column: string) =>
+            column === 'status'
+              ? { data: started.filter((row) => row.user_id === userId), error: null }
+              : { data: [], error: null },
           limit: async () => ({ data: started, error: null }),
           update: (values: Record<string, unknown>) => ({
             eq: async (_column: string, id: string) => {

@@ -171,13 +171,24 @@ picture per draft.
 UI_PREVIEW=1 NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co \
   NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-anon-key \
   NEXT_PUBLIC_APP_URL=http://localhost:3000 npx next dev -p 3400   # in the background
-SHOOT_WIDTHS=laptop SHOOT_THEMES=light npm run shoot -- <surface id>
+SHOOT_SHELL=<page path> SHOOT_WIDTHS=landscape SHOOT_THEMES=light npm run shoot -- <surface id>
 ```
 
+Every picture shows the whole app, never a panel on its own: the person asked
+for the sidebar and the top bar in every post's picture. `SHOOT_SHELL` puts
+the surface inside the shell (`app/preview/shell-frame.tsx`) and lights the
+row of the page it names, so set it to the route the surface stands for, such
+as `/shopping/dashboard` for `shopping-dashboard` or `/jobs/pipeline` for a
+pipeline surface. A surface whose `width` is `screen` is a page outside the
+shell and is shot without it.
+
 `scripts/shoot.ts` is the script the UI passes use; it writes
-`.preview-shots/<id>--laptop-light.png` and leaves out the dev badge. Use
-`SHOOT_WIDTHS=phone` instead for a surface whose `width` is `narrow`, or when
-the angle is about using the app on a phone. Open the PNG and look at it
+`.preview-shots/<id>--landscape-light.png` and leaves out the dev badge.
+Every post picture is horizontal, as the person asked: `landscape` is a 16:9
+window at 1440 by 810, shot as the screen shows it, so a long page shows its
+top rather than coming out as a tall strip. Choose the surface whose subject
+sits in that first screen. Use `SHOOT_WIDTHS=phone` only when the angle is
+about using the app on a phone. Open the PNG and look at it
 before using it: it has to show the thing the draft is about, readably.
 
 **Commit it.** Copy it to `public/posts/<YYYY-MM-DD>-<surface id>.png` (the

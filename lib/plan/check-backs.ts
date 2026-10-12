@@ -116,6 +116,64 @@ export function chooseWake(
     .sort((a, b) => a.dueAt.localeCompare(b.dueAt));
 }
 
+/** The plan row a check-back is for, as a link names it. */
+export type CheckBackStep = { id: string; number: number; outline: string; title: string };
+
+/** A check-back with the step it is for, where that step is on the list given. */
+export type PlacedCheckBack = CheckBack & { step: CheckBackStep | null };
+
+/**
+ * Each check-back with the plan row it came from, out of `steps`. On a
+ * feature's page `steps` is the feature and everything beneath it, and a
+ * check-back for a row outside them is left out: it shows on its own
+ * feature's page. With `keepUnplaced`, as on the Dash tab, it stays, with
+ * no step. Soonest first either way.
+ *
+ * A step that is already done keeps its check-backs: the check is often what
+ * confirms it landed (a weekly run's first firing), so it is still the step
+ * the check is about.
+ */
+export function placeCheckBacks(
+  rows: readonly CheckBack[],
+  steps: readonly CheckBackStep[],
+  { keepUnplaced = false }: { keepUnplaced?: boolean } = {},
+): PlacedCheckBack[] {
+  const byId = new Map(steps.map((step) => [step.id, step]));
+  return rows
+    .map((row) => {
+      const step = row.planItemId ? byId.get(row.planItemId) : undefined;
+      return {
+        ...row,
+        step: step
+          ? { id: step.id, number: step.number, outline: step.outline, title: step.title }
+          : null,
+      };
+    })
+    .filter((row) => keepUnplaced || row.step !== null)
+    .sort((a, b) => a.dueAt.localeCompare(b.dueAt));
+}
+
+/** "26 Oct": the day a check-back falls due, as a waiting step names it. */
+export function checkDay(dueAt: string): string {
+  return new Date(dueAt).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  });
+}
+
+/**
+ * What a step waiting on check-backs is waiting on, in the move's words: the
+ * day alone, "Waiting on 26 Oct". It was "the check on 26 Oct", which the
+ * Status column cut off mid-word (note 5025f689); the clock beside the row and
+ * the tooltip already say it is a check-back.
+ */
+export function checkWaitName(waits: readonly { dueAt: string }[]): string {
+  const last = waits[waits.length - 1];
+  // A no-break space, so a wrapped cell keeps "26 Oct" together.
+  return last ? checkDay(last.dueAt).replace(' ', '\u00a0') : '';
+}
+
 /** "in 2h 5m", "5m ago", "now": how the CLI and the Dash tab say a due time. */
 export function dueWords(dueAt: string, now: number): string {
   const diff = new Date(dueAt).getTime() - now;

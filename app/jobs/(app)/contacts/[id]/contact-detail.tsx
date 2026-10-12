@@ -4,7 +4,7 @@ import { Pencil, Plus } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ChipSelect, Field, FieldError, InlineInput, Input, Textarea } from '@/components/ui/field';
+import { ChipSelect, Field, FieldError, InlineTextarea, Input, Textarea } from '@/components/ui/field';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { logTouch, markTouchAnswered, updateContact, updateTouch } from '../actions';
 import type { ContactRow } from '../view';
@@ -154,18 +154,16 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
                 ))}
               </ChipSelect>
               <span className="text-ink-muted">{touch.direction}</span>
-              {/* `sm:order-last` puts the answer back at the end of the row
-                  where there is room for one; below `sm` it stays where the
-                  DOM has it, above the message, so the line that wraps is the
-                  message and not this. */}
+              {/* The answer stays on the first line with the date and the
+                  channel, and the words take the line below, so every send
+                  row has the same shape at every width. */}
               {touch.respondedAt ? (
-                <span className="text-ink sm:order-last">replied</span>
+                <span className="text-ink">replied</span>
               ) : touch.direction === 'outbound' ? (
                 <Button
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className="sm:order-last"
                   disabled={pending}
                   onClick={() =>
                     startTransition(async () => {
@@ -181,22 +179,14 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
                   They replied
                 </Button>
               ) : null}
-              {/* Last in the row, so on a phone -- where it takes the whole of
-                  the next line -- the date, the channel and the answer stay
-                  together above it. The words are the send's own text, edited
-                  where they are read; a send just logged opens on them. */}
-              <InlineInput
-                aria-label="What you said"
-                defaultValue={touch.message ?? ''}
-                placeholder="What you said, roughly"
-                autoFocus={touch.id === freshId}
-                className="min-w-0 basis-full text-ink-muted sm:flex-1 sm:basis-auto"
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') event.currentTarget.blur();
-                }}
-                onBlur={(event) => {
+              {/* Last, on a line of its own beneath the date, the channel and
+                  the answer. The words are the send's own text, edited where
+                  they are read; a send just logged opens on them. */}
+              <SendWords
+                message={touch.message}
+                startEditing={touch.id === freshId}
+                onSave={(message) => {
                   if (touch.id === freshId) setFreshId(null);
-                  const message = event.currentTarget.value.trim();
                   if (message === (touch.message ?? '')) return;
                   patchTouch(touch.id, { message: message || null });
                   startTransition(async () => {
@@ -327,13 +317,61 @@ function ContactEditForm({
       </Field>
       <FieldError>{error}</FieldError>
       <div className="flex gap-2">
-        <Button type="button" size="sm" disabled={pending} onClick={save}>
+        <Button type="button" size="sm" pending={pending} onClick={save}>
           Save
         </Button>
-        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={onCancel}>
+        <Button type="button" size="sm" variant="ghost" pending={pending} onClick={onCancel}>
           Cancel
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * The words of one send, as text that wraps until it is pressed (law 14).
+ *
+ * An always-open input cut a long message off mid-word at 390. At rest the
+ * whole message is set as writing and is the button; pressed, it becomes an
+ * editor of the same size, and leaving it saves. A send just logged opens on
+ * the editor, since its words are what comes next.
+ */
+function SendWords({
+  message,
+  startEditing,
+  onSave,
+}: {
+  message: string | null;
+  startEditing: boolean;
+  onSave: (message: string) => void;
+}) {
+  const [editing, setEditing] = useState(startEditing);
+  const box = 'min-w-0 basis-full';
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        title="Edit what you said"
+        className={`${box} rounded-control px-1 py-0.5 text-left text-ui transition-colors duration-quick hover:bg-sunken ${message ? 'text-ink-muted' : 'text-ink-ghost'}`}
+      >
+        {message || 'What you said, roughly'}
+      </button>
+    );
+  }
+
+  return (
+    <InlineTextarea
+      aria-label="What you said"
+      defaultValue={message ?? ''}
+      placeholder="What you said, roughly"
+      autoFocus
+      className={`${box} text-ink-muted`}
+      onBlur={(event) => {
+        setEditing(false);
+        onSave(event.currentTarget.value.trim());
+      }}
+    />
   );
 }

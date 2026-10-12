@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
-import { Field, Textarea } from '@/components/ui/field';
+import { Textarea } from '@/components/ui/field';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { answerQuiz, skipQuiz, type AnswerState } from './actions';
@@ -31,16 +31,16 @@ const MARK = {
 function AnswerButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
+    <Button type="submit" pending={pending}>
       {pending ? 'Marking…' : 'Answer'}
     </Button>
   );
 }
 
-function SkipButton() {
+function SkipButton({ formAction }: { formAction: (formData: FormData) => void }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="ghost" disabled={pending}>
+    <Button type="submit" variant="ghost" formAction={formAction} pending={pending}>
       {pending ? 'Passing…' : 'I do not know'}
     </Button>
   );
@@ -53,6 +53,7 @@ export function QuestionForm({
   position,
   total,
   left,
+  intro,
 }: {
   quizId: string;
   questionId: string;
@@ -60,6 +61,7 @@ export function QuestionForm({
   position: number;
   total: number;
   left: number;
+  intro: string;
 }) {
   const router = useRouter();
   const [state, answer] = useActionState<AnswerState, FormData>(answerQuiz, {});
@@ -69,7 +71,8 @@ export function QuestionForm({
 
   return (
     <div className={cn(cardVariants({ padding: 'standard' }), 'mt-6')}>
-      <p className="text-small text-ink-muted">
+      <p className="text-small text-ink-muted">{intro}</p>
+      <p className="mt-3 text-small text-ink-muted">
         Question {position} of {total} · {left} left
       </p>
 
@@ -101,41 +104,39 @@ export function QuestionForm({
           </div>
         </div>
       ) : (
-        <>
-          <form action={answer} className="mt-4">
-            <input type="hidden" name="quizId" value={quizId} />
-            <input type="hidden" name="questionId" value={questionId} />
+        <form action={answer} className="mt-4">
+          <input type="hidden" name="quizId" value={quizId} />
+          <input type="hidden" name="questionId" value={questionId} />
 
-            <Field
-              label="Your answer"
-              id="response"
-              hint="In your own words, from memory. It is marked against what the material says rather than against the wording."
-            >
-              {/* ui-ok: composer-always-open -- the question is the screen.
-                * There is nothing listed above this box for it to be standing
-                * open in front of. */}
-              <Textarea id="response" name="response" rows={3} maxLength={2000} autoFocus />
-            </Field>
+          {/* ui-ok: composer-always-open -- the question is the screen.
+           * There is nothing listed above this box for it to be standing
+           * open in front of. The page header says "in your own words"
+           * once, so the box needs only a placeholder. */}
+          <Textarea
+            id="response"
+            name="response"
+            rows={3}
+            maxLength={2000}
+            autoFocus
+            aria-label="Your answer"
+            placeholder="Your answer, from memory"
+          />
 
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <AnswerButton />
-              <PaidHint
-                action="app/learn/quiz/[id]/take/actions.ts#answerQuiz"
-                what="Cost of marking the answer"
-              />
-              {state.error && <span className="text-ui text-danger">{state.error}</span>}
-            </div>
-          </form>
-
-          {/* Its own form, so passing does not have to get past the answer box
-              being empty. Every question is passable: a blank is honest. */}
-          <form action={skip} className="mt-2">
-            <input type="hidden" name="quizId" value={quizId} />
-            <input type="hidden" name="questionId" value={questionId} />
-            <SkipButton />
-            {passed.error && <span className="ml-3 text-ui text-danger">{passed.error}</span>}
-          </form>
-        </>
+          {/* Passing sits beside Answer and submits the same form to its own
+                action, so an empty box does not get in its way. Every question
+                is passable: a blank is honest. */}
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <AnswerButton />
+            <SkipButton formAction={skip} />
+            <PaidHint
+              action="app/learn/quiz/[id]/take/actions.ts#answerQuiz"
+              what="Cost of marking the answer"
+            />
+            {(state.error || passed.error) && (
+              <span className="text-ui text-danger">{state.error ?? passed.error}</span>
+            )}
+          </div>
+        </form>
       )}
     </div>
   );
