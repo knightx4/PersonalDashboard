@@ -122,6 +122,9 @@ vi.mock('@/inngest/vault/sync', () => ({
 vi.mock('@/inngest/goals/daily', () => ({
   runGoalsDaily: vi.fn(async () => ({ skipped: 'no Claude steps are ready' })),
 }));
+vi.mock('@/inngest/goals/scope-days', () => ({
+  runScopeDays: vi.fn(async () => ({ written: 23 })),
+}));
 vi.mock('@/inngest/goals/quiet-runs', () => ({
   runGoalsQuietSweep: vi.fn(async () => ({ closed: ['run-0'] })),
 }));
@@ -212,6 +215,9 @@ describe('the daily cron route', () => {
     // reads what is still going (plan #1002).
     expect(runGoalsQuietSweep).toHaveBeenCalled();
     expect(body.results['goals-quiet-runs']).toEqual({ closed: ['run-0'] });
+
+    // Each open goal and feature gets its step counts for the day (plan #1836).
+    expect(body.results['scope-days']).toEqual({ written: 23 });
 
     // The claim sweep runs before the digest, so the summary reports the rows
     // it has already corrected rather than the ones it is about to.

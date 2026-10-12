@@ -11,6 +11,7 @@ import { runIdeaScoreCatchUp } from '@/inngest/dev/idea-scores';
 import { runGoalsDaily } from '@/inngest/goals/daily';
 import { runGoalsQuietSweep } from '@/inngest/goals/quiet-runs';
 import { runGoalsWeekly } from '@/inngest/goals/weekly';
+import { runScopeDays } from '@/inngest/goals/scope-days';
 
 // Long enough for the pump it starts: PUMP_BUDGET_MS is what that work is
 // allowed to take, and a route that ends first takes the hand-off with it.
@@ -73,6 +74,9 @@ export async function GET(request: NextRequest) {
     { name: 'goals-quiet-runs', run: () => runGoalsQuietSweep() },
     { name: 'goals-daily', run: () => runGoalsDaily() },
     { name: 'goals-weekly', run: () => runGoalsWeekly() },
+    // After the goals stages: the counts are of the steps as they stand once
+    // the morning's closing is done (plan #1836).
+    { name: 'scope-days', run: () => runScopeDays() },
     { name: 'plan-claims', run: () => runClaimSweep() },
     { name: 'dev-digest', run: () => runDevDigest() },
     // After the digest, which files ideas overnight without triage, so they

@@ -104,6 +104,7 @@ export const coreSources: ModuleSources = {
     { table: 'core.people', reason: 'Who a shopping order was for.' },
     { table: 'core.push_subscriptions', reason: 'Browsers that accepted notifications, for sending the morning brief.' },
     { table: 'core.saved_views', reason: 'Saved list filters.' },
+    { table: 'core.scope_days', reason: 'Steps under each open goal or feature at the end of each day, counted by the daily run from rows that are sources in their own modules.' },
     { table: 'core.sync_jobs', reason: 'Sync bookkeeping.' },
     { table: 'core.watch_readings', reason: 'Each reading a watch took, for its trend and alerts; the watch itself is the source.' },
     { table: 'public.profiles', reason: 'Display name and settings.' },
