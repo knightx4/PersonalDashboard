@@ -163,6 +163,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       action: 'Answer',
       unblocks: 3,
       on: null,
+      backFromSnooze: true,
     },
     {
       kind: 'step',

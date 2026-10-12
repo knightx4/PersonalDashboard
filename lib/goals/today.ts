@@ -92,6 +92,8 @@ export type TodayItem = {
   prepared?: Prepared;
   /** For a step of yours: whether it is on Todo, sent there by you or by Dash. */
   onTodo?: boolean;
+  /** Set when a snooze on the row ran out and nothing changed under it (plan #1844). */
+  backFromSnooze?: boolean;
 };
 
 /** What Dash wrote for a step of yours: a draft, a script or a checklist. */
