@@ -6,7 +6,10 @@ import { requireUser } from '@/lib/auth/server';
 import { createGoalsClient } from '@/lib/goals/auth/server';
 import { undoRunChange } from '@/lib/goals/run-changes-store';
 import { ACKNOWLEDGED_STALE_ERROR } from '@/lib/core/run-activities';
+import { answerFrom } from '@/lib/core/run-questions';
+import { answerGoalRun } from '@/lib/goals/run-answer';
 import type { AcknowledgeRunState } from '@/components/runs/acknowledge-run';
+import type { AnswerRunState } from '@/components/runs/run-answer';
 
 /**
  * Undo on one line of a run's changes (plan #1013). The rules are in
@@ -79,4 +82,24 @@ export async function acknowledgeGoalRunAction(
   if (!data || data.length === 0) return { error: 'This run is not quiet any more. Reload to see where it stands.' };
   revalidatePath('/goals', 'layout');
   return {};
+}
+
+/**
+ * Your answer to the question a goal run is waiting on (plan #1824), from the
+ * run's page or from the Goals inbox. The rules are in
+ * lib/goals/run-answer.ts: written as a response line, then the run is woken,
+ * or continued as a new run when its session has stopped.
+ */
+// latency: pending
+export async function answerGoalRunAction(_prev: AnswerRunState, form: FormData): Promise<AnswerRunState> {
+  const user = await requireUser();
+  const runId = z.string().uuid().safeParse(form.get('runId'));
+  if (!runId.success) return { error: 'Could not tell which run that was.' };
+  const parsed = answerFrom(form.get('answer'));
+  if ('refusal' in parsed) return { error: parsed.refusal };
+  const client = await createGoalsClient();
+  const outcome = await answerGoalRun({ client, userId: user.id, runId: runId.data, answer: parsed.answer });
+  if (!outcome.ok) return { error: outcome.error };
+  revalidatePath('/goals', 'layout');
+  return { answered: parsed.answer, continued: outcome.continued };
 }

@@ -6,6 +6,8 @@ import { Disclosure } from '@/components/ui/disclosure';
 import { LinkedText } from '@/components/ui/linked-text';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { RUN_ACTIVITY_LABEL, type RunActivity } from '@/lib/core/run-activities';
+import { choiceKey, openQuestion } from '@/lib/core/run-questions';
+import { RunAnswer, type AnswerRunAction } from './run-answer';
 import { exactTime, shortWhen } from '@/lib/comments/when';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { useClockNow } from '@/lib/use-clock-now';
@@ -45,8 +47,10 @@ const LOST = {
  * The lines a Dash run wrote, oldest first, on one card (the thread pattern):
  * the run's state first, then each line with what kind it is and when, Dash's
  * on the recessed ground and your answers on the card's own. A question shows
- * its choices, with the one you picked ticked once your answer is under it;
- * answering from here is plan #1824.
+ * its choices, with the one you picked ticked once your answer is under it.
+ * While the run is waiting on its newest question and `answer` is given, that
+ * question's choices are presses that answer it, with a box for your own
+ * words (plan #1824, components/runs/run-answer.tsx).
  *
  * Open while the run is going. Once it has ended the lines fold under their
  * count, since the summary and the changes on the page already say what the
@@ -61,6 +65,7 @@ export function RunLinesView({
   state,
   connection = 'open',
   acknowledge,
+  answer,
   className,
 }: {
   lines: readonly RunActivity[];
@@ -68,17 +73,22 @@ export function RunLinesView({
   connection?: RunLinesConnection;
   /** The acknowledge press for a stale run; drawn beside its state line. */
   acknowledge?: React.ReactNode;
+  /** The runs table's answer action, which makes a waiting question answerable here. */
+  answer?: AnswerRunAction;
   className?: string;
 }) {
   const now = useClockNow();
   const following = state === 'live' || state === 'waiting';
+  const open = state === 'waiting' && answer ? openQuestion(lines) : null;
   const title = (
     <span className="flex min-w-0 items-center gap-1.5 text-body font-medium text-ink">
       <DashMark size="2xs" decorative className="text-ink-muted" />
       Dash&rsquo;s lines
     </span>
   );
-  const list = <LineList lines={lines} now={now} />;
+  const list = (
+    <LineList lines={lines} now={now} open={open && answer ? { id: open.id, action: answer } : null} />
+  );
 
   if (state === 'ended') {
     return (
@@ -117,7 +127,16 @@ export function RunLinesView({
   );
 }
 
-function LineList({ lines, now }: { lines: readonly RunActivity[]; now: number }) {
+function LineList({
+  lines,
+  now,
+  open,
+}: {
+  lines: readonly RunActivity[];
+  now: number;
+  /** The question still waiting, and the action that answers it. */
+  open: { id: string; action: AnswerRunAction } | null;
+}) {
   return (
     <ol className="space-y-1">
       {lines.map((line, index) => (
@@ -126,6 +145,7 @@ function LineList({ lines, now }: { lines: readonly RunActivity[]; now: number }
           line={line}
           now={now}
           answer={line.kind === 'question' ? answerAfter(lines, index) : null}
+          answerWith={open?.id === line.id ? open.action : undefined}
         />
       ))}
     </ol>
@@ -141,12 +161,18 @@ function answerAfter(lines: readonly RunActivity[], index: number): string | nul
   return null;
 }
 
-/** A choice and an answer compared as words: case and a closing full stop aside. */
-function choiceKey(text: string): string {
-  return text.trim().replace(/[.!]+$/, '').toLowerCase();
-}
-
-function RunLine({ line, now, answer }: { line: RunActivity; now: number; answer: string | null }) {
+function RunLine({
+  line,
+  now,
+  answer,
+  answerWith,
+}: {
+  line: RunActivity;
+  now: number;
+  answer: string | null;
+  /** Given on the question the run is waiting on: its choices become presses. */
+  answerWith?: AnswerRunAction;
+}) {
   const yours = line.kind === 'response';
 
   return (
@@ -162,7 +188,9 @@ function RunLine({ line, now, answer }: { line: RunActivity; now: number; answer
       <p className="text-ui break-words whitespace-pre-wrap text-ink">
         <LinkedText text={line.body} />
       </p>
-      {line.options && (
+      {answerWith ? (
+        <RunAnswer runId={line.run_id} options={line.options} action={answerWith} />
+      ) : line.options && (
         <ul className="mt-1 space-y-0.5" aria-label="Its choices">
           {line.options.map((option) => {
             const picked = answer !== null && answer === choiceKey(option);

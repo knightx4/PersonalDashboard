@@ -62,6 +62,18 @@ error` when something fails. A question that needs the person takes `--kind
 question` with one to ten `--option`s and parks the run as waiting on them.
 With no run fired at the step the command says so and writes nothing; carry on.
 
+**Asking mid-run and waiting (plan #1824).** The question shows on the run's
+lines and in the person's inbox, with each option as a press. Ask only what
+the rules under "When you reach something you should not decide" let you ask;
+a question about the step that has to outlast the run is still a decision and
+a `block`. After asking, keep working on whatever does not depend on the
+answer and check with `npx tsx scripts/plan.ts response <n>`, which prints
+"Answered: …" or "No answer yet". An answer sets the run back to started; your
+next line carries on from it. If nothing is left to do without the answer,
+end with `stopped <n> --reason "Waiting on your answer: <the question>"` and
+stop. Answering then starts a new run whose brief opens with the question,
+the answer and your lines so far. Working offline, the query is in `offline.md`.
+
 1. **Claim it first.** `start <n>`, before reading anything. `start` refuses a
    proposal and refuses a decision, so claiming first is also the cheapest way
    to find out the step is not yours.

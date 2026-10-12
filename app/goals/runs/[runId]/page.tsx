@@ -18,7 +18,7 @@ import { AcknowledgeRun } from '@/components/runs/acknowledge-run';
 import type { RunLinesState } from '@/components/runs/run-lines';
 import { loadRunActivities } from '@/lib/core/run-activities-store';
 import type { RunOutcome } from '@/lib/goals/runs';
-import { acknowledgeGoalRunAction } from './actions';
+import { acknowledgeGoalRunAction, answerGoalRunAction } from './actions';
 
 export const metadata = { title: 'Run' };
 export const dynamic = 'force-dynamic';
@@ -143,6 +143,7 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
         acknowledge={
           state === 'stale' ? <AcknowledgeRun runId={run.id} action={acknowledgeGoalRunAction} /> : undefined
         }
+        answer={answerGoalRunAction}
       />
       {lines.length === 0 ? (
         <EmptyState
