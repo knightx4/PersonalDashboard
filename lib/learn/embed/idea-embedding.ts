@@ -85,7 +85,7 @@ export async function embedIdeaClaim(
   return one ?? NONE;
 }
 
-async function ledgerIdeaSpend(
+export async function ledgerIdeaSpend(
   learn: LearnSupabaseClient,
   userId: string,
   reports: SpendReport[],
