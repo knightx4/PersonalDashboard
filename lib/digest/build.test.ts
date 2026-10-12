@@ -170,8 +170,9 @@ describe('the feature a closed row belongs to', () => {
     const middle = step({ id: 'm', number: 435, title: 'A middle step', parentId: 'f' });
     const leaf = step({ id: 'l', number: 439, title: 'Gather the conversations', parentId: 'm' });
 
+    // Named by its outline, as the plan page heads the row: #439 sits at 430.1.1.
     const [event] = whatHappened({ plan: plan([feature, middle, leaf]), notes: [], since: SINCE }).filter(
-      (row) => row.ref === '#439',
+      (row) => row.ref === '#430.1.1',
     );
 
     expect(event.feature).toEqual({ ref: '#430', title: 'One tab for your day' });
@@ -214,7 +215,7 @@ describe('the workspace a closed row belongs to', () => {
     const leaf = step({ id: 'l', number: 439, module: null, parentId: 'f' });
 
     const [event] = whatHappened({ plan: plan([feature, leaf]), notes: [], since: SINCE }).filter(
-      (row) => row.ref === '#439',
+      (row) => row.ref === '#430.1',
     );
 
     expect(event.module).toBe('learn');
@@ -225,7 +226,7 @@ describe('the workspace a closed row belongs to', () => {
     const leaf = step({ id: 'l', number: 439, module: 'vault', parentId: 'f' });
 
     const [event] = whatHappened({ plan: plan([feature, leaf]), notes: [], since: SINCE }).filter(
-      (row) => row.ref === '#439',
+      (row) => row.ref === '#430.1',
     );
 
     expect(event.module).toBe('vault');

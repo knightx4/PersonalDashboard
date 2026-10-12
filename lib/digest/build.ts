@@ -4,6 +4,7 @@ import type { ModuleId } from '@/lib/modules';
 import type { PlanData, PlanItem } from '@/lib/plan/load';
 import { buildPlanTree, workOrder } from '@/lib/plan/tree';
 import { isAppScope } from '@/lib/plan/projects';
+import { outlineIndex, readableRefs, refFor, stepRef, type OutlineIndex } from '@/lib/plan/ref';
 
 /**
  * The morning summary, built from the rows the app already holds.
@@ -128,6 +129,7 @@ function answeredDecisions(
   since: string,
   byId: ReadonlyMap<string, PlanParentRow>,
   moduleById: ReadonlyMap<string, ModuleId | null>,
+  outlines: OutlineIndex,
 ): DigestEvent[] {
   return items
     .filter(
@@ -143,9 +145,9 @@ function answeredDecisions(
       return {
         kind: 'decision' as const,
         title: oneLine(item.title),
-        ref: `#${item.number}`,
+        ref: refFor(item.number, outlines),
         commit: null,
-        note: item.resolution ? oneLine(item.resolution, NOTE_LIMIT) : null,
+        note: item.resolution ? oneLine(readableRefs(item.resolution, outlines), NOTE_LIMIT) : null,
         at: item.completedAt as string,
         feature: featureFrom(feature),
         module: item.module ?? inherited(feature, moduleById),
@@ -202,6 +204,9 @@ export function whatHappened(input: {
     ),
   );
 
+  // Each step named by its outline, `#1073.4`, as the plan page heads the row.
+  const outlines = outlineIndex(buildPlanTree(input.plan).flatMap((section) => section.nodes));
+
   const shipped = changelogEntries({
     plan: input.plan.items,
     planParents: parentsOf(input.plan.items),
@@ -211,9 +216,9 @@ export function whatHappened(input: {
     .map((entry) => ({
       kind: entry.source === 'plan' ? ('step' as const) : ('note' as const),
       title: oneLine(entry.title),
-      ref: entry.number === null ? null : `#${entry.number}`,
+      ref: entry.number === null ? null : refFor(entry.number, outlines),
       commit: shortSha(entry.commitSha),
-      note: entry.source === 'note' && entry.detail ? oneLine(entry.detail, NOTE_LIMIT) : null,
+      note: entry.source === 'note' && entry.detail ? oneLine(readableRefs(entry.detail, outlines), NOTE_LIMIT) : null,
       at: entry.at,
       feature: featureFrom(entry.issue),
       module: entry.module ?? inherited(entry.issue, moduleById),
@@ -221,7 +226,7 @@ export function whatHappened(input: {
 
   const byId = new Map(parentsOf(input.plan.items).map((row) => [row.id, row]));
 
-  return [...shipped, ...answeredDecisions(input.plan.items, input.since, byId, moduleById)].sort(
+  return [...shipped, ...answeredDecisions(input.plan.items, input.since, byId, moduleById, outlines)].sort(
     (a, b) => b.at.localeCompare(a.at),
   );
 }
@@ -285,7 +290,7 @@ export function whatIsReady(plan: PlanData): DigestPointer[] {
     .map((node) => ({
       kind: 'decision' as const,
       title: oneLine(node.title),
-      ref: `#${node.number}`,
+      ref: stepRef(node),
       detail: null,
     }));
 
@@ -295,7 +300,7 @@ export function whatIsReady(plan: PlanData): DigestPointer[] {
     .map((node) => ({
       kind: 'ready' as const,
       title: oneLine(node.title),
-      ref: `#${node.number}`,
+      ref: stepRef(node),
       detail: null,
     }));
 

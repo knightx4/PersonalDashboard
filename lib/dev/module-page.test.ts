@@ -87,6 +87,24 @@ describe("a module's page", () => {
     expect(summary.shipped.map((s) => s.id)).toEqual(['new', 'old']);
   });
 
+  it('names each shipped step by the outline the plan page heads it with', () => {
+    const feature = item({ id: 'feat', number: 1073 });
+    const summary = moduleSummary(
+      jobs,
+      inputs({
+        plan: [
+          feature,
+          item({ id: 'first', parentId: 'feat', number: 1080, position: 1, status: 'done', completedAt: '2026-09-01T00:00:00Z' }),
+          item({ id: 'second', parentId: 'feat', number: 1084, position: 2, status: 'done', completedAt: '2026-10-01T00:00:00Z' }),
+        ],
+      }),
+    );
+    expect(summary.shipped.map((s) => [s.number, s.outline])).toEqual([
+      [1084, '1073.2'],
+      [1080, '1073.1'],
+    ]);
+  });
+
   it('takes the outstanding bugs filed from its pages, and its own ideas', () => {
     const summary = moduleSummary(
       jobs,

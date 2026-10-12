@@ -13,10 +13,19 @@
  * no stamp, and reads exactly as it did before.
  */
 
+import { numberFromRef, refFor, type OutlineIndex } from './ref';
+
 /** The stamp itself. Written by a re-shape, read by the page and the brief. */
 export type ReshapeOrigin = {
-  /** The decision whose answer produced this step. */
-  number: number;
+  /**
+   * The decision whose answer produced this step, or null when the stamp
+   * names it by an outline no step has now.
+   */
+  number: number | null;
+  /** The decision as the stamp wrote it: `1084` in older stamps, `1073.4` in newer. */
+  written: string;
+  /** The decision as the person reads it, `#1073.4` where the outline is known. */
+  ref: string;
   /** That answer, short enough for one line. */
   gist: string;
 };
@@ -25,21 +34,22 @@ export type ReshapeOrigin = {
 const MAX_GIST = 160;
 
 /**
- * Compose the line.
+ * Compose the line. The decision is named by its outline (`1073.4`) when the
+ * caller has it, which is how newer stamps read; a bare number still works.
  *
  * The gist comes from the decision's own `resolution` rather than from
  * whoever is writing the row, so a session cannot paraphrase an answer into
  * something the person did not say.
  */
-export function reshapeStamp(number: number, resolution: string): string {
+export function reshapeStamp(decision: number | string, resolution: string): string {
   const first = resolution.split('\n').find((line) => line.trim()) ?? '';
   const gist = first.trim();
-  return `From #${number}'s answer: ${
+  return `From #${String(decision).replace(/^#/, '')}'s answer: ${
     gist.length > MAX_GIST ? `${gist.slice(0, MAX_GIST - 1).trimEnd()}…` : gist
   }`;
 }
 
-const PATTERN = /^From #(\d+)'s answer: (.+)$/m;
+const PATTERN = /^From #(\d+(?:\.\d+)*)'s answer: (.+)$/m;
 
 /**
  * Read it back, or null when there is none.
@@ -48,11 +58,21 @@ const PATTERN = /^From #(\d+)'s answer: (.+)$/m;
  * stamped by a re-shape can be blocked and closed like any other, and every
  * one of those appends a dated line beneath.
  */
-export function reshapeOrigin(comment: string | null): ReshapeOrigin | null {
+export function reshapeOrigin(
+  comment: string | null,
+  outlines: OutlineIndex = new Map(),
+): ReshapeOrigin | null {
   if (!comment) return null;
   const match = PATTERN.exec(comment);
   if (!match) return null;
-  return { number: Number(match[1]), gist: match[2].trim() };
+  const written = match[1];
+  const number = numberFromRef(written, outlines);
+  return {
+    number,
+    written,
+    ref: number === null || written.includes('.') ? `#${written}` : refFor(number, outlines),
+    gist: match[2].trim(),
+  };
 }
 
 /**

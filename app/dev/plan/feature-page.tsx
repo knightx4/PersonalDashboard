@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRight, Plus } from 'lucide-react';
@@ -20,7 +20,8 @@ import { ViewChips } from '@/components/plan-tree/view-chips';
 import { planRowId } from '@/lib/comments/refs';
 import { Dependencies } from '@/components/plan-tree/dependencies';
 import { Questions } from '@/components/plan-tree/questions';
-import { PLAN_COMMENTS } from '@/components/plan-tree/types';
+import { PLAN_COMMENTS, outlinesOf } from '@/components/plan-tree/types';
+import { readableRefs, stepRef } from '@/lib/plan/ref';
 import { DashCredit } from '@/components/ui/dash-mark';
 import { threadRef } from '@/lib/thread/subjects';
 import { cn } from '@/lib/cn';
@@ -176,6 +177,11 @@ export function FeaturePage({
     if (startEditing) setEditing(true);
   }, [startEditing, setEditing]);
   const node = parts.node as PlanNode;
+  // Every step's outline, so stored text naming a step `#1084` reads as the
+  // `#1073.4` its row heads itself with.
+  const outlines = useMemo(() => outlinesOf(parts.refTitles), [parts.refTitles]);
+  const readable = (text: string) => readableRefs(text, outlines);
+  const ref = stepRef(node);
   const [fogState, fogAction, fogPending] = useActionState(dismissPlanFog, {} as PlanActionState);
 
   const crumbs = featureCrumbs(node, module, moduleLabel);
@@ -251,7 +257,7 @@ export function FeaturePage({
         label="Status"
         value={
           <ActionMenu
-            label={`Status of #${node.number} ${node.title}`}
+            label={`Status of ${ref} ${node.title}`}
             items={parts.statusMenu}
             align="start"
             // Pulled up by the room the press target adds, so its word sits on
@@ -307,7 +313,7 @@ export function FeaturePage({
         label="Priority"
         value={
           <ActionMenu
-            label={`Priority of #${node.number} ${node.title}`}
+            label={`Priority of ${ref} ${node.title}`}
             items={parts.priorityMenu}
             align="start"
             // Pulled up as Status is, so the gap above it matches the others.
@@ -382,7 +388,7 @@ export function FeaturePage({
       // While the compose surface is open the title and summary are its
       // first two fields, so the header names what is being edited instead
       // of showing them twice.
-      title={editingHere ? `Editing #${node.number}` : node.title}
+      title={editingHere ? `Editing ${ref}` : node.title}
       description={
         editingHere ? undefined : (
           <>
@@ -392,7 +398,7 @@ export function FeaturePage({
             {/* The number and who added it each keep to one line and wrap
                 between them, so a date never breaks in two (plan #1688). */}
             <span className="inline-flex flex-wrap items-center gap-x-2 text-small">
-              <span className="whitespace-nowrap">Feature #{node.number}</span>
+              <span className="whitespace-nowrap">Feature {ref}</span>
               {parts.addedBy && (
                 <span
                   className="whitespace-nowrap"
@@ -404,7 +410,7 @@ export function FeaturePage({
               )}
               {parts.origin && (
                 <span>
-                  From #{parts.origin.number}&apos;s answer: {parts.origin.gist}
+                  From {parts.origin.ref}&apos;s answer: {readable(parts.origin.gist)}
                 </span>
               )}
             </span>
@@ -414,7 +420,7 @@ export function FeaturePage({
       actions={
         <>
           {parts.sendButton}
-          <ActionMenu label={`Actions for #${node.number}`} items={menu} />
+          <ActionMenu label={`Actions for ${ref}`} items={menu} />
         </>
       }
       glance={glance}
@@ -426,7 +432,7 @@ export function FeaturePage({
     >
       {notices}
       {tab === 'activity' ? (
-        <FeatureActivity entries={featureActivity(node, { ...activity, updates })} />
+        <FeatureActivity entries={featureActivity(node, { ...activity, updates, outlines })} />
       ) : tab === 'steps' ? (
         <FeatureSteps
           node={node}
@@ -470,7 +476,7 @@ export function FeaturePage({
             {node.fog && node.fogDismissedAt === null && (
               <FogNote
                 id={node.id}
-                fog={node.fog}
+                fog={readable(node.fog)}
                 aside={false}
                 action={fogAction}
                 pending={fogPending}
@@ -480,21 +486,21 @@ export function FeaturePage({
             {node.detail && node.kind !== 'decision' && (
               <DetailPart>
                 <p className="whitespace-pre-wrap text-body text-ink">
-                  <LinkedText text={node.detail} />
+                  <LinkedText text={readable(node.detail)} />
                 </p>
               </DetailPart>
             )}
             {node.acceptance && (
               <DetailPart label="Done when">
                 <p className="whitespace-pre-wrap text-ui text-ink">
-                  <LinkedText text={node.acceptance} />
+                  <LinkedText text={readable(node.acceptance)} />
                 </p>
               </DetailPart>
             )}
             {node.blockAsk && (
               <DetailPart label="Needs">
                 <p className="whitespace-pre-wrap text-ui text-ink">
-                  <LinkedText text={node.blockAsk} />
+                  <LinkedText text={readable(node.blockAsk)} />
                 </p>
               </DetailPart>
             )}

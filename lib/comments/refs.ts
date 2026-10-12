@@ -26,8 +26,12 @@
  * caller never offers here.
  */
 
-/** Steps are numbered from 1; five digits is a plan far larger than this one. */
-const REF = /(^|[^A-Za-z0-9_&#])#(\d{1,5})(?![A-Za-z0-9_])/;
+/**
+ * Steps are numbered from 1; five digits is a plan far larger than this one.
+ * A reference may also be written by outline, `#1073.4`, the way the plan page
+ * heads the row; a trailing full stop ends a sentence and is not part of it.
+ */
+const REF = /(^|[^A-Za-z0-9_&#])#(\d{1,5}(?:\.\d+)*)(?![A-Za-z0-9_]|\.\d)/;
 
 /**
  * Where a step number is read. `all`, because a link must reach a closed one,
@@ -52,19 +56,36 @@ export type RefPart = { text: string; ref: number | null };
  * One part per run of text, the same shape `splitOnMention` returns, so the
  * renderer treats the two the same way. A body with no reference in it comes
  * back as a single part.
+ *
+ * A stored `#1084` is the step's number. A written `#1073.4` is its outline,
+ * read back to the number through `titles`; an outline the titles do not
+ * place stays as words, since linking `#1073` from it would name the wrong row.
  */
-export function splitOnRefs(text: string): RefPart[] {
+export function splitOnRefs(text: string, titles?: PlanRefTitles): RefPart[] {
   const parts: RefPart[] = [];
   const scan = new RegExp(REF.source, 'g');
   let from = 0;
+  let byOutline: Map<string, number> | null = null;
+  const numberOf = (written: string): number | null => {
+    if (!written.includes('.')) return Number(written);
+    if (!byOutline) {
+      byOutline = new Map();
+      for (const [number, entry] of Object.entries(titles ?? {})) {
+        if (entry.outline) byOutline.set(entry.outline, Number(number));
+      }
+    }
+    return byOutline.get(written) ?? null;
+  };
 
   for (let hit = scan.exec(text); hit; hit = scan.exec(text)) {
+    const ref = numberOf(hit[2]);
+    if (ref === null) continue;
     // The match carries the character before the `#`, which belongs to the
     // words around it rather than to the reference.
     const before = hit[1] ?? '';
     const start = hit.index + before.length;
     if (start > from) parts.push({ text: text.slice(from, start), ref: null });
-    parts.push({ text: text.slice(start, scan.lastIndex), ref: Number(hit[2]) });
+    parts.push({ text: text.slice(start, scan.lastIndex), ref });
     from = scan.lastIndex;
   }
 

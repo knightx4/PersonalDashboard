@@ -47,6 +47,7 @@ import {
 } from '@/lib/plan/health-words';
 import { reshapeOrigin, sessionOrigin } from '@/lib/plan/origin';
 import { quietSendAsk } from '@/lib/plan/liveness';
+import { readableRefs, stepRef, type OutlineIndex } from '@/lib/plan/ref';
 import { isResolvingAnswers, type LastRun } from '@/lib/plan/run-end';
 import { type RunRaise } from '@/lib/plan/work';
 import { checkLine, type CommitCheck } from '@/lib/plan/checks';
@@ -82,7 +83,7 @@ import {
   STATUS_LABEL,
   scopeLabel,
 } from './step-forms';
-import type { TreeActions } from '@/components/plan-tree/types';
+import { outlinesOf, type TreeActions } from '@/components/plan-tree/types';
 import { LinkedText } from '@/components/ui/linked-text';
 import { criticStopNeeds, type CriticStopView } from '@/lib/plan/ui-check-stop';
 import { CriticStop } from './critic-stop';
@@ -143,11 +144,14 @@ function AnswerDecision({
   action,
   pending,
   autoFocus,
+  outlines,
 }: {
   node: PlanNode;
   action: (formData: FormData) => void;
   pending: boolean;
   autoFocus: boolean;
+  /** Every step's outline, so a stored `#1084` reads as the row does. */
+  outlines: OutlineIndex;
 }) {
   const { answer, setAnswer, choose } = useAnswerDraft();
 
@@ -161,9 +165,12 @@ function AnswerDecision({
           box used to come first with the options as a row of chips above it,
           which put the form in front of the thing the form is about. */}
       <TheQuestion outline={node.outline} title={node.title} />
-      <TheOptions detail={node.detail} onChoose={choose} />
+      <TheOptions
+        detail={node.detail === null ? null : readableRefs(node.detail, outlines)}
+        onChoose={choose}
+      />
 
-      {node.resolution && <TheAnswered resolution={node.resolution} />}
+      {node.resolution && <TheAnswered resolution={readableRefs(node.resolution, outlines)} />}
       <AnswerBox
         id={node.id}
         detail={node.detail}
@@ -203,18 +210,20 @@ function SetupJob({
   action,
   pending,
   error,
+  outlines,
 }: {
   node: PlanNode;
   action: (formData: FormData) => void;
   pending: boolean;
   error?: string;
+  outlines: OutlineIndex;
 }) {
   return (
     <div className="space-y-2.5 rounded-lg bg-caution-tint/40 px-3 py-2.5">
       <div className="space-y-0.5">
         <QuestionPartLabel>What to set up</QuestionPartLabel>
         <p className="whitespace-pre-wrap text-ui text-ink">
-          <LinkedText text={node.detail?.trim() || node.title} />
+          <LinkedText text={readableRefs(node.detail?.trim() || node.title, outlines)} />
         </p>
       </div>
       <form action={action} className="space-y-2">
@@ -246,8 +255,8 @@ function SetupJob({
 function sendLabel(node: PlanNode): string {
   const beneath = flatten([node]).length - 1;
   return beneath === 0
-    ? `Send #${node.number} to Dash`
-    : `Send #${node.number} and ${beneath} ${beneath === 1 ? 'step' : 'steps'} to Dash`;
+    ? `Send ${stepRef(node)} to Dash`
+    : `Send ${stepRef(node)} and ${beneath} ${beneath === 1 ? 'step' : 'steps'} to Dash`;
 }
 
 /**
@@ -435,29 +444,30 @@ function SendToClaude({
 }
 
 /** The facts a health tooltip needs, read off a plan row. */
-function healthFactsOf(node: PlanNode): HealthFacts {
+function healthFactsOf(node: PlanNode, outlines: OutlineIndex): HealthFacts {
+  const readable = (text: string | null) => (text === null ? null : readableRefs(text, outlines));
   return {
     closed: isClosed(node.status),
     openBeneath: flatten(node.children).filter((child) => !isClosed(child.status)),
-    resolution: node.resolution,
-    blockAsk: node.blockAsk,
-    comment: node.comment,
+    resolution: readable(node.resolution),
+    blockAsk: readable(node.blockAsk),
+    comment: readable(node.comment),
     waitingOn: node.waitingOn,
     waitsUntil: node.waitsUntil,
   };
 }
 
-function healthOf(node: PlanNode, liveness?: PlanLiveness) {
-  return healthWordsOf(planHealthOf(node, liveness), healthFactsOf(node));
+function healthOf(node: PlanNode, liveness: PlanLiveness | undefined, outlines: OutlineIndex) {
+  return healthWordsOf(planHealthOf(node, liveness), healthFactsOf(node, outlines));
 }
 
 function moveFor(node: PlanNode, context?: MoveContext) {
-  // A step held up by exactly one other says which, by number: "Waiting on
-  // #1453". More than one, and the tooltip and the Needs line name them.
+  // A step held up by exactly one other says which, by its outline: "Waiting
+  // on #1450.3". More than one, and the tooltip and the Needs line name them.
   // Waiting only on a check-back, it names the day: "Waiting on 26 Oct".
   const waitingOn =
     node.waitingOn.length === 1
-      ? `#${node.waitingOn[0].number}`
+      ? stepRef(node.waitingOn[0])
       : node.waitingOn.length === 0 && node.waitsUntil.length > 0
         ? checkWaitName(node.waitsUntil)
         : undefined;
@@ -768,7 +778,18 @@ export function usePlanRow({
     () => (runNow === 0 ? serverLiveness : planLiveness(flatten([node]), lastRuns, runNow)),
     [node, lastRuns, runNow, serverLiveness],
   );
-  const health = healthOf(node, liveness);
+  // What a "#494" written in a comment on this page is called. The catalog is
+  // already every step's number and title, so no page needs to hand it over.
+  const refTitles = useMemo(
+    () =>
+      Object.fromEntries(
+        catalog.map((entry) => [entry.number, { title: entry.title, outline: entry.outline }]),
+      ),
+    [catalog],
+  );
+  // The same outlines by number, for stored text that names a step `#1084`.
+  const outlines = useMemo(() => outlinesOf(refTitles), [refTitles]);
+  const health = healthOf(node, liveness, outlines);
   const claim = liveness[node.id];
   // The run behind this row, where there is one to account for. Typed as
   // possibly missing because most rows have no run at all -- the index
@@ -787,17 +808,8 @@ export function usePlanRow({
   // that the press is taken with the evidence in front of you. Null before
   // mount, since `runNow` is 0 there and no claim reads quiet at that instant,
   // which is what keeps the server render and the first client one agreeing.
-  const quietAsk = claim === 'quiet' && run ? quietSendAsk(node.number, run, runNow) : null;
+  const quietAsk = claim === 'quiet' && run ? quietSendAsk(node, run, runNow) : null;
   const resolving = useResolving(lastRuns, liveness, runNow);
-  // What a "#494" written in a comment on this page is called. The catalog is
-  // already every step's number and title, so no page needs to hand it over.
-  const refTitles = useMemo(
-    () =>
-      Object.fromEntries(
-        catalog.map((entry) => [entry.number, { title: entry.title, outline: entry.outline }]),
-      ),
-    [catalog],
-  );
   // An overhaul's run claims nothing on the row itself, so its move would go
   // on reading as before while the routine works it. Said in the Status
   // column instead, the way a claimed step says it (plan #1514).
@@ -815,7 +827,7 @@ export function usePlanRow({
 
   // The answer that produced this row, on the steps a re-shape wrote and on
   // nothing else.
-  const origin = reshapeOrigin(node.comment);
+  const origin = reshapeOrigin(node.comment, outlines);
   // And the session that wrote it ready to build, while it is still open. Once
   // the step is closed the question it raises -- keep this or not -- has been
   // answered one way or the other, and the stamp stays in the comment as
@@ -961,8 +973,8 @@ export function usePlanRow({
       destructive: true,
       confirm:
         descendants > 0
-          ? `Delete #${node.number} and the ${descendants} step${descendants === 1 ? '' : 's'} beneath it? This cannot be undone.`
-          : `Delete #${node.number}? This cannot be undone.`,
+          ? `Delete ${stepRef(node)} and the ${descendants} step${descendants === 1 ? '' : 's'} beneath it? This cannot be undone.`
+          : `Delete ${stepRef(node)}? This cannot be undone.`,
       formAction: (formData: FormData) => deletePlanItem({}, formData),
       formFields: { id: node.id },
     },
@@ -1103,7 +1115,7 @@ export function usePlanRow({
             </span>
           )}
           <ActionMenu
-            label={`Priority of #${node.number} ${node.title}`}
+            label={`Priority of ${stepRef(node)} ${node.title}`}
             items={priorityMenu}
             align="start"
             // Inline in the column too, so the word and the size after it stay
@@ -1193,6 +1205,7 @@ export function usePlanRow({
               action={answerAction}
               pending={answerPending}
               autoFocus={row.answering}
+              outlines={outlines}
             />
           )}
 
@@ -1222,6 +1235,7 @@ export function usePlanRow({
               action={setupAction}
               pending={setupPending}
               error={setupState.error}
+              outlines={outlines}
             />
           )}
         </>
@@ -1367,7 +1381,7 @@ export function usePlanRow({
               glyph={null}
               word={afterWord(move.move)!}
               tone={MOVE_TONE.waiting}
-              title={`${move.title} Opens #${node.waitingOn[0].outline ?? node.waitingOn[0].number}.`}
+              title={`${move.title} Opens ${stepRef(node.waitingOn[0])}.`}
             />
           </a>
         ) : (

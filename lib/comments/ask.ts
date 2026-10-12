@@ -59,6 +59,7 @@ import { SPEC_CHANGE_COLUMNS, sectionsTouched, specChangeFrom } from '@/lib/spec
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { actionSchema } from './reply-payload';
+import { stepRef } from '@/lib/plan/ref';
 import { checkReplyAfterResponse } from '@/lib/writing/reply-check';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -177,7 +178,7 @@ async function subjectRowOf(input: AskInput): Promise<Subject | null> {
     return {
       context: planBrief(sections, node, { visions: await loadVisionBodies(supabase, userId) }),
       thread: node.thread,
-      label: `#${node.number} ${node.title}`,
+      label: `${stepRef(node)} ${node.title}`,
     };
   }
 

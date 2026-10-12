@@ -29,15 +29,23 @@ working by hand, apply the same ones:
 -- the open steps, in reading order. Rows whose module is a project in
 -- lib/plan/projects.ts ('website') are built from that project's own
 -- repository by its own routine, never from this one: leave them out.
-select number, parent_id, title, status, priority, size, assignee, acceptance, comment
-from plan_items
-where user_id = '…' and status not in ('done', 'dropped')
-  and module is distinct from 'website'
-order by module nulls last, position, created_at;
+-- Name each step by its outline (o.outline, "1073.4"), the way the page and
+-- plan.ts do; the number is its identity in the database and is not what you
+-- write to the person. A step is found by its outline through the same view:
+-- `where o.outline = '1073.4'`.
+select o.outline, p.number, p.parent_id, p.title, p.status, p.priority, p.size,
+       p.assignee, p.acceptance, p.comment
+from plan_items p
+join plan_item_outlines o on o.id = p.id
+where p.user_id = '…' and p.status not in ('done', 'dropped')
+  and p.module is distinct from 'website'
+order by p.module nulls last, p.position, p.created_at;
 
 -- what a step waits on
-select d.depends_on_id, p.number, p.title, p.status
-from plan_dependencies d join plan_items p on p.id = d.depends_on_id
+select d.depends_on_id, o.outline, p.title, p.status
+from plan_dependencies d
+join plan_items p on p.id = d.depends_on_id
+join plan_item_outlines o on o.id = p.id
 where d.item_id = '…';
 
 -- the visions, when shaping: one row per workspace that has one, keyed by
@@ -49,6 +57,8 @@ select module, body from module_visions where user_id = '…';
 insert into plan_items (user_id, module, title, detail, acceptance, size, status, position)
 values ('…', 'shopping', '…', '…', '…', 'l', 'proposed', 10)
 returning id, number;
+-- and its outline, which is how you name it from here on:
+-- select outline from plan_item_outlines where id = '<the new id>';
 update ideas set plan_item_id = '<the feature id>' where id = '<the idea id>';
 
 -- a decision, when shaping: the question, its options, your recommendation.
@@ -73,7 +83,7 @@ select bool_or(status = 'proposed') as proposed from chain;
 -- `cse_…` id in CLAUDE_CODE_REMOTE_SESSION_ID; 'Added by a session on
 -- <date>.' when there is none). This is what `add` writes and what
 -- lib/plan/origin.ts reads back for the page's drop, so keep the wording
--- exactly. A re-shape puts its 'From #63''s answer: …' line first and this
+-- exactly. A re-shape puts its 'From #<outline>''s answer: …' line first and this
 -- one beneath it. A proposed chain, or a step that would act outside the
 -- repository (what `--proposed` is for; building.md, 'Steps that act
 -- outside the repository'): status 'proposed', and no stamp.
@@ -129,7 +139,7 @@ limit 1;
 update plan_items set status = 'in_progress' where id = '…';
 
 -- done (after committing, so HEAD is the commit that did it). First, for a
--- step that changed a screen: `npm run ui-guard -- <n> --commit <sha>` names
+-- step that changed a screen: `npm run ui-guard -- <number> --commit <sha>` (offline it takes the number, since reading an outline needs the database) names
 -- the gallery surfaces its files serve and prints a select to run here. Each
 -- row it returns is a surface whose latest design check is not a pass, and
 -- the step does not close while there is one: say which, and send it back to
@@ -183,16 +193,18 @@ update plan_items set fog = '…', fog_dismissed_at = null where id = '…';
 -- and `fog_dismissed_at` is the patch of fog on it; `ideas.dismissed_at` is
 -- a suggestion they are not taking. Leave every one of them out of what you
 -- read the plan for, and never write one back in another form.
-select number, title, dismissed_at, fog_dismissed_at from plan_items
-where user_id = '…' and (dismissed_at is not null or fog_dismissed_at is not null);
+select o.outline, p.title, p.dismissed_at, p.fog_dismissed_at
+from plan_items p join plan_item_outlines o on o.id = p.id
+where p.user_id = '…' and (p.dismissed_at is not null or p.fog_dismissed_at is not null);
 
 -- a row a re-shape wrote, stamped with the answer that produced it. The same
 -- line `add --from` writes, and what the page and the brief read back; keep
 -- the wording exactly, including the apostrophe, or it stops being found.
+-- The decision is named by its outline, as `add --from` now writes it.
 insert into plan_items (user_id, module, parent_id, title, acceptance, size,
                         status, position, comment)
 values ('…', 'dev', '<the feature id>', '…', '…', 's', 'proposed', 30,
-        'From #63''s answer: <that answer, first line>');
+        'From #<the decision''s outline>''s answer: <that answer, first line>');
 
 -- stopped: a run ending with its step neither closed nor blocked says why,
 -- in one line of 300 characters or fewer, on the newest run fired at the step
@@ -232,7 +244,7 @@ where id = (select id from plan_runs where user_id = '…'
 -- waiting on:
 --   insert into check_backs (user_id, title, detail, due_at, plan_item_id, source)
 --   values ('…', '<what to look at>', '<what to check>', now() + interval '2 hours',
---           '<the step id>', 'plan #<n>');
+--           '<the step id>', 'plan #<outline>');
 update plan_items
 set status = 'blocked', block_ask = '<what it needs, in one sentence>',
     block_kind = 'outside',
@@ -251,12 +263,12 @@ where id = '…';
 -- "send_step" | "reword", "text": "…", "module": "…" | null, "field": null}.
 -- `add_step` leaves a proposal, `build_step` writes the step ready to be
 -- worked and puts a session on it in the same press, `send_step` takes a
--- step already on the plan, named by number in "text" as "#342". The CLI
+-- step already on the plan, named by its outline in "text" as "#1073.4". The CLI
 -- refuses a raise without one and doing the insert by hand does not make it
 -- optional either.
 insert into raised_items (user_id, module, title, detail, ask, consequence, source, status)
 values ('…', 'dev', '…', '…', '…', '{"name": "file_idea", "text": "…"}'::jsonb,
-        'plan #<n>', 'open')
+        'plan #<outline>', 'open')
 returning id;
 
 -- what is outstanding in both directions: what the person has not answered,

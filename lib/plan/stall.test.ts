@@ -151,7 +151,7 @@ describe('stuckStep', () => {
           { kind: 'build', status: 'in_progress', number: 4, title: 'Tune it from two weeks of undos' },
         ],
       }),
-    ).toEqual({ number: 4, title: 'Tune it from two weeks of undos' });
+    ).toEqual({ number: 4, outline: null, title: 'Tune it from two weeks of undos' });
     expect(stuckStep({ children: [] })).toBeNull();
   });
 });
@@ -385,7 +385,7 @@ describe('waitingSteps', () => {
   it('says why nothing under a feature can be worked when every open step waits', () => {
     expect(
       waitingSteps(feature([{ id: 'c', planItemId: 's', title: 'Five closes exist.', dueAt: '2026-10-26T06:00:00.000Z' }])),
-    ).toBe('Nothing under #1073 can be worked now: #1135 waits until 26 Oct (Five closes exist).');
+    ).toBe('Nothing under #1073 can be worked now: #1073.2 waits until 26 Oct (Five closes exist).');
   });
 
   it('lets a feature through with a step that can be worked', () => {

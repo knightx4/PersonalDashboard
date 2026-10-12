@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Three jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step number, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Re-shaping: re-read a feature against the questions answered beneath it, graduating fog into steps (ready under an approved feature, proposed only when they act outside the repository), dropping what an answer made pointless, and writing any new question as a decision. Use when the user says "work the plan", "build the next step", "do plan #12", "shape idea …", "re-shape feature #95", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
+description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Three jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step's outline, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Re-shaping: re-read a feature against the questions answered beneath it, graduating fog into steps (ready under an approved feature, proposed only when they act outside the repository), dropping what an answer made pointless, and writing any new question as a decision. Use when the user says "work the plan", "build the next step", "do plan #1073.4", "shape idea …", "re-shape feature #95", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
 ---
 
 # Working the plan
@@ -73,7 +73,23 @@ npx tsx scripts/plan.ts raises                 # open raises, and answers no ses
                                                # a closed one is finished with and is not listed
 ```
 
-Steps are named by number — the `#12` on the page. Numbers are never reused.
+### Naming a step
+
+Every `<n>` and `<m>` above is a step's outline, the `1073.4` its row on the
+page heads itself with: the fourth step under feature #1073. A top-level
+feature's outline is its number. `plan.ts` takes `1073.4` or `#1073.4`, and
+prints every step that way.
+
+Name a step by its outline in everything you write: replies and reports,
+notes, comments, asks, details, raise text, commit and merge subjects, and the
+prompts you give subagents. Write `#1073.4`, with no number beside it. Each
+step also has a number (#1084), which is its identity in the database and
+never changes, but the person reads the outline. Sessions that wrote "#1081"
+for the step the page showed as "1073.1" left them translating one into the
+other. Text written before this rule still names steps by number; `plan.ts`
+shows it with the outline, and you leave it as it is. Querying the database
+directly, join `plan_item_outlines` on `id` to get the outline
+(`reference/offline.md`).
 
 If `DATABASE_URL` is missing, read `reference/offline.md` rather than guessing.
 
@@ -107,7 +123,7 @@ writes are not recorded yet.
   repository** in `reference/building.md` defines.
 - A step **assigned to Claude** is yours to pick up on your own. `next --claude`
   lists them in order.
-- A step **named by the user** ("do #12", or a routine fired from the page with
+- A step **named by the user** ("do #1073.4", or a routine fired from the page with
   a brief) is yours whoever it is assigned to.
 - A **decision** is never yours, however it is assigned and whoever named it.
   It is a question put to the person, and it closes on their answer. `next
@@ -142,7 +158,7 @@ you close when they are all done.
 
 ## Building
 
-**One step, on its own** — "do #12", or one step named in a brief. Read
+**One step, on its own** — "do #1073.4", or one step named in a brief. Read
 `reference/building.md` and follow it yourself, then put the commit on main as
 in step 4 below. A subagent for a single step is pure overhead, except on a
 Sonnet session for a step sized `m` or `l` (step 3 below).
@@ -195,7 +211,7 @@ thousand tokens, and gets to the end.
 
    The prompt is short:
 
-   > Build plan step #N. Read `.claude/skills/plan/reference/building.md` and
+   > Build plan step #<outline>. Read `.claude/skills/plan/reference/building.md` and
    > follow it exactly. You are in a worktree: give it a hard-linked copy of
    > node_modules first (`cp -al <the main checkout>/node_modules .`) and use
    > `PREVIEW_PORT=<3400 + 1, 2 or 3>` for the preview.
@@ -233,17 +249,17 @@ thousand tokens, and gets to the end.
      build, and every failure that kept main red on 23 September 2026 came
      through what that left out.
    - Merge the working branch into `main` with `--no-ff`, subject `Merge plan
-     step #N: <title>`, and push.
+     step #<outline>: <title>`, and push.
    - Then close the step: `done <n> --note "…"`, with the note the subagent
      wrote. `done` refuses a commit that is not on main, so the merge comes
      first; a subagent cannot close its own step and does not try. It also
      refuses a step that changed a screen while one of its gallery surfaces
      has no passing design check (plan #1534), so before the merge run
-     `npm run ui-guard -- <n> --commit <the branch's head>` and send a step
+     `npm run ui-guard -- <outline> --commit <the branch's head>` and send a step
      it refuses back to the critic rather than merging it.
 
    Anything that fails belongs to whichever step broke it: fix it, and amend or
-   add a commit against that step's number, before the merge. That includes
+   add a commit against that step's outline, before the merge. That includes
    a failure another session merged: main is what you are about to push, so
    it is yours to get passing, and a step that merges onto red makes it
    worse. Running the gate before every merge costs about three minutes a step
@@ -287,9 +303,9 @@ thousand tokens, and gets to the end.
    critic stop, a failing merge, a step that keeps growing), `blocked` when it
    cannot move until the person answers or sets something up. The body is
    for the person: what closed, what is next, and what is waiting on them,
-   by number and title, in the writing guide's terms. One update per feature
+   by outline and title, in the writing guide's terms. One update per feature
    per batch, not one per step.
-8. **Report when the batch ends**: every step closed **by number and title**,
+8. **Report when the batch ends**: every step closed **by outline and title**,
    what became ready, what is blocked and on what, and anything raised on
    `/dev/inbox`, by title. A report that says "closed four steps" makes the
    person go and look. Say which steps reached main and which did not: a closed

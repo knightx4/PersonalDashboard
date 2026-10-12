@@ -2,6 +2,7 @@ import { createClient, requireUser } from '@/lib/auth/server';
 import { PageHeader } from '@/components/shell/page-header';
 import { loadRaised } from '@/lib/raised/load';
 import { planRefTitles } from '@/lib/plan/load';
+import { stepRef } from '@/lib/plan/ref';
 import { loadPlanForRequest } from '@/lib/plan/request-plan';
 import { loadPlanRunQuestions } from '@/lib/plan/run-answer';
 import { buildPlanTree, flattenSections, type PlanSection } from '@/lib/plan/tree';
@@ -91,7 +92,7 @@ export default async function DevInboxPage() {
   const raised = new Map(queue.open.map((raise) => [raiseRef(raise.id), raise]));
   const snoozed = snoozedItems(snoozes, (ref) => {
     const step = numbered.get(ref);
-    return step ? `#${step.number} ${step.title}` : (raised.get(ref)?.title ?? null);
+    return step ? `${stepRef(step)} ${step.title}` : (raised.get(ref)?.title ?? null);
   });
 
   return (

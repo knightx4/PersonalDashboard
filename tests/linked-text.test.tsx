@@ -32,6 +32,14 @@ describe('RefText', () => {
     expect(html).toMatch(/<a[^>]*comment-ref/);
   });
 
+  it('links a written outline and reads a stored number as its outline', () => {
+    const titles = { 1084: { title: 'Name steps', outline: '1073.4' } };
+    const html = renderToStaticMarkup(<RefText text="See #1073.4 and #1084" titles={titles} />);
+    expect(html.match(/#plan-1084/g)).toHaveLength(2);
+    expect(html.match(/>#1073\.4</g)).toHaveLength(2);
+    expect(html).toContain('title="#1073.4 — Name steps"');
+  });
+
   it('links an address when there are no step numbers', () => {
     const html = renderToStaticMarkup(<RefText text="see example.com" />);
     expect(html).toContain('href="https://example.com"');

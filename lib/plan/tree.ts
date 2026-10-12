@@ -11,6 +11,7 @@ import {
 } from './load';
 import { claimLiveness, type ClaimLiveness, type ClaimRun, type ClaimStep } from './liveness';
 import { PLAN_SCOPES, planScopeLabel, type PlanScope } from '@/lib/plan/projects';
+import { stepRef } from './ref';
 
 /**
  * The plan, read.
@@ -1363,6 +1364,10 @@ function matchesQuery(node: PlanNode, terms: readonly string[]): boolean {
     // one step arrived at several.
     const number = /^#(\d+)$/.exec(term);
     if (number) return node.number === Number(number[1]);
+    // `#1073.4` the same way: the step the row heads itself with, and not
+    // #1073.41 or a child of it.
+    const outline = /^#(\d+(?:\.\d+)+)$/.exec(term);
+    if (outline) return node.outline === outline[1];
     return haystack.includes(term.replace(/^#/, ''));
   });
 }
@@ -1540,13 +1545,14 @@ export function isWaitingOnThePerson(
  */
 export function blockRefusal(
   node: Pick<PlanNode, 'number'> & {
+    outline?: string | null;
     dependsOn?: readonly PlanLink[];
     blockKind?: PlanBlockKind | null;
   },
 ): string {
   if (!waitsOnItsSteps(node)) {
     return (
-      `#${node.number} is blocked on something outside the repo. ` +
+      `${stepRef(node)} is blocked on something outside the repo. ` +
       'Clear what it is waiting on first -- its note says what.'
     );
   }
@@ -1558,16 +1564,16 @@ export function blockRefusal(
   const open = (node.dependsOn ?? []).filter((link) => !isClosed(link.item.status));
   if (open.length === 0) {
     return (
-      `#${node.number} is blocked on other steps, and none are recorded against it. ` +
+      `${stepRef(node)} is blocked on other steps, and none are recorded against it. ` +
       'Say what it is waiting for, or put it back to not started.'
     );
   }
 
-  const named = andList(open.map((link) => `#${link.item.number}`));
+  const named = andList(open.map((link) => stepRef(link.item)));
   return open.length === 1
-    ? `#${node.number} is blocked on ${named}, which is still open. ` +
+    ? `${stepRef(node)} is blocked on ${named}, which is still open. ` +
         'It clears itself when that step closes.'
-    : `#${node.number} is blocked on ${named}, which are still open. ` +
+    : `${stepRef(node)} is blocked on ${named}, which are still open. ` +
         'It clears itself when they close.';
 }
 

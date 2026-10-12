@@ -134,6 +134,14 @@ describe('filesOfStep', () => {
     expect(calls.find((c) => c[0] === 'log')).toContain('--grep=(plan #12)');
   });
 
+  it('also finds the commits tagged with the step outline', () => {
+    const { git, calls } = fakeGit('abc1234 p1');
+    filesOfStep(1084, 'abc1234', git, '1073.4');
+    const log = calls.find((c) => c[0] === 'log');
+    expect(log).toContain('--grep=(plan #1084)');
+    expect(log).toContain('--grep=(plan #1073.4)');
+  });
+
   it('reads an ordinary commit with show', () => {
     const { git } = fakeGit('abc1234 p1');
     expect(filesOfStep(12, 'abc1234', git)).toEqual(['components/b.tsx', 'lib/a.ts', 'lib/own.ts']);

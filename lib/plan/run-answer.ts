@@ -24,6 +24,7 @@ import { loadVisionBodies } from '@/lib/specs/vision';
 import { QUESTION_RULE, planBrief } from './brief';
 import { builderFor, projectPreamble } from './handover';
 import { loadPlan } from './load';
+import { refFor, stepRef } from './ref';
 import type { RunJob } from './run-end';
 import { startRoutineRun } from './runs';
 import { buildPlanTree, findNode, flatten } from './tree';
@@ -138,7 +139,7 @@ async function fireContinuation(input: {
       text =
         (builder.project ? projectPreamble(builder.project) : '') +
         `${opening}\n\n` +
-        `Carry on the ${job} run on plan #${node.number}, "${node.title}", following ${how}. ` +
+        `Carry on the ${job} run on plan ${stepRef(node)}, "${node.title}", following ${how}. ` +
         'The brief below is the plan as the app holds it right now, and the plan is the source ' +
         'of truth.\n\n' +
         `${QUESTION_RULE}\n\n` +
@@ -173,6 +174,22 @@ export async function countPlanRunQuestions(supabase: Db, userId: string): Promi
   }
 }
 
+/** The outlines of these steps by number; empty when the view cannot be read, so they read by number. */
+async function outlinesOf(supabase: Db, userId: string, numbers: number[]): Promise<Map<number, string>> {
+  if (numbers.length === 0) return new Map();
+  try {
+    const { data, error } = await supabase
+      .from('plan_item_outlines')
+      .select('number, outline')
+      .eq('user_id', userId)
+      .in('number', numbers);
+    if (error) return new Map();
+    return new Map(((data ?? []) as { number: number; outline: string }[]).map((row) => [row.number, row.outline]));
+  } catch {
+    return new Map();
+  }
+}
+
 /** Every plan run waiting on your answer, newest first, as the Dev inbox lists them. */
 export async function loadPlanRunQuestions(supabase: Db, userId: string): Promise<RunQuestion[]> {
   const { data, error } = await supabase
@@ -193,12 +210,17 @@ export async function loadPlanRunQuestions(supabase: Db, userId: string): Promis
     plan_item: { number: number; title: string } | null;
   }[];
   const questions = await latestQuestions(supabase, rows.map((row) => row.id));
+  const outlines = await outlinesOf(
+    supabase,
+    userId,
+    rows.flatMap((row) => (row.plan_item ? [row.plan_item.number] : [])),
+  );
   return rows.map((row) => {
     const line = questions[row.id];
     return {
       runTable: 'plan_runs' as const,
       runId: row.id,
-      about: row.plan_item ? `#${row.plan_item.number} ${row.plan_item.title}` : `A ${row.job} run`,
+      about: row.plan_item ? `${refFor(row.plan_item.number, outlines)} ${row.plan_item.title}` : `A ${row.job} run`,
       href: row.plan_item ? `/dev/plan/${row.plan_item.number}` : '/dev/raised',
       body: line?.body ?? null,
       options: line?.options ?? null,

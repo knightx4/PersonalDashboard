@@ -16,9 +16,11 @@ import {
 } from '@/components/dev/question';
 import type { PlanRefTitles } from '@/lib/comments/refs';
 import { isClosed, isDismissed } from '@/lib/plan/load';
+import { readableRefs } from '@/lib/plan/ref';
 import { cn } from '@/lib/cn';
 import {
   PLAN_COMMENTS,
+  outlinesOf,
   type TreeAction,
   type TreeActionState,
   type TreeActions,
@@ -115,6 +117,8 @@ export function QuestionRow({
   useSettled(answerState, () => setAnswering(false));
 
   const settled = isClosed(node.status);
+  // A stored `#1084` in the options or the answer, drawn as the row's outline.
+  const outlines = outlinesOf(titles);
   // Only ever rendered under the Dismissed view: everywhere else the row is
   // pruned before it gets here.
   const aside = isDismissed(node);
@@ -169,11 +173,15 @@ export function QuestionRow({
           ) : (
             <>
               <TheQuestion outline={node.outline} title={node.title} />
-              <TheOptions detail={node.detail} onChoose={settled ? undefined : choose} />
+              <TheOptions
+                detail={node.detail === null ? null : readableRefs(node.detail, outlines)}
+                onChoose={settled ? undefined : choose} />
             </>
           )}
 
-          {node.resolution && <TheAnswered resolution={node.resolution} />}
+          {node.resolution && (
+            <TheAnswered resolution={readableRefs(node.resolution, outlines)} />
+          )}
 
           {answering ? (
             <AnswerBox

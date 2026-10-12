@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { dayLabel } from '@/lib/dev/inspiration/view';
 import { planHref } from '@/lib/search/sources/dev-map';
+import { stepRef } from '@/lib/plan/ref';
 import {
   loadLastPostsRun,
   loadSocialPosts,
@@ -76,7 +77,8 @@ export type PostsPage = {
   onX: { posts: XPostView[]; total: number };
 };
 
-export type PostStepRow = { id: string; number: number; title: string };
+/** A cited step; `outline` is where the plan page places it, `1073.4`, when known. */
+export type PostStepRow = { id: string; number: number; title: string; outline?: string | null };
 export type PostNoteRow = { id: string; body: string };
 
 function firstLine(text: string): string {
@@ -116,7 +118,7 @@ export function buildPostsPage(input: {
       sources.push({
         kind: 'step',
         id: step.id,
-        label: `#${step.number}`,
+        label: stepRef(step),
         title: step.title,
         href: planHref(step.number),
       });
@@ -243,9 +245,13 @@ export async function loadPostsPage(
   const stepIds = [...new Set(posts.flatMap((post) => post.sourcePlanItemIds))];
   const noteIds = [...new Set(posts.flatMap((post) => post.sourceFeedbackIds))];
 
-  const [steps, notes, x] = await Promise.all([
+  const [steps, outlines, notes, x] = await Promise.all([
     stepIds.length
       ? supabase.from('plan_items').select('id, number, title').eq('user_id', userId).in('id', stepIds)
+      : Promise.resolve({ data: [], error: null }),
+    // Each cited step's outline, so its chip reads as the plan page heads the row.
+    stepIds.length
+      ? supabase.from('plan_item_outlines').select('id, outline').eq('user_id', userId).in('id', stepIds)
       : Promise.resolve({ data: [], error: null }),
     noteIds.length
       ? supabase.from('feedback_items').select('id, body').eq('user_id', userId).in('id', noteIds)
@@ -255,9 +261,13 @@ export async function loadPostsPage(
   if (steps.error) throw new Error(`Could not read the steps the posts cite: ${steps.error.message}`);
   if (notes.error) throw new Error(`Could not read the notes the posts cite: ${notes.error.message}`);
 
+  // A failed outline read leaves the chips on their numbers.
+  const placed = new Map(
+    ((outlines.error ? [] : (outlines.data ?? [])) as { id: string; outline: string }[]).map((row) => [row.id, row.outline]),
+  );
   return buildPostsPage({
     posts,
-    steps: (steps.data ?? []) as PostStepRow[],
+    steps: ((steps.data ?? []) as PostStepRow[]).map((step) => ({ ...step, outline: placed.get(step.id) ?? null })),
     notes: (notes.data ?? []) as PostNoteRow[],
     run,
     now,

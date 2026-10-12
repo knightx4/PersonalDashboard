@@ -191,7 +191,7 @@ describe('writeDigestFor', () => {
       featuresBudget: 6,
       featuresLeft: 4,
       features: [{ ref: '#100', title: 'The runner' }],
-      closed: [{ ref: '#101', title: 'The tick' }],
+      closed: [{ ref: '#100.1', title: 'The tick' }],
       blocked: [],
     });
   });

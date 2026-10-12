@@ -11,7 +11,7 @@ The turn it appends is written by `overhaulTurn` in
 `lib/plan/overhaul-run.ts`. The overnight runner never fires it and never
 takes an overhaul's steps.
 
-The app appends a turn naming the overhaul by number and title, the
+The app appends a turn naming the overhaul by outline and title, the
 account's `user_id`, and the overhaul's brief as the plan holds it. The
 prompt below is what the routine carries when it starts. The prompt and the
 connectors are stored on claude.ai, not read from here, so a change to
@@ -49,7 +49,7 @@ built by a subagent following .claude/skills/plan/reference/building.md,
 and you merge it as the Building section of .claude/skills/plan/SKILL.md
 says, running npm run gate first.
 
-The turn after this one names the overhaul by number, the user_id, and the
+The turn after this one names the overhaul by outline, the user_id, and the
 overhaul's brief. If there is no such turn, or the row it names is not on
 the overhaul track, stop and say so rather than choosing an overhaul.
 
@@ -59,7 +59,7 @@ proposed step) or on a block. Never accept the design for the person, close
 their try-it step, answer your own decision, or close a removal step or the
 overhaul while a count is above its target.
 
-Report every step you closed or blocked by number and title, each Design
+Report every step you closed or blocked by outline and title, each Design
 log line you wrote, each count with its value against its target, and what
 the overhaul now waits on.
 ```

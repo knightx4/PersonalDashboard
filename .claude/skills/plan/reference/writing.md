@@ -49,7 +49,7 @@ a line of its own: `Pattern: list and detail`, `Pattern: deck`, `Pattern:
 thread`, `Pattern: tabbed detail`, `Pattern: main plus rail` or `Pattern: tabbed
 sections`, the names in `lib/plan/patterns.ts`. The brief prints that pattern's
 rule for the design critic. When none fits, the line is `Pattern: none fits,
-see #<n>`, naming the decision written for the person (`shaping.md`). A step
+see #<outline>`, naming the decision written for the person (`shaping.md`). A step
 that changes no screen has no pattern line.
 
 **Do not write:**

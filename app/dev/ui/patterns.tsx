@@ -18,6 +18,7 @@ import type { DevComment } from '@/lib/comments/load';
 import type { Deck as DeckDeclaration } from '@/lib/preview/deck';
 import { threadRef } from '@/lib/thread/subjects';
 import type { Tab } from '@/lib/tabs';
+import { stepRef } from '@/lib/plan/ref';
 import { OpenTab } from './open-tab';
 
 /**
@@ -263,17 +264,17 @@ const FEATURE_TABS: readonly Tab[] = [
   { id: 'steps', label: 'Steps', count: 10 },
 ];
 
-const FEATURE_STEPS: readonly { number: number; title: string; state: string }[] = [
-  { number: 1661, title: 'Which layout should the feature page and goal page use?', state: 'Answered' },
-  { number: 1662, title: 'Use module, feature, step and substep as the level names', state: 'Done' },
-  { number: 1663, title: 'Build the shared tabbed detail layout', state: 'In progress' },
-  { number: 1664, title: 'Open each feature on its own page with an Overview', state: 'Ready' },
-  { number: 1665, title: 'Group the Steps tab by status', state: 'Ready' },
-  { number: 1666, title: "Keep Dash's latest update on each feature, with a health", state: 'Ready' },
-  { number: 1667, title: 'Show what moved on the Activity tab', state: 'Ready' },
-  { number: 1668, title: 'Split progress between you and Dash', state: 'Ready' },
-  { number: 1670, title: 'Write an update from the feature page', state: 'Ready' },
-  { number: 1671, title: 'Move the goal page onto the same layout', state: 'Ready' },
+const FEATURE_STEPS: readonly { number: number; outline: string; title: string; state: string }[] = [
+  { number: 1661, outline: '1660.1', title: 'Which layout should the feature page and goal page use?', state: 'Answered' },
+  { number: 1662, outline: '1660.2', title: 'Use module, feature, step and substep as the level names', state: 'Done' },
+  { number: 1663, outline: '1660.3', title: 'Build the shared tabbed detail layout', state: 'In progress' },
+  { number: 1664, outline: '1660.4', title: 'Open each feature on its own page with an Overview', state: 'Ready' },
+  { number: 1665, outline: '1660.5', title: 'Group the Steps tab by status', state: 'Ready' },
+  { number: 1666, outline: '1660.6', title: "Keep Dash's latest update on each feature, with a health", state: 'Ready' },
+  { number: 1667, outline: '1660.7', title: 'Show what moved on the Activity tab', state: 'Ready' },
+  { number: 1668, outline: '1660.8', title: 'Split progress between you and Dash', state: 'Ready' },
+  { number: 1670, outline: '1660.9', title: 'Write an update from the feature page', state: 'Ready' },
+  { number: 1671, outline: '1660.10', title: 'Move the goal page onto the same layout', state: 'Ready' },
 ];
 
 const FEATURE_ACTIVITY: readonly { when: string; what: string }[] = [
@@ -327,7 +328,7 @@ function FeatureSteps() {
             key={step.number}
             href="#"
             title={step.title}
-            meta={`#${step.number}`}
+            meta={stepRef(step)}
             end={step.state}
           />
         ))}

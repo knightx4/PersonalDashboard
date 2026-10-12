@@ -60,10 +60,17 @@ export async function loadInspiration(supabase: SupabaseClient, userId: string):
     ),
   ];
   const planNumbers = new Map<string, number>();
+  const planOutlines = new Map<string, string>();
   if (planIds.length > 0) {
-    const plan = await supabase.from('plan_items').select('id, number').eq('user_id', userId).in('id', planIds);
+    const [plan, placed] = await Promise.all([
+      supabase.from('plan_items').select('id, number').eq('user_id', userId).in('id', planIds),
+      // Where the plan page places each, so a takeaway names it the same way.
+      supabase.from('plan_item_outlines').select('id, outline').eq('user_id', userId).in('id', planIds),
+    ]);
     if (plan.error) throw new Error(`Could not read the plan the takeaways name: ${plan.error.message}`);
     for (const item of plan.data ?? []) planNumbers.set(String(item.id), Number(item.number));
+    // A failed outline read leaves them named by number.
+    for (const item of placed.error ? [] : (placed.data ?? [])) planOutlines.set(String(item.id), String(item.outline));
   }
 
   return buildInspirationPage({
@@ -72,6 +79,7 @@ export async function loadInspiration(supabase: SupabaseClient, userId: string):
     takeaways: takeawayRows,
     links: (links.data ?? []) as LinkRow[],
     planNumbers,
+    planOutlines,
     ideaPlanItems,
   });
 }
