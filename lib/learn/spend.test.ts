@@ -131,6 +131,9 @@ describe('the operation names', () => {
       'word-essay-question',
       'rephrase-essay-selection',
       'check-essay-paragraph',
+      'research-essay-question',
+      'gather-essay-sources',
+      'judge-essay-claims',
     ]);
   });
 });

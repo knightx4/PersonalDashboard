@@ -144,6 +144,14 @@ export const MODELS = {
   learnEssayRephrase: SONNET,
   /** lib/learn/essays/checks-model.ts, a named check on one paragraph of an essay */
   learnEssayCheck: SONNET,
+  /**
+   * lib/learn/essays/research-model.ts, an essay's first research pass and
+   * the deeper pass's gathering: Haiku with the basic web search and fetch
+   * tools, since the dynamic-filtering versions are for Opus and Sonnet only
+   */
+  learnEssayResearch: HAIKU,
+  /** lib/learn/essays/research-model.ts, the deeper pass marking each claim against the pages read */
+  learnEssayJudge: SONNET,
   /** lib/learn/survey/idea.ts */
   learnSurveyIdea: HAIKU,
   /** lib/learn/vault/classify.ts */

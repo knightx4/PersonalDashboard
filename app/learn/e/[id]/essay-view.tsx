@@ -42,6 +42,8 @@ import {
 import { EssayBriefFold, EssayInterviewCard } from './essay-brief';
 import { EssayNotesCard, noteRangesIn, useEssayNotes } from './essay-notes';
 import { EssayStudyCard, useEssayStudy, type StudyState } from './essay-study';
+import { EssayResearchCard, useEssayResearch } from './essay-research';
+import { NO_RESEARCH, type EssayResearchRuns } from '@/lib/learn/essays/research';
 
 /** How long after the last keystroke the draft is saved. */
 const SAVE_AFTER_MS = 800;
@@ -424,6 +426,11 @@ function TargetForm({ id, target, onSet }: { id: string; target: number | null; 
  * seconds after you pause; its buttons insert a link or a quote at the
  * cursor. It is laptop only, as the spec says.
  *
+ * After it, research (plan #1863.9, essay-research.tsx): a first pass on the
+ * question and a deeper pass on the draft's claims, each run only by its
+ * button, with its price beside it. A quote it found becomes a numbered
+ * footnote at the cursor.
+ *
  * `initialVault`, `briefOpen`, `initialSuggestion`, `initialAskMarks`,
  * `initialNoteOpen` and `study` are for the gallery, which draws a save that
  * stopped, the brief unfolded, a suggestion waiting, the question after a
@@ -439,6 +446,8 @@ export function EssayView({
   initialNoteOpen = null,
   study,
   originStudy,
+  research = NO_RESEARCH,
+  researchRunning = null,
 }: {
   essay: Essay;
   initialVault?: VaultState;
@@ -452,6 +461,10 @@ export function EssayView({
   study?: StudyState;
   /** What the interview's "What made you think this?" offers, for the gallery. */
   originStudy?: StudyState;
+  /** The newest research run of each level (plan #1863.9). */
+  research?: EssayResearchRuns;
+  /** A level drawn as running, for the gallery. */
+  researchRunning?: 'first' | 'deeper' | null;
 }) {
   const [doc, setDoc] = useState({ text: essay.draftBody, marks: essay.marks, version: 0 });
   const [words, setWords] = useState(() => countWords(essay.draftBody));
@@ -468,6 +481,12 @@ export function EssayView({
   const onInsert = useCallback((text: string, quote?: { name: string }) => {
     editor.current?.insert(text, quote);
   }, []);
+  const researchApi = useEssayResearch(
+    essay.id,
+    editor,
+    research,
+    researchRunning ? { [researchRunning]: 'running' } : {},
+  );
   const onHideStudy = studyApi.hide;
   const placedNotes = noteApi.notes;
   const initialNotes = useMemo(() => noteRangesIn(doc.text, placedNotes), [doc, placedNotes]);
@@ -687,6 +706,7 @@ export function EssayView({
     <div className={cn('flex flex-col gap-4', quiet)}>
       <EssayNotesCard api={noteApi} paragraphs={paragraphs} />
       <EssayStudyCard state={studyApi.state} onInsert={onInsert} onHide={(key) => void onHideStudy(key)} />
+      <EssayResearchCard api={researchApi} />
       <Card padding="none">
         <CardSection title="Length">
           {target !== null && (

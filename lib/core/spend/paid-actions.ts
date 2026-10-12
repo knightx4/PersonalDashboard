@@ -56,6 +56,11 @@ export const PAID_ACTIONS = {
   // a pause, and the interview with the brief (plan #1863.8). One embedding,
   // cached, so a paragraph searched before costs nothing.
   'app/learn/e/[id]/actions.ts#findEssayStudy': ['embed-note-match'],
+  // Learn: research on an essay (plan #1863.9), one button per level. The
+  // first pass searches the question; the deeper pass gathers pages and
+  // marks the draft's claims against them.
+  'app/learn/e/[id]/actions.ts#researchEssay:first': ['research-essay-question'],
+  'app/learn/e/[id]/actions.ts#researchEssay:deeper': ['gather-essay-sources', 'judge-essay-claims'],
   // Saving a personality result has Dash read it against your notes once the
   // page has answered (plan #1635); the button under the read asks again.
   'app/learn/know/personality/actions.ts#saveBigFiveAction': ['read-personality', 'embed-note-match'],

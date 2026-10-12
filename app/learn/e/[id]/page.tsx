@@ -3,6 +3,7 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { essayTitle } from '@/lib/learn/essays/model';
 import { loadEssay } from '@/lib/learn/essays/store';
 import { loadEssayNotes } from '@/lib/learn/essays/notes-store';
+import { loadEssayResearch } from '@/lib/learn/essays/research-store';
 import { EssayView } from './essay-view';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function EssayPage({ params }: { params: Promise<{ id: string }> }) {
   const essay = await read((await params).id);
   if (!essay) notFound();
-  const notes = await readNotes(essay.id, essay.draftBody);
-  return <EssayView essay={essay} notes={notes} />;
+  const [notes, research] = await Promise.all([
+    readNotes(essay.id, essay.draftBody),
+    createLearnClient().then((supabase) => loadEssayResearch(supabase, essay.id)),
+  ]);
+  return <EssayView essay={essay} notes={notes} research={research} />;
 }
