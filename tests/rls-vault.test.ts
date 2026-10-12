@@ -236,6 +236,14 @@ beforeAll(async () => {
     select store_note_embeddings(jsonb_build_array(jsonb_build_object(
       'note_id', note_id, 'body_hash', body_hash, 'embedding', ${VECTOR}::text, 'model', 'voyage-4-lite')))
     from stale_note_embeddings(1, ${userA})`;
+
+  // A note's passages (plan #1863.7), written through the function the sync
+  // uses, so the source hash is the one it would store.
+  await admin`
+    select store_note_blocks(note_id, source_hash, jsonb_build_array(jsonb_build_object(
+      'position', 0, 'heading_path', '[]'::jsonb, 'start_offset', 0, 'end_offset', 5,
+      'text_hash', 'h', 'embedding', ${VECTOR}::text, 'model', 'voyage-4-lite')))
+    from stale_note_blocks(100, ${userA}) where note_id = ${noteA}`;
 });
 
 afterAll(async () => {
@@ -273,6 +281,7 @@ describe('RLS coverage', () => {
       'maya_gate_checks',
       'maya_messages',
       'maya_threads',
+      'note_blocks',
       'note_connections',
       'note_embeddings',
       'notes',
@@ -902,6 +911,32 @@ describe('the merge log, across users', () => {
     await expect(
       asUser(userA, (tx) => tx`delete from map_merge_resets where merge_id = ${mergeA}`),
     ).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe('note blocks, across users', () => {
+  it('shows the owner their passages and another user none', async () => {
+    const own = await asUser(userA, (tx) => tx`select id from note_blocks`);
+    const other = await asUser(userB, (tx) => tx`select id from note_blocks`);
+    expect([own.length, other.length]).toEqual([1, 0]);
+  });
+
+  it('will not list or store passages on another user\'s note', async () => {
+    const stale = await asUser(userB, (tx) => tx`select note_id from stale_note_blocks(100, null)`);
+    expect(stale.map((row) => row.note_id)).not.toContain(noteA);
+
+    const [hash] = await admin<{ h: string }[]>`
+      select note_blocks_source_hash(path, body) as h from notes where id = ${noteA}`;
+    const [row] = await asUser(
+      userB,
+      (tx) => tx`select store_note_blocks(${noteA}, ${hash.h}, '[]'::jsonb) as written`,
+    );
+    expect(row.written).toBe(0);
+    const near = await asUser(
+      userB,
+      (tx) => tx`select block_id from nearest_note_blocks(${VECTOR}, null, 5, 0, null, null)`,
+    );
+    expect(near).toHaveLength(0);
   });
 });
 

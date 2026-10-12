@@ -9,6 +9,7 @@ import type { VaultSupabaseClient } from '@/lib/vault/db/schema-name';
 import { acceptNoteMap } from '@/lib/vault/map/accept';
 import { scorePositionCentrality, type CentralityResult } from '@/lib/vault/map/centrality';
 import { embedMapRows, type MapEmbedResult } from '@/lib/vault/map/embed';
+import { indexNoteBlocks, type BlockIndexResult } from '@/lib/vault/notes/block-index';
 import { embedVaultNotes, type NoteEmbedResult } from '@/lib/vault/notes/embed';
 import { linkPositions, type LinkPassResult } from '@/lib/vault/map/link-positions';
 import { applyMergeProposals, type ApplyResult } from '@/lib/vault/map/merge-apply';
@@ -62,6 +63,13 @@ export const THEME_MERGE_UNTIL_MS = 150_000;
 export const NOTE_EMBED_UNTIL_MS = 120_000;
 
 /**
+ * When splitting vault notes into passages stops starting new chunks (plan
+ * #1863.7). After the note vectors and before the theme merges; a first
+ * backfill of the whole vault takes a few ticks.
+ */
+export const NOTE_BLOCKS_UNTIL_MS = 145_000;
+
+/**
  * When applying the theme proposals stops (plan #820). Normally a few
  * seconds after the theme pass, since a merge takes about 25ms; the first run
  * over a backlog of two thousand uses the whole window and finishes on later
@@ -113,6 +121,7 @@ export type MapSweepTickSummary = {
    * the backfill, and whatever a sync ran out of time for. Null when it threw.
    */
   notesEmbedded: Pick<NoteEmbedResult, 'embedded' | 'stopped'> | null;
+  noteBlocks: Pick<BlockIndexResult, 'notes' | 'embedded' | 'stopped'> | null;
   /**
    * Theme merge proposals written after embedding (plan #811). Null when the
    * pass did not run: no ANTHROPIC_API_KEY, embedding still catching up, or
@@ -152,6 +161,7 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     failed: [],
     embedded: null,
     notesEmbedded: null,
+    noteBlocks: null,
     themeMerges: null,
     positionMerges: null,
     applied: { theme: null, position: null },
@@ -212,6 +222,18 @@ export async function runMapSweepTick(): Promise<MapSweepTickSummary> {
     summary.notesEmbedded = { embedded: notes.embedded, stopped: notes.stopped };
   } catch (err) {
     console.error('[map sweep] note embedding', err instanceof Error ? err.message : err);
+  }
+
+  // Every note whose passages are missing or stale, for passage search
+  // (plan #1863.7). Same key and the same no-key stop.
+  try {
+    const blocks = await indexNoteBlocks(supabase, createCoreServiceSupabase(), {
+      userId: null,
+      deadline: startedAt + NOTE_BLOCKS_UNTIL_MS,
+    });
+    summary.noteBlocks = { notes: blocks.notes, embedded: blocks.embedded, stopped: blocks.stopped };
+  } catch (err) {
+    console.error('[map sweep] note blocks', err instanceof Error ? err.message : err);
   }
 
   // Theme pairs that have no merge proposal yet. Waits while embedding is
