@@ -53,6 +53,15 @@ export const learnSources: ModuleSources = {
       href: (id) => `/learn/r/${id}`,
     },
     {
+      table: 'learn.learning_log',
+      module: 'Learn',
+      holds: 'What a conversation with Claude covered: the topic, a summary and the ideas it named.',
+      weight: 'record',
+      search: ['topic', 'question', 'summary'],
+      title: 'topic',
+      note: 'Exposure, not knowledge: the ideas start unknown in the graph and are credited only when answered.',
+    },
+    {
       table: 'learn.sources',
       module: 'Learn',
       holds: 'Books, articles and courses in their library.',
@@ -239,5 +248,6 @@ export const learnSources: ModuleSources = {
     },
     { table: 'learn.video_clip_cuts', reason: 'Which videos have been cut into clips.' },
     { table: 'learn.video_clip_subjects', reason: 'Join rows tagging a clip with each subject it serves.' },
+    { table: 'learn.reading_subjects', reason: 'Join rows relating a reading to each subject it belongs to.' },
   ],
 };

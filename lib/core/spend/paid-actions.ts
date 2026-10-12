@@ -217,6 +217,10 @@ export const PAID_WITHOUT_BUTTON: Record<string, string> = {
     'Fired on Mondays by pg_cron to shortlist startups for the job search; the Find startups button on Find makes the same call under app/jobs/(app)/find/actions.ts#findStartups.',
   'app/api/cron/startup-discovery/route.ts#POST':
     'Fired on Mondays by pg_cron to shortlist startups for the job search; the Find startups button on Find makes the same call under app/jobs/(app)/find/actions.ts#findStartups.',
+  'app/api/cron/theme-placement/route.ts#GET':
+    'Fired every hour by pg_cron to place vault themes and Learn subjects in the areas, and to look up where to read readings added from a chat whose lookup did not run after the reply (plan #1806, #1810); no press starts it.',
+  'app/api/cron/theme-placement/route.ts#POST':
+    'Fired every hour by pg_cron to place vault themes and Learn subjects in the areas, and to look up where to read readings added from a chat whose lookup did not run after the reply (plan #1806, #1810); no press starts it.',
   'app/api/cron/maya-gate/route.ts#GET':
     'Fired every hour by pg_cron to ask Jev about new vault notes and have Maya write on a few; no press starts it.',
   'app/api/cron/maya-gate/route.ts#POST':

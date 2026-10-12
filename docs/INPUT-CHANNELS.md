@@ -34,7 +34,10 @@ Five pieces already exist, and most of the channels below reuse them.
   browser's sign-in. It files job postings only.
 - **The Claude connector** (`app/api/mcp/route.ts`, `lib/connector/`). Claude
   apps call it with a bearer token from Supabase's OAuth server. The token
-  can only read.
+  can only read. Three Learn writes run on the server instead, for the
+  person the token names (plan #1808, `lib/connector/writes.ts`): adding a
+  reading list from a chat, logging what a chat covered, and marking a
+  reading read.
 
 What does not exist: any way for something other than a signed-in browser to
 write. Every channel below that is not email needs that first.

@@ -125,6 +125,7 @@ describe('the operation names', () => {
       'score-clips',
       'rate-clips',
       'read-personality',
+      'match-subjects',
     ]);
   });
 });

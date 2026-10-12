@@ -203,6 +203,8 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // sentences out. Written by the hourly top-up, a few cards a run.
   'describe-card-clip': background(unit(HAIKU, 2_000, 120)),
   'read-personality': run(SONNET, 7_000, 1_200),
+  // Every subject's name and up to three names from a chat in; a match each out.
+  'match-subjects': background(run(HAIKU, 2_000, 200)),
   // One Wikipedia section in, a card for each of up to three ideas out.
   'write-asked-card': run(SONNET, 4_000, 2_000),
   // One idea's claim and basis and what was written in; the marks and a

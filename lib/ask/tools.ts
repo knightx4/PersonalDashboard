@@ -18,6 +18,7 @@ import {
 } from './lookups';
 import type { AskSchema } from './db';
 import { coursesLookup } from './courses';
+import { learningCoveredLookup, readingListLookup } from './learn';
 import { LIST_ROWS_MAX, LISTABLE, listRowsLookup, listableList, listableSource, sourceWorkspace } from './list-rows';
 import { notePositionsLookup } from './positions';
 import { DEV_ROW_KINDS, DEV_TEXT_KINDS, findDevTextLookup, readDevRowLookup, readSpecLookup, specList } from './dev';
@@ -51,6 +52,8 @@ export const ASK_TOOL_NAMES = [
   'vault_notes',
   'note_positions',
   'courses',
+  'reading_list',
+  'learning_covered',
   'read_spec',
   'read_dev_row',
   'find_dev_text',
@@ -269,6 +272,33 @@ export const ASK_TOOLS: readonly Anthropic.Tool[] = [
     },
   },
   {
+    name: 'reading_list',
+    description:
+      'What is on the person\'s Learn reading list: each reading with its status (queued, reading, read or abandoned), the list it is on, why it was recommended, their note on it, and its link. Narrow by subject (words of a subject\'s name, matching the readings related to it or on a list titled with those words), by query (words of the title, author or reason), and by status, where "open" means queued or reading. Newest first, up to 60. Use it for "what is on my reading list about evals?", "what have I not read yet on agents?" or "did I read Building Effective Agents?".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        subject: { type: 'string', description: 'Words of the subject, such as "agents" or "economics".' },
+        query: { type: 'string', description: 'Words of the title, author or reason.' },
+        status: { type: 'string', enum: ['open', 'queued', 'reading', 'read', 'abandoned'] },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'learning_covered',
+    description:
+      'What the person has covered on a topic in Learn: each matching subject with how many of its ideas they were tested as knowing, how many are untested and how many readings on it they have read, and each conversation logged about it with its summary and the ideas it named. A logged conversation means they met the ideas, not that they know them. Use it before explaining a topic, to build on what they have already been through, and for "what have I learned about agents?".',
+    input_schema: {
+      type: 'object',
+      properties: {
+        topic: { type: 'string', description: 'Words of the subject or topic, such as "AI agents".' },
+      },
+      required: ['topic'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'read_spec',
     description: `Read one of the specs on the Dev specs page, section by section: the documents the app is built against. Pass a query to get the sections that talk about it, each with its full text (up to 6,000 characters) and a link to that section on the spec's page, so you can quote the paragraph that answers the question. Leave the query out, or ask for something no section mentions, and it lists the spec's headings; pass one back as section to read it. Only for the owner of the app, with the Dev workspace on. The specs, by slug: ${specList()}.`,
     input_schema: {
@@ -387,6 +417,8 @@ const LOOKUPS: Record<AskToolName, { run: Lookup; module: ModuleId | null }> = {
   vault_notes: { run: vaultLookup, module: 'vault' },
   note_positions: { run: notePositionsLookup, module: 'vault' },
   courses: { run: coursesLookup, module: 'vault' },
+  reading_list: { run: readingListLookup, module: 'learn' },
+  learning_covered: { run: learningCoveredLookup, module: 'learn' },
   // Checks the owner and the Dev workspace itself (lib/ask/dev.ts).
   read_spec: { run: readSpecLookup, module: null },
   read_dev_row: { run: readDevRowLookup, module: null },
