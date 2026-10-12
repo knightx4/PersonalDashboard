@@ -91,9 +91,15 @@ export const devSources: ModuleSources = {
     'public.ui_reviews',
     'public.vision_reviews',
     'public.x_accounts',
+    'public.x_reads',
   ].map((table) => ({
     table,
-    reason: table === 'public.x_accounts' ? 'The X connection and its encrypted tokens.' : ABOUT_THE_APP,
+    reason:
+      table === 'public.x_accounts'
+        ? 'The X connection and its encrypted tokens.'
+        : table === 'public.x_reads'
+          ? 'A log of each request made to X and how many posts it read, for checking the bill.'
+          : ABOUT_THE_APP,
     page: PAGES[table],
   })),
 };

@@ -26,11 +26,12 @@ export type XAccountRow = {
   status: 'active' | 'disconnected';
   last_synced_at: string | null;
   newest_post_id: string | null;
+  read_problem: string | null;
   created_at: string;
 };
 
 export const X_ACCOUNT_COLUMNS =
-  'id, user_id, x_user_id, handle, access_token, refresh_token, token_expires_at, status, last_synced_at, newest_post_id, created_at';
+  'id, user_id, x_user_id, handle, access_token, refresh_token, token_expires_at, status, last_synced_at, newest_post_id, read_problem, created_at';
 
 export async function loadXAccount(db: Db, userId: string): Promise<XAccountRow | null> {
   const { data, error } = await db
@@ -65,11 +66,11 @@ export function xAccountWrite(input: {
 export type XConnectionView =
   | { state: 'unconfigured'; setupStep: number }
   | { state: 'none' }
-  | { state: 'connected'; handle: string; lastSyncedAt: string | null }
+  | { state: 'connected'; handle: string; lastSyncedAt: string | null; problem?: string | null }
   | { state: 'disconnected'; handle: string };
 
 export function xConnectionView(
-  row: Pick<XAccountRow, 'handle' | 'status' | 'last_synced_at'> | null,
+  row: (Pick<XAccountRow, 'handle' | 'status' | 'last_synced_at'> & { read_problem?: string | null }) | null,
   configured: boolean,
   setupStep: number,
 ): XConnectionView {
@@ -78,7 +79,12 @@ export function xConnectionView(
   if (!configured) return { state: 'unconfigured', setupStep };
   if (!row) return { state: 'none' };
   if (row.status === 'disconnected') return { state: 'disconnected', handle: row.handle };
-  return { state: 'connected', handle: row.handle, lastSyncedAt: row.last_synced_at };
+  return {
+    state: 'connected',
+    handle: row.handle,
+    lastSyncedAt: row.last_synced_at,
+    problem: row.read_problem ?? null,
+  };
 }
 
 /** Thrown when the account cannot be read until the person connects again. */
