@@ -3115,6 +3115,29 @@ const findView = {
   ],
 };
 
+/** Jobs Today drawn from the sample rows, with the review queue given. */
+function JobsTodaySurface({ review }: { review: ReviewPeek }) {
+  return (
+    <TodayPage
+      review={review}
+      board={todayPageBoard}
+      summary={summariseSearch(
+        todayPageRows,
+        todayPageBoard.interviews.map((interview) => ({
+          id: interview.id,
+          scheduledAt: interview.scheduledAt,
+          timeKnown: interview.timeKnown,
+          groupId: interview.groupId,
+        })),
+        todayPageNow,
+      )}
+      live={liveByMove(todayPageRows, new Set(['p3']))}
+      since={todayPageSince}
+      timezone="Europe/London"
+    />
+  );
+}
+
 export const SURFACES: readonly Surface[] = [
   {
     id: 'jobs-role-timeline',
@@ -4129,25 +4152,16 @@ export const SURFACES: readonly Surface[] = [
     label: 'Today',
     module: 'jobs',
     width: 'wide',
-    render: () => (
-      <TodayPage
-        review={todayPageReview}
-        board={todayPageBoard}
-        summary={summariseSearch(
-          todayPageRows,
-          todayPageBoard.interviews.map((interview) => ({
-            id: interview.id,
-            scheduledAt: interview.scheduledAt,
-            timeKnown: interview.timeKnown,
-            groupId: interview.groupId,
-          })),
-          todayPageNow,
-        )}
-        live={liveByMove(todayPageRows, new Set(['p3']))}
-        since={todayPageSince}
-        timezone="Europe/London"
-      />
-    ),
+    render: () => <JobsTodaySurface review={todayPageReview} />,
+  },
+  {
+    /* The same page with nothing waiting to be checked, so the review strip
+     * does not draw: the picture for a post about Today. */
+    id: 'jobs-today-clear',
+    label: 'Today · nothing to check',
+    module: 'jobs',
+    width: 'wide',
+    render: () => <JobsTodaySurface review={{ count: 0, items: [] }} />,
   },
   {
     /* Analytics: how far each channel's applications got (plan #1595). */

@@ -82,12 +82,12 @@ const ACTIVITY: Activity = {
   lastSweepAt: '2026-10-06T07:00:00Z',
   entries: [
     entry('a1', '2026-10-06T11:03:00Z', 'email', 'good', 'in_process', 'Interview booked', 'Copperline · Senior Financial Analyst, Revenue Operations and Planning', 'Hiring manager, Thursday 9 October at 2:00 pm'),
-    entry('a2', '2026-10-06T11:03:00Z', 'email', 'info', 'acknowledged', 'Application confirmed', 'Check · Strategic Finance Associate'),
-    entry('a3', '2026-10-06T07:00:00Z', 'sweep', 'muted', 'ghosted', 'Closed as ghosted', 'Brex · FP&A Manager', 'No reply in 45 days'),
-    entry('a4', '2026-10-05T18:20:00Z', 'email', 'bad', 'rejected', 'Rejected after the recruiter screen', 'Plaid · Finance Business Partner'),
-    entry('a5', '2026-10-05T09:15:00Z', 'you', 'muted', 'lead', 'Added the role', 'Mercury · Strategic Finance Lead'),
-    entry('a6', '2026-10-04T16:40:00Z', 'auto', 'info', 'submitted', 'Marked as sent', 'Array · FP&A Analyst', 'A confirmation arrived for a role still in drafting'),
-    entry('a7', '2026-10-03T07:00:00Z', 'sweep', 'info', 'submitted', 'Follow-up sent', 'Linear · Finance Operations', null),
+    entry('a2', '2026-10-06T11:03:00Z', 'email', 'info', 'acknowledged', 'Application confirmed', 'Wrenfield · Strategic Finance Associate'),
+    entry('a3', '2026-10-06T07:00:00Z', 'sweep', 'muted', 'ghosted', 'Closed as ghosted', 'Thornbury · FP&A Manager', 'No reply in 45 days'),
+    entry('a4', '2026-10-05T18:20:00Z', 'email', 'bad', 'rejected', 'Rejected after the recruiter screen', 'Saltmarsh Labs · Finance Business Partner'),
+    entry('a5', '2026-10-05T09:15:00Z', 'you', 'muted', 'lead', 'Added the role', 'Ollerton Pay · Strategic Finance Lead'),
+    entry('a6', '2026-10-04T16:40:00Z', 'auto', 'info', 'submitted', 'Marked as sent', 'Kittiwake · FP&A Analyst', 'A confirmation arrived for a role still in drafting'),
+    entry('a7', '2026-10-03T07:00:00Z', 'sweep', 'info', 'submitted', 'Follow-up sent', 'Fenwright · Finance Operations', null),
   ],
 };
 
