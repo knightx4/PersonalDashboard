@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useActionState, useState } from 'react';
-import { ChevronDown, Copy, ExternalLink } from 'lucide-react';
+import { BellRing, ChevronDown, Copy, ExternalLink } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
 import { ActionMenu } from '@/components/ui/action-menu';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -20,6 +20,9 @@ import {
   canSetAside,
 } from '@/lib/goals/set-aside';
 import type { TodayItem, TodayKind } from '@/lib/goals/today';
+import { SnoozeMenu } from '@/components/inbox/snooze-menu';
+import { snoozeRefOf } from '@/lib/goals/inbox-snooze';
+import { snoozeInboxRowAction, unsnoozeInboxRowAction } from './inbox/actions';
 import { askDashStepAction } from './[goalId]/shaping-actions';
 import { restoreAsideAction, setAsideAction } from './home-actions';
 import { countRhythmAction, setStepStatusAction } from './[goalId]/actions';
@@ -144,6 +147,7 @@ export function TodayRow({
   preparable,
   onAside,
   onHanded,
+  onSnoozed,
 }: {
   item: TodayItem;
   rank: number | null;
@@ -152,6 +156,8 @@ export function TodayRow({
   onAside: (hidden: boolean) => void;
   /** Dash took it to prepare: the row moves to Dash's lane. */
   onHanded?: () => void;
+  /** Where the row can be snoozed (the Inbox): hide the row (true) or bring it back (false). */
+  onSnoozed?: (hidden: boolean) => void;
 }) {
   const [state, action, pending] = useActionState(
     (_prev: State, form: FormData) => act(item.kind, form),
@@ -162,7 +168,9 @@ export function TodayRow({
   const primary = PRIMARY_VALUE[item.kind];
   const second = SECOND[item.kind];
   const href = hrefFor(item);
-  const meta = [item.on ? formatDay(item.on) : null, item.detail].filter(Boolean).join(' · ');
+  const meta = [item.on ? formatDay(item.on) : null, item.detail]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <li className="card-pad-x row-pad flex items-start gap-3">
@@ -172,6 +180,12 @@ export function TodayRow({
         </span>
       )}
       <div className="min-w-0 flex-1 space-y-1">
+        {item.backFromSnooze && (
+          <p className="inline-flex items-center gap-1 text-small font-semibold text-accent">
+            <BellRing className="size-3.5" strokeWidth={1.75} aria-hidden />
+            Back from snooze
+          </p>
+        )}
         {item.url ? (
           <a
             href={item.url}
@@ -247,6 +261,7 @@ export function TodayRow({
             )}
             <span className="ml-auto flex items-center gap-1">
               {preparable && <PrepareButton item={item} onHanded={onHanded} />}
+              {onSnoozed && snoozeRefOf(item.kind, item.id) && <SnoozeRow item={item} onSnoozed={onSnoozed} />}
               {canSetAside(item.kind) && <NotNow item={item} onAside={onAside} />}
             </span>
             {state.error && <span className="w-full text-small text-danger">{state.error}</span>}
@@ -365,6 +380,41 @@ function NotNow({ item, onAside }: { item: TodayItem; onAside: (hidden: boolean)
       }))}
     />
   );
+}
+
+/**
+ * Snooze: the row leaves the Inbox and its count until the day chosen, or
+ * sooner if the step, goal or flag changes (lib/core/inbox-snoozes.ts). The
+ * toast's Undo brings it back. A refusal brings the row back and says why.
+ */
+function SnoozeRow({ item, onSnoozed }: { item: TodayItem; onSnoozed: (hidden: boolean) => void }) {
+  const toast = useToast();
+  const fields = (choice?: string) => {
+    const form = new FormData();
+    form.set('id', item.id);
+    form.set('kind', item.kind);
+    if (choice) form.set('choice', choice);
+    return form;
+  };
+  const choose = async (choice: string) => {
+    onSnoozed(true);
+    const result = await snoozeInboxRowAction(fields(choice));
+    if (result.error) {
+      onSnoozed(false);
+      toast({ text: result.error });
+      return;
+    }
+    toast({
+      text: result.message ?? 'Snoozed.',
+      undone: 'Brought back.',
+      undo: async () => {
+        const back = await unsnoozeInboxRowAction(fields());
+        if (back.error) throw new Error(back.error);
+        onSnoozed(false);
+      },
+    });
+  };
+  return <SnoozeMenu label={item.title} onChoose={(choice) => void choose(choice)} />;
 }
 
 /**
