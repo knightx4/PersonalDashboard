@@ -119,6 +119,22 @@ update goals.runs set last_seen_at = now(), now_on = '<the step title, or what y
 where id = '<run id>' and user_id = '<user>' and status = 'started';
 ```
 
+Write the same moments as run lines, which the run's page shows as they
+arrive. One insert, against this run's id (`run_table` is `goals.runs`;
+`kind` is `thought`, `action`, `question` or `error`; `body` up to 4000
+characters):
+
+```sql
+insert into core.run_activities (user_id, run_table, run_id, kind, body)
+values ('<user>', 'goals.runs', '<run id>', 'action', $l$Started: <the step title>$l$);
+```
+
+Leave at least a start line, a line per step you work, and an end line
+("Finished: <the summary>", or `error` with the reason). A question for the
+person is `kind` `question` with `options` set to a JSON array of one to ten
+choices, followed by `update goals.runs set status = 'awaiting_input'`; when
+you carry on, set the status back to `started`.
+
 Report when you start mapping a goal, at each step of a morning run, at each
 step of a phase, and at least every 15 minutes during anything long, such as
 reading a long Gmail thread or researching one step. `now_on` is a short

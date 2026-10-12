@@ -55,6 +55,8 @@ npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
 npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet about
                                                # finishing this feature, one patch;
                                                # --clear once it can be seen
+npx tsx scripts/plan.ts activity <n> --kind thought|action|question|error --body "…" [--option "…"]
+                                               # a line on your run (see building.md, run lines)
 npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
                                                # file a follow-on on /dev/ideas; it lands
                                                # marked as your suggestion, under the
