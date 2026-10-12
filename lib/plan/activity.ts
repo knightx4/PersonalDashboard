@@ -13,6 +13,10 @@ import { featureHref } from './feature-page';
  *
  * - each row's own times: `created_at`, `started_at`, `completed_at` and,
  *   while it is blocked, `blocked_at`;
+ * - the row's status changes in `plan_history` (plan #1830), which began on
+ *   12 October 2026 and gives every start, block, answer and close since then
+ *   its exact time and who made it, including the earlier ones the columns
+ *   have since overwritten;
  * - the dated lines in each row's comment ("Done 2026-10-07: …", "Blocked …",
  *   "Answered …"), which are the close notes and the blocks a row has since
  *   come out of, and which the columns forget;
@@ -20,8 +24,10 @@ import { featureHref } from './feature-page';
  *   the runs sent at its rows (`plan_runs`) and what Dash recorded doing to
  *   them (`core.dash_actions`).
  *
- * A dated line and a column that say the same thing are one entry: the
- * column gives the time, the line gives the note. A Dash action that matches
+ * A dated line and a column or history row that say the same thing are one
+ * entry: the column or the history gives the time, the line gives the note.
+ * Only changes older than the history are left as dated lines, listed by
+ * their day. A Dash action that matches
  * an entry marks it as Dash's rather than being listed twice.
  *
  * Pure, so the page and the tests read the same list.
@@ -92,6 +98,19 @@ export type ActivityDashAction = {
   createdAt: string;
 };
 
+/**
+ * A status change from `plan_history`. `actor` is 'me' for a change the
+ * person made in the app and 'claude' for Dash and everything else.
+ */
+export type ActivityStatusChange = {
+  id: string;
+  stepId: string;
+  oldStatus: string | null;
+  newStatus: string | null;
+  actor: 'me' | 'claude';
+  createdAt: string;
+};
+
 /** The ref a Dash action on a plan row carries, and the row's id inside it. */
 export const PLAN_ACTION_REF = 'public.plan_items:';
 
@@ -115,6 +134,13 @@ const ACTION_KINDS: Record<string, ActivityKind> = {
   drop_step: 'dropped',
   block_step: 'blocked',
 };
+
+/**
+ * How near a column's time has to be to a history row's to be the same
+ * change. The trigger that keeps the columns runs in the same statement, so
+ * the two are normally identical.
+ */
+const SAME_CHANGE_MS = 60 * 1000;
 
 /** How near a Dash action has to be to an entry to be the same event. */
 const SAME_EVENT_MS = 10 * 60 * 1000;
@@ -187,6 +213,7 @@ export function featureActivity(
     updates?: readonly PlanUpdate[];
     runs?: readonly ActivityRun[];
     actions?: readonly ActivityDashAction[];
+    history?: readonly ActivityStatusChange[];
   } = {},
 ): ActivityEntry[] {
   const rows = flatten([feature]);
@@ -195,6 +222,12 @@ export function featureActivity(
 
   const push = (entry: Omit<ActivityEntry, 'id'>) =>
     entries.push({ ...entry, id: `${entry.kind}-${entry.subject.number}-${entries.length}` });
+
+  const changesOn = new Map<string, ActivityStatusChange[]>();
+  for (const change of sources.history ?? []) {
+    if (change.oldStatus === change.newStatus || !Number.isFinite(Date.parse(change.createdAt))) continue;
+    changesOn.set(change.stepId, [...(changesOn.get(change.stepId) ?? []), change]);
+  }
 
   for (const node of rows) {
     const subject = subjectOf(feature, node);
@@ -210,6 +243,42 @@ export function featureActivity(
       return null;
     };
 
+    // Status changes on record, newest first, so each takes the newest
+    // unused line of its kind on its day as its note.
+    const changes = [...(changesOn.get(node.id) ?? [])].sort(
+      (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+    );
+    const timed: { kind: ActivityKind; at: number }[] = [];
+    const recorded = (kind: ActivityKind, at: string) =>
+      timed.some((one) => one.kind === kind && Math.abs(one.at - Date.parse(at)) <= SAME_CHANGE_MS);
+    let newestClose = true;
+    let newestBlock = true;
+    for (const change of changes) {
+      const kind = changeKind(node, change, lines);
+      if (!kind) continue;
+      if (kind === 'started' && node.kind !== 'build') continue;
+      const noted = kind === 'started' ? null : noteFor(kind, change.createdAt);
+      const isClose = kind === 'closed' || kind === 'dropped' || (kind === 'answered' && node.kind === 'decision');
+      const current = isClose && newestClose && closeKind(node) === kind;
+      if (isClose) newestClose = false;
+      const blockNow = kind === 'blocked' && newestBlock && node.status === 'blocked';
+      if (kind === 'blocked') newestBlock = false;
+      timed.push({ kind, at: Date.parse(change.createdAt) });
+      push({
+        kind,
+        at: change.createdAt,
+        dayOnly: false,
+        who: change.actor === 'me' ? 'you' : 'dash',
+        verb: VERB[kind as keyof typeof VERB],
+        subject,
+        detail:
+          (current && kind === 'answered' ? node.resolution : null) ??
+          noted ??
+          (blockNow ? node.blockAsk : null),
+        sha: current && kind === 'closed' ? node.commitSha : null,
+      });
+    }
+
     const added = sessionOrigin(node.comment);
     push({
       kind: 'added',
@@ -221,11 +290,11 @@ export function featureActivity(
       detail: null,
       sha: null,
     });
-    if (node.startedAt && node.kind === 'build') {
+    if (node.startedAt && node.kind === 'build' && !recorded('started', node.startedAt)) {
       push({ kind: 'started', at: node.startedAt, dayOnly: false, who: null, verb: VERB.started, subject, detail: null, sha: null });
     }
     const blockedAt = sources.blockedAt?.[node.id];
-    if (node.status === 'blocked' && blockedAt) {
+    if (node.status === 'blocked' && blockedAt && !recorded('blocked', blockedAt)) {
       push({
         kind: 'blocked',
         at: blockedAt,
@@ -238,7 +307,7 @@ export function featureActivity(
       });
     }
     const closed = closeKind(node);
-    if (closed && node.completedAt) {
+    if (closed && node.completedAt && !recorded(closed, node.completedAt)) {
       push({
         kind: closed,
         at: node.completedAt,
@@ -353,6 +422,37 @@ export function featureActivity(
   // listed after every timed entry that day: it says no more than the day.
   const sortKey = (entry: ActivityEntry) => Date.parse(entry.at);
   return listed.sort((a, b) => sortKey(b) - sortKey(a) || a.id.localeCompare(b.id));
+}
+
+/**
+ * The entry a status change makes, or null for one the tab does not list.
+ * A blocked step going back to not started is an answer only when an
+ * `Answered …` line on the same day says so; lifted any other way (a setup
+ * step written for it, a reopen) it is not listed, as before the history.
+ */
+function changeKind(
+  node: PlanNode,
+  change: ActivityStatusChange,
+  lines: readonly DatedLine[],
+): ActivityKind | null {
+  switch (change.newStatus) {
+    case 'in_progress':
+      return 'started';
+    case 'blocked':
+      return 'blocked';
+    case 'done':
+      return node.kind === 'decision' ? 'answered' : 'closed';
+    case 'dropped':
+      return 'dropped';
+    case 'not_started':
+      return change.oldStatus === 'blocked' && answeredOn(lines, change.createdAt) ? 'answered' : null;
+    default:
+      return null;
+  }
+}
+
+function answeredOn(lines: readonly DatedLine[], at: string): boolean {
+  return lines.some((line) => line.verb === 'Answered' && line.date === day(at));
 }
 
 /** How many rows added in the same minute are listed as one entry. */

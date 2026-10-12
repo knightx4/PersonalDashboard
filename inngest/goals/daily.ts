@@ -15,7 +15,10 @@ import type { StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
 import { holdActingSteps, type HoldSurface } from '@/lib/goals/hold-acts-store';
 import { jevEnabledFor } from '@/lib/jev/enabled';
-import { reviewGoals } from '@/lib/goals/reviews';
+import { judgedOnPace, reviewGoals } from '@/lib/goals/reviews';
+import { addDays, todayIn } from '@/lib/todo/tasks/model';
+import { PACE_WINDOW_DAYS, paceForGoal, type GoalPace } from '@/lib/goals/pace';
+import { loadAccountPaceRows } from '@/lib/goals/pace-store';
 import { loadGoalActivity, loadLatestReviews } from '@/lib/goals/reviews-store';
 import { prepCandidates } from '@/lib/goals/prep-candidates';
 import { summariseProgress } from '@/lib/goals/progress';
@@ -26,7 +29,7 @@ import { STALE_STEP_LIMIT, staleSteps } from '@/lib/goals/stale-steps';
 import { statementLines, type StatementSource } from '@/lib/goals/statements';
 import { loadStatementSources } from '@/lib/goals/statements-store';
 import { loadStepTouches } from '@/lib/goals/stale-steps-store';
-import { accountToday, loadLiveTree } from '@/lib/goals/steps-store';
+import { accountTimeZone, loadLiveTree } from '@/lib/goals/steps-store';
 import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
 
 /**
@@ -143,6 +146,42 @@ async function readEvidence(input: EvidenceInput): Promise<EvidenceBrief | null>
   }
 }
 
+/**
+ * The pace of each open goal judged on its pace (judgedOnPace; plan #1738),
+ * keyed by goal, for the review. A goal with a due date, an errand or a goal
+ * with a step on Todo has no entry. When the rows cannot be read each such
+ * goal still has an entry, null, so the brief says to leave it without a
+ * verdict rather than judge it on what waits on whom.
+ */
+async function paces({
+  client,
+  userId,
+  goals,
+  byGoal,
+  today,
+  timeZone,
+}: {
+  client: GoalsSupabaseClient;
+  userId: string;
+  goals: Goal[];
+  byGoal: Map<string, StepNode[]>;
+  today: string;
+  timeZone: string;
+}): Promise<Map<string, GoalPace | null>> {
+  const paced = goals.filter((g) => g.status === 'open' && judgedOnPace(g, byGoal.get(g.id) ?? []));
+  const out = new Map<string, GoalPace | null>(paced.map((g) => [g.id, null]));
+  if (paced.length === 0) return out;
+  try {
+    const rows = await loadAccountPaceRows(client, userId, addDays(today, -PACE_WINDOW_DAYS));
+    for (const g of paced) {
+      out.set(g.id, paceForGoal(g.id, byGoal.get(g.id) ?? [], rows, today, timeZone));
+    }
+  } catch (error) {
+    console.warn(`[goals] pace not read: ${error instanceof Error ? error.message : 'failed'}`);
+  }
+  return out;
+}
+
 const ownerSchema = z.object({ userId: z.string().uuid() });
 
 export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<GoalsDailyResult> {
@@ -172,7 +211,8 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
   await (deps?.holdActs ?? holdActingSteps)({ client, userId, surface: 'scheduled' });
 
   // A step whose start date has not come is left for a later morning.
-  const today = await accountToday(client, userId, now);
+  const timeZone = await accountTimeZone(client, userId);
+  const today = todayIn(timeZone, new Date(now));
   const [{ goals, byGoal }, stale, activity, latest, touched] = await Promise.all([
     loadLiveTree(client, { userId, today }),
     loadOutOfDateAnswers(client, userId),
@@ -185,11 +225,11 @@ export async function runGoalsDaily(deps?: Partial<GoalsDailyDeps>): Promise<Goa
     activity,
     latest,
     now,
+    await paces({ client, userId, goals: goals.map((g) => g.goal), byGoal, today, timeZone }),
   );
   const ready = readyClaudeSteps(
     goals.map((g) => g.goal),
     byGoal,
-    today,
   );
   const answers = outOfDateSteps(
     goals.map((g) => g.goal),

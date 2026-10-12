@@ -31,7 +31,7 @@ export default async function GoalsInboxPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader title="Inbox" />
       <GoalsInboxView
-        groups={goalInboxGroups(home.onYou, home.dash)}
+        groups={goalInboxGroups(home.onYou, home.dash, home.waitingRuns)}
         laterOn={home.laterOn}
         preparable={home.preparable}
         canRun={owner}

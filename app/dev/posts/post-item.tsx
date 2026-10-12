@@ -19,6 +19,8 @@ import {
 import type { PostCard } from '@/lib/dev/posts-page';
 import {
   addPostImage,
+  confirmXMatch,
+  dismissXMatch,
   dropPost,
   editPostAngle,
   editPostBody,
@@ -260,6 +262,56 @@ function SuggestedActions({ card }: { card: PostCard }) {
   );
 }
 
+/**
+ * "Is this it?" (plan #1820): a post on X that reads close to this draft but
+ * not close enough to mark it posted unasked. Yes, this is it marks the draft posted with
+ * that post's link; No stops asking, and the post is listed under Posted on X.
+ */
+function IsThisIt({ postId, candidate }: { postId: string; candidate: NonNullable<PostCard['candidate']> }) {
+  const [confirmed, confirm, confirming] = useActionState(confirmXMatch, {} as PostsActionState);
+  const [dismissed, dismiss, dismissing] = useActionState(dismissXMatch, {} as PostsActionState);
+  const busy = confirming || dismissing;
+  return (
+    <section aria-label="Is this it?" className="flex flex-col gap-2 rounded-control bg-sunken px-3 py-2.5">
+      <p className="text-small text-ink">
+        <span className="font-semibold">Is this it?</span>{' '}
+        <span className="text-ink-muted">
+          Posted on X on {candidate.day}
+          {candidate.threadPosts > 1 ? `, the first of a thread of ${candidate.threadPosts}` : ''}.
+        </span>
+      </p>
+      <p className="line-clamp-6 whitespace-pre-wrap break-words text-body text-ink">
+        <LinkedText text={candidate.text} />
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <form action={confirm}>
+          <input type="hidden" name="id" value={postId} />
+          <input type="hidden" name="x_post_id" value={candidate.xPostId} />
+          <Button type="submit" size="sm" variant="secondary" pending={confirming} disabled={busy}>
+            {confirming ? 'Saving…' : 'Yes, this is it'}
+          </Button>
+        </form>
+        <form action={dismiss}>
+          <input type="hidden" name="id" value={postId} />
+          <input type="hidden" name="x_post_id" value={candidate.xPostId} />
+          <Button type="submit" size="sm" variant="ghost" pending={dismissing} disabled={busy}>
+            {dismissing ? 'Saving…' : 'No, not this one'}
+          </Button>
+        </form>
+        <a
+          href={candidate.url}
+          target="_blank"
+          rel="noreferrer"
+          className="press-area text-small font-medium text-accent hover:underline"
+        >
+          Open on X
+        </a>
+      </div>
+      <FieldError>{confirmed.error ?? dismissed.error}</FieldError>
+    </section>
+  );
+}
+
 function RestoreButton({ id }: { id: string }) {
   const [state, action, pending] = useActionState(restorePost, {} as PostsActionState);
   return (
@@ -284,7 +336,7 @@ function StatusLine({ card }: { card: PostCard }) {
             href={post.postedUrl}
             target="_blank"
             rel="noreferrer"
-            className="text-small font-medium text-accent hover:underline"
+            className="press-area text-small font-medium text-accent hover:underline"
           >
             Open on X
           </a>
@@ -488,6 +540,8 @@ export function PostItem({ card }: { card: PostCard }) {
           ))}
         </p>
       )}
+
+      {card.candidate && editing === null && <IsThisIt postId={post.id} candidate={card.candidate} />}
 
       {editable && editing === null && <SuggestedActions card={card} />}
       {post.status === 'dropped' && <RestoreButton id={post.id} />}

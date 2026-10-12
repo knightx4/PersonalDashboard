@@ -153,6 +153,27 @@ export function placeCheckBacks(
     .sort((a, b) => a.dueAt.localeCompare(b.dueAt));
 }
 
+/** "26 Oct": the day a check-back falls due, as a waiting step names it. */
+export function checkDay(dueAt: string): string {
+  return new Date(dueAt).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  });
+}
+
+/**
+ * What a step waiting on check-backs is waiting on, in the move's words: the
+ * day alone, "Waiting on 26 Oct". It was "the check on 26 Oct", which the
+ * Status column cut off mid-word (note 5025f689); the clock beside the row and
+ * the tooltip already say it is a check-back.
+ */
+export function checkWaitName(waits: readonly { dueAt: string }[]): string {
+  const last = waits[waits.length - 1];
+  // A no-break space, so a wrapped cell keeps "26 Oct" together.
+  return last ? checkDay(last.dueAt).replace(' ', '\u00a0') : '';
+}
+
 /** "in 2h 5m", "5m ago", "now": how the CLI and the Dash tab say a due time. */
 export function dueWords(dueAt: string, now: number): string {
   const diff = new Date(dueAt).getTime() - now;

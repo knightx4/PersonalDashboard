@@ -119,14 +119,59 @@ update goals.runs set last_seen_at = now(), now_on = '<the step title, or what y
 where id = '<run id>' and user_id = '<user>' and status = 'started';
 ```
 
+Write the same moments as run lines, which the run's page shows as they
+arrive. One insert, against this run's id (`run_table` is `goals.runs`;
+`kind` is `thought`, `action`, `question` or `error`; `body` up to 4000
+characters):
+
+```sql
+insert into core.run_activities (user_id, run_table, run_id, kind, body)
+values ('<user>', 'goals.runs', '<run id>', 'action', $l$Started: <the step title>$l$);
+```
+
+Leave at least a start line, a line per step you work, and an end line
+("Finished: <the summary>", or `error` with the reason). A question for the
+person is `kind` `question` with `options` set to a JSON array of one to ten
+choices, followed by `update goals.runs set status = 'awaiting_input'`; when
+you carry on, set the status back to `started`.
+
+The question shows on the run's page and in the Goals inbox, each choice a
+press (plan #1824). Ask there only what has to be settled before this run can
+finish; a question that can wait for a later run is still a decision step.
+After asking, work on whatever does not depend on the answer, and check for it:
+
+```sql
+select a.body as answer
+from core.run_activities q
+join core.run_activities a
+  on a.run_id = q.run_id and a.kind = 'response' and a.created_at > q.created_at
+where q.run_id = '<run id>' and q.kind = 'question'
+order by q.created_at desc, a.created_at asc
+limit 1;
+```
+
+No row means no answer yet. Answering sets the run back to `started` for
+you. If nothing is left to do without the answer, stop waiting: write
+`update goals.runs set ended_at = now() where id = '<run id>'`, leaving the
+status `awaiting_input`, and end the session. The answer then starts a new
+run whose brief opens with the question, the answer and your lines so far.
+Never write a `response` line yourself; it is the person's.
+
 Report when you start mapping a goal, at each step of a morning run, at each
 step of a phase, and at least every 15 minutes during anything long, such as
 reading a long Gmail thread or researching one step. `now_on` is a short
 line, up to 300 characters; the step's title is usually right.
 
-A run with no report for 45 minutes is taken to have died. A sweep every few
-minutes closes it as failed, and the person can press **Ask Dash** again. If you find your run row already closed as failed, stop
-working: say so in your last message and do not write to it again.
+A run that has written a line is judged by its newest line or report: silent
+for 30 minutes, a sweep marks it `stale`, and it stays so until the person
+acknowledges it, which ends it as failed. If you resume a run you find
+`stale`, write a line and set it back with `update goals.runs set status =
+'started' where id = '<run id>' and user_id = '<user>' and status = 'stale'`.
+A run that has
+written no line keeps the old rule: no report for 45 minutes and the sweep
+closes it as failed. Either way the person can press **Ask Dash** again. If
+you find your run row already closed as failed, stop working: say so in your
+last message and do not write to it again.
 
 ## Reading the goal
 
@@ -217,11 +262,11 @@ not in this file, find it here and read it:
 | Re-shaping after answers, The re-shape run | `reference/reshape.md` |
 | Merging duplicate steps, Closing a step from evidence, Moving a step that has sat for a week, Steps under way | `reference/tending.md` |
 | Blocked and waiting steps, Steps for later, Watching a price outside the app | `reference/step-states.md` |
-| The week's focus, The morning run, Reading new statements from Gmail, Reviewing each goal | `reference/morning.md` |
+| The morning run, Reading new statements from Gmail, Reviewing each goal, Topping up a goal's suggestions | `reference/morning.md` |
 | Working the ready steps, People and roles you find go to Jobs, A cover letter goes on its role, Files | `reference/working-steps.md` |
 | A step or phase sent from its row, Replying to a comment | `reference/requests.md` |
 | A step of yours to prepare, A Dash step before yours | `reference/prep.md` |
-| The weekly run, Researching the help each goal asks for, The week's notes | `reference/weekly.md` |
+| The weekly run, Researching the help each goal asks for, Suggesting steps, The week's notes | `reference/weekly.md` |
 | What goes in a file | `reference/files.md` |
 | The catalogue of sources | `reference/sources.md` |
 

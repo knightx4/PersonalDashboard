@@ -26,6 +26,7 @@ import { useClockNow } from '@/lib/use-clock-now';
 import { Button } from '@/components/ui/button';
 import { FieldError, FieldHint } from '@/components/ui/field';
 import { PLAN_PRIORITIES, PLAN_PRIORITY_LABEL, PLAN_STATUSES, isClosed } from '@/lib/plan/load';
+import { checkWaitName } from '@/lib/plan/check-backs';
 import {
   flatten,
   healthOf as planHealthOf,
@@ -440,6 +441,7 @@ function healthFactsOf(node: PlanNode): HealthFacts {
     blockAsk: node.blockAsk,
     comment: node.comment,
     waitingOn: node.waitingOn,
+    waitsUntil: node.waitsUntil,
   };
 }
 
@@ -450,7 +452,13 @@ function healthOf(node: PlanNode, liveness?: PlanLiveness) {
 function moveFor(node: PlanNode, context?: MoveContext) {
   // A step held up by exactly one other says which, by number: "Waiting on
   // #1453". More than one, and the tooltip and the Needs line name them.
-  const waitingOn = node.waitingOn.length === 1 ? `#${node.waitingOn[0].number}` : undefined;
+  // Waiting only on a check-back, it names the day: "Waiting on 26 Oct".
+  const waitingOn =
+    node.waitingOn.length === 1
+      ? `#${node.waitingOn[0].number}`
+      : node.waitingOn.length === 0 && node.waitsUntil.length > 0
+        ? checkWaitName(node.waitsUntil)
+        : undefined;
   return moveWordsFor(planMoveOf(node, context), ownMoveWord(node, context), waitingOn);
 }
 
@@ -1046,7 +1054,14 @@ export function usePlanRow({
            itself, drawn only while the row is under the pointer or the menu
            is being reached by keyboard: the resting row still says nothing,
            which is the whole reason Normal is silent. */
-        <>
+        <span className="whitespace-nowrap">
+          {/* At Normal the size leads, so it sits where Next or Someday would
+              rather than after a word that is not drawn (plan #1747). */}
+          {node.priority === 2 && node.size && (
+            <span className="text-ink-muted" title={SIZE_LABEL[node.size]}>
+              {node.size.toUpperCase()}{' '}
+            </span>
+          )}
           <ActionMenu
             label={`Priority of #${node.number} ${node.title}`}
             items={priorityMenu}
@@ -1071,13 +1086,13 @@ export function usePlanRow({
               </span>
             }
           />
-          {node.size && (
+          {node.priority !== 2 && node.size && (
             <span className="text-ink-muted" title={SIZE_LABEL[node.size]}>
-              {node.priority !== 2 && ' · '}
+              {' · '}
               {node.size.toUpperCase()}
             </span>
           )}
-        </>
+        </span>
   );
   const quickActions = (
     <>
@@ -1320,7 +1335,7 @@ export function usePlanRow({
           />
         )
       ) : (
-        <MoveLabel move={move.move} title={move.title} />
+        <MoveLabel move={move.move} title={move.title} className="max-w-full" wordClassName="whitespace-normal" />
       )
     ) : null,
     statusMenu,

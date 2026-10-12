@@ -9,6 +9,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import type { GoalInboxGroup } from '@/lib/goals/inbox';
 import type { LaterLaneItem } from '@/lib/goals/lanes';
 import type { TodayItem } from '@/lib/goals/today';
+import { RunQuestionCard } from '@/components/runs/run-question-card';
+import { answerGoalRunAction } from '../runs/[runId]/actions';
 import { DashRow, LaterRow } from '../goal-lanes';
 import { TodayRow } from '../today-list';
 
@@ -47,12 +49,12 @@ export function GoalsInboxView({
 
   const shown = groups
     .map((group) => ({ ...group, items: group.items.filter((item) => !gone.has(keyOf(item))) }))
-    .filter((group) => group.items.length + group.dash.length > 0);
+    .filter((group) => group.items.length + group.dash.length + group.runs.length > 0);
   const later = laterOn.filter((item) => !back.has(item.id));
   const cells: InboxCell[] = shown.map((group) => ({
     key: group.key,
     title: group.title,
-    count: group.items.length + group.dash.length,
+    count: group.items.length + group.dash.length + group.runs.length,
     hint: group.hint,
   }));
 
@@ -76,13 +78,18 @@ export function GoalsInboxView({
               <>
                 {group.title}
                 <span className="tabular ml-2 font-normal text-ink-muted">
-                  {group.items.length + group.dash.length}
+                  {group.items.length + group.dash.length + group.runs.length}
                 </span>
               </>
             }
           >
             <Card>
               <ul className="divide-y divide-border">
+                {/* First: a run is held until it hears back, where a step
+                    of yours waits as long as you like. */}
+                {group.runs.map((question) => (
+                  <RunQuestionCard key={`run:${question.runId}`} question={question} action={answerGoalRunAction} />
+                ))}
                 {group.items.map((item) => (
                   <TodayRow
                     key={keyOf(item)}
@@ -91,6 +98,7 @@ export function GoalsInboxView({
                     preparable={canPrepare.has(item.id)}
                     onAside={(hidden) => setGone((current) => toggle(current, keyOf(item), hidden))}
                     onHanded={() => setGone((current) => toggle(current, keyOf(item), true))}
+                    onSnoozed={(hidden) => setGone((current) => toggle(current, keyOf(item), hidden))}
                   />
                 ))}
                 {group.dash.map((item) => (

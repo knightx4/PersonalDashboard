@@ -78,7 +78,13 @@ const MAX_AREA = 14_000_000;
 const ALL_WIDTHS = [
   { name: 'phone', width: 390, height: 844 },
   { name: 'laptop', width: 1280, height: 900 },
+  // A post's picture on X: a 16:9 window, shot as the screen shows it rather
+  // than stretched to the whole page, so it lands horizontal in the timeline.
+  { name: 'landscape', width: 1440, height: 810 },
 ] as const;
+
+/** Sizes shot as the window shows them, never grown to the page's length. */
+const WINDOW_ONLY: ReadonlySet<string> = new Set(['landscape']);
 
 /**
  * Both widths unless told otherwise. A posts run (.claude/skills/posts) wants
@@ -90,7 +96,9 @@ const WIDTHS = (() => {
   const asked = process.env.SHOOT_WIDTHS?.split(',')
     .map((value) => value.trim())
     .filter(Boolean);
-  if (!asked || asked.length === 0) return ALL_WIDTHS;
+  if (!asked || asked.length === 0) {
+    return ALL_WIDTHS.filter((size) => !WINDOW_ONLY.has(size.name));
+  }
   const known = ALL_WIDTHS.filter((size) => asked.includes(size.name));
   if (known.length !== asked.length) {
     throw new Error(`SHOOT_WIDTHS: use ${ALL_WIDTHS.map((size) => size.name).join(' or ')}`);
@@ -326,7 +334,8 @@ async function main() {
           awaitPromise: true,
         });
 
-        if (SHELL) {
+        const windowOnly = WINDOW_ONLY.has(size.name);
+        if (SHELL && !windowOnly) {
           const hidden = (await evaluate<number>(send, HIDDEN_HEIGHT)) ?? 0;
           if (hidden > 0) {
             await send('Emulation.setDeviceMetricsOverride', {
@@ -346,9 +355,11 @@ async function main() {
           expression: 'document.documentElement.scrollHeight',
           returnByValue: true,
         });
-        const pageHeight = Number(
-          (measured as unknown as { result?: { value?: number } }).result?.value ?? size.height,
-        );
+        const pageHeight = windowOnly
+          ? size.height
+          : Number(
+              (measured as unknown as { result?: { value?: number } }).result?.value ?? size.height,
+            );
         const fits = (factor: number) =>
           size.width * factor <= MAX_SIDE &&
           pageHeight * factor <= MAX_SIDE &&
@@ -366,7 +377,7 @@ async function main() {
 
         const { data } = await send('Page.captureScreenshot', {
           format: 'png',
-          captureBeyondViewport: true,
+          captureBeyondViewport: !windowOnly,
         });
         const name = `${surfaceId}--${size.name}-${slug(theme)}.png`;
         writeFileSync(join(OUT, name), Buffer.from(data, 'base64'));

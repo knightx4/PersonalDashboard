@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { FieldError, Select } from '@/components/ui/field';
 import { catalogLabel, subtreeOf } from '@/lib/plan/catalog';
 import { PLAN_STATUS_LABEL, isClosed } from '@/lib/plan/load';
+import { checkDay } from '@/lib/plan/check-backs';
 import { cn } from '@/lib/cn';
 import type { TreeActionState, TreeActions, TreeCatalogEntry, TreeDependencyNode } from './types';
 
@@ -79,13 +80,20 @@ export function Dependencies<E extends TreeCatalogEntry>({
     byModule.set(key, [...(byModule.get(key) ?? []), entry]);
   }
 
+  const checks = node.waitsUntil ?? [];
   const offer = !closed && candidates.length > 0;
-  if (node.dependsOn.length === 0 && inherited.length === 0 && node.blocks.length === 0 && !offer)
+  if (
+    node.dependsOn.length === 0 &&
+    inherited.length === 0 &&
+    checks.length === 0 &&
+    node.blocks.length === 0 &&
+    !offer
+  )
     return null;
 
   return (
     <div className="space-y-2">
-      {(node.dependsOn.length > 0 || inherited.length > 0) && (
+      {(node.dependsOn.length > 0 || inherited.length > 0 || checks.length > 0) && (
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-small text-ink-muted">Depends on</span>
           {node.dependsOn.map((link) => (
@@ -120,6 +128,17 @@ export function Dependencies<E extends TreeCatalogEntry>({
               className="inline-flex items-center rounded-full bg-caution-tint px-2 py-0.5 text-small text-caution opacity-80"
             >
               {stepName(ref)} · above
+            </span>
+          ))}
+          {/* A check-back: the step needs something that does not exist yet,
+              and a session looks again on the day. */}
+          {checks.map((check) => (
+            <span
+              key={check.id}
+              title={`${check.title}. A session looks again on ${checkDay(check.dueAt)}, and the step waits until then.`}
+              className="inline-flex items-center rounded-full bg-caution-tint px-2 py-0.5 text-small text-caution"
+            >
+              Check on {checkDay(check.dueAt)}
             </span>
           ))}
         </div>

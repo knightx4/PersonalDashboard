@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { areaHref } from '@/lib/goals/all-goals';
 import { formatDay } from '@/lib/goals/dates';
+import { formatDue, isDueOverdue } from '@/lib/goals/due-precision';
 import type { DashOffer } from '@/lib/goals/hand-off';
 import { nextMove, type HomeGoal } from '@/lib/goals/home';
 import type { DashLaneItem, LaterLaneItem } from '@/lib/goals/lanes';
@@ -162,7 +163,7 @@ export function GoalLanes({
         <Card>
           {mine.length === 0 ? (
             <p className="card-pad-x row-pad text-small text-ink-muted">
-              Nothing is waiting on you in this week’s goals.
+              Nothing is waiting on you from Todo or your dated goals.
             </p>
           ) : (
             <ul className="divide-y divide-border">{mine.map(row)}</ul>
@@ -283,12 +284,19 @@ export function GoalLanes({
  * The other goals under their areas, each area where its first goal falls in
  * the order given, so the errands that lead the list still lead it.
  */
-export function byArea(lines: HomeGoal[]): { areaId: string; areaName: string; goals: HomeGoal[] }[] {
+export function byArea(
+  lines: HomeGoal[],
+): { areaId: string; areaName: string; goals: HomeGoal[] }[] {
   const groups = new Map<string, { areaId: string; areaName: string; goals: HomeGoal[] }>();
   for (const line of lines) {
     const group = groups.get(line.goal.areaId);
     if (group) group.goals.push(line);
-    else groups.set(line.goal.areaId, { areaId: line.goal.areaId, areaName: line.areaName, goals: [line] });
+    else
+      groups.set(line.goal.areaId, {
+        areaId: line.goal.areaId,
+        areaName: line.areaName,
+        goals: [line],
+      });
   }
   return [...groups.values()];
 }
@@ -301,11 +309,13 @@ export function byArea(lines: HomeGoal[]): { areaId: string; areaName: string; g
 function OtherGoalRow({ line, today }: { line: HomeGoal; today?: string }) {
   const { goal, review } = line;
   const move = nextMove(line);
-  const late = Boolean(goal.errand && goal.dueOn && today && goal.dueOn < today);
+  const late = Boolean(
+    goal.errand && today && isDueOverdue(goal.dueOn, goal.duePrecision ?? 'day', today),
+  );
   const tone = review ? VERDICT_TONES[review.verdict] : null;
   const word =
     goal.errand && goal.dueOn
-      ? `Due ${formatDay(goal.dueOn)}${today ? `, ${dueIn(goal.dueOn, today)}` : ''}`
+      ? `Due ${formatDue(goal.dueOn, goal.duePrecision, today ? Number(today.slice(0, 4)) : undefined)}${today && (late || (goal.duePrecision ?? 'day') === 'day') ? `, ${dueIn(goal.dueOn, today)}` : ''}`
       : review
         ? VERDICT_LABELS[review.verdict]
         : null;
@@ -444,7 +454,13 @@ function QuietGoalRow({
   );
 }
 
-export function LaterRow({ item, onBack }: { item: LaterLaneItem; onBack: (gone: boolean) => void }) {
+export function LaterRow({
+  item,
+  onBack,
+}: {
+  item: LaterLaneItem;
+  onBack: (gone: boolean) => void;
+}) {
   const toast = useToast();
   return (
     <li className="card-pad-x row-pad space-y-1">

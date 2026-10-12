@@ -8,9 +8,13 @@ import {
   activityTouches,
   goalActivity,
   isCurrent,
+  judgedOnPace,
   latestByGoal,
+  pacedGoalIds,
+  paceVerdict,
   reviewGoals,
   reviewLines,
+  standingReviews,
   toReview,
   type GoalReview,
   type ReviewRow,
@@ -223,8 +227,8 @@ describe('rows', () => {
     });
   });
 
-  it('labels all six verdicts', () => {
-    expect(VERDICTS).toEqual(['on_track', 'stalled', 'waiting_on_you', 'waiting_on_date', 'waiting_on_goal', 'met']);
+  it('labels all eight verdicts', () => {
+    expect(VERDICTS).toEqual(['on_track', 'stalled', 'waiting_on_you', 'waiting_on_date', 'waiting_on_goal', 'met', 'pace_holding', 'pace_slipping']);
     expect(VERDICTS.map((v) => VERDICT_LABELS[v])).toEqual([
       'On track',
       'Stalled',
@@ -232,6 +236,8 @@ describe('rows', () => {
       'Waiting on a date',
       'Waiting on another goal',
       'Done-when met',
+      'Keeping its pace',
+      'Slower than usual',
     ]);
   });
 });
@@ -301,5 +307,64 @@ describe('loadLatestReviews', () => {
     expect(calls).toContainEqual({ method: 'eq', args: ['user_id', 'u'] });
     const since = new Date(NOW - REVIEWS_SHOWN_FOR_DAYS * 24 * 60 * 60 * 1000).toISOString();
     expect(calls).toContainEqual({ method: 'gte', args: ['created_at', since] });
+  });
+});
+
+describe('goals judged on their pace (plan #1738)', () => {
+  const known = { known: true as const, activeDays: 6, typicalGap: 5, lastOn: '2026-09-29', daysSince: 2, slower: false };
+
+  it('judges on pace a goal with no date, no errand and nothing open on Todo', () => {
+    expect(judgedOnPace({ dueOn: null }, [])).toBe(true);
+    expect(judgedOnPace({ dueOn: '2026-12-31' }, [])).toBe(false);
+    expect(judgedOnPace({ dueOn: null, errand: true }, [])).toBe(false);
+    const deep = [{ status: 'open', onTodo: false, children: [{ status: 'open', onTodo: true }] }];
+    expect(judgedOnPace({ dueOn: null }, deep)).toBe(false);
+    expect(judgedOnPace({ dueOn: null }, [{ status: 'done', onTodo: true }])).toBe(true);
+  });
+
+  it('finds the same goals from flat rows', () => {
+    const base = { status: 'open', due_on: null, errand: false, on_todo: false };
+    const paced = pacedGoalIds([
+      { ...base, id: 'city', parent_id: null, level: 'goal' },
+      { ...base, id: 'job', parent_id: null, level: 'goal', due_on: '2026-10-31' },
+      { ...base, id: 'song', parent_id: null, level: 'goal' },
+      { ...base, id: 's1', parent_id: 'song', level: 'step' },
+      { ...base, id: 's2', parent_id: 's1', level: 'step', on_todo: true },
+      { ...base, id: 'errand', parent_id: null, level: 'goal', errand: true, due_on: '2026-10-20' },
+    ]);
+    expect([...paced]).toEqual(['city']);
+  });
+
+  it('lets only a met or pace verdict stand on a goal judged on its pace', () => {
+    const latest = new Map<string, GoalReview>([
+      ['city', review({ goalId: 'city', verdict: 'waiting_on_you' })],
+      ['clean', review({ goalId: 'clean', verdict: 'pace_holding' })],
+      ['job', review({ goalId: 'job', verdict: 'waiting_on_you' })],
+    ]);
+    const standing = standingReviews(latest, new Set(['city', 'clean']));
+    expect([...standing.keys()].sort()).toEqual(['clean', 'job']);
+  });
+
+  it('reads the verdict from the pace, and none while it is unknown', () => {
+    expect(paceVerdict(known)).toBe('pace_holding');
+    expect(paceVerdict({ ...known, slower: true })).toBe('pace_slipping');
+    expect(paceVerdict({ known: false, activeDays: 1, lastOn: null, daysSince: null })).toBeNull();
+    expect(paceVerdict(null)).toBeNull();
+  });
+
+  it('never forces a goal judged on its pace to stalled, and says its verdict in the brief', () => {
+    const quiet = new Map([['g', { lastDoneAt: '2026-08-01T12:00:00Z', since: null }]]);
+    const [paced] = reviewGoals([goal({})], quiet, new Map(), NOW, new Map([['g', { ...known, slower: true }]]));
+    expect(paced).toMatchObject({ stalled: false });
+    const lines = reviewLines(paced).join('\n');
+    expect(lines).toContain('judged on its pace');
+    expect(lines).toContain('The verdict is pace_slipping (slower than usual)');
+    expect(lines).not.toContain('the verdict is stalled');
+
+    const [thin] = reviewGoals([goal({})], quiet, new Map(), NOW, new Map([['g', null]]));
+    expect(reviewLines(thin).join('\n')).toContain('write no row unless its done-when is met');
+    const [dated] = reviewGoals([goal({})], quiet, new Map(), NOW);
+    expect(dated.stalled).toBe(true);
+    expect(reviewLines(dated).join('\n')).not.toContain('judged on its pace');
   });
 });

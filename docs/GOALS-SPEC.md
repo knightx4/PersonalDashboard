@@ -409,7 +409,11 @@ have a due date. What changes is what asks for attention.
   stalled and waiting on a date apply to goals with a due date, errands and
   goals with a step on Todo. Any other goal gets **Keeping its pace**, or
   **Slower than usual** once the current gap is more than one and a half
-  times its usual one, and no verdict while its pace is unknown.
+  times its usual one, and no verdict while its pace is unknown. The morning
+  brief gives each such goal its pace and the verdict it reads as, and the
+  pages show only a met or pace verdict on it, so an older "Waiting on you"
+  stops showing the day the goal loses its date or its step on Todo
+  (`judgedOnPace` and `standingReviews` in `lib/goals/reviews.ts`).
 - **Every goal has suggestions** (#1739). The weekly run keeps two to four
   things the person could do next on each open goal, including suggested
   steps drawn from its map and its log, beside the events and reading it
@@ -423,48 +427,9 @@ have a due date. What changes is what asks for attention.
   added as a step that is already closed, so it still counts towards the
   pace. Home's Done today includes goal steps closed and progress logged.
 
-Whether the week's focus stays once Todo stops filling itself is decision
-#1741.
-
-## The week's focus
-
-In early October 2026 fifteen goals were open, more than a hundred steps of
-the person's were open under them, and about one a day was closed. Every goal
-put its next step on the home and on Todo every day, so no goal stood out
-from the others. Each week the person now picks the two or three goals they
-are pushing, and the rest wait (goals migration 0070).
-
-- **Focus is a flag on a goal**, `goals.items.focus`. Only the person sets
-  or clears it: a trigger refuses a change made as Dash, and the history
-  keeps every choice. A goal with focus is a **focus goal**.
-- **While no goal has focus, every goal counts**, as before. Once one open
-  goal has it, a goal counts as in focus when it is a focus goal or an errand
-  due within seven days or already late (`inFocus` in `lib/goals/focus.ts`).
-  An errand never needs picking, because its date brings it in.
-- **The Plan your week card** is on the Goals home while this week has no
-  plan: `goals.visits.planned_week` holds the Monday of the last week planned,
-  and a newer Monday brings the card back (`needsPlanning`). It opens with
-  last week in one line (steps of yours closed, rhythm targets met out of
-  those due) and a link to Dash's review of the week at `/home/week`. Then
-  the open goals that are not errands, as chips, with the current focus
-  already picked, and **Set this week's focus**. Saving gives focus to the
-  picked goals, takes it from every other goal, records this Monday and
-  folds the card away. Saving with nothing picked is a week without a focus.
-- **Three is suggested, not enforced.** Picking a fourth is allowed, and the
-  card says three is the most that tends to work (`FOCUS_SUGGESTED`).
-- **The home's header names the focus goals** with a Change link that opens
-  the card again (`?plan=1`). On All goals each open goal that is not an
-  errand has a target button that turns its focus on or off, and a focus
-  goal's title carries the same target.
-- **Todo shows focus goals' next steps only** while a focus is chosen. See
-  "Todo" below for what still comes through from every goal.
-- **Dash works focus goals first.** The morning run lists their ready Claude
-  steps before the rest, so `DAILY_STEP_LIMIT` spends its places on them and
-  other goals' steps fill what is left (`readyClaudeSteps` in
-  `lib/goals/daily-run.ts`). The night run puts a focus goal's step ahead of
-  any due date (`chooseNightSteps`). The morning brief and the note on the
-  home start with the focus goals. Closing steps from evidence, statements
-  and each goal's daily verdict still cover every open goal.
+The week's focus is gone (plan #1742, decision #1741). The `focus` column on
+`goals.items` and `goals.visits.planned_week` stay in the database with what
+they held, and nothing reads or writes them.
 
 ## Todo
 
@@ -472,53 +437,26 @@ This follows the rule in [TODO-SPEC.md](TODO-SPEC.md): an obligation is shown
 by whoever needs to show it and written by whoever owns it. A goal step is
 owned by Goals and is never copied into `todo.tasks`.
 
-Plan #1733 replaces the automatic lines below with steps sent to Todo by the
-person or by Dash. See "Goals without a deadline".
-
-- Each open goal's **next step of yours** is on Todo with nothing pressed
-  (plan #1266). It is one step per goal, the first of the next steps the
-  Goals home shows for it: open, nothing it waits on and nothing open under
-  it, its start date come, soonest due first and then tree order. So twelve
-  goals add at most twelve lines, and a parked or proposed goal, a step that
-  waits on another and a step for later put nothing there. A next step keeps
-  its own due date on Todo, overdue or not, and one with no date shows today.
-  The rule is `goalTodoSteps` in `lib/goals/todo.ts`.
-- **While a focus is chosen** (see "The week's focus"), only a goal in focus
-  puts its next step on Todo: a focus goal, or an errand due within seven
-  days. A step you pressed Show on Todo on, an open question and Dash's
-  results to read still come from every goal. Rhythms come only from goals
-  in focus (`focusRhythms`), and every rhythm's periods are still kept up to
-  date.
-- Each `mine` step also has a **Show on Todo** button, for any step beyond
-  the next one. Pressing it sets a flag on the step, and it stays on Todo
-  until it is closed; an undated one goes in Someday. A step that is both
-  flagged and a goal's next step is listed once, and shows today when it has
-  no date. The agenda source (`lib/todo/agenda/sources/goal-steps.ts`,
-  beside `job-reminders.ts`) reads both at query time.
+- **Todo holds only the goal steps sent there** (plan #1735). A step of
+  yours is on Todo when you pressed **Send to Todo** on it, or Dash put it
+  there. Nothing comes through by itself. Most goals have no deadline, and
+  a step from every goal each day made Todo a second copy of the Goals home.
+  The rule is `todoSteps` in
+  `lib/goals/todo.ts`, and the agenda source is
+  `lib/todo/agenda/sources/goal-steps.ts`, which reads it at query time.
+- Each `mine` step has **Send to Todo** in its menu, and **Take off Todo**
+  once it is there. Pressing it sets a flag on the step, and it stays on
+  Todo until it is closed or taken off; an undated one goes in "On you, no
+  date". A step for later shows on the day it starts.
 - Ticking the item on Todo closes the step in Goals, because it is the same
-  row, and the goal's next step after it takes its place. Dismissing or
-  deferring it on Todo writes only a dismissal, as for every other foreign
-  source. The dismissal is keyed by the step, so **Not this one** on a next
-  step hides that step only: the goal has no line on Todo until its next step
-  is a different one, because that one was closed, reordered or given a later
-  date.
-- Each **open question** the Goals home lists as waiting on you is on Todo
-  too, today (plan #1267): unanswered, not put aside, not under a step for
-  later, on an open goal. It has a button per lettered option, the
-  recommended one marked, and pressing one records that option as the answer
-  exactly as the option button on the goal page does. The question then
-  leaves Todo, and the re-shape run fires from the answer as it does for one
-  given here. A question whose options cannot be read shows as a link to it
-  on its goal. The rule is `todoQuestions` in `lib/goals/todo.ts`, from the
-  same pass of `dailyView` that picks the next steps.
-- When Dash has **finished work you have not read**, Todo shows one line
-  such as "Dash finished 2 things for you", linking to "What Dash did" on
-  the Goals home (plan #1268). The count is the home's results to read, Dash
-  steps with a result and no `reviewed_at` (`unreadDashResults` in
-  `lib/goals/todo.ts`), so marking a result read takes it off the count. At
-  zero the line is not there.
-- Rhythms for the current period appear on Todo on their own until the count
-  is met. There is no flag to set for those.
+  row. Dismissing or deferring it on Todo writes only a dismissal, as for
+  every other foreign source, keyed by the step.
+- **Left on the Goals home, not Todo**: each goal's next step, rhythms for
+  the current period, Dash's open questions, Dash's results to read, goals
+  and steps Dash proposed, and steps blocked on you. Each of these used to
+  reach Todo (plans #1266, #1267, #1268, #928 and #1473) and was taken off
+  by plan #1735. Home's Today reads the same agenda as Todo, so it shows
+  none of them either.
 - Dated items, such as an event you said you would attend, show on their date.
 
 Nothing is written to Google Calendar. Todo reads calendars through iCal feeds
@@ -618,6 +556,21 @@ step and its entry share that one line, so one Undo archives the step and
 marks the entry undone. A bad amount drops the entry and keeps the step.
 Progress still goes on the goal itself when the work belongs to the goal as a
 whole rather than to a piece of it.
+
+Work the sentence says is finished, with no step for it, is added as a step
+that is already closed (plan #1740). The add move carries `done`, only for a
+step of the person's, and the step is written and closed in one line with no
+progress entry, since the close is the record. With a cleaning goal and no
+bathroom step, "cleaned the bathroom" files `Added "Clean the bathroom" in …
+as done`, and Undo archives the step.
+
+The same filing runs from the "What did you do?" box on Home, at the top of
+Done today, and on each open goal's Overview (`components/goals/log-done.tsx`).
+On a goal's page the message names that goal as the one the line was written
+on, and filing keeps to it unless the sentence plainly concerns another.
+Home's Done today lists every task ticked since midnight, goal steps closed
+and progress logged since then, newest first, eight at most with the rest
+counted (`lib/goals/done-today.ts`). The day's sigil keeps its own rule.
 
 A count can be several at once, on the day they happened (plan #1279). The
 count move takes an amount, one when the sentence gives none, and a day read
@@ -828,8 +781,7 @@ runs after the feature half:
 - It starts nothing while any goals run is going, so goal steps are worked
   one at a time.
 - `chooseNightSteps` in `lib/goals/overnight-choice.ts` orders the ready
-  Claude steps: a focus goal's step first (see "The week's focus"), then
-  soonest due, then the goal that has gone longest
+  Claude steps: soonest due first, then the goal that has gone longest
   without progress, then page order. It takes one step per goal, and skips a
   goal that already has a run going and a step whose last two runs failed or
   never reported back.
@@ -869,27 +821,23 @@ anything beside anything else:
 1. **Dash's card**: one sentence on where the goals stand, the first
    paragraph of Dash's morning note (`goals.briefs`) with **More** for the
    rest, and Ask Dash, the home's one box for adding anything.
-2. **This week**: the week's focus goals by name, and the card that plans
-   the week. The page passes both in (`focusLine` and `planWeek` on
-   `HomeView`); without them nothing is drawn.
-3. **Do next**: at most five things on you, ranked (`lib/goals/today.ts`,
+2. **Do next**: at most five things on you, ranked (`lib/goals/today.ts`,
    `TODAY_CAP`), each with its one button (Answer, Done, Review and so on),
    Not now, and Ask Dash where Dash can prepare the step.
-4. Four lines that open in place, each saying on its closed line whether it
+3. Four lines that open in place, each saying on its closed line whether it
    is worth opening: **Dash is on N things** (the runs going now, Dash's open
    steps, and goals Dash could take), **Since your last visit** (below),
-   **Later** (the rest of what is on you in the week's goals, and steps set
+   **Later** (the rest of what is on you from Todo and dated goals, and steps set
    aside with Not now), and **Other goals** (one line each: the title, its
    status, or its due date for an errand, and its next move).
 
-Do next comes from the week's focus goals (`goals.items.focus`). While no
-goal is marked, every goal counts. An errand due within seven days, or late,
-counts whether it is marked or not. Questions, flags, and proposed steps or
-goals waiting on your approval come from any goal, because they hold up work
-wherever they are. The rule is `homeInFocus` and the split `homeLists`, both
-in `lib/goals/home.ts`. Other goals lists every goal out of focus, plus an
-errand with no row in Do next, so an errand with a date always shows
-somewhere.
+Do next lists the steps of yours that are on Todo and everything on you under
+a goal with a due date. Questions, flags, and proposed steps or goals waiting
+on your approval come from any goal, because they hold up work wherever they
+are. A goal with no due date shows its other steps only when they are sent to
+Todo. The split is `homeLists` in `lib/goals/home.ts`. Other goals lists every
+goal with no due date, plus an errand with no row in Do next, so an errand
+with a date always shows somewhere.
 
 When Dash has prepared something for a step in Do next, it shows on that
 step's row: the result of the Dash step whose `prepares_id` names the step,
@@ -913,9 +861,8 @@ steps is too much to read every morning.
 
 ### Tiles, Ask Dash and the tabs
 
-The home has no goal tiles. The week's focus goals are named in the This
-week line, the others are under Other goals, and pressing a goal's name in
-either opens the goal. All goals, linked at the foot of Other goals, lists
+The home has no goal tiles. Goals without a due date are under Other goals,
+and pressing a goal's name there opens the goal. All goals, linked at the foot of Other goals, lists
 every goal.
 
 Ask Dash, in Dash's card, sends its words where a chip says: to a goal,
@@ -1014,9 +961,20 @@ in place to be answered; a proposal or a result is a link to its row on the
 Steps tab (`stepAnchor` in `lib/goals/goal-page.ts`). Your own ready steps
 are not listed there, since they are the open rows on Steps and the status
 line counts them. Below that is what feeds the goal rather than being its
-work: context from the other modules, the kinds of weekly help, links to
+work: context from the other modules, then **Suggestions** on an open goal
+(plan #1739): a few suggested steps, each with **Add as step** and **Not for
+me**, and the events or reading the goal asks for, with **Going**, beneath
+which a line names the kinds of weekly help with **Change**. Then links to
 Learn and the job search, the Learn section, files, related vault notes, and
 the add lines for whatever is still empty.
+
+**Files** lists every file written for the goal or one of its steps, once
+each, the goal's own first, and says who wrote each and for which step
+("Written by Dash for “Compare the two cards’ rates” · version 2"). When Dash
+does a step by writing, it files what it wrote through `goals.file_result`
+(migrations-goals/0075, plan #1860), which keeps one file per step: working
+the step again makes a new version, and the earlier ones stay readable on
+the file's page. A new version is unread again (`core.files.read_at`).
 
 **Steps** holds the step tree, its tab counting the open steps. **Now** is
 the stages in hand (under "Stages" above), each a row with its open steps
@@ -1471,7 +1429,7 @@ Filed on the plan as a proposed feature. Each is one step.
 2. Areas and goals: add, edit, reorder, archive; fog on a goal.
 3. The step tree with sub-steps, the four kinds, and the full-tree view.
 4. The daily view, with the next items per goal and what is waiting on you.
-5. Show on Todo: the flag, the agenda source, ticking closes the step.
+5. Send to Todo: the flag, the agenda source, ticking closes the step.
 6. Rhythms: period rows, the at-risk line, the Todo item per period.
 7. Capture: the fast filing call, the filed list with Undo, captures kept.
 8. Readings: dated numbers against a goal, and a small chart of them.

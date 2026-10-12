@@ -1,7 +1,7 @@
 /**
  * Check whether a step that changed a screen may close (plan #1534).
  *
- *   npm run ui-guard -- <step> [--commit <sha>] [--accept]
+ *   npm run ui-guard -- <step> [--commit <sha>] [--accept | --settle "<why>"]
  *
  * The same check `scripts/plan.ts done` makes, for a session that closes
  * through the Supabase connector because it has no DATABASE_URL
@@ -21,9 +21,21 @@
  * accept, it writes (or prints, without DATABASE_URL) an `accepted` round
  * for each surface that has not passed, and only when the step's comment
  * carries an `Answered` line newer than its last block (`uiAcceptSql`).
+ *
+ * With `--settle "<why>"`, the builder settles the surfaces still waiting
+ * itself (`uiSettleSql`): one still failing after the critic's third round,
+ * or one reached only through a shared file. Design checks are not put to the
+ * person (their answer of 12 October 2026).
  */
 import postgres from 'postgres';
-import { isScreenFile, uiAcceptSql, uiCheckRefusal, uiGuardSql, type CheckRound } from '../lib/plan/ui-check-guard';
+import {
+  isScreenFile,
+  uiAcceptSql,
+  uiCheckRefusal,
+  uiGuardSql,
+  uiSettleSql,
+  type CheckRound,
+} from '../lib/plan/ui-check-guard';
 import { localGit, stepScreenInputs } from '../lib/plan/ui-check-local';
 
 function arg(flag: string): string | null {
@@ -37,10 +49,16 @@ function fail(message: string): never {
 }
 
 async function main(): Promise<void> {
-  const stepArg = process.argv.slice(2).find((a, i, all) => !a.startsWith('--') && all[i - 1] !== '--commit');
+  const stepArg = process.argv
+    .slice(2)
+    .find((a, i, all) => !a.startsWith('--') && all[i - 1] !== '--commit' && all[i - 1] !== '--settle');
   const accept = process.argv.includes('--accept');
+  const settle = process.argv.includes('--settle') ? (arg('--settle') ?? '') : null;
   const step = Number((stepArg ?? '').replace(/^#/, ''));
-  if (!Number.isInteger(step) || step < 1) fail('npm run ui-guard -- <step> [--commit <sha>]');
+  if (!Number.isInteger(step) || step < 1) {
+    fail('npm run ui-guard -- <step> [--commit <sha>] [--accept | --settle "<why>"]');
+  }
+  if (settle !== null && !settle.trim()) fail('--settle needs the reason: --settle "<why>".');
   const commit = arg('--commit') ?? localGit(['rev-parse', 'HEAD']).trim();
 
   const { files, surfaces } = stepScreenInputs(step, commit);
@@ -55,6 +73,26 @@ async function main(): Promise<void> {
   console.log(`#${step} serves: ${surfaces.join(', ')}`);
 
   const databaseUrl = process.env.DATABASE_URL;
+  if (settle !== null) {
+    const statement = uiSettleSql(step, surfaces, settle);
+    if (!databaseUrl) {
+      console.log('\nRun this through the Supabase connector. It settles each surface still waiting.\n');
+      console.log(statement);
+      return;
+    }
+    const sql = postgres(databaseUrl, { max: 1, prepare: false, onnotice: () => {} });
+    try {
+      const rows = await sql.unsafe(statement);
+      console.log(
+        rows.length === 0
+          ? `Nothing written: every surface of #${step} had passed.`
+          : `Settled ${rows.length} surface${rows.length === 1 ? '' : 's'} on #${step}.`,
+      );
+    } finally {
+      await sql.end({ timeout: 5 });
+    }
+    return;
+  }
   if (accept) {
     const statement = uiAcceptSql(step, surfaces);
     if (!databaseUrl) {

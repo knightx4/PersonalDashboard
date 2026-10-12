@@ -31,8 +31,31 @@ export type PostSource = {
   href: string;
 };
 
+/** A post read from X (plan #1820), as the tab draws it. */
+export type XPostView = {
+  xPostId: string;
+  /** The whole post; for a thread, its first post. */
+  text: string;
+  url: string;
+  /** The day it went up on X. */
+  day: string;
+  /** How many posts the thread has, counting this one; 1 for a single post. */
+  threadPosts: number;
+};
+
+/** A stored post as the loader hands it to the builder. */
+export type XStoredPost = {
+  xPostId: string;
+  text: string;
+  url: string;
+  createdAt: string;
+  threadPosts: number;
+};
+
 export type PostCard = {
   post: SocialPost;
+  /** The post a near match asks about on a waiting or dropped draft ("Is this it?"). */
+  candidate: XPostView | null;
   sources: PostSource[];
   /** The images to draw: each entry of `image_paths` and its link (postImageSrc). */
   images: { path: string; src: string }[];
@@ -46,6 +69,11 @@ export type PostsPage = {
   dropped: PostCard[];
   run: PostsRun | null;
   runState: PostsRunState;
+  /**
+   * Posts on X that match no draft, newest first (plan #1820): `posts` is
+   * the page of them drawn, `total` how many there are in all.
+   */
+  onX: { posts: XPostView[]; total: number };
 };
 
 export type PostStepRow = { id: string; number: number; title: string };
@@ -61,9 +89,20 @@ export function buildPostsPage(input: {
   notes: readonly PostNoteRow[];
   run: PostsRun | null;
   now: number;
+  /** What was read from X: the posts drafts ask about, and the page of the rest. */
+  x?: { candidates: readonly XStoredPost[]; listed: readonly XStoredPost[]; total: number };
 }): PostsPage {
   const steps = new Map(input.steps.map((step) => [step.id, step]));
   const notes = new Map(input.notes.map((note) => [note.id, note]));
+  const today = new Date(input.now);
+  const xView = (p: XStoredPost): XPostView => ({
+    xPostId: p.xPostId,
+    text: p.text,
+    url: p.url,
+    day: dayLabel(p.createdAt, today),
+    threadPosts: p.threadPosts,
+  });
+  const candidates = new Map((input.x?.candidates ?? []).map((p) => [p.xPostId, xView(p)]));
 
   const card = (post: SocialPost): PostCard => {
     const sources: PostSource[] = [];
@@ -92,7 +131,9 @@ export function buildPostsPage(input: {
       return src ? [{ path, src }] : [];
     });
     const when = post.status === 'posted' ? post.postedAt : post.status === 'dropped' ? post.droppedAt : null;
-    return { post, sources, images, day: dayLabel(when ?? post.createdAt, new Date(input.now)) };
+    const candidate =
+      post.status !== 'posted' && post.xCandidateId ? (candidates.get(post.xCandidateId) ?? null) : null;
+    return { post, candidate, sources, images, day: dayLabel(when ?? post.createdAt, today) };
   };
 
   return {
@@ -101,16 +142,98 @@ export function buildPostsPage(input: {
     dropped: input.posts.filter((post) => post.status === 'dropped').map(card),
     run: input.run,
     runState: postsRunState(input.run, input.now),
+    onX: { posts: (input.x?.listed ?? []).map(xView), total: input.x?.total ?? 0 },
   };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, any, any>;
 
+/** How many posts from X the tab lists at first, and how many more each press adds. */
+export const X_POSTS_PAGE = 50;
+
+/** X returns at most the latest 3,200 posts, so a list never needs more. */
+const X_POSTS_MAX = 3200;
+
+/** The `onx` search parameter as a count to list, in whole pages. */
+export function xPostsShown(raw: string | null | undefined): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= X_POSTS_PAGE) return X_POSTS_PAGE;
+  return Math.min(Math.ceil(n / X_POSTS_PAGE) * X_POSTS_PAGE, X_POSTS_MAX);
+}
+
+/**
+ * The posts read from X that the tab draws: the ones drafts ask about, and
+ * the newest `shown` that no draft holds or asks about, each with how many
+ * posts its thread has.
+ */
+async function loadXPosts(
+  supabase: Db,
+  userId: string,
+  posts: readonly SocialPost[],
+  shown: number,
+): Promise<{ candidates: XStoredPost[]; listed: XStoredPost[]; total: number }> {
+  const asked = [
+    ...new Set(posts.flatMap((p) => (p.status !== 'posted' && p.xCandidateId ? [p.xCandidateId] : []))),
+  ];
+  // X post ids are digits, so the list can go in the filter as it is.
+  const held = [
+    ...new Set(posts.flatMap((p) => [p.xPostId, p.status === 'posted' ? null : p.xCandidateId]).filter((id): id is string => Boolean(id && /^\d+$/.test(id)))),
+  ];
+  const columns = 'x_post_id, text, url, created_at';
+
+  let listQuery = supabase
+    .from('x_posts')
+    .select(columns, { count: 'exact' })
+    .eq('user_id', userId)
+    .eq('kind', 'post')
+    .order('created_at', { ascending: false })
+    .limit(shown);
+  if (held.length) listQuery = listQuery.not('x_post_id', 'in', `(${held.join(',')})`);
+
+  const [listed, candidates] = await Promise.all([
+    listQuery,
+    asked.length
+      ? supabase.from('x_posts').select(columns).eq('user_id', userId).in('x_post_id', asked)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (listed.error) throw new Error(`Could not read your posts on X: ${listed.error.message}`);
+  if (candidates.error) throw new Error(`Could not read the posts drafts ask about: ${candidates.error.message}`);
+
+  const rows = [...(listed.data ?? []), ...(candidates.data ?? [])] as Array<Record<string, unknown>>;
+  const ids = [...new Set(rows.map((r) => String(r.x_post_id)))];
+  const threadPosts = new Map<string, number>();
+  if (ids.length) {
+    const { data, error } = await supabase
+      .from('x_posts')
+      .select('conversation_id')
+      .eq('user_id', userId)
+      .eq('kind', 'thread_reply')
+      .in('conversation_id', ids);
+    if (error) throw new Error(`Could not read your threads on X: ${error.message}`);
+    for (const r of (data ?? []) as Array<{ conversation_id: string }>) {
+      threadPosts.set(r.conversation_id, (threadPosts.get(r.conversation_id) ?? 0) + 1);
+    }
+  }
+  const stored = (r: Record<string, unknown>): XStoredPost => ({
+    xPostId: String(r.x_post_id),
+    text: String(r.text ?? ''),
+    url: String(r.url),
+    createdAt: String(r.created_at),
+    threadPosts: 1 + (threadPosts.get(String(r.x_post_id)) ?? 0),
+  });
+  return {
+    candidates: ((candidates.data ?? []) as Array<Record<string, unknown>>).map(stored),
+    listed: ((listed.data ?? []) as Array<Record<string, unknown>>).map(stored),
+    total: listed.count ?? 0,
+  };
+}
+
 export async function loadPostsPage(
   supabase: Db,
   userId: string,
   now: number = Date.now(),
+  shown: number = X_POSTS_PAGE,
 ): Promise<PostsPage> {
   const [posts, run] = await Promise.all([
     loadSocialPosts(supabase, userId),
@@ -120,13 +243,14 @@ export async function loadPostsPage(
   const stepIds = [...new Set(posts.flatMap((post) => post.sourcePlanItemIds))];
   const noteIds = [...new Set(posts.flatMap((post) => post.sourceFeedbackIds))];
 
-  const [steps, notes] = await Promise.all([
+  const [steps, notes, x] = await Promise.all([
     stepIds.length
       ? supabase.from('plan_items').select('id, number, title').eq('user_id', userId).in('id', stepIds)
       : Promise.resolve({ data: [], error: null }),
     noteIds.length
       ? supabase.from('feedback_items').select('id, body').eq('user_id', userId).in('id', noteIds)
       : Promise.resolve({ data: [], error: null }),
+    loadXPosts(supabase, userId, posts, shown),
   ]);
   if (steps.error) throw new Error(`Could not read the steps the posts cite: ${steps.error.message}`);
   if (notes.error) throw new Error(`Could not read the notes the posts cite: ${notes.error.message}`);
@@ -137,5 +261,6 @@ export async function loadPostsPage(
     notes: (notes.data ?? []) as PostNoteRow[],
     run,
     now,
+    x,
   });
 }

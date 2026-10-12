@@ -21,6 +21,8 @@ export type GoalStatusCardProps = {
   review: GoalReview | null;
   /** Whether that status is recent enough to stand as today's (isCurrent). */
   current: boolean;
+  /** What moved since the review before this one (reviewChangeLine); null for none. */
+  change?: string | null;
   brief: Brief | null;
   /** When the note was written, to follow "written": "today", "on 3 Oct". */
   briefWhen: string | null;
@@ -34,6 +36,7 @@ export function GoalStatusCard({
   line,
   review,
   current,
+  change,
   brief,
   briefWhen,
   work,
@@ -59,6 +62,7 @@ export function GoalStatusCard({
         ) : (
           <p className="text-ui text-ink-muted">Dash has not checked this goal yet.</p>
         )}
+        {change && <p className="tabular text-small text-ink-muted">{change}</p>}
         {brief && (
           <Disclosure
             title={

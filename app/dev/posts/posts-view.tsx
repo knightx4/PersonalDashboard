@@ -10,16 +10,18 @@ import { AskForPost, SuggestPosts } from './suggest-posts';
 import type { XConnectionView, XConnectNotice } from '@/lib/x/account';
 import { WritePost } from './write-post';
 import { XConnection } from './x-connection';
+import { XPostList } from './x-posts';
 
 /**
  * The Posts tab in Dev (plan #1419): X posts Dash drafted about building this
- * app, waiting ones first, then the posted and dropped ones folded beneath.
+ * app, waiting ones first, then the posted ones, the posts on X that match no
+ * draft (plan #1820) and the dropped ones, folded beneath.
  *
  * Apart from the route so the surface gallery draws the same thing from
  * fixtures (app/preview/posts-surfaces.tsx).
  */
 
-function PostList({ cards }: { cards: PostCard[] }) {
+export function PostList({ cards }: { cards: PostCard[] }) {
   return (
     <ul className={cn(cardVariants(), 'divide-y divide-border')}>
       {cards.map((card) => (
@@ -91,6 +93,18 @@ export function PostsScreen({
         <SectionFold title="Posted" count={page.posted.length} defaultOpen={page.suggested.length === 0}>
           <PostList cards={page.posted} />
         </SectionFold>
+      )}
+
+      {page.onX.total > 0 && (
+        <div id="posted-on-x" className="scroll-mt-bar">
+          <SectionFold
+            title="Posted on X"
+            count={page.onX.total}
+            defaultOpen={page.suggested.length === 0}
+          >
+            <XPostList posts={page.onX.posts} total={page.onX.total} />
+          </SectionFold>
+        </div>
       )}
 
       {page.dropped.length > 0 && (

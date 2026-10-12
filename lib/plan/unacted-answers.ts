@@ -23,16 +23,24 @@
  * Dates. History lines carry only the day (`Answered 2026-10-11:`), and runs
  * carry a time. A run on a later day is after the line, and one on an earlier
  * day is before it. A run on the same day is compared with the answer's exact
- * time when the app knows it: the person's thread turn with the same words,
- * which `answerBlockedStep` writes beside the line, or the `accepted` round an
- * accept writes. When neither exists the same-day run is counted as earlier,
- * and the step is sent. That rule can send a step a second time only when a
- * same-day run came after the answer and ended without closing or blocking
- * it; it never sends twice for the backstop's own send, because the `Sent …`
- * line it writes becomes the newest line. Counting the run as later instead
- * would leave an answer given in the evening unread whenever a session had
- * run the step that morning, which is the usual order: a session blocks, then
- * the person answers.
+ * time, taken from the first of these that falls on the line's day:
+ *
+ * - the step leaving `blocked` in `plan_history` (plan #1830). Every answer
+ *   moves the step from blocked to not started in the same write as its
+ *   line, whoever wrote it: the page, Dash, or SQL by hand.
+ * - the person's thread turn with the same words, which `answerBlockedStep`
+ *   writes beside the line.
+ * - the `accepted` round an accept writes.
+ *
+ * The history began on 12 October 2026, so the other two are for answers
+ * given before then. When none exists the same-day run is counted as
+ * earlier, and the step is sent. That rule can send a step a second time
+ * only for an answer older than the history, when a same-day run came after
+ * it and ended without closing or blocking it; it never sends twice for the
+ * backstop's own send, because the `Sent …` line it writes becomes the newest
+ * line. Counting the run as later instead would leave an answer given in the
+ * evening unread whenever a session had run the step that morning, which is
+ * the usual order: a session blocks, then the person answers.
  */
 
 /** One dated line on a step's history: `Blocked 2026-10-11: …`. */
@@ -71,6 +79,8 @@ export type AnswerStep = {
   turns: readonly { body: string; createdAt: string }[];
   /** When each `accepted` round for the step was written. */
   acceptedAt: readonly string[];
+  /** When `plan_history` recorded the step leaving `blocked`, if ever. */
+  unblockedAt?: readonly string[];
 };
 
 /** A run that started, by the row it was sent at. */
@@ -131,7 +141,8 @@ export function unactedAnswers(
     if (!lines.some((line) => line.word === 'Blocked')) continue;
 
     const answeredAt =
-      newest.word === 'Answered'
+      newestOn(newest.date, step.unblockedAt ?? []) ??
+      (newest.word === 'Answered'
         ? newestOn(
             newest.date,
             // The line holds the answer's first line; the turn holds all of it.
@@ -139,7 +150,7 @@ export function unactedAnswers(
               .filter((turn) => turn.body.trim().split('\n')[0].trim() === newest.text)
               .map((turn) => turn.createdAt),
           )
-        : newestOn(newest.date, step.acceptedAt);
+        : newestOn(newest.date, step.acceptedAt));
 
     // The step and every row above it, guarding against a loop in bad data.
     const covering: string[] = [];

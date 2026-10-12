@@ -84,12 +84,11 @@ build. The critic is given:
 It answers with pass, or with fixes. Each fix names what is wrong in the
 picture, at which width and theme, and the law or preference it breaks. The
 builder makes the fixes, shoots again and hands the new shots back. A step
-gets three rounds. After a third failure the step blocks on the person, with
-the critic's last fixes, where the shots are and the branch in its ask, and
-the person accepts the screen as it is or says what to change (decision 1,
-answered A). Saying what to change gives the builder three fresh rounds,
-numbered on from 4. `lib/plan/ui-check-stop.ts` writes the ask and
-`npm run ui-stop` prints it.
+gets three rounds. After a third failure the builder settles the screen
+itself and closes the step, with the critic's last fixes in its close note
+(decision 1, now answered B). Surfaces a step reaches only through a shared
+file are settled the same way. `npm run ui-stop` prints the fixes and the
+settle command, `npm run ui-guard -- <n> --settle "<why>"`.
 
 The builder never writes the verdict. Each round is recorded in a table,
 `public.ui_checks`, with the step, the surface, the round, the verdict and the
@@ -422,11 +421,13 @@ Recommendation: A. Three failed rounds usually means the step is missing a
 decision, such as which pattern the screen should use, and that is the
 person's to make.
 
-Answered A on the plan (#1535). The stop is plan #1609; accepting or
-redirecting from the step's row is plan #1610. Accepting writes a round with
-the verdict `accepted` for each surface that stopped. Only the person writes
-it, and the close guard counts it as passed, so the record keeps who let the
-screen through.
+Answered A on the plan (#1535), then changed to B on 12 October 2026: the
+person asked for their questions to be about direction, and a week of
+"accept it as it is" blocks were not. The builder writes the `accepted`
+round itself (`uiSettleSql`), with notes opening "Settled by Dash", and the
+person's own accepts from the step's row (#1610) still work for steps blocked
+before the change. The close guard counts both as passed, and the record
+keeps who let the screen through.
 
 ## Order of work
 

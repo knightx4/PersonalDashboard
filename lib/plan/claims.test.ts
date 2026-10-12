@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { claimExpiredNote, expiredClaim } from './claims';
+import { claimExpiredNote, claimHeldByRun, expiredClaim } from './claims';
 import { STALLED_AFTER_MINUTES } from './elapsed';
 
 const start = '2026-09-09T10:00:00.000Z';
@@ -59,5 +59,22 @@ describe('claimExpiredNote', () => {
     expect(claimExpiredNote(start, at(160), '  fetch failed  ')).toMatch(
       /the clock decided alone\. fetch failed\.$/,
     );
+  });
+});
+
+describe('claimHeldByRun (plan #1825)', () => {
+  const line = '2026-09-09T09:00:00.000Z';
+
+  it('holds a claim while the run behind it writes lines and has not ended', () => {
+    for (const status of ['started', 'awaiting_input', 'stale']) {
+      expect(claimHeldByRun({ status, lastLineAt: line })).toBe(true);
+    }
+  });
+
+  it('leaves the claim to the clock when the run ended or wrote no lines', () => {
+    expect(claimHeldByRun({ status: 'failed', lastLineAt: line })).toBe(false);
+    expect(claimHeldByRun({ status: 'finished', lastLineAt: line })).toBe(false);
+    expect(claimHeldByRun({ status: 'started', lastLineAt: null })).toBe(false);
+    expect(claimHeldByRun(null)).toBe(false);
   });
 });

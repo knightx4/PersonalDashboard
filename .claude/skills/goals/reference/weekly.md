@@ -6,7 +6,8 @@ saying which file holds each section named here.
 
 Once a week the daily cron fires the routine with the `goals.runs` row it
 wrote with `job` `weekly` (`inngest/goals/weekly.ts`). It researches the
-help the goals ask for, then leaves a note on every open goal. It writes no
+help the goals ask for, suggests steps on every open goal, then leaves a note
+on every open goal. It writes no
 verdicts: each goal's status is the morning run's ("Reviewing each goal").
 
 ### Researching the help each goal asks for
@@ -95,6 +96,40 @@ Todo, and marking the unanswered ones ignored is done by the cron. The guard
 (`goals` 0008) refuses a Claude write to any of them. The summary says how
 many suggestions you wrote of each kind, and what in each kind's past
 reactions you followed.
+
+### Suggesting steps
+
+Every open goal has a Suggestions section on its page (plan #1739), and the
+weekly run is what fills it. The brief lists every open goal, then the steps
+suggested before and what became of each: `added as a step`, `not_for_me`,
+or `ignored` (no answer within the week).
+
+For each goal, write two to four suggested steps: the next things the person
+could do on it that are not already steps. Draw them from the goal's map
+(its stages, what is open, what was just closed and what it leads to), from
+what they logged on it (`goals.progress_entries`, the closed steps and their
+evidence), and from its done-when. Each is one thing they could do in a
+sitting or two, phrased as the step's own title, with one or two sentences in
+`detail` on why now. A goal that also gets events or reading this week still
+gets its steps, so the section is never only research.
+
+Follow the past lines: more like what was added as a step, less like what
+was turned down or left. Do not suggest a step the goal already has, open or
+closed, or one turned down in the last eight weeks.
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+insert into goals.suggestions (user_id, item_id, run_id, kind, title, detail)
+values ('<user>', '<goal id>', '<the run id>', 'step',
+        'Read the community board minutes on the Gowanus rezoning',
+        'The last step closed was the overview article, and the minutes are where the fight is in its own words.');
+```
+
+`item_id` is the goal, `url`, `happens_on` and `place` stay null, and
+`accepted_step_id` is the person's: Add as step on the goal's page writes the
+step and sets it. A suggested step never goes on Todo by itself. The summary
+says how many steps you suggested, on how many goals.
 
 ### The week's notes
 

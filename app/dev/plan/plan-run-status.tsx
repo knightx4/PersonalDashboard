@@ -15,7 +15,7 @@ import { CircleAlert } from 'lucide-react';
 import { useClockNow } from '@/lib/use-clock-now';
 import { elapsedSince } from '@/lib/plan/elapsed';
 import { type ClaimLiveness } from '@/lib/plan/liveness';
-import { lastRunLine, type LastRun } from '@/lib/plan/run-end';
+import { lastRunLine, staleLine, type LastRun } from '@/lib/plan/run-end';
 import {
   closedLine,
   nothingToShowLine,
@@ -31,6 +31,10 @@ import { checkLine, checkWord, type CommitCheck } from '@/lib/plan/checks';
 import type { PlanNode } from '@/lib/plan/tree';
 import { subtreeOf, type PlanCatalogEntry } from './plan-catalog';
 import { cn } from '@/lib/cn';
+import { LiveRunLines } from '@/components/runs/live-run-lines';
+import { AcknowledgeRun } from '@/components/runs/acknowledge-run';
+import type { RunLinesState } from '@/components/runs/run-lines';
+import { acknowledgePlanRunAction, answerPlanRunAction } from './run-actions';
 
 export function when(iso: string | null): string | null {
   return iso ? iso.slice(0, 10) : null;
@@ -184,7 +188,10 @@ export function RunWork({
   return (
     <div>
       <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">Its run</p>
-      <p className="text-ui text-ink">{runStartedLine(work, now)}</p>
+      <p className="text-ui text-ink">{runStartedLine(work, now, run.waiting === 'stale')}</p>
+      {/* When a run that went quiet was last heard from (plan #1825); its
+          Acknowledge sits with its lines below. */}
+      {run.waiting === 'stale' && <p className="text-ui text-caution">{staleLine(run, now)}</p>}
       {work.push && <p className="text-ui text-ink-muted">{pushLine(work.push, now)}</p>}
       {closed && <p className="text-ui text-ink-muted">{closed}</p>}
       {raised && <p className="text-ui text-ink-muted">{raised}</p>}
@@ -194,8 +201,31 @@ export function RunWork({
           muted: nothing on this row can be read properly until the key is
           fixed, and the sentence says how. */}
       {refused && <p className="text-ui text-caution">{refused}</p>}
+      {/* The lines the run wrote as it worked, filling in while it is going
+          (plan #1826). Read in the browser, since the row is opened there. */}
+      {run.id && (
+        <LiveRunLines
+          runTable="plan_runs"
+          runId={run.id}
+          state={planLinesState(run)}
+          className="mt-2"
+          acknowledge={
+            run.waiting === 'stale' ? (
+              <AcknowledgeRun runId={run.id} action={acknowledgePlanRunAction} />
+            ) : undefined
+          }
+          answer={answerPlanRunAction}
+        />
+      )}
     </div>
   );
+}
+
+/** How a plan run's lines are drawn for how it stands. */
+function planLinesState(run: LastRun): RunLinesState {
+  if (run.waiting === 'stale') return 'stale';
+  if (run.waiting === 'awaiting_input') return 'waiting';
+  return run.status === 'started' ? 'live' : 'ended';
 }
 
 /**

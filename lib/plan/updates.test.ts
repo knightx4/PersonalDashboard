@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanItem } from '@/lib/plan/load';
 import { buildPlanTree, flattenSections } from '@/lib/plan/tree';
-import { planUpdateFromRow, progressSince, updateCounts } from './updates';
+import {
+  changeSincePrevious,
+  planUpdateFromRow,
+  progressSince,
+  updateCounts,
+  updateOverdueDays,
+} from './updates';
 
 let counter = 0;
 function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem {
@@ -93,5 +99,58 @@ describe("Dash's update on a feature", () => {
     expect(planUpdateFromRow(row)?.health).toBe('at_risk');
     expect(planUpdateFromRow({ ...row, health: 'off_track' })).toBeNull();
     expect(planUpdateFromRow({ ...row, steps_total: null })).toBeNull();
+  });
+});
+
+describe('changeSincePrevious', () => {
+  const snap = (openIds: string[], done: number, total: number) => ({
+    v: 1 as const,
+    open: openIds.length,
+    done,
+    total,
+    blocked: 0,
+    openIds,
+    dueOn: null,
+  });
+  it('has nothing to say without an earlier update', () => {
+    expect(changeSincePrevious({ stepsDoneAfter: 1, stepsTotal: 2, snapshot: null }, null)).toBeNull();
+  });
+  it('counts closed, added and removed from the snapshots', () => {
+    const earlier = { stepsDoneAfter: 1, stepsTotal: 4, snapshot: snap(['a', 'b', 'c'], 1, 4) };
+    const later = { stepsDoneAfter: 2, stepsTotal: 4, snapshot: snap(['d', 'e'], 2, 4) };
+    // a left and was closed; b and c left unfinished; d and e are new.
+    expect(changeSincePrevious(later, earlier)).toBe(
+      'Since the update before: 1 step closed, 2 added, 2 removed.',
+    );
+  });
+  it('falls back to the stored totals for updates with no snapshot', () => {
+    const earlier = { stepsDoneAfter: 1, stepsTotal: 4, snapshot: null };
+    expect(changeSincePrevious({ stepsDoneAfter: 3, stepsTotal: 5, snapshot: null }, earlier)).toBe(
+      'Since the update before: 2 steps closed, 1 added.',
+    );
+    expect(changeSincePrevious({ stepsDoneAfter: 1, stepsTotal: 3, snapshot: null }, earlier)).toBe(
+      'Since the update before: 1 removed.',
+    );
+  });
+  it('says so when nothing moved', () => {
+    const same = { stepsDoneAfter: 1, stepsTotal: 4, snapshot: null };
+    expect(changeSincePrevious(same, same)).toMatch(/No change/);
+  });
+});
+
+describe('updateOverdueDays', () => {
+  const day = 24 * 60 * 60 * 1000;
+  const feature = (startedAt: string | null) => ({ startedAt, children: [] });
+  it('flags a moving feature seven days after its last update', () => {
+    expect(updateOverdueDays(feature(null), 'in_progress', new Date(NOW - 7 * day).toISOString(), NOW)).toBe(7);
+    expect(updateOverdueDays(feature(null), 'working', new Date(NOW - 6 * day).toISOString(), NOW)).toBeNull();
+  });
+  it('counts from the start when there is no update', () => {
+    expect(updateOverdueDays(feature(new Date(NOW - 9 * day).toISOString()), 'in_progress', undefined, NOW)).toBe(9);
+    expect(updateOverdueDays(feature(null), 'in_progress', undefined, NOW)).toBeNull();
+  });
+  it('leaves a feature that is not moving alone', () => {
+    expect(updateOverdueDays(feature(null), 'not_started', new Date(NOW - 30 * day).toISOString(), NOW)).toBeNull();
+    expect(updateOverdueDays(feature(null), 'done', new Date(NOW - 30 * day).toISOString(), NOW)).toBeNull();
   });
 });

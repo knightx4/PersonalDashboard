@@ -19,6 +19,7 @@ import { loadPlan } from '@/lib/plan/load';
 import {
   loadOvernightRun,
   OVERNIGHT_AT_ONCE,
+  featureSessionsAtOnce,
   overnightVerdict,
   recordOvernightFire,
   stopOvernightRun,
@@ -29,15 +30,21 @@ import { remainingUntil } from '@/lib/plan/elapsed';
 import { endsRun } from '@/lib/plan/run-end';
 import {
   featureSteps,
+  isStalled,
   raiseFeatureId,
   raiseHolds,
   runsByFeature,
   shouldRaiseStall,
+  stallMove,
   stallRaise,
   STALL_JOBS,
+  stuckStep,
   type FeatureRaise,
   type StallRun,
+  type UnstickRun,
+  waitingSteps,
 } from '@/lib/plan/stall';
+import { startUnstick } from '@/lib/plan/unstick-run';
 import { endQuietRuns } from '@/lib/plan/runs';
 import { subtreeBlockedAt, subtreeClosedAt, subtreeTrail } from '@/lib/plan/subtree';
 import { buildPlanTree, flatten, type PlanNode, type PlanSection } from '@/lib/plan/tree';
@@ -337,9 +344,9 @@ export type OvernightFireChoice =
  * `OVERNIGHT_RETRY_AFTER_MINUTES`, then sent once more. If that retry closes
  * nothing either -- nothing has closed since the fire before it -- it is held
  * for the run, so a feature that is truly stuck costs two sessions and not
- * one every six hours. Held for good means held until the person moves it:
- * an answer under it releases it (`personAnsweredSince`), and so does the yes
- * on the raise the tick files for it (`heldRaise`).
+ * one every six hours. Held for good means held until something changes: an
+ * answer under it releases it (`personAnsweredSince`), and so does a stall
+ * diagnosis that has ended since (`fileStalls`).
  */
 export function heldBack(
   feature: PlanNode,
@@ -376,57 +383,11 @@ export function passedOverNote(held: readonly PassedOver[], now: number): string
   const named = held.slice(0, NAMED_HELD).map((one) =>
     one.retryAt
       ? `#${one.number} ${one.title} closed nothing in its last session; it is sent once more in ${remainingUntil(one.retryAt, now)}.`
-      : `#${one.number} ${one.title} closed nothing in its last two sessions. The button to send it again is on /dev/inbox.`,
+      : `#${one.number} ${one.title} closed nothing in its last two sessions. A session is sent to find out why.`,
   );
   const rest = held.length - named.length;
   if (rest > 0) named.push(`${rest} more ${rest === 1 ? 'is' : 'are'} held the same way.`);
   return named.join(' ');
-}
-
-/**
- * The raise filed for a feature the guard holds for good: one per feature
- * per fire that closed nothing, so `source` names both and a tick that finds
- * one already filed files nothing.
- *
- * Before this, a feature held for good stayed held with nothing to press. On
- * 10 October nine features were held that way and the runner sat idle. The
- * yes is `send_step` on the feature's number, which sends it as a feature run
- * (lib/comments/act.ts), the same send the plan page's button makes.
- */
-export function heldRaise(one: PassedOver): {
-  module: string | null;
-  title: string;
-  ask: string;
-  detail: string;
-  consequence: {
-    name: 'send_step';
-    text: string;
-    module: null;
-    field: null;
-    detail: null;
-    kind: null;
-  };
-  source: string;
-} {
-  const named = `#${one.number} ${one.title}`;
-  return {
-    module: one.module,
-    title: `${named} is held: its last two sessions closed nothing`.slice(0, 200),
-    ask: `Send ${named} to a session again?`.slice(0, 500),
-    detail:
-      `The overnight runner sent ${named} twice and neither session closed a step, so it ` +
-      'stopped sending it. Yes sends it again now. No leaves it held until you send it from ' +
-      'its row on /dev/plan. The blocked steps and threads under it say where the sessions stopped.',
-    consequence: {
-      name: 'send_step',
-      text: `#${one.number}`,
-      module: null,
-      field: null,
-      detail: null,
-      kind: null,
-    },
-    source: `overnight held ${one.id} after ${one.lastFiredAt}`,
-  };
 }
 
 /** What one tick did, which is usually nothing. */
@@ -438,7 +399,13 @@ export type OvernightTick =
    * in the modules the running sessions are already in. `running` is how many
    * are going; `liveness` is `unknown` when any of them could not be read.
    */
-  | { act: 'waiting'; liveness: RunLiveness; running: number }
+  | {
+      act: 'waiting';
+      liveness: RunLiveness;
+      running: number;
+      /** The most this tick would keep going: four when goals had nothing to start. */
+      atOnce?: number;
+    }
   /**
    * Nothing was ready this minute, and the night was left running.
    *
@@ -487,7 +454,7 @@ export function tickNote(tick: OvernightTick): string | null {
       if (tick.liveness === 'unknown') {
         return 'Waiting. GitHub could not be asked whether a session is still going, so nothing new is started until it can.';
       }
-      if (tick.running >= OVERNIGHT_AT_ONCE) {
+      if (tick.running >= (tick.atOnce ?? OVERNIGHT_AT_ONCE)) {
         return `Waiting: ${tick.running} sessions are running, the most it starts at once.`;
       }
       return tick.running === 1
@@ -517,6 +484,12 @@ export function tickNote(tick: OvernightTick): string | null {
  */
 export type OvernightPorts = {
   now: number;
+  /**
+   * How many feature sessions to keep going this tick. `OVERNIGHT_AT_ONCE`
+   * when left out; the cron passes four when the goals half had nothing to
+   * start (`featureSessionsAtOnce`).
+   */
+  atOnce?: number;
   loadRun: () => Promise<OvernightRun | null>;
   loadSections: () => Promise<readonly PlanSection[]>;
   /** When each feature was last fired, by feature id. */
@@ -549,57 +522,35 @@ export type OvernightPorts = {
   recordFire: (featuresLeft: number | null) => Promise<void>;
   stop: (reason: string) => Promise<void>;
   /**
-   * File a raise for each feature held for good (`heldRaise`), skipping any
-   * already filed for the same fire. Left out, nothing is filed.
+   * Deal with each feature whose last two runs closed nothing (`fileStalls`):
+   * send a diagnosis, or raise it once a diagnosis has not got it moving. Says
+   * which features to hold from the runner and which a finished diagnosis has
+   * released. Left out, nothing is sent, raised or held.
    */
-  raiseHeld?: (held: readonly PassedOver[]) => Promise<void>;
-  /**
-   * File a raise for each feature whose last two runs closed nothing, quoting
-   * why the sessions stopped (`lib/plan/stall.ts`), and return the features a
-   * raise holds from the runner: one still open, or one answered no with
-   * nothing sent at the feature since. Left out, nothing is raised or held.
-   */
-  stalls?: (sections: readonly PlanSection[]) => Promise<readonly string[]>;
+  stalls?: (sections: readonly PlanSection[]) => Promise<StallVerdict>;
 };
 
 /** A feature session that is still going, as the tick counts it. */
 export type InFlightRun = { featureId: string | null; liveness: RunLiveness };
 
 /**
- * Hand the features held for good to `raiseHeld`, each once a tick. A raise
- * that cannot be filed is logged and stepped over: the tick still has
- * features to fire.
- */
-async function raiseHeldForGood(
-  ports: OvernightPorts,
-  passedOver: readonly PassedOver[],
-  raised: Set<string>,
-): Promise<void> {
-  if (!ports.raiseHeld) return;
-  const fresh = passedOver.filter((one) => one.retryAt === null && !raised.has(one.id));
-  if (fresh.length === 0) return;
-  for (const one of fresh) raised.add(one.id);
-  try {
-    await ports.raiseHeld(fresh);
-  } catch (err) {
-    console.error(
-      `a held feature could not be raised on the overnight tick: ${
-        err instanceof Error ? err.message : 'failed'
-      }`,
-    );
-  }
-}
-
-/**
  * Raise the stalled features and return the ones a raise holds. A failure is
  * logged and holds nothing: the tick still has features to fire, and the
  * in-night guard still stops it resending one that closed nothing.
  */
+/** The fires with the given features left out. */
+function firesWithout(
+  fires: Readonly<Record<string, string>>,
+  ids: ReadonlySet<string>,
+): Record<string, string> {
+  return Object.fromEntries(Object.entries(fires).filter(([id]) => !ids.has(id)));
+}
+
 async function raiseStalls(
   ports: OvernightPorts,
   sections: readonly PlanSection[],
-): Promise<readonly string[]> {
-  if (!ports.stalls) return [];
+): Promise<StallVerdict> {
+  if (!ports.stalls) return { held: [], released: [] };
   try {
     return await ports.stalls(sections);
   } catch (err) {
@@ -608,7 +559,7 @@ async function raiseStalls(
         err instanceof Error ? err.message : 'failed'
       }`,
     );
-    return [];
+    return { held: [], released: [] };
   }
 }
 
@@ -685,8 +636,9 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
 
   const inFlight = (await ports.runsInFlight(run)).filter((one) => !isOver(one.liveness));
   const unrecorded = inFlight.some((one) => one.featureId === null);
-  if (inFlight.length >= OVERNIGHT_AT_ONCE || unrecorded) {
-    return { act: 'waiting', liveness: waitingOn(inFlight), running: inFlight.length };
+  const atOnce = ports.atOnce ?? OVERNIGHT_AT_ONCE;
+  if (inFlight.length >= atOnce || unrecorded) {
+    return { act: 'waiting', liveness: waitingOn(inFlight), running: inFlight.length, atOnce };
   }
   const runningIds = inFlight.map((one) => one.featureId as string);
 
@@ -730,22 +682,22 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
   // send, which writes. So the choosing and the firing take turns, each
   // refusal costs one candidate, and the loop can go round at most once per
   // top-level feature.
-  // Stalled features are raised before the choice, so a feature held by its
-  // raise is never chosen and never gets the plainer held raise below as well.
-  const raiseHeldIds = await raiseStalls(ports, sections);
+  // Stalled features are dealt with before the choice: one being diagnosed,
+  // or held by its raise, is never chosen. One whose diagnosis has ended since
+  // its last build is let out of the in-night guard for one more try, since
+  // the diagnosis either cleared the wall or wrote what it waits on.
+  const stalls = await raiseStalls(ports, sections);
+  const released = new Set(stalls.released);
+  const lastFired = firesWithout(lastFiredAt, released);
+  const previousFired = firesWithout(previousFiredAt, released);
 
   const refused: RefusedFeature[] = [];
-  const raised = new Set<string>();
   let remaining: readonly PlanSection[] = outsideRunning(sections, runningIds);
-  for (const id of raiseHeldIds) remaining = without(remaining, id);
+  for (const id of stalls.held) remaining = without(remaining, id);
   const rounds = remaining.reduce((total, section) => total + section.nodes.length, 0) + 1;
 
   for (let round = 0; round < rounds; round += 1) {
-    const choice = chooseOvernightFire(remaining, run, ports.now, lastFiredAt, previousFiredAt);
-    // A feature held for good gets a raise whose yes sends it again, so the
-    // person always has something to press. Filed on any tick that finds one,
-    // including a tick that goes on to fire another feature.
-    await raiseHeldForGood(ports, choice.passedOver ?? [], raised);
+    const choice = chooseOvernightFire(remaining, run, ports.now, lastFired, previousFired);
     if (choice.act === 'end') {
       // The chooser can only say the tree ran out, and once anything has been
       // refused that is no longer the whole truth: the reason has to name them,
@@ -783,7 +735,12 @@ export async function overnightTick(ports: OvernightPorts): Promise<OvernightTic
         // With sessions going, what is ready may only be in their modules, and
         // one of them finishing changes that. Said as waiting on them.
         if (inFlight.length > 0 && refused.length === 0) {
-          return { act: 'waiting', liveness: waitingOn(inFlight), running: inFlight.length };
+          return {
+            act: 'waiting',
+            liveness: waitingOn(inFlight),
+            running: inFlight.length,
+            atOnce,
+          };
         }
         return { act: 'nothing-ready', reason };
       }
@@ -869,6 +826,8 @@ const STALL_RUN_READ = 1000;
 
 type StallRunRow = {
   id: string;
+  /** Absent reads as a build run. */
+  job?: string | null;
   plan_item_id: string;
   status: string;
   created_at: string;
@@ -877,6 +836,46 @@ type StallRunRow = {
   error: string | null;
 };
 
+/**
+ * Dismiss the open raises about features that no longer need them: done or
+ * dropped, or with every open step now waiting on something the plan shows. A
+ * failure is logged: a stale raise costs a glance, and the tick has work to do.
+ */
+async function dismissRaisesAbout(
+  supabase: Db,
+  userId: string,
+  finished: ReadonlySet<string>,
+): Promise<void> {
+  if (finished.size === 0) return;
+  const { data, error } = await supabase
+    .from('raised_items')
+    .select('id, source')
+    .eq('user_id', userId)
+    .eq('status', 'open')
+    .or('source.like.overnight held *,source.like.stalled *');
+  if (error) {
+    console.error(`the raises about settled features could not be read: ${error.message}`);
+    return;
+  }
+  const stale = ((data ?? []) as { id: string; source: string | null }[])
+    .filter((row) => {
+      const feature = raiseFeatureId(row.source);
+      return feature !== null && finished.has(feature);
+    })
+    .map((row) => row.id);
+  if (stale.length === 0) return;
+  const { error: writeError } = await supabase
+    .from('raised_items')
+    .update({ status: 'dismissed' })
+    .eq('user_id', userId)
+    .in('id', stale);
+  if (writeError) {
+    console.error(`the raises about settled features could not be dismissed: ${writeError.message}`);
+  } else {
+    console.log(`overnight: dismissed ${stale.length} raise(s) about settled features.`);
+  }
+}
+
 type HeldRaiseRow = {
   source: string | null;
   status: string;
@@ -884,43 +883,74 @@ type HeldRaiseRow = {
   answered_at: string | null;
 };
 
+/** What the stall check settled: features to hold, and features to try again. */
+export type StallVerdict = {
+  /** Held from the runner: a diagnosis is running, or a raise holds it. */
+  held: string[];
+  /**
+   * A diagnosis has ended since the newest build run, so the in-night guard's
+   * hold is lifted and the runner may send it once more.
+   */
+  released: string[];
+};
+
 /**
- * Raise each approved feature whose last two runs closed nothing, and say
- * which features a raise holds (plan #1803; the rules are `lib/plan/stall.ts`).
+ * Deal with each approved feature whose last two build runs closed nothing
+ * (plan #1803; the rules are `stallMove` in lib/plan/stall.ts).
  *
- * Two reads: the account's newest build runs, and its raises about held
- * features of either kind. Every run on a feature counts, whoever sent it, so
- * this sees stalls the in-night guard cannot. A raise that cannot be written
- * is logged and the next feature is tried.
+ * Sending such a feature again as it stands reached the same wall each time,
+ * so the first answer is a diagnosis: one `unstick` run that finds the wall
+ * and either fixes it or writes the blocker where the plan shows it. Only when
+ * a build after that diagnosis still closes nothing is the person asked. A
+ * feature whose open steps all wait is left alone: the plan already says what
+ * each waits on, and the runner does not choose it.
+ *
+ * Two reads: the account's newest build and diagnosis runs, and its raises
+ * about held features of either kind. Every run on a feature counts, whoever
+ * sent it, so this sees stalls the in-night guard cannot. A raise or a
+ * diagnosis that cannot be started is logged and the next feature is tried.
  */
 export async function fileStalls(input: {
   supabase: Db;
   userId: string;
   sections: readonly PlanSection[];
   now?: number;
-}): Promise<string[]> {
+  /** Send a diagnosis at a stalled feature. Left out, none is sent. */
+  diagnose?: (
+    feature: PlanNode,
+    runs: readonly StallRun[],
+  ) => Promise<{ ok: boolean; error?: string }>;
+}): Promise<StallVerdict> {
   const { supabase, userId, sections } = input;
+  const verdict: StallVerdict = { held: [], released: [] };
 
-  // The approved features, and every row beneath each, by id.
+  // The approved features, and every row beneath each, by id. The finished
+  // ones are kept apart so a raise still open about one can be put away.
   const features = new Map<string, PlanNode>();
   const featureOf = new Map<string, string>();
+  const settled = new Set<string>();
   for (const section of sections) {
     for (const node of section.nodes) {
-      if (node.status === 'done' || node.status === 'dropped' || node.status === 'proposed') {
+      if (node.status === 'done' || node.status === 'dropped') {
+        settled.add(node.id);
         continue;
       }
+      if (node.status === 'proposed') continue;
       features.set(node.id, node);
       for (const row of flatten([node])) featureOf.set(row.id, node.id);
     }
   }
-  if (features.size === 0) return [];
+  if (features.size === 0) {
+    await dismissRaisesAbout(supabase, userId, settled);
+    return verdict;
+  }
 
   const [runRead, heldRead, stallRead] = await Promise.all([
     supabase
       .from('plan_runs')
-      .select('id, plan_item_id, status, created_at, stop_reason, stop_pieces, error')
+      .select('id, job, plan_item_id, status, created_at, stop_reason, stop_pieces, error')
       .eq('user_id', userId)
-      .in('job', [...STALL_JOBS])
+      .in('job', [...STALL_JOBS, 'unstick'])
       .not('plan_item_id', 'is', null)
       .order('created_at', { ascending: false })
       .limit(STALL_RUN_READ),
@@ -938,16 +968,29 @@ export async function fileStalls(input: {
   const readError = runRead.error ?? heldRead.error ?? stallRead.error;
   if (readError) throw new Error(readError.message);
 
-  const runs: StallRun[] = ((runRead.data ?? []) as StallRunRow[]).map((row) => ({
-    id: row.id,
-    planItemId: row.plan_item_id,
-    status: row.status,
-    createdAt: row.created_at,
-    stopReason: row.stop_reason,
-    stopPieces: row.stop_pieces,
-    error: row.error,
-  }));
+  const rows = (runRead.data ?? []) as StallRunRow[];
+  const runs: StallRun[] = rows
+    .filter((row) => row.job !== 'unstick')
+    .map((row) => ({
+      id: row.id,
+      planItemId: row.plan_item_id,
+      status: row.status,
+      createdAt: row.created_at,
+      stopReason: row.stop_reason,
+      stopPieces: row.stop_pieces,
+      error: row.error,
+    }));
   const byFeature = runsByFeature(runs, (id) => featureOf.get(id) ?? null);
+  const unsticks = new Map<string, UnstickRun[]>();
+  for (const row of rows) {
+    if (row.job !== 'unstick') continue;
+    const feature = featureOf.get(row.plan_item_id);
+    if (!feature) continue;
+    unsticks.set(feature, [
+      ...(unsticks.get(feature) ?? []),
+      { createdAt: row.created_at, status: row.status, stopReason: row.stop_reason },
+    ]);
+  }
 
   const raises = new Map<string, FeatureRaise[]>();
   for (const row of [...(heldRead.data ?? []), ...(stallRead.data ?? [])] as HeldRaiseRow[]) {
@@ -959,24 +1002,69 @@ export async function fileStalls(input: {
   }
 
   const now = new Date(input.now ?? Date.now()).toISOString();
-  const held: string[] = [];
   for (const [id, feature] of features) {
     const last = byFeature.get(id) ?? [];
     const filed = raises.get(id) ?? [];
-    if (shouldRaiseStall(last, filed)) {
-      const { error } = await supabase
-        .from('raised_items')
-        .insert({ user_id: userId, ...stallRaise(feature, last, featureSteps(feature)), status: 'open' });
+    const diagnoses = unsticks.get(id) ?? [];
+    const waits = waitingSteps(feature);
+    const move = stallMove(last, diagnoses, waits === null);
+
+    // Stalled with every open step waiting: the plan shows the waits, so a
+    // raise asking to send it again asks nothing.
+    if (waits !== null && isStalled(last)) {
+      settled.add(id);
+      continue;
+    }
+
+    if (move === 'diagnose') {
+      if (!input.diagnose) continue;
+      try {
+        const sent = await input.diagnose(feature, last);
+        if (sent.ok) {
+          console.log(`overnight: sent a diagnosis at #${feature.number}, its last two runs closed nothing.`);
+          verdict.held.push(id);
+        } else {
+          console.error(`#${feature.number} could not be sent a diagnosis: ${sent.error ?? 'failed'}`);
+        }
+      } catch (err) {
+        console.error(
+          `#${feature.number} could not be sent a diagnosis: ${err instanceof Error ? err.message : 'failed'}`,
+        );
+      }
+      continue;
+    }
+    if (move === 'hold') {
+      verdict.held.push(id);
+      continue;
+    }
+    if (move === 'release') {
+      verdict.released.push(id);
+      continue;
+    }
+
+    if (move === 'raise' && shouldRaiseStall(last, filed)) {
+      const found = diagnoses.find((run) => run.stopReason)?.stopReason ?? null;
+      const { error } = await supabase.from('raised_items').insert({
+        user_id: userId,
+        ...stallRaise(feature, last, featureSteps(feature), stuckStep(feature), found),
+        status: 'open',
+      });
       if (error) {
         console.error(`#${feature.number} could not be raised as stalled: ${error.message}`);
       } else {
-        console.log(`overnight: raised #${feature.number}, its last two runs closed nothing.`);
+        console.log(`overnight: raised #${feature.number}, a diagnosis did not get it moving.`);
         filed.push({ status: 'open', createdAt: now, answeredAt: null });
       }
     }
-    if (raiseHolds(filed, last[0]?.createdAt ?? null)) held.push(id);
+    if (raiseHolds(filed, last[0]?.createdAt ?? null)) verdict.held.push(id);
   }
-  return held;
+
+  // A raise asking to send a feature that has since been finished, or whose
+  // steps all wait, asks nothing: #1104 was done on 11 October with its "send
+  // it again?" still open. Dismissed rather than answered, since nobody
+  // answered it.
+  await dismissRaisesAbout(supabase, userId, settled);
+  return verdict;
 }
 
 /**
@@ -1147,8 +1235,9 @@ function portsFor(input: {
   userId: string;
   now: number;
   fetch?: typeof globalThis.fetch;
+  atOnce?: number;
 }): OvernightPorts {
-  const { supabase, userId, now } = input;
+  const { supabase, userId, now, atOnce } = input;
   let sections: readonly PlanSection[] | null = null;
   // Both fire readings come from one read of the account's feature runs.
   let fires: ReturnType<typeof featureFires> | null = null;
@@ -1160,6 +1249,7 @@ function portsFor(input: {
 
   return {
     now,
+    atOnce,
     loadRun: () => loadOvernightRun(supabase, userId),
     loadSections,
     lastFiredAt: async () => (await readFires()).last,
@@ -1217,42 +1307,15 @@ function portsFor(input: {
       const { error } = await stopOvernightRun({ supabase, userId, reason, now: new Date(now) });
       if (error) console.error(`the overnight run could not be ended: ${error}`);
     },
-    stalls: (planSections) => fileStalls({ supabase, userId, sections: planSections, now }),
-    raiseHeld: async (held) => {
-      for (const one of held) {
-        const raise = heldRaise(one);
-        // Any raise for this fire, open or closed: a raise answered no stays
-        // answered until the feature is sent again and a new fire is held.
-        const { data: filed, error: readError } = await supabase
-          .from('raised_items')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('source', raise.source)
-          .limit(1);
-        if (readError) {
-          console.error(`the raises could not be read for #${one.number}: ${readError.message}`);
-          continue;
-        }
-        if ((filed ?? []).length > 0) continue;
-        // One open raise per feature (plan #1803): a stall raise filed for it
-        // already asks the same question with the cause.
-        const { data: open, error: openError } = await supabase
-          .from('raised_items')
-          .select('id')
-          .eq('user_id', userId)
-          .eq('status', 'open')
-          .like('source', `%${one.id}%`)
-          .limit(1);
-        if (openError) {
-          console.error(`the raises could not be read for #${one.number}: ${openError.message}`);
-          continue;
-        }
-        if ((open ?? []).length > 0) continue;
-        const { error } = await supabase.from('raised_items').insert({ user_id: userId, ...raise });
-        if (error) console.error(`#${one.number} could not be raised: ${error.message}`);
-        else console.log(`overnight: raised #${one.number}, held for good, on /dev/inbox.`);
-      }
-    },
+    stalls: (planSections) =>
+      fileStalls({
+        supabase,
+        userId,
+        sections: planSections,
+        now,
+        diagnose: (feature, runs) =>
+          startUnstick({ supabase, userId, sections: planSections, feature, runs }),
+      }),
   };
 }
 
@@ -1372,14 +1435,23 @@ export async function runOvernightTick(
 
   for (const userId of users) {
     try {
-      const tick = await overnightTick(portsFor({ supabase, userId, now, fetch: input.fetch }));
-      results[userId] = tick;
-      if (tick.act === 'fired') fired += 1;
-      // After the features, so it reads the budget they left. It reads the
-      // row again and holds to the same verdict, and a failure in it is
+      // Goals first, so the feature half knows whether the goals seat is
+      // free. It reads the row and holds to the same verdict as the feature
+      // half, which is still what ends the night, and a failure in it is
       // reported beside the feature half rather than costing it.
       const goal = await goalsHalf(goalsNight, userId);
       goals[userId] = goal;
+      const tick = await overnightTick(
+        portsFor({
+          supabase,
+          userId,
+          now,
+          fetch: input.fetch,
+          atOnce: featureSessionsAtOnce(goalsIdle(goal)),
+        }),
+      );
+      results[userId] = tick;
+      if (tick.act === 'fired') fired += 1;
       const note = [tickNote(tick), goalsNightNote(goal)].filter(Boolean).join(' ');
       await recordTick(supabase, userId, now, note === '' ? null : note);
       // A tick that fires says so; a tick that waits used to say nothing at
@@ -1471,6 +1543,14 @@ export async function sweepQuietRuns(input: {
     console.log(`overnight: wrote back ${tally.finished} finished and ${tally.failed} failed run(s).`);
   }
   return tally;
+}
+
+/**
+ * The goals half had nothing to start and nothing going, so its seat can go to
+ * a fourth feature. A failure or a run still going keeps the seat for goals.
+ */
+export function goalsIdle(tick: GoalsNightTick): boolean {
+  return tick.act === 'nothing-ready' || tick.act === 'no-routine';
 }
 
 /** The goals half of one account's tick, with a failure turned into a result. */

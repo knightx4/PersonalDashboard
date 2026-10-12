@@ -469,7 +469,8 @@ describe('todos', () => {
 describe('goal_status', () => {
   const tables: Tables = {
     'goals.items': [
-      { id: 'g1', user_id: ME, level: 'goal', status: 'open', title: 'Land a finance role', due_on: null, archived_at: null, position: 1 },
+      // Dated, so its on_track verdict stands: a goal with no date keeps only a met or pace verdict (plan #1738).
+      { id: 'g1', user_id: ME, level: 'goal', status: 'open', title: 'Land a finance role', due_on: '2026-12-31', archived_at: null, position: 1 },
       { id: 'g2', user_id: ME, level: 'goal', status: 'proposed', title: 'Run a half', due_on: null, archived_at: null, position: 2 },
       { id: 's1', user_id: ME, level: 'step', status: 'open', title: 'A step', due_on: null, archived_at: null, position: 3 },
       { id: 'g3', user_id: THEM, level: 'goal', status: 'open', title: 'Theirs', due_on: null, archived_at: null, position: 1 },
@@ -492,7 +493,7 @@ describe('goal_status', () => {
         href: '/goals/g1',
         detail: {
           status: 'open',
-          due_on: null,
+          due_on: '2026-12-31',
           verdict: 'On track',
           reviewed_on: '2026-09-26',
           why: 'Two applications out.',

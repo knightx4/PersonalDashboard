@@ -29,7 +29,7 @@ npx tsx scripts/plan.ts done <n> --note "…"    # close it; records HEAD commit
 npx tsx scripts/plan.ts answer <n> --note "…"  # the person's move. Never yours.
 npx tsx scripts/plan.ts block <n> --ask "…" [--on-steps] [--note "…"]
               # the ask names what the person does; "nothing needed from you" is refused.
-              # A step that only waits on time or a run stays in progress with a check-back.
+              # A step that waits on data, time or a run gets a check-back --from <n>, which holds it.
                                                # cannot proceed; the ask is the one sentence
                                                # saying what it needs, rewritten each time.
                                                # --on-steps: it clears itself when the steps it
@@ -55,6 +55,8 @@ npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
 npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet about
                                                # finishing this feature, one patch;
                                                # --clear once it can be seen
+npx tsx scripts/plan.ts activity <n> --kind thought|action|question|error --body "…" [--option "…"]
+                                               # a line on your run (see building.md, run lines)
 npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
                                                # file a follow-on on /dev/ideas; it lands
                                                # marked as your suggestion, under the
@@ -308,6 +310,7 @@ Each is one file. Read the one you were sent for; do not read the others.
 | `reference/building.md` | Building one step, start to close. What a subagent reads. |
 | `reference/shaping.md` | Turning an idea into a proposed feature, or an approved spec change into approved work. |
 | `reference/reshaping.md` | Re-reading a feature against the answers beneath it. |
+| `reference/unsticking.md` | Finding out why a feature stalled, and fixing it or writing what it waits on. |
 | `reference/overhaul.md` | Working an overhaul: the design session, the three phases, the review against the Contract. |
 | `reference/overhaul-routine.md` | The standing prompt for the routine that works an overhaul, and how to set it up. |
 | `reference/comments.md` | Answering a comment that tags `@dash`. |

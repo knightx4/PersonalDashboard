@@ -1,15 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { attachDependencies } from './dependencies';
 import { buildForest, markStartDates, type Step } from './steps';
-import { dailyView } from './daily';
-import {
-  canShowOnTodo,
-  focusRhythms,
-  goalsForTodo,
-  goalTodoSteps,
-  todoSteps,
-  unreadDashResults,
-} from './todo';
+import { canShowOnTodo, todoSteps } from './todo';
 import type { Goal } from './tree';
 
 function goal(id: string, extra: Partial<Goal> = {}): Goal {
@@ -58,6 +49,20 @@ function run(goals: Goal[], steps: Step[]) {
 }
 
 describe('todoSteps', () => {
+  it('puts nothing on Todo when nothing was sent, not even a goal\'s next step', () => {
+    const out = run(
+      [goal('g'), goal('h')],
+      [
+        step('next', 'g'),
+        step('due', 'h', { dueOn: '2026-10-01' }),
+        step('claude', 'g', { kind: 'claude' }),
+        step('rhythm', 'h', { kind: 'rhythm', rhythmCount: 3, rhythmPeriod: 'week' }),
+        step('question', 'g', { kind: 'decision' }),
+      ],
+    );
+    expect(out).toEqual([]);
+  });
+
   it('lists flagged open steps of yours with their goal and due date', () => {
     const out = run(
       [goal('g')],
@@ -68,8 +73,22 @@ describe('todoSteps', () => {
       ],
     );
     expect(out).toEqual([
-      { id: 'flagged', title: 'flagged', dueOn: '2026-10-01', startsOn: null, goalId: 'g', goalTitle: 'Goal g' },
-      { id: 'deep', title: 'deep', dueOn: null, startsOn: null, goalId: 'g', goalTitle: 'Goal g' },
+      { id: 'flagged', title: 'flagged', dueOn: '2026-10-01', startsOn: null, goalId: 'g', goalTitle: 'Goal g', reason: null },
+      { id: 'deep', title: 'deep', dueOn: null, startsOn: null, goalId: 'g', goalTitle: 'Goal g', reason: null },
+    ]);
+  });
+
+  it("carries Dash's reason for a step Dash sent, and none for one you sent", () => {
+    const out = run(
+      [goal('g')],
+      [
+        step('sent', 'g', { onTodo: true, onTodoBy: 'claude', onTodoReason: 'Due on the 13th' }),
+        step('mine', 'g', { onTodo: true, onTodoBy: 'me', onTodoReason: 'ignored' }),
+      ],
+    );
+    expect(out.map((s) => [s.id, s.reason])).toEqual([
+      ['sent', 'Due on the 13th'],
+      ['mine', null],
     ]);
   });
 
@@ -138,235 +157,5 @@ describe('canShowOnTodo', () => {
     expect(canShowOnTodo({ kind: 'mine', status: 'done' })).toBe(false);
     expect(canShowOnTodo({ kind: 'claude', status: 'open' })).toBe(false);
     expect(canShowOnTodo({ kind: 'decision', status: 'open' })).toBe(false);
-  });
-});
-
-describe('goalTodoSteps', () => {
-  const today = '2026-09-29';
-
-  function pick(goals: Goal[], steps: Step[]) {
-    const { byGoal } = buildForest(
-      goals.map((g) => g.id),
-      steps,
-    );
-    markStartDates(byGoal, today);
-    return goalTodoSteps(
-      goals.map((g) => ({ goal: g, areaName: 'Area' })),
-      byGoal,
-      today,
-    );
-  }
-
-  it("puts each open goal's next step of yours on Todo with nothing pressed, one per goal", () => {
-    const out = pick(
-      [goal('a'), goal('b')],
-      [
-        step('a1', 'a'),
-        step('a2', 'a'),
-        step('b1', 'b', { dueOn: '2026-10-20' }),
-        step('b2', 'b', { dueOn: '2026-10-05' }),
-      ],
-    );
-    expect(out).toEqual([
-      { id: 'a1', title: 'a1', dueOn: null, startsOn: null, goalId: 'a', goalTitle: 'Goal a', next: true },
-      { id: 'b2', title: 'b2', dueOn: '2026-10-05', startsOn: null, goalId: 'b', goalTitle: 'Goal b', next: true },
-    ]);
-  });
-
-  it('takes the next step only from goals in focus once a focus is chosen', () => {
-    const out = pick(
-      [
-        goal('focus', { focus: true }),
-        goal('rest'),
-        goal('errand', { errand: true, dueOn: '2026-10-03' }),
-        goal('later', { errand: true, dueOn: '2026-11-20' }),
-      ],
-      [
-        step('f1', 'focus'),
-        step('r1', 'rest'),
-        step('flagged', 'rest', { onTodo: true }),
-        step('e1', 'errand'),
-        step('l1', 'later'),
-      ],
-    );
-    expect(out.map((s) => [s.id, Boolean(s.next)])).toEqual([
-      ['flagged', false],
-      ['f1', true],
-      ['e1', true],
-    ]);
-  });
-
-  it('keeps an overdue next step at its own due date, which the Goals home blanks', () => {
-    const out = pick([goal('g')], [step('late', 'g', { dueOn: '2026-09-01' })]);
-    expect(out.map((s) => [s.id, s.dueOn])).toEqual([['late', '2026-09-01']]);
-  });
-
-  it('puts nothing there for a parked or proposed goal', () => {
-    const out = pick(
-      [goal('parked', { status: 'parked' }), goal('proposed', { status: 'proposed' })],
-      [step('p1', 'parked'), step('q1', 'proposed')],
-    );
-    expect(out).toEqual([]);
-  });
-
-  it('skips a step for later and a step with open steps under it, taking the next one', () => {
-    const out = pick(
-      [goal('g')],
-      [
-        step('later', 'g', { startsOn: '2026-11-01' }),
-        step('parent', 'g'),
-        step('child', 'parent'),
-      ],
-    );
-    expect(out.map((s) => s.id)).toEqual(['child']);
-  });
-
-  it('puts nothing there for a step that waits on another, which Todo shows instead', () => {
-    const goals = [goal('g'), goal('h')];
-    const { byGoal, nodes } = buildForest(
-      goals.map((g) => g.id),
-      [step('waits', 'g'), step('first', 'h')],
-    );
-    attachDependencies(byGoal, nodes, [{ id: 'd', itemId: 'waits', dependsOnId: 'first' }]);
-    const out = goalTodoSteps(
-      goals.map((g) => ({ goal: g, areaName: 'Area' })),
-      byGoal,
-      today,
-    );
-    expect(out.map((s) => s.id)).toEqual(['first']);
-  });
-
-  it("puts nothing there when the only steps are Claude's, a question or a rhythm", () => {
-    const out = pick(
-      [goal('g')],
-      [
-        step('claude', 'g', { kind: 'claude' }),
-        step('question', 'g', { kind: 'decision' }),
-        step('rhythm', 'g', { kind: 'rhythm', rhythmCount: 2, rhythmPeriod: 'week' }),
-      ],
-    );
-    expect(out).toEqual([]);
-  });
-
-  it('lists a flagged step that is also the next step once, and keeps other flagged steps', () => {
-    const out = pick(
-      [goal('g')],
-      [step('first', 'g', { onTodo: true }), step('second', 'g', { onTodo: true })],
-    );
-    expect(out.map((s) => [s.id, s.next ?? false])).toEqual([
-      ['first', true],
-      ['second', false],
-    ]);
-  });
-});
-
-describe('goalsForTodo questions', () => {
-  const today = '2026-09-29';
-
-  function questions(goals: Goal[], steps: Step[]) {
-    const { byGoal } = buildForest(
-      goals.map((g) => g.id),
-      steps,
-    );
-    markStartDates(byGoal, today);
-    return goalsForTodo(
-      goals.map((g) => ({ goal: g, areaName: 'Area' })),
-      byGoal,
-      today,
-    ).questions;
-  }
-
-  it('lists each open question on an open goal with its detail and goal', () => {
-    const detail = 'A — Ship it. Fast.\nB — Wait. Safer.\nRecommend A.';
-    const out = questions(
-      [goal('g')],
-      [step('parent', 'g'), step('q', 'parent', { kind: 'decision', title: 'Which?', detail })],
-    );
-    expect(out).toEqual([{ id: 'q', title: 'Which?', detail, goalId: 'g', goalTitle: 'Goal g' }]);
-  });
-
-  it('leaves out an answered question, one put aside, one for later and one on a goal not open', () => {
-    const out = questions(
-      [goal('g'), goal('parked', { status: 'parked' })],
-      [
-        step('answered', 'g', { kind: 'decision', resolution: 'A', status: 'done' }),
-        step('aside', 'g', { kind: 'decision', dismissedAt: '2026-09-20T00:00:00Z' }),
-        step('later', 'g', { startsOn: '2026-11-01' }),
-        step('under-later', 'later', { kind: 'decision' }),
-        step('parked-q', 'parked', { kind: 'decision' }),
-        step('open', 'g', { kind: 'decision' }),
-      ],
-    );
-    expect(out.map((q) => q.id)).toEqual(['open']);
-  });
-
-  it('still picks the next step from the same pass', () => {
-    const out = goalsForTodo(
-      [{ goal: goal('g'), areaName: 'Area' }],
-      buildForest(['g'], [step('q', 'g', { kind: 'decision' }), step('mine', 'g')]).byGoal,
-      today,
-    );
-    expect(out.steps.map((s) => s.id)).toEqual(['mine']);
-    expect(out.questions.map((q) => q.id)).toEqual(['q']);
-  });
-});
-
-describe('unreadDashResults', () => {
-  const today = '2026-09-29';
-
-  function count(goals: Goal[], steps: Step[]) {
-    const { byGoal } = buildForest(
-      goals.map((g) => g.id),
-      steps,
-    );
-    return unreadDashResults(
-      dailyView(
-        goals.map((g) => ({ goal: g, areaName: 'Area' })),
-        byGoal,
-        today,
-      ),
-    );
-  }
-
-  it("counts Dash's results not yet read, and nothing read, empty or dropped", () => {
-    expect(
-      count(
-        [goal('g')],
-        [
-          step('a', 'g', { kind: 'claude', status: 'done', result: 'Found three.' }),
-          step('b', 'g', { kind: 'claude', status: 'done', resultUrl: 'https://example.com' }),
-          step('read', 'g', { kind: 'claude', status: 'done', result: 'x', reviewedAt: '2026-09-28T00:00:00Z' }),
-          step('empty', 'g', { kind: 'claude' }),
-          step('dropped', 'g', { kind: 'claude', status: 'dropped', result: 'x' }),
-        ],
-      ),
-    ).toBe(2);
-  });
-
-  it('is zero with nothing waiting, and on a goal that is not open', () => {
-    expect(count([goal('g')], [step('mine', 'g')])).toBe(0);
-    expect(
-      count([goal('p', { status: 'parked' })], [step('a', 'p', { kind: 'claude', status: 'done', result: 'x' })]),
-    ).toBe(0);
-  });
-});
-
-describe('focusRhythms', () => {
-  const today = '2026-10-06';
-  const rhythms = [
-    { id: 'r-focus', goalId: 'focus' },
-    { id: 'r-rest', goalId: 'rest' },
-  ];
-
-  it('keeps every rhythm while no focus is chosen', () => {
-    expect(focusRhythms(rhythms, [goal('focus'), goal('rest')], today).map((r) => r.id)).toEqual([
-      'r-focus',
-      'r-rest',
-    ]);
-  });
-
-  it("keeps only focus goals' rhythms once a focus is chosen", () => {
-    const goals = [goal('focus', { focus: true }), goal('rest')];
-    expect(focusRhythms(rhythms, goals, today).map((r) => r.id)).toEqual(['r-focus']);
   });
 });

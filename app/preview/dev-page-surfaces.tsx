@@ -13,6 +13,7 @@ import { SpecDocView } from '@/app/dev/specs/[slug]/spec-doc-view';
 import { ChangelogView } from '@/app/dev/changelog/changelog-view';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import { phoneShot } from './plan-surfaces';
+import { planRowRef, raiseRef } from '@/lib/dev/inbox-snoozes';
 import { RaisedView } from '@/app/dev/raised/raised-view';
 import { ConversationsView } from '@/app/dev/raised/conversations-view';
 import { StatusPanel } from '@/app/dev/raised/status-panel';
@@ -44,6 +45,7 @@ import { ruleStates } from '@/lib/specs/rule-states';
 import type { ChangelogEntry } from '@/lib/changelog/entries';
 import type { RaisedQueue, RaisedRow } from '@/lib/raised/load';
 import type { WaitingGroup, WaitingRow } from '@/lib/plan/waiting';
+import { PLAN_RUN_QUESTION } from './run-lines-surfaces';
 import type { Conversation } from '@/lib/comments/recent';
 import type { ConnectedApp } from '@/lib/connector/apps';
 
@@ -731,6 +733,8 @@ const groups: WaitingGroup[] = [
     key: 'questions',
     title: 'Questions for you',
     entries: [
+      // A run held on a question it asked partway (plan #1824).
+      { kind: 'run', id: PLAN_RUN_QUESTION.runId, question: PLAN_RUN_QUESTION },
       {
         kind: 'plan',
         id: 'w2',
@@ -831,11 +835,24 @@ export function DevRaisedSurface() {
 export function DevInboxSurface() {
   return column(
     <>
-      <PageHeader
-        title="Inbox"
-        description="Everything waiting on you: jobs to go and do, questions to answer, and proposals to say yes to. Answer one and the next run reads it."
+      <PageHeader title="Inbox" />
+      <RaisedView
+        queue={raisedQueue}
+        groups={groups}
+        snooze={{
+          // The question came back today; the two below are still put aside,
+          // one with the longest title a step gets.
+          back: [planRowRef('w2')],
+          snoozed: [
+            {
+              ref: planRowRef('w9'),
+              title: '#1612 Decide which of the three export formats the weekly digest should attach to every email it sends',
+              snoozedUntil: '2026-10-09T00:00:00',
+            },
+            { ref: raiseRef('r9'), title: 'The mail provider is rate limiting', snoozedUntil: '2026-10-14T00:00:00' },
+          ],
+        }}
       />
-      <RaisedView queue={raisedQueue} groups={groups} />
     </>,
   );
 }

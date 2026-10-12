@@ -14,6 +14,9 @@ import { FileBody } from '@/components/files/file-body';
 import { FileLinks } from '@/components/files/file-links';
 import { GoalNumber } from '@/app/goals/[goalId]/goal-number';
 import { WaitingOnYou } from '@/app/goals/[goalId]/goal-flags';
+import { GoalLogDone } from '@/app/goals/[goalId]/goal-log-done';
+import { GoalSuggestions } from '@/app/goals/[goalId]/goal-suggestions';
+import type { Suggestion } from '@/lib/goals/suggestions';
 import { GoalFog, GoalShaping } from '@/app/goals/[goalId]/goal-shaping';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
 import type { InformationSeam } from '@/app/goals/[goalId]/information-step';
@@ -34,8 +37,11 @@ import { GoalDetail, GoalDoneWhen } from '@/app/goals/[goalId]/goal-detail';
 import { GoalActivity } from '@/app/goals/[goalId]/goal-activity';
 import { closedSteps, goalStages } from '@/lib/goals/goal-page';
 import { goalProgress } from '@/lib/goals/status';
+import { BurnUpChart } from '@/components/ui/burn-up-chart';
+import { MONTH_DAYS } from './burn-up-surfaces';
 import { goalMapWith } from './goal-surfaces';
 import { SetTab } from './set-tab';
+import { GOAL_RUN_QUESTION } from './run-lines-surfaces';
 
 /**
  * The Goals home, All goals, the top of a goal page and an information step,
@@ -82,6 +88,9 @@ const cards = goal('g-cards', 'a-money', 'Pay off the credit cards', {
   acceptance: 'Every card at a zero balance.',
   unit: '$',
   target: 0,
+  // A quarter, not a day: it reads "Q2 2027" wherever the date appears (plan #1840).
+  dueOn: '2027-06-30',
+  duePrecision: 'quarter',
   createdAt: '2026-06-02T09:00:00Z',
 });
 const fund = goal('g-fund', 'a-money', 'Build an emergency fund', {
@@ -154,6 +163,7 @@ const home: Omit<ComponentProps<typeof HomeView>, 'timeZone'> = {
       action: 'Answer',
       unblocks: 3,
       on: null,
+      backFromSnooze: true,
     },
     {
       kind: 'step',
@@ -408,7 +418,7 @@ export function GoalsInboxSurface() {
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader title="Inbox" />
       <GoalsInboxView
-        groups={goalInboxGroups(home.onYou, home.dash ?? [])}
+        groups={goalInboxGroups(home.onYou, home.dash ?? [], [GOAL_RUN_QUESTION])}
         laterOn={home.laterOn ?? []}
         preparable={home.preparable ?? []}
         canRun
@@ -614,6 +624,15 @@ const cardFiles = [
     fileId: 'f-rates',
     title: 'Which card to pay first',
     summary: 'Paying the 27% card first saves about $310 over paying the smaller balance first.',
+    meta: 'Written by Dash for “Compare the two cards’ rates” · version 2',
+    byDash: true,
+  },
+  {
+    fileId: 'f-letter',
+    title: 'A letter asking Chase to lower the rate on the Sapphire card',
+    summary: 'Asks for the rate to drop from 27% to the 19% offered to new cardholders, citing four years of on-time payments.',
+    meta: 'Written by Dash for “Draft the letter asking for a lower rate”',
+    byDash: true,
   },
 ];
 
@@ -659,6 +678,42 @@ export function FileSurface() {
   );
 }
 
+/** What Dash suggests on the cards goal (plan #1739). */
+const CARD_SUGGESTIONS: Suggestion[] = [
+  {
+    id: 'sg-autopay',
+    itemId: 'g-cards',
+    kind: 'step',
+    acceptedStepId: null,
+    title: 'Set autopay on the 27% card to $300 a month',
+    detail: 'The comparison found paying it first saves about $310.',
+    url: null,
+    place: null,
+    source: null,
+    happensOn: null,
+    startsAt: null,
+    reaction: null,
+    attended: null,
+    createdAt: '2026-10-11T08:00:00Z',
+  },
+  {
+    id: 'sg-rate',
+    itemId: 'g-cards',
+    kind: 'step',
+    acceptedStepId: null,
+    title: 'Ask the bank for a lower rate on the smaller card',
+    detail: null,
+    url: null,
+    place: null,
+    source: null,
+    happensOn: null,
+    startsAt: null,
+    reaction: null,
+    attended: null,
+    createdAt: '2026-10-11T08:00:00Z',
+  },
+];
+
 /**
  * The top of a goal page that has something in each part of its header
  * (plan #1078): Dash's verdict and the status line, the next move, Dash's
@@ -691,7 +746,7 @@ export function GoalTopSurface() {
         <GoalDoneWhen goal={cards} />
         <div className="space-y-4">
           <GoalStatusCard
-            line="3 on you · 1 step ready for Dash · usually every 5 days, last 2 days ago"
+            line="3 on you · 1 step ready for Dash · by Q2 2027 · usually every 5 days, last 2 days ago"
             brief={{
               id: 'brief-1',
               itemId: cards.id,
@@ -701,6 +756,7 @@ export function GoalTopSurface() {
             }}
             briefWhen="today"
             current
+            change="Since 8 Oct: 2 steps closed, 1 added, due date moved from 3 Nov to 20 Nov."
             review={cardsReview}
             ask={
               <GoalShaping
@@ -719,7 +775,16 @@ export function GoalTopSurface() {
               />
             }
           />
-          <GoalNumber goalId={cards.id} unit="$" target={0} readings={readings} today={TODAY} />
+          <GoalLogDone goalId={cards.id} />
+          <GoalNumber
+            goalId={cards.id}
+            unit="$"
+            target={0}
+            dueOn={cards.dueOn}
+            duePrecision={cards.duePrecision}
+            readings={readings}
+            today={TODAY}
+          />
           <WaitingOnYou
             rows={[
               {
@@ -748,6 +813,12 @@ export function GoalTopSurface() {
             questions={{ which }}
           />
         </div>
+        <BurnUpChart days={MONTH_DAYS} />
+        <GoalSuggestions
+          goalId={cards.id}
+          suggestions={CARD_SUGGESTIONS}
+          helpKinds={[{ kind: 'reading', note: 'paying down debt' }]}
+        />
         <GoalLinksSection goalId={cards.id} links={links} aimChoices={aimChoices} jobsOn />
         <section aria-labelledby="files-heading" className="space-y-2">
           <h2 id="files-heading" className="px-1 text-ui font-semibold text-ink">

@@ -51,6 +51,7 @@ const update: PlanUpdate = {
   stepsTotal: 3,
   session: null,
   createdAt: '2026-10-03T12:00:00Z',
+  snapshot: null,
 };
 
 describe('datedLines', () => {
@@ -195,6 +196,64 @@ describe('featureActivity', () => {
       '2026-10-02',
       '2026-10-01',
     ]);
+  });
+});
+
+describe('featureActivity with the history', () => {
+  // Blocked and answered on the 12th, started again and closed on the 13th.
+  const f = feature([
+    item({ id: 'f', number: 20, title: 'History' }),
+    item({
+      id: 's',
+      number: 21,
+      parentId: 'f',
+      title: 'Read the history',
+      status: 'done',
+      commitSha: 'feedface99',
+      startedAt: '2026-10-13T08:00:00Z',
+      completedAt: '2026-10-13T09:30:00Z',
+      comment:
+        'Blocked 2026-10-09: before the history.\n\nBlocked 2026-10-12: which table?\n\nAnswered 2026-10-12: plan_history\n\nDone 2026-10-13: Reads it.',
+    }),
+  ]);
+  const change = (id: string, oldStatus: string, newStatus: string, actor: 'me' | 'claude', createdAt: string) => ({
+    id,
+    stepId: 's',
+    oldStatus,
+    newStatus,
+    actor,
+    createdAt,
+  });
+  const entries = featureActivity(f, {
+    history: [
+      change('1', 'not_started', 'in_progress', 'claude', '2026-10-12T07:00:00Z'),
+      change('2', 'in_progress', 'blocked', 'claude', '2026-10-12T07:41:00Z'),
+      change('3', 'blocked', 'not_started', 'me', '2026-10-12T19:05:00Z'),
+      change('4', 'not_started', 'in_progress', 'claude', '2026-10-13T08:00:00Z'),
+      change('5', 'in_progress', 'done', 'claude', '2026-10-13T09:30:00Z'),
+      // A row whose status did not change is not a status change.
+      change('6', 'done', 'done', 'claude', '2026-10-13T10:00:00Z'),
+    ],
+  });
+  const on = (kind: string) => entries.filter((entry) => entry.kind === kind && entry.subject.number === 21);
+
+  it('times each change since the history began, with who made it', () => {
+    expect(on('blocked').map((entry) => [entry.at, entry.dayOnly, entry.who, entry.detail])).toEqual([
+      ['2026-10-12T07:41:00Z', false, 'dash', 'which table?'],
+      // Older than the history: still read from its line, by the day.
+      ['2026-10-09T00:00:00.000Z', true, null, 'before the history.'],
+    ]);
+    expect(on('answered')).toMatchObject([
+      { at: '2026-10-12T19:05:00Z', dayOnly: false, who: 'you', detail: 'plan_history' },
+    ]);
+    expect(on('started').map((entry) => entry.at)).toEqual(['2026-10-13T08:00:00Z', '2026-10-12T07:00:00Z']);
+  });
+
+  it('lists a change the columns also hold once, with the close note and commit', () => {
+    expect(on('closed')).toMatchObject([
+      { at: '2026-10-13T09:30:00Z', dayOnly: false, who: 'dash', detail: 'Reads it.', sha: 'feedface99' },
+    ]);
+    expect(entries.filter((entry) => entry.dayOnly)).toHaveLength(1);
   });
 });
 

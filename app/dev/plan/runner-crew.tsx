@@ -1,17 +1,19 @@
 import { DashMark, type DashLook } from '@/components/ui/dash-mark';
 import type { FeatureProgress } from '@/lib/digest/night';
 import { Disclosure } from '@/components/ui/disclosure';
+import { Meter } from '@/components/ui/meter';
 import { SLOT_ASLEEP_DEFAULT, type RunnerSlot, type SlotId } from '@/lib/plan/overnight-slots';
 
 /**
  * The runner's four Dashes, one for each thing it can run at once (plan
- * #1704): three feature sessions and the goals run. Each wears its own hat, so
- * the eye can follow one from glance to glance, and shows one of three states
- * with what goes with it to its right.
+ * #1704): three feature sessions and the goals seat, which a fourth feature
+ * takes while goals has nothing to start. They stack in one column. Each wears
+ * its own hat, so the eye can follow one from glance to glance, and shows one
+ * of three states with what goes with it to its right.
  *
  *   idle     the runner is off or held. "Not running", or "Held".
- *   working  a session is going in that slot: the step and its title, then
- *            the workspace and how long.
+ *   working  a session is going in that slot: the feature it is on, the
+ *            workspace and how long, and a meter of the feature's steps done.
  *   asleep   the runner is on and the slot has nothing ready: the tick's
  *            reason.
  *
@@ -23,6 +25,8 @@ const LOOKS: Record<SlotId, DashLook> = {
   'feature-1': 'top-hat',
   'feature-2': 'ball-cap',
   'feature-3': 'cowboy-hat',
+  // The fourth feature sits in the goals seat, so it wears the goals hat.
+  'feature-4': 'newsboy-cap',
   goals: 'newsboy-cap',
 };
 
@@ -54,6 +58,16 @@ function SlotText({
           {work.title ?? 'a run with no step recorded'}
         </span>
         {meta && <span className="block truncate text-small text-ink-muted">{meta}</span>}
+        {progress && (
+          <Meter
+            value={progress.done}
+            max={progress.total}
+            label={`${work.ref ?? 'The feature'}: ${progress.done} of ${progress.total} steps done`}
+            minFraction={0.04}
+            moves
+            className="mt-1.5 max-w-sm"
+          />
+        )}
       </>
     );
   }
@@ -91,7 +105,7 @@ export function RunnerCrew({
   held?: boolean;
 }) {
   return (
-    <ul aria-label="What each of the runner's four sessions is doing" className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+    <ul aria-label="What each of the runner's four sessions is doing" className="flex flex-col gap-3">
       {slots.map((slot) => (
         <li key={slot.slot} className="flex min-w-0 items-start gap-3">
           <DashMark
@@ -111,7 +125,7 @@ export function RunnerCrew({
               held={held}
               progress={
                 slot.state === 'working' && slot.work.step !== null
-                  ? (progress[`#${slot.work.step}`] ?? null)
+                  ? (slot.work.progress ?? progress[`#${slot.work.step}`] ?? null)
                   : null
               }
             />

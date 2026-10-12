@@ -18,9 +18,10 @@
 
 /**
  * Verdicts that let a surface through: the critic's `pass`, and `accepted`,
- * which the person writes from /dev/plan for a screen they let through after
- * the critic's last round (plan #1610, migration 0175). The critic never
- * writes `accepted`.
+ * written for a screen let through after the critic's last round (plan
+ * #1610, migration 0175): by the person from /dev/plan, or by the session
+ * that built it (`uiSettleSql`), whose notes open "Settled by Dash". The
+ * critic never writes `accepted`.
  */
 export const PASSING_VERDICTS: readonly string[] = ['pass', 'accepted'];
 
@@ -139,6 +140,8 @@ export function uiCheckRefusal(input: {
     `${missing.length === 1 ? 'its surface' : `${missing.length} of its surfaces`}: ${which}. ` +
     `Run the critic on ${missing.length === 1 ? 'it' : 'each'} and record the round ` +
     `(npm run ui-check -- ${input.step} ${first.surface} ${next}), then close it once it passes. ` +
+    `A surface still failing after round 3, or one reached only through a shared file, ` +
+    `is yours to settle: npm run ui-guard -- ${input.step} --settle "<why>". ` +
     `building.md, "Building a screen", has the loop.`
   );
 }
@@ -222,6 +225,52 @@ export function uiAcceptSql(step: number, surfaces: readonly string[]): string {
     'insert into ui_checks (user_id, step, surface, round, verdict, fixes, earlier, notes, shots)',
     `select step.user_id, ${step}, waiting.surface, waiting.round, 'accepted', '[]'::jsonb, '[]'::jsonb,`,
     "  'Accepted by you: ' || step.answer, '{}'::text[]",
+    'from waiting cross join step',
+    'returning surface, round;',
+  ].join('\n');
+}
+
+/**
+ * A session's own settle of the surfaces still waiting, written where the
+ * close guard reads it (`npm run ui-guard -- <n> --settle "<why>"`).
+ *
+ * Design checks are not questions for the person (their answer of 12 October
+ * 2026, which replaces decision #1535's A). Two kinds of surface reached them
+ * and nothing else: one the critic would not pass after its third round, and
+ * one the step's files reach through a shared component that nobody sent to
+ * the critic. The builder now settles both itself, says why in `reason`, and
+ * closes the step; the open fixes go in its close note, where the person can
+ * overrule them.
+ *
+ * It writes an `accepted` round, numbered on from each surface's last, with
+ * notes opening "Settled by Dash", so the record still says who let the
+ * screen through.
+ */
+export function uiSettleSql(step: number, surfaces: readonly string[], reason: string): string {
+  const check = uiGuardSql(step, surfaces);
+  if (!check) return '';
+  const why = reason.trim();
+  if (!why) throw new Error('Say why the surfaces are settled.');
+  if (why.includes('$r$')) throw new Error('The reason cannot contain $r$.');
+  const list = surfaces.map((s) => `'${s}'`).join(', ');
+  const passing = PASSING_VERDICTS.map((v) => `'${v}'`).join(', ');
+  return [
+    'with step as (',
+    `  select p.user_id from plan_items p where p.number = ${step} limit 1`,
+    '), waiting as (',
+    '  select s.surface, coalesce(last.round, 0) + 1 as round',
+    `  from unnest(array[${list}]::text[]) as s(surface)`,
+    '  cross join step',
+    '  left join lateral (',
+    '    select c.round, c.verdict from ui_checks c',
+    `    where c.user_id = step.user_id and c.step = ${step} and c.surface = s.surface`,
+    '    order by c.round desc limit 1',
+    '  ) last on true',
+    `  where last.verdict is null or last.verdict not in (${passing})`,
+    ')',
+    'insert into ui_checks (user_id, step, surface, round, verdict, fixes, earlier, notes, shots)',
+    `select step.user_id, ${step}, waiting.surface, waiting.round, 'accepted', '[]'::jsonb, '[]'::jsonb,`,
+    `  $r$Settled by Dash: ${why}$r$, '{}'::text[]`,
     'from waiting cross join step',
     'returning surface, round;',
   ].join('\n');

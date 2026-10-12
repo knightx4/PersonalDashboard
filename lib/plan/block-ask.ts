@@ -39,11 +39,32 @@ export function blockAskNamesBranch(ask: string): boolean {
   return NAMES_A_BRANCH.some((pattern) => pattern.test(text));
 }
 
+// Ways an ask puts a design check to the person, matched against the
+// lower-cased ask: the critic or a design check named, or a screen offered for
+// accepting as it is.
+const DESIGN_CHECK: RegExp[] = [
+  /\b(design )?critic\b/,
+  /\bdesign checks?\b/,
+  /\baccept\b[^.?]{0,80}\b(as (it|they) (is|are)|as unchanged|as drawn)\b/,
+];
+
+/**
+ * True for an ask that hands the person a design check. Since 12 October 2026
+ * those are not theirs: a screen the critic would not pass after three rounds,
+ * or surfaces a shared file reaches that nobody checked, are settled by the
+ * session (`npm run ui-guard -- <n> --settle "<why>"`).
+ */
+export function blockAskIsDesignCheck(ask: string): boolean {
+  const text = ask.toLowerCase().replace(/\s+/g, ' ');
+  return DESIGN_CHECK.some((pattern) => pattern.test(text));
+}
+
 /**
  * The refusal for a block whose ask cannot stand, or null when the ask is
- * fine. Two are refused: an ask that says nothing is needed from the person,
- * unless the block waits on other steps (`--on-steps`) and so shows as waiting
- * on them; and an ask that names a git branch, whatever the block waits on.
+ * fine. Three are refused, whatever the block waits on unless said: an ask
+ * that names a git branch; an ask that hands the person a design check; and
+ * an ask that says nothing is needed from the person, unless the block waits
+ * on other steps (`--on-steps`) and so shows as waiting on them.
  */
 export function blockAskRefusal(ask: string, onSteps: boolean): string | null {
   if (blockAskNamesBranch(ask)) {
@@ -52,6 +73,14 @@ export function blockAskRefusal(ask: string, onSteps: boolean): string | null {
       'off. Show them pictures instead. Merge the gallery drawing to main and link it as ' +
       '/preview?s=<id>, or point at the shots on the step\'s row in /dev/plan. Put the ' +
       'branch in --note, where the next session reads it.'
+    );
+  }
+  if (blockAskIsDesignCheck(ask)) {
+    return (
+      'That ask puts a design check to the person, and those are not theirs to answer. ' +
+      'Settle the surfaces yourself: npm run ui-guard -- <n> --settle "<why>", then merge ' +
+      'and close the step with any open fixes in the close note. building.md, "Building a ' +
+      'screen", has the rule.'
     );
   }
   if (onSteps) return null;

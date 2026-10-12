@@ -64,6 +64,7 @@ export function GoalDetail({
             areaId: goal.areaId,
             errand: goal.errand ?? false,
             dueOn: goal.dueOn ?? null,
+            duePrecision: goal.duePrecision,
             status: goal.status,
           }}
           places={places}

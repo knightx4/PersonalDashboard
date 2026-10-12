@@ -1,7 +1,7 @@
 /**
  * The Goals home (plan #1077): Dash's card with Ask Dash, Do next from the
- * week's focus goals with Dash's drafts beside their steps, and lines that
- * open to what Dash is on, what Dash did since your last visit, Later and the
+ * steps on Todo and goals with a due date, with Dash's drafts beside their
+ * steps, and lines that open to what Dash is on, what Dash did since your last visit, Later and the
  * other goals.
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -86,6 +86,7 @@ function item(id: string, extra: Partial<TodayItem> = {}): TodayItem {
     action: 'Done',
     unblocks: 0,
     on: null,
+    onTodo: true,
     ...extra,
   };
 }
@@ -130,17 +131,16 @@ function render(extra: Partial<Parameters<typeof HomeView>[0]> = {}): string {
   );
 }
 
-// The focus mark (goals 0070) is read loosely, as homeInFocus reads it.
-type GoalFields = Partial<HomeGoal['goal']> & { focus?: boolean };
+type GoalFields = Partial<HomeGoal['goal']>;
 
-/** A goal line with its own id and title, marked as a focus goal or not. */
+/** A goal line with its own id and title. */
 function other(id: string, title: string, extra: GoalFields = {}): HomeGoal {
   return { ...goal, goal: { ...goal.goal, id, title, ...extra } as HomeGoal['goal'], review: null };
 }
 
-/** The line marked as one of the week's focus goals. */
-function focusOn(line: HomeGoal): HomeGoal {
-  return { ...line, goal: { ...line.goal, focus: true } as HomeGoal['goal'] };
+/** The line given a due date, which puts its steps in Do next. */
+function dueOn(line: HomeGoal): HomeGoal {
+  return { ...line, goal: { ...line.goal, dueOn: '2026-12-01' } as HomeGoal['goal'] };
 }
 
 /** Whether the fold holding Since your last visit is drawn open. */
@@ -158,7 +158,7 @@ describe('the Goals home', () => {
       laterOn: [
         { id: 'l1', title: 'Turn on autopay', goalId: 'g1', goalTitle: 'Pay off the debts', startsOn: '2026-11-01', dueOn: null },
       ],
-      goals: [focusOn(goal), other('g2', 'Learn Spanish')],
+      goals: [dueOn(goal), other('g2', 'Learn Spanish')],
     });
     const order = [
       'of your 2 goals',
@@ -179,17 +179,6 @@ describe('the Goals home', () => {
     for (const old of ['Your goals', 'On you', 'This week', 'days you visited']) {
       expect(html).not.toContain(old);
     }
-  });
-
-  it('draws the focus line and the week’s plan when the page gives them', () => {
-    const html = render({
-      focusLine: <p>This week: Pay off the debts</p>,
-      planWeek: <p>Plan your week</p>,
-    });
-    const order = ['Ask Dash', 'This week: Pay off the debts', 'Plan your week', 'Do next'];
-    const positions = order.map((text) => html.indexOf(text));
-    expect(positions.every((p) => p >= 0)).toBe(true);
-    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
   });
 
   it('gives each thing in Do next one button and Not now', () => {
@@ -232,12 +221,17 @@ describe('the Goals home', () => {
     expect(html).toContain('href="/goals/inbox"');
   });
 
-  it('leaves out steps of goals that are not this week’s, but not their questions', () => {
+  it('leaves out steps not on Todo under a goal with no due date, but not its questions', () => {
     const html = render({
-      goals: [focusOn(goal), other('g2', 'Learn Spanish')],
+      goals: [dueOn(goal), other('g2', 'Learn Spanish')],
       onYou: [
         item('a', { title: 'Pay the card' }),
-        item('s', { title: 'Book a lesson', goalId: 'g2', goalTitle: 'Learn Spanish' }),
+        item('s', {
+          title: 'Book a lesson',
+          goalId: 'g2',
+          goalTitle: 'Learn Spanish',
+          onTodo: false,
+        }),
         item('sq', {
           kind: 'question',
           title: 'Which course?',
@@ -281,14 +275,14 @@ describe('the Goals home', () => {
 
   it('lists each other goal on one line: its status and its next move', () => {
     const waiting = { ...goal, goal: { ...goal.goal, id: 'g2', title: 'Learn Spanish' } };
-    const html = render({ goals: [focusOn(goal), waiting] });
+    const html = render({ goals: [dueOn(goal), waiting] });
     const others = html.slice(html.indexOf('Other goals'));
     expect(others).toContain('Learn Spanish');
     expect(others).toContain('Waiting on you');
     expect(others).toContain('Next: Choose avalanche or snowball, 28 Sept');
     expect(others).not.toContain('as of');
     const stale = render({
-      goals: [focusOn(goal), { ...waiting, current: false }],
+      goals: [dueOn(goal), { ...waiting, current: false }],
     });
     expect(stale).toContain('as of');
   });
@@ -298,7 +292,7 @@ describe('the Goals home', () => {
       other(id, title, { errand: true, dueOn });
     const html = render({
       goals: [
-        focusOn(goal),
+        dueOn(goal),
         errand('e2', 'Book the car service', '2026-10-20'),
         errand('e1', 'Give Sam a live show for her birthday', '2026-10-09'),
       ],

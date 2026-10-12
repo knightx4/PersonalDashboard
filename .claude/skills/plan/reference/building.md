@@ -33,6 +33,8 @@ npx tsx scripts/plan.ts reopen <n>             # put it back to not started
 npx tsx scripts/plan.ts stopped <n> --reason "…" [--piece "…" --piece "…"]
                                                # ending the run with <n> neither closed
                                                # nor blocked: say why, in one line
+npx tsx scripts/plan.ts activity <n> --kind thought|action|question|error --body "…" [--option "…"]
+                                               # one line on your run, shown live on its page
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
                                                [--proposed] [--size s|m|l] [--from <n>]
@@ -51,6 +53,26 @@ npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
 Steps are named by number — the `#12` on the page. Numbers are never reused.
 
 ## The loop
+
+**Write run lines as you go.** The run's page shows what you write with
+`activity <n>`: `--kind action` right after claiming ("Claimed #n"), after each
+commit ("Committed <sha>: <subject>"), and as the last line ("Finished #n" or
+what stopped it); `--kind thought` before a long stretch of work; `--kind
+error` when something fails. A question that needs the person takes `--kind
+question` with one to ten `--option`s and parks the run as waiting on them.
+With no run fired at the step the command says so and writes nothing; carry on.
+
+**Asking mid-run and waiting (plan #1824).** The question shows on the run's
+lines and in the person's inbox, with each option as a press. Ask only what
+the rules under "When you reach something you should not decide" let you ask;
+a question about the step that has to outlast the run is still a decision and
+a `block`. After asking, keep working on whatever does not depend on the
+answer and check with `npx tsx scripts/plan.ts response <n>`, which prints
+"Answered: …" or "No answer yet". An answer sets the run back to started; your
+next line carries on from it. If nothing is left to do without the answer,
+end with `stopped <n> --reason "Waiting on your answer: <the question>"` and
+stop. Answering then starts a new run whose brief opens with the question,
+the answer and your lines so far. Working offline, the query is in `offline.md`.
 
 1. **Claim it first.** `start <n>`, before reading anything. `start` refuses a
    proposal and refuses a decision, so claiming first is also the cheapest way
@@ -126,7 +148,7 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
 
    Then check the done-when line by line. If a line is not met, it is not
    done. A step that changes a screen is not done until the critic has passed
-   each of its surfaces. A third failed round blocks it instead (see
+   each of its surfaces. After a third failed round you settle it yourself (see
    **Building a screen**).
 
    **Do not run the full suite and do not run `next build`.** The session that
@@ -177,9 +199,9 @@ Steps are named by number — the `#12` on the page. Numbers are never reused.
     neither closed nor blocked writes one line on why before it stops:
     `stopped <n> --reason "…"`. The line goes on the run the step was sent
     as, ends it, and shows on the plan page after "Last run stopped". When
-    two runs on a feature close nothing, the app raises the feature quoting
-    these lines (#1801), so write what the next session or the person would
-    need: "Too big for one sitting: the export, the import and the page are
+    two runs on a feature close nothing, the app sends a session to find out
+    why (`unsticking.md`) and quotes these lines to it, and to the person if
+    that does not get it moving, so write what they would need: "Too big for one sitting: the export, the import and the page are
     three pieces of work", not "ran out of time". If the step is too big,
     add the pieces you would split it into, in order, one `--piece` each
     (two to twenty), titled as steps. Working offline, the SQL is in
@@ -312,63 +334,41 @@ a surface with no routes. A step that changes no surface skips this section.
 as it came back. You do not edit it, summarise it into a pass, or judge the
 pictures yourself in its place.
 
-**Three rounds, then the person.** If round 3 comes back `fix`, stop the
-loop: no fourth round, and no guess at what the critic would accept. A screen
-that fails three rounds is usually missing a decision, such as which pattern
-it should use, and that is the person's (decision #1535). So:
+**Three rounds, then settle it yourself.** If round 3 comes back `fix`, stop
+the loop: no fourth round. Design checks are not questions for the person.
+They said so on 12 October 2026, after a week of "accept it as it is"
+blocks, and that answer replaces decision #1535's A. So:
 
 1. Record round 3 like any other (below).
-2. Commit what you have and push your branch, so the work outlives the
-   session.
-3. Run `npm run ui-stop -- <step>`. It reads the recorded verdicts and prints
-   the ask: each surface that did not pass, how many fixes are open and where
-   the shots are, ending "accept it as it is, or say what to change". The
-   branch goes only in the `--note` it prints, which is the history line the
-   next session reads. It also prints the last fixes in full, and the block
-   to write: `plan.ts block <n> --ask "…" --note "…"` with no `--on-steps`, or
-   the statement for the connector. Write that block. It waits on the person,
-   not on other steps.
-4. Report the block, with the last verdict's fixes and where the shots are.
+2. Make any of the open fixes you can make cheaply, without another round.
+3. Run `npm run ui-stop -- <step>`. It prints the last fixes in full and the
+   settle command: `npm run ui-guard -- <step> --settle "<why>"`. Run it, or
+   the statement it prints through the connector. It writes an `accepted`
+   round for each surface still waiting, with notes opening "Settled by
+   Dash", so the record keeps who let the screen through.
+4. Merge and close the step as usual. The close note names each surface
+   settled and the fixes still open, in a line, so the person can overrule
+   it from the step's row.
 
-The person either accepts the screen as it is or says what to change, from
-the step's row on /dev/plan, which shows the last fixes and shots (plan
-#1610). Either way the step comes back ready, and its history says which:
+**Surfaces a shared file reaches.** The close guard lists every surface a
+changed file serves, so a change to a shared row or folder can name dozens
+of screens nobody sent to the critic. Send the surfaces the step meant to
+change to the critic. Settle the rest with the same command, naming in the
+reason that the step did not set out to change them, and do not block on
+them. Findings the critic makes on a surface the step did not cause are not
+this step's: file them as a ready step if they are worth doing, and close
+this one.
 
-- **Accepted** (a dated `Accepted …` line naming the branch): the person has
-  written an `accepted` round for each surface that stopped, and the close
-  guard counts it as passed. Do not build it again or run more rounds: merge
-  the named branch and close the step.
-- **Said what to change** (their words on the step's thread, and an
-  `Answered …` line): the builder gets three fresh rounds, numbered on from
-  4, against their words; the stop then falls on round 6, and so on.
-- **Answered with an accept** (an `Answered …` line that does not ask for a
-  change): the same as Accepted. The app now records the accept itself when
-  it can read the answer as one (`answerAccepts` in
-  `lib/plan/answer-accepts.ts`): it writes the `accepted` rounds and an
-  `Accepted …` line straight after the `Answered …` line, and sends the step
-  to a session. So an `Answered …` line that is the newest line, on a stop,
-  is one the app could not read as an accept, or one written by Dash or by
-  hand. Read it yourself: any answer that names nothing to change is an
-  accept, such as "Accept", "yes", "ok", "sure", "looks good", "It's fine",
-  "It's probably fine" or "I'll let you know if something comes up". On 10
-  October a step answered "It's fine", "yes" and "Accept" went back to not
-  started with its work never merged, because no session read those as
-  accepts. For an accept the app did not record, run `npm run ui-guard -- <n> --accept`, or the
-  statement it prints through the connector. It records an `accepted` round
-  for each surface still waiting, quoting the answer, and writes nothing
-  unless the step's newest `Answered` line is newer than its newest
-  `Blocked` line. Then merge the branch the history names and close the
-  step. Never put the same question to the person again: #1702 was answered
-  "Accept" and blocked on the same ask by the next session, because the
-  answer had never reached `ui_checks`.
+A shared component that has a surface drawing it in every state belongs on
+`COMPONENT_SURFACES` in `lib/preview/routes.ts`, so the guard stops at that
+surface rather than every page under it.
 
-The same holds for a block that is not a critic stop: a step whose files
-reach surfaces nobody has checked, answered "accept those as unchanged".
-Most of those blocks are gone since the guard stops at a shared piece's own
-surface (`COMPONENT_SURFACES` in `lib/preview/routes.ts`): a change inside
-the shell is looked at on `shell-full`, and Dash's mark on `dash-mark`,
-rather than on every page under every layout. A shared component that has a
-surface drawing it in every state belongs on that list.
+`block` refuses an ask that puts a design check to the person
+(`lib/plan/block-ask.ts`). Older steps blocked on one before the change: when
+the person answers, read any answer that names nothing to change as an accept
+(`npm run ui-guard -- <n> --accept`), merge the branch the history names and
+close the step. When the answer says what to change, the builder gets three
+fresh rounds against their words, numbered on from 4.
 
 **Recording a round.** Every round goes on record, passed or failed, before
 you make its fixes:
@@ -431,14 +431,18 @@ Stop and ask only when at least one of these holds:
   changes what they see or do, and neither the design laws, the code, an
   earlier answer nor the brief already points one way.
 - **It changes the scope.** Whether to build something at all, or building
-  noticeably more or less than the step asked for.
+  noticeably more or less than the step asked for. Folding a few small fixes
+  in, or leaving them for a step of their own, is not a change of scope:
+  decide it.
 
 A fourth moment in one workspace always meets the second: the catalogue in
 `app/dev/ui/moments.ts` holds three at most, and choosing which three is the
 person's. `shaping.md` has the decision to write.
 
 Names, wording, layout within the design laws, defaults, thresholds, ordering,
-and which of two equivalent implementations to use are not on that list.
+which of two equivalent implementations to use, and anything the design critic
+said are not on that list. The person's questions are for direction: what to
+build, what it is for, and what it costs them.
 
 When one of them does hold, do not pick an answer and build on it. A guess
 built on looks exactly like a decision from the outside. Write it down
@@ -502,9 +506,12 @@ Recommend A: the nesting is one column and nobody has asked for it."
 
 A block is for something the person does. `block` refuses an ask that says
 nothing is needed from them (without `--on-steps`), because a blocked step is
-listed under what they have to do. A step that only waits on time or a
-scheduled run stays `in_progress` with `check-back "<what to look at>" --after
-2h --from <n>`, which shows it as waiting on.
+listed under what they have to do. A step that waits on data that does not
+exist yet, on time, or on a scheduled run gets `check-back "<what has to exist>"
+--at <ISO time> --from <n>`. The check-back holds the step: the plan shows it as
+"Waiting on the check on <day>", and the runner does not send it until a session
+has done the check. Never leave such a step `in_progress` without one, and never
+block it on the person, since there is nothing for them to do.
 
 A step that should not be done is `drop <n> --note "why"`; say "out of scope:
 …" when that is the reason, since there is no status for it. Never delete a
@@ -625,8 +632,7 @@ to look at screens:
 - **Ends with the move wanted** in words they can answer in one line, such as
   "accept these as drawn, or say what to change on which one".
 
-The critic stop (`npm run ui-stop`) writes its ask with the links already in
-it. A hand-written ask is held to the same.
+A hand-written ask is held to the same.
 
 ### An answer always moves the step
 

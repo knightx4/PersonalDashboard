@@ -533,7 +533,7 @@ export function GoalRow({
         ),
       ];
 
-  // Show on Todo is offered on your open steps; taking one off is offered on
+  // Send to Todo is offered on your open steps; taking one off is offered on
   // any step still flagged, so nothing can be stranded on Todo.
   const todoItems: ActionMenuItem[] = !context.todoOn
     ? []
@@ -550,7 +550,7 @@ export function GoalRow({
         ? [
             {
               id: 'todo',
-              label: 'Show on Todo',
+              label: 'Send to Todo',
               formAction: menuAction(setStepOnTodoAction),
               formFields: { id: step.id, on: 'true' },
             },
@@ -862,7 +862,13 @@ export function GoalRow({
               For {prepares.title}
             </Link>
           )}
-          {onTodo && <span>On Todo</span>}
+          {onTodo && (
+            <span>
+              {step.onTodoBy === 'claude' && step.onTodoReason
+                ? `On Todo, from Dash: ${step.onTodoReason}`
+                : 'On Todo'}
+            </span>
+          )}
           {links.map((link) => (
             <Link key={link.linkId} href={`/goals/${link.goalId}`} className="underline">
               Also {link.title}

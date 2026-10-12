@@ -38,6 +38,7 @@ export function featureHealthFacts(node: PlanNode): HealthFacts {
     blockAsk: node.blockAsk,
     comment: node.comment,
     waitingOn: node.waitingOn,
+    waitsUntil: node.waitsUntil,
   };
 }
 

@@ -4,25 +4,6 @@ Part of the goals skill. Read [../SKILL.md](../SKILL.md) first: it has how
 every write is labelled, the run row, what you may change, and the index
 saying which file holds each section named here.
 
-## The week's focus
-
-Each week the person picks the two or three goals they are pushing:
-`goals.items.focus` on a goal (docs/GOALS-SPEC.md, "The week's focus").
-
-- **You never set or clear focus**, on any goal, and never propose it as a
-  step. The database refuses the write from you. Choosing what to push is
-  theirs; when you think a goal should be in focus, say so in a note.
-- **Work focus goals first.** The morning brief lists their ready steps first
-  and marks each "one of this week's focus goals"; work them in that order,
-  and reach other goals' steps only with the time left. An errand due within
-  seven days counts as in focus.
-- **Lead with the focus goals** in the home's note and the morning brief's
-  summary: how each moved and what is next on it, then the rest briefly.
-- Everything else covers every open goal as before: closing steps from
-  evidence, reading statements, and each goal's daily verdict.
-- While no goal has focus, every goal counts, and none of this changes
-  anything.
-
 ## The morning run
 
 The daily cron fires the routine each morning while there is an open goal
@@ -114,7 +95,97 @@ on: the tables its kept context comes from, and the `intent` sources in the
 catalogue. A new thoughts entry or a vault note can change a goal's next
 move. Write what matters as context, proposed, and say so in the reason.
 
-Give every open goal one verdict, taking the first that fits:
+### Sending a step with a near date to Todo
+
+Todo holds only what was sent there (docs/GOALS-SPEC.md, "Goals without a
+deadline"; plan #1736). Do this after closing, merging and moving steps and
+before the verdicts, so a step you just closed is not sent. Put a step on
+Todo, as Dash, when it is one of these:
+
+- a step of the person's (`kind = 'mine'`, `open`) whose own `due_on` is
+  within seven days of today, a past date included, because it is the most
+  urgent. Only a `due_precision` of `day` counts: "by Q2 2027" is not near.
+- the next open step of the person's under an errand (`errand = true`) whose
+  `due_on` is within seven days. The next one is the first by `position` that
+  can start (`starts_on` empty or not after today) and is not waiting on a
+  dependency or a question. One step per errand.
+
+Never send an undated step, a step of yours (`claude`), a step in a parked
+or unapproved goal, an archived or dismissed one, or one already on Todo.
+**Never send a step the person took off.** `goals.history` holds it: a row on
+the step, `action = 'update'`, `actor = 'me'`, `old_values.on_todo = true`
+and `new_values.on_todo = false`. That check is in the query below, so run it
+rather than a looser one. The person pressing Take off Todo on a step you
+sent is the same row, and from then on it stays off whatever its date does.
+
+```sql
+select s.id, s.title, s.due_on, s.parent_id, s.errand
+  from goals.items s
+ where s.user_id = '<user>' and s.level = 'step' and s.kind = 'mine'
+   and s.status = 'open' and not s.on_todo
+   and s.archived_at is null and s.dismissed_at is null
+   and s.due_on is not null and s.due_precision = 'day'
+   and s.due_on <= current_date + 7
+   and (s.starts_on is null or s.starts_on <= current_date)
+   and not exists (
+     select 1 from goals.history h
+      where h.user_id = s.user_id and h.table_name = 'items' and h.row_id = s.id
+        and h.action = 'update' and h.actor = 'me'
+        and h.old_values ->> 'on_todo' = 'true' and h.new_values ->> 'on_todo' = 'false');
+```
+
+That lists the steps with their own date. For an errand, read its goal's
+`due_on` and pick the next step as above, then check it against the same
+history clause before sending it. Keep out any step in a goal that is not
+open and approved, and any under a dropped step.
+
+Send each with a reason of one line, in the person's terms, that says why now
+and names the date: "Due on the 13th", "Due tomorrow", "Due 3 days ago", "The
+next step of Sam's birthday, due on the 9th". 500 characters is the most the
+database takes; keep it to a sentence. `on_todo_by` is set to `claude` by the
+database from the actor, so write only `on_todo` and the reason:
+
+```sql
+set local goals.actor = 'claude';
+set local goals.run_id = '<the run id>';
+select core.dash_before('goals.items:<id>');
+update goals.items set on_todo = true, on_todo_reason = 'Due on the 13th'
+ where id = '<id>' and user_id = '<user>';
+select core.record_dash_action('<user>', 'goals.items:<id>', 'update', 'send_step_to_todo',
+  $s$Dash sent "File the business taxes" to your Todo: due on the 13th.$s$);
+```
+
+The reason shows under the row on Todo and on the step. Name the steps sent
+in the run summary, with the reason, so the person can see what appeared.
+
+
+**First, which kind of goal it is** (plan #1738; docs/GOALS-SPEC.md, "Goals
+without a deadline"). A goal with a due date, an errand, or a goal with an
+open step on Todo is judged on what it waits on, by the list below. Every
+other goal is **judged on its pace**, and the brief says so on its lines,
+with the pace worked out by `lib/goals/pace.ts` and the verdict that pace
+gives:
+
+- **met** when its done-when is met, exactly as below.
+- Otherwise **pace_holding** ("Keeping its pace") or **pace_slipping**
+  ("Slower than usual"), whichever the brief names. The reason says the pace
+  in words ("Usually every 5 days, last done 2 days ago."); the next move
+  names the step they would most likely do next, with no `next_on` unless
+  that step has a date.
+- **No row at all** when the brief says its pace is unknown (too little
+  history, or it could not be read). The goal then shows no status, which is
+  right: there is nothing to judge yet.
+
+Such a goal is never waiting_on_you, stalled, waiting_on_date, on_track or
+waiting_on_goal, however long it has been quiet and whatever its open steps
+wait on. Three quiet weeks are not stalled on it, so add no step for that;
+"Slower than usual" says it. The pages ignore an older verdict of those
+kinds on it, so leaving it without a row clears yesterday's "Waiting on
+you". A goal that has run out of map still gets its next step, as below,
+and keeps its pace verdict.
+
+For a goal judged on what it waits on, give one verdict, taking the first
+that fits:
 
 - **met**: the done-when is met. This is the proposal to close the goal: the
   Goals home offers it on Today with one button, and closing stays the
@@ -214,6 +285,42 @@ home and out of the runs until the person takes it back up. That offer is
 the app's, from what was last done, so there is nothing to write for it.
 A parked goal is not in the brief.
 
-One row per goal per run. Rows are never updated: tomorrow's run adds a new
+Each row also keeps a `snapshot` of the goal's steps and due date (plan #1832:
+open, done, total, blocked, the open step ids, `dueOn`). A trigger fills it, so
+the inserts above stay as they are; never write step text into it.
+
+One row per goal per run, except a goal judged on its pace with its pace
+unknown, which gets none. Rows are never updated: tomorrow's run adds a new
 one, and the pages show the newest. The run summary gives the count of each
-verdict and names the stalled goals and the met ones.
+verdict, names the stalled goals and the met ones, and counts the goals left
+without a row because their pace is unknown.
+
+### Topping up a goal's suggestions
+
+After the review, find the open goals whose Suggestions section is empty
+(plan #1739): no suggestion on the goal or its steps still waiting for an
+answer, or marked going and not yet past.
+
+```sql
+with recursive tree as (
+  select id as goal_id, id from goals.items
+  where user_id = '<user>' and level = 'goal' and status = 'open' and archived_at is null
+  union all
+  select t.goal_id, i.id from goals.items i join tree t on i.parent_id = t.id
+  where i.level = 'step'
+)
+select g.id, g.title
+from goals.items g
+where g.user_id = '<user>' and g.level = 'goal' and g.status = 'open'
+  and g.archived_at is null
+  and not exists (
+    select 1 from goals.suggestions s join tree t on t.id = s.item_id
+    where t.goal_id = g.id
+      and s.accepted_step_id is null and s.attended is null
+      and (s.reaction is null or (s.reaction = 'going' and s.kind <> 'step'))
+      and (s.happens_on is null or s.happens_on >= current_date)
+  );
+```
+
+Give each one two suggested steps, as in "Suggesting steps" (`weekly.md`),
+with `run_id` this run. The summary names the goals you topped up.

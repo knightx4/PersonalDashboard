@@ -14,7 +14,6 @@
  */
 import type { OutOfDateStep } from '@/lib/goals/answers';
 import { isStaleStepBlock, waitsOnNothing } from '@/lib/goals/dependencies';
-import { focusActive, inFocus } from '@/lib/goals/focus';
 import { prepLine, type PrepCandidate } from '@/lib/goals/prep-candidates';
 import { underWayLine, type ProgressNudges } from '@/lib/goals/progress-nudges';
 import { reviewLines, type ReviewGoal } from '@/lib/goals/reviews';
@@ -37,12 +36,6 @@ export type ReadyStep = {
   title: string;
   goalId: string;
   goalTitle: string;
-  /**
-   * Set when its goal is in this week's focus while a focus is chosen
-   * (lib/goals/focus.ts). Absent when no focus is chosen or the goal is not
-   * in it.
-   */
-  focus?: true;
 };
 
 /**
@@ -53,22 +46,14 @@ export type ReadyStep = {
  * (plan #981). A blocked step and what is under it wait on you. A step whose
  * start date has not come waits for it, with everything under it; the
  * caller marks those with markStartDates.
- *
- * While the person has chosen the week's focus, the steps of goals in focus
- * come first, each group in page order, so DAILY_STEP_LIMIT spends its slots
- * on them and other goals' steps fill what is left. `today` lets an errand
- * due within a week count as in focus.
  */
 export function readyClaudeSteps(
   goals: Goal[],
   stepsByGoal: Map<string, StepNode[]>,
-  today?: string,
 ): ReadyStep[] {
   const ready: ReadyStep[] = [];
-  const active = focusActive(goals);
   for (const goal of goals) {
     if (goal.status !== 'open') continue;
-    const focus = active && inFocus(goal, goals, today);
     const walk = (nodes: StepNode[]) => {
       for (const node of nodes) {
         if (node.status !== 'open' && !isStaleStepBlock(node)) continue;
@@ -84,7 +69,6 @@ export function readyClaudeSteps(
             title: node.title,
             goalId: goal.id,
             goalTitle: goal.title,
-            ...(focus && { focus: true as const }),
           });
         }
         walk(node.children);
@@ -92,7 +76,7 @@ export function readyClaudeSteps(
     };
     walk(stepsByGoal.get(goal.id) ?? []);
   }
-  return active ? [...ready.filter((s) => s.focus), ...ready.filter((s) => !s.focus)] : ready;
+  return ready;
 }
 
 /** Whether a morning run was started recently enough that today's is done. */
@@ -152,8 +136,7 @@ export function dailyRunText(input: {
   const finished = input.underWay?.finished ?? [];
   const lines = input.steps.map(
     (step) =>
-      `- "${step.title}" (goals.items id ${step.id}), under the goal "${step.goalTitle}"` +
-      (step.focus ? ', one of this week\'s focus goals' : ''),
+      `- "${step.title}" (goals.items id ${step.id}), under the goal "${step.goalTitle}"`,
   );
   const stale = answers.map(
     (step) =>
@@ -228,13 +211,19 @@ export function dailyRunText(input: {
           'Then give every open goal below its status for today: one row in goals.reviews each,',
           'with a verdict of met, on_track, stalled, waiting_on_you, waiting_on_date or',
           'waiting_on_goal, one sentence on why, one on the next move, and next_on for the next',
-          'move\'s date where it has one. A goal whose done-when is met reads met, with a short',
+          'move\'s date where it has one. A goal its lines say is judged on its pace takes met,',
+          'or the pace verdict its lines give (pace_holding or pace_slipping), or no row at all',
+          'while its pace is unknown. A goal whose done-when is met reads met, with a short',
           'summary of how it got there as the reason: that is the proposal to close it, and closing',
           'stays the person\'s. A stalled goal also gets that next move as a step under it, named as',
           'step_id; a goal waiting on a date needs next_on; one waiting on another goal names it as',
           'waits_on_id. Follow .claude/skills/goals/SKILL.md, "Reviewing each goal".',
           '',
           ...review.flatMap((g) => [...reviewLines(g), '']),
+          // Every goal keeps a few suggestions on its page (plan #1739).
+          'Then give two suggested steps to each open goal whose Suggestions section is empty.',
+          'Follow .claude/skills/goals/SKILL.md, "Topping up a goal\'s suggestions".',
+          '',
         ]
       : []),
     ...(input.steps.length > 0

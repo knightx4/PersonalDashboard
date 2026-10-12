@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { quietRuns, type StartedRunRow } from './run-sweep';
+import { quietRuns, silentRuns, type StartedRunRow } from './run-sweep';
 
 const NOW = Date.parse('2026-09-25T12:00:00Z');
 
@@ -42,5 +42,27 @@ describe('quietRuns (plan #1002)', () => {
     // minutes, so the next one after the 45th closes it.
     expect(quietRuns([run], Date.parse('2026-09-25T11:44:00Z'))).toEqual([]);
     expect(quietRuns([run], Date.parse('2026-09-25T11:48:00Z')).map((c) => c.id)).toEqual(['half']);
+  });
+});
+
+describe('a goal run that writes lines (plan #1825)', () => {
+  it('is never closed by the 45-minute rule, and is marked stale 30 minutes after its last line', () => {
+    const lined = started('lined', { created_at: '2026-09-25T09:00:00Z' });
+    const lines = new Map([['lined', '2026-09-25T11:31:00Z']]);
+    expect(quietRuns([lined], NOW, lines)).toEqual([]);
+    expect(silentRuns([lined], lines, NOW)).toEqual([]);
+    expect(silentRuns([lined], lines, Date.parse('2026-09-25T12:01:00Z')).map((r) => r.id)).toEqual(['lined']);
+  });
+
+  it('counts a later report as being heard from', () => {
+    const run = started('r', { created_at: '2026-09-25T09:00:00Z', last_seen_at: '2026-09-25T11:45:00Z' });
+    const lines = new Map([['r', '2026-09-25T11:00:00Z']]);
+    expect(silentRuns([run], lines, NOW)).toEqual([]);
+  });
+
+  it('leaves a run with no lines to the 45-minute rule', () => {
+    const run = started('old', { created_at: '2026-09-25T10:00:00Z' });
+    expect(silentRuns([run], new Map(), NOW)).toEqual([]);
+    expect(quietRuns([run], NOW, new Map()).map((c) => c.id)).toEqual(['old']);
   });
 });

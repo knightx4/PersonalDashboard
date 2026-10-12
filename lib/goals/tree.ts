@@ -7,7 +7,7 @@
  * are in lib/goals/store.ts.
  */
 
-import type { DuePrecision } from '@/lib/goals/due-precision';
+import { isDuePrecision, periodEnd, type DuePrecision } from '@/lib/goals/due-precision';
 import type { HelpKindChoice } from '@/lib/goals/help-kinds';
 
 /** The limits the table's checks set (supabase/migrations-goals/0001). */
@@ -77,11 +77,6 @@ export type Goal = {
    * or took it back up (plan #1084); null when you never have.
    */
   keptOpenAt?: string | null;
-  /**
-   * Whether it is one of this week's focus goals, chosen by the person (goals
-   * 0070). While any goal has it, Home and Todo show only focus goals' steps.
-   */
-  focus?: boolean;
   /** When it was added, and when it was last closed. Read on the goal page's properties (plan #1671). */
   createdAt?: string | null;
   closedAt?: string | null;
@@ -223,7 +218,11 @@ export function parseGoalFields(
   if (rawDue !== null && rawDue !== undefined) {
     const due = clean(rawDue);
     if (due && !isDate(due)) return { ok: false, error: 'That is not a date.' };
-    fields.dueOn = due;
+    // How exact the date is (plan #1840); the date stored is that period's end.
+    const rawPrecision = clean(get('duePrecision')) ?? 'day';
+    if (!isDuePrecision(rawPrecision)) return { ok: false, error: 'That is not a date.' };
+    fields.dueOn = due ? periodEnd(due, rawPrecision) : due;
+    fields.duePrecision = due ? rawPrecision : 'day';
   }
 
   const rawErrand = get('errand');
