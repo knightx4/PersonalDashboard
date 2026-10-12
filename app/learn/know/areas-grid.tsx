@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Orbit } from 'lucide-react';
 import { Banner } from '@/components/ui/banner';
 import { Card } from '@/components/ui/card';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -16,6 +17,7 @@ import {
 } from '@/lib/learn/areas/grid';
 import type { DestinationGroup, OpenedPlace } from '@/lib/learn/areas/move';
 import { dayWords } from '@/lib/learn/graph/last-answered';
+import { SPACE_HREF } from '@/lib/learn/map/view';
 import { PlacedThemes, type ThemeRow } from './placed-themes';
 
 /**
@@ -219,9 +221,20 @@ export function AreasGrid({
 
   return (
     <section className="mt-8" aria-labelledby="areas-heading">
-      <h2 id="areas-heading" className="text-body font-medium text-ink">
-        By field
-      </h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <h2 id="areas-heading" className="text-body font-medium text-ink">
+          By field
+        </h2>
+        {/* The same ideas placed by meaning rather than filed by field
+            (plan #1857). */}
+        <Link
+          href={SPACE_HREF}
+          className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-accent"
+        >
+          <Orbit className="size-3.5" strokeWidth={2} aria-hidden />
+          Idea Space
+        </Link>
+      </div>
       <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-small text-ink-muted">
         <span className="inline-flex items-center gap-1">
           <StatusGlyph glyph={AREA_KIND_GLYPHS.strong} /> Strong

@@ -69,6 +69,7 @@ export const PAGE_ROUTES: readonly string[] = [
   '/learn/home',
   '/learn/know',
   '/learn/know/personality',
+  '/learn/know/space',
   '/learn/lists',
   '/learn/new',
   '/learn/next',
