@@ -7,7 +7,7 @@
  * are in lib/goals/store.ts.
  */
 
-import type { DuePrecision } from '@/lib/goals/due-precision';
+import { isDuePrecision, periodEnd, type DuePrecision } from '@/lib/goals/due-precision';
 import type { HelpKindChoice } from '@/lib/goals/help-kinds';
 
 /** The limits the table's checks set (supabase/migrations-goals/0001). */
@@ -223,7 +223,11 @@ export function parseGoalFields(
   if (rawDue !== null && rawDue !== undefined) {
     const due = clean(rawDue);
     if (due && !isDate(due)) return { ok: false, error: 'That is not a date.' };
-    fields.dueOn = due;
+    // How exact the date is (plan #1840); the date stored is that period's end.
+    const rawPrecision = clean(get('duePrecision')) ?? 'day';
+    if (!isDuePrecision(rawPrecision)) return { ok: false, error: 'That is not a date.' };
+    fields.dueOn = due ? periodEnd(due, rawPrecision) : due;
+    fields.duePrecision = due ? rawPrecision : 'day';
   }
 
   const rawErrand = get('errand');

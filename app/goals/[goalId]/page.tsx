@@ -396,6 +396,7 @@ export default async function GoalMapPage({
     unit: map.goal.unit,
     target: map.goal.target,
     dueOn: map.goal.dueOn ?? null,
+    duePrecision: map.goal.duePrecision,
     readings,
     today,
     numberFrom,
@@ -444,6 +445,7 @@ export default async function GoalMapPage({
     running: work.filter((item) => item.state === 'running').length,
     // An errand's date is already in the properties as Due.
     dueOn: errand ? null : (map.goal.dueOn ?? null),
+    duePrecision: map.goal.duePrecision,
     lastProgressOn: lastProgressOn(stepProgress),
     pace: pace ? paceLine(pace) : null,
   });

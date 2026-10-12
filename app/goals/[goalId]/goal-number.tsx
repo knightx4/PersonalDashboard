@@ -10,6 +10,8 @@ import { InlineInput, Input, Select } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
+import { formatDue, toDuePrecision, type DuePrecision } from '@/lib/goals/due-precision';
+import { DueField } from './due-field';
 import {
   READING_NOTE_MAX,
   UNIT_MAX,
@@ -52,6 +54,7 @@ export function GoalNumber({
   unit,
   target,
   dueOn = null,
+  duePrecision = 'day',
   readings,
   today,
   numberFrom = null,
@@ -64,6 +67,8 @@ export function GoalNumber({
   target: number | null;
   /** The goal's due date, YYYY-MM-DD, which the projection is read against. */
   dueOn?: string | null;
+  /** What dueOn is the end of: a day, month, quarter, half year or year. */
+  duePrecision?: DuePrecision;
   /** Oldest first. */
   readings: Reading[];
   today: string;
@@ -106,7 +111,13 @@ export function GoalNumber({
         <h2 id="number-heading" className="text-ui font-semibold text-ink">
           The number
         </h2>
-        <MeasureLine goalId={goalId} unit={unit} target={target} dueOn={dueOn} />
+        <MeasureLine
+          goalId={goalId}
+          unit={unit}
+          target={target}
+          dueOn={dueOn}
+          duePrecision={toDuePrecision(duePrecision)}
+        />
       </div>
       {(numberFrom || sources.length > 0) && (
         <NumberFromLine goalId={goalId} numberFrom={numberFrom} sources={sources} />
@@ -119,12 +130,20 @@ export function GoalNumber({
               <p
                 className={cn(
                   'text-small',
-                  projection.kind === 'reaches' && projection.daysEarly !== null && projection.daysEarly < 0
+                  projection.kind === 'reaches' &&
+                    projection.daysEarly !== null &&
+                    projection.daysEarly < 0
                     ? 'text-ink'
                     : 'text-ink-muted',
                 )}
               >
-                {projectionLine(projection, (day) => formatDay(day, true))}
+                {projectionLine(
+                  projection,
+                  (day) => formatDay(day, true),
+                  dueOn && duePrecision !== 'day'
+                    ? `the end of ${formatDue(dueOn, duePrecision)}`
+                    : undefined,
+                )}
               </p>
             )}
             <ReadingLine readings={readings} unit={unit} target={target} />
@@ -151,19 +170,24 @@ function MeasureLine({
   unit,
   target,
   dueOn,
+  duePrecision,
 }: {
   goalId: string;
   unit: string | null;
   target: number | null;
   dueOn: string | null;
+  duePrecision: DuePrecision;
 }) {
   const [state, save, saving] = useActionState(setMeasureAction, initial);
   const formRef = useRef<HTMLFormElement>(null);
   const [addingDate, setAddingDate] = useState(false);
+  // Bumped by Escape so the date field starts again from what is saved.
+  const [dueReset, setDueReset] = useState(0);
   const committed = {
     unit: unit ?? '',
     target: target === null ? '' : String(target),
     dueOn: dueOn ?? '',
+    duePrecision,
   };
 
   function commit() {
@@ -173,11 +197,14 @@ function MeasureLine({
     const changed =
       String(data.get('unit') ?? '').trim() !== committed.unit ||
       (data.has('target') && String(data.get('target') ?? '').trim() !== committed.target) ||
-      (data.has('dueOn') && String(data.get('dueOn') ?? '') !== committed.dueOn);
+      (data.has('dueOn') &&
+        (String(data.get('dueOn') ?? '') !== committed.dueOn ||
+          (committed.dueOn !== '' &&
+            String(data.get('duePrecision') ?? '') !== committed.duePrecision)));
     if (changed) form.requestSubmit();
   }
 
-  function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+  function onKeyDown(event: React.KeyboardEvent<HTMLElement>) {
     if (event.key === 'Enter') {
       // Two fields and no submit button, so the browser will not submit on
       // Enter by itself.
@@ -188,7 +215,9 @@ function MeasureLine({
     if (event.key !== 'Escape') return;
     const form = formRef.current;
     if (!form) return;
-    for (const name of ['unit', 'target', 'dueOn'] as const) {
+    setDueReset((n) => n + 1);
+    setAddingDate(false);
+    for (const name of ['unit', 'target'] as const) {
       const field = form.elements.namedItem(name);
       if (field instanceof HTMLInputElement) field.value = committed[name];
     }
@@ -206,9 +235,12 @@ function MeasureLine({
       ref={formRef}
       action={save}
       // A fresh key after each save puts the saved values back as the defaults.
-      key={`${committed.unit}|${committed.target}|${committed.dueOn}`}
+      key={`${committed.unit}|${committed.target}|${committed.dueOn}|${committed.duePrecision}`}
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) commit();
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          commit();
+          setAddingDate(false);
+        }
       }}
       className="flex flex-wrap items-baseline gap-x-1 text-small text-ink-muted"
     >
@@ -239,7 +271,7 @@ function MeasureLine({
           />
         </>
       )}
-      {unit && target !== null && !committed.dueOn && !addingDate && (
+      {unit && target !== null && !addingDate && (
         // No date yet: one quiet press rather than an empty date box waiting
         // for typing (plan #1671).
         <button
@@ -248,21 +280,21 @@ function MeasureLine({
           disabled={saving}
           className="press-area text-small text-ink-muted underline underline-offset-2 hover:text-ink"
         >
-          add a date
+          {committed.dueOn
+            ? `by ${formatDue(committed.dueOn, committed.duePrecision)}`
+            : 'add a date'}
         </button>
       )}
-      {unit && target !== null && (committed.dueOn || addingDate) && (
+      {unit && target !== null && addingDate && (
         <>
           <span>by</span>
-          <InlineInput
-            type="date"
-            name="dueOn"
-            defaultValue={committed.dueOn}
-            aria-label="When the goal is due. Clear it to have none."
+          <DueField
+            key={dueReset}
+            defaultDue={committed.dueOn}
+            defaultPrecision={committed.duePrecision}
             onKeyDown={onKeyDown}
             disabled={saving}
-            autoFocus={addingDate && !committed.dueOn}
-            className="tabular w-auto"
+            autoFocus
           />
         </>
       )}

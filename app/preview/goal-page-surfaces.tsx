@@ -83,6 +83,9 @@ const cards = goal('g-cards', 'a-money', 'Pay off the credit cards', {
   acceptance: 'Every card at a zero balance.',
   unit: '$',
   target: 0,
+  // A quarter, not a day: it reads "Q2 2027" wherever the date appears (plan #1840).
+  dueOn: '2027-06-30',
+  duePrecision: 'quarter',
   createdAt: '2026-06-02T09:00:00Z',
 });
 const fund = goal('g-fund', 'a-money', 'Build an emergency fund', {
@@ -692,7 +695,7 @@ export function GoalTopSurface() {
         <GoalDoneWhen goal={cards} />
         <div className="space-y-4">
           <GoalStatusCard
-            line="3 on you · 1 step ready for Dash · usually every 5 days, last 2 days ago"
+            line="3 on you · 1 step ready for Dash · by Q2 2027 · usually every 5 days, last 2 days ago"
             brief={{
               id: 'brief-1',
               itemId: cards.id,
@@ -721,7 +724,15 @@ export function GoalTopSurface() {
             }
           />
           <GoalLogDone goalId={cards.id} />
-          <GoalNumber goalId={cards.id} unit="$" target={0} readings={readings} today={TODAY} />
+          <GoalNumber
+            goalId={cards.id}
+            unit="$"
+            target={0}
+            dueOn={cards.dueOn}
+            duePrecision={cards.duePrecision}
+            readings={readings}
+            today={TODAY}
+          />
           <WaitingOnYou
             rows={[
               {
