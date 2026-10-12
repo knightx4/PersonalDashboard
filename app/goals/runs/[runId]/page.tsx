@@ -13,6 +13,12 @@ import { JOB_LABELS, runMeta, type RunListing } from '@/lib/goals/runs';
 import { loadRun } from '@/lib/goals/runs-store';
 import { RunChanges } from './run-changes';
 import { LinkedText } from '@/components/ui/linked-text';
+import { LiveRunLines } from '@/components/runs/live-run-lines';
+import { AcknowledgeRun } from '@/components/runs/acknowledge-run';
+import type { RunLinesState } from '@/components/runs/run-lines';
+import { loadRunActivities } from '@/lib/core/run-activities-store';
+import type { RunOutcome } from '@/lib/goals/runs';
+import { acknowledgeGoalRunAction } from './actions';
 
 export const metadata = { title: 'Run' };
 export const dynamic = 'force-dynamic';
@@ -21,8 +27,17 @@ export const dynamic = 'force-dynamic';
  * One goal run and what it changed (plan #1013): each change as a sentence,
  * read from goals.history by the run's id, with Undo on each of Claude's.
  * A change to a goal or step opens it, and so does the step the run was on
- * (note 55e9d14c).
+ * (note 55e9d14c). Above the changes, the lines the run wrote as it worked,
+ * filling in live while it is going (plan #1826).
  */
+
+/** How the run's lines are drawn for how it stands. */
+function linesState(outcome: RunOutcome): RunLinesState {
+  if (outcome === 'waiting') return 'waiting';
+  if (outcome === 'stale') return 'stale';
+  if (outcome === 'running' || outcome === 'silent') return 'live';
+  return 'ended';
+}
 
 /** Outside the component because it reads the clock. */
 function headerLine(run: RunListing, timeZone: string) {
@@ -36,7 +51,10 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
   const [account, client] = await Promise.all([loadAccountSettings(user.id), createGoalsClient()]);
   const run = await loadRun(client, runId);
   if (!run) notFound();
-  const lines = await loadRunChanges(client, runId);
+  const [lines, activity] = await Promise.all([
+    loadRunChanges(client, runId),
+    loadRunActivities(client, runId),
+  ]);
   // The goal or step each change was made to: its first target in items.
   const itemOf = (line: (typeof lines)[number]) =>
     line.targets.find((target) => target.table === 'items')?.rowId ?? null;
@@ -54,6 +72,7 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
   const runItemHref = run.item ? itemHrefs.get(run.item.id) : undefined;
   const { outcome, meta } = headerLine(run, account.timezone);
   const failed = outcome === 'failed';
+  const state = linesState(outcome);
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -116,6 +135,15 @@ export default async function GoalRunPage({ params }: { params: Promise<{ runId:
           </p>
         )
       )}
+      <LiveRunLines
+        runTable="goals.runs"
+        runId={run.id}
+        state={state}
+        initial={activity}
+        acknowledge={
+          state === 'stale' ? <AcknowledgeRun runId={run.id} action={acknowledgeGoalRunAction} /> : undefined
+        }
+      />
       {lines.length === 0 ? (
         <EmptyState
           icon={ListChecks}

@@ -1,8 +1,8 @@
 'use client';
 
 import type { LinkedFile } from '@/lib/files/files';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useMemo, useState, type ReactNode } from 'react';
+import { useRunRefresh } from '@/components/runs/use-run-refresh';
 import { ListTree } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -30,9 +30,6 @@ import { FinishedFold, GoalRow, type GoalRowContext } from './goal-row';
 import { StepComposer } from './step-parts';
 import { StepFinder } from './step-finder';
 import type { InformationSeam } from './information-step';
-
-/** How often the page looks again while a step's run is going, as the Claude panel does. */
-const RUN_POLL_MS = 15_000;
 
 const NO_RUNS: Record<string, StepRunView> = {};
 const NO_FILES: Record<string, LinkedFile[]> = {};
@@ -302,13 +299,8 @@ export function useGoalRows(
     canRun?: boolean;
   },
 ) {
-  const router = useRouter();
   const anyRunning = Object.values(runs).some((run) => run.running !== null);
-  useEffect(() => {
-    if (!anyRunning) return;
-    const timer = setInterval(() => router.refresh(), RUN_POLL_MS);
-    return () => clearInterval(timer);
-  }, [anyRunning, router]);
+  useRunRefresh(anyRunning);
 
   return useMemo(() => {
     const trees = [map.steps, ...map.linked.map((entry) => [entry.step])];

@@ -37,3 +37,65 @@ export type RunActivity = {
   options: string[] | null;
   created_at: string;
 };
+
+/** The columns a run's page reads. */
+export const RUN_ACTIVITY_COLUMNS = 'id, user_id, run_table, run_id, kind, body, options, created_at';
+
+/**
+ * One row as the page reads it, from a select or a Realtime payload, or null
+ * when it is not a line this app knows how to draw (plan #1826). The
+ * database checks keep run_table and kind to the lists above, so a null here
+ * means a payload that was not a run_activities row at all.
+ */
+export function runActivityFrom(row: Record<string, unknown> | null | undefined): RunActivity | null {
+  if (!row) return null;
+  const { id, user_id, run_table, run_id, kind, body, options, created_at } = row;
+  if (typeof id !== 'string' || typeof run_id !== 'string' || typeof body !== 'string') return null;
+  if (typeof created_at !== 'string' || typeof user_id !== 'string') return null;
+  if (!RUN_TABLES.includes(run_table as RunTable)) return null;
+  if (!RUN_ACTIVITY_KINDS.includes(kind as RunActivityKind)) return null;
+  const choices = Array.isArray(options)
+    ? options.filter((option): option is string => typeof option === 'string')
+    : null;
+  return {
+    id,
+    user_id,
+    run_table: run_table as RunTable,
+    run_id,
+    kind: kind as RunActivityKind,
+    body,
+    options: choices && choices.length > 0 ? choices : null,
+    created_at,
+  };
+}
+
+/**
+ * The lines a page holds with new ones added: each line once, oldest first.
+ *
+ * A page subscribes before it reads, so the first lines can arrive twice
+ * (once in the read, once from Realtime) and out of order; the id settles
+ * the first and created_at the second.
+ */
+export function mergeRunLines(
+  held: readonly RunActivity[],
+  incoming: readonly RunActivity[],
+): RunActivity[] {
+  const byId = new Map<string, RunActivity>();
+  for (const line of held) byId.set(line.id, line);
+  for (const line of incoming) byId.set(line.id, line);
+  return [...byId.values()].sort(
+    (a, b) => Date.parse(a.created_at) - Date.parse(b.created_at) || a.id.localeCompare(b.id),
+  );
+}
+
+/** What each kind of line is called beside it on a run's page. */
+export const RUN_ACTIVITY_LABEL: Record<RunActivityKind, string> = {
+  thought: 'Thinking',
+  action: 'Did',
+  question: 'Asked you',
+  response: 'You said',
+  error: 'Went wrong',
+};
+
+/** What a run that went quiet and was acknowledged is closed with. */
+export const ACKNOWLEDGED_STALE_ERROR = 'It stopped writing lines, and you acknowledged it.';

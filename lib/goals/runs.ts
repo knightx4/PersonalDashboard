@@ -65,7 +65,7 @@ export const JOB_LABELS: Record<RunJob, string> = {
  * RUN_QUIET_MS is one whose session died without writing back; the sweep
  * closes it as failed on the next tick, and until then it reads as silent.
  */
-export type RunOutcome = 'done' | 'failed' | 'running' | 'silent';
+export type RunOutcome = 'done' | 'failed' | 'running' | 'silent' | 'waiting' | 'stale';
 
 export function runOutcome(
   run: Pick<RunListing, 'status' | 'createdAt'> & { lastSeenAt?: string | null },
@@ -73,6 +73,8 @@ export function runOutcome(
 ): RunOutcome {
   if (run.status === 'done') return 'done';
   if (run.status === 'failed') return 'failed';
+  if (run.status === 'awaiting_input') return 'waiting';
+  if (run.status === 'stale') return 'stale';
   return runIsQuiet(run, now) ? 'silent' : 'running';
 }
 
@@ -81,6 +83,8 @@ export const OUTCOME_LABELS: Record<RunOutcome, string> = {
   failed: 'Failed',
   running: 'Still running',
   silent: 'Never reported back',
+  waiting: 'Waiting on you',
+  stale: 'Gone quiet',
 };
 
 /**
@@ -131,7 +135,13 @@ function isJob(value: string): value is RunJob {
 }
 
 function isStatus(value: string): value is GoalRunStatus {
-  return value === 'started' || value === 'done' || value === 'failed';
+  return (
+    value === 'started' ||
+    value === 'awaiting_input' ||
+    value === 'stale' ||
+    value === 'done' ||
+    value === 'failed'
+  );
 }
 
 /**

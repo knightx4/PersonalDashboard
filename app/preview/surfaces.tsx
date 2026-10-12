@@ -249,6 +249,7 @@ import {
   JobsThoughtsSurface,
 } from './jobs-page-surfaces';
 import { GoalRunSurface, MailMessageSurface } from './mail-run-surfaces';
+import { RunLinesSurface } from './run-lines-surfaces';
 import {
   AccountSurface,
   DevBugsSurface,
@@ -5770,6 +5771,17 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'page',
     render: () => <GoalRunSurface />,
+  },
+  {
+    /* A run's lines as Dash writes them (plan #1826), on a plan step's run
+     * and on a goal run's page: going, waiting on you, gone quiet with its
+     * Acknowledge press, just started, and with the live connection lost.
+     * Fixtures in run-lines-surfaces.tsx. */
+    id: 'run-lines',
+    label: 'Runs · Dash’s lines as it works',
+    module: 'goals',
+    width: 'page',
+    render: () => <RunLinesSurface />,
   },
   {
     id: 'jobs-activity',

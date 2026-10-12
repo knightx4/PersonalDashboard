@@ -10,6 +10,8 @@ import { replyMailto } from '@/lib/email/gmail-open';
 import type { GmailMessageContent } from '@/lib/email/providers/types';
 import type { ChangeLine } from '@/lib/goals/run-changes';
 import { JOB_LABELS, runMeta, type RunListing } from '@/lib/goals/runs';
+import { RunLinesView } from '@/components/runs/run-lines';
+import type { RunActivity } from '@/lib/core/run-activities';
 
 /**
  * One goal run and one email in the gallery (plan #1601). Both pages are
@@ -53,6 +55,27 @@ const LINES: ChangeLine[] = [
   line('6', 'Marked "Update the resume" done.', { actor: 'me', state: 'none' }),
 ];
 
+function activity(id: string, kind: RunActivity['kind'], at: string, body: string): RunActivity {
+  return {
+    id,
+    user_id: 'u',
+    run_table: 'goals.runs',
+    run_id: RUN.id,
+    kind,
+    body,
+    options: null,
+    created_at: `2026-10-06T${at}:00.000Z`,
+  };
+}
+
+/** The lines the run wrote as it worked (plan #1826), drawn once it has ended. */
+const ACTIVITY: RunActivity[] = [
+  activity('a1', 'thought', '12:41', 'Reading your answers on the visa question and the move.'),
+  activity('a2', 'action', '12:43', 'Settled "Decide on New York or remote" as New York.'),
+  activity('a3', 'action', '12:46', 'Added the collection "Application documents" with three drafts.'),
+  activity('a4', 'action', '12:47', 'Finished: two steps settled, one collection added, one phase moved.'),
+];
+
 /** The markup of app/goals/runs/[runId]/page.tsx after its reads. */
 export function GoalRunSurface() {
   const { meta } = runMeta(RUN, NOW, 'America/New_York');
@@ -79,6 +102,7 @@ export function GoalRunSurface() {
       <p className="rounded-card bg-sunken card-pad text-small break-words whitespace-pre-wrap text-ink">
         <LinkedText text={RUN.summary!} />
       </p>
+      <RunLinesView lines={ACTIVITY} state="ended" />
       <Card>
         <RunChanges runId={RUN.id} lines={LINES} />
       </Card>

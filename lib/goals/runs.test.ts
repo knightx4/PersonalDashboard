@@ -75,6 +75,14 @@ describe('runOutcome', () => {
     );
   });
 
+  it('reads a run waiting on you and a run gone quiet from their status, whatever the clock says', () => {
+    const late = start + RUN_QUIET_MS * 3;
+    expect(runOutcome({ status: 'awaiting_input', createdAt: created }, late)).toBe('waiting');
+    expect(runOutcome({ status: 'stale', createdAt: created }, start)).toBe('stale');
+    const [listing] = toRunListings([row({ status: 'stale' })]);
+    expect(listing.status).toBe('stale');
+  });
+
   it('passes done and failed through', () => {
     expect(runOutcome({ status: 'done', createdAt: created }, start)).toBe('done');
     expect(runOutcome({ status: 'failed', createdAt: created }, start)).toBe('failed');
