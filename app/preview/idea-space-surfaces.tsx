@@ -1,4 +1,4 @@
-import { IdeaSpaceView } from '@/app/learn/know/space/idea-space-view';
+import { IdeaSpaceView } from '@/app/learn/space/idea-space-view';
 import type { KnowledgeState } from '@/lib/learn/graph/model';
 import type { IdeaMapView, IdeaOnMap } from '@/lib/learn/map/load';
 import type { Point } from '@/lib/learn/map/layout';

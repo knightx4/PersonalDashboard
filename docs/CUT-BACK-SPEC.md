@@ -175,9 +175,9 @@ notification, so its open count says nothing about whether it is read on Home.
 Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. The
 baseline was measured on main on 3 October 2026.
 
-**R1.** Learn has four tabs at most: Now, Subjects, Reading lists and, for the
-owner, Videos.
-Checked by: count `learn-nav-tabs`, baseline 4.
+**R1.** Learn has five tabs at most: Now, Subjects, Idea Space, Reading lists
+and, for the owner, Videos. Idea Space was added at your ask on 12 October 2026.
+Checked by: count `learn-nav-tabs`, baseline 5.
 
 **R2.** Every page opened is recorded in `core.page_views`, and a prefetch or
 an `/api` call is not.
