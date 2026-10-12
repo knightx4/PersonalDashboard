@@ -3,6 +3,7 @@ import { APP_VISION, type VisionScope } from '@/lib/specs/vision';
 import { DISMISSAL_RULE, PLAIN_ENGLISH_RULE, QUESTION_RULE } from './brief';
 import { isClosed, isDismissed } from './load';
 import type { PlanNode, PlanSection } from './tree';
+import { stepRef } from './ref';
 
 /**
  * The re-shape that follows an accepted vision edit (plan #1137).
@@ -47,12 +48,12 @@ export function visionReshapeText(input: {
   /** The vision as it stood before the accept; null when there was none. */
   before: string | null;
   after: string;
-  features: readonly Pick<PlanNode, 'number' | 'title' | 'status'>[];
+  features: readonly (Pick<PlanNode, 'number' | 'title' | 'status'> & { outline?: string | null })[];
 }): string {
   const label = scopeLabel(input.scope);
   const moduleFlag = input.scope === APP_VISION ? '' : ` --module ${input.scope}`;
   const list = input.features
-    .map((feature) => `- #${feature.number} ${feature.title} (${feature.status.replace('_', ' ')})`)
+    .map((feature) => `- ${stepRef(feature)} ${feature.title} (${feature.status.replace('_', ' ')})`)
     .join('\n');
 
   return (

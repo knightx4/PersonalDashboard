@@ -73,7 +73,7 @@ describe('planBrief', () => {
   const brief = planBrief(sections, findNode(sections, 'page')!);
 
   it('opens with the handle and the title', () => {
-    expect(brief.startsWith('# Plan step #3 — The anonymous page\n')).toBe(true);
+    expect(brief.startsWith('# Plan step #2.1 — The anonymous page\n')).toBe(true);
   });
 
   it('says where the step sits and who holds it', () => {
@@ -96,11 +96,11 @@ describe('planBrief', () => {
   });
 
   it('lists the steps beneath it as a checklist', () => {
-    expect(brief).toContain('## Steps\n\n- [ ] #4 The form\n- [x] #5 The finished bit');
+    expect(brief).toContain('## Steps\n\n- [ ] #2.1.1 The form\n- [x] #2.1.2 The finished bit');
   });
 
   it('says what finishing it would unblock, and carries the note', () => {
-    expect(brief).toContain('## Unblocks\n\n- #6 Analytics on responses');
+    expect(brief).toContain('## Unblocks\n\n- #2.2 Analytics on responses');
     expect(brief).toContain('## Notes\n\nWaiting on the RPC review.');
   });
 
@@ -111,7 +111,7 @@ describe('planBrief', () => {
     expect(bare).not.toContain('## Waits on');
     expect(bare).not.toContain('## Steps');
     expect(bare).not.toContain('## Notes');
-    expect(bare).toContain('Part of: #2 Share links › #3 The anonymous page');
+    expect(bare).toContain('Part of: #2 Share links › #2.1 The anonymous page');
   });
 
   it('records the commit on a step that shipped', () => {
@@ -123,7 +123,7 @@ describe('planBrief', () => {
     // the whole feature is for, which is what it has to not miss.
     const bare = planBrief(sections, findNode(sections, 'form')!);
     expect(bare).toContain(
-      '## Destination\n\n#3 The anonymous page — Opens without a session. Shows only owned items.',
+      '## Destination\n\n#2.1 The anonymous page — Opens without a session. Shows only owned items.',
     );
   });
 
@@ -181,7 +181,7 @@ describe('planBrief with decisions and fog', () => {
 
   it('carries every decision already settled beneath the feature, with its answer', () => {
     const brief = planBrief(sections, findNode(sections, 'writer')!);
-    expect(brief).toContain('## Decided so far\n\n- #10 One file or many? — One file per month.');
+    expect(brief).toContain('## Decided so far\n\n- #9.1 One file or many? — One file per month.');
   });
 
   it('leaves out a decision that was withdrawn rather than answered', () => {
@@ -331,7 +331,7 @@ describe('the comments a hand-over carries', () => {
   it('carries the comments on the step, oldest first and marked', () => {
     const brief = planBrief(sections, page, { thread: true });
     expect(brief).toContain('## Comments\n\nLeft on these rows, oldest first.');
-    expect(brief).toContain('On #2 The anonymous page:\n\n- The person: No prices on this one.');
+    expect(brief).toContain('On #1.1 The anonymous page:\n\n- The person: No prices on this one.');
   });
 
   it('carries the comments on the steps beneath it as well, grouped by row', () => {
@@ -340,7 +340,7 @@ describe('the comments a hand-over carries', () => {
       'On #1 Share links:\n\n- The person: Keep the whole thing behind one token.\n' +
         '- Claude: Then the token is what the RLS policy reads.',
     );
-    expect(brief).toContain('On #2 The anonymous page:\n\n- The person: No prices on this one.');
+    expect(brief).toContain('On #1.1 The anonymous page:\n\n- The person: No prices on this one.');
   });
 
   it('leaves out what has been put aside, the same as the checklist', () => {
@@ -544,5 +544,27 @@ describe('the page pattern in a brief', () => {
 
   it('says nothing for a step that makes no screen', () => {
     expect(planBrief(sections, findNode(sections, 'plain')!)).not.toContain('## Pattern');
+  });
+});
+
+describe('a brief names steps the way the page does', () => {
+  it('reads a stored number in the notes as the outline it has now', () => {
+    const sections = buildPlanTree({
+      items: [
+        item({ id: 'top', title: 'Top', number: 900 }),
+        item({ id: 'one', title: 'First', parentId: 'top', number: 904 }),
+        item({
+          id: 'two',
+          title: 'Second',
+          parentId: 'top',
+          number: 911,
+          comment: 'Picks up where #904 left off; see PR #904 for the old attempt.',
+        }),
+      ],
+      dependencies: [],
+    });
+    const brief = planBrief(sections, findNode(sections, 'two')!);
+    expect(brief.startsWith('# Plan step #900.2 — Second\n')).toBe(true);
+    expect(brief).toContain('Picks up where #900.1 left off; see PR #904 for the old attempt.');
   });
 });

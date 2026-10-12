@@ -1,5 +1,6 @@
 import { planRowId } from '@/lib/comments/refs';
 import { sessionOrigin } from './origin';
+import { outlineIndex, readableRefs, stepRef, type OutlineIndex } from './ref';
 import { flatten, type PlanNode } from './tree';
 import type { PlanUpdate } from './updates';
 import { RUN_JOB_LABEL, type RunJob, type RunStatus } from './run-end';
@@ -49,6 +50,8 @@ export type ActivityKind =
 /** The row an entry is about, and where it is on the feature's page. */
 export type ActivitySubject = {
   number: number;
+  /** Where it sits ("1073.4"), which is what the entry names it by. */
+  outline?: string;
   title: string;
   href: string;
   /** The feature itself, which the page is already about. */
@@ -184,6 +187,7 @@ export function subjectOf(feature: PlanNode, node: PlanNode): ActivitySubject {
     node.id === feature.id || (node.kind === 'decision' && node.parentId === feature.id);
   return {
     number: node.number,
+    outline: node.outline,
     title: node.title,
     ...(node.id === feature.id ? { isFeature: true } : {}),
     href: onOverview
@@ -214,6 +218,11 @@ export function featureActivity(
     runs?: readonly ActivityRun[];
     actions?: readonly ActivityDashAction[];
     history?: readonly ActivityStatusChange[];
+    /**
+     * Every step's outline, so a stored `#1084` in a note reads as the
+     * `#1073.4` the page heads it with. The feature's own steps when left out.
+     */
+    outlines?: OutlineIndex;
   } = {},
 ): ActivityEntry[] {
   const rows = flatten([feature]);
@@ -416,7 +425,10 @@ export function featureActivity(
     });
   }
 
-  const listed = collapseAdded(feature, entries, rows);
+  const outlines = sources.outlines ?? outlineIndex([feature]);
+  const listed = collapseAdded(feature, entries, rows).map((entry) =>
+    entry.detail ? { ...entry, detail: readableRefs(entry.detail, outlines) } : entry,
+  );
 
   // Newest first. A dated line stands at the start of its day, so it is
   // listed after every timed entry that day: it says no more than the day.
@@ -487,8 +499,8 @@ function collapseAdded(
       dayOnly: false,
       who: added.every((entry) => entry.who === 'dash') ? 'dash' : null,
       verb: `Added ${addedWords(added.map((entry) => kindOf.get(entry.subject.number)))} to`,
-      subject: { number: feature.number, title: feature.title, isFeature: true, href: `${featureHref(feature.number)}?tab=steps` },
-      detail: ordered.map((entry) => `#${entry.subject.number} ${entry.subject.title}`).join('\n'),
+      subject: { number: feature.number, outline: feature.outline, title: feature.title, isFeature: true, href: `${featureHref(feature.number)}?tab=steps` },
+      detail: ordered.map((entry) => `${stepRef(entry.subject)} ${entry.subject.title}`).join('\n'),
       sha: null,
     });
   }

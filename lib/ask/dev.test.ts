@@ -317,6 +317,42 @@ describe('read_dev_row', () => {
     }
   });
 
+  it('names a step by its outline when the plan places it, reads an outline as a ref, and makes stored refs readable', async () => {
+    const outlined: Tables = {
+      ...tables,
+      plan_item_outlines: [
+        { user_id: ME, number: 1319, outline: '1319' },
+        { user_id: ME, number: 1248, outline: '1319.1' },
+        { user_id: ME, number: 1250, outline: '1319.1.1' },
+        { user_id: ME, number: 1251, outline: '1319.1.2' },
+        { user_id: THEM, number: 1248, outline: '9.9' },
+      ],
+      dev_comments: [
+        { user_id: ME, plan_item_id: STEP, author: 'claude', body: 'Waits on #1250, not #12 or PR #1251.', created_at: at },
+      ],
+    };
+    for (const ref of ['#1319.1', '1319.1', '#1248']) {
+      const result = await read({ kind: 'step', ref }, { tables: outlined });
+      expect(result.ok).toBe(true);
+      if (!result.ok) continue;
+      const [row] = result.rows;
+      expect(row.title).toBe('#1319.1 Read a row');
+      // The link still carries the number, the step's identity.
+      expect(row.href).toBe('/dev/plan?view=all&q=%231248');
+      expect(row.detail).toMatchObject({
+        step: '#1319.1',
+        number: 1248,
+        under: '#1319 Let Dash read your Dev pages in full',
+        comments: '[2026-09-01, Dash] Waits on #1319.1.1, not #12 or PR #1251.',
+      });
+      expect(row.detail?.decisions).toBe(
+        '#1319.1.1 Which shape? Answered: B, JSON.\n#1319.1.2 Which name? Not answered yet.',
+      );
+    }
+    const unknown = await read({ kind: 'step', ref: '#1319.7' }, { tables: outlined });
+    expect(unknown.ok).toBe(false);
+  });
+
   it('reads the sessions sent at a step, newest first, with why each stopped', async () => {
     const result = await read({ kind: 'step', ref: '#1248' });
     expect(result.ok && result.rows[0].detail?.sessions).toBe(
@@ -474,6 +510,22 @@ describe('find_dev_text', () => {
         },
       },
     ]);
+  });
+
+  it('names the step a hit sits on by its outline, and reads stored refs in the excerpt as outlines', async () => {
+    const outlined = {
+      ...tables,
+      plan_item_outlines: [
+        { user_id: ME, number: 1400, outline: '1390.2' },
+        { user_id: ME, number: 1323, outline: '1320.3' },
+      ],
+    };
+    const result = await find({ query: 'drop step', kinds: ['comment'] }, { tables: outlined });
+    expect(result.ok && result.rows[0]).toMatchObject({
+      title: '#1390.2 Show counts',
+      href: '/dev/plan?view=all&q=%231400',
+      detail: { excerpt: 'Drop this step, #1320.3 covers it.' },
+    });
   });
 
   it('looks in every kind, newest first, naming what Dash wrote, and leaves dismissed rows out', async () => {

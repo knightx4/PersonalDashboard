@@ -88,7 +88,7 @@ export type TakeawaySource = {
  * since been shaped; an idea alone when it has not.
  */
 export type TakeawayCover =
-  | { kind: 'plan'; number: number }
+  | { kind: 'plan'; number: number; outline?: string | null }
   | { kind: 'idea'; ideaId: string }
   | null;
 
@@ -186,6 +186,8 @@ export function buildInspirationPage(input: {
   links: LinkRow[];
   /** plan_items.number by id, for every plan item the takeaways and ideas name. */
   planNumbers: ReadonlyMap<string, number>;
+  /** Where the plan page places each of those items, `1073.4`, by id. */
+  planOutlines?: ReadonlyMap<string, string>;
   /** ideas.plan_item_id by idea id, for every idea the takeaways name. */
   ideaPlanItems: ReadonlyMap<string, string | null>;
   /** For whether a claimed check still holds; the clock when absent. */
@@ -218,12 +220,14 @@ export function buildInspirationPage(input: {
   const coverOf = (row: TakeawayRowData): TakeawayCover => {
     if (row.plan_item_id) {
       const number = input.planNumbers.get(row.plan_item_id);
-      if (number !== undefined) return { kind: 'plan', number };
+      if (number !== undefined) return { kind: 'plan', number, outline: input.planOutlines?.get(row.plan_item_id) ?? null };
     }
     if (row.idea_id) {
       const planItem = input.ideaPlanItems.get(row.idea_id);
       const number = planItem ? input.planNumbers.get(planItem) : undefined;
-      if (number !== undefined) return { kind: 'plan', number };
+      if (planItem && number !== undefined) {
+        return { kind: 'plan', number, outline: input.planOutlines?.get(planItem) ?? null };
+      }
       return { kind: 'idea', ideaId: row.idea_id };
     }
     return null;

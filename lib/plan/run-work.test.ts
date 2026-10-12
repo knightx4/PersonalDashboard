@@ -4,6 +4,7 @@ import {
   featureWork,
   judgedOnClock,
   noWorkNote,
+  outlineOf,
   readsWork,
   reshapeWork,
   workedEnd,
@@ -135,6 +136,23 @@ describe('reshapeWork', () => {
       { createdAt: at(400), detail: 'Also from #656, but before the run.' },
     ];
     expect(reshapeWork(rows, 'f', window, named)).toEqual({ done: 1 });
+  });
+
+  it('counts a feature named by its outline, and not one naming a step under it', () => {
+    const rows = [
+      row({ id: 'top', number: 1073 }),
+      row({ id: 'a', parentId: 'top', number: 1080, position: 0 }),
+      row({ id: 'f', parentId: 'top', number: 1084, position: 1, status: 'done' }),
+    ];
+    expect(outlineOf(rows, 'f')).toBe('1073.2');
+    const named = [
+      { createdAt: at(250), detail: 'Came out of the re-shape of #1073.2.' },
+      { createdAt: at(250), detail: 'Came out of #1084 too.' },
+      { createdAt: at(250), detail: 'Came out of #1073.2.1, a step beneath it.' },
+    ];
+    expect(reshapeWork(rows, 'f', window, named)).toEqual({ done: 2 });
+    // The feature above it is not named by a mention of one of its steps.
+    expect(reshapeWork(rows, 'top', window, named)).toEqual({ done: 0 });
   });
 });
 

@@ -152,6 +152,7 @@ describe('postsRunText', () => {
 
   it('asks for one draft when a step is named', () => {
     expect(postsRunText({ userId: 'u', focus: { number: 639 } })).toContain('#639 only');
+    expect(postsRunText({ userId: 'u', focus: { number: 1084, outline: '1073.4' } })).toContain('plan step #1073.4 (number 1084) only');
   });
 
   it('quotes what the person asked for, line by line', () => {

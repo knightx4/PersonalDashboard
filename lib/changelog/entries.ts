@@ -2,6 +2,7 @@ import { isModuleId, moduleForPath, MODULE_IDS, type ModuleId } from '@/lib/modu
 import type { FeedbackRow } from '@/lib/feedback/load';
 import type { PlanItem } from '@/lib/plan/load';
 import { isAppScope } from '@/lib/plan/projects';
+import { readableRefs, type OutlineIndex } from '@/lib/plan/ref';
 
 /**
  * What has shipped, read.
@@ -32,6 +33,12 @@ export type ChangelogEntry = {
   id: string;
   /** The plan step's `#12`. Null for a note, which has no number. */
   number: number | null;
+  /**
+   * Where the step sits on the plan, `1073.4`, which is what the line is
+   * headed with (lib/plan/ref.ts). Absent until `withOutlines` places it, and
+   * for a note.
+   */
+  outline?: string | null;
   /** When it closed. ISO, as the row stored it. */
   at: string;
   /** The day it landed, `YYYY-MM-DD`. */
@@ -242,6 +249,19 @@ export function changelogEntries(input: {
 }
 
 /**
+ * The entries with each step's outline, and the stored `#1084`s in every
+ * detail read as the `#1073.4`s the plan page shows. The number stays on the
+ * entry as its identity, for links, screens and posts.
+ */
+export function withOutlines(entries: readonly ChangelogEntry[], outlines: OutlineIndex): ChangelogEntry[] {
+  return entries.map((entry) => ({
+    ...entry,
+    outline: entry.number === null ? null : (outlines.get(entry.number) ?? null),
+    detail: entry.detail === null ? null : readableRefs(entry.detail, outlines),
+  }));
+}
+
+/**
  * The entries a search matches.
  *
  * Over the fields somebody would actually search this page for: what shipped
@@ -271,6 +291,7 @@ export function filterChangelog(
       entry.detail ?? '',
       entry.commitSha ?? '',
       entry.number === null ? '' : `#${entry.number}`,
+      entry.outline ? `#${entry.outline}` : '',
       entry.issue?.title ?? '',
       entry.issue === null ? '' : `#${entry.issue.number}`,
     ]

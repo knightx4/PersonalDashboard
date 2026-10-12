@@ -77,7 +77,7 @@ describe('suggestPostAbout', () => {
   it('starts the posts run focused on that one step', async () => {
     expect(await press('1419')).toEqual({ message: 'Sent.' });
     expect(state.started).toEqual([
-      expect.objectContaining({ userId: USER_ID, focus: { number: 1419 } }),
+      expect.objectContaining({ userId: USER_ID, focus: { number: 1419, outline: null } }),
     ]);
   });
 

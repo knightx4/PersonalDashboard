@@ -4,6 +4,7 @@ import {
   Fragment,
   useActionState,
   useEffect,
+  useMemo,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -22,6 +23,7 @@ import { StatusGlyph } from '@/components/ui/status-glyph';
 import { planRowId, type PlanRefTitles } from '@/lib/comments/refs';
 import { isClosed, isDismissed } from '@/lib/plan/load';
 import { sessionOrigin, type SessionOrigin } from '@/lib/plan/origin';
+import { readableRefs } from '@/lib/plan/ref';
 import type { PlanProgress } from '@/lib/plan/tree';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 import { cn } from '@/lib/cn';
@@ -31,6 +33,7 @@ import { LEVEL, ROW_GRID, TreeGuides } from './grid';
 import { Questions } from './questions';
 import {
   PLAN_COMMENTS,
+  outlinesOf,
   type TreeActionState,
   type TreeActions,
   type TreeCatalogEntry,
@@ -267,7 +270,14 @@ export function TreeRow<E extends TreeCatalogEntry>({
   /** The row's anchor. The dev plan's, which a `#494` in a comment lands on, by default. */
   anchorId?: string;
   /** The answer that produced this row, when a re-shape wrote it. */
-  origin?: { number: number; gist: string } | null;
+  origin?: {
+    number: number | null;
+    /** As the stamp wrote it, to find its line: `1084` or `1073.4`. */
+    written?: string;
+    /** As the person reads it, `#1073.4`. */
+    ref?: string;
+    gist: string;
+  } | null;
   /**
    * Which session wrote this row ready to build, when one did: the day, and
    * the session's id for the hover text. The dev plan's, for a step added
@@ -337,12 +347,15 @@ export function TreeRow<E extends TreeCatalogEntry>({
 
   const closed = isClosed(node.status);
   const isDecision = node.kind === 'decision';
-  // What the open button calls the row. A plan step's number is its handle,
-  // the one the commits and comments use, so the button says it. A page that
-  // anchors its rows by its own id has no such number: a goal step's is only
-  // its place in reading order, which the page shows nowhere, so the button
-  // says the outline the row reads ("12.1").
-  const handle = anchorId ? node.outline : node.number;
+  // What the open button calls the row: the outline the row heads itself
+  // with ("1073.4"), on a plan step and a goal step alike, so the label names
+  // the row the way the person reads it.
+  const handle = node.outline;
+  // Stored text can name a step by its number (`#1084`); it is drawn the way
+  // the page names that step (`#1073.4`). `titles` carries every outline the
+  // page knows, and a page without it draws the text as written.
+  const outlines = useMemo(() => outlinesOf(titles), [titles]);
+  const readable = (text: string) => readableRefs(text, outlines);
   // A setup job still open. Closed, it is an ordinary finished row -- the
   // errand is run, and a box inviting you to run it again would be a lie.
   const setupOpen = node.kind === 'setup' && !closed;
@@ -358,9 +371,10 @@ export function TreeRow<E extends TreeCatalogEntry>({
       .find(
         (line) =>
           line.trim() &&
-          !(origin && line.includes(`#${origin.number}'s answer:`)) &&
+          !(origin && line.includes(`#${origin.written ?? origin.number}'s answer:`)) &&
           !sessionOrigin(line),
       ) ?? '';
+  const glossText = readable(gloss);
 
   const inset = rowInset(trail);
 
@@ -401,7 +415,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
   const condensable = hasChildren && showChildren && !heading;
   // The first line of the detail, or of the done-when, without markdown's
   // link brackets: what a folded panel shows beside Show details.
-  const foldedPreview = (node.detail ?? node.acceptance ?? '')
+  const foldedPreview = readable(node.detail ?? node.acceptance ?? '')
     .split('\n')
     .map((line) => line.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/[*_#>`]/g, '').trim())
     .find((line) => line.length > 0);
@@ -546,7 +560,8 @@ export function TreeRow<E extends TreeCatalogEntry>({
             never think to open. */}
       {origin && (
         <span className="block truncate text-small text-ink-ghost">
-          From #{origin.number}&apos;s answer: {origin.gist}
+          From {origin.ref ?? `#${origin.written ?? origin.number}`}&apos;s answer:{' '}
+          {readable(origin.gist)}
         </span>
       )}
       {/* The same, for a step a session wrote ready to build. Approval
@@ -571,7 +586,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
       {gloss && !open && !need && (
         <span className={cn('block truncate text-small text-ink-muted', !list && 'max-sm:hidden')}>
           {!node.detail && 'Note: '}
-          {gloss}
+          {glossText}
         </span>
       )}
       {/* On a phone the list layout's last cell goes under the title. */}
@@ -739,7 +754,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
               !open && (
                 <span className="min-w-0 truncate text-small text-ink-muted">
                   {!node.detail && 'Note: '}
-                  {gloss}
+                  {glossText}
                 </span>
               )
             )}
@@ -818,7 +833,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
               longer holding the step open when you close it. */}
           <FogNote
             id={node.id}
-            fog={node.fog ?? ''}
+            fog={readable(node.fog ?? '')}
             aside={node.fogDismissedAt !== null}
             action={fogAction}
             pending={fogPending}
@@ -880,7 +895,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   {!isDecision && !setupOpen && detailView}
                   {node.detail && !isDecision && !setupOpen && !detailView && (
                     <p className="whitespace-pre-wrap text-ui text-ink-muted">
-                      <LinkedText text={node.detail} />
+                      <LinkedText text={readable(node.detail)} />
                     </p>
                   )}
                   {(node.acceptance || acceptanceView) && (
@@ -890,7 +905,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                       </p>
                       {acceptanceView ?? (
                         <p className="whitespace-pre-wrap text-ui text-ink">
-                          <LinkedText text={node.acceptance ?? ''} />
+                          <LinkedText text={readable(node.acceptance ?? '')} />
                         </p>
                       )}
                     </div>
@@ -904,13 +919,13 @@ export function TreeRow<E extends TreeCatalogEntry>({
                         Needs
                       </p>
                       <p className="whitespace-pre-wrap text-ui text-ink">
-                        <LinkedText text={node.blockAsk} />
+                        <LinkedText text={readable(node.blockAsk)} />
                       </p>
                     </div>
                   )}
                   {node.comment && (
                     <p className="whitespace-pre-wrap rounded-lg bg-canvas px-3 py-2 text-ui text-ink">
-                      <LinkedText text={node.comment} />
+                      <LinkedText text={readable(node.comment)} />
                     </p>
                   )}
 

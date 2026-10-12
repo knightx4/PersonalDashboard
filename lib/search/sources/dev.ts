@@ -39,8 +39,53 @@ import { devHits, matchVisions, matchWaiting, type DevRows } from '@/lib/search/
 /** As many open questions and raises as are read before matching. */
 const WAITING_READ = 200;
 
+/**
+ * The outline of each row by id, from the plan_item_outlines view. A read
+ * that fails leaves the map empty, and the hits fall back to the number,
+ * which still finds the step.
+ */
+async function outlinesFor(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ids: string[],
+): Promise<Map<string, string>> {
+  const index = new Map<string, string>();
+  if (ids.length === 0) return index;
+  try {
+    const { data, error } = await supabase
+      .from('plan_item_outlines')
+      .select('id, outline')
+      .in('id', [...new Set(ids)]);
+    if (error) return index;
+    for (const row of (data ?? []) as { id: string; outline: string | null }[]) {
+      if (row.outline) index.set(row.id, row.outline);
+    }
+  } catch {
+    // Named by number instead.
+  }
+  return index;
+}
+
 /** A search, or -- with no query -- everything. */
 type Read = SearchListContext & { query?: string };
+
+/** The stored number of the step at this outline, or null when none is or the read fails. */
+async function numberOfOutline(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  outline: string,
+): Promise<number | null> {
+  try {
+    const { data, error } = await supabase
+      .from('plan_item_outlines')
+      .select('number')
+      .eq('user_id', userId)
+      .eq('outline', outline)
+      .maybeSingle();
+    return error || !data ? null : (data as { number: number }).number;
+  } catch {
+    return null;
+  }
+}
 
 async function read(ctx: Read): Promise<SearchHit[]> {
   const supabase = await createClient();
@@ -49,7 +94,12 @@ async function read(ctx: Read): Promise<SearchHit[]> {
   const pattern = ctx.query ? `%${escapeLike(ctx.query)}%` : null;
   // "#612" or "612" is how a step is quoted everywhere else, and the number is
   // not in the title for `ilike` to find.
-  const number = ctx.query?.match(/^#?(\d+)$/)?.[1];
+  // An outline, "#1073.4", is how the plan page heads a step, so it is looked
+  // up to the number it names; one that names nothing finds nothing.
+  const outline = ctx.query?.trim().match(/^#?(\d+(?:\.\d+)+)$/)?.[1];
+  const number = outline
+    ? String((await numberOfOutline(supabase, ctx.userId, outline)) ?? 0)
+    : ctx.query?.match(/^#?(\d+)$/)?.[1];
 
   let plan = supabase
     .from('plan_items')
@@ -130,12 +180,21 @@ async function read(ctx: Read): Promise<SearchHit[]> {
     ctx.limit,
   );
 
+  // A step is named by its outline, `#1073.4`, the way the plan page heads it.
+  const plain = (planRead.data ?? []) as DevRows['plan'];
+  const outlines = await outlinesFor(supabase, [
+    ...plain.map((row) => row.id),
+    ...matched.questions.map((row) => row.id),
+  ]);
+  const placed = <T extends { id: string }>(row: T) => ({ ...row, outline: outlines.get(row.id) ?? null });
+
   const rows: DevRows = {
-    plan: (planRead.data ?? []) as DevRows['plan'],
+    plan: plain.map(placed),
     ideas: (ideaRead.data ?? []) as DevRows['ideas'],
     notes: (noteRead.data ?? []) as DevRows['notes'],
     specs,
-    ...matched,
+    questions: matched.questions.map(placed),
+    raises: matched.raises,
     visions: matchVisions(
       (visionRead.data ?? []) as NonNullable<DevRows['visions']>,
       ctx.query,

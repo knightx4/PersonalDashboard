@@ -1,10 +1,12 @@
 import { createClient, requireUser } from '@/lib/auth/server';
 import { loadChangelog } from '@/lib/changelog/load';
 import { loadScreenChanges } from '@/lib/plan/screen-change-load';
+import { readAll } from '@/lib/learn/db/read-all';
 import {
   CHANGELOG_DEFAULT_GROUPING,
   isChangelogGrouping,
   isChangelogModuleFilter,
+  withOutlines,
   type ChangelogGrouping,
   type ChangelogModuleFilter,
 } from '@/lib/changelog/entries';
@@ -67,13 +69,24 @@ export default async function DevChangelogPage({
   const workspace: ChangelogModuleFilter | null =
     askedModule && isChangelogModuleFilter(askedModule) ? askedModule : null;
 
-  const [entries, screens] = await Promise.all([
+  const [entries, screens, outlines] = await Promise.all([
     loadChangelog(supabase, user.id),
     loadScreenChanges(supabase, user.id),
+    // Every step's outline, so a line is headed `#1073.4` as the plan page
+    // heads the row. Paged, since the plan is past a thousand rows. A read
+    // that fails heads them by number instead.
+    readAll<{ number: number; outline: string }>((from, to) =>
+      supabase
+        .from('plan_item_outlines')
+        .select('number, outline')
+        .eq('user_id', user.id)
+        .order('number', { ascending: true })
+        .range(from, to),
+    ).catch(() => []),
   ]);
   return (
     <ChangelogView
-      entries={entries}
+      entries={withOutlines(entries, new Map(outlines.map((row) => [row.number, row.outline])))}
       grouping={grouping}
       query={query}
       workspace={workspace}

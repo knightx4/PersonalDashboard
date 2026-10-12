@@ -13,8 +13,12 @@ import { filesOfStep, type GitRunner } from './ui-check-guard';
 export const localGit: GitRunner = (args) =>
   execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
 
-export function stepScreenInputs(step: number, commit: string): { files: string[]; surfaces: string[] } {
-  const files = filesOfStep(step, commit, localGit);
+export function stepScreenInputs(
+  step: number,
+  commit: string,
+  outline?: string | null,
+): { files: string[]; surfaces: string[] } {
+  const files = filesOfStep(step, commit, localGit, outline);
   if (files.length === 0) return { files, surfaces: [] };
   const graph = importedBy(process.cwd());
   return { files, surfaces: surfacesForFiles(files, (file) => pagesUsing(file, graph)) };

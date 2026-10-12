@@ -33,6 +33,7 @@
 import { checkDay } from './check-backs';
 import { isClosed, isDismissed } from './load';
 import type { RunJob } from './run-end';
+import { stepRef } from './ref';
 import { flatten, isWaiting, isWaitingOnThePerson, type PlanNode } from './tree';
 
 /** The jobs whose runs build steps, and so can close one. */
@@ -71,7 +72,7 @@ export type StallFeature = {
 };
 
 /** A step a raise names as the one its feature is stuck on. */
-export type StuckStep = { number: number; title: string };
+export type StuckStep = { number: number; outline?: string | null; title: string };
 
 /**
  * The step a feature's sessions were stuck on: its first build row that is
@@ -80,12 +81,12 @@ export type StuckStep = { number: number; title: string };
  * weeks of data still to collect.
  */
 export function stuckStep(feature: {
-  children: readonly { kind: string; status: string; number: number; title: string }[];
+  children: readonly { kind: string; status: string; number: number; outline?: string; title: string }[];
 }): StuckStep | null {
   const row = feature.children.find(
     (child) => child.kind === 'build' && child.status !== 'done' && child.status !== 'dropped',
   );
-  return row ? { number: row.number, title: row.title } : null;
+  return row ? { number: row.number, outline: row.outline ?? null, title: row.title } : null;
 }
 
 /**
@@ -115,7 +116,7 @@ export function stuckAsk(named: string): string {
 export function stuckLine(step: StuckStep | null | undefined): string {
   if (!step) return '';
   return (
-    `The step it is stuck on is #${step.number} ${step.title}. If that step waits on something ` +
+    `The step it is stuck on is ${stepRef(step)} ${step.title}. If that step waits on something ` +
     'that has not happened yet, such as data still to collect or a setup only you can do, ' +
     'trying again will stop the same way. Close with a reason in that case.'
   );
@@ -220,11 +221,11 @@ export function waitingSteps(node: PlanNode): string | null {
   if (beneath.some((step) => !isWaiting(step) && !isWaitingOnThePerson(step))) return null;
   const said = beneath.slice(0, 3).map((step) => {
     const check = step.waitsUntil[step.waitsUntil.length - 1];
-    if (check) return `#${step.number} waits until ${checkDay(check.dueAt)} (${check.title.replace(/[.]+$/, '')})`;
-    if (step.waitingOn.length > 0) return `#${step.number} waits on #${step.waitingOn[0].number}`;
-    return `#${step.number} waits on you`;
+    if (check) return `${stepRef(step)} waits until ${checkDay(check.dueAt)} (${check.title.replace(/[.]+$/, '')})`;
+    if (step.waitingOn.length > 0) return `${stepRef(step)} waits on ${stepRef(step.waitingOn[0])}`;
+    return `${stepRef(step)} waits on you`;
   });
-  return `Nothing under #${node.number} can be worked now: ${said.join('; ')}.`;
+  return `Nothing under ${stepRef(node)} can be worked now: ${said.join('; ')}.`;
 }
 
 /**

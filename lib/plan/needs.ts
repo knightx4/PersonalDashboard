@@ -1,4 +1,5 @@
 import { isClosed, type PlanAssignee, type PlanKind, type PlanStatus } from './load';
+import { stepRef } from './ref';
 
 /**
  * Writing down the thing only you can supply, as a job rather than a wall.
@@ -38,6 +39,8 @@ export const SETUP_KIND: PlanKind = 'setup';
 export type WaitingStep = {
   id: string;
   number: number;
+  /** Where it sits ("1073.4"), which is how the refusal names it. */
+  outline?: string | null;
   parentId: string | null;
   kind: PlanKind;
   status: PlanStatus;
@@ -76,10 +79,10 @@ export function setupHome<T extends { id: string; number: number; parentId: stri
  */
 export function needsRefusal(waiting: WaitingStep): string | null {
   if (isClosed(waiting.status)) {
-    return `#${waiting.number} is already closed, so nothing is waiting on this. Name the step that is stopped.`;
+    return `${stepRef(waiting)} is already closed, so nothing is waiting on this. Name the step that is stopped.`;
   }
   if (waiting.kind === SETUP_KIND) {
-    return `#${waiting.number} is itself a setup job. Say both things in its detail rather than pointing one at the other.`;
+    return `${stepRef(waiting)} is itself a setup job. Say both things in its detail rather than pointing one at the other.`;
   }
   return null;
 }
@@ -108,17 +111,23 @@ export function needsLines(outcome: {
   title: string;
   parentNumber: number;
   waitingNumber: number;
+  /** The outlines of the three, which is how the lines name them when given. */
+  setupOutline?: string | null;
+  parentOutline?: string | null;
+  waitingOutline?: string | null;
   released: boolean;
   hasDetail: boolean;
 }): string[] {
+  const setup = stepRef({ number: outcome.setupNumber, outline: outcome.setupOutline });
+  const parent = stepRef({ number: outcome.parentNumber, outline: outcome.parentOutline });
+  const waiting = stepRef({ number: outcome.waitingNumber, outline: outcome.waitingOutline });
   const lines = [
-    `#${outcome.setupNumber} for you to set up, under #${outcome.parentNumber}: ${outcome.title}`,
-    `#${outcome.waitingNumber} waits on #${outcome.setupNumber}.`,
+    `${setup} for you to set up, under ${parent}: ${outcome.title}`,
+    `${waiting} waits on ${setup}.`,
   ];
   if (outcome.released) {
     lines.push(
-      `#${outcome.waitingNumber} was blocked; it is back to not started and waits on ` +
-        `#${outcome.setupNumber} instead.`,
+      `${waiting} was blocked; it is back to not started and waits on ${setup} instead.`,
     );
   }
   if (!outcome.hasDetail) {
@@ -143,9 +152,9 @@ export function needsLines(outcome: {
  * because "you cannot have this" with no next move is how a session ends up
  * inventing one.
  */
-export function setupStartRefusal(number: number): string {
+export function setupStartRefusal(number: number, outline?: string | null): string {
   return (
-    `#${number} is something for you to set up, not work to build. It is closed where it is ` +
+    `${stepRef({ number, outline })} is something for you to set up, not work to build. It is closed where it is ` +
     `read: on /dev/plan or the Dash tab's "Waiting on you", with "I have set this up".`
   );
 }

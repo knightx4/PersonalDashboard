@@ -173,7 +173,7 @@ describe('featureActivity', () => {
     expect(added.find((entry) => entry.subject.number === 10)?.verb).toBe('Added');
     expect(added.find((entry) => entry.detail)).toMatchObject({
       verb: 'Added 2 steps and a question to',
-      detail: '#11 Overview\n#12 Which layout?\n#13 Goal page',
+      detail: '#10.1 Overview\n#10.2 Which layout?\n#10.3 Goal page',
       subject: { isFeature: true, href: '/dev/plan/10?tab=steps' },
       who: null,
     });
@@ -188,6 +188,27 @@ describe('featureActivity', () => {
     );
     expect(one.find((entry) => entry.subject.number === 11)?.who).toBe('dash');
     expect(one.find((entry) => entry.subject.number === 10)).toMatchObject({ who: null, subject: { isFeature: true } });
+  });
+
+  it('reads a stored step number in a note as the outline the page shows', () => {
+    const entries = featureActivity(
+      feature([
+        item({ id: 'f', number: 10, title: 'Feature pages' }),
+        item({ id: 'a', number: 31, parentId: 'f', title: 'Overview' }),
+        item({
+          id: 'b',
+          number: 32,
+          parentId: 'f',
+          title: 'Steps tab',
+          status: 'done',
+          completedAt: '2026-10-02T10:00:00Z',
+          comment: 'Done 2026-10-02: Built on #31.',
+        }),
+      ]),
+    );
+    const closed = entries.find((entry) => entry.kind === 'closed');
+    expect(closed?.detail).toBe('Built on #10.1.');
+    expect(closed?.subject.outline).toBe('10.2');
   });
 
   it('groups by day', () => {

@@ -10,6 +10,7 @@ import {
   type DevComment,
 } from './load';
 import { threadSubject } from '@/lib/thread/subjects';
+import { stepRef } from '@/lib/plan/ref';
 
 /**
  * Every conversation on the account, wherever it was started.
@@ -128,7 +129,9 @@ function aboutFrom(target: CommentTarget, parent: Record<string, unknown> | null
     const number = Number(parent.number);
     const title = firstLine(parent.title);
     if (!Number.isFinite(number)) return title ?? UNNAMED.step;
-    return title ? `#${number} ${title}` : `#${number}`;
+    // Named by its outline, as the plan page heads the row, where it is known.
+    const ref = stepRef({ number, outline: typeof parent.outline === 'string' ? parent.outline : null });
+    return title ? `${ref} ${title}` : ref;
   }
 
   if (target === 'raise') return firstLine(parent.title) ?? UNNAMED.raise;
@@ -284,9 +287,19 @@ export async function loadConversations(
   await Promise.all(
     [...idsByTarget.entries()].map(async ([target, ids]) => {
       const { table, columns } = PARENT_READS[target];
-      const { data } = await supabase.from(table).select(columns).eq('user_id', userId).in('id', [...ids]);
+      const [{ data }, placed] = await Promise.all([
+        supabase.from(table).select(columns).eq('user_id', userId).in('id', [...ids]),
+        // A step's outline, from the view that places rows as the plan page does.
+        target === 'step'
+          ? supabase.from('plan_item_outlines').select('id, outline').eq('user_id', userId).in('id', [...ids])
+          : Promise.resolve({ data: [] }),
+      ]);
+      const outlines = new Map(
+        ((placed.data ?? []) as { id: string; outline: string }[]).map((row) => [String(row.id), row.outline]),
+      );
       for (const parent of (data ?? []) as unknown as Record<string, unknown>[]) {
-        parents.set(conversationKey(target, String(parent.id)), parent);
+        const outline = outlines.get(String(parent.id));
+        parents.set(conversationKey(target, String(parent.id)), outline ? { ...parent, outline } : parent);
       }
     }),
   );

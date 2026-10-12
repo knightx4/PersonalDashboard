@@ -2,6 +2,7 @@ import { commentLine } from '@/lib/comments/context';
 import { APP_VISION, type VisionBodies } from '@/lib/specs/vision';
 import { hasLiveFog, isClosed, isDismissed, type PlanStatus } from './load';
 import { reshapeOrigin } from './origin';
+import { outlineIndex, readableRefs, stepRef, type OutlineIndex } from './ref';
 import {
   ancestorsOf,
   flatten,
@@ -168,11 +169,11 @@ function stateWord(
 }
 
 function line(
-  node: Pick<PlanNode, 'id' | 'number' | 'title' | 'status'>,
+  node: Pick<PlanNode, 'id' | 'number' | 'outline' | 'title' | 'status'>,
   liveness?: PlanLiveness,
 ): string {
   const box = node.status === 'done' ? '[x]' : node.status === 'dropped' ? '[-]' : '[ ]';
-  return `- ${box} #${node.number} ${node.title}${
+  return `- ${box} ${stepRef(node)} ${node.title}${
     node.status === 'in_progress' || node.status === 'blocked'
       ? ` (${stateWord(node, liveness)})`
       : ''
@@ -372,14 +373,14 @@ export function visionFor(
  *
  * Dismissed rows are left out, the same as in the checklist.
  */
-function saidOn(node: PlanNode): string[] {
+function saidOn(node: PlanNode, outlines: OutlineIndex): string[] {
   const rows = flatten([node]).filter((item) => !isDismissed(item) && item.thread.length > 0);
   if (rows.length === 0) return [];
 
   const out = ['', '## Comments', '', 'Left on these rows, oldest first.'];
   for (const row of rows) {
-    out.push('', `On #${row.number} ${row.title}:`, '');
-    for (const comment of row.thread) out.push(`- ${commentLine(comment)}`);
+    out.push('', `On ${stepRef(row)} ${row.title}:`, '');
+    for (const comment of row.thread) out.push(`- ${readableRefs(commentLine(comment), outlines)}`);
   }
   return out;
 }
@@ -401,14 +402,15 @@ export function dismissedUnder(
   suggestions: readonly { body: string }[] = [],
 ): string {
   const rows = flatten([feature]);
+  const outlines = outlineIndex([feature]);
   const lines: string[] = [];
 
   for (const item of rows) {
     if (isDismissed(item)) {
-      lines.push(`- #${item.number} ${item.title} (${item.kind === 'decision' ? 'question' : 'step'})`);
+      lines.push(`- ${stepRef(item)} ${item.title} (${item.kind === 'decision' ? 'question' : 'step'})`);
     }
     if (item.fog && item.fogDismissedAt !== null) {
-      lines.push(`- The fog on #${item.number}: ${firstLine(item.fog)} (fog)`);
+      lines.push(`- The fog on ${stepRef(item)}: ${readableRefs(firstLine(item.fog), outlines)} (fog)`);
     }
   }
   for (const idea of suggestions) {
@@ -442,8 +444,12 @@ export function planBrief(
 
   const feature = featureOf(node, ancestors);
   const decided = decidedSoFar(feature, node);
+  // Stored text may name a step by the number it had before outlines were
+  // what the plan names steps by; it is written out the way the page reads.
+  const outlines = outlineIndex(sections.flatMap((section) => section.nodes));
+  const readable = (text: string) => readableRefs(text, outlines);
 
-  out.push(`# Plan step #${node.number} — ${node.title}`);
+  out.push(`# Plan step ${stepRef(node)} — ${node.title}`);
   out.push('');
 
   const facts = [
@@ -459,15 +465,15 @@ export function planBrief(
   out.push(facts.join(' · '));
 
   if (ancestors.length > 0) {
-    out.push(`Part of: ${ancestors.map((a) => `#${a.number} ${a.title}`).join(' › ')}`);
+    out.push(`Part of: ${ancestors.map((a) => `${stepRef(a)} ${a.title}`).join(' › ')}`);
   }
 
   // Said at the top rather than left in the notes at the bottom: a step
   // written by a re-shape is one nobody remembers agreeing to, and the answer
   // that produced it is the first thing worth knowing about it.
-  const origin = reshapeOrigin(node.comment);
+  const origin = reshapeOrigin(node.comment, outlines);
   if (origin) {
-    out.push(`From #${origin.number}'s answer: ${origin.gist}`);
+    out.push(`From ${origin.ref}'s answer: ${readable(origin.gist)}`);
   }
 
   // What the workspace is for, above where the feature is going: the layer a
@@ -480,21 +486,21 @@ export function planBrief(
   // Where the whole feature is going, above what this one step is for. A step
   // built against its own done-when alone can meet it and still miss the point.
   if (feature.id !== node.id && feature.acceptance) {
-    out.push('', '## Destination', '', `#${feature.number} ${feature.title} — ${feature.acceptance}`);
+    out.push('', '## Destination', '', `${stepRef(feature)} ${feature.title} — ${readable(feature.acceptance)}`);
   }
 
   if (decided.length > 0) {
     out.push('', '## Decided so far', '');
-    for (const item of decided) out.push(`- #${item.number} ${item.title} — ${item.resolution}`);
+    for (const item of decided) out.push(`- ${stepRef(item)} ${item.title} — ${readable(item.resolution ?? '')}`);
   }
 
   if (node.detail) {
     // A decision is a question with its options, not a description of work.
-    out.push('', node.kind === 'decision' ? '## Question' : '## What it involves', '', node.detail);
+    out.push('', node.kind === 'decision' ? '## Question' : '## What it involves', '', readable(node.detail));
   }
 
   if (node.acceptance) {
-    out.push('', '## Done when', '', node.acceptance);
+    out.push('', '## Done when', '', readable(node.acceptance));
   }
 
   const surfaces = surfaceIds(node, options.surfaces);
@@ -506,14 +512,14 @@ export function planBrief(
   // been put aside is not said at all -- that is the whole of what dismissing
   // it does.
   if (node.fog && hasLiveFog(node)) {
-    out.push('', '## Not yet specified', '', node.fog);
+    out.push('', '## Not yet specified', '', readable(node.fog));
   }
 
   if (node.dependsOn.length > 0) {
     out.push('', '## Waits on', '');
     for (const link of node.dependsOn) {
       const state = isClosed(link.item.status) ? STATUS_WORD[link.item.status] : 'still open';
-      out.push(`- #${link.item.number} ${link.item.title} (${state})`);
+      out.push(`- ${stepRef(link.item)} ${link.item.title} (${state})`);
     }
   }
 
@@ -522,7 +528,7 @@ export function planBrief(
   );
   if (inherited.length > 0) {
     out.push('', 'Also held up, through a step above it, by:', '');
-    for (const ref of inherited) out.push(`- #${ref.number} ${ref.title}`);
+    for (const ref of inherited) out.push(`- ${stepRef(ref)} ${ref.title}`);
   }
 
   if (node.children.length > 0) {
@@ -531,24 +537,24 @@ export function planBrief(
 
   if (node.blocks.length > 0) {
     out.push('', '## Unblocks', '');
-    for (const ref of node.blocks) out.push(`- #${ref.number} ${ref.title}`);
+    for (const ref of node.blocks) out.push(`- ${stepRef(ref)} ${ref.title}`);
   }
 
   // What it needs, above the record of every time it has been asked for. A
   // session handed a blocked step should read the sentence rather than work
   // out which paragraph of the notes still stands.
   if (node.blockAsk) {
-    out.push('', '## Blocked on', '', node.blockAsk);
+    out.push('', '## Blocked on', '', readable(node.blockAsk));
   }
 
   if (node.comment) {
-    out.push('', '## Notes', '', node.comment);
+    out.push('', '## Notes', '', readable(node.comment));
   }
 
-  if (options.thread) out.push(...saidOn(node));
+  if (options.thread) out.push(...saidOn(node, outlines));
 
   if (node.resolution) {
-    out.push('', '## Answered', '', node.resolution);
+    out.push('', '## Answered', '', readable(node.resolution));
   }
 
   if (node.commitSha) {

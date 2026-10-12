@@ -33,11 +33,14 @@ function db(options: {
   runs?: Record<string, unknown>[];
   /** Steps already under the feature. */
   steps?: Record<string, unknown>[];
+  /** Rows of the plan_item_outlines view. */
+  outlines?: Record<string, unknown>[];
 }) {
   const inserts: { table: string; rows: Record<string, unknown>[] }[] = [];
   const answer = (table: string, filters: Filters, single: boolean) => {
     if (table === 'raised_items') return { data: { source: options.source ?? null } };
     if (table === 'plan_runs') return { data: options.runs ?? [] };
+    if (table === 'plan_item_outlines') return { data: options.outlines ?? [] };
     if (table === 'plan_items' && single) return { data: options.feature ?? null };
     if (table === 'plan_items' && 'kind' in filters) return { data: options.steps ?? [] };
     return { data: [] };
@@ -119,6 +122,19 @@ describe('splitting a stalled feature', () => {
     expect(outcome.ok).toBe(true);
     expect(outcome.ok && outcome.said).toContain('Split #1172 Build the vault export into 3 steps');
     expect(outcome.ok && outcome.said).toContain('sent #1900 to be built');
+  });
+
+  it('names the new steps by their outlines in what it says', async () => {
+    const outlines = [
+      { number: 1172, outline: '1172' },
+      { number: 1900, outline: '1172.1' },
+      { number: 1901, outline: '1172.2' },
+      { number: 1902, outline: '1172.3' },
+    ];
+    const { supabase } = db({ feature: FEATURE, source: SOURCE, runs: RUNS, outlines });
+    const outcome = await split(supabase);
+    expect(outcome.ok && outcome.said).toContain('sent #1172.1 to be built');
+    expect(outcome.ok && outcome.said).toContain('#1172.1 Read the runs\n#1172.2 Write the raise\n#1172.3 Hold on No');
   });
 
   it('keeps the steps and says so when the first could not be sent', async () => {

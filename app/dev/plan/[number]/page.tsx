@@ -20,6 +20,7 @@ import { CHECK_BACK_COLUMNS, checkBackFrom, placeCheckBacks } from '@/lib/plan/c
 import { projectById } from '@/lib/plan/projects';
 import { planRoutine, projectRoutine } from '@/lib/feedback/routine';
 import { catalogOf } from '../plan-catalog';
+import { numberFromRef, outlineIndex } from '@/lib/plan/ref';
 import { FeaturePage } from '../feature-page';
 
 type Params = Promise<{ number: string }>;
@@ -59,8 +60,11 @@ function claimsAsOfNow(
  * page to go to.
  */
 export default async function FeatureRoute({ params }: { params: Params }) {
-  const number = numberOf((await params).number);
-  if (number === null) notFound();
+  // A step's number, or the outline its row reads ("1073.4"), which is looked
+  // up once the tree is built.
+  const raw = decodeURIComponent((await params).number).replace(/^#/, '');
+  const outline = /^\d+(?:\.\d+)+$/.test(raw) ? raw : null;
+  if (numberOf(raw) === null && outline === null) notFound();
 
   const user = await requireUser();
   const supabase = await createClient();
@@ -77,6 +81,10 @@ export default async function FeatureRoute({ params }: { params: Params }) {
 
   const liveness = claimsAsOfNow(data.items, lastRuns);
   const sections = buildPlanTree(data, liveness);
+  const number = outline
+    ? numberFromRef(outline, outlineIndex(sections.flatMap((section) => section.nodes)))
+    : numberOf(raw);
+  if (number === null) notFound();
   const found = findFeature(sections, number);
   if (!found) notFound();
   const elsewhere = stepRedirect(found.feature, found.target);

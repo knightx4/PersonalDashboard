@@ -3,6 +3,7 @@ import { isOutstanding, type FeedbackRow } from '@/lib/feedback/load';
 import type { IdeaRow } from '@/lib/ideas/load';
 import { MODULES, moduleForPath, type AppModule, type ModuleId } from '@/lib/modules';
 import { isClosed, isDismissed, type PlanItem } from '@/lib/plan/load';
+import { buildPlanTree, flattenSections } from '@/lib/plan/tree';
 import { SPECS, type SpecDoc } from '@/lib/specs/registry';
 import type { ScopeReview } from '@/lib/ui-review/load';
 import type { PageOpens } from '@/lib/usage/opens';
@@ -58,8 +59,11 @@ export type ModuleSummary = {
   features: PlanItem[];
   /** Open steps anywhere under the module's features, the features included. */
   openSteps: number;
-  /** Steps shipped, newest first, at most SHIPPED_LIMIT. */
-  shipped: PlanItem[];
+  /**
+   * Steps shipped, newest first, at most SHIPPED_LIMIT, each with the outline
+   * the plan page heads it with (`1073.4`) where the tree places it.
+   */
+  shipped: (PlanItem & { outline?: string })[];
   /** Outstanding bugs and requests filed from one of the module's pages. */
   bugs: FeedbackRow[];
   ideas: IdeaRow[];
@@ -109,6 +113,15 @@ function planModules(plan: readonly PlanItem[]): Map<string, string | null> {
   return resolved;
 }
 
+/**
+ * Each plan row's outline by id, from the same tree the plan page draws.
+ * Dependencies do not move a row in the tree, so none are passed.
+ */
+function planOutlines(plan: readonly PlanItem[]): Map<string, string> {
+  const nodes = flattenSections(buildPlanTree({ items: [...plan], dependencies: [] }));
+  return new Map(nodes.map((node) => [node.id, node.outline]));
+}
+
 function newestFirst(a: string | null, b: string | null): number {
   return (b ?? '').localeCompare(a ?? '');
 }
@@ -117,6 +130,7 @@ export function moduleSummary(
   module: AppModule,
   inputs: ModuleInputs,
   modules = planModules(inputs.plan),
+  outlines = planOutlines(inputs.plan),
 ): ModuleSummary {
   const id = module.id;
   const mine = inputs.plan.filter((item) => modules.get(item.id) === id && !isDismissed(item));
@@ -132,7 +146,8 @@ export function moduleSummary(
     shipped: mine
       .filter((item) => item.status === 'done')
       .sort((a, b) => newestFirst(a.completedAt, b.completedAt))
-      .slice(0, SHIPPED_LIMIT),
+      .slice(0, SHIPPED_LIMIT)
+      .map((item) => ({ ...item, outline: outlines.get(item.id) })),
     bugs: inputs.bugs.filter((row) => isOutstanding(row) && moduleForPath(row.pagePath) === id),
     ideas: inputs.ideas.filter((idea) => idea.module === id),
     specs: SPECS.filter((spec) => spec.module === id),
@@ -145,7 +160,8 @@ export function moduleSummary(
 /** Every module's summary, in the order the switcher lists them. */
 export function moduleSummaries(inputs: ModuleInputs): ModuleSummary[] {
   const modules = planModules(inputs.plan);
-  return MODULES.map((module) => moduleSummary(module, inputs, modules));
+  const outlines = planOutlines(inputs.plan);
+  return MODULES.map((module) => moduleSummary(module, inputs, modules, outlines));
 }
 
 /** "3 bugs", "1 idea": a count and its noun, the noun made plural when it needs to be. */

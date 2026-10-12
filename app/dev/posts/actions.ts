@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createClient } from '@/lib/auth/server';
 import { requireOwner } from '@/lib/dev/owner';
 import { sourceProblems } from '@/lib/dev/post-check';
+import { stepRef } from '@/lib/plan/ref';
 import {
   angleFromPost,
   cleanThread,
@@ -113,8 +114,17 @@ export async function suggestPostAbout(
   if (!step || step.status !== 'done' || step.kind !== 'build') {
     return { error: 'Only a step that has shipped can be posted about.' };
   }
+  // Where the plan page places it, `#1073.4`, which is how the step is named
+  // to the person and to the run. A failed read names it by number.
+  const { data: placed } = await supabase
+    .from('plan_item_outlines')
+    .select('outline')
+    .eq('user_id', user.id)
+    .eq('id', step.id)
+    .maybeSingle();
+  const outline = (placed as { outline: string } | null)?.outline ?? null;
   const problems = sourceProblems({
-    label: `#${step.number}`,
+    label: stepRef({ number: step.number, outline }),
     module: step.module ?? null,
     text: [step.title, step.detail, step.comment].filter(Boolean).join('\n'),
   });
@@ -135,7 +145,7 @@ export async function suggestPostAbout(
   const result = await startPostsRun({
     supabase,
     userId: user.id,
-    focus: { number: number.data },
+    focus: { number: number.data, outline },
   });
   revalidatePath(POSTS_PATH);
   if (!result.ok) return { error: result.error };

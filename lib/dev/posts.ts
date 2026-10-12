@@ -177,7 +177,7 @@ export const POSTS_RUN_HOLD_MINUTES = 45;
  * step, for the changelog's "Post about this" (#1420), or something the person
  * typed on the Posts tab (note 114ff495).
  */
-export type PostsRunFocus = { number: number } | { ask: string };
+export type PostsRunFocus = { number: number; outline?: string | null } | { ask: string };
 
 /** The longest ask the Posts tab sends, so a paste cannot swamp the turn. */
 export const MAX_POST_ASK = 1000;
@@ -188,7 +188,7 @@ function focusLine(focus: PostsRunFocus | null | undefined): string {
   }
   if ('number' in focus) {
     return (
-      `Write one draft about plan step #${focus.number} only, citing that step. ` +
+      `Write one draft about plan step ${focus.outline ? `#${focus.outline} (number ${focus.number})` : `#${focus.number}`} only, citing that step. ` +
       'Skip the search for what shipped, but still check the step is one a post may come from.'
     );
   }

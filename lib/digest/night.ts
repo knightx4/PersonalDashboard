@@ -3,6 +3,7 @@ import type { PlanItem } from '@/lib/plan/load';
 import { buildPlanTree, flatten, flattenSections } from '@/lib/plan/tree';
 import { overnightStanding, type OvernightRun, type OvernightStanding } from '@/lib/plan/overnight';
 import { oneLine } from './build';
+import { outlineIndex, readableRefs, refFor, type OutlineIndex } from '@/lib/plan/ref';
 
 /**
  * The night the runner just had, as the morning summary says it.
@@ -145,16 +146,25 @@ function parentsOf(items: readonly PlanItem[]): PlanParentRow[] {
   }));
 }
 
-function refOf(item: Pick<PlanItem, 'number' | 'title'>): DigestNightRef {
-  return { ref: `#${item.number}`, title: oneLine(item.title) };
+/**
+ * Every row's outline by its number, placed the way the plan page places it,
+ * so a night names a step as the page heads the row: `#1073.4`.
+ */
+function outlinesOf(items: readonly PlanItem[]): Map<number, string> {
+  return outlineIndex(buildPlanTree({ items: [...items], dependencies: [] }).flatMap((section) => section.nodes));
+}
+
+function refOf(item: Pick<PlanItem, 'number' | 'title'>, outlines: OutlineIndex): DigestNightRef {
+  return { ref: refFor(item.number, outlines), title: oneLine(item.title) };
 }
 
 function featureOf(
   item: PlanItem,
   byId: ReadonlyMap<string, PlanParentRow>,
+  outlines: OutlineIndex,
 ): DigestNightRef | null {
   const above = featureAbove(item.parentId, byId);
-  return above ? { ref: `#${above.number}`, title: oneLine(above.title) } : null;
+  return above ? { ref: refFor(above.number, outlines), title: oneLine(above.title) } : null;
 }
 
 /**
@@ -220,6 +230,7 @@ export function nightFrom(input: {
   const items = input.items;
   const byId = new Map(parentsOf(items).map((row) => [row.id, row]));
   const itemById = new Map(items.map((item) => [item.id, item]));
+  const outlines = outlinesOf(items);
 
   // One line per feature however many times it was fired: a feature the runner
   // came back to is still one feature it worked, and the count of presses is
@@ -232,7 +243,7 @@ export function nightFrom(input: {
       const item = itemById.get(fire.planItemId as string);
       if (!item || seen.has(item.id)) return [];
       seen.add(item.id);
-      return [{ ...refOf(item), at: fire.at }];
+      return [{ ...refOf(item, outlines), at: fire.at }];
     });
 
   // The newest press inside the window, whatever it was for. Read off the
@@ -244,7 +255,7 @@ export function nightFrom(input: {
       .sort((a, b) => b.at.localeCompare(a.at))
       .flatMap((fire) => {
         const item = itemById.get(fire.planItemId as string);
-        return item ? [{ ...refOf(item), at: fire.at, step: claimedStep(item.id, items) }] : [];
+        return item ? [{ ...refOf(item, outlines), at: fire.at, step: claimedStep(item.id, items) }] : [];
       })[0] ?? null;
 
   // Everything that closed while it was running. Nothing on a plan row says
@@ -257,7 +268,7 @@ export function nightFrom(input: {
         item.kind !== 'decision' && item.status === 'done' && inside(item.completedAt, startedAt),
     )
     .sort((a, b) => (a.completedAt as string).localeCompare(b.completedAt as string))
-    .map((item) => ({ ...refOf(item), feature: featureOf(item, byId), ask: null }));
+    .map((item) => ({ ...refOf(item, outlines), feature: featureOf(item, byId, outlines), ask: null }));
 
   // Blocked now, and written to during the night. `updated_at` is the only
   // stamp a block leaves -- there is no blocked_at column -- so this is "the
@@ -267,9 +278,9 @@ export function nightFrom(input: {
     .filter((item) => item.status === 'blocked' && inside(item.updatedAt, startedAt))
     .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))
     .map((item) => ({
-      ...refOf(item),
-      feature: featureOf(item, byId),
-      ask: item.blockAsk ? oneLine(item.blockAsk, 200) : null,
+      ...refOf(item, outlines),
+      feature: featureOf(item, byId, outlines),
+      ask: item.blockAsk ? oneLine(readableRefs(item.blockAsk, outlines), 200) : null,
     }));
 
   return {
@@ -380,7 +391,15 @@ export function lastNightFrom(input: {
       .map((fire) => fire.planItemId as string),
   );
   const parentOf = new Map(input.items.map((item) => [item.id, item.parentId]));
-  const refToId = new Map(input.items.map((item) => [`#${item.number}`, item.id]));
+  // A ref is the step's outline now and was its number in nights stored
+  // before; both find the row.
+  const outlines = outlinesOf(input.items);
+  const refToId = new Map(
+    input.items.flatMap((item) => [
+      [`#${item.number}`, item.id] as const,
+      [refFor(item.number, outlines), item.id] as const,
+    ]),
+  );
 
   // Walk up from the step itself, so a fired feature that is not at the root
   // of the tree still claims the steps beneath it.
@@ -419,7 +438,11 @@ export function featureProgress(
   items: readonly PlanItem[],
   featureRef: string,
 ): FeatureProgress | null {
-  const feature = items.find((item) => `#${item.number}` === featureRef);
+  // By number, as a stored night named it, or by outline, as one names it now.
+  const outlines = featureRef.includes('.') ? outlinesOf(items) : new Map<number, string>();
+  const feature = items.find(
+    (item) => `#${item.number}` === featureRef || refFor(item.number, outlines) === featureRef,
+  );
   if (!feature) return null;
 
   const children = new Map<string, PlanItem[]>();
@@ -464,6 +487,7 @@ export function onNow(
   items: readonly PlanItem[],
 ): OnNow[] {
   const itemById = new Map(items.map((item) => [item.id, item]));
+  const outlines = outlinesOf(items);
   const seen = new Set<string>();
   return [...runs]
     .sort((a, b) => b.at.localeCompare(a.at))
@@ -471,6 +495,6 @@ export function onNow(
       const item = itemById.get(run.planItemId);
       if (!item || seen.has(item.id)) return [];
       seen.add(item.id);
-      return [{ ...refOf(item), at: run.at, step: claimedStep(item.id, items) }];
+      return [{ ...refOf(item, outlines), at: run.at, step: claimedStep(item.id, items) }];
     });
 }

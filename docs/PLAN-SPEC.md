@@ -57,7 +57,7 @@ beside them.
 
 | Column | Meaning |
 |---|---|
-| `number` | The short, stable handle — "#12" — per account. Assigned by a counter on the profile and **never reused**, so a number in a commit message stays meaningful after the step is deleted. |
+| `number` | The step's stable identity, per account. Assigned by a counter on the profile and **never reused**, and what other rows point at. It is not what the person reads: everything shown or written to them names a step by its outline, the `#1073.4` its row heads itself with (the fourth step under feature #1073, computed by `buildPlanTree` and by the `plan_item_outlines` view). A top-level feature's outline is its number. Commit subjects, notes, comments, raises and session replies all use the outline; older text that names a step by number is shown with the outline (`lib/plan/ref.ts`). |
 | `module` | The workspace the step belongs to, or null for the app as a whole. A sub-step always has its parent's module. |
 | `parent_id` | The step this is part of, or null at the top of a module's plan. Cascades on delete: removing a feature removes its steps. |
 | `title`, `detail` | What it is, and what it involves. |
@@ -1007,7 +1007,7 @@ and the one file it was sent for, rather than all seven jobs to do one of them.
 
 `reference/building.md` is the per-step procedure: read the brief, check what
 it waits on, claim it, break it down if it is large, build to the done-when,
-verify, commit with `(plan #n)` in the subject, close with a note.
+verify, commit with `(plan #<outline>)` in the subject, close with a note.
 
 A batch is not built by the session that receives it. More than one step means
 each step goes to its own subagent, which reads `reference/building.md`, builds
