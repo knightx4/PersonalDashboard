@@ -1,6 +1,7 @@
 import { EssaysView } from '@/app/learn/essays/essays-view';
 import { EssayView } from '@/app/learn/e/[id]/essay-view';
 import type { Essay, EssaySummary } from '@/lib/learn/essays/model';
+import { ESSAY_VAULT_ERRORS } from '@/lib/learn/essays/vault';
 
 /**
  * The Essays list and the essay editor (plan #1865), from fixtures shaped like
@@ -67,6 +68,8 @@ The obvious reply is that gold held its value for centuries without being a solv
 const essay: Essay = {
   id: '00000000-0000-4000-8000-000000000001',
   path: 'Essays/Why money is the odd good out.md',
+  noteId: '00000000-0000-4000-8000-0000000000a1',
+  blobSha: '8642505e205f8a563b8b6c376bef88a1d7c3e0f2',
   draftBody: draft,
   unsaved: true,
   brief: {
@@ -81,4 +84,14 @@ const essay: Essay = {
 
 export function LearnEssaySurface() {
   return <EssayView essay={essay} />;
+}
+
+/** Cmd-S after the note was edited in Obsidian (plan #1866): the save stopped and offers a reload. */
+export function LearnEssayChangedSurface() {
+  return (
+    <EssayView
+      essay={essay}
+      initialVault={{ kind: 'failed', reason: 'changed', error: ESSAY_VAULT_ERRORS.changed }}
+    />
+  );
 }
