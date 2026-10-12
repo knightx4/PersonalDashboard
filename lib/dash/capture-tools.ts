@@ -100,7 +100,7 @@ export const CAPTURE_TOOLS: readonly DashTool[] = [
   ),
   move(
     CAPTURE_MOVE_TOOLS.add,
-    'A follow-up step the sentence implies, or work already done on something no step covers. For work already done, add the step under the nearest step it fits (or the goal) and give text, quantity, unit and day as for progress, so it starts under way; never also log the same work as a separate progress move.',
+    'A follow-up step the sentence implies, or work already done on something no step covers. Work the sentence says is finished ("cleaned the bathroom") is added with done true, so the step goes in already closed. Work begun but not finished is added under the nearest step it fits (or the goal) with text, quantity, unit and day as for progress, so it starts under way. Never also log the same work as a separate progress move.',
     {
       parent: { type: 'string', description: 'The goal or step it goes under, by its ref (g1 or s4).' },
       title: { type: 'string', description: 'What will be done, in a few plain words, with no quotation marks.' },
@@ -109,6 +109,11 @@ export const CAPTURE_TOOLS: readonly DashTool[] = [
         enum: ['mine', 'claude'],
         description:
           'mine when the person does it; claude when it is research or drafting Dash can do later, such as finding a sign-up page, a contact or an application form.',
+      },
+      done: {
+        type: 'boolean',
+        description:
+          'true when the sentence says this work is already finished, so the step is added closed. Only with kind mine. Leave it out for a step still to do or under way.',
       },
       text: TEXT,
       quantity: QUANTITY,

@@ -223,8 +223,8 @@ describe('rows', () => {
     });
   });
 
-  it('labels all six verdicts', () => {
-    expect(VERDICTS).toEqual(['on_track', 'stalled', 'waiting_on_you', 'waiting_on_date', 'waiting_on_goal', 'met']);
+  it('labels all eight verdicts', () => {
+    expect(VERDICTS).toEqual(['on_track', 'stalled', 'waiting_on_you', 'waiting_on_date', 'waiting_on_goal', 'met', 'pace_holding', 'pace_slipping']);
     expect(VERDICTS.map((v) => VERDICT_LABELS[v])).toEqual([
       'On track',
       'Stalled',
@@ -232,6 +232,8 @@ describe('rows', () => {
       'Waiting on a date',
       'Waiting on another goal',
       'Done-when met',
+      'Keeping its pace',
+      'Slower than usual',
     ]);
   });
 });

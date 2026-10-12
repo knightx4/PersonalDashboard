@@ -166,6 +166,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'home-page': ['/home'],
   'home-watching': ['/home'],
   'home-dash-today': ['/home'],
+  'goals-log-done': ['/home', '/goals/[goalId]'],
   'timeline-page': ['/timeline'],
   'timeline-year': ['/timeline/year/[year]'],
   'shell-full': ['/home'],
@@ -339,6 +340,9 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // every paid button in the app imports it (plan #1716).
   'core-cost-hint': ['components/ui/paid-hint.tsx'],
   'shell-full': ['components/shell/app-shell.tsx'],
+  // The "What did you do?" box on Home and each goal's page (plan #1740),
+  // drawn filed, empty and on a goal.
+  'goals-log-done': ['components/goals/log-done.tsx'],
   // The note button's panel, open with files added (plan #1713).
   'shell-note': ['components/shell/feedback-button.tsx'],
   // The same panel once a note has saved, with its triage (plan #1674).

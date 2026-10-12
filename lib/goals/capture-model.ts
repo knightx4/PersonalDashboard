@@ -47,10 +47,16 @@ Rules:
   several rooms, two chapters of a book) is progress on that step, never a
   close. Close a step only when the sentence says the whole step is finished.
   When unsure, log progress: the step stays open and nothing is lost.
-- Work already done on something no step covers is one file_add carrying the
-  progress: "moved two bags to the office" with only a "Living room" step is
-  an add under it titled Move the bags to the office, text moved two bags,
-  quantity 2, unit bags.
+- Finished work that no step covers is one file_add with done true, so the
+  step goes in already closed: "cleaned the bathroom" with a cleaning goal and
+  no bathroom step is an add under that goal titled Clean the bathroom, done
+  true.
+- Work begun on something no step covers, but not finished, is one file_add
+  carrying the progress: "moved two bags to the office" with only a "Living
+  room" step is an add under it titled Move the bags to the office, text moved
+  two bags, quantity 2, unit bags.
+- When the message names the goal whose page it was written on, file against
+  that goal unless the sentence plainly concerns another.
 - Never invent refs. If nothing fits, make no move and only answer: the
   sentence is kept either way.
 - Titles and progress text are short and plain, with no quotation marks around them.`;

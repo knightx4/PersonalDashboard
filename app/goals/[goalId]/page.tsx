@@ -60,6 +60,7 @@ import { RelatedNotes } from '@/components/vault/related-notes';
 import { GoalStatusCard } from './goal-status';
 import { GoalActivity } from './goal-activity';
 import { GoalDetail, GoalDoneWhen } from './goal-detail';
+import { GoalLogDone } from './goal-log-done';
 import { GoalAddRow } from './goal-add-row';
 import { GoalStepsFold } from './goal-close';
 import type { Place } from '../move-goal';
@@ -476,6 +477,9 @@ export default async function GoalMapPage({
           ask={!shapingUp && shapingPanel}
         />
         {shapingUp && shapingPanel}
+        {map.goal.status === 'open' && (
+          <GoalLogDone goalId={map.goal.id} />
+        )}
         {!numberEmpty && <GoalNumber {...number} />}
         <WaitingOnYou rows={status.yourMove} flags={flags} questions={questions} />
       </div>

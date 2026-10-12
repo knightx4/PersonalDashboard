@@ -182,38 +182,24 @@ export function ReadingView({ reading, subjects, alreadyRead, origin }: ReadingV
       </section>
       )}
 
+      {/* Where you are, then the two next steps side by side. Each button's
+          name says what it does, so neither needs a heading or a sentence:
+          "On Now" puts it on Now, where it comes first until it is finished;
+          "Go deeper on this" opens it as a reading list of its own, planned
+          when you get there, and this step stays where it is. */}
       <section className="mb-5">
         <h2 className="mb-2 text-ui font-semibold text-ink-muted">Where you are</h2>
         <StatusButtons readingId={reading.id} status={reading.status} />
-      </section>
-
-      {/* Separate from the status row above: where you are with a reading and
-          whether you mean to read it next are different facts, and the pair
-          that happens most is "reading" and "next". */}
-      <section className="mb-5">
-        <h2 className="mb-2 text-ui font-semibold text-ink-muted">Read next</h2>
-        <ReadNowButton readingId={reading.id} on={reading.readNowAt !== null} />
-        <p className="mt-1.5 text-small text-ink-muted">
-          Puts it on <Link href="/learn/now" className="underline underline-offset-2 hover:text-ink">Now</Link>
-          , where it comes first. Finishing it takes it off again.
-        </p>
-      </section>
-
-      {/* The other direction from Find sources, which finds more to read about
-          this subject as it stands. This breaks the subject into parts. */}
-      <section className="mb-5">
-        <h2 className="mb-2 text-ui font-semibold text-ink-muted">Go deeper</h2>
-        <form action={goDeeper}>
-          <input type="hidden" name="readingId" value={reading.id} />
-          <Button type="submit" variant="secondary" size="md">
-            <GitBranch className="size-4" strokeWidth={2} aria-hidden />
-            Go deeper on this
-          </Button>
-        </form>
-        <p className="mt-1.5 text-small text-ink-muted">
-          Opens this up as a reading list of its own, planned when you get there. This step stays
-          where it is.
-        </p>
+        <div className="mt-2 flex flex-wrap items-start gap-2">
+          <ReadNowButton readingId={reading.id} on={reading.readNowAt !== null} />
+          <form action={goDeeper}>
+            <input type="hidden" name="readingId" value={reading.id} />
+            <Button type="submit" variant="secondary" size="md">
+              <GitBranch className="size-4" strokeWidth={2} aria-hidden />
+              Go deeper on this
+            </Button>
+          </form>
+        </div>
       </section>
 
       <section>
@@ -231,7 +217,7 @@ export function ReadingView({ reading, subjects, alreadyRead, origin }: ReadingV
         rows that should never have been here: a search that attached the wrong
         book, a line the parser invented out of a sentence.
       */}
-      <section className="mt-8 border-t border-border pt-4">
+      <section className="mt-8 flex flex-col items-start gap-2 border-t border-border pt-4">
         <ConfirmStep
           action={removeFromTrack}
           fields={{ readingId: reading.id, trackId: reading.trackId }}
@@ -239,23 +225,22 @@ export function ReadingView({ reading, subjects, alreadyRead, origin }: ReadingV
           confirmLabel="Yes, remove it"
           pendingLabel="Removing…"
           align="start"
+          className="px-0"
         >
           Remove from this reading list
         </ConfirmStep>
-      </section>
 
-      {reading.source?.canonicalUrl && (
-        <p className="mt-6 text-small text-ink-muted">
+        {reading.source?.canonicalUrl && (
           <a
             href={reading.source.canonicalUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+            className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'px-0')}
           >
             Open the source itself, unnarrowed
           </a>
-        </p>
-      )}
+        )}
+      </section>
     </>
   );
 }

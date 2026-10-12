@@ -19,6 +19,7 @@ function suggestion(over: Partial<Suggestion>): Suggestion {
     id: 's',
     itemId: null,
     kind: 'events',
+    acceptedStepId: null,
     title: 'A talk',
     detail: null,
     url: 'https://example.test/talk',

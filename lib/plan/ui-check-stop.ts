@@ -1,6 +1,11 @@
 /**
  * The stop after a third failed critic round (plan #1609, decision #1535).
  *
+ * Since 12 October 2026 the builder no longer blocks on this: it settles the
+ * screen itself (`uiSettleSql`, `npm run ui-guard -- <n> --settle`), and
+ * `block` refuses the ask below. What follows still reads the steps blocked
+ * this way before then, so their rows and the person's accepts keep working.
+ *
  * When a surface's round 3 still comes back `fix`, the builder runs no fourth
  * round. It records the round, pushes its branch, and blocks the step on the
  * person (`block_kind = 'outside'`) with the ask this file writes: each
