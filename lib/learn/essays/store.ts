@@ -8,6 +8,7 @@ import {
   type EssayRow,
   type EssaySummary,
 } from './model';
+import type { EssayVaultPatch, VaultEssay } from './vault';
 
 /**
  * Reads and writes on `learn.essays` (plan #1865), through the person's own
@@ -80,4 +81,78 @@ export async function saveWordTarget(
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error('That essay is not there any more.');
+}
+
+/** The essay as the vault save reads it (plan #1866). */
+export async function loadVaultEssay(supabase: LearnSupabaseClient, id: string): Promise<VaultEssay | null> {
+  const { data, error } = await supabase
+    .from('essays')
+    .select('id, path, note_id, blob_sha, slug, brief')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw new Error(`Could not read the essay: ${error.message}`);
+  if (!data) return null;
+  const row = data as {
+    id: string;
+    path: string;
+    note_id: string | null;
+    blob_sha: string | null;
+    slug: string | null;
+    brief: unknown;
+  };
+  return { id: row.id, path: row.path, noteId: row.note_id, blobSha: row.blob_sha, slug: row.slug, brief: row.brief };
+}
+
+/** The slugs the person's other essays hold. */
+export async function takenEssaySlugs(supabase: LearnSupabaseClient, exceptId: string): Promise<Set<string>> {
+  const { data, error } = await supabase.from('essays').select('slug').neq('id', exceptId).not('slug', 'is', null);
+  if (error) throw new Error(`Could not read your essays: ${error.message}`);
+  return new Set(((data ?? []) as { slug: string }[]).map((row) => row.slug));
+}
+
+/**
+ * The note the essay was written to, and the draft that went into it. The
+ * draft is now what the vault holds, so `unsaved` goes false.
+ */
+export async function recordEssayNote(
+  supabase: LearnSupabaseClient,
+  id: string,
+  patch: EssayVaultPatch,
+): Promise<void> {
+  const { error } = await supabase
+    .from('essays')
+    .update({
+      note_id: patch.noteId,
+      path: patch.path,
+      blob_sha: patch.blobSha,
+      slug: patch.slug,
+      draft_body: patch.draftBody,
+      unsaved: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Take the vault's version of the note as the draft, after a save stopped
+ * because the note changed in Obsidian. The editor holds the body only, so
+ * that is what goes in.
+ */
+export async function adoptNoteVersion(
+  supabase: LearnSupabaseClient,
+  id: string,
+  note: { path: string; body: string; blobSha: string },
+): Promise<void> {
+  const { error } = await supabase
+    .from('essays')
+    .update({
+      path: note.path,
+      blob_sha: note.blobSha,
+      draft_body: note.body,
+      unsaved: false,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
 }

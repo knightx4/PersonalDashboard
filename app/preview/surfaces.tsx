@@ -20,6 +20,7 @@ import { StatusPicker } from '@/components/jobs/ui/status-picker';
 import { PipelineDenseList } from '@/components/jobs/pipeline/dense-list';
 import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
+import { IdeaSpaceDomainsSurface, IdeaSpaceSurface } from './idea-space-surfaces';
 import { DashMarkLooks } from './dash-mark-surface';
 import { CaptureBoxSurface } from './capture-surfaces';
 import { NoteButtonSurface, NoteSavedSurface } from './note-surfaces';
@@ -126,7 +127,12 @@ import {
   LearnYoutubePlaylistSurface,
   LearnYoutubeVideoSurface,
 } from './learn-page-surfaces';
-import { LearnEssaySurface, LearnEssaysEmptySurface, LearnEssaysSurface } from './essay-surfaces';
+import {
+  LearnEssayChangedSurface,
+  LearnEssaySurface,
+  LearnEssaysEmptySurface,
+  LearnEssaysSurface,
+} from './essay-surfaces';
 import { SchoolCourses } from '@/app/vault/education/course-list';
 import { educationGroups, educationCounts } from './education-fixtures';
 import { ReadingCard } from '@/components/learn/reading-card';
@@ -4849,6 +4855,26 @@ export const SURFACES: readonly Surface[] = [
     render: () => <KnowPersonalityEmptySurface />,
   },
   {
+    /* Idea Space (plan #1857): the neighbour map coloured by what you know,
+     * field and domain names on, one idea open in the rail with its nearest
+     * six, the two lists below it, and ideas still waiting for a place.
+     * Fixtures in idea-space-surfaces.tsx. */
+    id: 'learn-idea-space',
+    label: 'Learn · Idea Space, an idea open',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceSurface />,
+  },
+  {
+    /* The same map on its main axes, coloured by domain, with the fields not
+     * placed yet, as it is live until the daily run fills them. */
+    id: 'learn-idea-space-domains',
+    label: 'Learn · Idea Space, by domain',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceDomainsSurface />,
+  },
+  {
     /* Clips before any are cut. */
     id: 'learn-clips-empty',
     label: 'Learn · Clips, none cut yet',
@@ -6019,6 +6045,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnEssaySurface />,
+  },
+  {
+    id: 'learn-essay-changed',
+    label: 'Essay · Note changed in Obsidian',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayChangedSurface />,
   },
 
   /* The News and Todo pages that had no picture (plan #1603). Fixtures in
