@@ -179,9 +179,9 @@ Annotations: 0,1834 SHA-256 8642505e205f8a563b8b6c376bef88a1
   undoing the deletion of AI text marks it as yours.)
 - The block is rewritten only when the note is written to the vault, not on
   every keystroke. In the app's editor it is hidden.
-- If the hash does not match on open, the app says the note was edited
-  elsewhere and asks whether to keep the marks (shifted to the best match) or
-  clear them.
+- If the hash does not match when the app opens the vault's version of the
+  note, the app says the note was edited elsewhere and asks whether to keep
+  the marks (shifted to the best match) or clear them.
 - The block is removed from anything published.
 
 **"Your words"** is shown on the essay page as a percentage: your graphemes
@@ -311,7 +311,9 @@ and applied to the live project in the same sitting.
   (`note_id`, `path`, `blob_sha`), the draft body as last typed, whether it
   has unsaved changes, the brief (the five answers, pinned items and where
   the interview has got to), the
-  word target, the authorship ranges, the published snapshot (`published_body`,
+  word target, the authorship ranges as the note has them, the same marks on
+  the draft (`draft_authorship`, counted in the draft's own characters, since
+  the draft is often ahead of the note), the published snapshot (`published_body`,
   `published_at`, `slug`), and timestamps. A **source** in the catalogue: it
   holds what the person wrote.
 - **`learn.essay_notes`**: margin notes. The essay, the check that raised it,

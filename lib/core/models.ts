@@ -140,6 +140,8 @@ export const MODELS = {
   learnSurveyGoalIdea: HAIKU,
   /** lib/learn/essays/interview-model.ts, the next question of an essay's interview */
   learnEssayInterview: SONNET,
+  /** lib/learn/essays/rephrase-model.ts, Rephrase on a selected sentence of an essay */
+  learnEssayRephrase: SONNET,
   /** lib/learn/survey/idea.ts */
   learnSurveyIdea: HAIKU,
   /** lib/learn/vault/classify.ts */

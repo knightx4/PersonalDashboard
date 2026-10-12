@@ -318,6 +318,9 @@ export const LEARN_OPERATIONS = [
   // call per answer, four at most an essay, since the first question is
   // written without one.
   'word-essay-question',
+  // Rephrase on a selection in an essay (plan #1868): one Sonnet call per
+  // press, rewording the selected text only.
+  'rephrase-essay-selection',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

@@ -1,5 +1,16 @@
 import { createCapturedNote, type CreateNotePorts } from '@/lib/vault/notes/create';
 import { saveNote, type SaveNoteFailure, type SaveNotePorts } from '@/lib/vault/notes/save';
+import {
+  blockMarks,
+  blockMatches,
+  blockRanges,
+  readAuthorshipBlock,
+  relocateMarks,
+  shiftMarks,
+  stripAuthorshipBlock,
+  type AuthorMark,
+  type FileRange,
+} from './authorship';
 import { essayTitle, readBrief } from './model';
 import {
   ESSAYS_FOLDER,
@@ -7,6 +18,7 @@ import {
   essayNoteText,
   essaySlug,
   newEssayFrontmatter,
+  noteBodyMarks,
   rewriteEssayFile,
   uniqueSlug,
 } from './note';
@@ -33,6 +45,9 @@ export type VaultEssay = {
   blobSha: string | null;
   slug: string | null;
   brief: unknown;
+  /** The draft as stored and its marks, which a reload moves onto the vault's text. */
+  draftBody?: string;
+  marks?: AuthorMark[];
 };
 
 /** What the essay row becomes once the note is written. */
@@ -42,6 +57,10 @@ export type EssayVaultPatch = {
   blobSha: string;
   slug: string | null;
   draftBody: string;
+  /** The draft's marks, as `draft_authorship` keeps them. */
+  draftMarks: AuthorMark[];
+  /** The note's ranges, as its authorship block has them (plan #1868). */
+  authorship: FileRange[];
 };
 
 export type EssayVaultPorts = {
@@ -64,6 +83,10 @@ export type EssayVaultInput = {
   blobSha: string | null;
   /** Today in the person's time zone, `YYYY-MM-DD`, for the frontmatter dates. */
   today: string;
+  /** Who wrote what in `body`: Dash's and quoted runs, as UTF-16 ranges (plan #1868). */
+  marks: AuthorMark[];
+  /** The name the person's line in the authorship block takes. */
+  self: string;
 };
 
 export type EssayVaultFailure = SaveNoteFailure | 'empty';
@@ -114,6 +137,12 @@ export async function saveEssayToVault(ports: EssayVaultPorts, input: EssayVault
 
   const title = essayTitle(input.body, essay.path);
   const brief = readBrief(essay.brief);
+  const authorship = { marks: input.marks, self: input.self };
+  // The ranges of the file as written, for the essay row.
+  const ranges = (file: string | null): FileRange[] => {
+    const block = file ? readAuthorshipBlock(file) : null;
+    return block ? blockRanges(block) : [];
+  };
 
   // The note exists: save over it, from the blob the editor opened.
   if (essay.noteId && essay.blobSha) {
@@ -125,11 +154,19 @@ export async function saveEssayToVault(ports: EssayVaultPorts, input: EssayVault
       description: brief.claim,
       today: input.today,
     });
+    let written: string | null = null;
     const saved = await saveNote(ports.save, {
       path: essay.path,
       text: body,
       expectedBlobSha: input.blobSha,
-      rewrite: (raw, next) => rewriteEssayFile(raw, next, { title, updated: input.today }, fresh),
+      rewrite: (raw, next) => {
+        const marked = { ...authorship, marks: noteBodyMarks(input.body, input.marks) };
+        // A save that changes nothing but the date is no save: the file stays
+        // as it is and no commit is made.
+        const same = rewriteEssayFile(raw, next, { title }, fresh, marked);
+        written = same === raw ? raw : rewriteEssayFile(raw, next, { title, updated: input.today }, fresh, marked);
+        return written;
+      },
     });
     if (saved.ok) {
       await store(ports, essay.id, {
@@ -138,6 +175,8 @@ export async function saveEssayToVault(ports: EssayVaultPorts, input: EssayVault
         blobSha: saved.blobSha,
         slug: essay.slug,
         draftBody: input.body,
+        draftMarks: input.marks,
+        authorship: ranges(written),
       });
       return { ok: true, path: essay.path, blobSha: saved.blobSha, commitSha: saved.commitSha };
     }
@@ -153,7 +192,8 @@ export async function saveEssayToVault(ports: EssayVaultPorts, input: EssayVault
   // already at that name is never written over; the next number is tried.
   const slug = essay.slug ?? uniqueSlug(essaySlug(title), await ports.takenSlugs(essay.id));
   const fm = newEssayFrontmatter({ title, slug, description: brief.claim, today: input.today });
-  const created = await createCapturedNote(ports.create, essayNoteText(fm, input.body), title, ESSAYS_FOLDER);
+  const file = essayNoteText(fm, input.body, authorship);
+  const created = await createCapturedNote(ports.create, file, title, ESSAYS_FOLDER);
   if (!created.ok) return { ok: false, reason: created.reason, error: created.error };
 
   await store(ports, essay.id, {
@@ -162,6 +202,57 @@ export async function saveEssayToVault(ports: EssayVaultPorts, input: EssayVault
     blobSha: created.blobSha,
     slug,
     draftBody: input.body,
+    draftMarks: input.marks,
+    authorship: ranges(file),
   });
   return { ok: true, path: created.path, blobSha: created.blobSha, commitSha: created.commitSha };
+}
+
+/** The vault's version of an essay, as the editor takes it on a reload (plan #1868). */
+export type ReloadedEssay = {
+  /** The text the editor gets: the note's body without its authorship block. */
+  body: string;
+  /** Who wrote what in `body`. */
+  marks: AuthorMark[];
+  /**
+   * True when the block no longer matches the text, or went, while the
+   * essay had marks: the note was edited elsewhere. `marks` are then the old
+   * marks moved to where the same words are now, and the person is asked
+   * whether to keep them or clear them.
+   */
+  askMarks: boolean;
+};
+
+/**
+ * The editor's text and marks from the note as the vault has it. `file` is
+ * the whole file (frontmatter included, which the block's offsets count),
+ * or null when it could not be read; `noteBody` is the stored body, which
+ * holds the block; `previous` is the draft the reload replaces.
+ */
+export function essayFromVault(
+  file: string | null,
+  noteBody: string,
+  previous: { body: string; marks: readonly AuthorMark[] },
+): ReloadedEssay {
+  const body = stripAuthorshipBlock(noteBody);
+  const block = file ? readAuthorshipBlock(file) : null;
+  const moved = () => relocateMarks(previous.body, previous.marks, body);
+
+  if (!block) {
+    // A block taken off elsewhere, or a file that could not be read: the
+    // marks the draft had, where their words still are.
+    const marks = moved();
+    return { body, marks, askMarks: previous.marks.length > 0 };
+  }
+
+  // Where the body starts in the file: the block counts from the file's start.
+  const trimmed = body.replace(/(\r?\n)+$/, '');
+  const start = block.text.endsWith(trimmed) ? block.text.length - trimmed.length : -1;
+  const fromBlock = start < 0 ? [] : shiftMarks(blockMarks(block), -start, trimmed.length);
+  if (start >= 0 && blockMatches(block)) return { body, marks: fromBlock, askMarks: false };
+
+  // Edited elsewhere since the block was written. The old marks are moved by
+  // their words; without any, the block's own ranges are the best there is.
+  const marks = previous.marks.length > 0 ? moved() : fromBlock;
+  return { body, marks, askMarks: previous.marks.length > 0 || fromBlock.length > 0 };
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
+import { loadAccountSettings } from '@/lib/core/account/settings';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import {
@@ -15,6 +16,9 @@ import {
   skippedBrief,
 } from '@/lib/learn/essays/interview';
 import { askNextQuestion } from '@/lib/learn/essays/interview-model';
+import { DEFAULT_SELF_NAME, MARK_AUTHORS, readDraftMarks, type AuthorMark } from '@/lib/learn/essays/authorship';
+import { rephraseContext, rephraseProblem } from '@/lib/learn/essays/rephrase';
+import { rephraseSelection } from '@/lib/learn/essays/rephrase-model';
 import {
   BRIEF_FIELDS,
   parseWordTarget,
@@ -36,9 +40,9 @@ import {
   saveWordTarget,
   takenEssaySlugs,
 } from '@/lib/learn/essays/store';
-import { saveEssayToVault, type EssayVaultFailure } from '@/lib/learn/essays/vault';
+import { essayFromVault, saveEssayToVault, type EssayVaultFailure } from '@/lib/learn/essays/vault';
 import { createVaultClient } from '@/lib/vault/auth/server';
-import { noteCreatePorts, noteSavePorts } from '@/lib/vault/db/ports';
+import { noteCreatePorts, noteSavePorts, openConnectedSource } from '@/lib/vault/db/ports';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
 
 /**
@@ -49,21 +53,40 @@ import { embedVaultNotes } from '@/lib/vault/notes/embed';
 
 export type DraftSaveResult = { ok: true; savedAt: string } | { ok: false; error: string };
 
+/** Who wrote which runs of the draft, as the editor sends them (plan #1868). */
+const MarksInput = z
+  .array(
+    z.object({
+      author: z.enum(MARK_AUTHORS),
+      start: z.number().int().min(0),
+      length: z.number().int().min(1),
+      name: z.string().max(200),
+    }),
+  )
+  .max(5_000);
+
+export type MarksPayload = z.infer<typeof MarksInput>;
+
 const DraftInput = z.object({
   id: z.string().uuid(),
   // The longest essay the spec has in mind is about 2,000 words; this is far
   // past it and only stops a runaway paste.
   body: z.string().max(400_000, 'The draft is too long to save.'),
+  marks: MarksInput,
 });
 
+function marksOf(data: { body: string; marks: MarksPayload }): AuthorMark[] {
+  return readDraftMarks(data.marks, data.body.length);
+}
+
 // latency: optimistic
-export async function saveEssayDraft(id: string, body: string): Promise<DraftSaveResult> {
+export async function saveEssayDraft(id: string, body: string, marks: MarksPayload): Promise<DraftSaveResult> {
   await requireUser();
-  const parsed = DraftInput.safeParse({ id, body });
+  const parsed = DraftInput.safeParse({ id, body, marks });
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not save.' };
   try {
     const supabase = await createLearnClient();
-    const { updatedAt } = await saveDraft(supabase, parsed.data.id, parsed.data.body);
+    const { updatedAt } = await saveDraft(supabase, parsed.data.id, parsed.data.body, marksOf(parsed.data));
     return { ok: true, savedAt: updatedAt };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Could not save.' };
@@ -112,11 +135,12 @@ const EMBED_AFTER_SAVE_MS = 20_000;
 export async function saveEssayToVaultAction(
   id: string,
   body: string,
+  marks: MarksPayload,
   blobSha: string | null,
   timeZone: string | null,
 ): Promise<VaultSaveResult> {
   const user = await requireUser();
-  const parsed = VaultInput.safeParse({ id, body, blobSha, timeZone });
+  const parsed = VaultInput.safeParse({ id, body, marks, blobSha, timeZone });
   if (!parsed.success) {
     return { ok: false, reason: 'error', error: parsed.error.issues[0]?.message ?? 'Could not save.' };
   }
@@ -136,6 +160,7 @@ export async function saveEssayToVaultAction(
 
   const now = new Date();
   try {
+    const self = await selfName(user.id);
     const result = await saveEssayToVault(
       {
         loadEssay: (essayId) => loadVaultEssay(supabase, essayId),
@@ -150,6 +175,8 @@ export async function saveEssayToVaultAction(
         body: parsed.data.body,
         blobSha: parsed.data.blobSha,
         today: essayDay(now, parsed.data.timeZone),
+        marks: marksOf(parsed.data),
+        self,
       },
     );
     if (!result.ok) return result;
@@ -162,7 +189,22 @@ export async function saveEssayToVaultAction(
   }
 }
 
-export type ReloadResult = { ok: true; body: string; blobSha: string } | { ok: false; error: string };
+/**
+ * The name the person's line in the authorship block takes: the first word
+ * of their display name, or the Obsidian plugin's "Self" without one.
+ */
+async function selfName(userId: string): Promise<string> {
+  try {
+    const { displayName } = await loadAccountSettings(userId);
+    return displayName?.trim().split(/\s+/)[0] || DEFAULT_SELF_NAME;
+  } catch {
+    return DEFAULT_SELF_NAME;
+  }
+}
+
+export type ReloadResult =
+  | { ok: true; body: string; blobSha: string; marks: AuthorMark[]; askMarks: boolean }
+  | { ok: false; error: string };
 
 /**
  * After a save stopped because the note changed in Obsidian: take the
@@ -195,9 +237,24 @@ export async function reloadEssayFromVault(id: string, openedBlobSha: string | n
         error: 'Dash has not read the newer version from your vault yet. It comes in with the next sync; reload after that.',
       };
     }
-    await adoptNoteVersion(supabase, id, { path: note.path, body: note.body, blobSha: note.blob_sha });
+    // The whole file, for the authorship block's offsets and hash. Without
+    // it the marks are carried over by their words and the person is asked.
+    let file: string | null = null;
+    try {
+      const source = await openConnectedSource(vault);
+      if (typeof source !== 'string') file = await source.readBlob(note.blob_sha);
+    } catch (error) {
+      console.error('[essay reload] reading the file', error instanceof Error ? error.message : error);
+    }
+    const reloaded = essayFromVault(file, note.body, { body: essay.draftBody ?? '', marks: essay.marks ?? [] });
+    await adoptNoteVersion(supabase, id, {
+      path: note.path,
+      body: reloaded.body,
+      blobSha: note.blob_sha,
+      marks: reloaded.marks,
+    });
     revalidatePath('/learn/essays');
-    return { ok: true, body: note.body, blobSha: note.blob_sha };
+    return { ok: true, blobSha: note.blob_sha, ...reloaded };
   } catch (error) {
     console.error('[essay reload]', error instanceof Error ? error.message : error);
     return { ok: false, error: 'The note could not be read from your vault. Try again in a moment.' };
@@ -300,5 +357,73 @@ export async function saveEssayBriefField(id: string, field: string, value: stri
     return briefResult(brief);
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Could not save the brief.' };
+  }
+}
+
+export type RephraseResult =
+  | { ok: true; from: number; to: number; original: string; text: string; name: string }
+  | { ok: false; error: string };
+
+const RephraseInput = z.object({
+  id: z.string().uuid(),
+  doc: z.string().max(400_000),
+  from: z.number().int().min(0),
+  to: z.number().int().min(0),
+});
+
+/**
+ * Rephrase on a selection, rung 4 (plan #1868): Dash rewords the selected
+ * text, one Sonnet call, and the editor shows it as a change to accept or
+ * reject. Nothing is written here; accepting it is an edit like any other,
+ * marked as Dash's, and saved with the draft.
+ */
+// latency: pending
+export async function rephraseEssaySelection(
+  id: string,
+  doc: string,
+  from: number,
+  to: number,
+): Promise<RephraseResult> {
+  const user = await requireUser();
+  const parsed = RephraseInput.safeParse({ id, doc, from, to });
+  if (!parsed.success || parsed.data.to > parsed.data.doc.length || parsed.data.from >= parsed.data.to) {
+    return { ok: false, error: 'Select the words you want reworded first.' };
+  }
+  const selection = parsed.data.doc.slice(parsed.data.from, parsed.data.to);
+  const problem = rephraseProblem(selection);
+  if (problem) return { ok: false, error: problem };
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { ok: false, error: 'Rephrase needs the Anthropic key, which is not set on this deployment.' };
+
+  try {
+    const supabase = await createLearnClient();
+    const row = await loadBriefJson(supabase, parsed.data.id);
+    if (!row) return { ok: false, error: 'That essay is not there any more.' };
+    const brief = readBrief(row.brief);
+    const spend = collectSpend();
+    const result = await rephraseSelection({
+      selection,
+      ...rephraseContext(parsed.data.doc, parsed.data.from, parsed.data.to),
+      claim: brief.claim,
+      reader: brief.reader,
+      anthropicApiKey: apiKey,
+      onSpend: spend.sink,
+    });
+    await recordLearnSpend(user.id, 'rephrase-essay-selection', spend.reports);
+    if (!result.ok) {
+      console.error('[essay rephrase]', result.detail);
+      return { ok: false, error: 'Dash could not reword that. Try again, or select a little more or less.' };
+    }
+    return {
+      ok: true,
+      from: parsed.data.from,
+      to: parsed.data.to,
+      original: selection,
+      text: result.text,
+      name: result.model,
+    };
+  } catch (error) {
+    console.error('[essay rephrase]', error instanceof Error ? error.message : error);
+    return { ok: false, error: 'Dash could not reword that. Try again in a moment.' };
   }
 }

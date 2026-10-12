@@ -211,7 +211,7 @@ export const learnSources: ModuleSources = {
       search: ['path', 'draft_body'],
       title: 'path',
       href: (id) => `/learn/e/${id}`,
-      note: 'Each essay is also a note in the vault Essays folder, which the vault source reads. draft_body can be ahead of the note while unsaved is true. authorship marks which ranges are theirs and which Dash suggested and they accepted.',
+      note: 'Each essay is also a note in the vault Essays folder, which the vault source reads. draft_body can be ahead of the note while unsaved is true. authorship marks which ranges of the vault note are theirs and which Dash suggested and they accepted; draft_authorship marks the same in draft_body.',
     },
   ],
   notSources: [

@@ -209,6 +209,23 @@ describe('saveNote', () => {
     expect(h.stored).toEqual([]);
   });
 
+  it('writes nothing when the rewrite gives back the file as it is', async () => {
+    const src = source();
+    const h = harness({ src });
+
+    // An essay: the editor's body differs from the stored one (which holds
+    // the authorship block), but the file it builds is the same.
+    const result = await saveNote(h.ports, {
+      path: NOTE.path,
+      text: 'Different from the stored body',
+      expectedBlobSha: 'blob-old',
+      rewrite: (raw) => raw,
+    });
+
+    expect(result).toEqual({ ok: true, blobSha: 'blob-old', commitSha: null });
+    expect(src.writes).toEqual([]);
+  });
+
   it('still reports the save when storing it afterwards fails', async () => {
     const h = harness();
     h.ports.storeNote = async () => {
