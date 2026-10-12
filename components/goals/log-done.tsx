@@ -165,9 +165,9 @@ export function LogDone({
             placeholder={placeholder}
             aria-label="What did you do?"
             aria-invalid={error ? true : undefined}
-            className="min-w-0 flex-1 max-sm:h-11"
+            className="min-w-0 flex-1 max-sm:min-h-11"
           />
-          <Button type="submit" variant="secondary" pending={pending} className="max-sm:h-11">
+          <Button type="submit" variant="secondary" pending={pending} className="max-sm:min-h-11">
             {pending ? 'Logging…' : 'Log it'}
           </Button>
           <PaidCostsProvider costs={costs ?? {}}>
