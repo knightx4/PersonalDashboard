@@ -74,8 +74,13 @@
  *   npx tsx scripts/plan.ts depends <n> --on <m>
  *   npx tsx scripts/plan.ts undepend <n> --on <m>
  *
- * Steps are named by their number -- the "#12" on the page -- which is never
- * reused, so a number in a commit message stays meaningful.
+ * Steps are named by their outline, the "#1073.4" a row on the page heads
+ * itself with: the fourth step under feature #1073. Every step this prints is
+ * named that way, and every <n> above takes an outline (1073.4 or #1073.4) or
+ * a step's number. Text written through here is stored as written, so a
+ * session writes the outline there too. Older text that names a step by its
+ * number (#1084) is shown with the outline (lib/plan/ref.ts); the number is
+ * still the row's identity in the database.
  *
  * Which account: `--user <id or email prefix>`, or PLAN_USER in the
  * environment; when exactly one account has a plan, that one without asking.
@@ -132,6 +137,14 @@ import {
   updateCounts,
 } from '../lib/plan/updates';
 import { storedReading } from '../lib/plan/run-end';
+import {
+  numberFromRef,
+  outlineIndex,
+  readableRefs,
+  refFor,
+  stepRef,
+  type OutlineIndex,
+} from '../lib/plan/ref';
 import { CONSEQUENCE_SHAPE, consequenceFrom, parseConsequenceArg } from '../lib/raised/consequence';
 import type { SpendReport } from '../lib/core/spend/pricing';
 import { checkWriting, writingNote, writingWarning, type WritingText } from '../lib/writing/check';
@@ -212,7 +225,7 @@ async function checkRowWriting(
     }
 
     const warning = writingWarning(result);
-    if (warning) console.warn(`#${row.number} ${warning}`);
+    if (warning) console.warn(`${ref(row.number)} ${warning}`);
     const note = writingNote(result, new Date().toISOString().slice(0, 10));
     if (note) {
       await sql`
@@ -260,7 +273,7 @@ function positional(): string[] {
 }
 
 function fail(message: string): never {
-  console.error(message);
+  console.error(readable(message));
   process.exit(1);
 }
 
@@ -373,7 +386,11 @@ async function loadState(
 ): Promise<{ sections: PlanSection[]; liveness: PlanLiveness }> {
   const data = await loadData(sql, userId);
   const liveness = planLiveness(data.items, await loadRuns(sql, userId), Date.now());
-  return { sections: buildPlanTree(data, liveness), liveness };
+  const sections = buildPlanTree(data, liveness);
+  // The tree is built anyway, so its outlines become the names this run uses.
+  outlines = outlineIndex(sections.flatMap((section) => section.nodes));
+  outlinesLoaded = true;
+  return { sections, liveness };
 }
 
 /** The visions written on the specs page, by scope; the app's is under `app`. */
@@ -387,16 +404,50 @@ async function loadTree(sql: Sql, userId: string): Promise<PlanSection[]> {
   return (await loadState(sql, userId)).sections;
 }
 
+/**
+ * Every step's outline by its number, for naming steps to the person and for
+ * reading the outlines they and sessions write. Empty until a command loads
+ * it; `ref` and `readable` then fall back to the number, which is still right.
+ */
+let outlines: OutlineIndex = new Map();
+let outlinesLoaded = false;
+
+/** The outline index, read once per command, or again with `fresh` after a row is added. */
+async function loadOutlines(sql: Sql, userId: string, fresh = false): Promise<OutlineIndex> {
+  if (outlinesLoaded && !fresh) return outlines;
+  const sections = buildPlanTree(await loadData(sql, userId));
+  outlines = outlineIndex(sections.flatMap((section) => section.nodes));
+  outlinesLoaded = true;
+  return outlines;
+}
+
+/** `#1073.4` for a step's number. */
+function ref(number: number): string {
+  return refFor(number, outlines);
+}
+
+/** A step as it is typed in a command, `1073.4`, without the `#`. */
+function typed(number: number): string {
+  return ref(number).slice(1);
+}
+
+/** Stored text as the person reads it: each step's `#1084` shown as `#1073.4`. */
+function readable(text: string): string {
+  return readableRefs(text, outlines);
+}
+
 async function byNumber(sql: Sql, userId: string, raw: string | undefined): Promise<PlanItem> {
-  const number = Number(String(raw ?? '').replace(/^#/, ''));
-  if (!Number.isInteger(number) || number < 1) fail('Give a step number, the "#12" on the page.');
+  const number = numberFromRef(String(raw ?? ''), await loadOutlines(sql, userId));
+  if (number === null || !Number.isInteger(number) || number < 1) {
+    fail(`Give a step by its outline, the "#1073.4" on the page, or its number. "${raw ?? ''}" names no step.`);
+  }
   const rows = await sql<Record<string, unknown>[]>`
     select id, number, module, parent_id, title, detail, acceptance, status, kind, fog,
            resolution, comment, block_ask, block_kind, priority, size, assignee, commit_sha,
            position,
            started_at, completed_at, created_at, dismissed_at, fog_dismissed_at
     from plan_items where user_id = ${userId} and number = ${number}`;
-  if (rows.length === 0) fail(`No step #${number}.`);
+  if (rows.length === 0) fail(`No step ${raw?.startsWith('#') ? raw : `#${raw}`}.`);
   return planItemFromRow(rows[0]);
 }
 
@@ -422,7 +473,7 @@ function facts(node: PlanNode, liveness?: PlanLiveness): string {
   if (node.size) out.push(node.size.toUpperCase());
   if (node.assignee) out.push(node.assignee);
   if (node.waitingOn.length > 0 && !isClosed(node.status)) {
-    out.push(`waits ${node.waitingOn.map((ref) => `#${ref.number}`).join(',')}`);
+    out.push(`waits ${node.waitingOn.map((wait) => stepRef(wait)).join(',')}`);
   }
   if (node.children.length > 0 && node.rollup.live > 0) {
     out.push(`${node.rollup.done}/${node.rollup.live}`);
@@ -441,12 +492,13 @@ function printNode(node: PlanNode, indent = '', liveness?: PlanLiveness): void {
   // Round rather than square, and unlike the "[?]" a proposal wears: this is
   // not a box waiting to be ticked, it is a question waiting to be answered.
   const glyph = node.kind === 'decision' && !isClosed(node.status) ? '(?)' : GLYPH[node.status];
-  const head = `${indent}#${String(node.number).padEnd(4)}${glyph}  ${node.title}`;
+  // Headed by its outline, the "#1073.4" the row on the page shows.
+  const head = `${indent}${stepRef(node).padEnd(9)}${glyph}  ${readable(node.title)}`;
   const tail = facts(node, liveness);
   console.log(tail ? `${head.padEnd(64)}  ${tail}` : head);
   // The admission that part of this is not yet planned, on the line under it.
   if (node.fog && !node.fogDismissedAt) {
-    console.log(`${indent}      fog: ${node.fog.replace(/\s+/g, ' ').slice(0, 100)}`);
+    console.log(`${indent}           fog: ${readable(node.fog).replace(/\s+/g, ' ').slice(0, 100)}`);
   }
   for (const child of node.children) printNode(child, indent + '  ', liveness);
 }
@@ -514,12 +566,12 @@ function lastAuthor(row: RaisedListRow): string | null {
 
 function printCheckBack(row: CheckBack, now: number): void {
   const when = row.status === 'waiting' ? `due ${dueWords(row.dueAt, now)}` : row.status;
-  console.log(`\n${row.id.slice(0, 8)}  ${when}  ${row.title}`);
-  if (row.source) console.log(`  from ${row.source}`);
-  if (row.detail) console.log(`  ${row.detail.replace(/\s+/g, ' ')}`);
+  console.log(`\n${row.id.slice(0, 8)}  ${when}  ${readable(row.title)}`);
+  if (row.source) console.log(`  from ${readable(row.source)}`);
+  if (row.detail) console.log(`  ${readable(row.detail).replace(/\s+/g, ' ')}`);
   if (row.wokeAt) console.log(`  a session was woken for it at ${row.wokeAt}`);
   if (!row.wake && row.status === 'waiting') console.log('  waits for a session: the tick will not wake one');
-  if (row.outcome) console.log(`  found: ${row.outcome.replace(/\s+/g, ' ')}`);
+  if (row.outcome) console.log(`  found: ${readable(row.outcome).replace(/\s+/g, ' ')}`);
 }
 
 async function loadCheckBacks(sql: Sql, userId: string, all: boolean): Promise<CheckBack[]> {
@@ -542,15 +594,15 @@ async function loadCheckBacks(sql: Sql, userId: string, all: boolean): Promise<C
 
 function printRaise(row: RaisedListRow): void {
   const scope = row.module && isModuleId(row.module) ? row.module : null;
-  console.log(`\n${row.id.slice(0, 8)}  ${moduleLabel(scope)}  ${row.title}`);
-  if (row.source) console.log(`  raised by ${row.source}`);
+  console.log(`\n${row.id.slice(0, 8)}  ${moduleLabel(scope)}  ${readable(row.title)}`);
+  if (row.source) console.log(`  raised by ${readable(row.source)}`);
   // The ask above the story, the same order the page reads it in.
-  if (row.ask) console.log(`  asks: ${row.ask.replace(/\s+/g, ' ')}`);
+  if (row.ask) console.log(`  asks: ${readable(row.ask).replace(/\s+/g, ' ')}`);
   const consequence = consequenceFrom(row.consequence, scope);
-  if (consequence) console.log(`  a yes: ${consequence.said.replace(/\s+/g, ' ')}`);
-  if (row.detail) console.log(`  ${row.detail.replace(/\s+/g, ' ')}`);
+  if (consequence) console.log(`  a yes: ${readable(consequence.said).replace(/\s+/g, ' ')}`);
+  if (row.detail) console.log(`  ${readable(row.detail).replace(/\s+/g, ' ')}`);
   for (const comment of row.comments ?? []) {
-    console.log(`  ${comment.author === 'me' ? 'user' : 'claude'}: ${comment.body.replace(/\s+/g, ' ')}`);
+    console.log(`  ${comment.author === 'me' ? 'user' : 'claude'}: ${readable(comment.body).replace(/\s+/g, ' ')}`);
   }
 }
 
@@ -560,6 +612,10 @@ async function main(): Promise<void> {
   const userId = await resolveUser(sql);
 
   try {
+    // Every command names steps or reads a name, so the outlines are loaded
+    // first. `list` and `next` build the tree themselves and take them from it.
+    if (command !== 'list' && command !== 'next') await loadOutlines(sql, userId);
+
     if (command === 'list') {
       const { sections, liveness } = await loadState(sql, userId);
       const all = has('--all');
@@ -609,7 +665,7 @@ async function main(): Promise<void> {
       for (const row of rows) {
         const scope = row.module && isModuleId(row.module) ? row.module : null;
         console.log(
-          `${row.id.slice(0, 8)}  ${moduleLabel(scope).padEnd(18)}  ${row.body.replace(/\s+/g, ' ').slice(0, 90)}`,
+          `${row.id.slice(0, 8)}  ${moduleLabel(scope).padEnd(18)}  ${readable(row.body).replace(/\s+/g, ' ').slice(0, 90)}`,
         );
       }
       return;
@@ -645,7 +701,7 @@ async function main(): Promise<void> {
           ? [{ body: target.trim(), module: moduleArg && isModuleId(moduleArg) ? moduleArg : null }]
           : [];
       if (ideas.length === 0) {
-        fail('Give the idea: idea "…" [--module <id>] [--from <n>], or idea --file <path> with a "## " heading per idea.');
+        fail('Give the idea: idea "…" [--module <id>] [--from <outline>], or idea --file <path> with a "## " heading per idea.');
       }
       /**
        * What a new idea is checked against, read through the statement in
@@ -694,7 +750,9 @@ async function main(): Promise<void> {
         filed.unshift({ id: row.id, body: idea.body });
         filedAt.unshift(Date.now());
         written += 1;
-        console.log(`${row.id.slice(0, 8)}  ${moduleLabel(idea.module).padEnd(18)}  ${idea.body.replace(/\s+/g, ' ').slice(0, 90)}`);
+        console.log(
+          `${row.id.slice(0, 8)}  ${moduleLabel(idea.module).padEnd(18)}  ${readable(idea.body).replace(/\s+/g, ' ').slice(0, 90)}`,
+        );
       }
 
       if (refusals.length > 0) {
@@ -709,7 +767,7 @@ async function main(): Promise<void> {
       }
       if (written === 0) process.exit(1);
       console.log(
-        `\n${written} filed as suggestions${step ? ` from #${step.number}` : ''}. ` +
+        `\n${written} filed as suggestions${step ? ` from ${ref(step.number)}` : ''}. ` +
           'They are on /dev/ideas, under the user\'s own list.',
       );
       return;
@@ -730,7 +788,7 @@ async function main(): Promise<void> {
       if (!title) {
         fail(
           'Give the raise: raise "…" --ask "…" --consequence "<action>: <what>"\n' +
-            '[--detail "…"] [--module <id>] [--from <n>].',
+            '[--detail "…"] [--module <id>] [--from <outline>].',
         );
       }
       if (title.length > 200) fail('A title is at most 200 characters.');
@@ -776,15 +834,15 @@ async function main(): Promise<void> {
 
       const from = arg('--from');
       const step = from ? await byNumber(sql, userId, from) : null;
-      const source = arg('--source') ?? (step ? `plan #${step.number}` : null);
+      const source = arg('--source') ?? (step ? `plan ${ref(step.number)}` : null);
 
       const [row] = await sql<{ id: string }[]>`
         insert into raised_items (user_id, module, title, detail, ask, consequence, source)
         values (${userId}, ${scope}, ${title},
                 ${detail}, ${ask}, ${sql.json(consequence.action)}, ${source})
         returning id`;
-      console.log(`${row.id.slice(0, 8)}  raised: ${title}`);
-      console.log(`a yes: ${consequence.said}`);
+      console.log(`${row.id.slice(0, 8)}  raised: ${readable(title)}`);
+      console.log(`a yes: ${readable(consequence.said)}`);
       console.log('It is on /dev/inbox, and in the bell until it is answered or dismissed.');
       return;
     }
@@ -874,14 +932,14 @@ async function main(): Promise<void> {
 
       const from = arg('--from');
       const step = from ? await byNumber(sql, userId, from) : null;
-      const source = arg('--source') ?? (step ? `plan #${step.number}` : null);
+      const source = arg('--source') ?? (step ? `plan ${ref(step.number)}` : null);
       const wake = !has('--no-wake');
 
       const [row] = await sql<{ id: string }[]>`
         insert into check_backs (user_id, title, detail, due_at, plan_item_id, source, wake)
         values (${userId}, ${title}, ${detail}, ${dueAt}, ${step?.id ?? null}, ${source}, ${wake})
         returning id`;
-      console.log(`${row.id.slice(0, 8)}  due ${dueWords(dueAt.toISOString(), Date.now())}: ${title}`);
+      console.log(`${row.id.slice(0, 8)}  due ${dueWords(dueAt.toISOString(), Date.now())}: ${readable(title)}`);
       console.log(
         wake
           ? 'The next session after it falls due picks it up; an hour past due, the tick wakes one.'
@@ -933,7 +991,7 @@ async function main(): Promise<void> {
         update check_backs
         set status = ${status}, outcome = ${note}, closed_at = now()
         where id = ${matches[0].id} and user_id = ${userId}`;
-      console.log(`${matches[0].id.slice(0, 8)}  ${status}: ${matches[0].title}`);
+      console.log(`${matches[0].id.slice(0, 8)}  ${status}: ${readable(matches[0].title)}`);
       return;
     }
 
@@ -960,7 +1018,7 @@ async function main(): Promise<void> {
         return;
       }
       for (const node of order.slice(0, limit)) {
-        const head = `#${String(node.number).padEnd(4)}p${node.priority}  ${node.title}`;
+        const head = `${stepRef(node).padEnd(9)}p${node.priority}  ${readable(node.title)}`;
         const tail = facts(node, liveness);
         console.log(`${head.padEnd(64)}  ${moduleLabel(node.module)}${tail ? `  ${tail}` : ''}`);
       }
@@ -972,13 +1030,15 @@ async function main(): Promise<void> {
       const item = await byNumber(sql, userId, target);
       const { sections, liveness } = await loadState(sql, userId);
       const node = findNode(sections, item.id);
-      if (!node) fail(`#${item.number} is not in the tree.`);
+      if (!node) fail(`${ref(item.number)} is not in the tree.`);
       process.stdout.write(
-        planBrief(sections, node, {
-          liveness,
-          visions: await loadVisions(sql, userId),
-          surfaces: changedSurfaces(item.commitSha),
-        }),
+        readable(
+          planBrief(sections, node, {
+            liveness,
+            visions: await loadVisions(sql, userId),
+            surfaces: changedSurfaces(item.commitSha),
+          }),
+        ),
       );
       return;
     }
@@ -1045,9 +1105,9 @@ async function main(): Promise<void> {
       let comment: string | null = null;
       if (fromNumber) {
         const from = await byNumber(sql, userId, fromNumber);
-        if (from.kind !== 'decision') fail(`#${from.number} is not a decision.`);
-        if (!from.resolution) fail(`#${from.number} has not been answered yet.`);
-        comment = reshapeStamp(from.number, from.resolution);
+        if (from.kind !== 'decision') fail(`${ref(from.number)} is not a decision.`);
+        if (!from.resolution) fail(`${ref(from.number)} has not been answered yet.`);
+        comment = reshapeStamp(typed(from.number), from.resolution);
       }
 
       // A step a session writes ready under an approved feature says so, on
@@ -1070,6 +1130,8 @@ async function main(): Promise<void> {
                 ${proposed ? 'proposed' : 'not_started'},
                 ${(last?.position ?? 0) + 10}, ${comment})
         returning id, number`;
+      // Read again, so the new row is named by the outline it just took.
+      await loadOutlines(sql, userId, true);
 
       const ideaPrefix = arg('--idea');
       if (ideaPrefix) {
@@ -1087,7 +1149,7 @@ async function main(): Promise<void> {
       }
 
       console.log(
-        `#${row.number} ${
+        `${ref(row.number)} ${
           kind === 'decision'
             ? 'asked'
             : kind === SETUP_KIND
@@ -1098,7 +1160,7 @@ async function main(): Promise<void> {
                   ? 'added ready to build'
                   : 'added'
         }${
-          parent ? ` under #${parent.number}` : ` at the top of ${moduleLabel(scope)}`
+          parent ? ` under ${ref(parent.number)}` : ` at the top of ${moduleLabel(scope)}`
         }${ideaPrefix ? ` from idea ${ideaPrefix}` : ''}.`,
       );
       await checkRowWriting(sql, userId, row, {
@@ -1137,19 +1199,19 @@ async function main(): Promise<void> {
       const title = target?.trim();
       if (!title) {
         fail(
-          'needs "<what to set>" --for <n> [--detail "…"]. The title is the one-line summary — ' +
+          'needs "<what to set>" --for <outline> [--detail "…"]. The title is the one-line summary — ' +
             '"Set GITHUB_TOKEN in Vercel" — and --detail is what to actually go and do.',
         );
       }
       const forNumber = arg('--for');
       if (!forNumber) {
         fail(
-          'needs … --for <n>: say which step is waiting on this, so the edge gets written. A ' +
+          'needs … --for <outline>: say which step is waiting on this, so the edge gets written. A ' +
             'setup job nothing waits on is a note, and the work goes on reading as stuck.',
         );
       }
       const waiting = await byNumber(sql, userId, forNumber);
-      const refusal = needsRefusal(waiting);
+      const refusal = needsRefusal({ ...waiting, outline: outlines.get(waiting.number) });
       if (refusal) fail(refusal);
 
       // The whole plan rather than a query per question: it is tens of rows,
@@ -1174,6 +1236,7 @@ async function main(): Promise<void> {
         insert into plan_dependencies (user_id, item_id, depends_on_id)
         values (${userId}, ${waiting.id}, ${row.id})
         on conflict (item_id, depends_on_id) do nothing`;
+      await loadOutlines(sql, userId, true);
 
       // A step that was blocked on this very thing stops being blocked: the
       // dependency now says what it is waiting for, and a step that says it
@@ -1192,8 +1255,11 @@ async function main(): Promise<void> {
         waitingNumber: waiting.number,
         released,
         hasDetail: detail !== null,
+        setupOutline: outlines.get(row.number),
+        parentOutline: outlines.get(home.number),
+        waitingOutline: outlines.get(waiting.number),
       })) {
-        console.log(line);
+        console.log(readable(line));
       }
       await checkRowWriting(sql, userId, row, { title, detail });
       return;
@@ -1215,15 +1281,15 @@ async function main(): Promise<void> {
         returning number`;
       console.log(
         rows.length === 0
-          ? `Nothing proposed at or under #${item.number}.`
-          : `Approved ${rows.map((r) => `#${r.number}`).join(', ')}.`,
+          ? `Nothing proposed at or under ${ref(item.number)}.`
+          : `Approved ${rows.map((r) => `${ref(r.number)}`).join(', ')}.`,
       );
       return;
     }
 
     if (command === 'start') {
       if (item.status === 'proposed') {
-        fail(`#${item.number} is only proposed. A person approves it on /dev/plan first.`);
+        fail(`${ref(item.number)} is only proposed. A person approves it on /dev/plan first.`);
       }
       // The refusal this whole feature turns on. Making it the tool's rule
       // rather than the skill's is what stops a session that means well from
@@ -1231,8 +1297,8 @@ async function main(): Promise<void> {
       // recording it as though somebody had decided.
       if (item.kind === 'decision') {
         fail(
-          `#${item.number} is a decision, not work. It is answered, not built, and only by a ` +
-            `person: on /dev/plan, or with plan.ts answer ${item.number} --note "…".`,
+          `${ref(item.number)} is a decision, not work. It is answered, not built, and only by a ` +
+            `person: on /dev/plan, or with plan.ts answer ${typed(item.number)} --note "…".`,
         );
       }
       // And the same refusal for a setup job, for the same reason: the row
@@ -1241,7 +1307,7 @@ async function main(): Promise<void> {
       // the honest end of that is the step blocked again with the ask it
       // already had. Where it is closed is part of the refusal -- see
       // lib/plan/needs.ts.
-      if (item.kind === SETUP_KIND) fail(setupStartRefusal(item.number));
+      if (item.kind === SETUP_KIND) fail(setupStartRefusal(item.number, outlines.get(item.number)));
 
       // Claimed, and nothing written about who holds it.
       //
@@ -1258,7 +1324,7 @@ async function main(): Promise<void> {
         update plan_items
         set status = 'in_progress', block_ask = null, block_kind = null
         where id = ${item.id} and user_id = ${userId}`;
-      console.log(`#${item.number} in progress.`);
+      console.log(`${ref(item.number)} in progress.`);
       return;
     }
 
@@ -1266,7 +1332,7 @@ async function main(): Promise<void> {
       await sql`
         update plan_items set status = 'not_started', block_ask = null, block_kind = null
         where id = ${item.id} and user_id = ${userId}`;
-      console.log(`#${item.number} reopened.`);
+      console.log(`${ref(item.number)} reopened.`);
       return;
     }
 
@@ -1343,7 +1409,7 @@ async function main(): Promise<void> {
         })),
         ids,
       );
-      if (!run) fail(`No run was fired at #${item.number} or above it, so nothing was asked.`);
+      if (!run) fail(`No run was fired at ${ref(item.number)} or above it, so nothing was asked.`);
       const lines = await sql<{ kind: string; body: string; created_at: Date }[]>`
         select kind, body, created_at from core.run_activities
         where user_id = ${userId} and run_id = ${run.id}
@@ -1360,7 +1426,7 @@ async function main(): Promise<void> {
       if (refusal) fail(refusal);
       if (item.status === 'done' || item.status === 'blocked') {
         fail(
-          `#${item.number} is ${item.status}, which already says how the run ended. A stop ` +
+          `${ref(item.number)} is ${item.status}, which already says how the run ended. A stop ` +
             `reason is for a run that ends with its step neither closed nor blocked.`,
         );
       }
@@ -1386,15 +1452,15 @@ async function main(): Promise<void> {
         })),
         ids,
       );
-      if (!run) fail(`No run was fired at #${item.number} or above it, so there is no run to explain.`);
+      if (!run) fail(`No run was fired at ${ref(item.number)} or above it, so there is no run to explain.`);
       if (run.status === 'finished') {
-        fail(`The last run on #${item.number} already reads finished; there is no stop to explain.`);
+        fail(`The last run on ${ref(item.number)} already reads finished; there is no stop to explain.`);
       }
       const columns = stopColumns(run, reason, pieces, new Date().toISOString());
       await sql`
         update plan_runs set ${sql(columns)}
         where id = ${run.id} and user_id = ${userId}`;
-      console.log(`#${item.number} last run stopped: ${reason}`);
+      console.log(`${ref(item.number)} last run stopped: ${reason}`);
       if (pieces.length > 0) {
         pieces.forEach((piece, index) => console.log(`  ${index + 1}. ${piece}`));
       }
@@ -1414,7 +1480,7 @@ async function main(): Promise<void> {
       const note = arg('--note');
       if (!note) fail('--note is required for answer: say what you decided.');
       if (item.kind !== 'decision') {
-        fail(`#${item.number} is work, not a question. Close it with done --note "…".`);
+        fail(`${ref(item.number)} is work, not a question. Close it with done --note "…".`);
       }
 
       const stamp = new Date().toISOString().slice(0, 10);
@@ -1426,13 +1492,13 @@ async function main(): Promise<void> {
         set status = 'done', resolution = ${note}, comment = ${comment}, commit_sha = null,
             block_ask = null, block_kind = null
         where id = ${item.id} and user_id = ${userId}`;
-      console.log(`#${item.number} answered: ${note}`);
+      console.log(`${ref(item.number)} answered: ${note}`);
 
       const sections = await loadTree(sql, userId);
       const node = findNode(sections, item.id);
       const freed = node?.blocks.filter((ref) => findNode(sections, ref.id)?.ready) ?? [];
       if (freed.length > 0) {
-        console.log(`Now ready: ${freed.map((ref) => `#${ref.number} ${ref.title}`).join(', ')}`);
+        console.log(`Now ready: ${freed.map((step) => `${stepRef(step)} ${readable(step.title)}`).join(', ')}`);
       }
       return;
     }
@@ -1464,7 +1530,7 @@ async function main(): Promise<void> {
       const clear = has('--clear');
       if (clear && note) fail('Either --note or --clear, not both.');
       if (!clear && !note) {
-        fail(`fog ${item.number} --note "what cannot be seen yet", or --clear once it can.`);
+        fail(`fog ${typed(item.number)} --note "what cannot be seen yet", or --clear once it can.`);
       }
 
       // Writing a patch clears any dismissal on the old one: what the person
@@ -1475,8 +1541,8 @@ async function main(): Promise<void> {
         where id = ${item.id} and user_id = ${userId}`;
       console.log(
         clear
-          ? `#${item.number} fog cleared${item.fog ? '' : ' (it had none)'}.`
-          : `#${item.number} fog: ${note}`,
+          ? `${ref(item.number)} fog cleared${item.fog ? '' : ' (it had none)'}.`
+          : `${ref(item.number)} fog: ${note}`,
       );
       if (!clear && item.fog) {
         console.log(`Replaced the patch it had: ${item.fog.replace(/\s+/g, ' ')}`);
@@ -1498,7 +1564,7 @@ async function main(): Promise<void> {
       const ask = command === 'block' ? arg('--ask')?.trim() : undefined;
       if (command === 'block' && !ask) {
         fail(
-          `block ${item.number} --ask "what it needs, in one sentence" [--on-steps] ` +
+          `block ${typed(item.number)} --ask "what it needs, in one sentence" [--on-steps] ` +
             `[--note "the rest"]. The ask is what Dash and the plan row show, and blocking ` +
             `again replaces it; --note is the dated line, which is appended. --on-steps says ` +
             `the block is waiting on the steps it names and should clear itself when they ` +
@@ -1527,8 +1593,8 @@ async function main(): Promise<void> {
       // complete.
       if (command === 'done' && item.fog && !item.fogDismissedAt) {
         fail(
-          `#${item.number} still says part of it is not specified. Write the steps that ` +
-            `patch covers, or run plan.ts fog ${item.number} --clear, then close it.`,
+          `${ref(item.number)} still says part of it is not specified. Write the steps that ` +
+            `patch covers, or run plan.ts fog ${typed(item.number)} --clear, then close it.`,
         );
       }
       const status: PlanStatus = command === 'done' ? 'done' : command === 'block' ? 'blocked' : 'dropped';
@@ -1557,10 +1623,10 @@ async function main(): Promise<void> {
         // not wave the close through.
         let inputs: { files: string[]; surfaces: string[] };
         try {
-          inputs = stepScreenInputs(item.number, commit);
+          inputs = stepScreenInputs(item.number, commit, outlines.get(item.number));
         } catch (error) {
           fail(
-            `Could not read what #${item.number} changed at ${commit} to check its screens ` +
+            `Could not read what ${ref(item.number)} changed at ${commit} to check its screens ` +
               `(${error instanceof Error ? error.message : String(error)}). Run git fetch origin and try again.`,
           );
         }
@@ -1587,7 +1653,7 @@ async function main(): Promise<void> {
             block_ask = ${ask ?? null},
             block_kind = ${blockPatch(status, onSteps ? 'steps' : null).block_kind}
         where id = ${item.id} and user_id = ${userId}`;
-      console.log(`#${item.number} ${STATUS_WORD[status]}${commit ? ` (${commit})` : ''}: ${note}`);
+      console.log(`${ref(item.number)} ${STATUS_WORD[status]}${commit ? ` (${commit})` : ''}: ${note}`);
       if (ask && ask !== note) console.log(`Needs: ${ask}`);
       await checkRowWriting(sql, userId, item, ask && ask !== note ? { ask, note } : { note });
       if (status === 'blocked') {
@@ -1603,7 +1669,7 @@ async function main(): Promise<void> {
         const node = findNode(sections, item.id);
         const freed = node?.blocks.filter((ref) => findNode(sections, ref.id)?.ready) ?? [];
         if (freed.length > 0) {
-          console.log(`Now ready: ${freed.map((ref) => `#${ref.number} ${ref.title}`).join(', ')}`);
+          console.log(`Now ready: ${freed.map((step) => `${stepRef(step)} ${readable(step.title)}`).join(', ')}`);
         }
       }
       return;
@@ -1618,7 +1684,7 @@ async function main(): Promise<void> {
       const body = arg('--body')?.trim();
       if (!isPlanUpdateHealth(health) || !body) {
         fail(
-          `update ${item.number} --health ${PLAN_UPDATE_HEALTHS.join('|')} --body "two or three ` +
+          `update ${typed(item.number)} --health ${PLAN_UPDATE_HEALTHS.join('|')} --body "two or three ` +
             `sentences on what moved". Name the feature, not the step the run closed.`,
         );
       }
@@ -1627,13 +1693,13 @@ async function main(): Promise<void> {
       }
       if (item.parentId !== null) {
         fail(
-          `#${item.number} is a step. An update is on a feature: name the top-level row ` +
+          `${ref(item.number)} is a step. An update is on a feature: name the top-level row ` +
             `the step sits under.`,
         );
       }
       const sections = await loadTree(sql, userId);
       const feature = findNode(sections, item.id);
-      if (!feature) fail(`#${item.number} is not on the plan as it is read.`);
+      if (!feature) fail(`${ref(item.number)} is not on the plan as it is read.`);
       const [last] = await sql<{ created_at: Date }[]>`
         select created_at from plan_updates
         where user_id = ${userId} and feature_id = ${item.id}
@@ -1646,7 +1712,7 @@ async function main(): Promise<void> {
         values (${userId}, ${item.id}, ${health}, ${body}, ${counts.before}, ${counts.after},
                 ${counts.total}, ${runId}, ${currentSession(process.env) ?? null})`;
       console.log(
-        `#${item.number} ${PLAN_UPDATE_HEALTH[health].word.toLowerCase()}: ${progressSince({
+        `${ref(item.number)} ${PLAN_UPDATE_HEALTH[health].word.toLowerCase()}: ${progressSince({
           stepsDoneBefore: counts.before,
           stepsDoneAfter: counts.after,
           stepsTotal: counts.total,
@@ -1658,11 +1724,11 @@ async function main(): Promise<void> {
 
     if (command === 'assign') {
       const who = extra;
-      if (!who || !['me', 'none'].includes(who)) fail('assign <n> me|none');
+      if (!who || !['me', 'none'].includes(who)) fail('assign <outline> me|none');
       await sql`
         update plan_items set assignee = ${who === 'none' ? null : who}
         where id = ${item.id} and user_id = ${userId}`;
-      console.log(`#${item.number} ${who === 'none' ? 'unassigned' : `→ ${who}`}.`);
+      console.log(`${ref(item.number)} ${who === 'none' ? 'unassigned' : `→ ${who}`}.`);
       return;
     }
 
@@ -1670,7 +1736,7 @@ async function main(): Promise<void> {
       const value = Number(extra);
       if (!isPlanPriority(value)) fail('Priority is 1 (next), 2 (normal) or 3 (someday).');
       await sql`update plan_items set priority = ${value} where id = ${item.id} and user_id = ${userId}`;
-      console.log(`#${item.number} priority ${value}.`);
+      console.log(`${ref(item.number)} priority ${value}.`);
       return;
     }
 
@@ -1681,12 +1747,12 @@ async function main(): Promise<void> {
           insert into plan_dependencies (user_id, item_id, depends_on_id)
           values (${userId}, ${item.id}, ${other.id})
           on conflict (item_id, depends_on_id) do nothing`;
-        console.log(`#${item.number} waits on #${other.number}.`);
+        console.log(`${ref(item.number)} waits on ${ref(other.number)}.`);
       } else {
         await sql`
           delete from plan_dependencies
           where user_id = ${userId} and item_id = ${item.id} and depends_on_id = ${other.id}`;
-        console.log(`#${item.number} no longer waits on #${other.number}.`);
+        console.log(`${ref(item.number)} no longer waits on ${ref(other.number)}.`);
       }
       return;
     }

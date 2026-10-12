@@ -4,6 +4,7 @@ import { readAll } from '@/lib/learn/db/read-all';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import { EMBEDDING_DIMENSIONS } from '@/lib/learn/embed/voyage';
 import type { KnowledgeState } from '@/lib/learn/graph/model';
+import { placeAreas, type DomainPlacement, type FieldPlacement } from './area-map';
 import { buildIdeaMap, type IdeaMap, type MapIdea } from './idea-map';
 
 /**
@@ -32,8 +33,20 @@ export type IdeaOnMap = MapIdea & {
   domain: Named | null;
 };
 
+/** A field of the area catalogue placed on the map (plan #1856). */
+export type FieldOnMap = FieldPlacement & {
+  name: string;
+  domain: Named | null;
+  /** Ideas on the map under this field. Zero marks ground you have not been to. */
+  ideaCount: number;
+};
+
+export type DomainOnMap = DomainPlacement & { name: string; ideaCount: number };
+
 export type IdeaMapView = Omit<IdeaMap, 'ideas'> & {
   ideas: IdeaOnMap[];
+  /** Every embedded field and domain with a position, in both layouts, ideas or none. */
+  areas: { fields: FieldOnMap[]; domains: DomainOnMap[]; fieldsMissing: number };
   /** Ideas with no embedding yet, left off the map until the daily fill reaches them. */
   missing: number;
 };
@@ -47,7 +60,7 @@ type ConceptRow = {
 };
 type StateRow = { concept_id: string; state: KnowledgeState };
 type SubjectRow = { id: string; name: string; field_id: string | null; domain_id: string | null };
-type FieldRow = { id: string; name: string; domain_id: string | null };
+type FieldRow = { id: string; name: string; domain_id: string | null; embedding: string | number[] | null };
 type DomainRow = { id: string; name: string };
 
 /**
@@ -80,7 +93,7 @@ export async function loadIdeaMap(learn: LearnSupabaseClient, userId?: string): 
     readAll<ConceptRow>(own('concepts', 'id, name, claim, subject_id, embedding', 'id')),
     readAll<StateRow>(own('concept_state', 'concept_id, state', 'concept_id')),
     readAll<SubjectRow>(own('subjects', 'id, name, field_id, domain_id', 'id')),
-    readAll<FieldRow>((from, to) => learn.from('area_fields').select('id, name, domain_id').order('id').range(from, to)),
+    readAll<FieldRow>((from, to) => learn.from('area_fields').select('id, name, domain_id, embedding').order('id').range(from, to)),
     readAll<DomainRow>((from, to) => learn.from('area_domains').select('id, name').order('id').range(from, to)),
   ]);
 
@@ -100,12 +113,52 @@ export async function loadIdeaMap(learn: LearnSupabaseClient, userId?: string): 
   );
   const rowOf = new Map(embedded.map((row) => [row.id, row]));
 
+  const ideaVectors = embedded.map((row) => ({
+    id: row.id,
+    vector: row.vector,
+    state: stateOf.get(row.id) ?? ('unknown' as KnowledgeState),
+  }));
+  const fieldVectors: { id: string; domainId: string; vector: number[] }[] = [];
+  for (const row of fields) {
+    const vector = parseVector(row.embedding);
+    if (vector && row.domain_id) fieldVectors.push({ id: row.id, domainId: row.domain_id, vector });
+  }
+  const areaMap = placeAreas(ideaVectors, map, fieldVectors, domains);
+
+  // Ideas under each field and domain, by the same rule as the idea's labels.
+  const fieldIdeas = new Map<string, number>();
+  const domainIdeas = new Map<string, number>();
+  for (const row of embedded) {
+    const subject = row.subject_id ? subjectOf.get(row.subject_id) : undefined;
+    const field = subject?.field_id ? fieldOf.get(subject.field_id) : undefined;
+    const domainId = subject?.domain_id ?? field?.domain_id ?? null;
+    if (field) fieldIdeas.set(field.id, (fieldIdeas.get(field.id) ?? 0) + 1);
+    if (domainId) domainIdeas.set(domainId, (domainIdeas.get(domainId) ?? 0) + 1);
+  }
+
   const named = (row: { id: string; name: string } | undefined): Named | null =>
     row ? { id: row.id, name: row.name } : null;
 
   return {
     ...map,
     missing: concepts.length - embedded.length,
+    areas: {
+      fieldsMissing: fields.length - fieldVectors.length,
+      fields: areaMap.fields.map((placement) => {
+        const row = fieldOf.get(placement.id)!;
+        return {
+          ...placement,
+          name: row.name,
+          domain: named(row.domain_id ? domainOf.get(row.domain_id) : undefined),
+          ideaCount: fieldIdeas.get(placement.id) ?? 0,
+        };
+      }),
+      domains: areaMap.domains.map((placement) => ({
+        ...placement,
+        name: domainOf.get(placement.id)!.name,
+        ideaCount: domainIdeas.get(placement.id) ?? 0,
+      })),
+    },
     ideas: map.ideas.map((idea) => {
       const row = rowOf.get(idea.id)!;
       const subject = row.subject_id ? subjectOf.get(row.subject_id) : undefined;

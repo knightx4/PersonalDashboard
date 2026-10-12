@@ -13,6 +13,7 @@
  * `app/dev/plan/actions.ts` does the reads and the fire.
  */
 import { isClosed } from './load';
+import { stepRef } from './ref';
 import type { PlanNode } from './tree';
 
 /** The routine as the deployment has it: which of the two values are set. */
@@ -27,18 +28,18 @@ export type OverhaulRoutineState = { id: boolean; token: boolean };
  * stop.
  */
 export function overhaulRefusal(
-  node: Pick<PlanNode, 'number' | 'track' | 'status'>,
+  node: Pick<PlanNode, 'number' | 'track' | 'status'> & { outline?: string | null },
   routine: OverhaulRoutineState,
   latest: { status: string; job: string } | null | undefined,
 ): string | null {
   if (node.track !== 'overhaul') {
-    return `#${node.number} is not an overhaul, so the overhaul routine has nothing to work there.`;
+    return `${stepRef(node)} is not an overhaul, so the overhaul routine has nothing to work there.`;
   }
   if (node.status === 'proposed') {
-    return `#${node.number} is only a proposal. Approve it before starting the overhaul.`;
+    return `${stepRef(node)} is only a proposal. Approve it before starting the overhaul.`;
   }
   if (isClosed(node.status)) {
-    return `#${node.number} is ${node.status}, so there is nothing left to work.`;
+    return `${stepRef(node)} is ${node.status}, so there is nothing left to work.`;
   }
   if (!routine.id || !routine.token) {
     const missing = [
@@ -49,8 +50,8 @@ export function overhaulRefusal(
   }
   if (latest?.status === 'started') {
     return latest.job === 'overhaul'
-      ? `An overhaul run is already working #${node.number}. Wait for it to finish.`
-      : `A run is already working #${node.number}. Wait for it to finish before starting the overhaul.`;
+      ? `An overhaul run is already working ${stepRef(node)}. Wait for it to finish.`
+      : `A run is already working ${stepRef(node)}. Wait for it to finish before starting the overhaul.`;
   }
   return null;
 }
@@ -60,12 +61,12 @@ export function overhaulRefusal(
  * title, the account, and the brief as the plan holds it now.
  */
 export function overhaulTurn(
-  node: Pick<PlanNode, 'number' | 'title'>,
+  node: Pick<PlanNode, 'number' | 'title'> & { outline?: string | null },
   userId: string,
   brief: string,
 ): string {
   return (
-    `Work overhaul #${node.number}, "${node.title}".\n` +
+    `Work overhaul ${stepRef(node)}, "${node.title}".\n` +
     `user_id: ${userId}\n\n` +
     'The brief is below. It is the plan as the app holds it right now, and the plan is ' +
     'the source of truth. "Decided so far" is every answer settled beneath this overhaul.\n\n' +

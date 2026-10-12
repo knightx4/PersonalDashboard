@@ -1,6 +1,6 @@
 # Building one plan step
 
-You have been given one step from the build plan by number. Build it, verify
+You have been given one step from the build plan by its outline. Build it, verify
 it, commit it, close it, and report. You are not working the rest of the
 feature — the session that sent you is, and it will send the next step once
 you are done.
@@ -50,7 +50,12 @@ npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
 npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
 ```
 
-Steps are named by number — the `#12` on the page. Numbers are never reused.
+Every `<n>` above is a step's outline, the `1073.4` its row on the page heads
+itself with. Name steps that way in everything you write, from the commit
+subject to the report, as `#1073.4` with no number beside it. The number each
+step also has (#1084) is its identity in the database; the person reads the
+outline. `SKILL.md`, **Naming a step**, has
+the rule in full.
 
 ## The loop
 
@@ -158,7 +163,7 @@ the answer and your lines so far. Working offline, the query is in `offline.md`.
    about a test that the narrow run cannot reach: run what the done-when needs
    and say so in your report.
 7. **Commit the step on its own.** One step per commit. End the subject with
-   the step: `Add the anonymous share page (plan #14)`. A step that changed a
+   the step's outline: `Add the anonymous share page (plan #1073.4)`. A step that changed a
    screen has each critic round recorded in `public.ui_checks` before it
    commits (see **Building a screen**). **Do not push and do
    not merge.** The session that sent you puts your commit on main and closes
@@ -214,7 +219,7 @@ You are one step in a batch, and the session that sent you keeps none of what
 you read. Your report is the only thing that survives you, so write it for the
 session building the next step:
 
-- **The step, by number and title, and what you did to it** — committed, with
+- **The step, by outline and title, and what you did to it** — committed, with
   the sha and the note it should close with; blocked, and on what; or put back,
   and why.
 - **What changed**, as files and what each now does. Not a diff; the next
@@ -229,7 +234,7 @@ session building the next step:
   many rounds it took, and the last verdict. After a third failed round, the
   last verdict's fixes in full and where the shots are.
 - **Anything you wrote outside your own step**: a decision and its dependency
-  edge, fog graduated or cleared, an idea filed, a raise. By number and title.
+  edge, fog graduated or cleared, an idea filed, a raise. By outline and title.
 - **Any step that became ready** when you closed yours.
 
 Keep it to what the next session needs. A page is too long; three lines is too
@@ -366,7 +371,7 @@ surface rather than every page under it.
 `block` refuses an ask that puts a design check to the person
 (`lib/plan/block-ask.ts`). Older steps blocked on one before the change: when
 the person answers, read any answer that names nothing to change as an accept
-(`npm run ui-guard -- <n> --accept`), merge the branch the history names and
+(`npm run ui-guard -- <outline> --accept`), merge the branch the history names and
 close the step. When the answer says what to change, the builder gets three
 fresh rounds against their words, numbered on from 4.
 
@@ -409,7 +414,7 @@ the report rather than leaving it out.
 **The close checks the rounds.** `done` refuses a step whose commits change a
 `.tsx` file under `app/` or `components/` while the latest recorded round of
 any surface those files serve is not a `pass`, and names each such surface
-(plan #1534, `lib/plan/ui-check-guard.ts`). `npm run ui-guard -- <n>` runs
+(plan #1534, `lib/plan/ui-check-guard.ts`). `npm run ui-guard -- <outline>` runs
 the same check from your branch, and prints the SQL for the connector where
 there is no `DATABASE_URL`. Run it before you report a screen step: a
 surface it names is a round still to run or record.
@@ -613,7 +618,7 @@ to look at screens:
 
 - **Names the screens as the app names them**, page by page: "the account
   page, and these Dev pages: bugs, changelog, ideas". A surface id, a step
-  number or a commit hash is never the only name for anything; when one is
+  outline or a commit hash is never the only name for anything; when one is
   given, the sentence also says what it covers.
 - **Says where to look, with a link for each screen**: `/preview?s=<id>`,
   which opens that drawing in the gallery on the live site.

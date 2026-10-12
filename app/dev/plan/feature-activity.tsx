@@ -19,6 +19,7 @@ import {
   type ActivityKind,
 } from '@/lib/plan/activity';
 import { PLAN_UPDATE_HEALTH, progressSince } from '@/lib/plan/updates';
+import { stepRef } from '@/lib/plan/ref';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
 
 /** How many entries show before "Show all". */
@@ -94,7 +95,7 @@ function ActivityRow({ entry }: { entry: ActivityEntry }) {
       href={entry.subject.href}
       className="font-medium text-ink underline-offset-2 hover:underline"
     >
-      {entry.subject.isFeature ? 'this feature' : `#${entry.subject.number} ${entry.subject.title}`}
+      {entry.subject.isFeature ? 'this feature' : `${stepRef(entry.subject)} ${entry.subject.title}`}
     </Link>
   );
 
@@ -111,7 +112,7 @@ function ActivityRow({ entry }: { entry: ActivityEntry }) {
           href={entry.subject.href}
           className="text-ink-muted underline-offset-2 hover:underline"
         >
-          Open #{entry.subject.number}
+          Open {stepRef(entry.subject)}
         </Link>
       </>
     );

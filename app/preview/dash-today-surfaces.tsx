@@ -68,7 +68,7 @@ const GROUPS: DashTodayGroup[] = [
     entries: [11, 10, 9, 8, 7, 6].map((n) =>
       entry(n, {
         workspace: 'dev',
-        sentence: `Dash closed step #${1500 + n}.`,
+        sentence: `Dash closed step #1490.${n}.`,
         href: `/dev/plan#${1500 + n}`,
         at: `2026-10-06T${String(n).padStart(2, '0')}:30:00Z`,
         noUndo: n === 9 ? 'A closed step goes back by reopening it on the plan.' : null,

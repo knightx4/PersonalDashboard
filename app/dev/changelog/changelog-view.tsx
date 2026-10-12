@@ -25,6 +25,7 @@ import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import { sourceProblems } from '@/lib/dev/post-check';
 import { moduleById } from '@/lib/modules';
 import { ViewChips } from '@/components/plan-tree/view-chips';
+import { stepRef } from '@/lib/plan/ref';
 import { PostAbout } from './post-about';
 
 /**
@@ -259,7 +260,11 @@ function IssueSummary({
   return (
     <details className="group">
       <summary className={ROW}>
-        <RowLead open="group-open:rotate-90" module={mark} number={group.number} />
+        <RowLead
+          open="group-open:rotate-90"
+          module={mark}
+          name={group.number === null ? null : stepRef({ number: group.number })}
+        />
         {/* The title has the line to itself on a phone, with the count and
             the day quietly underneath; from the small breakpoint up there is
             room for both on one line (plan #1745). */}
@@ -315,12 +320,13 @@ const ROW =
 function RowLead({
   open,
   module,
-  number,
+  name,
 }: {
   /** The rotate class for the `details` this row opens. */
   open: string;
   module: ChangelogEntry['module'] | undefined;
-  number: number | null;
+  /** The step as the plan page heads it, `#1073.4`; null for a note. */
+  name: string | null;
 }) {
   return (
     <>
@@ -333,8 +339,8 @@ function RowLead({
       <span className="flex size-6 shrink-0 items-center">
         {module !== undefined && <ModuleMark module={module} size="sm" />}
       </span>
-      <span className="tabular h-6 w-12 shrink-0 text-small leading-6 text-ink-ghost">
-        {number !== null && `#${number}`}
+      <span className="tabular h-6 min-w-12 shrink-0 whitespace-nowrap text-small leading-6 text-ink-ghost">
+        {name}
       </span>
     </>
   );
@@ -384,7 +390,11 @@ function Entry({
     <li>
       <details className="group/entry">
         <summary className={ROW}>
-          <RowLead open="group-open/entry:rotate-90" module={entry.module} number={entry.number} />
+          <RowLead
+            open="group-open/entry:rotate-90"
+            module={entry.module}
+            name={entry.number === null ? null : stepRef({ number: entry.number, outline: entry.outline })}
+          />
           {/* Two lines at most on a phone and one from the small breakpoint
               up. A note's title is the whole thing somebody typed on a phone,
               so the untruncated version is three lines and the list stops
@@ -454,7 +464,7 @@ function postable(entry: ChangelogEntry): boolean {
   if (entry.source !== 'plan' || entry.number === null) return false;
   return (
     sourceProblems({
-      label: `#${entry.number}`,
+      label: stepRef({ number: entry.number, outline: entry.outline }),
       module: entry.module,
       text: [entry.title, entry.detail].filter(Boolean).join('\n'),
     }).length === 0

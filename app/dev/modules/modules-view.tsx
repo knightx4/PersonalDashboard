@@ -21,6 +21,7 @@ import type { IdeaRow } from '@/lib/ideas/load';
 import { formatMicroDollars } from '@/lib/money';
 import { featureHref } from '@/lib/plan/feature-page';
 import { PLAN_STATUS_LABEL, type PlanItem } from '@/lib/plan/load';
+import { stepRef } from '@/lib/plan/ref';
 import { visionAnchor } from '@/lib/specs/vision';
 import type { Tab } from '@/lib/tabs';
 import { openedText } from '@/lib/usage/report';
@@ -133,7 +134,7 @@ function FeatureRows({ items, flat }: { items: readonly PlanItem[]; flat?: boole
   return (
     <Rows flat={flat}>
       {items.map((item) => (
-        <Row flat={flat} key={item.id} meta={`#${item.number} · ${PLAN_STATUS_LABEL[item.status]}`}>
+        <Row flat={flat} key={item.id} meta={`${stepRef(item)} · ${PLAN_STATUS_LABEL[item.status]}`}>
           <Link href={featureHref(item.number)} className={rowLink}>
             {item.title}
           </Link>
@@ -186,14 +187,24 @@ function IdeaRows({ ideas, flat }: { ideas: readonly IdeaRow[]; flat?: boolean }
   );
 }
 
-function ShippedRows({ items, flat }: { items: readonly PlanItem[]; flat?: boolean }) {
+/**
+ * A shipped step is named by its outline, `#1073.4`, as the plan page heads
+ * it, when the summary placed it; by its number otherwise.
+ */
+function ShippedRows({
+  items,
+  flat,
+}: {
+  items: readonly (PlanItem & { outline?: string | null })[];
+  flat?: boolean;
+}) {
   return (
     <Rows flat={flat}>
       {items.map((item) => (
         <Row
           flat={flat}
           key={item.id}
-          meta={`#${item.number}${item.completedAt ? ` · ${item.completedAt.slice(0, 10)}` : ''}`}
+          meta={`${stepRef(item)}${item.completedAt ? ` · ${item.completedAt.slice(0, 10)}` : ''}`}
         >
           <Link href={featureHref(item.number)} className={rowLink}>
             {item.title}

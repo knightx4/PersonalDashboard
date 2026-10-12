@@ -227,7 +227,7 @@ not held.
    is the sharp end of that; the detail is for what does not fit the shape.
 6. **Stop.** Do not `start`, do not `approve`, do not `answer` your own
    decisions, do not assign anything to Claude, do not write code. Report the
-   feature and its steps **by number and title**, and the questions. The
+   feature and its steps **by outline and title**, and the questions. The
    person approves on `/dev/plan`, and only then does the building loop in `building.md`
    apply. That one approval is the last the feature needs: steps a session
    adds beneath it later go in ready to build, except a step that acts
@@ -345,5 +345,5 @@ something the person decided.
    design session writes, by the third row, after the person accepts the
    design. `overhaul.md` is how the overhaul's own run works the three.
 8. **Report** the commit on main, the change marked applied, and every row
-   you wrote by number and title, or which of steps 1 to 3 stopped the run
+   you wrote by outline and title, or which of steps 1 to 3 stopped the run
    and why.

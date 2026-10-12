@@ -3,7 +3,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { AskContext, AskToolResult, SchemaClient } from '@/lib/ask/db';
 import { executeProposal } from '@/lib/ask/propose';
 import type { SpendReport } from '@/lib/core/spend/pricing';
-import { answerQuestion, askDash, ASK_MODEL, gapNote, type AskLookupEvent, type AskStores } from './ask';
+import { answerQuestion, askDash, ASK_MODEL, ASK_VOICE, gapNote, type AskLookupEvent, type AskStores } from './ask';
 import {
   ANSWER_MAX_TOKENS,
   answerFromLookups,
@@ -127,6 +127,14 @@ function memoryStores(existing: TalkTurn[] = []) {
   };
   return { stores, written, spend, changes };
 }
+
+describe("Dash's voice", () => {
+  it('names a plan step by its outline, never the stored number', () => {
+    expect(ASK_VOICE.system.replace(/\s+/g, ' ')).toContain(
+      'Name a plan step by its outline, such as #1073.4, the way the plan page heads it, never by the stored number.',
+    );
+  });
+});
 
 describe('askDash', () => {
   it('files what it could not do as a note, with the question, once it has looked', async () => {

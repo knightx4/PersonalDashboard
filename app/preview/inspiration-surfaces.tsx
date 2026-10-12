@@ -123,6 +123,7 @@ const PAGE = buildInspirationPage({
   takeaways: TAKEAWAYS,
   links: LINKS,
   planNumbers: new Map([['p1', 1288]]),
+  planOutlines: new Map([['p1', '1288']]),
   ideaPlanItems: new Map(),
 });
 

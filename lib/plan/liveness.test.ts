@@ -520,7 +520,7 @@ describe('quietRunNote', () => {
 
 describe('quietSendAsk', () => {
   it('is a question, and it carries the evidence rather than the verdict', () => {
-    const ask = quietSendAsk(586, run({ createdAt: minutesAgo(90), reading: reading(1, 35) }), NOW);
+    const ask = quietSendAsk({ number: 586 }, run({ createdAt: minutesAgo(90), reading: reading(1, 35) }), NOW);
     expect(ask).toContain('#586');
     expect(ask).toContain('35m');
     expect(ask).toContain('A push');
@@ -570,7 +570,7 @@ describe('sendOverClaim', () => {
     expect(verdict.send).toBe(false);
     if (verdict.send) throw new Error('unreachable');
     expect(verdict.confirmable).toBe(true);
-    expect(verdict.ask).toBe(quietSendAsk(586, quietRun, NOW));
+    expect(verdict.ask).toBe(quietSendAsk({ number: 586 }, quietRun, NOW));
   });
 
   it('sends that same step once the question has been answered', () => {
@@ -751,6 +751,12 @@ describe('featureBetweenSteps', () => {
   it('says what to wait for', () => {
     expect(betweenStepsRefusal({ number: 866 })).toContain(
       '#866 has a session working through its steps',
+    );
+  });
+
+  it('names the feature by its outline when it has one', () => {
+    expect(betweenStepsRefusal({ number: 1084, outline: '1073.4' })).toContain(
+      '#1073.4 has a session working through its steps',
     );
   });
 });

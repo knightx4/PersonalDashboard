@@ -130,7 +130,7 @@ export function lookupLabel(name: string, input: unknown): string {
     case 'read_dev_row': {
       const kind = field(input, 'kind');
       const ref = field(input, 'ref');
-      if (kind === 'step' && typeof ref === 'string' && /^#?\d+$/.test(ref.trim())) {
+      if (kind === 'step' && typeof ref === 'string' && /^#?\d+(?:\.\d+)*$/.test(ref.trim())) {
         return `Reading step #${ref.trim().replace(/^#/, '')}`;
       }
       return kind === 'idea' ? 'Reading an idea' : kind === 'note' ? 'Reading a note' : kind === 'raise' ? 'Reading a raise' : 'Reading a plan step';

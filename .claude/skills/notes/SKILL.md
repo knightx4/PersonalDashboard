@@ -646,6 +646,12 @@ npx tsx scripts/plan.ts raise "…" --ask "…" --consequence "<action>: <what>"
 `--ask` is required: the move you want back, in one sentence the user can
 answer in one line. The detail is the evidence for it, not the ask itself.
 
+A plan step named anywhere you write, in a raise, a note's resolution or a
+reply, is named by its outline, the `#1073.4` its row on `/dev/plan` heads
+itself with, and `plan.ts` takes it that way. The number a step also has is
+its identity in the database, and the person does not read it
+(`.claude/skills/plan/SKILL.md`, **Naming a step**).
+
 **A session never answers or dismisses a raise.** That is the user's move on
 `/dev/inbox`, the same rule as never answering its own decision. A session
 that answers its own question has no questions, only guesses with a paper

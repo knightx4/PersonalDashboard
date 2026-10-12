@@ -159,6 +159,7 @@ describe('buildInspirationPage', () => {
         ['p1', 1412],
         ['p2', 99],
       ]),
+      planOutlines: new Map([['p1', '1400.12']]),
       ideaPlanItems: new Map([
         ['i1', 'p2'],
         ['i2', null],
@@ -166,8 +167,8 @@ describe('buildInspirationPage', () => {
     });
 
     expect(page.filed.map((t) => t.cover)).toEqual([
-      { kind: 'plan', number: 1412 },
-      { kind: 'plan', number: 99 },
+      { kind: 'plan', number: 1412, outline: '1400.12' },
+      { kind: 'plan', number: 99, outline: null },
       { kind: 'idea', ideaId: 'i2' },
     ]);
     expect(page.list.map((t) => t.cover)).toEqual([null]);

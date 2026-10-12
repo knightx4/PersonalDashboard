@@ -147,7 +147,7 @@ function walkRefs(node: Node, titles?: PlanRefTitles): void {
       continue;
     }
 
-    const parts = splitOnRefs(child.value);
+    const parts = splitOnRefs(child.value, titles);
     if (!parts.some((part) => part.ref !== null)) {
       out.push(child);
       continue;

@@ -58,7 +58,7 @@ function lines(text: string): string[] {
  * The files a step changed, read from git.
  *
  * Two places, joined: the commit the close records, and every commit on its
- * history whose subject ends `(plan #<n>)`. The commit a close records is
+ * history whose subject ends `(plan #<n>)` or `(plan #<outline>)`. The commit a close records is
  * usually the merge that put the step on main, and a merge lists no files of
  * its own, so a merge is read against its first parent, which is everything
  * the branch brought in. The subject search catches a step whose close
@@ -67,7 +67,13 @@ function lines(text: string): string[] {
  * Throws when git cannot read the commit: a guard that cannot see the files
  * must not wave the close through.
  */
-export function filesOfStep(step: number, commit: string, git: GitRunner): string[] {
+export function filesOfStep(
+  step: number,
+  commit: string,
+  git: GitRunner,
+  /** The step's outline ("1073.4"), which newer subjects carry instead of the number. */
+  outline?: string | null,
+): string[] {
   if (!/^[0-9a-f]{7,40}$/i.test(commit)) throw new Error(`"${commit}" is not a commit sha.`);
   const parents = lines(git(['rev-list', '--parents', '-n', '1', commit]))[0]?.split(/\s+/) ?? [];
   if (parents.length === 0) throw new Error(`git does not know commit ${commit}.`);
@@ -81,6 +87,7 @@ export function filesOfStep(step: number, commit: string, git: GitRunner): strin
     '--no-merges',
     '--fixed-strings',
     `--grep=(plan #${step})`,
+    ...(outline && outline !== String(step) ? [`--grep=(plan #${outline})`] : []),
     '--name-only',
     '--format=',
   ]);
@@ -125,6 +132,8 @@ function describe(missing: UnpassedSurface): string {
  */
 export function uiCheckRefusal(input: {
   step: number;
+  /** The step's outline ("1073.4"), which the sentence names it by when given. */
+  outline?: string | null;
   files: readonly string[];
   surfaces: readonly string[];
   checks: readonly CheckRound[];
@@ -136,7 +145,7 @@ export function uiCheckRefusal(input: {
   const first = missing[0];
   const next = (first.round ?? 0) + 1;
   return (
-    `#${input.step} changed a screen, and the design critic has not passed ` +
+    `#${input.outline || input.step} changed a screen, and the design critic has not passed ` +
     `${missing.length === 1 ? 'its surface' : `${missing.length} of its surfaces`}: ${which}. ` +
     `Run the critic on ${missing.length === 1 ? 'it' : 'each'} and record the round ` +
     `(npm run ui-check -- ${input.step} ${first.surface} ${next}), then close it once it passes. ` +

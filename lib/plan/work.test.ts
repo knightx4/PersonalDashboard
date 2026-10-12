@@ -91,6 +91,25 @@ describe('the raises a run filed', () => {
     expect(sourceNumbers(null)).toEqual([]);
   });
 
+  it('reads a source that names the step by its outline', () => {
+    const outlines = new Map([[1084, '1073.4']]);
+    expect(sourceNumbers('plan #1073.4', outlines)).toEqual([1084]);
+    expect(sourceNumbers('plan #1073.4 re-shape, and #1084', outlines)).toEqual([1084, 1084]);
+    // An outline no step has, or no index to look it up in, names nothing.
+    expect(sourceNumbers('plan #1073.9', outlines)).toEqual([]);
+    expect(sourceNumbers('plan #1073.4')).toEqual([]);
+  });
+
+  it('attributes a raise written with an outline to the run on that step', () => {
+    const filed = raisesFiledSince(
+      [raise({ id: 'new', source: 'plan #1073.4' }), raise({ id: 'old', source: 'plan #1084' })],
+      [1084],
+      FIRED,
+      new Map([[1084, '1073.4']]),
+    );
+    expect(filed.map((r) => r.id).sort()).toEqual(['new', 'old']);
+  });
+
   it('takes the ones that name one of its steps and were filed after it started', () => {
     const filed = raisesFiledSince(
       [

@@ -123,11 +123,13 @@ function describe(s: StoppedSurface, owner: string): string {
  */
 export function criticStopAsk(input: {
   owner: number | string;
+  /** A step owner's outline ("1073.4"), which the ask names it by. */
+  outline?: string | null;
   surfaces: readonly StoppedSurface[];
 }): string {
   if (input.surfaces.length === 0) throw new Error('No surface stopped: nothing to ask.');
   const owner = String(input.owner).replace(/^#/, '');
-  const label = /^\d+$/.test(owner) ? `#${owner}` : `note ${owner}`;
+  const label = /^\d+$/.test(owner) ? `#${input.outline || owner}` : `note ${owner}`;
   const which = input.surfaces.map((s) => describe(s, owner)).join('; ');
   return (
     `${STOP_ASK_OPENING}${label}'s screen: ${which}. ` +
@@ -161,6 +163,8 @@ export function isCriticStopAsk(ask: string | null | undefined): boolean {
  */
 export function criticStopBlockSql(input: {
   step: number;
+  /** The step's outline ("1073.4"), which the recorded action names it by. */
+  outline?: string | null;
   ask: string;
   note?: string;
   date: string;
@@ -171,6 +175,9 @@ export function criticStopBlockSql(input: {
     throw new Error(`"${input.userId}" is not a user id.`);
   }
   if (!Number.isInteger(input.step) || input.step < 1) throw new Error(`"${input.step}" is not a step number.`);
+  if (input.outline && !/^\d+(?:\.\d+)*$/.test(input.outline)) {
+    throw new Error(`"${input.outline}" is not an outline.`);
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) throw new Error(`"${input.date}" is not a date.`);
   const note = input.note ?? input.ask;
   if (input.ask.includes('$a$') || note.includes('$a$')) throw new Error('The ask cannot contain $a$.');
@@ -186,7 +193,7 @@ export function criticStopBlockSql(input: {
     `    comment = coalesce(comment || E'\\n\\n', '') || $a$Blocked ${input.date}: ${note}$a$`,
     `where ${match};`,
     `select core.record_dash_action(${user}, ${ref}, 'update', 'block_step',`,
-    `  $a$Dash stopped step #${input.step} after the design critic's last round and handed the screen to you.$a$);`,
+    `  $a$Dash stopped step #${input.outline || input.step} after the design critic's last round and handed the screen to you.$a$);`,
   ].join('\n');
 }
 

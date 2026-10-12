@@ -40,6 +40,12 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.14",
+    "@lezer/highlight": "^1.2.5",
     "@modelcontextprotocol/server": "^2.2.0",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.8",
