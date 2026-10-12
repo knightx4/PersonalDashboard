@@ -82,9 +82,9 @@ describe('criticStopAsk', () => {
 
   // The person cannot open branches, so the ask names none and the refusal
   // on blocks would turn it away if it did.
-  it('names no branch, and passes the block guard', () => {
+  it('names no branch, and is refused as a block: design checks are not put to the person', () => {
     expect(ask).not.toMatch(/branch/i);
-    expect(blockAskRefusal(ask, false)).toBeNull();
+    expect(blockAskRefusal(ask, false)).toContain('--settle');
   });
 
   it('puts the branch on the history line instead', () => {

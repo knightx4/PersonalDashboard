@@ -193,8 +193,8 @@ builder about ten minutes, so a round is spent only on what the person would
 see and want changed.
 
 Three rounds is the limit the spec sets. After a third failed round the
-builder stops and hands the screen to the person with your last fixes, and
-they accept it or say what to change. That is theirs and the builder's, not
+builder stops, settles the screen and closes the step with your last fixes
+in its note, where the person can overrule it. That is the builder's, not
 yours: on round 3, give the verdict exactly as on any other round and say
 nothing about what should follow it. When the person has said what to change,
 you may be sent rounds 4 to 6 with their words in the prompt; judge those the
