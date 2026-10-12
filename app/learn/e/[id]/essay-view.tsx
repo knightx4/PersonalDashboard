@@ -4,7 +4,8 @@ import { useActionState, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link';
 import { ArrowRight, ChevronLeft } from 'lucide-react';
 import { MainRail } from '@/components/patterns/main-rail';
-import { MarkdownEditor } from '@/components/learn/markdown-editor';
+import { MarkdownEditor, type MarkdownEditorHandle } from '@/components/learn/markdown-editor';
+import { PaidHint } from '@/components/ui/paid-hint';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { InlineInput } from '@/components/ui/field';
@@ -19,8 +20,16 @@ import {
   type EssayInterview,
 } from '@/lib/learn/essays/model';
 import { essayNoteBody } from '@/lib/learn/essays/note';
+import {
+  draftMarksJson,
+  yourWords,
+  YOUR_WORDS_RULE,
+  type AuthorMark,
+} from '@/lib/learn/essays/authorship';
+import type { Suggestion } from '@/lib/learn/essays/authorship-editor';
 import type { EssayVaultFailure } from '@/lib/learn/essays/vault';
 import {
+  rephraseEssaySelection,
   reloadEssayFromVault,
   saveEssayDraft,
   saveEssayToVaultAction,
@@ -68,6 +77,14 @@ function sentence(text: string): string {
   return /[.!?]$/.test(text) ? text : `${text}.`;
 }
 
+/** The draft as the saves send it: the text and who wrote which runs of it. */
+type Draft = { text: string; marks: AuthorMark[] };
+
+/** One string for a draft, so "has this been saved" is one comparison. */
+function draftKey(draft: Draft): string {
+  return `${draft.text}\u0000${JSON.stringify(draftMarksJson(draft.marks))}`;
+}
+
 function browserTimeZone(): string | null {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
@@ -89,11 +106,19 @@ function browserTimeZone(): string | null {
  * draft save never crosses a vault save. A draft save that fails says so and
  * tries again. A vault save that fails says why; once the note has changed
  * in Obsidian nothing writes to it on its own again until you reload.
+ *
+ * Who wrote which runs of the text (plan #1868) travels with it in both
+ * saves, so a change to the marks alone, such as clearing them, is saved too.
  */
-function useEssaySave(essay: Essay, initialVault: VaultState, onReloaded: (body: string) => void) {
-  const latest = useRef(essay.draftBody);
-  const saved = useRef(essay.draftBody);
-  const inVault = useRef<string | null>(essay.unsaved ? null : essay.draftBody);
+function useEssaySave(
+  essay: Essay,
+  initialVault: VaultState,
+  onReloaded: (draft: Draft, askMarks: boolean) => void,
+) {
+  const first: Draft = { text: essay.draftBody, marks: essay.marks };
+  const latest = useRef(first);
+  const saved = useRef(draftKey(first));
+  const inVault = useRef<string | null>(essay.unsaved ? null : draftKey(first));
   const blobSha = useRef(essay.blobSha);
   const halted = useRef(initialVault.kind === 'failed' && initialVault.reason === 'changed');
   const queue = useRef<Promise<void>>(Promise.resolve());
@@ -112,12 +137,12 @@ function useEssaySave(essay: Essay, initialVault: VaultState, onReloaded: (body:
   }, []);
 
   const draftTask = useCallback(async () => {
-    while (latest.current !== saved.current) {
+    while (draftKey(latest.current) !== saved.current) {
       const body = latest.current;
       setDraft({ kind: 'pending' });
       let result: Awaited<ReturnType<typeof saveEssayDraft>>;
       try {
-        result = await saveEssayDraft(essay.id, body);
+        result = await saveEssayDraft(essay.id, body.text, draftMarksJson(body.marks));
       } catch {
         result = { ok: false, error: 'The connection dropped.' };
       }
@@ -125,7 +150,7 @@ function useEssaySave(essay: Essay, initialVault: VaultState, onReloaded: (body:
         setDraft({ kind: 'failed', error: sentence(result.error) });
         return;
       }
-      saved.current = body;
+      saved.current = draftKey(body);
       setDraft({ kind: 'saved', at: result.savedAt });
     }
   }, [essay.id]);
@@ -143,21 +168,28 @@ function useEssaySave(essay: Essay, initialVault: VaultState, onReloaded: (body:
 
   const vaultTask = useCallback(async () => {
     const body = latest.current;
-    if (body === inVault.current || essayNoteBody(body) === '') {
+    const key = draftKey(body);
+    if (key === inVault.current || essayNoteBody(body.text) === '') {
       await draftTask();
       return;
     }
     setVault({ kind: 'saving' });
     let result: VaultSaveResult;
     try {
-      result = await saveEssayToVaultAction(essay.id, body, blobSha.current, browserTimeZone());
+      result = await saveEssayToVaultAction(
+        essay.id,
+        body.text,
+        draftMarksJson(body.marks),
+        blobSha.current,
+        browserTimeZone(),
+      );
     } catch {
       result = { ok: false, reason: 'error', error: 'The connection dropped, so the essay is not in your vault yet.' };
     }
     if (result.ok) {
       blobSha.current = result.blobSha;
-      inVault.current = body;
-      saved.current = body;
+      inVault.current = key;
+      saved.current = key;
       setPath(result.path);
       setDraft({ kind: 'saved', at: result.savedAt });
       setVault({ kind: 'saved', at: result.savedAt });
@@ -200,14 +232,15 @@ function useEssaySave(essay: Essay, initialVault: VaultState, onReloaded: (body:
         setReloadError(result.error);
         return;
       }
-      latest.current = result.body;
-      saved.current = result.body;
-      inVault.current = result.body;
+      const reloaded: Draft = { text: result.body, marks: result.marks };
+      latest.current = reloaded;
+      saved.current = draftKey(reloaded);
+      inVault.current = draftKey(reloaded);
       blobSha.current = result.blobSha;
       halted.current = false;
       setDraft({ kind: 'saved', at: null });
       setVault({ kind: 'idle' });
-      onReloaded(result.body);
+      onReloaded(reloaded, result.askMarks);
     });
   }, [enqueue, essay.id, onReloaded]);
 
@@ -219,7 +252,7 @@ function useEssaySave(essay: Essay, initialVault: VaultState, onReloaded: (body:
   }, [draft, flush]);
 
   const change = useCallback(
-    (doc: string) => {
+    (doc: Draft) => {
       latest.current = doc;
       setDraft((now) => (now.kind === 'failed' ? now : { kind: 'pending' }));
       setVault((now) => (now.kind === 'saved' ? { kind: 'idle' } : now));
@@ -236,10 +269,11 @@ function useEssaySave(essay: Essay, initialVault: VaultState, onReloaded: (body:
       if (document.visibilityState === 'hidden') void flush();
     };
     const leaving = (event: BeforeUnloadEvent) => {
-      if (latest.current === inVault.current) return;
+      const key = draftKey(latest.current);
+      if (key === inVault.current) return;
       void saveToVault(false);
       // Only a draft the database does not have yet is worth holding the tab for.
-      if (latest.current !== saved.current) event.preventDefault();
+      if (key !== saved.current) event.preventDefault();
     };
     document.addEventListener('visibilitychange', hidden);
     window.addEventListener('beforeunload', leaving);
@@ -370,20 +404,37 @@ function TargetForm({ id, target, onSet }: { id: string; target: number | null; 
  * the margin notes and what you studied. On a phone it follows the text, so
  * the vault note and its save are there too; focus mode is laptop only.
  *
- * `initialVault` and `briefOpen` are for the gallery, which draws a save
- * that stopped and the brief unfolded.
+ * Select some text and Rephrase asks Dash for one rewording of it (rung 4,
+ * plan #1868), shown struck through and replaced, with Accept and Reject.
+ * Accepted text is marked as Dash's, and the rail says what share of the
+ * words are yours.
+ *
+ * `initialVault`, `briefOpen`, `initialSuggestion` and `initialAskMarks` are
+ * for the gallery, which draws a save that stopped, the brief unfolded, a
+ * suggestion waiting and the question after a reload.
  */
 export function EssayView({
   essay,
   initialVault = { kind: 'idle' },
   briefOpen = false,
+  initialSuggestion = null,
+  initialAskMarks = false,
 }: {
   essay: Essay;
   initialVault?: VaultState;
   briefOpen?: boolean;
+  initialSuggestion?: Suggestion | null;
+  initialAskMarks?: boolean;
 }) {
-  const [doc, setDoc] = useState({ text: essay.draftBody, version: 0 });
+  const [doc, setDoc] = useState({ text: essay.draftBody, marks: essay.marks, version: 0 });
   const [words, setWords] = useState(() => countWords(essay.draftBody));
+  const [share, setShare] = useState(() => yourWords(essay.draftBody, essay.marks).percent);
+  const [askMarks, setAskMarks] = useState(initialAskMarks);
+  const [selected, setSelected] = useState(false);
+  const [rephrase, setRephrase] = useState<{ kind: 'idle' } | { kind: 'asking' } | { kind: 'failed'; error: string }>({
+    kind: 'idle',
+  });
+  const editor = useRef<MarkdownEditorHandle>(null);
   const [title, setTitle] = useState(() => essayTitle(essay.draftBody, essay.path));
   const [target, setTarget] = useState(essay.wordTarget);
   const [typing, setTyping] = useState(false);
@@ -398,10 +449,12 @@ export function EssayView({
 
   // A reload puts the vault's version in a fresh editor.
   const onReloaded = useCallback(
-    (body: string) => {
-      setDoc((now) => ({ text: body, version: now.version + 1 }));
-      setWords(countWords(body));
-      setTitle(essayTitle(body, essay.path));
+    (next: Draft, ask: boolean) => {
+      setDoc((now) => ({ text: next.text, marks: next.marks, version: now.version + 1 }));
+      setWords(countWords(next.text));
+      setShare(yourWords(next.text, next.marks).percent);
+      setTitle(essayTitle(next.text, essay.path));
+      setAskMarks(ask);
     },
     [essay.path],
   );
@@ -412,13 +465,48 @@ export function EssayView({
   );
 
   const onChange = useCallback(
-    (text: string) => {
+    (text: string, marks: AuthorMark[]) => {
       setWords(countWords(text));
+      setShare(yourWords(text, marks).percent);
       setTitle(essayTitle(text, essay.path));
-      change(text);
+      change({ text, marks });
     },
     [change, essay.path],
   );
+  const onSelect = useCallback((on: boolean) => {
+    setSelected(on);
+    if (on) setRephrase((now) => (now.kind === 'failed' ? { kind: 'idle' } : now));
+  }, []);
+
+  const askRephrase = useCallback(async () => {
+    const selection = editor.current?.selection();
+    if (!selection) return;
+    setRephrase({ kind: 'asking' });
+    let result: Awaited<ReturnType<typeof rephraseEssaySelection>>;
+    try {
+      result = await rephraseEssaySelection(essay.id, selection.doc, selection.from, selection.to);
+    } catch {
+      result = { ok: false, error: 'The connection dropped. Try again in a moment.' };
+    }
+    if (!result.ok) {
+      setRephrase({ kind: 'failed', error: result.error });
+      return;
+    }
+    const shown = editor.current?.suggest(
+      { from: result.from, to: result.to, text: result.text, name: result.name },
+      result.original,
+    );
+    setRephrase(
+      shown
+        ? { kind: 'idle' }
+        : { kind: 'failed', error: 'That text changed while Dash was rewording it. Select it again and ask again.' },
+    );
+  }, [essay.id]);
+
+  const clearMarks = useCallback(() => {
+    editor.current?.setMarks([]);
+    setAskMarks(false);
+  }, []);
   const onTyping = useCallback(() => setTyping(true), []);
   const onSaveNow = useCallback(() => void saveToVault(true), [saveToVault]);
 
@@ -456,17 +544,50 @@ export function EssayView({
           <ChevronLeft className="size-4" strokeWidth={2} aria-hidden />
           Essays
         </Link>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          aria-pressed={focusMode}
-          onClick={() => setFocusMode((on) => !on)}
-          className="hidden lg:inline-flex"
-        >
-          {focusMode ? 'Focus on' : 'Focus'}
-        </Button>
+        <div className="flex items-center gap-1">
+          <PaidHint action="app/learn/e/[id]/actions.ts#rephraseEssaySelection" what="Cost of a rephrase" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={!selected || rephrase.kind === 'asking'}
+            pending={rephrase.kind === 'asking'}
+            // Keeps the editor's selection showing while the button is pressed.
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => void askRephrase()}
+            title={selected ? undefined : 'Select some text to have Dash reword it'}
+          >
+            {rephrase.kind === 'asking' ? 'Rephrasing…' : 'Rephrase'}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-pressed={focusMode}
+            onClick={() => setFocusMode((on) => !on)}
+            className="hidden lg:inline-flex"
+          >
+            {focusMode ? 'Focus on' : 'Focus'}
+          </Button>
+        </div>
       </div>
+      {askMarks && (
+        <Card padding="standard" role="alert" className="mb-3 flex flex-col items-start gap-3">
+          <p className="text-ui text-ink">
+            This note was edited outside Dash after the marks saying who wrote what were saved, so they may not
+            line up any more. Keep them, moved to where the same words are now, or clear them and count every
+            word as yours.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="secondary" onClick={() => setAskMarks(false)}>
+              Keep the marks
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={clearMarks}>
+              Clear the marks
+            </Button>
+          </div>
+        </Card>
+      )}
       {asking ? (
         <EssayInterviewCard essayId={essay.id} interview={asking} onChange={onBrief} />
       ) : (
@@ -481,7 +602,10 @@ export function EssayView({
       <Card padding="standard">
         <MarkdownEditor
           key={doc.version}
+          handle={editor}
           initialDoc={doc.text}
+          initialMarks={doc.marks}
+          initialSuggestion={doc.version === 0 ? initialSuggestion : null}
           label={`Essay: ${title}`}
           placeholder="Start with a title, like # Why money is the odd good out"
           focusMode={focusMode}
@@ -489,8 +613,14 @@ export function EssayView({
           onChange={onChange}
           onTyping={onTyping}
           onSaveNow={onSaveNow}
+          onSelect={onSelect}
         />
       </Card>
+      {rephrase.kind === 'failed' && (
+        <p role="alert" className="mt-2 px-1 text-small text-danger">
+          {rephrase.error}
+        </p>
+      )}
       <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-1 text-small text-ink-muted">
         <span className="tabular-nums">{countLabel}</span>
         <span role="status" className={cn(draft.kind === 'failed' && 'text-danger')}>
@@ -509,6 +639,12 @@ export function EssayView({
             <Meter value={Math.min(words, target)} max={target} label={countLabel} className="mb-3" />
           )}
           <TargetForm id={essay.id} target={target} onSet={setTarget} />
+          {/* One row like Target; the counting rule is on the figure, for a pointer and a screen reader. */}
+          <p className="mt-2 flex items-center justify-between gap-3 text-ui text-ink" title={YOUR_WORDS_RULE}>
+            <span>Your words</span>
+            <span className="tabular-nums">{share === null ? 'None yet' : `${share}%`}</span>
+            <span className="sr-only">{YOUR_WORDS_RULE}</span>
+          </p>
         </CardSection>
         <CardSection title="Vault">
           <p className="text-ui text-ink [overflow-wrap:anywhere]">

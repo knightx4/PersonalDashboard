@@ -293,6 +293,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-essays-empty': ['/learn/essays'],
   'learn-essay': ['/learn/e/[id]'],
   'learn-essay-changed': ['/learn/e/[id]'],
+  'learn-essay-rephrase': ['/learn/e/[id]'],
+  'learn-essay-marks': ['/learn/e/[id]'],
   'learn-essay-brief': ['/learn/e/[id]'],
   'learn-essay-interview': ['/learn/e/[id]'],
   'learn-essay-interview-later': ['/learn/e/[id]'],

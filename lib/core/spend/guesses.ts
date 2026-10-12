@@ -212,6 +212,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The interview's rules, the brief so far and the kind of question in; one
   // sentence out.
   'word-essay-question': run(SONNET, 900, 60),
+  // The rules, up to 1,800 characters of essay around the selection and the
+  // selection in; its rewording out.
+  'rephrase-essay-selection': run(SONNET, 1_200, 250),
   // One Wikipedia section in, a card for each of up to three ideas out.
   'write-asked-card': run(SONNET, 4_000, 2_000),
   // One idea's claim and basis and what was written in; the marks and a

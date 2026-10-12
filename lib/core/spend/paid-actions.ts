@@ -46,6 +46,8 @@ export const PAID_ACTIONS = {
   'app/learn/know/actions.ts#approveFromCourse': ['place-track'],
   // Learn: an essay's interview, one question per answer (plan #1867)
   'app/learn/e/[id]/actions.ts#answerEssayInterview': ['word-essay-question'],
+  // Learn: Rephrase on a selection in an essay (plan #1868)
+  'app/learn/e/[id]/actions.ts#rephraseEssaySelection': ['rephrase-essay-selection'],
   // Saving a personality result has Dash read it against your notes once the
   // page has answered (plan #1635); the button under the read asks again.
   'app/learn/know/personality/actions.ts#saveBigFiveAction': ['read-personality', 'embed-note-match'],

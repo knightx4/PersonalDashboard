@@ -9,6 +9,7 @@ import {
   type EssayPin,
   type EssaySummary,
 } from './model';
+import { draftMarksJson, readDraftMarks, type AuthorMark } from './authorship';
 import { newEssayBrief } from './interview';
 import type { EssayVaultPatch, VaultEssay } from './vault';
 
@@ -62,18 +63,20 @@ export async function createEssay(
 }
 
 /**
- * The draft as last typed. It is now ahead of the vault note, so `unsaved`
- * goes true; the vault save clears it.
+ * The draft as last typed, with who wrote which runs of it (plan #1868). It
+ * is now ahead of the vault note, so `unsaved` goes true; the vault save
+ * clears it.
  */
 export async function saveDraft(
   supabase: LearnSupabaseClient,
   id: string,
   body: string,
+  marks: readonly AuthorMark[],
 ): Promise<{ updatedAt: string }> {
   const updatedAt = new Date().toISOString();
   const { data, error } = await supabase
     .from('essays')
-    .update({ draft_body: body, unsaved: true, updated_at: updatedAt })
+    .update({ draft_body: body, draft_authorship: draftMarksJson(marks), unsaved: true, updated_at: updatedAt })
     .eq('id', id)
     .select('id')
     .maybeSingle();
@@ -125,7 +128,7 @@ export async function saveWordTarget(
 export async function loadVaultEssay(supabase: LearnSupabaseClient, id: string): Promise<VaultEssay | null> {
   const { data, error } = await supabase
     .from('essays')
-    .select('id, path, note_id, blob_sha, slug, brief')
+    .select('id, path, note_id, blob_sha, slug, brief, draft_body, draft_authorship')
     .eq('id', id)
     .maybeSingle();
   if (error) throw new Error(`Could not read the essay: ${error.message}`);
@@ -137,8 +140,20 @@ export async function loadVaultEssay(supabase: LearnSupabaseClient, id: string):
     blob_sha: string | null;
     slug: string | null;
     brief: unknown;
+    draft_body: string | null;
+    draft_authorship: unknown;
   };
-  return { id: row.id, path: row.path, noteId: row.note_id, blobSha: row.blob_sha, slug: row.slug, brief: row.brief };
+  const draftBody = row.draft_body ?? '';
+  return {
+    id: row.id,
+    path: row.path,
+    noteId: row.note_id,
+    blobSha: row.blob_sha,
+    slug: row.slug,
+    brief: row.brief,
+    draftBody,
+    marks: readDraftMarks(row.draft_authorship, draftBody.length),
+  };
 }
 
 /** The slugs the person's other essays hold. */
@@ -165,6 +180,8 @@ export async function recordEssayNote(
       blob_sha: patch.blobSha,
       slug: patch.slug,
       draft_body: patch.draftBody,
+      draft_authorship: draftMarksJson(patch.draftMarks),
+      authorship: patch.authorship,
       unsaved: false,
       updated_at: new Date().toISOString(),
     })
@@ -175,12 +192,12 @@ export async function recordEssayNote(
 /**
  * Take the vault's version of the note as the draft, after a save stopped
  * because the note changed in Obsidian. The editor holds the body only, so
- * that is what goes in.
+ * that is what goes in, with the marks its authorship block gave it.
  */
 export async function adoptNoteVersion(
   supabase: LearnSupabaseClient,
   id: string,
-  note: { path: string; body: string; blobSha: string },
+  note: { path: string; body: string; blobSha: string; marks: readonly AuthorMark[] },
 ): Promise<void> {
   const { error } = await supabase
     .from('essays')
@@ -188,6 +205,7 @@ export async function adoptNoteVersion(
       path: note.path,
       blob_sha: note.blobSha,
       draft_body: note.body,
+      draft_authorship: draftMarksJson(note.marks),
       unsaved: false,
       updated_at: new Date().toISOString(),
     })

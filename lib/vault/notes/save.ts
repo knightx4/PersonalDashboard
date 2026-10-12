@@ -169,6 +169,9 @@ export async function saveNote(
     if (text === null) {
       return failed('error', `Could not separate the frontmatter of ${note.path} from its body.`);
     }
+    // The stored body can differ from the editor's while the file does not:
+    // an essay's authorship block is in the file but not in the editor.
+    if (text === raw) return { ok: true, blobSha: note.blobSha, commitSha: null };
     const sizeBytes = new TextEncoder().encode(text).byteLength;
     if (sizeBytes > MAX_NOTE_BYTES) {
       return failed('too-large', `${note.path} would be ${sizeBytes} bytes.`);

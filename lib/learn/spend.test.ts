@@ -128,6 +128,7 @@ describe('the operation names', () => {
       'match-subjects',
       'embed-idea',
       'word-essay-question',
+      'rephrase-essay-selection',
     ]);
   });
 });

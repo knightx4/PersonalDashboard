@@ -7,6 +7,8 @@
  * in the gallery from fixtures.
  */
 
+import { readDraftMarks, type AuthorMark } from './authorship';
+
 /**
  * The brief, in the person's own words (spec, "Starting an essay"): the five
  * answers the interview asks for (plan #1867), and what they pinned to it.
@@ -53,6 +55,8 @@ export type Essay = {
   /** The note's blob SHA when the editor opened it; the next vault save starts from it. */
   blobSha: string | null;
   draftBody: string;
+  /** The runs of the draft that are Dash's or quoted (plan #1868); the rest is the person's. */
+  marks: AuthorMark[];
   /** True while the draft is ahead of the vault note. */
   unsaved: boolean;
   brief: EssayBrief;
@@ -77,7 +81,7 @@ export type EssaySummary = {
 
 /** The columns both reads select. */
 export const ESSAY_COLUMNS =
-  'id, path, note_id, blob_sha, draft_body, unsaved, brief, word_target, published_at, updated_at';
+  'id, path, note_id, blob_sha, draft_body, draft_authorship, unsaved, brief, word_target, published_at, updated_at';
 
 export type EssayRow = {
   id: string;
@@ -85,6 +89,7 @@ export type EssayRow = {
   note_id?: string | null;
   blob_sha?: string | null;
   draft_body: string | null;
+  draft_authorship?: unknown;
   unsaved: boolean | null;
   brief: unknown;
   word_target: number | null;
@@ -152,6 +157,7 @@ export function toEssay(row: EssayRow): Essay {
     noteId: row.note_id ?? null,
     blobSha: row.blob_sha ?? null,
     draftBody: row.draft_body ?? '',
+    marks: readDraftMarks(row.draft_authorship, (row.draft_body ?? '').length),
     unsaved: row.unsaved ?? false,
     brief: readBrief(row.brief),
     interview: readInterview(row.brief),

@@ -130,6 +130,8 @@ import {
 import {
   LearnEssayBriefSurface,
   LearnEssayChangedSurface,
+  LearnEssayMarksSurface,
+  LearnEssayRephraseSurface,
   LearnEssayInterviewLaterSurface,
   LearnEssayInterviewSurface,
   LearnEssaySurface,
@@ -6049,6 +6051,20 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <LearnEssaySurface />,
+  },
+  {
+    id: 'learn-essay-rephrase',
+    label: 'Essay · Rephrase waiting to be accepted',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayRephraseSurface />,
+  },
+  {
+    id: 'learn-essay-marks',
+    label: 'Essay · Keep or clear the marks after an edit elsewhere',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnEssayMarksSurface />,
   },
   {
     id: 'learn-essay-changed',

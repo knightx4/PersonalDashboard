@@ -8,8 +8,13 @@
  * saves only `title` and `updated` are rewritten, so a tag or a confidence
  * the person set in Obsidian is kept byte for byte.
  *
+ * The note ends with the authorship block (plan #1868), built here from the
+ * draft's marks each time the file is written; see authorship.ts.
+ *
  * Pure: no database and no repository, so all of it is tested.
  */
+
+import { authorshipBlock, shiftMarks, type AuthorMark } from './authorship';
 
 /** The vault folder new essays are written into. */
 export const ESSAYS_FOLDER = 'Essays';
@@ -116,9 +121,50 @@ export function essayNoteBody(draft: string): string {
   return trimmed ? `${trimmed}\n` : '';
 }
 
-/** The whole file for a new essay note: frontmatter, a blank line, the body. */
-export function essayNoteText(fm: EssayFrontmatter, draft: string): string {
-  return `${buildEssayFrontmatter(fm)}\n${essayNoteBody(draft)}`;
+/**
+ * Who wrote what, for the block at the end of the note: the draft's marks,
+ * as UTF-16 ranges of `essayNoteBody(draft)` (see `noteBodyMarks`), and the
+ * name the person's line takes.
+ */
+export type EssayAuthorship = { marks: readonly AuthorMark[]; self: string };
+
+/**
+ * The draft's marks moved onto the body as it is written: the leading blank
+ * lines `essayNoteBody` drops are taken off, and the trailing space it trims
+ * cut. The editor's text has no CRs, so the offsets are LF offsets.
+ */
+export function noteBodyMarks(draft: string, marks: readonly AuthorMark[]): AuthorMark[] {
+  const lf = draft.replace(/\r\n/g, '\n');
+  const lead = lf.length - lf.replace(/^\s*\n/, '').length;
+  const body = essayNoteBody(draft).replace(/\n$/, '');
+  return shiftMarks(marks, -lead, body.length);
+}
+
+/**
+ * The file from its frontmatter block (LF) and its body, with the
+ * authorship block after a blank line. `marks` are ranges of the body. The
+ * block is built on the LF text and the file then given `eol`: a CRLF is one
+ * grapheme, as an LF is, so the offsets hold, and the hash is taken of the
+ * text as it is written.
+ */
+function withAuthorship(head: string, body: string, authorship: EssayAuthorship, eol: string): string {
+  const text = `${head}${body.replace(/\n+$/, '')}`;
+  const marks = shiftMarks(authorship.marks, head.length, text.length);
+  const written = eol === '\n' ? text : text.replace(/\n/g, eol);
+  const { block } = authorshipBlock(text, marks, { self: authorship.self, hashText: written });
+  return `${written}${eol}${eol}${eol === '\n' ? block : block.replace(/\n/g, eol)}${eol}`;
+}
+
+/**
+ * The whole file for a new essay note: frontmatter, a blank line, the body,
+ * and with `authorship` the block saying who wrote what. `authorship.marks`
+ * are ranges of the draft.
+ */
+export function essayNoteText(fm: EssayFrontmatter, draft: string, authorship?: EssayAuthorship): string {
+  const head = `${buildEssayFrontmatter(fm)}\n`;
+  const body = essayNoteBody(draft);
+  if (!authorship || !body) return `${head}${body}`;
+  return withAuthorship(head, body, { ...authorship, marks: noteBodyMarks(draft, authorship.marks) }, '\n');
 }
 
 /** A frontmatter block at the very start of a file, with its closing line. */
@@ -126,18 +172,28 @@ const BLOCK = /^---\r?\n([\s\S]*?\r?\n)?---[ \t]*(?:\r?\n|$)/;
 
 /**
  * The file with `title` and `updated` rewritten in its frontmatter and its
- * body replaced. Every other line of the frontmatter is kept as it was. A
+ * body replaced; without `updated` the date the file has is kept. Every other line of the frontmatter is kept as it was. A
  * file with no frontmatter (someone removed it in Obsidian) gets a fresh
  * block from `fresh`, so the note is still found as an essay.
+ *
+ * With `authorship` the old authorship block, which went with the old body,
+ * is replaced by one for the new body. Its marks are ranges of
+ * `essayNoteBody(body)`: `noteBodyMarks` of the draft.
  */
 export function rewriteEssayFile(
   raw: string,
   body: string,
-  change: { title: string; updated: string },
+  change: { title: string; updated?: string },
   fresh: EssayFrontmatter,
+  authorship?: EssayAuthorship,
 ): string {
   const match = raw.match(BLOCK);
-  if (!match) return essayNoteText({ ...fresh, title: change.title, updated: change.updated }, body);
+  if (!match) {
+    const fm = { ...fresh, title: change.title, updated: change.updated ?? fresh.updated };
+    const written = essayNoteBody(body);
+    if (!authorship || !written) return essayNoteText(fm, body);
+    return withAuthorship(`${buildEssayFrontmatter(fm)}\n`, written, authorship, '\n');
+  }
 
   const eol = raw.includes('\r\n') ? '\r\n' : '\n';
   const inner = (match[1] ?? '').replace(/\r?\n$/, '');
@@ -149,9 +205,13 @@ export function rewriteEssayFile(
     else lines.push(line);
   };
   set('title', quoted(change.title));
-  set('updated', change.updated);
+  if (change.updated) set('updated', change.updated);
 
-  const text = `---${eol}${lines.join(eol)}${eol}---${eol}${eol}${essayNoteBody(body)}`;
+  const written = essayNoteBody(body);
+  if (authorship && written) {
+    return withAuthorship(`---\n${lines.join('\n')}\n---\n\n`, written, authorship, eol);
+  }
+  const text = `---${eol}${lines.join(eol)}${eol}---${eol}${eol}${written}`;
   return eol === '\r\n' ? text.replace(/\r?\n/g, '\r\n') : text;
 }
 
