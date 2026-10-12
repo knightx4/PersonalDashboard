@@ -1,5 +1,6 @@
 import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { formatDay } from '@/lib/goals/dates';
+import { formatDue } from '@/lib/goals/due-precision';
 import { lastActiveWords, paceHint, paceWords, type GoalPace } from '@/lib/goals/pace';
 import { VERDICT_LABELS, type GoalReview } from '@/lib/goals/reviews';
 import type { GoalProgress } from '@/lib/goals/status';
@@ -34,7 +35,7 @@ export function goalLine(
 }
 
 type Props = {
-  goal: Pick<Goal, 'areaId' | 'status' | 'dueOn' | 'createdAt' | 'closedAt' | 'errand'>;
+  goal: Pick<Goal, 'areaId' | 'status' | 'dueOn' | 'duePrecision' | 'createdAt' | 'closedAt' | 'errand'>;
   areaName: string;
   review: GoalReview | null;
   progress: Pick<GoalProgress, 'live' | 'done' | 'bands'>;
@@ -147,7 +148,7 @@ export function GoalProperties({ goal, areaName, review, progress, timeZone, pac
       {/* Plain text, as the feature page's Module is: the path above the
           title already goes to the area. */}
       <Property label="Area" value={areaName} />
-      {goal.dueOn && <Property label="Due" value={formatDay(goal.dueOn, true)} />}
+      {goal.dueOn && <Property label="Due" value={formatDue(goal.dueOn, goal.duePrecision)} />}
       {closed && (
         <Property label={goal.status === 'dropped' ? 'Dropped' : 'Finished'} value={closed} />
       )}
