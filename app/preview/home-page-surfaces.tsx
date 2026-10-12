@@ -16,6 +16,8 @@ import type { Brief } from '@/lib/shell/brief';
 import type { ModuleId } from '@/lib/modules';
 import { WatchingSurface } from './watching-surfaces';
 import { DashTodaySurface } from './dash-today-surfaces';
+import { DoneTodayCard } from '@/app/home/done-today';
+import { DONE_TODAY } from './log-done-surfaces';
 
 /**
  * Home as a whole page (plan #1627), inside the shell, so the critic sees the
@@ -154,6 +156,7 @@ export function HomePageSurface() {
                 { key: 'd5', overdue: false, title: 'Pay Sam back for the concert tickets', href: '/todo' },
               ]}
             />
+            <DoneTodayCard done={DONE_TODAY} logging />
             <UpdatesCard updates={UPDATES} now={NOW} timezone={TZ} />
           </>
         }

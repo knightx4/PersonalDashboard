@@ -22,6 +22,11 @@ import { loadAgenda, type Agenda } from '@/lib/todo/agenda/load';
 import { todaySlice } from '@/lib/todo/agenda/today';
 import { dayClosed, doneToday, type DoneTodayTask } from '@/lib/todo/agenda/day-close';
 import { loadDoneSinceMidnight } from '@/lib/todo/tasks/load';
+import type { Task } from '@/lib/todo/tasks/model';
+import { wallClockToInstant } from '@/lib/todo/time';
+import { createGoalsClient } from '@/lib/goals/auth/server';
+import { doneTodayList, type DoneTodayList } from '@/lib/goals/done-today';
+import { loadGoalsDoneToday } from '@/lib/goals/done-today-store';
 import {
   firstToday,
   HOME_ARRIVED_COOKIE,
@@ -67,6 +72,7 @@ import {
 import { loadDashToday, type DashTodayGroup } from '@/lib/shell/dash-today';
 import { DashTodaySection } from './dash-today';
 import { undoDashToday } from './actions';
+import { DoneTodayCard } from './done-today';
 
 export const metadata = { title: 'Home' };
 
@@ -167,14 +173,31 @@ export default async function HomePage({
   const agenda = loadAgenda(user.id).catch(() => null);
   // What was finished today, for the day's sigil beside the date (plan
   // #1558): the same rule the agenda closes the day by.
-  const done: Promise<DoneTodayTask[]> = on('todo')
-    ? safe(
-        loadDoneSinceMidnight(user.id, settings.timezone, now).then((tasks) =>
-          doneToday(tasks, settings.timezone, now),
-        ),
-        [],
-      )
+  const tasksDone: Promise<Task[]> = on('todo')
+    ? safe(loadDoneSinceMidnight(user.id, settings.timezone, now), [])
     : Promise.resolve([]);
+  const done: Promise<DoneTodayTask[]> = tasksDone.then((tasks) =>
+    doneToday(tasks, settings.timezone, now),
+  );
+  // Done today (plan #1740): every task ticked since midnight, and the goal
+  // steps closed and progress logged since then.
+  const since = wallClockToInstant(today, '00:00', settings.timezone);
+  const goalsDone = on('goals')
+    ? safe(
+        createGoalsClient().then((goals) => loadGoalsDoneToday(goals, user.id, since)),
+        { steps: [], progress: [] },
+      )
+    : Promise.resolve({ steps: [], progress: [] });
+  const doneList: Promise<DoneTodayList> = Promise.all([tasksDone, goalsDone]).then(
+    ([tasks, goals]) =>
+      doneTodayList(
+        tasks.flatMap((task) =>
+          task.completedAt ? [{ id: task.id, title: task.title, completedAt: task.completedAt }] : [],
+        ),
+        goals.steps,
+        goals.progress,
+      ),
+  );
 
   // Each brief already swallows its own failures; the review counts feed two
   // of them and are guarded here for the same reason.
@@ -350,6 +373,10 @@ export default async function HomePage({
 
               <Suspense fallback={<SectionSkeleton rows={3} className="mt-4" />}>
                 <TodaySection agenda={agenda} timezone={settings.timezone} />
+              </Suspense>
+
+              <Suspense fallback={null}>
+                <DoneTodaySection done={doneList} logging={on('goals')} />
               </Suspense>
 
               <Suspense fallback={<SectionSkeleton rows={4} className="mt-4" />}>
@@ -544,6 +571,23 @@ async function ObservationsSection({
  * Nothing at all when there is nothing at all -- no "0 things due", no empty
  * card.
  */
+/**
+ * What was done today and the box to log more (plan #1740). Absent when
+ * Goals is off and nothing was done, since there is then nothing to show and
+ * nowhere to write.
+ */
+async function DoneTodaySection({
+  done,
+  logging,
+}: {
+  done: Promise<DoneTodayList>;
+  logging: boolean;
+}) {
+  const list = await done;
+  if (!logging && list.lines.length === 0) return null;
+  return <DoneTodayCard done={list} logging={logging} />;
+}
+
 async function TodaySection({
   agenda,
   timezone,
