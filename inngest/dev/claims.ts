@@ -262,7 +262,13 @@ export async function releaseStaleClaims(
 
   // A claim whose run writes lines is held by them and never by the clock
   // (plan #1825). Asked before GitHub, which only the rest need.
-  const held = await claimsHeldByLines(supabase, expired);
+  // A read that throws holds nothing, the same as one that errors.
+  const held = await claimsHeldByLines(supabase, expired).catch((err: unknown) => {
+    console.error(
+      `the lines behind the stale claims could not be read: ${err instanceof Error ? err.message : 'failed'}`,
+    );
+    return new Set<string>();
+  });
   const condemned = expired.filter(({ row }) => !held.has(row.id));
 
   // Asked once, for the whole condemned set, before anything is written.
