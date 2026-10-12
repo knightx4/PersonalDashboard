@@ -7,6 +7,7 @@
  * are in lib/goals/store.ts.
  */
 
+import type { DuePrecision } from '@/lib/goals/due-precision';
 import type { HelpKindChoice } from '@/lib/goals/help-kinds';
 
 /** The limits the table's checks set (supabase/migrations-goals/0001). */
@@ -56,6 +57,11 @@ export type Goal = {
   target: number | null;
   /** When the goal is due, YYYY-MM-DD, or null (plan #1025). Read on the goal page only. */
   dueOn?: string | null;
+  /**
+   * What dueOn is the end of: a day, month, quarter, half or year (plan #1839).
+   * Anything but a day means dueOn is that period's last day.
+   */
+  duePrecision?: DuePrecision;
   /**
    * Whether it is an errand: a one-off job with a date it is due by, which Dash
    * maps short (plan #1261). An errand always has a dueOn; the database refuses
@@ -154,6 +160,8 @@ export type GoalFields = {
   errand?: boolean;
   /** The date it is due by, YYYY-MM-DD, or null to clear it. An errand needs one. */
   dueOn?: string | null;
+  /** What the date is the end of; a date other than a day must be its period's last day. */
+  duePrecision?: DuePrecision;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
