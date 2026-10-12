@@ -2,6 +2,7 @@ import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { GOALS_SCHEMA, type GoalsSupabaseClient } from '@/lib/goals/db/schema-name';
+import { toDuePrecision } from '@/lib/goals/due-precision';
 import {
   nextPosition,
   reorder,
@@ -34,7 +35,9 @@ type GoalRow = {
   unit: string | null;
   target: number | string | null;
   due_on: string | null;
+  due_precision?: string | null;
   errand: boolean;
+  focus?: boolean;
   archived_at?: string | null;
 };
 
@@ -57,7 +60,9 @@ const toGoal = (row: GoalRow): Goal => ({
   unit: row.unit,
   target: row.target === null ? null : Number(row.target),
   dueOn: row.due_on,
+  duePrecision: toDuePrecision(row.due_precision),
   errand: row.errand,
+  focus: row.focus ?? false,
   archivedAt: row.archived_at ?? null,
 });
 
@@ -84,7 +89,7 @@ export async function loadGoals(
 ): Promise<Goal[]> {
   let query = client
     .from('items')
-    .select('id, area_id, title, acceptance, fog, status, position, unit, target, due_on, errand, archived_at')
+    .select('id, area_id, title, acceptance, fog, status, position, unit, target, due_on, due_precision, errand, focus, archived_at')
     .eq('level', 'goal');
   if (!archived) query = query.is('archived_at', null);
   const { data, error } = await query.order('position').order('created_at');
@@ -111,19 +116,25 @@ async function writeOrder(
   if (failed?.error) throw new Error(failed.error.message);
 }
 
+/** A new area at the end of yours, and its id. */
 export async function insertArea(
   client: GoalsSupabaseClient,
   userId: string,
   name: string,
-): Promise<void> {
+): Promise<string> {
   const { data: rows, error: readError } = await client
     .from('areas')
     .select('position')
     .is('archived_at', null);
   if (readError) throw new Error(readError.message);
   const position = nextPosition((rows ?? []).map((row) => row.position as number));
-  const { error } = await client.from('areas').insert({ user_id: userId, name, position });
+  const { data, error } = await client
+    .from('areas')
+    .insert({ user_id: userId, name, position })
+    .select('id')
+    .single();
   if (error) throw new Error(error.message);
+  return data.id as string;
 }
 
 /** False when no live area has that id. */
@@ -265,6 +276,7 @@ export async function insertGoal(
       detail: fields.detail ?? null,
       errand: fields.errand ?? false,
       due_on: fields.dueOn ?? null,
+      due_precision: fields.duePrecision ?? 'day',
       position: nextPosition((rows ?? []).map((row) => row.position as number)),
     })
     .select('id')
@@ -284,12 +296,17 @@ export async function updateGoal(
   id: string,
   fields: GoalFields,
 ): Promise<boolean> {
-  const { areaId, errand, dueOn, ...rest } = fields;
+  const { areaId, errand, dueOn, duePrecision, ...rest } = fields;
   const change: Record<string, unknown> = { ...rest };
   // An errand and its date go in one write, so the check that an errand has a
   // due date (goals 0061) sees both at once.
   if (errand !== undefined) change.errand = errand;
   if (dueOn !== undefined) change.due_on = dueOn;
+  // The precision goes with the date: the database holds a month, quarter,
+  // half or year date to being its period's last day (goals 0072). Clearing
+  // the date puts the precision back to a day.
+  if (duePrecision !== undefined) change.due_precision = duePrecision;
+  else if (dueOn === null) change.due_precision = 'day';
 
   if (areaId !== undefined) {
     const { data: area, error: areaError } = await client

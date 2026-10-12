@@ -265,7 +265,7 @@ describe('add_goal_step', () => {
     const insert = tables['goals.history'].find((h) => h.row_id === steps[0].id && h.action === 'insert');
     expect(insert?.actor).toBe('claude');
     expect(confirmed.ok && confirmed.change).toMatchObject({ writtenTable: 'goals.items', writtenRef: steps[0].id });
-    expect(confirmed.ok && changeHref(confirmed.change)).toBe(`/goals/${GOAL}#step-${steps[0].id}`);
+    expect(confirmed.ok && changeHref(confirmed.change)).toBe(`/goals/${GOAL}/s/${steps[0].id}`);
 
     const undone = await undoChange(deps, change.id as string);
     expect(undone.ok && undone.change.status).toBe('undone');

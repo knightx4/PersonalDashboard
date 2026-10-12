@@ -49,6 +49,16 @@ import { MOTION_MS } from '@/lib/motion';
  * which it is and the mark still reads under reduced motion, when nothing
  * moves. The motion is the dash-mark-* utilities in app/globals.css, all of
  * them switched off in the reduced-motion block.
+ *
+ * A look puts a hat on the visor, so several Dashes side by side can be told
+ * apart: the runner card's four slots wear a top hat, a ball cap, a cowboy hat
+ * and a newsboy cap (plan #1701). The hat is drawn in currentColor whatever
+ * the tone, so on the brand ramp it stands out from the visor as ink. It sits
+ * in the visor's group, so it leans with it while working and breathes with it
+ * asleep, when every hat but the ball cap tips over a little and slips with
+ * each breath (dash-mark-tip). Done and failed have the flag above the visor
+ * where the hat would go, so they draw without one. Without a look the mark
+ * draws exactly as it always has.
  */
 
 export type DashState = 'idle' | 'asleep' | 'working' | 'done' | 'failed';
@@ -59,6 +69,20 @@ export const DASH_STATES: readonly DashState[] = ['idle', 'asleep', 'working', '
 export type DashActivity = 'reading' | 'searching' | 'writing' | 'thinking';
 
 export const DASH_ACTIVITIES: readonly DashActivity[] = ['reading', 'searching', 'writing', 'thinking'];
+
+/** A hat that tells one Dash from another. Without one, Dash is bareheaded. */
+export type DashLook = 'top-hat' | 'ball-cap' | 'cowboy-hat' | 'newsboy-cap';
+
+/** In the runner card's order: Feature 1, Feature 2, Feature 3, Goals. */
+export const DASH_LOOKS: readonly DashLook[] = ['top-hat', 'ball-cap', 'cowboy-hat', 'newsboy-cap'];
+
+/** Each look's name, as a sentence would say it. */
+export const DASH_LOOK_NAMES: Record<DashLook, string> = {
+  'top-hat': 'top hat',
+  'ball-cap': 'ball cap',
+  'cowboy-hat': 'cowboy hat',
+  'newsboy-cap': 'newsboy cap',
+};
 
 /** currentColor takes the colour of the place; brand wears the app icon's ramp. */
 export type DashTone = 'current' | 'brand';
@@ -219,11 +243,111 @@ const Pole = ({ paint }: Paint) => (
   <path d={`M${POLE} ${VISOR.y + FLAG_DROP}V1.6`} stroke={paint} strokeWidth={1} strokeLinecap="round" />
 );
 
-function Working({ id, paint, activity }: Paint & { id: string; activity?: DashActivity }) {
+/**
+ * Each hat as it sits on the level visor: its solid shapes, and the lines cut
+ * out of it (a band, a seam) so the ground shows through, the way the visor's
+ * eyes are cut. `tip` is how far it tips over while Dash sleeps, in degrees
+ * about the top of the visor; the ball cap stays put.
+ */
+const HATS: Record<DashLook, { shape: React.ReactNode; cuts: React.ReactNode; tip: number }> = {
+  'top-hat': {
+    shape: (
+      <>
+        <rect x={8} y={0.6} width={8} height={6.4} rx={0.6} />
+        <Pill x={5.6} y={6.4} width={12.8} height={1.4} />
+      </>
+    ),
+    cuts: <rect x={8} y={4.6} width={8} height={1} fill="#000" />,
+    tip: -12,
+  },
+  'ball-cap': {
+    shape: (
+      <>
+        <path d="M6.6 7.8Q6.6 2.8 12 2.6Q17.2 2.8 17.4 7.8Z" />
+        <path d="M15.4 7.8H22.2Q21.8 6.4 17.4 6.2Z" />
+        <circle cx={12} cy={2.5} r={0.7} />
+      </>
+    ),
+    cuts: <path d="M12 3.2V7.2M9 3.8Q8.4 5.6 8.6 7.4" stroke="#000" strokeWidth={0.45} strokeLinecap="round" />,
+    tip: 0,
+  },
+  'cowboy-hat': {
+    // A crown pinched in the middle, over a brim turned up at both ends.
+    shape: (
+      <>
+        <path d="M8.4 6.6Q8 1.6 10.2 1.4Q11.2 1.4 12 2.4Q12.8 1.4 13.8 1.4Q16 1.6 15.6 6.6Z" />
+        <path d="M2.8 4.6Q3.6 7.6 8 7.6H16Q20.4 7.6 21.2 4.6Q19.6 6.4 16 6.2H8Q4.4 6.4 2.8 4.6Z" />
+      </>
+    ),
+    cuts: <rect x={8.5} y={5} width={7} height={0.8} fill="#000" />,
+    tip: -10,
+  },
+  'newsboy-cap': {
+    // Low and full, pulled forward over a short brim, with a button on top.
+    shape: (
+      <>
+        <path d="M13.6 7.9H22.4Q22.6 6.6 19.6 6.2Z" />
+        <path d="M5 7.8Q3.8 6 5 4.4Q7 2.4 11 2.2Q16 2 19 3.8Q20.8 5 20.2 6.2Q19.6 6.9 17.4 6.8Q16.6 7.4 15.4 7.6Z" />
+        <circle cx={12.2} cy={2.1} r={0.8} />
+      </>
+    ),
+    cuts: (
+      <g stroke="#000" strokeLinecap="round">
+        <path d="M5.6 7.1Q10.4 6.5 15.6 6.9" strokeWidth={0.4} />
+        <path d="M12.2 2.6Q8.8 3.1 6.6 5.2M12.2 2.6Q15.6 3 17.8 4.6" strokeWidth={0.35} />
+      </g>
+    ),
+    tip: 8,
+  },
+};
+
+/** Where a hat tips about while Dash sleeps: the middle of the visor's top edge. */
+const TIP_ORIGIN = '12 7';
+
+function Hat({ look, id, asleep = false }: { look: DashLook; id: string; asleep?: boolean }) {
+  const hat = HATS[look];
+  const mask = `${id}-hat`;
+  const drawn = (
+    <>
+      <mask id={mask} maskUnits="userSpaceOnUse" x={0} y={0} width={24} height={24}>
+        <rect width={24} height={24} fill="#fff" />
+        {hat.cuts}
+      </mask>
+      <g fill="currentColor" mask={`url(#${mask})`}>
+        {hat.shape}
+      </g>
+    </>
+  );
+  if (!asleep || hat.tip === 0) return drawn;
+  // The tip is the still shape; the slip with each breath goes the same way.
+  return (
+    <g transform={`rotate(${hat.tip} ${TIP_ORIGIN})`}>
+      <g
+        className="dash-mark-tip"
+        style={{ '--dash-tip': `${Math.sign(hat.tip) * 4}deg` } as React.CSSProperties}
+      >
+        {drawn}
+      </g>
+    </g>
+  );
+}
+
+/** The snooze z, raised into the corner above a hat. */
+const SNOOZE = 'M17.6 2.4H20.6L17.6 5.6H20.6';
+const SNOOZE_OVER_HAT = 'M19.6 0.4H22.6L19.6 3.6H22.6';
+
+function Working({
+  id,
+  paint,
+  activity,
+  look,
+}: Paint & { id: string; activity?: DashActivity; look?: DashLook }) {
+  const hat = look ? <Hat look={look} id={id} /> : null;
   switch (activity) {
     case 'reading':
       return (
         <>
+          {hat}
           <CutVisor id={id} paint={paint} cuts={<Eyes y={10.6} className="dash-mark-read" />} />
           <path d="M6 19H18M6 21.4H13" stroke={paint} strokeWidth={1.2} strokeLinecap="round" opacity={0.5} />
         </>
@@ -233,6 +357,7 @@ function Working({ id, paint, activity }: Paint & { id: string; activity?: DashA
       return (
         <>
           <circle className="dash-mark-ping" cx={12} cy={12} r={7} stroke={paint} strokeWidth={1} opacity={0.45} />
+          {hat}
           <CutVisor id={id} paint={paint} cuts={<Eyes className="dash-mark-sweep" />} />
         </>
       );
@@ -240,6 +365,7 @@ function Working({ id, paint, activity }: Paint & { id: string; activity?: DashA
     case 'writing':
       return (
         <>
+          {hat}
           <CutVisor id={id} paint={paint} cuts={<Eyes y={10.6} />} />
           <Pill className="dash-mark-write" x={5} y={18.6} width={12} height={1.6} fill={paint} />
           <rect className="dash-mark-caret" x={18.2} y={17.4} width={1.2} height={4} rx={0.4} fill={paint} />
@@ -249,11 +375,14 @@ function Working({ id, paint, activity }: Paint & { id: string; activity?: DashA
     case 'thinking':
       // At rest the eyes look up into the corner, so a still frame is not idle.
       return (
-        <CutVisor
-          id={id}
-          paint={paint}
-          cuts={<Eyes className="dash-mark-ponder" transform="translate(1.8 -1.5)" />}
-        />
+        <>
+          {hat}
+          <CutVisor
+            id={id}
+            paint={paint}
+            cuts={<Eyes className="dash-mark-ponder" transform="translate(1.8 -1.5)" />}
+          />
+        </>
       );
 
     default:
@@ -278,6 +407,8 @@ function Working({ id, paint, activity }: Paint & { id: string; activity?: DashA
           ))}
           <g className="dash-mark-rattle">
             <g transform="translate(12 12) skewX(-14) translate(-12 -12)">
+              {/* The leaning visor is shorter at the back, so the hat moves forward with it. */}
+              {hat && <g transform="translate(1.6 0)">{hat}</g>}
               <CutVisor id={id} paint={paint} box={LEANING} cuts={<Eyes x={LEANING_EYES} y={10} />} />
             </g>
           </g>
@@ -291,12 +422,36 @@ function Glyph({
   activity,
   id,
   paint,
-}: Paint & { state: DashState; activity?: DashActivity; id: string }) {
+  look,
+}: Paint & { state: DashState; activity?: DashActivity; id: string; look?: DashLook }) {
   switch (state) {
     case 'working':
-      return <Working id={id} paint={paint} activity={activity} />;
+      return <Working id={id} paint={paint} activity={activity} look={look} />;
 
     case 'asleep':
+      if (look) {
+        // The hat breathes with the visor, so both go in the breathing group.
+        return (
+          <>
+            <g className="dash-mark-breathe">
+              <Hat look={look} id={id} asleep />
+              <CutVisor
+                id={id}
+                paint={paint}
+                cuts={<path d={SHUT} fill="none" stroke="#000" strokeWidth={1.6} strokeLinecap="round" />}
+              />
+            </g>
+            <path
+              className="dash-mark-snooze"
+              d={SNOOZE_OVER_HAT}
+              stroke={paint}
+              strokeWidth={1.1}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </>
+        );
+      }
       return (
         <>
           <CutVisor
@@ -307,7 +462,7 @@ function Glyph({
           />
           <path
             className="dash-mark-snooze"
-            d="M17.6 2.4H20.6L17.6 5.6H20.6"
+            d={SNOOZE}
             stroke={paint}
             strokeWidth={1.1}
             strokeLinecap="round"
@@ -358,13 +513,19 @@ function Glyph({
 
     case 'idle':
     default:
-      return <CutVisor id={id} paint={paint} cuts={<Eyes className="dash-mark-blink" />} />;
+      return (
+        <>
+          {look && <Hat look={look} id={id} />}
+          <CutVisor id={id} paint={paint} cuts={<Eyes className="dash-mark-blink" />} />
+        </>
+      );
   }
 }
 
 export function DashMark({
   state = 'idle',
   activity,
+  look,
   tone = 'current',
   size = 'icon',
   label,
@@ -374,6 +535,12 @@ export function DashMark({
   state?: DashState;
   /** What kind of work, for a working mark. Ignored in every other state. */
   activity?: DashActivity;
+  /**
+   * A hat, where several Dashes stand side by side and each needs telling
+   * apart: the runner card's slots. Drawn idle, asleep and working; done and
+   * failed have their flag there instead.
+   */
+  look?: DashLook;
   /**
    * The brand ramp, for where Dash is the subject: the Ask Dash button, a
    * reply on its way. Left out, the mark takes the colour of its place.
@@ -393,6 +560,7 @@ export function DashMark({
   const id = `dash-mark-${useId().replace(/:/g, '')}`;
   const sizing = SIZES[size];
   const kind = state === 'working' ? activity : undefined;
+  const hat = state === 'done' || state === 'failed' ? undefined : look;
   const name = label ?? (kind ? DASH_ACTIVITY_LABELS[kind] : DASH_STATE_LABELS[state]);
   const brand = tone === 'brand' && state !== 'failed';
   const ramp = HOME_MARK.key;
@@ -403,6 +571,7 @@ export function DashMark({
       className={cn('inline-flex shrink-0 items-center justify-center', sizing.box, className)}
       data-dash-state={state}
       {...(kind ? { 'data-dash-activity': kind } : {})}
+      {...(hat ? { 'data-dash-look': hat } : {})}
       {...(brand ? { 'data-dash-tone': 'brand' } : {})}
       {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': name })}
     >
@@ -422,7 +591,7 @@ export function DashMark({
           fill={brand ? ramp.from : 'currentColor'}
           fillOpacity={brand ? 0.16 : 0.12}
         />
-        <Glyph state={state} activity={kind} id={id} paint={paint} />
+        <Glyph state={state} activity={kind} id={id} paint={paint} look={hat} />
       </svg>
     </span>
   );

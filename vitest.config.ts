@@ -15,6 +15,8 @@ export default defineConfig({
     environment: 'node',
     // .tsx too, so a component can be rendered rather than described.
     include: ['tests/**/*.test.{ts,tsx}', 'lib/**/*.test.{ts,tsx}'],
+    // Clears EMBEDDING_API_KEY, so saving an idea in a test embeds nothing.
+    setupFiles: ['./tests/stubs/no-embedding-key.ts'],
     // The database tests share one schema, so they must not run concurrently.
     fileParallelism: false,
     testTimeout: 20_000,

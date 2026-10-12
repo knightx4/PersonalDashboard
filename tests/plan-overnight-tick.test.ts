@@ -22,7 +22,10 @@ import {
   overnightTick,
   featureRunLiveness,
   featureRunsInFlight,
+  fileStalls,
+  heldRaise,
   OVERNIGHT_NO_PROGRESS,
+  personAnsweredSince,
   outsideRunning,
   runOvernightTick,
   sweepQuietRuns,
@@ -216,8 +219,22 @@ describe('chooseOvernightFire', () => {
 
     expect(choice).toMatchObject({ act: 'end', reason: OVERNIGHT_NO_PROGRESS });
     expect(choice.act === 'end' && 'passedOver' in choice && choice.passedOver).toEqual([
-      { number: expect.any(Number), title: 'Step first', retryAt: '2026-09-18T04:00:00.000Z' },
-      { number: expect.any(Number), title: 'Step second', retryAt: '2026-09-18T04:00:00.000Z' },
+      {
+        id: 'first',
+        number: expect.any(Number),
+        title: 'Step first',
+        module: 'shopping',
+        lastFiredAt: HOUR_AGO,
+        retryAt: '2026-09-18T04:00:00.000Z',
+      },
+      {
+        id: 'second',
+        number: expect.any(Number),
+        title: 'Step second',
+        module: 'shopping',
+        lastFiredAt: HOUR_AGO,
+        retryAt: '2026-09-18T04:00:00.000Z',
+      },
     ]);
   });
 
@@ -234,6 +251,57 @@ describe('chooseOvernightFire', () => {
   it('holds it for the rest of the run once that retry has closed nothing too', () => {
     const choice = chooseOvernightFire(
       tree(twoFeatures()),
+      night(),
+      MIDNIGHT,
+      { first: SEVEN_HOURS_AGO },
+      { first: YESTERDAY },
+    );
+
+    expect(choice.act === 'fire' && choice.feature.id).toBe('second');
+    // Named on the fire too, so the tick can raise it on the same turn.
+    expect(choice.passedOver).toMatchObject([{ id: 'first', retryAt: null }]);
+  });
+
+  // The person answered something beneath a held feature: whatever stopped its
+  // sessions may be settled, so it goes again rather than waiting for morning.
+  it.each([
+    ['a turn of theirs on a thread', { thread: [{ id: 't', author: 'me' as const, body: 'It is fine.', createdAt: '2026-09-17T20:00:00.000Z' }] }],
+    ['an Answered line dated the day of the fire', { comment: 'Blocked 2026-09-17: Which one?\n\nAnswered 2026-09-17: The list.' }],
+    ['an Accepted line dated after it', { comment: 'Accepted 2026-09-18: the screen as it is.' }],
+  ])('releases a feature held for good once the person has answered since: %s', (_, said) => {
+    const sections = tree([
+      item({ id: 'first', priority: 1 }),
+      item({ id: 'first-step', parentId: 'first', priority: 1, status: 'blocked', blockKind: 'outside', ...said }),
+      item({ id: 'first-next', parentId: 'first', priority: 1 }),
+    ]);
+
+    const choice = chooseOvernightFire(
+      sections,
+      night(),
+      MIDNIGHT,
+      { first: SEVEN_HOURS_AGO },
+      { first: YESTERDAY },
+    );
+
+    expect(choice.act === 'fire' && choice.feature.id).toBe('first');
+  });
+
+  it('keeps it held when what the person said came before the fire', () => {
+    const sections = tree([
+      item({ id: 'first', priority: 1 }),
+      item({
+        id: 'first-step',
+        parentId: 'first',
+        priority: 1,
+        comment: 'Answered 2026-09-16: The list.',
+        thread: [{ id: 't', author: 'me', body: 'The list.', createdAt: '2026-09-16T09:00:00.000Z' }],
+      }),
+      item({ id: 'second', priority: 3 }),
+      item({ id: 'second-step', parentId: 'second', priority: 3 }),
+    ]);
+
+    const choice = chooseOvernightFire(
+      sections,
       night(),
       MIDNIGHT,
       { first: SEVEN_HOURS_AGO },
@@ -333,9 +401,75 @@ describe('overnightTick', () => {
     });
     const tick = await overnightTick(spent.ports);
     expect(tick.act === 'nothing-ready' && tick.reason).toContain(
-      'closed nothing in its last two sessions, so it waits for you.',
+      'closed nothing in its last two sessions. The button to send it again is on /dev/inbox.',
     );
     expect(spent.calls.fired).toEqual([]);
+  });
+
+  it('raises a feature held for good once a tick, with the fire that closed nothing', async () => {
+    const raised: Array<{ id: string; lastFiredAt: string }> = [];
+    const { ports: p } = ports({
+      now: Date.parse('2026-09-18T13:00:00.000Z'),
+      loadRun: async () => night({ startedAt: '2026-09-17T23:00:00.000Z', stopBy: null }),
+      lastFiredAt: async () => ({ feature: '2026-09-18T06:00:00.000Z' }),
+      previousFiredAt: async () => ({ feature: '2026-09-17T23:30:00.000Z' }),
+      raiseHeld: async (held) => {
+        raised.push(...held.map((one) => ({ id: one.id, lastFiredAt: one.lastFiredAt })));
+      },
+    });
+
+    await overnightTick(p);
+
+    expect(raised).toEqual([{ id: 'feature', lastFiredAt: '2026-09-18T06:00:00.000Z' }]);
+  });
+
+  it('raises nothing for a feature waiting out its six hours', async () => {
+    const raiseHeld = vi.fn(async () => {});
+    const { ports: p } = ports({
+      loadRun: async () => night({ startedAt: '2026-09-17T23:00:00.000Z' }),
+      lastFiredAt: async () => ({ feature: '2026-09-17T23:30:00.000Z' }),
+      raiseHeld,
+    });
+
+    await overnightTick(p);
+
+    expect(raiseHeld).not.toHaveBeenCalled();
+  });
+
+  it('still fires another feature when the raise cannot be filed', async () => {
+    const { ports: p, calls } = ports({
+      now: Date.parse('2026-09-18T01:00:00.000Z'),
+      loadSections: async () => tree(twoFeatures()),
+      lastFiredAt: async () => ({ first: '2026-09-17T23:10:00.000Z' }),
+      previousFiredAt: async () => ({ first: '2026-09-17T23:05:00.000Z' }),
+      raiseHeld: async () => {
+        throw new Error('raised_items is unreadable');
+      },
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired' });
+    expect(calls.fired).toEqual([{ feature: 'second', step: 'second-step' }]);
+  });
+
+  it('passes over a feature its stall raise holds and fires the next', async () => {
+    const { ports: p, calls } = ports({
+      loadSections: async () => tree(twoFeatures()),
+      stalls: async () => ['first'],
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired' });
+    expect(calls.fired).toEqual([{ feature: 'second', step: 'second-step' }]);
+  });
+
+  it('still fires when the stalls cannot be read', async () => {
+    const { ports: p, calls } = ports({
+      stalls: async () => {
+        throw new Error('plan_runs is unreadable');
+      },
+    });
+
+    await expect(overnightTick(p)).resolves.toMatchObject({ act: 'fired' });
+    expect(calls.fired).toEqual([{ feature: 'feature', step: 'step' }]);
   });
 
   it('fires a run with no cap without counting anything down', async () => {
@@ -658,6 +792,54 @@ describe('overnightTick', () => {
   });
 });
 
+describe('personAnsweredSince', () => {
+  const feature = (over: Partial<PlanItem>) =>
+    findNode(tree([item({ id: 'f' }), item({ id: 's', parentId: 'f', ...over })]), 'f')!;
+
+  it('counts the person on a thread, and not Dash', () => {
+    const at = '2026-10-09T10:00:00.000Z';
+    expect(
+      personAnsweredSince(
+        feature({ thread: [{ id: 't', author: 'claude', body: 'Blocked.', createdAt: '2026-10-09T11:00:00.000Z' }] }),
+        at,
+      ),
+    ).toBe(false);
+    expect(
+      personAnsweredSince(
+        feature({ thread: [{ id: 't', author: 'me', body: 'yes', createdAt: '2026-10-09T11:00:00.000Z' }] }),
+        at,
+      ),
+    ).toBe(true);
+  });
+
+  it('reads a dated line on the day of the fire as newer, and one the day before as older', () => {
+    const at = '2026-10-09T23:00:00.000Z';
+    expect(personAnsweredSince(feature({ comment: 'Answered 2026-10-09: It is fine.' }), at)).toBe(true);
+    expect(personAnsweredSince(feature({ comment: 'Answered 2026-10-08: It is fine.' }), at)).toBe(false);
+    expect(personAnsweredSince(feature({ comment: 'Blocked 2026-10-10: Which one?' }), at)).toBe(false);
+  });
+});
+
+describe('heldRaise', () => {
+  it('asks in one line whether to send the feature again, and a yes sends it', () => {
+    const raise = heldRaise({
+      id: 'feature-uuid',
+      number: 1660,
+      title: 'Quick notes in the vault',
+      module: 'vault',
+      lastFiredAt: '2026-10-10T03:00:00.000Z',
+      retryAt: null,
+    });
+
+    expect(raise.ask).toBe('Send #1660 Quick notes in the vault to a session again?');
+    expect(raise.consequence).toMatchObject({ name: 'send_step', text: '#1660' });
+    expect(raise.module).toBe('vault');
+    // One per fire that closed nothing: the source names both.
+    expect(raise.source).toBe('overnight held feature-uuid after 2026-10-10T03:00:00.000Z');
+    expect(raise.source).not.toContain('#');
+  });
+});
+
 describe('overnightRefusedReason', () => {
   it('names each refusal once, with a full stop', () => {
     expect(
@@ -732,6 +914,33 @@ describe('runOvernightTick', () => {
       head_sha: HEAD,
       conclusion: 'passed',
     });
+    vi.unstubAllEnvs();
+  });
+
+  it('sends answered steps on a tick with no night running', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase } = quietNight();
+    const answers = vi.fn(async () => ({
+      u1: { act: 'sent' as const, step: 1600, refused: [] },
+    }));
+
+    const summary = await runOvernightTick({ supabase, now: NOW, fetch: green() as never, answers });
+
+    expect(summary.accounts).toBe(0);
+    expect(answers).toHaveBeenCalledTimes(1);
+    expect(summary.answered).toEqual({ u1: { act: 'sent', step: 1600, refused: [] } });
+    vi.unstubAllEnvs();
+  });
+
+  it('finishes the tick when the answered-step pass breaks', async () => {
+    vi.stubEnv('GITHUB_READ_TOKEN', 'ghp_test');
+    const { supabase } = quietNight();
+    const answers = vi.fn(async () => Promise.reject(new Error('plan_items unreadable')));
+
+    const summary = await runOvernightTick({ supabase, now: NOW, fetch: green() as never, answers });
+
+    expect(summary.answered).toEqual({});
+    expect(summary.main.conclusion).toBe('passed');
     vi.unstubAllEnvs();
   });
 
@@ -818,6 +1027,134 @@ describe('outsideRunning', () => {
     const sections = tree([item({ id: 'todo-a', module: 'todo' })]);
     const ids = outsideRunning(sections, ['gone']).flatMap((one) => one.nodes.map((n) => n.id));
     expect(ids).toEqual(['todo-a']);
+  });
+});
+
+describe('fileStalls', () => {
+  type Row = Record<string, unknown>;
+
+  /**
+   * plan_runs and raised_items as chains that answer every read with the
+   * given rows, and record what is inserted. The filters are left to the
+   * real query; what is checked is what the tick does with the answer.
+   */
+  function db(runs: Row[], raises: Row[]) {
+    const inserted: Row[] = [];
+    const from = (table: string) => {
+      const rows = table === 'plan_runs' ? runs : raises;
+      const answer = { data: rows, error: null };
+      const chain: Record<string, unknown> = {
+        select: () => chain,
+        eq: () => chain,
+        in: () => chain,
+        not: () => chain,
+        order: () => chain,
+        limit: async () => answer,
+        like: (_column: string, pattern: string) =>
+          Promise.resolve({
+            data: rows.filter((row) =>
+              String(row.source).startsWith(pattern.replace(/%$/, '')),
+            ),
+            error: null,
+          }),
+        insert: async (row: Row) => {
+          inserted.push(row);
+          return { error: null };
+        },
+      };
+      return chain;
+    };
+    return { supabase: { from } as never, inserted };
+  }
+
+  const sections = () => tree([item({ id: 'feature', number: 1801 }), item({ id: 'step', parentId: 'feature' })]);
+  const failed = (id: string, at: string, over: Row = {}) => ({
+    id,
+    plan_item_id: 'step',
+    status: 'failed',
+    created_at: at,
+    stop_reason: null,
+    stop_pieces: null,
+    error: null,
+    ...over,
+  });
+
+  it('raises a feature whose last two runs closed nothing, quoting why, and holds it', async () => {
+    const { supabase, inserted } = db(
+      [
+        failed('r2', '2026-10-11T10:00:00.000Z', { stop_reason: 'Main was red.' }),
+        failed('r1', '2026-10-10T10:00:00.000Z'),
+      ],
+      [],
+    );
+
+    const held = await fileStalls({ supabase, userId: 'u', sections: sections(), now: Date.parse('2026-10-11T12:00:00.000Z') });
+
+    expect(held).toEqual(['feature']);
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]).toMatchObject({
+      user_id: 'u',
+      status: 'open',
+      source: 'stalled feature runs r2 r1',
+      consequence: { name: 'send_step', text: '#1801' },
+    });
+    expect(String(inserted[0].detail)).toContain('"Main was red."');
+  });
+
+  // #1804: the split is only asked of a feature with no steps of its own.
+  it('asks to split a feature with no steps into the pieces its session left', async () => {
+    const pieces = { stop_reason: 'Too big.', stop_pieces: ['Read the runs', 'Write the raise'] };
+    const bare = () => tree([item({ id: 'feature', number: 1801 })]);
+    const runs = [
+      failed('r2', '2026-10-11T10:00:00.000Z', { plan_item_id: 'feature', ...pieces }),
+      failed('r1', '2026-10-10T10:00:00.000Z', { plan_item_id: 'feature' }),
+    ];
+
+    const lone = db(runs, []);
+    await fileStalls({ supabase: lone.supabase, userId: 'u', sections: bare(), now: MIDNIGHT });
+    expect(lone.inserted[0]).toMatchObject({
+      ask: expect.stringMatching(/^Split #1801 .* into 2 steps\?$/),
+      consequence: { name: 'split_feature', text: '#1801' },
+    });
+
+    const stepped = db(runs.map((run) => ({ ...run, plan_item_id: 'step' })), []);
+    await fileStalls({ supabase: stepped.supabase, userId: 'u', sections: sections(), now: MIDNIGHT });
+    expect(stepped.inserted[0]).toMatchObject({ consequence: { name: 'send_step' } });
+  });
+
+  it('adds no second raise while the first is open', async () => {
+    const { supabase, inserted } = db(
+      [failed('r3', '2026-10-12T10:00:00.000Z'), failed('r2', '2026-10-11T10:00:00.000Z')],
+      [
+        {
+          source: 'stalled feature runs r2 r1',
+          status: 'open',
+          created_at: '2026-10-11T11:00:00.000Z',
+          answered_at: null,
+        },
+      ],
+    );
+
+    const held = await fileStalls({ supabase, userId: 'u', sections: sections(), now: MIDNIGHT });
+
+    expect(inserted).toEqual([]);
+    // Sent by hand since the raise, so the raise no longer holds it.
+    expect(held).toEqual([]);
+  });
+
+  it('raises nothing for a feature whose newest run closed a step', async () => {
+    const { supabase, inserted } = db(
+      [
+        failed('r2', '2026-10-11T10:00:00.000Z', { status: 'finished' }),
+        failed('r1', '2026-10-10T10:00:00.000Z'),
+      ],
+      [],
+    );
+
+    const held = await fileStalls({ supabase, userId: 'u', sections: sections(), now: MIDNIGHT });
+
+    expect(inserted).toEqual([]);
+    expect(held).toEqual([]);
   });
 });
 

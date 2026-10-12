@@ -715,6 +715,43 @@ describe('reading the purpose', () => {
   });
 });
 
+describe('keeping the confirmation link', () => {
+  const SIGNUP = {
+    subject: 'Please confirm your subscription',
+    text_body: 'Confirm subscription (https://example.substack.com/c/abcdefghijklmnopqrstuvwx)',
+    html_body:
+      '<a href="https://example.substack.com/c/abcdefghijklmnopqrstuvwx">Confirm subscription</a>' +
+      '<a href="https://example.substack.com/c/unsub0123456789abcdef">Unsubscribe</a>',
+  };
+
+  it('stores the link when the issue is a confirmation', async () => {
+    const { news } = await run(
+      reported({ line: 'Confirm', summary: 'Asks to confirm.', purpose: 'confirmation', stories: [] }),
+      SIGNUP,
+    );
+    expect(news.updates[0]).toMatchObject({
+      purpose: 'confirmation',
+      confirm_url: 'https://example.substack.com/c/abcdefghijklmnopqrstuvwx',
+    });
+  });
+
+  it('stores none for any other purpose, even with a confirm link in it', async () => {
+    const { news } = await run(
+      reported({ line: 'News', summary: 'Two stories.', purpose: 'news', stories: [] }),
+      SIGNUP,
+    );
+    expect(news.updates[0]).toMatchObject({ purpose: 'news', confirm_url: null });
+  });
+
+  it('stores none when a confirmation has no clear link', async () => {
+    const { news } = await run(
+      reported({ line: 'Code', summary: 'A code.', purpose: 'confirmation', stories: [] }),
+      { subject: 'Your code', text_body: 'Your code is 123456.', html_body: '<p>123456</p>' },
+    );
+    expect(news.updates[0]).toMatchObject({ purpose: 'confirmation', confirm_url: null });
+  });
+});
+
 describe('which failures are the API’s', () => {
   it('counts no credit, rate limits, overload and server errors as passing', () => {
     expect(

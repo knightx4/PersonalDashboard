@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 import { SPEC_COUNTERS } from '../../scripts/spec-counts';
-import { HAIKU, HAIKU_DATED, MODELS, OPUS, SONNET } from './models';
+import { HAIKU, MODELS, OPUS, SONNET } from './models';
 
 const ROOT = join(__dirname, '../..');
 
@@ -13,8 +13,8 @@ describe('model ids', () => {
     expect(counter!.measure(ROOT)).toEqual(['lib/core/models.ts']);
   });
 
-  it('name one of the four tiers at every call site', () => {
-    const tiers: string[] = [OPUS, SONNET, HAIKU, HAIKU_DATED];
+  it('name one of the three tiers at every call site', () => {
+    const tiers: string[] = [OPUS, SONNET, HAIKU];
     for (const id of Object.values(MODELS)) expect(tiers).toContain(id);
   });
 });

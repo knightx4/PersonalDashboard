@@ -14,20 +14,53 @@ import type { ModuleId } from '@/lib/modules';
  * Pure, and no `server-only`.
  */
 
+/**
+ * How well one hit matches the query, or null when it does not.
+ *
+ * The title, and whatever else the source said this is looked for by -- a
+ * role's company, say. Never the subtitle: those are words like "Company ·
+ * Job search", and matching them makes nearly every query match nearly every
+ * row.
+ */
+export function hitPoints(hit: SearchHit, query: string): number | null {
+  const points = Math.max(
+    score(hit.title, query) ?? -1,
+    hit.match ? (score(`${hit.title} ${hit.match}`, query) ?? -1) - 1 : -1,
+  );
+  return points >= 0 ? points : null;
+}
+
+/**
+ * Two lists already ranked best first, merged into one on their points.
+ *
+ * The palette's two halves (plan #1618): the places you can go and the things
+ * you own are each ranked against the query, and this puts them in one order.
+ * On equal points the first list's row goes first, and each list keeps its
+ * own order, so a list ranked by its own tie-breaks stays that way.
+ */
+export function mergeRanked<A, B>(
+  first: readonly { item: A; points: number }[],
+  second: readonly { item: B; points: number }[],
+): (A | B)[] {
+  const merged: (A | B)[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < first.length || j < second.length) {
+    if (j >= second.length || (i < first.length && first[i].points >= second[j].points)) {
+      merged.push(first[i].item);
+      i += 1;
+    } else {
+      merged.push(second[j].item);
+      j += 1;
+    }
+  }
+  return merged;
+}
+
 /** Ranked against the query, best first, then alphabetically for stability. */
 export function rankHits(hits: SearchHit[], query: string): SearchHit[] {
   return hits
-    .map((hit) => ({
-      hit,
-      // The title, and whatever else the source said this is looked for by --
-      // a role's company, say. Never the subtitle: those are words like
-      // "Company · Job search", and matching them makes nearly every query
-      // match nearly every row.
-      points: Math.max(
-        score(hit.title, query) ?? -1,
-        hit.match ? (score(`${hit.title} ${hit.match}`, query) ?? -1) - 1 : -1,
-      ),
-    }))
+    .map((hit) => ({ hit, points: hitPoints(hit, query) ?? -1 }))
     .filter((scored) => scored.points >= 0)
     .sort(
       (a, b) => b.points - a.points || a.hit.title.localeCompare(b.hit.title),

@@ -28,6 +28,8 @@ npx tsx scripts/plan.ts start <n>              # claim it (in_progress); refuses
 npx tsx scripts/plan.ts done <n> --note "…"    # close it; records HEAD commit
 npx tsx scripts/plan.ts answer <n> --note "…"  # the person's move. Never yours.
 npx tsx scripts/plan.ts block <n> --ask "…" [--on-steps] [--note "…"]
+              # the ask names what the person does; "nothing needed from you" is refused.
+              # A step that only waits on time or a run stays in progress with a check-back.
                                                # cannot proceed; the ask is the one sentence
                                                # saying what it needs, rewritten each time.
                                                # --on-steps: it clears itself when the steps it
@@ -37,6 +39,10 @@ npx tsx scripts/plan.ts needs "<what to set>" --for <n> [--detail "…"]
                                                # an account. Writes a setup step of theirs under
                                                # the same feature and makes <n> wait on it
 npx tsx scripts/plan.ts drop <n> --note "…"    # will not do; say why
+npx tsx scripts/plan.ts stopped <n> --reason "…" [--piece "…" --piece "…"]
+                                               # ending without closing or blocking <n>:
+                                               # one line on why, onto the run. Too big?
+                                               # name the pieces it would split into
 npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
                                                [--proposed] [--from <n>]
                                                # ready under an approved feature, a
@@ -81,6 +87,12 @@ writes are not recorded yet.
 - A **proposed** step is nobody's to build. It is a proposal waiting on the
   person. `next` never lists one, `start` refuses one, and nothing in this
   skill moves one out of `proposed` — that is the person's move, on the page.
+
+  **Auto approve.** When the person has turned on auto approve (the switch on
+  the Plan row on Home, `plan_overnight_runs.auto_approve`), a trigger writes
+  every proposed row as `not_started`. A row you insert as proposed then comes
+  back approved and ready. That is the person's standing yes, not a session
+  approving: write proposals exactly as you would otherwise.
 
   **Approval is per feature.** The person approves a feature once, and that
   approves every step beneath it. A step a session adds under an approved
@@ -130,7 +142,8 @@ you close when they are all done.
 
 **One step, on its own** — "do #12", or one step named in a brief. Read
 `reference/building.md` and follow it yourself, then put the commit on main as
-in step 4 below. A subagent for a single step is pure overhead.
+in step 4 below. A subagent for a single step is pure overhead, except on a
+Sonnet session for a step sized `m` or `l` (step 3 below).
 
 **A feature, or more than one step** — you are the orchestrator, not the
 builder. Send each step to its own subagent and keep your own context for the
@@ -154,24 +167,58 @@ thousand tokens, and gets to the end.
    to do about each answer"` rather than a routine on the account: it shows on
    the Dash tab, any session can finish it, and the tick wakes one an hour past
    due if none has.
+
+   A step whose history ends in an `Answered …` or `Accepted …` line is acted
+   on in this batch. An answer that asks for no change ("It's fine", "yes",
+   "ok") is an accept: merge and close. An answer that picks no direction
+   takes the option the ask recommended. A new question goes out only when no
+   direction can be chosen, and never the same one twice
+   (`reference/building.md`, "An answer always moves the step").
 2. **Work out the order.** `show <the feature>` gives the tree, the done-whens
    and what waits on what. List the steps you are going to build, in dependency
    order. Steps that wait on nothing come first; a step whose dependency is
    still open is not in this batch.
-3. **Send each step to a subagent, one at a time.** The prompt is short:
+3. **Send the ready steps to subagents, up to three at once.** Every step
+   that is ready now and does not wait on another step in the batch goes out
+   together, each to its own subagent with `isolation: "worktree"`, so each
+   builds in its own copy of the repository. When one reports, merge it (step
+   4) and send whatever its close made ready, keeping up to three going. One
+   step at a time left a twelve-step feature taking most of a day while steps
+   that waited on nothing sat in the queue.
+
+   Hold a step back from the round when it changes the same screen as
+   another step going out, judged from the two details: two builders editing
+   one page conflict at the merge and the second rebuilds. Send it when the
+   first has merged.
+
+   The prompt is short:
 
    > Build plan step #N. Read `.claude/skills/plan/reference/building.md` and
-   > follow it exactly.
+   > follow it exactly. You are in a worktree: give it a hard-linked copy of
+   > node_modules first (`cp -al <the main checkout>/node_modules .`) and use
+   > `PREVIEW_PORT=<3400 + 1, 2 or 3>` for the preview.
    >
    > What earlier steps in this batch worked out: <the carry-forward, below>
 
+   **Pick the builder's model by the step's size.** A step sized `s` goes to
+   a subagent with `model: "sonnet"`; `m`, `l` and a step with no size go to
+   `model: "opus"`. Name the model every time, because a subagent without one
+   takes this session's, and this session may be running on Sonnet. The
+   `ui-critic` agent names its own model and is not changed by this.
+
    **Do not read the step's source files yourself, and do not make the edit.**
    Every file you open is a file you carry for the rest of the batch. Reading
-   "just to check" is how the batch runs out of room.
+   "just to check" is how the batch runs out of room. The same holds for a
+   single step named on its own when this session is on Sonnet and the step
+   is sized `m` or `l`: send it to an Opus subagent rather than building it
+   here.
 4. **Put the step on main before it closes.** A subagent commits and stops
    there, so the merge is yours, and it runs as soon as the subagent reports
    its commit:
 
+   - Merge the subagent's worktree branch (its result names it) into the
+     working branch. Do this for one step at a time even while others are
+     still building: each step merges and runs the gate on its own.
    - `git fetch origin`, with no refs named. Naming them aborts the whole fetch
      when one of them is missing, which is the normal state of a branch nobody
      has pushed yet, and leaves `origin/main` stale.
@@ -205,7 +252,9 @@ thousand tokens, and gets to the end.
    **When the merge will not go through** — a conflict you cannot resolve from
    what you have read, or a check you cannot get passing — push the working
    branch first, so what the step built survives this session, then `block <n>
-   --ask "…"` with that branch named in the ask. Stop the batch there: do not
+   --ask "…" --note "…"` with that branch named in the note. The ask never
+   names it: the person cannot open branches, and `block` refuses an ask that
+   names one. Stop the batch there: do not
    send the next step, and do not close the blocked one, because its commit is
    on a branch and that is what the guard on `done` is for. Decisions #685 and
    #695 are why. The next session starts from main as it then stands, and can
@@ -220,12 +269,30 @@ thousand tokens, and gets to the end.
    written a decision and blocked its step. Do not build around it and do not
    send a later step that depends on it. Other steps in the batch that do not
    depend on it are still yours to send.
-7. **Report when the batch ends**: every step closed **by number and title**,
+7. **Write Dash's update on each feature the batch worked**, once its steps
+   are closed or blocked and before the report (plan #1666):
+
+   ```
+   npx tsx scripts/plan.ts update <the feature> --health on_track|at_risk|blocked \
+     --body "<two or three sentences on what moved>"
+   ```
+
+   The feature's page shows the latest one at the top of its Overview, with
+   the health and a line saying how many of its steps are done now and how
+   many were done at the update before; the command works out those counts
+   from the plan. `on_track` when the feature is moving and nothing open
+   threatens it, `at_risk` when something might stop it landing as written (a
+   critic stop, a failing merge, a step that keeps growing), `blocked` when it
+   cannot move until the person answers or sets something up. The body is
+   for the person: what closed, what is next, and what is waiting on them,
+   by number and title, in the writing guide's terms. One update per feature
+   per batch, not one per step.
+8. **Report when the batch ends**: every step closed **by number and title**,
    what became ready, what is blocked and on what, and anything raised on
-   `/dev/raised`, by title. A report that says "closed four steps" makes the
+   `/dev/inbox`, by title. A report that says "closed four steps" makes the
    person go and look. Say which steps reached main and which did not: a closed
    step is on main already, and a step blocked on a failed merge is on the
-   branch the block names, which the report names too.
+   branch its history names, which the report names too.
 
 If the batch ends before the steps do — something blocked, or you are running
 short — say exactly which steps are left and that they are still handed over.
@@ -269,7 +336,7 @@ select. A build run needs nothing: closing or blocking its step ends it.
 |---|---|
 | `proposed` | Waiting on the person's approve. Never built. A new feature and the steps shaped under it, or a step that acts outside the repository. |
 | `not_started` | Decided on, not begun. |
-| `in_progress` | Claimed right now. At most one at a time. |
+| `in_progress` | Claimed right now. Up to three at once under one feature run, one per builder. |
 | `blocked` | Needs an answer or something outside the repo. Reason required. |
 | `done` | Shipped, verified against its done-when. Carries the commit. |
 | `dropped` | Decided against. Reason required. |

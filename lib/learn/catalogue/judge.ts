@@ -360,7 +360,7 @@ export function anthropicJudge(options: {
             },
           },
         ],
-        tool_choice: forceTool(TOOL_NAME),
+        tool_choice: forceTool(TOOL_NAME, JUDGE_MODEL),
         messages: [
           {
             role: 'user',

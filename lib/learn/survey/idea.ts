@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { usageFrom, type SpendSink } from '@/lib/core/spend/pricing';
 import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { embedIdeaClaim } from '@/lib/learn/embed/idea-embedding';
 import { kindSchema, masterySchema } from '@/lib/learn/graph/chain-payload';
 import { KIND_RULE, KIND_TOOL_FIELD } from '@/lib/learn/graph/kind-prompt';
 import { MASTERY_RULE, MASTERY_TOOL_FIELD } from '@/lib/learn/graph/mastery-prompt';
@@ -196,7 +197,7 @@ export async function ideaFromThemeNotes(input: {
           },
         },
       ],
-      tool_choice: forceTool(TOOL_NAME),
+      tool_choice: forceTool(TOOL_NAME, MODEL),
       messages: [{ role: 'user', content: lines.join('\n') }],
     });
   } catch (error) {
@@ -354,6 +355,7 @@ export async function writeSurveyIdea(input: {
   if (!result.ok) return result;
 
   const { idea } = result;
+  const vector = await embedIdeaClaim(input.supabase, input.userId, idea.claim);
   const { data, error } = await input.supabase
     .from('concepts')
     .insert({
@@ -365,6 +367,7 @@ export async function writeSurveyIdea(input: {
       origin: 'reading',
       mastery: idea.mastery,
       kind: idea.kind,
+      ...vector,
     })
     .select('id')
     .single();

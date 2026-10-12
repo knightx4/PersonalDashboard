@@ -5,7 +5,7 @@ import { useFormStatus } from 'react-dom';
 import { Pencil, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
-import { cardVariants } from '@/components/ui/card';
+import { Card, cardVariants } from '@/components/ui/card';
 import { FieldError, Textarea } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import { KindBadge } from '@/components/learn/kind-badge';
@@ -213,6 +213,7 @@ export function BranchFromClaim({
   conceptId,
   claim,
   wording,
+  original = null,
 }: {
   conceptId: string;
   claim: string;
@@ -221,6 +222,12 @@ export function BranchFromClaim({
    * server, because the date is in the account's timezone.
    */
   wording: string;
+  /**
+   * What the app first wrote, once there is a version of yours sitting where
+   * it was. It sits in the same card on the recessed ground, which is how a
+   * thread tells Dash's words from yours.
+   */
+  original?: string | null;
 }) {
   const claimRef = useRef<HTMLParagraphElement>(null);
   const [selection, setSelection] = useState('');
@@ -261,13 +268,21 @@ export function BranchFromClaim({
     <>
       {/* The claim, which is the concept. Everything else on this page is
           about it. */}
-      <p ref={claimRef} className="mb-1 text-body text-ink">
-        {claim}
-      </p>
+      <Card padding="dense" className="mb-3">
+        <p ref={claimRef} className="mb-1 text-body text-ink">
+          {claim}
+        </p>
 
-      {/* Directly under the sentence, because it is about that sentence and
-          nothing else on the page. */}
-      <p className="mb-3 text-small text-ink-muted">{wording}</p>
+        {/* Directly under the sentence, because it is about that sentence and
+            nothing else on the page. */}
+        <p className="text-small text-ink-muted">{wording}</p>
+        {original && (
+          <div className="mt-3 rounded-lg bg-canvas px-3 py-2">
+            <h2 className="text-small font-semibold text-ink-muted">What the app first wrote</h2>
+            <p className="mt-1 max-w-prose text-ui text-ink-muted">{original}</p>
+          </div>
+        )}
+      </Card>
 
       {chain && state.selection ? (
         <Proposal

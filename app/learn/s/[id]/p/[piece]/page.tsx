@@ -1,16 +1,12 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
-import { PageHeader } from '@/components/shell/page-header';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadPiecePage } from '@/lib/learn/lessons/piece-store';
 import { loadPieceStanding, loadPracticeView } from '@/lib/learn/lessons/practice-store';
 import { REVIEWS_AT_PIECE_START, type DueReview } from '@/lib/learn/lessons/review';
 import { loadDueReviews } from '@/lib/learn/lessons/review-store';
-import { ReviewList } from '@/app/learn/review/review-list';
-import { PieceLessons, PiecePassing } from './piece-view';
+import { PiecePageView } from './piece-page-view';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,82 +45,5 @@ export default async function PiecePage({ params }: { params: Promise<{ id: stri
     skip: page.ideas.map((idea) => idea.conceptId),
   }).catch((): DueReview[] => []);
 
-  const { piece, subject, unit, siblings } = page;
-
-  return (
-    <>
-      <p className="mb-3">
-        <Link
-          href={`/learn/s/${subject.id}`}
-          className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
-          {subject.name}
-        </Link>
-      </p>
-
-      <PageHeader
-        title={piece.title}
-        description={`Unit ${unit.ordinal}, ${unit.title} · piece ${piece.ordinal} of ${siblings.length}${
-          piece.passedAt ? ' · passed' : ''
-        }`}
-      />
-
-      {unit.outcome && (
-        <p className="mb-5 text-ui text-ink-muted">
-          <span className="text-ink">By the end of the unit: </span>
-          {unit.outcome}
-        </p>
-      )}
-
-      <ReviewList
-        reviews={reviews}
-        title="First, from earlier pieces"
-        description="Due for review today. A right answer brings the next question later; a miss brings it back tomorrow."
-        showPlan={false}
-      />
-
-      {page.ideas.length === 0 ? (
-        <p className="mb-6 text-body text-ink-muted">The ideas this piece covered are no longer in the subject.</p>
-      ) : (
-        <>
-          <PieceLessons subjectId={subject.id} pieceId={piece.id} ideas={page.ideas} />
-          <div className="mt-6">
-            <PiecePassing
-              subjectId={subject.id}
-              pieceId={piece.id}
-              practice={practice}
-              check={page.check}
-              passedAt={piece.passedAt}
-              practicePassed={standing.practicePassed}
-              checkPassed={standing.checkPassed}
-            />
-          </div>
-        </>
-      )}
-
-      {siblings.length > 1 && (
-        <nav aria-label="Pieces in this unit" className="mt-8">
-          <h2 className="mb-2 text-ui font-semibold text-ink-muted">This unit&rsquo;s pieces</h2>
-          <ol className="space-y-1">
-            {siblings.map((sibling) => (
-              <li key={sibling.id} className="flex items-baseline gap-2 text-ui">
-                <span className="w-5 shrink-0 text-ink-muted tabular-nums">{sibling.ordinal}.</span>
-                {sibling.id === piece.id ? (
-                  <span className="font-medium text-ink" aria-current="page">
-                    {sibling.title}
-                  </span>
-                ) : (
-                  <Link href={`/learn/s/${subject.id}/p/${sibling.id}`} className="text-accent hover:underline">
-                    {sibling.title}
-                  </Link>
-                )}
-                {sibling.passed && <span className="text-small text-ink-muted">passed</span>}
-              </li>
-            ))}
-          </ol>
-        </nav>
-      )}
-    </>
-  );
+  return <PiecePageView page={page} practice={practice} standing={standing} reviews={reviews} />;
 }

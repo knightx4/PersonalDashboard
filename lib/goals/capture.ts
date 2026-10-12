@@ -42,6 +42,7 @@ import {
   type ProgressTally,
 } from '@/lib/goals/progress';
 import { formatReading, parseNumber } from '@/lib/goals/readings';
+import type { CountSource } from '@/lib/goals/rhythm-sources';
 import { periodOf, progressLine } from '@/lib/goals/rhythms';
 import { STEP_TITLE_MAX, type RhythmPeriod, type StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
@@ -84,8 +85,19 @@ export type CaptureStep = {
   title: string;
   kind: 'mine' | 'claude' | 'rhythm';
   depth: number;
-  /** A rhythm's shape and its current period, when it has one open. */
-  rhythm: { period: RhythmPeriod; startsOn: string; count: number; target: number } | null;
+  /**
+   * A rhythm's shape and its current period, when it has one open, and where
+   * its count is read from when it counts itself (0069). Such a rhythm is
+   * shown so a sentence about it is not filed elsewhere, but is never counted
+   * here: its count is its source's.
+   */
+  rhythm: {
+    period: RhythmPeriod;
+    startsOn: string;
+    count: number;
+    target: number;
+    source?: CountSource | null;
+  } | null;
   /** The done-when, shown so filing can read a total from it (plan #1277). */
   acceptance?: string | null;
   /** The step's estimated total, when it has one. */
@@ -162,6 +174,7 @@ export function captureContext(
                     startsOn: current.startsOn,
                     count: current.count,
                     target: current.target,
+                    ...(node.countSource ? { source: node.countSource } : {}),
                   }
                 : null,
             acceptance: node.acceptance?.trim().slice(0, CONTEXT_TEXT_MAX) || null,
@@ -233,7 +246,9 @@ export function captureMessage(
       const shape =
         step.kind === 'rhythm'
           ? step.rhythm
-            ? `rhythm, ${progressLine(step.rhythm.period, step.rhythm)}`
+            ? step.rhythm.source
+              ? `rhythm, ${progressLine(step.rhythm.period, step.rhythm, step.rhythm.source)}, counts itself, never count it`
+              : `rhythm, ${progressLine(step.rhythm.period, step.rhythm)}`
             : 'rhythm, no period open'
           : step.kind;
       lines.push(`${indent}${step.ref} [${shape}]: ${step.title}`);
@@ -499,6 +514,9 @@ export function parseMove(
     case 'count': {
       const step = steps.get(text(entry.step));
       if (!step || step.kind !== 'rhythm' || !step.rhythm) return null;
+      // A rhythm that counts itself takes its count from its source, so a
+      // count here would be overwritten at the next sync, or counted twice.
+      if (step.rhythm.source) return null;
       const amount = readCount(entry);
       if (amount === null) return null;
       // Counted in the period the day falls in (plan #1279): "yesterday"

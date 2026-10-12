@@ -53,8 +53,16 @@
  *                                # rather than on something only you can supply
  *   npx tsx scripts/plan.ts drop <n> --note "why not"
  *   npx tsx scripts/plan.ts reopen <n>
+ *   npx tsx scripts/plan.ts stopped <n> --reason "why, in one line" [--piece "…" --piece "…"]
+ *                                # ending a run with the step neither closed nor
+ *                                # blocked: the reason goes on the run, and the
+ *                                # pieces are the split a too-big step would take
  *   npx tsx scripts/plan.ts fog <n> --note "what cannot be seen yet" | --clear
  *                                # one patch per feature, about finishing it
+ *   npx tsx scripts/plan.ts update <feature> --health on_track|at_risk|blocked --body "…"
+ *                                [--run <plan_runs id>]   # Dash's update on a feature, at
+ *                                # the end of a build or re-shape run; the step counts
+ *                                # are worked out from the plan
  *   npx tsx scripts/plan.ts assign <n> me|none
  *   npx tsx scripts/plan.ts priority <n> 1|2|3
  *   npx tsx scripts/plan.ts depends <n> --on <m>
@@ -85,6 +93,7 @@ import { uiCheckRefusal, type CheckRound } from '../lib/plan/ui-check-guard';
 import { stepScreenInputs } from '../lib/plan/ui-check-local';
 import type { VisionBodies } from '../lib/specs/vision';
 import { closeRefusal, commitOnMain } from '../lib/plan/github';
+import { runForStop, stopColumns, stopLine, stopRefusal } from '../lib/plan/stop-reason';
 import { branchesContaining } from '../lib/plan/branches';
 import {
   needsLines,
@@ -105,7 +114,16 @@ import {
   parseDelay,
   type CheckBack,
 } from '../lib/plan/check-backs';
+import { blockAskRefusal } from '../lib/plan/block-ask';
 import { CLAIM_WORD, type ClaimRun } from '../lib/plan/liveness';
+import {
+  isPlanUpdateHealth,
+  PLAN_UPDATE_BODY_MAX,
+  PLAN_UPDATE_HEALTH,
+  PLAN_UPDATE_HEALTHS,
+  progressSince,
+  updateCounts,
+} from '../lib/plan/updates';
 import { storedReading } from '../lib/plan/run-end';
 import { CONSEQUENCE_SHAPE, consequenceFrom, parseConsequenceArg } from '../lib/raised/consequence';
 import type { SpendReport } from '../lib/core/spend/pricing';
@@ -204,6 +222,15 @@ const argv = process.argv.slice(2);
 function arg(flag: string): string | null {
   const index = argv.indexOf(flag);
   return index > -1 ? (argv[index + 1] ?? null) : null;
+}
+
+/** Every value a repeatable flag was given, in order. */
+function args(flag: string): string[] {
+  const out: string[] = [];
+  argv.forEach((value, index) => {
+    if (value === flag && argv[index + 1] !== undefined) out.push(argv[index + 1]);
+  });
+  return out;
 }
 
 function has(flag: string): boolean {
@@ -686,7 +713,7 @@ async function main(): Promise<void> {
      * step: a risk it found in code it was only passing through, a question of
      * taste, a thing it will not decide alone. A decision belongs to one
      * feature and the notes queue is what you report as wrong; this is the
-     * third home, and it is read on /dev/raised.
+     * third home, and it is read on /dev/inbox.
      *
      * A session never answers or dismisses its own raise, the same rule as
      * never answering its own decision, so there is no command for either.
@@ -751,7 +778,7 @@ async function main(): Promise<void> {
         returning id`;
       console.log(`${row.id.slice(0, 8)}  raised: ${title}`);
       console.log(`a yes: ${consequence.said}`);
-      console.log('It is on /dev/raised, and in the bell until it is answered or dismissed.');
+      console.log('It is on /dev/inbox, and in the bell until it is answered or dismissed.');
       return;
     }
 
@@ -1236,6 +1263,58 @@ async function main(): Promise<void> {
       return;
     }
 
+    // Why a session stopped without closing its step (plan #1802), written onto
+    // the run it was sent as: the newest run fired at the step or a row above
+    // it. A run still going is ended, since the session has said it is over.
+    // `--piece`, given twice or more, is the split a too-big step would take.
+    if (command === 'stopped') {
+      const reason = stopLine(arg('--reason'));
+      const pieces = args('--piece').map(stopLine);
+      const refusal = stopRefusal(reason, pieces);
+      if (refusal) fail(refusal);
+      if (item.status === 'done' || item.status === 'blocked') {
+        fail(
+          `#${item.number} is ${item.status}, which already says how the run ended. A stop ` +
+            `reason is for a run that ends with its step neither closed nor blocked.`,
+        );
+      }
+      const chain = await sql<{ id: string }[]>`
+        with recursive chain as (
+          select id, parent_id from plan_items where id = ${item.id} and user_id = ${userId}
+          union all
+          select p.id, p.parent_id from plan_items p
+          join chain on p.id = chain.parent_id
+          where p.user_id = ${userId}
+        )
+        select id from chain`;
+      const ids = chain.map((row) => row.id);
+      const rows = await sql<{ id: string; plan_item_id: string; status: string; created_at: Date }[]>`
+        select id, plan_item_id, status, created_at from plan_runs
+        where user_id = ${userId} and plan_item_id in ${sql(ids)}`;
+      const run = runForStop(
+        rows.map((row) => ({
+          id: row.id,
+          planItemId: row.plan_item_id,
+          status: row.status,
+          createdAt: row.created_at.toISOString(),
+        })),
+        ids,
+      );
+      if (!run) fail(`No run was fired at #${item.number} or above it, so there is no run to explain.`);
+      if (run.status === 'finished') {
+        fail(`The last run on #${item.number} already reads finished; there is no stop to explain.`);
+      }
+      const columns = stopColumns(run, reason, pieces, new Date().toISOString());
+      await sql`
+        update plan_runs set ${sql(columns)}
+        where id = ${run.id} and user_id = ${userId}`;
+      console.log(`#${item.number} last run stopped: ${reason}`);
+      if (pieces.length > 0) {
+        pieces.forEach((piece, index) => console.log(`  ${index + 1}. ${piece}`));
+      }
+      return;
+    }
+
     /**
      * The other way a step closes: on an answer rather than a commit.
      *
@@ -1348,6 +1427,10 @@ async function main(): Promise<void> {
       // to be wrong: #499 read as ready for a day because a block about a
       // GitHub token cleared itself off unrelated steps closing.
       const onSteps = command === 'block' && has('--on-steps');
+      if (command === 'block' && ask) {
+        const refusal = blockAskRefusal(ask, onSteps);
+        if (refusal) fail(refusal);
+      }
       const note = arg('--note') ?? ask;
       if (!note) fail(`--note is required for ${command}: say what happened.`);
 
@@ -1437,6 +1520,53 @@ async function main(): Promise<void> {
           console.log(`Now ready: ${freed.map((ref) => `#${ref.number} ${ref.title}`).join(', ')}`);
         }
       }
+      return;
+    }
+
+    // Dash's update on a feature (plan #1666): what a build or re-shape run
+    // says about the feature it worked, at the end of the run. The counts are
+    // worked out here, from the plan as it now stands, so the run only says
+    // the health and what moved.
+    if (command === 'update') {
+      const health = arg('--health')?.trim();
+      const body = arg('--body')?.trim();
+      if (!isPlanUpdateHealth(health) || !body) {
+        fail(
+          `update ${item.number} --health ${PLAN_UPDATE_HEALTHS.join('|')} --body "two or three ` +
+            `sentences on what moved". Name the feature, not the step the run closed.`,
+        );
+      }
+      if (body.length > PLAN_UPDATE_BODY_MAX) {
+        fail(`The body is ${body.length} characters; keep it under ${PLAN_UPDATE_BODY_MAX}.`);
+      }
+      if (item.parentId !== null) {
+        fail(
+          `#${item.number} is a step. An update is on a feature: name the top-level row ` +
+            `the step sits under.`,
+        );
+      }
+      const sections = await loadTree(sql, userId);
+      const feature = findNode(sections, item.id);
+      if (!feature) fail(`#${item.number} is not on the plan as it is read.`);
+      const [last] = await sql<{ created_at: Date }[]>`
+        select created_at from plan_updates
+        where user_id = ${userId} and feature_id = ${item.id}
+        order by created_at desc limit 1`;
+      const counts = updateCounts(feature, last ? last.created_at.toISOString() : null, Date.now());
+      const runId = arg('--run')?.trim() || null;
+      await sql`
+        insert into plan_updates (user_id, feature_id, health, body, steps_done_before,
+                                  steps_done_after, steps_total, run_id, session)
+        values (${userId}, ${item.id}, ${health}, ${body}, ${counts.before}, ${counts.after},
+                ${counts.total}, ${runId}, ${currentSession(process.env) ?? null})`;
+      console.log(
+        `#${item.number} ${PLAN_UPDATE_HEALTH[health].word.toLowerCase()}: ${progressSince({
+          stepsDoneBefore: counts.before,
+          stepsDoneAfter: counts.after,
+          stepsTotal: counts.total,
+        })}`,
+      );
+      await checkRowWriting(sql, userId, item, { note: body });
       return;
     }
 

@@ -9,6 +9,7 @@ import {
   type NoteClass,
 } from '@/lib/learn/vault/classify-payload';
 import { MODELS } from '@/lib/core/models';
+import { forceTool } from '@/lib/learn/graph/tool-call';
 
 /**
  * What kind of note this is, in one cheap call.
@@ -92,7 +93,7 @@ export async function classifyNote(input: {
         },
       },
     ],
-    tool_choice: { type: 'tool', name: TOOL_NAME },
+    tool_choice: forceTool(TOOL_NAME, MODEL),
     messages: [
       {
         role: 'user',

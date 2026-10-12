@@ -10,6 +10,8 @@
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { companyKey, personKey, roleKey, type OpeningSuggestion, type PersonSuggestion } from './payload';
 import { SUGGEST_MODEL } from './model';
+import { admitOpenings, scoredColumns, type Admission, type Admitter } from './admit';
+import { JEV_MODEL } from '@/lib/jev/wire';
 
 /** A followed-board posting offered to a search: a role found at this link came from that board. */
 export type BoardOrigin = { url: string; company: string };
@@ -21,16 +23,37 @@ function one<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null;
 }
 
-/** Store found roles. Returns "Title at Company" for each written; a duplicate link is skipped. */
+/**
+ * Store found roles. Returns "Title at Company" for each written onto the
+ * list; a duplicate link is skipped. With an admitter (the person has Jev on)
+ * each role is scored first, and one below the lowest fit score is written
+ * as expired rather than shown, so a later search does not find it again
+ * (admit.ts).
+ */
 export async function storeOpenings(
   supabase: AppSupabaseClient,
   userId: string,
   openings: readonly OpeningSuggestion[],
   boards: readonly BoardOrigin[],
+  admitter?: Admitter | null,
 ): Promise<string[]> {
   const fromBoard = new Map(boards.map((board) => [board.url, board.company]));
+  const admissions: Admission<OpeningSuggestion>[] = admitter
+    ? await admitOpenings(
+        openings,
+        (opening) => ({
+          title: opening.title,
+          company: opening.company,
+          location: opening.location,
+          why: opening.why,
+          move: opening.move,
+        }),
+        admitter,
+      )
+    : openings.map((item) => ({ item, scores: null, belowGate: false }));
   const headlines: string[] = [];
-  for (const opening of openings) {
+  for (const admission of admissions) {
+    const opening = admission.item;
     const board = fromBoard.get(opening.url);
     const { error } = await supabase.from('suggestions').insert({
       user_id: userId,
@@ -44,10 +67,11 @@ export async function storeOpenings(
       url: opening.url,
       location: opening.location,
       model: SUGGEST_MODEL,
+      ...scoredColumns(admission, JEV_MODEL),
     });
-    if (!error) headlines.push(`${opening.title} at ${opening.company}`);
+    if (!error && !admission.belowGate) headlines.push(`${opening.title} at ${opening.company}`);
     // 23505: the link was suggested already, by a goal step or an earlier run.
-    else if (error.code !== '23505') console.error('[jobs suggestions] apply insert', error.message);
+    else if (error && error.code !== '23505') console.error('[jobs suggestions] apply insert', error.message);
   }
   return headlines;
 }

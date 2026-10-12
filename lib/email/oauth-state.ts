@@ -6,15 +6,20 @@ function hmac(secret: string, payload: string): string {
   return createHmac('sha256', secret).update(payload).digest('base64url');
 }
 
-/** Signed, time-limited state tying the OAuth round-trip to one user. */
-export function signGmailOAuthState(userId: string, secret: string): string {
+/**
+ * Signed, time-limited state tying the OAuth round-trip to one user. Used by
+ * the Gmail grant and the X connection (plan #1818) alike.
+ */
+export function signOAuthState(userId: string, secret: string): string {
   const ts = Date.now();
   const payload = `${userId}.${ts}`;
   const sig = hmac(secret, payload);
   return Buffer.from(`${payload}.${sig}`).toString('base64url');
 }
 
-export function verifyGmailOAuthState(state: string, userId: string, secret: string): boolean {
+export const signGmailOAuthState = signOAuthState;
+
+export function verifyOAuthState(state: string, userId: string, secret: string): boolean {
   try {
     const decoded = Buffer.from(state, 'base64url').toString('utf8');
     const lastDot = decoded.lastIndexOf('.');
@@ -40,3 +45,5 @@ export function verifyGmailOAuthState(state: string, userId: string, secret: str
     return false;
   }
 }
+
+export const verifyGmailOAuthState = verifyOAuthState;

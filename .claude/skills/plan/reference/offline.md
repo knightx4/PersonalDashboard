@@ -117,6 +117,31 @@ set status = 'done', commit_sha = '…',
     comment = coalesce(comment || E'\n\n', '') || 'Done <date>: …'
 where id = '…';
 
+-- update: Dash's update on a feature, at the end of a build or re-shape run
+-- (plan #1666; SKILL.md, Building step 7). The counts are the feature's steps
+-- and substeps, decisions, setup jobs and dropped steps left out: done now,
+-- done when its last update was written (or a day ago, for its first), and
+-- the total. lib/plan/updates.ts `updateCounts` is the rule; this is it in SQL.
+with recursive beneath as (
+  select id, kind, status, completed_at from plan_items
+  where parent_id = '<the feature id>' and user_id = '…'
+  union all
+  select p.id, p.kind, p.status, p.completed_at from plan_items p
+  join beneath b on p.parent_id = b.id where p.user_id = '…'
+), since as (
+  select coalesce(max(created_at), now() - interval '1 day') as at
+  from plan_updates where feature_id = '<the feature id>' and user_id = '…'
+), counted as (
+  select * from beneath where kind = 'build' and status <> 'dropped'
+)
+insert into plan_updates (user_id, feature_id, health, body, steps_done_before,
+                          steps_done_after, steps_total, session)
+select '…', '<the feature id>', 'on_track', $u$<two or three sentences>$u$,
+  (select count(*) from counted, since where status = 'done' and completed_at <= since.at),
+  (select count(*) from counted where status = 'done'),
+  (select count(*) from counted),
+  'cse_…';
+
 -- answer: the person's move, never a session's. Here to be recognised, not run.
 update plan_items
 set status = 'done', resolution = '<their words>', commit_sha = null,
@@ -144,6 +169,27 @@ insert into plan_items (user_id, module, parent_id, title, acceptance, size,
 values ('…', 'dev', '<the feature id>', '…', '…', 's', 'proposed', 30,
         'From #63''s answer: <that answer, first line>');
 
+-- stopped: a run ending with its step neither closed nor blocked says why,
+-- in one line of 300 characters or fewer, on the newest run fired at the step
+-- or a row above it (a feature batch is fired at the feature). A run still
+-- 'started' is ended 'failed' with the reason as its error too; one the
+-- cutoff already ended keeps the app's note in `error`. `stop_pieces` is the
+-- split a too-big step would take, two to twenty titles in order, or null.
+-- A run row is Dash's own record, so no record_dash_action call.
+with recursive chain as (
+  select id, parent_id from plan_items where id = '<the step id>' and user_id = '…'
+  union all
+  select p.id, p.parent_id from plan_items p join chain on p.id = chain.parent_id
+)
+update plan_runs
+set stop_reason = $r$<why, one line>$r$, stop_pieces = null, stopped_at = now(),
+    status = case when status = 'started' then 'failed' else status end,
+    error = case when status = 'started' then $r$<why, one line>$r$ else error end
+where id = (select id from plan_runs where user_id = '…'
+            and plan_item_id in (select id from chain)
+            order by created_at desc limit 1)
+  and status <> 'finished';
+
 -- block: not finished, so no commit. `block_ask` is the one sentence saying
 -- what it needs, rewritten on every block and read by Dash and the plan row;
 -- the dated line is the history and is appended. Clear `block_ask` whenever
@@ -154,6 +200,14 @@ values ('…', 'dev', '<the feature id>', '…', '…', 's', 'proposed', 30,
 -- person to answer or decide something. A key or an account is not a block at
 -- all now; it is a setup step, above. Use 'steps' only with the
 -- dependency rows to match; 'outside' otherwise. Cleared with the ask.
+-- Never write a block whose ask says nothing is needed from the person
+-- ("nothing needed from you", "just waiting on the run"): a block is listed
+-- under what they have to do. A step that only waits on time or a scheduled
+-- run stays in progress and gets a check_backs row instead, so it shows as
+-- waiting on:
+--   insert into check_backs (user_id, title, detail, due_at, plan_item_id, source)
+--   values ('…', '<what to look at>', '<what to check>', now() + interval '2 hours',
+--           '<the step id>', 'plan #<n>');
 update plan_items
 set status = 'blocked', block_ask = '<what it needs, in one sentence>',
     block_kind = 'outside',
@@ -163,7 +217,7 @@ where id = '…';
 -- raise: what you need from the person, when it belongs to no step. `source`
 -- says which run raised it and what it was doing; `module` is null for the app
 -- as a whole. Never answer or dismiss one -- that is the person's move on
--- /dev/raised, the same as a decision.
+-- /dev/inbox, the same as a decision.
 -- `ask` is the move you want back, in one sentence answerable in one line;
 -- the CLI refuses a raise without one and doing the insert by hand does not
 -- make it optional.
@@ -205,6 +259,11 @@ select core.add_thread_turn('…', 'public.raised_items:<the raise>', 'claude', 
 -- `public.ideas:<id>` an idea, `public.raised_items:<id>` a raise. Read a
 -- thread from core.thread_turns by the same ref.
 select core.add_thread_turn('…', 'public.plan_items:<the step>', 'claude', $c$…$c$);
+
+-- a comment that asks nothing and wants nothing done (and that you changed
+-- nothing for) may be marked seen instead; see comments.md. The turn id is
+-- on core.thread_turns for the ref.
+select core.acknowledge_thread_turn('…', 'public.plan_items:<the step>', '<turn id>');
 ```
 
 `started_at` and `completed_at` are kept by a trigger from the status; do not

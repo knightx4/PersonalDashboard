@@ -3,6 +3,8 @@ import { ideaRowFrom } from '@/lib/ideas/load';
 import type { Triage } from '@/lib/feedback/triage';
 import {
   IDEA_SCORE_QUESTION,
+  IDEA_SCORE_VERSION,
+  needsScore,
   NO_VISION,
   NOT_TRIAGED,
   ideaScoreState,
@@ -55,6 +57,26 @@ describe('an idea score', () => {
 });
 
 describe('the score question', () => {
+  it('puts a small fix to an often-used part at the middle level, not at the edge (plan #1644)', () => {
+    expect(IDEA_SCORE_QUESTION.levels[1]).toBe(
+      'Helps a little: a convenience at the edge of the workspace, in a part used now and then',
+    );
+    expect(IDEA_SCORE_QUESTION.levels[2]).toBe(
+      'Helps somewhat: a real improvement to one part of the workspace, including a small fix to how a part used most days looks, moves or responds',
+    );
+    expect(scaleIdeaScore(2)).toBe(50);
+  });
+
+  it('is at version 2, and a score asked under any other is due again', () => {
+    expect(IDEA_SCORE_VERSION).toBe(2);
+    const at = '2026-09-30T09:00:01Z';
+    expect(needsScore(null)).toBe(true);
+    expect(needsScore({ value: 25, confidence: 0.9, at })).toBe(true);
+    expect(needsScore({ value: 25, confidence: 0.9, at, question: 1 })).toBe(true);
+    expect(needsScore({ value: 50, confidence: 0.9, at, question: 2 })).toBe(false);
+    expect(scoreFrom({ value: 50, confidence: 0.9, at, question: 2 })).toEqual({ value: 50, confidence: 0.9, at, question: 2 });
+  });
+
   it('has five levels and scales them to 0 to 100', () => {
     expect(IDEA_SCORE_QUESTION.levels).toHaveLength(5);
     expect(scaleIdeaScore(0)).toBe(0);
@@ -76,6 +98,7 @@ describe('the score question', () => {
     expect(readIdeaScore({ ok: true, answer, model: 'jev-1.13.0' }, at)).toEqual({
       value: 75,
       confidence: 0.912,
+      question: IDEA_SCORE_VERSION,
       at: '2026-09-30T10:00:00.000Z',
     });
     expect(readIdeaScore({ ok: false, reason: 'timeout', detail: '' })).toBeNull();

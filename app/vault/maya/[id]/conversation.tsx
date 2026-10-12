@@ -23,9 +23,9 @@ const MAYA: TalkAssistant = { name: 'Maya', Mark: OwlIcon };
  * changes as Maya's answer appears. `children` is the thought, drawn on the
  * server.
  *
- * Each of the three parts sits on its own card (note 9d8f9bd9): where you have
- * got to, the thought, and the replies. On the bare page they ran together as
- * one column of prose, and the headings were all that told them apart.
+ * Where you have got to sits on its own card (note 9d8f9bd9); Maya's thought and
+ * the replies share the next, parted by a rule, with Maya's turns on the
+ * recessed ground and yours on the card's (plan #1794).
  *
  * "Copy as note" (plan #1287) puts the thread on the clipboard as Markdown
  * for Obsidian, built here so it carries the summary as it now stands. The
@@ -71,9 +71,11 @@ export function MayaConversation({
         </section>
       </Card>
 
-      <Card padding="standard">{children}</Card>
+      <Card padding="standard">
+        {children}
 
-      <Card padding="standard" className="mt-6">
+        <hr className="my-5 border-border" />
+
         <section aria-labelledby="replies-heading">
           <h2 id="replies-heading" className="mb-2 text-body font-semibold text-ink">
             Replies
@@ -82,6 +84,7 @@ export function MayaConversation({
             id={`maya-${threadId}`}
             turns={turns}
             assistant={MAYA}
+            onCard
             label="Reply to Maya"
             placeholder="Agree, push back, or take it somewhere else"
             hint={

@@ -65,6 +65,9 @@ vi.mock('@/lib/learn/graph/load', () => ({
   loadConcept: vi.fn(async () => ({ state: 'unknown' })),
 }));
 
+// Each idea is saved with its claim's embedding (plan #1853).
+vi.mock('@/lib/learn/embed/idea-embedding', () => import('@/tests/stubs/idea-embedding'));
+
 const { writeGoalQuestion, unusedCard } = await import('./goal-question');
 const { goalQuestionDepth, cardBasisPrefix } = await import('./goal-idea');
 const { answeredRight } = await import('./goal-load');
@@ -178,6 +181,10 @@ describe('writeGoalQuestion', () => {
     expect(prompts[0]!.content).toContain(AIM.about);
     expect(prompts[0]!.content).not.toContain('The section they read');
     expect(state.concepts[0]).toMatchObject({ basis: `From your goal "${AIM.name}"` });
+    expect(state.concepts[0]).toMatchObject({
+      embedding: `vector of ${FROM_WORDING.claim}`,
+      embedding_model: 'voyage-4-lite',
+    });
     expect(state.probes).toHaveLength(1);
   });
 

@@ -202,8 +202,17 @@ function StoryGridCard({
               {story.actions && (
                 <div
                   className={cn(
-                    'flex flex-wrap items-center',
-                    small ? '[&_button]:px-1.5' : 'gap-2',
+                    'flex items-center',
+                    // A card beside the lead on the issue page keeps its
+                    // three actions on one line, under the link when they do
+                    // not fit beside it, rather than leaving Save alone on a
+                    // line of its own (law 9). Quick read's small cards carry
+                    // more actions than fit one line, so they still wrap.
+                    lead
+                      ? 'flex-wrap gap-2'
+                      : small
+                        ? 'flex-wrap [&_button]:px-1.5'
+                        : 'flex-nowrap [&_button]:px-1.5',
                   )}
                 >
                   {story.actions}
