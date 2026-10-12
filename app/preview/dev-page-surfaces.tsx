@@ -13,6 +13,7 @@ import { SpecDocView } from '@/app/dev/specs/[slug]/spec-doc-view';
 import { ChangelogView } from '@/app/dev/changelog/changelog-view';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import { phoneShot } from './plan-surfaces';
+import { planRowRef, raiseRef } from '@/lib/dev/inbox-snoozes';
 import { RaisedView } from '@/app/dev/raised/raised-view';
 import { ConversationsView } from '@/app/dev/raised/conversations-view';
 import { StatusPanel } from '@/app/dev/raised/status-panel';
@@ -835,7 +836,23 @@ export function DevInboxSurface() {
   return column(
     <>
       <PageHeader title="Inbox" />
-      <RaisedView queue={raisedQueue} groups={groups} />
+      <RaisedView
+        queue={raisedQueue}
+        groups={groups}
+        snooze={{
+          // The question came back today; the two below are still put aside,
+          // one with the longest title a step gets.
+          back: [planRowRef('w2')],
+          snoozed: [
+            {
+              ref: planRowRef('w9'),
+              title: '#1612 Decide which of the three export formats the weekly digest should attach to every email it sends',
+              snoozedUntil: '2026-10-09T00:00:00',
+            },
+            { ref: raiseRef('r9'), title: 'The mail provider is rate limiting', snoozedUntil: '2026-10-14T00:00:00' },
+          ],
+        }}
+      />
     </>,
   );
 }
