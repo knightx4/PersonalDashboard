@@ -16,6 +16,7 @@
  * shows a run's state in the browser.
  */
 import { STALLED_AFTER_MINUTES, elapsedSince } from './elapsed';
+import type { RunWaitingStatus } from '@/lib/core/run-activities';
 
 /** What a run ends as. `started` is the third state, and the one it begins in. */
 export type RunEnd = 'finished' | 'failed';
@@ -49,7 +50,10 @@ export type RunJob =
   | 'vision_reshape'
   | 'ci_fix'
   | 'posts'
-  | 'spec_change';
+  | 'spec_change'
+  | 'overhaul'
+  | 'audit'
+  | 'unstick';
 
 /**
  * What to call the press, where the page names the run behind a step.
@@ -75,6 +79,9 @@ export const RUN_JOB_LABEL: Record<RunJob, string> = {
   ci_fix: 'A fix for red CI',
   posts: 'A run drafting posts',
   spec_change: 'A run writing in a spec change',
+  overhaul: 'An overhaul run',
+  audit: 'A spec audit',
+  unstick: 'A look at why a feature stalled',
 };
 
 /**
@@ -101,6 +108,9 @@ export const RUN_JOB_NOUN: Record<RunJob, string> = {
   ci_fix: 'CI fix',
   posts: 'posts run',
   spec_change: 'spec change run',
+  overhaul: 'overhaul run',
+  audit: 'spec audit',
+  unstick: 'stall diagnosis',
 };
 
 /**
@@ -144,6 +154,14 @@ export type StoredRunReading = {
 
 /** The last run against one step, as the plan page reads it. */
 export type LastRun = {
+  /** The plan_runs row, which its lines hang on (plan #1826). Absent in older fixtures. */
+  id?: string;
+  /**
+   * The status beside `started` that says why a run is not working right
+   * now: it asked you something, or it stopped writing lines. `status` still
+   * reads `started` for both, so every rule that reads it is unchanged.
+   */
+  waiting?: RunWaitingStatus | null;
   status: RunStatus;
   createdAt: string;
   /** Why it did not finish. Null on every run that is going or that did. */
@@ -152,6 +170,18 @@ export type LastRun = {
   job: RunJob;
   /** What GitHub last said about it, or null while nothing has asked. */
   reading: StoredRunReading | null;
+  /**
+   * Why the session stopped, in its own words (`plan.ts stopped`, #1802).
+   * Null or absent when it said nothing, as on a run the cutoff ended.
+   */
+  stopReason?: string | null;
+  /** The pieces a session that found the work too big would split it into. */
+  stopPieces?: string[] | null;
+  /**
+   * When the run last wrote a line (plan #1825), or null when it has written
+   * none. Read only for a run that has not ended.
+   */
+  lastLineAt?: string | null;
 };
 
 /** The five columns a stored reading is spread across. */
@@ -372,11 +402,34 @@ export function runQuietNote(createdAt: string, now: number): string {
   return `Nothing was heard from this run for ${elapsedSince(createdAt, now)}.`;
 }
 
-/** What the plan page says about the last run against a step. */
-export function lastRunLine(run: LastRun, now: number): string {
+/**
+ * What the plan page says about the last run against a step.
+ *
+ * The session's own reason comes first: it says why, where the app's note on
+ * a run the cutoff caught only says how long it was quiet.
+ */
+export function lastRunLine(
+  run: Pick<LastRun, 'status' | 'createdAt' | 'error' | 'stopReason' | 'lastLineAt' | 'waiting'>,
+  now: number,
+): string {
   if (run.status === 'finished') return 'Last run finished';
+  if (run.status === 'started' && run.waiting === 'stale') {
+    return now === 0
+      ? 'Last run went quiet'
+      : `Last run went quiet: last heard from ${elapsedSince(run.lastLineAt ?? run.createdAt, now)} ago`;
+  }
+  if (run.status === 'started' && run.waiting === 'awaiting_input') return 'Last run is waiting on your answer';
   if (run.status === 'failed') {
-    return `Last run stopped: ${run.error ?? 'no reason recorded'}`;
+    return `Last run stopped: ${run.stopReason ?? run.error ?? 'no reason recorded'}`;
   }
   return now === 0 ? 'A run is going' : `A run has been going ${elapsedSince(run.createdAt, now)}`;
+}
+
+/**
+ * When a stale run was last heard from (plan #1825), for the opened row's
+ * account of its run: its newest line, or its start if the line was not read.
+ */
+export function staleLine(run: Pick<LastRun, 'createdAt' | 'lastLineAt'>, now: number): string {
+  if (now === 0) return 'Gone quiet.';
+  return `Gone quiet: last heard from ${elapsedSince(run.lastLineAt ?? run.createdAt, now)} ago.`;
 }

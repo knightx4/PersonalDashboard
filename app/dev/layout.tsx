@@ -12,6 +12,7 @@ import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { loadPlanForRequest } from '@/lib/plan/request-plan';
 import { buildPlanTree } from '@/lib/plan/tree';
 import { waitingOnYou } from '@/lib/plan/waiting';
+import { countPlanRunQuestions } from '@/lib/plan/run-answer';
 import { countProposedSpecChanges } from '@/lib/specs/changes';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { estimatePaidActions, paidActionsUnder } from '@/lib/core/spend/paid-actions';
@@ -56,7 +57,7 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     return <NoPermission what="The Dev workspace" />;
   }
 
-  const [settings, counts, activity, raised, plan, mainCheck, costs, specChanges] =
+  const [settings, counts, activity, raised, plan, mainCheck, costs, specChanges, runQuestions] =
     await Promise.all([
       loadAccountSettings(user.id),
       loadModuleCounts(user.id),
@@ -72,6 +73,9 @@ export default async function DevLayout({ children }: { children: React.ReactNod
       // Changes to specs waiting on a yes, which Home lists under To approve
       // (plan #1506).
       countProposedSpecChanges(supabase, user.id),
+      // Runs held on a question they asked partway, which the Inbox lists
+      // under Need your answer (plan #1824).
+      countPlanRunQuestions(supabase, user.id),
     ]);
 
   /**
@@ -87,10 +91,10 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   const waiting = waitingOnYou(buildPlanTree(plan));
 
   /**
-   * Dash is first because it is the page the day starts on: the summary of the
-   * last 24 hours, the questions a session needs answered before it can carry
-   * on, and every conversation you have had with Dash. A question nobody reads
-   * is a session that guessed.
+   * Home is first because it is the page the day starts on: what is running,
+   * the summary of the last 24 hours, and every conversation you have had with
+   * Dash. The Inbox beside it holds the questions a session needs answered
+   * before it can carry on. A question nobody reads is a session that guessed.
    *
    * Then three lists: what was decided and is being built, what is wrong now,
    * and what is only being thought about. The plan leads them because it is
@@ -118,11 +122,15 @@ export default async function DevLayout({ children }: { children: React.ReactNod
   const sections: NavSection[] = [
     // The route stays /dev/raised, which keeps every link already written into
     // a notification, a comment and an old summary working.
+    { href: '/dev/raised', label: 'Home', icon: 'devHome' },
+    // Everything waiting on you, the way an inbox holds what is addressed to
+    // you. Home carried it until the summary and the conversations pushed it
+    // down the page; the badge is the length of this list.
     {
-      href: '/dev/raised',
-      label: 'Home',
-      icon: 'raised',
-      badge: raised.length + waiting.length + specChanges,
+      href: '/dev/inbox',
+      label: 'Inbox',
+      icon: 'inbox',
+      badge: raised.length + waiting.length + specChanges + runQuestions,
     },
     { href: '/dev/plan', label: 'Plan', icon: 'plan' },
     { href: '/dev/bugs', label: 'Bugs and requests', icon: 'bugs' },
@@ -131,6 +139,10 @@ export default async function DevLayout({ children }: { children: React.ReactNod
     // Ideas because a takeaway is an idea someone else had.
     { href: '/dev/inspiration', label: 'Inspiration', icon: 'inspiration' },
     { href: '/dev/specs', label: 'Specs', icon: 'specs' },
+    // One page per workspace, gathering its rows from the lists above and
+    // below. A single entry rather than one per module: a tab for each would
+    // be the plan's sections again (note 4308875b).
+    { href: '/dev/modules', label: 'Modules', icon: 'modules' },
     { href: '/dev/ui', label: 'UI', icon: 'ui' },
     { href: '/dev/surfaces', label: 'Surfaces', icon: 'surfaces' },
     // Which pages are opened, and the model spend of each workspace (plan

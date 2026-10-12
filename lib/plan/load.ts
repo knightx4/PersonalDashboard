@@ -207,6 +207,11 @@ export type PlanItem = {
   /** The step this is part of, or null at the top of a module's plan. */
   parentId: string | null;
   title: string;
+  /**
+   * One line saying what it is, under the title (plan #1670). Written in the
+   * compose surface a feature is made in; absent on rows from before it.
+   */
+  summary?: string | null;
   /** What the step involves. The paragraph under the heading. */
   detail: string | null;
   /** Done when. What the work is checked against, written before the work. */
@@ -283,14 +288,29 @@ export type PlanDependency = {
   dependsOnId: string;
 };
 
+/**
+ * A check-back still waiting on a plan row: a session said to look again at
+ * a time, because the step needs something that does not exist yet, such as
+ * two weeks of data. The step waits on it the way it waits on another step
+ * (`PlanNode.waitsUntil`), so the runner does not send it before then.
+ */
+export type PlanCheckWait = {
+  id: string;
+  planItemId: string;
+  title: string;
+  dueAt: string;
+};
+
 export type PlanData = {
   items: PlanItem[];
   dependencies: PlanDependency[];
+  /** The waiting check-backs on plan rows. Absent reads as none. */
+  checkWaits?: PlanCheckWait[];
 };
 
 /** Every column the app reads off a plan row. Shared with the changelog. */
 export const ITEM_COLUMNS =
-  'id, number, module, parent_id, title, detail, acceptance, status, kind, track, fog, resolution, ' +
+  'id, number, module, parent_id, title, summary, detail, acceptance, status, kind, track, fog, resolution, ' +
   'comment, block_ask, block_kind, priority, size, assignee, commit_sha, position, ' +
   'started_at, completed_at, ' +
   'created_at, updated_at, dismissed_at, fog_dismissed_at';
@@ -311,7 +331,7 @@ export async function loadPlan(
   supabase: SupabaseClient<any, 'public'>,
   userId: string,
 ): Promise<PlanData> {
-  const [rows, deps, threads] = await Promise.all([
+  const [rows, deps, threads, checks] = await Promise.all([
     readAll<Record<string, unknown>>((from, to) =>
       supabase
         .from('plan_items')
@@ -334,6 +354,7 @@ export async function loadPlan(
     // Every thread under a plan row, from the shared store (plan #1470), in
     // one read keyed by ref rather than a ref per row.
     loadTableThreads(supabase, PLAN_TABLE, { userId }),
+    loadCheckWaits(supabase, userId),
   ]);
 
   return {
@@ -343,7 +364,41 @@ export async function loadPlan(
       itemId: row.item_id as string,
       dependsOnId: row.depends_on_id as string,
     })),
+    checkWaits: checks,
   };
+}
+
+/**
+ * The check-backs still waiting on plan rows. A read that fails leaves them
+ * out, which is how the plan read before they held anything: a step then reads
+ * as ready rather than the whole plan failing to load.
+ */
+async function loadCheckWaits(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: SupabaseClient<any, 'public'>,
+  userId: string,
+): Promise<PlanCheckWait[]> {
+  try {
+    const { data, error } = await supabase
+      .from('check_backs')
+      .select('id, plan_item_id, title, due_at')
+      .eq('user_id', userId)
+      .eq('status', 'waiting');
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as Record<string, unknown>[])
+      .filter((row) => typeof row.plan_item_id === 'string')
+      .map((row) => ({
+        id: row.id as string,
+        planItemId: row.plan_item_id as string,
+        title: row.title as string,
+        dueAt: row.due_at as string,
+      }));
+  } catch (err) {
+    console.error(
+      `the check-backs could not be read for the plan: ${err instanceof Error ? err.message : 'failed'}`,
+    );
+    return [];
+  }
 }
 
 /**
@@ -374,6 +429,7 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
     module: planScopeOf(scope),
     parentId: (row.parent_id as string | null) ?? null,
     title: row.title as string,
+    summary: (row.summary as string | null) ?? null,
     detail: (row.detail as string | null) ?? null,
     acceptance: (row.acceptance as string | null) ?? null,
     status: isPlanStatus(status) ? status : 'not_started',

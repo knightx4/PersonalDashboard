@@ -109,6 +109,22 @@ describe('readyClaudeSteps', () => {
   });
 });
 
+describe('page order', () => {
+  it('keeps page order across goals', () => {
+    expect(ready([goal('a'), goal('b')], [step('a1', 'a'), step('b1', 'b')])).toEqual(['a1', 'b1']);
+  });
+
+  it('does not mark a goal in the brief', () => {
+    const text = dailyRunText({
+      userId: 'u',
+      runId: 'r',
+      steps: [{ id: 's', title: 'Draft', goalId: 'g', goalTitle: 'Move' }],
+    });
+    expect(text).toContain(`under the goal "Move"`);
+    expect(text).not.toContain('focus');
+  });
+});
+
 describe('ranRecently', () => {
   const now = Date.parse('2026-09-24T12:00:00Z');
   it('refuses a second morning run within the gap and allows one after it', () => {

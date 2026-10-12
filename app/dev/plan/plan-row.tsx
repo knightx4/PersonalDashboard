@@ -12,6 +12,7 @@ import {
   removePlanDependency,
   reshapePlanFeature,
   sendPlanFeatureToClaude,
+  workPlanOverhaul,
   dismissPlanDecision,
   dismissPlanFog,
   sendPlanItemToClaude,
@@ -25,6 +26,7 @@ import { useClockNow } from '@/lib/use-clock-now';
 import { Button } from '@/components/ui/button';
 import { FieldError, FieldHint } from '@/components/ui/field';
 import { PLAN_PRIORITIES, PLAN_PRIORITY_LABEL, PLAN_STATUSES, isClosed } from '@/lib/plan/load';
+import { checkWaitName } from '@/lib/plan/check-backs';
 import {
   flatten,
   healthOf as planHealthOf,
@@ -68,6 +70,8 @@ import { cn } from '@/lib/cn';
 import { TreeRow, rowInset, useTreeRow } from '@/components/plan-tree/tree-row';
 import { RowIconButton } from '@/components/plan-tree/row-icon-button';
 import { MoveLabel } from '@/components/ui/move-label';
+import { MOVE_TONE, waitingOnName, type Move } from '@/lib/core/move';
+import { StateLabel } from '@/components/dev/state-label';
 import {
   ASSIGNEE_LABEL,
   AddStep,
@@ -80,13 +84,19 @@ import type { TreeActions } from '@/components/plan-tree/types';
 import { LinkedText } from '@/components/ui/linked-text';
 import { criticStopNeeds, type CriticStopView } from '@/lib/plan/ui-check-stop';
 import { CriticStop } from './critic-stop';
+import { SendScreenBack } from './send-back';
+import { ScreenChanges } from '@/components/dev/screen-change';
+import { featureHref, waitedOnHref } from '@/lib/plan/feature-page';
+import type { ScreenChangeView } from '@/lib/plan/screen-change';
+import type { PlanPicture } from '@/lib/plan/pictures';
+import { PlanPictures } from '@/components/dev/plan-pictures';
 
 /**
  * One row of the dev plan, drawn through the shared tree row.
  */
 
 /** The plan's own writes, for the shared tree components. */
-const PLAN_TREE_ACTIONS: TreeActions = {
+export const PLAN_TREE_ACTIONS: TreeActions = {
   answer: answerPlanDecision,
   setStatus: setPlanItemStatus,
   dismissQuestion: dismissPlanDecision,
@@ -254,6 +264,9 @@ function SendToClaude({
   batchPending,
   reshapeAction,
   reshapePending,
+  overhaulAction,
+  overhaulPending,
+  running,
   quiet,
   quietAsk,
   onAskQuiet,
@@ -269,6 +282,11 @@ function SendToClaude({
   /** The other direction: re-read the feature against what has been settled. */
   reshapeAction: (formData: FormData) => void;
   reshapePending: boolean;
+  /** An overhaul's own press: start the overhaul routine on it (plan #1514). */
+  overhaulAction: (formData: FormData) => void;
+  overhaulPending: boolean;
+  /** A run against this row is going now, so the overhaul press waits. */
+  running: boolean;
   /** Nothing has been said about the last run yet, so the missing-key note is
       worth the room. */
   quiet: boolean;
@@ -296,13 +314,15 @@ function SendToClaude({
     (step) => step.id !== node.id && !isClosed(step.status) && step.status !== 'proposed',
   ).length;
 
+  const overhaul = node.track === 'overhaul' && node.status !== 'proposed';
+
   const held = resolving
     ? 'Dash is re-reading this feature against the answers you just gave. This comes back when it is done.'
     : undefined;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {quietAsk ? (
+      {overhaul ? null : quietAsk ? (
         // Nothing is submitted from here while the run is quiet. The press
         // raises the question on the row, and answering it is what sends --
         // one question in one place, however Send was reached.
@@ -333,7 +353,31 @@ function SendToClaude({
           </Button>
         </form>
       )}
-      {beneath > 0 && (
+      {/* An overhaul is worked by its own routine in its own order, so it
+          gets that press in place of Send and the batch, which would hand
+          its steps to the plan routine one after another. */}
+      {overhaul && (
+        <form action={overhaulAction}>
+          <input type="hidden" name="id" value={node.id} />
+          <Button
+            type="submit"
+            size="sm"
+            variant="secondary"
+            pending={overhaulPending}
+            disabled={resolving || running}
+            title={
+              held ??
+              (running
+                ? 'A run is working this now. This comes back when it is done.'
+                : 'Start the overhaul routine on this overhaul. It works its steps in order and stops at the first thing that needs you.')
+            }
+          >
+            <Play className="size-3.5" aria-hidden />
+            {overhaulPending ? 'Starting…' : 'Work this overhaul'}
+          </Button>
+        </form>
+      )}
+      {beneath > 0 && !overhaul && (
         <form action={batchAction}>
           <input type="hidden" name="id" value={node.id} />
           <Button
@@ -379,7 +423,7 @@ function SendToClaude({
           Re-reading this against your answers. The buttons come back when it is done.
         </span>
       )}
-      {!canSend && quiet && !resolving && (
+      {!canSend && quiet && !resolving && !overhaul && (
         <span className="text-small text-ink-muted">
           Needs the plan routine&apos;s token on the deployment.
         </span>
@@ -397,6 +441,7 @@ function healthFactsOf(node: PlanNode): HealthFacts {
     blockAsk: node.blockAsk,
     comment: node.comment,
     waitingOn: node.waitingOn,
+    waitsUntil: node.waitsUntil,
   };
 }
 
@@ -407,7 +452,13 @@ function healthOf(node: PlanNode, liveness?: PlanLiveness) {
 function moveFor(node: PlanNode, context?: MoveContext) {
   // A step held up by exactly one other says which, by number: "Waiting on
   // #1453". More than one, and the tooltip and the Needs line name them.
-  const waitingOn = node.waitingOn.length === 1 ? `#${node.waitingOn[0].number}` : undefined;
+  // Waiting only on a check-back, it names the day: "Waiting on 26 Oct".
+  const waitingOn =
+    node.waitingOn.length === 1
+      ? `#${node.waitingOn[0].number}`
+      : node.waitingOn.length === 0 && node.waitsUntil.length > 0
+        ? checkWaitName(node.waitsUntil)
+        : undefined;
   return moveWordsFor(planMoveOf(node, context), ownMoveWord(node, context), waitingOn);
 }
 
@@ -485,8 +536,12 @@ function useResolving(
  * one step of it is read in full. Its sub-steps follow it as rows of their
  * own, one level further in, folded with the chevron; the fold starts closed
  * on a step that is finished, because what is done is consulted, not read.
+ *
+ * Worked out here as parts rather than drawn, so the feature's own page
+ * (feature-page.tsx, plan #1664) offers every press the row does from the
+ * same menus and the same action states, and the two cannot drift.
  */
-export function PlanRow({
+export function usePlanRow({
   node,
   trail,
   catalog,
@@ -497,10 +552,14 @@ export function PlanRow({
   commitChecks,
   overhaulProgress = {},
   criticStops = {},
+  screenChanges = {},
+  pictures = {},
   view,
   searching,
   unfolded,
   opened = false,
+  asStep = false,
+  moveAfter = false,
 }: {
   node: PlanNode;
   /** One entry per level above: whether that level's line carries on below this row. */
@@ -533,6 +592,10 @@ export function PlanRow({
   overhaulProgress?: Readonly<Record<string, OverhaulProgress>>;
   /** What the design critic last asked of each step it stopped, by step id (plan #1610). */
   criticStops?: Readonly<Record<string, CriticStopView>>;
+  /** Each step's changed screens with their pictures, by step number (plan #1541). */
+  screenChanges?: Readonly<Record<number, readonly ScreenChangeView[]>>;
+  /** The drawn options on each row, by plan item id (migration 0189). */
+  pictures?: Readonly<Record<string, readonly PlanPicture[]>>;
   /** Which view is on. Only Dismissed shows what has been put aside. */
   view: View;
   /** Whether a search is narrowing the page. Unfolds closed rows that hold a hit. */
@@ -558,6 +621,26 @@ export function PlanRow({
    * in the app passes it.
    */
   opened?: boolean;
+  /**
+   * The rows at the top of this list are steps, not features: the feature
+   * page's Steps tab lists a feature's steps with no feature row above them,
+   * so what goes under them is a substep and their titles fold rather than
+   * link (plan #1664).
+   */
+  asStep?: boolean;
+  /**
+   * Say a waiting move as "After #935" rather than "Waiting on #935". The
+   * feature page sets it: its Health column already says "Waiting", and a
+   * second "Waiting" beside it in the move column named a different fact.
+   */
+  moveAfter?: boolean;
+  /**
+   * A small line under the title saying where the row sits, for a list that
+   * does not draw the tree: the Steps tab's status groups name a substep's
+   * step this way (plan #1665), and a step listed beneath the one it waits on
+   * names it. Read by `PlanRow`, not here.
+   */
+  source?: string;
 }) {
   // Ticks, so a re-shape that ages out stops holding this row's buttons shut
   // without the page being navigated. 0 before mount, which is what keeps the
@@ -609,12 +692,21 @@ export function PlanRow({
     reshapePlanFeature,
     {} as PlanActionState,
   );
+  // An overhaul's own press: the overhaul routine, not the plan routine.
+  const [overhaulState, overhaulAction, overhaulPending] = useActionState(
+    workPlanOverhaul,
+    {} as PlanActionState,
+  );
 
   // A step the design critic stopped draws its fixes and shots in a panel of
   // its own, so the Needs line says only what that panel does not (plan #1610).
   const criticStop = node.status === 'blocked' ? criticStops[node.id] : undefined;
   const descendants = flatten([node]).length - 1;
   const closed = isClosed(node.status);
+  // A row at the top of its module is a feature, so what goes under it is a
+  // step; anything deeper is a substep (PLAN-SPEC, "Levels").
+  const childLevel = trail.length === 0 && !asStep ? 'step' : 'substep';
+  const addChildLabel = childLevel === 'step' ? 'Add a step' : 'Add a substep';
   const isDecision = node.kind === 'decision';
   // A setup job still open. Closed, it is an ordinary finished row.
   const setupOpen = node.kind === 'setup' && !closed;
@@ -659,7 +751,16 @@ export function PlanRow({
       ),
     [catalog],
   );
-  const move = moveFor(node, resolving);
+  // An overhaul's run claims nothing on the row itself, so its move would go
+  // on reading as before while the routine works it. Said in the Status
+  // column instead, the way a claimed step says it (plan #1514).
+  const overhaulRunning = node.track === 'overhaul' && run?.status === 'started';
+  const move = overhaulRunning
+    ? {
+        move: { state: 'dash_working' } as const,
+        title: 'The overhaul routine is working this now.',
+      }
+    : moveFor(node, resolving);
   // Whether this row itself is the one being re-read. The rollup above would
   // also be true of a feature whose child is being re-shaped, and it is the
   // child's buttons that should be shut, not this one's.
@@ -752,7 +853,8 @@ export function PlanRow({
     },
     // The quick icons are only there from sm up and only under a pointer, so
     // the menu carries the same two actions for a phone and for a keyboard.
-    ...(closed
+    // An overhaul is sent by its own press below, never to the plan routine.
+    ...(closed || node.track === 'overhaul'
       ? []
       : [
           {
@@ -785,7 +887,19 @@ export function PlanRow({
           },
         ]
       : []),
-    { id: 'add-child', label: 'Add a sub-step', onSelect: row.addChild },
+    // The overhaul press, for a phone and a keyboard as the others are.
+    ...(node.track === 'overhaul' && !closed && node.status !== 'proposed'
+      ? [
+          {
+            id: 'overhaul',
+            label: 'Work this overhaul',
+            disabled: beingResolved || run?.status === 'started',
+            formAction: (formData: FormData) => workPlanOverhaul({}, formData),
+            formFields: { id: node.id },
+          },
+        ]
+      : []),
+    { id: 'add-child', label: addChildLabel, onSelect: row.addChild },
     { id: 'edit', label: 'Edit', onSelect: () => setEditing(true) },
     {
       id: 'up',
@@ -812,36 +926,68 @@ export function PlanRow({
     },
   ]);
 
-  const inset = rowInset(trail);
   const actionError =
     assignState.error ??
     sendState.error ??
     batchState.error ??
     reshapeState.error ??
+    overhaulState.error ??
     answerState.error;
   const actionMessage =
     assignState.message ??
     sendState.message ??
     batchState.message ??
     reshapeState.message ??
+    overhaulState.message ??
     answerState.message;
-
-  return (
-    <TreeRow
-      node={criticStop ? { ...node, blockAsk: criticStopNeeds(criticStop.branch) } : node}
-      trail={trail}
-      row={row}
-      health={health}
-      move={move.move && <MoveLabel move={move.move} title={move.title} />}
-      statusMenu={statusMenu}
-      menu={menu}
-      actions={PLAN_TREE_ACTIONS}
-      origin={origin}
-      addedBy={addedBy}
-      titles={refTitles}
-      dependencies={{ catalog, groupOf: (entry) => scopeLabel(entry.module) }}
-      marks={
-        <>
+  /* The question a quiet run puts in front of Send, wherever the press
+              came from. It sits where the result of that press will sit, so the
+              answer and what came back of it read as one exchange in one place.
+              Gone once something has come back, since the question has been
+              answered by then and the answer is what there is to read. */
+  const confirmNotice =
+    confirmingSend && quietAsk && !sendState.error && !sendState.message ? (
+      <>
+              <p className="text-ink-muted">{quietAsk}</p>
+              <div className="mt-1 flex items-center gap-2">
+                {/* Cancel first and plain, because doing nothing is the safe half
+                    of this and the press that sends should be the deliberate one. */}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setConfirmingSend(false)}
+                >
+                  Cancel
+                </Button>
+                <form action={sendAction}>
+                  <input type="hidden" name="id" value={node.id} />
+                  {/* The answer, and the only thing that carries it. The guard
+                      refuses the press without it. */}
+                  <input type="hidden" name="confirm" value="quiet" />
+                  <Button type="submit" size="sm" variant="secondary" pending={sendPending}>
+                    {sendPending ? 'Sending…' : 'Send it anyway'}
+                  </Button>
+                </form>
+              </div>
+      </>
+    ) : null;
+  /* Cancel first and plain, because doing nothing is the safe half
+                    of this and the press that sends should be the deliberate one. */
+  const resultNotice = (actionError ?? actionMessage) ? (
+      <>
+              <FieldError>{actionError}</FieldError>
+              {!actionError && (
+                // Ink, not green. The tones above are a status system where
+                // positive means done; this is a transient "Assigned" or "Sent"
+                // from the action that just ran, which is the system reporting
+                // itself and is not a claim about money (law 4).
+                <span className="text-ink-muted">{actionMessage}</span>
+              )}
+      </>
+    ) : null;
+  const marks = (
+    <>
           {/* The steps you kept, on the row.
            * The runner takes anything approved that is not yours, so the
            * fact worth reading off a resting row is which steps it will
@@ -867,11 +1013,14 @@ export function PlanRow({
            * by its own routine and the runner never fires it, which is the
            * one thing about it a resting plan would otherwise hide: its ready
            * steps look like any other's. A word rather than an icon, because
-           * there is no glyph that already means "replaces how this works". */}
+           * there is no glyph that already means "replaces how this works".
+           * Not on a phone, where it took the title's width beside it and a
+           * title of six words ran to three lines (plan #1688); an overhaul's
+           * summary line under the title says what it is. */}
           {node.track === 'overhaul' && (
             <span
               title="Overhaul. Built by its own routine; the runner will not take it."
-              className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1.5 py-0.5 text-micro text-accent"
+              className="inline-flex shrink-0 items-center rounded-full bg-accent-tint px-1.5 py-0.5 text-micro text-accent max-sm:hidden"
             >
               Overhaul
             </span>
@@ -892,9 +1041,9 @@ export function PlanRow({
             <Underway startedAt={node.startedAt} assignee={node.assignee} claim={claim} />
           )}
         </>
-      }
-      priority={
-        /* Priority, and only when it says something. Nearly every step is at
+  );
+  const priority = (
+    /* Priority, and only when it says something. Nearly every step is at
            Normal, so the word was on almost every row and told you nothing;
            what you are scanning for is the handful marked Next or Someday.
            The separator before the size goes with it, so a normal step at S
@@ -905,11 +1054,22 @@ export function PlanRow({
            itself, drawn only while the row is under the pointer or the menu
            is being reached by keyboard: the resting row still says nothing,
            which is the whole reason Normal is silent. */
-        <>
+        <span className="whitespace-nowrap">
+          {/* At Normal the size leads, so it sits where Next or Someday would
+              rather than after a word that is not drawn (plan #1747). */}
+          {node.priority === 2 && node.size && (
+            <span className="text-ink-muted" title={SIZE_LABEL[node.size]}>
+              {node.size.toUpperCase()}{' '}
+            </span>
+          )}
           <ActionMenu
             label={`Priority of #${node.number} ${node.title}`}
             items={priorityMenu}
             align="start"
+            // Inline in the column too, so the word and the size after it stay
+            // on one line ("Next · M") rather than the size dropping under
+            // the menu's block (plan #1688).
+            className="inline-block align-baseline"
             triggerClassName={cn(
               'h-auto w-auto rounded px-0.5 py-0 font-normal',
               node.priority === 2 &&
@@ -926,16 +1086,16 @@ export function PlanRow({
               </span>
             }
           />
-          {node.size && (
+          {node.priority !== 2 && node.size && (
             <span className="text-ink-muted" title={SIZE_LABEL[node.size]}>
-              {node.priority !== 2 && ' · '}
+              {' · '}
               {node.size.toUpperCase()}
             </span>
           )}
-        </>
-      }
-      quickActions={
-        <>
+        </span>
+  );
+  const quickActions = (
+    <>
           {!closed &&
             (quietAsk ? (
               // Nothing is sent from here while the run is quiet: the press
@@ -972,59 +1132,12 @@ export function PlanRow({
             <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
           </RowIconButton>
         </>
-      }
-      notices={
-        <>
-          {/* The question a quiet run puts in front of Send, wherever the press
-              came from. It sits where the result of that press will sit, so the
-              answer and what came back of it read as one exchange in one place.
-              Gone once something has come back, since the question has been
-              answered by then and the answer is what there is to read. */}
-          {confirmingSend && quietAsk && !sendState.error && !sendState.message && (
-            <li style={inset} className="pb-1.5 pr-3 text-small">
-              <p className="text-ink-muted">{quietAsk}</p>
-              <div className="mt-1 flex items-center gap-2">
-                {/* Cancel first and plain, because doing nothing is the safe half
-                    of this and the press that sends should be the deliberate one. */}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setConfirmingSend(false)}
-                >
-                  Cancel
-                </Button>
-                <form action={sendAction}>
-                  <input type="hidden" name="id" value={node.id} />
-                  {/* The answer, and the only thing that carries it. The guard
-                      refuses the press without it. */}
-                  <input type="hidden" name="confirm" value="quiet" />
-                  <Button type="submit" size="sm" variant="secondary" pending={sendPending}>
-                    {sendPending ? 'Sending…' : 'Send it anyway'}
-                  </Button>
-                </form>
-              </div>
-            </li>
-          )}
-
-          {/* What the last action did, wherever it was started from. */}
-          {(actionError ?? actionMessage) && (
-            <li style={inset} className="pb-1.5 pr-3 text-small">
-              <FieldError>{actionError}</FieldError>
-              {!actionError && (
-                // Ink, not green. The tones above are a status system where
-                // positive means done; this is a transient "Assigned" or "Sent"
-                // from the action that just ran, which is the system reporting
-                // itself and is not a claim about money (law 4).
-                <span className="text-ink-muted">{actionMessage}</span>
-              )}
-            </li>
-          )}
-        </>
-      }
-      edit={<EditStep node={node} catalog={catalog} onDone={() => setEditing(false)} />}
-      body={
-        <>
+  );
+  const edit = (
+    <EditStep node={node} catalog={catalog} onDone={() => setEditing(false)} />
+  );
+  const body = (
+    <>
           {/* What its run has done, above the questions and the thread: on a
               step you opened because it says somebody is working it, this is
               the thing you opened it to find out. */}
@@ -1041,9 +1154,25 @@ export function PlanRow({
             />
           )}
 
+          {/* The drawn options on a proposal or decision, before anything
+              is built: what the person is being asked to approve or choose. */}
+          <PlanPictures pictures={pictures[node.id] ?? []} />
+
           {/* A screen the critic stopped after its last round: its fixes and
               shots, and the two ways on (plan #1610). */}
           {criticStop && <CriticStop id={node.id} view={criticStop} />}
+
+          {/* The screens this step changed, before and after, as the critic
+              passed them (plan #1541), each with a thumbs-down that reopens
+              a finished step with your words on it (plan #1542). */}
+          <ScreenChanges
+            changes={screenChanges[node.number] ?? []}
+            footer={
+              node.status === 'done'
+                ? (change) => <SendScreenBack id={node.id} surface={change.surface} />
+                : undefined
+            }
+          />
 
           {setupOpen && (
             <SetupJob
@@ -1054,9 +1183,9 @@ export function PlanRow({
             />
           )}
         </>
-      }
-      meta={
-        <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
+  );
+  const meta = (
+    <p className="flex flex-wrap gap-x-3 text-small text-ink-muted">
           <span>{scopeLabel(node.module)}</span>
           {node.priority !== 2 && <span>{PLAN_PRIORITY_LABEL[node.priority]}</span>}
           {node.size && <span>{SIZE_LABEL[node.size]}</span>}
@@ -1092,9 +1221,9 @@ export function PlanRow({
               is one of them too many. */}
           {run && !accountForRun && <LastRunLine run={run} />}
         </p>
-      }
-      panelActions={
-        <>
+  );
+  const panelActions = (
+    <>
           <form action={assignAction}>
             <input type="hidden" name="id" value={node.id} />
             <input type="hidden" name="assignee" value={assignValue} />
@@ -1112,6 +1241,9 @@ export function PlanRow({
               batchPending={batchPending}
               reshapeAction={reshapeAction}
               reshapePending={reshapePending}
+              overhaulAction={overhaulAction}
+              overhaulPending={overhaulPending}
+              running={run?.status === 'started'}
               resolving={beingResolved}
               quietAsk={quietAsk}
               onAskQuiet={() => setConfirmingSend(true)}
@@ -1121,28 +1253,186 @@ export function PlanRow({
             />
           )}
         </>
-      }
-      addChild={
-        <AddStep
+  );
+  const addChild = (
+    <AddStep
           module={node.module}
           parentId={node.id}
+          level={childLevel}
           open
           onDone={() => row.setAddingChild(false)}
         />
+  );
+
+  // The one press a feature's own page keeps in its header: the same Send the
+  // row's opened panel leads with, asking first when the run has gone quiet.
+  // It reads "Send to Dash" on the title's line (plan #1688): on the
+  // feature's own page it plainly sends that feature, and the count of rows
+  // beneath, which is every row at any depth rather than the steps Progress
+  // counts, is in its title instead. On a phone it is the play mark alone,
+  // the words kept as its name, so the title keeps the width of the line.
+  const sendWords = 'max-sm:sr-only';
+  const sendShape = 'press-area max-sm:size-9 max-sm:px-0';
+  const sendButton =
+    closed || node.track === 'overhaul' ? null : quietAsk ? (
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        disabled={beingResolved}
+        title={quietAsk}
+        onClick={() => setConfirmingSend(true)}
+        className={sendShape}
+      >
+        <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
+        <span className={sendWords}>Send to Dash</span>
+      </Button>
+    ) : (
+      <form action={sendAction}>
+        <input type="hidden" name="id" value={node.id} />
+        <Button
+          type="submit"
+          size="sm"
+          variant="secondary"
+          pending={sendPending}
+          disabled={beingResolved}
+          title={sendLabel(node)}
+          className={sendShape}
+        >
+          <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
+          <span className={sendWords}>{sendPending ? 'Sending…' : 'Send to Dash'}</span>
+        </Button>
+      </form>
+    );
+
+  return {
+    row,
+    sendButton,
+    batchAction,
+    node: criticStop ? { ...node, blockAsk: criticStopNeeds() } : node,
+    health,
+    move: move.move ? (
+      moveAfter && afterWord(move.move) ? (
+        // Waiting on one step, the words link to it (on this page, its row).
+        node.waitingOn.length === 1 ? (
+          <a
+            href={waitedOnHref(node, node.waitingOn[0])}
+            className="press-area underline underline-offset-2"
+          >
+            <StateLabel
+              glyph={null}
+              word={afterWord(move.move)!}
+              tone={MOVE_TONE.waiting}
+              title={`${move.title} Opens #${node.waitingOn[0].outline ?? node.waitingOn[0].number}.`}
+            />
+          </a>
+        ) : (
+          <StateLabel
+            glyph={null}
+            word={afterWord(move.move)!}
+            tone={MOVE_TONE.waiting}
+            title={move.title}
+          />
+        )
+      ) : (
+        <MoveLabel move={move.move} title={move.title} className="max-w-full" wordClassName="whitespace-normal" />
+      )
+    ) : null,
+    statusMenu,
+    priorityMenu,
+    menu,
+    origin,
+    addedBy,
+    refTitles,
+    closed,
+    childLevel,
+    addChildLabel,
+    marks,
+    priority,
+    quickActions,
+    confirmNotice,
+    resultNotice,
+    edit,
+    body,
+    meta,
+    panelActions,
+    addChild,
+  };
+}
+
+/** A waiting move said by what it comes after, so it never repeats Health's "Waiting". */
+function afterWord(move: Move): string | undefined {
+  if (move.state !== 'waiting') return undefined;
+  const name = move.waitingOn ? waitingOnName(move.waitingOn).trim() : '';
+  return name ? `After ${name}` : 'After other steps';
+}
+
+export type PlanRowProps = Parameters<typeof usePlanRow>[0];
+
+/**
+ * The row itself: `usePlanRow`'s parts laid into the shared tree row, with
+ * the feature's title linking to its own page (plan #1664).
+ */
+export function PlanRow(props: PlanRowProps) {
+  const { node: own, trail, view, searching, unfolded, opened = false } = props;
+  const parts = usePlanRow(props);
+  const inset = rowInset(trail);
+  // A feature is a build row at the top of its module. Its title opens the
+  // feature's page; a step's title still opens its panel in place.
+  const feature = trail.length === 0 && !props.asStep && own.kind === 'build';
+  return (
+    <TreeRow
+      node={parts.node}
+      trail={trail}
+      row={parts.row}
+      health={parts.health}
+      move={parts.move}
+      statusMenu={parts.statusMenu}
+      menu={parts.menu}
+      actions={PLAN_TREE_ACTIONS}
+      origin={parts.origin}
+      addedBy={parts.addedBy}
+      titles={parts.refTitles}
+      titleHref={feature ? featureHref(own.number) : undefined}
+      source={props.source}
+      dependencies={{ catalog: props.catalog, groupOf: (entry) => scopeLabel(entry.module) }}
+      marks={parts.marks}
+      priority={parts.priority}
+      quickActions={parts.quickActions}
+      notices={
+        <>
+          {parts.confirmNotice && (
+            <li style={inset} className="pb-1.5 pr-3 text-small">
+              {parts.confirmNotice}
+            </li>
+          )}
+          {parts.resultNotice && (
+            <li style={inset} className="pb-1.5 pr-3 text-small">
+              {parts.resultNotice}
+            </li>
+          )}
+        </>
       }
+      edit={parts.edit}
+      body={parts.body}
+      meta={parts.meta}
+      panelActions={parts.panelActions}
+      addChild={parts.addChild}
       renderChild={(child, childTrail) => (
         <PlanRow
           // The shared row hands back the node it was given, so this is one.
           node={child as PlanNode}
           trail={childTrail}
-          catalog={catalog}
-          canSend={canSend}
-          lastRuns={lastRuns}
-          runRaises={runRaises}
-          liveness={serverLiveness}
-          commitChecks={commitChecks}
-          overhaulProgress={overhaulProgress}
-          criticStops={criticStops}
+          catalog={props.catalog}
+          canSend={props.canSend}
+          lastRuns={props.lastRuns}
+          runRaises={props.runRaises}
+          liveness={props.liveness}
+          commitChecks={props.commitChecks}
+          overhaulProgress={props.overhaulProgress}
+          criticStops={props.criticStops}
+          screenChanges={props.screenChanges}
+          pictures={props.pictures}
           view={view}
           searching={searching}
           unfolded={unfolded}
@@ -1166,16 +1456,19 @@ export function PlanRow({
  */
 function OverhaulCounts({ progress }: { progress: OverhaulProgress | undefined }) {
   const quiet = 'shrink-0 text-micro text-ink-muted';
+  // "No rule counts yet" says nothing to act on, and on a phone it squeezed
+  // the title beside it to a letter a line, so it is left to wider screens.
+  const placeholder = 'hidden shrink-0 text-micro text-ink-muted sm:inline';
   if (!progress || progress.state === 'no-spec') {
     return (
-      <span className={quiet} title="Its detail names no spec, so there are no rule counts to show.">
+      <span className={placeholder} title="Its detail names no spec, so there are no rule counts to show.">
         No rule counts yet
       </span>
     );
   }
   if (progress.state === 'missing') {
     return (
-      <span className={quiet} title={`${progress.spec} could not be read, so its counts cannot be shown.`}>
+      <span className={placeholder} title={`${progress.spec} could not be read, so its counts cannot be shown.`}>
         No rule counts yet
       </span>
     );
@@ -1183,7 +1476,7 @@ function OverhaulCounts({ progress }: { progress: OverhaulProgress | undefined }
   if (progress.state === 'no-contract') {
     return (
       <span
-        className={quiet}
+        className={placeholder}
         title={`${progress.spec} has no Contract naming the rules this overhaul brings to target yet.`}
       >
         No rule counts yet
@@ -1206,7 +1499,7 @@ function OverhaulCounts({ progress }: { progress: OverhaulProgress | undefined }
         </span>
       ))}
       {progress.counts.length === 0 && (
-        <span className={quiet} title={`${progress.spec}'s Contract names no rule the row can count.${unread}`}>
+        <span className={placeholder} title={`${progress.spec}'s Contract names no rule the row can count.${unread}`}>
           No rule counts yet
         </span>
       )}

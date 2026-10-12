@@ -14,8 +14,9 @@ import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { cardVariants } from '@/components/ui/card';
-import { FieldError, PressLabel, Select, Textarea } from '@/components/ui/field';
-import { SubmitOnChange } from '@/components/shell/submit-on-change';
+import { FieldError, Select, Textarea } from '@/components/ui/field';
+import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
+import { TONE_TEXT } from '@/components/dev/state-label';
 import { cn } from '@/lib/cn';
 import { feedbackHealth, type FeedbackHealth } from '@/lib/dev/health';
 import { FEEDBACK_HEALTH_WORD } from '@/lib/dev/words';
@@ -31,6 +32,7 @@ import { KIND_TONE } from '@/components/feedback/kind-tone';
 import { TriageNote } from '@/components/feedback/triage-note';
 import { triageView } from '@/lib/feedback/triage';
 import { LinkedText } from '@/components/ui/linked-text';
+import { AttachmentList } from '@/components/attachments/attachment-list';
 
 // Defined in lib/feedback so both workspaces' pages and this component agree
 // on one shape.
@@ -55,15 +57,20 @@ const PRIORITY_LABEL: Record<number, string> = {
   3: 'someday',
 };
 
+const STATUS_OPTIONS: [string, string][] = [
+  ['open', 'Open'],
+  ['in_progress', 'In progress'],
+  ['blocked', 'Blocked'],
+  ['planned', 'Planned'],
+  ['done', 'Done'],
+  ['declined', 'Declined'],
+];
+
 function FeedbackCard({ row }: { row: FeedbackRow }) {
-  const [statusState, statusAction, statusPending] = useActionState(
-    updateFeedbackStatus,
-    {} as FeedbackActionState,
-  );
-  const [deleteState, deleteAction, deletePending] = useActionState(
-    deleteFeedback,
-    {} as FeedbackActionState,
-  );
+  // The status picker and the overflow menu run their actions from a menu,
+  // which passes the form data alone and drops what comes back. A refusal is
+  // kept here so it still shows under the note.
+  const [menuError, setMenuError] = useState<string | undefined>();
   const [editState, editAction, editPending] = useActionState(
     editFeedback,
     {} as FeedbackActionState,
@@ -108,6 +115,36 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
    */
   const canAnswer = row.status === 'blocked' || row.status === 'planned';
 
+  async function run(
+    action: (prev: FeedbackActionState, formData: FormData) => Promise<FeedbackActionState>,
+    formData: FormData,
+  ) {
+    const result = await action({}, formData);
+    setMenuError(result.error);
+  }
+
+  const statusItems: ActionMenuItem[] = STATUS_OPTIONS.map(([value, label]) => ({
+    id: value,
+    label,
+    disabled: value === row.status,
+    formAction: (formData) => run(updateFeedbackStatus, formData),
+    formFields: { id: row.id, status: value },
+  }));
+
+  const noteItems: ActionMenuItem[] = [
+    ...(canEdit && !editing
+      ? [{ id: 'edit', label: 'Edit', onSelect: () => setEditing(true) }]
+      : []),
+    {
+      id: 'delete',
+      label: 'Delete',
+      destructive: true,
+      confirm: 'Delete this note?',
+      formAction: (formData) => run(deleteFeedback, formData),
+      formFields: { id: row.id },
+    },
+  ];
+
   return (
     // The id is where the app-wide search lands a note: /dev/bugs#note-<id>.
     <li id={`note-${row.id}`} className="row-pad flex scroll-mt-bar flex-col gap-2 px-4">
@@ -120,39 +157,61 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
         >
           {FEEDBACK_KIND_LABEL[row.kind]}
         </span>
-        <StateLabel
-          glyph={FEEDBACK_HEALTH_GLYPHS[health]}
-          word={FEEDBACK_HEALTH_WORD[health]}
-          tone={HEALTH_TONE[health]}
-          title={
-            health === 'answered'
-              ? 'You replied, so it is a session\'s again. The status column still says blocked.'
-              : undefined
-          }
-        >
-          {/* Who has it, which the word deliberately does not say. Dash's mark,
-              at rest: the word beside it already says it is being worked. */}
-          {health === 'working' && <DashMark size="2xs" decorative />}
-        </StateLabel>
-        <span className="text-small text-ink-muted">
-          {row.createdAt.slice(0, 10)} · p{row.priority} {PRIORITY_LABEL[row.priority] ?? ''}
-          {/* A note filed from /dev/surfaces is a design note, and it read here
-            * as the raw string "/preview?s=jobs-pipeline-dense" -- which named
-            * neither the surface nor the fact that it is judged against the
-            * guide rather than fixed where it sits. */}
-          {surfaceOf(row.pagePath) ? (
-            <>
-              {' · '}
-              <a href="/dev/surfaces" className="text-accent hover:underline">
-                surface: {surfaceOf(row.pagePath)}
-              </a>
-              {' · judged against /dev/ui'}
-            </>
-          ) : (
-            (row.pagePath ?? '') && ` · ${row.pagePath}`
+        {/* The status is a word you press, which opens the picker: the select
+            and its Set button used to sit in a row of their own under every
+            note. */}
+        <ActionMenu
+          label="Change status"
+          items={statusItems}
+          align="start"
+          triggerClassName={cn(
+            'h-7 w-auto gap-1.5 px-1.5 text-small font-medium',
+            TONE_TEXT[HEALTH_TONE[health]],
           )}
+          trigger={
+            <StateLabel
+              className="text-inherit"
+              glyph={FEEDBACK_HEALTH_GLYPHS[health]}
+              word={FEEDBACK_HEALTH_WORD[health]}
+              tone={HEALTH_TONE[health]}
+              title={
+                health === 'answered'
+                  ? "You replied, so it is a session's again. The status column still says blocked."
+                  : undefined
+              }
+            >
+              {/* Who has it, which the word deliberately does not say. Dash's
+                  mark, at rest: the word beside it already says it is being
+                  worked. */}
+              {health === 'working' && <DashMark size="2xs" decorative />}
+            </StateLabel>
+          }
+        />
+        <span className="text-small text-ink-muted">
+          {row.createdAt.slice(0, 10)}
+          {/* The rest of the line is for a wider screen: on a phone the top
+              line is the type, the status, the date and the menu. */}
+          <span className="max-sm:hidden">
+            {' · '}p{row.priority} {PRIORITY_LABEL[row.priority] ?? ''}
+            {/* A note filed from /dev/surfaces is a design note, and it read here
+             * as the raw string "/preview?s=jobs-pipeline-dense" -- which named
+             * neither the surface nor the fact that it is judged against the
+             * guide rather than fixed where it sits. */}
+            {surfaceOf(row.pagePath) ? (
+              <>
+                {' · '}
+                <a href="/dev/surfaces" className="text-accent hover:underline">
+                  surface: {surfaceOf(row.pagePath)}
+                </a>
+                {' · judged against /dev/ui'}
+              </>
+            ) : (
+              (row.pagePath ?? '') && ` · ${row.pagePath}`
+            )}
+          </span>
         </span>
-        <code className="text-small text-ink-muted">{row.id.slice(0, 8)}</code>
+        <code className="text-small text-ink-muted max-sm:hidden">{row.id.slice(0, 8)}</code>
+        <ActionMenu label="Note actions" items={noteItems} className="ml-auto" />
       </div>
       <TriageNote view={triageView(row.triage ?? null)} />
 
@@ -182,12 +241,7 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
             <Button type="submit" size="sm" pending={editPending}>
               {editPending ? 'Saving…' : 'Save'}
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setEditing(false)}
-            >
+            <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
               Cancel
             </Button>
           </div>
@@ -197,6 +251,11 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
           <LinkedText text={row.body} />
         </p>
       )}
+
+      {/* What was filed with it, such as the screenshot of what went wrong
+          (plan #1713). Under the text while editing too: the files are not
+          part of what the form changes. */}
+      <AttachmentList files={row.attachments ?? []} />
 
       {row.resolutionNote && (
         <p className="rounded-lg bg-canvas px-3 py-2 text-ui text-ink-muted">
@@ -221,54 +280,7 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <form action={statusAction} className="relative flex items-center gap-2">
-          <input type="hidden" name="id" value={row.id} />
-          <PressLabel htmlFor={`status-${row.id}`} />
-          <Select
-            id={`status-${row.id}`}
-            name="status"
-            defaultValue={row.status}
-            className="relative w-32"
-            aria-label="Status"
-            disabled={statusPending}
-          >
-            <option value="open">Open</option>
-            <option value="in_progress">In progress</option>
-            <option value="blocked">Blocked</option>
-            <option value="planned">Planned</option>
-            <option value="done">Done</option>
-            <option value="declined">Declined</option>
-          </Select>
-          {/* Picking a status is the whole decision; a Set button after it just
-              asks you to confirm what you already said. Same treatment the
-              inventory filters got: the select submits itself, and the button
-              stays in the markup as the way through with JavaScript off. */}
-          <SubmitOnChange />
-          <Button
-            type="submit"
-            size="sm"
-            variant="secondary"
-            pending={statusPending}
-            data-fallback-submit
-          >
-            {statusPending ? 'Saving…' : 'Set'}
-          </Button>
-          {statusPending && <span className="text-small text-ink-muted">Saving…</span>}
-        </form>
-        {canEdit && !editing && (
-          <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(true)}>
-            Edit
-          </Button>
-        )}
-        <form action={deleteAction}>
-          <input type="hidden" name="id" value={row.id} />
-          <Button type="submit" size="sm" variant="ghost" disabled={deletePending}>
-            Delete
-          </Button>
-        </form>
-        <FieldError>{statusState.error ?? deleteState.error ?? editState.error}</FieldError>
-      </div>
+      <FieldError>{menuError ?? editState.error}</FieldError>
     </li>
   );
 }

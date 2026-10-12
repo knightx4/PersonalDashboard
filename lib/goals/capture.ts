@@ -28,6 +28,8 @@
  * of the bags" is 2 bags logged on the bags step, and the step stays open.
  * Work the tree has no step for is an add that carries the progress (plan
  * #1278): the step goes in already under way, and one Undo takes back both.
+ * Finished work the tree has no step for is an add marked done (plan #1740):
+ * the step goes in already closed, so it counts towards the goal's pace.
  */
 import type { RhythmRecord } from '@/lib/goals/rhythms';
 import {
@@ -42,6 +44,7 @@ import {
   type ProgressTally,
 } from '@/lib/goals/progress';
 import { formatReading, parseNumber } from '@/lib/goals/readings';
+import type { CountSource } from '@/lib/goals/rhythm-sources';
 import { periodOf, progressLine } from '@/lib/goals/rhythms';
 import { STEP_TITLE_MAX, type RhythmPeriod, type StepNode } from '@/lib/goals/steps';
 import type { Goal } from '@/lib/goals/tree';
@@ -84,8 +87,19 @@ export type CaptureStep = {
   title: string;
   kind: 'mine' | 'claude' | 'rhythm';
   depth: number;
-  /** A rhythm's shape and its current period, when it has one open. */
-  rhythm: { period: RhythmPeriod; startsOn: string; count: number; target: number } | null;
+  /**
+   * A rhythm's shape and its current period, when it has one open, and where
+   * its count is read from when it counts itself (0069). Such a rhythm is
+   * shown so a sentence about it is not filed elsewhere, but is never counted
+   * here: its count is its source's.
+   */
+  rhythm: {
+    period: RhythmPeriod;
+    startsOn: string;
+    count: number;
+    target: number;
+    source?: CountSource | null;
+  } | null;
   /** The done-when, shown so filing can read a total from it (plan #1277). */
   acceptance?: string | null;
   /** The step's estimated total, when it has one. */
@@ -162,6 +176,7 @@ export function captureContext(
                     startsOn: current.startsOn,
                     count: current.count,
                     target: current.target,
+                    ...(node.countSource ? { source: node.countSource } : {}),
                   }
                 : null,
             acceptance: node.acceptance?.trim().slice(0, CONTEXT_TEXT_MAX) || null,
@@ -233,7 +248,9 @@ export function captureMessage(
       const shape =
         step.kind === 'rhythm'
           ? step.rhythm
-            ? `rhythm, ${progressLine(step.rhythm.period, step.rhythm)}`
+            ? step.rhythm.source
+              ? `rhythm, ${progressLine(step.rhythm.period, step.rhythm, step.rhythm.source)}, counts itself, never count it`
+              : `rhythm, ${progressLine(step.rhythm.period, step.rhythm)}`
             : 'rhythm, no period open'
           : step.kind;
       lines.push(`${indent}${step.ref} [${shape}]: ${step.title}`);
@@ -244,6 +261,22 @@ export function captureMessage(
   if (hint) lines.push('', hint);
   lines.push('', 'What happened, as the person wrote it:', body);
   return lines.join('\n');
+}
+
+/**
+ * The line telling filing which goal's page the sentence was written on
+ * (plan #1740), so "cleaned the bathroom" on the cleaning goal lands there.
+ * Null when the goal is not among the open goals shown, which leaves the
+ * sentence to be filed as from anywhere else.
+ */
+export function goalHintLine(context: CaptureContext, goalId: string | null | undefined): string | null {
+  if (!goalId) return null;
+  const goal = context.goals.find((g) => g.id === goalId);
+  if (!goal) return null;
+  return (
+    `This was written on the page of ${goal.ref} (${goal.title}). File it against that goal ` +
+    'unless the sentence plainly concerns another.'
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -292,6 +325,11 @@ export type PlannedAction =
        * #1278). Null for a step nothing has been done on yet.
        */
       progress?: AddedProgress | null;
+      /**
+       * The work is finished (plan #1740): the step is added closed, and
+       * carries no progress, since the close is the record of it.
+       */
+      done?: boolean;
     };
 
 /** The progress an add carries, in the progress move's terms. */
@@ -499,6 +537,9 @@ export function parseMove(
     case 'count': {
       const step = steps.get(text(entry.step));
       if (!step || step.kind !== 'rhythm' || !step.rhythm) return null;
+      // A rhythm that counts itself takes its count from its source, so a
+      // count here would be overwritten at the next sync, or counted twice.
+      if (step.rhythm.source) return null;
       const amount = readCount(entry);
       if (amount === null) return null;
       // Counted in the period the day falls in (plan #1279): "yesterday"
@@ -568,9 +609,13 @@ export function parseMove(
       if (!goal) return null;
       // Work already done on the new step (plan #1278): text or an amount
       // makes it progress. A bad amount drops the progress, not the step.
+      const stepKind = entry.kind === 'claude' ? 'claude' : 'mine';
+      // Finished work goes in closed (plan #1740); only the person's own
+      // work can be finished already, so a step for Dash never is.
+      const done = entry.done === true && stepKind === 'mine';
       const said = text(entry.text).slice(0, NOTE_MAX);
       const amount = readAmount(entry);
-      const carries = !!said || (amount?.quantity ?? null) !== null;
+      const carries = !done && (!!said || (amount?.quantity ?? null) !== null);
       const progress: AddedProgress | null =
         carries && amount
           ? {
@@ -587,8 +632,9 @@ export function parseMove(
           goal,
           parent: parentStep,
           title,
-          stepKind: entry.kind === 'claude' ? 'claude' : 'mine',
+          stepKind,
           progress,
+          ...(done ? { done: true } : {}),
         },
         key: `add:${(parentStep ?? goal).id}:${title.toLowerCase()}`,
       };
@@ -693,6 +739,8 @@ export type FiledEntry = (
        * Undo on this one line takes back both. Absent when there was none.
        */
       progress?: AddedFiledProgress;
+      /** The step went in closed, as finished work (plan #1740). Absent otherwise. */
+      done?: boolean;
       undone_at: string | null;
     }
 ) & {
@@ -758,6 +806,7 @@ export function describeFiled(entry: FiledEntry): string {
     case 'reading':
       return `Recorded ${formatReading(entry.value, entry.unit)} for ${entry.goal_title}`;
     case 'add': {
+      if (entry.done) return `Added "${entry.title}" in ${entry.goal_title} as done`;
       const added =
         entry.step_kind === 'claude'
           ? `Added a step for Dash in ${entry.goal_title}: "${entry.title}"`
@@ -908,6 +957,8 @@ export async function fileCapture(
   today: string,
   deps: FilingDeps,
   hint?: string | null,
+  /** The goal whose page the box is on (plan #1740), told to the model as a hint. */
+  goalId?: string | null,
 ): Promise<FilingResult> {
   const trimmed = body.trim();
   if (!trimmed) return { ok: false, error: 'Write what happened first.', captureId: null };
@@ -951,7 +1002,8 @@ export async function fileCapture(
     return next;
   };
 
-  const reply = await deps.ask(captureMessage(context, trimmed, today, hint), file);
+  const hints = [goalHintLine(context, goalId), hint].filter(Boolean).join('\n') || null;
+  const reply = await deps.ask(captureMessage(context, trimmed, today, hints), file);
   await queue;
   if (!reply.ok && filed.length === 0) {
     return { ok: false, error: `${reply.error} What you wrote is kept.`, captureId };

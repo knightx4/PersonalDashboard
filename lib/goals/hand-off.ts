@@ -1,8 +1,8 @@
 /**
  * Who holds each goal, and what Dash could take next, for the Goals home.
  *
- * The goal board says, on each goal, how much of it is on you and whether
- * Dash is on it: the things on you from Up next and the list folded under it,
+ * goalHolders counts, on each goal, how much of it is on you and whether
+ * Dash is on it, which the offers below read: the things on you ranked,
  * Dash's open steps, and the run going on it now, if any.
  *
  * Put Dash to work offers a few things to hand over in one press, so that

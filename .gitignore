@@ -53,3 +53,6 @@ next-env.d.ts
 # the whole reason this line is here.
 __boundary_probe.ts
 __design_probe.ts
+
+# A note's files, downloaded by scripts/notes.ts files <id> (plan #1713).
+.notes-files/

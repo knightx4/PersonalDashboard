@@ -81,7 +81,9 @@ function laidOut(items: PlanItem[], raises: RaisedRow[] = []) {
           ? `#${entry.row.number}`
           : entry.kind === 'raise'
             ? entry.raise.title
-            : entry.spec.change.title,
+            : entry.kind === 'spec'
+              ? entry.spec.change.title
+              : `run ${entry.question.runId}`,
       ),
     ]),
   );
@@ -301,6 +303,28 @@ describe('waitingGroups', () => {
     );
     const approve = laid.find((group) => group.key === 'approve')!;
     expect(approve.entries.map((entry) => `${entry.kind}:${entry.id}`)).toEqual(['plan:a', 'spec:s1']);
+  });
+
+  it('puts a run waiting on your answer first among the questions (plan #1824)', () => {
+    const laid = waitingGroups(
+      buildPlanTree({ items: [item({ id: 'b', number: 2, kind: 'decision' })], dependencies: [] }),
+      raisedQueueFrom([]),
+      undefined,
+      [],
+      [
+        {
+          runTable: 'plan_runs',
+          runId: 'r1',
+          about: '#1824 Let Dash ask you something mid-run and wait',
+          href: '/dev/plan/1824',
+          body: 'Stay or close?',
+          options: ['Stay', 'Close'],
+          askedAt: '2026-10-12T09:00:00Z',
+        },
+      ],
+    );
+    const questions = laid.find((group) => group.key === 'questions')!;
+    expect(questions.entries.map((entry) => `${entry.kind}:${entry.id}`)).toEqual(['run:r1', 'plan:b']);
   });
 
   it('sorts a stopped step, a question and a proposal into the three groups', () => {

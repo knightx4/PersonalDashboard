@@ -65,6 +65,19 @@ describe('a goal is an outcome, not a practice', () => {
   });
 });
 
+describe('parseGoalFields date precision', () => {
+  const get = (fields: Record<string, string>) => (key: string) => fields[key] ?? null;
+  it('stores the end of the period and the precision', () => {
+    const result = parseGoalFields(get({ due: '2027-05-10', duePrecision: 'month' }));
+    expect(result.ok && result.value).toMatchObject({ dueOn: '2027-05-31', duePrecision: 'month' });
+    expect(parseGoalFields(get({ due: '2027-05-10' }))).toMatchObject({
+      ok: true,
+      value: { dueOn: '2027-05-10', duePrecision: 'day' },
+    });
+    expect(parseGoalFields(get({ due: '2027-05-10', duePrecision: 'week' })).ok).toBe(false);
+  });
+});
+
 describe('parseAreaNote', () => {
   it('trims a note and clears an empty one', () => {
     expect(parseAreaNote('  Meet people in transit ')).toEqual({ ok: true, value: 'Meet people in transit' });
@@ -160,10 +173,13 @@ describe('parseGoalFields for errands (plan #1261)', () => {
   it('takes the flag with its date, and the flag off alone', () => {
     expect(parseGoalFields(form({ errand: 'true', due: '2026-10-12' }))).toEqual({
       ok: true,
-      value: { errand: true, dueOn: '2026-10-12' },
+      value: { errand: true, dueOn: '2026-10-12', duePrecision: 'day' },
     });
     expect(parseGoalFields(form({ errand: 'false' }))).toEqual({ ok: true, value: { errand: false } });
-    expect(parseGoalFields(form({ due: '' }))).toEqual({ ok: true, value: { dueOn: null } });
+    expect(parseGoalFields(form({ due: '' }))).toEqual({
+      ok: true,
+      value: { dueOn: null, duePrecision: 'day' },
+    });
   });
 
   it('refuses an errand without a date, a date that is not one, and a flag it cannot read', () => {

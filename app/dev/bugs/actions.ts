@@ -5,7 +5,6 @@ import { after } from 'next/server';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { isOwner, requireOwner } from '@/lib/dev/owner';
-import { codeMatches } from '@/lib/feedback/code';
 import { notesRoutine } from '@/lib/feedback/routine';
 import {
   FEEDBACK_KINDS,
@@ -19,9 +18,18 @@ import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import { triageView, type TriageTable, type TriageView } from '@/lib/feedback/triage';
 import { triageRow } from '@/lib/feedback/triage-run';
+import {
+  moveIdeaToNote,
+  moveNoteToIdea,
+  routesToPlan,
+  type FiledAs,
+} from '@/lib/feedback/move';
 import { scoreIdeaRow } from '@/lib/ideas/score-run';
 import { jevEnabledFor } from '@/lib/jev/enabled';
 import { addThreadTurn } from '@/lib/thread/store';
+import { parseUploadedAttachments } from '@/lib/attachments/rules';
+import { recordAttachments, removeAttachmentsFor } from '@/lib/attachments/store';
+import { noteFilesBrief, noteRef, outstandingNoteFiles } from '@/lib/feedback/files';
 
 /** One queue, one page. The old per-workspace pages redirect to it. */
 function revalidateFeedback(): void {
@@ -55,16 +63,9 @@ const submitSchema = z.object({
  *
  * `requireUser`, not `requireOwner`, on purpose. Do not "fix" it.
  *
- * The submit code goes the same way. It is the owner's code, printed nowhere
- * and known to nobody else, so asking a second account for it would be asking
- * for a value they cannot have -- the panel does not even draw the box for
- * them (#418). Still asked of the owner, because for them it is what stops a
- * note being filed by a page left open on a shared screen, and dropping it
- * would be weakening a check that is working.
- *
- * So: owner and wrong code is refused, exactly as before. Anyone else signed
- * in files without one, and whatever they typed in a field that is not there
- * is not read.
+ * There is no submit code. The owner was asked for one until note 7c1f7238
+ * asked for it to go: it guarded only against a page left open on a shared
+ * screen, where everything else in the app is open too.
  */
 // latency: pending
 export async function submitFeedback(
@@ -73,10 +74,6 @@ export async function submitFeedback(
 ): Promise<FeedbackActionState> {
   const user = await requireUser();
   const supabase = await createClient();
-
-  if ((await isOwner({ user, supabase })) && !codeMatches(String(formData.get('code') ?? ''))) {
-    return { error: 'That code is not right.' };
-  }
 
   const parsed = submitSchema.safeParse({
     kind: String(formData.get('kind') ?? 'feature'),
@@ -100,9 +97,22 @@ export async function submitFeedback(
     .single();
   if (error) return { error: error.message };
 
+  // The files added with "Add a file" (plan #1713), already in your folder of
+  // the bucket, recorded against the note now that it has an id. The note is
+  // kept when this fails, and the message says the files did not go with it.
+  const files = parseUploadedAttachments(formData.get('attachments'), user.id);
+  let filesError: string | null = null;
+  if (files.length > 0 && data?.id) {
+    try {
+      await recordAttachments(await createCoreClient(), user.id, noteRef(String(data.id)), files);
+    } catch {
+      filesError = 'Note saved, but its files could not be added.';
+    }
+  }
+
   revalidateFeedback();
   return {
-    message: SAVED[parsed.data.kind],
+    message: filesError ?? SAVED[parsed.data.kind],
     filed: data?.id ? { table: 'feedback_items', id: String(data.id) } : undefined,
   };
 }
@@ -112,24 +122,40 @@ const triageSchema = z.object({
   id: z.string().uuid(),
 });
 
+/** What triage made of a row the header just saved, and where it now is. */
+export type FiledTriage = {
+  view: TriageView | null;
+  /**
+   * The idea a note was moved to, when triage was sure it is work to plan
+   * (plan #1675). Null for a note that stays in the queue.
+   */
+  ideaId: string | null;
+};
+
 /**
  * Triage what the header panel just saved (plan #1179): Jev reads it and says
- * bug or request, which workspace, how soon, and whether an open note or idea
- * already says the same. Stored on the row and handed back for the panel to
- * show under "saved". An idea is also given its score (plan #1327), after
- * the answer has gone.
+ * bug or request, which workspace, how soon, fix or plan, and whether an open
+ * note or idea already says the same. Stored on the row and handed back for
+ * the panel to show under "saved". An idea is also given its score (plan
+ * #1327), after the answer has gone.
  *
- * Called by the panel once `submitFeedback` or `submitIdea` has returned, so
- * saving never waits on Jev. Null when there is nothing to show: the account
- * has not agreed to send text to Jev (every account but the owner, today),
- * the row is not the caller's, it is a like, or Jev failed. The row is only
- * ever the caller's own, matched on `user_id` as well as `id`.
+ * A note triage is sure needs planning moves to the ideas page (plan #1675):
+ * an idea is written from the same text under the triaged workspace and the
+ * note is marked planned, naming it. The owner's notes only, since the ideas
+ * page is theirs alone and every other account keeps filing notes. An unsure
+ * answer stays a note for the notes routine to judge.
+ *
+ * Called by the panel once `submitFeedback` has returned, so saving never
+ * waits on Jev. Null when there is nothing to show: the account has not
+ * agreed to send text to Jev (every account but the owner, today), the row is
+ * not the caller's, it is a like, or Jev failed. The row is only ever the
+ * caller's own, matched on `user_id` as well as `id`.
  */
 // latency: pending
 export async function triageFiled(input: {
   table: TriageTable;
   id: string;
-}): Promise<TriageView | null> {
+}): Promise<FiledTriage | null> {
   const user = await requireUser();
   const parsed = triageSchema.safeParse(input);
   if (!parsed.success) return null;
@@ -142,23 +168,77 @@ export async function triageFiled(input: {
   const triage = await triageRow(supabase, { userId: user.id, ...parsed.data, spend });
   await recordSessionSpend(user.id, { module: 'core', operation: 'triage-note' }, spend);
 
+  let ideaId: string | null = null;
+  if (
+    parsed.data.table === 'feedback_items' &&
+    routesToPlan(triage) &&
+    (await isOwner({ user, supabase }))
+  ) {
+    const moved = await moveNoteToIdea(supabase, { userId: user.id, noteId: parsed.data.id });
+    if (moved.ok) ideaId = moved.ideaId;
+    else console.warn(`[triage] could not move the note to ideas: ${moved.error}`);
+  }
+
   // An idea is then scored against its workspace's vision (plan #1327), once
   // this has answered so the panel's triage line does not wait on it. Asked
   // whether or not triage came back: a null triage is read as untriaged, and
-  // an idea Jev fails on stays unscored for the daily catch-up.
-  if (parsed.data.table === 'ideas') {
-    const { id } = parsed.data;
+  // an idea Jev fails on stays unscored for the daily catch-up. A note just
+  // moved to the ideas page is scored as its idea.
+  const scoreId = parsed.data.table === 'ideas' ? parsed.data.id : ideaId;
+  if (scoreId) {
     after(async () => {
       const scoreSpend: SpendReport[] = [];
-      await scoreIdeaRow(supabase, { userId: user.id, id, triage, spend: scoreSpend });
+      await scoreIdeaRow(supabase, { userId: user.id, id: scoreId, triage, spend: scoreSpend });
       await recordSessionSpend(user.id, { module: 'core', operation: 'score-idea' }, scoreSpend);
     });
   }
   if (!triage) return null;
 
-  if (parsed.data.table === 'ideas') revalidatePath('/dev/ideas');
-  else revalidateFeedback();
-  return triageView(triage);
+  if (parsed.data.table === 'ideas' || ideaId) revalidatePath('/dev/ideas');
+  if (parsed.data.table === 'feedback_items') revalidateFeedback();
+  return { view: triageView(triage), ideaId };
+}
+
+const flipSchema = z.object({
+  noteId: z.string().uuid(),
+  ideaId: z.string().uuid().nullable(),
+  to: z.enum(['note', 'idea']),
+});
+
+export type FlipResult = { error?: string; filedAs?: FiledAs; ideaId?: string };
+
+/**
+ * The saved panel's flip (plan #1675): move what was just filed the other
+ * way. To the ideas page, an idea is written from the note's text (or the one
+ * an earlier flip dismissed is restored) and the note is marked planned. Back
+ * to the queue, the note reopens and the idea is dismissed. The owner's alone,
+ * as the ideas page is.
+ */
+// latency: pending
+export async function flipFiled(input: {
+  noteId: string;
+  ideaId: string | null;
+  to: FiledAs;
+}): Promise<FlipResult> {
+  const supabase = await createClient();
+  const user = await requireOwner({ supabase });
+  const parsed = flipSchema.safeParse(input);
+  if (!parsed.success) return { error: 'Missing note.' };
+  const { noteId, ideaId, to } = parsed.data;
+
+  let moved;
+  if (to === 'idea') {
+    moved = await moveNoteToIdea(supabase, { userId: user.id, noteId, ideaId });
+  } else if (ideaId) {
+    moved = await moveIdeaToNote(supabase, { userId: user.id, noteId, ideaId });
+  } else {
+    return { error: 'Missing idea.' };
+  }
+  if (!moved.ok) return { error: moved.error };
+
+  revalidateFeedback();
+  revalidatePath('/dev/ideas');
+  return { filedAs: to, ideaId: moved.ideaId };
 }
 
 const SAVED: Record<FeedbackKind, string> = {
@@ -349,6 +429,14 @@ export async function deleteFeedback(
     .eq('user_id', user.id);
   if (error) return { error: error.message };
 
+  // A note's files are recorded by ref, which nothing cascades from, so they
+  // go with it here (plan #1713). Best effort: the note is already gone.
+  try {
+    await removeAttachmentsFor(await createCoreClient(), noteRef(id.data));
+  } catch (filesError) {
+    console.error(`Removing a deleted note's files failed: ${(filesError as Error).message}`);
+  }
+
   revalidateFeedback();
   return { message: 'Deleted.' };
 }
@@ -364,16 +452,32 @@ export async function runFeatureRoutine(
   // Signature is fixed by useActionState; the button sends nothing.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _prev: FeedbackActionState,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _formData: FormData,
 ): Promise<FeedbackActionState> {
   const supabase = await createClient();
   const user = await requireOwner({ supabase });
+
+  // A run reads the queue through SQL, which cannot open the private bucket,
+  // so the files on the notes it will work go with it as signed links
+  // (plan #1713).
+  const { data: open } = await supabase
+    .from('feedback_items')
+    .select('id')
+    .eq('user_id', user.id)
+    .in('status', [...OUTSTANDING_STATUSES])
+    .in('kind', [...NOTES_WORK_KINDS]);
+  const files = await outstandingNoteFiles(
+    await createCoreClient(),
+    ((open ?? []) as { id: string }[]).map((row) => row.id),
+  );
 
   const result = await startRoutineRun({
     supabase,
     userId: user.id,
     job: 'notes',
     routine: notesRoutine(),
+    text: noteFilesBrief(files),
   });
   if (!result.ok) return { error: result.error };
   return { message: result.detail };

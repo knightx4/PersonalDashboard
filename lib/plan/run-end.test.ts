@@ -4,6 +4,7 @@ import {
   isResolvingAnswers,
   RESHAPE_UNDERWAY_MINUTES,
   lastRunLine,
+  staleLine,
   readingColumns,
   readingFor,
   runEnd,
@@ -91,6 +92,17 @@ describe('lastRunLine', () => {
     expect(lastRunLine(run(), at(45))).toBe('A run has been going 45m');
   });
 
+  it('says when a stale run was last heard from (plan #1825)', () => {
+    expect(lastRunLine(run({ waiting: 'stale', lastLineAt: new Date(at(60)).toISOString() }), at(105))).toBe(
+      'Last run went quiet: last heard from 45m ago',
+    );
+    expect(lastRunLine(run({ waiting: 'stale' }), 0)).toBe('Last run went quiet');
+    expect(lastRunLine(run({ waiting: 'awaiting_input' }), at(5))).toBe('Last run is waiting on your answer');
+    expect(staleLine(run({ lastLineAt: new Date(at(60)).toISOString() }), at(150))).toBe(
+      'Gone quiet: last heard from 1h 30m ago.',
+    );
+  });
+
   it('says nothing about a clock it does not have yet', () => {
     expect(lastRunLine(run(), 0)).toBe('A run is going');
   });
@@ -103,6 +115,19 @@ describe('lastRunLine', () => {
     expect(lastRunLine(run({ status: 'failed', error: 'Anthropic answered 401.' }), at(60))).toBe(
       'Last run stopped: Anthropic answered 401.',
     );
+  });
+
+  it("gives the session's own reason over the app's note", () => {
+    expect(
+      lastRunLine(
+        run({
+          status: 'failed',
+          error: 'Nothing was heard from this run for 2h.',
+          stopReason: 'Too big for one sitting: six pieces of work.',
+        }),
+        at(150),
+      ),
+    ).toBe('Last run stopped: Too big for one sitting: six pieces of work.');
   });
 
   it('says so when a stopped run kept no reason', () => {

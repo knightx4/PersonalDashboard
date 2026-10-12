@@ -31,7 +31,12 @@ export const DAILY_STEP_LIMIT = 10;
  */
 export const DAILY_GAP_MS = 20 * 60 * 60 * 1000;
 
-export type ReadyStep = { id: string; title: string; goalId: string; goalTitle: string };
+export type ReadyStep = {
+  id: string;
+  title: string;
+  goalId: string;
+  goalTitle: string;
+};
 
 /**
  * Every Claude step the morning run should work, in page order: an open
@@ -42,7 +47,10 @@ export type ReadyStep = { id: string; title: string; goalId: string; goalTitle: 
  * start date has not come waits for it, with everything under it; the
  * caller marks those with markStartDates.
  */
-export function readyClaudeSteps(goals: Goal[], stepsByGoal: Map<string, StepNode[]>): ReadyStep[] {
+export function readyClaudeSteps(
+  goals: Goal[],
+  stepsByGoal: Map<string, StepNode[]>,
+): ReadyStep[] {
   const ready: ReadyStep[] = [];
   for (const goal of goals) {
     if (goal.status !== 'open') continue;
@@ -56,7 +64,12 @@ export function readyClaudeSteps(goals: Goal[], stepsByGoal: Map<string, StepNod
           node.resultUrl === null &&
           waitsOnNothing(node)
         ) {
-          ready.push({ id: node.id, title: node.title, goalId: goal.id, goalTitle: goal.title });
+          ready.push({
+            id: node.id,
+            title: node.title,
+            goalId: goal.id,
+            goalTitle: goal.title,
+          });
         }
         walk(node.children);
       }
@@ -122,7 +135,8 @@ export function dailyRunText(input: {
   const stalled = input.underWay?.stalled ?? [];
   const finished = input.underWay?.finished ?? [];
   const lines = input.steps.map(
-    (step) => `- "${step.title}" (goals.items id ${step.id}), under the goal "${step.goalTitle}"`,
+    (step) =>
+      `- "${step.title}" (goals.items id ${step.id}), under the goal "${step.goalTitle}"`,
   );
   const stale = answers.map(
     (step) =>
@@ -197,13 +211,19 @@ export function dailyRunText(input: {
           'Then give every open goal below its status for today: one row in goals.reviews each,',
           'with a verdict of met, on_track, stalled, waiting_on_you, waiting_on_date or',
           'waiting_on_goal, one sentence on why, one on the next move, and next_on for the next',
-          'move\'s date where it has one. A goal whose done-when is met reads met, with a short',
+          'move\'s date where it has one. A goal its lines say is judged on its pace takes met,',
+          'or the pace verdict its lines give (pace_holding or pace_slipping), or no row at all',
+          'while its pace is unknown. A goal whose done-when is met reads met, with a short',
           'summary of how it got there as the reason: that is the proposal to close it, and closing',
           'stays the person\'s. A stalled goal also gets that next move as a step under it, named as',
           'step_id; a goal waiting on a date needs next_on; one waiting on another goal names it as',
           'waits_on_id. Follow .claude/skills/goals/SKILL.md, "Reviewing each goal".',
           '',
           ...review.flatMap((g) => [...reviewLines(g), '']),
+          // Every goal keeps a few suggestions on its page (plan #1739).
+          'Then give two suggested steps to each open goal whose Suggestions section is empty.',
+          'Follow .claude/skills/goals/SKILL.md, "Topping up a goal\'s suggestions".',
+          '',
         ]
       : []),
     ...(input.steps.length > 0

@@ -3,6 +3,8 @@ import 'server-only';
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { parseRef } from '@/lib/core/refs';
+import type { RoleStage } from '@/lib/dash/bulk-roles';
+import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 
 /**
  * The changes Dash proposes in an Ask Dash answer (feature #1186), kept in
@@ -34,6 +36,11 @@ export const DASH_CHANGE_KINDS = [
   'close_todo',
   'close_goal_step',
   'add_role_note',
+  'add_job_lead',
+  'add_idea',
+  'change_items',
+  'move_roles',
+  'set_goal_done_when',
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -57,12 +64,30 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  * away (plan #1440). Each is written by its tool in lib/dash/writes.ts and
  * kept as done from the start; `input` holds only what the card says.
  *
- * add_goal         the goal and the area it went under.
+ * add_goal         the goal and the area it went under, and whether Dash
+ *                  made that area for it.
  * change_todo      the todo's title now, the title it had when renamed, and
  *                  the day it moved to when moved (null: no day any more).
  * close_todo       the todo ticked off.
  * close_goal_step  the step marked done and the goal it sits under.
  * add_role_note    the note and the role it went on.
+ * add_idea         the idea as filed, and the workspace it is about (null:
+ *                  the app as a whole).
+ * add_job_lead     the role saved as a lead, its company, and the posting
+ *                  link it came from when there was one.
+ * change_items     many owned items changed at once (plan #1656): which of
+ *                  the bulk bar's changes, how many items it moved, the
+ *                  first few of their names, and how many it left alone.
+ *                  Every item it moved is kept in `undo.rows`
+ *                  (lib/dash/bulk-items.ts).
+ * move_roles       many roles moved to one stage or archived at once (plan
+ *                  #1657): the stage asked for, the status it wrote, how
+ *                  many roles it moved, the first few of their names, and
+ *                  how many it left alone. Every application it moved is
+ *                  kept in `undo.rows` with the event Dash wrote
+ *                  (lib/dash/bulk-roles.ts).
+ * set_goal_done_when  the goal, the done-when it now has (null: cleared) and
+ *                  the one it had before (notes 06d36ab2, fa2ac6fe).
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -81,7 +106,7 @@ export type DashChangeInput = {
     goalTitle: string | null;
     pushOn: boolean;
   };
-  add_goal: { areaId: string; areaName: string; title: string; dueOn: string | null };
+  add_goal: { areaId: string; areaName: string; areaMade?: boolean; title: string; dueOn: string | null };
   change_todo: {
     id: string;
     title: string;
@@ -93,6 +118,22 @@ export type DashChangeInput = {
   close_todo: { id: string; title: string; items: number };
   close_goal_step: { id: string; title: string; goalId: string; goalTitle: string };
   add_role_note: { roleId: string; roleTitle: string; body: string };
+  add_idea: { body: string; module: string | null };
+  add_job_lead: { roleId: string; roleTitle: string; companyName: string; url: string | null };
+  change_items: {
+    change: 'for_sale' | 'not_for_sale' | 'to_return' | 'not_returning' | 'group';
+    count: number;
+    titles: string[];
+    left: number;
+  };
+  move_roles: {
+    stage: RoleStage;
+    status: ApplicationStatus;
+    count: number;
+    titles: string[];
+    left: number;
+  };
+  set_goal_done_when: { id: string; title: string; doneWhen: string | null; previous: string | null };
 };
 
 /** The kinds Dash proposed for a Confirm before plan #1440, which keep their own undo in lib/ask/changes.ts. */
@@ -188,27 +229,40 @@ export type MadeDashChange = NewDashChange & {
 };
 
 /**
+ * The comment a thread write answered (plan #1518): the row thread it sits
+ * in, in core.conversations, and the person's turn in it. Kept on the record
+ * as conversation_id and turn_id, so Home can say where the change came from.
+ */
+export type ThreadCause = { conversationId: string; turnId: string };
+
+/**
  * Keeps a change Dash made straight away (plan #1440) in an `ask`
  * conversation: done from the start, with the row it wrote and that row's
  * values before and after, so its card under the answer offers Undo. Tied to
  * the answer by attachProposals once the answer is kept, like a proposal.
- * A change made in a thread is kept the same way with surface 'thread' and
- * no conversation, and Home offers its Undo.
+ * A change made in a thread is kept the same way with surface 'thread', under
+ * the comment that asked for it when the thread names one, and Home offers
+ * its Undo.
  */
 export async function insertMadeChange(
   core: CoreSupabaseClient,
   userId: string,
-  /** The `ask` conversation; null for a change made in a thread (plan #1465), which has none. */
-  conversationId: string | null,
+  /**
+   * The `ask` conversation, as its id. For a change made in a thread (plan
+   * #1465), the comment it answered, or null when the thread names none.
+   */
+  where: string | ThreadCause | null,
   made: MadeDashChange,
   now: string = new Date().toISOString(),
 ): Promise<DashChange> {
+  const ask = typeof where === 'string';
   const { data, error } = await core
     .from(DASH_ACTIONS)
     .insert({
       user_id: userId,
-      conversation_id: conversationId,
-      surface: conversationId === null ? 'thread' : 'ask',
+      conversation_id: ask ? where : (where?.conversationId ?? null),
+      ...(where && !ask ? { turn_id: where.turnId } : {}),
+      surface: ask ? 'ask' : 'thread',
       kind: made.kind,
       input: made.input,
       status: 'done',

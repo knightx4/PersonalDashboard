@@ -407,6 +407,21 @@ describe('job_applications', () => {
     expect(rows[0].detail).toMatchObject({ company: 'Acme', last_heard_on: null, sent_on: '2026-08-01' });
   });
 
+  it('finds sent applications that never had a reply, for a bulk move (plan #1657)', async () => {
+    const withConfirmation: Tables = {
+      ...tables,
+      'job_search.application_events': [
+        ...(tables['job_search.application_events'] ?? []),
+        // An automatic confirmation is not a reply.
+        { application_id: 'a1', user_id: ME, kind: 'confirmation', occurred_at: '2026-08-01T11:00:00Z' },
+      ],
+    };
+    const result = await executeAskTool('job_applications', { no_reply: true, to: '2026-07-31' }, context(withConfirmation));
+    expect(expectLinkedRows(result).map((r) => r.ref)).toEqual(['a3']);
+    const all = await executeAskTool('job_applications', { no_reply: true }, context(withConfirmation));
+    expect(expectLinkedRows(all).map((r) => r.ref).sort()).toEqual(['a1', 'a3']);
+  });
+
   it('narrows to the days sent', async () => {
     const result = await executeAskTool(
       'job_applications',
@@ -454,7 +469,8 @@ describe('todos', () => {
 describe('goal_status', () => {
   const tables: Tables = {
     'goals.items': [
-      { id: 'g1', user_id: ME, level: 'goal', status: 'open', title: 'Land a finance role', due_on: null, archived_at: null, position: 1 },
+      // Dated, so its on_track verdict stands: a goal with no date keeps only a met or pace verdict (plan #1738).
+      { id: 'g1', user_id: ME, level: 'goal', status: 'open', title: 'Land a finance role', due_on: '2026-12-31', archived_at: null, position: 1 },
       { id: 'g2', user_id: ME, level: 'goal', status: 'proposed', title: 'Run a half', due_on: null, archived_at: null, position: 2 },
       { id: 's1', user_id: ME, level: 'step', status: 'open', title: 'A step', due_on: null, archived_at: null, position: 3 },
       { id: 'g3', user_id: THEM, level: 'goal', status: 'open', title: 'Theirs', due_on: null, archived_at: null, position: 1 },
@@ -477,7 +493,7 @@ describe('goal_status', () => {
         href: '/goals/g1',
         detail: {
           status: 'open',
-          due_on: null,
+          due_on: '2026-12-31',
           verdict: 'On track',
           reviewed_on: '2026-09-26',
           why: 'Two applications out.',
@@ -623,6 +639,8 @@ describe('recall', () => {
         'Write the target down in one sentence', 0.5),
       passage(ME, 'job_search.notes', 'b0000000-0000-4000-8000-000000000001', 0,
         'Note on Strategic Finance at Ramp\n\nThe kind of team I would take a pay cut for.', 0.48),
+      passage(ME, 'job_search.interviews', 'b0000000-0000-4000-8000-000000000002', 0,
+        'Interview for Strategic Finance at Ramp, round 1\n\nNotes: They want someone who owns the model end to end.', 0.46),
       passage(ME, 'learn.card_notes', 'c0000000-0000-4000-8000-000000000001', 0,
         'Note on Career capital\n\nSkills that travel matter more than the title.', 0.44),
       passage(ME, 'public.order_items', 'd0000000-0000-4000-8000-000000000001', 0,
@@ -638,6 +656,10 @@ describe('recall', () => {
     'job_search.notes': [
       { id: 'b0000000-0000-4000-8000-000000000001', user_id: ME, role_id: 'r1', company_id: 'co1', contact_id: null },
     ],
+    'job_search.interviews': [
+      { id: 'b0000000-0000-4000-8000-000000000002', user_id: ME, application_id: 'ap1' },
+    ],
+    'job_search.applications': [{ id: 'ap1', user_id: ME, role_id: 'r1' }],
     'learn.card_notes': [{ id: 'c0000000-0000-4000-8000-000000000001', user_id: ME, concept_id: 'k1' }],
     'public.order_items': [{ id: 'd0000000-0000-4000-8000-000000000001', order_id: 'o1' }],
   };
@@ -683,7 +705,7 @@ describe('recall', () => {
     expect(byRef.get(IDEA)?.href).toBe(`/dev/ideas#idea-${IDEA}`);
     expect(byRef.get(IDEA)?.detail?.passage_2_by).toBe('Dash');
     expect(byRef.get(STEP)?.href).toBe('/dev/plan?view=all&q=%2312');
-    expect(byRef.get(QUESTION)?.href).toBe(`/dev/raised#waiting-${QUESTION}`);
+    expect(byRef.get(QUESTION)?.href).toBe(`/dev/inbox#waiting-${QUESTION}`);
     expect(byRef.get('plan#ideas')?.href).toBe('/dev/specs/plan#ideas');
   });
 
@@ -729,8 +751,9 @@ describe('recall', () => {
     expect(rows.map((r) => [r.table, r.href])).toEqual([
       ['obsidian.notes', '/vault/n/Career/YC%20Jobs%20Application.md'],
       ['core.files', '/goals/files/f0000000-0000-4000-8000-000000000001'],
-      ['goals.items', '/goals/a0000000-0000-4000-8000-000000000001#step-a0000000-0000-4000-8000-000000000002'],
+      ['goals.items', '/goals/a0000000-0000-4000-8000-000000000001/s/a0000000-0000-4000-8000-000000000002'],
       ['job_search.notes', '/jobs/roles/r1'],
+      ['job_search.interviews', '/jobs/roles/r1'],
       ['learn.card_notes', '/learn/c/k1'],
       ['public.order_items', '/shopping/orders/o1'],
     ]);
@@ -804,5 +827,50 @@ describe('recall', () => {
     expect((await recall({})).result.ok).toBe(false);
     expect((await recall({ question: 'x' })).result.ok).toBe(false);
     expect((await recall({ question: 'land value tax', only_mine: 'yes' })).result.ok).toBe(false);
+  });
+});
+
+describe('list_rows', () => {
+  const video = (userId: string, id: string, title: string, added: string, extra: Row = {}): Row => ({
+    id: `${id}-row`,
+    user_id: userId,
+    video_id: id,
+    item: { title },
+    why: `Why ${title}`,
+    summary: null,
+    key_points: null,
+    verdict: 'watch',
+    watched_at: null,
+    left_playlist_at: null,
+    added_at: added,
+    ...extra,
+  });
+  const tables: Tables = {
+    'learn.watch_list': [
+      video(ME, 'abc', 'How cities grow', '2026-10-01'),
+      video(ME, 'def', 'Land value tax explained', '2026-10-05', { watched_at: '2026-10-06' }),
+      video(THEM, 'ghi', 'Not theirs', '2026-10-07'),
+    ],
+  };
+
+  it('reads a table no other lookup covers, newest first, named by its embedded title and linked to its page', async () => {
+    const rows = expectLinkedRows(await executeAskTool('list_rows', { table: 'learn.watch_list' }, context(tables)));
+    expect(rows.map((r) => [r.ref, r.title, r.href])).toEqual([
+      ['def', 'Land value tax explained', '/learn/videos/def'],
+      ['abc', 'How cities grow', '/learn/videos/abc'],
+    ]);
+    expect(rows[0].detail).toMatchObject({ why: 'Why Land value tax explained', watched_at: '2026-10-06' });
+  });
+
+  it('keeps only rows holding every word given', async () => {
+    const result = await executeAskTool('list_rows', { table: 'learn.watch_list', contains: 'land tax' }, context(tables));
+    expect(expectLinkedRows(result).map((r) => r.ref)).toEqual(['def']);
+  });
+
+  it('refuses a table outside the catalogue, and one whose workspace is off', async () => {
+    const outside = await executeAskTool('list_rows', { table: 'auth.users' }, context(tables));
+    expect(outside).toEqual({ ok: false, error: expect.stringContaining('not a table list_rows can read') });
+    const off = await executeAskTool('list_rows', { table: 'learn.watch_list' }, context(tables, { enabledModules: ['shopping'] }));
+    expect(off).toEqual({ ok: false, error: expect.stringContaining('Learn workspace is switched off') });
   });
 });

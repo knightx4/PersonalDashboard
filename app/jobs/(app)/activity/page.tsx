@@ -31,10 +31,9 @@ export default async function ActivityPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <PageHeader
-        title="Activity"
-        description="What the syncs have actually changed. The inbox reads mail and opens or moves roles; the nightly sweep closes what has gone quiet and raises the nudges on This week."
-      />
+      {/* No description: the heading says it, and what the inbox and the
+          nightly sweep do is told in the empty state, where it is news. */}
+      <PageHeader title="Activity" />
       <CheckInboxNow
         accounts={(accounts ?? []).map((account) => ({
           id: account.id as string,

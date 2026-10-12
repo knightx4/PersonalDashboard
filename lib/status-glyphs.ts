@@ -41,6 +41,10 @@ import type { TaskStatus } from '@/lib/todo/tasks/model';
  * nobody has answered yet, which is a state no geometric mark said: the empty
  * hexagon already means "nothing has happened to this", and a question waiting
  * on you is the opposite of that.
+ *
+ * `clock` is the hexagon as a clock face, two hands and no ring. It was added
+ * for a plan step put down until a check-back falls due (note 5025f689): the
+ * dashed hexagon says a step waits on other work, and this one waits on a day.
  */
 export const STATUS_GLYPHS = [
   'empty',
@@ -54,6 +58,7 @@ export const STATUS_GLYPHS = [
   'bar',
   'dashed',
   'question',
+  'clock',
 ] as const;
 
 export type StatusGlyph = (typeof STATUS_GLYPHS)[number];

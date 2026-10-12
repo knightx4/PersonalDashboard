@@ -73,6 +73,9 @@ vi.mock('@/lib/learn/graph/load', () => ({
   loadConcept: vi.fn(async () => ({ state: 'unknown' })),
 }));
 
+// Each idea is saved with its claim's embedding (plan #1853).
+vi.mock('@/lib/learn/embed/idea-embedding', () => import('@/tests/stubs/idea-embedding'));
+
 const { pickLevel3Article, writeLevel3Question } = await import('./level3-question');
 
 /** `learn.concepts`, enough for the insert. */
@@ -194,6 +197,10 @@ describe('writeLevel3Question', () => {
     expect(prompts[0]!.content).toContain('Their goal: Photosynthesis');
     expect(prompts[0]!.content).toContain('water is split');
     expect(state.concepts[0]).toMatchObject({ subject_id: 'level3-subject', user_id: 'user-1' });
+    expect(state.concepts[0]).toMatchObject({
+      embedding: `vector of ${String(state.concepts[0]!.claim)}`,
+      embedding_model: 'voyage-4-lite',
+    });
     expect(state.crossListed).toEqual([
       { conceptId: 'concept-1', subjectId: 'subject:Photosynthesis', article: 'Photosynthesis' },
     ]);

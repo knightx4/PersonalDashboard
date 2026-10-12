@@ -66,16 +66,16 @@ export function SpecRules({ states }: { states: RuleState[] }) {
           const look = LOOK[state.kind];
           return (
             <li key={state.rule.number} className="space-y-1 py-3 first:pt-0 last:pb-0">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <p className="min-w-0 flex-1 text-body text-ink">
-                  <span className="font-semibold">R{state.rule.number}.</span>{' '}
-                  <Sentence text={state.rule.sentence} />
+              <p className="text-body text-ink">
+                <span className="font-semibold">R{state.rule.number}.</span>{' '}
+                <Sentence text={state.rule.sentence} />
+              </p>
+              <div className="flex items-baseline justify-between gap-x-3">
+                <p className="min-w-0 flex-1 text-ui text-ink-muted tabular-nums">
+                  <Summary state={state} />
                 </p>
                 <StateLabel glyph={look.glyph} word={look.word} tone={look.tone} />
               </div>
-              <p className="text-ui text-ink-muted tabular-nums">
-                <Summary state={state} />
-              </p>
               {state.problems.map((problem) => (
                 <p key={problem} className="text-ui text-caution">
                   {problem}

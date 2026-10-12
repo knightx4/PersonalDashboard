@@ -32,18 +32,13 @@ import {
   type Practice,
   liveRhythms,
   type HomeRhythm,
-  type LiveRhythm,
   type RhythmRecord,
 } from '@/lib/goals/rhythms';
 import { loadLatestReviews } from '@/lib/goals/reviews-store';
+import { isCountSource } from '@/lib/goals/rhythm-sources';
 import { syncRhythms } from '@/lib/goals/rhythms-store';
 import { goalProgress, type GoalProgress } from '@/lib/goals/status';
-import {
-  goalsForTodo,
-  unreadDashResults,
-  type TodoQuestion,
-  type TodoStep,
-} from '@/lib/goals/todo';
+import { todoSteps, type TodoStep } from '@/lib/goals/todo';
 import { nextPosition, reorder, type Goal, type GoalStatus } from '@/lib/goals/tree';
 import { todayIn } from '@/lib/todo/tasks/model';
 
@@ -77,7 +72,11 @@ type ItemRow = {
   position: number;
   rhythm_count: number | null;
   rhythm_period: RhythmPeriod | null;
+  count_source?: string | null;
+  count_match?: string | null;
   on_todo: boolean;
+  on_todo_by?: string | null;
+  on_todo_reason?: string | null;
   result: string | null;
   result_url: string | null;
   reviewed_at: string | null;
@@ -96,6 +95,7 @@ type ItemRow = {
   prep_checked_at?: string | null;
   errand?: boolean;
   created_at?: string | null;
+  closed_at?: string | null;
   estimated_total?: number | string | null;
   total_unit?: string | null;
 };
@@ -125,9 +125,9 @@ async function loadDependencies(
 const ITEM_COLUMNS =
   'id, level, area_id, parent_id, kind, status, title, detail, acceptance, fog, fog_dismissed_at, ' +
   'resolution, ' +
-  'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, on_todo, result, result_url, reviewed_at, ' +
-  'unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
-  'kept_open_at, prepares_id, prep_checked_at, errand, created_at, estimated_total, total_unit';
+  'dismissed_at, due_on, starts_on, position, rhythm_count, rhythm_period, count_source, count_match, on_todo, on_todo_by, on_todo_reason, result, ' +
+  'result_url, reviewed_at, unit, target, collection_id, asks_for, questions, block_ask, block_kind, acts, help_kinds, proposed_help_kinds, ' +
+  'kept_open_at, prepares_id, prep_checked_at, errand, created_at, closed_at, estimated_total, total_unit';
 
 const toStep = (row: ItemRow): Step => ({
   id: row.id,
@@ -145,7 +145,11 @@ const toStep = (row: ItemRow): Step => ({
   position: row.position,
   rhythmCount: row.rhythm_count,
   rhythmPeriod: row.rhythm_period,
+  countSource: isCountSource(row.count_source) ? row.count_source : null,
+  countMatch: row.count_match ?? null,
   onTodo: row.on_todo,
+  onTodoBy: row.on_todo_by === 'me' || row.on_todo_by === 'claude' ? row.on_todo_by : null,
+  onTodoReason: row.on_todo_reason ?? null,
   result: row.result,
   resultUrl: row.result_url,
   reviewedAt: row.reviewed_at,
@@ -158,6 +162,7 @@ const toStep = (row: ItemRow): Step => ({
   preparesId: row.prepares_id ?? null,
   prepCheckedAt: row.prep_checked_at ?? null,
   createdAt: row.created_at ?? null,
+  closedAt: row.closed_at ?? null,
   estimatedTotal:
     row.estimated_total === null || row.estimated_total === undefined
       ? null
@@ -182,6 +187,8 @@ const toGoal = (row: ItemRow): Goal => ({
   proposedHelpKinds: readHelpKinds(row.proposed_help_kinds),
   keptOpenAt: row.kept_open_at ?? null,
   errand: row.errand ?? false,
+  createdAt: row.created_at ?? null,
+  closedAt: row.closed_at ?? null,
 });
 
 export type GoalMap = {
@@ -634,6 +641,11 @@ export async function accountToday(
   userId: string,
   now: number,
 ): Promise<string> {
+  return todayIn(await accountTimeZone(client, userId), new Date(now));
+}
+
+/** The account's time zone, for the same runs; UTC when the setting cannot be read. */
+export async function accountTimeZone(client: GoalsSupabaseClient, userId: string): Promise<string> {
   let zone: string | null = null;
   try {
     const { data } = await client
@@ -646,7 +658,7 @@ export async function accountToday(
   } catch {
     // Read as UTC, as the comment above says.
   }
-  return todayIn(zone ?? 'UTC', new Date(now));
+  return zone ?? 'UTC';
 }
 
 /**
@@ -679,49 +691,21 @@ export async function loadDailyView(
   };
 }
 
-/** A live rhythm whose current period is not yet met, for Todo (plan #928). */
-export type TodoRhythm = LiveRhythm & { startsOn: string; count: number };
-
 /**
  * What Goals puts on Todo, for the agenda source in
- * lib/todo/agenda/sources/goal-steps.ts: each open goal's next step of yours
- * (plan #1266) and the steps you pressed Show on Todo on (plan #927); the
- * rule for both is goalTodoSteps in lib/goals/todo.ts. The open questions
- * on your goals, to answer from Todo (plan #1267), from the same pass of
- * dailyView (goalsForTodo). And every live
- * rhythm until its current period's count is met (plan #928). Rhythms need no
- * flag, as the spec says; "Not this one" on Todo hides only this period.
+ * lib/todo/agenda/sources/goal-steps.ts: the steps sent there, by you with
+ * Send to Todo or by Dash (plans #927, #1735). The rule is todoSteps in
+ * lib/goals/todo.ts. Nothing else comes through on its own any more: a goal's
+ * next step, rhythms, questions and Dash's results stay on the Goals home.
  */
 export async function loadTodoGoals(
   client: GoalsSupabaseClient,
   { userId, today }: Today,
-): Promise<{ steps: TodoStep[]; questions: TodoQuestion[]; rhythms: TodoRhythm[] }> {
+): Promise<{ steps: TodoStep[] }> {
   // userId narrows the read for a service-role client (the morning brief);
   // under RLS it changes nothing.
   const { goals, byGoal } = await loadLiveTree(client, { userId, today });
-  const goalList = goals.map((g) => g.goal);
-  const live = liveRhythms(goalList, byGoal);
-  const records = await syncRhythms(client, userId, live, today);
-  const rhythms = live.flatMap((rhythm) => {
-    const current = records.get(rhythm.id)?.current;
-    if (!current || current.count >= current.target) return [];
-    return [
-      { ...rhythm, target: current.target, startsOn: current.startsOn, count: current.count },
-    ];
-  });
-  return { ...goalsForTodo(goals, byGoal, today), rhythms };
-}
-
-/**
- * How many of Dash's results wait to be read, for the line on Todo (plan
- * #1268); the rule is unreadDashResults in lib/goals/todo.ts.
- */
-export async function loadUnreadDashResults(
-  client: GoalsSupabaseClient,
-  { userId, today }: Today,
-): Promise<number> {
-  const { goals, byGoal } = await loadLiveTree(client, { userId, today });
-  return unreadDashResults(dailyView(goals, byGoal, today));
+  return { steps: todoSteps(goals.map((g) => g.goal), byGoal) };
 }
 
 /**

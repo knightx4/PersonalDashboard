@@ -108,7 +108,7 @@ describe('an ordinary course', () => {
     await ask(client);
 
     const call = createOf(client).mock.calls[0][0];
-    expect(call.model).toBe('claude-sonnet-5');
+    expect(call.model).toBe('claude-sonnet-5-5');
     const content = call.messages[0].content as string;
     expect(content).toContain('Subject: Economics');
     expect(content).toContain('- Code: ECON 201');
@@ -120,7 +120,7 @@ describe('an ordinary course', () => {
     const spend = vi.fn();
     await ask(clientReturning(CHAIN, { input_tokens: 900, output_tokens: 400 }), { onSpend: spend });
     expect(spend).toHaveBeenCalledTimes(1);
-    expect(spend.mock.calls[0][0].model).toBe('claude-sonnet-5');
+    expect(spend.mock.calls[0][0].model).toBe('claude-sonnet-5-5');
   });
 });
 

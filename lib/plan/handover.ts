@@ -29,6 +29,7 @@ import {
   underwayRefusal,
 } from './liveness';
 import { QUESTION_RULE, planBrief } from './brief';
+import { waitingSteps } from './stall';
 import { loadVisionBodies } from '@/lib/specs/vision';
 import { endRunsOnStep, loadLastRuns, reshapeUnderway, startRoutineRun } from './runs';
 import { isClosed, loadPlan } from './load';
@@ -56,7 +57,7 @@ type Db = SupabaseClient<any, 'public'>;
  * with no id, the routine call falls back to the plan routine, which would
  * build the step in this repository.
  */
-function builderFor(
+export function builderFor(
   sections: readonly PlanSection[],
   node: PlanNode,
 ): { ok: true; project: DevProject | null; routine: RoutineTarget } | { ok: false; error: string } {
@@ -73,7 +74,7 @@ function builderFor(
 }
 
 /** The sentence that tells a project's session where it is and what to read. */
-function projectPreamble(project: DevProject): string {
+export function projectPreamble(project: DevProject): string {
   const { owner, repo, branch } = project.repo;
   return (
     `This step belongs to ${project.label}, the repository ${owner}/${repo} ` +
@@ -473,6 +474,13 @@ export async function handFeatureToClaude(input: {
     };
   }
 
+  // Nor when every open step beneath waits on another step or on a check-back.
+  // The feature row itself is always open, so it was counted as work: #1073
+  // went out three times with its one step waiting on a check-back for two
+  // weeks of data, and each session found nothing to do and said so.
+  const waits = waitingSteps(node);
+  if (waits) return { ok: false, error: waits, refused: true };
+
   // A session is started on the feature and not one row is written. Nothing is
   // handed over and nothing is marked underway.
   //
@@ -508,7 +516,11 @@ export async function handFeatureToClaude(input: {
     'first step that needs a decision from me: block it with the exact question rather ' +
     'than guessing, and do not skip past it to a later step that depends on it. Merge ' +
     'each step to main as it closes, before you send the next one. The Building section ' +
-    'says how. Report every step you closed, by number and ' +
+    'says how. A step that needs data that does not exist yet, or a run that has not ' +
+    'fired, gets a check-back with --from <its number>, which holds it until then. If you end ' +
+    `having closed and blocked nothing, first write why with plan.ts stopped ${node.number} ` +
+    '--reason "…": a run that says nothing is sent a session to find out why. Report every ' +
+    'step you closed, by number and ' +
     'title.\n\nThe brief is below; it is the plan as the app holds it right now, and ' +
     'the plan is the source of truth.\n\n' +
     planBrief(sections, node, { thread: true, liveness, visions });

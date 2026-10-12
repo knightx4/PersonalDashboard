@@ -1,9 +1,9 @@
 /**
  * Every goal run, for the Runs page under Goals (plan #1012).
  *
- * One goals.runs row per run: "Work on this" or a comment on a goal (job
+ * One goals.runs row per run: Ask Dash or a comment on a goal (job
  * `goal`), the morning run (`daily`), the weekly run (`weekly`), or answers
- * to questions on a goal (`reshape`, plan #1017), or one step or phase sent
+ * to questions on a goal (`reshape`, plan #1017), or one step or phase asked for
  * from its row (`step`, `phase`, plan #1000), or one step of yours Claude was
  * asked to prepare (`prepare`, plan #1001), or Plan this area on an area
  * (`area`), or your answer to something Claude flagged on a goal (`raise`,
@@ -15,7 +15,8 @@
  * mean.
  */
 import { formatInstant } from './dates';
-import { runIsQuiet, runProgress, type GoalRunStatus } from '@/lib/goals/shaping';
+import { lineSilent } from '@/lib/core/run-liveness';
+import { minutesAgo, runIsQuiet, runProgress, type GoalRunStatus } from '@/lib/goals/shaping';
 
 export type RunJob =
   | 'goal'
@@ -41,6 +42,8 @@ export type RunListing = {
   /** When the session last reported, and what it said it was on (plan #1002). */
   lastSeenAt: string | null;
   nowOn: string | null;
+  /** When the run last wrote a line (plan #1825); null or absent when it wrote none or was not read. */
+  lastLineAt?: string | null;
   /** The goal or step it was on; null for a morning or weekly run, or when that item was deleted. */
   item: { id: string; title: string; level: 'goal' | 'step' } | null;
   /** The area an area run was on; null for every other run, or when the area was deleted. */
@@ -49,7 +52,7 @@ export type RunListing = {
 
 /** What started each kind of run, as the page names it. */
 export const JOB_LABELS: Record<RunJob, string> = {
-  goal: 'Work on this',
+  goal: 'Asked Dash about the goal',
   daily: 'Morning run',
   weekly: 'Weekly run',
   reshape: 'After your answers',
@@ -65,14 +68,29 @@ export const JOB_LABELS: Record<RunJob, string> = {
  * RUN_QUIET_MS is one whose session died without writing back; the sweep
  * closes it as failed on the next tick, and until then it reads as silent.
  */
-export type RunOutcome = 'done' | 'failed' | 'running' | 'silent';
+export type RunOutcome = 'done' | 'failed' | 'running' | 'silent' | 'waiting' | 'stale';
 
+/**
+ * A run that writes lines (plan #1825) is read from its newest line: the
+ * sweep marks it stale once silent for RUN_SILENT_MINUTES, and it stays
+ * stale until you acknowledge it. A run with no lines keeps the 45-minute
+ * rule above.
+ */
 export function runOutcome(
-  run: Pick<RunListing, 'status' | 'createdAt'> & { lastSeenAt?: string | null },
+  run: Pick<RunListing, 'status' | 'createdAt'> & {
+    lastSeenAt?: string | null;
+    lastLineAt?: string | null;
+  },
   now: number,
 ): RunOutcome {
   if (run.status === 'done') return 'done';
   if (run.status === 'failed') return 'failed';
+  if (run.status === 'stale') return 'stale';
+  if (run.status === 'awaiting_input') return 'waiting';
+  // A run that writes lines is never "never reported back": the sweep marks
+  // it stale from its last line, and only a stale row can be acknowledged,
+  // so until then it reads as going.
+  if (lineSilent(run.lastLineAt, now) !== null) return 'running';
   return runIsQuiet(run, now) ? 'silent' : 'running';
 }
 
@@ -81,7 +99,17 @@ export const OUTCOME_LABELS: Record<RunOutcome, string> = {
   failed: 'Failed',
   running: 'Still running',
   silent: 'Never reported back',
+  waiting: 'Waiting on you',
+  stale: 'Gone quiet',
 };
+
+/** When a run was last heard from: its newest line, its last report, or its start. */
+export function lastHeardIso(run: Pick<RunListing, 'createdAt' | 'lastSeenAt' | 'lastLineAt'>): string {
+  const times = [run.lastLineAt, run.lastSeenAt, run.createdAt].filter(
+    (iso): iso is string => !!iso && Number.isFinite(Date.parse(iso)),
+  );
+  return times.reduce((a, b) => (Date.parse(b) > Date.parse(a) ? b : a), run.createdAt);
+}
 
 /**
  * How long a run took, from its row being written to its end, or null when
@@ -131,7 +159,13 @@ function isJob(value: string): value is RunJob {
 }
 
 function isStatus(value: string): value is GoalRunStatus {
-  return value === 'started' || value === 'done' || value === 'failed';
+  return (
+    value === 'started' ||
+    value === 'awaiting_input' ||
+    value === 'stale' ||
+    value === 'done' ||
+    value === 'failed'
+  );
 }
 
 /**
@@ -167,7 +201,12 @@ export function toRunListings(rows: readonly RunRowWithItem[]): RunListing[] {
 export function runMeta(run: RunListing, now: number, timeZone: string): { outcome: RunOutcome; meta: string } {
   const outcome = runOutcome(run, now);
   const took = runDuration(run);
-  const progress = outcome === 'running' ? runProgress(run, now) : null;
+  const progress =
+    outcome === 'running'
+      ? runProgress(run, now)
+      : outcome === 'stale'
+        ? `last heard from ${minutesAgo(lastHeardIso(run), now)}`
+        : null;
   const meta = [
     OUTCOME_LABELS[outcome],
     progress,

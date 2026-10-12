@@ -69,7 +69,7 @@ function CloseButton({ onClose, hasReport }: { onClose: () => void; hasReport: b
   const { pending } = useFormStatus();
   if (hasReport) return null;
   return (
-    <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
+    <Button type="button" variant="ghost" onClick={onClose} pending={pending}>
       Cancel
     </Button>
   );
@@ -78,7 +78,7 @@ function CloseButton({ onClose, hasReport }: { onClose: () => void; hasReport: b
 function PullButton() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" disabled={pending}>
+    <Button type="submit" variant="secondary" pending={pending}>
       {pending ? 'Fetching lectures and embedding…' : 'Pull it in'}
     </Button>
   );

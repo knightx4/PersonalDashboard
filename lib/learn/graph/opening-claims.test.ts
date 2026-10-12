@@ -53,7 +53,7 @@ describe('when it names the claims', () => {
     await ask(client);
 
     expect(client.messages.create).toHaveBeenCalledTimes(1);
-    expect(client.messages.create.mock.calls[0][0].model).toBe('claude-sonnet-5');
+    expect(client.messages.create.mock.calls[0][0].model).toBe('claude-sonnet-5-5');
   });
 
   it('reports what it cost', async () => {
@@ -64,7 +64,7 @@ describe('when it names the claims', () => {
     );
 
     expect(reports).toHaveLength(1);
-    expect(reports[0].model).toBe('claude-sonnet-5');
+    expect(reports[0].model).toBe('claude-sonnet-5-5');
   });
 });
 
