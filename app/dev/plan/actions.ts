@@ -483,7 +483,7 @@ export async function updateFeature(
  * answer is one click from the list rather than a form you have to open, fill
  * and submit.
  */
-// latency: pending
+// latency: optimistic -- the row shows the new status at once and takes it back, with the reason in a toast, if refused
 export async function setPlanItemStatus(
   _prev: PlanActionState,
   formData: FormData,
@@ -798,7 +798,7 @@ export async function approveProposals(
  * A proposed step can be marked yours. The column says what you kept, not
  * that the step has been agreed to, and nothing picks up a proposal.
  */
-// latency: pending
+// latency: optimistic -- the row shows Mine or Not mine at once and takes it back, with the reason in a toast, if refused
 export async function setPlanItemAssignee(
   _prev: PlanActionState,
   formData: FormData,
@@ -853,7 +853,7 @@ export async function setPlanItemAssignee(
  * thing is decided per row, and a feature marked Next does not make every step
  * under it Next.
  */
-// latency: pending
+// latency: optimistic -- the row shows the new priority at once and takes it back, with the reason in a toast, if refused
 export async function setPlanItemPriority(
   _prev: PlanActionState,
   formData: FormData,
@@ -885,7 +885,7 @@ export async function setPlanItemPriority(
  * numbers moves nothing. Re-dealing costs a handful of writes on a list that
  * is a handful long.
  */
-// latency: pending
+// latency: optimistic -- the row swaps with its neighbour at once and goes back, with the reason in a toast, if refused
 export async function movePlanItem(
   _prev: PlanActionState,
   formData: FormData,

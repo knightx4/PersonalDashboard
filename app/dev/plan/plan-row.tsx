@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useMemo, useState } from 'react';
+import { useActionState, useCallback, useMemo, useState } from 'react';
 import { CircleUser, Pencil, Play } from 'lucide-react';
 import {
   addPlanDependency,
@@ -8,7 +8,6 @@ import {
   answerPlanDecision,
   approvePlanItem,
   deletePlanItem,
-  movePlanItem,
   removePlanDependency,
   reshapePlanFeature,
   sendPlanFeatureToClaude,
@@ -23,6 +22,9 @@ import {
 } from './actions';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { useClockNow } from '@/lib/use-clock-now';
+import { useOptimisticWrite } from '@/lib/use-optimistic-write';
+import { applyRowChange, type RowChange, type RowFields, type SiblingMove } from '@/lib/plan/optimistic';
+import { SiblingMoveProvider, useMoveSibling, useSiblingOrder, writeMove } from './sibling-order';
 import { Button } from '@/components/ui/button';
 import { FieldError, FieldHint } from '@/components/ui/field';
 import { PLAN_PRIORITIES, PLAN_PRIORITY_LABEL, PLAN_STATUSES, isClosed } from '@/lib/plan/load';
@@ -525,6 +527,23 @@ function useResolving(
   );
 }
 
+/** One row control's write, as the form data its action reads. */
+async function writeRowChange(id: string, change: RowChange) {
+  const formData = new FormData();
+  formData.set('id', id);
+  switch (change.kind) {
+    case 'status':
+      formData.set('status', change.status);
+      return setPlanItemStatus({}, formData);
+    case 'priority':
+      formData.set('priority', String(change.priority));
+      return setPlanItemPriority({}, formData);
+    case 'assignee':
+      formData.set('assignee', change.assignee ?? '');
+      return setPlanItemAssignee({}, formData);
+  }
+}
+
 /**
  * One step: what it is, where it stands, and what is beneath it.
  *
@@ -542,7 +561,7 @@ function useResolving(
  * same menus and the same action states, and the two cannot drift.
  */
 export function usePlanRow({
-  node,
+  node: served,
   trail,
   catalog,
   canSend,
@@ -646,6 +665,38 @@ export function usePlanRow({
   // without the page being navigated. 0 before mount, which is what keeps the
   // server render and the first client one agreeing.
   const runNow = useClockNow();
+  // Status, priority and assignee change on the row when pressed and come back
+  // if the write is refused (plan #1850). `served` is what the server sent;
+  // `node` is that with the change in flight laid over it, and is what the rest
+  // of the row reads.
+  const serverFields = useMemo<RowFields>(
+    () => ({ status: served.status, priority: served.priority, assignee: served.assignee }),
+    [served.status, served.priority, served.assignee],
+  );
+  const { shown: fields, run: changeRow } = useOptimisticWrite<RowFields, RowChange>({
+    value: serverFields,
+    apply: applyRowChange,
+    write: (change) => writeRowChange(served.id, change),
+  });
+  // The steps beneath draw in the order their list holds, so a press of Move up
+  // on one of them swaps it here before the server has answered.
+  const children = useSiblingOrder(served.children);
+  // A row outside a list that holds its order (the feature page's tabs) still
+  // moves, through a write of its own that waits for the server.
+  const moveSibling = useMoveSibling();
+  const { run: moveAlone } = useOptimisticWrite<number, SiblingMove>({
+    value: 0,
+    apply: (current) => current,
+    write: writeMove,
+  });
+  const moveSelf = useCallback(
+    (direction: 'up' | 'down') => (moveSibling ?? moveAlone)({ id: served.id, direction }),
+    [moveSibling, moveAlone, served.id],
+  );
+  const node = useMemo(
+    () => ({ ...served, ...fields, children: children.ordered as PlanNode[] }),
+    [served, fields, children.ordered],
+  );
   const row = useTreeRow(node, {
     searching,
     unfolded,
@@ -660,10 +711,6 @@ export function usePlanRow({
   // place is better than the same question drawn three times.
   const [confirmingSend, setConfirmingSend] = useState(false);
 
-  const [assignState, assignAction, assignPending] = useActionState(
-    setPlanItemAssignee,
-    {} as PlanActionState,
-  );
   // Held by the row rather than by the button, because the same action is one
   // of the quick icons and what happened is said once, in one place.
   const [sendState, sendAction, sendPending] = useActionState(
@@ -814,8 +861,7 @@ export function usePlanRow({
       id: status,
       label: STATUS_LABEL[status],
       disabled: status === node.status,
-      formAction: (formData: FormData) => setPlanItemStatus({}, formData),
-      formFields: { id: node.id, status },
+      onSelect: () => changeRow({ kind: 'status', status }),
     })),
   ];
 
@@ -823,8 +869,7 @@ export function usePlanRow({
     id: `priority-${priority}`,
     label: PLAN_PRIORITY_LABEL[priority],
     disabled: priority === node.priority,
-    formAction: (formData: FormData) => setPlanItemPriority({}, formData),
-    formFields: { id: node.id, priority: String(priority) },
+    onSelect: () => changeRow({ kind: 'priority', priority }),
   }));
 
   // The open steps beneath this one, which the press covers as well. Said in
@@ -848,8 +893,7 @@ export function usePlanRow({
       // and it should not need the step opened first.
       id: 'assign',
       label: assignLabel,
-      formAction: (formData: FormData) => setPlanItemAssignee({}, formData),
-      formFields: { id: node.id, assignee: assignValue },
+      onSelect: () => changeRow({ kind: 'assignee', assignee: assignValue || null }),
     },
     // The quick icons are only there from sm up and only under a pointer, so
     // the menu carries the same two actions for a phone and for a keyboard.
@@ -904,14 +948,12 @@ export function usePlanRow({
     {
       id: 'up',
       label: 'Move up',
-      formAction: (formData: FormData) => movePlanItem({}, formData),
-      formFields: { id: node.id, direction: 'up' },
+      onSelect: () => moveSelf('up'),
     },
     {
       id: 'down',
       label: 'Move down',
-      formAction: (formData: FormData) => movePlanItem({}, formData),
-      formFields: { id: node.id, direction: 'down' },
+      onSelect: () => moveSelf('down'),
     },
     {
       id: 'delete',
@@ -927,14 +969,12 @@ export function usePlanRow({
   ]);
 
   const actionError =
-    assignState.error ??
     sendState.error ??
     batchState.error ??
     reshapeState.error ??
     overhaulState.error ??
     answerState.error;
   const actionMessage =
-    assignState.message ??
     sendState.message ??
     batchState.message ??
     reshapeState.message ??
@@ -1114,10 +1154,12 @@ export function usePlanRow({
                 </RowIconButton>
               </form>
             ))}
-          <form action={assignAction}>
-            <input type="hidden" name="id" value={node.id} />
-            <input type="hidden" name="assignee" value={assignValue} />
-            <RowIconButton type="submit" label={assignLabel} pending={assignPending}>
+          <>
+            <RowIconButton
+              type="button"
+              label={assignLabel}
+              onClick={() => changeRow({ kind: 'assignee', assignee: assignValue || null })}
+            >
               {/* The head-and-shoulders the assignee picker uses for Me, and
                   accented while the step is yours, so the icon says which way
                   the next press goes. */}
@@ -1127,7 +1169,7 @@ export function usePlanRow({
                 aria-hidden
               />
             </RowIconButton>
-          </form>
+          </>
           <RowIconButton label="Edit" onClick={() => setEditing(true)}>
             <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
           </RowIconButton>
@@ -1224,13 +1266,14 @@ export function usePlanRow({
   );
   const panelActions = (
     <>
-          <form action={assignAction}>
-            <input type="hidden" name="id" value={node.id} />
-            <input type="hidden" name="assignee" value={assignValue} />
-            <Button type="submit" size="sm" variant="ghost" pending={assignPending}>
-              {assignLabel}
-            </Button>
-          </form>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => changeRow({ kind: 'assignee', assignee: assignValue || null })}
+          >
+            {assignLabel}
+          </Button>
           {!closed && (
             <SendToClaude
               node={node}
@@ -1306,6 +1349,7 @@ export function usePlanRow({
     );
 
   return {
+    moveChildren: children.move,
     row,
     sendButton,
     batchAction,
@@ -1381,6 +1425,7 @@ export function PlanRow(props: PlanRowProps) {
   // feature's page; a step's title still opens its panel in place.
   const feature = trail.length === 0 && !props.asStep && own.kind === 'build';
   return (
+    <SiblingMoveProvider move={parts.moveChildren}>
     <TreeRow
       node={parts.node}
       trail={trail}
@@ -1440,6 +1485,7 @@ export function PlanRow(props: PlanRowProps) {
         />
       )}
     />
+    </SiblingMoveProvider>
   );
 }
 

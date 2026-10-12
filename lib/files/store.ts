@@ -94,6 +94,37 @@ export async function loadListingsById(
 }
 
 /**
+ * Mark a file read (plan #1861): its newest version has been opened. Only an
+ * unread file is written, so opening it again changes nothing, and the
+ * trigger keeps updated_at as it was (migration 0203), so the file does not
+ * move in the list. True when it was unread until now.
+ */
+export async function markFileRead(core: CoreSupabaseClient, id: string): Promise<boolean> {
+  const { data, error } = await core
+    .from('files')
+    .update({ read_at: new Date().toISOString() })
+    .eq('id', id)
+    .is('read_at', null)
+    .is('archived_at', null)
+    .select('id');
+  if (error) throw new Error(`Could not mark the file read: ${error.message}`);
+  return (data ?? []).length > 0;
+}
+
+/** Your files still to read, newest first: Dash's, with the current version unopened. */
+export async function loadUnreadFiles(core: CoreSupabaseClient): Promise<FileListing[]> {
+  const { data, error } = await core
+    .from('files')
+    .select(LISTING_COLUMNS)
+    .eq('made_by', 'claude')
+    .is('read_at', null)
+    .is('archived_at', null)
+    .order('updated_at', { ascending: false });
+  if (error) throw new Error(`Could not read which files are unread: ${error.message}`);
+  return ((data ?? []) as ListingRow[]).map(toListing);
+}
+
+/**
  * The thread under a file, oldest first, kept under the file's ref in
  * core.conversations since plan #1470 (core.file_comments is read-only).
  */

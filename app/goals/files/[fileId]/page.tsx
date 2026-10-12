@@ -95,9 +95,10 @@ export default async function FilePage({
         <Card padding="standard">
           <FileBody markdown={shown.body} />
         </Card>
-        {/* Reading the newest version is reading the results that link to it. */}
+        {/* Reading the newest version marks the file read, and the results that link to it. */}
         {!older && (
           <MarkFileRead
+            fileId={file.id}
             stepIds={uses.filter((use) => use.level === 'step').map((use) => use.itemId)}
           />
         )}
