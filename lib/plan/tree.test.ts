@@ -1986,4 +1986,9 @@ describe('waiting on a check-back', () => {
   it('leaves a step with no check-back ready', () => {
     expect(stepOf(build([])).ready).toBe(true);
   });
+
+  it('counts it apart from the rest of the waiting, for the clock', () => {
+    expect(build([check('step')]).tally).toMatchObject({ waiting: 1, checkingBack: 1 });
+    expect(build([]).tally).toMatchObject({ waiting: 0, checkingBack: 0 });
+  });
 });
