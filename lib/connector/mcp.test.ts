@@ -5,6 +5,7 @@ const calls = vi.hoisted(() => ({
   checkConnectorRate: vi.fn(),
   recordConnectorCall: vi.fn(),
   executeAskTool: vi.fn(),
+  runConnectorWrite: vi.fn(),
 }));
 
 vi.mock('./calls', () => ({
@@ -17,7 +18,13 @@ vi.mock('@/lib/ask/tools', async (importActual) => ({
   executeAskTool: calls.executeAskTool,
 }));
 
+vi.mock('./writes', async (importActual) => ({
+  ...(await importActual<typeof import('./writes')>()),
+  runConnectorWrite: calls.runConnectorWrite,
+}));
+
 import { ASK_TOOLS, ASK_TOOL_NAMES } from '@/lib/ask/tools';
+import { CONNECTOR_WRITE_TOOLS } from './writes';
 import type { ConnectorAccess } from './access';
 import { protectedResourceResponse, serveMcp } from './mcp';
 import { refusal } from './token';
@@ -28,6 +35,10 @@ import { refusal } from './token';
  */
 
 const HOST = 'https://dash.example.com';
+const LOOKUP_NAMES: string[] = ASK_TOOL_NAMES.filter(
+  (name) => name !== 'search_mail' && name !== 'read_mail' && name !== 'show_chart',
+);
+const WRITE_NAMES = CONNECTOR_WRITE_TOOLS.map((tool) => tool.definition.name);
 const METADATA = `${HOST}/.well-known/oauth-protected-resource/api/mcp`;
 const core = { name: 'core client' };
 /** The service-role client the log is written through: the token cannot write (plan #1257). */
@@ -112,7 +123,7 @@ describe('a request without a usable token', () => {
 });
 
 describe('the tool list', () => {
-  it('offers every Ask Dash lookup but mail search and the chart, with their own descriptions and schemas, read only', async () => {
+  it('offers every Ask Dash lookup but mail search and the chart, read only, then the Learn writes', async () => {
     await call('initialize', {
       protocolVersion: '2025-06-18',
       capabilities: {},
@@ -122,12 +133,15 @@ describe('the tool list', () => {
       tools: { name: string; description: string; inputSchema: Record<string, unknown>; annotations: Record<string, unknown> }[];
     };
 
-    expect(tools.map((t) => t.name)).toEqual(ASK_TOOL_NAMES.filter((name) => name !== 'search_mail' && name !== 'read_mail' && name !== 'show_chart'));
-    for (const tool of tools) {
+    expect(tools.map((t) => t.name)).toEqual([...LOOKUP_NAMES, ...WRITE_NAMES]);
+    for (const tool of tools.filter((t) => LOOKUP_NAMES.includes(t.name))) {
       const ask = ASK_TOOLS.find((t) => t.name === tool.name)!;
       expect(tool.description).toBe(ask.description);
       expect(tool.inputSchema).toMatchObject(ask.input_schema);
       expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false });
+    }
+    for (const tool of tools.filter((t) => WRITE_NAMES.includes(t.name))) {
+      expect(tool.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
     }
   });
 });
@@ -188,9 +202,7 @@ describe('a subscription request', () => {
     const response = await serveMcp(modernRequest('tools/list', {}), async () => session, makeLog);
     expect(response.status).toBe(200);
     const { tools } = (await rpcResult(response)) as { tools: { name: string }[] };
-    expect(tools.map((tool) => tool.name)).toEqual(
-      ASK_TOOL_NAMES.filter((name) => name !== 'search_mail' && name !== 'read_mail' && name !== 'show_chart'),
-    );
+    expect(tools.map((tool) => tool.name)).toEqual([...LOOKUP_NAMES, ...WRITE_NAMES]);
   });
 });
 
@@ -257,6 +269,58 @@ describe('a tool call', () => {
 
     expect(calls.recordConnectorCall).toHaveBeenCalledTimes(1);
     expect(answer).toMatchObject({ isError: true, content: [{ text: 'The Todo workspace is switched off, so it cannot be read.' }] });
+  });
+});
+
+describe('a write call', () => {
+  const writeCtx = { userId: 'me', name: 'service-role learn context' };
+  const makeWrite = vi.fn(() => writeCtx as never);
+
+  async function write(name: string, args: Record<string, unknown>, withWrite = true) {
+    const response = await serveMcp(
+      mcpRequest({ jsonrpc: '2.0', id: ++rpcId, method: 'tools/call', params: { name, arguments: args } }),
+      async () => session,
+      makeLog,
+      withWrite ? makeWrite : undefined,
+    );
+    expect(response.status).toBe(200);
+    return (await rpcResult(response)) as { content: { text: string }[]; isError?: boolean };
+  }
+
+  it('runs on the service-role context for the verified person, never the token, and is logged once', async () => {
+    const result: AskToolResult = {
+      ok: true,
+      rows: [{ table: 'learn.readings', ref: 'r1', title: 'Building Effective Agents', href: '/learn/r/r1' }],
+    };
+    calls.runConnectorWrite.mockResolvedValue(result);
+
+    const answer = await write('add_to_reading_list', { items: [{ title: 'Building Effective Agents' }], subjects: ['AI agents'] });
+
+    expect(calls.checkConnectorRate).toHaveBeenCalledWith(core, 'me', undefined);
+    expect(makeWrite).toHaveBeenCalledWith('me');
+    expect(calls.runConnectorWrite.mock.calls[0][0].definition.name).toBe('add_to_reading_list');
+    expect(calls.runConnectorWrite.mock.calls[0][1]).toBe(writeCtx);
+    expect(calls.executeAskTool).not.toHaveBeenCalled();
+    expect(calls.recordConnectorCall).toHaveBeenCalledTimes(1);
+    expect(calls.recordConnectorCall).toHaveBeenCalledWith(logClient, expect.objectContaining({ tool: 'add_to_reading_list', result }));
+    expect(JSON.parse(answer.content[0].text).rows[0].href).toBe(`${HOST}/learn/r/r1`);
+  });
+
+  it('is refused, and logged, when the route gave no way to write', async () => {
+    const answer = await write('mark_read', { title: 'agents' }, false);
+
+    expect(calls.runConnectorWrite).not.toHaveBeenCalled();
+    expect(calls.recordConnectorCall).toHaveBeenCalledTimes(1);
+    expect(answer).toMatchObject({ isError: true, content: [{ text: 'Changes cannot be made through this connection.' }] });
+  });
+
+  it('is capped like a lookup', async () => {
+    calls.checkConnectorRate.mockResolvedValue({ ok: false, limit: 'minute', retryAt: '', retryAfterSeconds: 20, message: 'Too many calls.' });
+
+    const answer = await write('log_learning', { topic: 'Evals', summary: 'x', subject: 'Evals' });
+
+    expect(calls.runConnectorWrite).not.toHaveBeenCalled();
+    expect(answer).toMatchObject({ isError: true, content: [{ text: 'Too many calls.' }] });
   });
 });
 

@@ -305,6 +305,10 @@ export const LEARN_OPERATIONS = [
   // more each time the button on the Know page asks for a fresh read. The
   // notes are found with the cached trait sentences, under 'embed-note-match'.
   'read-personality',
+  // Matching the subject names a Claude chat gives to the person's own
+  // subjects (plan #1809): one Haiku call per reading list or session added
+  // through the connector, made only when a name is not an exact match.
+  'match-subjects',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
