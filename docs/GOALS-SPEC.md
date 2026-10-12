@@ -409,7 +409,11 @@ have a due date. What changes is what asks for attention.
   stalled and waiting on a date apply to goals with a due date, errands and
   goals with a step on Todo. Any other goal gets **Keeping its pace**, or
   **Slower than usual** once the current gap is more than one and a half
-  times its usual one, and no verdict while its pace is unknown.
+  times its usual one, and no verdict while its pace is unknown. The morning
+  brief gives each such goal its pace and the verdict it reads as, and the
+  pages show only a met or pace verdict on it, so an older "Waiting on you"
+  stops showing the day the goal loses its date or its step on Todo
+  (`judgedOnPace` and `standingReviews` in `lib/goals/reviews.ts`).
 - **Every goal has suggestions** (#1739). The weekly run keeps two to four
   things the person could do next on each open goal, including suggested
   steps drawn from its map and its log, beside the events and reading it
