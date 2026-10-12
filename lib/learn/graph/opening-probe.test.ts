@@ -139,7 +139,7 @@ describe('writing a question for each claim', () => {
     });
 
     expect(reports).toHaveLength(2);
-    expect(reports[0].model).toBe('claude-haiku-4-5');
+    expect(reports[0].model).toBe('claude-haiku-5-5');
   });
 });
 
@@ -239,7 +239,7 @@ describe('grading a written answer', () => {
     await ask(grader({ why: 'Fine.', correct: true }), (report) => reports.push(report));
 
     expect(reports).toHaveLength(1);
-    expect(reports[0].model).toBe('claude-haiku-4-5');
+    expect(reports[0].model).toBe('claude-haiku-5-5');
   });
 
   it('says so rather than guessing when the grade comes back malformed', async () => {

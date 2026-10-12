@@ -25,7 +25,7 @@ import { approveNoteConcepts, readNoteIntoGraph, type NoteGraphState } from './a
 function SubmitButton({ idle, busy }: { idle: string; busy: string }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant="secondary" size="sm" disabled={pending}>
+    <Button type="submit" variant="secondary" size="sm" pending={pending}>
       {pending ? busy : idle}
     </Button>
   );
@@ -53,6 +53,9 @@ export function NoteToGraph({
     return (
       <form action={approve} className="mt-4">
         <input type="hidden" name="subjectId" value={state.subjectId} />
+        {state.noteReadId && (
+          <input type="hidden" name="noteReadId" value={state.noteReadId} />
+        )}
         <input type="hidden" name="chain" value={JSON.stringify(state.chain)} />
 
         <p className="text-ui text-ink-muted">

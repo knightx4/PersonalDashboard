@@ -139,6 +139,18 @@ export function toRepoPath(vaultPath: string, subpath: string): string {
 /** The folder capture writes new notes into, at the top of the vault (plan #1582). */
 export const INBOX_FOLDER = 'Inbox';
 
+/**
+ * The note Dash keeps at the top of the vault listing every waiting quick note
+ * (plan #1732). It is outside the Inbox on purpose, so it is never a quick note
+ * itself, and no triage suggestion or search offers it as a place to file into.
+ */
+export const TRIAGE_NOTE_PATH = 'Quick note triage.md';
+export const TRIAGE_NOTE_TITLE = 'Quick note triage';
+
+export function isTriageNotePath(vaultPath: string): boolean {
+  return vaultPath === TRIAGE_NOTE_PATH;
+}
+
 /** The folder a note lives in, or '' for one at the vault root. */
 export function folderOf(vaultPath: string): string {
   const cut = vaultPath.lastIndexOf('/');

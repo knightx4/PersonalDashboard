@@ -33,18 +33,44 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-role-answers': ['/jobs/roles/[id]'],
   'jobs-role-interviews': ['/jobs/roles/[id]'],
   'jobs-pipeline-board': ['/jobs/pipeline'],
+  'jobs-moment-forward': ['/jobs/pipeline'],
+  'jobs-moment-offer': ['/jobs/pipeline'],
+  'jobs-moment-reject': ['/jobs/pipeline'],
+  'jobs-pipeline-focus': ['/jobs/pipeline'],
+  'jobs-pipeline-table': ['/jobs/pipeline'],
   'shopping-item-details': ['/shopping/inventory/[id]'],
   'dev-comment-thread': ['/dev/plan'],
+  'dev-comment-thread-seen': ['/dev/plan'],
+  'dev-comment-thread-seen-moment': ['/dev/plan'],
   'dev-comment-thread-empty': ['/dev/plan'],
   'dev-comment-thread-composer': ['/dev/plan'],
   'dev-plan-tree': ['/dev/plan'],
+  'dev-plan-table': ['/dev/plan'],
   'dev-plan-opened': ['/dev/plan'],
   'dev-plan-critic-stop': ['/dev/plan'],
+  'dev-plan-screen-change': ['/dev/plan'],
+  'dev-plan-send-back': ['/dev/plan'],
+  'dev-plan-feature': ['/dev/plan/[number]'],
+  'dev-plan-feature-steps': ['/dev/plan/[number]'],
+  'dev-plan-feature-activity': ['/dev/plan/[number]'],
+  'dev-plan-feature-steps-yours': ['/dev/plan/[number]'],
+  'dev-plan-feature-edit': ['/dev/plan/[number]'],
+  'dev-plan-new-feature': ['/dev/plan', '/dev/projects/[id]'],
   'goals-steps-tree': ['/goals/[goalId]'],
   'goals-steps-opened': ['/goals/[goalId]'],
+  'goals-step': ['/goals/[goalId]/s/[stepId]'],
+  'goals-substep': ['/goals/[goalId]/s/[stepId]'],
+  'goals-step-close': ['/goals/[goalId]/s/[stepId]'],
+  'goals-step-arrival': ['/goals/[goalId]/s/[stepId]'],
   'goals-home': ['/goals'],
+  'goals-inbox': ['/goals/inbox'],
   'goals-all': ['/goals/all'],
+  'goals-area': ['/goals/area/[areaId]'],
   'goals-page-top': ['/goals/[goalId]'],
+  'goals-page-steps': ['/goals/[goalId]'],
+  'goals-page-close': ['/goals/[goalId]'],
+  'goals-page-arrival': ['/goals/[goalId]'],
+  'goals-page-activity': ['/goals/[goalId]'],
   'goals-file': ['/goals/files/[fileId]'],
   'goals-page-bare': ['/goals/[goalId]'],
   'goals-page-linking': ['/goals/[goalId]'],
@@ -52,20 +78,36 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'goals-info-list': ['/goals/[goalId]'],
   'goals-info-list-open': ['/goals/[goalId]'],
   'dev-ui': ['/dev/ui'],
+  'dev-ui-corrections': ['/dev/ui'],
+  'dev-ui-taste': ['/dev/ui'],
   'dev-surfaces': ['/dev/surfaces'],
+  'dev-surfaces-changed': ['/dev/surfaces'],
   'jobs-pipeline-dense': ['/jobs/pipeline'],
-  'jobs-pipeline-list': ['/jobs/pipeline'],
   'jobs-company': ['/jobs/companies/[slug]'],
+  'jobs-company-add-person': ['/jobs/companies/[slug]'],
+  'jobs-company-about': ['/jobs/companies/[slug]'],
   'jobs-review': ['/jobs/review'],
   'jobs-settings': ['/jobs/settings'],
+  'jobs-material': ['/jobs/material'],
+  'jobs-material-evidence': ['/jobs/material'],
+  'jobs-material-voice': ['/jobs/material'],
   'jobs-contacts': ['/jobs/contacts'],
   'jobs-contact': ['/jobs/contacts/[id]'],
   'jobs-role-new': ['/jobs/roles/new'],
-  'jobs-recommended-roles': ['/jobs/roles'],
-  'jobs-roles-table': ['/jobs/roles'],
+  'jobs-find': ['/jobs/find'],
+  'jobs-recommended-roles': ['/jobs/find'],
+  'jobs-roles-table': ['/jobs/pipeline'],
+  'jobs-pipeline-filtered': ['/jobs/pipeline'],
   'jobs-today': ['/jobs'],
+  'jobs-insights': ['/jobs/analytics'],
   'todo-calendar-month': ['/todo/calendar'],
   'todo-feed-event': ['/todo/calendar'],
+  'vault-new-note': ['/vault'],
+  'vault-quick-note': ['/vault'],
+  'vault-quick-note-read-only': ['/vault'],
+  'vault-triage': ['/vault/triage'],
+  'vault-triage-empty': ['/vault/triage'],
+  'vault-triage-read-only': ['/vault/triage'],
   'vault-note': ['/vault/n/[...path]'],
   'vault-note-edit': ['/vault/n/[...path]'],
   'vault-note-editing': ['/vault/n/[...path]'],
@@ -76,6 +118,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'vault-education-list': ['/vault/education'],
   'learn-track-readings': ['/learn/t/[id]'],
   'learn-now-deck': ['/learn/now'],
+  'learn-now-subject-empty': ['/learn/now'],
   'learn-courses-empty': ['/learn/know'],
   'learn-courses-list': ['/learn/know'],
   'learn-course-check': ['/learn/know'],
@@ -84,28 +127,47 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'learn-subject-chain': ['/learn/s/[id]'],
   'jobs-interviews': ['/jobs/interviews'],
   'shell-display-options': [
-    '/jobs/roles',
+    '/jobs/pipeline',
     '/jobs/companies',
     '/shopping/orders',
     '/shopping/inventory',
   ],
   'shell-search-bar': ['/home'],
   'shell-capture': ['/home'],
+  'shell-note': ['/dev/bugs'],
+  'shell-note-saved': ['/dev/bugs'],
   'ask-dash-new': ['/ask', '/ask/[ref]'],
   'ask-dash-answer': ['/ask', '/ask/[ref]'],
   'ask-dash-failed': ['/ask', '/ask/[ref]'],
   'ask-dash-page': ['/goals', '/ask'],
+  'ask-dash-rows': ['/shopping/inventory', '/jobs/pipeline'],
   'ask-dash-proposal': ['/ask', '/ask/[ref]'],
   'ask-dash-changes': ['/ask', '/ask/[ref]'],
   'ask-made-changes': ['/ask', '/ask/[ref]'],
+  'ask-dash-thread': ['/ask/[ref]'],
+  'ask-dash-files': ['/ask', '/ask/[ref]'],
   'learn-clips': ['/learn/clips'],
   'learn-clips-empty': ['/learn/clips'],
+  'learn-subject-clips': ['/learn/s/[id]/clips'],
+  'learn-subject-clips-empty': ['/learn/s/[id]/clips'],
+  'learn-personality-test': ['/learn/know/personality'],
+  'learn-personality-scores': ['/learn/know/personality'],
+  'learn-personality-add-type': ['/learn/know/personality'],
+  'learn-know-personality': ['/learn/know'],
+  'learn-know-personality-reading': ['/learn/know'],
+  'learn-know-personality-empty': ['/learn/know'],
   'dev-inspiration': ['/dev/inspiration'],
   'dev-inspiration-list': ['/dev/inspiration'],
   'dev-inspiration-unread': ['/dev/inspiration'],
   'dev-posts': ['/dev/posts'],
   'dev-posts-drafting': ['/dev/posts'],
+  'dev-posts-write': ['/dev/posts'],
+  'dev-posts-x': ['/dev/posts'],
+  'home-page': ['/home'],
   'home-watching': ['/home'],
+  'home-dash-today': ['/home'],
+  'goals-log-done': ['/home', '/goals/[goalId]'],
+  'goals-suggestions': ['/goals/[goalId]'],
   'timeline-page': ['/timeline'],
   'timeline-year': ['/timeline/year/[year]'],
   'shell-full': ['/home'],
@@ -114,6 +176,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'news-issue-essay': ['/news/i/[id]'],
   'news-issue-original': ['/news/i/[id]'],
   'news-issue-failed': ['/news/i/[id]'],
+  'news-issue-confirm': ['/news/i/[id]'],
+  'news-issue-confirmed': ['/news/i/[id]'],
   'news-quick-story': ['/news'],
   'news-quick-in-shell': ['/news'],
   'news-quick-essay': ['/news'],
@@ -124,15 +188,21 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'news-story-grid-no-pictures': ['/news/i/[id]', '/news'],
   'shopping-recurring': ['/shopping/recurring'],
   'shopping-recurring-empty': ['/shopping/recurring'],
+  'news-needs-confirming': ['/news/all'],
   'news-saved': ['/news/saved'],
   'news-saved-empty': ['/news/saved'],
+  'news-review': ['/news/review'],
+  'news-review-empty': ['/news/review'],
+  'news-review-failed': ['/news/review'],
   'core-cost-hint': ['/shopping/sell', '/shopping/review', '/account/spend'],
   'core-spend-estimates': ['/account/spend'],
   'dev-motion-travel': ['/dev/ui'],
   'dev-motion-settle': ['/dev/ui'],
   'dev-motion-clear': ['/dev/ui'],
+  'dash-mark': ['/dev/ui'],
   'todo-day-close': ['/todo'],
   'todo-day-closed': ['/todo'],
+  'todo-task-files': ['/todo', '/todo/all'],
   'news-quick-got-through': ['/news'],
   'news-quick-got-through-loaded': ['/news'],
   'home-arrival': ['/home'],
@@ -143,6 +213,13 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'anatomy-dashboard': ['/dev/ui'],
   'anatomy-settings': ['/dev/ui'],
   'anatomy-compose': ['/dev/ui'],
+  'pattern-list': ['/dev/ui'],
+  'pattern-detail': ['/dev/ui'],
+  'pattern-deck': ['/dev/ui'],
+  'pattern-thread': ['/dev/ui'],
+  'pattern-tabbed': ['/dev/ui'],
+  'pattern-rail': ['/dev/ui'],
+  'pattern-sections': ['/dev/ui'],
   'front-door': ['/'],
   'auth-login': ['/login'],
   'auth-signup': ['/signup'],
@@ -156,18 +233,137 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'share-form': ['/s/[token]'],
   'open-missing': ['/open/[ref]'],
   'account': ['/account'],
+  'account-notifications': ['/account'],
+  'account-workspaces': ['/account'],
+  'account-activity': ['/account'],
+  'account-capture-token-made': ['/account'],
   'home-week': ['/home/week', '/home/week/[week]'],
   'home-week-none': ['/home/week', '/home/week/[week]'],
   'dev-bugs': ['/dev/bugs'],
   'dev-changelog': ['/dev/changelog'],
+  'dev-changelog-screens': ['/dev/changelog'],
   'dev-ideas': ['/dev/ideas'],
+  'dev-ideas-empty': ['/dev/ideas'],
   'dev-project-plan': ['/dev/projects/[id]'],
   'dev-raised': ['/dev/raised'],
+  'dev-inbox': ['/dev/inbox'],
+  'dev-raised-status': ['/dev/raised'],
+  'dev-runner-crew': ['/dev/plan', '/dev/raised'],
   'dev-specs': ['/dev/specs'],
+  'dev-specs-interview-empty': ['/dev/specs'],
+  'dev-specs-interview-half': ['/dev/specs'],
+  'dev-specs-interview-drafted': ['/dev/specs'],
   'dev-spec': ['/dev/specs/[slug]'],
   'dev-ui-review': ['/dev/ui/review'],
   'dev-usage': ['/dev/usage'],
+  'dev-usage-empty': ['/dev/usage'],
+  'dev-modules': ['/dev/modules'],
+  'dev-module': ['/dev/modules/[id]'],
+  'goals-run': ['/goals/runs/[runId]'],
+  'jobs-activity': ['/jobs/activity'],
+  'jobs-analytics': ['/jobs/analytics'],
+  'jobs-answers': ['/jobs/answers'],
+  'jobs-thoughts': ['/jobs/find'],
+  'jobs-onboarding': ['/jobs/onboarding'],
+  'jobs-case-page': ['/jobs/p/[slug]'],
+  'mail-message': ['/mail/[id]'],
+  'learn-concept': ['/learn/c/[id]'],
+  'learn-lists': ['/learn/lists'],
+  'learn-new': ['/learn/new'],
+  'learn-opening': ['/learn/opening/[id]'],
+  'learn-quiz': ['/learn/quiz/[id]'],
+  'learn-quiz-take': ['/learn/quiz/[id]/take'],
+  'learn-quiz-new': ['/learn/quiz/new'],
+  'learn-reading': ['/learn/r/[id]'],
+  'learn-piece': ['/learn/s/[id]/p/[piece]'],
+  'learn-probe': ['/learn/s/[id]/probe'],
+  'learn-videos': ['/learn/videos'],
+  'learn-video': ['/learn/videos/[videoId]'],
+  'learn-youtube-channel': ['/learn/youtube/[slug]'],
+  'learn-youtube-playlist': ['/learn/youtube/p/[id]'],
+  'learn-youtube-video': ['/learn/youtube/v/[videoId]'],
+  'news-all': ['/news/all'],
+  'news-story': ['/news/i/[id]/s/[index]'],
+  'news-settings': ['/news/settings'],
+  'todo-all': ['/todo/all'],
+  'todo-settings': ['/todo/settings'],
+  'todo-waiting': ['/todo/waiting'],
+  'shopping-dashboard': ['/shopping/dashboard'],
+  'shopping-add-books': ['/shopping/inventory/add/books'],
+  'shopping-add-games': ['/shopping/inventory/add/games'],
+  'shopping-order': ['/shopping/orders/[id]'],
+  'shopping-order-new': ['/shopping/orders/new'],
+  'shopping-order-receipt': ['/shopping/orders/receipt'],
+  'shopping-returns': ['/shopping/returns'],
+  'shopping-saved': ['/shopping/saved'],
+  'shopping-saved-item': ['/shopping/saved/[id]'],
+  'shopping-settings': ['/shopping/settings'],
+  'shopping-shares': ['/shopping/share'],
+  'shopping-share': ['/shopping/share/[id]'],
+  'shopping-share-families': ['/shopping/share/families'],
+  'vault-map': ['/vault/map'],
+  'vault-theme': ['/vault/map/[id]'],
+  'vault-maya': ['/vault/maya'],
+  'vault-maya-thread': ['/vault/maya/[id]'],
+  'vault-settings': ['/vault/settings'],
 };
+
+/**
+ * Shared components drawn by a surface of their own, which a change to them
+ * is looked at in instead of every page that imports them (plan #1708).
+ *
+ * The Ask Dash thread is imported by the shell, so following its importers
+ * reached the root layout and named nearly every surface in the gallery. Its
+ * surface draws the thread in each state it has, and that is the check a
+ * change to it needs. The walk up from a changed file stops at a file listed
+ * here (lib/preview/importers.ts), so a file only it imports, such as a piece
+ * of the reply, stops there too.
+ *
+ * A file that imports one of these is not covered by it. The Ask Dash sheet
+ * (components/shell/ask-dash.tsx) is the shell's too, and reached every
+ * surface in the gallery the same way (plan #1658); a change to the sheet is
+ * looked at in ask-dash-rows, which draws it open over a page with the
+ * newest thing it does.
+ *
+ * The shell is the widest of them. Every workspace's layout mounts it, so a
+ * piece only the shell uses (the search bar, the Ask Dash button, the Dash
+ * mark beside it) used to name all of the 189 surfaces under those layouts,
+ * and a step that changed the mark waited on a check of each one (#1702).
+ * `shell-full` draws the shell around a page, which is where such a change
+ * shows. A piece a page imports for itself still reaches that page.
+ */
+export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
+  'ask-dash-thread': ['components/talk/talk-thread.tsx'],
+  // The box open with files added and the $ beside Send (plan #1716).
+  'ask-dash-files': ['components/talk/talk-thread.tsx'],
+  'ask-dash-rows': ['components/shell/ask-dash.tsx'],
+  // The $ hint found by the action it prices: drawn on its own surface, as
+  // every paid button in the app imports it (plan #1716).
+  'core-cost-hint': ['components/ui/paid-hint.tsx'],
+  'shell-full': ['components/shell/app-shell.tsx'],
+  // The "What did you do?" box on Home and each goal's page (plan #1740),
+  // drawn filed, empty and on a goal.
+  'goals-log-done': ['components/goals/log-done.tsx'],
+  // A goal's Suggestions section (plan #1739), drawn full and empty.
+  'goals-suggestions': ['app/goals/[goalId]/goal-suggestions.tsx'],
+  // The note button's panel, open with files added (plan #1713).
+  'shell-note': ['components/shell/feedback-button.tsx'],
+  // The same panel once a note has saved, with its triage (plan #1674).
+  'shell-note-saved': ['components/shell/feedback-button.tsx', 'components/feedback/triage-note.tsx'],
+  // Every state of the mark, bare and in each hat, at every size.
+  'dash-mark': ['components/ui/dash-mark.tsx'],
+  // The runner's card with its four Dashes, running and off (plan #1704).
+  'dev-runner-crew': ['app/dev/plan/overnight-control.tsx', 'app/dev/plan/runner-crew.tsx'],
+};
+
+/** The surface that stands for a shared component, or null for any other file. */
+export function surfaceOfComponent(file: string): string | null {
+  const path = file.replace(/^\.\//, '');
+  for (const [id, files] of Object.entries(COMPONENT_SURFACES)) {
+    if (files.includes(path)) return id;
+  }
+  return null;
+}
 
 /** A route split into its segments; `/` is no segments. */
 function segmentsOf(route: string): string[] {
@@ -195,9 +391,20 @@ export function routeMatches(surfaceRoute: string, route: string, under = false)
   return s.length === r.length || under;
 }
 
-/** The surfaces standing for `route`, or for any page beneath it with `under`. */
+/**
+ * The surfaces standing for `route`, or for any page beneath it with `under`.
+ *
+ * A route with no pattern in it that a surface lists exactly is that page and
+ * no other: Next serves a static folder before a dynamic one, so
+ * `/shopping/orders/new` is never `/shopping/orders/[id]` (plan #1783).
+ */
 export function surfacesForRoute(route: string, under = false): string[] {
-  return Object.entries(SURFACE_ROUTES)
+  const entries = Object.entries(SURFACE_ROUTES);
+  if (!under && !route.includes('[')) {
+    const exact = entries.filter(([, routes]) => routes.includes(route)).map(([id]) => id);
+    if (exact.length > 0) return exact;
+  }
+  return entries
     .filter(([, routes]) => routes.some((r) => routeMatches(r, route, under)))
     .map(([id]) => id);
 }
@@ -265,7 +472,8 @@ function surfacesForAppFile(file: string): string[] {
  * `app/` (a component under `components/`) reaches its pages through the
  * files that import it, which `importers` supplies when the caller can read
  * the file system (lib/preview/importers.ts); without it such a file serves
- * nothing.
+ * nothing. A shared component in COMPONENT_SURFACES, changed or reached on
+ * the way up, serves its own surface in place of the pages above it.
  */
 export function surfacesForFiles(
   files: readonly string[],
@@ -277,9 +485,20 @@ export function surfacesForFiles(
     // The gallery's own files draw surfaces rather than serve a page; the
     // pages that import them (/dev/surfaces) are not what changed.
     if (!path.endsWith('.tsx') || path.startsWith('app/preview/')) continue;
+    // A shared component with a surface of its own is looked at there, and
+    // its importers are not followed (plan #1708).
+    const own = surfaceOfComponent(path);
+    if (own) {
+      found.add(own);
+      continue;
+    }
     const reached = path.startsWith('app/') ? [path] : [];
     if (importers) reached.push(...importers(path));
-    for (const appFile of reached) for (const id of surfacesForAppFile(appFile)) found.add(id);
+    for (const file of reached) {
+      const stop = surfaceOfComponent(file);
+      if (stop) found.add(stop);
+      else for (const id of surfacesForAppFile(file)) found.add(id);
+    }
   }
   return Object.keys(SURFACE_ROUTES).filter((id) => found.has(id));
 }

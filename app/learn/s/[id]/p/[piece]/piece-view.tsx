@@ -402,7 +402,7 @@ export function PracticeData({ table }: { table: PracticeTable }) {
   );
   return (
     <div className="mt-3">
-      <Table stack={false} flush>
+      <Table stack={false} flush fit>
         <THead>
           <tr>
             {table.columns.map((column, index) => (

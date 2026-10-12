@@ -46,7 +46,9 @@ import { todayIn } from '@/lib/todo/tasks/model';
 /**
  * The capture box's two writes for Goals (plan #929): file a sentence, and
  * undo one line of what it filed. Called from the shell's capture panel
- * (components/shell/capture.tsx), so it is reachable from every page.
+ * (components/shell/capture.tsx), so it is reachable from every page, and
+ * from the "What did you do?" box on Home and on each goal's page
+ * (components/goals/log-done.tsx, plan #1740).
  *
  * Filing runs on Dash's shared loop with surface capture and Haiku (plan
  * #1478), its five moves made as write tools. Both write through a client
@@ -87,9 +89,15 @@ export type CaptureMoveHint = { move: CaptureMove; picked: boolean } | null;
 export async function fileGoalCapture(
   body: string,
   hint: CaptureMoveHint = null,
+  /**
+   * The goal whose page the box is on (plan #1740), passed to filing as the
+   * goal the sentence is most likely about. Anything not a uuid is ignored.
+   */
+  goalId: string | null = null,
 ): Promise<GoalCaptureState> {
   const user = await requireUser();
   if (typeof body !== 'string') return { error: 'Write what happened first.' };
+  const onGoal = typeof goalId === 'string' && z.string().uuid().safeParse(goalId).success ? goalId : null;
   const hintLine =
     hint && isCaptureMove(hint.move) ? captureHintLine(hint.move, hint.picked === true) : null;
 
@@ -119,7 +127,7 @@ export async function fileGoalCapture(
       apply: (id, action) =>
         applyCaptureAction(client, { userId: user.id, today, captureId: id, dash }, action),
       save: (id, filed) => saveFiled(client, id, filed),
-    }, hintLine);
+    }, hintLine, onGoal);
     await recordSessionSpend(user.id, { module: 'goals', operation: 'file-capture' }, spend);
     if (!result.ok) return { error: result.error, captureId: result.captureId ?? undefined };
     if (result.filed.length > 0) refresh();

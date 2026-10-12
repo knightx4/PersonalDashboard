@@ -62,6 +62,7 @@ export function FeedbackQueueView({
         <RunRoutineButton
           openCount={queue.outstanding.filter(isNotesWork).length}
           divider="bottom"
+          hint={false}
         />
       </div>
 

@@ -475,6 +475,16 @@ are not set up.
 Replacing the pair invalidates every existing subscription: each device has to
 turn the switch on the account page off and on again.
 
+The Posts tab in Dev reads your own X posts (feature #1815) through an X app
+you own, signed in with OAuth 2.0. Both values are set in Vercel for
+Production and Preview. Without them the tab says the keys are not set and
+links to plan step #1816, which walks through making the app.
+
+| Variable | What it is | Where it comes from |
+|---|---|---|
+| `X_CLIENT_ID` | The X app's OAuth 2.0 client id. | console.x.com, the app's Keys and tokens, after setting up user authentication with the callback `https://<your domain>/api/x/callback`. |
+| `X_CLIENT_SECRET` | The matching client secret, shown once. | The same page. |
+
 ---
 
 ## Local development

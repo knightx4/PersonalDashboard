@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requestAskDb, requestDashDeps } from '@/lib/ask/clients';
 import { requireUser } from '@/lib/auth/server';
+import { parseUploadedAttachments } from '@/lib/attachments/rules';
+import { recordAttachments } from '@/lib/attachments/store';
 import { fileCaptureParts, type CaptureFiled } from '@/lib/capture/file';
 import { captureFiling, offeredCapturePlaces } from '@/lib/capture/place';
 import {
@@ -14,9 +16,8 @@ import {
   type CapturePlace,
   type CaptureSort,
   type CaptureSortContext,
-  type CaptureSortGoal,
-  type CaptureSortRole,
 } from '@/lib/capture/sort';
+import { loadCaptureSortLists } from '@/lib/capture/lists';
 import { sortCapture } from '@/lib/capture/sort-model';
 import { todoCaptureForm } from '@/lib/capture/todo';
 import { loadAccountSettings } from '@/lib/core/account/settings';
@@ -60,10 +61,6 @@ function apiKey(): string | null {
 /** Open goals and live roles change rarely; a pause in typing should not read them every time. */
 const LISTS = new Map<string, { at: number; goals: CaptureSortContext['goals']; roles: CaptureSortContext['roles'] }>();
 const LISTS_TTL_MS = 60_000;
-/** The most goals or roles the sorter is shown. */
-const LIST_MAX = 40;
-
-type RoleJoin = { id: string; title: string; companies: { name: string } | null } | null;
 
 /**
  * The sorter's context: the places this account can file into, its open
@@ -78,47 +75,10 @@ async function sortContext(userId: string): Promise<CaptureSortContext> {
   const held = LISTS.get(userId);
   if (held && Date.now() - held.at < LISTS_TTL_MS) return { places, goals: held.goals, roles: held.roles };
 
-  let goals: CaptureSortGoal[] = [];
-  let roles: CaptureSortRole[] = [];
-  if (places.includes('goals')) {
-    try {
-      const client = await createGoalsClient();
-      const { data } = await client
-        .from('items')
-        .select('id, title')
-        .eq('user_id', userId)
-        .eq('level', 'goal')
-        .eq('status', 'open')
-        .is('archived_at', null)
-        .order('position')
-        .limit(LIST_MAX);
-      goals = ((data ?? []) as { id: string; title: string }[]).map((g) => ({ id: g.id, title: g.title }));
-    } catch (error) {
-      console.error('capture: could not read goals', error);
-    }
-  }
-  if (places.includes('jobs')) {
-    try {
-      const client = await createJobsClient();
-      const { data } = await client
-        .from('applications')
-        .select('updated_at, roles ( id, title, companies ( name ) )')
-        .eq('user_id', userId)
-        .is('closed_at', null)
-        .order('updated_at', { ascending: false })
-        .limit(LIST_MAX);
-      const seen = new Set<string>();
-      for (const row of (data ?? []) as unknown as { roles: RoleJoin }[]) {
-        const role = row.roles;
-        if (!role || seen.has(role.id)) continue;
-        seen.add(role.id);
-        roles.push({ id: role.id, title: role.title, company: role.companies?.name ?? null });
-      }
-    } catch (error) {
-      console.error('capture: could not read roles', error);
-      roles = [];
-    }
-  }
+  const { goals, roles } = await loadCaptureSortLists(userId, places, {
+    goals: () => createGoalsClient(),
+    jobs: () => createJobsClient(),
+  });
   LISTS.set(userId, { at: Date.now(), goals, roles });
   return { places, goals, roles };
 }
@@ -194,10 +154,19 @@ export type CaptureBoxResult = CaptureFiled & {
  * File what was typed. With a sure sort or a pick from the box, each part
  * goes to its writer; with neither, the sentence is sorted here first, and an
  * unsure answer files nothing and comes back as `ask`.
+ *
+ * `uploaded` is what the box's "Add a file" put in the bucket (plan #1714).
+ * Each row filed gets every file, so a capture Dash split in two holds them
+ * on both; the copies in storage are shared.
  */
 // latency: pending
-export async function fileCaptureBox(body: string, shown: CaptureBoxShown): Promise<CaptureBoxResult> {
+export async function fileCaptureBox(
+  body: string,
+  shown: CaptureBoxShown,
+  uploaded: unknown = [],
+): Promise<CaptureBoxResult> {
   const user = await requireUser();
+  const files = parseUploadedAttachments(uploaded, user.id);
   const sentence = typeof body === 'string' ? body.trim() : '';
   if (!sentence) return { filed: [], errors: [], error: 'Type something first.' };
   if (sentence.length > CAPTURE_BODY_MAX) {
@@ -251,7 +220,16 @@ export async function fileCaptureBox(body: string, shown: CaptureBoxShown): Prom
     },
     vault: (text) => fileVaultNote(user.id, text),
     record: (entry) => recordDashAction(deps, entry),
+    ...(files.length > 0
+      ? {
+          attach: async (ref: string) => {
+            await recordAttachments(await createCoreClient(), user.id, ref, files);
+            return files.length;
+          },
+        }
+      : {}),
   });
+  if (files.length > 0) revalidatePath('/todo', 'layout');
   if (result.filed.some((item) => item.place === 'vault')) revalidatePath('/vault', 'layout');
   if (result.filed.some((item) => item.place === 'jobs')) revalidatePath('/jobs', 'layout');
   revalidatePath('/home');

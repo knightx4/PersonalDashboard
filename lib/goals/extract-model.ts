@@ -16,6 +16,7 @@ import type { CollectionField, CollectionShape } from '@/lib/goals/collections';
 import type { LearnedKind } from '@/lib/goals/document-kinds';
 import { EXTRACT_TOOL, extractionPrompt, extractionTool } from '@/lib/goals/extract';
 import { MODELS } from '@/lib/core/models';
+import { forceTool } from '@/lib/learn/graph/tool-call';
 
 export const EXTRACT_MODEL = MODELS.goalExtract;
 
@@ -64,7 +65,7 @@ export async function askExtractModel(
       max_tokens: 8192,
       system: extractionPrompt(collection.name, collection.shape, kinds, collection.fields),
       tools: [tool as Anthropic.Tool],
-      tool_choice: { type: 'tool', name: EXTRACT_TOOL },
+      tool_choice: forceTool(EXTRACT_TOOL, EXTRACT_MODEL),
       messages: [
         {
           role: 'user',

@@ -185,3 +185,17 @@ function joinDays(days: readonly string[]): string {
     })
     .join(', ');
 }
+
+/**
+ * The preferences split by whether the person has taken them off /dev/ui
+ * (`public.ui_taste_removals`, plan #1547). `removed` is the ids they took
+ * off; an id no longer in `TASTE` is ignored. Both halves keep the order of
+ * `TASTE`.
+ */
+export function splitTaste(removed: readonly string[]): { kept: Taste[]; removed: Taste[] } {
+  const off = new Set(removed);
+  return {
+    kept: TASTE.filter((taste) => !off.has(taste.id)),
+    removed: TASTE.filter((taste) => off.has(taste.id)),
+  };
+}

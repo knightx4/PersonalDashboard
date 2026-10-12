@@ -11,6 +11,8 @@ export interface FetchedPosting {
   text: string;
   url: string | null;
   location: string | null;
+  /** The employer, where the page or API names it. Absent when it does not. */
+  company?: string | null;
   atsJobId: string | null;
   boardToken: string | null;
   /** Empty for every vendor except Greenhouse; the bookmarklet fills the gap. */

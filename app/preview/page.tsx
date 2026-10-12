@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { isOwner } from '@/lib/dev/owner';
 import Link from 'next/link';
 import { SURFACES } from './surfaces';
+import { ShellFrame } from './shell-frame';
 import { MAIN_BOX } from '@/components/shell/main-box';
 import {
   INTERACTIONS_SCRIPT_ID,
@@ -32,7 +33,7 @@ export const dynamic = 'force-dynamic';
 export default async function PreviewPage({
   searchParams,
 }: {
-  searchParams: Promise<{ s?: string; w?: string }>;
+  searchParams: Promise<{ s?: string; w?: string; shell?: string }>;
 }) {
   /**
    * The owner, or the harness. It used to be UI_PREVIEW alone, which meant the
@@ -51,7 +52,7 @@ export default async function PreviewPage({
    */
   if (process.env.UI_PREVIEW !== '1' && !(await isOwner())) notFound();
 
-  const { s } = await searchParams;
+  const { s, shell } = await searchParams;
   const surface = SURFACES.find((entry) => entry.id === s);
 
   if (s && !surface) notFound();
@@ -59,6 +60,22 @@ export default async function PreviewPage({
   if (surface?.width === 'screen') {
     // A page outside the shell: drawn on the bare body, as the app serves it.
     return surface.render();
+  }
+
+  if (surface && shell) {
+    // Inside the whole shell, lit at the page it stands for (shell-frame.tsx).
+    // A page arrangement takes the shell's own box; a panel keeps its column.
+    return (
+      <ShellFrame module={surface.module} path={shell}>
+        {surface.width === 'page' ? (
+          surface.render()
+        ) : (
+          <div className={`mx-auto ${surface.width === 'narrow' ? 'max-w-2xl' : 'max-w-4xl'}`}>
+            {surface.render()}
+          </div>
+        )}
+      </ShellFrame>
+    );
   }
 
   if (surface) {

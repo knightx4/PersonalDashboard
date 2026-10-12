@@ -32,16 +32,20 @@ const TITLE = 'A title to find';
  * a goal rather than a step. Given the row's user and id.
  */
 const FILL: Record<string, (user: string, id: string) => Record<string, unknown>> = {
+  'core.attachments': (user, id) => ({ path: `${user}/${id}-a.pdf`, content_type: 'application/pdf', ref: `public.feedback_items:${id}` }),
   'core.conversations': (_, id) => ({ subject_kind: 'ask', subject_ref: id }),
   'core.year_reviews': () => ({ year: 2025, totals: '{}' }),
   'core.week_reviews': () => ({ week: '2026-09-27', facts: '{}', source: 'plain' }),
   'goals.items': () => ({ level: 'goal', area_id: randomUUID(), parent_id: null, kind: null }),
   'job_search.companies': () => ({ slug: 'a-company' }),
+  'learn.personality_results': () => ({ kind: 'mbti', typed_value: 'INTJ' }),
+  'learn.watch_list': () => ({ video_id: 'dQw4w9WgXcQ' }),
   'news.issues': () => ({ text_body: 'x' }),
   'obsidian.notes': () => ({ path: 'Career/A note.md' }),
   'obsidian.transcripts': (user) => ({ storage_path: `${user}/a.pdf` }),
   'public.plan_items': () => ({ number: 4242 }),
   'public.social_posts': () => ({ body: '["x"]', draft: '["x"]' }),
+  'public.x_posts': () => ({ url: 'https://x.com/a/status/1' }),
   'todo.events': () => ({ starts_on: '2026-01-01', ends_on: '2026-01-02', starts_at: null, ends_at: null }),
   'todo.feed_events': () => ({ starts_on: '2026-01-01', ends_on: '2026-01-02', starts_at: null, ends_at: null }),
 };

@@ -107,6 +107,10 @@ export function consequenceSaid(action: DashAction, module: ModuleId | null): st
       return `Hands ${text} to a session to be built.`;
     case 'build_step':
       return `Writes this on the plan, about ${where}, and hands it to a session to build now: ${text}`;
+    // Filed only by the overnight tick on a stall raise (#1804), never by a
+    // comment or the CLI, so it is not in ACTIONS.
+    case 'split_feature':
+      return `Writes the pieces this raise lists as steps under ${text}, ready to build, and hands the first to a session.`;
     // A consequence is only ever run on a raise, and a raise has no wording of
     // its own to rewrite: `reword` there writes a plan row instead (#604), so
     // that is what a yes does and what this has to say.

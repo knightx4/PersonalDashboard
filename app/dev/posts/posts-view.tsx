@@ -7,6 +7,9 @@ import { cn } from '@/lib/cn';
 import type { PostCard, PostsPage } from '@/lib/dev/posts-page';
 import { PostItem } from './post-item';
 import { AskForPost, SuggestPosts } from './suggest-posts';
+import type { XConnectionView, XConnectNotice } from '@/lib/x/account';
+import { WritePost } from './write-post';
+import { XConnection } from './x-connection';
 
 /**
  * The Posts tab in Dev (plan #1419): X posts Dash drafted about building this
@@ -28,16 +31,17 @@ function PostList({ cards }: { cards: PostCard[] }) {
 
 /** Where the last run stands, said only when it is going or did not finish. */
 function RunLine({ page }: { page: PostsPage }) {
+  // On a panel of its own, like the X row, rather than bare on the page.
   if (page.runState === 'going') {
     return (
-      <p role="status" className="text-small text-ink-muted">
+      <p role="status" className={cn(cardVariants({ padding: 'dense' }), 'text-small text-ink-muted')}>
         Dash is drafting posts. They show here when it is done.
       </p>
     );
   }
   if (page.runState === 'failed') {
     return (
-      <p role="alert" className="text-small text-caution">
+      <p role="alert" className={cn(cardVariants({ padding: 'dense' }), 'text-small text-caution')}>
         The last run did not finish{page.run?.error ? `: ${page.run.error}` : '.'}
       </p>
     );
@@ -45,7 +49,16 @@ function RunLine({ page }: { page: PostsPage }) {
   return null;
 }
 
-export function PostsScreen({ page }: { page: PostsPage }) {
+export function PostsScreen({
+  page,
+  x,
+  xNotice,
+}: {
+  page: PostsPage;
+  /** The X connection (plan #1818); left out where a surface draws only the drafts. */
+  x?: XConnectionView;
+  xNotice?: XConnectNotice | null;
+}) {
   const none = page.suggested.length + page.posted.length + page.dropped.length === 0;
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -58,14 +71,17 @@ export function PostsScreen({ page }: { page: PostsPage }) {
         <div className="-mt-3 space-y-1">
           <RunLine page={page} />
           <AskForPost runState={page.runState} />
+          <WritePost />
         </div>
       </div>
+
+      {x && <XConnection view={x} notice={xNotice} />}
 
       {none ? (
         <EmptyState
           icon={Megaphone}
           title="No drafts yet"
-          description="Suggest posts asks Dash for three to five X posts about what shipped since the last one you posted, each citing the steps it came from. Edit one, copy it, post it on X yourself, then paste the link back here."
+          description="Suggest posts asks Dash for three to five X posts about what shipped since the last one you posted, each citing the steps it came from. Or write your own. Click a post to edit it, copy it, post it on X yourself, then paste the link back here."
         />
       ) : (
         page.suggested.length > 0 && <PostList cards={page.suggested} />

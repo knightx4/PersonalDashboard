@@ -403,7 +403,7 @@ export async function readRunWork(
   }
 
   let planRows: WorkRow[] = [];
-  if (needs('feature', 'reshape')) {
+  if (needs('feature', 'overhaul', 'reshape')) {
     type Row = {
       id: string;
       parent_id: string | null;
@@ -478,7 +478,7 @@ export async function readRunWork(
       out.set(run.id, { done: done.length });
     } else if (run.job === 'reshape' && run.plan_item_id) {
       out.set(run.id, reshapeWork(planRows, run.plan_item_id, window, topLevel));
-    } else if (run.job === 'feature' && run.plan_item_id) {
+    } else if ((run.job === 'feature' || run.job === 'overhaul') && run.plan_item_id) {
       out.set(
         run.id,
         featureWork(planRows, run.plan_item_id, window, now, FEATURE_IDLE_AFTER_MINUTES),
@@ -825,7 +825,7 @@ export async function loadLastRuns(supabase: Db, userId: string): Promise<Record
   const { data, error } = await supabase
     .from('plan_runs')
     .select(
-      'plan_item_id, status, error, created_at, job, github_checked_at, last_push_at, last_push_sha, last_push_subject, github_error',
+      'plan_item_id, status, error, created_at, job, github_checked_at, last_push_at, last_push_sha, last_push_subject, github_error, stop_reason, stop_pieces',
     )
     .eq('user_id', userId)
     .not('plan_item_id', 'is', null)
@@ -843,6 +843,8 @@ export async function loadLastRuns(supabase: Db, userId: string): Promise<Record
       error: string | null;
       created_at: string;
       job: string;
+      stop_reason?: string | null;
+      stop_pieces?: string[] | null;
     } & Partial<RunReadingColumns>
   >) {
     if (last[row.plan_item_id]) continue;
@@ -852,6 +854,8 @@ export async function loadLastRuns(supabase: Db, userId: string): Promise<Record
       error: row.error,
       job: row.job as RunJob,
       reading: storedReading(row),
+      stopReason: row.stop_reason ?? null,
+      stopPieces: row.stop_pieces ?? null,
     };
   }
   return last;
@@ -910,7 +914,18 @@ export async function loadRunRaises(supabase: Db, userId: string): Promise<RunRa
 const FIRE_LIMIT = 200;
 
 /** One press the runner made, as `nightFrom` reads it. */
-export type FeatureFire = { planItemId: string | null; at: string };
+export type FeatureFire = {
+  planItemId: string | null;
+  at: string;
+  /** The run's id, which keeps two fires at the same instant apart. */
+  id?: string;
+  /**
+   * When the row was written back as over, or null while it still says
+   * `started`. Only a time: it says when a slot on the runner card came free,
+   * never whether the run did well (see the note below).
+   */
+  writtenBackAt?: string | null;
+};
 
 /**
  * Every feature the runner may have fired, newest first.
@@ -931,7 +946,7 @@ export type FeatureFire = { planItemId: string | null; at: string };
 export async function loadFeatureFires(supabase: Db, userId: string): Promise<FeatureFire[]> {
   const { data, error } = await supabase
     .from('plan_runs')
-    .select('plan_item_id, created_at')
+    .select('id, plan_item_id, created_at, status, updated_at')
     .eq('user_id', userId)
     .eq('job', 'feature')
     .order('created_at', { ascending: false })
@@ -940,9 +955,19 @@ export async function loadFeatureFires(supabase: Db, userId: string): Promise<Fe
     console.error(`plan_runs could not be read for the night: ${error.message}`);
     return [];
   }
-  return ((data ?? []) as Array<{ plan_item_id: string | null; created_at: string }>).map(
-    (row) => ({ planItemId: row.plan_item_id, at: row.created_at }),
-  );
+  type Row = {
+    id: string;
+    plan_item_id: string | null;
+    created_at: string;
+    status: string;
+    updated_at: string | null;
+  };
+  return ((data ?? []) as Row[]).map((row) => ({
+    planItemId: row.plan_item_id,
+    at: row.created_at,
+    id: row.id,
+    writtenBackAt: row.status === 'started' ? null : (row.updated_at ?? row.created_at),
+  }));
 }
 
 /** A run still going, as the plan page's "On" lines read it. */

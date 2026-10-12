@@ -101,6 +101,7 @@ export function AppShell({
   activity = [],
   mainCheck = null,
   notifications = [],
+  pathname: pathnameOverride,
   children,
 }: {
   /** The signed-in user's id. ⌘K stamps the list it holds with it. */
@@ -139,9 +140,16 @@ export function AppShell({
   mainCheck?: MainCheck | null;
   /** What is waiting on you, wherever you are standing. Today: open raises. */
   notifications?: Notification[];
+  /**
+   * The path to light in the column, in place of the browser's. Only the
+   * preview gallery passes it: a page photographed there is served from
+   * /preview, so without it no section would read as the one you are on.
+   */
+  pathname?: string;
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
+  const browserPath = usePathname();
+  const pathname = pathnameOverride ?? browserPath;
   const router = useRouter();
   const paneRef = useRef<HTMLDivElement>(null);
   const [drawer, setDrawer] = useState(false);

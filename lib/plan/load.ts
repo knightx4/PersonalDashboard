@@ -207,6 +207,11 @@ export type PlanItem = {
   /** The step this is part of, or null at the top of a module's plan. */
   parentId: string | null;
   title: string;
+  /**
+   * One line saying what it is, under the title (plan #1670). Written in the
+   * compose surface a feature is made in; absent on rows from before it.
+   */
+  summary?: string | null;
   /** What the step involves. The paragraph under the heading. */
   detail: string | null;
   /** Done when. What the work is checked against, written before the work. */
@@ -290,7 +295,7 @@ export type PlanData = {
 
 /** Every column the app reads off a plan row. Shared with the changelog. */
 export const ITEM_COLUMNS =
-  'id, number, module, parent_id, title, detail, acceptance, status, kind, track, fog, resolution, ' +
+  'id, number, module, parent_id, title, summary, detail, acceptance, status, kind, track, fog, resolution, ' +
   'comment, block_ask, block_kind, priority, size, assignee, commit_sha, position, ' +
   'started_at, completed_at, ' +
   'created_at, updated_at, dismissed_at, fog_dismissed_at';
@@ -374,6 +379,7 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
     module: planScopeOf(scope),
     parentId: (row.parent_id as string | null) ?? null,
     title: row.title as string,
+    summary: (row.summary as string | null) ?? null,
     detail: (row.detail as string | null) ?? null,
     acceptance: (row.acceptance as string | null) ?? null,
     status: isPlanStatus(status) ? status : 'not_started',

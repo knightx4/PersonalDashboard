@@ -49,7 +49,9 @@ export type RunJob =
   | 'vision_reshape'
   | 'ci_fix'
   | 'posts'
-  | 'spec_change';
+  | 'spec_change'
+  | 'overhaul'
+  | 'audit';
 
 /**
  * What to call the press, where the page names the run behind a step.
@@ -75,6 +77,8 @@ export const RUN_JOB_LABEL: Record<RunJob, string> = {
   ci_fix: 'A fix for red CI',
   posts: 'A run drafting posts',
   spec_change: 'A run writing in a spec change',
+  overhaul: 'An overhaul run',
+  audit: 'A spec audit',
 };
 
 /**
@@ -101,6 +105,8 @@ export const RUN_JOB_NOUN: Record<RunJob, string> = {
   ci_fix: 'CI fix',
   posts: 'posts run',
   spec_change: 'spec change run',
+  overhaul: 'overhaul run',
+  audit: 'spec audit',
 };
 
 /**
@@ -152,6 +158,13 @@ export type LastRun = {
   job: RunJob;
   /** What GitHub last said about it, or null while nothing has asked. */
   reading: StoredRunReading | null;
+  /**
+   * Why the session stopped, in its own words (`plan.ts stopped`, #1802).
+   * Null or absent when it said nothing, as on a run the cutoff ended.
+   */
+  stopReason?: string | null;
+  /** The pieces a session that found the work too big would split it into. */
+  stopPieces?: string[] | null;
 };
 
 /** The five columns a stored reading is spread across. */
@@ -372,11 +385,19 @@ export function runQuietNote(createdAt: string, now: number): string {
   return `Nothing was heard from this run for ${elapsedSince(createdAt, now)}.`;
 }
 
-/** What the plan page says about the last run against a step. */
-export function lastRunLine(run: LastRun, now: number): string {
+/**
+ * What the plan page says about the last run against a step.
+ *
+ * The session's own reason comes first: it says why, where the app's note on
+ * a run the cutoff caught only says how long it was quiet.
+ */
+export function lastRunLine(
+  run: Pick<LastRun, 'status' | 'createdAt' | 'error' | 'stopReason'>,
+  now: number,
+): string {
   if (run.status === 'finished') return 'Last run finished';
   if (run.status === 'failed') {
-    return `Last run stopped: ${run.error ?? 'no reason recorded'}`;
+    return `Last run stopped: ${run.stopReason ?? run.error ?? 'no reason recorded'}`;
   }
   return now === 0 ? 'A run is going' : `A run has been going ${elapsedSince(run.createdAt, now)}`;
 }

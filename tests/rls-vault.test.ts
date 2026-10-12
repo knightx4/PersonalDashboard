@@ -138,7 +138,7 @@ beforeAll(async () => {
                                      similarity, verdict, survivor_id, survivor_name,
                                      reason, confidence, model)
     values (${userA}, 'theme', ${first}, ${second}, 'first', 'second', 'embedding',
-            0.8, 'same', ${first}, 'Urbanism', 'One subject.', 0.9, 'claude-haiku-4-5')
+            0.8, 'same', ${first}, 'Urbanism', 'One subject.', 0.9, 'claude-haiku-5-5')
     returning id`;
   proposalA = proposal.id;
 
@@ -156,7 +156,7 @@ beforeAll(async () => {
     insert into position_link_pairs (user_id, a_id, b_id, similarity, judged_at, relation,
                                      from_id, reason, confidence, model)
     values (${userA}, ${first}, ${second}, 0.7, now(), 'supports', ${first},
-            'one is why the other holds', 0.8, 'claude-haiku-4-5')`;
+            'one is why the other holds', 0.8, 'claude-haiku-5-5')`;
   await admin`
     insert into position_link_scans (user_id, position_id, embedded_at)
     values (${userA}, ${positionA}, null)`;
