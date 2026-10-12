@@ -159,12 +159,18 @@ async function fireContinuation(input: {
 
 /** How many plan runs are waiting on your answer, for the Inbox tab's badge. Zero on a failed read. */
 export async function countPlanRunQuestions(supabase: Db, userId: string): Promise<number> {
-  const { count, error } = await supabase
-    .from('plan_runs')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('status', 'awaiting_input');
-  return error ? 0 : Math.min(count ?? 0, 50);
+  // Never throws: the badge is drawn by the layout of every Dev page, and a
+  // read that fails leaves the count out rather than the page.
+  try {
+    const { count, error } = await supabase
+      .from('plan_runs')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('status', 'awaiting_input');
+    return error ? 0 : Math.min(count ?? 0, 50);
+  } catch {
+    return 0;
+  }
 }
 
 /** Every plan run waiting on your answer, newest first, as the Dev inbox lists them. */
