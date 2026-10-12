@@ -37,6 +37,8 @@ import { GoalDetail, GoalDoneWhen } from '@/app/goals/[goalId]/goal-detail';
 import { GoalActivity } from '@/app/goals/[goalId]/goal-activity';
 import { closedSteps, goalStages } from '@/lib/goals/goal-page';
 import { goalProgress } from '@/lib/goals/status';
+import { BurnUpChart } from '@/components/ui/burn-up-chart';
+import { MONTH_DAYS } from './burn-up-surfaces';
 import { goalMapWith } from './goal-surfaces';
 import { SetTab } from './set-tab';
 import { GOAL_RUN_QUESTION } from './run-lines-surfaces';
@@ -801,6 +803,7 @@ export function GoalTopSurface() {
             questions={{ which }}
           />
         </div>
+        <BurnUpChart days={MONTH_DAYS} />
         <GoalSuggestions
           goalId={cards.id}
           suggestions={CARD_SUGGESTIONS}

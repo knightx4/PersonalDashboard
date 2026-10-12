@@ -1,6 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient, requireUser } from '@/lib/auth/server';
+import { createCoreClient } from '@/lib/core/auth/server';
+import { loadScopeDays, planScopeRef, type ScopeDay } from '@/lib/goals/scope-days';
 import { loadPlan } from '@/lib/plan/load';
 import { endQuietRuns, loadLastRuns, loadRunRaises } from '@/lib/plan/runs';
 import { loadCommitChecks } from '@/lib/plan/ci';
@@ -82,7 +84,7 @@ export default async function FeatureRoute({ params }: { params: Params }) {
 
   const { feature, module, moduleLabel } = found;
   const beneath = flatten([feature]);
-  const [overhaulProgress, criticStops, updates, activity, checkBacks] = await Promise.all([
+  const [overhaulProgress, criticStops, updates, activity, checkBacks, scopeDays] = await Promise.all([
     loadOverhaulProgress(
       supabase,
       user.id,
@@ -106,6 +108,11 @@ export default async function FeatureRoute({ params }: { params: Params }) {
         'plan_item_id',
         beneath.map((node) => node.id),
       ),
+    // The saved step counts behind the burn-up chart (plan #1837). A failed
+    // read leaves the chart out rather than the page.
+    createCoreClient()
+      .then((core) => loadScopeDays(core, planScopeRef(feature.id)))
+      .catch((): ScopeDay[] => []),
   ]);
   const comingBack = placeCheckBacks(
     (checkBacks.data ?? []).map((row) => checkBackFrom(row as Record<string, unknown>)),
@@ -144,6 +151,7 @@ export default async function FeatureRoute({ params }: { params: Params }) {
       updates={updates}
       activity={activity}
       comingBack={comingBack}
+      scopeDays={scopeDays}
     />
   );
 }

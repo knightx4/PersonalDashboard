@@ -4,6 +4,8 @@ import { useActionState, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRight, Plus } from 'lucide-react';
+import { BurnUpChart } from '@/components/ui/burn-up-chart';
+import type { ScopeDay } from '@/lib/goals/scope-days';
 import { DetailCard, DetailPart, TabbedDetail } from '@/components/patterns/tabbed-detail';
 import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
@@ -108,6 +110,7 @@ export function FeaturePage({
   activity,
   comingBack = [],
   startEditing = false,
+  scopeDays = [],
 }: {
   feature: PlanNode;
   module: PlanScope | null;
@@ -140,6 +143,8 @@ export function FeaturePage({
   comingBack?: readonly PlacedCheckBack[];
   /** Open with the compose surface already showing, for the gallery. The page leaves it off. */
   startEditing?: boolean;
+  /** The saved step counts, oldest first; the Overview draws them from three days (plan #1837). */
+  scopeDays?: readonly ScopeDay[];
 }) {
   const router = useRouter();
   const search = useSearchParams();
@@ -501,6 +506,7 @@ export function FeaturePage({
               closed={parts.closed}
             />
           </DetailCard>
+          <BurnUpChart days={scopeDays} />
           {parts.body}
           {/* Questions draws nothing for a closed feature that never asked
               one, and then neither does its card. */}

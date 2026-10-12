@@ -46,6 +46,8 @@ import { addDays, todayIn } from '@/lib/todo/tasks/model';
 import { FileLinks } from '@/components/files/file-links';
 import type { LinkedFile } from '@/lib/files/files';
 import { createCoreClient } from '@/lib/core/auth/server';
+import { BurnUpChart } from '@/components/ui/burn-up-chart';
+import { goalScopeRef, loadScopeDays, type ScopeDay } from '@/lib/goals/scope-days';
 import { writtenWhen, type Brief } from '@/lib/goals/briefs';
 import { loadBrief } from '@/lib/goals/briefs-store';
 import { loadFilesOf } from '@/lib/goals/files-store';
@@ -348,6 +350,9 @@ export default async function GoalMapPage({
   // (plan #1044), so a reload shows it going. A failed read leaves the lines
   // out rather than the page.
   const [core, vault] = await Promise.all([createCoreClient(), createVaultClient()]);
+  // The saved step counts behind the burn-up chart (plan #1837). A failed
+  // read leaves the chart out rather than the page.
+  const scopeDays = loadScopeDays(core, goalScopeRef(map.goal.id)).catch((): ScopeDay[] => []);
   const related = relatedNotes(
     vault,
     user.id,
@@ -468,6 +473,7 @@ export default async function GoalMapPage({
   // closed goal too.
   const runs = shapingView?.runs ?? runRowsOf(history, account.timezone);
 
+  const burnUpDays = await scopeDays;
   const overview = (
     <div className="space-y-6">
       <GoalDoneWhen goal={map.goal}>
@@ -497,6 +503,7 @@ export default async function GoalMapPage({
         {!numberEmpty && <GoalNumber {...number} />}
         <WaitingOnYou rows={status.yourMove} flags={flags} questions={questions} />
       </div>
+      <BurnUpChart days={burnUpDays} />
       <GoalContext items={shownItems} />
       {map.goal.status === 'open' && (
         <GoalSuggestions
