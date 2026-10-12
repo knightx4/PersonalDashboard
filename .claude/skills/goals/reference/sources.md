@@ -316,6 +316,14 @@ Things they read or mean to read, with why and their note.
 - Name a row by `title`; link it by `id`
 - Opens at `/learn/r/<id>`
 
+### `learn.learning_log` (Learn)
+
+What a conversation with Claude covered: the topic, a summary and the ideas it named.
+
+- Search: `topic`, `question`, `summary`
+- Name a row by `topic`; link it by `id`
+- Exposure, not knowledge: the ideas start unknown in the graph and are credited only when answered.
+
 ### `learn.sources` (Learn)
 
 Books, articles and courses in their library.

@@ -27,7 +27,9 @@ import { loadProjectView } from '@/lib/learn/lessons/project-store';
 import { isOwner } from '@/lib/dev/owner';
 import { loadSubjectChannels, type SubjectChannels } from '@/lib/learn/youtube/subject-channels';
 import { deleteSubject } from './actions';
+import { loadSubjectLearning, type SubjectLearning } from '@/lib/learn/chat/subject-load';
 import { ChannelsSection } from './channels';
+import { ChatLearningSection } from './chat-learning';
 import { WriteCurriculum } from './curriculum';
 import { PlanSection } from './plan';
 import { PullArticles } from './pull-articles';
@@ -63,6 +65,10 @@ export const maxDuration = 300;
  * its own, which lays out its chain of ideas as a goal filed under it, and a
  * chain is shown inside the unit it belongs to. Goals asked outside the
  * curriculum come after it.
+ *
+ * Below the goals, the readings related to the subject from any list and
+ * the conversations logged about it (plan #1814), apart from the graph
+ * because neither says what you know.
  *
  * Writes from here: opening a unit or naming another goal, which saves nothing
  * until the chain is approved; writing a curriculum for a track that has
@@ -262,7 +268,7 @@ export default async function SubjectPage({
   const subject = await loadSubject(supabase, id);
   if (!subject) notFound();
 
-  const [graph, goals, settings, interest, units, pieces] = await Promise.all([
+  const [graph, goals, settings, interest, units, pieces, learning] = await Promise.all([
     loadGraph(supabase, id),
     loadGoals(supabase, id),
     loadAccountSettings(user.id),
@@ -273,6 +279,9 @@ export default async function SubjectPage({
     loadCurriculum(supabase, id).catch(() => [] as StoredUnit[]),
     // A goal's pieces that cannot be read leave the units without their links.
     loadTrackPieces(supabase, user.id, id).catch(() => new Map<string, PieceSibling[]>()),
+    // Readings related to it and chats logged about it (plan #1814). Ones that
+    // cannot be read leave the section out.
+    loadSubjectLearning(supabase, id).catch((): SubjectLearning => ({ readings: [], sessions: [] })),
   ]);
   // A learning goal's track opens on its plan (plan #1143). A plan that
   // cannot be read leaves the page as an ordinary track's.
@@ -509,6 +518,8 @@ export default async function SubjectPage({
       {/* A second goal in a subject you already have is the cheap case: the
           generator is told what is here and proposes only what is missing. */}
       <GoalForm subjectId={subject.id} />
+
+      <ChatLearningSection learning={learning} timezone={settings.timezone} />
 
       {channels && <ChannelsSection subjectId={id} channels={channels.channels} kept={channels.kept} />}
 

@@ -118,6 +118,8 @@ export const MODELS = {
   learnOpeningProbe: HAIKU,
   /** lib/learn/graph/probe.ts */
   learnProbe: HAIKU,
+  /** lib/learn/chat/subjects.ts */
+  learnChatSubjects: HAIKU,
   /** lib/learn/import/areas.ts */
   learnImportAreas: SONNET,
   /** lib/learn/import/parse.ts */

@@ -123,6 +123,7 @@ describe('RLS coverage', () => {
       'feed_cards',
       'goals',
       'imports',
+      'learning_log',
       'next_outcomes',
       'note_reads',
       'opening_questions',
@@ -139,6 +140,7 @@ describe('RLS coverage', () => {
       'quiz_questions',
       'quiz_sources',
       'quizzes',
+      'reading_subjects',
       'readings',
       'review_questions',
       'settings',
@@ -155,6 +157,60 @@ describe('RLS coverage', () => {
       'video_transcripts',
       'watch_list',
     ]);
+  });
+});
+
+describe('what a chat adds (plan #1807)', () => {
+  // A reading related to a subject, and a logged conversation, both A's. The
+  // join row's foreign key to the subject is composite, so B cannot relate
+  // A's reading to a subject of B's or the other way round.
+  let subjectA = '';
+  let subjectB = '';
+
+  beforeAll(async () => {
+    [{ id: subjectA }] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Agentic AI Systems') returning id`;
+    [{ id: subjectB }] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userB}, 'Bob studies things') returning id`;
+    await admin`
+      insert into reading_subjects (user_id, reading_id, subject_id)
+      values (${userA}, ${readingA}, ${subjectA})`;
+    await admin`
+      insert into learning_log (user_id, subject_id, topic, summary, ideas)
+      values (${userA}, ${subjectA}, 'Evals', 'Define good, build a set, read failures.', '[]'::jsonb)`;
+  });
+
+  it('shows the owner their rows and nobody else', async () => {
+    expect(await asUser(userA, (tx) => tx`select id from reading_subjects`)).toHaveLength(1);
+    expect(await asUser(userA, (tx) => tx`select id from learning_log`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from reading_subjects`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select id from learning_log`)).toHaveLength(0);
+  });
+
+  it('refuses a row written for another account', async () => {
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into reading_subjects (user_id, reading_id, subject_id)
+        values (${userA}, ${readingA}, ${subjectA})`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into learning_log (user_id, topic, summary) values (${userA}, 'x', 'y')`),
+    ).rejects.toThrow();
+  });
+
+  it('cannot relate one account\'s reading to another account\'s subject', async () => {
+    await expect(
+      admin`
+        insert into reading_subjects (user_id, reading_id, subject_id)
+        values (${userA}, ${readingA}, ${subjectB})`,
+    ).rejects.toThrow();
+    // B's own subject, A's reading: the reading's key carries its owner too.
+    await expect(
+      asUser(userB, (tx) => tx`
+        insert into reading_subjects (user_id, reading_id, subject_id)
+        values (${userB}, ${readingA}, ${subjectB})`),
+    ).rejects.toThrow();
   });
 });
 
