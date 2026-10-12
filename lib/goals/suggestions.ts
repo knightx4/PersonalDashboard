@@ -152,6 +152,9 @@ export function pastSince(now: number): string {
  */
 export function homeSuggestions(all: Suggestion[], today: string): Suggestion[] {
   return all
+    // A suggested step is answered on its goal's page, with Add as step: going
+    // would put it on Todo, which a suggested step never reaches by itself.
+    .filter((s) => s.kind !== 'step')
     .filter((s) => s.reaction !== 'not_for_me' && s.attended === null)
     .filter((s) => s.happensOn === null || s.happensOn >= today)
     .sort((a, b) => {
@@ -173,6 +176,7 @@ export function homeSuggestions(all: Suggestion[], today: string): Suggestion[] 
 export function todoSuggestions(all: Suggestion[], today: string, to: string): Suggestion[] {
   return all.filter(
     (s) =>
+      s.kind !== 'step' &&
       s.reaction === 'going' &&
       s.attended === null &&
       (s.happensOn === null || (s.happensOn >= today && s.happensOn <= to)),
@@ -206,6 +210,42 @@ export function didYouGoSuggestions(going: Suggestion[], today: string): Suggest
     .sort((a, b) => (b.happensOn ?? '').localeCompare(a.happensOn ?? ''));
 }
 
+/** The most a goal's Suggestions section lists. */
+export const GOAL_SUGGESTIONS_SHOWN = 6;
+
+/**
+ * What a goal's Suggestions section lists (plan #1739): the suggestions made
+ * for the goal or for one of its steps (`itemIds`), still waiting for an
+ * answer, or marked going and not yet past. One turned down, added as a step,
+ * left unanswered for the week or already past is gone. Suggested steps come
+ * first, then the rest soonest first, undated ones last.
+ *
+ * A goal whose list is empty is the one the morning run tops up, read by the
+ * same rule in SQL (.claude/skills/goals/reference/morning.md, "Topping up
+ * a goal's suggestions").
+ */
+export function goalSuggestions(
+  all: readonly Suggestion[],
+  itemIds: ReadonlySet<string>,
+  today: string,
+): Suggestion[] {
+  return all
+    .filter((s) => s.itemId !== null && itemIds.has(s.itemId))
+    .filter((s) => s.acceptedStepId === null && s.attended === null)
+    .filter((s) => s.reaction === null || (s.reaction === 'going' && s.kind !== 'step'))
+    .filter((s) => s.happensOn === null || s.happensOn >= today)
+    .sort((a, b) => {
+      if ((a.kind === 'step') !== (b.kind === 'step')) return a.kind === 'step' ? -1 : 1;
+      if (a.happensOn !== b.happensOn) {
+        if (a.happensOn === null) return 1;
+        if (b.happensOn === null) return -1;
+        return a.happensOn < b.happensOn ? -1 : 1;
+      }
+      return b.createdAt.localeCompare(a.createdAt);
+    })
+    .slice(0, GOAL_SUGGESTIONS_SHOWN);
+}
+
 function when(s: Pick<Suggestion, 'happensOn' | 'startsAt'>): string | null {
   if (s.startsAt) return s.startsAt.slice(0, 16).replace('T', ' ');
   return s.happensOn;
@@ -213,7 +253,7 @@ function when(s: Pick<Suggestion, 'happensOn' | 'startsAt'>): string | null {
 
 /** One line of the brief for a past suggestion and what you did with it. */
 export function pastLine(s: Suggestion): string {
-  const reaction = s.reaction ?? 'no answer yet';
+  const reaction = s.acceptedStepId ? 'added as a step' : (s.reaction ?? 'no answer yet');
   const went = s.attended === true ? ', and went' : s.attended === false ? ', and did not go' : '';
   const facts = [s.source, s.place, when(s)].filter(Boolean).join(', ');
   return `- ${reaction}${went}: "${s.title}"${facts ? ` (${facts})` : ''}`;
@@ -256,13 +296,19 @@ export function kindsAskedFor(goals: HelpGoal[]): HelpKind[] {
  * with the kinds of help it asks for, and under each kind asked for, every
  * reaction to that kind from the last few weeks, then asks for the week's
  * notes. The verdict on each goal moved to the morning run, which writes one
- * every day (plan #1074). A week when no goal asks for help is the notes and
- * nothing else.
+ * every day (plan #1074).
+ *
+ * Every open goal also gets two to four suggested steps of its own (plan
+ * #1739), drawn from its map and what was logged on it, so each goal's
+ * Suggestions section has something in it. `open` lists those goals; the
+ * steps suggested before and what became of them come under `step`.
  */
 export function weeklyRunText(input: {
   userId: string;
   runId: string;
   goals: HelpGoal[];
+  /** Every open goal, which each get suggested steps. */
+  open?: { id: string; title: string }[];
   past: Suggestion[];
 }): string {
   const goals = input.goals.flatMap((g) => [
@@ -304,11 +350,31 @@ export function weeklyRunText(input: {
           '',
         ]
       : ['No goal asks for weekly help this week, so there is nothing to research.', ''];
+  const open = input.open ?? [];
+  const pastSteps = input.past.filter((s) => s.kind === 'step').map(pastLine);
+  const steps =
+    open.length > 0
+      ? [
+          'Then suggest two to four steps for each open goal below, the next things the person',
+          'could do on it, drawn from its map and from what they logged on it. Follow',
+          '.claude/skills/goals/SKILL.md, "Suggesting steps". Write each to goals.suggestions with',
+          'kind step, item_id set to the goal, and no url. A suggested step is not a step: it',
+          'becomes one only when the person presses Add as step.',
+          '',
+          ...open.map((g) => `- "${g.title}" (goals.items id ${g.id})`),
+          '',
+          'Steps you suggested before, and what the person did with them (newest first):',
+          '',
+          ...(pastSteps.length > 0 ? pastSteps : ['- Nothing yet.']),
+          '',
+        ]
+      : [];
   return [
     'The weekly run. Each goal\'s status is written every morning by the morning run, so this run',
     'does not write to goals.reviews.',
     '',
     ...research,
+    ...steps,
     'Then leave a note on every open goal and one for the Goals home, as in "Leaving a note",',
     'reading each goal\'s newest status in goals.reviews.',
     '',

@@ -201,6 +201,7 @@ import { TimelineSurface, YearReviewSurface } from './timeline-surfaces';
 import { WatchingSurface } from './watching-surfaces';
 import { DashTodaySurface } from './dash-today-surfaces';
 import { LogDoneSurface } from './log-done-surfaces';
+import { GoalSuggestionsSurface } from './goal-suggestions-surfaces';
 import { HomePageSurface } from './home-page-surfaces';
 import { ClipStreamSurface, ClipsEmptySurface, SubjectClipsEmptySurface, SubjectClipsSurface } from './clip-surfaces';
 import {
@@ -4925,6 +4926,17 @@ export const SURFACES: readonly Surface[] = [
     module: 'goals',
     width: 'wide',
     render: () => <LogDoneSurface />,
+  },
+  {
+    /* A goal's Suggestions section (plan #1739): suggested steps with Add as
+     * step, an event with Going, one marked going and the help asked for,
+     * then a goal with nothing suggested yet. Fixtures in
+     * goal-suggestions-surfaces.tsx. */
+    id: 'goals-suggestions',
+    label: 'Goal · Suggestions',
+    module: 'goals',
+    width: 'page',
+    render: () => <GoalSuggestionsSurface />,
   },
   {
     /* The timeline (plan #1118): the months newest first, the newest open,

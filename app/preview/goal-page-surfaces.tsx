@@ -15,6 +15,8 @@ import { FileLinks } from '@/components/files/file-links';
 import { GoalNumber } from '@/app/goals/[goalId]/goal-number';
 import { WaitingOnYou } from '@/app/goals/[goalId]/goal-flags';
 import { GoalLogDone } from '@/app/goals/[goalId]/goal-log-done';
+import { GoalSuggestions } from '@/app/goals/[goalId]/goal-suggestions';
+import type { Suggestion } from '@/lib/goals/suggestions';
 import { GoalFog, GoalShaping } from '@/app/goals/[goalId]/goal-shaping';
 import { StepTree } from '@/app/goals/[goalId]/step-tree';
 import type { InformationSeam } from '@/app/goals/[goalId]/information-step';
@@ -663,6 +665,42 @@ export function FileSurface() {
   );
 }
 
+/** What Dash suggests on the cards goal (plan #1739). */
+const CARD_SUGGESTIONS: Suggestion[] = [
+  {
+    id: 'sg-autopay',
+    itemId: 'g-cards',
+    kind: 'step',
+    acceptedStepId: null,
+    title: 'Set autopay on the 27% card to $300 a month',
+    detail: 'The comparison found paying it first saves about $310.',
+    url: null,
+    place: null,
+    source: null,
+    happensOn: null,
+    startsAt: null,
+    reaction: null,
+    attended: null,
+    createdAt: '2026-10-11T08:00:00Z',
+  },
+  {
+    id: 'sg-rate',
+    itemId: 'g-cards',
+    kind: 'step',
+    acceptedStepId: null,
+    title: 'Ask the bank for a lower rate on the smaller card',
+    detail: null,
+    url: null,
+    place: null,
+    source: null,
+    happensOn: null,
+    startsAt: null,
+    reaction: null,
+    attended: null,
+    createdAt: '2026-10-11T08:00:00Z',
+  },
+];
+
 /**
  * The top of a goal page that has something in each part of its header
  * (plan #1078): Dash's verdict and the status line, the next move, Dash's
@@ -761,6 +799,11 @@ export function GoalTopSurface() {
             questions={{ which }}
           />
         </div>
+        <GoalSuggestions
+          goalId={cards.id}
+          suggestions={CARD_SUGGESTIONS}
+          helpKinds={[{ kind: 'reading', note: 'paying down debt' }]}
+        />
         <GoalLinksSection goalId={cards.id} links={links} aimChoices={aimChoices} jobsOn />
         <section aria-labelledby="files-heading" className="space-y-2">
           <h2 id="files-heading" className="px-1 text-ui font-semibold text-ink">
