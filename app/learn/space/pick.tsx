@@ -1,24 +1,25 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { mapHref, type MapParams } from '@/lib/learn/map/view';
 
 /**
- * Which idea is open on Idea Space, shared by the map and the rail (plan
- * #1883).
+ * Idea Space's view state, shared by the map, its switches and the rail.
  *
- * The address carries the open idea (law 5), but waiting for the page to
- * come back before the rail changed made a tap feel dead. So a pick shows at
- * once, on the map and in the rail, from the ideas already on the page, and
- * the address follows. Once the page comes back with the new address, the
- * address is the answer again; the back button and a pasted link work as
- * they did.
+ * Every switch on the page (layout, colour, names, a domain in the legend, the
+ * open idea) changes what is drawn from data already on the page, so it is
+ * held here and changed at once. The address follows through
+ * `history.replaceState` (law 5): a reload, a pasted link and the server's
+ * first render all read it, but no switch waits on the server. Until 13
+ * October each switch was a link, and every press asked the server to read
+ * every idea and work both layouts out again, which took seconds.
  */
 
 type Pick = {
-  selectedId: string | null;
   params: MapParams;
+  selectedId: string | null;
+  /** Change any part of the view; the address follows. */
+  set: (change: Partial<MapParams>) => void;
   pick: (id: string | null) => void;
   /** Lets go of the domain picked out in the legend, as pressing empty ground does. */
   clearDomain: () => void;
@@ -27,33 +28,28 @@ type Pick = {
 const PickContext = createContext<Pick | null>(null);
 
 export function PickProvider({
-  params,
+  params: initial,
   children,
 }: {
   params: MapParams;
   children: React.ReactNode;
 }) {
-  const router = useRouter();
-  // What was picked, and the address it was picked from: once the address
-  // moves on (the page came back, or the back button), the address wins.
-  const [picked, setPicked] = useState<{ id: string | null; from: string | null } | null>(null);
-  const selectedId = picked && picked.from === params.idea ? picked.id : params.idea;
+  const [params, setParams] = useState(initial);
 
-  const pick = useCallback(
-    (id: string | null) => {
-      setPicked({ id, from: params.idea });
-      router.push(mapHref(params, { idea: id }), { scroll: false });
-    },
-    [params, router],
-  );
+  const set = useCallback((change: Partial<MapParams>) => {
+    setParams((current) => {
+      const next = { ...current, ...change };
+      if (typeof window !== 'undefined') window.history.replaceState(null, '', mapHref(next));
+      return next;
+    });
+  }, []);
 
-  const clearDomain = useCallback(() => {
-    router.push(mapHref(params, { domain: null }), { scroll: false });
-  }, [params, router]);
+  const pick = useCallback((id: string | null) => set({ idea: id }), [set]);
+  const clearDomain = useCallback(() => set({ domain: null }), [set]);
 
   const value = useMemo(
-    () => ({ selectedId, params, pick, clearDomain }),
-    [selectedId, params, pick, clearDomain],
+    () => ({ params, selectedId: params.idea, set, pick, clearDomain }),
+    [params, set, pick, clearDomain],
   );
   return <PickContext.Provider value={value}>{children}</PickContext.Provider>;
 }
@@ -65,22 +61,27 @@ export function usePick(): Pick {
 }
 
 /**
- * A link's press turned into a pick, so the rail changes at once. A press
- * with a modifier key, or any button but the first, is left to the browser
- * so the link still opens in a new tab.
+ * A link's press turned into a change of view, so the page answers at once.
+ * A press with a modifier key, or any button but the first, is left to the
+ * browser so the link still opens in a new tab.
  */
-export function pickOnClick(pick: (id: string | null) => void, id: string | null) {
+export function viewOnClick(apply: () => void) {
   return (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
       return;
     event.preventDefault();
-    pick(id);
+    apply();
   };
+}
+
+/** A link's press turned into a pick. */
+export function pickOnClick(pick: (id: string | null) => void, id: string | null) {
+  return viewOnClick(() => pick(id));
 }
 
 /** The line under the map that says what a tap does, while nothing is open. */
 export function TapHint() {
   const { selectedId } = usePick();
   if (selectedId) return null;
-  return <p>Tap an idea to see its six nearest.</p>;
+  return <p>Point at or tap an idea to see its six nearest.</p>;
 }

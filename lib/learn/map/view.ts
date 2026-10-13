@@ -294,36 +294,76 @@ export const AXIS_END_IDEAS = 10;
 
 /**
  * Names for the four ends of the main-axes layout (plan #1883), worked out
- * from the ten ideas furthest along each end: the two fields (or, for an idea
- * with no field, domains) most of them are in, most first, ties by name, in
- * lower case. A catalogue name with a comma in it ("Economics, business and
- * finance") is cut at the comma, so the two names stay two.
+ * from the ten ideas furthest along each end.
+ *
+ * An end is named by the fields (or, for an idea with no field, domains) that
+ * are over-represented there compared with the whole map, not by the ones
+ * most common there. Most of the person's ideas are in one field, so naming
+ * by count put "economics" at both ends of an axis, which says nothing about
+ * the direction. A name has to hold at least two of the end's ideas (one when
+ * the end is a single idea) and more than its share of the map. A name that
+ * qualifies at both ends of one axis stays only at the end where it stands out
+ * more, so the two ends always differ. Up to two names, strongest first, ties
+ * by name, in lower case; a catalogue name with a comma in it ("Economics,
+ * business and finance") is cut at the comma, so the two names stay two.
  */
 type PlacedIdea = { pca: Point; field: { name: string } | null; domain: { name: string } | null };
 
+function areaName(idea: PlacedIdea): string | null {
+  const full = idea.field?.name ?? idea.domain?.name;
+  if (!full) return null;
+  const short = full.split(',')[0]!.trim().toLowerCase();
+  return short || null;
+}
+
+function shares(ideas: readonly PlacedIdea[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const idea of ideas) {
+    const name = areaName(idea);
+    if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return counts;
+}
+
 export function axisEnds(ideas: readonly PlacedIdea[], per = AXIS_END_IDEAS): AxisEnds {
-  const name = (end: readonly PlacedIdea[]): string | null => {
-    const counts = new Map<string, number>();
-    for (const idea of end) {
-      const full = idea.field?.name ?? idea.domain?.name;
-      if (!full) continue;
-      const short = full.split(',')[0]!.trim().toLowerCase();
-      if (short) counts.set(short, (counts.get(short) ?? 0) + 1);
-    }
-    const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-    return ranked.length > 0 ? ranked.slice(0, 2).map(([text]) => text).join(', ') : null;
-  };
   // Too few for two tens: halves, so the two ends never share an idea.
   const take = Math.min(per, Math.floor(ideas.length / 2));
   if (take === 0) return { left: null, right: null, top: null, bottom: null };
+  const overall = shares(ideas);
+
+  // How far over its share of the map each name is at one end.
+  const lift = (end: readonly PlacedIdea[]): Map<string, number> => {
+    const floor = Math.min(2, end.length);
+    const out = new Map<string, number>();
+    for (const [name, count] of shares(end)) {
+      if (count < floor) continue;
+      const over = count / end.length - (overall.get(name) ?? 0) / ideas.length;
+      if (over > 0) out.set(name, over);
+    }
+    return out;
+  };
+
+  // The two ends of one axis, with any name both claim kept where it stands out more.
+  const pair = (low: readonly PlacedIdea[], high: readonly PlacedIdea[]): [string | null, string | null] => {
+    const a = lift(low);
+    const b = lift(high);
+    for (const name of [...a.keys()]) {
+      if (!b.has(name)) continue;
+      if (a.get(name)! >= b.get(name)!) b.delete(name);
+      else a.delete(name);
+    }
+    const named = (scores: Map<string, number>): string | null => {
+      const ranked = [...scores.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]));
+      return ranked.length > 0 ? ranked.slice(0, 2).map(([text]) => text).join(', ') : null;
+    };
+    return [named(a), named(b)];
+  };
+
   const byX = [...ideas].sort((a, b) => a.pca.x - b.pca.x);
   const byY = [...ideas].sort((a, b) => a.pca.y - b.pca.y);
-  return {
-    left: name(byX.slice(0, take)),
-    right: name(byX.slice(-take)),
-    top: name(byY.slice(-take)),
-    bottom: name(byY.slice(0, take)),
-  };
+  const [left, right] = pair(byX.slice(0, take), byX.slice(-take));
+  const [bottom, top] = pair(byY.slice(0, take), byY.slice(-take));
+  return { left, right, top, bottom };
 }
 
 /**

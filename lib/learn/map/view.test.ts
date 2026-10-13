@@ -146,7 +146,7 @@ describe('axis ends', () => {
     domain: domain ? { name: domain } : null,
   });
 
-  it('names each end from the two fields most of its ideas are in', () => {
+  it('names each end from the fields over-represented there', () => {
     const ideas = [
       ...Array.from({ length: 6 }, (_, i) => at(-1 + i * 0.01, 0, 'Economics, business and finance')),
       ...Array.from({ length: 4 }, (_, i) => at(-0.9 + i * 0.01, 0, 'Psychology')),
@@ -155,6 +155,22 @@ describe('axis ends', () => {
     const ends = axisEnds(ideas);
     expect(ends.left).toBe('economics, psychology');
     expect(ends.right).toBe('the modern era');
+  });
+
+  it('never names both ends of an axis after the field most ideas are in', () => {
+    // Economics fills most of the map, so it is common at both ends of the
+    // vertical axis; it may name at most one of them.
+    const econ = 'Economics, business and finance';
+    const ideas = [
+      ...Array.from({ length: 7 }, (_, i) => at(0, 1 - i * 0.01, econ)),
+      ...Array.from({ length: 3 }, (_, i) => at(0, 0.9 - i * 0.01, 'Computing')),
+      ...Array.from({ length: 20 }, (_, i) => at(0, 0.1 - i * 0.001, econ)),
+      ...Array.from({ length: 5 }, (_, i) => at(0, -1 + i * 0.01, econ)),
+      ...Array.from({ length: 5 }, (_, i) => at(0, -0.9 + i * 0.01, 'The modern era')),
+    ];
+    const ends = axisEnds(ideas);
+    expect(ends.top).toBe('computing');
+    expect(ends.bottom).toBe('the modern era');
   });
 
   it('falls back to the domain, and says nothing for ideas with neither', () => {
