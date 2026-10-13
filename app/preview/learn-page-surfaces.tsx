@@ -478,6 +478,7 @@ const reading: ReadingDetail = {
   tEndSeconds: null,
   finishedAt: null,
   readNowAt: '2026-10-06T08:00:00Z',
+  givenText: null,
   conceptId: elasticity.id,
   newsStoryId: null,
   source: {
@@ -501,6 +502,20 @@ export function LearnReadingSurface() {
     <ReadingView
       reading={reading}
       subjects={[SUBJECT, { id: 's-hist', name: 'Ancient history', note: null, createdAt: '2026-07-01T10:00:00Z' }]}
+      alreadyRead={null}
+      origin={null}
+    />
+  );
+}
+
+export function LearnReadingTextSurface() {
+  return (
+    <ReadingView
+      reading={{
+        ...reading,
+        givenText: { label: 'Pasted', addedAt: '2026-10-12T09:30:00Z' },
+      }}
+      subjects={[SUBJECT]}
       alreadyRead={null}
       origin={null}
     />

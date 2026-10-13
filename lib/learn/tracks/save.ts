@@ -413,6 +413,31 @@ export async function setReadingNote(
 }
 
 /**
+ * Keep the text of a reading on the reading, or clear it with null.
+ *
+ * Returns false when no row of yours matched, so a reading that is not yours
+ * (RLS hides it) or is gone is told apart from a write that worked.
+ */
+export async function setReadingText(
+  supabase: LearnSupabaseClient,
+  readingId: string,
+  given: { text: string; label: string } | null,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('readings')
+    .update(
+      given
+        ? { given_text: given.text, given_text_label: given.label, given_text_at: new Date().toISOString() }
+        : { given_text: null, given_text_label: null, given_text_at: null },
+    )
+    .eq('id', readingId)
+    .select('id');
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw messageFor('Saving the text', error);
+  return (data?.length ?? 0) > 0;
+}
+
+/**
  * Write back what the locate pass established.
  *
  * The only path that may promote a locator it was handed, because it is the
