@@ -179,8 +179,7 @@ const FINISHES: Record<
 };
 
 /**
- * Smoked glass with a hairline edge, and light catching the edge in a few
- * bright glints that bloom softly. The module's colour is the light behind
+ * Glass with a hairline edge and a quiet lit edge along the top. The module's colour is the light behind
  * the glass (`glint`), or the glass itself (`glint-tint`).
  */
 function GlintObject({
@@ -202,7 +201,6 @@ function GlintObject({
   const { back, front, frontTransform, lines, dots, onBack } = drawing;
   const pane = (props: React.SVGProps<SVGPathElement>) => <path d={front} transform={frontTransform} {...props} />;
   const weight = px <= 22 ? 2 : px <= 34 ? 1.65 : 1.35;
-  const spark = `color-mix(in srgb, ${from} 35%, #fff)`;
   const detail = (colour: string) => (
     <>
       <g fill="none" stroke={colour} strokeWidth={weight} strokeLinecap="round" strokeLinejoin="round">
@@ -235,31 +233,15 @@ function GlintObject({
         <filter id={`${id}-blur`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
           <feGaussianBlur stdDeviation={1.4} />
         </filter>
-        <filter id={`${id}-bloom`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
-          <feGaussianBlur stdDeviation={0.9} />
-        </filter>
         <filter id={`${id}-soft`} filterUnits="userSpaceOnUse" x={-10} y={-10} width={44} height={44}>
           <feGaussianBlur stdDeviation={0.5} />
         </filter>
         <clipPath id={`${id}-clip`}>{pane({})}</clipPath>
-        {/* Where the light catches the edge: the top, the lower right, and faintly the left. */}
-        <radialGradient id={`${id}-g1`} gradientUnits="userSpaceOnUse" cx={13} cy={3.5} r={6}>
-          <stop offset="0" stopColor="#fff" />
-          <stop offset="1" stopColor="#fff" stopOpacity={0} />
-        </radialGradient>
-        <radialGradient id={`${id}-g2`} gradientUnits="userSpaceOnUse" cx={20.5} cy={19.5} r={4.5}>
-          <stop offset="0" stopColor="#fff" />
-          <stop offset="1" stopColor="#fff" stopOpacity={0} />
-        </radialGradient>
-        <radialGradient id={`${id}-g3`} gradientUnits="userSpaceOnUse" cx={2.8} cy={12} r={3.5}>
-          <stop offset="0" stopColor="#fff" stopOpacity={0.6} />
-          <stop offset="1" stopColor="#fff" stopOpacity={0} />
-        </radialGradient>
-        <mask id={`${id}-glints`} maskUnits="userSpaceOnUse" x={-4} y={-4} width={32} height={32}>
-          <rect x={-4} y={-4} width={32} height={32} fill={`url(#${id}-g1)`} />
-          <rect x={-4} y={-4} width={32} height={32} fill={`url(#${id}-g2)`} />
-          <rect x={-4} y={-4} width={32} height={32} fill={`url(#${id}-g3)`} />
-        </mask>
+        <linearGradient id={`${id}-lit`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
+          <stop offset="0" stopColor="#fff" stopOpacity={0.7} />
+          <stop offset="0.5" stopColor="#fff" stopOpacity={0.15} />
+          <stop offset="1" stopColor="#fff" stopOpacity={0.35} />
+        </linearGradient>
         <linearGradient id={`${id}-sheen`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
           <stop offset="0" stopColor="#fff" stopOpacity={0.16} />
           <stop offset="0.45" stopColor="#fff" stopOpacity={0.02} />
@@ -303,13 +285,8 @@ function GlintObject({
       {pane({ fill: `url(#${id}-sheen)` })}
       {/* The hairline edge. */}
       {pane({ stroke: '#fff', strokeOpacity: 0.32, strokeWidth: 0.4 })}
-      {/* The glints, and their bloom. */}
-      <g mask={`url(#${id}-glints)`}>
-        <g filter={`url(#${id}-bloom)`} opacity={0.9}>
-          {pane({ strokeWidth: 1.8, style: { stroke: spark } })}
-        </g>
-        {pane({ stroke: '#fff', strokeWidth: 0.6 })}
-      </g>
+      {/* A quiet lit edge, brighter along the top, in place of glints. */}
+      {pane({ stroke: `url(#${id}-lit)`, strokeWidth: 0.5 })}
       <g opacity={0.3} filter={`url(#${id}-soft)`} transform="translate(0 .4)">
         {detail(`color-mix(in srgb, ${to} 70%, #000)`)}
       </g>
