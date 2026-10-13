@@ -13,12 +13,20 @@ import { ConnectVaultForm } from './connect-form';
 import { SyncNowButton } from './sync-now-button';
 import { VaultMoreMenu } from './more-menu';
 import { formatClock } from '@/lib/clock';
+import { Tooltip } from '@/components/ui/tooltip';
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'Connected',
   needs_reauth: 'Needs reconnection',
   disconnected: 'Disconnected',
   error: 'Error',
+};
+
+/** What each status beside the vault's name means, on hover and focus. */
+const STATUS_HINT: Record<string, string> = {
+  needs_reauth: 'GitHub access has lapsed, so reconnect to keep syncing',
+  disconnected: 'The vault is no longer syncing from GitHub',
+  error: 'The last sync failed, and the reason is written below',
 };
 
 const WRITE_ACCESS_LABEL: Record<Exclude<WriteAccess, 'reconnect'>, string> = {
@@ -79,10 +87,16 @@ export function VaultSettingsView({
                   {STATUS_LABEL[connection.status]}
                 </span>
               ) : (
-                <Chip tone="caution">
-                  <AlertTriangle strokeWidth={1.75} aria-hidden />
-                  {STATUS_LABEL[connection.status] ?? connection.status}
-                </Chip>
+                <Tooltip
+                  label={STATUS_HINT[connection.status] ?? 'The vault is not syncing'}
+                  align="end"
+                  className="shrink-0"
+                >
+                  <Chip tone="caution" tabIndex={0}>
+                    <AlertTriangle strokeWidth={1.75} aria-hidden />
+                    {STATUS_LABEL[connection.status] ?? connection.status}
+                  </Chip>
+                </Tooltip>
               )}
             </CardHeader>
             <CardBody className="space-y-3">

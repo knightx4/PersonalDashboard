@@ -26,7 +26,16 @@ function whoOf(node: FeatureRow['node']): string {
   return isClaudes(node) ? 'Dash' : '—';
 }
 
-function Health({ row, className }: { row: FeatureRow; className?: string }) {
+function Health({
+  row,
+  className,
+  focusable,
+}: {
+  row: FeatureRow;
+  className?: string;
+  /** False inside the row's link. */
+  focusable?: boolean;
+}) {
   const health = healthWordsOf(row.health, featureHealthFacts(row.node));
   return (
     <StateLabel
@@ -35,6 +44,7 @@ function Health({ row, className }: { row: FeatureRow; className?: string }) {
       word={health.word}
       glyph={health.glyph}
       className={className}
+      focusable={focusable}
     />
   );
 }
@@ -101,14 +111,15 @@ export function FeatureTable({
                         tone="caution"
                         glyph="dashed"
                         word="Update overdue"
-                        title={`${overdue[row.node.id]} days since the last update`}
+                        title={`${overdue[row.node.id]} days since Dash last wrote an update on this feature. Nothing is needed from you.`}
+                        focusable={false}
                         className="ml-2 align-middle font-normal"
                       />
                     )}
                     {/* The phone's one line under the title: health and how
                         far through, which is what the dropped columns leave. */}
                     <span className="mt-1 flex items-center gap-3 text-small font-normal md:hidden">
-                      <Health row={row} />
+                      <Health row={row} focusable={false} />
                       {row.percent !== null && (
                         <span className="tabular text-ink-muted">{row.percent}% done</span>
                       )}

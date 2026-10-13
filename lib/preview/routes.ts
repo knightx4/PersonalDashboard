@@ -204,6 +204,9 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'news-review-failed': ['/news/review'],
   'core-cost-hint': ['/shopping/sell', '/shopping/review', '/account/spend'],
   'core-spend-estimates': ['/account/spend'],
+  // Nothing uses the Tooltip yet (plan #1985.1); /dev/ui is where it is reviewed.
+  'core-tooltip': ['/dev/ui'],
+  'dev-status-tips': ['/dev/plan', '/dev/ideas', '/dev/inbox', '/dev/bugs'],
   'dev-motion-travel': ['/dev/ui'],
   'dev-motion-settle': ['/dev/ui'],
   'dev-motion-clear': ['/dev/ui'],
@@ -375,6 +378,11 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   // The $ hint found by the action it prices: drawn on its own surface, as
   // every paid button in the app imports it (plan #1716).
   'core-cost-hint': ['components/ui/paid-hint.tsx'],
+  // The shared tooltip (plan #1985.1).
+  'core-tooltip': ['components/ui/tooltip.tsx'],
+  // A row's state with its tip (plan #1985.5), which every dev queue and
+  // Goals draw through the same label.
+  'dev-status-tips': ['components/dev/state-label.tsx'],
   'shell-full': ['components/shell/app-shell.tsx'],
   // The "What did you do?" box on Home and each goal's page (plan #1740),
   // drawn filed, empty and on a goal.

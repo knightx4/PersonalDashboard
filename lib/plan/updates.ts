@@ -34,11 +34,26 @@ export const PLAN_UPDATE_BODY_MAX = 1200;
 /** How each health is drawn: a shape, a word and a tone, as StateLabel takes them. */
 export const PLAN_UPDATE_HEALTH: Record<
   PlanUpdateHealth,
-  { word: string; glyph: StatusGlyph; tone: DevTone }
+  { word: string; glyph: StatusGlyph; tone: DevTone; title: string }
 > = {
-  on_track: { word: 'On track', glyph: 'check', tone: 'positive' },
-  at_risk: { word: 'At risk', glyph: 'dashed', tone: 'caution' },
-  blocked: { word: 'Blocked', glyph: 'bar', tone: 'caution' },
+  on_track: {
+    word: 'On track',
+    glyph: 'check',
+    tone: 'positive',
+    title: 'Dash expects this to land as planned. Nothing is needed from you.',
+  },
+  at_risk: {
+    word: 'At risk',
+    glyph: 'dashed',
+    tone: 'caution',
+    title: 'Dash sees something that could hold this up. The update says what.',
+  },
+  blocked: {
+    word: 'Blocked',
+    glyph: 'bar',
+    tone: 'caution',
+    title: 'Nothing can move until something is settled. The update says what, and whether it is yours.',
+  },
 };
 
 export type PlanUpdate = {

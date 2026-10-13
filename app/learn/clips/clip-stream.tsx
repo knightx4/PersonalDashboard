@@ -7,6 +7,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { cardVariants } from '@/components/ui/card';
 import { useToast } from '@/components/ui/toast';
+import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
 import { nowHref } from '@/lib/learn/flow/href';
 import { clockTime, thumbnailUrl, watchAt } from '@/lib/learn/youtube/format';
@@ -509,14 +510,15 @@ export function ClipStream({
       {current && (
         <div className="space-y-3 card-pad-x pt-3 pb-4 lg:pb-5">
           <div className="flex items-center gap-2 text-small tabular-nums text-ink-muted">
-            <IconButton
-              label={`Back ${BACK_SECONDS} seconds`}
-              onClick={() => nudge(-BACK_SECONDS)}
-              disabled={!begun}
-              className="-ml-1"
-            >
-              <RotateCcw strokeWidth={1.75} aria-hidden />
-            </IconButton>
+            <Tooltip label={`Go back ${BACK_SECONDS} seconds`} className="-ml-1 shrink-0">
+              <IconButton
+                label={`Back ${BACK_SECONDS} seconds`}
+                onClick={() => nudge(-BACK_SECONDS)}
+                disabled={!begun}
+              >
+                <RotateCcw strokeWidth={1.75} aria-hidden />
+              </IconButton>
+            </Tooltip>
             <span>{clockTime(elapsed)}</span>
             <input
               type="range"

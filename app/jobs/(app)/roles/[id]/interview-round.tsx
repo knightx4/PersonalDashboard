@@ -16,6 +16,7 @@ import {
   unlinkRoundMessage,
 } from './interview-actions';
 import { InlineInput, Select } from '@/components/ui/field';
+import { Tooltip } from '@/components/ui/tooltip';
 import { GmailLink, NoteKindButton, CollapsibleField } from './shared';
 import { InterviewCard } from './interview-card';
 import { AddInterview } from './add-interview';
@@ -139,18 +140,20 @@ export function InterviewGroupCard({
     // interviews belong to which round without indenting them.
     <Card padding="dense" className="border-accent/40 bg-accent-tint/30">
       <header className="flex flex-wrap items-center gap-2">
-        <IconButton
-          size="sm"
-          label={open ? 'Fold this round away' : 'Open this round'}
-          onClick={() => setOpen((value) => !value)}
-          aria-expanded={open}
-        >
-          <ChevronDown
-            className={cn('transition-transform duration-quick', !open && '-rotate-90')}
-            strokeWidth={1.75}
-            aria-hidden
-          />
-        </IconButton>
+        <Tooltip label={open ? 'Hide this round' : 'Show this round'} className="shrink-0">
+          <IconButton
+            size="sm"
+            label={open ? 'Fold this round away' : 'Open this round'}
+            onClick={() => setOpen((value) => !value)}
+            aria-expanded={open}
+          >
+            <ChevronDown
+              className={cn('transition-transform duration-quick', !open && '-rotate-90')}
+              strokeWidth={1.75}
+              aria-hidden
+            />
+          </IconButton>
+        </Tooltip>
         <CalendarClock className="size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
         {/* The number is the round's, not the interviews'. Four conversations
             on one afternoon are all the second round; numbering each of them
@@ -391,20 +394,22 @@ function RoundMail({
               ) : (
                 <span className="text-ink">{message.subject ?? '(no subject)'}</span>
               )}
-              <IconButton
-                size="sm"
-                label={`Take ${message.subject ?? 'this email'} off this round`}
-                disabled={pending}
-                onClick={() =>
-                  startTransition(async () => {
-                    const result = await unlinkRoundMessage({ groupId, messageId: message.id });
-                    setError(result.error);
-                  })
-                }
-                className="-my-1 self-center hover:text-danger"
-              >
-                <X strokeWidth={1.75} aria-hidden />
-              </IconButton>
+              <Tooltip label="Take this email off the round" className="self-center">
+                <IconButton
+                  size="sm"
+                  label={`Take ${message.subject ?? 'this email'} off this round`}
+                  disabled={pending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const result = await unlinkRoundMessage({ groupId, messageId: message.id });
+                      setError(result.error);
+                    })
+                  }
+                  className="-my-1 hover:text-danger"
+                >
+                  <X strokeWidth={1.75} aria-hidden />
+                </IconButton>
+              </Tooltip>
             </li>
           ))}
         </ul>

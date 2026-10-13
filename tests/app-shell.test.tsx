@@ -115,7 +115,7 @@ describe('the bottom bar', () => {
 describe('capture', () => {
   it('offers a way in from the header, with its shortcut on it', () => {
     const html = render([]);
-    expect(html).toContain('title="Capture something (⌥C)"');
+    expect(html).toContain('<span class="sr-only">Capture something</span>');
     expect(html).toContain('>⌥C<');
   });
 
@@ -325,32 +325,36 @@ describe('the search button on a phone', () => {
     return html.slice(at, html.indexOf('</header>', at));
   }
 
+  // The button's name: its tip is a Tooltip now, drawn only on hover.
+  const SEARCH = '<span class="sr-only">Search</span>';
+
   it('draws a search button in the top row', () => {
-    expect(header(shell('todo'))).toContain('title="Search"');
+    expect(header(shell('todo'))).toContain(SEARCH);
   });
 
   it('draws it below lg only, where the bar has no field', () => {
     const bar = header(shell('todo'));
-    const at = bar.indexOf('title="Search"');
-    // The button's own classes, read from the tag the title sits in.
-    const tag = bar.slice(bar.lastIndexOf('<button', at), bar.indexOf('>', at));
+    const at = bar.indexOf(SEARCH);
+    // The button's own classes, read from the tag the name sits in.
+    const start = bar.lastIndexOf('<button', at);
+    const tag = bar.slice(start, bar.indexOf('>', start));
     expect(tag).toContain('lg:hidden');
   });
 
   it('puts it with the account icons rather than in the middle of the bar', () => {
     const bar = header(shell('todo'));
-    expect(bar.indexOf('title="Search"')).toBeGreaterThan(bar.indexOf('aria-label="Search"'));
-    expect(bar.indexOf('title="Search"')).toBeLessThan(bar.indexOf('Capture something'));
+    expect(bar.indexOf(SEARCH)).toBeGreaterThan(bar.indexOf('aria-label="Search"'));
+    expect(bar.indexOf(SEARCH)).toBeLessThan(bar.indexOf('Capture something'));
   });
 
   it('draws it outside a workspace too', () => {
-    expect(header(shell(null))).toContain('title="Search"');
+    expect(header(shell(null))).toContain(SEARCH);
   });
 
   it('draws the ring and dot rather than the magnifier (plan #1365)', () => {
     const bar = header(shell('todo'));
-    const at = bar.indexOf('title="Search"');
-    const button = bar.slice(at, bar.indexOf('</button>', at));
+    const at = bar.indexOf(SEARCH);
+    const button = bar.slice(bar.lastIndexOf('<button', at), at);
     expect(button).toContain('data-mark="search"');
     expect(button).not.toContain('lucide-search');
   });

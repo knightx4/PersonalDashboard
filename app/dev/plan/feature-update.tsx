@@ -37,6 +37,7 @@ export function FeatureUpdate({
           glyph={health.glyph}
           word={health.word}
           tone={health.tone}
+          title={health.title}
           className={cn('text-ui font-medium', TONE_TEXT[health.tone])}
         />
         <span className="text-small text-ink-muted">

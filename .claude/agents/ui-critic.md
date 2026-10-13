@@ -91,6 +91,10 @@ For each shot, ask:
   (laws 9, 11, 13). A box inside a box inside a card is a fix.
 - **Edges and overflow.** Is anything cut off, overflowing sideways, touching
   the edge of the screen, or sitting under where the dock would be?
+- **Icon-only controls.** Does a button or link drawn as an icon alone have a
+  name the person can read? Hover or long-press should show a tooltip, and
+  the shot should not leave a lone icon whose meaning is a guess (spec rule
+  R20). Fix a bare one, citing `spec R20`.
 - **Hierarchy.** Is it clear in one glance what the page is about and what to
   press next? Does the forward action sit where the person can reach it at
   390?

@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { LinkPending } from '@/components/ui/link-pending';
 import { cn } from '@/lib/cn';
 import { ReviewLines, type ReviewLine } from './review-lines';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /** A neighbouring day with a review: where its arrow goes and what it is called. */
 export type ReviewDayLink = { href: string; label: string };
@@ -112,20 +113,24 @@ function DayArrows({
   return (
     <nav aria-label="Other days" className="flex items-center gap-2">
       {earlier ? (
-        <Link href={earlier.href} className={shape} aria-label={`Review for ${earlier.label}`} title={earlier.label}>
-          <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
-          <LinkPending />
-        </Link>
+        <Tooltip label={`Review for ${earlier.label}`}>
+          <Link href={earlier.href} className={shape} aria-label={`Review for ${earlier.label}`}>
+            <ChevronLeft className="size-4" strokeWidth={1.75} aria-hidden />
+            <LinkPending />
+          </Link>
+        </Tooltip>
       ) : (
         <span aria-hidden className={cn(shape, 'opacity-40')}>
           <ChevronLeft className="size-4" strokeWidth={1.75} />
         </span>
       )}
       {later ? (
-        <Link href={later.href} className={shape} aria-label={`Review for ${later.label}`} title={later.label}>
-          <ChevronRight className="size-4" strokeWidth={1.75} aria-hidden />
-          <LinkPending />
-        </Link>
+        <Tooltip label={`Review for ${later.label}`} align="end">
+          <Link href={later.href} className={shape} aria-label={`Review for ${later.label}`}>
+            <ChevronRight className="size-4" strokeWidth={1.75} aria-hidden />
+            <LinkPending />
+          </Link>
+        </Tooltip>
       ) : (
         <span aria-hidden className={cn(shape, 'opacity-40')}>
           <ChevronRight className="size-4" strokeWidth={1.75} />

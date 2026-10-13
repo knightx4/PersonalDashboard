@@ -12,6 +12,7 @@ import { ModuleMark } from '@/components/ui/module-mark';
 import { menuItemClass, popoverSurface } from '@/components/ui/popover';
 import { toggleChipClass } from '@/components/ui/chip';
 import { IconButton } from '@/components/ui/icon-button';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * What a task is about, found by typing.
@@ -81,9 +82,11 @@ export function LinkPicker({
             <ModuleMark module={value.module} size="sm" />
             <span className="min-w-0 truncate">{value.label}</span>
           </button>
-          <IconButton label="Not about this" size="sm" onClick={() => onChange(null)} className="rounded-pill">
-            <X strokeWidth={1.75} aria-hidden />
-          </IconButton>
+          <Tooltip label="Not about this" className="shrink-0">
+            <IconButton label="Not about this" size="sm" onClick={() => onChange(null)} className="rounded-pill">
+              <X strokeWidth={1.75} aria-hidden />
+            </IconButton>
+          </Tooltip>
         </span>
       ) : (
         <button

@@ -5,7 +5,7 @@ import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { formatCompBand, formatDate, shortAge, type PipelineRow } from '@/lib/jobs/applications/load';
 import type { DisplayChoice } from '@/lib/list-display';
-import { ScoreReasons, chanceFigureText, fitText } from '@/components/jobs/ui/score-figures';
+import { ScoreReasons, Unsure, chanceFigureText, fitText } from '@/components/jobs/ui/score-figures';
 import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
 
 /**
@@ -131,13 +131,17 @@ export function RolesTable({
             </TD>
             )}
             {showing('fit') && (
-             <TD label={FIT_SCORE_LABEL} muted className={cn(cell, 'tabular')} title={row.scoreNote?.fit?.unsure ? 'Dash is not sure of this one' : undefined}>
-              {row.scoreNote ? (fitText(row.scoreNote) ?? '') : ''}
+            <TD label={FIT_SCORE_LABEL} muted className={cn(cell, 'tabular')}>
+              <Unsure unsure={row.scoreNote?.fit?.unsure}>
+                <span>{row.scoreNote ? (fitText(row.scoreNote) ?? '') : ''}</span>
+              </Unsure>
             </TD>
             )}
             {showing('chance') && (
-            <TD label={CHANCE_LABEL} muted className={cell} title={row.scoreNote?.chance?.unsure ? 'Dash is not sure of this one' : undefined}>
-              {row.scoreNote ? (chanceFigureText(row.scoreNote) ?? '') : ''}
+            <TD label={CHANCE_LABEL} muted className={cell}>
+              <Unsure unsure={row.scoreNote?.chance?.unsure}>
+                <span>{row.scoreNote ? (chanceFigureText(row.scoreNote) ?? '') : ''}</span>
+              </Unsure>
             </TD>
             )}
             {showing('comp') && (
