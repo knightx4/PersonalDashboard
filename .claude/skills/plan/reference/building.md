@@ -324,8 +324,16 @@ a surface with no routes. A step that changes no surface skips this section.
    `/dev/ui`, which the critic must not cite: `select taste_id from
    ui_taste_removals where user_id = '…'`, or "none". It answers with a paragraph and a fenced `json` verdict:
    `verdict` is `pass` or `fix`, and each fix names the shot, where, the
-   problem, what it breaks (`law <n>`, `taste:<id>`, `pattern`, `done-when`
-   or `regression`) and the change.
+   problem, what it breaks (`law <n>`, `taste:<id>`, `pattern`, `done-when`,
+   `regression` or `question:eye`) and the change. Every verdict also
+   answers three questions under `questions`, each with an `answer` and an
+   `ok`: `eye`, where the eye goes first and whether that is what the screen
+   is for; `competition`, whether anything such as a label, outline or
+   heading competes with the data; and `lines`, whether the lines are
+   lighter than the text (UI-QUALITY-SPEC Part 2, R19). A screen with no
+   clear answer to the first fails. The prompt asks for all three; a
+   verdict that comes back without them goes back to the critic, since the
+   recorder refuses it.
 5. **Record the round** (below), whatever the verdict.
 6. **On `fix`, make every change it asks for**, shoot again and start the next
    round. Most surfaces fail round 1. A fix you think is wrong is still the
@@ -388,11 +396,12 @@ you make its fixes:
    ```
 
    It checks the file is the critic's shape and is for that surface and
-   round, keeps a copy of the four shots beside it as
+   round, refusing one that leaves out any of the three questions or passes
+   a screen whose `eye` answer is not `ok`, keeps a copy of the four shots beside it as
    `<step>--<surface>--r<round>--<shot>.png` (the next shoot overwrites the
    originals), and writes one row to `public.ui_checks`: step, surface,
    round, verdict, the fixes and the `earlier` list as the critic wrote them,
-   its notes, and the shots' paths in the private `ui-shots` bucket. A round
+   its notes, the three answers in `questions`, and the shots' paths in the private `ui-shots` bucket. A round
    recorded twice is replaced, not duplicated.
 
 What the recorder can reach depends on the session:

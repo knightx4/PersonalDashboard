@@ -94,8 +94,9 @@ the repository.
 
 ## After a vision edit
 
-A second kind of re-shape starts when the person accepts a new vision for a
-workspace on the specs page (#1109 settled that it should). The turn names the
+A second kind of re-shape starts when a workspace's vision changes on the
+specs page: the person accepts an edit the weekly review proposed (#1109
+settled that it should), or saves a new vision by hand. The turn names the
 workspace, gives the new vision and the one it replaced, and lists every open
 feature there. One run reads them all.
 
@@ -123,3 +124,6 @@ run writes is ready to build and nothing is dropped by it.
    dismissed. The run changes rows, not code, so it does not commit. Report,
    by outline and title, what you proposed, which drops you asked about, and
    which features you read and left alone.
+5. **Mark the run finished**, as the last write, under job `vision_reshape`
+   (not `reshape`): the SQL is at the end of SKILL.md. The run is about no
+   step, so nothing else ends it.

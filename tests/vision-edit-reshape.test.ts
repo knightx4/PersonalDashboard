@@ -12,10 +12,29 @@ const state = vi.hoisted(() => ({
   sections: [] as unknown[],
   runs: [] as { job: string; planItemId?: string | null; text?: string | null }[],
   fire: { ok: true, detail: 'started', runId: 'run-1' } as Record<string, unknown>,
+  saved: null as null | { body: string },
+  upserts: [] as unknown[],
 }));
 
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
-vi.mock('@/lib/auth/server', () => ({ createClient: async () => ({}) }));
+// Just enough of the client for saveModuleVision: read the vision it replaces,
+// then upsert the new one.
+vi.mock('@/lib/auth/server', () => ({
+  createClient: async () => ({
+    from: () => {
+      const query = {
+        select: () => query,
+        eq: () => query,
+        maybeSingle: async () => ({ data: state.saved, error: null }),
+        upsert: async (row: unknown) => {
+          state.upserts.push(row);
+          return { error: null };
+        },
+      };
+      return query;
+    },
+  }),
+}));
 vi.mock('@/lib/dev/owner', () => ({ requireOwner: async () => ({ id: 'owner' }) }));
 vi.mock('@/lib/specs/vision-review', () => ({
   decideVisionEdit: async () => ({ error: state.error, edit: state.edit }),
@@ -33,7 +52,7 @@ vi.mock('@/lib/plan/runs', () => ({
   },
 }));
 
-const { acceptVisionEdit, dismissVisionEdit } = await import('@/app/dev/specs/actions');
+const { acceptVisionEdit, dismissVisionEdit, saveModuleVision } = await import('@/app/dev/specs/actions');
 
 const ID = '00000000-0000-4000-8000-000000000001';
 function form() {
@@ -55,6 +74,8 @@ beforeEach(() => {
   ];
   state.runs = [];
   state.fire = { ok: true, detail: 'started', runId: 'run-1' };
+  state.saved = null;
+  state.upserts = [];
 });
 
 describe('acceptVisionEdit', () => {
@@ -100,5 +121,50 @@ describe('dismissVisionEdit', () => {
     const result = await dismissVisionEdit({}, form());
     expect(state.runs).toEqual([]);
     expect(result.message).toBe('Edit dismissed.');
+  });
+});
+
+describe('saveModuleVision', () => {
+  function saveForm(module: string, body: string) {
+    const data = new FormData();
+    data.set('module', module);
+    data.set('body', body);
+    return data;
+  }
+
+  it('re-shapes the workspace when a saved vision changes it', async () => {
+    state.saved = { body: 'Old.' };
+    const result = await saveModuleVision({}, saveForm('jobs', 'New.'));
+    expect(state.upserts).toHaveLength(1);
+    expect(state.runs).toHaveLength(1);
+    expect(state.runs[0].job).toBe('vision_reshape');
+    expect(state.runs[0].text).toContain('## The new vision\n\nNew.');
+    expect(state.runs[0].text).toContain('## The vision it replaced\n\nOld.');
+    expect(result.message).toMatch(/^Vision saved\. Dash is re-reading the 2 open features in Job search/);
+  });
+
+  it('reads the app vision against the trees filed under no workspace', async () => {
+    state.sections = [{ module: null, nodes: [feature(7, 'in_progress')] }];
+    const result = await saveModuleVision({}, saveForm('app', 'The app, newly.'));
+    expect(state.runs).toHaveLength(1);
+    expect(state.runs[0].text).toContain('#7 Feature 7');
+    expect(state.runs[0].text).toContain('Nothing was written before.');
+    expect(result.message).toMatch(/the app as a whole/);
+  });
+
+  it('starts nothing when the save changes nothing', async () => {
+    state.saved = { body: 'Same.' };
+    const result = await saveModuleVision({}, saveForm('jobs', '  Same.  '));
+    expect(state.runs).toEqual([]);
+    expect(result.message).toBe('Vision saved.');
+  });
+
+  it('keeps the save and says so when the run does not start', async () => {
+    state.fire = { ok: false, error: 'CLAUDE_PLAN_ROUTINE_ID is not set', status: null };
+    const result = await saveModuleVision({}, saveForm('jobs', 'New.'));
+    expect(state.upserts).toHaveLength(1);
+    expect(result.message).toBe(
+      'Vision saved. The re-shape of the open features in Job search did not start: CLAUDE_PLAN_ROUTINE_ID is not set',
+    );
   });
 });
