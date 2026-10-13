@@ -321,12 +321,12 @@ const functions = functionSpendRows([
 ]);
 
 export function DevUsageSurface() {
-  return <UsageScreen report={report} functions={functions} now={new Date('2026-10-04T12:00:00Z')} />;
+  return <UsageScreen report={report} functions={functions} phoneShare={{ phone: 312, total: 1204 }} now={new Date('2026-10-04T12:00:00Z')} />;
 }
 
 /** The tab before any model call has been made and before any page was opened. */
 export function DevUsageEmptySurface() {
-  return <UsageScreen report={usageReport([])} functions={[]} now={new Date('2026-10-04T12:00:00Z')} />;
+  return <UsageScreen report={usageReport([])} functions={[]} phoneShare={{ phone: 0, total: 0 }} now={new Date('2026-10-04T12:00:00Z')} />;
 }
 
 // ---- UI review ------------------------------------------------------------
