@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { DashMark, type DashLook } from '@/components/ui/dash-mark';
+import { DashMark, type DashRunner } from '@/components/ui/dash-mark';
 import type { FeatureProgress } from '@/lib/digest/night';
 import { Meter } from '@/components/ui/meter';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -12,6 +12,7 @@ import {
   type SlotId,
 } from '@/lib/plan/overnight-slots';
 import { useNewestRunLines } from '@/components/runs/use-newest-run-lines';
+import { useRunPose } from '@/components/runs/use-run-pose';
 import { LiveRunLines } from '@/components/runs/live-run-lines';
 import { type RunActivity } from '@/lib/core/run-activities';
 import { answerPlanRunAction } from './run-actions';
@@ -21,11 +22,14 @@ import { answerPlanRunAction } from './run-actions';
  * #1704): three feature sessions and the goals seat, which a fourth feature
  * takes while goals has nothing to start.
  *
- * They sit in a strip, one pill each. A pill wears its Dash's hat, so the eye
- * can follow one from glance to glance, and says in one line what the slot is
- * doing: the feature and its meter with the run's newest line while it
- * works, the tick's reason while it sleeps, "Held" or "Not running" while the
- * runner is held or off.
+ * They sit in a strip, one pill each. A pill shows its own Dash, with its own
+ * visor shape and colour, so the eye can follow one from glance to glance, and
+ * says what the slot is doing: the workspace and feature with its meter while
+ * it works, the tick's reason while it sleeps, "Held" or "Not running" while
+ * the runner is held or off. While a slot works, its Dash takes the shape of
+ * the run's newest line: reading, searching, testing, writing or thinking,
+ * asking while a question waits on you, with a wince for an error and a hop
+ * for a step finished (lib/core/run-pose.ts).
  *
  * Pressing a pill opens the slot below the strip: the whole of what its run
  * has written, live, with any question it is waiting on to answer there.
@@ -35,14 +39,14 @@ import { answerPlanRunAction } from './run-actions';
  * Which session takes which slot is `runnerSlots`' call; this only draws it.
  */
 
-/** Decision #1701: the hats, in slot order. */
-const LOOKS: Record<SlotId, DashLook> = {
-  'feature-1': 'top-hat',
-  'feature-2': 'ball-cap',
-  'feature-3': 'cowboy-hat',
-  // The fourth feature sits in the goals seat, so it wears the goals hat.
-  'feature-4': 'newsboy-cap',
-  goals: 'newsboy-cap',
+/** Each slot's Dash: its own visor shape and colour, in slot order. */
+const RUNNERS: Record<SlotId, DashRunner> = {
+  'feature-1': 'feature-1',
+  'feature-2': 'feature-2',
+  'feature-3': 'feature-3',
+  // The fourth feature sits in the goals seat, so it takes the goals Dash.
+  'feature-4': 'goals',
+  goals: 'goals',
 };
 
 /**
@@ -83,6 +87,7 @@ function PillName({ slot }: { slot: RunnerSlot }) {
 function Pill({
   slot,
   held,
+  newest,
   progress,
   open,
   panel,
@@ -90,12 +95,15 @@ function Pill({
 }: {
   slot: RunnerSlot;
   held: boolean;
+  newest: RunActivity | null;
   progress: FeatureProgress | null;
   open: boolean;
   panel: string;
   onPress: () => void;
 }) {
   const working = slot.state === 'working';
+  // While it works, the Dash takes the shape of its newest line (lib/core/run-pose.ts).
+  const { pose, moment } = useRunPose(working ? newest : null);
   return (
     <button
       type="button"
@@ -107,12 +115,12 @@ function Pill({
       }`}
     >
       <DashMark
-        state={slot.state}
-        look={LOOKS[slot.slot]}
-        tone={working ? 'brand' : 'current'}
+        state={working ? pose.state : slot.state}
+        activity={working ? pose.activity : undefined}
+        moment={working ? (moment ?? undefined) : undefined}
+        runner={RUNNERS[slot.slot]}
         size="md"
         decorative
-        className={working ? undefined : 'text-ink-muted'}
       />
       {/* Every pill has the same three rows, a meter track included, so the
           four stand the same height whatever their slots are doing. */}
@@ -240,6 +248,7 @@ export function RunnerCrew({
             <Pill
               slot={slot}
               held={held}
+              newest={newestOf(slot)}
               progress={progressOf(slot)}
               open={open === slot.slot}
               panel={panel}
