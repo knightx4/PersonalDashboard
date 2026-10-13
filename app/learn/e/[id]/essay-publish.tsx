@@ -115,7 +115,7 @@ export function EssayPublishCard({
               href={`https://${SITE}${essayAddress(state.slug)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-accent underline underline-offset-2"
+              className="flex min-h-11 items-center text-accent underline underline-offset-2"
             >
               {SITE}
               {essayAddress(state.slug)}
