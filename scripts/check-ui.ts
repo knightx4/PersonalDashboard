@@ -242,6 +242,59 @@ const FULL_BORDER = /(?:^|\s)border(?=\s|$)/;
 const CLASS_STRING =
   /className=(?:"([^"]*)"|\{`([^`]*)`\})|'([^']*\b(?:rounded|border|bg)-[^']*)'/g;
 
+/**
+ * The element that opens at `column` on the line after `before`: the text of
+ * its opening tag and what sits between it and its closing tag. Null when it
+ * is self-closing or its closing tag is not found.
+ *
+ * Reads the opening tag by counting braces and quotes, so `onClick={() => a > b}`
+ * does not end the tag early. Not a parse; enough for the shapes JSX is written
+ * in here.
+ */
+function elementAt(
+  source: string,
+  before: string[],
+  column: number,
+  name: string,
+): { open: string; children: string } | null {
+  const start = before.reduce((sum, line) => sum + line.length + 1, 0) + column;
+  let at = start;
+  let depth = 0;
+  let quote = '';
+  for (; at < source.length; at += 1) {
+    const ch = source[at]!;
+    if (quote) {
+      if (ch === quote) quote = '';
+    } else if (ch === '"' || ch === "'" || (ch === '`' && depth > 0)) quote = ch;
+    else if (ch === '{') depth += 1;
+    else if (ch === '}') depth -= 1;
+    else if (ch === '>' && depth === 0) break;
+  }
+  if (at >= source.length || source[at - 1] === '/') return null;
+  const close = source.indexOf(`</${name}>`, at);
+  if (close === -1) return null;
+  return { open: source.slice(start, at + 1), children: source.slice(at + 1, close) };
+}
+
+/** Components that draw an icon in this codebase besides the lucide imports. */
+const ICON_NAME = /^(?:\w*Icon|Icon\w*|\w*Glyph|\w*Mark)$/;
+
+/** What names a control to a screen reader and to a mouse, or may, through a spread. */
+const LABELLED = /\b(?:aria-label|aria-labelledby|title|label)\s*=|\{\s*\.\.\./;
+
+/**
+ * Whether the children are one icon and nothing else: no text, no sr-only span,
+ * no second element. `lucide` is the names the file imports from lucide-react.
+ */
+function onlyAnIcon(children: string, lucide: Set<string>): boolean {
+  const text = children.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').trim();
+  if (/^<svg\b[\s\S]*<\/svg>$/.test(text)) return !/aria-label|<title/.test(text);
+  const icon = /^<(\w+)\b([^<]*)\/>$/.exec(text);
+  if (!icon) return false;
+  if (!lucide.has(icon[1]!) && !ICON_NAME.test(icon[1]!)) return false;
+  return !/\b(?:aria-label|title)\s*=/.test(icon[2]!);
+}
+
 const RULES: Rule[] = [
   {
     id: 'hand-rolled-box',
@@ -499,6 +552,46 @@ const RULES: Rule[] = [
       }
 
       return [`${declared[1]}() has no tier`];
+    },
+  },
+  {
+    id: 'icon-button-without-label',
+    law: '-',
+    says: 'a button or link whose only child is an icon, with no aria-label, title or Tooltip',
+    instead:
+      'aria-label on the control and a <Tooltip> around it (components/ui/tooltip), so a mouse and a screen reader both get the name',
+    /**
+     * `<button>`, `<Button>`, `<IconButton>`, `<a>` or `<Link>` whose children
+     * are one icon (plan #1985.2).
+     *
+     * An icon alone says nothing to a screen reader and little to a person who
+     * has not met it, and the written rules ask for a tooltip on every new
+     * control. The control is labelled when its opening tag has `aria-label`,
+     * `aria-labelledby` or `title`, when it spreads props that may carry one,
+     * or when a `<Tooltip>` encloses it. An icon is a name imported from
+     * lucide-react, an `<svg>`, or a component named *Icon, *Glyph or *Mark.
+     * An icon beside text, or with an sr-only span, is not icon-only.
+     *
+     * Existing ones sit in scripts/ui-baseline.json under this rule's id. A
+     * step that labels a file's controls lowers its count with
+     * `npm run check:ui -- --update`.
+     */
+    only: /\.tsx$/,
+    find: (line, { before, source }) => {
+      const out: string[] = [];
+      for (const match of line.matchAll(/<(button|Button|IconButton|a|Link)\b/g)) {
+        const element = elementAt(source, before, match.index!, match[1]!);
+        if (!element || LABELLED.test(element.open)) continue;
+        const lucide = new Set(
+          [...source.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]lucide-react['"]/g)].flatMap((m) =>
+            m[1]!.split(',').map((name) => name.split(/\s+as\s+/).pop()!.trim()),
+          ),
+        );
+        if (!onlyAnIcon(element.children, lucide)) continue;
+        if (encloses(line, before, /<Tooltip\b/)) continue;
+        out.push(`<${match[1]}> with only an icon`);
+      }
+      return out;
     },
   },
 ];

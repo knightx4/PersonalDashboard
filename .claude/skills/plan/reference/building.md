@@ -150,6 +150,11 @@ the answer and your lines so far. Working offline, the query is in `offline.md`.
    failure found at the merge costs a second gate run. Run them before the
    critic, so the critic's shots are of the screen that will merge.
 
+   A control drawn as an icon alone takes an `aria-label` and a `<Tooltip>`
+   (`components/ui/tooltip`). `check:ui` fails a new one
+   (`icon-button-without-label`, spec R20). When you touch a file that holds
+   unlabelled ones, label them and run `npm run check:ui -- --update`.
+
    Then check the done-when line by line. If a line is not met, it is not
    done. A step that changes a screen is not done until the critic has passed
    each of its surfaces. After a third failed round you settle it yourself (see

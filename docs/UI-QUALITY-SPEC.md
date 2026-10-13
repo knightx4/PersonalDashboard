@@ -520,6 +520,12 @@ Checked by: audit.
 **R19.** Every design check verdict answers the three questions of Part 2.
 Checked by: audit.
 
+**R20.** A button or link whose only child is an icon has an `aria-label`
+(or `title`) and sits inside a `<Tooltip>`, so a mouse and a screen reader
+both get its name. Checked by: `check:ui` rule `icon-button-without-label`,
+baseline 0 when the rule was added, target 0. A new one fails the gate; the
+valve is `ui-ok:` on the line, as for the other rules.
+
 ## Decisions
 
 **1. What happens when a screen fails its third round with the critic?**
