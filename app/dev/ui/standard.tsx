@@ -519,6 +519,8 @@ const DASH_STATE_NOTES: Record<DashState, string> = {
     'Eyes shut and the core down to a smouldering ember, with a z drifting up. For a Dash that has to be woken: the tag button on a comment, until it is pressed.',
   working:
     'The visor leans forward with speed lines streaming off the back and the core pulsing. Indeterminate: nothing fills, because a run does not report how far it has got. Under reduced motion it keeps the lean.',
+  asking:
+    'A question is waiting on you: the eyes look straight out and a question mark pulses beside the visor until you answer.',
   done: 'The core turns green and the eyes smile, with a gentle bob.',
   failed: 'No core, just clear glass and flat eyes, flickering now and then. Always beside the error text.',
 };
@@ -527,6 +529,7 @@ const DASH_STATE_NOTES: Record<DashState, string> = {
 const DASH_ACTIVITY_NOTES: Record<DashActivity, string> = {
   reading: 'Eyes lowered and jumping along a line, over two lines of text.',
   searching: 'Eyes sweeping wide while a ring pings out from the visor.',
+  testing: 'Eyes running down a short checklist below the visor, each row ticking in turn.',
   writing: 'Eyes lowered to a line drawing out under the visor towards a blinking caret.',
   thinking: 'Eyes glancing up to one corner, then the other. At rest they look up into the corner.',
 };

@@ -37,6 +37,13 @@ const MOTIONS = [
   'ponder',
   'bob',
   'flicker',
+  'scan',
+  'tick',
+  'ask',
+  'settle',
+  'shake',
+  'hop',
+  'flash',
 ] as const;
 
 /**
@@ -80,6 +87,7 @@ describe('DashMark', () => {
     expect(render({ state: 'working', activity: 'searching' })).toContain('dash-mark-ping');
     expect(render({ state: 'working', activity: 'writing' })).toContain('dash-mark-write');
     expect(render({ state: 'working', activity: 'thinking' })).toContain('dash-mark-ponder');
+    expect(render({ state: 'working', activity: 'testing' })).toContain('dash-mark-tick');
     expect(still(render({ state: 'idle', activity: 'reading' }))).toBe(still(render({ state: 'idle' })));
     expect(render({ state: 'done', activity: 'searching' })).not.toContain('data-dash-activity');
   });
@@ -149,6 +157,27 @@ describe('DashMark', () => {
     const html = render({});
     expect(html).toContain('data-dash-state="idle"');
     expect(html).toContain('width="16"');
+  });
+});
+
+describe('asking and its moments', () => {
+  it('asks with a pulsing question mark', () => {
+    const html = render({ state: 'asking' });
+    expect(html).toContain('dash-mark-ask');
+    expect(html).toContain('aria-label="Dash is asking you something"');
+  });
+
+  it('eases into each state rather than snapping', () => {
+    for (const state of DASH_STATES) expect(render({ state })).toContain('dash-mark-settle');
+  });
+
+  it('winces and hops once, on top of the state', () => {
+    const wince = render({ state: 'working', moment: { kind: 'wince', id: 'e1' } });
+    expect(wince).toContain('dash-mark-shake');
+    expect(wince).toContain('dash-mark-flash');
+    const hop = render({ state: 'working', activity: 'writing', moment: { kind: 'hop', id: 'a1' } });
+    expect(hop).toContain('dash-mark-hop');
+    expect(render({ state: 'working' })).not.toContain('dash-mark-shake');
   });
 });
 

@@ -25,6 +25,8 @@ import { MOTION_MS } from '@/lib/motion';
  *   working   the visor leans forward with speed lines streaming off the back
  *             and the core pulsing. Indeterminate: nothing fills, because a
  *             run does not report how far it has got.
+ *   asking    a question is waiting on you: the eyes look straight out and a
+ *             question mark pulses beside the visor until you answer.
  *   done      the core turns green and the eyes smile; it bobs gently.
  *   failed    no core at all, just clear glass and flat eyes, flickering now
  *             and then like a light that has gone.
@@ -33,8 +35,13 @@ import { MOTION_MS } from '@/lib/motion';
  *
  *   reading    eyes lowered and jumping along two lines of text below.
  *   searching  eyes sweeping wide while a ring pings out from the visor.
+ *   testing    eyes running down a short checklist below, ticking it off.
  *   writing    eyes lowered to a line being drawn out towards a caret.
  *   thinking   eyes glancing up to one corner, then the other.
+ *
+ * A change of state or kind eases in rather than snapping, and a `moment`
+ * plays once on top of whatever the mark is doing: a wince for an error the
+ * work carries on from, a hop for a step finished.
  *
  * Every state and kind has its own still shape, so a single frame says which
  * it is and the mark still reads under reduced motion. The motion is the
@@ -50,14 +57,21 @@ import { MOTION_MS } from '@/lib/motion';
  * danger colour beside an error.
  */
 
-export type DashState = 'idle' | 'asleep' | 'working' | 'done' | 'failed';
+export type DashState = 'idle' | 'asleep' | 'working' | 'asking' | 'done' | 'failed';
 
-export const DASH_STATES: readonly DashState[] = ['idle', 'asleep', 'working', 'done', 'failed'];
+export const DASH_STATES: readonly DashState[] = ['idle', 'asleep', 'working', 'asking', 'done', 'failed'];
 
 /** What kind of work a working mark shows. Without one it leans and races. */
-export type DashActivity = 'reading' | 'searching' | 'writing' | 'thinking';
+export type DashActivity = 'reading' | 'searching' | 'testing' | 'writing' | 'thinking';
 
-export const DASH_ACTIVITIES: readonly DashActivity[] = ['reading', 'searching', 'writing', 'thinking'];
+export const DASH_ACTIVITIES: readonly DashActivity[] = ['reading', 'searching', 'testing', 'writing', 'thinking'];
+
+/**
+ * A one-off on top of the state, played once each time its id changes: a
+ * wince (a shake and a red flash of the core) for an error the run carries on
+ * from, a hop (a jump and a green flash) for a step closed or a commit made.
+ */
+export type DashMoment = { kind: 'wince' | 'hop'; id: string };
 
 /** One of the runner card's four slots, each with its own visor and colour. */
 export type DashRunner = 'feature-1' | 'feature-2' | 'feature-3' | 'goals';
@@ -90,6 +104,7 @@ export const DASH_STATE_LABELS: Record<DashState, string> = {
   idle: 'Dash',
   asleep: 'Dash is asleep',
   working: 'Dash is working',
+  asking: 'Dash is asking you something',
   done: 'Dash has finished',
   failed: 'Dash could not finish',
 };
@@ -98,6 +113,7 @@ export const DASH_STATE_LABELS: Record<DashState, string> = {
 export const DASH_ACTIVITY_LABELS: Record<DashActivity, string> = {
   reading: 'Dash is reading',
   searching: 'Dash is searching',
+  testing: 'Dash is testing',
   writing: 'Dash is writing',
   thinking: 'Dash is thinking',
 };
@@ -210,6 +226,7 @@ export function DashGlyph({
   activity,
   tone = 'current',
   runner,
+  moment,
 }: {
   /** Unique per mark: names its gradients, filter and clip. */
   id: string;
@@ -217,6 +234,7 @@ export function DashGlyph({
   activity?: DashActivity;
   tone?: DashTone;
   runner?: DashRunner;
+  moment?: DashMoment;
 }) {
   const visor: Visor = runner ? RUNNERS[runner].visor : 'capsule';
   const ramp: readonly string[] = runner
@@ -232,7 +250,7 @@ export function DashGlyph({
   const kind = state === 'working' ? activity : undefined;
   const lean = state === 'working' && !kind;
   // Reading and writing raise the visor to leave room for the line below it.
-  const cy = kind === 'reading' || kind === 'writing' ? 10 : 12;
+  const cy = kind === 'reading' || kind === 'writing' ? 10 : kind === 'testing' ? 9.4 : 12;
   const d = visorPath(visor, cy);
   const ey = visor === 'shield' ? cy - 0.6 : cy;
 
@@ -287,6 +305,10 @@ export function DashGlyph({
     const look =
       kind === 'reading'
         ? { className: 'dash-mark-read', dy: 0.8 }
+        : kind === 'testing'
+          ? { className: 'dash-mark-scan', dy: 0.8 }
+          : state === 'asking'
+            ? { className: undefined, dy: 0 }
         : kind === 'writing'
           ? { className: undefined, dy: 0.8 }
           : kind === 'searching'
@@ -366,6 +388,32 @@ export function DashGlyph({
   }
   if (state === 'done') body = <g className="dash-mark-bob">{body}</g>;
   if (failed) body = <g className="dash-mark-flicker">{body}</g>;
+  // A new state or kind eases in, rather than snapping from the last one.
+  body = (
+    <g key={`${state}-${kind ?? ''}`} className="dash-mark-settle">
+      {body}
+    </g>
+  );
+  if (moment) {
+    const flash = moment.kind === 'wince' ? '#ff4d4d' : '#22c55e';
+    body = (
+      <g key={moment.id} className={moment.kind === 'wince' ? 'dash-mark-shake' : 'dash-mark-hop'}>
+        {body}
+        <g clipPath={`url(#${id}-clip)`}>
+          <rect
+            className="dash-mark-flash"
+            x={2}
+            y={cy - 7}
+            width={20}
+            height={14}
+            fill={flash}
+            filter={`url(#${id}-blur)`}
+            opacity={0}
+          />
+        </g>
+      </g>
+    );
+  }
 
   return (
     <>
@@ -403,6 +451,36 @@ export function DashGlyph({
           <rect className="dash-mark-caret" x={16.8} y={16.2} width={1.3} height={4} rx={0.5} fill={solid} />
         </>
       )}
+      {kind === 'testing' && (
+        <g>
+          {[16.4, 18.6, 20.8].map((y, index) => (
+            <g key={y}>
+              <rect x={9.4} y={y - 0.55} width={index === 2 ? 5 : 8} height={1.1} rx={0.55} fill={solid} opacity={0.45} />
+              <path
+                className="dash-mark-tick"
+                style={{ animationDelay: `${index * MOTION_MS.moment}ms` }}
+                d={`M5.9 ${y}l.9.9 1.6-1.8`}
+                stroke={solid}
+                strokeWidth={1.1}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </g>
+          ))}
+        </g>
+      )}
+      {state === 'asking' && (
+        <g className="dash-mark-ask">
+          <circle cx={19.6} cy={4.2} r={3.1} fill={solid} />
+          <path
+            d="M18.5 3.3a1.15 1.15 0 1 1 1.6 1.05c-.35.17-.5.4-.5.8v.15"
+            stroke="#fff"
+            strokeWidth={0.9}
+            strokeLinecap="round"
+          />
+          <circle cx={19.6} cy={6.35} r={0.5} fill="#fff" />
+        </g>
+      )}
       {kind === 'thinking' && (
         <>
           <circle cx={18.8} cy={4.8} r={1} fill={solid} opacity={0.55} />
@@ -427,6 +505,7 @@ export function DashMark({
   state = 'idle',
   activity,
   runner,
+  moment,
   tone = 'current',
   size = 'icon',
   label,
@@ -441,6 +520,8 @@ export function DashMark({
    * Dash's capsule. The colour holds in every state, so `tone` is ignored.
    */
   runner?: DashRunner;
+  /** A one-off to play once on top of the state; a new id plays it again. */
+  moment?: DashMoment;
   /**
    * The brand ramp, for where Dash is the subject: the Ask Dash button, a
    * reply on its way. Left out, the core takes the colour of its place.
@@ -472,7 +553,7 @@ export function DashMark({
       {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': name })}
     >
       <svg width={sizing.px} height={sizing.px} viewBox="0 0 24 24" fill="none" overflow="visible" aria-hidden>
-        <DashGlyph id={id} state={state} activity={kind} tone={tone} runner={runner} />
+        <DashGlyph id={id} state={state} activity={kind} tone={tone} runner={runner} moment={moment} />
       </svg>
     </span>
   );
