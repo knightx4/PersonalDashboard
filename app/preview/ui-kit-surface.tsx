@@ -9,6 +9,7 @@ import { Sparkline } from '@/components/ui/sparkline';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { Tabs } from '@/components/ui/tabs';
+import { TimelineDemo } from './timeline-demo';
 import { ENTRIES } from './overhaul/entries';
 
 /**
@@ -124,6 +125,10 @@ export function UiKit() {
             <ModuleMark module={null} />
           </div>
         </div>
+      </Group>
+
+      <Group title="Timeline">
+        <TimelineDemo />
       </Group>
 
       <Group title="Loading">
