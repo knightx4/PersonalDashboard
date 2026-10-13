@@ -122,6 +122,8 @@ import {
   LearnQuizTakeSurface,
   LearnReadingSurface,
   LearnReadingTextSurface,
+  LearnReadingSummarySurface,
+  LearnReadingUnreadableSurface,
   LearnVideoSurface,
   LearnVideosSurface,
   LearnYoutubeChannelSurface,
@@ -142,6 +144,7 @@ import {
   LearnEssayInterviewSurface,
   LearnEssaySurface,
   LearnPlanFinishedSurface,
+  LearnSubjectConversationsSurface,
   LearnEssaysEmptySurface,
   LearnEssaysSurface,
 } from './essay-surfaces';
@@ -1702,6 +1705,7 @@ const readingRow = (
   finishedAt: null,
   readNowAt: null,
   givenText: null,
+  summary: null,
   conceptId: null,
   newsStoryId: null,
   source: null,
@@ -5995,6 +5999,20 @@ export const SURFACES: readonly Surface[] = [
     render: () => <LearnReadingTextSurface />,
   },
   {
+    id: 'learn-reading-summary',
+    label: 'Reading · With a summary from its link, cut short',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnReadingSummarySurface />,
+  },
+  {
+    id: 'learn-reading-unreadable',
+    label: 'Reading · Summarize could not read the link',
+    module: 'learn',
+    width: 'page',
+    render: () => <LearnReadingUnreadableSurface />,
+  },
+  {
     id: 'learn-piece',
     label: 'Plan · One piece, with its practice',
     module: 'learn',
@@ -6149,6 +6167,13 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'narrow',
     render: () => <LearnPlanFinishedSurface />,
+  },
+  {
+    id: 'learn-subject-conversations',
+    label: 'Subject · Conversations, each ready to write about',
+    module: 'learn',
+    width: 'narrow',
+    render: () => <LearnSubjectConversationsSurface />,
   },
 
   /* The News and Todo pages that had no picture (plan #1603). Fixtures in

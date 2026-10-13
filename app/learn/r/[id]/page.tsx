@@ -3,12 +3,21 @@ import { createLearnClient } from '@/lib/learn/auth/server';
 import { loadOtherReadingsOfSource, loadReading } from '@/lib/learn/tracks/load';
 import { loadReadingOrigins } from '@/lib/learn/tracks/news-origin';
 import { loadSubjects } from '@/lib/learn/graph/load';
+import { READING_TABS, type ReadingTab } from '@/lib/learn/tracks/reading-tabs';
+import { tabFrom } from '@/lib/tabs';
 import { ReadingView } from './reading-view';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ReadingPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ReadingPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string | string[] }>;
+}) {
   const { id } = await params;
+  const tab = tabFrom((await searchParams).tab, READING_TABS) as ReadingTab;
 
   const supabase = await createLearnClient();
   const reading = await loadReading(supabase, id);
@@ -30,5 +39,7 @@ export default async function ReadingPage({ params }: { params: Promise<{ id: st
     ? ((await loadReadingOrigins([reading.newsStoryId])).get(reading.newsStoryId) ?? null)
     : null;
 
-  return <ReadingView reading={reading} subjects={subjects} alreadyRead={alreadyRead} origin={origin} />;
+  return (
+    <ReadingView reading={reading} subjects={subjects} alreadyRead={alreadyRead} origin={origin} tab={tab} />
+  );
 }
