@@ -5,7 +5,9 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth/server';
 import { createLearnClient } from '@/lib/learn/auth/server';
-import { loadReading } from '@/lib/learn/tracks/load';
+import { loadReading, type ReadingSummary } from '@/lib/learn/tracks/load';
+import { getReadingText } from '@/lib/learn/locate/reading-text';
+import { summarizeReadingText } from '@/lib/learn/tracks/reading-summary-model';
 import { locatePassage } from '@/lib/learn/locate/locate';
 import { suggestSources } from '@/lib/learn/import/suggest';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
@@ -25,6 +27,7 @@ import {
   setReadingNote,
   setReadingText,
   setReadingStatus,
+  setReadingSummary,
 } from '@/lib/learn/tracks/save';
 import { cleanReadingText, MAX_READING_TEXT, PASTED_LABEL } from '@/lib/learn/tracks/reading-text';
 import { extractPdfText, ownsReadingPdfPath } from '@/lib/learn/tracks/reading-pdf';
@@ -352,6 +355,70 @@ export async function saveReadingText(
 
   revalidatePath(`/learn/r/${parsed.data.readingId}`);
   return {};
+}
+
+export type SummarizeResult =
+  | { ok: true; summary: ReadingSummary }
+  | {
+      ok: false;
+      error: string;
+      /** True when the reading's text could not be read: the page points to paste or upload. */
+      unreadable?: boolean;
+    };
+
+/**
+ * Summarize, and Redo (plan #1876.4): one model call over the reading's text,
+ * kept on the reading so it shows again on later visits.
+ *
+ * The text is what getReadingText returns: the text you gave the reading when
+ * there is some, its link otherwise. A link Dash cannot read costs nothing and
+ * comes back as the paste-or-upload message.
+ */
+// latency: pending
+export async function summarizeReading(readingId: string): Promise<SummarizeResult> {
+  const user = await requireUser();
+
+  const id = z.string().uuid().safeParse(readingId);
+  if (!id.success) return { ok: false, error: 'Could not work out which reading that was.' };
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { ok: false, error: 'Summarize needs the Anthropic key, which is not set on this deployment.' };
+
+  try {
+    const supabase = await createLearnClient();
+    const reading = await loadReading(supabase, id.data);
+    if (!reading) return { ok: false, error: 'That reading is not there any more.' };
+
+    const text = await getReadingText(supabase, {
+      id: reading.id,
+      url: reading.openUrl ?? reading.source?.canonicalUrl ?? null,
+    });
+    if (!text.ok) return { ok: false, error: text.message, unreadable: true };
+
+    const spend = collectSpend();
+    const result = await summarizeReadingText({
+      title: reading.subject,
+      why: reading.why,
+      text: text.text,
+      anthropicApiKey: apiKey,
+      onSpend: spend.sink,
+    });
+    await recordLearnSpend(user.id, 'summarize-reading', spend.reports);
+    if (!result.ok) {
+      console.error('[reading summary]', result.detail);
+      return { ok: false, error: 'Dash could not write a summary this time. Try again in a moment.' };
+    }
+
+    const saved = { text: result.text, from: text.from, label: text.label, truncated: text.truncated };
+    const found = await setReadingSummary(supabase, reading.id, saved);
+    if (!found) return { ok: false, error: 'That reading is not there any more.' };
+
+    revalidatePath(`/learn/r/${reading.id}`);
+    return { ok: true, summary: { ...saved, writtenAt: new Date().toISOString() } };
+  } catch (error) {
+    console.error('[reading summary]', error instanceof Error ? error.message : error);
+    return { ok: false, error: 'Dash could not write a summary this time. Try again in a moment.' };
+  }
 }
 
 /** Take the text off the reading; Dash goes back to the link. */

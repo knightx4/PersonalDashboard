@@ -217,6 +217,10 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The rules, up to 1,800 characters of essay around the selection and the
   // selection in; its rewording out.
   'rephrase-essay-selection': run(SONNET, 1_200, 250),
+  // The rules and a reading's text in, up to 200,000 characters (about
+  // 50,000 tokens); a typical article or chapter is a fifth of that. Two
+  // short paragraphs out.
+  'summarize-reading': run(SONNET, 12_000, 300),
   // The rules, the brief and an essay of about 1,200 words (read from the
   // cache after a run's first call), and one paragraph in; at most one
   // finding out. Per paragraph the check reads.

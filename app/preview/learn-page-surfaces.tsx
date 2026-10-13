@@ -8,6 +8,7 @@ import { OpeningView } from '@/app/learn/opening/[id]/opening-view';
 import { QuizView } from '@/app/learn/quiz/[id]/quiz-view';
 import { TakeQuizView } from '@/app/learn/quiz/[id]/take/take-view';
 import { ReadingView } from '@/app/learn/r/[id]/reading-view';
+import { SetTab } from './set-tab';
 import { PiecePageView } from '@/app/learn/s/[id]/p/[piece]/piece-page-view';
 import { ProbeView } from '@/app/learn/s/[id]/probe/probe-view';
 import { VideosView } from '@/app/learn/videos/videos-view';
@@ -479,6 +480,7 @@ const reading: ReadingDetail = {
   finishedAt: null,
   readNowAt: '2026-10-06T08:00:00Z',
   givenText: null,
+  summary: null,
   conceptId: elasticity.id,
   newsStoryId: null,
   source: {
@@ -510,15 +512,73 @@ export function LearnReadingSurface() {
 
 export function LearnReadingTextSurface() {
   return (
-    <ReadingView
-      reading={{
-        ...reading,
-        givenText: { label: 'Rodrik-2018-what-do-new-industrial-policies-teach-us-final-draft.pdf', addedAt: '2026-10-12T09:30:00Z' },
-      }}
-      subjects={[SUBJECT]}
-      alreadyRead={null}
-      origin={null}
-    />
+    <>
+      <SetTab tab="summary" />
+      <ReadingView
+        tab="summary"
+        reading={{
+          ...reading,
+          givenText: { label: 'Rodrik-2018-what-do-new-industrial-policies-teach-us-final-draft.pdf', addedAt: '2026-10-12T09:30:00Z' },
+          summary: {
+            text: 'Rodrik argues that the question for industrial policy is no longer whether governments should pick winners but how they should run the search for them. Old-style policy failed less because officials chose badly than because nothing made them stop backing a choice that was not working.\n\nHe draws on programmes in Chile, Korea and the United States to set out three conditions: firms and officials who talk often enough to learn what holds production back, support that is tied to results and withdrawn when they do not come, and an agency answerable for what it spends. He concludes that the case for industrial policy now rests on the quality of that process rather than on any list of favoured sectors.',
+            writtenAt: '2026-10-12T09:41:00Z',
+            from: 'given',
+            label: 'Rodrik-2018-what-do-new-industrial-policies-teach-us-final-draft.pdf',
+            truncated: false,
+          },
+        }}
+        subjects={[SUBJECT]}
+        alreadyRead={null}
+        origin={null}
+      />
+    </>
+  );
+}
+
+/** The Summary tab with a summary written from the link, of a reading Dash cut at 200,000 characters. */
+export function LearnReadingSummarySurface() {
+  return (
+    <>
+      <SetTab tab="summary" />
+      <ReadingView
+        tab="summary"
+        reading={{
+          ...reading,
+          summary: {
+            text: 'The chapter explains price elasticity of demand: how far the quantity people buy changes when the price changes, measured as the percentage change in quantity over the percentage change in price. Where that figure is below one, demand is inelastic, and a price rise brings in more money because buyers cut back by less than the price went up.\n\nIt works through petrol, cigarettes and restaurant meals to show that goods with few substitutes, or that take a small share of income, tend to be inelastic. It ends by turning the same measure on supply, and on who carries a tax: the side of the market that can least easily walk away pays most of it.',
+            writtenAt: '2026-10-13T08:15:00Z',
+            from: 'link',
+            label: 'https://openstax.org/books/principles-economics-3e/pages/5-1-price-elasticity-of-demand-and-price-elasticity-of-supply',
+            truncated: true,
+          },
+        }}
+        subjects={[SUBJECT]}
+        alreadyRead={null}
+        origin={null}
+      />
+    </>
+  );
+}
+
+/** The Summary tab after Summarize could not read a paywalled link. */
+export function LearnReadingUnreadableSurface() {
+  return (
+    <>
+      <SetTab tab="summary" />
+      <ReadingView
+        tab="summary"
+        reading={{
+          ...reading,
+          locatorConfidence: 'unverified',
+          source: { ...reading.source!, access: 'paywalled', canonicalUrl: 'https://www.jstor.org/stable/26409491' },
+          openUrl: 'https://www.jstor.org/stable/26409491',
+        }}
+        subjects={[SUBJECT]}
+        alreadyRead={null}
+        origin={null}
+        summaryFailure={{ error: 'Dash could not read this link; paste the text or upload a PDF.', unreadable: true }}
+      />
+    </>
   );
 }
 

@@ -51,6 +51,18 @@ export type TrackSummary = {
   matches: MatchedReading[];
 };
 
+/** A reading's saved summary and what it was written from. */
+export type ReadingSummary = {
+  text: string;
+  writtenAt: string;
+  /** 'given' is text you pasted or uploaded; 'link' is the page at the reading's link. */
+  from: 'given' | 'link';
+  /** That text's label ('Pasted', a file name) or the address it was read from. */
+  label: string;
+  /** True when the reading was longer than what Dash read. */
+  truncated: boolean;
+};
+
 export type ReadingRow = {
   id: string;
   position: number;
@@ -83,6 +95,8 @@ export type ReadingRow = {
   readNowAt: string | null;
   /** Text you gave this reading, when you did (plan #1876.1). The text itself is read by loadReadingText. */
   givenText: { label: string; addedAt: string } | null;
+  /** Dash's summary of this reading, from the Summarize button (plan #1876.4). */
+  summary: ReadingSummary | null;
   /**
    * The concept this row was queued to close, when it came from a gap in a
    * subject graph. Null for a reading you wrote down yourself, which is most
@@ -171,6 +185,11 @@ type ReadingRecord = {
   read_now_at: string | null;
   given_text_label: string | null;
   given_text_at: string | null;
+  summary: string | null;
+  summary_at: string | null;
+  summary_from: string | null;
+  summary_label: string | null;
+  summary_truncated: boolean | null;
   concept_id: string | null;
   news_story_id: string | null;
   sources: {
@@ -217,6 +236,16 @@ function toReading(row: ReadingRecord): ReadingRow {
       row.given_text_label && row.given_text_at
         ? { label: row.given_text_label, addedAt: row.given_text_at }
         : null,
+    summary:
+      row.summary && row.summary_at && (row.summary_from === 'given' || row.summary_from === 'link')
+        ? {
+            text: row.summary,
+            writtenAt: row.summary_at,
+            from: row.summary_from,
+            label: row.summary_label ?? '',
+            truncated: row.summary_truncated === true,
+          }
+        : null,
     conceptId: row.concept_id,
     newsStoryId: row.news_story_id ?? null,
     source: row.sources
@@ -240,6 +269,7 @@ const TRACK_COLUMNS = 'id, title, question, status, created_at, branched_from';
 const READING_COLUMNS =
   'id, position, status, title, why, note, locator_kind, locator_label, locator_basis, ' +
   'locator_confidence, open_url, text_anchor, page_from, page_to, t_start_seconds, t_end_seconds, finished_at, read_now_at, given_text_label, given_text_at, ' +
+  'summary, summary_at, summary_from, summary_label, summary_truncated, ' +
   'concept_id, news_story_id, ' +
   'sources!readings_source_fk ( id, title, author, kind, year, canonical_url, access, price_cents, page_count )';
 

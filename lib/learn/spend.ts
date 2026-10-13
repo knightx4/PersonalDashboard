@@ -342,6 +342,10 @@ export const LEARN_OPERATIONS = [
   // argues, then one embedding per claim to find the notes that already hold
   // it, under 'embed-note-match'.
   'name-essay-claims',
+  // Summarize on a reading's page (plan #1876.4): one Sonnet call over the
+  // reading's text, at most 200,000 characters, per press of Summarize or
+  // Redo. Nothing is spent when the link cannot be read.
+  'summarize-reading',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];
