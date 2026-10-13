@@ -32,6 +32,9 @@ function hue(module: AppModule): CSSProperties {
   return { '--hue-from': module.key.from, '--hue-to': module.key.to } as CSSProperties;
 }
 
+// The browser tab reads "Dash" alone, without the " · Dash" every other page adds.
+export const metadata = { title: { absolute: 'Dash' } };
+
 export default function HomePage() {
   const workspaces = modulesFor(false);
   const byId = (id: ModuleId) => workspaces.find((module) => module.id === id)!;

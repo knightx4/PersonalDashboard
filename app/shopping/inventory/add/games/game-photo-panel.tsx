@@ -152,7 +152,7 @@ export function GameShelfPhotoPanel() {
         <div className="flex flex-wrap gap-2">
           {previews.map((src, index) => (
             // eslint-disable-next-line @next/next/no-img-element -- local data URL
-            <img key={index} src={src} alt="" className="h-14 w-14 rounded object-cover" />
+            <img key={index} src={src} alt="" className="h-14 w-14 rounded-card object-cover" />
           ))}
         </div>
       )}

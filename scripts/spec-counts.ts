@@ -164,6 +164,99 @@ function rawMotionInCode(file: string, text: string): string[] {
   return out;
 }
 
+// -- docs/ONE-INTERFACE-SPEC.md ---------------------------------------------
+
+/**
+ * Rule R14: a radius class is one of the tokens the themes move
+ * (`rounded-pane`, `rounded-card`, `rounded-control`, `rounded-pill`) or
+ * `rounded-full`. One item per other radius class in a string under app/ or
+ * components/, as `file:line: the class`: the fixed sizes (`rounded`,
+ * `rounded-lg`, `rounded-[7px]`), with or without a side (`rounded-t-md`) or
+ * a variant (`sm:rounded-xl`). Aurora's rounder and Poster's square corners
+ * reach only the tokens, so a fixed size is a corner the theme skips.
+ *
+ * `rounded-none` is allowed: zero is zero in every theme, and it is how a
+ * component's own corner is taken off where an edge meets the page.
+ *
+ * Read from string literals with the comments blanked, and only those that
+ * read as a class list: prose about a class ("rounded-lg is a fixed 8px.")
+ * has a comma, a colon or a full stop followed by a space, or ends a
+ * sentence. app/preview/overhaul/now.tsx and entries.tsx are not read: they
+ * draw and describe the markup from before the component overhaul, on
+ * purpose, beside what replaced it.
+ */
+const RADIUS_CLASS =
+  /(?<![\w-])((?:[\w-]+:)*rounded(?:-(?:t|b|l|r|s|e|tl|tr|bl|br|ss|se|es|ee))?(?:-([\w.]+|\[[^\]\s]+\]))?)(?![\w-])/g;
+const ON_TOKEN = new Set(['pane', 'card', 'control', 'pill', 'full', 'none']);
+const STRING_LITERAL = /'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g;
+const PROSE = /[,.;:?!]\s|[.?!]['"`]?$/;
+const RADIUS_RECORDS = new Set(['app/preview/overhaul/now.tsx', 'app/preview/overhaul/entries.tsx']);
+
+function offTokenRadius(root: string): string[] {
+  const out: string[] = [];
+  for (const file of listFiles(root, ['app', 'components'], ['.ts', '.tsx'])) {
+    if (/\.test\.tsx?$/.test(file) || RADIUS_RECORDS.has(file)) continue;
+    const code = withoutComments(readFileSync(join(root, file), 'utf8'));
+    for (const literal of code.matchAll(STRING_LITERAL)) {
+      const body = literal[0].slice(1, -1);
+      if (PROSE.test(body)) continue;
+      for (const m of body.matchAll(RADIUS_CLASS)) {
+        if (m[2] !== undefined && ON_TOKEN.has(m[2])) continue;
+        out.push(`${file}:${lineAt(code, literal.index + 1 + m.index)}: ${m[1]}`);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Rule R15: Lucide icons are drawn at one stroke weight, ICON_STROKE (1.75,
+ * app/dev/ui/measurements.ts). One item per Lucide element under app/ or
+ * components/ drawn at any other weight, as `file:line: <Name strokeWidth>`.
+ * An element with no strokeWidth counts too: Lucide's own default is 2.
+ *
+ * A Lucide element is a tag named by an import from `lucide-react` (an alias
+ * included), or, in a file that imports from it, a tag named `Icon` or
+ * `…Icon` that the file does not define itself: the `Icon` a row is handed as
+ * a `LucideIcon`. The one weight allowed besides 1.75 is the phone dock's
+ * current tab, drawn at 2 on purpose so the tab you are on reads heavier.
+ * The overhaul records are not read, as for R14.
+ */
+const LUCIDE_IMPORT = /import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*['"]lucide-react['"]/g;
+const JSX_OPEN = /<([A-Z][\w.]*)(\s[^<>]*?)?\/?>/g;
+const STROKE_PROP = /\bstrokeWidth=(?:\{([^}]*)\}|"([^"]*)")/;
+const ON_STROKE = /^(?:1\.75|(?:\w+\.)?ICON_STROKE)$/;
+const DOCK_CURRENT = { file: 'components/shell/app-shell.tsx', value: 'on ? 2 : 1.75' };
+
+function iconStrokeOff(root: string): string[] {
+  const out: string[] = [];
+  for (const file of listFiles(root, ['app', 'components'], ['.tsx'])) {
+    if (/\.test\.tsx$/.test(file) || RADIUS_RECORDS.has(file)) continue;
+    const code = withoutComments(readFileSync(join(root, file), 'utf8'));
+    if (!code.includes('lucide-react')) continue;
+    const names = new Set<string>();
+    for (const m of code.matchAll(LUCIDE_IMPORT)) {
+      for (const part of m[1].split(',')) {
+        const name = part.trim().replace(/^type\s+/, '').split(/\s+as\s+/).pop()?.trim() ?? '';
+        if (/^[A-Z]/.test(name) && !/^Lucide(?:Icon|Props)$/.test(name)) names.add(name);
+      }
+    }
+    for (const m of code.matchAll(JSX_OPEN)) {
+      const name = m[1];
+      const handed =
+        /(?:^|\.)\w*Icon$/.test(name) &&
+        !new RegExp(`\\b(?:function|const)\\s+${name.replace('.', '\\.')}\\b`).test(code);
+      if (!names.has(name) && !handed) continue;
+      const prop = (m[2] ?? '').match(STROKE_PROP);
+      const value = prop ? (prop[1] ?? prop[2]).trim() : null;
+      if (value !== null && ON_STROKE.test(value)) continue;
+      if (file === DOCK_CURRENT.file && value === DOCK_CURRENT.value) continue;
+      out.push(`${file}:${lineAt(code, m.index)}: <${name} strokeWidth=${value ?? '(Lucide default 2)'}>`);
+    }
+  }
+  return out;
+}
+
 // -- docs/UI-QUALITY-SPEC.md ------------------------------------------------
 
 /** A page that returns nothing and calls `redirect`: a moved address, not a screen. */
@@ -254,6 +347,18 @@ export const SPEC_COUNTERS: readonly SpecCounter[] = [
         .filter((file) => !/\.test\.tsx?$/.test(file) && file !== 'lib/motion.ts')
         .flatMap((file) => rawMotionInCode(file, readFileSync(join(root, file), 'utf8'))),
     ],
+  },
+  {
+    name: 'off-token-radius',
+    counts: 'radius classes under app/ and components/ that the themes do not move',
+    target: 0,
+    measure: offTokenRadius,
+  },
+  {
+    name: 'icon-stroke-off',
+    counts: 'Lucide icons under app/ and components/ drawn at a stroke other than 1.75',
+    target: 0,
+    measure: iconStrokeOff,
   },
   {
     name: 'routes-without-surface',

@@ -151,7 +151,7 @@ function ToastItem({
       onMouseEnter={() => setHeld(true)}
       onMouseLeave={() => setHeld(false)}
       className={cn(
-        'popover-panel toast-in pointer-events-auto flex w-full sm:w-auto sm:max-w-md items-center gap-3 rounded-lg border border-border bg-raised py-2 pl-3 pr-1.5 font-mono text-micro text-ink shadow-lg',
+        'popover-panel toast-in pointer-events-auto flex w-full sm:w-auto sm:max-w-md items-center gap-3 rounded-card border border-border bg-raised py-2 pl-3 pr-1.5 font-mono text-micro text-ink shadow-lg',
         toast.state === 'failed' && 'text-danger',
       )}
     >
@@ -161,7 +161,7 @@ function ToastItem({
           type="button"
           onClick={undo}
           disabled={pending}
-          className="press inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-sans text-ui font-semibold text-accent hover:bg-accent-tint disabled:opacity-50"
+          className="press inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 font-sans text-ui font-semibold text-accent hover:bg-accent-tint disabled:opacity-50"
         >
           <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
           {pending ? 'Undoing…' : 'Undo'}
@@ -170,7 +170,7 @@ function ToastItem({
       <button
         type="button"
         onClick={() => dismiss(toast.id)}
-        className="press flex size-6 items-center justify-center rounded-md text-ink-muted hover:bg-sunken hover:text-ink"
+        className="press flex size-6 items-center justify-center rounded-control text-ink-muted hover:bg-sunken hover:text-ink"
       >
         <X className="size-3.5" strokeWidth={1.75} aria-hidden />
         <span className="sr-only">Dismiss</span>

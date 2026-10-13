@@ -163,7 +163,7 @@ function FeedbackCard({ row }: { row: FeedbackRow }) {
           items={statusItems}
           align="start"
           triggerClassName={cn(
-            'h-7 w-auto gap-1.5 px-1.5 text-small font-medium',
+            'h-(--control-h) w-auto gap-1.5 px-1.5 text-small font-medium',
             TONE_TEXT[HEALTH_TONE[health]],
           )}
           trigger={

@@ -227,7 +227,7 @@ export default async function CompaniesPage({
                                     website: company.website,
                                     careersUrl: company.careers_url,
                                   }}
-                                  className="size-5 rounded"
+                                  className="size-5 rounded-control"
                                   imageClassName="size-4"
                                 />
                                 <span className="min-w-0">

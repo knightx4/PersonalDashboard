@@ -84,8 +84,8 @@ export const RADII: readonly { name: string; px: number; where: string }[] = [
     px: 8,
     where: 'Buttons, inputs, chips, menu rows, the hover ground on a list row.',
   },
-  { name: 'rounded', px: 4, where: 'A keycap, and the focus outline.' },
-  { name: 'rounded-full', px: 0, where: 'Badges, counts, avatars, the sigil.' },
+  { name: 'rounded-pill', px: 0, where: 'Chips, toggle chips and badges. Square in Poster, like everything else.' },
+  { name: 'rounded-full', px: 0, where: 'Counts, avatars, dots and the sigil: round in every theme.' },
 ];
 
 /** The steps of the 4px grid that are in use, and what each one is for. */

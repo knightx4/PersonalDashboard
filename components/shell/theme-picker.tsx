@@ -527,7 +527,7 @@ function Swatch({
       // one thing on the screen that cannot be a token.
       style={style}
     >
-      {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={3} aria-hidden />}
+      {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={1.75} aria-hidden />}
       <span className="sr-only">{label}</span>
     </button>
   );
@@ -564,7 +564,7 @@ function PaletteSwatch({
         boxShadow: `2px 2px 0 ${palette.ink}`,
       }}
     >
-      {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={3} aria-hidden />}
+      {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={1.75} aria-hidden />}
       <span className="sr-only">{label}</span>
     </button>
   );
@@ -627,7 +627,7 @@ function SkySwatch({
       // screen that cannot be a token.
       style={style}
     >
-      {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={3} aria-hidden />}
+      {chosen && <Check className="size-3.5 text-surface mix-blend-difference" strokeWidth={1.75} aria-hidden />}
       <span className="sr-only">{label}</span>
     </button>
   );

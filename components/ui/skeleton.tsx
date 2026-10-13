@@ -27,7 +27,7 @@ export function PageHeaderSkeleton({ action = true }: { action?: boolean }) {
         <Skeleton className="h-5 w-40" />
         <Skeleton className="h-3.5 w-64" />
       </div>
-      {action && <Skeleton className="h-8 w-28 rounded-lg" />}
+      {action && <Skeleton className="h-8 w-28 rounded-control" />}
     </div>
   );
 }
@@ -38,7 +38,7 @@ export function RowsSkeleton({ rows = 6, thumb = false }: { rows?: number; thumb
     <div className={cn(cardVariants(), 'divide-y divide-border overflow-hidden')}>
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} className="flex items-center gap-3 px-3 py-3">
-          {thumb && <Skeleton className="size-11 shrink-0 rounded-lg" />}
+          {thumb && <Skeleton className="size-11 shrink-0 rounded-card" />}
           <div className="min-w-0 flex-1 space-y-2">
             <Skeleton className="h-3.5" style={{ width: `${58 - index * 4}%` }} />
             <Skeleton className="h-3 w-1/3" />
@@ -57,7 +57,7 @@ export function RailSkeleton() {
         <div key={group} className="space-y-2">
           <Skeleton className="h-2.5 w-20" />
           {Array.from({ length: 4 }).map((_, item) => (
-            <Skeleton key={item} className="h-7 rounded-lg" />
+            <Skeleton key={item} className="h-7 rounded-control" />
           ))}
         </div>
       ))}

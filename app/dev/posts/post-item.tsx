@@ -242,9 +242,9 @@ function SuggestedActions({ card }: { card: PostCard }) {
         onClick={() => copy('all', threadCopyText(card.post.body))}
       >
         {copied === 'all' ? (
-          <Check className="size-3.5" aria-hidden />
+          <Check strokeWidth={1.75} className="size-3.5" aria-hidden />
         ) : (
-          <Copy className="size-3.5" aria-hidden />
+          <Copy strokeWidth={1.75} className="size-3.5" aria-hidden />
         )}
         {copied === 'all' ? 'Copied' : thread ? 'Copy thread' : 'Copy'}
       </Button>
@@ -382,7 +382,7 @@ function PostImage({
           download
           className={buttonVariants({ variant: 'ghost', size: 'sm' })}
         >
-          <Download className="size-3.5" aria-hidden />
+          <Download strokeWidth={1.75} className="size-3.5" aria-hidden />
           Save image
         </a>
         {editable && (
@@ -466,9 +466,9 @@ export function PostItem({ card }: { card: PostCard }) {
                         aria-label={`Copy post ${index + 1}`}
                       >
                         {copied === String(index) ? (
-                          <Check className="size-3.5" aria-hidden />
+                          <Check strokeWidth={1.75} className="size-3.5" aria-hidden />
                         ) : (
-                          <Copy className="size-3.5" aria-hidden />
+                          <Copy strokeWidth={1.75} className="size-3.5" aria-hidden />
                         )}
                         {copied === String(index) ? 'Copied' : 'Copy'}
                       </Button>
@@ -495,7 +495,7 @@ export function PostItem({ card }: { card: PostCard }) {
       {editable && editing === null && post.body.length < MAX_THREAD_POSTS && (
         <div>
           <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(post.body.length)}>
-            <Plus className="size-3.5" aria-hidden />
+            <Plus strokeWidth={1.75} className="size-3.5" aria-hidden />
             Add a post to the thread
           </Button>
         </div>

@@ -68,6 +68,7 @@ export function LinkPicker({
         // The chip is the trigger as well, so picking something does not take
         // the control away from a keyboard: focus returns to a button that is
         // still there, and changing your mind is the same click as making it.
+        // ui-ok: fixed-control-height -- a chip, drawn at the h-7 every Chip is
         <span className="inline-flex h-7 max-w-xs items-center gap-1 rounded-pill bg-sunken pl-2.5 pr-0.5 text-small text-ink">
           <button
             ref={triggerRef}

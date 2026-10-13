@@ -40,7 +40,7 @@ export function TakeawayActions({ id, status }: { id: string; status: 'open' | '
         <form action={craft}>
           <input type="hidden" name="id" value={id} />
           <Button type="submit" size="sm" variant="secondary" pending={crafting} disabled={setting}>
-            <Sparkles className="size-3.5" aria-hidden />
+            <Sparkles strokeWidth={1.75} className="size-3.5" aria-hidden />
             {crafting ? 'Sending…' : 'Craft into a plan'}
           </Button>
         </form>

@@ -291,7 +291,7 @@ const RULES: Rule[] = [
      * shape a control is written in. Everything with a prefix is a different
      * property.
      */
-    find: (line) => [...line.matchAll(/(?<![\w-])(h-(?:9|10|11))\b/g)].map((m) => m[1]!),
+    find: (line) => [...line.matchAll(/(?<![\w-])(h-(?:7|8|9|10|11|12))\b/g)].map((m) => m[1]!),
   },
   {
     id: 'scoped-token-in-var',

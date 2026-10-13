@@ -133,7 +133,7 @@ function CalendarRow({ calendar }: { calendar: CalendarChoice }) {
         <span className="flex min-w-0 items-center gap-2">
           <Check
             className={cn('size-4 shrink-0', calendar.shown ? 'text-accent' : 'opacity-0')}
-            strokeWidth={2.5}
+            strokeWidth={1.75}
             aria-hidden
           />
           <span className="truncate">{calendar.name}</span>

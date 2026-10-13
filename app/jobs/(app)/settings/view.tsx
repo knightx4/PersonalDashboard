@@ -570,6 +570,7 @@ function BookmarkletSection({ appOrigin }: { appOrigin: string }) {
             Capture questions
           </a>
         ) : (
+          // ui-ok: fixed-control-height -- stands in for a line of link text, not a control
           <span className="skeleton inline-block h-7 w-40" />
         )}
         {href && (

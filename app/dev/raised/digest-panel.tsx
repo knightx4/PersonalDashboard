@@ -155,7 +155,7 @@ function Night({ night }: { night: DigestNight }) {
     <section aria-label="The overnight runner" className="space-y-1.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="inline-flex items-center gap-1.5 text-body font-semibold text-ink">
-          <Moon className="size-4 text-ink-muted" aria-hidden />
+          <Moon strokeWidth={1.75} className="size-4 text-ink-muted" aria-hidden />
           Overnight
         </span>
         <OvernightState standing={night.standing} />

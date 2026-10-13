@@ -33,6 +33,7 @@ export function PoweredByBgg() {
             <img
               src="/powered-by-bgg.png"
               alt="Powered by BGG"
+              // ui-ok: fixed-control-height -- the badge's size, not a control
               className="h-8 w-auto"
               onError={() => setLogoFailed(true)}
             />

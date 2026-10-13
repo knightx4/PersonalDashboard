@@ -14,7 +14,10 @@ import { PAGE_ROUTES } from '@/lib/usage/pages';
 /** 'load' is a full document request; 'navigation' is a client-side move. */
 export type PageViewVia = 'load' | 'navigation';
 
-export type PageView = { route: string; workspace: ModuleId | null; via: PageViewVia };
+/** The kind of device a page was opened on, read from the user agent. */
+export type PageViewDevice = 'phone' | 'laptop';
+
+export type PageView = { route: string; workspace: ModuleId | null; via: PageViewVia; device: PageViewDevice };
 
 /** The parts of a request the rules read. */
 export type PageRequest = {
@@ -110,11 +113,21 @@ export function pageViewVia(request: PageRequest): PageViewVia | null {
   return (header('accept') ?? '').includes('text/html') ? 'load' : null;
 }
 
+/**
+ * Phone for iPhone, iPad and Android, laptop for everything else, including a
+ * request with no user agent (plan #1919.6). An Android tablet counts as a
+ * phone, as an iPad does: the question is whether the person used a touch
+ * screen they hold, not its size.
+ */
+export function deviceFor(userAgent: string | null): PageViewDevice {
+  return /iPhone|iPad|iPod|Android/i.test(userAgent ?? '') ? 'phone' : 'laptop';
+}
+
 /** What to record for a request, or null when it did not open a page. */
 export function pageView(request: PageRequest): PageView | null {
   const via = pageViewVia(request);
   if (!via) return null;
   const route = routePattern(request.pathname);
   if (!route) return null;
-  return { route, workspace: moduleForPath(route), via };
+  return { route, workspace: moduleForPath(route), via, device: deviceFor(request.headers.get('user-agent')) };
 }

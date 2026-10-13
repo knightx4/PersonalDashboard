@@ -453,7 +453,7 @@ function Interviewers({
         autoFocus
         placeholder="Their name"
         aria-label="Name of the person to add"
-        className="h-7 w-48 py-0 text-small"
+        className="w-48 py-0 text-small"
         onChange={(event) => setNewName(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && newName?.trim()) {
@@ -527,7 +527,7 @@ function Interviewers({
             aria-label="Add an interviewer"
             defaultValue=""
             disabled={pending}
-            className="h-7 w-56 py-0 text-small"
+            className="w-56 py-0 text-small"
             onChange={(event) => {
               if (event.target.value === NEW_CONTACT) {
                 setNewName('');

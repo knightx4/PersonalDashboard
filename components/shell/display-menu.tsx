@@ -218,7 +218,7 @@ function Views({ menu }: { menu: ListDisplayMenu }) {
           maxLength={60}
           placeholder="Save this as…"
           aria-label="Name for this view"
-          className="h-7 text-small"
+          className="text-small"
         />
         <Button type="submit" variant="ghost" size="xs" className="shrink-0">
           Save
@@ -250,7 +250,7 @@ function ViewRow({ view, list }: { view: DisplayView; list: string }) {
           required
           maxLength={60}
           aria-label={`Rename ${view.name}`}
-          className="h-7 text-small"
+          className="text-small"
           autoFocus
         />
         <Button type="submit" variant="ghost" size="xs" className="shrink-0">
@@ -273,7 +273,7 @@ function ViewRow({ view, list }: { view: DisplayView; list: string }) {
       >
         <Check
           className={cn('size-3.5 shrink-0', view.inForce ? 'text-accent' : 'opacity-0')}
-          strokeWidth={2.5}
+          strokeWidth={1.75}
           aria-hidden
         />
         <span className="truncate">{view.name}</span>

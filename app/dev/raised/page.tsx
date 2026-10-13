@@ -36,7 +36,7 @@ import { loadStartedGoalRuns } from '@/lib/goals/runs-store';
 import { goalsStatus } from '@/lib/goals/runner-status';
 import { loadGoalsNight } from '@/inngest/goals/overnight';
 
-export const metadata = { title: 'Dash' };
+export const metadata = { title: 'Home' };
 
 /** How far back the pictures under the strip reach. */
 const SHIPPED_WINDOW_MS = 48 * 60 * 60 * 1000;
