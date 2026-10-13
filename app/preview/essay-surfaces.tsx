@@ -423,6 +423,28 @@ export function LearnEssayFinishSurface() {
   );
 }
 
+/**
+ * A published essay (plan #1863.11): on the site since its first publish,
+ * published again a day later, with the longest web address a slug gets.
+ */
+export function LearnEssayPublishSurface() {
+  return (
+    <WithCosts>
+      <EssayView
+        essay={{
+          ...essay,
+          finishedAt: '2026-10-12T15:00:00Z',
+          unsaved: false,
+          publishedAt: '2026-10-13T09:30:00Z',
+          firstPublishedAt: '2026-10-12T15:10:00Z',
+          slug: 'money-holds-value-only-because-can-become-every-other-good',
+        }}
+        study={STUDY_WAITING}
+      />
+    </WithCosts>
+  );
+}
+
 /** Cmd-S after the note was edited in Obsidian (plan #1866): the save stopped and offers a reload. */
 export function LearnEssayChangedSurface() {
   return (

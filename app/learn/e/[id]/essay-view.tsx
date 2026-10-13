@@ -32,12 +32,14 @@ import type { Suggestion } from '@/lib/learn/essays/authorship-editor';
 import type { EssayVaultFailure } from '@/lib/learn/essays/vault';
 import {
   finishEssay,
+  publishEssay,
   rephraseEssaySelection,
   reloadEssayFromVault,
   saveEssayDraft,
   saveEssayToVaultAction,
   setEssayWordTarget,
   type FinishResult,
+  type PublishResult,
   type TargetState,
   type VaultSaveResult,
 } from './actions';
@@ -46,6 +48,7 @@ import { EssayNotesCard, noteRangesIn, useEssayNotes } from './essay-notes';
 import { EssayStudyCard, useEssayStudy, type StudyState } from './essay-study';
 import { EssayResearchCard, useEssayResearch } from './essay-research';
 import { EssayFinishCard, type FinishView } from './essay-finish';
+import { EssayPublishCard, type PublishView } from './essay-publish';
 import { NO_RESEARCH, type EssayResearchRuns } from '@/lib/learn/essays/research';
 
 /** How long after the last keystroke the draft is saved. */
@@ -87,6 +90,16 @@ function saveLine(draft: SaveState, vault: VaultState): string {
 function sentence(text: string): string {
   return /[.!?]$/.test(text) ? text : `${text}.`;
 }
+
+/** What Finish and Publish both answer: the vault save they made, or why they stopped. */
+type VaultPress =
+  | { ok: true; savedAt: string; path: string; blobSha: string }
+  | {
+      ok: false;
+      error: string;
+      saved?: { savedAt: string; path: string; blobSha: string };
+      reason?: EssayVaultFailure;
+    };
 
 /** The draft as the saves send it: the text and who wrote which runs of it. */
 type Draft = { text: string; marks: AuthorMark[] };
@@ -213,28 +226,33 @@ function useEssaySave(
   }, [draftTask, essay.id]);
 
   /**
-   * Finish (plan #1873): the vault save, with the note's stage raised, and
-   * then the claims. It goes through the same queue as the other saves and
-   * keeps the same blob SHA, so what it wrote is what the next save starts from.
+   * Finish (plan #1873) and Publish (plan #1863.11): each a vault save with
+   * more after it. They go through the same queue as the other saves and
+   * keep the same blob SHA, so what they wrote is what the next save starts from.
    */
-  const finish = useCallback(
-    () =>
-      new Promise<FinishResult>((resolve) => {
+  const vaultPress = useCallback(
+    <R extends FinishResult | PublishResult>(
+      call: (body: Draft) => Promise<R>,
+      empty: string,
+      dropped: string,
+    ) =>
+      new Promise<R | { ok: false; error: string }>((resolve) => {
         void enqueue(async () => {
           const body = latest.current;
           const key = draftKey(body);
           if (essayNoteBody(body.text) === '') {
-            resolve({ ok: false, error: 'Write something first; there is nothing to finish yet.' });
+            resolve({ ok: false, error: empty });
             return;
           }
           setVault({ kind: 'saving' });
-          let result: FinishResult;
+          let result: R | { ok: false; error: string };
           try {
-            result = await finishEssay(essay.id, body.text, draftMarksJson(body.marks), blobSha.current, browserTimeZone());
+            result = await call(body);
           } catch {
-            result = { ok: false, error: 'The connection dropped, so the essay is not finished yet.' };
+            result = { ok: false, error: dropped };
           }
-          const kept = result.ok ? result : result.saved;
+          const outcome: VaultPress = result;
+          const kept = outcome.ok ? outcome : outcome.saved;
           if (kept) {
             blobSha.current = kept.blobSha;
             inVault.current = key;
@@ -242,9 +260,9 @@ function useEssaySave(
             setPath(kept.path);
             setDraft({ kind: 'saved', at: kept.savedAt });
             setVault({ kind: 'saved', at: kept.savedAt });
-          } else if (!result.ok && result.reason) {
-            if (result.reason === 'changed') halted.current = true;
-            setVault({ kind: 'failed', reason: result.reason, error: result.error });
+          } else if (!outcome.ok && outcome.reason) {
+            if (outcome.reason === 'changed') halted.current = true;
+            setVault({ kind: 'failed', reason: outcome.reason, error: outcome.error });
           } else {
             setVault({ kind: 'idle' });
           }
@@ -252,7 +270,27 @@ function useEssaySave(
           await draftTask();
         });
       }),
-    [draftTask, enqueue, essay.id],
+    [draftTask, enqueue],
+  );
+
+  const finish = useCallback(
+    () =>
+      vaultPress<FinishResult>(
+        (body) => finishEssay(essay.id, body.text, draftMarksJson(body.marks), blobSha.current, browserTimeZone()),
+        'Write something first; there is nothing to finish yet.',
+        'The connection dropped, so the essay is not finished yet.',
+      ),
+    [essay.id, vaultPress],
+  );
+
+  const publish = useCallback(
+    () =>
+      vaultPress<PublishResult>(
+        (body) => publishEssay(essay.id, body.text, draftMarksJson(body.marks), blobSha.current, browserTimeZone()),
+        'Write something first; there is nothing to publish yet.',
+        'The connection dropped, so the essay is not published yet.',
+      ),
+    [essay.id, vaultPress],
   );
 
   /** Cmd-S and the button are `asked`; leaving and the idle timer are not, and stop once the note has changed. */
@@ -340,7 +378,7 @@ function useEssaySave(
     };
   }, [flush, saveToVault]);
 
-  return { draft, vault, path, reloadError, change, saveToVault, reload, finish };
+  return { draft, vault, path, reloadError, change, saveToVault, reload, finish, publish };
 }
 
 /**
@@ -454,7 +492,8 @@ function TargetForm({ id, target, onSet }: { id: string; target: number | null; 
  * above the draft; once it is done or skipped the brief sits folded there
  * instead, and every answer can be edited in place.
  *
- * The rail holds the length and the vault note (plan #1866) and Finish (plan #1873); later steps add
+ * The rail holds the length and the vault note (plan #1866), Finish (plan #1873) and Publish
+ * (plan #1863.11, essay-publish.tsx); later steps add
  * the margin notes and what you studied. On a phone it follows the text, so
  * the vault note and its save are there too; focus mode is laptop only.
  *
@@ -496,6 +535,7 @@ export function EssayView({
   researchRunning = null,
   finishView,
   finishStage,
+  publishView,
 }: {
   essay: Essay;
   initialVault?: VaultState;
@@ -517,6 +557,8 @@ export function EssayView({
   finishView?: FinishView;
   /** The stage the gallery's finished essay is at. */
   finishStage?: EssayStage;
+  /** The Publish card drawn in this state, for the gallery (plan #1863.11). */
+  publishView?: PublishView;
 }) {
   const [doc, setDoc] = useState({ text: essay.draftBody, marks: essay.marks, version: 0 });
   const [words, setWords] = useState(() => countWords(essay.draftBody));
@@ -544,6 +586,8 @@ export function EssayView({
   const initialNotes = useMemo(() => noteRangesIn(doc.text, placedNotes), [doc, placedNotes]);
   const [title, setTitle] = useState(() => essayTitle(essay.draftBody, essay.path));
   const [target, setTarget] = useState(essay.wordTarget);
+  // Finish in this visit makes Publish available without a reload.
+  const [finishedAt, setFinishedAt] = useState(essay.finishedAt);
   const [typing, setTyping] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [brief, setBrief] = useState(essay.brief);
@@ -565,7 +609,7 @@ export function EssayView({
     },
     [essay.path],
   );
-  const { draft, vault, path, reloadError, change, saveToVault, reload, finish } = useEssaySave(
+  const { draft, vault, path, reloadError, change, saveToVault, reload, finish, publish } = useEssaySave(
     essay,
     initialVault,
     onReloaded,
@@ -797,8 +841,19 @@ export function EssayView({
         inEvidenceBank={essay.inEvidenceBank}
         canFinish={words > 0 && vault.kind !== 'saving'}
         onFinish={finish}
+        onFinished={setFinishedAt}
         initial={finishView}
         stage={finishStage}
+      />
+      <EssayPublishCard
+        essayId={essay.id}
+        finished={finishedAt !== null}
+        publishedAt={essay.publishedAt}
+        firstPublishedAt={essay.firstPublishedAt ?? null}
+        slug={essay.slug ?? null}
+        canPublish={words > 0 && vault.kind !== 'saving'}
+        onPublish={publish}
+        initial={publishView}
       />
     </div>
   );

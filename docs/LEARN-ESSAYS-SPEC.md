@@ -324,6 +324,10 @@ once an essay. A stage a note already has beyond seedling is kept.
   essay. Private note titles do not leak.
 - The site reads published essays through two functions open to the anonymous
   key: one lists them, one returns one by slug. Neither can read a draft.
+  They are `public.published_essays()` and `public.published_essay(p_slug)`,
+  and they return only the owner's essays. A link between published essays
+  points at `/writing/<slug>`. When an essay is unpublished, the links other
+  essays make to it become plain text.
 - The site gets a Writing page listing essays newest first, with title,
   description, stage and date, and a page per essay showing its stage,
   confidence and the dates it was published and last updated.

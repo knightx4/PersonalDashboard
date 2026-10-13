@@ -65,6 +65,10 @@ export type Essay = {
   /** The length aimed at, 200 to 2,000 words, or null for none. */
   wordTarget: number | null;
   publishedAt: string | null;
+  /** When it was first published, kept through Unpublish (plan #1863.11). */
+  firstPublishedAt?: string | null;
+  /** The essay's web address on the site, set at the first vault save. */
+  slug?: string | null;
   /** When Finish last ran (plan #1873); null for a draft. */
   finishedAt: string | null;
   /** True once the essay is in the Jobs evidence bank. */
@@ -85,7 +89,7 @@ export type EssaySummary = {
 
 /** The columns both reads select. */
 export const ESSAY_COLUMNS =
-  'id, path, note_id, blob_sha, draft_body, draft_authorship, unsaved, brief, word_target, published_at, finished_at, evidence_item_id, updated_at';
+  'id, path, note_id, blob_sha, draft_body, draft_authorship, unsaved, brief, word_target, published_at, first_published_at, slug, finished_at, evidence_item_id, updated_at';
 
 export type EssayRow = {
   id: string;
@@ -98,6 +102,8 @@ export type EssayRow = {
   brief: unknown;
   word_target: number | null;
   published_at: string | null;
+  first_published_at?: string | null;
+  slug?: string | null;
   finished_at?: string | null;
   evidence_item_id?: string | null;
   updated_at: string;
@@ -169,6 +175,8 @@ export function toEssay(row: EssayRow): Essay {
     interview: readInterview(row.brief),
     wordTarget: row.word_target,
     publishedAt: row.published_at,
+    firstPublishedAt: row.first_published_at ?? null,
+    slug: row.slug ?? null,
     finishedAt: row.finished_at ?? null,
     inEvidenceBank: Boolean(row.evidence_item_id),
     updatedAt: row.updated_at,
