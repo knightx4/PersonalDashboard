@@ -45,6 +45,19 @@ export const popoverSurface =
   'popover-panel rise-in rounded-card border border-border bg-raised shadow-lg';
 
 /**
+ * One row of a menu inside a panel with `padding="menu"`: inset from the
+ * panel's edge, the control's radius, a quiet hover. ActionMenu and every
+ * hand-built menu draw their rows with this, so two menus on one page have
+ * the same rows.
+ */
+export function menuItemClass(destructive = false): string {
+  return (
+    'press flex w-full items-center gap-2 rounded-control px-2.5 py-1.5 text-left text-ui transition-colors duration-quick ' +
+    (destructive ? 'text-danger hover:bg-danger-tint' : 'text-ink hover:bg-sunken')
+  );
+}
+
+/**
  * The scrim: the ground an overlay is read against, and the button that
  * closes it. Six overlays drew their own and three spellings had appeared --
  * bg-black/40 with a 1px blur, bg-black/40 with none, and bg-ink/25 -- so

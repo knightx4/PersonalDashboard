@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { BookOpen, CornerDownRight, Plus } from 'lucide-react';
 import { ListPage } from '@/components/patterns/list-detail';
 import { PageHeader } from '@/components/shell/page-header';
@@ -67,7 +67,7 @@ export function ListsView({ rows, search }: { rows: NestedTrack[]; search: strin
       title="Reading lists"
       actions={
         <Link href="/learn/new" className={buttonVariants({ variant: 'primary', size: 'sm' })}>
-          <Plus className="size-4" strokeWidth={2} aria-hidden />
+          <Plus className="size-4" strokeWidth={1.75} aria-hidden />
           New reading list
         </Link>
       }
@@ -124,7 +124,7 @@ export function ListsView({ rows, search }: { rows: NestedTrack[]; search: strin
                   {depth > 0 && (
                     <CornerDownRight
                       className="mr-1.5 inline size-3.5 shrink-0 align-[-0.15em] text-ink-muted"
-                      strokeWidth={2}
+                      strokeWidth={1.75}
                       aria-hidden
                     />
                   )}
@@ -151,7 +151,7 @@ export function ListsView({ rows, search }: { rows: NestedTrack[]; search: strin
                       href={`/learn/r/${reading.id}`}
                       className="flex items-center gap-1.5 py-1 pl-5 pr-4 text-ui text-ink-muted transition-colors duration-quick hover:text-ink"
                     >
-                      <CornerDownRight className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
+                      <CornerDownRight className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
                       <span className="truncate">{reading.subject}</span>
                     </Link>
                   </li>

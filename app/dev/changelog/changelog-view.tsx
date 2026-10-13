@@ -1,9 +1,10 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ChevronRight, History } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
 import { Card } from '@/components/ui/card';
+import { toggleChipClass } from '@/components/ui/chip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ModuleMark } from '@/components/ui/module-mark';
 import {
@@ -93,12 +94,7 @@ export function ChangelogView({
                 key={candidate}
                 href={href({ group: candidate })}
                 aria-current={candidate === grouping ? 'page' : undefined}
-                className={cn(
-                  'press press-area rounded-full px-2.5 py-1 text-small font-medium transition-colors',
-                  candidate === grouping
-                    ? 'bg-accent text-surface'
-                    : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-                )}
+                className={toggleChipClass(candidate === grouping)}
               >
                 {CHANGELOG_GROUPING_LABEL[candidate]}
               </Link>
@@ -309,7 +305,7 @@ function IssueSummary({
  * moving it.
  */
 const ROW =
-  'row-pad -mx-2 flex cursor-pointer list-none items-start gap-2 rounded-lg px-2 hover:bg-sunken [&::-webkit-details-marker]:hidden';
+  'row-pad -mx-2 flex cursor-pointer list-none items-start gap-2 rounded-control px-2 hover:bg-sunken [&::-webkit-details-marker]:hidden';
 
 /**
  * The slots in front of a row's title, the same three in the same order on

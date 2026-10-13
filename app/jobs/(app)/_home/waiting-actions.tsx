@@ -1,9 +1,10 @@
 'use client';
 
 import { useActionState, useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ListPlus, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/cn';
 import { FieldError, Input } from '@/components/ui/field';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { SNOOZE_DAYS, type WaitingOnYou } from '@/lib/jobs/today/load';
@@ -85,14 +86,14 @@ export function WaitingActions({ row }: { row: WaitingOnYou }) {
           <span className="px-2 text-small text-ink-muted">Added to your to-dos</span>
         ) : (
           <Button type="button" variant="ghost" size="sm" onClick={() => setAdding((open) => !open)}>
-            <ListPlus className="size-3.5" strokeWidth={2} aria-hidden />
+            <ListPlus className="size-3.5" strokeWidth={1.75} aria-hidden />
             {adding ? 'Cancel' : 'Add a to-do'}
           </Button>
         )}
         {prep.href && !preparing ? (
           <Link
             href={prep.href}
-            className="press-area px-2 text-small text-accent underline underline-offset-2"
+            className={cn(linkVariants(), 'press-area px-2 text-small')}
           >
             {prep.error ? 'See what went wrong' : 'Read Dash’s help'}
           </Link>
@@ -100,7 +101,7 @@ export function WaitingActions({ row }: { row: WaitingOnYou }) {
           <span className="flex items-center gap-1">
             <form action={prepare}>
               <Button type="submit" variant="ghost" size="sm" pending={preparing}>
-                <Sparkles className="size-3.5" strokeWidth={2} aria-hidden />
+                <Sparkles className="size-3.5" strokeWidth={1.75} aria-hidden />
                 {preparing ? 'Dash is reading it…' : 'Prepare with Dash'}
               </Button>
             </form>

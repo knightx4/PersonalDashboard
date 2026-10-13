@@ -66,14 +66,14 @@ export function ProbeOptions({
           {answered && index === answered.correctIndex && (
             <Tooltip label="The correct answer" align="end" className="absolute right-3 top-3.5">
               <span tabIndex={0} role="img" aria-label="The correct answer" className="inline-flex">
-                <Check className="size-4 text-ink-muted" strokeWidth={2} aria-hidden />
+                <Check className="size-4 text-ink-muted" strokeWidth={1.75} aria-hidden />
               </span>
             </Tooltip>
           )}
           {answered && index === answered.chosenIndex && index !== answered.correctIndex && (
             <Tooltip label="What you picked" align="end" className="absolute right-3 top-3.5">
               <span tabIndex={0} role="img" aria-label="What you picked" className="inline-flex">
-                <X className="size-4 text-danger" strokeWidth={2} aria-hidden />
+                <X className="size-4 text-danger" strokeWidth={1.75} aria-hidden />
               </span>
             </Tooltip>
           )}

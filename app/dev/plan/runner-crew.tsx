@@ -1,8 +1,13 @@
+'use client';
+
 import { DashMark, type DashLook } from '@/components/ui/dash-mark';
 import type { FeatureProgress } from '@/lib/digest/night';
 import { Disclosure } from '@/components/ui/disclosure';
 import { Meter } from '@/components/ui/meter';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { SLOT_ASLEEP_DEFAULT, type RunnerSlot, type SlotId } from '@/lib/plan/overnight-slots';
+import { useNewestRunLines } from '@/components/runs/use-newest-run-lines';
+import { RUN_ACTIVITY_LABEL, type RunActivity } from '@/lib/core/run-activities';
 
 /**
  * The runner's four Dashes, one for each thing it can run at once (plan
@@ -14,8 +19,8 @@ import { SLOT_ASLEEP_DEFAULT, type RunnerSlot, type SlotId } from '@/lib/plan/ov
  *   idle     the runner is off or held. "Not running", or "Held".
  *   working  a session is going in that slot: the feature it is on, the
  *            workspace and how long, and a meter of the feature's steps done.
- *   asleep   the runner is on and the slot has nothing ready: the tick's
- *            reason.
+ *   asleep   the runner is on and nothing is going in the slot: a line read
+ *            from the tick's reason (`asleepLine`), the reason folded under.
  *
  * Which session takes which slot is `runnerSlots`' call; this only draws it.
  */
@@ -34,10 +39,13 @@ function SlotText({
   slot,
   held,
   progress,
+  newest,
 }: {
   slot: RunnerSlot;
   held: boolean;
   progress: FeatureProgress | null;
+  /** The run's newest line, live, or null before it has written one. */
+  newest: RunActivity | null;
 }) {
   if (slot.state === 'working') {
     const { work } = slot;
@@ -58,6 +66,18 @@ function SlotText({
           {work.title ?? 'a run with no step recorded'}
         </span>
         {meta && <span className="block truncate text-small text-ink-muted">{meta}</span>}
+        {newest && (
+          // Keyed by the line, so a new one replaces the old rather than the
+          // text changing under the reader; aria-live says it once.
+          <span
+            key={newest.id}
+            aria-live="polite"
+            className={`mt-1 block truncate text-small ${newest.kind === 'error' ? 'text-danger' : 'text-ink'}`}
+          >
+            <span className="text-ink-muted">{RUN_ACTIVITY_LABEL[newest.kind]}: </span>
+            {newest.body}
+          </span>
+        )}
         {progress && (
           <Meter
             value={progress.done}
@@ -72,7 +92,7 @@ function SlotText({
     );
   }
   if (slot.state === 'asleep') {
-    const line = 'Asleep, nothing to work on';
+    const { line } = slot;
     // The default reason says nothing the line has not, so there is nothing to open.
     if (slot.reason === SLOT_ASLEEP_DEFAULT) {
       return <span className="block text-ui text-ink-muted">{line}</span>;
@@ -104,8 +124,15 @@ export function RunnerCrew({
   /** The runner is held: an idle slot says so rather than "Not running". */
   held?: boolean;
 }) {
+  const runIds = slots.flatMap((slot) =>
+    slot.state === 'working' && slot.work.runId ? [slot.work.runId] : [],
+  );
+  const newest = useNewestRunLines(runIds);
   return (
-    <ul aria-label="What each of the runner's four sessions is doing" className="flex flex-col gap-3">
+    <ul
+      aria-label="What each of the runner's four sessions is doing"
+      className="flex flex-col gap-3"
+    >
       {slots.map((slot) => (
         <li key={slot.slot} className="flex min-w-0 items-start gap-3">
           <DashMark
@@ -117,12 +144,17 @@ export function RunnerCrew({
             className={slot.state === 'working' ? undefined : 'text-ink-muted'}
           />
           <span className="min-w-0 flex-1">
-            <span className="block text-micro font-semibold uppercase tracking-wider text-ink-muted">
+            <SectionLabel as="span" className="block">
               {slot.label}
-            </span>
+            </SectionLabel>
             <SlotText
               slot={slot}
               held={held}
+              newest={
+                slot.state === 'working' && slot.work.runId
+                  ? (newest.get(slot.work.runId) ?? null)
+                  : null
+              }
               progress={
                 slot.state === 'working' && slot.work.step !== null
                   ? (slot.work.progress ?? progress[`#${slot.work.step}`] ?? null)

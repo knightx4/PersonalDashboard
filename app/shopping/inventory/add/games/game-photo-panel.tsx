@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useRef, useState } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import {
   extractGamesFromPhoto,
   saveGameBatch,
@@ -13,7 +13,7 @@ import { gameSubtitle } from './game-forms';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
-import { FieldError } from '@/components/ui/field';
+import { Checkbox, FieldError } from '@/components/ui/field';
 import { cn } from '@/lib/cn';
 import {
   PHOTO_ACCEPT,
@@ -152,7 +152,7 @@ export function GameShelfPhotoPanel() {
         <div className="flex flex-wrap gap-2">
           {previews.map((src, index) => (
             // eslint-disable-next-line @next/next/no-img-element -- local data URL
-            <img key={index} src={src} alt="" className="h-14 w-14 rounded object-cover" />
+            <img key={index} src={src} alt="" className="h-14 w-14 rounded-card object-cover" />
           ))}
         </div>
       )}
@@ -191,8 +191,7 @@ export function GameShelfPhotoPanel() {
                   key={`${game.bggId ?? game.title}-${index}`}
                   className="card-pad-x row-pad flex gap-3"
                 >
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     name="selected"
                     value={String(index)}
                     defaultChecked={!game.needsConfirmation}
@@ -203,10 +202,10 @@ export function GameShelfPhotoPanel() {
                     <img
                       src={game.imageUrl}
                       alt=""
-                      className="h-14 w-14 shrink-0 rounded object-cover bg-canvas"
+                      className="h-14 w-14 shrink-0 rounded-card object-cover bg-canvas"
                     />
                   ) : (
-                    <div className="h-14 w-14 shrink-0 rounded bg-canvas" />
+                    <div className="h-14 w-14 shrink-0 rounded-card bg-canvas" />
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-ink">{game.title}</p>
@@ -230,7 +229,7 @@ export function GameShelfPhotoPanel() {
             {savePending ? 'Saving…' : 'Add ticked games'}
           </Button>
           {saveState.savedIds && saveState.savedIds.length > 0 && (
-            <Link href="/shopping/inventory" className="text-ui text-accent underline">
+            <Link href="/shopping/inventory" className={cn('text-ui', linkVariants())}>
               View inventory
             </Link>
           )}
@@ -258,8 +257,7 @@ export function GameShelfPhotoPanel() {
           <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border')}>
             {unmatched.map((row, index) => (
               <li key={`${row.raw}-${index}`} className="card-pad-x row-pad flex gap-3 text-ui">
-                <input
-                  type="checkbox"
+                <Checkbox
                   name="selected"
                   value={String(index)}
                   defaultChecked

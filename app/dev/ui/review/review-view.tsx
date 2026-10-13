@@ -1,7 +1,9 @@
 'use client';
 
 import { useActionState, useLayoutEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { toggleChipClass } from '@/components/ui/chip';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
@@ -56,7 +58,7 @@ function StartReview({ scope }: { scope: UiScope }) {
     <form action={action} className="space-y-1">
       <input type="hidden" name="module" value={scope} />
       <Button type="submit" size="sm" variant="secondary" pending={pending}>
-        <Play className="size-3.5" aria-hidden />
+        <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
         Review it
       </Button>
       {/* Said out loud, both ways. A pass that could not start looks exactly
@@ -78,7 +80,7 @@ function StandingRow({ standing }: { standing: Standing }) {
         {surfaces > 0 ? (
           <Link
             href={`/dev/surfaces#surfaces-${scope}`}
-            className="press-area text-small text-accent hover:underline"
+            className={cn('press-area text-small', linkVariants())}
           >
             {surfaces} surface{surfaces === 1 ? '' : 's'}
           </Link>
@@ -101,7 +103,7 @@ function StandingRow({ standing }: { standing: Standing }) {
         <StartReview scope={scope} />
         <Link
           href={{ pathname: '/dev/ui/review', query: { module: scope } }}
-          className="press-area text-small text-accent hover:underline"
+          className={cn('press-area text-small', linkVariants())}
         >
           Just this one
         </Link>
@@ -146,7 +148,7 @@ function FindingRow({ finding }: { finding: UiFinding }) {
         {finding.surface && (
           <Link
             href={`/preview?s=${finding.surface}`}
-            className="press-area text-small text-accent hover:underline"
+            className={cn('press-area text-small', linkVariants())}
           >
             {finding.surface}
           </Link>
@@ -209,10 +211,7 @@ function FindingRow({ finding }: { finding: UiFinding }) {
   );
 }
 
-const CHIP =
-  'press press-area inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-small font-medium capitalize transition-colors duration-quick';
-const CHIP_OFF = 'text-ink-muted hover:bg-accent-tint hover:text-accent';
-const CHIP_ON = 'bg-accent text-surface';
+const chip = (on: boolean) => cn(toggleChipClass(on), 'capitalize');
 /** Below md, where the row is kept to one line. Matches Tailwind's max-md. */
 const PHONE = '(max-width: 767.98px)';
 /** gap-x-1, in pixels. */
@@ -271,13 +270,13 @@ function ModuleChips({ only }: { only: UiScope | null }) {
         aria-hidden
         className="pointer-events-none invisible absolute left-0 top-0 flex max-w-full gap-x-1 overflow-hidden"
       >
-        <span className={CHIP}>Everything</span>
+        <span className={chip(false)}>Everything</span>
         {order.map((scope) => (
-          <span key={scope} className={CHIP}>
+          <span key={scope} className={chip(false)}>
             {scope}
           </span>
         ))}
-        <span className={CHIP}>More</span>
+        <span className={chip(false)}>More</span>
       </div>
       <nav
         ref={rowRef}
@@ -290,7 +289,7 @@ function ModuleChips({ only }: { only: UiScope | null }) {
         <Link
           href="/dev/ui/review"
           aria-current={only === null ? 'page' : undefined}
-          className={cn(CHIP, only === null ? CHIP_ON : CHIP_OFF)}
+          className={chip(only === null)}
         >
           Everything
         </Link>
@@ -299,7 +298,7 @@ function ModuleChips({ only }: { only: UiScope | null }) {
             key={scope}
             href={{ pathname: '/dev/ui/review', query: { module: scope } }}
             aria-current={only === scope ? 'page' : undefined}
-            className={cn(CHIP, only === scope ? CHIP_ON : CHIP_OFF)}
+            className={chip(only === scope)}
           >
             {scope}
           </Link>
@@ -309,7 +308,7 @@ function ModuleChips({ only }: { only: UiScope | null }) {
             type="button"
             aria-expanded={open}
             onClick={() => setOpen(!open)}
-            className={cn(CHIP, CHIP_OFF)}
+            className={chip(false)}
           >
             {open ? 'Less' : 'More'}
           </button>
@@ -349,14 +348,13 @@ export function ReviewView({ standings, only }: { standings: Standing[]; only: U
           heading saying "0 findings" is law 1 twice over. */}
       {undecided.length > 0 && (
         <section className="space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-body font-semibold text-ink">
-              To decide <span className="font-normal text-ink-muted">({undecided.length})</span>
-            </h2>
-            {undecided.length > 1 && (
-              <ConfirmAll ids={undecided.map(({ finding }) => finding.id)} />
-            )}
-          </div>
+          <SectionHeading
+            title="To decide"
+            count={undecided.length}
+            action={
+              undecided.length > 1 && <ConfirmAll ids={undecided.map(({ finding }) => finding.id)} />
+            }
+          />
           <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {undecided.map(({ finding }) => (
               <FindingRow key={finding.id} finding={finding} />
@@ -367,7 +365,7 @@ export function ReviewView({ standings, only }: { standings: Standing[]; only: U
 
       <p className="text-small text-ink-muted">
         The laws these are held against are on{' '}
-        <Link href="/dev/ui" className="text-accent hover:underline">
+        <Link href="/dev/ui" className={linkVariants()}>
           the UI page
         </Link>
         .

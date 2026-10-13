@@ -1,7 +1,7 @@
 'use client';
 
 import { startTransition } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ChevronRight } from 'lucide-react';
 import { LinkPending } from '@/components/ui/link-pending';
 import { countLabel } from '@/lib/news/issues/list';

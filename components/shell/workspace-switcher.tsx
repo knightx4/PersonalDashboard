@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -232,7 +232,7 @@ export function WorkspaceSwitcher({
           // chip saying otherwise was note e16311ad. ⌘1 to ⌘4 jump straight to a
           // workspace without opening this at all.
           className={cn(
-            'press flex w-full items-center gap-2 rounded-lg py-1.5 transition-colors duration-quick',
+            'press flex w-full items-center gap-2 rounded-control py-1.5 transition-colors duration-quick',
             compact ? 'justify-center px-1' : 'pl-1.5 pr-2',
             onShell
               ? open
@@ -296,7 +296,7 @@ export function WorkspaceSwitcher({
                 onClick={() => setOpen(false)}
                 onFocus={() => setActiveIndex(index)}
                 className={cn(
-                  'flex items-start gap-2.5 rounded-lg px-2 py-2 transition-colors duration-quick',
+                  'flex items-start gap-2.5 rounded-control px-2 py-2 transition-colors duration-quick',
                   isCurrent ? 'bg-accent-tint' : 'hover:bg-sunken',
                 )}
               >
@@ -347,7 +347,7 @@ function WorkspaceRowBody({
         )}
       </span>
       {isCurrent && (
-        <Check className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={2} aria-hidden />
+        <Check className="mt-0.5 size-4 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
       )}
     </>
   );
@@ -424,7 +424,7 @@ export function WorkspaceSheet({
               aria-current={isCurrent ? 'true' : undefined}
               onClick={onClose}
               className={cn(
-                'flex items-start gap-2.5 rounded-lg px-2 py-3',
+                'flex items-start gap-2.5 rounded-control px-2 py-3',
                 isCurrent ? 'bg-accent-tint' : 'hover:bg-sunken',
               )}
             >

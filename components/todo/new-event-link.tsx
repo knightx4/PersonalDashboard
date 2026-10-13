@@ -1,8 +1,9 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { iconButtonVariants } from '@/components/ui/icon-button';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**
@@ -32,12 +33,9 @@ export function NewEventLink({
       <Link
         href={href}
         aria-label={`New event on ${day}`}
-        className={cn(
-          'press flex size-5 shrink-0 items-center justify-center rounded-full text-ink-ghost hover:bg-accent-tint hover:text-accent',
-          linkClassName,
-        )}
+        className={cn(iconButtonVariants({ size: 'sm' }), linkClassName)}
       >
-        <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
+        <Plus strokeWidth={1.75} aria-hidden />
       </Link>
     </Tooltip>
   );

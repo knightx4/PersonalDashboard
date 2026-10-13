@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Moon, Sprout } from 'lucide-react';
@@ -70,7 +70,7 @@ export function TrackOffers({
       {pickedUp && (
         <p className="text-small text-ink-muted" aria-live="polite">
           Picked up{' '}
-          <Link href={`/learn/s/${pickedUp.subjectId}`} className="text-ink underline underline-offset-2">
+          <Link href={`/learn/s/${pickedUp.subjectId}`} className={linkVariants()}>
             {pickedUp.name}
           </Link>
           . Its lessons come back into Learn now from the next cards written.
@@ -95,7 +95,7 @@ export function MadeTrackLine({ track, className }: { track: MadeTrack; classNam
   return (
     <p className={cn('text-small text-ink-muted', className)} aria-live="polite">
       Started{' '}
-      <Link href={`/learn/s/${track.id}`} className="text-ink underline underline-offset-2">
+      <Link href={`/learn/s/${track.id}`} className={linkVariants()}>
         {track.name}
       </Link>
       {track.units > 0
@@ -144,7 +144,7 @@ function FeedOfferCard({
   return (
     <Card padding="standard">
       <p className="flex items-center gap-1.5 text-small text-ink-muted">
-        <Sprout className="size-3.5" strokeWidth={2} aria-hidden />
+        <Sprout className="size-3.5" strokeWidth={1.75} aria-hidden />
         A new subject
       </p>
       <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">
@@ -236,11 +236,11 @@ function RestingTrackCard({
   return (
     <Card padding="standard">
       <p className="flex items-center gap-1.5 text-small text-ink-muted">
-        <Moon className="size-3.5" strokeWidth={2} aria-hidden />
+        <Moon className="size-3.5" strokeWidth={1.75} aria-hidden />
         A resting subject
       </p>
       <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">
-        <Link href={`/learn/s/${track.subjectId}`} className="hover:underline underline-offset-2">
+        <Link href={`/learn/s/${track.subjectId}`} className="hover:underline">
           {track.name}
         </Link>
       </h2>

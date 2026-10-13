@@ -19,7 +19,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { FieldError, InlineInput, Input, Label } from '@/components/ui/field';
 import { Group } from '@/components/ui/disclosure';
-import { popoverSurface } from '@/components/ui/popover';
+import { IconButton } from '@/components/ui/icon-button';
+import { menuItemClass, popoverSurface } from '@/components/ui/popover';
 import { cn } from '@/lib/cn';
 import type { MerchantPolicyRow } from '@/lib/returns/policies';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -94,15 +95,16 @@ function PolicyRow({
           <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-small text-ink-muted">
             <span>{policyMeta(policy)}</span>
             {policy.hasOverride && (
-              <button
+              <Button
                 type="submit"
+                variant="link"
                 name="intent"
                 value="reset"
                 disabled={pending}
-                className="press shrink-0 rounded-control text-small font-medium text-accent hover:underline disabled:opacity-50"
+                className="shrink-0"
               >
                 Use default
-              </button>
+              </Button>
             )}
           </p>
         </div>
@@ -149,14 +151,9 @@ function AddMerchantForm({
       title="Add a retailer"
       action={
         <Tooltip label="Cancel" align="end">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="press rounded-control p-1 text-ink-muted hover:bg-sunken hover:text-ink"
-            aria-label="Cancel"
-          >
-            <X className="size-4" strokeWidth={1.75} />
-          </button>
+          <IconButton label="Cancel" size="sm" onClick={onCancel}>
+            <X strokeWidth={1.75} />
+          </IconButton>
         </Tooltip>
       }
     >
@@ -370,7 +367,7 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
             role="listbox"
             className={cn(
               popoverSurface,
-              'absolute z-menu mt-1 max-h-64 w-full overflow-auto',
+              'absolute z-menu mt-1 max-h-64 w-full overflow-auto p-1',
             )}
           >
             {matches.length === 0 && !canAdd ? (
@@ -387,8 +384,9 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
                       role="option"
                       aria-selected={highlight === index}
                       className={cn(
-                        'flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-body transition-colors',
-                        highlight === index ? 'bg-accent-tint text-accent' : 'hover:bg-canvas',
+                        menuItemClass(),
+                        'justify-between gap-3',
+                        highlight === index && 'bg-sunken',
                       )}
                       onMouseEnter={() => setHighlight(index)}
                       onClick={() => selectPolicy(policy)}
@@ -409,17 +407,19 @@ export function ReturnPoliciesSection({ policies }: { policies: MerchantPolicyRo
                   </li>
                 ))}
                 {canAdd && (
-                  <li role="presentation">
+                  <li
+                    role="presentation"
+                    className={cn(matches.length > 0 && 'mt-1 border-t border-border pt-1')}
+                  >
                     <button
                       type="button"
                       id={`${listId}-add`}
                       role="option"
                       aria-selected={highlight === matches.length}
                       className={cn(
-                        'flex w-full items-center gap-2 border-t border-border px-3 py-2.5 text-left text-body transition-colors',
-                        highlight === matches.length
-                          ? 'bg-accent-tint text-accent'
-                          : 'text-accent hover:bg-canvas',
+                        menuItemClass(),
+                        'text-accent',
+                        highlight === matches.length && 'bg-sunken',
                       )}
                       onMouseEnter={() => setHighlight(matches.length)}
                       onClick={() => startAdd(query)}

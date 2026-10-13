@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { AlertCircle, Mail } from 'lucide-react';
 import { Banner } from '@/components/ui/banner';
 import { buttonVariants } from '@/components/ui/button';

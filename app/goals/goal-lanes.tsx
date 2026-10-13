@@ -1,8 +1,8 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useActionState, useState } from 'react';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { DashMark } from '@/components/ui/dash-mark';
 import { MoveLabel } from '@/components/ui/move-label';
@@ -154,7 +154,7 @@ export function GoalLanes({
           {inboxCount > 0 && (
             <Link
               href="/goals/inbox"
-              className="press-area text-small text-accent underline-offset-2 hover:underline max-sm:min-h-11 max-sm:inline-flex max-sm:items-center"
+              className={cn('press-area text-small max-sm:inline-flex max-sm:min-h-11 max-sm:items-center', linkVariants())}
             >
               All {inboxCount} in Inbox
             </Link>
@@ -251,8 +251,8 @@ export function GoalLanes({
                 <Link
                   href={areaHref(group.areaId)}
                   className={cn(
-                    'inline-flex items-baseline gap-2 px-1 text-small font-medium text-ink-muted',
-                    'underline-offset-2 hover:text-ink hover:underline max-sm:min-h-11 max-sm:items-center',
+                    'inline-flex items-baseline gap-2 px-1 text-small font-medium max-sm:min-h-11 max-sm:items-center',
+                    linkVariants({ tone: 'quiet' }),
                   )}
                 >
                   {group.areaName}
@@ -269,7 +269,7 @@ export function GoalLanes({
             ))}
             <Link
               href="/goals/all"
-              className="inline-flex items-center px-1 text-small text-accent underline-offset-2 hover:underline max-sm:min-h-11"
+              className={cn('inline-flex items-center px-1 text-small max-sm:min-h-11', linkVariants())}
             >
               All goals
             </Link>
@@ -371,7 +371,7 @@ function WorkingRow({ run }: { run: RunListing }) {
       </span>
       <Link
         href={`/goals/runs/${run.id}`}
-        className="press-area shrink-0 text-small text-accent underline-offset-2 hover:underline"
+        className={cn('press-area shrink-0 text-small', linkVariants())}
       >
         Watch
       </Link>
@@ -384,7 +384,7 @@ export function DashRow({ item }: { item: DashLaneItem }) {
     <li className="card-pad-x row-pad space-y-1">
       <Link
         href={stepHref(item.goalId, item.id)}
-        className="press-area block text-ui font-semibold break-words text-ink underline-offset-2 hover:underline"
+        className="press-area block text-ui font-semibold break-words text-ink hover:underline"
       >
         {item.title}
       </Link>
@@ -430,7 +430,7 @@ function QuietGoalRow({
     <li className="card-pad-x row-pad space-y-1">
       <Link
         href={`/goals/${offer.goalId}`}
-        className="press-area block text-ui font-semibold break-words text-ink underline-offset-2 hover:underline"
+        className="press-area block text-ui font-semibold break-words text-ink hover:underline"
       >
         {offer.title}
       </Link>
@@ -466,7 +466,7 @@ export function LaterRow({
     <li className="card-pad-x row-pad space-y-1">
       <Link
         href={stepHref(item.goalId, item.id)}
-        className="press-area block text-ui font-semibold break-words text-ink underline-offset-2 hover:underline"
+        className="press-area block text-ui font-semibold break-words text-ink hover:underline"
       >
         {item.title}
       </Link>
@@ -475,9 +475,10 @@ export function LaterRow({
         {item.dueOn && `, due ${formatDay(item.dueOn)}`}
       </p>
       <div className="pt-1">
-        <button
+        <Button
           type="button"
-          className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+          variant="ghost"
+          size="sm"
           onClick={async () => {
             onBack(true);
             const form = new FormData();
@@ -492,7 +493,7 @@ export function LaterRow({
           }}
         >
           Bring back now
-        </button>
+        </Button>
       </div>
     </li>
   );

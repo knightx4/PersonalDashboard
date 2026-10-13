@@ -2,8 +2,8 @@
 
 import { Tooltip } from '@/components/ui/tooltip';
 import { useActionState, useState } from 'react';
-import Link from 'next/link';
-import { ChevronRight, Lightbulb, Sparkles } from 'lucide-react';
+import Link, { linkVariants } from '@/components/ui/link';
+import { Lightbulb, Sparkles } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
 import { ModuleMark } from '@/components/ui/module-mark';
 import {
@@ -42,7 +42,10 @@ import { IDEA_HEALTH_WORD } from '@/lib/dev/words';
 import { IDEA_HEALTH_GLYPHS } from '@/lib/status-glyphs';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
-import { segmentedFrame } from '@/components/ui/segmented';
+import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
+import { Chip } from '@/components/ui/chip';
+import { Note } from '@/components/ui/note';
+import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { cn } from '@/lib/cn';
 import { TriageNote } from '@/components/feedback/triage-note';
 import { triageView } from '@/lib/feedback/triage';
@@ -154,9 +157,9 @@ function ShapeIdea({ idea }: { idea: IdeaRow }) {
     return (
       <Link
         href="/dev/plan?view=all"
-        className="press-area inline-flex items-center gap-1.5 text-small text-accent hover:underline"
+        className={cn('press-area inline-flex items-center gap-1.5 text-small', linkVariants())}
       >
-        <Sparkles className="size-3.5" aria-hidden />
+        <Sparkles strokeWidth={1.75} className="size-3.5" aria-hidden />
         In the plan as #{idea.planItem.number}
       </Link>
     );
@@ -166,7 +169,7 @@ function ShapeIdea({ idea }: { idea: IdeaRow }) {
     <form action={action} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="id" value={idea.id} />
       <Button type="submit" size="sm" variant="secondary" pending={pending}>
-        <Sparkles className="size-3.5" aria-hidden />
+        <Sparkles strokeWidth={1.75} className="size-3.5" aria-hidden />
         {pending ? 'Sending…' : 'Shape into a plan'}
       </Button>
       {/* Ink, not green. Law 4 keeps positive for money coming back, and "sent"
@@ -287,21 +290,18 @@ function IdeaCard({ idea, dismissed = false }: { idea: IdeaRow; dismissed?: bool
       <div className="flex flex-wrap items-center gap-2">
         {/* With the workspace's own mark (note 7bdcb540), and the home mark
             for Everything, so the chip reads before its word does. */}
-        <span className="inline-flex items-center gap-1 rounded-full bg-accent-tint py-0.5 pl-1 pr-2 text-micro font-semibold uppercase tracking-wide text-accent">
+        <Chip tone="accent" size="sm" className="pl-1">
           <ModuleMark module={idea.module} size="xs" className="-my-0.5" />
           {scopeLabel(idea.module)}
-        </span>
+        </Chip>
         {/* Only a suggestion is marked. Tagging your own ideas "me" would put a
             label on every row to distinguish the few that need one. */}
         {idea.source === 'claude' && (
           <Tooltip label="Dash suggested this one. Shape it if you want it, or put it aside.">
-            <span
-              tabIndex={0}
-              className="inline-flex items-center gap-1 rounded-full bg-raised px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-ink-muted"
-            >
+            <Chip size="sm" tabIndex={0}>
               <DashMark size="2xs" decorative />
               Suggested
-            </span>
+            </Chip>
           </Tooltip>
         )}
         <IdeaScoreLabel idea={idea} />
@@ -435,13 +435,7 @@ function ArrangeRow<T extends string>({
             href={href(option.value)}
             scroll={false}
             aria-current={on ? 'true' : undefined}
-            className={cn(
-              'press inline-flex h-(--control-h) items-center px-2.5 text-ui font-medium',
-              'transition-colors duration-quick focus-visible:outline-2 focus-visible:-outline-offset-2',
-              on
-                ? 'bg-accent-tint text-accent'
-                : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
-            )}
+            className={segmentClass(on)}
           >
             {option.label}
           </Link>
@@ -514,9 +508,7 @@ export function IdeasView({
         <div className="space-y-2">
           <Arrange grouping={grouping} sort={sort} />
           {/* On a quiet panel rather than bare on the page (taste:no-bare-text). */}
-          <p className="rounded-md bg-sunken px-3 py-2 text-small text-ink-muted">
-            {IDEA_RANKING_RULE}
-          </p>
+          <Note className="text-small text-ink-muted">{IDEA_RANKING_RULE}</Note>
         </div>
       )}
 
@@ -561,24 +553,15 @@ export function IdeasView({
           // Foldable, and open to start with (law 10). A workspace you are
           // done thinking about should be one line, and the count on that line
           // is what makes folding it a choice rather than losing track of it.
-          // `<details>` so it folds before JavaScript loads and a keyboard and
-          // a screen reader get it for nothing.
-          <details key={group.key} open className="group/section space-y-2">
-            <summary className="press flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
-              <ChevronRight
-                className="size-4 shrink-0 text-ink-ghost transition-transform duration-quick group-open/section:rotate-90"
-                strokeWidth={1.75}
-                aria-hidden
-              />
-              {group.label}{' '}
-              <span className="font-normal text-ink-muted">({group.rows.length})</span>
-            </summary>
-            <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+          // A native `<details>` underneath, so it folds before JavaScript
+          // loads and a keyboard and a screen reader get it for nothing.
+          <SectionFold key={group.key} title={group.label} count={group.rows.length}>
+            <ul className={cn(cardVariants(), 'divide-y divide-border')}>
               {group.rows.map((idea) => (
                 <IdeaCard key={idea.id} idea={idea} />
               ))}
             </ul>
-          </details>
+          </SectionFold>
         ),
       )}
 
@@ -592,18 +575,16 @@ export function IdeasView({
         // night of follow-ons is the section most worth being able to put away
         // in one click, and the count on the folded line says how many are
         // waiting (law 10).
-        <details open className="group/suggested space-y-2">
-          <summary className="press flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
-            <ChevronRight
-              className="size-4 shrink-0 text-ink-ghost transition-transform duration-quick group-open/suggested:rotate-90"
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            <DashMark size="icon" decorative className="text-ink-ghost" />
-            Suggested by Dash{' '}
-            <span className="font-normal text-ink-muted">({suggested.length})</span>
-          </summary>
-          <div className="mt-2 space-y-3 pl-5">
+        <SectionFold
+          title={
+            <>
+              <DashMark size="icon" decorative className="self-center text-ink-ghost" />
+              Suggested by Dash
+            </>
+          }
+          count={suggested.length}
+        >
+          <div className="space-y-3 pl-5">
             {suggestedGroups.map((group) =>
               // One list has no heading to fold by, the same as above.
               group.label === '' ? (
@@ -615,88 +596,67 @@ export function IdeasView({
               ) : (
                 // Each workspace folds on its own, open to start with, the same
                 // way the groups of your own ideas above do (law 10).
-                <details key={group.key} open className="group/suggested-module space-y-2">
-                  <summary className="press flex cursor-pointer list-none items-center gap-1.5 text-ui font-semibold text-ink [&::-webkit-details-marker]:hidden">
-                    <ChevronRight
-                      className="size-4 shrink-0 text-ink-ghost transition-transform duration-quick group-open/suggested-module:rotate-90"
-                      strokeWidth={1.75}
-                      aria-hidden
-                    />
-                    {group.label}{' '}
-                    <span className="font-normal text-ink-muted">({group.rows.length})</span>
-                  </summary>
-                  <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+                <Disclosure
+                  key={group.key}
+                  defaultOpen
+                  title={
+                    <>
+                      {group.label}{' '}
+                      <span className="font-normal text-ink-muted">({group.rows.length})</span>
+                    </>
+                  }
+                  bodyClassName="mt-2"
+                >
+                  <ul className={cn(cardVariants(), 'divide-y divide-border')}>
                     {group.rows.map((idea) => (
                       <IdeaCard key={idea.id} idea={idea} />
                     ))}
                   </ul>
-                </details>
+                </Disclosure>
               ),
             )}
           </div>
-        </details>
+        </SectionFold>
       )}
 
       {/* Suggestions Jev scored under the floor (note 073cacdf): out of the
           list above, folded shut like the record below, and still shapeable
           from here if one turns out to matter. */}
       {lowScored.length > 0 && (
-        <details className="group/low">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
-            <ChevronRight
-              className="size-4 shrink-0 text-ink-ghost transition-transform duration-quick group-open/low:rotate-90"
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            Suggestions scored under {SUGGESTION_SCORE_FLOOR}{' '}
-            <span className="font-normal text-ink-muted">({lowScored.length})</span>
-          </summary>
-          <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+        <SectionFold
+          title={`Suggestions scored under ${SUGGESTION_SCORE_FLOOR}`}
+          count={lowScored.length}
+          defaultOpen={false}
+        >
+          <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {sortIdeas(lowScored, sort).map((idea) => (
               <IdeaCard key={idea.id} idea={idea} />
             ))}
           </ul>
-        </details>
+        </SectionFold>
       )}
 
       {shaped.length > 0 && (
-        <details className="group">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
-            <ChevronRight
-              className="size-4 shrink-0 text-ink-ghost transition-transform duration-quick group-open:rotate-90"
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            Already in the plan{' '}
-            <span className="font-normal text-ink-muted">({shaped.length})</span>
-          </summary>
-          <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+        <SectionFold title="Already in the plan" count={shaped.length} defaultOpen={false}>
+          <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {sortIdeas(shaped, sort).map((idea) => (
               <IdeaCard key={idea.id} idea={idea} />
             ))}
           </ul>
-        </details>
+        </SectionFold>
       )}
 
       {/* Where a dismissal goes, which is why dismissing is not deleting.
           Folded shut and out of every count above: the point of putting an
           idea aside is not reading it again unless you come looking. */}
       {dismissed.length > 0 && (
-        <details className="group">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body font-semibold text-ink [&::-webkit-details-marker]:hidden">
-            <ChevronRight
-              className="size-4 shrink-0 text-ink-ghost transition-transform duration-quick group-open:rotate-90"
-              strokeWidth={1.75}
-              aria-hidden
-            />
-            Dismissed <span className="font-normal text-ink-muted">({dismissed.length})</span>
-          </summary>
-          <ul className={cn(cardVariants(), 'mt-2 divide-y divide-border')}>
+        <SectionFold title="Dismissed" count={dismissed.length} defaultOpen={false}>
+          <ul className={cn(cardVariants(), 'divide-y divide-border')}>
             {sortIdeas(dismissed, sort).map((idea) => (
               <IdeaCard key={idea.id} idea={idea} dismissed />
             ))}
           </ul>
-        </details>
+        </SectionFold>
       )}
     </div>
   );

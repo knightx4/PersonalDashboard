@@ -118,7 +118,7 @@ export default async function AccountPage({
       >
         <div className="mx-auto max-w-3xl">
 
-          <div className="mt-5">
+          <div>
           <AccountView
             tab={tab}
             email={user.email ?? ''}

@@ -12,7 +12,7 @@ function WriteButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" variant="primary" pending={pending}>
-      <ListOrdered className="size-4" strokeWidth={2} aria-hidden />
+      <ListOrdered className="size-4" strokeWidth={1.75} aria-hidden />
       {pending ? 'Writing the curriculum…' : 'Write the curriculum'}
     </Button>
   );

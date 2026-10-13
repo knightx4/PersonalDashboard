@@ -1,7 +1,7 @@
 'use client';
 
 import { Equal, EqualNot } from 'lucide-react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
@@ -105,9 +105,9 @@ export function PersonalityReadPanel({
           {points.map((point, i) => (
             <li key={`${point.note.id}-${i}`} className="flex gap-2">
               {point.stance === 'clashes' ? (
-                <EqualNot aria-hidden strokeWidth={2} className="mt-1 size-4 shrink-0 text-ink" />
+                <EqualNot aria-hidden strokeWidth={1.75} className="mt-1 size-4 shrink-0 text-ink" />
               ) : (
-                <Equal aria-hidden strokeWidth={2} className="mt-1 size-4 shrink-0 text-ink" />
+                <Equal aria-hidden strokeWidth={1.75} className="mt-1 size-4 shrink-0 text-ink" />
               )}
               <div className="min-w-0">
                 <p className="text-body text-ink">
@@ -120,7 +120,7 @@ export function PersonalityReadPanel({
                   From{' '}
                   <Link
                     href={noteHref(point.note.path)}
-                    className="break-words text-ink underline decoration-border underline-offset-2 hover:decoration-ink"
+                    className={cn('break-words', linkVariants({ tone: 'quiet' }))}
                   >
                     {point.note.title}
                   </Link>

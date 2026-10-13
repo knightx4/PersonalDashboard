@@ -13,7 +13,7 @@ export default function Loading() {
       <PageHeaderSkeleton action={false} />
 
       <Card padding="dense" className="flex items-center gap-3">
-        <Skeleton className="size-8 shrink-0 rounded-[9px]" />
+        <Skeleton className="size-8 shrink-0 rounded-control" />
         <div className="min-w-0 flex-1 space-y-2">
           <Skeleton className="h-3.5 w-40" />
           <Skeleton className="h-3 w-64 max-w-full" />
@@ -32,13 +32,13 @@ export default function Loading() {
         {[4, 3, 2].map((rows, section) => (
           <Card key={section} padding="none" className="px-3">
             <div className="row-pad flex items-center gap-3">
-              <Skeleton className="size-6 shrink-0 rounded-[7px]" />
+              <Skeleton className="size-6 shrink-0 rounded-control" />
               <Skeleton className="h-4 w-32" />
             </div>
             <div className="divide-y divide-border border-t border-border">
               {Array.from({ length: rows }).map((_, index) => (
                 <div key={index} className="row-pad flex items-center gap-3">
-                  <Skeleton className="size-[18px] shrink-0 rounded" />
+                  <Skeleton className="size-[18px] shrink-0 rounded-control" />
                   <Skeleton className="h-3.5" style={{ width: `${58 - index * 8}%` }} />
                 </div>
               ))}

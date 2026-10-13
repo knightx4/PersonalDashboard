@@ -1,5 +1,6 @@
 import { RotateCcw } from 'lucide-react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
+import { buttonVariants } from '@/components/ui/button';
 import { ListPage } from '@/components/patterns/list-detail';
 import { FilterSheet } from '@/components/shell/filter-sheet';
 import { RailGroup, RailItem } from '@/components/shell/left-rail';
@@ -102,7 +103,7 @@ export function ReturnsPageView({
       actions={
         <Link
           href="/shopping/settings#return-policies"
-          className="press-area text-ui font-medium text-accent hover:underline"
+          className={buttonVariants({ variant: 'ghost', size: 'sm' })}
         >
           Edit return policies
         </Link>

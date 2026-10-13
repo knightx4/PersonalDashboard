@@ -6,6 +6,8 @@ import {
   type PlanRefTitles,
 } from '@/lib/comments/refs';
 import { LinkedText } from '@/components/ui/linked-text';
+import { linkVariants } from '@/components/ui/link';
+import { cn } from '@/lib/cn';
 
 /**
  * Plain text, with its step numbers turned into links.
@@ -40,7 +42,7 @@ export function RefText({ text, titles }: { text: string; titles?: PlanRefTitles
           <a
             key={index}
             href={planRefHref(part.ref)}
-            className="comment-ref underline underline-offset-2 hover:text-accent"
+            className={cn('comment-ref', linkVariants())}
             title={planRefLabel(part.ref, titles)}
           >
             {planRefText(part.ref, titles)}

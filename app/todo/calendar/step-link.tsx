@@ -1,7 +1,8 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { iconButtonVariants } from '@/components/ui/icon-button';
 import { Tooltip } from '@/components/ui/tooltip';
 import type { CalendarView } from '@/lib/todo/calendar/range';
 
@@ -26,9 +27,9 @@ export function StepLink({
       <Link
         href={{ pathname: '/todo/calendar', query: { view, date } }}
         aria-label={label}
-        className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
+        className={iconButtonVariants({ size: 'md' })}
       >
-        <Icon className="size-4" strokeWidth={1.75} aria-hidden />
+        <Icon strokeWidth={1.75} aria-hidden />
       </Link>
     </Tooltip>
   );

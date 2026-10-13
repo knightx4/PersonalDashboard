@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { Play, TriangleAlert } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
@@ -165,7 +165,7 @@ export function RunRoutineButton({
             leaving the decision -- the button says the run is already going, so
             pressing it is a choice rather than an accident. */}
         <Button type="submit" size="sm" variant="secondary" pending={pending}>
-          <Play className="size-3.5" aria-hidden />
+          <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
           {pending ? 'Starting…' : running ? 'Run it again anyway' : 'Run Feature Routine'}
         </Button>
         {openCount != null && (
@@ -177,7 +177,7 @@ export function RunRoutineButton({
           <Link
             href={allHref}
             onClick={onNavigate}
-            className="press-area ml-auto text-ui text-accent hover:underline"
+            className={cn('press-area ml-auto text-ui', linkVariants())}
           >
             See all
           </Link>
@@ -215,7 +215,7 @@ export function RunRoutineButton({
           decide whether to run it again. */}
       {run !== null && run.stale && (
         <p className="flex items-start gap-2 text-ui text-ink-muted">
-          <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-caution" aria-hidden />
+          <TriangleAlert strokeWidth={1.75} className="mt-0.5 size-3.5 shrink-0 text-caution" aria-hidden />
           <span className="min-w-0">
             “{trim(run.note)}” has been in progress for {elapsed(run.since, now)}, so the run that
             claimed it has most likely stopped without closing it.

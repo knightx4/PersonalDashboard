@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ArrowLeft } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
@@ -11,6 +11,7 @@ import { switcherCounts } from '@/lib/modules/switcher-counts';
 import { AppShell } from '@/components/shell/app-shell';
 import { PageHeader } from '@/components/shell/page-header';
 import { cardVariants } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/cn';
 import { formatMicroDollars, todayInTimezone } from '@/lib/money';
 import { loadSpend } from '@/lib/core/spend/load';
@@ -180,7 +181,7 @@ export default async function SpendPage() {
               href="/account"
               className="inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
             >
-              <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+              <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
               Account
             </Link>
           </p>
@@ -198,15 +199,11 @@ export default async function SpendPage() {
 
           {rows.length === 0 && (
             <>
-              <p
-                className={cn(
-                  cardVariants(),
-                  'border-dashed px-4 py-6 text-center text-body text-ink-muted',
-                )}
-              >
-                Nothing has been spent yet. Every model call this app makes lands here — what it was
-                doing, which model ran, and what it cost.
-              </p>
+              <EmptyState
+                size="box"
+                title="Nothing has been spent yet."
+                description="Every model call this app makes lands here — what it was doing, which model ran, and what it cost."
+              />
               {estimates}
             </>
           )}

@@ -1,6 +1,5 @@
 import Link from '@/components/ui/link';
-import { segmentedFrame } from '@/components/ui/segmented';
-import { cn } from '@/lib/cn';
+import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { nowHref, practiceHref } from '@/lib/learn/flow/href';
 
 /**
@@ -23,11 +22,7 @@ export function PracticeSwitch({ practice, track = null }: { practice: boolean; 
           href={option.href}
           scroll={false}
           aria-current={option.on ? 'true' : undefined}
-          className={cn(
-            'press inline-flex h-(--control-h) items-center px-2.5 text-ui font-medium',
-            'transition-colors duration-quick focus-visible:outline-2 focus-visible:-outline-offset-2',
-            option.on ? 'bg-accent-tint text-accent' : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
-          )}
+          className={segmentClass(option.on)}
         >
           {option.label}
         </Link>

@@ -10,7 +10,10 @@ import {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { IconButton } from '@/components/ui/icon-button';
+import { cn } from '@/lib/cn';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { usePathname } from 'next/navigation';
 import { SquarePen, X } from 'lucide-react';
 import { DashMark } from '@/components/ui/dash-mark';
@@ -244,14 +247,13 @@ export function AskDashButton() {
   if (!handle) return null;
   return (
     <Tooltip label="Ask Dash" className="shrink-0">
-      <button
-        type="button"
+      <IconButton
+        label="Ask Dash"
         onClick={() => handle.open()}
-        className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink"
+        className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
       >
         <DashMark size="icon" tone="brand" decorative />
-        <span className="sr-only">Ask Dash</span>
-      </button>
+      </IconButton>
     </Tooltip>
   );
 }
@@ -593,7 +595,7 @@ export function AskDashPanel({
         role="dialog"
         aria-modal="true"
         aria-labelledby="ask-dash-title"
-        className="popover-panel absolute inset-x-0 bottom-0 flex max-h-[85dvh] flex-col rounded-t-xl border-t border-border bg-raised pb-[env(safe-area-inset-bottom)] md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-[min(30rem,100vw)] md:rounded-none md:border-l md:border-t-0 md:pb-0"
+        className="popover-panel absolute inset-x-0 bottom-0 flex max-h-[85dvh] flex-col rounded-t-card border-t border-border bg-raised pb-[env(safe-area-inset-bottom)] md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-[min(30rem,100vw)] md:rounded-none md:border-l md:border-t-0 md:pb-0"
       >
         <PaidCostsProvider costs={costs}>
           <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
@@ -612,25 +614,15 @@ export function AskDashPanel({
             <div className="flex shrink-0 items-center gap-0.5">
               {started && (
                 <Tooltip label="New question" align="end">
-                  <button
-                    type="button"
-                    onClick={() => show({ kind: 'new' })}
-                    className="press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
-                  >
-                    <SquarePen className="size-4" strokeWidth={2} aria-hidden />
-                    <span className="sr-only">New question</span>
-                  </button>
+                  <IconButton label="New question" onClick={() => show({ kind: 'new' })}>
+                    <SquarePen strokeWidth={1.75} aria-hidden />
+                  </IconButton>
                 </Tooltip>
               )}
               <Tooltip label="Close Dash" align="end">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
-                >
-                  <X className="size-4" strokeWidth={2} aria-hidden />
-                  <span className="sr-only">Close Dash</span>
-                </button>
+                <IconButton label="Close Dash" onClick={onClose}>
+                  <X strokeWidth={1.75} aria-hidden />
+                </IconButton>
               </Tooltip>
             </div>
           </div>
@@ -760,14 +752,16 @@ function Earlier({
   if (recent.conversations.length === 0) return null;
   return (
     <section aria-labelledby="ask-dash-earlier" className="pt-2">
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 id="ask-dash-earlier" className="text-small font-semibold text-ink-muted">
-          Earlier questions
-        </h3>
-        <Link href="/ask" className="press-area text-small text-accent underline-offset-2 hover:underline">
-          All of them
-        </Link>
-      </div>
+      <SectionHeading
+        as="h3"
+        id="ask-dash-earlier"
+        title="Earlier questions"
+        action={
+          <Link href="/ask" className={cn(linkVariants({ tone: 'inline' }), 'press-area text-small')}>
+            All of them
+          </Link>
+        }
+      />
       <ul className="mt-1 divide-y divide-border">
         {recent.conversations.map((conversation) => (
           <li key={conversation.id}>
@@ -864,14 +858,9 @@ export function LookingAt({
         Looking at: <span className="text-ink">{label}</span>
       </span>
       <Tooltip label={dropTitle} align="end" className="shrink-0">
-        <button
-          type="button"
-          onClick={onDrop}
-          className="press flex size-6 shrink-0 items-center justify-center rounded-control hover:bg-surface hover:text-ink"
-        >
-          <X className="size-3.5" strokeWidth={2} aria-hidden />
-          <span className="sr-only">{dropTitle}</span>
-        </button>
+        <IconButton label={dropTitle} size="sm" onClick={onDrop} className="hover:bg-surface">
+          <X strokeWidth={1.75} aria-hidden />
+        </IconButton>
       </Tooltip>
     </p>
   );

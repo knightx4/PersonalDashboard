@@ -17,7 +17,7 @@ import { RunRoutineButton } from '@/components/feedback/run-routine-button';
 import { TriageNote } from '@/components/feedback/triage-note';
 import { FieldError, Label, Textarea } from '@/components/ui/field';
 import { Popover } from '@/components/ui/popover';
-import { cn } from '@/lib/cn';
+import { IconButton } from '@/components/ui/icon-button';
 import type { UploadedAttachment } from '@/lib/attachments/rules';
 import type { FeedbackKind } from '@/lib/feedback/load';
 import type { FiledAs } from '@/lib/feedback/move';
@@ -178,22 +178,17 @@ export function FeedbackButton({
   return (
     <div className="relative shrink-0">
       <Tooltip label="Report a bug, request a feature, or note an idea" align="end">
-        <button
+        <IconButton
           ref={triggerRef}
-          type="button"
+          label="Report a bug, request a feature, or note an idea"
           onClick={() => setOpen((prev) => !prev)}
           aria-expanded={open}
           aria-haspopup="dialog"
-          className={cn(
-            'press flex size-8 items-center justify-center rounded-full transition-colors',
-            open
-              ? 'bg-accent-tint text-accent'
-              : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink',
-          )}
+          active={open}
+          className={open ? undefined : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink'}
         >
-          <MessageSquarePlus className="size-4" aria-hidden />
-          <span className="sr-only">Report a bug, request a feature, or note an idea</span>
-        </button>
+          <MessageSquarePlus strokeWidth={1.75} aria-hidden />
+        </IconButton>
       </Tooltip>
 
       {open && (

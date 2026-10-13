@@ -18,6 +18,8 @@ import type { FeedCard } from '@/lib/learn/feed/card';
 import type { MarkedPart } from '@/lib/learn/feed/mentions';
 import { startTrack, type NewTrackState } from '../new/actions';
 import { explainPhrase, makePhraseCard, type ExplainedPhrase } from './actions';
+import { Note } from '@/components/ui/note';
+import { IconButton } from '@/components/ui/icon-button';
 
 /**
  * Explain a phrase you select on a Learn now card (plan #1057).
@@ -170,7 +172,7 @@ export function PhraseExplainer({
         }}
         onClick={() => explain(pressed.current || selection)}
       >
-        <Sparkles className="size-3.5 shrink-0" strokeWidth={2} aria-hidden />
+        <Sparkles className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
         <span className="truncate">Explain “{selection}”</span>
       </Button>
       <span onMouseDown={(event) => event.preventDefault()}>
@@ -223,22 +225,13 @@ function Explanation({
     });
 
   return (
-    <section
-      aria-live="polite"
-      className="mb-2 max-h-[45vh] overflow-y-auto rounded-control bg-sunken px-3 py-2.5"
-    >
+    <Note aria-live="polite" className="mb-2 max-h-[45vh] overflow-y-auto">
       <div className="flex items-start justify-between gap-2">
         <h3 className="min-w-0 text-small font-semibold break-words text-ink">“{phrase}”</h3>
         <Tooltip label="Close the explanation" align="end">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            aria-label="Close the explanation"
-          >
-            <X className="size-3.5" strokeWidth={2} aria-hidden />
-          </Button>
+          <IconButton label="Close the explanation" onClick={onClose}>
+            <X strokeWidth={1.75} aria-hidden />
+          </IconButton>
         </Tooltip>
       </div>
 
@@ -263,9 +256,9 @@ function Explanation({
                   disabled={made !== null}
                 >
                   {made ? (
-                    <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                    <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
                   ) : (
-                    <Plus className="size-3.5" strokeWidth={2} aria-hidden />
+                    <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
                   )}
                   {made ? 'Card made' : making ? 'Writing the card…' : 'Make it a card'}
                 </Button>
@@ -285,7 +278,7 @@ function Explanation({
                 value={`What is ${phrase}, and how does it bear on ${cardTitle}?`}
               />
               <Button type="submit" variant="ghost" size="sm" pending={startingTrack}>
-                <Sprout className="size-3.5" strokeWidth={2} aria-hidden />
+                <Sprout className="size-3.5" strokeWidth={1.75} aria-hidden />
                 {startingTrack ? 'Starting a subject…' : 'Start a subject'}
               </Button>
             </form>
@@ -309,7 +302,7 @@ function Explanation({
           {trackState.error && <p className="mt-1 text-small text-danger">{trackState.error}</p>}
         </>
       )}
-    </section>
+    </Note>
   );
 }
 
@@ -336,7 +329,8 @@ export function Mentioned({
         onClick={() => onTap(part.text)}
         title={part.mention.why || undefined}
         aria-label={`Explain ${part.text}`}
-        className="inline cursor-pointer select-text rounded-sm p-0 text-left font-[inherit] text-inherit underline decoration-accent decoration-dotted decoration-2 underline-offset-4 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        /* ui-ok: a phrase to explain, drawn as text with a dotted underline; not a link */
+        className="inline cursor-pointer select-text rounded-control p-0 text-left font-[inherit] text-inherit underline decoration-accent decoration-dotted decoration-2 underline-offset-4 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         {part.text}
       </button>

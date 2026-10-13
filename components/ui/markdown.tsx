@@ -305,7 +305,7 @@ function Fold({ section, setup }: { section: Section; setup: Pipeline }) {
       >
         <ChevronRight
           aria-hidden
-          strokeWidth={2}
+          strokeWidth={1.75}
           className="size-3.5 shrink-0 text-ink-muted transition-transform duration-quick group-open/fold:rotate-90"
         />
         <span role="heading" aria-level={Math.min(section.level + 2, 6)} className="fold-title">

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { ClipPlayer } from '@/components/learn/clip-player';
@@ -39,7 +39,7 @@ export function LibraryVideoView({ data, language, paragraphs, start, stop }: Li
             href={`/learn/youtube/${channel.slug}`}
             className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
           >
-            <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+            <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
             {channel.name}
           </Link>
         </p>
@@ -53,7 +53,7 @@ export function LibraryVideoView({ data, language, paragraphs, start, stop }: Li
               .filter(Boolean)
               .join(' · ')}
             {video.durationSeconds !== null || language ? ' · ' : ''}
-            <a href={video.url} className="hover:underline" target="_blank" rel="noreferrer">
+            <a href={video.url} className={linkVariants({ tone: 'quiet' })} target="_blank" rel="noreferrer">
               Open on YouTube
             </a>
           </>

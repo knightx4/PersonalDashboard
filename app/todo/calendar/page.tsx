@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { CalendarDays, Plus } from 'lucide-react';
 import { requireUser } from '@/lib/auth/server';
 import { loadCalendar } from '@/lib/todo/calendar/load';
@@ -16,6 +16,7 @@ import { PageHeader } from '@/components/shell/page-header';
 import { Banner } from '@/components/ui/banner';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
+import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { EmptyState } from '@/components/ui/empty-state';
 import { loadEvent } from '@/lib/todo/events/load';
 import { loadFeedEvent, loadFeeds } from '@/lib/todo/feeds/load';
@@ -178,7 +179,7 @@ export default async function TodoCalendarPage({
 
         {/* Day, week, month -- keeping the day you were looking at, so
             switching view does not also move you in time. */}
-        <nav aria-label="View" className="ml-auto flex items-center gap-1">
+        <nav aria-label="View" className={cn(segmentedFrame, 'ml-auto')}>
           {CALENDAR_VIEWS.map((candidate) => (
             <Link
               key={candidate}
@@ -187,12 +188,7 @@ export default async function TodoCalendarPage({
                 query: { view: candidate, date: calendar.anchor },
               }}
               aria-current={candidate === calendar.view ? 'page' : undefined}
-              className={cn(
-                'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-quick',
-                candidate === calendar.view
-                  ? 'bg-accent text-surface'
-                  : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-              )}
+              className={segmentClass(candidate === calendar.view)}
             >
               {CALENDAR_VIEW_LABEL[candidate]}
             </Link>

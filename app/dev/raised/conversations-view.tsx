@@ -2,7 +2,7 @@
 
 import { Tooltip } from '@/components/ui/tooltip';
 import { useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { markConversationRead } from './actions';
 import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';

@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { RotateCcw, Tag } from 'lucide-react';
 import {
   InventoryRowActions,
@@ -12,6 +12,7 @@ import { formatMoney } from '@/lib/money';
 import { displayNameOf } from '@/lib/inventory/list-display';
 import { displayVariant } from '@/lib/inventory/display';
 import { cn } from '@/lib/cn';
+import { Chip } from '@/components/ui/chip';
 import { PersonBadge } from '@/components/people/person-badge';
 import type { Person } from '@/lib/people/load';
 import { UNSET_SWATCH } from '@/lib/lists/gradients';
@@ -95,7 +96,7 @@ export function InventoryRow({
             item page's fallback have always drawn the same thumbnail without
             one. Law 11. */}
         <span
-          className="relative size-11 shrink-0 overflow-hidden rounded-lg bg-canvas"
+          className="relative size-11 shrink-0 overflow-hidden rounded-control bg-canvas"
           style={{ boxShadow: `inset 3px 0 0 ${accent}` }}
         >
           {item.image_url ? (
@@ -117,16 +118,16 @@ export function InventoryRow({
             {title}
             <PersonBadge person={item.person} className="ml-2 align-middle" />
             {item.return_planned && (
-              <span className="ml-2 inline-flex items-center gap-1 align-middle text-micro font-semibold uppercase tracking-wide text-accent">
-                <RotateCcw className="size-3" strokeWidth={2} aria-hidden />
+              <Chip tone="accent" size="sm" className="ml-2 align-middle">
+                <RotateCcw strokeWidth={1.75} aria-hidden />
                 To return
-              </span>
+              </Chip>
             )}
             {item.for_sale && (
-              <span className="ml-2 inline-flex items-center gap-1 align-middle text-micro font-semibold uppercase tracking-wide text-caution">
-                <Tag className="size-3" strokeWidth={2} aria-hidden />
+              <Chip tone="caution" size="sm" className="ml-2 align-middle">
+                <Tag strokeWidth={1.75} aria-hidden />
                 For sale
-              </span>
+              </Chip>
             )}
           </p>
           {/* Merchant and date can each be turned off, and the separator goes
@@ -161,9 +162,9 @@ export function InventoryRow({
                 look like one item. */}
             {showing('price') && unitLabel}
             {quantity > 1 && (
-              <span className="ml-1.5 rounded bg-sunken px-1.5 py-0.5 text-micro font-semibold text-ink-muted">
+              <Chip size="sm" className="ml-1.5">
                 ×{quantity}
-              </span>
+              </Chip>
             )}
           </p>
           {quantity > 1 && showing('price') && (

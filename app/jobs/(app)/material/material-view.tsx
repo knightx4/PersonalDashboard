@@ -1,17 +1,20 @@
 'use client';
 
+import { SectionHeading } from '@/components/ui/section-heading';
 import { useActionState, useId, useRef, useState, useTransition, type FormEvent } from 'react';
 import { MessageSquareText, Trash2 } from 'lucide-react';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
+import { Chip } from '@/components/ui/chip';
 import { Group } from '@/components/ui/disclosure';
-import { ChipSelect, Input, Label, PressLabel, Select, Textarea } from '@/components/ui/field';
+import { IconButton } from '@/components/ui/icon-button';
+import { Checkbox, ChipSelect, Input, Label, PressLabel, Select, Textarea } from '@/components/ui/field';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cardVariants } from '@/components/ui/card';
-import { segmentedFrame } from '@/components/ui/segmented';
+import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { Tooltip } from '@/components/ui/tooltip';
 import { createClient as createBrowserJobsClient } from '@/lib/jobs/auth/client';
@@ -98,13 +101,7 @@ export function MaterialView(props: MaterialProps) {
                 key={entry.id}
                 href={materialHref(entry.id)}
                 aria-current={on ? 'page' : undefined}
-                className={cn(
-                  'press inline-flex h-(--control-h) items-center px-2.5 text-ui font-medium',
-                  'transition-colors duration-quick focus-visible:outline-2 focus-visible:-outline-offset-2',
-                  on
-                    ? 'bg-accent-tint text-accent'
-                    : 'bg-surface text-ink-muted hover:bg-sunken hover:text-ink',
-                )}
+                className={segmentClass(on)}
               >
                 {entry.label}
               </Link>
@@ -193,7 +190,7 @@ function VoiceSection({
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">Writing voice</h2>
+      <SectionHeading title="Writing voice" />
 
       {!editing ? (
         <div className="mt-4 space-y-2">
@@ -301,7 +298,7 @@ function ResumeSection({
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">Resume versions</h2>
+      <SectionHeading title="Resume versions" />
       <p className="mt-0.5 text-ui text-ink-muted">
         The versions you send. Paste a version&rsquo;s text and the evidence bank can read it for
         stories.
@@ -403,27 +400,26 @@ function ResumeRow({
     <li className="text-ui">
       <div className="flex flex-wrap items-baseline gap-2">
         <span className="font-medium text-ink">{resume.label}</span>
-        {resume.isDefault && <span className="text-micro text-accent">default</span>}
+        {resume.isDefault && (
+          <Chip tone="accent" size="sm">
+            default
+          </Chip>
+        )}
         {resume.hasPdf && (
           <a
             href={`/jobs/resume/${resume.id}`}
             target="_blank"
             rel="noreferrer"
-            className="text-accent underline-offset-2 hover:underline"
+            className={linkVariants()}
           >
             Open PDF
           </a>
         )}
         {!resume.hasText && <span className="text-small text-ink-muted">no text pasted</span>}
         {resume.notes && <span className="text-ink-muted">{resume.notes}</span>}
-        <button
-          type="button"
-          className="text-small text-ink-muted underline-offset-2 hover:text-ink hover:underline disabled:opacity-60"
-          disabled={busy}
-          onClick={() => input.current?.click()}
-        >
+        <Button type="button" variant="link" disabled={busy} onClick={() => input.current?.click()}>
           {busy ? 'Uploading…' : resume.hasPdf ? 'Replace PDF' : 'Attach PDF'}
-        </button>
+        </Button>
         <input
           ref={input}
           type="file"
@@ -479,7 +475,7 @@ function EvidenceSection({
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">Evidence bank</h2>
+      <SectionHeading title="Evidence bank" />
       {/* Why the bank matters is said once, while it is empty. With entries in
           it, the count under the heading is the useful line (law 15). */}
       {evidence.length === 0 && (
@@ -518,26 +514,21 @@ function EvidenceSection({
                   </span>
                 </Tooltip>
                 {item.skills.map((skill) => (
-                  <span
-                    key={skill}
-                    className="rounded-full bg-canvas px-1.5 py-0.5 text-small text-ink-muted"
-                  >
-                    {skill.replace(/_/g, ' ')}
-                  </span>
+                  <Chip key={skill}>{skill.replace(/_/g, ' ')}</Chip>
                 ))}
-                <Tooltip label="Delete this piece of evidence" align="end" className="ml-auto">
-                  <button
-                    type="button"
-                    className="text-ink-muted hover:text-danger"
+                <Tooltip label="Delete this piece of evidence" align="end" className="ml-auto self-center">
+                  <IconButton
+                    size="sm"
+                    label={`Delete ${item.title}`}
+                    className="hover:text-danger"
                     onClick={() =>
                       startTransition(async () => {
                         await deleteEvidence(item.id);
                       })
                     }
-                    aria-label={`Delete ${item.title}`}
                   >
-                    <Trash2 className="size-3.5" strokeWidth={1.75} />
-                  </button>
+                    <Trash2 strokeWidth={1.75} aria-hidden />
+                  </IconButton>
                 </Tooltip>
               </div>
               <p className="mt-1 line-clamp-3 text-small text-ink-muted">{item.body}</p>
@@ -796,8 +787,7 @@ function SeedFromWriting({
             {drafts.map((draft, index) => (
               <div key={index} className={cn('row-pad', !draft.picked && 'opacity-60')}>
                 <div className="flex items-start gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     className="mt-2"
                     checked={draft.picked}
                     onChange={(event) => patch(index, { picked: event.target.checked })}
@@ -886,16 +876,17 @@ function SeedFromWriting({
             >
               Add {picked.length} to the bank
             </Button>
-            <button
+            <Button
               type="button"
-              className="text-small text-ink-muted hover:text-ink"
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setDrafts(null);
                 setMessage(null);
               }}
             >
               Discard
-            </button>
+            </Button>
           </div>
         </div>
       )}

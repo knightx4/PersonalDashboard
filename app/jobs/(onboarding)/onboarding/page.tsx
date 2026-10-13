@@ -7,6 +7,9 @@ import { markOnboardingComplete, onboardingNeeded } from '@/lib/jobs/onboarding'
 import { cn } from '@/lib/cn';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
+import Link, { linkVariants } from '@/components/ui/link';
+import { Note } from '@/components/ui/note';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { CompaniesForm, FinishForm, SkipForm, WelcomeForm } from './forms';
 
 export const metadata = { title: 'Welcome' };
@@ -54,9 +57,7 @@ export default async function OnboardingPage({
       {step === 'welcome' && (
         <section className="space-y-6">
           <div>
-            <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
-              Welcome
-            </p>
+            <SectionLabel>Welcome</SectionLabel>
             <h1 className="font-display mt-2 text-title font-semibold tracking-tight text-ink">
               A pipeline that keeps itself current
             </h1>
@@ -91,9 +92,7 @@ export default async function OnboardingPage({
       {step === 'companies' && (
         <section className="space-y-6">
           <div>
-            <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
-              Step 2
-            </p>
+            <SectionLabel>Step 2</SectionLabel>
             <h1 className="font-display mt-2 text-title font-semibold tracking-tight text-ink">
               Who are you going after?
             </h1>
@@ -125,9 +124,7 @@ export default async function OnboardingPage({
       {step === 'gmail' && (
         <section className="space-y-6">
           <div>
-            <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">
-              Step 3
-            </p>
+            <SectionLabel>Step 3</SectionLabel>
             <h1 className="font-display mt-2 text-title font-semibold tracking-tight text-ink">
               Let it read your job-search mail
             </h1>
@@ -173,9 +170,9 @@ export default async function OnboardingPage({
             Google will show an &ldquo;unverified app&rdquo; warning if this deployment has not
             been through their review. That is about the review, not about what the app does. The
             full detail is in the{' '}
-            <a href="/privacy" className="text-accent underline underline-offset-2">
+            <Link href="/privacy" className={linkVariants()}>
               privacy policy
-            </a>
+            </Link>
             .
           </p>
 
@@ -188,9 +185,9 @@ export default async function OnboardingPage({
                 Connect Gmail
               </a>
             ) : (
-              <p className="rounded-lg bg-canvas px-3 py-2 text-ui text-ink-muted">
+              <Note className="text-ink-muted">
                 Gmail is not configured on this deployment. Everything else works.
-              </p>
+              </Note>
             )}
             <SkipForm />
           </div>

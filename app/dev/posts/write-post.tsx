@@ -87,7 +87,7 @@ export function WritePost({ defaultOpen = false }: { defaultOpen?: boolean }) {
                 <img
                   src={postImageSrc(path) ?? ''}
                   alt="An image to post with this"
-                  className="h-20 w-auto max-w-40 rounded-sm bg-sunken object-cover"
+                  className="h-20 w-auto max-w-40 rounded-card bg-sunken object-cover"
                 />
                 <button
                   type="button"
@@ -99,7 +99,7 @@ export function WritePost({ defaultOpen = false }: { defaultOpen?: boolean }) {
                     // ui-ok: a round remove badge on a thumbnail, not a grouping box; the border keeps it off the picture.
                     className="grid size-6 place-items-center rounded-full border border-border bg-raised text-ink"
                   >
-                    <X className="size-3.5" aria-hidden />
+                    <X strokeWidth={1.75} className="size-3.5" aria-hidden />
                   </span>
                 </button>
               </li>
@@ -113,7 +113,7 @@ export function WritePost({ defaultOpen = false }: { defaultOpen?: boolean }) {
           />
           {posts.length < MAX_THREAD_POSTS && (
             <Button type="button" variant="ghost" size="sm" onClick={() => setPosts((p) => [...p, ''])}>
-              <Plus className="size-3.5" aria-hidden />
+              <Plus strokeWidth={1.75} className="size-3.5" aria-hidden />
               Add a post
             </Button>
           )}

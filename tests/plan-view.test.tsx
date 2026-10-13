@@ -261,8 +261,8 @@ describe('PlanView', () => {
     );
     // Both presses are on the page: the runner's step offers Mine, and the one
     // already held offers the press that gives it back.
-    expect(html).toContain('<span class="sr-only">Mine</span>');
-    expect(html).toContain('<span class="sr-only">Not mine</span>');
+    expect(html).toContain('aria-label="Mine"');
+    expect(html).toContain('aria-label="Not mine"');
     // Pressed buttons, not forms: the row changes at once (plan #1850), so the
     // press carries no hidden fields for the action to read.
     expect(html).not.toContain('name="assignee"');
@@ -302,7 +302,7 @@ describe('PlanView', () => {
     // you kept -- not on the runner's steps.
     expect((html.match(/Marked yours/g) ?? []).length).toBe(1);
     expect(html).toContain(
-      '>Account deletion</a><span title="Yours, so the runner will not take it.'
+      '>Account deletion<span hidden=""></span></a><span title="Yours, so the runner will not take it.'
     );
     // The robot that marked a handed-over step is gone with it.
     expect(html).not.toContain('lucide-bot');
@@ -332,7 +332,7 @@ describe('PlanView', () => {
       />,
     );
     expect((html.match(/>Overhaul</g) ?? []).length).toBe(1);
-    expect(html).toContain('>Move threads onto the core</a><span title="An overhaul:');
+    expect(html).toContain('>Move threads onto the core<span hidden=""></span></a><span title="An overhaul:');
     // With no counts handed over, the row says so rather than showing nothing.
     expect((html.match(/No rule counts yet/g) ?? []).length).toBe(1);
   });

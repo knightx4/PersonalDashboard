@@ -51,6 +51,8 @@ export type SlotGoalRun = {
 };
 
 export type SlotWork = {
+  /** The plan run's id, whose lines the card follows; null when the fire left none. */
+  runId: string | null;
   /** The step number, null for a goals run or a fire with no record. */
   step: number | null;
   /** How the plan writes it ("#1700.2"), null where `step` is. */
@@ -69,7 +71,15 @@ export type SlotWork = {
 export type RunnerSlot =
   | { slot: SlotId; label: string; state: 'idle' }
   | { slot: SlotId; label: string; state: 'working'; work: SlotWork }
-  | { slot: SlotId; label: string; state: 'asleep'; reason: string };
+  | {
+      slot: SlotId;
+      label: string;
+      state: 'asleep';
+      /** The tick's sentence, folded under `line`. */
+      reason: string;
+      /** What the closed row says, read from `reason` by `asleepLine`. */
+      line: string;
+    };
 
 export type SlotId = 'feature-1' | 'feature-2' | 'feature-3' | 'feature-4' | 'goals';
 
@@ -85,6 +95,28 @@ export type RunnerSlotsInput = {
 
 /** Said when the tick has not yet written a reason. */
 export const SLOT_ASLEEP_DEFAULT = 'Waiting for the next check.';
+
+/** The asleep line when nothing is ready, and the goals seat's always. */
+export const SLOT_NOTHING_READY = 'Asleep, nothing to work on';
+
+/**
+ * The one line an empty feature slot shows, read from the tick's note.
+ *
+ * Every empty slot used to say "Asleep, nothing to work on", which was false
+ * on most nights: the tick had started one feature, or the ready work was all
+ * in workspaces with a session going, with eleven features ready on the plan.
+ * The note's openings are written by `tickNote` in inngest/dev/overnight.ts,
+ * and a note this does not know reads as a slot the next check may fill.
+ */
+export function asleepLine(reason: string): string {
+  if (reason.startsWith('Waiting until something is ready')) return SLOT_NOTHING_READY;
+  if (reason.includes('nothing else ready can run beside')) {
+    return 'Waiting: what is ready is in busy workspaces';
+  }
+  if (reason.startsWith('Waiting. GitHub')) return 'Waiting until GitHub answers';
+  if (reason.startsWith('The last check could not finish')) return 'The last check failed';
+  return 'Free until the next check';
+}
 
 const FEATURE_SLOTS: readonly SlotId[] = ['feature-1', 'feature-2', 'feature-3'];
 const LABELS: Record<SlotId, string> = {
@@ -124,7 +156,10 @@ export function assignSlots(sessions: readonly SlotSession[]): Map<string, numbe
       a.session.id.localeCompare(b.session.id),
   );
 
-  const held: Array<string | null> = Array.from({ length: OVERNIGHT_AT_ONCE_GOALS_IDLE }, () => null);
+  const held: Array<string | null> = Array.from(
+    { length: OVERNIGHT_AT_ONCE_GOALS_IDLE },
+    () => null,
+  );
   const assigned = new Map<string, number>();
   for (const event of events) {
     if (event.fire) {
@@ -140,8 +175,12 @@ export function assignSlots(sessions: readonly SlotSession[]): Map<string, numbe
   return assigned;
 }
 
+/** A session id that is a plan run's, not the stand-in a fire with no row gets. */
+const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 function workOf(
   src: {
+    id?: string;
     firedAt: string;
     step: SlotSession['step'];
     title?: string | null;
@@ -152,6 +191,7 @@ function workOf(
   now: number,
 ): SlotWork {
   return {
+    runId: src.id && RUN_ID.test(src.id) ? src.id : null,
     step: src.step?.number ?? null,
     ref: src.step ? (src.step.ref ?? `#${src.step.number}`) : null,
     title: src.step?.title ?? src.title ?? null,
@@ -198,7 +238,9 @@ export function runnerSlots(input: RunnerSlotsInput): RunnerSlot[] {
     const session = going.get(index);
     if (!on) return { slot, label, state: 'idle' };
     if (session) return { slot, label, state: 'working', work: workOf(session, now) };
-    return sleeps ? { slot, label, state: 'asleep', reason } : { slot, label, state: 'idle' };
+    return sleeps
+      ? { slot, label, state: 'asleep', reason, line: asleepLine(reason) }
+      : { slot, label, state: 'idle' };
   });
 
   const fourth = on ? going.get(FEATURE_SLOTS.length) : undefined;
@@ -237,6 +279,7 @@ export function runnerSlots(input: RunnerSlotsInput): RunnerSlot[] {
       label,
       state: 'asleep',
       reason: input.goalsReason?.trim() || SLOT_ASLEEP_DEFAULT,
+      line: SLOT_NOTHING_READY,
     });
   } else {
     slots.push({ slot: 'goals', label, state: 'idle' });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Activity } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
@@ -268,7 +268,7 @@ function MainDotMark({ check }: { check: MainCheck | null }) {
               href={check.runUrl}
               target="_blank"
               rel="noreferrer"
-              className="mt-2 inline-block text-caption text-ink-muted underline underline-offset-2 hover:text-ink"
+              className={cn(linkVariants({ tone: 'quiet' }), 'mt-2 inline-block text-caption')}
             >
               Open the run on GitHub
             </a>
@@ -359,7 +359,7 @@ function Readings({ check }: { check: MainCheck }) {
                   href={check.deployUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="underline underline-offset-2 hover:text-ink"
+                  className={cn(linkVariants({ tone: 'quiet' }), 'text-current')}
                 >
                   Open the deploy
                 </a>

@@ -271,18 +271,36 @@ describe('the Overnight card while a night is running', () => {
     // A closed disclosure draws no text for its body: strip every closed
     // details body and the reason is gone from what the card reads.
     expect(html).not.toMatch(/<details[^>]*\sopen/);
-    const visible = html.replace(/<details[^>]*>[\s\S]*?<\/details>/g, (d) =>
-      (d.match(/<summary[^>]*>[\s\S]*?<\/summary>/) ?? [''])[0],
+    const visible = html.replace(
+      /<details[^>]*>[\s\S]*?<\/details>/g,
+      (d) => (d.match(/<summary[^>]*>[\s\S]*?<\/summary>/) ?? [''])[0],
     );
     expect(visible).not.toContain('Waiting until something is ready.');
     expect(visible).toContain('Asleep, nothing to work on');
-    expect((html.match(/Asleep, nothing to work on<\/span><\/span><\/summary>/g) ?? []).length).toBe(4);
+    expect(
+      (html.match(/Asleep, nothing to work on<\/span><\/span><\/summary>/g) ?? []).length,
+    ).toBe(4);
   });
 
   it('draws no disclosure for an asleep slot with only the default reason', () => {
     const html = draw({ run: run({ lastTickNote: null }), sessions: [] });
-    expect(html).toContain('Asleep, nothing to work on</span>');
+    expect(html).toContain('Free until the next check</span>');
     expect(html).not.toContain('Waiting for the next check.');
+  });
+
+  it('says a slot is free, not that nothing is ready, after a tick that started one', () => {
+    const html = draw({ run: run({ lastTickNote: 'Started #1985.' }), sessions: [] });
+    expect((html.match(/Free until the next check/g) ?? []).length).toBe(3);
+  });
+
+  it('says the ready work is in busy workspaces when that is why a slot waits', () => {
+    const html = draw({
+      run: run({
+        lastTickNote: 'Waiting: one session is running, and nothing else ready can run beside it.',
+      }),
+      sessions: [],
+    });
+    expect(html).toContain('Waiting: what is ready is in busy workspaces');
   });
 
   it('leaves all four idle when the runner is off', () => {

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
@@ -37,7 +37,7 @@ export default async function AskConversationPage({
         href="/ask"
         className="mb-2 inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
       >
-        <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+        <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
         Questions to Dash
       </Link>
       <PageHeader title={askTitle(first.body)} />

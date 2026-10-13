@@ -9,7 +9,9 @@ import { targetForHit } from '@/lib/todo/links/from-hit';
 import type { LinkTarget } from '@/lib/todo/links/model';
 import type { ModuleId } from '@/lib/modules';
 import { ModuleMark } from '@/components/ui/module-mark';
-import { popoverSurface } from '@/components/ui/popover';
+import { menuItemClass, popoverSurface } from '@/components/ui/popover';
+import { toggleChipClass } from '@/components/ui/chip';
+import { IconButton } from '@/components/ui/icon-button';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**
@@ -67,7 +69,8 @@ export function LinkPicker({
         // The chip is the trigger as well, so picking something does not take
         // the control away from a keyboard: focus returns to a button that is
         // still there, and changing your mind is the same click as making it.
-        <span className="inline-flex max-w-xs items-center gap-1.5 rounded-full bg-sunken py-1 pl-2 pr-1 text-small text-ink">
+        // ui-ok: fixed-control-height -- a chip, drawn at the h-7 every Chip is
+        <span className="inline-flex h-7 max-w-xs items-center gap-1 rounded-pill bg-sunken pl-2.5 pr-0.5 text-small text-ink">
           <button
             ref={triggerRef}
             type="button"
@@ -80,14 +83,9 @@ export function LinkPicker({
             <span className="min-w-0 truncate">{value.label}</span>
           </button>
           <Tooltip label="Not about this" className="shrink-0">
-            <button
-              type="button"
-              onClick={() => onChange(null)}
-              className="press flex size-5 shrink-0 items-center justify-center rounded-full text-ink-muted transition-colors duration-quick hover:bg-accent-tint hover:text-accent"
-            >
-              <X className="size-3.5" strokeWidth={1.75} aria-hidden />
-              <span className="sr-only">Not about this</span>
-            </button>
+            <IconButton label="Not about this" size="sm" onClick={() => onChange(null)} className="rounded-pill">
+              <X strokeWidth={1.75} aria-hidden />
+            </IconButton>
           </Tooltip>
         </span>
       ) : (
@@ -96,9 +94,9 @@ export function LinkPicker({
           type="button"
           onClick={() => setOpen((on) => !on)}
           aria-expanded={open}
-          className="press inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-small font-medium text-ink-muted transition-colors duration-quick hover:bg-accent-tint hover:text-accent"
+          className={toggleChipClass(false)}
         >
-          <Link2 className="size-3.5" strokeWidth={1.75} aria-hidden />
+          <Link2 strokeWidth={1.75} aria-hidden />
           Link
         </button>
       )}
@@ -242,10 +240,7 @@ export function LinkFinder({
               type="button"
               onClick={() => choose(hit)}
               onMouseMove={() => setActive(index)}
-              className={cn(
-                'flex w-full items-center gap-2.5 rounded-control px-2 py-1.5 text-left transition-colors',
-                index === active ? 'bg-accent-tint' : 'hover:bg-sunken',
-              )}
+              className={cn(menuItemClass(), 'gap-2.5', index === active && 'bg-sunken')}
             >
               <ModuleMark module={hit.module} size="sm" />
               <span className="min-w-0 flex-1 truncate text-ui text-ink">{hit.title}</span>

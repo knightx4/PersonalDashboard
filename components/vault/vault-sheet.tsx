@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { PanelLeftOpen, X } from 'lucide-react';
-import { buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { scrim } from '@/components/ui/popover';
 import { VaultPanel } from '@/components/vault/vault-panel';
 import type { VaultFolderGroup } from '@/components/vault/vault-tree';
-import { cn } from '@/lib/cn';
 import { noteHref } from '@/lib/vault/paths';
 import { Tooltip } from '@/components/ui/tooltip';
 
@@ -76,15 +76,17 @@ export function VaultSheet({
 
   return (
     <>
-      <button
+      <Button
         type="button"
+        variant="secondary"
+        size="sm"
         onClick={() => setOpen(true)}
         aria-expanded={open}
-        className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'shrink-0 lg:hidden')}
+        className="shrink-0 lg:hidden"
       >
         <PanelLeftOpen className="size-4" strokeWidth={1.75} aria-hidden />
         Browse the vault
-      </button>
+      </Button>
 
       {open && (
         <div className="fixed inset-0 z-overlay lg:hidden">
@@ -109,14 +111,9 @@ export function VaultSheet({
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 className="text-ui font-semibold text-ink">Vault</h2>
               <Tooltip label="Close the vault" align="end">
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
-                >
-                  <X className="size-4" strokeWidth={2} aria-hidden />
-                  <span className="sr-only">Close the vault</span>
-                </button>
+                <IconButton label="Close the vault" onClick={() => setOpen(false)}>
+                  <X strokeWidth={1.75} aria-hidden />
+                </IconButton>
               </Tooltip>
             </div>
 

@@ -13,12 +13,13 @@ export default function Loading() {
       <main className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
         <div className="border-b border-border-strong pb-6 pt-2">
           <Skeleton className="h-3.5 w-28" />
+          {/* ui-ok: fixed-control-height -- stands in for the page title, not a control */}
           <Skeleton className="mt-3 h-12 w-80 max-w-full" />
         </div>
         <div className="mt-2 divide-y divide-border">
           {Array.from({ length: 3 }).map((_, index) => (
             <div key={index} className="flex items-center gap-3 py-3.5">
-              <Skeleton className="size-6 shrink-0 rounded-[7px]" />
+              <Skeleton className="size-6 shrink-0 rounded-control" />
               <Skeleton className="h-4" style={{ width: `${62 - index * 9}%` }} />
             </div>
           ))}
@@ -29,7 +30,7 @@ export default function Loading() {
               key={index}
               className={cn(cardVariants({ padding: 'dense' }), 'flex items-center gap-3')}
             >
-              <Skeleton className="size-8 shrink-0 rounded-[9px]" />
+              <Skeleton className="size-8 shrink-0 rounded-control" />
               <div className="min-w-0 flex-1 space-y-2">
                 <Skeleton className="h-3.5 w-24" />
                 <Skeleton className="h-3 w-32" />

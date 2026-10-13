@@ -1,11 +1,8 @@
 import Link from '@/components/ui/link';
 import { ChevronDown } from 'lucide-react';
 import { ActionMenu } from '@/components/ui/action-menu';
+import { toggleChipClass } from '@/components/ui/chip';
 import { cn } from '@/lib/cn';
-
-const chipClass = 'press press-area rounded-full px-2.5 py-1 text-small font-medium transition-colors';
-const chipOn = 'bg-accent text-surface';
-const chipOff = 'text-ink-muted hover:bg-accent-tint hover:text-accent';
 
 /**
  * A row of view chips, with any further views in a menu at its end (#516's
@@ -59,7 +56,7 @@ export function ViewChips<V extends string>({
           href={hrefOf(candidate)}
           scroll={scroll}
           aria-current={candidate === view ? 'page' : undefined}
-          className={cn(chipClass, candidate === view ? chipOn : chipOff)}
+          className={toggleChipClass(candidate === view)}
         >
           {label(candidate)}
         </Link>
@@ -74,10 +71,10 @@ export function ViewChips<V extends string>({
           trigger={
             <span className="inline-flex items-center gap-1">
               {inMenu ? label(view) : 'More'}
-              <ChevronDown className="size-3.5" strokeWidth={2} aria-hidden />
+              <ChevronDown strokeWidth={1.75} aria-hidden />
             </span>
           }
-          triggerClassName={cn(chipClass, 'gap-1', inMenu ? chipOn : chipOff)}
+          triggerClassName={toggleChipClass(inMenu)}
           items={menu.map((candidate) => ({
             id: candidate,
             label: counts?.[candidate] ? `${labels[candidate]} ${counts[candidate]}` : labels[candidate],

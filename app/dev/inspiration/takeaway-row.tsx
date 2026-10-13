@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Thread } from '@/components/thread/thread';
 import { threadRef } from '@/lib/thread/subjects';
@@ -13,6 +13,7 @@ import { stepRef } from '@/lib/plan/ref';
 import type { Takeaway, TakeawaySource } from '@/lib/dev/inspiration/view';
 import { TakeawayActions } from './takeaway-actions';
 import { LinkedText } from '@/components/ui/linked-text';
+import { Chip } from '@/components/ui/chip';
 
 /**
  * One takeaway, drawn the same way in both views (plan #1412).
@@ -30,10 +31,10 @@ const MODULE_LABEL = new Map<ModuleId, string>(MODULES.map((module) => [module.i
 
 function WorkspaceChip({ module }: { module: ModuleId | null }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-accent-tint py-0.5 pl-1 pr-2 text-micro font-semibold uppercase tracking-wide text-accent">
+    <Chip tone="accent" size="sm" className="pl-1">
       <ModuleMark module={module} size="xs" className="-my-0.5" />
       {module ? (MODULE_LABEL.get(module) ?? module) : 'Everything'}
-    </span>
+    </Chip>
   );
 }
 
@@ -120,7 +121,7 @@ function Moment({ source, label }: { source: TakeawaySource; label?: string }) {
       href={source.href}
       target="_blank"
       rel="noreferrer"
-      className="tabular font-medium text-accent hover:underline"
+      className={cn('tabular font-medium', linkVariants())}
       title={at ? `Open the video at ${at}` : 'Open the video'}
     >
       {label ?? (at ? `Watch at ${at}` : 'Watch')}
@@ -170,7 +171,7 @@ export function TakeawayRow({ takeaway, inVideo = false }: { takeaway: Takeaway;
                     href={source.href}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-medium text-ink hover:underline"
+                    className={cn('font-medium', linkVariants())}
                   >
                     {source.videoTitle}
                   </a>

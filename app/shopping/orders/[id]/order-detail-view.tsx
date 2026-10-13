@@ -1,10 +1,13 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { Property } from '@/components/shell/detail-layout';
 import { DetailFacts, DetailPage } from '@/components/patterns/list-detail';
 import { Banner } from '@/components/ui/banner';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
+import { SectionLabel } from '@/components/ui/section-heading';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { cn } from '@/lib/cn';
 import { ConfirmOrderButton, DiscardOrderButton } from '@/app/shopping/review/review-buttons';
 import { restoreDeletedOrder } from '@/app/shopping/orders/actions';
@@ -144,7 +147,7 @@ export function OrderDetailView({
             <Banner tone="warn" className="mb-5">
               This order is in Deleted orders. Its inventory is hidden from your owned list until
               you restore it. Manage it in{' '}
-              <Link href="/shopping/settings#deleted-orders" className="underline underline-offset-2">
+              <Link href="/shopping/settings#deleted-orders" className={linkVariants()}>
                 Settings
               </Link>
               .
@@ -214,7 +217,7 @@ export function OrderDetailView({
                         href={shipment.tracking_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-ui font-medium text-accent hover:underline"
+                        className={INLINE_LINK}
                       >
                         Track package
                       </a>
@@ -350,7 +353,7 @@ export function OrderDetailView({
                         href={item.product_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-ui font-medium text-accent hover:underline"
+                        className={INLINE_LINK}
                       >
                         View product
                       </a>
@@ -360,7 +363,7 @@ export function OrderDetailView({
                     <li key={unit.id} className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       <Link
                         href={`/shopping/inventory/${unit.id}`}
-                        className="text-ui font-medium text-accent hover:underline"
+                        className={INLINE_LINK}
                       >
                         View in inventory
                         {units.length > 1 ? ` (${index + 1} of ${units.length})` : ''}
@@ -368,9 +371,7 @@ export function OrderDetailView({
                       <span className="tabular text-ui text-ink-muted">
                         Landed {unit.costLabel}
                       </span>
-                      <span className="rounded-md bg-canvas px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wide text-ink-muted">
-                        {unit.status.replaceAll('_', ' ')}
-                      </span>
+                      <Chip size="sm">{unit.status.replaceAll('_', ' ')}</Chip>
                     </li>
                   ))}
                 </ul>
@@ -382,7 +383,7 @@ export function OrderDetailView({
 
       {/* One label per line on the left, every value on the right edge. */}
       <Card padding="dense">
-        <dl className="space-y-2 text-body">
+        <ValueList>
           {(
             [
               ['Subtotal', totals.subtotal],
@@ -391,16 +392,10 @@ export function OrderDetailView({
               ['Discount', totals.discount],
             ] as const
           ).map(([label, value]) => (
-            <div key={label} className="flex items-baseline justify-between gap-4">
-              <dt className="text-ink-muted">{label}</dt>
-              <dd className="tabular text-right text-ink">{value}</dd>
-            </div>
+            <ValueRow key={label} label={label} value={value} align="end" />
           ))}
-          <div className="flex items-baseline justify-between gap-4 border-t border-border pt-2">
-            <dt className="font-medium text-ink">Total</dt>
-            <dd className="tabular text-right font-semibold text-ink">{totals.total}</dd>
-          </div>
-        </dl>
+          <ValueRow label="Total" value={totals.total} total />
+        </ValueList>
       </Card>
 
       {/* Notes on the order; one tagged @dash is answered here, from the
@@ -418,14 +413,14 @@ export function OrderDetailView({
   );
 }
 
-const QUIET_LINK =
-  'text-ui text-ink-muted transition-colors duration-quick hover:text-accent hover:underline';
+const INLINE_LINK = cn('text-ui', linkVariants());
+const QUIET_LINK = cn('text-ui', linkVariants({ tone: 'quiet' }));
 
 /** A titled section of rows on one card. */
 function OrderSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-3">
-      <h2 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">{title}</h2>
+      <SectionLabel as="h2">{title}</SectionLabel>
       <ul className={cn(cardVariants({ padding: 'none' }), 'divide-y divide-border overflow-hidden')}>
         {children}
       </ul>

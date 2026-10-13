@@ -6,6 +6,7 @@ import { ATTACHMENT_MAX_BYTES, VAULT_ATTACHMENTS_BUCKET, type AttachmentMimeType
 import { createVaultSource, type VaultSource } from '@/lib/vault/providers';
 import type { AttachmentPlan, KnownAttachment, KnownAttachments } from '@/lib/vault/sync/attachments';
 import type { CreateNotePorts, RemoveNotePorts } from '@/lib/vault/notes/create';
+import type { RenameNotePorts } from '@/lib/vault/notes/rename';
 import type { SaveNotePorts, SavableNote } from '@/lib/vault/notes/save';
 import type { KnownNotes } from '@/lib/vault/sync/plan';
 import type {
@@ -504,6 +505,35 @@ export function noteRemovePorts(supabase: VaultSupabaseClient): RemoveNotePorts 
         .eq('blob_sha', blobSha)
         .is('deleted_at', null);
       if (error) throw new Error(`Removing the note failed: ${error.message}`);
+    },
+  };
+}
+
+/** The ports for renaming a note from its page (note 69c302f1), over the session client. */
+export function noteRenamePorts(supabase: VaultSupabaseClient): RenameNotePorts {
+  return {
+    openSource: () => openConnectedSource(supabase),
+
+    async loadNote(path) {
+      const { data, error } = await supabase
+        .from('notes')
+        .select('id, path, blob_sha')
+        .eq('path', path)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (error) throw new Error(`Reading ${path} failed: ${error.message}`);
+      if (!data) return null;
+      const row = data as { id: string; path: string; blob_sha: string };
+      return { id: row.id, path: row.path, blobSha: row.blob_sha };
+    },
+
+    async moveNote(noteId, expectedBlobSha, row) {
+      const { error } = await supabase
+        .from('notes')
+        .update({ path: row.path, title: row.title, blob_sha: row.blobSha })
+        .eq('id', noteId)
+        .eq('blob_sha', expectedBlobSha);
+      if (error) throw new Error(`Storing the renamed note failed: ${error.message}`);
     },
   };
 }

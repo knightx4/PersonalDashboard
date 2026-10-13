@@ -324,13 +324,13 @@ function PracticeCard({
                     {mark.met ? (
                       <Tooltip label="This part of your answer is right" className="mt-0.5 shrink-0">
                         <span tabIndex={0} role="img" aria-label="Right" className="inline-flex">
-                          <Check className="size-4 text-ink" strokeWidth={2} aria-hidden />
+                          <Check className="size-4 text-ink" strokeWidth={1.75} aria-hidden />
                         </span>
                       </Tooltip>
                     ) : (
                       <Tooltip label="This part is missing from your answer" className="mt-0.5 shrink-0">
                         <span tabIndex={0} role="img" aria-label="Missing" className="inline-flex">
-                          <X className="size-4 text-ink-muted" strokeWidth={2} aria-hidden />
+                          <X className="size-4 text-ink-muted" strokeWidth={1.75} aria-hidden />
                         </span>
                       </Tooltip>
                     )}
@@ -535,9 +535,9 @@ function PieceCheckCard({
           {check.response && <p className="text-ui text-ink-muted">You wrote: {check.response}</p>}
           <p className={cn('flex items-center gap-1.5 text-ui font-medium', check.correct ? 'text-ink' : 'text-ink-muted')}>
             {check.correct ? (
-              <Check className="size-4" strokeWidth={2} aria-hidden />
+              <Check className="size-4" strokeWidth={1.75} aria-hidden />
             ) : (
-              <X className="size-4" strokeWidth={2} aria-hidden />
+              <X className="size-4" strokeWidth={1.75} aria-hidden />
             )}
             {check.correct ? 'Right.' : 'Not yet.'}
           </p>

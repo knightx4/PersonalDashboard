@@ -1,9 +1,11 @@
 {
   "agent-action-gaps": 172,
   "conversational-model-paths": 8,
+  "icon-stroke-off": 0,
   "learn-nav-tabs": 5,
   "link-tables-per-target-column": 4,
   "model-id-files": 1,
+  "off-token-radius": 0,
   "raw-motion-values": 0,
   "routes-without-surface": 0,
   "thread-tables": 1

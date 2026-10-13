@@ -1,11 +1,12 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
+import { IconButton } from '@/components/ui/icon-button';
 import { moveRoleToCompany } from './actions';
 import { Tooltip } from '@/components/ui/tooltip';
 
@@ -45,18 +46,16 @@ export function RoleCompany({
         {/* The icon button's full hit target, pulled in with negative margins
             so a 32px box does not push the subtitle's line apart. */}
         <Tooltip label="Move this role to another company" className="-my-2">
-          <button
-            type="button"
+          <IconButton
+            label="Move this role to another company"
             onClick={() => {
               setDraft(name);
               setError(null);
               setEditing(true);
             }}
-            className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
           >
-            <Pencil className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
-            <span className="sr-only">Move this role to another company</span>
-          </button>
+            <Pencil strokeWidth={1.75} aria-hidden />
+          </IconButton>
         </Tooltip>
       </span>
     );

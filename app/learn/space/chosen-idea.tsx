@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -8,6 +8,8 @@ import type { IdeaOnMap } from '@/lib/learn/map/load';
 import { STATE_MARK_LABEL, mapHref, markOf, similarityText } from '@/lib/learn/map/view';
 import { Mark } from './idea-plot';
 import { pickOnClick, usePick } from './pick';
+import { iconButtonVariants } from '@/components/ui/icon-button';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
 
 const CONCEPT_HREF = (id: string) => `/learn/c/${id}`;
 
@@ -43,23 +45,18 @@ export function ChosenIdea({ ideas }: { ideas: readonly IdeaOnMap[] }) {
             scroll={false}
             onClick={pickOnClick(pick, null)}
             aria-label="Close this idea"
-            className="press-area shrink-0 rounded-control p-1 text-ink-muted hover:bg-sunken hover:text-ink"
+            className={iconButtonVariants({ size: 'md' })}
           >
-            <X className="size-4" strokeWidth={2} aria-hidden />
+            <X strokeWidth={1.75} aria-hidden />
           </Link>
         </Tooltip>
       </div>
       <p className="mt-1 line-clamp-4 text-ui text-ink-muted">{idea.claim}</p>
-      <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-ui">
+      <ValueList className="mt-3">
         {facts.map(([label, value]) =>
-          value ? (
-            <div key={label} className="contents">
-              <dt className="text-ink-muted">{label}</dt>
-              <dd className="text-ink">{value}</dd>
-            </div>
-          ) : null,
+          value ? <ValueRow key={label} label={label} value={value} align="end" /> : null,
         )}
-      </dl>
+      </ValueList>
 
       {idea.neighbours.length > 0 && (
         <>

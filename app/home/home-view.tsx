@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { CalendarClock } from 'lucide-react';
 import { MainRail } from '@/components/patterns/main-rail';
 import { Card } from '@/components/ui/card';
@@ -118,7 +118,7 @@ export function WorkspaceMarks({ workspaces }: { workspaces: readonly HomeWorksp
         <Tooltip key={workspace.id} label={workspace.label}>
           <Link
             href={workspace.href}
-            className="press press-area rounded-[8px] transition-opacity duration-quick hover:opacity-75"
+            className="press press-area rounded-control transition-opacity duration-quick hover:opacity-75"
           >
             <ModuleMark module={workspace.id} size="md" />
             <span className="sr-only">{workspace.label}</span>
@@ -185,7 +185,7 @@ export function TodayCard({
     <Card padding="standard" className="mt-4">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-ui font-semibold text-ink">Today</h2>
-        <Link href="/todo" className="press-area text-small font-medium text-accent underline underline-offset-2">
+        <Link href="/todo" className={`press-area text-small ${linkVariants()}`}>
           The agenda
         </Link>
       </div>
@@ -194,7 +194,7 @@ export function TodayCard({
           {happening.map((entry) => (
             <li
               key={entry.key}
-              className="flex flex-wrap items-baseline gap-x-2 rounded-lg bg-accent-tint px-3 py-1.5 text-small text-ink"
+              className="flex flex-wrap items-baseline gap-x-2 rounded-control bg-accent-tint px-3 py-1.5 text-small text-ink"
             >
               <CalendarClock className="size-3.5 shrink-0 text-accent" strokeWidth={1.75} aria-hidden />
               {entry.at && <span className="tabular font-medium">{formatClock(entry.at, { timeZone: timezone })}</span>}
@@ -266,7 +266,7 @@ export function WeekCard({ rows, timezone }: { rows: readonly WeekRow[]; timezon
     <Card padding="standard">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-ui font-semibold text-ink">This week</h2>
-        <Link href="/todo" className="press-area text-small font-medium text-accent underline underline-offset-2">
+        <Link href="/todo" className={`press-area text-small ${linkVariants()}`}>
           The agenda
         </Link>
       </div>

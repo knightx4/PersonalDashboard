@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { BadgeCheck, AlertTriangle, ExternalLink, GitBranch } from 'lucide-react';
 import { ClipPlayer } from '@/components/learn/clip-player';
 import { TabbedDetail } from '@/components/patterns/tabbed-detail';
@@ -155,7 +155,7 @@ function ReadingProperties({ reading, origin }: { reading: ReadingDetail; origin
         label="Reading list"
         wide
         value={
-          <Link href={`/learn/t/${reading.trackId}`} className="hover:underline">
+          <Link href={`/learn/t/${reading.trackId}`} className={linkVariants()}>
             {reading.trackTitle}
           </Link>
         }
@@ -168,7 +168,7 @@ function ReadingProperties({ reading, origin }: { reading: ReadingDetail; origin
           wide
           value={
             origin.href ? (
-              <Link href={origin.href} className="hover:underline">
+              <Link href={origin.href} className={linkVariants()}>
                 {origin.senderName}
               </Link>
             ) : (
@@ -228,7 +228,7 @@ function ReadingTabBody({
         // Something you wrote down. There is nothing to open, and saying so is
         // the honest thing -- an empty "Where to read" box would read as a
         // failure rather than as a step you have not taken.
-        <section className={cn(cardVariants({ padding: 'dense' }), 'mb-5 border-dashed')}>
+        <section className={cn(cardVariants({ padding: 'dense' }), 'mb-5 border border-dashed')}>
           <h2 className="mb-2 text-ui font-semibold text-ink-muted">No source yet</h2>
           {/* The row's own basis rather than a fixed sentence: a subject can
               get here by being typed or by being proposed for a topic. */}
@@ -241,9 +241,9 @@ function ReadingTabBody({
 
           <p className="flex items-start gap-2 text-body text-ink">
             {verified ? (
-              <BadgeCheck className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={2} aria-hidden />
+              <BadgeCheck className="mt-0.5 size-4 shrink-0 text-ink-muted" strokeWidth={1.75} aria-hidden />
             ) : (
-              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-caution" strokeWidth={2} aria-hidden />
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-caution" strokeWidth={1.75} aria-hidden />
             )}
             <span>{where || 'The whole thing'}</span>
           </p>
@@ -271,7 +271,7 @@ function ReadingTabBody({
               <form action={openReading} className="flex flex-wrap items-center gap-1">
                 <input type="hidden" name="readingId" value={reading.id} />
                 <Button type="submit" variant="primary" size="md">
-                  <ExternalLink className="size-4" strokeWidth={2} aria-hidden />
+                  <ExternalLink className="size-4" strokeWidth={1.75} aria-hidden />
                   Open
                 </Button>
                 <PaidHint action="app/learn/r/[id]/actions.ts#openReading" what="Cost of finding the passage" />
@@ -302,7 +302,7 @@ function ReadingTabBody({
           <form action={goDeeper}>
             <input type="hidden" name="readingId" value={reading.id} />
             <Button type="submit" variant="secondary" size="md">
-              <GitBranch className="size-4" strokeWidth={2} aria-hidden />
+              <GitBranch className="size-4" strokeWidth={1.75} aria-hidden />
               Go deeper on this
             </Button>
           </form>

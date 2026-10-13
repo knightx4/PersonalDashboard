@@ -1,12 +1,15 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Pencil } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { CardSection } from '@/components/ui/card';
+import { IconButton } from '@/components/ui/icon-button';
+import { SectionLabel } from '@/components/ui/section-heading';
+import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { Field, FieldError, Textarea, Input } from '@/components/ui/field';
 import { formatCompBand, formatDateTime } from '@/lib/jobs/applications/load';
 import type { Requirement } from '@/lib/jobs/jd/requirements';
@@ -168,7 +171,7 @@ export function Posting({
             Your evidence bank is empty, so there is nothing to match against.{' '}
             <Link
               href="/jobs/material?part=evidence"
-              className="underline underline-offset-2 transition-colors duration-quick hover:text-ink"
+              className={linkVariants({ tone: 'quiet' })}
             >
               Fill it in Material.
             </Link>
@@ -193,9 +196,7 @@ export function Posting({
               if (items.length === 0) return null;
               return (
                 <div key={group.kind}>
-                  <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-                    {group.label}
-                  </h4>
+                  <SectionLabel as="h4">{group.label}</SectionLabel>
                   <ul className="mt-1 space-y-1">
                     {items.map((item, index) => {
                       const match = verdictFor.get(item.text);
@@ -335,50 +336,39 @@ function RoleDetailsCard({
               </Button>
             )}
             <Tooltip label="Edit posting details" align="end">
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
-              >
-                <Pencil className="size-4" strokeWidth={1.75} aria-hidden />
-                <span className="sr-only">Edit posting details</span>
-              </button>
+              <IconButton label="Edit posting details" onClick={() => setEditing(true)}>
+                <Pencil strokeWidth={1.75} aria-hidden />
+              </IconButton>
             </Tooltip>
           </div>
         }
       >
-        <dl className="space-y-1.5 text-ui">
-          <div className="flex items-baseline gap-2">
-            <dt className="w-24 shrink-0 text-ink-muted">Posting link</dt>
-            <dd className="min-w-0 flex-1 truncate">
-              {jdUrl ? (
-                <a
-                  href={jdUrl}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="text-accent underline underline-offset-2 transition-colors duration-quick hover:text-accent-hover"
-                >
+        <ValueList>
+          <ValueRow
+            label="Posting link"
+            value={
+              jdUrl ? (
+                <a href={jdUrl} target="_blank" rel="noreferrer noopener" className={linkVariants()}>
                   {jdUrl}
                 </a>
-              ) : (
-                <span className="text-ink-muted">—</span>
-              )}
-            </dd>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <dt className="w-24 shrink-0 text-ink-muted">ATS job id</dt>
-            <dd className="text-ink">{atsJobId ?? <span className="text-ink-muted">—</span>}</dd>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <dt className="w-24 shrink-0 text-ink-muted">Compensation</dt>
-            <dd className="text-ink">
-              {compBand ?? <span className="text-ink-muted">—</span>}
-              {compBand && compSource && (
-                <span className="ml-1.5 text-small text-ink-muted">from the {compSource}</span>
-              )}
-            </dd>
-          </div>
-        </dl>
+              ) : null
+            }
+          />
+          <ValueRow label="ATS job id" value={atsJobId} />
+          <ValueRow
+            label="Compensation"
+            value={
+              compBand ? (
+                <>
+                  {compBand}
+                  {compSource && (
+                    <span className="ml-1.5 text-small text-ink-muted">from the {compSource}</span>
+                  )}
+                </>
+              ) : null
+            }
+          />
+        </ValueList>
 
         {/* What this lookup just did, beside the button that did it. */}
         {lookup && (
@@ -396,7 +386,7 @@ function RoleDetailsCard({
                         href={candidate.url}
                         target="_blank"
                         rel="noreferrer noopener"
-                        className="text-ink-muted underline underline-offset-2 transition-colors duration-quick hover:text-ink"
+                        className={linkVariants({ tone: 'quiet' })}
                       >
                         {candidate.title}
                       </a>

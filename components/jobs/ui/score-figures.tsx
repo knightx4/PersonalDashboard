@@ -1,6 +1,7 @@
 import { cloneElement, type ReactElement } from 'react';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/cn';
+import { chipVariants } from '@/components/ui/chip';
 import { chanceText, type ScoreFigure, type ScoreNote } from '@/lib/jobs/suggest/score-notes';
 import { CHANCE_LABEL, FIT_SCORE_LABEL } from '@/lib/jobs/suggest/scores';
 
@@ -36,19 +37,18 @@ export function chanceFigureText(note: ScoreNote): string | null {
 /** Both figures as chips, for beside a title. */
 export function ScoreChips({ note, className }: { note: ScoreNote | null | undefined; className?: string }) {
   if (!note) return null;
-  const chip = 'rounded-control bg-sunken px-1.5 py-0.5 text-small text-ink-muted';
   return (
     <span className={cn('inline-flex flex-wrap gap-1.5', className)}>
       {note.fit && (
         <Unsure unsure={note.fit.unsure}>
-          <span className={cn('tabular', chip, note.fit.unsure && 'opacity-70')}>
+          <span className={cn(chipVariants(), note.fit.unsure && 'opacity-70')}>
             {FIT_SCORE_LABEL} {fitText(note)}
           </span>
         </Unsure>
       )}
       {note.chance && (
         <Unsure unsure={note.chance.unsure}>
-          <span className={cn(chip, note.chance.unsure && 'opacity-70')}>
+          <span className={cn(chipVariants(), note.chance.unsure && 'opacity-70')}>
             {CHANCE_LABEL}: {chanceFigureText(note)?.toLowerCase()}
           </span>
         </Unsure>

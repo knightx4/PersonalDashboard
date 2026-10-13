@@ -76,6 +76,13 @@ export type AppModule = {
    * make that depend on where you happened to stop.
    */
   alwaysHome?: true;
+  /**
+   * The workspace's own settings page, and a line saying what is on it.
+   * Account's Workspaces tab builds its list of settings links from these, so
+   * a workspace that has a settings page is never left out of it (plan #1924).
+   * Absent means the workspace has no settings page.
+   */
+  settings?: { href: string; hint: string };
 };
 
 /**
@@ -135,6 +142,7 @@ export const MODULES: readonly AppModule[] = [
     description: 'Orders, inventory, returns and resale',
     accent: '--color-w-shopping',
     key: { shape: 'cart', from: '#fb7185', to: '#be123c' },
+    settings: { href: '/shopping/settings', hint: 'Connected mailbox, merchants and return windows' },
   },
   {
     id: 'jobs',
@@ -144,6 +152,7 @@ export const MODULES: readonly AppModule[] = [
     description: 'Pipeline, roles, companies and interviews',
     accent: '--color-w-jobs',
     key: { shape: 'briefcase', from: '#a78bfa', to: '#7c3aed' },
+    settings: { href: '/jobs/settings', hint: 'Ghost threshold, résumés and evidence' },
   },
   {
     id: 'todo',
@@ -155,6 +164,7 @@ export const MODULES: readonly AppModule[] = [
     description: 'What has to happen, across everything',
     accent: '--color-w-todo',
     key: { shape: 'list', from: '#38bdf8', to: '#0369a1' },
+    settings: { href: '/todo/settings', hint: 'How far ahead the agenda looks, and what feeds it' },
   },
   {
     id: 'vault',
@@ -166,6 +176,7 @@ export const MODULES: readonly AppModule[] = [
     description: 'Your Obsidian notes, mirrored and searchable',
     accent: '--color-w-vault',
     key: { shape: 'lock', from: '#f0abfc', to: '#a21caf' },
+    settings: { href: '/vault/settings', hint: 'The repository this mirrors, and its token' },
   },
   {
     id: 'learn',
@@ -200,6 +211,7 @@ export const MODULES: readonly AppModule[] = [
     // from the warning colour in all four themes than rose sits from the
     // delete red, which is the distance this set already accepts.
     key: { shape: 'envelope', from: '#e8c760', to: '#846905' },
+    settings: { href: '/news/settings', hint: 'Your newsletter address, hidden topics and local area' },
   },
   {
     id: 'goals',

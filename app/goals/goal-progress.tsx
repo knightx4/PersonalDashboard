@@ -1,4 +1,5 @@
 import { HelpCircle } from 'lucide-react';
+import { Chip } from '@/components/ui/chip';
 import { MoveLabel } from '@/components/ui/move-label';
 import { Bands } from '@/components/ui/meter';
 import { cn } from '@/lib/cn';
@@ -78,11 +79,11 @@ export function QuestionMark({ count }: { count: number }) {
   const words = `${count} ${count === 1 ? 'question' : 'questions'} waiting on your answer`;
   return (
     <Tooltip label={words} className="shrink-0">
-      <span className="inline-flex items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution">
-        <HelpCircle className="size-3" strokeWidth={2} aria-hidden />
+      <Chip tone="caution">
+        <HelpCircle strokeWidth={1.75} aria-hidden />
         {count}
         <span className="sr-only">{words}</span>
-      </span>
+      </Chip>
     </Tooltip>
   );
 }

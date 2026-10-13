@@ -7,7 +7,8 @@ import { updateInventoryItem, type ActionState } from '@/app/shopping/inventory/
 import { Button } from '@/components/ui/button';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
 import { CardSection, cardVariants } from '@/components/ui/card';
-import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
+import { Checkbox, Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
+import { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import {
   ATTRIBUTE_FIELD_TYPES,
@@ -142,7 +143,7 @@ export function ItemDetailsPanel({
                         href={values[field.key]}
                         target="_blank"
                         rel="noreferrer"
-                        className="font-medium text-accent hover:underline"
+                        className={linkVariants()}
                       >
                         Open link
                       </a>
@@ -225,7 +226,7 @@ export function ItemDetailsPanel({
                           href={values[field.key]}
                           target="_blank"
                           rel="noreferrer"
-                          className="font-medium text-accent hover:underline"
+                          className={linkVariants()}
                         >
                           Open link
                         </a>
@@ -349,8 +350,7 @@ function CategoryTemplateForm({
             className="flex h-(--control-h) items-center gap-2 text-ui text-ink-muted"
             title="Add this field’s value to the eBay search for the item"
           >
-            <input
-              type="checkbox"
+            <Checkbox
               checked={row.inSearch}
               disabled={row.type === 'url'}
               onChange={(event) =>
@@ -360,7 +360,6 @@ function CategoryTemplateForm({
                   ),
                 )
               }
-              className="size-4 accent-[var(--c-accent)]"
             />
             In eBay search
           </label>

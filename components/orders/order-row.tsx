@@ -1,18 +1,19 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { MerchantAvatar } from '@/components/merchants/merchant-avatar';
 import { OrderRowMenu } from '@/components/orders/order-row-menu';
 import { formatMoney } from '@/lib/money';
 import { cn } from '@/lib/cn';
+import { Chip, type ChipTone } from '@/components/ui/chip';
 import { PersonBadge } from '@/components/people/person-badge';
 import type { Person } from '@/lib/people/load';
 
-const STATUS_STYLES: Record<string, string> = {
-  ordered: 'bg-accent-tint text-accent',
-  shipped: 'bg-accent-tint text-accent',
-  delivered: 'bg-canvas text-ink-muted',
-  partially_returned: 'bg-caution-tint text-caution',
-  returned: 'bg-positive-tint text-positive',
-  cancelled: 'bg-canvas text-ink-muted',
+const STATUS_TONES: Record<string, ChipTone> = {
+  ordered: 'accent',
+  shipped: 'accent',
+  delivered: 'neutral',
+  partially_returned: 'caution',
+  returned: 'positive',
+  cancelled: 'neutral',
 };
 
 function formatOrderDate(iso: string): string {
@@ -52,7 +53,7 @@ export type OrderRowData = {
 };
 
 export function OrderRow({ order }: { order: OrderRowData }) {
-  const statusClass = STATUS_STYLES[order.status] ?? 'bg-canvas text-ink-muted';
+  const statusTone = STATUS_TONES[order.status] ?? 'neutral';
   const meta = [
     formatOrderDate(order.order_date),
     order.external_order_number ? `#${order.external_order_number}` : null,
@@ -77,14 +78,9 @@ export function OrderRow({ order }: { order: OrderRowData }) {
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
             <p className="truncate font-semibold text-ink">{order.merchant_name}</p>
-            <span
-              className={cn(
-                'shrink-0 rounded-md px-1.5 py-0.5 text-micro font-semibold uppercase tracking-wide',
-                statusClass,
-              )}
-            >
+            <Chip tone={statusTone} size="sm">
               {statusLabel(order.status)}
-            </span>
+            </Chip>
             <PersonBadge person={order.person} />
           </div>
           <p className="mt-0.5 truncate text-ui text-ink-muted">

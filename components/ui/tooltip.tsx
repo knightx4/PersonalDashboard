@@ -44,7 +44,7 @@ export function Tooltip({
 }: {
   /** The tip's text. Keep it to a few words. */
   label: string;
-  children: ReactElement<{ 'aria-describedby'?: string }>;
+  children: ReactElement<{ 'aria-describedby'?: string; title?: string }>;
   /** Which edge of the child the tip hangs from; `end` near a row's right edge. */
   align?: 'start' | 'end';
   /**
@@ -96,9 +96,6 @@ export function Tooltip({
       onFocus={(event) => {
         if ((event.target as HTMLElement).matches(':focus-visible')) ask();
       }}
-      // A press means the child is being used: the tip goes, so it does not
-      // sit over the menu or panel the press opens.
-      onPointerDown={hide}
       onBlur={hide}
       // A press is the person using the control, and what it opens (a menu, a
       // panel) hangs where the tip does. The tip comes back on the next hover.
@@ -110,7 +107,9 @@ export function Tooltip({
         }
       }}
     >
-      {cloneElement(children, open ? { 'aria-describedby': tipId } : {})}
+      {/* `title: undefined` clears a native title the child sets itself, as
+          IconButton does from its label, so the tip is the only one shown. */}
+      {cloneElement(children, { title: undefined, ...(open ? { 'aria-describedby': tipId } : {}) })}
       {open && (
         <Popover
           ref={panelRef}

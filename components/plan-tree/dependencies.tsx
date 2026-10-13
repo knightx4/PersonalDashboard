@@ -9,7 +9,7 @@ import { FieldError, Select } from '@/components/ui/field';
 import { catalogLabel, subtreeOf } from '@/lib/plan/catalog';
 import { PLAN_STATUS_LABEL, isClosed } from '@/lib/plan/load';
 import { checkDay } from '@/lib/plan/check-backs';
-import { cn } from '@/lib/cn';
+import { Chip } from '@/components/ui/chip';
 import type { TreeActionState, TreeActions, TreeCatalogEntry, TreeDependencyNode } from './types';
 
 /**
@@ -100,22 +100,19 @@ export function Dependencies<E extends TreeCatalogEntry>({
           {node.dependsOn.map((link) => (
             <form key={link.dependencyId} action={removeAction} className="contents">
               <input type="hidden" name="id" value={link.dependencyId} />
-              <span
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-full py-0.5 pl-2 pr-1 text-small',
-                  isClosed(link.item.status)
-                    ? 'bg-positive-tint text-positive'
-                    : 'bg-caution-tint text-caution',
-                )}
+              <Chip
+                tone={isClosed(link.item.status) ? 'positive' : 'caution'}
+                className="max-w-full pr-1"
               >
                 <Tooltip
+                  className="min-w-0"
                   label={
                     isClosed(link.item.status)
                       ? 'That step has closed, so it no longer holds this one up.'
                       : 'This step waits until that one closes, then frees itself. Nothing is needed from you.'
                   }
                 >
-                  <span tabIndex={0} className="rounded-full">
+                  <span tabIndex={0} className="min-w-0 truncate rounded-full">
                     {stepName(link.item)}
                     {isClosed(link.item.status) &&
                       ` (${PLAN_STATUS_LABEL[link.item.status].toLowerCase()})`}
@@ -131,23 +128,21 @@ export function Dependencies<E extends TreeCatalogEntry>({
                     aria-label={`Stop waiting on ${stepHandle(link.item) ?? link.item.title}`}
                     className="press rounded-full p-0.5 hover:bg-surface/60"
                   >
-                    <X className="size-3" strokeWidth={2} aria-hidden />
+                    <X strokeWidth={1.75} aria-hidden />
                   </button>
                 </Tooltip>
-              </span>
+              </Chip>
             </form>
           ))}
           {inherited.map((ref) => (
             <Tooltip
               key={ref.id}
               label="A step above this one waits on it, so this one waits too. It frees itself when that closes."
+              className="max-w-full"
             >
-              <span
-                tabIndex={0}
-                className="inline-flex items-center rounded-full bg-caution-tint px-2 py-0.5 text-small text-caution opacity-80"
-              >
-                {stepName(ref)} · above
-              </span>
+              <Chip tone="caution" tabIndex={0} className="max-w-full opacity-80">
+                <span className="min-w-0 truncate">{stepName(ref)} · above</span>
+              </Chip>
             </Tooltip>
           ))}
           {/* A check-back: the step needs something that does not exist yet,
@@ -157,12 +152,9 @@ export function Dependencies<E extends TreeCatalogEntry>({
               key={check.id}
               label={`${check.title.replace(/[.]+$/, '')}. Dash looks again on ${checkDay(check.dueAt)}, and the step waits until then. Nothing is needed from you.`}
             >
-              <span
-                tabIndex={0}
-                className="inline-flex items-center rounded-full bg-caution-tint px-2 py-0.5 text-small text-caution"
-              >
+              <Chip tone="caution" tabIndex={0}>
                 Check on {checkDay(check.dueAt)}
-              </span>
+              </Chip>
             </Tooltip>
           ))}
         </div>

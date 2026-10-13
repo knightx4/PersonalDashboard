@@ -3,6 +3,7 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 import { FEEDBACK_KIND_LABEL, type OtherFeedbackRow } from '@/lib/feedback/load';
 import { KIND_TONE } from '@/components/feedback/kind-tone';
+import { Chip } from '@/components/ui/chip';
 import { LinkedText } from '@/components/ui/linked-text';
 
 /**
@@ -37,14 +38,9 @@ export function OtherUsersFeedback({ rows }: { rows: OtherFeedbackRow[] }) {
         {rows.map((row) => (
           <li key={row.id} className="row-pad flex flex-col gap-2 px-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={cn(
-                  'rounded-full px-2 py-0.5 text-micro font-semibold uppercase tracking-wide',
-                  KIND_TONE[row.kind],
-                )}
-              >
-                {FEEDBACK_KIND_LABEL[row.kind]}
-              </span>
+              <Chip tone={KIND_TONE[row.kind]} size="sm">
+          {FEEDBACK_KIND_LABEL[row.kind]}
+        </Chip>
               {/* The account, first among the facts: on this list it is the
                   one thing the note itself cannot tell you. */}
               <span className="text-ui text-ink">{row.email ?? 'another account'}</span>

@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { cn } from '@/lib/cn';
 import {
   columnFoldedServerSnapshot,
@@ -185,17 +186,15 @@ export function FoldNoteListButton() {
   if (!hydrated) return null;
   return (
     <Tooltip label="Hide the note list" className="hidden shrink-0 lg:inline-flex">
-      <button
+      <IconButton
         ref={ref}
-        type="button"
+        label="Hide the note list"
         onClick={() => setFolded(true)}
         aria-expanded={!folded}
         aria-controls={NOTE_LIST_ID}
-        className="press hidden size-8 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink lg:flex"
       >
-        <PanelLeftClose className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
-        <span className="sr-only">Hide the note list</span>
-      </button>
+        <PanelLeftClose strokeWidth={1.75} aria-hidden />
+      </IconButton>
     </Tooltip>
   );
 }

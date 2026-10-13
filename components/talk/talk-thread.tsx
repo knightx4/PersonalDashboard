@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowUp, CircleUser, CornerDownRight } from 'lucide-react';
 import { CommentBody } from '@/components/dev/comment-body';
 import { DashMark, type DashActivity, type DashState } from '@/components/ui/dash-mark';
@@ -109,7 +109,7 @@ function AuthorMark({
     );
   }
   const Glyph = role === 'assistant' ? assistant.Mark : CircleUser;
-  return <Glyph className="size-3.5 text-ink-ghost" strokeWidth={2} aria-hidden />;
+  return <Glyph className="size-3.5 text-ink-ghost" strokeWidth={1.75} aria-hidden />;
 }
 
 function Turn({
@@ -133,7 +133,7 @@ function Turn({
   return (
     <li
       className={
-        onCard && turn.role === 'assistant' ? '-mx-2 flex gap-2 rounded-lg bg-canvas px-2 py-1.5' : 'flex gap-2'
+        onCard && turn.role === 'assistant' ? '-mx-2 flex gap-2 rounded-control bg-canvas px-2 py-1.5' : 'flex gap-2'
       }
     >
       <div className="flex w-4 shrink-0 justify-center pt-1">
@@ -183,7 +183,7 @@ function Turn({
 // which draws no space of its own, so the rows stay one tight list at every
 // width (plan #1708). The truncation is on the words inside, since a clipping
 // link would clip the press area with them.
-const CITED_LINK = 'press-area flex min-w-0 text-ui text-accent underline-offset-2 hover:underline';
+const CITED_LINK = `press-area flex min-w-0 text-ui ${linkVariants({ tone: 'inline' })}`;
 
 /**
  * The rows an answer rests on, each a link to where it lives (plan #1090).
@@ -200,7 +200,7 @@ function Cited({ citations }: { citations: readonly TalkCitation[] }) {
         >
           <CornerDownRight
             className="size-3 shrink-0 translate-y-0.5 text-ink-ghost"
-            strokeWidth={2}
+            strokeWidth={1.75}
             aria-hidden
           />
           {citation.href.startsWith('/') ? (
@@ -540,7 +540,7 @@ export function TalkThread({
                   disabled={!draft.trim() || sending || uploading}
                   title="Send"
                 >
-                  <ArrowUp className="size-4" strokeWidth={2} aria-hidden />
+                  <ArrowUp className="size-4" strokeWidth={1.75} aria-hidden />
                   <span className="sr-only">Send</span>
                 </Button>
               </div>

@@ -136,13 +136,13 @@ export function ProjectCard({
                     {mark.met ? (
                       <Tooltip label="This part of your answer is right" className="mt-0.5 shrink-0">
                         <span tabIndex={0} role="img" aria-label="Right" className="inline-flex">
-                          <Check className="size-4 text-ink" strokeWidth={2} aria-hidden />
+                          <Check className="size-4 text-ink" strokeWidth={1.75} aria-hidden />
                         </span>
                       </Tooltip>
                     ) : (
                       <Tooltip label="This part is missing from your answer" className="mt-0.5 shrink-0">
                         <span tabIndex={0} role="img" aria-label="Missing" className="inline-flex">
-                          <X className="size-4 text-ink-muted" strokeWidth={2} aria-hidden />
+                          <X className="size-4 text-ink-muted" strokeWidth={1.75} aria-hidden />
                         </span>
                       </Tooltip>
                     )}

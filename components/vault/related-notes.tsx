@@ -1,7 +1,7 @@
 'use client';
 
 import { Suspense, use } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { FileText } from 'lucide-react';
 import type { RelatedNoteLink } from '@/lib/vault/notes/related';
 
@@ -66,7 +66,7 @@ function RelatedNotesList({
           <li key={note.noteId}>
             <Link
               href={note.href}
-              className="inline-flex max-w-full items-baseline gap-1.5 text-ui text-accent hover:underline"
+              className={`inline-flex max-w-full items-baseline gap-1.5 text-ui ${linkVariants()}`}
             >
               <FileText
                 className="size-3.5 shrink-0 translate-y-0.5"

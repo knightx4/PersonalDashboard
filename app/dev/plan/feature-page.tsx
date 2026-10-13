@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronRight, Plus } from 'lucide-react';
@@ -12,6 +12,7 @@ import { Property, PropertyList } from '@/components/shell/detail-layout';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { LinkedText } from '@/components/ui/linked-text';
 import { StateLabel, TONE_TEXT } from '@/components/dev/state-label';
 import { Thread } from '@/components/thread/thread';
@@ -261,7 +262,7 @@ export function FeaturePage({
             align="start"
             // Pulled up by the room the press target adds, so its word sits on
             // the same line as Health's and Progress's beside it.
-            triggerClassName="-my-1 -ml-1.5 h-7 w-auto px-1.5 text-ui font-normal text-ink"
+            triggerClassName="-my-1 -ml-1.5 h-(--control-h) w-auto px-1.5 text-ui font-normal text-ink"
             trigger={<span>{statusWord}</span>}
           />
         }
@@ -317,7 +318,7 @@ export function FeaturePage({
             items={parts.priorityMenu}
             align="start"
             // Pulled up as Status is, so the gap above it matches the others.
-            triggerClassName="-my-1 -ml-1.5 h-7 w-auto px-1.5 text-ui font-normal text-ink"
+            triggerClassName="-my-1 -ml-1.5 h-(--control-h) w-auto px-1.5 text-ui font-normal text-ink"
             trigger={<span>{PLAN_PRIORITY_LABEL[node.priority]}</span>}
           />
         }
@@ -338,7 +339,7 @@ export function FeaturePage({
           // A workspace has a page of its own in Dev (/dev/modules); a
           // project's page is the crumb above the title.
           module && isModuleId(module) ? (
-            <Link href={`/dev/modules/${module}`} className="press-area hover:underline">
+            <Link href={`/dev/modules/${module}`} className={cn('press-area', linkVariants())}>
               {moduleLabel || scopeLabel(node.module)}
             </Link>
           ) : (
@@ -608,7 +609,7 @@ function FeatureSteps({
               <Link
                 href={stepsViewHref(node.number, view)}
                 scroll={false}
-                className="press-area text-ink underline underline-offset-2"
+                className={cn('press-area', linkVariants())}
               >
                 Show all steps
               </Link>
@@ -644,7 +645,7 @@ function FeatureSteps({
           </ul>
         </>
       ) : (
-        !adding && <p className="text-ui text-ink-muted">No steps under this feature yet.</p>
+        !adding && <EmptyState size="inline" title="No steps under this feature yet." />
       )}
       {adding ? (
         <div className={cn(cardVariants({ padding: 'dense' }))}>{addForm}</div>
@@ -684,7 +685,7 @@ function SplitLink({ href, count, who }: { href: string; count: number; who: Hel
       href={href}
       scroll={false}
       aria-label={`${count} open ${count === 1 ? 'step' : 'steps'} ${who === 'me' ? 'yours' : 'Dash’s'}, show them`}
-      className="-mx-1.5 inline-flex min-h-7 items-center max-sm:min-h-11 rounded-sm px-1.5 underline underline-offset-2 hover:bg-sunken"
+      className={cn('-mx-1.5 inline-flex min-h-7 items-center max-sm:min-h-11 rounded-control px-1.5 hover:bg-sunken', linkVariants())}
     >
       {count} open
     </Link>
@@ -733,7 +734,7 @@ function StepGroupRows({ group, children }: { group: StepGroup; children: React.
         >
           <ChevronRight
             className={cn('size-3.5 text-ink-muted transition-transform', open && 'rotate-90')}
-            strokeWidth={2}
+            strokeWidth={1.75}
             aria-hidden
           />
           {heading}

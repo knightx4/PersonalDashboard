@@ -26,6 +26,8 @@ import { applyRowChange, type RowChange, type RowFields, type SiblingMove } from
 import { SiblingMoveProvider, useMoveSibling, useSiblingOrder, writeMove } from './sibling-order';
 import { Button } from '@/components/ui/button';
 import { FieldError, FieldHint } from '@/components/ui/field';
+import { chipVariants } from '@/components/ui/chip';
+import { Note } from '@/components/ui/note';
 import { PLAN_PRIORITIES, PLAN_PRIORITY_LABEL, PLAN_STATUSES, isClosed } from '@/lib/plan/load';
 import { checkWaitName } from '@/lib/plan/check-backs';
 import {
@@ -93,6 +95,7 @@ import { featureHref, waitedOnHref } from '@/lib/plan/feature-page';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 import type { PlanPicture } from '@/lib/plan/pictures';
 import { PlanPictures } from '@/components/dev/plan-pictures';
+import { linkVariants } from '@/components/ui/link';
 
 /**
  * One row of the dev plan, drawn through the shared tree row.
@@ -159,29 +162,31 @@ function AnswerDecision({
        box, and the caution hairline round it was a second claim on a grouping
        the ground had already made. The tint stays -- it is the thing saying a
        question is waiting on you. Law 11. */
-    <div className="space-y-2.5 rounded-lg bg-caution-tint/40 px-3 py-2.5">
-      {/* The question and its options, before the box that closes them. The
-          box used to come first with the options as a row of chips above it,
-          which put the form in front of the thing the form is about. */}
-      <TheQuestion outline={node.outline} title={node.title} />
-      <TheOptions
-        detail={node.detail === null ? null : readableRefs(node.detail, outlines)}
-        onChoose={choose}
-      />
+    <Note tone="caution" glyph={false} role={undefined}>
+      <div className="space-y-2.5">
+        {/* The question and its options, before the box that closes them. The
+            box used to come first with the options as a row of chips above it,
+            which put the form in front of the thing the form is about. */}
+        <TheQuestion outline={node.outline} title={node.title} />
+        <TheOptions
+          detail={node.detail === null ? null : readableRefs(node.detail, outlines)}
+          onChoose={choose}
+        />
 
-      {node.resolution && <TheAnswered resolution={readableRefs(node.resolution, outlines)} />}
-      <AnswerBox
-        id={node.id}
-        detail={node.detail}
-        resolution={node.resolution}
-        action={action}
-        pending={pending}
-        answer={answer}
-        onAnswer={setAnswer}
-        autoFocus={autoFocus}
-        hint
-      />
-    </div>
+        {node.resolution && <TheAnswered resolution={readableRefs(node.resolution, outlines)} />}
+        <AnswerBox
+          id={node.id}
+          detail={node.detail}
+          resolution={node.resolution}
+          action={action}
+          pending={pending}
+          answer={answer}
+          onAnswer={setAnswer}
+          autoFocus={autoFocus}
+          hint
+        />
+      </div>
+    </Note>
   );
 }
 
@@ -218,23 +223,25 @@ function SetupJob({
   outlines: OutlineIndex;
 }) {
   return (
-    <div className="space-y-2.5 rounded-lg bg-caution-tint/40 px-3 py-2.5">
-      <div className="space-y-0.5">
-        <QuestionPartLabel>What to set up</QuestionPartLabel>
-        <p className="whitespace-pre-wrap text-ui text-ink">
-          <LinkedText text={readableRefs(node.detail?.trim() || node.title, outlines)} />
-        </p>
+    <Note tone="caution" glyph={false} role={undefined}>
+      <div className="space-y-2.5">
+        <div className="space-y-0.5">
+          <QuestionPartLabel>What to set up</QuestionPartLabel>
+          <p className="whitespace-pre-wrap text-ui text-ink">
+            <LinkedText text={readableRefs(node.detail?.trim() || node.title, outlines)} />
+          </p>
+        </div>
+        <form action={action} className="space-y-2">
+          <input type="hidden" name="id" value={node.id} />
+          <input type="hidden" name="status" value="done" />
+          <FieldHint>This closes the step. Nothing is committed against it.</FieldHint>
+          <Button type="submit" size="sm" pending={pending}>
+            I have set this up
+          </Button>
+          <FieldError>{error}</FieldError>
+        </form>
       </div>
-      <form action={action} className="space-y-2">
-        <input type="hidden" name="id" value={node.id} />
-        <input type="hidden" name="status" value="done" />
-        <FieldHint>This closes the step. Nothing is committed against it.</FieldHint>
-        <Button type="submit" size="sm" pending={pending}>
-          I have set this up
-        </Button>
-        <FieldError>{error}</FieldError>
-      </form>
-    </div>
+    </Note>
   );
 }
 
@@ -356,7 +363,7 @@ function SendToClaude({
           title={held ?? quietAsk}
           onClick={onAskQuiet}
         >
-          <Play className="size-3.5" aria-hidden />
+          <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
           {sendLabel(node)}
         </Button>
       ) : (
@@ -370,7 +377,7 @@ function SendToClaude({
             disabled={resolving}
             title={held}
           >
-            <Play className="size-3.5" aria-hidden />
+            <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
             {pending ? 'Sending…' : sendLabel(node)}
           </Button>
         </form>
@@ -394,7 +401,7 @@ function SendToClaude({
                 : 'Start the overhaul routine on this overhaul. It works its steps in order and stops at the first thing that needs you.')
             }
           >
-            <Play className="size-3.5" aria-hidden />
+            <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
             {overhaulPending ? 'Starting…' : 'Work this overhaul'}
           </Button>
         </form>
@@ -1065,11 +1072,11 @@ export function usePlanRow({
               label="Yours, so the runner will not take it. Press Not mine to give it back."
               className="shrink-0"
             >
-              <span className="inline-flex items-center rounded-full bg-accent-tint px-1 py-0.5 text-accent">
+              <span className={cn(chipVariants({ tone: 'accent', size: 'sm' }), 'px-1')}>
                 {/* The head-and-shoulders from the assignee picker, the same
                     icon the Mine press uses, so the mark and the press that
                     sets it are recognisably one thing. */}
-                <CircleUser className="size-3" strokeWidth={2} aria-hidden />
+                <CircleUser strokeWidth={1.75} aria-hidden />
                 <span className="sr-only">Marked yours</span>
               </span>
             </Tooltip>
@@ -1087,7 +1094,7 @@ export function usePlanRow({
               label="An overhaul: built in order by its own routine, which Work this overhaul starts. The runner will not take it."
               className="shrink-0 max-sm:hidden"
             >
-              <span className="inline-flex items-center rounded-full bg-accent-tint px-1.5 py-0.5 text-micro text-accent">
+              <span className={chipVariants({ tone: 'accent', size: 'sm' })}>
                 Overhaul
               </span>
             </Tooltip>
@@ -1140,7 +1147,7 @@ export function usePlanRow({
             // the menu's block (plan #1688).
             className="inline-block align-baseline"
             triggerClassName={cn(
-              'h-auto w-auto rounded px-0.5 py-0 font-normal',
+              'h-auto w-auto rounded-control px-0.5 py-0 font-normal',
               node.priority === 2 &&
                 'text-ink-ghost opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100',
             )}
@@ -1401,7 +1408,7 @@ export function usePlanRow({
         node.waitingOn.length === 1 ? (
           <a
             href={waitedOnHref(node, node.waitingOn[0])}
-            className="press-area underline underline-offset-2"
+            className={cn('press-area', linkVariants({ tone: 'quiet' }))}
           >
             <StateLabel
               glyph={null}

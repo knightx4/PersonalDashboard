@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Check, Copy, Download, Plus } from 'lucide-react';
 import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -242,9 +242,9 @@ function SuggestedActions({ card }: { card: PostCard }) {
         onClick={() => copy('all', threadCopyText(card.post.body))}
       >
         {copied === 'all' ? (
-          <Check className="size-3.5" aria-hidden />
+          <Check strokeWidth={1.75} className="size-3.5" aria-hidden />
         ) : (
-          <Copy className="size-3.5" aria-hidden />
+          <Copy strokeWidth={1.75} className="size-3.5" aria-hidden />
         )}
         {copied === 'all' ? 'Copied' : thread ? 'Copy thread' : 'Copy'}
       </Button>
@@ -302,7 +302,7 @@ function IsThisIt({ postId, candidate }: { postId: string; candidate: NonNullabl
           href={candidate.url}
           target="_blank"
           rel="noreferrer"
-          className="press-area text-small font-medium text-accent hover:underline"
+          className={cn('press-area text-small font-medium', linkVariants())}
         >
           Open on X
         </a>
@@ -341,7 +341,7 @@ function StatusLine({ card }: { card: PostCard }) {
             href={post.postedUrl}
             target="_blank"
             rel="noreferrer"
-            className="press-area text-small font-medium text-accent hover:underline"
+            className={cn('press-area text-small font-medium', linkVariants())}
           >
             Open on X
           </a>
@@ -385,7 +385,7 @@ function PostImage({
           src={image.src}
           alt="Image to post with this draft"
           loading="lazy"
-          className="max-h-64 max-w-full rounded-sm bg-sunken object-contain"
+          className="max-h-64 max-w-full rounded-card bg-sunken object-contain"
         />
       </a>
       <div className="flex flex-wrap items-center gap-1">
@@ -395,7 +395,7 @@ function PostImage({
           download
           className={buttonVariants({ variant: 'ghost', size: 'sm' })}
         >
-          <Download className="size-3.5" aria-hidden />
+          <Download strokeWidth={1.75} className="size-3.5" aria-hidden />
           Save image
         </a>
         {editable && (
@@ -470,19 +470,21 @@ export function PostItem({ card }: { card: PostCard }) {
                   )}
                   <div className="flex items-center justify-end gap-2">
                     {thread && editable && (
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
+                        size="xs"
                         onClick={() => copy(String(index), text)}
-                        className="press inline-flex items-center gap-1 rounded-control px-1 text-small text-ink-muted hover:text-ink focus-visible:outline-2"
+                        className="gap-1"
                         aria-label={`Copy post ${index + 1}`}
                       >
                         {copied === String(index) ? (
-                          <Check className="size-3.5" aria-hidden />
+                          <Check strokeWidth={1.75} className="size-3.5" aria-hidden />
                         ) : (
-                          <Copy className="size-3.5" aria-hidden />
+                          <Copy strokeWidth={1.75} className="size-3.5" aria-hidden />
                         )}
                         {copied === String(index) ? 'Copied' : 'Copy'}
-                      </button>
+                      </Button>
                     )}
                     <Counter text={text} />
                   </div>
@@ -506,7 +508,7 @@ export function PostItem({ card }: { card: PostCard }) {
       {editable && editing === null && post.body.length < MAX_THREAD_POSTS && (
         <div>
           <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(post.body.length)}>
-            <Plus className="size-3.5" aria-hidden />
+            <Plus strokeWidth={1.75} className="size-3.5" aria-hidden />
             Add a post to the thread
           </Button>
         </div>
@@ -545,7 +547,7 @@ export function PostItem({ card }: { card: PostCard }) {
               <Link
                 href={source.href}
                 title={source.title}
-                className="tabular font-medium text-ink hover:underline"
+                className={cn('tabular font-medium', linkVariants())}
               >
                 {source.label}
               </Link>

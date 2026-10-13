@@ -16,7 +16,7 @@ export function WatchedButton({ watched }: { watched: boolean }) {
       aria-pressed={watched}
       pending={pending}
     >
-      {watched && !pending && <Check className="size-3.5" strokeWidth={2} aria-hidden />}
+      {watched && !pending && <Check className="size-3.5" strokeWidth={1.75} aria-hidden />}
       {pending ? 'Saving…' : watched ? 'Watched' : 'Mark watched'}
     </Button>
   );

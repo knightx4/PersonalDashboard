@@ -1,5 +1,5 @@
 import { Package, SearchX } from 'lucide-react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { InventoryRow, type InventoryRowItem } from '@/components/inventory/inventory-row';
 import { InventoryBulkBar } from '@/components/inventory/inventory-selection';

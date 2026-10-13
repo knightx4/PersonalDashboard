@@ -499,7 +499,7 @@ export function OvernightControl({
   // the mark puts it in a column of its own.
   const labelText = (
     <span className="inline-flex min-h-(--control-h) items-center gap-1.5 text-ui font-medium text-ink">
-      <Moon className="size-4 text-ink-muted" aria-hidden />
+      <Moon strokeWidth={1.75} className="size-4 text-ink-muted" aria-hidden />
       {label}
     </span>
   );
@@ -564,7 +564,7 @@ export function OvernightControl({
                       : 'Approve every proposed feature and step now, and each new one as it is written.'
                   }
                 >
-                  <CheckCheck className="size-3.5" aria-hidden />
+                  <CheckCheck strokeWidth={1.75} className="size-3.5" aria-hidden />
                   {autoApprove ? 'Auto approve on' : 'Auto approve'}
                 </Button>
               </form>
@@ -579,7 +579,7 @@ export function OvernightControl({
                   pending={pausing}
                   title="Fire nothing more. What is already building finishes and commits."
                 >
-                  <Pause className="size-3.5" aria-hidden />
+                  <Pause strokeWidth={1.75} className="size-3.5" aria-hidden />
                   {pausing ? 'Holding…' : 'Hold'}
                 </Button>
               </form>
@@ -594,7 +594,7 @@ export function OvernightControl({
                   pending={resuming}
                   title="Carry on from wherever the plan now is, on what is left of the budget and the clock"
                 >
-                  <Play className="size-3.5" aria-hidden />
+                  <Play strokeWidth={1.75} className="size-3.5" aria-hidden />
                   {resuming ? 'Resuming…' : 'Resume'}
                 </Button>
               </form>
@@ -609,7 +609,7 @@ export function OvernightControl({
                   pending={stopping}
                   title="End the night. What is already building still finishes; nothing follows it."
                 >
-                  <Square className="size-3.5" aria-hidden />
+                  <Square strokeWidth={1.75} className="size-3.5" aria-hidden />
                   {stopping ? 'Stopping…' : 'Stop'}
                 </Button>
               </form>

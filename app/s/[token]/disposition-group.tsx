@@ -3,7 +3,8 @@
 import { useState, useTransition } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { PRESS_AREA, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import type { ShareGroup } from '@/lib/share/read/load-disposition';
 import { respondToShare } from './actions';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -59,6 +60,9 @@ const CHOICES: Array<{ id: Choice; label: string; tint: string; button: string; 
 ];
 
 type Counts = { keep: number; sell: number; giveaway: number };
+
+/** The stepper's buttons take the lane's ink rather than their own. */
+const STEP = 'text-current hover:bg-surface hover:text-current disabled:opacity-30';
 
 export function DispositionGroup({
   token,
@@ -222,29 +226,27 @@ export function DispositionGroup({
                   <span className="pl-1 text-ui font-medium">{choice.label}</span>
                   <span className="flex items-center gap-1">
                     <Tooltip label={`One fewer to ${choice.label.toLowerCase()}`}>
-                      <button
-                        type="button"
+                      <IconButton
                         onClick={() => step(choice.id, -1)}
                         disabled={counts[choice.id] === 0}
-                        aria-label={`One fewer to ${choice.label.toLowerCase()}`}
-                        className={cn(PRESS_AREA, 'press grid size-7 place-items-center rounded-control hover:bg-surface disabled:opacity-30')}
+                        label={`One fewer to ${choice.label.toLowerCase()}`}
+                        className={STEP}
                       >
-                        <Minus className="size-3.5" aria-hidden />
-                      </button>
+                        <Minus strokeWidth={1.75} aria-hidden />
+                      </IconButton>
                     </Tooltip>
                     <span className="w-4 text-center text-body tabular-nums">
                       {counts[choice.id]}
                     </span>
                     <Tooltip label={`One more to ${choice.label.toLowerCase()}`} align="end">
-                      <button
-                        type="button"
+                      <IconButton
                         onClick={() => step(choice.id, 1)}
                         disabled={undecided === 0}
-                        aria-label={`One more to ${choice.label.toLowerCase()}`}
-                        className={cn(PRESS_AREA, 'press grid size-7 place-items-center rounded-control hover:bg-surface disabled:opacity-30')}
+                        label={`One more to ${choice.label.toLowerCase()}`}
+                        className={STEP}
                       >
-                        <Plus className="size-3.5" aria-hidden />
-                      </button>
+                        <Plus strokeWidth={1.75} aria-hidden />
+                      </IconButton>
                     </Tooltip>
                   </span>
                 </div>

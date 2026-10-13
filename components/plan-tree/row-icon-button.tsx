@@ -1,3 +1,4 @@
+import { IconButton } from '@/components/ui/icon-button';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**
@@ -26,15 +27,9 @@ export function RowIconButton({
 }) {
   return (
     <Tooltip label={tip ?? label} align="end">
-      <button
-        type={type}
-        onClick={onClick}
-        disabled={pending}
-        className="press flex size-7 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink disabled:opacity-50"
-      >
+      <IconButton type={type} label={label} onClick={onClick} disabled={pending}>
         {children}
-        <span className="sr-only">{label}</span>
-      </button>
+      </IconButton>
     </Tooltip>
   );
 }

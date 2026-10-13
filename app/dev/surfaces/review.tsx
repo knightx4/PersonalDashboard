@@ -11,6 +11,7 @@ import { cn } from '@/lib/cn';
 import { planHref } from '@/lib/search/sources/dev-map';
 import type { SurfaceChange } from '@/lib/plan/screen-change';
 import { noteOnSurface, type SurfaceNoteState } from './actions';
+import Link, { linkVariants } from '@/components/ui/link';
 
 export type SurfaceNote = {
   id: string;
@@ -119,9 +120,9 @@ function SurfaceCard({ surface, width }: { surface: ReviewSurface; width: 'phone
           {surface.changed && (
             <p className="text-small text-ink-muted">
               Changed by{' '}
-              <a href={planHref(surface.changed.step)} className="text-accent hover:underline">
+              <Link href={planHref(surface.changed.step)} className={linkVariants()}>
                 #{surface.changed.step}
-              </a>{' '}
+              </Link>{' '}
               on {shortDate(surface.changed.checkedAt)}
             </p>
           )}

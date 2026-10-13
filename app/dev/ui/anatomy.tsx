@@ -8,7 +8,7 @@ import { Group } from '@/components/ui/disclosure';
 import { ChipSelect, ComposeBody, ComposeTitle, InlineInput, Input } from '@/components/ui/field';
 import { Figure } from '@/components/ui/figure';
 import { Meter } from '@/components/ui/meter';
-import { Kbd } from '@/components/shell/key-hints';
+import { Kbd } from '@/components/ui/kbd';
 import { ICON_STROKE } from './measurements';
 import { formatMoney } from '@/lib/money';
 

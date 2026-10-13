@@ -1,3 +1,5 @@
+import Link, { linkVariants } from '@/components/ui/link';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { cn } from '@/lib/cn';
 import type { ScreenChangeView } from '@/lib/plan/screen-change';
 
@@ -16,14 +18,14 @@ import type { ScreenChangeView } from '@/lib/plan/screen-change';
 
 function Picture({ src, alt, className }: { src: string; alt: string; className?: string }) {
   return (
-    <a href={src} target="_blank" rel="noreferrer" className="press block rounded-md">
+    <a href={src} target="_blank" rel="noreferrer" className="press block rounded-card">
       {/* eslint-disable-next-line @next/next/no-img-element -- a redirect to a signed link in the private ui-shots bucket */}
       <img
         src={src}
         alt={alt}
         loading="lazy"
         className={cn(
-          'aspect-[9/16] w-full rounded-md border border-border bg-sunken object-cover object-top' /* ui-ok: a photograph of a phone screen, not a container; the hairline keeps a shot whose ground matches the panel from dissolving into it */,
+          'aspect-[9/16] w-full rounded-card border border-border bg-sunken object-cover object-top' /* ui-ok: a photograph of a phone screen, not a container; the hairline keeps a shot whose ground matches the panel from dissolving into it */,
           className,
         )}
       />
@@ -34,7 +36,7 @@ function Picture({ src, alt, className }: { src: string; alt: string; className?
 /** Where a picture would be, saying why there is none. */
 function Missing({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex aspect-[9/16] w-full items-center justify-center rounded-md bg-sunken p-3 text-center text-small text-ink-muted">
+    <div className="flex aspect-[9/16] w-full items-center justify-center rounded-card bg-sunken p-3 text-center text-small text-ink-muted">
       {children}
     </div>
   );
@@ -71,8 +73,8 @@ export function ScreenChanges({
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <figure className="space-y-1">
-                <figcaption className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
-                  Before
+                <figcaption>
+                  <SectionLabel as="span">Before</SectionLabel>
                 </figcaption>
                 {change.before ? (
                   <Picture
@@ -84,8 +86,8 @@ export function ScreenChanges({
                 )}
               </figure>
               <figure className="space-y-1">
-                <figcaption className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
-                  After
+                <figcaption>
+                  <SectionLabel as="span">After</SectionLabel>
                 </figcaption>
                 {change.after ? (
                   <Picture
@@ -148,9 +150,9 @@ export function ShippedScreens({ screens }: { screens: readonly ShippedScreen[] 
             alt={`${screen.change.surface} after #${screen.step}, on a phone`}
           />
           <figcaption className="text-micro text-ink-muted">
-            <a href={screen.href} className="press-area line-clamp-2 hover:text-ink hover:underline">
+            <Link href={screen.href} className={cn('press-area line-clamp-2', linkVariants({ tone: 'quiet' }))}>
               #{screen.step} {screen.title}
-            </a>
+            </Link>
           </figcaption>
         </figure>
       ))}

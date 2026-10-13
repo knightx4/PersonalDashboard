@@ -1,7 +1,8 @@
 'use client';
 
 import { useActionState, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { cn } from '@/lib/cn';
 import { Repeat } from 'lucide-react';
 import { RowIconButton } from '@/components/plan-tree/row-icon-button';
 import { StateLabel } from '@/components/dev/state-label';
@@ -236,7 +237,7 @@ function ProgressLine({
       Last progress {formatDate(beneath.on)} on{' '}
       <Link
         href={stepHref(goalId, beneath.stepId)}
-        className="press-area underline-offset-2 hover:underline"
+        className={cn('press-area', linkVariants({ tone: 'quiet' }))}
       >
         {beneath.title}
       </Link>
@@ -281,7 +282,7 @@ function ProgressList({ progress }: { progress: ItemProgress }) {
  */
 function StepRunLine({ run, inset }: { run: StepRunView; inset: React.CSSProperties }) {
   const details = (
-    <Link href={`/goals/runs/${run.runId}`} className="underline underline-offset-2">
+    <Link href={`/goals/runs/${run.runId}`} className={linkVariants({ tone: 'quiet' })}>
       Details
     </Link>
   );
@@ -312,7 +313,7 @@ function StepRunLine({ run, inset }: { run: StepRunView; inset: React.CSSPropert
   if (!run.summary) return null;
   return (
     <li style={inset} className="pb-1.5 pr-3 text-small text-ink-muted">
-      <Link href={`/goals/runs/${run.runId}`} className="underline-offset-2 hover:underline">
+      <Link href={`/goals/runs/${run.runId}`} className={linkVariants({ tone: 'quiet' })}>
         Last run
       </Link>
       : {run.summary}
@@ -340,7 +341,7 @@ function BlockForm({
   }, {} as TreeActionState);
   return (
     <li style={inset} className="pb-2 pr-3">
-      <form action={action} className="space-y-2 rounded-lg bg-sunken px-3 py-2.5">
+      <form action={action} className="space-y-2 rounded-control bg-sunken px-3 py-2.5">
         <input type="hidden" name="id" value={node.id} />
         <InlineInput
           name="ask"
@@ -785,7 +786,7 @@ export function GoalRow({
           {step.kind === 'rhythm' && (
             <Tooltip label={STEP_KIND_LABELS.rhythm} className="shrink-0">
               <span className="inline-flex text-ink-muted">
-                <Repeat className="size-3" strokeWidth={1.75} aria-hidden />
+                <Repeat className="size-3.5" strokeWidth={1.75} aria-hidden />
                 <span className="sr-only">{STEP_KIND_LABELS.rhythm}</span>
               </span>
             </Tooltip>

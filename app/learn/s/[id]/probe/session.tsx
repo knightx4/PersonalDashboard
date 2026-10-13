@@ -5,7 +5,6 @@ import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { cardVariants } from '@/components/ui/card';
-import { cn } from '@/lib/cn';
 import { KindBadge } from '@/components/learn/kind-badge';
 import { MasteryChecks } from '@/components/learn/mastery-checks';
 import { ProbeOptions } from '@/components/learn/probe-options';
@@ -20,6 +19,7 @@ import {
   type DeclareState,
   type FloorState,
 } from './actions';
+import { EmptyState } from '@/components/ui/empty-state';
 
 /**
  * One question at a time, and the truth about how far along you are.
@@ -317,21 +317,28 @@ export function ProbeSession({
           {declared.error && <p className="mt-3 text-ui text-danger">{declared.error}</p>}
         </div>
       ) : (
-        <form action={ask} className={cn(cardVariants(), 'border-dashed px-4 py-6 text-center')}>
+        <form action={ask}>
           <input type="hidden" name="subjectId" value={subjectId} />
           {/* Only here, and deliberately: the form that asks for another
               question carries no concept, so the session picks for itself from
               the second question on. */}
           {startConceptId && <input type="hidden" name="conceptId" value={startConceptId} />}
-          <p className="text-body text-ink-muted">
-            {startConceptName
-              ? `The first question is about ${startConceptName}. After that, one at a time against whatever this subject has least evidence on.`
-              : 'One question at a time, written against one idea in this subject. Ten is a good start, and then as many as you want.'}
-          </p>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+          <EmptyState
+            size="box"
+            title={
+              startConceptName
+                ? `The first question is about ${startConceptName}.`
+                : 'One question at a time, written against one idea in this subject.'
+            }
+            description={
+              startConceptName
+                ? 'After that, one at a time against whatever this subject has least evidence on.'
+                : 'Ten is a good start, and then as many as you want.'
+            }
+          >
             <AskButton label="Start" />
             {live.error && <span className="text-ui text-danger">{live.error}</span>}
-          </div>
+          </EmptyState>
         </form>
       )}
     </>

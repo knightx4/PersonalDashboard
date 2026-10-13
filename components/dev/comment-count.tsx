@@ -27,7 +27,7 @@ export function CommentCount({ count }: { count: number }) {
       className="shrink-0"
     >
       <span className="tabular inline-flex items-center gap-0.5 text-small text-ink-ghost">
-        <MessageSquare className="size-3" strokeWidth={2} aria-hidden />
+        <MessageSquare className="size-3.5" strokeWidth={1.75} aria-hidden />
         {count}
         <span className="sr-only">{word}</span>
       </span>

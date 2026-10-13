@@ -8,6 +8,8 @@ import { cn } from '@/lib/cn';
 import { buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
 import { scrim } from '@/components/ui/popover';
+import { IconButton } from '@/components/ui/icon-button';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**
@@ -84,14 +86,9 @@ export function LeftRail({
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 className="text-ui font-semibold text-ink">Filters</h2>
               <Tooltip label="Close filters" align="end">
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
-                >
-                  <X className="size-4" strokeWidth={2} aria-hidden />
-                  <span className="sr-only">Close filters</span>
-                </button>
+                <IconButton label="Close filters" onClick={() => setOpen(false)}>
+                  <X strokeWidth={1.75} aria-hidden />
+                </IconButton>
               </Tooltip>
             </div>
             <div className="flex-1 space-y-6 overflow-y-auto p-4" onClick={() => setOpen(false)}>
@@ -129,9 +126,9 @@ export function RailGroup({
 }) {
   return (
     <div>
-      <h2 className="mb-2 px-1 text-micro font-semibold uppercase tracking-wider text-ink-muted">
+      <SectionLabel as="h2" className="mb-2 px-1">
         {label}
-      </h2>
+      </SectionLabel>
       <div className="space-y-0.5">{children}</div>
     </div>
   );
@@ -180,9 +177,9 @@ export function RailPicker({
 
   return (
     <div>
-      <h2 className="mb-2 px-1 text-micro font-semibold uppercase tracking-wider text-ink-muted">
+      <SectionLabel as="h2" className="mb-2 px-1">
         {label}
-      </h2>
+      </SectionLabel>
       {/* The shared button, not a fifth drawing of one. This was a control
           wearing the *container* hairline -- `border-border`, which owes no
           contrast because a container is also identified by its fill -- at a
@@ -196,11 +193,9 @@ export function RailPicker({
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         className={cn(
-          buttonVariants({ variant: 'secondary' }),
+          buttonVariants({ variant: 'secondary', pressed: !!active }),
           'w-full justify-between gap-2 text-left font-normal',
-          active
-            ? 'border-accent bg-accent-tint font-medium text-accent hover:border-accent hover:bg-accent-tint'
-            : 'text-ink-muted',
+          active ? 'font-medium' : 'text-ink-muted',
         )}
       >
         <span className="flex-1 truncate">{active?.label ?? anyLabel}</span>
@@ -286,7 +281,7 @@ export function RailItem({
   href?: string;
 }) {
   const className = cn(
-    'flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-ui transition-colors duration-quick',
+    'flex w-full items-center gap-2 rounded-control px-2.5 py-1.5 text-left text-ui transition-colors duration-quick',
     active
       ? quiet
         ? 'bg-sunken font-medium text-ink'
@@ -298,7 +293,7 @@ export function RailItem({
     <>
       {iconSlug ? (
         <span
-          className="flex size-5 shrink-0 items-center justify-center rounded-md"
+          className="flex size-5 shrink-0 items-center justify-center rounded-control"
           style={
             swatch && !swatch.includes('gradient')
               ? { backgroundColor: `${swatch}22`, color: swatch }

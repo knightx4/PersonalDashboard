@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Popover } from '@/components/ui/popover';
+import { IconButton } from '@/components/ui/icon-button';
 import { usePopover } from '@/lib/use-popover';
 import { Tooltip } from '@/components/ui/tooltip';
 
@@ -50,25 +51,20 @@ export function NotificationsButton({
   return (
     <div className="relative shrink-0">
       <Tooltip label={`${count} notification${count === 1 ? '' : 's'}`} align="end">
-        <button
+        <IconButton
           ref={triggerRef}
-          type="button"
+          label={`Notifications, ${count} unread`}
           onClick={() => setOpen((prev) => !prev)}
           aria-expanded={open}
           aria-haspopup="dialog"
-          className={cn(
-            'press relative flex size-8 items-center justify-center rounded-full transition-colors',
-            open
-              ? 'bg-accent-tint text-accent'
-              : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink',
-          )}
+          active={open}
+          className={cn('relative', !open && 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink')}
         >
-          <Bell className="size-4" aria-hidden />
+          <Bell strokeWidth={1.75} aria-hidden />
           <span className="tabular absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-caution-fill px-1 text-micro font-bold leading-4 text-caution-fill-ink">
             {count > 9 ? '9+' : count}
           </span>
-          <span className="sr-only">Notifications, {count} unread</span>
-        </button>
+        </IconButton>
       </Tooltip>
 
       {open && (

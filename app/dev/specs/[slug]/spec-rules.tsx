@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { StateLabel, type DevTone } from '@/components/dev/state-label';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -63,7 +63,7 @@ function Summary({ state }: { state: RuleState }) {
     return (
       <>
         Its check is still to be built, in{' '}
-        <Link href={planRefHref(step)} className="text-ink underline-offset-2 hover:underline">
+        <Link href={planRefHref(step)} className={linkVariants()}>
           #{step}
         </Link>
         .

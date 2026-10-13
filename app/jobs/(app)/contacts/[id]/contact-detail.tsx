@@ -4,6 +4,9 @@ import { Pencil, Plus } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
+import { IconButton } from '@/components/ui/icon-button';
+import { linkVariants } from '@/components/ui/link';
 import { ChipSelect, Field, FieldError, InlineTextarea, Input, Textarea } from '@/components/ui/field';
 import { formatDate } from '@/lib/jobs/applications/load';
 import { logTouch, markTouchAnswered, updateContact, updateTouch } from '../actions';
@@ -46,22 +49,15 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
       <header className="flex flex-wrap items-center gap-2">
         <h1 className="text-body font-semibold text-ink">{contact.fullName}</h1>
         {contact.title && <span className="text-ui text-ink-muted">{contact.title}</span>}
-        <span className="rounded-full bg-canvas px-1.5 py-0.5 text-small text-ink-muted">
-          {contact.relationship.replace(/_/g, ' ')}
-        </span>
+        <Chip>{contact.relationship.replace(/_/g, ' ')}</Chip>
         <span className="ml-auto text-small text-ink-muted">
           {contact.status.replace(/_/g, ' ')}
         </span>
         {!editing && (
           <Tooltip label="Edit their details" align="end">
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="press flex size-8 items-center justify-center rounded-lg text-ink-muted transition-colors duration-quick hover:bg-sunken hover:text-ink"
-            >
-              <Pencil className="size-4" strokeWidth={1.75} aria-hidden />
-              <span className="sr-only">Edit their details</span>
-            </button>
+            <IconButton label="Edit their details" onClick={() => setEditing(true)}>
+              <Pencil strokeWidth={1.75} aria-hidden />
+            </IconButton>
           </Tooltip>
         )}
       </header>
@@ -86,7 +82,7 @@ export function ContactDetail({ contact: initial, timezone }: { contact: Contact
                 href={contact.linkedinUrl}
                 target="_blank"
                 rel="noreferrer noopener"
-                className="text-accent underline underline-offset-2"
+                className={linkVariants()}
               >
                 LinkedIn
               </a>

@@ -1,7 +1,15 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { mapHref, type MapParams } from '@/lib/learn/map/view';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { mapHref, parseMapParams, type MapParams } from '@/lib/learn/map/view';
 
 /**
  * Idea Space's view state, shared by the map, its switches and the rail.
@@ -9,8 +17,9 @@ import { mapHref, type MapParams } from '@/lib/learn/map/view';
  * Every switch on the page (layout, colour, names, a domain in the legend, the
  * open idea) changes what is drawn from data already on the page, so it is
  * held here and changed at once. The address follows through
- * `history.replaceState` (law 5): a reload, a pasted link and the server's
- * first render all read it, but no switch waits on the server. Until 13
+ * `history.pushState` (law 5): a reload, a pasted link and the server's first
+ * render all read it, the back button undoes the last switch, and no switch
+ * waits on the server. Until 13
  * October each switch was a link, and every press asked the server to read
  * every idea and work both layouts out again, which took seconds.
  */
@@ -36,12 +45,32 @@ export function PickProvider({
 }) {
   const [params, setParams] = useState(initial);
 
+  // The view as last set, read by `set` so a switch pushes one history entry
+  // even where React runs a state update twice.
+  const latest = useRef(params);
+  useEffect(() => {
+    latest.current = params;
+  }, [params]);
+
   const set = useCallback((change: Partial<MapParams>) => {
-    setParams((current) => {
-      const next = { ...current, ...change };
-      if (typeof window !== 'undefined') window.history.replaceState(null, '', mapHref(next));
-      return next;
-    });
+    const next = { ...latest.current, ...change };
+    latest.current = next;
+    setParams(next);
+    window.history.pushState(null, '', mapHref(next));
+  }, []);
+
+  // Back and forward move through the switches pressed, so the view is read
+  // back from the address they land on.
+  useEffect(() => {
+    const restore = () => {
+      const search: Record<string, string> = {};
+      new URLSearchParams(window.location.search).forEach((value, key) => {
+        search[key] = value;
+      });
+      setParams(parseMapParams(search));
+    };
+    window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
   }, []);
 
   const pick = useCallback((id: string | null) => set({ idea: id }), [set]);

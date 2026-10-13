@@ -1,6 +1,7 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
+import { cn } from '@/lib/cn';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Banner } from '@/components/ui/banner';
@@ -81,7 +82,7 @@ export function InboxSyncBanner({
         </span>{' '}
         <Link
           href="/shopping/settings#inboxes"
-          className="font-medium text-accent underline underline-offset-2"
+          className={cn(linkVariants({ tone: 'inline' }), 'font-medium')}
         >
           View progress
         </Link>

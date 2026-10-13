@@ -113,6 +113,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'vault-note': ['/vault/n/[...path]'],
   'vault-note-edit': ['/vault/n/[...path]'],
   'vault-note-editing': ['/vault/n/[...path]'],
+  'vault-note-rename': ['/vault/n/[...path]'],
   'vault-note-attachments': ['/vault/n/[...path]'],
   'vault-education-empty': ['/vault/education'],
   'vault-education-upload': ['/vault/education'],
@@ -210,6 +211,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-motion-settle': ['/dev/ui'],
   'dev-motion-clear': ['/dev/ui'],
   'dash-mark': ['/dev/ui'],
+  'ui-kit': ['/dev/ui'],
   'todo-day-close': ['/todo'],
   'todo-day-closed': ['/todo'],
   'todo-task-files': ['/todo', '/todo/all'],
@@ -242,6 +244,11 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'onboarding-gmail': ['/onboarding'],
   'share-form': ['/s/[token]'],
   'open-missing': ['/open/[ref]'],
+  // A workspace's not-found.tsx and error.tsx (plan #1923). They draw no page
+  // of their own, so they stand on /open, the one page whose whole content is
+  // a row that is no longer there.
+  'route-not-found': ['/open/[ref]'],
+  'route-error': ['/open/[ref]'],
   'account': ['/account'],
   'account-notifications': ['/account'],
   'account-workspaces': ['/account'],
@@ -388,6 +395,58 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
   'shell-note-saved': ['components/shell/feedback-button.tsx', 'components/feedback/triage-note.tsx'],
   // Every state of the mark, bare and in each hat, at every size.
   'dash-mark': ['components/ui/dash-mark.tsx'],
+  // Every other primitive, in each state it has (app/preview/ui-kit-surface.tsx).
+  // Without this a change to Button or Card reached every surface in the
+  // gallery, and each had to be settled by hand. A new file in components/ui
+  // belongs here or on a surface of its own (lib/preview/ui-kit.test.ts).
+  'ui-kit': [
+    'components/ui/action-menu.tsx',
+    'components/ui/add-trigger.tsx',
+    'components/ui/banner.tsx',
+    'components/ui/burn-up-chart.tsx',
+    'components/ui/button.tsx',
+    'components/ui/card.tsx',
+    'components/ui/chip.tsx',
+    'components/ui/confirm-step.tsx',
+    'components/ui/cost-hint.tsx',
+    'components/ui/disclosure.tsx',
+    'components/ui/editable-prose.tsx',
+    'components/ui/empty-state.tsx',
+    'components/ui/field.tsx',
+    'components/ui/figure.tsx',
+    'components/ui/fold-details.tsx',
+    'components/ui/folding-markdown.tsx',
+    'components/ui/gmail-anchor.tsx',
+    'components/ui/icon-button.tsx',
+    'components/ui/kbd.tsx',
+    'components/ui/link-pending.tsx',
+    'components/ui/link.tsx',
+    'components/ui/linked-text.tsx',
+    'components/ui/live-dot.tsx',
+    'components/ui/markdown.tsx',
+    'components/ui/meter.tsx',
+    'components/ui/module-mark.tsx',
+    'components/ui/move-label.tsx',
+    'components/ui/note.tsx',
+    'components/ui/popover.tsx',
+    'components/ui/rating.tsx',
+    'components/ui/return-fuse.tsx',
+    'components/ui/route-error.tsx',
+    'components/ui/search-mark.tsx',
+    'components/ui/section-heading.tsx',
+    'components/ui/segmented.tsx',
+    'components/ui/selection.tsx',
+    'components/ui/sigil.tsx',
+    'components/ui/skeleton.tsx',
+    'components/ui/sparkline.tsx',
+    'components/ui/stat.tsx',
+    'components/ui/status-glyph.tsx',
+    'components/ui/table.tsx',
+    'components/ui/tabs.tsx',
+    'components/ui/timezone-field.tsx',
+    'components/ui/toast.tsx',
+    'components/ui/value-row.tsx',
+  ],
   // The runner's card with its four Dashes, running and off (plan #1704).
   'dev-runner-crew': ['app/dev/plan/overnight-control.tsx', 'app/dev/plan/runner-crew.tsx'],
   // A run's lines in every state, on a plan step and a goal run (plan #1826).
@@ -398,6 +457,9 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
     // The presses that answer a waiting question (plan #1824).
     'components/runs/run-answer.tsx',
   ],
+  // What every workspace's not-found.tsx and error.tsx draw (plan #1923).
+  'route-not-found': ['components/shell/no-longer-there.tsx'],
+  'route-error': ['components/ui/route-error.tsx'],
 };
 
 /** The surface that stands for a shared component, or null for any other file. */
@@ -454,7 +516,17 @@ export function surfacesForRoute(route: string, under = false): string[] {
 }
 
 /** Files a route can hold that frame every page beneath them. */
-const FRAMES = new Set(['layout', 'template', 'loading', 'error', 'not-found']);
+const FRAMES = new Set(['layout', 'template', 'loading']);
+
+/**
+ * Files that replace a page only when it fails or finds nothing, so they
+ * change none of the pages beneath them as those are normally seen: each is
+ * looked at on the surface that draws it (plan #1923).
+ */
+const STATE_SURFACES: Readonly<Record<string, string>> = {
+  'not-found': 'route-not-found',
+  error: 'route-error',
+};
 
 /**
  * The page a file under `app/` belongs to, as a route, or null for a file
@@ -486,9 +558,10 @@ function baseName(file: string): string {
 /**
  * The surfaces one file under `app/` serves.
  *
- * A page serves its own route. A layout, loading or error file frames every
- * page beneath it. Any other file is taken to serve the page of its folder;
- * when that folder is not a page of its own (`app/news/quick/`), the search
+ * A page serves its own route. A layout or loading file frames every page
+ * beneath it, and an error or not-found file serves the surface that draws
+ * it. Any other file is taken to serve the page of its folder; when that
+ * folder is not a page of its own (`app/news/quick/`), the search
  * moves up a folder at a time until a surface answers, stopping short of `/`
  * so that a stray file does not claim the whole gallery.
  */
@@ -497,6 +570,7 @@ function surfacesForAppFile(file: string): string[] {
   if (route === null) return [];
   const base = baseName(file);
   if (base === 'page' || base === 'route') return surfacesForRoute(route);
+  if (base in STATE_SURFACES) return [STATE_SURFACES[base]];
   if (FRAMES.has(base)) return surfacesForRoute(route, true);
 
   const segments = segmentsOf(route);

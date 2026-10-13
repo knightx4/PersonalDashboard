@@ -3,6 +3,7 @@
 import Link from '@/components/ui/link';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
+import { toggleChipClass } from '@/components/ui/chip';
 import type { NewsTopic } from '@/lib/news/issues/topics';
 import { chipsThatFit } from '@/lib/news/quick/chip-fit';
 
@@ -18,15 +19,8 @@ export type TopicChipsProps = {
   className?: string;
 };
 
-/**
- * A filled pill with no border, the same shape FilterChips draws, so the chip
- * in force reads like the filter chips on other pages (law 11: no hand-drawn
- * bordered box).
- */
-const CHIP =
-  'press inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-small transition-colors duration-quick';
-const CHIP_OFF = 'bg-sunken text-ink-muted hover:bg-accent-tint hover:text-accent';
-const CHIP_ON = 'bg-accent-tint font-medium text-accent';
+/** The chip FilterChips draws, so the chip in force reads like the filter chips on other pages. */
+const CHIP = toggleChipClass(false);
 
 /**
  * A row of topic chips above Quick read and the newsletter list (plan #860).
@@ -111,7 +105,7 @@ export function TopicChips({ topics, selected, hrefs, allHref, className }: Topi
         <Link
           href={allHref}
           aria-current={selected ? undefined : 'true'}
-          className={cn(CHIP, selected ? CHIP_OFF : CHIP_ON)}
+          className={toggleChipClass(!selected)}
         >
           All topics
         </Link>
@@ -122,7 +116,7 @@ export function TopicChips({ topics, selected, hrefs, allHref, className }: Topi
               key={topic}
               href={current ? allHref : (hrefs[topic] ?? allHref)}
               aria-current={current ? 'true' : undefined}
-              className={cn(CHIP, current ? CHIP_ON : CHIP_OFF)}
+              className={toggleChipClass(current)}
             >
               {topic}
             </Link>
@@ -133,7 +127,7 @@ export function TopicChips({ topics, selected, hrefs, allHref, className }: Topi
             type="button"
             aria-expanded={open}
             onClick={() => setOpen(!open)}
-            className={cn(CHIP, CHIP_OFF)}
+            className={CHIP}
           >
             {open ? 'Less' : 'More'}
           </button>

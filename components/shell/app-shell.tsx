@@ -22,7 +22,9 @@ import { SearchMark } from '@/components/ui/search-mark';
 import type { SearchScope } from '@/lib/search/scope';
 import { CaptureButton, CaptureProvider } from '@/components/shell/capture';
 import { AskDashButton, AskDashProvider } from '@/components/shell/ask-dash';
-import { KeyHintsProvider, Kbd } from '@/components/shell/key-hints';
+import { KeyHintsProvider } from '@/components/shell/key-hints';
+import { Kbd } from '@/components/ui/kbd';
+import { IconButton } from '@/components/ui/icon-button';
 import { ToastProvider } from '@/components/ui/toast';
 import { scrim } from '@/components/ui/popover';
 import { NAV_ICONS, type NavIconName } from '@/components/shell/nav-icons';
@@ -34,6 +36,7 @@ import {
 } from '@/components/shell/workspace-switcher';
 import { ModuleMark } from '@/components/ui/module-mark';
 import { HOME_MARK, moduleById, switchableModules, type ModuleId } from '@/lib/modules';
+import { openingOffset, savePaneScroll } from '@/lib/shell/pane-scroll';
 import type { Theme } from '@/lib/theme';
 import type { ActivityLine } from '@/lib/shell/activity';
 import type { MainCheck } from '@/lib/plan/main-check';
@@ -62,7 +65,9 @@ export type NavSection = {
    * A badge only where an unattended count causes silent data damage. Review
    * has earned one -- an unworked queue is how the dashboard quietly becomes
    * wrong -- and Raised has, because an unread question is a session that
-   * guessed and built on the guess. Nothing else in this app has.
+   * guessed and built on the guess. Goals' Inbox and Learn's Now carry one
+   * too, for the same reason: an unanswered question or a due item left
+   * unseen goes stale quietly.
    */
   badge?: number;
 };
@@ -210,15 +215,58 @@ export function AppShell({
   }, []);
 
   /**
-   * A new page starts at the top of the page.
+   * A new page starts at the top of the pane, and Back returns to where you
+   * were (plan #1919.2).
    *
    * The router scrolls `window` on navigation, and from lg up the window is
    * not the thing that scrolls -- the pane is. Without this, opening a role
    * from halfway down the pipeline lands you halfway down the role. Below lg
    * the pane is not a scroll container and this is a no-op.
+   *
+   * Next gives no event for the kind of navigation, but a Back or Forward
+   * press fires `popstate` before the new path renders, so that sets a flag
+   * the path change reads. The offset is saved as the pane scrolls and again
+   * at the moment of leaving, before the old content is replaced.
    */
+  const poppedRef = useRef(false);
+  const pathRef = useRef(pathname);
   useEffect(() => {
-    paneRef.current?.scrollTo({ top: 0 });
+    const pane = paneRef.current;
+    if (!pane) return;
+    const save = () => savePaneScroll(pathRef.current, pane.scrollTop);
+    const onPop = () => {
+      save();
+      poppedRef.current = true;
+    };
+    pane.addEventListener('scroll', save, { passive: true });
+    document.addEventListener('click', save, true);
+    window.addEventListener('popstate', onPop, true);
+    return () => {
+      pane.removeEventListener('scroll', save);
+      document.removeEventListener('click', save, true);
+      window.removeEventListener('popstate', onPop, true);
+    };
+  }, []);
+  useEffect(() => {
+    const pane = paneRef.current;
+    pathRef.current = pathname;
+    const popped = poppedRef.current;
+    poppedRef.current = false;
+    if (!pane) return;
+    const top = openingOffset(pathname, popped);
+    pane.scrollTo({ top });
+    if (!top) return;
+    // The page may still be filling in; keep asking for a moment until the
+    // pane is long enough to hold the offset.
+    let tries = 0;
+    let frame = 0;
+    const settle = () => {
+      if (Math.abs(pane.scrollTop - top) < 2 || ++tries > 30) return;
+      pane.scrollTo({ top });
+      frame = requestAnimationFrame(settle);
+    };
+    frame = requestAnimationFrame(settle);
+    return () => cancelAnimationFrame(frame);
   }, [pathname]);
 
   function toggleCollapsed() {
@@ -337,7 +385,7 @@ export function AppShell({
         // Where capture flies an item filed into this workspace (landed.ts).
         data-capture-nav={href}
         className={cn(
-          'group relative flex items-center gap-2 rounded-lg py-1.5 text-ui font-medium transition-colors duration-quick',
+          'group relative flex items-center gap-2 rounded-control py-1.5 text-ui font-medium transition-colors duration-quick',
           narrow ? 'justify-center px-2' : 'pl-3 pr-2',
           on
             ? 'bg-shell-hover text-shell-ink'
@@ -621,7 +669,7 @@ export function AppShell({
                   aria-label={collapsed ? 'Expand the sidebar' : 'Collapse the sidebar'}
                   aria-pressed={collapsed}
                   className={cn(
-                    'press flex w-full items-center gap-2 rounded-lg py-1.5 text-ui font-medium text-shell-muted transition-colors duration-quick hover:bg-shell-hover/60 hover:text-shell-ink',
+                    'press flex w-full items-center gap-2 rounded-control py-1.5 text-ui font-medium text-shell-muted transition-colors duration-quick hover:bg-shell-hover/60 hover:text-shell-ink',
                     collapsed ? 'justify-center px-2' : 'pl-3 pr-2',
                   )}
                 >
@@ -650,14 +698,13 @@ export function AppShell({
               <aside className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-shell-border bg-shell">
                 <div className="flex justify-end px-2 pt-2">
                   <Tooltip label="Close navigation" align="end">
-                    <button
-                      type="button"
+                    <IconButton
+                      label="Close navigation"
                       onClick={() => setDrawer(false)}
-                      className="press flex size-8 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
+                      className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
                     >
-                      <X className="size-4" strokeWidth={2} aria-hidden />
-                      <span className="sr-only">Close navigation</span>
-                    </button>
+                      <X strokeWidth={1.75} aria-hidden />
+                    </IconButton>
                   </Tooltip>
                 </div>
                 {/* Never narrow: a drawer you opened on purpose has no width to
@@ -686,14 +733,13 @@ export function AppShell({
             <header className="sticky top-0 z-chrome bg-page/85 pt-[env(safe-area-inset-top)] backdrop-blur">
               <div className="flex h-(--bar-h) items-center gap-1 px-3 sm:gap-2 sm:px-5">
                 <Tooltip label="Open navigation" className="shrink-0 lg:hidden">
-                  <button
-                    type="button"
+                  <IconButton
+                    label="Open navigation"
                     onClick={() => setDrawer(true)}
-                    className="press flex size-8 shrink-0 items-center justify-center rounded-lg text-shell-muted hover:bg-shell-hover hover:text-shell-ink lg:hidden"
-                    aria-label="Open navigation"
+                    className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink"
                   >
-                    <Menu className="size-4" strokeWidth={1.75} aria-hidden />
-                  </button>
+                    <Menu strokeWidth={1.75} aria-hidden />
+                  </IconButton>
                 </Tooltip>
 
                 {/* The mark in the bar is the switcher, not a picture of one.
@@ -808,14 +854,14 @@ export function AppShell({
                   the left and a second way in beside it would be two controls
                   for one thing. */}
                   <Tooltip label="Search" className="shrink-0 lg:hidden">
-                    <button
-                      type="button"
+                    <IconButton
+                      label="Search"
                       onClick={() => openSearch()}
-                      className="press flex size-8 shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-hover hover:text-shell-ink lg:hidden"
+                      className="text-shell-muted hover:bg-shell-hover hover:text-shell-ink lg:hidden"
                     >
                       <SearchMark />
                       <span className="sr-only">Search</span>
-                    </button>
+                    </IconButton>
                   </Tooltip>
 
                   {/* Dash, from any page (plan #1090): a question about

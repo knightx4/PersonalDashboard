@@ -1,10 +1,12 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useActionState, useId, useRef, useState } from 'react';
 import { Check, Pin, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { Popover } from '@/components/ui/popover';
 import { usePopover } from '@/lib/use-popover';
 import { Input } from '@/components/ui/field';
@@ -82,7 +84,7 @@ export function DisplayMenu({
         onClick={() => setOpen(!open)}
         className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), 'gap-1.5')}
       >
-        <SlidersHorizontal className="size-3.5" strokeWidth={2} aria-hidden />
+        <SlidersHorizontal className="size-3.5" strokeWidth={1.75} aria-hidden />
         <span className={wordClassName}>{label}</span>
         {/* A property turned off leaves nothing behind on the rows to say so,
           * so the count is on the button rather than only inside the panel. */}
@@ -136,15 +138,11 @@ export function DisplayMenu({
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  const headingId = useId();
   return (
-    <section aria-labelledby={headingId}>
-      <h2
-        id={headingId}
-        className="px-2 pb-1 text-micro font-semibold uppercase tracking-wider text-ink-muted"
-      >
+    <section aria-label={title}>
+      <SectionLabel as="h2" className="px-2 pb-1">
         {title}
-      </h2>
+      </SectionLabel>
       <div className="space-y-0.5">{children}</div>
     </section>
   );
@@ -168,7 +166,7 @@ function ChoiceRow({ choice }: { choice: DisplayChoice }) {
       )}
     >
       <span className="truncate">{choice.label}</span>
-      {choice.chosen && <Check className="size-4 shrink-0" strokeWidth={2} aria-hidden />}
+      {choice.chosen && <Check className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />}
     </Link>
   );
 }
@@ -221,14 +219,11 @@ function Views({ menu }: { menu: ListDisplayMenu }) {
           maxLength={60}
           placeholder="Save this as…"
           aria-label="Name for this view"
-          className="h-7 text-small"
+          className="text-small"
         />
-        <button
-          type="submit"
-          className="shrink-0 rounded px-1.5 py-1 text-small text-ink-muted hover:bg-sunken hover:text-ink"
-        >
+        <Button type="submit" variant="ghost" size="xs" className="shrink-0">
           Save
-        </button>
+        </Button>
       </form>
       {state.error && <p className="text-small text-danger">{state.error}</p>}
     </Section>
@@ -256,15 +251,12 @@ function ViewRow({ view, list }: { view: DisplayView; list: string }) {
           required
           maxLength={60}
           aria-label={`Rename ${view.name}`}
-          className="h-7 text-small"
+          className="text-small"
           autoFocus
         />
-        <button
-          type="submit"
-          className="shrink-0 rounded px-1.5 py-1 text-small text-ink-muted hover:bg-sunken hover:text-ink"
-        >
+        <Button type="submit" variant="ghost" size="xs" className="shrink-0">
           Rename
-        </button>
+        </Button>
         {renameState.error && <span className="text-small text-danger">{renameState.error}</span>}
       </form>
     );
@@ -275,14 +267,14 @@ function ViewRow({ view, list }: { view: DisplayView; list: string }) {
       <Link
         href={view.href}
         className={cn(
-          'flex min-w-0 flex-1 items-center gap-2 rounded px-1.5 py-1 text-ui hover:bg-sunken',
+          'flex min-w-0 flex-1 items-center gap-2 rounded-control px-1.5 py-1 text-ui hover:bg-sunken',
           view.inForce ? 'text-ink' : 'text-ink-muted',
         )}
         aria-current={view.inForce ? 'true' : undefined}
       >
         <Check
           className={cn('size-3.5 shrink-0', view.inForce ? 'text-accent' : 'opacity-0')}
-          strokeWidth={2.5}
+          strokeWidth={1.75}
           aria-hidden
         />
         <span className="truncate">{view.name}</span>
@@ -296,16 +288,17 @@ function ViewRow({ view, list }: { view: DisplayView; list: string }) {
         <input type="hidden" name="id" value={view.id} />
         {view.isDefault && <input type="hidden" name="clear" value="1" />}
         <Tooltip label={view.isDefault ? `Stop opening on ${view.name}` : `Open ${list} on ${view.name}`} align="end">
-          <button
+          <IconButton
             type="submit"
-            aria-label={view.isDefault ? `Stop opening on ${view.name}` : `Open ${list} on ${view.name}`}
+            size="sm"
+            label={view.isDefault ? `Stop opening on ${view.name}` : `Open ${list} on ${view.name}`}
             className={cn(
-              'rounded p-1 text-ink-muted opacity-0 hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover/view:opacity-100',
+              'opacity-0 focus-visible:opacity-100 group-hover/view:opacity-100',
               view.isDefault && 'text-accent opacity-100',
             )}
           >
-            <Pin className="size-3.5" strokeWidth={2} aria-hidden />
-          </button>
+            <Pin strokeWidth={1.75} aria-hidden />
+          </IconButton>
         </Tooltip>
       </form>
 
@@ -313,23 +306,26 @@ function ViewRow({ view, list }: { view: DisplayView; list: string }) {
         <input type="hidden" name="list" value={list} />
         <input type="hidden" name="id" value={view.id} />
         <Tooltip label={`Delete ${view.name}`} align="end">
-          <button
+          <IconButton
             type="submit"
-            aria-label={`Delete ${view.name}`}
-            className="rounded p-1 text-ink-muted opacity-0 hover:bg-sunken hover:text-danger focus-visible:opacity-100 group-hover/view:opacity-100"
+            size="sm"
+            label={`Delete ${view.name}`}
+            className="opacity-0 hover:text-danger focus-visible:opacity-100 group-hover/view:opacity-100"
           >
-            <Trash2 className="size-3.5" strokeWidth={2} aria-hidden />
-          </button>
+            <Trash2 strokeWidth={1.75} aria-hidden />
+          </IconButton>
         </Tooltip>
       </form>
 
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="xs"
         onClick={() => setRenaming(true)}
-        className="shrink-0 rounded px-1.5 py-1 text-small text-ink-muted opacity-0 hover:bg-sunken hover:text-ink focus-visible:opacity-100 group-hover/view:opacity-100"
+        className="shrink-0 opacity-0 focus-visible:opacity-100 group-hover/view:opacity-100"
       >
         Rename
-      </button>
+      </Button>
     </div>
   );
 }

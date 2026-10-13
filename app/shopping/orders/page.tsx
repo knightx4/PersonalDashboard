@@ -1,5 +1,5 @@
 import { Receipt } from 'lucide-react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { createClient, requireUser } from '@/lib/auth/server';
 import { createCoreClient } from '@/lib/core/auth/server';
 import { defaultViewHref, savedViewsFor } from '@/lib/saved-views/store';

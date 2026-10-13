@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import {
   ArrowDown,
@@ -22,6 +22,8 @@ import { ClipPlayer } from '@/components/learn/clip-player';
 import { Button } from '@/components/ui/button';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { Card } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
+import { Note } from '@/components/ui/note';
 import { Disclosure, SectionFold } from '@/components/ui/disclosure';
 import { RelatedNotes } from '@/components/vault/related-notes';
 import { Field, Textarea } from '@/components/ui/field';
@@ -437,7 +439,7 @@ function UpNext({
               </span>
               {card.video && (
                 <span className="inline-flex shrink-0 items-center gap-1 text-small text-ink-muted">
-                  <Play className="size-3" strokeWidth={2} aria-hidden />
+                  <Play className="size-3.5" strokeWidth={1.75} aria-hidden />
                   Clip
                 </span>
               )}
@@ -687,19 +689,13 @@ function DeckCard({
           <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-small text-ink-muted">
             <span>{card.why}</span>
             {card.depth && (
-              <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-                {DEPTH_LABEL[card.depth]}
-              </span>
+              <Chip>{DEPTH_LABEL[card.depth]}</Chip>
             )}
             {card.returning === 'review' && (
-              <span className="rounded-pill bg-caution-tint px-1.5 py-0.5 text-small text-caution">
-                Back because you wanted to work on it
-              </span>
+              <Chip tone="caution">Back because you wanted to work on it</Chip>
             )}
             {card.returning === 'skipped' && (
-              <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-                Back after you skipped it
-              </span>
+              <Chip>Back after you skipped it</Chip>
             )}
           </p>
           <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">
@@ -767,11 +763,11 @@ function DeckCard({
               {/* What the clip says and why it is on this card (note
                   cde86a10), once the top-up has written it. */}
               {card.video.note && (
-                <div className="mt-2 rounded-control bg-sunken px-3 py-2.5">
+                <Note className="mt-2">
                   <h4 className="text-small font-semibold text-ink-muted">In this video</h4>
                   <p className="mt-1 text-body text-ink">{card.video.note.said}</p>
                   <p className="mt-1 text-small text-ink-muted">{card.video.note.why}</p>
-                </div>
+                </Note>
               )}
             </section>
           )}
@@ -857,10 +853,10 @@ function DeckCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => void openCardSource(card.id)}
-                className="inline-flex items-center gap-1 text-ink underline underline-offset-2 hover:text-accent"
+                className={cn('inline-flex items-center gap-1', linkVariants({ tone: 'quiet' }))}
               >
                 {card.article}
-                <ExternalLink className="size-3" strokeWidth={2} aria-hidden />
+                <ExternalLink className="size-3.5" strokeWidth={1.75} aria-hidden />
               </a>
               {` · ${card.site}`}
               {card.licence ? ` · ${card.licence}` : ''}
@@ -878,15 +874,15 @@ function DeckCard({
                 disabled={saved !== null}
               >
                 {saved ? (
-                  <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                  <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
                 ) : (
-                  <Bookmark className="size-3.5" strokeWidth={2} aria-hidden />
+                  <Bookmark className="size-3.5" strokeWidth={1.75} aria-hidden />
                 )}
                 {saved ? 'Saved' : saving ? 'Saving…' : 'Save'}
               </Button>
             )}
             <Button type="button" variant="ghost" size="sm" onClick={testMe} pending={testing}>
-              <GraduationCap className="size-3.5" strokeWidth={2} aria-hidden />
+              <GraduationCap className="size-3.5" strokeWidth={1.75} aria-hidden />
               {testing
                 ? card.kind === 'lesson'
                   ? 'Opening the questions…'
@@ -911,9 +907,9 @@ function DeckCard({
                   disabled={made !== null || testing}
                 >
                   {made ? (
-                    <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                    <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
                   ) : (
-                    <Sprout className="size-3.5" strokeWidth={2} aria-hidden />
+                    <Sprout className="size-3.5" strokeWidth={1.75} aria-hidden />
                   )}
                   {made ? 'Subject made' : making ? 'Making a subject…' : 'Make this a subject'}
                 </Button>
@@ -936,7 +932,7 @@ function DeckCard({
                 onClick={onDismiss}
                 disabled={testing}
               >
-                <X className="size-3.5" strokeWidth={2} aria-hidden />
+                <X className="size-3.5" strokeWidth={1.75} aria-hidden />
                 Not interested
               </Button>
               <Button
@@ -952,9 +948,9 @@ function DeckCard({
                 )}
               >
                 {difficulty === 'too_hard' ? (
-                  <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                  <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
                 ) : (
-                  <Weight className="size-3.5" strokeWidth={2} aria-hidden />
+                  <Weight className="size-3.5" strokeWidth={1.75} aria-hidden />
                 )}
                 <span className="sm:hidden">Hard</span>
                 <span className="max-sm:hidden">Too hard</span>
@@ -972,9 +968,9 @@ function DeckCard({
                 )}
               >
                 {difficulty === 'too_easy' ? (
-                  <Check className="size-3.5" strokeWidth={2} aria-hidden />
+                  <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
                 ) : (
-                  <Feather className="size-3.5" strokeWidth={2} aria-hidden />
+                  <Feather className="size-3.5" strokeWidth={1.75} aria-hidden />
                 )}
                 <span className="sm:hidden">Easy</span>
                 <span className="max-sm:hidden">Too easy</span>
@@ -997,7 +993,7 @@ function DeckCard({
           {saved && (
             <p className="mt-2 text-small text-ink-muted">
               On{' '}
-              <Link href={`/learn/t/${saved.id}`} className="text-ink underline underline-offset-2">
+              <Link href={`/learn/t/${saved.id}`} className={linkVariants()}>
                 {saved.title}
               </Link>
               .
@@ -1008,7 +1004,7 @@ function DeckCard({
 
         {/* The three swipes as buttons, held at the foot of the screen while
             a long card is read, so leaving a card never needs a scroll back. */}
-        <div className="sticky bottom-0 rounded-b-[inherit] border-t border-border bg-surface card-pad-x py-2">
+        <div className="sticky bottom-0 rounded-b-card border-t border-border bg-surface card-pad-x py-2">
           {/* A phrase selected on the card, and its explanation (plan
               #1057), above the swipes so it is on screen wherever the
               phrase was. */}
@@ -1025,7 +1021,7 @@ function DeckCard({
               onClick={() => onSwipe('skipped')}
               aria-keyshortcuts="ArrowLeft"
             >
-              <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+              <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
               Not now
             </Button>
             <Button
@@ -1034,7 +1030,7 @@ function DeckCard({
               onClick={() => onSwipe('known')}
               aria-keyshortcuts="ArrowDown"
             >
-              <ArrowDown className="size-3.5" strokeWidth={2} aria-hidden />
+              <ArrowDown className="size-3.5" strokeWidth={1.75} aria-hidden />
               Got it
             </Button>
             <Button
@@ -1044,7 +1040,7 @@ function DeckCard({
               aria-keyshortcuts="ArrowRight"
             >
               Work on this
-              <ArrowRight className="size-3.5" strokeWidth={2} aria-hidden />
+              <ArrowRight className="size-3.5" strokeWidth={1.75} aria-hidden />
             </Button>
           </div>
         </div>
@@ -1089,7 +1085,7 @@ function UnitCheckCard({
   return (
     <Card padding="standard">
       <p className="flex items-center gap-1.5 text-small text-ink-muted">
-        <GraduationCap className="size-3.5" strokeWidth={2} aria-hidden />
+        <GraduationCap className="size-3.5" strokeWidth={1.75} aria-hidden />
         {card.why}
       </p>
       <h2 className="mt-1 font-display text-title tracking-tight break-words text-ink">{card.title}</h2>
@@ -1132,9 +1128,9 @@ function UnitCheckCard({
         <div className="mt-3 space-y-2" aria-live="polite">
           <p className={cn('flex items-center gap-1.5 text-ui font-medium', marked.correct ? 'text-ink' : 'text-ink-muted')}>
             {marked.correct ? (
-              <Check className="size-4" strokeWidth={2} aria-hidden />
+              <Check className="size-4" strokeWidth={1.75} aria-hidden />
             ) : (
-              <X className="size-4" strokeWidth={2} aria-hidden />
+              <X className="size-4" strokeWidth={1.75} aria-hidden />
             )}
             {marked.correct ? 'Right.' : 'Not quite.'}
           </p>

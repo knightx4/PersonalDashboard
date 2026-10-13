@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { CompanyAvatar } from '@/components/jobs/ui/company-avatar';
@@ -127,7 +127,7 @@ function PipelineLine({ row }: { row: PipelineRow }) {
         {row.needsReview && (
           <Tooltip label="Something on this role needs you to look at it" align="end" className="shrink-0">
             <span role="img" aria-label="Needs review" className="inline-flex">
-              <AlertTriangle className="size-3.5 text-caution" strokeWidth={2} aria-hidden />
+              <AlertTriangle className="size-3.5 text-caution" strokeWidth={1.75} aria-hidden />
             </span>
           </Tooltip>
         )}

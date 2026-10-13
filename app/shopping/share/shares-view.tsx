@@ -1,7 +1,8 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Share2 } from 'lucide-react';
 import { ListPage } from '@/components/patterns/list-detail';
 import { PageHeader } from '@/components/shell/page-header';
+import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { NewShareButton } from './share-ui';
 
@@ -46,10 +47,10 @@ export function SharesView({ rows }: { rows: ShareListRow[] }) {
     <PageHeader
       title="Shared forms"
       actions={
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <Link
             href="/shopping/share/families"
-            className="text-ui font-medium text-accent hover:underline"
+            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
           >
             Grouping
           </Link>

@@ -5,7 +5,8 @@ import { Pin, Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
-import { Field, FieldError, Input, Textarea } from '@/components/ui/field';
+import { ToggleChip } from '@/components/ui/chip';
+import { Checkbox, Field, FieldError, Input, Textarea } from '@/components/ui/field';
 import { StatusGlyph } from '@/components/ui/status-glyph';
 import { LinkPicker, type LinkChoice } from '@/components/todo/link-picker';
 import { addTask, editTask, type TaskFormState } from '@/app/todo/actions';
@@ -109,7 +110,7 @@ export function AddTask({ today }: { today: string }) {
             if (!event.target.value) setTime('');
           }}
           className={cn(
-            'tabular rounded-full bg-transparent px-2 py-1 text-small outline-none transition-colors duration-quick',
+            'tabular rounded-full px-2 py-1 text-small outline-none transition-colors duration-quick',
             'focus:ring-1 focus:ring-accent/40',
             dueOn ? 'text-ink' : 'text-ink-muted',
           )}
@@ -122,7 +123,7 @@ export function AddTask({ today }: { today: string }) {
             aria-label="At"
             value={time}
             onChange={(event) => setTime(event.target.value)}
-            className="tabular rounded-full bg-transparent px-2 py-1 text-small text-ink-muted outline-none transition-colors duration-quick focus:ring-1 focus:ring-accent/40"
+            className="tabular rounded-full px-2 py-1 text-small text-ink-muted outline-none transition-colors duration-quick focus:ring-1 focus:ring-accent/40"
           />
         )}
 
@@ -132,30 +133,18 @@ export function AddTask({ today }: { today: string }) {
         <LinkPicker value={about} onChange={setAbout} />
 
         <Tooltip label={pinned ? 'Pinned to the top' : 'Pin to the top'}>
-          <button
-            type="button"
-            aria-pressed={pinned}
-            onClick={() => setPinned((on) => !on)}
-            className={cn(
-              'press flex size-7 items-center justify-center rounded-full transition-colors duration-quick',
-              pinned ? 'bg-accent text-surface' : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-            )}
-          >
-            <Pin className="size-3.5" strokeWidth={1.75} aria-hidden />
+          <ToggleChip on={pinned} onClick={() => setPinned((on) => !on)} className="px-2">
+            <Pin strokeWidth={1.75} aria-hidden />
             <span className="sr-only">{pinned ? 'Pinned to the top' : 'Pin to the top'}</span>
-          </button>
+          </ToggleChip>
         </Tooltip>
         <input type="hidden" name="pinned" value={pinned ? 'on' : ''} />
 
         {/* One button for the one thing that genuinely needs its own room,
             in place of a Details fold over three fields that did not. */}
-        <button
-          type="button"
-          onClick={() => setNoting((open) => !open)}
-          className="ml-auto text-ui font-medium text-ink-muted transition-colors duration-quick hover:text-ink"
-        >
+        <Button type="button" variant="ghost" size="xs" onClick={() => setNoting((open) => !open)} className="ml-auto">
           {noting ? 'Hide note' : 'Add note'}
-        </button>
+        </Button>
       </div>
 
       {/* Hidden rather than unmounted, so a note typed and then folded away is
@@ -255,13 +244,7 @@ function DueFields({
 function PinnedField({ id, defaultChecked = false }: { id: string; defaultChecked?: boolean }) {
   return (
     <label htmlFor={id} className="group flex w-fit cursor-pointer items-center gap-2 text-ui text-ink">
-      <input
-        id={id}
-        type="checkbox"
-        name="pinned"
-        defaultChecked={defaultChecked}
-        className="peer sr-only"
-      />
+      <Checkbox id={id} name="pinned" defaultChecked={defaultChecked} className="peer sr-only" />
       <StatusGlyph
         glyph="empty"
         size={16}
@@ -298,17 +281,9 @@ function QuickDay({
   const on = value === day;
 
   return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={() => onPick(on ? '' : day)}
-      className={cn(
-        'press rounded-full px-2.5 py-1 text-small font-medium transition-colors duration-quick',
-        on ? 'bg-accent text-surface' : 'text-ink-muted hover:bg-accent-tint hover:text-accent',
-      )}
-    >
+    <ToggleChip on={on} onClick={() => onPick(on ? '' : day)}>
       {label}
-    </button>
+    </ToggleChip>
   );
 }
 

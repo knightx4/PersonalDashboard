@@ -7,6 +7,7 @@ import { ThreadPanel } from '@/components/patterns/thread';
 import { CommentBody } from '@/components/dev/comment-body';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { DashMark } from '@/components/ui/dash-mark';
 import { Disclosure } from '@/components/ui/disclosure';
 import { ComposeBody, ComposeBox, FieldError } from '@/components/ui/field';
@@ -24,6 +25,7 @@ import {
   stopInterview,
   type InterviewActionState,
 } from './interview-actions';
+import Link, { linkVariants } from '@/components/ui/link';
 
 /**
  * Dash's interview about one workspace, under its vision on the specs page
@@ -54,12 +56,12 @@ const AUTHOR_NAME = { me: 'You', claude: 'Dash' } as const;
 function Turn({ turn, now }: { turn: DevComment; now: number }) {
   const dash = turn.author === 'claude';
   return (
-    <li className={cn('flex gap-2', dash && '-mx-2 rounded-lg bg-canvas px-2 py-1.5')}>
+    <li className={cn('flex gap-2', dash && '-mx-2 rounded-control bg-sunken px-2 py-1.5')}>
       <div className="flex w-4 shrink-0 justify-center pt-1">
         {dash ? (
           <DashMark size="2xs" decorative className="text-ink-ghost" />
         ) : (
-          <CircleUser className="size-3.5 text-ink-ghost" strokeWidth={2} aria-hidden />
+          <CircleUser className="size-3.5 text-ink-ghost" strokeWidth={1.75} aria-hidden />
         )}
       </div>
       <div className="min-w-0 flex-1 space-y-0.5">
@@ -80,7 +82,7 @@ function Turn({ turn, now }: { turn: DevComment; now: number }) {
 /** Dash's line while it writes, in the place its turn will take. */
 function Writing({ children }: { children: React.ReactNode }) {
   return (
-    <li className="-mx-2 flex gap-2 rounded-lg bg-canvas px-2 py-1.5" aria-live="polite">
+    <li className="-mx-2 flex gap-2 rounded-control bg-sunken px-2 py-1.5" aria-live="polite">
       <div className="flex w-4 shrink-0 justify-center pt-1">
         <DashMark size="2xs" state="working" activity="writing" tone="brand" decorative />
       </div>
@@ -105,15 +107,10 @@ function Offer({
   disabled?: boolean;
 }) {
   return (
-    <button
-      type={type}
-      onClick={onClick}
-      disabled={disabled}
-      className="press -ml-1.5 inline-flex items-center gap-1.5 rounded-control px-1.5 py-1 text-ui text-ink-ghost transition-colors duration-quick hover:bg-sunken hover:text-ink-muted disabled:opacity-50"
-    >
+    <Button type={type} variant="ghost" size="sm" onClick={onClick} disabled={disabled} className="-ml-2.5">
       <MessagesSquare className="size-3.5 shrink-0" strokeWidth={1.75} aria-hidden />
       {label}
-    </button>
+    </Button>
   );
 }
 
@@ -201,18 +198,18 @@ export function InterviewPanel({
         <ul className="space-y-1 text-ui">
           <li>
             {view.visionHref ? (
-              <a href={view.visionHref} className="inline-flex min-h-11 items-center text-accent hover:underline">
+              <Link href={view.visionHref} className={cn('inline-flex min-h-11 items-center', linkVariants())}>
                 The drafted vision, waiting above
-              </a>
+              </Link>
             ) : (
               <span className="text-ink-muted">You have decided the drafted vision.</span>
             )}
           </li>
           <li>
             {view.specChangeHref ? (
-              <a href={view.specChangeHref} className="inline-flex min-h-11 items-center text-accent hover:underline">
+              <Link href={view.specChangeHref} className={cn('inline-flex min-h-11 items-center', linkVariants())}>
                 The drafted spec change, under Changes to specs
-              </a>
+              </Link>
             ) : (
               <span className="text-ink-muted">You have decided the drafted spec change.</span>
             )}
@@ -306,16 +303,16 @@ export function InterviewPanel({
                 <div className="mt-1 flex items-center justify-end gap-1">
                   <PaidHint action={ANSWER} what="Cost of answering" />
                   <Tooltip label="Send your answer to Dash." align="end">
-                    <button
+                    <IconButton
                       type="submit"
                       name="intent"
                       value="answer"
                       disabled={!draft.trim()}
-                      className="press flex size-7 items-center justify-center rounded-full bg-accent text-fill-ink transition-colors duration-quick hover:bg-accent-hover disabled:bg-sunken disabled:text-ink-ghost"
+                      label="Send your answer"
+                      className="rounded-full bg-accent text-fill-ink hover:bg-accent-hover hover:text-fill-ink disabled:bg-sunken disabled:text-ink-ghost"
                     >
-                      <ArrowUp className="size-4" strokeWidth={2} aria-hidden />
-                      <span className="sr-only">Send your answer</span>
-                    </button>
+                      <ArrowUp strokeWidth={1.75} aria-hidden />
+                    </IconButton>
                   </Tooltip>
                 </div>
               </ComposeBox>

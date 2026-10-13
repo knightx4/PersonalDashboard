@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { SectionLabel } from '@/components/ui/section-heading';
 
 /**
  * The header over one group of rows: what the group is, how many rows are in
@@ -29,10 +30,9 @@ export function GroupHeader({
 }) {
   return (
     <div className={cn('flex items-baseline justify-between gap-3 px-1', className)}>
-      <h2 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
+      <SectionLabel as="h2" count={count}>
         {label}
-        <span className="ml-2 font-normal normal-case tracking-normal text-ink-muted">{count}</span>
-      </h2>
+      </SectionLabel>
       {subtotal != null && subtotal !== false && (
         <p className="tabular text-small text-ink-muted">{subtotal}</p>
       )}

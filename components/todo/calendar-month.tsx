@@ -1,6 +1,7 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
+import { SectionLabel } from '@/components/ui/section-heading';
 import type { CalendarDay, CalendarEntry } from '@/lib/todo/calendar/month';
 import { formatClock } from '@/lib/clock';
 import { NewEventLink } from '@/components/todo/new-event-link';
@@ -46,12 +47,9 @@ export function CalendarMonthGrid({
     <Card padding="none" className="relative mt-4 overflow-hidden">
       <div className="grid grid-cols-7 border-b border-border">
         {WEEKDAYS.map((label) => (
-          <div
-            key={label}
-            className="truncate px-1.5 py-1.5 text-micro font-semibold uppercase tracking-wide text-ink-muted sm:px-2"
-          >
+          <SectionLabel key={label} as="span" className="block truncate px-1.5 py-1.5 sm:px-2">
             {label}
-          </div>
+          </SectionLabel>
         ))}
       </div>
 
@@ -150,7 +148,7 @@ export function WorkweekOutline({ className }: { className?: string }) {
     <div
       aria-hidden
       className={cn(
-        'pointer-events-none absolute inset-y-0 left-0 w-[calc(100%*5/7)] rounded-l-[inherit] ring-1 ring-inset ring-border-strong',
+        'pointer-events-none absolute inset-y-0 left-0 w-[calc(100%*5/7)] rounded-l-card ring-1 ring-inset ring-border-strong',
         className,
       )}
     />
@@ -192,7 +190,7 @@ export function Pill({ entry, timezone }: { entry: CalendarEntry; timezone: stri
   const body = (
     <span
       className={cn(
-        'flex items-baseline gap-1 truncate rounded px-1 py-0.5 text-small leading-tight',
+        'flex items-baseline gap-1 truncate rounded-control px-1 py-0.5 text-small leading-tight',
         entry.kind === 'event' && 'bg-accent-tint font-medium text-ink',
         // Outlined where your own event is filled: it is on the day, but it
         // belongs to a calendar somewhere else and cannot be edited here.

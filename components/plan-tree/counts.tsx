@@ -164,7 +164,7 @@ export function Breakdown({ rollup }: { rollup: PlanProgress }) {
     <Tooltip label={`Of the ${live} steps beneath this: ${title}.`} align="end">
       <span
         tabIndex={0}
-        className="tabular flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded text-small text-ink-muted"
+        className="tabular flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-control text-small text-ink-muted"
         aria-label={`${title} of ${live} steps`}
       >
         {shown.map((c) => (

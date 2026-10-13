@@ -22,6 +22,7 @@ import { SurfaceReview } from '@/app/dev/surfaces/review';
 import { SearchBarSurface } from './search-bar-surface';
 import { IdeaSpaceDomainsSurface, IdeaSpaceSurface } from './idea-space-surfaces';
 import { DashMarkLooks } from './dash-mark-surface';
+import { UiKit } from './ui-kit-surface';
 import { CaptureBoxSurface } from './capture-surfaces';
 import { NoteButtonSurface, NoteSavedSurface } from './note-surfaces';
 import { TaskFilesSurface } from './task-files-surfaces';
@@ -95,7 +96,7 @@ import { TriagePreview } from './triage-surfaces';
 import { NoteProperties } from '@/components/vault/note-properties';
 import { NoteBody } from '@/components/vault/note-body';
 import { NoteEdit } from '@/app/vault/n/[...path]/note-edit';
-import { NoteEditingPreview } from './note-edit-surfaces';
+import { NoteEditingPreview, NoteRenamePreview } from './note-edit-surfaces';
 import { buildAttachmentIndex, type AttachmentEntry } from '@/lib/vault/markdown/attachments';
 import { buildLinkIndex, toStandardMarkdown } from '@/lib/vault/markdown/obsidian';
 import { noteHref } from '@/lib/vault/paths';
@@ -165,6 +166,7 @@ import { ConceptList } from '@/components/learn/concept-list';
 import type { ReadingRow } from '@/lib/learn/tracks/load';
 import type { Concept } from '@/lib/learn/graph/model';
 import { AppShell, type NavSection } from '@/components/shell/app-shell';
+import { RouteErrorSurface, RouteNotFoundSurface } from './route-state-surfaces';
 import { DisplayMenu } from '@/components/shell/display-menu';
 import { GroupHeader } from '@/components/shell/group-header';
 import {
@@ -184,6 +186,8 @@ import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { CostHint } from '@/components/ui/cost-hint';
 import { Tooltip } from '@/components/ui/tooltip';
+import { IconButton } from '@/components/ui/icon-button';
+import { Chip } from '@/components/ui/chip';
 import { StateLabel } from '@/components/dev/state-label';
 import { healthOf as planHealthWords } from '@/lib/plan/health-words';
 import { IDEA_HEALTH_WORD, WAITING_TITLE, WAITING_WORD } from '@/lib/dev/words';
@@ -2881,15 +2885,13 @@ function DevStatusTips() {
 }
 
 function TooltipRows() {
-  const iconButton =
-    'press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink';
   return (
     <div className="space-y-24 pb-24">
       <div className="flex items-center gap-2">
         <Tooltip label="Waiting on your reply" defaultOpen>
-          <button type="button" aria-label="Waiting" className={iconButton}>
-            <Clock className="size-3.5" strokeWidth={1.75} aria-hidden />
-          </button>
+          <IconButton label="Waiting">
+            <Clock strokeWidth={1.75} aria-hidden />
+          </IconButton>
         </Tooltip>
         <span className="text-small text-ink-muted">An icon button</span>
       </div>
@@ -2898,31 +2900,27 @@ function TooltipRows() {
           label="Dash read this thread and found nothing that needs you, so it was filed without a notification"
           defaultOpen
         >
-          <span
-            tabIndex={0}
-            aria-label="Filed quietly"
-            className="rounded-full bg-sunken px-2 py-0.5 text-small text-ink-muted"
-          >
+          <Chip tabIndex={0} aria-label="Filed quietly">
             Filed
-          </span>
+          </Chip>
         </Tooltip>
         <span className="text-small text-ink-muted">A badge with a long tip</span>
       </div>
       <div className="flex items-center justify-end gap-2">
         <span className="text-small text-ink-muted">At a row’s right edge</span>
         <Tooltip label="Pinned to the top" align="end" defaultOpen>
-          <button type="button" aria-label="Pinned" className={iconButton}>
-            <Pin className="size-3.5" strokeWidth={1.75} aria-hidden />
-          </button>
+          <IconButton label="Pinned">
+            <Pin strokeWidth={1.75} aria-hidden />
+          </IconButton>
         </Tooltip>
       </div>
       {/* Its tip stands above it, so the row leaves the room above. */}
       <div className="flex items-center justify-end gap-2 pt-16">
         <span className="text-small text-ink-muted">In the bar at the foot of the window</span>
         <Tooltip label="CI on main passed 4 minutes ago" above defaultOpen>
-          <button type="button" aria-label="CI on main" className={iconButton}>
+          <IconButton label="CI on main">
             <span className="size-2 rounded-full bg-positive" aria-hidden />
-          </button>
+          </IconButton>
         </Tooltip>
       </div>
     </div>
@@ -4566,6 +4564,20 @@ export const SURFACES: readonly Surface[] = [
     render: () => <NoteEditingPreview body={noteMarkdown} />,
   },
   {
+    /* Renaming a note (note 69c302f1): the file's name in a box where the
+     * title was, with Rename and Cancel under it. */
+    id: 'vault-note-rename',
+    label: 'Note · Renaming',
+    module: 'vault',
+    width: 'narrow',
+    render: () => (
+      <NoteRenamePreview>
+        <NoteProperties frontmatter={noteFrontmatter} />
+        <NoteBody markdown={noteMarkdown} />
+      </NoteRenamePreview>
+    ),
+  },
+  {
     /* A note's embedded files (plan #1302): an image, a sized one, a PDF, a
      * recording, and the four ways a file can be unavailable. The images are
      * drawn from data URLs here; on the page they come through the signed
@@ -5591,6 +5603,17 @@ export const SURFACES: readonly Surface[] = [
     render: () => <DashMarkLooks />,
   },
 
+  /* Every shared component in components/ui, in each state it has. A change
+   * to a primitive is looked at here instead of on every page that imports
+   * it (COMPONENT_SURFACES in lib/preview/routes.ts). */
+  {
+    id: 'ui-kit',
+    label: 'Design · Every shared component',
+    module: 'dev',
+    width: 'wide',
+    render: () => <UiKit />,
+  },
+
   /* The day closing on the agenda (plan #1556): played by ticking the last
    * thing due today, and as a page that loads with the day already closed. */
   {
@@ -5811,6 +5834,21 @@ export const SURFACES: readonly Surface[] = [
     module: 'dev',
     width: 'page',
     render: () => <OpenMissingSurface />,
+  },
+  /* A workspace's not-found and error files, inside the shell (plan #1923). */
+  {
+    id: 'route-not-found',
+    label: 'Any workspace · A row that is no longer there',
+    module: 'news',
+    width: 'page',
+    render: () => <RouteNotFoundSurface />,
+  },
+  {
+    id: 'route-error',
+    label: 'Any workspace · A page that failed to load',
+    module: 'news',
+    width: 'page',
+    render: () => <RouteErrorSurface />,
   },
 
   /* The account, the week review and the Dev tabs (plan #1600). Fixtures

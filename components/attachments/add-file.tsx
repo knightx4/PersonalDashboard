@@ -3,6 +3,7 @@
 import { useId, useImperativeHandle, useRef, useState } from 'react';
 import { Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { FieldError } from '@/components/ui/field';
 import {
   ATTACHMENT_ACCEPT,
@@ -135,7 +136,7 @@ export function AddFile({
         aria-describedby={errors.length > 0 ? errorId : undefined}
         onClick={() => input.current?.click()}
       >
-        <Paperclip aria-hidden className="size-4" />
+        <Paperclip strokeWidth={1.75} aria-hidden className="size-4" />
         {uploading ? 'Adding…' : 'Add a file'}
       </Button>
       {value.length > 0 && (
@@ -147,15 +148,15 @@ export function AddFile({
             >
               <span className="min-w-0 truncate">{file.name}</span>
               <span className="shrink-0 text-ink-muted">{attachmentSize(file.size)}</span>
-              <button
-                type="button"
-                className="press press-area inline-flex size-6 shrink-0 items-center justify-center rounded-control text-ink-muted hover:bg-surface hover:text-ink"
-                aria-label={`Remove ${file.name}`}
+              <IconButton
+                size="sm"
+                label={`Remove ${file.name}`}
+                className="hover:bg-surface"
                 disabled={disabled}
                 onClick={() => remove(file.path)}
               >
-                <X aria-hidden className="size-3.5" />
-              </button>
+                <X aria-hidden strokeWidth={1.75} />
+              </IconButton>
             </li>
           ))}
         </ul>

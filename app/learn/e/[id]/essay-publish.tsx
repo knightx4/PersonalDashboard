@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { essayAddress } from '@/lib/learn/essays/address';
 import { unpublishEssay, type PublishResult, type UnpublishResult } from './actions';
+import { linkVariants } from '@/components/ui/link';
+import { cn } from '@/lib/cn';
 
 /**
  * Publish (plan #1863.11; spec, "Finishing and publishing"). One press saves
@@ -115,7 +117,7 @@ export function EssayPublishCard({
               href={`https://${SITE}${essayAddress(state.slug)}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex min-h-11 items-center text-accent underline underline-offset-2"
+              className={cn('flex min-h-11 items-center', linkVariants())}
             >
               {SITE}
               {essayAddress(state.slug)}

@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Bookmark, BookmarkCheck, ChevronDown, ExternalLink, Play, RotateCcw, ThumbsDown, Volume2 } from 'lucide-react';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { cardVariants } from '@/components/ui/card';
 import { useToast } from '@/components/ui/toast';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -468,19 +469,19 @@ export function ClipStream({
                     />
                   )}
                   <span className="relative flex size-16 items-center justify-center rounded-full bg-white/15">
-                    <Play className="size-7 translate-x-0.5" strokeWidth={2} aria-hidden />
+                    <Play className="size-7 translate-x-0.5" strokeWidth={1.75} aria-hidden />
                   </span>
                 </>
               )}
               {cover === 'sound' && (
                 <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-ui font-medium">
-                  <Volume2 className="size-4" strokeWidth={2} aria-hidden />
+                  <Volume2 className="size-4" strokeWidth={1.75} aria-hidden />
                   Tap for sound
                 </span>
               )}
               {paused && !cover && (
                 <span className="flex size-16 items-center justify-center rounded-full bg-black/60">
-                  <Play className="size-7 translate-x-0.5" strokeWidth={2} aria-hidden />
+                  <Play className="size-7 translate-x-0.5" strokeWidth={1.75} aria-hidden />
                 </span>
               )}
             </button>
@@ -493,7 +494,10 @@ export function ClipStream({
             {(exhausted || fixed) && (
               <p className="max-w-sm text-ui text-white/80">
                 Dash cuts more from your videos a few times a day.{' '}
-                <Link href={nowHref(subjectId)} className="underline underline-offset-2 hover:text-white">
+                <Link
+                  href={nowHref(subjectId)}
+                  className={cn(linkVariants({ tone: 'quiet' }), 'text-white/80 decoration-white/40 hover:text-white')}
+                >
                   Go to Now
                 </Link>
               </p>
@@ -506,16 +510,14 @@ export function ClipStream({
       {current && (
         <div className="space-y-3 card-pad-x pt-3 pb-4 lg:pb-5">
           <div className="flex items-center gap-2 text-small tabular-nums text-ink-muted">
-            <Tooltip label={`Go back ${BACK_SECONDS} seconds`} className="-ml-2.5 shrink-0">
-              <button
-                type="button"
+            <Tooltip label={`Go back ${BACK_SECONDS} seconds`} className="-ml-1 shrink-0">
+              <IconButton
+                label={`Back ${BACK_SECONDS} seconds`}
                 onClick={() => nudge(-BACK_SECONDS)}
                 disabled={!begun}
-                aria-label={`Back ${BACK_SECONDS} seconds`}
-                className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'size-11 shrink-0 px-0')}
               >
-                <RotateCcw className="size-4" strokeWidth={2} aria-hidden />
-              </button>
+                <RotateCcw strokeWidth={1.75} aria-hidden />
+              </IconButton>
             </Tooltip>
             <span>{clockTime(elapsed)}</span>
             <input
@@ -560,36 +562,30 @@ export function ClipStream({
               href={watchAt(current.videoId, current.startSeconds)}
               target="_blank"
               rel="noreferrer"
-              className={stageButton}
+              className={buttonVariants({ variant: 'secondary' })}
             >
-              <ExternalLink className="size-4" strokeWidth={2} aria-hidden />
+              <ExternalLink className="size-4" strokeWidth={1.75} aria-hidden />
               Full video at {clockTime(current.startSeconds)}
             </a>
-            <button type="button" onClick={toggleSave} aria-pressed={current.saved} className={stageButton}>
+            <Button type="button" variant="secondary" onClick={toggleSave} pressed={current.saved}>
               {current.saved ? (
-                <BookmarkCheck className="size-4" strokeWidth={2} aria-hidden />
+                <BookmarkCheck className="size-4" strokeWidth={1.75} aria-hidden />
               ) : (
-                <Bookmark className="size-4" strokeWidth={2} aria-hidden />
+                <Bookmark className="size-4" strokeWidth={1.75} aria-hidden />
               )}
               {current.saved ? 'Saved' : 'Save'}
-            </button>
-            <button type="button" onClick={notInterested} className={stageButton}>
-              <ThumbsDown className="size-4" strokeWidth={2} aria-hidden />
+            </Button>
+            <Button type="button" variant="secondary" onClick={notInterested}>
+              <ThumbsDown className="size-4" strokeWidth={1.75} aria-hidden />
               Not interested
-            </button>
-            <button type="button" onClick={next} className={cn(stageButton, 'ml-auto')}>
+            </Button>
+            <Button type="button" variant="secondary" onClick={next} className="ml-auto">
               Next
-              <ChevronDown className="size-4" strokeWidth={2} aria-hidden />
-            </button>
+              <ChevronDown className="size-4" strokeWidth={1.75} aria-hidden />
+            </Button>
           </div>
         </div>
       )}
     </div>
   );
 }
-
-/** A button under the stage: the ordinary secondary button, tinted while pressed. */
-const stageButton = cn(
-  buttonVariants({ variant: 'secondary' }),
-  'aria-pressed:bg-accent-tint aria-pressed:text-accent',
-);

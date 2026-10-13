@@ -9,7 +9,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { ChevronDown, HelpCircle, Wrench } from 'lucide-react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,9 @@ import { sessionOrigin, type SessionOrigin } from '@/lib/plan/origin';
 import { readableRefs } from '@/lib/plan/ref';
 import type { PlanProgress } from '@/lib/plan/tree';
 import type { StatusGlyph as GlyphName } from '@/lib/status-glyphs';
+import { Chip } from '@/components/ui/chip';
+import { Note } from '@/components/ui/note';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { cn } from '@/lib/cn';
 import { Breakdown } from './counts';
 import { Dependencies } from './dependencies';
@@ -447,7 +450,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
       triggerClassName={cn(
         list
           ? 'size-7 px-0 text-small font-medium'
-          : 'h-7 w-auto gap-1.5 px-1.5 text-small font-medium',
+          : 'h-(--control-h) w-auto gap-1.5 px-1.5 text-small font-medium',
         TONE_TEXT[health.tone],
       )}
       trigger={
@@ -547,17 +550,17 @@ export function TreeRow<E extends TreeCatalogEntry>({
             label={`${unanswered === 1 ? 'A question' : `${unanswered} questions`} under this step ${unanswered === 1 ? 'waits' : 'wait'} on your answer. Open the step to answer.`}
             className="shrink-0"
           >
-            <span
+            <Chip
+              tone="caution"
               // A tab stop only where the row is not itself a button.
               tabIndex={titleHref ? 0 : undefined}
-              className="inline-flex items-center gap-0.5 rounded-full bg-caution-tint px-1.5 text-small font-semibold text-caution"
             >
-              <HelpCircle className="size-3" strokeWidth={2} aria-hidden />
+              <HelpCircle strokeWidth={1.75} aria-hidden />
               {unanswered}
               <span className="sr-only">
                 unanswered {unanswered === 1 ? 'question' : 'questions'}
               </span>
-            </span>
+            </Chip>
           </Tooltip>
         )}
         {/* And whether anything has been said about it. */}
@@ -659,7 +662,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                 aria-label={foldLabel}
                 className={cn(
                   LEVEL,
-                  'press flex h-5 shrink-0 items-center justify-center rounded text-ink-muted hover:bg-accent-tint hover:text-accent',
+                  'press flex h-5 shrink-0 items-center justify-center rounded-control text-ink-muted hover:bg-accent-tint hover:text-accent',
                 )}
               >
                 <ChevronDown
@@ -684,7 +687,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                 tabIndex={0}
                 className={cn(
                   LEVEL,
-                  'flex h-5 select-none items-center justify-center rounded text-small font-semibold text-caution',
+                  'flex h-5 select-none items-center justify-center rounded-control text-small font-semibold text-caution',
                 )}
               >
                 ?<span className="sr-only">Decision</span>
@@ -703,7 +706,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                 tabIndex={0}
                 className={cn(
                   LEVEL,
-                  'flex h-5 select-none items-center justify-center rounded text-caution',
+                  'flex h-5 select-none items-center justify-center rounded-control text-caution',
                 )}
               >
                 <Wrench className="size-3.5" strokeWidth={1.75} aria-hidden />
@@ -825,6 +828,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
             {/* No "Who" column. It was a column of dashes with the occasional
                 name in it -- one fact, on a plan whose every approved step the
                 runner takes unless you keep it, and keeping it is a button. */}
+            {/* ui-ok: fixed-control-height -- a cell matching the sm:leading-7 text beside it, not a control */}
             <span className="hidden sm:flex sm:h-7 sm:items-center">
               <Breakdown rollup={node.rollup} />
             </span>
@@ -876,7 +880,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   type="button"
                   onClick={() => setDetailsShown(!detailsShown)}
                   aria-expanded={detailsShown}
-                  className="press -mx-1 flex w-full min-w-0 items-center gap-1 rounded px-1 text-small font-semibold text-ink-muted hover:bg-accent-tint hover:text-accent"
+                  className="press -mx-1 flex w-full min-w-0 items-center gap-1 rounded-control px-1 text-small font-semibold text-ink-muted hover:bg-accent-tint hover:text-accent"
                 >
                   <ChevronDown
                     className={cn(
@@ -910,9 +914,7 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   )}
                   {(node.acceptance || acceptanceView) && (
                     <div>
-                      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
-                        Done when
-                      </p>
+                      <SectionLabel>Done when</SectionLabel>
                       {acceptanceView ?? (
                         <p className="whitespace-pre-wrap text-ui text-ink">
                           <LinkedText text={readable(node.acceptance ?? '')} />
@@ -925,18 +927,16 @@ export function TreeRow<E extends TreeCatalogEntry>({
                   sentence that still stands. */}
                   {node.blockAsk && (
                     <div>
-                      <p className="text-small font-semibold uppercase tracking-wide text-ink-muted">
-                        Needs
-                      </p>
+                      <SectionLabel>Needs</SectionLabel>
                       <p className="whitespace-pre-wrap text-ui text-ink">
                         <LinkedText text={readable(node.blockAsk)} />
                       </p>
                     </div>
                   )}
                   {node.comment && (
-                    <p className="whitespace-pre-wrap rounded-lg bg-canvas px-3 py-2 text-ui text-ink">
+                    <Note className="whitespace-pre-wrap">
                       <LinkedText text={readable(node.comment)} />
-                    </p>
+                    </Note>
                   )}
 
                   {body}

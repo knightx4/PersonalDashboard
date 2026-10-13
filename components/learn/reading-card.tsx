@@ -1,8 +1,9 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { AlertTriangle, BadgeCheck, CircleDashed, CircleSlash, Check } from 'lucide-react';
 import type { ReadingRow, SourceAccess } from '@/lib/learn/tracks/load';
 import { formatMoney } from '@/lib/money';
 import { Tooltip } from '@/components/ui/tooltip';
+import { Chip } from '@/components/ui/chip';
 
 /**
  * One reading, in a list.
@@ -43,9 +44,9 @@ function AccessBadge({ access, priceCents }: { access: SourceAccess; priceCents:
   // that is already inside a card -- law 11's "a shared ground groups".
   return (
     <Tooltip label={ACCESS_HINT[access] ?? label}>
-      <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+      <Chip>
         {price ? `${label} · ${price}` : label}
-      </span>
+      </Chip>
     </Tooltip>
   );
 }
@@ -83,11 +84,11 @@ export function LocatorLine({ reading }: { reading: ReadingRow }) {
       {verified ? (
         <Tooltip label="Dash checked this place in the source" className="shrink-0">
           <span role="img" aria-label="Checked" className="inline-flex">
-            <BadgeCheck className="size-3.5 text-ink-muted" strokeWidth={2} aria-hidden />
+            <BadgeCheck className="size-3.5 text-ink-muted" strokeWidth={1.75} aria-hidden />
           </span>
         </Tooltip>
       ) : (
-        <AlertTriangle className="size-3.5 shrink-0 text-caution" strokeWidth={2} aria-hidden />
+        <AlertTriangle className="size-3.5 shrink-0 text-caution" strokeWidth={1.75} aria-hidden />
       )}
       <span>{where || 'Location not confirmed'}</span>
       {!verified && where && <span className="text-small">· unconfirmed</span>}
@@ -103,7 +104,7 @@ function StatusIcon({ status }: { status: ReadingRow['status'] }) {
     return (
       <Tooltip label="You have read this" className="shrink-0">
         <span role="img" aria-label="Read" className="inline-flex">
-          <Check className="size-4 text-ink-muted" strokeWidth={2} aria-hidden />
+          <Check className="size-4 text-ink-muted" strokeWidth={1.75} aria-hidden />
         </span>
       </Tooltip>
     );
@@ -112,7 +113,7 @@ function StatusIcon({ status }: { status: ReadingRow['status'] }) {
     return (
       <Tooltip label="You gave up on this one" className="shrink-0">
         <span role="img" aria-label="Gave up" className="inline-flex">
-          <CircleSlash className="size-4 text-ink-ghost" strokeWidth={2} aria-hidden />
+          <CircleSlash className="size-4 text-ink-ghost" strokeWidth={1.75} aria-hidden />
         </span>
       </Tooltip>
     );
@@ -121,7 +122,7 @@ function StatusIcon({ status }: { status: ReadingRow['status'] }) {
     return (
       <Tooltip label="You have started this" className="shrink-0">
         <span role="img" aria-label="Started" className="inline-flex">
-          <CircleDashed className="size-4 text-accent" strokeWidth={2} aria-hidden />
+          <CircleDashed className="size-4 text-accent" strokeWidth={1.75} aria-hidden />
         </span>
       </Tooltip>
     );
@@ -170,9 +171,9 @@ export function ReadingCard({ reading, from }: { reading: ReadingRow; from?: str
               // Written down, nothing found for it yet. Said plainly rather
               // than left blank, because a row with no source and no note
               // about it reads as a row that failed.
-              <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-ghost">
+              <Chip className="text-ink-ghost">
                 No source yet
-              </span>
+              </Chip>
             )}
           </span>
 
