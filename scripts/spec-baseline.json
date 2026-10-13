@@ -8,5 +8,6 @@
   "off-token-radius": 0,
   "raw-motion-values": 0,
   "routes-without-surface": 0,
+  "shell-mounts": 1,
   "thread-tables": 1
 }

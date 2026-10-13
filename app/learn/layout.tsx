@@ -1,72 +1,50 @@
-import { redirect } from 'next/navigation';
-import { createClient, getUser } from '@/lib/auth/server';
-import { loadAccountSettings } from '@/lib/core/account/settings';
-import { isOwner } from '@/lib/dev/owner';
-import { AppShell, type NavSection } from '@/components/shell/app-shell';
-import { loadModuleCounts } from '@/lib/modules/counts';
-import { loadRaisedNotifications } from '@/lib/raised/notifications';
-import { loadActivity } from '@/lib/shell/activity';
-import { loadMainCheck } from '@/lib/shell/main-check';
+import type { NavSection } from '@/components/shell/app-shell';
 import { loadLearnBrief } from '@/lib/shell/brief';
-import { switcherCounts } from '@/lib/modules/switcher-counts';
+import { shellFor } from '@/lib/shell/shell-for';
 import { createLearnClient } from '@/lib/learn/auth/server';
 import { countReadNow } from '@/lib/learn/tracks/load';
-import { createCoreClient } from '@/lib/core/auth/server';
-import { estimatePaidActions, paidActionsUnder } from '@/lib/core/spend/paid-actions';
-import { PaidCostsProvider } from '@/components/ui/paid-hint';
+import { paidActionsUnder } from '@/lib/core/spend/paid-actions';
 
 /**
  * Shell for the learn workspace.
  *
- * The proxy already blocks unauthenticated requests; the check here is a
- * second line, not the first.
+ * The proxy already blocks unauthenticated requests; the shell's loader
+ * checks again, as a second line rather than the first.
  *
  * No onboarding gate, for the same reason the vault has none: nothing this
  * module does needs a Gmail grant, and bouncing somebody to a consent screen
  * because they pasted a reading list would be the wrong app answering.
  */
 export default async function LearnLayout({ children }: { children: React.ReactNode }) {
-  const user = await getUser();
-  if (!user) redirect('/login');
+  return shellFor({
+    module: 'learn',
+    sections: async ({ owner }) =>
+      learnSections(owner, await countReadNow(await createLearnClient())),
+    brief: () => loadLearnBrief(),
+    // Every paid button's $ hint in Learn, from one read of the spend ledger
+    // (plan #917). Here rather than on each page because the buttons sit in
+    // forms several components deep, and the figures change slowly enough that
+    // one read per visit to the module is plenty.
+    paidActions: paidActionsUnder('app/learn/'),
+    children,
+  });
+}
 
-  const supabase = await createClient();
-  // Every paid button's $ hint in Learn, from one read of the spend ledger
-  // (plan #917). Here rather than on each page because the buttons sit in
-  // forms several components deep, and the figures change slowly enough that
-  // one read per visit to the module is plenty.
-  const [{ data: profile }, settings, counts, activity, raised, mainCheck, owner, costs] =
-    await Promise.all([
-      supabase.from('profiles').select('display_name').eq('id', user.id).single(),
-      loadAccountSettings(user.id),
-      loadModuleCounts(user.id),
-      loadActivity(),
-      loadRaisedNotifications(user.id),
-      loadMainCheck(),
-      isOwner({ user }),
-      createCoreClient()
-        .then((core) => estimatePaidActions(core, user.id, paidActionsUnder('app/learn/')))
-        .catch(() => ({})),
-    ]);
-
-  const brief = await loadLearnBrief();
-
-  /**
-   * Now first (plan #1486): the feed, with what is waiting in a strip at the
-   * top and the practice questions behind its Practice only switch. Home and
-   * Practice Flow were tabs of their own until then, and /learn/home and
-   * /learn/flow redirect to Now. Then the subjects, then the rest. A subject,
-   * a single idea and a quiz are reached through Subjects, and a reading list
-   * and a reading through Reading lists, so they are `alsoMatches` rather
-   * than tabs of their own -- a nav that grows an entry per depth level stops being
-   * navigation.
-   *
-   * There is no Learn next tab. Its re-checks are asked in the practice
-   * questions, its readings are on Now, and /learn/next redirects.
-   */
-  const learnClient = await createLearnClient();
-  const readNow = await countReadNow(learnClient);
-
-  const sections: NavSection[] = [
+/**
+ * Now first (plan #1486): the feed, with what is waiting in a strip at the
+ * top and the practice questions behind its Practice only switch. Home and
+ * Practice Flow were tabs of their own until then, and /learn/home and
+ * /learn/flow redirect to Now. Then the subjects, then the rest. A subject,
+ * a single idea and a quiz are reached through Subjects, and a reading list
+ * and a reading through Reading lists, so they are `alsoMatches` rather
+ * than tabs of their own -- a nav that grows an entry per depth level stops being
+ * navigation.
+ *
+ * There is no Learn next tab. Its re-checks are asked in the practice
+ * questions, its readings are on Now, and /learn/next redirects.
+ */
+function learnSections(owner: boolean, readNow: number): NavSection[] {
+  return [
     // Learn now replaced the Read now tab (plan #805) and became Now (plan
     // #1486). The badge counts the readings you queued, which the feed shows
     // first, and not the cards it wrote: there are always about twenty of
@@ -126,26 +104,4 @@ export default async function LearnLayout({ children }: { children: React.ReactN
         ]
       : []),
   ];
-
-  return (
-    <div data-workspace="learn">
-      <AppShell
-        account={user.id}
-        module="learn"
-        sections={sections}
-        displayName={profile?.display_name ?? null}
-        email={user.email ?? ''}
-        enabledModules={settings.enabledModules}
-        isOwner={owner}
-        counts={switcherCounts(counts)}
-        theme={settings.theme}
-        notifications={raised}
-        activity={activity}
-        mainCheck={mainCheck}
-        brief={brief}
-      >
-        <PaidCostsProvider costs={costs}>{children}</PaidCostsProvider>
-      </AppShell>
-    </div>
-  );
 }
