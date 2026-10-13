@@ -71,4 +71,63 @@ describe('the You writes', () => {
     const result = await runYouWrite(write('change_place'), env(tables), { place_ref: PLACE, name: 'Mine now' });
     expect(result).toEqual({ ok: false, error: 'There is no place of theirs with that ref. Look it up first.' });
   });
+
+  describe('save_job', () => {
+    const JOB = '22222222-2222-4222-8222-222222222222';
+    const shop = (fields: Record<string, unknown> = {}) => ({
+      id: JOB,
+      user_id: ME,
+      employer: 'Corner Bookshop',
+      title: 'Shop assistant',
+      place: null,
+      started: '2014',
+      ended: '2016',
+      note: null,
+      edited: false,
+      ...fields,
+    });
+
+    it('adds a job as one they wrote', async () => {
+      const tables: FakeTables = { 'you.work_history': [] };
+      const result = await runYouWrite(write('save_job'), env(tables), {
+        employer: 'Corner Bookshop',
+        started: '2014',
+        ended: '2016',
+      });
+      if ('ok' in result) throw new Error(result.error);
+      expect(result.op).toBe('insert');
+      expect(result.kind).toBe('save_job');
+      expect(result.after).toMatchObject({ user_id: ME, employer: 'Corner Bookshop', started: '2014', ended: '2016', edited: true });
+      expect(result.summary).toBe('Dash added the job at "Corner Bookshop", 2014 – 2016.');
+    });
+
+    it('needs an employer to add one', async () => {
+      const result = await runYouWrite(write('save_job'), env({ 'you.work_history': [] }), { title: 'Cook' });
+      expect(result).toEqual({ ok: false, error: expect.stringMatching(/^employer: /) });
+    });
+
+    it('corrects a job by its ref, keeps the rest and marks it edited', async () => {
+      const tables = { 'you.work_history': [shop()] };
+      const result = await runYouWrite(write('save_job'), env(tables), { job_ref: JOB, ended: '2017' });
+      if ('ok' in result) throw new Error(result.error);
+      expect(result.op).toBe('update');
+      expect(result.subjectRef).toBe(`you.work_history:${JOB}`);
+      expect(result.before).toMatchObject({ ended: '2016', edited: false });
+      expect(result.after).toMatchObject({ employer: 'Corner Bookshop', title: 'Shop assistant', started: '2014', ended: '2017', edited: true });
+      expect(result.summary).toBe('Dash changed the job at "Corner Bookshop": ended.');
+    });
+
+    it('will not change somebody else’s job or send nothing to change', async () => {
+      const theirs = { 'you.work_history': [shop({ user_id: OTHER })] };
+      expect(await runYouWrite(write('save_job'), env(theirs), { job_ref: JOB, title: 'Boss' })).toEqual({
+        ok: false,
+        error: 'There is no job of theirs with that ref. Look it up first.',
+      });
+      const mine = { 'you.work_history': [shop()] };
+      expect(await runYouWrite(write('save_job'), env(mine), { job_ref: JOB })).toEqual({
+        ok: false,
+        error: expect.stringMatching(/^Say what to change/),
+      });
+    });
+  });
 });
