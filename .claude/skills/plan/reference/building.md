@@ -263,6 +263,23 @@ name. A step that changes a page with no surface adds one, and adds its routes
 to `SURFACE_ROUTES` in the same file; `tests/preview-routes.test.ts` fails on
 a surface with no routes. A step that changes no surface skips this section.
 
+**Hidden parts.** A screen has parts a person sees only after doing
+something: hover controls, popovers, drawers, empty and loading states, and
+comment indicators. The hidden-parts rule in `docs/UI-QUALITY-SPEC.md` makes
+them part of the screen. When the brief or the step's detail lists any, build
+every one with the screen, not the default layout alone, and give each its
+own gallery surface (an entry in `app/preview/surfaces.tsx` that draws the
+part open or showing, with a route in `SURFACE_ROUTES`), named
+`<id>-<part>`. A hover control is drawn with the hover held, a drawer or
+popover open, an empty state with an empty fixture, a loading state mid-load,
+and a comment indicator on a row that has a comment. Photograph each with the
+rest of the loop below, so every listed part has its four shots and its own
+recorded round. A part you cannot draw is not skipped silently: say which
+and why in the close note. Send the critic the list of hidden parts the step
+names, or "none" when it names none, in the prompt (4 below). A screen that
+shows only its default state, with a listed part missing, comes back as a
+fix and is not wired until every part is drawn and passed.
+
 **References.** A reference is a design the person prefers for a screen
 (`docs/UI-QUALITY-SPEC.md`, Part 2 and R18), kept by surface id in
 `lib/preview/references.ts`, so every later step on that surface is judged
@@ -344,7 +361,8 @@ registered; working offline, read the line and `REFERENCES` yourself.
    moment from `app/dev/ui/moments.ts` the surface plays (its name and
    `sees` line) or "none", the reference registered for the surface in
    `lib/preview/references.ts` (its picture paths, link and `why`, as
-   `referenceForCritic` prints it) or "none", the step's done-when, the page pattern, and on
+   `referenceForCritic` prints it) or "none", the hidden parts the step lists
+(each with the surface that draws it) or "none", the step's done-when, the page pattern, and on
    rounds 2 and 3 the fixes from the round before. The
    pattern is the name and rule under the brief's `## Pattern` section.
    Working offline, take the name from the `Pattern:` line of the step's

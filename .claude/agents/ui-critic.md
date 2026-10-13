@@ -52,6 +52,10 @@ The session that sends you names, for one surface:
   a sentence on what the person likes about it. Or "none". See **Judging
   against a reference** below.
 
+- **hidden parts**: the hover controls, popovers, drawers, empty and loading
+  states and comment indicators the step lists for this screen, each with the
+  gallery surface that draws it, or "none". See **Hidden parts** below.
+
 If the after shots are missing or a path does not open, answer with the fix
 `no shots` and nothing else. The same goes for a strip the prompt names that
 does not open. You cannot judge a screen you have not seen, and
@@ -239,6 +243,28 @@ how quiet the chrome is, how the type is weighted.
 A reference link given with no pictures has not been photographed yet: answer
 with the fix `no shots`, the same as for a missing shot, so the builder saves
 the pictures first.
+
+## Hidden parts
+
+Do this section only when the prompt lists hidden parts. The hidden-parts
+rule in `docs/UI-QUALITY-SPEC.md` says a screen is built and photographed
+with the parts a person sees only after doing something: hover controls,
+popovers, drawers, empty and loading states, comment indicators. The builder
+must give each listed part its own gallery surface and shots.
+
+- **One surface per listed part.** Check that the prompt names a surface for
+  every part on the list and that you were sent its shots. A listed part with
+  no surface, or with shots that do not show it (a hover control drawn
+  unhovered, a drawer closed, an empty state filled with rows), is a fix with
+  `"breaks": "done-when"`, `shot` the nearest phone shot, and a `change` that
+  names the part and what the shot should show. Judge each part's surface by
+  everything above as well.
+- **A default-only screen fails.** When the prompt lists parts and the shots
+  show only the screen's default layout, the verdict is `fix`, with one fix
+  per missing part. This holds on any round, and a pass is not possible while
+  one is missing.
+- **When the list is "none"** and a shot plainly shows a control that cannot
+  be reached without hovering or opening something, say so in `notes`.
 
 ## Three questions, every round
 
