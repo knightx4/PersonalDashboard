@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/shell/page-header';
 import { AutoSave } from './auto-save';
 import { SaveLinkForm } from './save-link-form';
+import { PageColumn } from '@/components/shell/page-width';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Save a link' };
@@ -23,9 +24,9 @@ export default async function SaveLinkPage({
   const text = one(params.text);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <PageColumn>
       <PageHeader title="Save a link" />
       {url || text ? <AutoSave url={url} text={text} /> : <SaveLinkForm autoFocus />}
-    </div>
+    </PageColumn>
   );
 }
