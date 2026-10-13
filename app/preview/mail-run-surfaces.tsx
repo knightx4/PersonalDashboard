@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card } from '@/components/ui/card';
 import { buttonVariants } from '@/components/ui/button';
@@ -86,7 +86,7 @@ export function GoalRunSurface() {
         description={
           <>
             {'On '}
-            <Link href={`/goals/${RUN.item!.id}`} className="underline-offset-2 hover:underline">
+            <Link href={`/goals/${RUN.item!.id}`} className={linkVariants({ tone: 'quiet' })}>
               {RUN.item!.title}
             </Link>
             {' · '}
@@ -94,7 +94,7 @@ export function GoalRunSurface() {
           </>
         }
         actions={
-          <Link href="/goals/runs" className="press-area text-small text-ink-muted underline-offset-2 hover:underline">
+          <Link href="/goals/runs" className={`${linkVariants({ tone: 'quiet' })} press-area text-small`}>
             All runs
           </Link>
         }

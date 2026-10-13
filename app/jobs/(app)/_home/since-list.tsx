@@ -1,9 +1,12 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowUpRight, Mail, Minus, X } from 'lucide-react';
 import { formatDateTime } from '@/lib/jobs/applications/load';
 import type { SinceView } from '@/lib/jobs/home/since-load';
 import type { ActivityTone } from '@/lib/jobs/activity/load';
 import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Note } from '@/components/ui/note';
+import { cn } from '@/lib/cn';
 import { HomeSection } from './home-section';
 
 /**
@@ -57,25 +60,24 @@ export function SinceList({ since, timezone }: { since: SinceView; timezone: str
       }}
     >
       {quiet ? (
-        <p className="px-1 text-small text-ink-muted">Nothing new since then.</p>
+        <EmptyState size="inline" title="Nothing new since then." className="px-1" />
       ) : (
         <Card padding="standard" className="space-y-3">
           {since.stopped.length > 0 && (
             <ul className="space-y-1.5">
               {since.stopped.map((account) => (
-                <li
-                  key={account.id}
-                  className="rounded-lg bg-caution-tint px-3 py-2 text-small text-ink"
-                >
-                  {account.emailAddress} has stopped syncing, so new mail is not coming in.{' '}
-                  <Link
-                    href="/jobs/settings#inboxes"
-                    className="font-medium underline hover:text-accent"
-                  >
-                    {account.status === 'needs_reauth'
-                      ? 'Reconnect it'
-                      : 'Check the inbox settings'}
-                  </Link>
+                <li key={account.id}>
+                  <Note tone="caution" className="text-small">
+                    {account.emailAddress} has stopped syncing, so new mail is not coming in.{' '}
+                    <Link
+                      href="/jobs/settings#inboxes"
+                      className={cn(linkVariants({ tone: 'quiet' }), 'font-medium text-ink')}
+                    >
+                      {account.status === 'needs_reauth'
+                        ? 'Reconnect it'
+                        : 'Check the inbox settings'}
+                    </Link>
+                  </Note>
                 </li>
               ))}
             </ul>

@@ -3,7 +3,7 @@
 import { useActionState, useRef, useState, type ReactNode } from 'react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { Button } from '@/components/ui/button';
-import { InlineInput, Input, Select } from '@/components/ui/field';
+import { Checkbox, InlineInput, Input, Select } from '@/components/ui/field';
 import { useToast } from '@/components/ui/toast';
 import { PAYEE_MAX } from '@/lib/recurring/limits';
 import {
@@ -285,14 +285,12 @@ function MoveCharges({
           {charges.map((c) => (
             <li key={c.id}>
               <label className="flex items-center gap-2 text-ui text-ink">
-                <input
-                  type="checkbox"
+                <Checkbox
                   name="charge"
                   value={c.id}
                   checked={picked.has(c.id)}
                   onChange={(e) => toggle(c.id, e.target.checked)}
                   disabled={moving}
-                  className="size-4 shrink-0 rounded border-border text-accent focus:ring-accent/30"
                 />
                 <span className="min-w-0 flex-1 truncate">{c.when}</span>
                 <span className="tabular shrink-0">{c.amount ?? 'No amount'}</span>

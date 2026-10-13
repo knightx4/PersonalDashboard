@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, Flag, ListTree } from 'lucide-react';
 import { FileBody } from '@/components/files/file-body';
@@ -85,7 +85,7 @@ export default async function FilePage({
           <Banner tone="info">
             <p className="text-small text-ink">
               This is version {asked}.{' '}
-              <Link href={fileHref(file.id)} className="underline underline-offset-2">
+              <Link href={fileHref(file.id)} className={linkVariants()}>
                 Read the newest, version {file.version}
               </Link>
               .

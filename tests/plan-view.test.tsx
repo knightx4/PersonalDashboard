@@ -291,7 +291,7 @@ describe('PlanView', () => {
     // you kept -- not on the runner's steps.
     expect((html.match(/Marked yours/g) ?? []).length).toBe(1);
     expect(html).toContain(
-      '>Account deletion</a><span title="Yours. The runner will not take this one."',
+      '>Account deletion<span hidden=""></span></a><span title="Yours. The runner will not take this one."',
     );
     // The robot that marked a handed-over step is gone with it.
     expect(html).not.toContain('lucide-bot');
@@ -321,7 +321,7 @@ describe('PlanView', () => {
       />,
     );
     expect((html.match(/>Overhaul</g) ?? []).length).toBe(1);
-    expect(html).toContain('>Move threads onto the core</a><span title="Overhaul.');
+    expect(html).toContain('>Move threads onto the core<span hidden=""></span></a><span title="Overhaul.');
     // With no counts handed over, the row says so rather than showing nothing.
     expect((html.match(/No rule counts yet/g) ?? []).length).toBe(1);
   });

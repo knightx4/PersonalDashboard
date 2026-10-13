@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowLeft } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { CardSection } from '@/components/ui/card';
@@ -189,7 +189,7 @@ export function ConceptPageView({ view, probes, opening, material, notes, timezo
           href={`/learn/s/${subject.id}`}
           className="press-area inline-flex items-center gap-1 text-ui text-ink-muted hover:text-ink"
         >
-          <ArrowLeft className="size-3.5" strokeWidth={2} aria-hidden />
+          <ArrowLeft className="size-3.5" strokeWidth={1.75} aria-hidden />
           {subject.name}
         </Link>
       </p>
@@ -347,7 +347,7 @@ export function ConceptPageView({ view, probes, opening, material, notes, timezo
             Nothing has been asked about this yet.{' '}
             <Link
               href={`/learn/s/${subject.id}/probe`}
-              className="underline underline-offset-2 hover:text-ink"
+              className={linkVariants({ tone: 'quiet' })}
             >
               Ask about this subject
             </Link>{' '}

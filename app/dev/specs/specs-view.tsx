@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { MessageSquareText } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Disclosure } from '@/components/ui/disclosure';
@@ -35,7 +35,7 @@ function SpecRow({ spec, comments }: { spec: SpecDoc; comments: number }) {
           <h3 className="text-body font-semibold text-ink">{spec.title}</h3>
           {comments > 0 && (
             <span className="flex shrink-0 items-center gap-1 text-caption text-ink-muted">
-              <MessageSquareText className="size-3.5" strokeWidth={2} aria-hidden />
+              <MessageSquareText className="size-3.5" strokeWidth={1.75} aria-hidden />
               {comments}
             </span>
           )}
@@ -124,7 +124,7 @@ export function SpecsView({
                 </span>
                 {group.comments > 0 && (
                   <span className="flex items-center gap-1">
-                    <MessageSquareText className="size-3.5" strokeWidth={2} aria-hidden />
+                    <MessageSquareText className="size-3.5" strokeWidth={1.75} aria-hidden />
                     {group.comments}
                   </span>
                 )}

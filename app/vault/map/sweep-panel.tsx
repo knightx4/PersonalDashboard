@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Disclosure } from '@/components/ui/disclosure';
+import { Note } from '@/components/ui/note';
 import type { SweepOutcome } from '@/lib/vault/map/sweep';
 import type { SweepView } from '@/lib/vault/map/sweep-read';
 import { startSweep, stopSweep } from './actions';
@@ -74,9 +75,9 @@ export function SweepPanel({ sweep }: { sweep: SweepView | null }) {
       {/* The error stays out of the fold: a sweep that could not continue is
           not something to find by opening a line. */}
       {sweep.lastError && (
-        <p className="mb-2 rounded-lg bg-caution-tint px-3 py-2 text-ui text-ink">
+        <Note tone="caution" className="mb-2">
           The last run could not continue: {sweep.lastError}
-        </p>
+        </Note>
       )}
       <Disclosure title={heading} meta={failed > 0 ? `· ${failed} failed` : undefined}>
         {sweep.status === 'running' && (

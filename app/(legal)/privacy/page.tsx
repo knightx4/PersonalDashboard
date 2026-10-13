@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { PRESS_AREA } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 
@@ -338,7 +338,7 @@ export default function PrivacyPage() {
         Nothing sent from your notes is used to train a model. Anthropic&rsquo;s{' '}
         <a
           href="https://www.anthropic.com/legal/commercial-terms"
-          className="text-accent hover:underline"
+          className={linkVariants({ tone: 'inline' })}
         >
           commercial terms
         </a>{' '}
@@ -383,7 +383,7 @@ export default function PrivacyPage() {
           You can also revoke our access directly at{' '}
           <a
             href="https://myaccount.google.com/permissions"
-            className="text-accent hover:underline"
+            className={linkVariants({ tone: 'inline' })}
           >
             myaccount.google.com/permissions
           </a>
@@ -472,7 +472,7 @@ export default function PrivacyPage() {
         adheres to the{' '}
         <a
           href="https://developers.google.com/terms/api-services-user-data-policy"
-          className="text-accent hover:underline"
+          className={linkVariants({ tone: 'inline' })}
         >
           Google API Services User Data Policy
         </a>
@@ -485,7 +485,7 @@ export default function PrivacyPage() {
       </p>
 
       <p className="!mt-8 !text-ui">
-        <Link href="/terms" className={cn(PRESS_AREA, 'text-accent hover:underline')}>
+        <Link href="/terms" className={cn(PRESS_AREA, linkVariants({ tone: 'inline' }))}>
           Terms of Service
         </Link>
       </p>

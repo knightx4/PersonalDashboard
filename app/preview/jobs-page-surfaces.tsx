@@ -1,3 +1,4 @@
+import { SectionLabel } from '@/components/ui/section-heading';
 import { Inbox, FileText, Shield } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { Card, CardSection, cardVariants } from '@/components/ui/card';
@@ -480,7 +481,7 @@ export function JobsOnboardingSurface() {
         </div>
         <section className="space-y-6">
           <div>
-            <p className="text-ui font-medium uppercase tracking-wider text-ink-muted">Welcome</p>
+            <SectionLabel>Welcome</SectionLabel>
             <h1 className="font-display mt-2 text-title font-semibold tracking-tight text-ink">
               A pipeline that keeps itself current
             </h1>

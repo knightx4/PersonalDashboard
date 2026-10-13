@@ -1,7 +1,9 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Card } from '@/components/ui/card';
+import { iconButtonVariants } from '@/components/ui/icon-button';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { Pill, WorkweekOutline, opensAt } from '@/components/todo/calendar-month';
 import { blocksFor, hourIn, hourWindow, hoursOf } from '@/lib/todo/calendar/range';
 import type { CalendarDay } from '@/lib/todo/calendar/month';
@@ -74,9 +76,9 @@ export function CalendarTimeGrid({
               here rather than the exception. */}
           {hasAllDay && (
             <div className="grid border-b border-border bg-canvas" style={columns}>
-              <span className="px-2 py-1.5 text-micro font-semibold uppercase tracking-wide text-ink-muted">
+              <SectionLabel as="span" className="px-2 py-1.5">
                 All day
-              </span>
+              </SectionLabel>
               {days.map((day, index) => (
                 <div
                   key={day.day}
@@ -133,7 +135,7 @@ export function CalendarTimeGrid({
                       width: `${(1 / block.lanes) * 100}%`,
                     }}
                     className={cn(
-                      'pointer-events-none my-px rounded-md border-l-2',
+                      'pointer-events-none my-px rounded-control border-l-2',
                       // A subscribed appointment takes up the same hours and
                       // says so more quietly: it is on the day, but it is
                       // somebody else's row and nothing here can move it.
@@ -201,9 +203,9 @@ function DayHeading({
         href={{ pathname: '/todo/calendar', query: { view: 'day', date: day.day } }}
         className="flex min-w-0 flex-1 items-baseline gap-1.5 px-2 py-1.5 transition-colors duration-quick hover:bg-sunken"
       >
-        <span className="truncate text-micro font-semibold uppercase tracking-wide text-ink-muted">
+        <SectionLabel as="span" className="truncate">
           {weekday}
-        </span>
+        </SectionLabel>
         <span
           className={cn(
             'tabular text-ui',
@@ -220,9 +222,9 @@ function DayHeading({
         href={newEventHref(day.day)}
         aria-label={`New event on ${day.day}`}
         title="New event"
-        className="press flex size-5 shrink-0 items-center justify-center rounded-full text-ink-ghost transition-colors duration-quick hover:bg-accent-tint hover:text-accent"
+        className={iconButtonVariants({ size: 'sm' })}
       >
-        <Plus className="size-3.5" strokeWidth={1.75} aria-hidden />
+        <Plus strokeWidth={1.75} aria-hidden />
       </Link>
     </div>
   );

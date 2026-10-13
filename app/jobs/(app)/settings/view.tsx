@@ -5,6 +5,11 @@ import { Check, Copy, Mail, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Banner } from '@/components/ui/banner';
+import { chipVariants, ToggleChip } from '@/components/ui/chip';
+import { IconButton } from '@/components/ui/icon-button';
+import Link, { linkVariants } from '@/components/ui/link';
+import { Note } from '@/components/ui/note';
+import { SectionHeading } from '@/components/ui/section-heading';
 import { InlineInput, Input, Label } from '@/components/ui/field';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { ValueList, ValueRow } from '@/components/ui/value-row';
@@ -87,21 +92,21 @@ function ProfileSection({
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">Job search</h2>
+      <SectionHeading title="Job search" />
       <p className="mt-0.5 text-ui text-ink-muted">{email}</p>
       <p className="mt-2 text-small text-ink-muted">
         Your name and timezone are account settings now — they hold across every workspace, so they
         live under{' '}
-        <a href="/account" className="font-medium text-accent underline underline-offset-2">
+        <Link href="/account" className={cn(linkVariants(), 'font-medium')}>
           Account
-        </a>
+        </Link>
         , and so does deleting the account, which was never the job search&rsquo;s to offer.
       </p>
       <p className="mt-2 text-small text-ink-muted">
         The titles you are aiming for and the industries never to suggest are on{' '}
-        <a href="/jobs/find" className="font-medium text-accent underline underline-offset-2">
+        <Link href="/jobs/find" className={cn(linkVariants(), 'font-medium')}>
           Find
-        </a>
+        </Link>
         , beside the roles and people they shape.
       </p>
 
@@ -307,23 +312,17 @@ function PreferenceChoices({
           {options.map((option) => {
             const on = chosen.includes(option.value);
             return (
-              <button
+              <ToggleChip
                 key={option.value}
+                on={on}
                 type="submit"
                 name="toggle"
                 value={option.value}
-                aria-pressed={on}
                 disabled={pending}
-                className={cn(
-                  'press inline-flex items-center gap-1 rounded-control px-1.5 py-0.5 text-ui',
-                  on
-                    ? 'bg-sunken font-medium text-ink'
-                    : 'text-ink-muted hover:bg-sunken hover:text-ink',
-                )}
               >
-                {on && <Check className="size-3.5" strokeWidth={2} aria-hidden />}
+                {on && <Check strokeWidth={1.75} aria-hidden />}
                 {option.label}
-              </button>
+              </ToggleChip>
             );
           })}
           {chosen.length === 0 && (
@@ -374,7 +373,7 @@ function InboxSection({
 
   return (
     <section id="inboxes" className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">Connected inboxes</h2>
+      <SectionHeading title="Connected inboxes" />
       <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
         Read-only, scoped to a search query about recruiting mail. Message bodies are never stored.
         Subjects and senders are kept only for the messages that turn out to be relevant —
@@ -391,11 +390,11 @@ function InboxSection({
               </Button>
             </a>
           ) : (
-            <p className="rounded-lg bg-canvas px-3 py-2 text-ui text-ink-muted">
+            <Note className="text-ink-muted">
               Inbox scanning for the job search side is not connected yet — it needs its own Google
               grant, separate from the one the shopping side uses. Everything else works without it:
               add roles by pasting a job link, or use the capture bookmarklet.
-            </p>
+            </Note>
           )}
         </div>
       ) : (
@@ -408,18 +407,16 @@ function InboxSection({
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-ui font-medium text-ink">{account.emailAddress}</span>
                 <span
-                  className={cn(
-                    'rounded-full px-1.5 py-0.5 text-micro',
-                    account.status === 'active'
-                      ? // Connected is the ordinary state, so it is set quietly:
-                        // it was wearing the offer hue, which law 4 gives to one
-                        // stage of the pipeline and to nothing else, and green,
-                        // which means money came back. Amber stays on the broken
-                        // one, where "something is wrong and only you can fix it"
-                        // is exactly what it means.
-                        'bg-sunken text-ink-muted'
-                      : 'bg-caution-tint text-ink',
-                  )}
+                  className={chipVariants({
+                    size: 'sm',
+                    // Connected is the ordinary state, so it is set quietly:
+                    // it was wearing the offer hue, which law 4 gives to one
+                    // stage of the pipeline and to nothing else, and green,
+                    // which means money came back. Amber stays on the broken
+                    // one, where "something is wrong and only you can fix it"
+                    // is exactly what it means.
+                    tone: account.status === 'active' ? 'neutral' : 'caution',
+                  })}
                 >
                   {account.status.replace(/_/g, ' ')}
                 </span>
@@ -433,11 +430,11 @@ function InboxSection({
               </div>
 
               {account.status === 'needs_reauth' && (
-                <p className="mt-2 rounded bg-caution-tint px-2 py-1.5 text-small text-ink">
+                <Note tone="caution" className="mt-2 text-small">
                   Google stopped honouring the token. Reconnect below. If this happens weekly, the
                   OAuth app is still in Testing status — Google expires refresh tokens every seven
                   days there.
-                </p>
+                </Note>
               )}
 
               {backfillResumable(backfillStateOf(account)) && account.latestBackfill && (
@@ -446,14 +443,14 @@ function InboxSection({
                 // partway. It resumes where it stopped -- which the page has to
                 // actually say, or the only reading left is that nothing
                 // happened the last six times.
-                <p className="mt-2 rounded bg-canvas px-2 py-1.5 text-small text-ink-muted">
+                <Note className="mt-2 text-small text-ink-muted">
                   First scan stopped partway — {account.latestBackfill.messagesSeen} messages read
                   {account.latestBackfill.finishedAt
                     ? `, ${formatDate(account.latestBackfill.finishedAt)}`
                     : ''}
                   . It picks up where it left off, and keeps going on its own while a page of the
                   app is open.
-                </p>
+                </Note>
               )}
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -483,7 +480,7 @@ function InboxSection({
                 </Button>
                 <a
                   href="/api/auth/gmail/connect?return_to=/jobs/settings"
-                  className="text-small text-ink-muted underline underline-offset-2 hover:text-ink"
+                  className={cn(linkVariants({ tone: 'quiet' }), 'text-small')}
                 >
                   Reconnect
                 </a>
@@ -546,7 +543,7 @@ function BookmarkletSection({ appOrigin }: { appOrigin: string }) {
 
   return (
     <section id="bookmarklet" className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">Capture application questions</h2>
+      <SectionHeading title="Capture application questions" />
       <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
         Drag this to your bookmarks bar. On an application form, click it: it reads the question
         labels and sends them here. It runs in your browser inside your session, which is why it
@@ -611,7 +608,7 @@ function ExcludedSendersSection({
 
   return (
     <section className={cardVariants({ padding: 'standard' })}>
-      <h2 className="text-body font-semibold text-ink">Excluded senders</h2>
+      <SectionHeading title="Excluded senders" />
       <p className="mt-0.5 text-ui leading-relaxed text-ink-muted">
         Mail from Indeed is already excluded everywhere for everyone — it is suggested jobs, not
         anything you applied to. Add a domain here for anything else that keeps showing up as a lead
@@ -623,18 +620,18 @@ function ExcludedSendersSection({
           {excludedSenders.map((entry) => (
             <li key={entry.id} className="flex items-center gap-2 text-ui">
               <span className="tabular text-ink">{entry.domain}</span>
-              <button
-                type="button"
-                className="ml-auto text-ink-muted hover:text-danger"
+              <IconButton
+                size="sm"
+                label={`Stop excluding ${entry.domain}`}
+                className="ml-auto hover:text-danger"
                 onClick={() =>
                   startTransition(async () => {
                     await removeExcludedSender(entry.id);
                   })
                 }
-                aria-label={`Stop excluding ${entry.domain}`}
               >
-                <Trash2 className="size-3.5" strokeWidth={1.75} />
-              </button>
+                <Trash2 strokeWidth={1.75} aria-hidden />
+              </IconButton>
             </li>
           ))}
         </ul>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import {
   saveGame,
   saveManualGame,
@@ -49,10 +49,10 @@ export function GameCard({
         <img
           src={game.imageUrl}
           alt=""
-          className="h-24 w-24 shrink-0 rounded-md object-cover bg-canvas"
+          className="h-24 w-24 shrink-0 rounded-card object-cover bg-canvas"
         />
       ) : (
-        <div className="hidden h-24 w-24 shrink-0 items-center sm:flex justify-center rounded-md bg-canvas text-small text-ink-muted">
+        <div className="hidden h-24 w-24 shrink-0 items-center sm:flex justify-center rounded-card bg-canvas text-small text-ink-muted">
           No image
         </div>
       )}
@@ -200,7 +200,7 @@ export function AddGameManualForm({
         <p className="text-body text-accent">
           {state.message}{' '}
           {state.savedIds?.[0] && (
-            <Link className="underline" href={`/shopping/inventory/${state.savedIds[0]}`}>
+            <Link className={linkVariants()} href={`/shopping/inventory/${state.savedIds[0]}`}>
               View item
             </Link>
           )}
@@ -255,7 +255,7 @@ export function GameSearchForm() {
         <p className="text-body text-accent">
           {saveState.message}{' '}
           {saveState.savedIds?.[0] && (
-            <Link className="underline" href={`/shopping/inventory/${saveState.savedIds[0]}`}>
+            <Link className={linkVariants()} href={`/shopping/inventory/${saveState.savedIds[0]}`}>
               View item
             </Link>
           )}

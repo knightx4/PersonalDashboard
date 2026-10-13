@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { AlertTriangle, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { CardSection, cardVariants } from '@/components/ui/card';
@@ -227,7 +227,7 @@ function FocusLine({
         {row.needsReview && (
           <AlertTriangle
             className="size-3.5 shrink-0 text-caution"
-            strokeWidth={2}
+            strokeWidth={1.75}
             aria-label="Needs review"
           />
         )}

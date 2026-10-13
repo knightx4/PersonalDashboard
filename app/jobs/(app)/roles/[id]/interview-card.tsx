@@ -1,11 +1,15 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { CalendarDays, Video } from 'lucide-react';
+import { CalendarDays, Video, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
+import { IconButton } from '@/components/ui/icon-button';
+import { Note } from '@/components/ui/note';
+import { SectionLabel } from '@/components/ui/section-heading';
 import { EditableProse } from '@/components/ui/editable-prose';
 import { Input, Label, Select } from '@/components/ui/field';
 import { formatInterviewWhen } from '@/lib/jobs/applications/load';
@@ -108,7 +112,7 @@ export function InterviewCard({
               href={interview.meetingUrl}
               target="_blank"
               rel="noreferrer noopener"
-              className="press-area inline-flex items-center gap-1 text-accent underline underline-offset-2"
+              className={cn(linkVariants(), 'press-area inline-flex items-center gap-1')}
             >
               <Video className="size-3.5" strokeWidth={1.75} aria-hidden />
               Join the call
@@ -119,7 +123,7 @@ export function InterviewCard({
               href={interview.calendarHref}
               target="_blank"
               rel="noreferrer noopener"
-              className="press-area inline-flex items-center gap-1 text-accent underline underline-offset-2"
+              className={cn(linkVariants(), 'press-area inline-flex items-center gap-1')}
             >
               <CalendarDays className="size-3.5" strokeWidth={1.75} aria-hidden />
               Open in Calendar
@@ -131,18 +135,14 @@ export function InterviewCard({
       <Interviewers interview={interview} companyContacts={companyContacts} />
 
       {needsDebrief && (
-        <p className="mt-2 rounded bg-caution-tint px-2 py-1.5 text-small text-ink">
+        <Note tone="caution" className="mt-2 text-small">
           Write the debrief tonight. One written three days later is worth very little.{' '}
           {!showNotes && (
-            <button
-              type="button"
-              onClick={() => setShowNotes(true)}
-              className="font-medium underline underline-offset-2"
-            >
+            <Button type="button" variant="link" onClick={() => setShowNotes(true)} className="text-ink">
               Start it
-            </button>
+            </Button>
           )}
-        </p>
+        </Note>
       )}
 
       {/* Prep and Notes, each a field on the round, read as writing and
@@ -217,9 +217,7 @@ export function InterviewCard({
 
       {interview.questionsAsked.length > 0 && (
         <div className="mt-3">
-          <h4 className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-            Questions they asked
-          </h4>
+          <SectionLabel as="h4">Questions they asked</SectionLabel>
           <ul className="mt-1 space-y-0.5 text-ui text-ink-muted">
             {interview.questionsAsked.map((question, index) => (
               <li key={index}>· {question}</li>
@@ -235,43 +233,41 @@ export function InterviewCard({
       {/* No Save button: the prep and the notes each save themselves. */}
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
         {grouped && (
-          <button
+          <Button
             type="button"
+            variant="link"
             disabled={pending}
             onClick={() => startTransition(() => void ungroupInterview(interview.id))}
-            className="text-small text-ink-muted underline underline-offset-2 hover:text-ink"
           >
             Move it to its own round
-          </button>
+          </Button>
         )}
         <span className="ml-auto">
           {confirmingDelete ? (
             <span className="flex items-center gap-2">
               <span className="text-small text-ink-muted">Delete this round?</span>
-              <button
+              <Button
                 type="button"
+                variant="danger"
+                size="xs"
                 disabled={pending}
                 onClick={() => startTransition(() => void deleteInterview(interview.id))}
-                className="press text-small font-medium text-danger"
               >
                 Delete
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmingDelete(false)}
-                className="text-small text-ink-muted hover:text-ink"
-              >
+              </Button>
+              <Button type="button" variant="ghost" size="xs" onClick={() => setConfirmingDelete(false)}>
                 Cancel
-              </button>
+              </Button>
             </span>
           ) : (
-            <button
+            <Button
               type="button"
+              variant="link"
               onClick={() => setConfirmingDelete(true)}
-              className="text-small text-ink-muted underline underline-offset-2 hover:text-danger"
+              className="hover:text-danger"
             >
               Not a real round — remove it
-            </button>
+            </Button>
           )}
         </span>
       </div>
@@ -306,8 +302,9 @@ function InterviewHeading({
             round, and the round above it is what carries the number. */}
         <h3 className="text-ui font-semibold text-ink">
           {interviewKindLabel(kind)}
-          <button
+          <Button
             type="button"
+            variant="link"
             onClick={() => {
               setDraftKind(kind);
               const fields = fieldsFromSchedule(scheduledAt, timeKnown);
@@ -316,10 +313,10 @@ function InterviewHeading({
               setError(null);
               setEditing(true);
             }}
-            className="ml-2 align-middle text-small font-normal text-ink-muted underline underline-offset-2 hover:text-accent"
+            className="ml-2 align-middle"
           >
             Edit
-          </button>
+          </Button>
         </h3>
         <span className={cn('tabular text-small', scheduledAt ? 'text-ink-muted' : 'text-caution')}>
           {when}
@@ -468,37 +465,33 @@ function Interviewers({
       <Button type="button" size="sm" disabled={pending || !newName?.trim()} onClick={addByName}>
         Add
       </Button>
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         onClick={() => {
           setNewName(null);
           setError(null);
         }}
-        className="text-small text-ink-muted hover:text-ink"
       >
         Cancel
-      </button>
+      </Button>
     </span>
   );
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-small">
-      <span className="text-micro font-semibold uppercase tracking-wider text-ink-muted">
-        Interviewers
-      </span>
+      <SectionLabel as="span">Interviewers</SectionLabel>
 
       {interview.participants.length === 0 && !adding && (
         <span className="text-ink-muted">Nobody named yet</span>
       )}
 
       {interview.participants.map((participant) => (
-        <span
-          key={participant.contactId}
-          className="inline-flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5"
-        >
+        <Chip key={participant.contactId} className="pr-0.5">
           <Link
             href={`/jobs/contacts/${participant.contactId}`}
-            className="text-ink underline underline-offset-2 hover:text-accent"
+            className={cn(linkVariants({ tone: 'quiet' }), 'text-ink')}
             title={participant.title ?? undefined}
           >
             {participant.name}
@@ -506,10 +499,10 @@ function Interviewers({
           {participant.role !== 'interviewer' && (
             <span className="text-ink-muted">{participant.role}</span>
           )}
-          <button
-            type="button"
+          <IconButton
+            size="sm"
+            label={`Remove ${participant.name}`}
             disabled={pending}
-            aria-label={`Remove ${participant.name}`}
             onClick={() =>
               startTransition(
                 () =>
@@ -519,11 +512,11 @@ function Interviewers({
                   }),
               )
             }
-            className="text-ink-muted hover:text-danger"
+            className="-my-1 -mr-1 hover:text-danger"
           >
-            ×
-          </button>
-        </span>
+            <X strokeWidth={1.75} aria-hidden />
+          </IconButton>
+        </Chip>
       ))}
 
       {adding ? (
@@ -554,13 +547,9 @@ function Interviewers({
           </Select>
         )
       ) : (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="text-ink-muted underline underline-offset-2 hover:text-accent"
-        >
+        <Button type="button" variant="link" onClick={() => setAdding(true)}>
           Add
-        </button>
+        </Button>
       )}
 
       {error && <span className="text-danger">{error}</span>}

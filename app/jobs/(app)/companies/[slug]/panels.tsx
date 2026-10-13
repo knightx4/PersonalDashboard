@@ -1,12 +1,15 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useSearchParams } from 'next/navigation';
 import { useActionState, useState, useTransition, type ReactNode } from 'react';
 import { Briefcase, Building2, MessagesSquare, Send, Users } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Note } from '@/components/ui/note';
 import { Field, FieldError, Input, Select, Textarea } from '@/components/ui/field';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { EditableProse } from '@/components/ui/editable-prose';
@@ -232,7 +235,7 @@ function Details({
                   href={form.website}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="press-area text-accent underline underline-offset-2"
+                  className={cn(linkVariants(), 'press-area')}
                 >
                   {form.website}
                 </a>
@@ -247,7 +250,7 @@ function Details({
                   href={form.careersUrl}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="press-area text-accent underline underline-offset-2"
+                  className={cn(linkVariants(), 'press-area')}
                 >
                   {form.careersUrl}
                 </a>
@@ -262,7 +265,7 @@ function Details({
                   href={form.linkedinUrl}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="press-area text-accent underline underline-offset-2"
+                  className={cn(linkVariants(), 'press-area')}
                 >
                   {form.linkedinUrl}
                 </a>
@@ -343,7 +346,7 @@ function Details({
               href={form.website}
               target="_blank"
               rel="noreferrer noopener"
-              className="mt-1 inline-block text-small text-accent underline underline-offset-2"
+              className={cn(linkVariants(), 'mt-1 inline-block text-small')}
             >
               Open
             </a>
@@ -458,7 +461,7 @@ function Enrichment({ companyId }: { companyId: string }) {
         // not yet yours -- a recessed ground says that, where a border inside
         // the company card would only be the card's edge drawn twice. Law 11:
         // a shared ground groups.
-        <div className="mt-3 rounded-card bg-canvas p-3">
+        <Note className="mt-3 p-3">
           <p className="text-ui font-medium text-ink">{proposal.label}</p>
           {proposal.description && (
             <p className="text-small text-ink-muted">{proposal.description}</p>
@@ -497,7 +500,7 @@ function Enrichment({ companyId }: { companyId: string }) {
               Not this company
             </Button>
           </div>
-        </div>
+        </Note>
       )}
     </div>
   );
@@ -564,13 +567,13 @@ function AiEnrichment({ companyId }: { companyId: string }) {
       {proposal && (
         // Same well as the Wikidata proposal above, for the same reason: this
         // is a search result waiting on your yes, not a fact about the company.
-        <div className="mt-3 rounded-card bg-canvas p-3">
+        <Note className="mt-3 p-3">
           {proposal.website && (
             <a
               href={proposal.website}
               target="_blank"
               rel="noreferrer noopener"
-              className="text-ui font-medium text-accent underline underline-offset-2"
+              className={cn(linkVariants(), 'text-ui font-medium')}
             >
               {proposal.website}
             </a>
@@ -597,7 +600,7 @@ function AiEnrichment({ companyId }: { companyId: string }) {
                     href={source.url}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="underline underline-offset-2"
+                    className={linkVariants({ tone: 'quiet' })}
                   >
                     {source.title ?? new URL(source.url).hostname}
                   </a>
@@ -625,7 +628,7 @@ function AiEnrichment({ companyId }: { companyId: string }) {
               Not this company
             </Button>
           </div>
-        </div>
+        </Note>
       )}
     </div>
   );
@@ -692,20 +695,16 @@ function Contacts({
             <FieldError>{state.error}</FieldError>
           </div>
           {!more && (
-            <button
-              type="button"
-              onClick={() => setMore(true)}
-              className="press-area text-small text-ink-muted underline underline-offset-2 hover:text-accent"
-            >
+            <Button type="button" variant="link" onClick={() => setMore(true)}>
               More: LinkedIn and work email
-            </button>
+            </Button>
           )}
         </form>
       ) : (
         <AddTrigger label="Add a person" onClick={() => setAdding(true)} />
       )}
       {contacts.length === 0 ? (
-        !adding && <p className="mt-2 text-ui text-ink-muted">Nobody recorded here yet.</p>
+        !adding && <EmptyState size="inline" title="Nobody recorded here yet." className="mt-2" />
       ) : (
         <ul className="mt-2 divide-y divide-border">
           {contacts.map((contact) => (
@@ -718,16 +717,14 @@ function Contacts({
                 {contact.fullName}
               </Link>
               {contact.title && <span className="text-small text-ink-muted">{contact.title}</span>}
-              <span className="rounded-full bg-canvas px-1.5 py-0.5 text-small text-ink-muted">
-                {contact.relationship.replace(/_/g, ' ')}
-              </span>
+              <Chip>{contact.relationship.replace(/_/g, ' ')}</Chip>
               <span className="text-small text-ink-muted">{contact.status.replace(/_/g, ' ')}</span>
               {contact.linkedinUrl && (
                 <a
                   href={contact.linkedinUrl}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="press-area text-small text-accent underline underline-offset-2"
+                  className={cn(linkVariants(), 'press-area text-small')}
                 >
                   LinkedIn
                 </a>
@@ -885,11 +882,13 @@ function Notes({
 
       <ul className="mt-3 space-y-2">
         {notes.map((note) => (
-          <li key={note.id} className="rounded-lg bg-canvas p-2.5">
-            <FoldingMarkdown markdown={note.body} className="text-ui text-ink" />
-            <p className="tabular mt-1 text-small text-ink-muted">
-              {formatDate(note.createdAt, timezone)}
-            </p>
+          <li key={note.id}>
+            <Note>
+              <FoldingMarkdown markdown={note.body} className="text-ui text-ink" />
+              <p className="tabular mt-1 text-small text-ink-muted">
+                {formatDate(note.createdAt, timezone)}
+              </p>
+            </Note>
           </li>
         ))}
       </ul>

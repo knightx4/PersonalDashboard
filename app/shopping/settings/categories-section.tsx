@@ -8,6 +8,7 @@ import {
   type CategoryActionState,
 } from '@/app/shopping/settings/actions';
 import { Button } from '@/components/ui/button';
+import { chipVariants } from '@/components/ui/chip';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { FieldError, InlineInput, Input } from '@/components/ui/field';
 import { Group } from '@/components/ui/disclosure';
@@ -100,7 +101,7 @@ export function CategoriesSection({ categories }: { categories: SettingsCategory
           {system.map((category) => (
             <li
               key={category.id}
-              className="inline-flex items-center gap-1.5 rounded-full bg-sunken px-2.5 py-1 text-ui text-ink-muted"
+              className={chipVariants()}
             >
               <span
                 className="size-2 rounded-full"

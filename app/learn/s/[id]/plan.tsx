@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ArrowRight, Check } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
@@ -16,6 +16,8 @@ import {
 import { WriteAboutThis } from '@/app/learn/essays/write-about-this';
 import { AddUnitForm, UnitMenu } from './plan-edit';
 import { ProjectCard } from './project';
+import { Chip } from '@/components/ui/chip';
+import { EmptyState } from '@/components/ui/empty-state';
 
 /**
  * A learning goal's plan (plan #1143, LEARN-LESSONS-SPEC "The plan page"),
@@ -82,7 +84,7 @@ export function PlanSection({
             className={cn(buttonVariants({ variant: 'primary' }), 'press mt-3')}
           >
             {progress.next.state === 'open' ? 'Start it' : 'Carry on'}
-            <ArrowRight className="size-3.5" strokeWidth={2} aria-hidden />
+            <ArrowRight className="size-3.5" strokeWidth={1.75} aria-hidden />
           </Link>
         </div>
       ) : finished && goal ? (
@@ -90,15 +92,19 @@ export function PlanSection({
         // to offer is an essay on it (plan #1867).
         <WriteAboutThis kind="goal" refId={goal.aimId} title={goal.name} className="mb-4" />
       ) : (
-        <p className={cn(cardVariants(), 'mb-4 border-dashed px-4 py-6 text-center text-body text-ink-muted')}>
-          {progress.total === 0
+        <EmptyState
+          size="box"
+          className="mb-4"
+          title={
+            progress.total === 0
             ? 'Its pieces are written unit by unit, a unit or two an hour. The first will be here soon.'
             : progress.unitsWritten < progress.units
               ? 'Every piece written so far is passed. The next unit is being split into pieces.'
               : finished
                 ? 'You have finished this plan: every piece and the final project are passed.'
-                : 'Every piece of this plan is passed. Pass the final project below to finish it.'}
-        </p>
+                : 'Every piece of this plan is passed. Pass the final project below to finish it.'
+          }
+        />
       )}
 
       <ol className={cn(cardVariants(), 'divide-y divide-border')}>
@@ -183,17 +189,17 @@ function PieceRow({ piece, href, next }: { piece: PlanPiece; href: string; next:
   return (
     <li className="flex items-baseline gap-2 text-ui">
       <span className="w-5 shrink-0 text-ink-muted tabular-nums">{piece.ordinal}.</span>
-      <Link href={href} className="inline-flex min-h-11 min-w-0 items-center text-accent hover:underline lg:min-h-0">
+      <Link href={href} className={cn('inline-flex min-h-11 min-w-0 items-center lg:min-h-0', linkVariants())}>
         {piece.title}
       </Link>
       {next && (
-        <span className="shrink-0 rounded-pill bg-accent-tint px-1.5 py-0.5 text-small font-medium text-accent">
+        <Chip tone="accent">
           Next
-        </span>
+        </Chip>
       )}
       {piece.state === 'passed' ? (
         <span className="inline-flex shrink-0 items-center gap-0.5 text-small text-ink-muted">
-          <Check className="size-3.5" strokeWidth={2} aria-hidden />
+          <Check className="size-3.5" strokeWidth={1.75} aria-hidden />
           {words}
         </span>
       ) : (

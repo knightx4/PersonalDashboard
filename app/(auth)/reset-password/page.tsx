@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/ui/link';
 import { useActionState } from 'react';
 import { Button, PRESS_AREA } from '@/components/ui/button';
 import { cn } from '@/lib/cn';

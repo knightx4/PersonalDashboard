@@ -42,6 +42,8 @@ import {
 import { planRowRef, raiseRef } from '@/lib/dev/inbox-snoozes';
 import { RunQuestionCard } from '@/components/runs/run-question-card';
 import { answerPlanRunAction } from '@/app/dev/plan/run-actions';
+import { SectionLabel } from '@/components/ui/section-heading';
+import { Chip } from '@/components/ui/chip';
 
 const MODULE_LABEL: Record<ModuleId, string> = Object.fromEntries(
   MODULES.map((module) => [module.id, module.label]),
@@ -60,9 +62,7 @@ function scopeLabel(module: ModuleId | null): string {
 function Ask({ ask, titles }: { ask: string; titles?: PlanRefTitles }) {
   return (
     <div className="space-y-0.5">
-      <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
-        Needs from you
-      </p>
+      <SectionLabel>Needs from you</SectionLabel>
       <p className="whitespace-pre-wrap text-body text-ink">
         <RefText text={ask} titles={titles} />
       </p>
@@ -79,9 +79,7 @@ function Ask({ ask, titles }: { ask: string; titles?: PlanRefTitles }) {
 function Consequence({ said, titles }: { said: string; titles?: PlanRefTitles }) {
   return (
     <div className="space-y-0.5">
-      <p className="text-micro font-semibold uppercase tracking-wide text-ink-muted">
-        Answering yes
-      </p>
+      <SectionLabel>Answering yes</SectionLabel>
       <p className="whitespace-pre-wrap text-body text-ink-muted">
         <RefText text={said} titles={titles} />
       </p>
@@ -262,9 +260,9 @@ function RaiseCard({
     // The anchor a search hit on this raise lands on (plan #1154).
     <li id={raiseAnchor(row.id)} className="flex scroll-mt-bar flex-col gap-2 px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-accent-tint px-2 py-0.5 text-micro font-semibold uppercase tracking-wide text-accent">
+        <Chip tone="accent" size="sm">
           {scopeLabel(row.module)}
-        </span>
+        </Chip>
         <span className="tabular text-small text-ink-muted">{row.createdAt.slice(0, 10)}</span>
         <StatusLabel row={row} />
         {snooze?.back && <BackFromSnoozeMark />}

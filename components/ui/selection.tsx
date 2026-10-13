@@ -13,7 +13,7 @@ import {
 } from 'react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
-import { Kbd } from '@/components/shell/key-hints';
+import { Kbd } from '@/components/ui/kbd';
 import {
   EMPTY_SELECTION,
   clearSelection,

@@ -7,6 +7,7 @@ import {
   type ActionState,
   type PreviewState,
 } from '@/app/shopping/saved/actions';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Banner } from '@/components/ui/banner';
 import { Button } from '@/components/ui/button';
 import { Card, cardVariants } from '@/components/ui/card';
@@ -97,10 +98,10 @@ export function SaveForm({ compact = false }: { compact?: boolean }) {
               <ul className="mt-2 space-y-1 text-ui text-ink-muted">
                 {preview.ownedMatches!.map((match) => (
                   <li key={match.id}>
-                    <a href={`/shopping/inventory/${match.id}`} className="text-accent hover:underline">
+                    <Link href={`/shopping/inventory/${match.id}`} className={linkVariants()}>
                       {match.name}
                       {match.variant ? ` · ${match.variant}` : ''}
-                    </a>
+                    </Link>
                     {match.costCents != null && (
                       <span> · {formatMoney(match.costCents)}</span>
                     )}

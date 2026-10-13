@@ -1,10 +1,11 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Chip } from '@/components/ui/chip';
 import { CardSection } from '@/components/ui/card';
 import { DashMark } from '@/components/ui/dash-mark';
 import { PaidHint } from '@/components/ui/paid-hint';
@@ -124,9 +125,9 @@ function CompanyRow({ company }: { company: DiscoveredCompany }) {
     <li className="row-pad space-y-1">
       <div className="flex items-baseline gap-2">
         {company.score !== null && (
-          <span className="tabular shrink-0 rounded-control bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
+          <Chip>
             {FIT_SCORE_LABEL} {company.score}
-          </span>
+          </Chip>
         )}
         <h3 className="min-w-0 text-ui font-medium text-ink">
           {company.website ? (
@@ -156,7 +157,7 @@ function CompanyRow({ company }: { company: DiscoveredCompany }) {
       {company.reason && <p className="text-small text-ink-muted">{company.reason}</p>}
       <div className="flex flex-wrap items-center gap-2 pt-0.5">
         {company.companySlug ? (
-          <Link href={`/jobs/companies/${company.companySlug}`} className="press-area text-small text-accent hover:underline">
+          <Link href={`/jobs/companies/${company.companySlug}`} className={cn(linkVariants(), 'press-area text-small')}>
             On your companies list
           </Link>
         ) : (

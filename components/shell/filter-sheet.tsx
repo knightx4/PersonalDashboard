@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { SlidersHorizontal, X } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { scrim } from '@/components/ui/popover';
+import { IconButton } from '@/components/ui/icon-button';
 
 /**
  * Filters behind one button at every width, for a list page that is one
@@ -67,14 +68,9 @@ export function FilterSheet({
           >
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 className="text-ui font-semibold text-ink">Filters</h2>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="press flex size-8 items-center justify-center rounded-lg text-ink-muted hover:bg-sunken hover:text-ink"
-              >
-                <X className="size-4" strokeWidth={2} aria-hidden />
-                <span className="sr-only">Close filters</span>
-              </button>
+              <IconButton label="Close filters" onClick={() => setOpen(false)}>
+                <X strokeWidth={1.75} aria-hidden />
+              </IconButton>
             </div>
             <div className="flex-1 space-y-6 overflow-y-auto p-4" onClick={() => setOpen(false)}>
               {children}

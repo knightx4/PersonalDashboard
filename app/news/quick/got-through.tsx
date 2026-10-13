@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
+import { Stat } from '@/components/ui/stat';
 import { useChangedWhileWatched, useCountUp, useReducedMotion } from '@/components/ui/motion';
 import { cn } from '@/lib/cn';
 import { MOTION_MS } from '@/lib/motion';
@@ -62,16 +63,10 @@ export function GotThrough({
     >
       <Card padding="standard" data-got-through="">
         <h2 className="text-ui font-semibold text-ink">Today in Quick read</h2>
-        <dl className="mt-2 flex gap-8">
-          <div>
-            <dt className="text-small text-ink-muted">Read</dt>
-            <dd className="tabular font-display text-title text-ink">{read}</dd>
-          </div>
-          <div>
-            <dt className="text-small text-ink-muted">Skipped</dt>
-            <dd className="tabular font-display text-title text-ink">{skipped}</dd>
-          </div>
-        </dl>
+        <div className="mt-2 flex gap-8">
+          <Stat value={read} label="Read" />
+          <Stat value={skipped} label="Skipped" />
+        </div>
         {/* The figures count up for the eye; this says them once, as they end. */}
         <p className="sr-only" role="status">
           {`You read ${summary.read} and skipped ${summary.skipped} today.`}

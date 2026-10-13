@@ -1,5 +1,6 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { ChevronRight } from 'lucide-react';
+import { Disclosure } from '@/components/ui/disclosure';
 import { storyAddsToSummary, storyParagraphs } from '@/lib/news/issues/stories';
 
 /**
@@ -29,31 +30,29 @@ export function StoryText({
     return (
       <Link
         href={href}
-        className="mt-1.5 inline-flex items-center gap-1 text-ui text-accent hover:underline"
+        className={`mt-1.5 inline-flex items-center gap-1 text-ui ${linkVariants()}`}
       >
-        <ChevronRight className="size-3" strokeWidth={2} aria-hidden />
+        <ChevronRight className="size-3.5" strokeWidth={1.75} aria-hidden />
         Read the full story
       </Link>
     );
   }
   return (
-    <details className="group mt-1.5">
-      <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-ui text-accent hover:underline [&::-webkit-details-marker]:hidden">
-        <ChevronRight
-          className="size-3 transition-transform group-open:rotate-90"
-          strokeWidth={2}
-          aria-hidden
-        />
-        <span className="group-open:hidden">Read the full story</span>
-        <span className="hidden group-open:inline">Hide the full story</span>
-      </summary>
-      <div className="mt-2 space-y-2 border-l-2 border-border pl-3">
-        {paragraphs.map((paragraph, index) => (
-          <p key={index} className="break-words text-body leading-relaxed text-ink">
-            {paragraph}
-          </p>
-        ))}
-      </div>
-    </details>
+    <Disclosure
+      className="mt-1.5"
+      title={
+        <>
+          <span className="group-open/disc:hidden">Read the full story</span>
+          <span className="hidden group-open/disc:inline">Hide the full story</span>
+        </>
+      }
+      bodyClassName="mt-2 space-y-2 border-l-2 border-border pl-3"
+    >
+      {paragraphs.map((paragraph, index) => (
+        <p key={index} className="break-words text-body leading-relaxed text-ink">
+          {paragraph}
+        </p>
+      ))}
+    </Disclosure>
   );
 }

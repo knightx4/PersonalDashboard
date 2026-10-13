@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { formatMoney } from '@/lib/money';
 import { Banner } from '@/components/ui/banner';
 import { SavedItemBody } from './item-forms';
@@ -62,7 +62,7 @@ export function SavedItemView({
                 <li key={match.id}>
                   <Link
                     href={`/shopping/inventory/${match.id}`}
-                    className="text-accent hover:underline"
+                    className={linkVariants()}
                   >
                     {match.name}
                     {match.variant ? ` · ${match.variant}` : ''}

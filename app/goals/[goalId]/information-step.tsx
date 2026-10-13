@@ -4,6 +4,7 @@ import { useActionState, useId, useRef, useState, useTransition } from 'react';
 import { ActionMenu, type ActionMenuItem } from '@/components/ui/action-menu';
 import { AddTrigger } from '@/components/ui/add-trigger';
 import { Button } from '@/components/ui/button';
+import { Note } from '@/components/ui/note';
 import { Disclosure, Group } from '@/components/ui/disclosure';
 import { Field, FieldError, InlineTextarea } from '@/components/ui/field';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
@@ -649,7 +650,7 @@ function RecordTable({
           onClose={() => setFilling(false)}
         />
       ) : adding ? (
-        <div className="rounded-control bg-sunken p-3">
+        <Note className="p-3">
           <AddRecordForm
             stepId={node.id}
             collection={collection}
@@ -657,7 +658,7 @@ function RecordTable({
             onDone={() => setAdding(false)}
             onCancel={() => setAdding(false)}
           />
-        </div>
+        </Note>
       ) : (
         <div className="flex flex-wrap items-center gap-3">
           <AddTrigger label="Add a row" onClick={() => setAdding(true)} />

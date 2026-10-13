@@ -2,6 +2,7 @@ import type { PositionKind } from '@/lib/learn/graph/position-prompt';
 import { POSITION_KIND_LABEL, STANCE_LABEL } from '@/lib/vault/map/labels';
 import type { ProposedStance } from '@/lib/vault/map/proposal';
 import { cn } from '@/lib/cn';
+import { Chip } from '@/components/ui/chip';
 import { LinkedText } from '@/components/ui/linked-text';
 
 /**
@@ -49,9 +50,7 @@ export function MapPosition({
           {POSITION_KIND_LABEL[kind]} · {STANCE_LABEL[stance]}
         </span>
         {tag && (
-          <span className="rounded-pill bg-sunken px-1.5 py-0.5 text-small text-ink-muted">
-            {tag}
-          </span>
+          <Chip>{tag}</Chip>
         )}
       </span>
       <span className="mt-0.5 block text-ui text-ink">{statement}</span>

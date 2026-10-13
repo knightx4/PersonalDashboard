@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { SearchMark } from '@/components/ui/search-mark';
 import { cn } from '@/lib/cn';
 import { popoverSurface, scrim } from '@/components/ui/popover';
-import { Kbd } from '@/components/shell/key-hints';
+import { Kbd } from '@/components/ui/kbd';
 import { SearchRowLine } from '@/components/shell/search-row';
 import { SearchScopeChip } from '@/components/shell/search-scope-chip';
 import {

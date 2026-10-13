@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { countAt, useReducedMotion } from '@/components/ui/motion';
+import { Stat } from '@/components/ui/stat';
 import { cn } from '@/lib/cn';
 import { formatMoney } from '@/lib/money';
 import { MOTION_MS } from '@/lib/motion';
@@ -105,7 +106,7 @@ function SavingsFigure({ savings }: { savings: OnTimeSavings }) {
   }, [totalCents, recentKey, reduceMotion]);
 
   return (
-    <span ref={ref} className="tabular-nums text-title font-semibold text-ink" suppressHydrationWarning>
+    <span ref={ref} suppressHydrationWarning>
       {formatMoney(shown, currency)}
     </span>
   );
@@ -120,10 +121,13 @@ export function OnTimeSavingsFigure({
 }) {
   if (savings.length === 0) return null;
   return (
-    <div className={cn('flex flex-wrap items-baseline gap-x-3 gap-y-1', className)}>
-      <span className="text-ui text-ink-muted">Saved by returning on time this year</span>
+    <div className={cn('flex flex-wrap gap-x-6 gap-y-2', className)}>
       {savings.map((entry) => (
-        <SavingsFigure key={entry.currency} savings={entry} />
+        <Stat
+          key={entry.currency}
+          value={<SavingsFigure savings={entry} />}
+          label="Saved by returning on time this year"
+        />
       ))}
     </div>
   );

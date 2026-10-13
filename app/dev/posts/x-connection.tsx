@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cardVariants } from '@/components/ui/card';
 import { ConfirmStep } from '@/components/ui/confirm-step';
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { cn } from '@/lib/cn';
 import { planHref } from '@/lib/search/sources/dev-map';
 import type { XConnectionView, XConnectNotice } from '@/lib/x/account';
@@ -78,7 +78,7 @@ export function XConnection({
           <p className="text-ui font-medium text-ink">X is not connected</p>
           <p className="text-small text-ink-muted">
             Connecting needs the X app&rsquo;s keys, which are not set yet.{' '}
-            <Link href={planHref(view.setupStep)} className="font-medium text-accent hover:underline">
+            <Link href={planHref(view.setupStep)} className={cn('font-medium', linkVariants())}>
               Step #{view.setupStep} says how to set them.
             </Link>
           </p>

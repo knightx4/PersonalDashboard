@@ -157,7 +157,7 @@ function DashTodayRow({
         </div>
         {undone ? (
           <span className="inline-flex shrink-0 items-center gap-1 text-small font-medium text-ink-muted">
-            <Undo2 className="size-3.5" strokeWidth={2} aria-hidden />
+            <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
             Undone
           </span>
         ) : entry.noUndo ? null : (
@@ -170,7 +170,7 @@ function DashTodayRow({
             disabled={pending}
             onClick={press}
           >
-            <Undo2 className="size-3.5" strokeWidth={2} aria-hidden />
+            <Undo2 className="size-3.5" strokeWidth={1.75} aria-hidden />
             {pending ? 'Undoing…' : 'Undo'}
           </Button>
         )}
