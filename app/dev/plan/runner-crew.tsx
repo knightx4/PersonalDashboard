@@ -7,6 +7,7 @@ import { Meter } from '@/components/ui/meter';
 import { SectionLabel } from '@/components/ui/section-heading';
 import { SLOT_ASLEEP_DEFAULT, type RunnerSlot, type SlotId } from '@/lib/plan/overnight-slots';
 import { useNewestRunLines } from '@/components/runs/use-newest-run-lines';
+import { useRunPose } from '@/components/runs/use-run-pose';
 import { LiveRunLines } from '@/components/runs/live-run-lines';
 import { RUN_ACTIVITY_LABEL, type RunActivity } from '@/lib/core/run-activities';
 import { answerPlanRunAction } from './run-actions';
@@ -18,9 +19,13 @@ import { answerPlanRunAction } from './run-actions';
  *
  * They sit in a strip, one pill each. A pill shows its own Dash, with its own
  * visor shape and colour, so the eye can follow one from glance to glance, and
- * says in one line what the slot is doing: the feature and its meter with the run's newest line while it
- * works, the tick's reason while it sleeps, "Held" or "Not running" while the
- * runner is held or off.
+ * says in one line what the slot is doing. While a slot works, its Dash takes
+ * the shape of the run's newest line: reading, searching, testing, writing or
+ * thinking, asking while a question waits on you, with a wince for an error
+ * and a hop for a step finished (lib/core/run-pose.ts). The line says the
+ * feature and its meter with the run's newest line while it works, the tick's
+ * reason while it sleeps, "Held" or "Not running" while the runner is held or
+ * off.
  *
  * Pressing a pill opens the slot below the strip: the whole of what its run
  * has written, live, with any question it is waiting on to answer there.
@@ -67,6 +72,8 @@ function Pill({
   onPress: () => void;
 }) {
   const working = slot.state === 'working';
+  // While it works, the Dash takes the shape of its newest line (lib/core/run-pose.ts).
+  const { pose, moment } = useRunPose(working ? newest : null);
   const line = pillLine(slot, held, newest);
   const meta = working
     ? [slot.slot === 'goals' ? null : slot.work.module, slot.work.doing, slot.work.elapsed]
@@ -83,7 +90,14 @@ function Pill({
         open ? 'border-accent bg-accent-tint' : 'border-border bg-sunken hover:border-border-strong'
       }`}
     >
-      <DashMark state={slot.state} runner={RUNNERS[slot.slot]} size="md" decorative />
+      <DashMark
+        state={working ? pose.state : slot.state}
+        activity={working ? pose.activity : undefined}
+        moment={working ? (moment ?? undefined) : undefined}
+        runner={RUNNERS[slot.slot]}
+        size="md"
+        decorative
+      />
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <SectionLabel as="span" className="block truncate">
           {slot.label}

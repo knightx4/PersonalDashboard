@@ -2751,6 +2751,143 @@ button[aria-busy='true'] {
   animation: dash-mark-flicker calc(var(--motion-moment) * 12) steps(1) infinite;
 }
 
+/* Testing: the eyes run down a short checklist, and each row ticks in turn. */
+@keyframes dash-mark-scan {
+  0%,
+  25% {
+    transform: translateY(0);
+  }
+  33%,
+  58% {
+    transform: translateY(0.6px);
+  }
+  66%,
+  92% {
+    transform: translateY(1.2px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@utility dash-mark-scan {
+  animation: dash-mark-scan calc(var(--motion-moment) * 3) var(--ease-sway) infinite;
+}
+
+@keyframes dash-mark-tick {
+  0%,
+  10% {
+    opacity: 0;
+  }
+  20%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@utility dash-mark-tick {
+  animation: dash-mark-tick calc(var(--motion-moment) * 3) var(--ease-out-soft) infinite;
+}
+
+/* Asking: the question mark pulses until the question is answered. */
+@keyframes dash-mark-ask {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.75;
+  }
+}
+
+@utility dash-mark-ask {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: dash-mark-ask calc(var(--motion-moment) * 4) var(--ease-sway) infinite;
+}
+
+/* A change of state or kind eases in rather than snapping. */
+@keyframes dash-mark-settle {
+  0% {
+    opacity: 0.35;
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility dash-mark-settle {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+  animation: dash-mark-settle var(--motion-quick) var(--ease-out-soft) both;
+}
+
+/* The two moments, each played once: a wince for an error the work carries
+ * on from, a hop for a step finished. The flash lights the core red or green
+ * as it happens. */
+@keyframes dash-mark-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-1.2px);
+  }
+  40% {
+    transform: translateX(1.1px);
+  }
+  60% {
+    transform: translateX(-0.8px);
+  }
+  80% {
+    transform: translateX(0.5px);
+  }
+}
+
+@utility dash-mark-shake {
+  animation: dash-mark-shake var(--motion-move) var(--ease-sway) 1;
+}
+
+@keyframes dash-mark-hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  35% {
+    transform: translateY(-2.4px);
+  }
+  60% {
+    transform: translateY(0.4px);
+  }
+}
+
+@utility dash-mark-hop {
+  animation: dash-mark-hop var(--motion-move) var(--ease-out-soft) 1;
+}
+
+@keyframes dash-mark-flash {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@utility dash-mark-flash {
+  animation: dash-mark-flash calc(var(--motion-move) * 2) var(--ease-out-soft) 1;
+}
+
 /* The seen mark arriving once Dash has only acknowledged a comment: it grows
  * in from a little smaller as the mark beside it settles. */
 @keyframes dash-seen-in {
@@ -2909,6 +3046,13 @@ button[aria-busy='true'] {
   .dash-mark-ponder,
   .dash-mark-bob,
   .dash-mark-flicker,
+  .dash-mark-scan,
+  .dash-mark-tick,
+  .dash-mark-ask,
+  .dash-mark-settle,
+  .dash-mark-shake,
+  .dash-mark-hop,
+  .dash-mark-flash,
   .dash-seen-in {
     animation: none;
   }

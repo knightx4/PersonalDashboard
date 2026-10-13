@@ -19,6 +19,7 @@ const STATE_NAMES: Record<DashState, string> = {
   idle: 'Idle',
   asleep: 'Asleep',
   working: 'Working',
+  asking: 'Asking',
   done: 'Done',
   failed: 'Failed',
 };
@@ -37,7 +38,7 @@ function Row({ name, detail, runner, plain }: { name: string; detail: string; ru
         <p className="text-ui text-ink">{name}</p>
         <p className="text-small text-ink-muted">{detail}</p>
       </div>
-      <div className={`grid flex-1 grid-cols-5 gap-2 ${plain ? 'text-ink-muted' : ''}`}>
+      <div className={`grid flex-1 grid-cols-3 gap-2 sm:grid-cols-6 ${plain ? 'text-ink-muted' : ''}`}>
         {DASH_STATES.map((state) => (
           <div key={state} className="flex flex-col items-start gap-1">
             <div className="flex items-end gap-1">
