@@ -33,10 +33,22 @@ export function NoteProperties({ frontmatter }: { frontmatter: Record<string, un
       {entries.map(([key, value]) => (
         <div key={key} className="contents">
           <dt className="font-medium text-ink-muted">{key}</dt>
-          <dd className="min-w-0 break-words text-ink">{formatValue(value)}</dd>
+          <dd className="min-w-0 break-words text-ink">
+            <PropertyValue text={formatValue(value)} />
+          </dd>
         </div>
       ))}
     </dl>
+  );
+}
+
+/** An address is a link, opened in a new tab; anything else stays text. */
+function PropertyValue({ text }: { text: string }) {
+  if (!/^https?:\/\/\S+$/.test(text)) return <>{text}</>;
+  return (
+    <a href={text} target="_blank" rel="noreferrer" className="text-accent underline underline-offset-2 hover:no-underline">
+      {text}
+    </a>
   );
 }
 

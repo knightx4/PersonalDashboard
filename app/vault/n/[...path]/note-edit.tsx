@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useActionState, useRef, useState, useTransition } from 'react';
 import { ArrowRight, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ComposeBody, ComposeBox, FieldError, Input } from '@/components/ui/field';
+import { ComposeBody, ComposeBox, FieldError, InlineInput } from '@/components/ui/field';
 import { basenameOf, noteHref } from '@/lib/vault/paths';
 import { renameNoteAction, saveNoteEdit, type RenameNoteState, type SaveNoteState } from './actions';
 
@@ -139,7 +139,7 @@ export function RenameForm({
     <form action={rename} className="space-y-2">
       <input type="hidden" name="notePath" value={notePath} />
       <input type="hidden" name="blobSha" value={blobSha} />
-      <Input
+      <InlineInput
         name="name"
         value={name}
         onChange={(event) => setName(event.target.value)}
@@ -152,6 +152,8 @@ export function RenameForm({
         aria-label="Note name"
         autoFocus
         onFocus={(event) => event.currentTarget.select()}
+        // The title's own size and weight, in the title's place (law 12).
+        className="-mx-1 font-display text-title font-semibold tracking-tight sm:text-title"
       />
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" size="sm" pending={pending} disabled={!name.trim()}>
