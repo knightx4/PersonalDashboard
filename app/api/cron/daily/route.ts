@@ -93,7 +93,8 @@ export async function GET(request: NextRequest) {
     // The person's own X posts, newest since the last read (plan #1819).
     // Before the embeddings so a slow model call cannot crowd it out.
     { name: 'x-posts', run: () => runXReadsForAll() },
-    // Last, and bounded: Learn ideas saved without a vector get one (plan #1854).
+    // Last, and bounded: Learn ideas saved without a vector get one (plan #1854),
+    // then the places on Idea Space are worked out from them again (plan #1997.2).
     { name: 'learn-embeddings', run: () => runLearnEmbeddingsDaily() },
   ];
 

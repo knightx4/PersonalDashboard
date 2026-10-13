@@ -125,6 +125,8 @@ describe('RLS coverage', () => {
       'essays',
       'feed_cards',
       'goals',
+      'idea_place_members',
+      'idea_places',
       'imports',
       'learning_log',
       'next_outcomes',
@@ -154,6 +156,7 @@ describe('RLS coverage', () => {
       'track_offers',
       'tracks',
       'transcript_calls',
+      'vault_dust',
       'video_clip_cuts',
       'video_clip_subjects',
       'video_clips',
@@ -2327,6 +2330,114 @@ describe('personality test results', () => {
     await expect(
       admin`update personality_results set read_points = '[]'::jsonb where user_id = ${userA}`,
     ).rejects.toThrow();
+  });
+});
+
+describe('places on Idea Space (plan #1997.2)', () => {
+  // learn 0112_idea_places.sql. The daily run writes places with the service
+  // role; the person only reads their own, and an idea cannot be put in a
+  // place of another account's.
+  let conceptA = '';
+  let placeA = '';
+
+  beforeAll(async () => {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Places subject') returning id`;
+    const [concept] = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      values (${userA}, ${subject.id}, 'Bullwhip effect', 'Small swings in demand grow up the supply chain.',
+              'Written by hand for this test.')
+      returning id`;
+    conceptA = concept.id;
+    const [place] = await admin<{ id: string }[]>`
+      insert into idea_places (user_id, name, named_members, named_at, member_count)
+      values (${userA}, 'Chip shortages and the bullwhip', array[${conceptA}]::uuid[], now(), 1)
+      returning id`;
+    placeA = place.id;
+    await admin`insert into idea_place_members (concept_id, place_id, user_id)
+                values (${conceptA}, ${placeA}, ${userA})`;
+  });
+
+  it('shows the owner their places and nobody else', async () => {
+    expect(await asUser(userA, (tx) => tx`select id from idea_places`)).toHaveLength(1);
+    expect(await asUser(userA, (tx) => tx`select concept_id from idea_place_members`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from idea_places`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select concept_id from idea_place_members`)).toHaveLength(0);
+  });
+
+  it('leaves the writing to the daily run', async () => {
+    await expect(
+      asUser(userA, (tx) => tx`insert into idea_places (user_id, name) values (${userA}, 'Mine')`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userA, (tx) => tx`update idea_places set name = 'Renamed' where id = ${placeA}`),
+    ).rejects.toThrow();
+  });
+
+  it("refuses an idea in another account's place, and goes with the idea", async () => {
+    await expect(
+      admin`insert into idea_places (user_id, name) values (${userB}, 'Bob place') returning id`.then(
+        ([row]) => admin`insert into idea_place_members (concept_id, place_id, user_id)
+                         values (${conceptA}, ${row!.id}, ${userB})`,
+      ),
+    ).rejects.toThrow();
+    await admin`delete from concepts where id = ${conceptA}`;
+    expect(await admin`select 1 from idea_place_members where place_id = ${placeA}`).toHaveLength(0);
+  });
+});
+
+describe('vault notes as dust on Idea Space (plan #1997.6)', () => {
+  // learn 0114_vault_dust.sql. The daily run matches each vault note with its
+  // most alike idea through refresh_vault_dust; the person only reads their
+  // own rows, and a row goes with its note's embedding.
+  let noteA = '';
+  let nearIdea = '';
+
+  beforeAll(async () => {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Dust subject') returning id`;
+    const ideas = await admin<{ id: string; name: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis, embedding)
+      values
+        (${userA}, ${subject.id}, 'Near idea', 'Close to the note.', 'Written by hand for this test.',
+         (array_fill(0.0::real, array[1023]) || array[1.0::real])::extensions.vector),
+        (${userA}, ${subject.id}, 'Far idea', 'Far from the note.', 'Written by hand for this test.',
+         (array[1.0::real] || array_fill(0.0::real, array[1023]))::extensions.vector)
+      returning id, name`;
+    nearIdea = ideas.find((idea) => idea.name === 'Near idea')!.id;
+    const [connection] = await admin<{ id: string }[]>`
+      insert into obsidian.vault_connections (user_id, repo_owner, repo_name, branch, access_token)
+      values (${userA}, 'a', 'dust-vault', 'main', 'encrypted') returning id`;
+    const [note] = await admin<{ id: string }[]>`
+      insert into obsidian.notes (user_id, connection_id, path, title, body, blob_sha, size_bytes)
+      values (${userA}, ${connection.id}, 'Dust.md', 'Dust', 'A note.', 'sha-dust', 7) returning id`;
+    noteA = note.id;
+    await admin`
+      insert into obsidian.note_embeddings (note_id, user_id, embedding, embedding_model, body_hash)
+      values (${noteA}, ${userA},
+              (array_fill(0.1::real, array[1023]) || array[1.0::real])::extensions.vector,
+              'voyage-4-lite', 'hash')`;
+  });
+
+  it('matches each note with its most alike idea, and stops once the notes run out', async () => {
+    const [first] = await admin<{ next: string | null }[]>`
+      select learn.refresh_vault_dust(${userA}::uuid, null, 200) as next`;
+    expect(first!.next).toBeNull();
+    const rows = await admin<{ concept_id: string }[]>`select concept_id from vault_dust where note_id = ${noteA}`;
+    expect(rows).toEqual([{ concept_id: nearIdea }]);
+  });
+
+  it('shows the owner their dust and nobody else, and leaves the writing to the daily run', async () => {
+    expect(await asUser(userA, (tx) => tx`select note_id from vault_dust`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select note_id from vault_dust`)).toHaveLength(0);
+    await expect(
+      asUser(userA, (tx) => tx`select learn.refresh_vault_dust(${userA}::uuid, null, 200)`),
+    ).rejects.toThrow();
+  });
+
+  it("goes with the note's embedding", async () => {
+    await admin`delete from obsidian.note_embeddings where note_id = ${noteA}`;
+    expect(await admin`select 1 from vault_dust where note_id = ${noteA}`).toHaveLength(0);
   });
 });
 
