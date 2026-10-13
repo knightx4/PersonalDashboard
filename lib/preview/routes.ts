@@ -239,6 +239,11 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'onboarding-gmail': ['/onboarding'],
   'share-form': ['/s/[token]'],
   'open-missing': ['/open/[ref]'],
+  // A workspace's not-found.tsx and error.tsx (plan #1923). They draw no page
+  // of their own, so they stand on /open, the one page whose whole content is
+  // a row that is no longer there.
+  'route-not-found': ['/open/[ref]'],
+  'route-error': ['/open/[ref]'],
   'account': ['/account'],
   'account-notifications': ['/account'],
   'account-workspaces': ['/account'],
@@ -390,6 +395,9 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
     // The presses that answer a waiting question (plan #1824).
     'components/runs/run-answer.tsx',
   ],
+  // What every workspace's not-found.tsx and error.tsx draw (plan #1923).
+  'route-not-found': ['components/shell/no-longer-there.tsx'],
+  'route-error': ['components/ui/route-error.tsx'],
 };
 
 /** The surface that stands for a shared component, or null for any other file. */
@@ -446,7 +454,17 @@ export function surfacesForRoute(route: string, under = false): string[] {
 }
 
 /** Files a route can hold that frame every page beneath them. */
-const FRAMES = new Set(['layout', 'template', 'loading', 'error', 'not-found']);
+const FRAMES = new Set(['layout', 'template', 'loading']);
+
+/**
+ * Files that replace a page only when it fails or finds nothing, so they
+ * change none of the pages beneath them as those are normally seen: each is
+ * looked at on the surface that draws it (plan #1923).
+ */
+const STATE_SURFACES: Readonly<Record<string, string>> = {
+  'not-found': 'route-not-found',
+  error: 'route-error',
+};
 
 /**
  * The page a file under `app/` belongs to, as a route, or null for a file
@@ -478,9 +496,10 @@ function baseName(file: string): string {
 /**
  * The surfaces one file under `app/` serves.
  *
- * A page serves its own route. A layout, loading or error file frames every
- * page beneath it. Any other file is taken to serve the page of its folder;
- * when that folder is not a page of its own (`app/news/quick/`), the search
+ * A page serves its own route. A layout or loading file frames every page
+ * beneath it, and an error or not-found file serves the surface that draws
+ * it. Any other file is taken to serve the page of its folder; when that
+ * folder is not a page of its own (`app/news/quick/`), the search
  * moves up a folder at a time until a surface answers, stopping short of `/`
  * so that a stray file does not claim the whole gallery.
  */
@@ -489,6 +508,7 @@ function surfacesForAppFile(file: string): string[] {
   if (route === null) return [];
   const base = baseName(file);
   if (base === 'page' || base === 'route') return surfacesForRoute(route);
+  if (base in STATE_SURFACES) return [STATE_SURFACES[base]];
   if (FRAMES.has(base)) return surfacesForRoute(route, true);
 
   const segments = segmentsOf(route);

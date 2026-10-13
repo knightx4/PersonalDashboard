@@ -12,7 +12,7 @@ import { OnboardingFrame } from '@/app/(onboarding)/frame';
 import { OnboardingSteps } from '@/app/(onboarding)/onboarding/onboarding-steps';
 import { ShareForm } from '@/app/s/[token]/share-form';
 import type { ShareGroup, SharePage } from '@/lib/share/read/load-disposition';
-import { NoLongerThere } from '@/app/open/[ref]/no-longer-there';
+import { NoLongerThere } from '@/components/shell/no-longer-there';
 
 /**
  * The pages a visitor reaches before signing in, or outside the app's shell,
