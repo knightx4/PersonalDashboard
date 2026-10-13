@@ -35,7 +35,7 @@ vi.mock('@/lib/goals/steps-store', () => ({
   updateStep: mocks.updateStep,
   setStepOnTodo: mocks.setStepOnTodo,
   loadGoalMap: vi.fn(async () => ({
-    goal: { id: 'g', title: 'Clear the loans', status: 'open', acceptance: null, fog: null, unit: null, target: null },
+    goal: { id: 'g', title: 'Clear the loans', status: 'open', acceptance: null, unit: null, target: null },
     steps: [
       step('mine-1', 'mine', 'Email the servicer'),
       step('claude-1', 'claude', 'Compare the repayment plans'),

@@ -33,7 +33,6 @@ const MAPPED: NightGoal = {
   status: 'open',
   approvedAt: minutesAgo(1000),
   createdAt: minutesAgo(2000),
-  fogChangedAt: null,
 };
 
 function status(input: {

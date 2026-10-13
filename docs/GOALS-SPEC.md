@@ -37,7 +37,7 @@ as a goal (Career, then *Land your next role*).
 **Goals** are outcomes that end. A goal sits under an area and has a
 done-when describing a state of the world that will be true: pay off the
 student debt, land your next role, know ten people in the scene by name,
-bench 200 lbs. It may start vague, with fog in place of the done-when.
+bench 200 lbs. It may start vague, with its title alone and no done-when yet.
 **A goal is never a practice.** "Go to one urbanism event a week" and "apply
 every week" are ways of getting somewhere, not somewhere to get; the goal is
 the outcome they serve, and they go inside it as rhythm steps. The app
@@ -160,19 +160,20 @@ the calendar; waiting on another step is a dependency ("Blocked and waiting"
 in the goals skill). Only steps take one, and a step with both dates starts
 on or before the day it is due.
 
-### Fog and refining a goal
+### Refining a goal
 
-A goal can go in vague. "Get fit" is written with **fog**, the same field the
-dev plan uses for a feature nobody can specify yet: one honest paragraph
-saying what is not known. Claude settles what it can from the person's notes
-and its own judgement, and asks as a `decision` step only what it cannot
-settle ("where are you now?"). Once that is answered it proposes concrete
+A goal can go in vague. "Get fit" goes in with its title alone, and what is
+not known yet is asked as a question beneath it. Claude settles what it can
+from the person's notes and its own judgement, and asks as a `decision` step
+only what it cannot settle ("where are you now?"). Once that is answered it proposes concrete
 goals beneath it, such as *bench 200 lbs by March*. Questions are the
 exception: the goals skill's "Decide first, ask last" gives the test, and a
 choice Claude made shows on the steps it shapes as a `Decided:` line the
 person can overrule.
 This is the shape and re-shape flow from `.claude/skills/plan`, pointed at a
-goal instead of an idea.
+goal instead of an idea. Goals used to hold the unknown part in a *fog* note
+on the goal; goals migration 0076 removed it, and the questions beneath the
+goal replace it.
 
 ### Planning an area
 
@@ -626,11 +627,10 @@ the same allowance. So Goals runs on a schedule rather than on every change:
   #1083, "Approval" above). The
   same run then works up to ten ready `claude` steps (`DAILY_STEP_LIMIT` in
   `lib/goals/daily-run.ts`) and the rest wait for the next morning. You open the app about once a day, so this
-  is when the work has to be ready. The morning run does not map new or
-  foggy goals; the night run does that.
+  is when the work has to be ready. The morning run does not map new
+  goals; the night run does that.
 - **Overnight.** While the overnight runner on `/dev/plan` is started, it
-  maps each open goal that has no map yet or whose fog you changed, at most
-  once a night, and then works ready `claude` steps one at a time between
+  maps each open goal that has no map yet, at most once a night, and then works ready `claude` steps one at a time between
   features. See "Claude's
   own work" below.
 - **Weekly.** Research for each goal of the kinds of help it asks for:
@@ -1058,8 +1058,8 @@ education or joining an organization, based on what you marked as worth it.
 **Make friends in New York** (Relationships). Mostly yours. A rhythm, a map of
 steps, and credit from city events you attended. No people list for now.
 
-**Have good relationships** (Relationships). Starts as fog, refined by
-questions into goals you can act on.
+**Have good relationships** (Relationships). Starts as a title alone, refined
+by questions into goals you can act on.
 
 ## History
 
@@ -1308,8 +1308,7 @@ tally or banded bar.
    tooltip.
 4. **Read-only detail**: an opened step shows its detail, Done when and Needs
    as text, with Edit as a separate action.
-5. **Proposals and fog**: approve or reject one proposed step, and the goal's
-   fog shown under it.
+5. **Proposals**: approve or reject one proposed step.
 6. **Run status**: Claude is working on this while a run is going, and what
    it changed once it ends.
 7. **Blocked and waiting steps** (plan #981): a step can be blocked with one
@@ -1339,7 +1338,7 @@ A sketch for the migration, not the migration itself.
 - `goals.items`: the tree. One table for goals and steps, as `plan_items` is
   one table for features and steps. `area_id` on top-level rows, `parent_id`
   below them, `level` (`goal` or `step`), `kind`, `status`, `title`, `detail`,
-  `acceptance`, `fog`, `resolution`, `due_on`, `starts_on` (a step's first
+  `acceptance`, `resolution`, `due_on`, `starts_on` (a step's first
   possible day, "Steps for later"), `on_todo`, `approved_at`,
   `acts` (on a Claude step, what working it does outside the plan),
   `merged_into` (on a step dropped as a duplicate, the step that carries its
@@ -1426,7 +1425,7 @@ Filed on the plan as a proposed feature. Each is one step.
 
 1. The workspace and its tables: `goals` in `lib/modules.ts`, the schema
    above with history triggers and archiving, and an empty Goals home.
-2. Areas and goals: add, edit, reorder, archive; fog on a goal.
+2. Areas and goals: add, edit, reorder, archive.
 3. The step tree with sub-steps, the four kinds, and the full-tree view.
 4. The daily view, with the next items per goal and what is waiting on you.
 5. Send to Todo: the flag, the agenda source, ticking closes the step.
@@ -1448,7 +1447,7 @@ Second round, filed as its own feature:
 18. Comments and @dash on goals and steps.
 19. Status words, colours and progress per goal.
 20. Read-only step detail.
-21. Approving or rejecting one proposal, and fog on the page.
+21. Approving or rejecting one proposal.
 22. Run status on a goal.
 23. The skill: full maps, information steps, Gmail pre-fill, options required.
 

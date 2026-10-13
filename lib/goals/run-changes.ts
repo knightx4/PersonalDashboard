@@ -259,8 +259,6 @@ function itemSentence(row: HistoryRow, names: ChangeNames): string {
     return `Renamed ${str(oldV.title) ?? 'a step'} to ${str(newV.title) ?? title}`;
   if ('parent_id' in newV) return `Moved ${title}`;
   if ('result' in newV) return `Wrote the result on ${title}`;
-  if ('fog' in newV)
-    return newV.fog === null ? `Cleared the fog on ${title}` : `Wrote the fog on ${title}`;
 
   const words = [
     ...new Set(

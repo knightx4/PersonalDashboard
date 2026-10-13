@@ -16,7 +16,6 @@ const goal = (id: string, areaId: string): Goal => ({
   areaId,
   title: id,
   acceptance: null,
-  fog: null,
   status: 'open',
   position: 0,
   unit: null,
@@ -61,7 +60,6 @@ describe('a goal is an outcome, not a practice', () => {
     expect(title.ok).toBe(false);
     expect(!title.ok && title.error).toMatch(/rhythm step/);
     expect(parseGoalFields(get({ acceptance: 'Kept for 8 of 10 weeks' })).ok).toBe(false);
-    expect(parseGoalFields(get({ fog: 'Maybe once a week, maybe more' })).ok).toBe(true);
   });
 });
 
@@ -103,21 +101,13 @@ describe('parseGoalFields', () => {
     ).toEqual({ ok: true, value: { title: 'Pay off the debts', acceptance: 'Every card at zero' } });
   });
 
-  it('takes fog in place of a done-when', () => {
-    expect(
-      parseGoalFields(form({ title: 'Get fit', fog: 'Strength or endurance?' }), {
-        requireTitle: true,
-      }),
-    ).toEqual({ ok: true, value: { title: 'Get fit', fog: 'Strength or endurance?' } });
-  });
-
   it('refuses a new goal with no title', () => {
     expect(parseGoalFields(form({ acceptance: 'x' }), { requireTitle: true }).ok).toBe(false);
     expect(parseGoalFields(form({ title: ' ' }), { requireTitle: true }).ok).toBe(false);
   });
 
-  it('clears a done-when or fog sent empty, and leaves absent fields alone', () => {
-    expect(parseGoalFields(form({ fog: '  ' }))).toEqual({ ok: true, value: { fog: null } });
+  it('clears a done-when sent empty, and leaves absent fields alone', () => {
+    expect(parseGoalFields(form({ acceptance: '  ' }))).toEqual({ ok: true, value: { acceptance: null } });
     expect(parseGoalFields(form({}))).toEqual({ ok: true, value: {} });
   });
 

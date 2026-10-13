@@ -47,7 +47,6 @@ function line(id: string, extra: Partial<HomeGoal> = {}): HomeGoal {
       areaId: 'area',
       title: `Goal ${id}`,
       acceptance: null,
-      fog: null,
       status: 'open',
       position: 10,
       unit: null,

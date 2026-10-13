@@ -90,7 +90,7 @@ const EMPTY_VIEW: Partial<Record<View, { title: string; description: string }>> 
   dismissed: {
     title: 'Nothing put aside',
     description:
-      'A question you do not want to settle yet, or a patch of fog you do not want raised, is put aside from the row it sits on. It waits here until you bring it back.',
+      'A question you do not want to settle yet is put aside from the row it sits on. It waits here until you bring it back.',
   },
   blocked: {
     title: 'Nothing waiting right now',
@@ -164,7 +164,6 @@ function SummaryStrip({
     { view: 'ready', value: summary.ready, noun: 'ready' },
     { view: 'proposed', value: summary.proposed, noun: 'proposed' },
     { view: 'blocked', value: summary.waiting, noun: 'waiting' },
-    { view: 'fog', value: summary.fog, noun: 'not specified' },
     // Only once there is something in it. A permanent "0 dismissed" would be
     // a count of a thing that has never happened.
     ...(summary.dismissed > 0

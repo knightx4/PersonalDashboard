@@ -112,11 +112,6 @@ export function isDismissed(item: { dismissedAt: string | null }): boolean {
   return item.dismissedAt !== null;
 }
 
-/** Fog that is still being raised: written, and not put aside. */
-export function hasLiveFog(item: { fog: string | null; fogDismissedAt: string | null }): boolean {
-  return item.fog !== null && item.fogDismissedAt === null;
-}
-
 /** 1 next, 2 normal, 3 someday — the same three the notes queue uses. */
 export const PLAN_PRIORITIES = [1, 2, 3] as const;
 export type PlanPriority = (typeof PLAN_PRIORITIES)[number];
@@ -226,11 +221,6 @@ export type PlanItem = {
    * the feature at the top of a plan; the steps beneath it are `feature`.
    */
   track: PlanTrack;
-  /**
-   * What is not yet known. One paragraph admitting the part of a feature
-   * nobody can see far enough into to write steps for. Null once it can be.
-   */
-  fog: string | null;
   /** The answer a decision closed with, in the person's words. */
   resolution: string | null;
   /**
@@ -240,8 +230,6 @@ export type PlanItem = {
    * brought back. Null on everything you have not put aside.
    */
   dismissedAt: string | null;
-  /** The same for the fog patch alone, which outlives the row it sits on. */
-  fogDismissedAt: string | null;
   /** Your own note on it. Not the plan, but what happened to it. */
   comment: string | null;
   /**
@@ -310,10 +298,10 @@ export type PlanData = {
 
 /** Every column the app reads off a plan row. Shared with the changelog. */
 export const ITEM_COLUMNS =
-  'id, number, module, parent_id, title, summary, detail, acceptance, status, kind, track, fog, resolution, ' +
+  'id, number, module, parent_id, title, summary, detail, acceptance, status, kind, track, resolution, ' +
   'comment, block_ask, block_kind, priority, size, assignee, commit_sha, position, ' +
   'started_at, completed_at, ' +
-  'created_at, updated_at, dismissed_at, fog_dismissed_at';
+  'created_at, updated_at, dismissed_at';
 
 /**
  * Every row of the account's plan. The whole tree is what the page shows and
@@ -435,10 +423,8 @@ export function planItemFromRow(row: Record<string, unknown>): PlanItem {
     status: isPlanStatus(status) ? status : 'not_started',
     kind: isPlanKind(kind) ? kind : 'build',
     track: isPlanTrack(track) ? track : 'feature',
-    fog: (row.fog as string | null) ?? null,
     resolution: (row.resolution as string | null) ?? null,
     dismissedAt: stamp(row.dismissed_at),
-    fogDismissedAt: stamp(row.fog_dismissed_at),
     comment: (row.comment as string | null) ?? null,
     blockAsk: (row.block_ask as string | null) ?? null,
     blockKind: blockKind && isPlanBlockKind(blockKind) ? blockKind : null,

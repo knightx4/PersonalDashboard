@@ -70,8 +70,8 @@ export function visionReshapeText(input: {
     `- Work the new vision calls for that no open feature covers is a new feature, added with --proposed and no --parent${moduleFlag}, whose detail opens by naming the part of the vision it serves.\n` +
     '- Work the new vision calls for inside a feature already listed is a step added with ' +
     '--proposed under it, even though the feature is approved.\n\n' +
-    'Do not approve anything, answer a decision, start or build a step, graduate or ' +
-    'rewrite fog, or add again what a feature already holds. A feature the new vision ' +
+    'Do not approve anything, answer a decision, start or build a step, ' +
+    'or add again what a feature already holds. A feature the new vision ' +
     'leaves as it was gets nothing. You change rows, not code: do not commit or push. ' +
     'Report, by number and title, what you proposed and which drops you asked about, and ' +
     'which features you read and left alone.\n\n' +

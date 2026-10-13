@@ -77,6 +77,6 @@ you: plainly, with the specifics in it, and no more words than the thing
 needs. Ordinary technical English. A step that reads as though nobody wrote
 it is worse than a blunt one.
 
-The same applies to a decision's question and its options, to fog, and to the
-note you close a step with.
+The same applies to a decision's question and its options, and to the note
+you close a step with.
 

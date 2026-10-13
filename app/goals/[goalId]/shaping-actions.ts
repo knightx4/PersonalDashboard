@@ -13,7 +13,6 @@ import {
   approveGoal,
   loadShaping,
   markReviewed,
-  setFogAside,
   setQuestionAside,
   settleProposal,
   startGoalRun,
@@ -273,23 +272,4 @@ export async function settleProposalAction(
   const beneath = settled - 1;
   const more = beneath > 0 ? `, with ${beneath} beneath it` : '';
   return saved(approve ? `Approved${more}.` : `Turned down${more}.`);
-}
-
-/** Not now on a goal's fog, or Bring back (plan #960). */
-// latency: pending
-export async function setFogAsideAction(
-  _prev: ShapingActionState,
-  form: FormData,
-): Promise<ShapingActionState> {
-  await requireUser();
-  const id = Id.safeParse(form.get('id'));
-  if (!id.success) return { error: 'Could not tell which goal that was.' };
-  const aside = form.get('dismissed') !== '0';
-  try {
-    const changed = await setFogAside(await createGoalsClient(), id.data, aside);
-    if (!changed) return { error: 'That goal no longer says what is not known.' };
-  } catch {
-    return { error: aside ? 'Could not put it aside. Try again.' : 'Could not bring it back. Try again.' };
-  }
-  return saved();
 }

@@ -12,7 +12,6 @@ When questions under the goal have a `resolution`:
   older provisional step still `proposed` under an approved goal goes to
   `open` once settled.
 - Write any new steps the answer made clear, in the phase they belong to.
-- Update or clear the goal's `fog`.
 - Ask a new question only if an answer opened one. Never re-ask one the person
   answered, or one they put aside.
 - A provisional step of the person's kind (`mine` or `rhythm`) is not yours

@@ -1,6 +1,6 @@
 /**
  * Claude shaping a goal, and approving what it proposed (docs/GOALS-SPEC.md,
- * "Fog and refining a goal" and "Approval"; plan #932).
+ * "Refining a goal" and "Approval"; plan #932).
  *
  * Ask Dash on a goal fires the goals routine for that goal. The session
  * follows .claude/skills/goals: it maps the whole path for the goal (phases,

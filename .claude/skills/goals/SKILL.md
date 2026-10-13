@@ -7,7 +7,7 @@ description: Work the person's life goals in the goals schema, the tree of areas
 
 Goals is the person's own workspace at `/goals`: areas (money, career, the
 city), goals under them, and a tree of steps under each goal. The spec is
-`docs/GOALS-SPEC.md`; read "The three levels", "Fog and refining a goal",
+`docs/GOALS-SPEC.md`; read "The three levels", "Refining a goal",
 "Approval" and "Second round: making it useful" before your first write.
 
 Your part is the map: the whole path from where the person is to the goal's
@@ -75,8 +75,8 @@ To the person you are **Dash**. Anything they will read (a step's result, a
 file, a note, a reply, a flag, a verdict) says "Dash" or "I", never "Claude".
 
 Never write `closed_at` (a trigger keeps it), `goals.history` (triggers write
-it), `approved_at`, `reviewed_at`, a question's `resolution`, `dismissed_at`
-or `fog_dismissed_at`, and never set a record's `draft` to false.
+it), `approved_at`, `reviewed_at`, a question's `resolution` or `dismissed_at`,
+and never set a record's `draft` to false.
 
 ## The run row
 
@@ -176,7 +176,7 @@ last message and do not write to it again.
 ## Reading the goal
 
 ```sql
-select id, area_id, title, detail, acceptance, fog, fog_dismissed_at, status,
+select id, area_id, title, detail, acceptance, status,
        approved_at, unit, target
 from goals.items
 where id = '<goal id>' and user_id = '<user>' and level = 'goal' and archived_at is null;
@@ -225,10 +225,6 @@ Two things the person has put aside stay put aside:
 - **A question with `dismissed_at` set** was put aside with Not now. It is
   still unanswered: build on it as provisional, as for any open question, and
   do not ask it again in other words. Never write `dismissed_at`.
-- **Fog with `fog_dismissed_at` set** was put aside. Do not raise the same
-  point again as fog or as a question. Rewriting the goal's fog to say
-  something new brings it back, which is allowed when there is something new
-  to say. Never write `fog_dismissed_at`.
 
 ## What to read for this run
 

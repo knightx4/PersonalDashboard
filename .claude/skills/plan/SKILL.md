@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Three jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step's outline, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Re-shaping: re-read a feature against the questions answered beneath it, graduating fog into steps (ready under an approved feature, proposed only when they act outside the repository), dropping what an answer made pointless, and writing any new question as a decision. Use when the user says "work the plan", "build the next step", "do plan #1073.4", "shape idea …", "re-shape feature #95", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
+description: Work the build plan in plan_items — the tree of features and steps on /dev/plan. Three jobs. Building: pick the next ready step (or a named one), build it against its acceptance criteria, verify, commit with the step's outline, close it with a note. Shaping: turn an idea from the ideas page into a proposed feature with steps, done-whens and sizes, for the person to approve — never built, never approved by a session. Re-shaping: re-read a feature against the questions answered beneath it and the code, writing the work an answer made specifiable as steps (ready under an approved feature, proposed only when they act outside the repository), dropping what an answer made pointless, and writing any new question as a decision. Use when the user says "work the plan", "build the next step", "do plan #1073.4", "shape idea …", "re-shape feature #95", "what's next on the plan", or a routine is fired from the Plan or Ideas page.
 ---
 
 # Working the plan
@@ -43,7 +43,7 @@ npx tsx scripts/plan.ts stopped <n> --reason "…" [--piece "…" --piece "…"]
                                                # ending without closing or blocking <n>:
                                                # one line on why, onto the run. Too big?
                                                # name the pieces it would split into
-npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…"]
+npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"]
                                                [--proposed] [--from <n>]
                                                # ready under an approved feature, a
                                                # proposal under a proposed one.
@@ -52,9 +52,6 @@ npx tsx scripts/plan.ts add "title" --parent <n> [--done-when "…"] [--fog "…
                                                # --from: whose answer made this
 npx tsx scripts/plan.ts add "the question?" --parent <n> --kind decision --detail "…"
 npx tsx scripts/plan.ts depends <n> --on <m>   # n cannot start until m is done
-npx tsx scripts/plan.ts fog <n> --note "…"    # what cannot be seen yet about
-                                               # finishing this feature, one patch;
-                                               # --clear once it can be seen
 npx tsx scripts/plan.ts activity <n> --kind thought|action|question|error --body "…" [--option "…"]
                                                # a line on your run (see building.md, run lines)
 npx tsx scripts/plan.ts idea "…" [--module <id>] [--from <n>]
@@ -95,8 +92,8 @@ If `DATABASE_URL` is missing, read `reference/offline.md` rather than guessing.
 
 **Writing by hand, record each write** to `plan_items` or `ideas` with
 `core.record_dash_action`, so Home lists it under what Dash did today with an
-Undo: a step or decision added, a step closed, blocked, dropped or given fog,
-an idea filed or linked. A claim (`in_progress`) is not recorded; the close
+Undo: a step or decision added, a step closed, blocked or dropped, an idea
+filed or linked. A claim (`in_progress`) is not recorded; the close
 that follows it is. `reference/offline.md` shows the calls. The CLI's own
 writes are not recorded yet.
 
@@ -370,15 +367,14 @@ and it clears itself when the other step is done. Do not mark a step
 "Out of scope" is not a status either. It is `drop <n> --note "out of scope:
 …"`, which reads the same and needs no sixth column.
 
-## Kind and fog
+## Kind and dismissal
 
 Beside the status, two columns say what a step is rather than where it stands.
 
 | | Meaning |
 |---|---|
 | `kind` | `build`, `decision` or `setup`. A build step closes on a commit; a decision closes on the person's answer, recorded in `resolution`; a setup step closes when the person says they have done the thing outside the repo, and carries no commit. It is a kind and not a status because all three move through the same states — not started, blocked, dropped — and differ only in what closing them means. |
-| `dismissed_at`, `fog_dismissed_at` | Put aside by the person as not right now — the row itself, and the patch of fog on it. Hidden everywhere but the Dismissed view. Never written by a session. See `reference/dismissed.md`. |
-| `fog` | The "not yet specified" note: one paragraph admitting what cannot yet be seen well enough to write steps for. Allowed on any step, meaningful mostly on a feature. Written with `add --fog`, changed later with `fog <n> --note "…"`, and cleared with `fog <n> --clear` once the steps that dispel it exist. `reference/reshaping.md` is what does that clearing. |
+| `dismissed_at` | Put aside by the person as not right now. Hidden everywhere but the Dismissed view. Never written by a session. See `reference/dismissed.md`. |
 
 Every answered decision beneath a feature is carried into the brief of every
 step under it, under **Decided so far**. That is what it is for: ask once,

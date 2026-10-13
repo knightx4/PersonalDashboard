@@ -8,7 +8,7 @@ import { threadText } from '@/lib/comments/context';
 import { planRoutine } from '@/lib/feedback/routine';
 import { IDEA_COLUMNS, IDEAS_TABLE, ideaRowFrom } from '@/lib/ideas/load';
 import { withThreads } from '@/lib/thread/store';
-import { FOG_RULE, PLAIN_ENGLISH_RULE, QUESTION_RULE, visionFor } from '@/lib/plan/brief';
+import { FOLLOW_ON_RULE, PLAIN_ENGLISH_RULE, QUESTION_RULE, visionFor } from '@/lib/plan/brief';
 import { MODULE_IDS, MODULES } from '@/lib/modules';
 import { shapeHoldReason } from '@/lib/plan/hold';
 import { startRoutineRun } from '@/lib/plan/runs';
@@ -272,7 +272,7 @@ export async function shapeIdea(
     'how every row is worded. Write a proposal only: a feature with its steps, ' +
     'each with a done-when and a size, all in the proposed status and linked back to the idea. ' +
     'Do not build anything and do not approve anything.\n\n' +
-    `${PLAIN_ENGLISH_RULE}\n\n${FOG_RULE}\n\n${QUESTION_RULE}\n\n` +
+    `${PLAIN_ENGLISH_RULE}\n\n${FOLLOW_ON_RULE}\n\n${QUESTION_RULE}\n\n` +
     (vision ? `## Vision\n\n${vision}\n\n` : '') +
     `Idea ${idea.id} (about ${label}):\n\n${idea.body}\n` +
     (said ? `\n${said}` : '');

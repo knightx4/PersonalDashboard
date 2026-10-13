@@ -21,8 +21,8 @@ import { placeCheckBacks } from '@/lib/plan/check-backs';
  * Here so the plan page can be photographed before and after a change to how
  * its rows are drawn: #980 moves the row and the tree into shared components,
  * and the check that nothing moved is that these shots do not change. Every
- * state a row can be in is somewhere in the tree -- a feature with fog, one
- * with a question beneath it, a proposal, a block, a setup job, a step
+ * state a row can be in is somewhere in the tree -- a feature with a
+ * question beneath it, a proposal, a block, a setup job, a step
  * waiting on another, one waiting on a check-back, a finished step and a
  * dropped one.
  *
@@ -44,10 +44,8 @@ function item(over: Partial<PlanItem> & { id: string; title: string }): PlanItem
     status: 'not_started',
     kind: 'build',
     track: 'feature',
-    fog: null,
     resolution: null,
     dismissedAt: null,
-    fogDismissedAt: null,
     comment: null,
     blockAsk: null,
     blockKind: null,
@@ -167,9 +165,8 @@ const items: PlanItem[] = [
     size: 'm',
   }),
   item({
-    id: 'fog-feature',
+    id: 'week-feature',
     title: 'Plan a week around the goals',
-    fog: 'Which goals get a slot each week is not settled.',
     status: 'proposed',
     priority: 3,
   }),

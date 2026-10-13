@@ -46,10 +46,9 @@ import { createGoalsServiceSupabase } from '@/inngest/goals/supabase-admin';
  * next one tried; a fire that failed ends the turn, since the next step would
  * go to the same routine.
  *
- * Mapping comes first (plan #1009). A goal never mapped, or one whose fog
- * changed since it was, gets a mapping run: the same goals.runs row with job
- * `goal` and the same brief that "Work on this" fires, so its proposed map is
- * waiting in the morning. `chooseNightMaps` says which, at most one mapping
+ * Mapping comes first (plan #1009). A goal never mapped gets a mapping run:
+ * the same goals.runs row with job `goal` and the same brief that "Work on
+ * this" fires, so its proposed map is waiting in the morning. `chooseNightMaps` says which, at most one mapping
  * run per goal per night. A map comes before steps because an unmapped goal
  * has no steps for the night to work, and a mapping run spends one of the
  * night's budget like a step does.
@@ -171,9 +170,7 @@ export async function goalsNightTick(ports: GoalsNightPorts): Promise<GoalsNight
 export function goalsNightNote(tick: GoalsNightTick): string | null {
   if (tick.act === 'fired') return `Started the goal step "${tick.title}" on "${tick.goalTitle}".`;
   if (tick.act === 'mapped') {
-    return tick.reason === 'new'
-      ? `Started mapping the goal "${tick.goalTitle}".`
-      : `Started mapping the goal "${tick.goalTitle}" again, since its fog changed.`;
+    return `Started mapping the goal "${tick.goalTitle}".`;
   }
   if (tick.act === 'failed') return `A goals run could not be started: ${tick.error}`;
   return null;
@@ -183,40 +180,6 @@ export function goalsNightNote(tick: GoalsNightTick): string | null {
 const RUNS_LIMIT = 500;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** Enough fog changes to find each goal's latest; a goal's fog is rewritten a handful of times. */
-const FOG_LIMIT = 1000;
-
-/**
- * When each goal's fog was last written or cleared by anyone but Claude, from
- * goals.history. An update row carries only the fields it changed, so a row
- * with a `fog` key in new_values is a fog change, including one that cleared
- * it. Claude's own fog writes are left out: they are what a map produces.
- */
-async function loadFogChanges(
-  client: GoalsSupabaseClient,
-  userId: string,
-  goalIds: string[],
-): Promise<Map<string, string>> {
-  const changed = new Map<string, string>();
-  if (goalIds.length === 0) return changed;
-  const { data, error } = await client
-    .from('history')
-    .select('row_id, created_at')
-    .eq('user_id', userId)
-    .eq('table_name', 'items')
-    .eq('action', 'update')
-    .neq('actor', 'claude')
-    .in('row_id', goalIds)
-    .not('new_values->fog', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(FOG_LIMIT);
-  if (error) throw new Error(`Could not read fog changes: ${error.message}`);
-  for (const row of (data ?? []) as Array<{ row_id: string; created_at: string }>) {
-    if (!changed.has(row.row_id)) changed.set(row.row_id, row.created_at);
-  }
-  return changed;
-}
 
 /** Each live goal's approval and creation, which the tree does not carry. */
 async function loadGoalStamps(
@@ -303,10 +266,7 @@ export async function loadGoalsNight(
   }));
 
   const goalIds = goals.map((g) => g.goal.id);
-  const [stamps, fog] = await Promise.all([
-    loadGoalStamps(client, userId, goalIds),
-    loadFogChanges(client, userId, goalIds),
-  ]);
+  const stamps = await loadGoalStamps(client, userId, goalIds);
   const nightGoals: NightGoal[] = goals.flatMap(({ goal }) => {
     const stamp = stamps.get(goal.id);
     if (!stamp) return [];
@@ -317,7 +277,6 @@ export async function loadGoalsNight(
         status: goal.status,
         approvedAt: stamp.approvedAt,
         createdAt: stamp.createdAt,
-        fogChangedAt: fog.get(goal.id) ?? null,
         errandDueOn: goal.errand ? goal.dueOn : null,
       },
     ];

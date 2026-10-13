@@ -11,7 +11,7 @@
  *   npx tsx scripts/plan.ts show <n>
  *   npx tsx scripts/plan.ts add "<title>" [--parent <n>] [--module <id>]
  *                                [--priority 1|2|3] [--size s|m|l]
- *                                [--detail "…"] [--done-when "…"] [--fog "…"]
+ *                                [--detail "…"] [--done-when "…"]
  *                                [--proposed] [--idea <id prefix>]
  *                                [--kind decision|setup] [--from <n>]
  *                                # under an approved feature a step is ready
@@ -63,8 +63,6 @@
  *                                # question takes 1-10 options and parks the run on you
  *   npx tsx scripts/plan.ts response <n>   # your answer to the run's last question, or
  *                                # "No answer yet"; what a session that asked reads back
- *   npx tsx scripts/plan.ts fog <n> --note "what cannot be seen yet" | --clear
- *                                # one patch per feature, about finishing it
  *   npx tsx scripts/plan.ts update <feature> --health on_track|at_risk|blocked --body "…"
  *                                [--run <plan_runs id>]   # Dash's update on a feature, at
  *                                # the end of a build or re-shape run; the step counts
@@ -327,10 +325,10 @@ async function resolveUser(sql: Sql): Promise<string> {
 
 async function loadData(sql: Sql, userId: string): Promise<PlanData> {
   const rows = await sql<Record<string, unknown>[]>`
-    select id, number, module, parent_id, title, detail, acceptance, status, kind, fog,
+    select id, number, module, parent_id, title, detail, acceptance, status, kind,
            resolution, comment, block_ask, block_kind, priority, size, assignee, commit_sha,
            position,
-           started_at, completed_at, created_at, dismissed_at, fog_dismissed_at
+           started_at, completed_at, created_at, dismissed_at
     from plan_items where user_id = ${userId}
     order by position, created_at`;
   const deps = await sql<{ id: string; item_id: string; depends_on_id: string }[]>`
@@ -442,10 +440,10 @@ async function byNumber(sql: Sql, userId: string, raw: string | undefined): Prom
     fail(`Give a step by its outline, the "#1073.4" on the page, or its number. "${raw ?? ''}" names no step.`);
   }
   const rows = await sql<Record<string, unknown>[]>`
-    select id, number, module, parent_id, title, detail, acceptance, status, kind, fog,
+    select id, number, module, parent_id, title, detail, acceptance, status, kind,
            resolution, comment, block_ask, block_kind, priority, size, assignee, commit_sha,
            position,
-           started_at, completed_at, created_at, dismissed_at, fog_dismissed_at
+           started_at, completed_at, created_at, dismissed_at
     from plan_items where user_id = ${userId} and number = ${number}`;
   if (rows.length === 0) fail(`No step ${raw?.startsWith('#') ? raw : `#${raw}`}.`);
   return planItemFromRow(rows[0]);
@@ -496,10 +494,6 @@ function printNode(node: PlanNode, indent = '', liveness?: PlanLiveness): void {
   const head = `${indent}${stepRef(node).padEnd(9)}${glyph}  ${readable(node.title)}`;
   const tail = facts(node, liveness);
   console.log(tail ? `${head.padEnd(64)}  ${tail}` : head);
-  // The admission that part of this is not yet planned, on the line under it.
-  if (node.fog && !node.fogDismissedAt) {
-    console.log(`${indent}           fog: ${readable(node.fog).replace(/\s+/g, ' ').slice(0, 100)}`);
-  }
   for (const child of node.children) printNode(child, indent + '  ', liveness);
 }
 
@@ -672,8 +666,8 @@ async function main(): Promise<void> {
     }
 
     /**
-     * Filing a follow-on, which is where one goes now that fog is only about
-     * finishing the feature in front of you.
+     * Filing a follow-on: anything the feature in front of you can ship
+     * without.
      *
      * Everything written here is a suggestion: this command is how a session
      * writes an idea, and the user writes theirs on the page or from the
@@ -1122,10 +1116,10 @@ async function main(): Promise<void> {
 
       const [row] = await sql<{ id: string; number: number }[]>`
         insert into plan_items (user_id, module, parent_id, title, detail, acceptance,
-                                fog, kind, priority, size, assignee, status, position,
+                                kind, priority, size, assignee, status, position,
                                 comment)
         values (${userId}, ${scope}, ${parent?.id ?? null}, ${title},
-                ${arg('--detail')}, ${arg('--done-when')}, ${arg('--fog')}, ${kind},
+                ${arg('--detail')}, ${arg('--done-when')}, ${kind},
                 ${priority}, ${size}, ${assignee},
                 ${proposed ? 'proposed' : 'not_started'},
                 ${(last?.position ?? 0) + 10}, ${comment})
@@ -1167,7 +1161,6 @@ async function main(): Promise<void> {
         title,
         detail: arg('--detail'),
         done_when: arg('--done-when'),
-        fog: arg('--fog'),
       });
       return;
     }
@@ -1503,54 +1496,6 @@ async function main(): Promise<void> {
       return;
     }
 
-    /**
-     * Writing and clearing the "not yet specified" note.
-     *
-     * `add --fog` could write it and nothing could ever touch it again, which
-     * made fog a thing you could only get wrong once. It also made the return
-     * trip impossible: graduating a patch of fog into steps means clearing it
-     * in the same breath, and a session working without the page -- which is
-     * every routine session, since DATABASE_URL is unset there -- had no way
-     * to do the second half.
-     *
-     * Not a status change and not a close, so no dated line in the comment:
-     * fog is a description of the step, and the description simply becomes
-     * accurate or stops being needed. What replaced it is legible from the
-     * steps that appeared, which is the point of graduating it.
-     *
-     * One patch per feature, because it is one column: a second `--note`
-     * overwrites the first rather than joining it, and the patch it replaced
-     * is printed so that losing one is never silent. A session with two things
-     * to say has one of them wrong -- fog is what cannot be decided until part
-     * of this feature exists, and anything the feature can ship without is a
-     * follow-on that belongs on the ideas page (`plan.ts idea`).
-     */
-    if (command === 'fog') {
-      const note = arg('--note')?.trim();
-      const clear = has('--clear');
-      if (clear && note) fail('Either --note or --clear, not both.');
-      if (!clear && !note) {
-        fail(`fog ${typed(item.number)} --note "what cannot be seen yet", or --clear once it can.`);
-      }
-
-      // Writing a patch clears any dismissal on the old one: what the person
-      // put aside was the sentence that was there, not the column.
-      await sql`
-        update plan_items
-        set fog = ${clear ? null : (note ?? null)}, fog_dismissed_at = null
-        where id = ${item.id} and user_id = ${userId}`;
-      console.log(
-        clear
-          ? `${ref(item.number)} fog cleared${item.fog ? '' : ' (it had none)'}.`
-          : `${ref(item.number)} fog: ${note}`,
-      );
-      if (!clear && item.fog) {
-        console.log(`Replaced the patch it had: ${item.fog.replace(/\s+/g, ' ')}`);
-      }
-      if (note) await checkRowWriting(sql, userId, item, { fog: note });
-      return;
-    }
-
     // Closing or parking a step always records why. A status with no reason
     // is how a plan becomes something nobody trusts.
     if (command === 'done' || command === 'block' || command === 'drop') {
@@ -1586,17 +1531,6 @@ async function main(): Promise<void> {
       const note = arg('--note') ?? ask;
       if (!note) fail(`--note is required for ${command}: say what happened.`);
 
-      // Fog on a step being closed as done is work that was never specified
-      // sitting on work that is finished. Nothing reads it again from there.
-      // Graduating it is the re-shape's first move; clearing it is one
-      // command. Blocking and dropping are fine: neither claims the step is
-      // complete.
-      if (command === 'done' && item.fog && !item.fogDismissedAt) {
-        fail(
-          `${ref(item.number)} still says part of it is not specified. Write the steps that ` +
-            `patch covers, or run plan.ts fog ${typed(item.number)} --clear, then close it.`,
-        );
-      }
       const status: PlanStatus = command === 'done' ? 'done' : command === 'block' ? 'blocked' : 'dropped';
       const commit = command === 'done' ? (arg('--commit') ?? currentCommit()) : null;
 

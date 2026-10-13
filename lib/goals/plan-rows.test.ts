@@ -392,7 +392,7 @@ describe('goalViewOf and goalViewHref', () => {
     expect(goalViewOf('you')).toBe('you');
     expect(goalViewOf(['all', 'you'])).toBe('all');
     expect(goalViewOf(undefined)).toBe('open');
-    expect(goalViewOf('fog')).toBe('open');
+    expect(goalViewOf('nonsense')).toBe('open');
   });
 
   it('keeps Open on the bare path', () => {

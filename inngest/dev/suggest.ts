@@ -93,8 +93,7 @@ them do not already say. A step that is ready is already on the page; repeating
 it is noise. What is worth writing down is a pattern across rows: an idea filed weeks ago that nobody has shaped, two open
 questions that hold up the same feature, a feature whose steps are all closed
 but which is still open itself, a step blocked on something that has since
-been answered, a fog note that has sat unresolved while the feature under it
-was built.
+been answered.
 
 Every #number below is followed by that row's status now, in brackets. A row
 marked done, answered, dropped or dismissed is settled: nothing about it is
@@ -125,7 +124,6 @@ export type DigestContext = {
   openDecisions: string[];
   unshapedIdeas: string[];
   blockedSteps: string[];
-  fogPatches: string[];
   openRaises: string[];
   shipped: string[];
   inProgress: string[];
@@ -141,7 +139,6 @@ export function buildPrompt(context: DigestContext): string {
     'The plan as it stands this morning.',
     ...section('Questions waiting on them:', context.openDecisions),
     ...section('Steps blocked:', context.blockedSteps),
-    ...section('Fog -- features nobody can write steps for yet:', context.fogPatches),
     ...section('Ideas filed and not yet shaped, with how long ago:', context.unshapedIdeas),
     ...section('Raised and not yet answered:', context.openRaises),
     ...section('Underway right now:', context.inProgress),

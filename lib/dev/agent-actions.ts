@@ -36,7 +36,6 @@ export const devActions: ModuleActions = {
     updatePlanItem: tool('reword'),
     setPlanItemStatus: none('session', 'scripts/plan.ts start, done, block, reopen and drop.'),
     dismissPlanDecision: none('theirs'),
-    dismissPlanFog: none('theirs'),
     approvePlanItem: none('theirs'),
     approveProposals: none('theirs'),
     setPlanItemAssignee: none('session', 'scripts/plan.ts assign.'),

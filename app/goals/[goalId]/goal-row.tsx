@@ -59,7 +59,6 @@ import {
 import { InformationStep, type InformationSeam } from './information-step';
 import {
   askDashStepAction,
-  setFogAsideAction,
   settleProposalAction,
   type ShapingActionState,
 } from './shaping-actions';
@@ -102,9 +101,6 @@ const GOAL_TREE_ACTIONS: TreeActions = {
   ask: askGoalQuestion,
   addDependency: addGoalStepDependency,
   removeDependency: removeGoalStepDependency,
-  // Steps carry no fog; only the goal does, and it has its own note above
-  // the tree. Here for the shape, never pressed.
-  dismissFog: setFogAsideAction,
 };
 
 const GOAL_COMMENTS = { target: 'goal' as const };
