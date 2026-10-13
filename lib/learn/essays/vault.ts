@@ -102,6 +102,8 @@ export type EssayVaultResult =
       blobSha: string;
       /** The commit the save made; null when the vault already had this text. */
       commitSha: string | null;
+      /** The note's stage as written, so Finish can name it (plan #1873). */
+      stage: EssayStage;
     }
   | { ok: false; reason: EssayVaultFailure; error: string };
 
@@ -120,6 +122,12 @@ export const ESSAY_VAULT_ERRORS: Record<EssayVaultFailure, string> = {
 
 function failed(reason: EssayVaultFailure): EssayVaultResult {
   return { ok: false, reason, error: ESSAY_VAULT_ERRORS[reason] };
+}
+
+/** The stage a written essay file's frontmatter holds; draft when it has none. */
+function stageOf(file: string | null): EssayStage {
+  const line = file?.match(/^stage:\s*["']?([a-z]+)["']?\s*$/m);
+  return atLeastStage(line?.[1], 'draft');
 }
 
 async function store(ports: EssayVaultPorts, id: string, patch: EssayVaultPatch): Promise<void> {
@@ -185,7 +193,7 @@ export async function saveEssayToVault(ports: EssayVaultPorts, input: EssayVault
         draftMarks: input.marks,
         authorship: ranges(written),
       });
-      return { ok: true, path: essay.path, blobSha: saved.blobSha, commitSha: saved.commitSha };
+      return { ok: true, path: essay.path, blobSha: saved.blobSha, commitSha: saved.commitSha, stage: stageOf(written) };
     }
     // The note was deleted or moved in Obsidian: write a new one below, so
     // the words are in the vault again rather than the essay never saving.
@@ -213,7 +221,7 @@ export async function saveEssayToVault(ports: EssayVaultPorts, input: EssayVault
     draftMarks: input.marks,
     authorship: ranges(file),
   });
-  return { ok: true, path: created.path, blobSha: created.blobSha, commitSha: created.commitSha };
+  return { ok: true, path: created.path, blobSha: created.blobSha, commitSha: created.commitSha, stage: fm.stage };
 }
 
 /** The vault's version of an essay, as the editor takes it on a reload (plan #1868). */

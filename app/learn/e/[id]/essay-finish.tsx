@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardSection } from '@/components/ui/card';
 import { PaidHint } from '@/components/ui/paid-hint';
 import type { EssayClaim, OfferedClaim } from '@/lib/learn/essays/finish';
+import type { EssayStage } from '@/lib/learn/essays/note';
 import { acceptEssayFinish, type AcceptFinishResult, type FinishResult } from './actions';
 
 /**
@@ -47,6 +48,19 @@ function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
+/** What Add makes, said on the button: the notes, the bank item, or both. */
+export function addLabel(notes: number, evidence: boolean): string {
+  if (notes === 0) return evidence ? 'Add to the evidence bank' : 'Nothing ticked';
+  const made = `Add ${plural(notes, 'note', 'notes')}`;
+  return evidence ? `${made} and the bank item` : made;
+}
+
+/** The line under the heading once the essay is finished, naming its stage when this press set it. */
+export function finishedLine(date: string, stage: EssayStage | null): string {
+  const saved = stage ? `Saved to your vault as ${stage === 'evergreen' ? 'an' : 'a'} ${stage}` : 'Saved to your vault';
+  return `Finished on ${date}. ${saved} and added to your learning log.`;
+}
+
 /** The offers: a tick for each claim without a note, and one for the evidence bank. */
 function Offering({
   offers,
@@ -69,7 +83,8 @@ function Offering({
       else next.add(name);
       return next;
     });
-  const count = picked.size + (evidence && !offers.inEvidenceBank ? 1 : 0);
+  const bank = evidence && !offers.inEvidenceBank;
+  const count = picked.size + (bank ? 1 : 0);
 
   return (
     <div className="mt-3">
@@ -121,7 +136,7 @@ function Offering({
       {fresh.length > 0 && (
         <p className="mt-2 text-small text-ink-muted">Ticked claims become short notes in your Inbox.</p>
       )}
-      <div className="mt-3 flex gap-2 border-t border-line pt-3">
+      <div className="mt-3 flex gap-2 border-t border-border pt-3">
         {offers.inEvidenceBank ? (
           <>
             <span aria-hidden className="mt-1 size-4 shrink-0" />
@@ -154,9 +169,9 @@ function Offering({
           variant="secondary"
           disabled={busy || count === 0}
           pending={busy}
-          onClick={() => onAdd([...picked], evidence && !offers.inEvidenceBank)}
+          onClick={() => onAdd([...picked], bank)}
         >
-          {busy ? 'Adding…' : count === 0 ? 'Nothing ticked' : `Add ${count}`}
+          {busy ? 'Adding…' : addLabel(picked.size, bank)}
         </Button>
         <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onSkip}>
           Not now
@@ -225,6 +240,7 @@ export function EssayFinishCard({
   onFinish,
   initial = { kind: 'idle' },
   className,
+  stage = null,
 }: {
   essayId: string;
   finishedAt: string | null;
@@ -234,9 +250,12 @@ export function EssayFinishCard({
   onFinish: () => Promise<FinishResult>;
   initial?: FinishView;
   className?: string;
+  /** The note's stage, known once Finish has run in this visit (and in the gallery). */
+  stage?: EssayStage | null;
 }) {
   const [view, setView] = useState<FinishView>(initial);
   const [finished, setFinished] = useState(finishedAt);
+  const [stageNow, setStageNow] = useState<EssayStage | null>(stage);
 
   const finish = useCallback(async () => {
     setView({ kind: 'running' });
@@ -247,6 +266,7 @@ export function EssayFinishCard({
       return;
     }
     setFinished(result.finishedAt);
+    setStageNow(result.stage);
     setView({ kind: 'offers', claims: result.claims, inEvidenceBank: result.inEvidenceBank });
   }, [onFinish]);
 
@@ -278,8 +298,8 @@ export function EssayFinishCard({
       <CardSection title="Finish">
         <p className="text-small text-ink-muted">
           {finished
-            ? `Finished on ${when(finished)}. It is a seedling or later in your vault and in your learning log.`
-            : 'Saves the essay to your vault as a seedling, logs it in your learning log with the claims it argues, and offers notes for the claims your vault lacks and a place in your evidence bank.'}
+            ? finishedLine(when(finished), stageNow)
+            : 'Saves the essay to your vault as a seedling, logs it in your learning log with the claims it argues, and offers notes for the claims your vault lacks and an item in your Jobs evidence bank.'}
         </p>
         {finished && inEvidenceBank && view.kind === 'idle' && (
           <p className="mt-1 text-small text-ink-muted">It is in your evidence bank.</p>

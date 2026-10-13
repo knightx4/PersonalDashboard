@@ -395,6 +395,7 @@ export function LearnEssayFinishSurface() {
       <EssayView
         essay={{ ...essay, finishedAt: '2026-10-12T15:00:00Z', unsaved: false }}
         study={STUDY_WAITING}
+        finishStage="seedling"
         finishView={{
           kind: 'offers',
           inEvidenceBank: false,

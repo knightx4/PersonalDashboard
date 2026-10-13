@@ -162,7 +162,7 @@ export async function setEssayWordTarget(_prev: TargetState, formData: FormData)
 }
 
 export type VaultSaveResult =
-  | { ok: true; savedAt: string; path: string; blobSha: string }
+  | { ok: true; savedAt: string; path: string; blobSha: string; stage?: EssayStage }
   | { ok: false; reason: EssayVaultFailure; error: string };
 
 const VaultInput = DraftInput.extend({
@@ -241,7 +241,7 @@ async function writeEssayToVault(
     if (!result.ok) return result;
     revalidatePath('/learn/essays');
     revalidatePath('/vault');
-    return { ok: true, savedAt: now.toISOString(), path: result.path, blobSha: result.blobSha };
+    return { ok: true, savedAt: now.toISOString(), path: result.path, blobSha: result.blobSha, stage: result.stage };
   } catch (error) {
     console.error('[essay vault]', error instanceof Error ? error.message : error);
     return { ok: false, reason: 'error', error: 'The essay could not be saved to your vault. Try again in a moment.' };
@@ -894,6 +894,8 @@ export type FinishResult =
       /** True when the essay is already in the evidence bank, so the offer is not made again. */
       inEvidenceBank: boolean;
       finishedAt: string;
+      /** The stage the note is at after the save, seedling or later. */
+      stage: EssayStage;
     }
   | {
       ok: false;
@@ -981,7 +983,14 @@ export async function finishEssay(
     const finishedAt = new Date().toISOString();
     await markFinished(learn, parsed.data.id, finishedAt);
     revalidatePath('/learn/essays');
-    return { ok: true, ...kept, claims, inEvidenceBank: Boolean(row.evidenceItemId), finishedAt };
+    return {
+      ok: true,
+      ...kept,
+      claims,
+      inEvidenceBank: Boolean(row.evidenceItemId),
+      finishedAt,
+      stage: saved.stage ?? 'seedling',
+    };
   } catch (error) {
     console.error('[essay finish]', error instanceof Error ? error.message : error);
     return {

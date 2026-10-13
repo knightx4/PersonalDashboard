@@ -19,7 +19,7 @@ import {
   type EssayBrief,
   type EssayInterview,
 } from '@/lib/learn/essays/model';
-import { essayNoteBody } from '@/lib/learn/essays/note';
+import { essayNoteBody, type EssayStage } from '@/lib/learn/essays/note';
 import { essayParagraphs } from '@/lib/learn/essays/checks';
 import type { EssayNotes } from '@/lib/learn/essays/notes-store';
 import {
@@ -495,6 +495,7 @@ export function EssayView({
   research = NO_RESEARCH,
   researchRunning = null,
   finishView,
+  finishStage,
 }: {
   essay: Essay;
   initialVault?: VaultState;
@@ -514,6 +515,8 @@ export function EssayView({
   researchRunning?: 'first' | 'deeper' | null;
   /** The Finish card drawn in this state, for the gallery (plan #1873). */
   finishView?: FinishView;
+  /** The stage the gallery's finished essay is at. */
+  finishStage?: EssayStage;
 }) {
   const [doc, setDoc] = useState({ text: essay.draftBody, marks: essay.marks, version: 0 });
   const [words, setWords] = useState(() => countWords(essay.draftBody));
@@ -795,6 +798,7 @@ export function EssayView({
         canFinish={words > 0 && vault.kind !== 'saving'}
         onFinish={finish}
         initial={finishView}
+        stage={finishStage}
       />
     </div>
   );
