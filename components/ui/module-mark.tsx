@@ -179,7 +179,7 @@ const FINISHES: Record<
 };
 
 /**
- * Glass with a hairline edge and a quiet lit edge along the top. The module's colour is the light behind
+ * Glass with a bevelled edge: a rim lit at the top left, a band of light the width of the glass inside it, light gathered along the bottom, and a faint darker ring where the glass bends the light. The module's colour is the light behind
  * the glass (`glint`), or the glass itself (`glint-tint`).
  */
 function GlintObject({
@@ -237,10 +237,24 @@ function GlintObject({
           <feGaussianBlur stdDeviation={0.5} />
         </filter>
         <clipPath id={`${id}-clip`}>{pane({})}</clipPath>
-        <linearGradient id={`${id}-lit`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
-          <stop offset="0" stopColor="#fff" stopOpacity={0.7} />
-          <stop offset="0.5" stopColor="#fff" stopOpacity={0.15} />
-          <stop offset="1" stopColor="#fff" stopOpacity={0.35} />
+        {/* The light caught by the edge: strong at the top left, gone down the sides, a little back at the bottom right. */}
+        <linearGradient id={`${id}-lit`} gradientUnits="userSpaceOnUse" x1={4} y1={3} x2={20} y2={22}>
+          <stop offset="0" stopColor="#fff" stopOpacity={1} />
+          <stop offset="0.28" stopColor="#fff" stopOpacity={0.4} />
+          <stop offset="0.48" stopColor="#fff" stopOpacity={0} />
+          <stop offset="0.9" stopColor="#fff" stopOpacity={0} />
+          <stop offset="1" stopColor="#fff" stopOpacity={0.3} />
+        </linearGradient>
+        {/* The thickness of the glass, lit the same way but softer, so the edge reads as a bevel. */}
+        <linearGradient id={`${id}-bevel`} gradientUnits="userSpaceOnUse" x1={4} y1={3} x2={20} y2={22}>
+          <stop offset="0" stopColor="#fff" stopOpacity={0.75} />
+          <stop offset="0.35" stopColor="#fff" stopOpacity={0.12} />
+          <stop offset="0.6" stopColor="#fff" stopOpacity={0} />
+        </linearGradient>
+        {/* Light that has come through the glass and gathers along the bottom inside edge. */}
+        <linearGradient id={`${id}-pool`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
+          <stop offset="0.6" stopColor="#fff" stopOpacity={0} />
+          <stop offset="1" stopColor="#fff" stopOpacity={0.6} />
         </linearGradient>
         <linearGradient id={`${id}-sheen`} gradientUnits="userSpaceOnUse" x1={0} y1={3} x2={0} y2={22}>
           <stop offset="0" stopColor="#fff" stopOpacity={0.16} />
@@ -283,10 +297,17 @@ function GlintObject({
         )}
       </g>
       {pane({ fill: `url(#${id}-sheen)` })}
-      {/* The hairline edge. */}
-      {pane({ stroke: '#fff', strokeOpacity: 0.32, strokeWidth: 0.4 })}
-      {/* A quiet lit edge, brighter along the top, in place of glints. */}
-      {pane({ stroke: `url(#${id}-lit)`, strokeWidth: 0.5 })}
+      <g clipPath={`url(#${id}-clip)`}>
+        {/* Just inside the edge the glass bends the light away: a faint darker ring. */}
+        <g opacity={0.22} filter={`url(#${id}-soft)`}>
+          {pane({ fill: 'none', strokeWidth: 3, style: { stroke: `color-mix(in srgb, ${to} 60%, #000)` } })}
+        </g>
+        {/* The bevel: a band of light the width of the glass's thickness. */}
+        <g filter={`url(#${id}-soft)`}>{pane({ fill: 'none', stroke: `url(#${id}-bevel)`, strokeWidth: 2.4 })}</g>
+        <g filter={`url(#${id}-blur)`}>{pane({ fill: 'none', stroke: `url(#${id}-pool)`, strokeWidth: 3 })}</g>
+      </g>
+      {/* The rim itself, catching the light where the bevel does. */}
+      {pane({ fill: 'none', stroke: `url(#${id}-lit)`, strokeWidth: 0.45 })}
       <g opacity={0.3} filter={`url(#${id}-soft)`} transform="translate(0 .4)">
         {detail(`color-mix(in srgb, ${to} 70%, #000)`)}
       </g>
