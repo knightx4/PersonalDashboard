@@ -108,6 +108,7 @@ export default async function AccountPage({
               timezone: settings.timezone,
               displayCurrency: settings.displayCurrency,
               enabledModules: settings.enabledModules,
+              theme: settings.theme,
             }}
             isOwner={owner}
             vapidPublicKey={vapidPublicKey()}

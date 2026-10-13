@@ -1,12 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from 'react';
-import { Check, Palette } from 'lucide-react';
+import { useEffect, useMemo, useState, useSyncExternalStore, useTransition } from 'react';
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { Popover } from '@/components/ui/popover';
-import { IconButton } from '@/components/ui/icon-button';
 import { SectionLabel } from '@/components/ui/section-heading';
-import { usePopover } from '@/lib/use-popover';
 import { setTheme } from '@/app/theme-actions';
 import { setDensity } from '@/app/density-actions';
 import {
@@ -101,8 +98,44 @@ function same(a: Theme, b: Theme): boolean {
   return formatTheme(a) === formatTheme(b);
 }
 
+/**
+ * Puts the account's theme on a device that has never seen it.
+ *
+ * Mounted once by the shell on every page, since the theme picker now lives on
+ * the account page and the shell no longer carries it. Renders nothing.
+ */
+export function ThemeRepair({ value }: { value: Theme }) {
+  const [, startTransition] = useTransition();
+  /**
+   * The account is the truth; the cookie is a device-local mirror.
+   *
+   * On a machine that has never seen this account the cookie is absent, so the
+   * server rendered the system default and the first paint was the wrong
+   * theme. Apply it and repair the cookie, so this page is right and so is the
+   * next one.
+   *
+   * Only when the document is carrying no choice at all, though -- not merely
+   * a different one. `value` arrives from a render, and saving a theme starts
+   * a render, so the value that comes back can be the one from before the
+   * write; a disagreement is as likely to be this effect holding the stale
+   * copy as the document holding it. `shouldRepairTheme` is where that rule
+   * and the reason for it live.
+   */
+  const stored = formatTheme(value);
+  useEffect(() => {
+    if (!stored) return;
+    const root = document.documentElement;
+    if (!shouldRepairTheme(root.getAttribute(THEME_CHOICE_ATTRIBUTE), stored)) return;
+    applyTheme(root, value);
+    startTransition(() => {
+      void setTheme(stored);
+    });
+  }, [stored, value]);
+  return null;
+}
+
+/** The theme controls, drawn in the page: room, surface, colour, density. */
 export function ThemePicker({ value }: { value: Theme }) {
-  const [open, setOpen] = useState(false);
   // undefined means "whatever the account says"; anything else is a choice
   // made on this page since it loaded. Derived rather than copied into state,
   // so a change from the server cannot be silently ignored.
@@ -113,8 +146,6 @@ export function ThemePicker({ value }: { value: Theme }) {
    */
   const [preview, setPreview] = useState<Theme | undefined>(undefined);
   const [, startTransition] = useTransition();
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
 
   /**
    * The density dial lives in the same panel: it is the other "how does this
@@ -167,39 +198,6 @@ export function ThemePicker({ value }: { value: Theme }) {
     if (!touched) return;
     applyTheme(document.documentElement, showing);
   }, [touched, showing]);
-
-  /**
-   * The account is the truth; the cookie is a device-local mirror.
-   *
-   * On a machine that has never seen this account the cookie is absent, so the
-   * server rendered the system default and the first paint was the wrong
-   * theme. Apply it and repair the cookie, so this page is right and so is the
-   * next one.
-   *
-   * Only when the document is carrying no choice at all, though -- not merely
-   * a different one. `value` arrives from a render, and saving a theme starts
-   * a render, so the value that comes back can be the one from before the
-   * write; a disagreement is as likely to be this effect holding the stale
-   * copy as the document holding it. `shouldRepairTheme` is where that rule
-   * and the reason for it live.
-   */
-  const stored = formatTheme(value);
-  useEffect(() => {
-    if (!stored) return;
-    const root = document.documentElement;
-    if (!shouldRepairTheme(root.getAttribute(THEME_CHOICE_ATTRIBUTE), stored)) return;
-    applyTheme(root, value);
-    startTransition(() => {
-      void setTheme(stored);
-    });
-  }, [stored, value]);
-
-  usePopover({ open, onClose: close, panelRef, triggerRef });
-
-  function close() {
-    setOpen(false);
-    setPreview(undefined);
-  }
 
   /**
    * Take a choice, and leave the panel up.
@@ -268,32 +266,10 @@ export function ThemePicker({ value }: { value: Theme }) {
   });
 
   return (
-    <div className="relative shrink-0">
-      <IconButton
-        ref={triggerRef}
-        label="Theme"
-        onClick={() => (open ? close() : setOpen(true))}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        active={open}
-        className={open ? undefined : 'text-shell-muted hover:bg-shell-hover hover:text-shell-ink'}
-      >
-        <Palette strokeWidth={1.75} aria-hidden />
-      </IconButton>
+    <div role="group" aria-label="Theme">
+          <SectionLabel className="pb-1.5">Light or dark</SectionLabel>
 
-      {open && (
-        <Popover
-          ref={panelRef}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Theme"
-          tabIndex={-1}
-          padding="menu"
-          className="sm:w-72"
-        >
-          <SectionLabel className="px-2 pb-1.5 pt-1">Theme</SectionLabel>
-
-          <div role="radiogroup" aria-label="Light or dark" className="flex gap-1 px-1 pb-1">
+          <div role="radiogroup" aria-label="Light or dark" className="flex gap-1 pb-1">
             {THEME_POLARITIES.map((option) => {
               // Following the system is not one of these, so nothing is
               // checked until a room has actually been chosen.
@@ -307,8 +283,9 @@ export function ThemePicker({ value }: { value: Theme }) {
                   onClick={() => save(inPolarity(option.id))}
                   title={option.mood}
                   className={cn(
-                    'press flex-1 rounded-control px-2 py-1.5 text-small font-medium transition-colors',
-                    on ? 'bg-accent-tint text-accent' : 'text-ink-muted hover:bg-sunken hover:text-ink',
+                    // ui-ok: hand-rolled-box -- a segmented choice needs its outline to read as pressable; the chosen one drops it for the tint.
+                    'press flex-1 rounded-control border px-2 py-1.5 text-small font-medium transition-colors',
+                    on ? 'border-transparent bg-accent-tint text-accent' : 'border-border text-ink-muted hover:bg-sunken hover:text-ink',
                   )}
                 >
                   {option.label}
@@ -317,9 +294,9 @@ export function ThemePicker({ value }: { value: Theme }) {
             })}
           </div>
 
-          <SectionLabel className="px-2 pb-1.5 pt-2">Surface</SectionLabel>
+          <SectionLabel className="pb-1.5 pt-3">Surface</SectionLabel>
 
-          <div role="radiogroup" aria-label="Surface" className="flex gap-1 px-1 pb-1">
+          <div role="radiogroup" aria-label="Surface" className="flex gap-1 pb-1">
             {THEME_SURFACES.map((option) => {
               const on = showing.kind !== 'system' && here.surface === option.id;
               return (
@@ -331,8 +308,9 @@ export function ThemePicker({ value }: { value: Theme }) {
                   onClick={() => save(inSurface(option.id))}
                   title={option.mood}
                   className={cn(
-                    'press flex-1 rounded-control px-2 py-1.5 text-small font-medium transition-colors',
-                    on ? 'bg-accent-tint text-accent' : 'text-ink-muted hover:bg-sunken hover:text-ink',
+                    // ui-ok: hand-rolled-box -- a segmented choice needs its outline to read as pressable; the chosen one drops it for the tint.
+                    'press flex-1 rounded-control border px-2 py-1.5 text-small font-medium transition-colors',
+                    on ? 'border-transparent bg-accent-tint text-accent' : 'border-border text-ink-muted hover:bg-sunken hover:text-ink',
                   )}
                 >
                   {option.label}
@@ -341,10 +319,10 @@ export function ThemePicker({ value }: { value: Theme }) {
             })}
           </div>
 
-          <SectionLabel className="px-2 pb-1.5 pt-2">Colour</SectionLabel>
+          <SectionLabel className="pb-1.5 pt-3">Colour</SectionLabel>
 
           {poster ? (
-            <div className="flex flex-wrap gap-1.5 px-2 pb-2">
+            <div className="flex flex-wrap gap-1.5 pb-2">
               {PALETTES.map((option) => {
                 const next = posterFor(option.id, here.polarity);
                 return (
@@ -359,7 +337,7 @@ export function ThemePicker({ value }: { value: Theme }) {
               })}
             </div>
           ) : aurora ? (
-            <div className="flex flex-wrap gap-1.5 px-2 pb-2">
+            <div className="flex flex-wrap gap-1.5 pb-2">
               {SKIES.filter((option) => option[here.polarity === 'light' ? 'dawn' : 'night']).map((option) => {
                 const next = auroraFor(here.polarity, option.id);
                 return (
@@ -376,7 +354,7 @@ export function ThemePicker({ value }: { value: Theme }) {
             </div>
           ) : (
           <>
-          <div className="flex flex-wrap gap-1.5 px-2 pb-1">
+          <div className="flex flex-wrap gap-1.5 pb-1">
             <Swatch
               theme={inHue(null)}
               label="No colour"
@@ -408,15 +386,18 @@ export function ThemePicker({ value }: { value: Theme }) {
             onClick={() => save({ kind: 'system' })}
             aria-pressed={showing.kind === 'system'}
             className={cn(
-              'mt-1 flex w-full items-center gap-2.5 rounded-control border-t border-border px-2 pb-1.5 pt-2 text-left text-ui transition-colors',
-              showing.kind === 'system' ? 'text-accent' : 'text-ink-muted hover:text-ink',
+              // ui-ok: hand-rolled-box -- a segmented choice needs its outline to read as pressable; the chosen one drops it for the tint.
+              'press mt-3 w-full rounded-control border px-2 py-1.5 text-small font-medium transition-colors',
+              showing.kind === 'system'
+                ? 'border-transparent bg-accent-tint text-accent'
+                : 'border-border text-ink-muted hover:bg-sunken hover:text-ink',
             )}
           >
             Follow the system
           </button>
 
-          <SectionLabel className="mt-1 border-t border-border px-2 pb-1.5 pt-2.5">Density</SectionLabel>
-          <div role="radiogroup" aria-label="Density" className="flex gap-1 px-1 pb-1">
+          <SectionLabel className="pb-1.5 pt-3">Density</SectionLabel>
+          <div role="radiogroup" aria-label="Density" className="flex gap-1 pb-1">
             {DENSITIES.map((option) => (
               <button
                 key={option.id}
@@ -425,18 +406,17 @@ export function ThemePicker({ value }: { value: Theme }) {
                 aria-checked={density === option.id}
                 onClick={() => chooseDensity(option.id)}
                 className={cn(
-                  'press flex-1 rounded-control px-2 py-1.5 text-small font-medium transition-colors',
+                  // ui-ok: hand-rolled-box -- a segmented choice needs its outline to read as pressable; the chosen one drops it for the tint.
+                  'press flex-1 rounded-control border px-2 py-1.5 text-small font-medium transition-colors',
                   density === option.id
-                    ? 'bg-accent-tint text-accent'
-                    : 'text-ink-muted hover:bg-sunken hover:text-ink',
+                    ? 'border-transparent bg-accent-tint text-accent'
+                    : 'border-border text-ink-muted hover:bg-sunken hover:text-ink',
                 )}
               >
                 {option.label}
               </button>
             ))}
           </div>
-        </Popover>
-      )}
     </div>
   );
 }
@@ -522,6 +502,7 @@ function Swatch({
         // ui-ok: hand-rolled-box -- a user's colour against a like ground needs an edge, which is the case law 11 keeps the border for.
         'press flex size-8 items-center justify-center rounded-control border border-border-strong transition-transform hover:scale-105',
         way && 'wash-chip',
+        chosen && 'ring-2 ring-accent ring-offset-2 ring-offset-surface',
       )}
       // ui-ok: raw-hex -- this is the generated colour itself, which is the
       // one thing on the screen that cannot be a token.
@@ -622,6 +603,7 @@ function SkySwatch({
       className={cn(
         // ui-ok: hand-rolled-box -- a user's colour against a like ground needs an edge, which is the case law 11 keeps the border for.
         'press wash-chip flex size-8 items-center justify-center rounded-control border border-border-strong transition-transform hover:scale-105',
+        chosen && 'ring-2 ring-accent ring-offset-2 ring-offset-surface',
       )}
       // ui-ok: raw-hex -- this is the sky itself, which is the one thing on the
       // screen that cannot be a token.

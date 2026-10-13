@@ -1048,6 +1048,7 @@ export function AccountSurface({
           timezone: 'America/New_York',
           displayCurrency: 'USD',
           enabledModules: ['shopping', 'jobs', 'todo', 'vault', 'learn', 'news', 'goals'],
+          theme: { kind: 'generated', mode: 'light', hue: 330, way: 'ember' },
         }}
         isOwner
         vapidPublicKey={null}
