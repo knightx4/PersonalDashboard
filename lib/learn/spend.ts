@@ -350,6 +350,10 @@ export const LEARN_OPERATIONS = [
   // reading's text, at most 200,000 characters, per press of Summarize or
   // Redo. Nothing is spent when the link cannot be read.
   'summarize-reading',
+  // Naming the places on Idea Space (plan #1997.2): one Haiku call in the
+  // daily run for the places that are new or whose ideas changed by more
+  // than a third, up to forty places a call, and none on a day nothing moved.
+  'name-places',
 ] as const;
 
 export type LearnOperation = (typeof LEARN_OPERATIONS)[number];

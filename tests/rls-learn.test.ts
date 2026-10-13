@@ -125,6 +125,8 @@ describe('RLS coverage', () => {
       'essays',
       'feed_cards',
       'goals',
+      'idea_place_members',
+      'idea_places',
       'imports',
       'learning_log',
       'next_outcomes',
@@ -2327,6 +2329,59 @@ describe('personality test results', () => {
     await expect(
       admin`update personality_results set read_points = '[]'::jsonb where user_id = ${userA}`,
     ).rejects.toThrow();
+  });
+});
+
+describe('places on Idea Space (plan #1997.2)', () => {
+  // learn 0112_idea_places.sql. The daily run writes places with the service
+  // role; the person only reads their own, and an idea cannot be put in a
+  // place of another account's.
+  let conceptA = '';
+  let placeA = '';
+
+  beforeAll(async () => {
+    const [subject] = await admin<{ id: string }[]>`
+      insert into subjects (user_id, name) values (${userA}, 'Places subject') returning id`;
+    const [concept] = await admin<{ id: string }[]>`
+      insert into concepts (user_id, subject_id, name, claim, basis)
+      values (${userA}, ${subject.id}, 'Bullwhip effect', 'Small swings in demand grow up the supply chain.',
+              'Written by hand for this test.')
+      returning id`;
+    conceptA = concept.id;
+    const [place] = await admin<{ id: string }[]>`
+      insert into idea_places (user_id, name, named_members, named_at, member_count)
+      values (${userA}, 'Chip shortages and the bullwhip', array[${conceptA}]::uuid[], now(), 1)
+      returning id`;
+    placeA = place.id;
+    await admin`insert into idea_place_members (concept_id, place_id, user_id)
+                values (${conceptA}, ${placeA}, ${userA})`;
+  });
+
+  it('shows the owner their places and nobody else', async () => {
+    expect(await asUser(userA, (tx) => tx`select id from idea_places`)).toHaveLength(1);
+    expect(await asUser(userA, (tx) => tx`select concept_id from idea_place_members`)).toHaveLength(1);
+    expect(await asUser(userB, (tx) => tx`select id from idea_places`)).toHaveLength(0);
+    expect(await asUser(userB, (tx) => tx`select concept_id from idea_place_members`)).toHaveLength(0);
+  });
+
+  it('leaves the writing to the daily run', async () => {
+    await expect(
+      asUser(userA, (tx) => tx`insert into idea_places (user_id, name) values (${userA}, 'Mine')`),
+    ).rejects.toThrow();
+    await expect(
+      asUser(userA, (tx) => tx`update idea_places set name = 'Renamed' where id = ${placeA}`),
+    ).rejects.toThrow();
+  });
+
+  it("refuses an idea in another account's place, and goes with the idea", async () => {
+    await expect(
+      admin`insert into idea_places (user_id, name) values (${userB}, 'Bob place') returning id`.then(
+        ([row]) => admin`insert into idea_place_members (concept_id, place_id, user_id)
+                         values (${conceptA}, ${row!.id}, ${userB})`,
+      ),
+    ).rejects.toThrow();
+    await admin`delete from concepts where id = ${conceptA}`;
+    expect(await admin`select 1 from idea_place_members where place_id = ${placeA}`).toHaveLength(0);
   });
 });
 
