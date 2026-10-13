@@ -46,8 +46,12 @@ export type TimelineEntry = {
   /** When it happened: a Date or an ISO string. */
   time: Date | string;
   kind: TimelineKind;
+  /** The time is a day and nothing finer: the row shows the date and no clock. */
+  dayOnly?: boolean;
   title: string;
   body?: string;
+  /** Whose words the body is, so the person's and Dash's panels look different. */
+  voice?: 'you' | 'dash';
   link?: { href: string; label: string };
   /** One press on the row, such as Undo. */
   action?: { label: string; onSelect: () => void; disabled?: boolean };
@@ -116,7 +120,12 @@ export function Timeline({
         const gap = next ? gapLabel(entry.time, next.time) : null;
         const here = parts(entry.time, timeZone);
         const above = i > 0 ? parts(sorted[i - 1].time, timeZone) : null;
-        const when = above && above.day === here.day ? here.clock : `${here.day}, ${here.clock}`;
+        const sameDay = above && above.day === here.day;
+        const when = entry.dayOnly
+          ? here.day
+          : sameDay
+            ? here.clock
+            : `${here.day}, ${here.clock}`;
         const isLast = i === sorted.length - 1;
         const external = entry.link ? !entry.link.href.startsWith('/') : false;
 
@@ -137,7 +146,20 @@ export function Timeline({
                 >
                   {when}
                 </time>
-                {entry.body && <p className="mt-1 text-small text-ink-muted">{entry.body}</p>}
+                {entry.body && (
+                  <p
+                    className={cn(
+                      'mt-1.5 whitespace-pre-line rounded-md px-3 py-2 text-small text-ink-muted',
+                      entry.voice === 'you'
+                        ? 'border border-border bg-raised'
+                        : entry.voice === 'dash'
+                          ? 'border-l-2 border-accent bg-sunken'
+                          : 'bg-sunken',
+                    )}
+                  >
+                    {entry.body}
+                  </p>
+                )}
                 {(entry.link || entry.action) && (
                   <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-small">
                     {entry.link &&
