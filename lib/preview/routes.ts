@@ -276,6 +276,7 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'dev-usage-empty': ['/dev/usage'],
   'dev-modules': ['/dev/modules'],
   'dev-module': ['/dev/modules/[id]'],
+  'dev-module-ideas': ['/dev/modules/[id]'],
   'goals-run': ['/goals/runs/[runId]'],
   'run-lines': ['/goals/runs/[runId]', '/dev/plan/[number]'],
   'jobs-activity': ['/jobs/activity'],
@@ -286,7 +287,8 @@ export const SURFACE_ROUTES: Readonly<Record<string, readonly string[]>> = {
   'jobs-case-page': ['/jobs/p/[slug]'],
   'mail-message': ['/mail/[id]'],
   'learn-concept': ['/learn/c/[id]'],
-  'learn-lists': ['/learn/lists'],
+  // /learn/save opened empty is the save box this surface draws above the lists.
+  'learn-lists': ['/learn/lists', '/learn/save'],
   'learn-new': ['/learn/new'],
   'learn-opening': ['/learn/opening/[id]'],
   'learn-quiz': ['/learn/quiz/[id]'],

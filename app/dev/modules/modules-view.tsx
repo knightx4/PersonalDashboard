@@ -18,6 +18,7 @@ import {
 } from '@/lib/dev/module-page';
 import { FEEDBACK_KIND_LABEL, type FeedbackRow } from '@/lib/feedback/load';
 import type { IdeaRow } from '@/lib/ideas/load';
+import { ShapeIdea } from '@/app/dev/ideas/ideas-view';
 import { formatMicroDollars } from '@/lib/money';
 import { featureHref } from '@/lib/plan/feature-page';
 import { PLAN_STATUS_LABEL, type PlanItem } from '@/lib/plan/load';
@@ -114,15 +115,19 @@ function Row({
   children,
   meta,
   flat = false,
+  action,
 }: {
   children: React.ReactNode;
   meta: React.ReactNode;
   flat?: boolean;
+  /** A move made on the row where it stands, under its meta line. */
+  action?: React.ReactNode;
 }) {
   return (
     <li className={cn('flex flex-col gap-0.5 py-3', flat ? 'first:pt-1 last:pb-0' : 'px-4')}>
       <span className="min-w-0 [overflow-wrap:anywhere]">{children}</span>
       <span className="text-small text-ink-muted">{meta}</span>
+      {action && <div className="pt-2">{action}</div>}
     </li>
   );
 }
@@ -167,6 +172,11 @@ function BugRows({ rows, flat }: { rows: readonly FeedbackRow[]; flat?: boolean 
   );
 }
 
+/**
+ * The Ideas tab carries the same Shape into a plan button as /dev/ideas, so an
+ * idea goes onto the plan from its workspace's page (note 2c0d63b2). The
+ * overview's short list stays links only.
+ */
 function IdeaRows({ ideas, flat }: { ideas: readonly IdeaRow[]; flat?: boolean }) {
   return (
     <Rows flat={flat}>
@@ -175,6 +185,7 @@ function IdeaRows({ ideas, flat }: { ideas: readonly IdeaRow[]; flat?: boolean }
           flat={flat}
           key={idea.id}
           meta={`${idea.source === 'me' ? 'Yours' : 'Suggested by Dash'} · ${idea.createdAt.slice(0, 10)}`}
+          action={flat ? undefined : <ShapeIdea idea={idea} />}
         >
           <Link href={`/dev/ideas#idea-${idea.id}`} className={rowLink}>
             {firstLine(idea.body)}

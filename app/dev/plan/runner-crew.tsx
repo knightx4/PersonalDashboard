@@ -121,6 +121,8 @@ function Pill({
         runner={RUNNERS[slot.slot]}
         size="md"
         decorative
+        // Only a slot at work glows; asleep or off, its Dash sits unlit.
+        still={!working}
       />
       {/* Every pill has the same three rows, a meter track included, so the
           four stand the same height whatever their slots are doing. */}

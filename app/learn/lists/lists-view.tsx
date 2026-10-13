@@ -6,6 +6,7 @@ import { SearchEmpty } from '@/components/shell/search-empty';
 import { SearchField } from '@/components/shell/search-field';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { SaveLinkForm } from '../save/save-link-form';
 import type { TrackProgress } from '@/lib/learn/tracks/load';
 import type { NestedTrack } from '@/lib/learn/tracks/tree';
 import { PageColumn } from '@/components/shell/page-width';
@@ -74,9 +75,14 @@ export function ListsView({ rows, search }: { rows: NestedTrack[]; search: strin
       }
     />
   );
+  // Saving a link comes first: it is the quick way onto the queue, and the
+  // search is for finding something already there.
   const tools = (
-    <div className="max-w-md">
-      <SearchField placeholder="Search your reading lists" />
+    <div className="space-y-3">
+      <SaveLinkForm />
+      <div className="max-w-md">
+        <SearchField placeholder="Search your reading lists" />
+      </div>
     </div>
   );
 
