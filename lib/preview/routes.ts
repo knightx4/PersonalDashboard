@@ -443,6 +443,7 @@ export const COMPONENT_SURFACES: Readonly<Record<string, readonly string[]>> = {
     'components/ui/status-glyph.tsx',
     'components/ui/table.tsx',
     'components/ui/tabs.tsx',
+    'components/ui/timeline.tsx',
     'components/ui/timezone-field.tsx',
     'components/ui/toast.tsx',
     'components/ui/value-row.tsx',
