@@ -70,9 +70,10 @@ import {
  */
 export type AskSource = ChangePresses & {
   /**
-   * Ask, and hear each lookup as it starts and finishes (plan #1438). A
-   * source that cannot say what it looks up, such as the gallery's, ignores
-   * `onLookup` and the thread shows the waiting line alone.
+   * Ask, and hear each lookup as it starts and finishes (plan #1438) and
+   * each piece of the answer as it is written (plan #1902). A source that
+   * cannot say either ignores the listener, and the thread shows the waiting
+   * line until the answer lands.
    */
   ask: (
     question: string,
@@ -81,6 +82,7 @@ export type AskSource = ChangePresses & {
     onLookup?: (lookup: LookupWire) => void,
     files?: UploadedAttachment[],
     list?: AskListFilter | null,
+    onText?: (piece: string) => void,
   ) => Promise<AskDashResult>;
   recent: typeof recentAskQuestions;
   open: typeof openAskQuestion;
@@ -90,7 +92,8 @@ export type AskSource = ChangePresses & {
 };
 
 /**
- * Asks through app/api/ask/route.ts, which streams the lookups as they run.
+ * Asks through app/api/ask/route.ts, which streams the lookups as they run
+ * and the answer as it is written.
  * The route answers 401 when the session has gone; anything that is not a
  * stream comes back as an error for the thread, never a throw.
  */
@@ -101,6 +104,7 @@ async function askLive(
   onLookup?: (lookup: LookupWire) => void,
   files?: UploadedAttachment[],
   list: AskListFilter | null = null,
+  onText?: (piece: string) => void,
 ): Promise<AskDashResult> {
   let response: Response;
   try {
@@ -117,7 +121,11 @@ async function askLive(
     return { turns: [], error: 'Dash could not be asked. Check your connection and try again.' };
   }
   try {
-    return await readAskStream(response.body, (lookup) => onLookup?.(lookup));
+    return await readAskStream(
+      response.body,
+      (lookup) => onLookup?.(lookup),
+      (piece) => onText?.(piece),
+    );
   } catch {
     return { turns: [], error: STREAM_CUT };
   }
@@ -260,12 +268,13 @@ export function useAskSend(
   onHandedOff?: (count: number) => void,
   onLookup?: (lookup: LookupWire) => void,
   list: AskListFilter | null = null,
+  onText?: (piece: string) => void,
 ): TalkSend {
   const source = useAskDash()?.source ?? ACTIONS;
   const ref = useRef(initialRef);
-  const heard = useRef({ onConversation, onChanges, onHandedOff, onLookup, page, list });
+  const heard = useRef({ onConversation, onChanges, onHandedOff, onLookup, onText, page, list });
   useEffect(() => {
-    heard.current = { onConversation, onChanges, onHandedOff, onLookup, page, list };
+    heard.current = { onConversation, onChanges, onHandedOff, onLookup, onText, page, list };
   });
   return useCallback<TalkSend>(async (body, files) => {
     const result = await source.ask(
@@ -275,6 +284,7 @@ export function useAskSend(
       (lookup) => heard.current.onLookup?.(lookup),
       files,
       heard.current.list,
+      (piece) => heard.current.onText?.(piece),
     );
     if (result.conversation && result.conversation.ref !== ref.current) {
       ref.current = result.conversation.ref;
@@ -341,6 +351,9 @@ export function AskThread({
   // What Dash is looking up for the answer on its way (plan #1438), emptied
   // on each question; the answer once landed shows its own, folded.
   const [live, setLive] = useState<LookupLine[]>([]);
+  // The answer as far as Dash has written it (plan #1902), emptied on each
+  // question; the saved turn takes its place when the answer lands.
+  const [written, setWritten] = useState('');
   const send = useAskSend(
     conversationRef,
     page,
@@ -352,6 +365,7 @@ export function AskThread({
     (count) => setOpen((current) => current + count),
     (lookup) => setLive((current) => heardLookup(current, lookup)),
     list,
+    (piece) => setWritten((current) => current + piece),
   );
   const onChanged = useCallback(
     (next: DashChange) => setChanges((current) => current.map((c) => (c.id === next.id ? next : c))),
@@ -384,10 +398,12 @@ export function AskThread({
       send={(body, files) => {
         onSend?.();
         setLive([]);
+        setWritten('');
         return send(body, files);
       }}
       waiting={ASK_WAITING}
       working={<LookupList lines={live} label="What Dash is looking up" />}
+      written={written}
       activity="searching"
       incoming={incoming}
       below={(turn) => {

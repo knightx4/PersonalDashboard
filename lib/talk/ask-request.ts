@@ -67,6 +67,8 @@ export async function askDashInRequest(input: {
   list?: AskListFilter | null;
   /** Hears each lookup as it starts and finishes (plan #1438): the streaming route listens. */
   onLookup?: (event: AskLookupEvent) => void;
+  /** Hears the answer's text as it is written (plan #1902): the streaming route listens. */
+  onText?: (piece: string) => void;
 }): Promise<AskDashResult> {
   const user = await requireUser();
   const [settings, core] = await Promise.all([loadAccountSettings(user.id), createCoreClient()]);
@@ -98,6 +100,7 @@ export async function askDashInRequest(input: {
         tool.apply({ ...ctx, seen, goals: (history) => createGoalsClient(history), createTask }, args),
       anthropicApiKey: process.env.ANTHROPIC_API_KEY,
       onLookup: input.onLookup,
+      onText: input.onText,
     },
     {
       start: (question) => startAsk(core, user.id, question),

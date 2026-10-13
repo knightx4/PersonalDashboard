@@ -9,13 +9,16 @@ import { encodeStreamLine, lookupWire, type AskStreamLine } from '@/lib/talk/loo
 export const dynamic = 'force-dynamic';
 
 /**
- * Ask Dash with the lookups shown as they run (plan #1438).
+ * Ask Dash with the lookups shown as they run (plan #1438) and the answer
+ * shown as it is written (plan #1902).
  *
  * The sheet and /ask ask Dash here. A route handler rather than a server
  * action, which is where this used to be, because an action hands back one
  * value when it is finished and this has to say something while it works.
  * The body is newline-delimited JSON: a `lookup` line as each lookup starts
- * and as it finishes, then one `result` line holding the AskDashResult.
+ * and as it finishes, a `text` line for each piece of the answer as Dash
+ * writes it (plan #1902), then one `result` line holding the AskDashResult,
+ * whose saved turn is the answer as kept.
  * lib/talk/lookups.ts writes and reads both.
  *
  * The person comes from the session and nowhere else; the body names only the
@@ -87,6 +90,7 @@ export async function POST(request: Request) {
             const lookup = lookupWire(event);
             if (lookup) send({ lookup });
           },
+          onText: (text) => send({ text }),
         });
         // The list of past questions reads the table, so a new question or a new
         // answer has to show there the next time it is opened.
