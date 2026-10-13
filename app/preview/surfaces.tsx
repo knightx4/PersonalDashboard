@@ -24,6 +24,8 @@ import { SearchBarSurface } from './search-bar-surface';
 import {
   IdeaSpaceAroundSurface,
   IdeaSpacePlaceSurface,
+  IdeaSpaceRecordingChooseSurface,
+  IdeaSpaceRecordingSurface,
   IdeaSpaceReplaySurface,
   IdeaSpaceCardSurface,
   IdeaSpaceDenseSurface,
@@ -5112,6 +5114,23 @@ export const SURFACES: readonly Surface[] = [
     module: 'learn',
     width: 'page',
     render: () => <IdeaSpaceAroundSurface />,
+  },
+  {
+    /* Recording mode on (plan #1997.9), a place open as a graph: the hidden
+     * places and the ideas in them read "A private place" and "Private idea". */
+    id: 'learn-idea-space-recording',
+    label: 'Learn · Idea Space, recording mode on',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceRecordingSurface />,
+  },
+  {
+    /* Recording mode off, two places ticked to hide, in the rail's card. */
+    id: 'learn-idea-space-recording-choose',
+    label: 'Learn · Idea Space, choosing places to hide',
+    module: 'learn',
+    width: 'page',
+    render: () => <IdeaSpaceRecordingChooseSurface />,
   },
   {
     /* Ten thousand test ideas, for the frame rate the sky has to hold (plan #1997.6). */

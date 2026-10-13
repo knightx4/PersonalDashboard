@@ -594,3 +594,28 @@ export function IdeaSpaceDenseSurface() {
   const view = useMemo(() => dense(10_000), []);
   return <IdeaSpaceView view={view} params={DEFAULT_PARAMS} />;
 }
+
+/**
+ * Recording mode on (plan #1997.9) with a place open as a graph: the place and
+ * the next one over are hidden, so the title, the ideas and the rail read
+ * "A private place" and "Private idea", and the places left show as they are.
+ */
+export function IdeaSpaceRecordingSurface() {
+  const hidden = VIEW.places.filter((p) => p.name === 'How memory holds on' || p.name === 'Incentives, prices and the long run');
+  const open = VIEW.places.find((p) => p.name === 'How memory holds on')!;
+  return (
+    <IdeaSpaceView
+      view={VIEW}
+      params={{ ...DEFAULT_PARAMS, place: open.id }}
+      recording={{ on: true, hidden: hidden.map((p) => p.id) }}
+    />
+  );
+}
+
+/** Recording mode off with two places ticked to hide, in the rail's Recording mode card. */
+export function IdeaSpaceRecordingChooseSurface() {
+  const hidden = VIEW.places.filter((p) => p.name === 'How memory holds on' || p.name === 'Incentives, prices and the long run');
+  return (
+    <IdeaSpaceView view={VIEW} params={DEFAULT_PARAMS} recording={{ on: false, hidden: hidden.map((p) => p.id) }} chooseOpen />
+  );
+}

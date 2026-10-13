@@ -30,6 +30,7 @@ export function MapTimeline({
   day,
   counts,
   onDay,
+  touring = false,
 }: {
   /** The first day, as milliseconds at midnight UTC. */
   start: number;
@@ -38,8 +39,16 @@ export function MapTimeline({
   day: number;
   counts: DayCounts;
   onDay: (day: number) => void;
+  /** The scripted tour is stepping the day, so a replay of its own would run beside it. */
+  touring?: boolean;
 }) {
   const [playing, setPlaying] = useState(false);
+  // A tour that starts ends a replay of the timeline's own.
+  const [wasTouring, setWasTouring] = useState(touring);
+  if (touring !== wasTouring) {
+    setWasTouring(touring);
+    if (touring) setPlaying(false);
+  }
   const dayRef = useRef(day);
   useEffect(() => {
     dayRef.current = day;

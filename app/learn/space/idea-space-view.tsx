@@ -1,3 +1,6 @@
+'use client';
+
+import { useMemo, useState } from 'react';
 import Link from '@/components/ui/link';
 import { Orbit } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
@@ -13,6 +16,8 @@ import { MapSection } from './map-section';
 import { PickProvider } from './pick';
 import { PageColumn } from '@/components/shell/page-width';
 import { PlaceRail } from './place-rail';
+import { RecordingCard } from './recording-card';
+import { NOT_RECORDING, viewFor, type Recording } from '@/lib/learn/map/recording';
 
 /**
  * The Idea Space page (plan #1857): every idea with an embedding on one map,
@@ -35,10 +40,13 @@ const CONCEPT_HREF = (id: string) => `/learn/c/${id}`;
 const LIST_SHOWN = 5;
 
 export function IdeaSpaceView({
-  view,
+  view: whole,
   params,
   pointingAt,
   daysAgo,
+  recording: saved = NOT_RECORDING,
+  save,
+  chooseOpen,
 }: {
   /** Null when the ideas could not be read, which the page says in place (law 2). */
   view: IdeaMapView | null;
@@ -47,7 +55,16 @@ export function IdeaSpaceView({
   pointingAt?: string | null;
   /** The gallery opens the timeline this many days before today. */
   daysAgo?: number;
+  /** Recording mode as the person last left it (plan #1997.9). */
+  recording?: Recording;
+  /** Remembers a change to it; the gallery passes none and keeps it in the page. */
+  save?: (recording: Recording) => Promise<{ ok: true } | { ok: false; error: string }>;
+  /** The gallery draws the recording card's list of places open. */
+  chooseOpen?: boolean;
 }) {
+  const [recording, setRecording] = useState(saved);
+  // Names are made private here, once, so nothing below can draw one.
+  const view = useMemo(() => (whole ? viewFor(whole, recording) : null), [whole, recording]);
   const header = (
     <PageHeader
       crumbs={[
@@ -103,6 +120,7 @@ export function IdeaSpaceView({
           <>
             <ChosenIdea ideas={view.ideas} places={view.places} />
             <PlaceRail view={view} />
+            <RecordingCard places={whole?.places ?? []} recording={recording} onChange={setRecording} save={save} chooseOpen={chooseOpen} />
             <SameIdeas view={view} nameOf={nameOf} />
             <UntestedNearKnown view={view} nameOf={nameOf} />
           </>

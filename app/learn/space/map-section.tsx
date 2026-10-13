@@ -1,15 +1,16 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, Clapperboard, Square } from 'lucide-react';
 import Link from '@/components/ui/link';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { segmentClass, segmentedFrame } from '@/components/ui/segmented';
 import { cn } from '@/lib/cn';
 import type { IdeaMapView, IdeaOnMap } from '@/lib/learn/map/load';
 import type { Point } from '@/lib/learn/map/layout';
-import { ideaGraph, openedFrom, type IdeaGraph } from '@/lib/learn/map/place-graph';
+import { ideaGraph, openedFrom, paramsFor, type IdeaGraph } from '@/lib/learn/map/place-graph';
+import { TOUR_DWELL_MS, tourScript, type TourScript } from '@/lib/learn/map/tour';
 import { dustAt } from '@/lib/learn/map/sky';
 import { countsOf, mapOn, momentOf, timelineSpan, type LightThen } from '@/lib/learn/map/timeline';
 import { DOMAIN_HUES, axisEnds, countText, domainSlots, mapHref, type AxisEnds, type MapParams } from '@/lib/learn/map/view';
@@ -80,6 +81,7 @@ export function MapSection({
   const [day, setDay] = useState(() => Math.max(0, span.days - (daysAgo ?? 0)));
   const onDay = useCallback((next: number) => setDay(next), []);
   const shownDay = Math.min(day, span.days);
+  const tour = useTour({ view, days: span.days, setDay: onDay, set });
   const past = !graph && shownDay < span.days;
   const replay = useMemo(
     () => (past ? mapOn(view.ideas, momentOf(span, shownDay, today)) : null),
@@ -106,9 +108,18 @@ export function MapSection({
   const axes = layout === 'axes' ? axisEnds(view.ideas) : null;
 
   return (
-    <section aria-label="The map">
+    <section
+      aria-label="The map"
+      // Any press on the map, the timeline or the legend takes the tour's hands off.
+      onPointerDownCapture={(event) => {
+        if (!(event.target as Element).closest('[data-tour]')) tour.stop();
+      }}
+      onKeyDownCapture={(event) => {
+        if (event.key !== 'Tab' && !(event.target as Element).closest('[data-tour]')) tour.stop();
+      }}
+    >
       {graph ? (
-        <GraphBar graph={graph} view={view} params={params} set={set} />
+        <GraphBar graph={graph} view={view} params={params} set={set} tour={tour} />
       ) : (
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <span role="group" aria-label="Layout" className={segmentedFrame}>
@@ -130,6 +141,7 @@ export function MapSection({
               </Link>
             ))}
           </span>
+          <TourButton tour={tour} />
         </div>
       )}
 
@@ -150,7 +162,7 @@ export function MapSection({
         </div>
         <div className="card-pad-x pb-(--card-p)">
           {!graph && span.days > 0 && (
-            <MapTimeline start={span.start} days={span.days} day={shownDay} counts={countsOf(lights)} onDay={onDay} />
+            <MapTimeline start={span.start} days={span.days} day={shownDay} counts={countsOf(lights)} onDay={onDay} touring={tour.running} />
           )}
           <Legend params={params} set={set} lights={lights} domains={domainsThen} slots={slots} dust={dust.length} />
           <MapNotes view={view} params={params} graph={graph} past={past} />
@@ -416,11 +428,13 @@ function GraphBar({
   view,
   params,
   set,
+  tour,
 }: {
   graph: IdeaGraph;
   view: IdeaMapView;
   params: MapParams;
   set: (change: Partial<MapParams>) => void;
+  tour: Tour;
 }) {
   const back = { place: null, around: null };
   const strengthOf = new Map(view.ideas.map((idea) => [idea.id, idea.strength]));
@@ -442,6 +456,107 @@ function GraphBar({
           {plural(graph.core.length, 'idea')}, {countText(known)} known
         </span>
       </h2>
+      <TourButton tour={tour} />
     </div>
+  );
+}
+
+// -- The scripted tour (plan #1997.9) ------------------------------------------
+
+type TourPhase = { at: 'idle' } | { at: 'replay' } | { at: 'stop'; i: number } | { at: 'out' };
+
+type Tour = { running: boolean; start: () => void; stop: () => void };
+
+const SAME_ROUTE = { place: null, around: null, idea: null } as const;
+/** A whole replay takes about this long, as the timeline's own play does. */
+const TOUR_REPLAY_MS = 6000;
+
+function reducedMotion(): boolean {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * The same camera path every time: replay the map's growth to today, fly into
+ * the place you know best, hop next door, pull back out. The route is fixed
+ * when the tour starts (lib/learn/map/tour.ts). With reduced motion the
+ * replay is skipped to today, and the flights cut, as they do for a press.
+ * Pressing anywhere on the map ends it, through `stop`.
+ */
+function useTour({
+  view,
+  days,
+  setDay,
+  set,
+}: {
+  view: IdeaMapView;
+  days: number;
+  setDay: (day: number) => void;
+  set: (change: Partial<MapParams>) => void;
+}): Tour {
+  const [phase, setPhase] = useState<TourPhase>({ at: 'idle' });
+  const [script, setScript] = useState<TourScript>({ stops: [] });
+
+  const stop = useCallback(() => setPhase((now) => (now.at === 'idle' ? now : { at: 'idle' })), []);
+  const start = useCallback(() => {
+    setScript(tourScript(view));
+    set(SAME_ROUTE);
+    setPhase({ at: 'replay' });
+  }, [view, set]);
+
+  useEffect(() => {
+    if (phase.at === 'idle') return;
+    const later = (ms: number, then: () => void) => {
+      const timer = setTimeout(then, ms);
+      return () => clearTimeout(timer);
+    };
+    const afterReplay = () => setPhase(script.stops.length > 0 ? { at: 'stop', i: 0 } : { at: 'idle' });
+
+    if (phase.at === 'replay') {
+      if (reducedMotion() || days === 0) {
+        setDay(days);
+        return later(TOUR_DWELL_MS.afterReplay, afterReplay);
+      }
+      let day = 0;
+      let finish: (() => void) | undefined;
+      setDay(0);
+      const every = Math.min(Math.max(TOUR_REPLAY_MS / days, 40), 600);
+      const timer = setInterval(() => {
+        day += 1;
+        setDay(Math.min(day, days));
+        if (day >= days) {
+          clearInterval(timer);
+          finish = later(TOUR_DWELL_MS.afterReplay, afterReplay);
+        }
+      }, every);
+      return () => {
+        clearInterval(timer);
+        finish?.();
+      };
+    }
+    if (phase.at === 'stop') {
+      const { i } = phase;
+      set(paramsFor(script.stops[i]!));
+      return later(TOUR_DWELL_MS.perStop, () => setPhase(i + 1 < script.stops.length ? { at: 'stop', i: i + 1 } : { at: 'out' }));
+    }
+    set(SAME_ROUTE);
+    return later(TOUR_DWELL_MS.afterPullOut, () => setPhase({ at: 'idle' }));
+  }, [phase, script, days, setDay, set]);
+
+  return { running: phase.at !== 'idle', start, stop };
+}
+
+function TourButton({ tour }: { tour: Tour }) {
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      data-tour
+      aria-pressed={tour.running}
+      onClick={tour.running ? tour.stop : tour.start}
+      className="shrink-0"
+    >
+      {tour.running ? <Square strokeWidth={1.75} aria-hidden /> : <Clapperboard strokeWidth={1.75} aria-hidden />}
+      {tour.running ? 'Stop the tour' : 'Take the tour'}
+    </Button>
   );
 }
