@@ -13,7 +13,6 @@ export type YouTab = 'personality' | 'places' | 'work' | 'insights';
 
 type TabCopy = {
   title: string;
-  description: string;
   icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
   emptyTitle: string;
   emptyDescription: string;
@@ -24,7 +23,6 @@ type TabCopy = {
 export const YOU_TABS: Record<YouTab, TabCopy> = {
   personality: {
     title: 'Personality',
-    description: 'Your test results, and what Dash reads in them',
     icon: Fingerprint,
     emptyTitle: 'Your results are still in Learn',
     emptyDescription:
@@ -33,7 +31,6 @@ export const YOU_TABS: Record<YouTab, TabCopy> = {
   },
   places: {
     title: 'Places',
-    description: 'Where you have lived',
     icon: MapPin,
     emptyTitle: 'No places yet',
     emptyDescription:
@@ -41,7 +38,6 @@ export const YOU_TABS: Record<YouTab, TabCopy> = {
   },
   work: {
     title: 'Work & school',
-    description: 'The jobs you have held and the courses you have taken',
     icon: GraduationCap,
     emptyTitle: 'Nothing here yet',
     emptyDescription:
@@ -50,7 +46,6 @@ export const YOU_TABS: Record<YouTab, TabCopy> = {
   },
   insights: {
     title: 'Insights',
-    description: 'What Dash notices about you',
     icon: Sparkles,
     emptyTitle: 'Nothing noticed yet',
     emptyDescription:
@@ -62,7 +57,7 @@ export function YouTabEmpty({ tab }: { tab: YouTab }) {
   const copy = YOU_TABS[tab];
   return (
     <>
-      <PageHeader title={copy.title} description={copy.description} />
+      <PageHeader title={copy.title} />
       <EmptyState
         icon={copy.icon}
         title={copy.emptyTitle}
