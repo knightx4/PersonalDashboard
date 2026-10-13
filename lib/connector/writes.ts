@@ -2,7 +2,11 @@ import 'server-only';
 
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SpendReport } from '@/lib/core/spend/pricing';
-import { AskInputError, type AskRow, type AskToolResult, type SchemaClient } from '@/lib/ask/db';
+import { AskInputError, type AskDb, type AskRow, type AskToolResult, type SchemaClient } from '@/lib/ask/db';
+import { recordDashAction } from '@/lib/core/dash-actions';
+import type { DashWriteContext, QuickNoteFiled } from '@/lib/dash/registry';
+import { WRITE_TOOLS } from '@/lib/dash/writes';
+import type { ModuleId } from '@/lib/modules';
 import type { LearnSupabaseClient } from '@/lib/learn/db/schema-name';
 import {
   MAX_CHAT_ITEMS,
@@ -19,7 +23,10 @@ import { LEARN_WRITES, runLearnWrite } from '@/lib/dash/learn-writes';
 
 /**
  * The connector's write tools (plan #1808, under #1805): the few changes a
- * Claude app may make in Learn for the person it is signed in as.
+ * Claude app may make for the person it is signed in as. Three change Learn;
+ * three more (plan #1894.2) save a quick note, file an idea and save a job
+ * lead, by running Ask Dash's own write tools (lib/dash/writes.ts) on the
+ * service-role clients, so each writes the row the page would.
  *
  * The token stays read-only. 0134_connector_read_only.sql makes every
  * database request carrying a connector token read-only, because the token
@@ -48,6 +55,18 @@ export type ConnectorWriteContext = {
   anthropicApiKey: string | undefined;
   /** How long the lookups after the reply may run, as a Date.now() value. */
   lookupDeadline: number;
+  /**
+   * The service-role client per schema, for the writes Ask Dash's tools make
+   * (add_quick_note, add_idea, add_job_lead). Absent: those are refused.
+   */
+  db?: AskDb;
+  /** Writes a quick note into the person's vault Inbox. Absent: add_quick_note is refused. */
+  fileQuickNote?: (text: string) => Promise<QuickNoteFiled>;
+  /**
+   * The person's workspaces and day, from the token's lookup context
+   * (connectorAccess): a write into a workspace that is off is refused.
+   */
+  account?: { enabledModules: readonly ModuleId[]; today: string; timezone?: string };
 };
 
 export type ConnectorWriteTool = {
@@ -377,8 +396,91 @@ const LEARN_TOOLS: readonly ConnectorWriteTool[] = LEARN_WRITES.map((write) => (
   },
 }));
 
+/** Ask Dash's write tools the connector also offers, with what a client is told each does. */
+type SharedWrite = 'add_quick_note' | 'add_idea' | 'add_job_lead';
+
+function refuse(): never {
+  throw new AskInputError('That change cannot be made through this connection.');
+}
+
+/**
+ * One of Ask Dash's write tools, run for the connector: the same checks and
+ * the same write, on a context built from the service-role clients, then
+ * recorded in core.dash_actions as a routine's change (surface 'routine'), so
+ * Home lists it with an Undo. A quick note keeps the blob SHA it was written
+ * at, and Home's Undo takes its file out of the vault (undoneByVault).
+ */
+function sharedWrite(name: SharedWrite, description: string): ConnectorWriteTool {
+  const dash = WRITE_TOOLS.find((tool) => tool.name === name);
+  if (!dash) throw new Error(`Ask Dash has no write tool called ${name}.`);
+  return {
+    definition: { ...dash.definition, description },
+    async run(ctx, input) {
+      if (!ctx.db || !ctx.account) refuse();
+      const db = ctx.db;
+      const write = {
+        userId: ctx.userId,
+        today: ctx.account.today,
+        timezone: ctx.account.timezone,
+        enabledModules: ctx.account.enabledModules,
+        db,
+        searchSources: [],
+        // None of these three names a row it looked up, or writes a goal or a todo.
+        seen: () => false,
+        goals: async () => refuse(),
+        createTask: async () => refuse(),
+        fileQuickNote: ctx.fileQuickNote,
+      } satisfies DashWriteContext;
+      const result = await dash.apply(write, input);
+      if (!result.ok) return { ok: false, error: result.error };
+      const recorded = await recordDashAction(
+        { userId: ctx.userId, core: ctx.core, db },
+        {
+          surface: 'routine',
+          kind: result.kind,
+          subjectRef: result.subjectRef,
+          op: result.op,
+          summary: result.summary,
+          beforeValues: result.before,
+          undo: result.undo ?? null,
+        },
+      );
+      return {
+        ok: true,
+        rows: [result.row],
+        note: recorded
+          ? `${result.summary} It is listed on Home in Dash with an Undo.`
+          : `${result.summary} Its Undo could not be kept, so it is changed back on its page.`,
+      };
+    },
+  };
+}
+
+const addQuickNote = sharedWrite(
+  'add_quick_note',
+  'Save a quick thought to the person\'s vault in Dash, as a quick note in its Inbox, when they ask you to note, jot down or save a thought ("add this to my quick thoughts", "save this thought on Dash"). Write it word for word as they gave it. It waits in Quick note triage to be sorted, and is listed on Home with an Undo.',
+);
+
+const addIdea = sharedWrite(
+  'add_idea',
+  'File an idea on the ideas page in Dash\'s Dev workspace, when they ask you to note an idea for the app ("add an idea to Dev", "file that as an idea"). Write it as they said it, readable among other ideas, and name the workspace it is about when it is about one (jobs, goals, learn, vault, dev and so on). It is listed on Home with an Undo.',
+);
+
+const addJobLead = sharedWrite(
+  'add_job_lead',
+  'Save a job to the person\'s leads in Dash\'s Jobs workspace, when they ask you to ("add this job to my leads", a pasted posting link). Pass the posting link when there is one; the title and the company are read from the posting when it names them, so a bare link is enough. Pass the title and company when they named them. If the posting cannot be read or names no company, the call says what to ask them. It is listed on Home with an Undo.',
+);
+
 /** Every write the connector offers, in the order clients are sent them. */
-export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [addToReadingList, logLearning, markRead, ...LEARN_TOOLS];
+export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [
+  addToReadingList,
+  logLearning,
+  markRead,
+  addQuickNote,
+  addIdea,
+  addJobLead,
+  ...LEARN_TOOLS,
+];
 
 /** Run one write. Never throws: a bad input or a failed write is an error result the model can read. */
 export async function runConnectorWrite(

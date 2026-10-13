@@ -169,8 +169,9 @@ export async function runConnectorWriteTool(
     return text(rate.message, true);
   }
 
+  const { enabledModules, today, timezone } = session.ctx;
   const result = session.write
-    ? await runConnectorWrite(tool, session.write(caller.userId), input)
+    ? await runConnectorWrite(tool, { ...session.write(caller.userId), account: { enabledModules, today, timezone } }, input)
     : ({ ok: false, error: 'Changes cannot be made through this connection.' } as const);
   await logCall(log, { ...who, result });
   return result.ok ? text(JSON.stringify(withAbsoluteLinks(result, origin))) : text(result.error, true);
@@ -233,7 +234,7 @@ const handler = createMcpHandler(registerAskTools, {
   // limit that way. Without it, a listen is acknowledged and closed at once.
   capabilities: { tools: { listChanged: false } },
   instructions:
-    "Lookups over the person's own dashboard: their orders and spending, job applications, todos, goals, Obsidian vault notes, their Learn reading list and what they have studied, and what they have written about a topic anywhere in it. Every row comes back with a link to its page in the dashboard. Three tools change Learn: add_to_reading_list when they ask to save something to read, log_learning when they ask to record what a conversation covered, and mark_read when they say they finished something. Six more make the other Learn changes they ask for: change_reading, add_learn_track, add_track_reading, reword_concept, add_concept_note and change_video. Each change is listed on their Home page with an Undo.",
+    "Lookups over the person's own dashboard: their orders and spending, job applications, todos, goals, Obsidian vault notes, their Learn reading list and what they have studied, and what they have written about a topic anywhere in it. Every row comes back with a link to its page in the dashboard. Three tools change Learn: add_to_reading_list when they ask to save something to read, log_learning when they ask to record what a conversation covered, and mark_read when they say they finished something. Three more save what they ask you to: add_quick_note for a quick thought, add_idea for an idea for the app, and add_job_lead for a job from its posting link. Six more make the other Learn changes they ask for: change_reading, add_learn_track, add_track_reading, reword_concept, add_concept_note and change_video. Every change is listed on Home in Dash with an Undo.",
 });
 
 /**

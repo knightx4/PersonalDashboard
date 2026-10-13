@@ -1,4 +1,4 @@
-import { gap, none, type ModuleActions } from '@/lib/agent-actions/types';
+import { gap, none, tool, type ModuleActions } from '@/lib/agent-actions/types';
 
 /**
  * The actions that belong to no one workspace: signing in, the account, Ask,
@@ -74,7 +74,7 @@ export const coreActions: ModuleActions = {
   },
   'app/capture-actions.ts': {
     sortCaptureBox: none('page'),
-    fileCaptureBox: gap('Save a quick thought (plan #1896).'),
+    fileCaptureBox: tool('add_quick_note', 'add_todo', 'add_role_note', 'add_goal_step'),
     undoCaptureBox: none('theirs'),
     captureBoxCosts: none('page'),
   },

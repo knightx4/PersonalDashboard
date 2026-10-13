@@ -59,7 +59,7 @@ function ok(result: DashWriteResult): Extract<DashWriteResult, { ok: true }> {
 }
 
 /** Keeps a write as Ask does, then undoes it through Ask's Undo. */
-async function keepAndUndo(result: Extract<DashWriteResult, { ok: true }>) {
+async function keepAndUndo(result: Extract<DashWriteResult, { ok: true }>, undoVaultNote?: ChangeDeps['undoVaultNote']) {
   const client = fakeSchemaDb(tables);
   const core = client('core') as unknown as CoreSupabaseClient;
   const kept = await insertMadeChange(core, ME, 'conv-1', { ...result, undo: result.undo ?? null } as unknown as MadeDashChange);
@@ -73,6 +73,7 @@ async function keepAndUndo(result: Extract<DashWriteResult, { ok: true }>) {
     goals: async () => client('goals') as unknown as GoalsSupabaseClient,
     createTask: async () => ({ id: null, error: 'unused' }),
     now: () => '2026-10-03T12:00:00Z',
+    ...(undoVaultNote ? { undoVaultNote } : {}),
   };
   return { kept, undone: await undoChange(deps, kept.id) };
 }
@@ -377,6 +378,67 @@ describe('add_idea', () => {
   it('refuses a workspace that does not exist', async () => {
     const result = await apply('add_idea', { text: 'Something good', module: 'cooking' });
     expect(!result.ok && result.error).toContain('is not a workspace');
+  });
+});
+
+describe('add_quick_note', () => {
+  const NOTE = '00000000-0000-4000-8000-000000000d01';
+  const PATH = 'Inbox/AI and the death of software.md';
+  const thought = 'AI and the death of software.\nSoftware may become largely open source.';
+
+  /** Writes the note as fileVaultNote would, into the fake obsidian.notes. */
+  function filing(): DashWriteContext {
+    return {
+      ...context(['vault']),
+      fileQuickNote: async (text) => {
+        tables['obsidian.notes'].push({ id: NOTE, user_id: ME, path: PATH, title: 'AI and the death of software', body: text, blob_sha: 'sha-1', deleted_at: null });
+        return { ok: true, noteId: NOTE, path: PATH, title: 'AI and the death of software', blobSha: 'sha-1' };
+      },
+    };
+  }
+
+  beforeEach(() => {
+    tables['obsidian.notes'] = [];
+  });
+
+  it('saves the thought word for word in the vault Inbox, keeps the blob SHA, and Undo takes the file back out', async () => {
+    const result = ok(await apply('add_quick_note', { text: thought }, filing()));
+    expect(tables['obsidian.notes']).toEqual([expect.objectContaining({ body: thought, path: PATH })]);
+    expect(result).toMatchObject({
+      kind: 'add_quick_note',
+      op: 'insert',
+      subjectRef: `obsidian.notes:${NOTE}`,
+      input: { noteId: NOTE, path: PATH, body: thought },
+      undo: { vault_blob_sha: 'sha-1' },
+      row: { table: 'obsidian.notes', ref: NOTE, href: '/vault/n/Inbox/AI%20and%20the%20death%20of%20software.md' },
+      summary: 'Dash saved the quick note "AI and the death of software." to your vault\'s Inbox.',
+    });
+
+    const removed: unknown[] = [];
+    const { undone } = await keepAndUndo(result, async (action) => {
+      removed.push(action);
+      tables['core.dash_actions'] = tables['core.dash_actions'].map((row) =>
+        row.id === action.id ? { ...row, status: 'undone', undone_at: '2026-10-03T12:00:00Z' } : row,
+      );
+      return { ok: true };
+    });
+    expect(undone.ok).toBe(true);
+    expect(removed).toEqual([expect.objectContaining({ subjectRef: `obsidian.notes:${NOTE}`, undo: { vault_blob_sha: 'sha-1' } })]);
+  });
+
+  it('says why when the vault cannot write, and saves nothing', async () => {
+    const ctx: DashWriteContext = {
+      ...context(['vault']),
+      fileQuickNote: async () => ({ ok: false, error: 'Your vault token can read notes but not write them.' }),
+    };
+    const result = await apply('add_quick_note', { text: thought }, ctx);
+    expect(!result.ok && result.error).toBe('Your vault token can read notes but not write them.');
+  });
+
+  it('refuses while the Vault is switched off', async () => {
+    const result = await apply('add_quick_note', { text: thought }, { ...filing(), enabledModules: ['todo'] });
+    expect(!result.ok && result.error).toContain('Vault workspace is switched off');
+    expect(tables['obsidian.notes']).toEqual([]);
   });
 });
 
