@@ -22,7 +22,8 @@ export type AskSchema =
   | 'todo'
   | 'learn'
   | 'news'
-  | 'goals';
+  | 'goals'
+  | 'you';
 
 /** A supabase-js client bound to one schema; which one is the caller's business. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

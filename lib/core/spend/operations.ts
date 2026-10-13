@@ -217,6 +217,15 @@ export const SPEND_OPERATIONS = {
     // background, run by the overnight tick.
     'check-run-acts',
   ],
+  you: [
+    // Dash's read of a personality result against your notes (plan #1635),
+    // moved here from Learn with the results (#1991.2), keeping its name so
+    // its history stays one row. One Sonnet call when a result is saved,
+    // after the page has answered, and one more each time the button on the
+    // Personality tab asks for a fresh read. The notes are found with the
+    // cached trait sentences, under 'embed-note-match'.
+    'read-personality',
+  ],
 } as const;
 
 export type JobsOperation = (typeof SPEND_OPERATIONS.jobs)[number];
@@ -224,6 +233,7 @@ export type ShoppingOperation = (typeof SPEND_OPERATIONS.shopping)[number];
 export type CoreOperation = (typeof SPEND_OPERATIONS.core)[number];
 export type NewsOperation = (typeof SPEND_OPERATIONS.news)[number];
 export type GoalsOperation = (typeof SPEND_OPERATIONS.goals)[number];
+export type YouOperation = (typeof SPEND_OPERATIONS.you)[number];
 
 /** A module and one of its operations, as a pair that cannot be mismatched. */
 export type SpendOperation =
@@ -231,4 +241,5 @@ export type SpendOperation =
   | { module: 'shopping'; operation: ShoppingOperation }
   | { module: 'core'; operation: CoreOperation }
   | { module: 'news'; operation: NewsOperation }
-  | { module: 'goals'; operation: GoalsOperation };
+  | { module: 'goals'; operation: GoalsOperation }
+  | { module: 'you'; operation: YouOperation };

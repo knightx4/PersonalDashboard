@@ -18,15 +18,15 @@ describe('courseHit', () => {
     year: 2019,
   });
 
-  it('names the course by code and title and links its row on the Education tab', () => {
+  it('names the course by code and title and links its row on the Work & school tab', () => {
     expect(econ).toMatchObject({
-      module: 'vault',
+      module: 'you',
       kind: 'course',
       title: 'ECON 101 Principles of Economics',
       subtitle: 'Course · State University · Fall 2019',
-      href: '/vault/education#course-c1',
+      href: '/you/work#course-c1',
     });
-    expect(parseRef(econ.ref!)).toMatchObject({ table: 'obsidian.courses', id: 'c1' });
+    expect(parseRef(econ.ref!)).toMatchObject({ table: 'you.courses', id: 'c1' });
   });
 
   it('is found by its term and school as well as its title', () => {

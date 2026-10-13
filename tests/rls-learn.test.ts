@@ -131,7 +131,6 @@ describe('RLS coverage', () => {
       'note_reads',
       'opening_questions',
       'opening_sweeps',
-      'personality_results',
       'phrase_explanations',
       'piece_checks',
       'piece_practice',
@@ -2029,14 +2028,14 @@ describe('the channels found for a subject', () => {
 
 describe('courses read in from a transcript', () => {
   // 0086_course_reads.sql (plan #1389). One row per course from the vault's
-  // Education tab that has been read into Learn, with the track it went into.
+  // Work & school tab that has been read into Learn, with the track it went into.
   let transcriptA = '';
   let courseA = '';
   let subjectA = '';
 
   async function seedCourse(userId: string, transcriptId: string, title: string): Promise<string> {
     const [row] = await admin<{ id: string }[]>`
-      insert into obsidian.courses (user_id, transcript_id, school, title, position)
+      insert into you.courses (user_id, transcript_id, school, title, position)
       values (${userId}, ${transcriptId}, 'State University', ${title}, 0)
       returning id`;
     return row.id;
@@ -2044,7 +2043,7 @@ describe('courses read in from a transcript', () => {
 
   beforeAll(async () => {
     const [t] = await admin<{ id: string }[]>`
-      insert into obsidian.transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
+      insert into you.transcripts (user_id, school, file_name, storage_path, mime_type, size_bytes)
       values (${userA}, 'State University', 'record.pdf', ${`${userA}/${crypto.randomUUID()}-record.pdf`},
               'application/pdf', 1000)
       returning id`;
@@ -2102,14 +2101,14 @@ describe('courses read in from a transcript', () => {
       select subject_id from course_reads where course_id = ${courseA}`;
     expect(kept.subject_id).toBeNull();
 
-    await admin`delete from obsidian.courses where id = ${courseA}`;
+    await admin`delete from you.courses where id = ${courseA}`;
     expect(await admin`select id from course_reads where course_id = ${courseA}`).toHaveLength(0);
   });
 
   it('drops the record with the transcript its course came from', async () => {
     const course = await seedCourse(userA, transcriptA, 'Calculus I');
     await admin`insert into course_reads (user_id, course_id) values (${userA}, ${course})`;
-    await admin`delete from obsidian.transcripts where id = ${transcriptA}`;
+    await admin`delete from you.transcripts where id = ${transcriptA}`;
     expect(await admin`select id from course_reads where course_id = ${course}`).toHaveLength(0);
   });
 });
@@ -2257,75 +2256,6 @@ describe('clips cut from video transcripts', () => {
         (tx) => tx`insert into video_clip_cuts (user_id, video_id, came_from)
                    values (${userA}, 'abcdefghijk', 'channel')`,
       ),
-    ).rejects.toThrow();
-  });
-});
-
-describe('personality test results', () => {
-  // 0092_personality_results.sql (plan #1631). One row per test taken or
-  // typed in; a retake is a second row, and Dash's read sits on the result.
-  const answers = admin.json(Array.from({ length: 50 }, (_, i) => (i % 5) + 1));
-
-  it('saves a result and reads it back, to its owner only', async () => {
-    await asUser(
-      userA,
-      (tx) => tx`insert into personality_results (user_id, kind, test_name, answers, extraversion,
-                   agreeableness, conscientiousness, emotional_stability, intellect, taken_at)
-                 values (${userA}, 'big_five', 'Big Five', ${answers}, 22, 38, 31, 27, 44,
-                         '2026-10-01')`,
-    );
-    await asUser(
-      userA,
-      (tx) => tx`insert into personality_results (user_id, kind, test_name, typed_value, taken_at)
-                 values (${userA}, 'enneagram', 'Enneagram', '5w4', '2023-05-12')`,
-    );
-    const own = await asUser(
-      userA,
-      (tx) => tx`select kind, extraversion, intellect, typed_value, taken_at::text as taken_at,
-                        jsonb_array_length(answers) as n
-                 from personality_results order by taken_at desc`,
-    );
-    expect(own).toEqual([
-      { kind: 'big_five', extraversion: 22, intellect: 44, typed_value: null, taken_at: '2026-10-01', n: 50 },
-      { kind: 'enneagram', extraversion: null, intellect: null, typed_value: '5w4', taken_at: '2023-05-12', n: null },
-    ]);
-    expect(await asUser(userB, (tx) => tx`select id from personality_results`)).toHaveLength(0);
-  });
-
-  it("does not let a user write or change another account's result", async () => {
-    await expect(
-      asUser(
-        userB,
-        (tx) => tx`insert into personality_results (user_id, kind, test_name, typed_value)
-                   values (${userA}, 'mbti', 'Myers-Briggs', 'ESTP')`,
-      ),
-    ).rejects.toThrow();
-    await asUser(userB, (tx) => tx`update personality_results set typed_value = 'ESTP'`);
-    await asUser(userB, (tx) => tx`delete from personality_results`);
-    const left = await admin`select id from personality_results where user_id = ${userA}`;
-    expect(left).toHaveLength(2);
-  });
-
-  it('refuses a result of the wrong shape, and a half-written read', async () => {
-    await expect(
-      admin`insert into personality_results (user_id, kind, test_name, typed_value)
-            values (${userA}, 'big_five', 'Big Five', 'high')`,
-    ).rejects.toThrow();
-    await expect(
-      admin`insert into personality_results (user_id, kind, test_name, answers, extraversion,
-              agreeableness, conscientiousness, emotional_stability, intellect)
-            values (${userA}, 'big_five', 'Big Five', ${answers}, 9, 38, 31, 27, 44)`,
-    ).rejects.toThrow();
-    await expect(
-      admin`insert into personality_results (user_id, kind, test_name)
-            values (${userA}, 'mbti', 'Myers-Briggs')`,
-    ).rejects.toThrow();
-    await expect(
-      admin`insert into personality_results (user_id, kind, test_name, typed_value)
-            values (${userA}, 'astrology', 'Stars', 'Leo')`,
-    ).rejects.toThrow();
-    await expect(
-      admin`update personality_results set read_points = '[]'::jsonb where user_id = ${userA}`,
     ).rejects.toThrow();
   });
 });

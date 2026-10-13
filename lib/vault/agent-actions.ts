@@ -11,14 +11,6 @@ export const vaultActions: ModuleActions = {
     fileQuickNoteAction: GAP,
     searchTriagePlaces: none('page'),
   },
-  'app/vault/education/actions.ts': {
-    readTranscriptAction: none('spends'),
-    saveTranscriptAction: GAP,
-    discardUploadAction: none('page'),
-    updateCourseAction: GAP,
-    removeCourseAction: none('deletes'),
-    removeTranscriptAction: none('deletes'),
-  },
   'app/vault/map/actions.ts': {
     startSweep: none('spends'),
     stopSweep: none('spends'),

@@ -405,7 +405,7 @@ export function NowCallouts() {
       <Specimen label="Inset on sunken, rounded-control" source="app/goals/[goalId]/information-step.tsx:639">
         <div className="w-full rounded-control bg-sunken p-3 text-ui text-ink">Rent is due on the first.</div>
       </Specimen>
-      <Specimen label="Inset on sunken, rounded-md" source="app/learn/know/personality-section.tsx:192">
+      <Specimen label="Inset on sunken, rounded-md" source="app/you/personality/personality-section.tsx:191">
         <div className="w-full rounded-md bg-sunken p-3 text-ui text-ink">Rent is due on the first.</div>
       </Specimen>
       <Specimen label="Accent with a left rule" source="app/learn/now/feed.tsx:719">

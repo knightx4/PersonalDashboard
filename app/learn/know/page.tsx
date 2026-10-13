@@ -1,4 +1,4 @@
-import Link from '@/components/ui/link';
+import Link, { linkVariants } from '@/components/ui/link';
 import { Network, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/shell/page-header';
 import { buttonVariants } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import { AreasGrid, type OpenedThemes } from './areas-grid';
 import { destinationsFor, openedPlace, runnerUpOf, targetValue } from '@/lib/learn/areas/move';
 import { loadPlacedThemes } from '@/lib/learn/areas/themes-load';
 import { createVaultClient } from '@/lib/vault/auth/server';
+import { createYouClient } from '@/lib/you/auth/server';
 import { chooseTrackOffer } from '@/lib/learn/flow/offer';
 import { chooseRestingOffer } from '@/lib/learn/lessons/resting-load';
 import { TrackOffers } from '@/components/learn/track-offers';
@@ -32,19 +33,13 @@ import { CustomTrackForm } from './custom-track-form';
 import { PriorForm } from './prior-form';
 import { FromCoursesForm } from './from-courses-form';
 import { readsByCourse, type CourseRead, type CourseReadRow } from '@/lib/learn/graph/course-reads';
-import { groupCourses, type SchoolGroup } from '@/lib/vault/education';
-import type { Course, Transcript } from '@/lib/vault/transcripts';
+import { groupCourses, type SchoolGroup } from '@/lib/you/education';
+import type { Course, Transcript } from '@/lib/you/transcripts';
 import { loadQuizzes, type QuizListItem } from '@/lib/learn/quiz/load';
 import { QuizzesSection } from './quizzes';
 import { LearnGoalsLine } from './learn-goals-line';
 import { loadLearnAreaHref } from '@/lib/goals/learn-area';
 import { loadActiveAims } from '@/lib/learn/aims-store';
-import { createCoreClient } from '@/lib/core/auth/server';
-import { latestBigFive, type BigFiveResult, type TypedResult } from '@/lib/learn/personality/model';
-import { loadPersonalityResults } from '@/lib/learn/personality/store';
-import { loadTraitThemes } from '@/lib/learn/personality/trait-themes-load';
-import type { TraitThemes } from '@/lib/learn/personality/trait-themes';
-import { PersonalitySection } from './personality-section';
 import { PageColumn } from '@/components/shell/page-width';
 
 export const dynamic = 'force-dynamic';
@@ -168,9 +163,10 @@ export default async function KnowPage({
   let courseReads: Record<string, CourseRead> = {};
   let coursesFailed = false;
   try {
+    const you = await createYouClient();
     const [transcripts, courses, reads] = await Promise.all([
-      vault.from('transcripts').select('*'),
-      vault.from('courses').select('*').order('position'),
+      you.from('transcripts').select('*'),
+      you.from('courses').select('*').order('position'),
       supabase.from('course_reads').select('course_id, subject_id, concepts_added, read_at'),
     ]);
     if (transcripts.error || courses.error || reads.error) throw new Error('courses');
@@ -191,33 +187,6 @@ export default async function KnowPage({
   } catch (error) {
     console.error('[learn subjects] quizzes', error instanceof Error ? error.message : error);
     quizzesFailed = true;
-  }
-
-  // Your personality result (plan #1634), with the vault themes nearest each
-  // trait. A failed read leaves the section out rather than taking the page;
-  // themes that could not be matched are said inside it.
-  let personality: {
-    latest: BigFiveResult | null;
-    earlier: BigFiveResult[];
-    typed: TypedResult[];
-    themes: TraitThemes | null;
-  } | null = null;
-  try {
-    const results = await loadPersonalityResults(supabase);
-    const latest = latestBigFive(results);
-    personality = {
-      latest,
-      earlier: results.filter(
-        (r): r is BigFiveResult => r.kind === 'big_five' && r.id !== latest?.id,
-      ),
-      typed: results.filter((r): r is TypedResult => r.kind !== 'big_five'),
-      themes: latest
-        ? await loadTraitThemes(vault, user.id, latest.scores, { core: await createCoreClient() })
-        : null,
-    };
-  } catch (error) {
-    console.error('[learn personality]', error instanceof Error ? error.message : error);
-    personality = null;
   }
 
   const courseCount = courseGroups.reduce(
@@ -315,7 +284,16 @@ export default async function KnowPage({
           they sit after the subjects and before the ways of making one. */}
       <QuizzesSection quizzes={quizzes} failed={quizzesFailed} open={params.open === 'quizzes'} />
 
-      {personality && <PersonalitySection {...personality} />}
+      {/* Your personality results moved to You (plan #1991.2); one line
+          says where, for anyone who looked for them here. The old
+          #personality anchor lands on it. */}
+      <p id="personality" className="mt-8 scroll-mt-6 text-ui text-ink-muted">
+        Your personality results are on{' '}
+        <Link href="/you/personality" className={linkVariants()}>
+          You
+        </Link>
+        .
+      </p>
 
       {/* Naming a goal is the other way a track comes into being: the chain
           for one question first, and the curriculum around it. */}
