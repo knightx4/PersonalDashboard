@@ -20,6 +20,7 @@ import { companyFromBoardToken } from '@/lib/jobs/ats/company';
 import type { AppSupabaseClient } from '@/lib/jobs/db/schema-name';
 import { BULK_MAX, changeItems, ITEM_CHANGES } from './bulk-items';
 import { moveRoles, ROLE_STAGES } from './bulk-roles';
+import { LEARN_WRITE_TOOLS } from './learn-writes';
 
 /**
  * The changes Dash makes straight away when asked (plan #1440, feature
@@ -47,6 +48,8 @@ import { moveRoles, ROLE_STAGES } from './bulk-roles';
  *   move_roles       many job roles moved to one stage or archived, each
  *                    through the board's own move, with one Undo
  *                    (lib/dash/bulk-roles.ts, plan #1657).
+ *   Learn's six      a reading, a reading list, an idea or a video changed
+ *                    or added (lib/dash/learn-writes.ts, plan #1894.8).
  *
  * add_todo, add_goal_step and mark_returned were proposals the person
  * confirmed until now; they are checked by the same code (lib/ask/propose.ts)
@@ -1005,6 +1008,8 @@ export const WRITE_TOOLS: readonly DashWriteTool<DashWriteResult>[] = [
     },
     moveRoles,
   ),
+  // Learn's, which the connector offers too (plan #1894.8).
+  ...LEARN_WRITE_TOOLS,
 ];
 
 /** The names of the write tools, which are also the kinds their records carry. */

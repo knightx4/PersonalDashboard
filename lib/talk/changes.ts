@@ -4,6 +4,7 @@ import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
 import { CORE_SCHEMA, type CoreSupabaseClient } from '@/lib/core/db/schema-name';
 import { parseRef } from '@/lib/core/refs';
 import type { RoleStage } from '@/lib/dash/bulk-roles';
+import { LEARN_CHANGE_KINDS, type LearnChangeInput, type LearnChangeKind } from '@/lib/ask/learn-changes';
 import type { ApplicationStatus } from '@/lib/jobs/pipeline';
 
 /**
@@ -41,6 +42,8 @@ export const DASH_CHANGE_KINDS = [
   'change_items',
   'move_roles',
   'set_goal_done_when',
+  // Learn's, which share one card shape (lib/ask/learn-changes.ts, plan #1894.8).
+  ...LEARN_CHANGE_KINDS,
 ] as const;
 export type DashChangeKind = (typeof DASH_CHANGE_KINDS)[number];
 
@@ -88,6 +91,10 @@ export type DashChangeStatus = 'proposed' | 'done' | 'declined' | 'undone';
  *                  (lib/dash/bulk-roles.ts).
  * set_goal_done_when  the goal, the done-when it now has (null: cleared) and
  *                  the one it had before (notes 06d36ab2, fa2ac6fe).
+ * Learn's six     a reading changed, a reading list started, a reading added
+ *                  to one, an idea reworded, a note on an idea and a video
+ *                  marked or moved (plan #1894.8): the sentence and link the
+ *                  tool wrote, in one shape (lib/ask/learn-changes.ts).
  */
 export type DashChangeInput = {
   add_todo: { title: string; body: null; dueOn: string | null; dueTime: null; pinned: false };
@@ -134,7 +141,7 @@ export type DashChangeInput = {
     left: number;
   };
   set_goal_done_when: { id: string; title: string; doneWhen: string | null; previous: string | null };
-};
+} & Record<LearnChangeKind, LearnChangeInput>;
 
 /** The kinds Dash proposed for a Confirm before plan #1440, which keep their own undo in lib/ask/changes.ts. */
 export const PROPOSAL_KINDS: readonly DashChangeKind[] = ['add_todo', 'add_goal_step', 'mark_returned', 'start_watch'];

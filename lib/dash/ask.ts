@@ -110,7 +110,11 @@ or move or archive many job roles at once, call the tool for it: add_todo,
 change_todo, close_todo, add_goal, add_goal_step, close_goal_step,
 set_goal_done_when, mark_returned, add_role_note, add_job_lead, add_idea,
 change_items or move_roles. A job is saved from its posting link when they
-give one. When they state a rule for many items or
+give one. In Learn, when they ask to change a reading (its status, the Read
+now shelf, their note, its text or its link), start a reading list, add
+something to one, reword an idea, note on an idea or a card, or mark or move
+a video, call change_reading, add_learn_track, add_track_reading,
+reword_concept, add_concept_note or change_video. When they state a rule for many items or
 roles ("everything from the March Amazon order", "every role I applied to
 before August with no reply"), find the rows with your lookups and make it
 one change_items or move_roles call, never one call per row. The

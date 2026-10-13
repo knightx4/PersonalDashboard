@@ -24,11 +24,17 @@ function ctx(): ConnectorWriteContext {
 }
 
 describe('runConnectorWrite', () => {
-  it('offers the three writes', () => {
+  it('offers the three writes, then the rest of Learn (plan #1894.8)', () => {
     expect(CONNECTOR_WRITE_TOOLS.map((entry) => entry.definition.name)).toEqual([
       'add_to_reading_list',
       'log_learning',
       'mark_read',
+      'change_reading',
+      'add_learn_track',
+      'add_track_reading',
+      'reword_concept',
+      'add_concept_note',
+      'change_video',
     ]);
   });
 
@@ -40,6 +46,9 @@ describe('runConnectorWrite', () => {
     ['log_learning', { topic: 'Evals', summary: 'x', subject: 'Evals', ideas: [{ name: 'A' }] }, 'claim is required.'],
     ['mark_read', {}, 'title is required.'],
     ['mark_read', { reading_id: 'not-an-id' }, "reading_id must be a reading's id."],
+    ['change_reading', { reading_id: 'not-an-id' }, "reading_id must be a reading's id, as a lookup returned it."],
+    ['add_learn_track', {}, 'title is missing: name the reading list.'],
+    ['change_video', { video_id: 'short' }, 'video_id must be the YouTube video id, eleven characters, as a lookup returned it.'],
   ])('%s refuses %j', async (name, input, error) => {
     expect(await runConnectorWrite(tool(name), ctx(), input)).toEqual({ ok: false, error });
   });

@@ -15,6 +15,7 @@ import {
   type ChatItem,
 } from '@/lib/learn/chat/readings';
 import { cleanSubjectNames, resolveChatSubjects } from '@/lib/learn/chat/subjects';
+import { LEARN_WRITES, runLearnWrite } from '@/lib/dash/learn-writes';
 
 /**
  * The connector's write tools (plan #1808, under #1805): the few changes a
@@ -357,8 +358,27 @@ const markRead: ConnectorWriteTool = {
   },
 };
 
+/**
+ * The rest of Learn's changes (plan #1894.8, lib/dash/learn-writes.ts), the
+ * same tools Ask has, run here on the service-role client for the verified
+ * person and recorded as Dash's like the three above.
+ */
+const LEARN_TOOLS: readonly ConnectorWriteTool[] = LEARN_WRITES.map((write) => ({
+  definition: {
+    name: write.name,
+    description: `${write.description} The change is listed on the person's Home page with an Undo.`,
+    input_schema: write.input_schema,
+  },
+  async run(ctx, input) {
+    const made = await runLearnWrite(write, { userId: ctx.userId, learn: ctx.learn }, input);
+    if ('ok' in made) throw new AskInputError(made.error);
+    await record(ctx, made.subjectRef, made.op, made.kind, made.summary, made.before ?? undefined);
+    return { ok: true, rows: [made.row], note: made.summary };
+  },
+}));
+
 /** Every write the connector offers, in the order clients are sent them. */
-export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [addToReadingList, logLearning, markRead];
+export const CONNECTOR_WRITE_TOOLS: readonly ConnectorWriteTool[] = [addToReadingList, logLearning, markRead, ...LEARN_TOOLS];
 
 /** Run one write. Never throws: a bad input or a failed write is an error result the model can read. */
 export async function runConnectorWrite(
