@@ -81,6 +81,7 @@ export function UiKit() {
           </div>
           <div className="sm:col-span-2">
             <Label htmlFor="ui-kit-textarea">Notes</Label>
+            {/* ui-ok: the kit draws the field itself, not a composer over a list */}
             <Textarea id="ui-kit-textarea" defaultValue="Ask about the on-call rota." />
           </div>
           <InlineInput aria-label="Salary" defaultValue="$185,000" />
