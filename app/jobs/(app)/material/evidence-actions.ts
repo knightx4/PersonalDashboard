@@ -3,12 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient, requireUser } from '@/lib/jobs/auth/server';
+import { addEvidenceItems } from '@/lib/jobs/evidence/bank';
 import { proposeEvidenceFromSource } from '@/lib/jobs/evidence/propose';
 import type { SpendReport } from '@/lib/core/spend/pricing';
 import { recordSessionSpend } from '@/lib/core/spend/session';
 import {
   MAX_CANDIDATES,
-  normalizeSkills,
   type EvidenceCandidate,
   type EvidenceSourceKind,
 } from '@/lib/jobs/evidence/propose-payload';
@@ -331,19 +331,8 @@ export async function acceptEvidence(
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { error } = await supabase.from('evidence_items').insert(
-    parsed.data.items.map((item) => ({
-      user_id: user.id,
-      title: item.title,
-      body: item.body,
-      context: item.context || null,
-      metrics: item.metrics || null,
-      strength: item.strength,
-      skills: normalizeSkills(item.skills),
-    })),
-  );
-
-  if (error) return { added: 0, error: error.message };
+  const added = await addEvidenceItems(supabase, user.id, parsed.data.items);
+  if (!added.ok) return { added: 0, error: added.error };
 
   revalidatePath('/jobs/material');
   return { added: parsed.data.items.length, error: null };

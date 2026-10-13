@@ -232,6 +232,9 @@ export const OPERATION_GUESSES: Record<OperationName, OperationGuess> = {
   // The five pages' kept text (about 5,000 tokens each) and the draft in; a
   // heading and a sentence or two per claim out, for up to six claims.
   'judge-essay-claims': run(SONNET, 30_000, 3_000),
+  // The rules and an essay of up to 2,000 words (about 3,000 tokens) in; at
+  // most eight claims of a sentence or two out (plan #1873).
+  'name-essay-claims': run(SONNET, 3_500, 700),
   // One Wikipedia section in, a card for each of up to three ideas out.
   'write-asked-card': run(SONNET, 4_000, 2_000),
   // One idea's claim and basis and what was written in; the marks and a

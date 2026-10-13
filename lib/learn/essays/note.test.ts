@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseNote } from '@/lib/vault/markdown/note';
 import {
   buildEssayFrontmatter,
+  atLeastStage,
   essayDay,
   essayNoteBody,
   essayNoteText,
@@ -106,6 +107,29 @@ describe('rewriteEssayFile', () => {
     const raw = essayNoteText(FM, DRAFT).replace(/\n/g, '\r\n');
     const next = rewriteEssayFile(raw, 'New', { title: 'T', updated: '2026-10-14' }, FM);
     expect(next.replace(/\r\n/g, '')).not.toContain('\n');
+  });
+});
+
+describe('the stage Finish sets (plan #1873)', () => {
+  it('never lowers a stage', () => {
+    expect(atLeastStage('draft', 'seedling')).toBe('seedling');
+    expect(atLeastStage('budding', 'seedling')).toBe('budding');
+    expect(atLeastStage(undefined, 'seedling')).toBe('seedling');
+    expect(atLeastStage('mulch', 'seedling')).toBe('seedling');
+  });
+
+  it('raises a draft note to seedling and keeps a later stage', () => {
+    const raw = essayNoteText(FM, DRAFT);
+    const raised = rewriteEssayFile(raw, DRAFT, { title: FM.title, stage: 'seedling' }, FM);
+    expect(raised).toContain('stage: seedling\n');
+    expect(rewriteEssayFile(raised, DRAFT, { title: FM.title, stage: 'seedling' }, FM)).toBe(raised);
+    const budding = raw.replace('stage: draft', 'stage: budding');
+    expect(rewriteEssayFile(budding, DRAFT, { title: FM.title, stage: 'seedling' }, FM)).toContain('stage: budding\n');
+  });
+
+  it('gives a file with no frontmatter the stage', () => {
+    const next = rewriteEssayFile('Just text', 'New', { title: 'T', stage: 'seedling' }, FM);
+    expect(next).toContain('stage: seedling\n');
   });
 });
 

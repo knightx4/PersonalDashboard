@@ -219,6 +219,40 @@ describe('markChatReadingRead', () => {
   });
 });
 
+describe('logChatSession for an essay (plan #1873)', () => {
+  const input = {
+    topic: 'Why money is the odd good out',
+    question: null,
+    summary: 'Wrote an essay.',
+    ideas: [{ name: 'A', claim: 'b' }],
+    subject: null,
+    essayId: 'essay-1',
+  };
+
+  it('adds an entry linked to the essay, and no ideas to any subject', async () => {
+    const { learn, queries } = fakeLearn((query) =>
+      query.table === 'learning_log' && query.op === 'insert' ? { data: { id: 'log1' } } : { data: null },
+    );
+    const logged = await logChatSession(learn, 'me', input);
+    expect(logged).toEqual({ id: 'log1', conceptsAdded: 0, conceptsKnown: 0 });
+    expect(queries.find((query) => query.op === 'insert')!.values).toMatchObject({
+      user_id: 'me',
+      essay_id: 'essay-1',
+      subject_id: null,
+    });
+    expect(queries.some((query) => query.table === 'concepts')).toBe(false);
+  });
+
+  it('updates the essay’s earlier entry rather than adding a second', async () => {
+    const { learn, queries } = fakeLearn(() => ({ data: { id: 'log0' } }));
+    const logged = await logChatSession(learn, 'me', input);
+    expect(logged.id).toBe('log0');
+    expect(queries.some((query) => query.op === 'insert')).toBe(false);
+    const update = queries.find((query) => query.op === 'update')!;
+    expect(filterValue(update, 'eq', 'id')).toBe('log0');
+  });
+});
+
 describe('logChatSession', () => {
   it('logs the session and adds only the ideas the subject lacks, with no state', async () => {
     const { learn, queries } = fakeLearn((query) => {

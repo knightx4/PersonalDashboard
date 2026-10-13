@@ -167,12 +167,22 @@ export function essayNoteText(fm: EssayFrontmatter, draft: string, authorship?: 
   return withAuthorship(head, body, { ...authorship, marks: noteBodyMarks(draft, authorship.marks) }, '\n');
 }
 
+/**
+ * The later of two stages. Finishing sets a stage "at least" a given one, so
+ * a note the person already moved to budding in Obsidian is not set back.
+ */
+export function atLeastStage(current: unknown, minimum: EssayStage): EssayStage {
+  const have = isOneOf(ESSAY_STAGES, current) ? ESSAY_STAGES.indexOf(current) : -1;
+  return ESSAY_STAGES[Math.max(have, ESSAY_STAGES.indexOf(minimum))];
+}
+
 /** A frontmatter block at the very start of a file, with its closing line. */
 const BLOCK = /^---\r?\n([\s\S]*?\r?\n)?---[ \t]*(?:\r?\n|$)/;
 
 /**
  * The file with `title` and `updated` rewritten in its frontmatter and its
- * body replaced; without `updated` the date the file has is kept. Every other line of the frontmatter is kept as it was. A
+ * body replaced; without `updated` the date the file has is kept. With `stage`
+ * the note's stage is raised to it and never lowered (plan #1873). Every other line of the frontmatter is kept as it was. A
  * file with no frontmatter (someone removed it in Obsidian) gets a fresh
  * block from `fresh`, so the note is still found as an essay.
  *
@@ -183,13 +193,18 @@ const BLOCK = /^---\r?\n([\s\S]*?\r?\n)?---[ \t]*(?:\r?\n|$)/;
 export function rewriteEssayFile(
   raw: string,
   body: string,
-  change: { title: string; updated?: string },
+  change: { title: string; updated?: string; stage?: EssayStage },
   fresh: EssayFrontmatter,
   authorship?: EssayAuthorship,
 ): string {
   const match = raw.match(BLOCK);
   if (!match) {
-    const fm = { ...fresh, title: change.title, updated: change.updated ?? fresh.updated };
+    const fm = {
+      ...fresh,
+      title: change.title,
+      updated: change.updated ?? fresh.updated,
+      stage: change.stage ? atLeastStage(fresh.stage, change.stage) : fresh.stage,
+    };
     const written = essayNoteBody(body);
     if (!authorship || !written) return essayNoteText(fm, body);
     return withAuthorship(`${buildEssayFrontmatter(fm)}\n`, written, authorship, '\n');
@@ -206,6 +221,12 @@ export function rewriteEssayFile(
   };
   set('title', quoted(change.title));
   if (change.updated) set('updated', change.updated);
+  if (change.stage) {
+    const line = lines.find((entry) => entry.startsWith('stage:'));
+    const have = line?.slice('stage:'.length).trim().replace(/^["']|["']$/g, '');
+    const next = atLeastStage(have, change.stage);
+    if (next !== have) set('stage', next);
+  }
 
   const written = essayNoteBody(body);
   if (authorship && written) {

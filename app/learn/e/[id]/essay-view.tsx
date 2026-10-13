@@ -19,7 +19,7 @@ import {
   type EssayBrief,
   type EssayInterview,
 } from '@/lib/learn/essays/model';
-import { essayNoteBody } from '@/lib/learn/essays/note';
+import { essayNoteBody, type EssayStage } from '@/lib/learn/essays/note';
 import { essayParagraphs } from '@/lib/learn/essays/checks';
 import type { EssayNotes } from '@/lib/learn/essays/notes-store';
 import {
@@ -31,11 +31,13 @@ import {
 import type { Suggestion } from '@/lib/learn/essays/authorship-editor';
 import type { EssayVaultFailure } from '@/lib/learn/essays/vault';
 import {
+  finishEssay,
   rephraseEssaySelection,
   reloadEssayFromVault,
   saveEssayDraft,
   saveEssayToVaultAction,
   setEssayWordTarget,
+  type FinishResult,
   type TargetState,
   type VaultSaveResult,
 } from './actions';
@@ -43,6 +45,7 @@ import { EssayBriefFold, EssayInterviewCard } from './essay-brief';
 import { EssayNotesCard, noteRangesIn, useEssayNotes } from './essay-notes';
 import { EssayStudyCard, useEssayStudy, type StudyState } from './essay-study';
 import { EssayResearchCard, useEssayResearch } from './essay-research';
+import { EssayFinishCard, type FinishView } from './essay-finish';
 import { NO_RESEARCH, type EssayResearchRuns } from '@/lib/learn/essays/research';
 
 /** How long after the last keystroke the draft is saved. */
@@ -209,6 +212,49 @@ function useEssaySave(
     await draftTask();
   }, [draftTask, essay.id]);
 
+  /**
+   * Finish (plan #1873): the vault save, with the note's stage raised, and
+   * then the claims. It goes through the same queue as the other saves and
+   * keeps the same blob SHA, so what it wrote is what the next save starts from.
+   */
+  const finish = useCallback(
+    () =>
+      new Promise<FinishResult>((resolve) => {
+        void enqueue(async () => {
+          const body = latest.current;
+          const key = draftKey(body);
+          if (essayNoteBody(body.text) === '') {
+            resolve({ ok: false, error: 'Write something first; there is nothing to finish yet.' });
+            return;
+          }
+          setVault({ kind: 'saving' });
+          let result: FinishResult;
+          try {
+            result = await finishEssay(essay.id, body.text, draftMarksJson(body.marks), blobSha.current, browserTimeZone());
+          } catch {
+            result = { ok: false, error: 'The connection dropped, so the essay is not finished yet.' };
+          }
+          const kept = result.ok ? result : result.saved;
+          if (kept) {
+            blobSha.current = kept.blobSha;
+            inVault.current = key;
+            saved.current = key;
+            setPath(kept.path);
+            setDraft({ kind: 'saved', at: kept.savedAt });
+            setVault({ kind: 'saved', at: kept.savedAt });
+          } else if (!result.ok && result.reason) {
+            if (result.reason === 'changed') halted.current = true;
+            setVault({ kind: 'failed', reason: result.reason, error: result.error });
+          } else {
+            setVault({ kind: 'idle' });
+          }
+          resolve(result);
+          await draftTask();
+        });
+      }),
+    [draftTask, enqueue, essay.id],
+  );
+
   /** Cmd-S and the button are `asked`; leaving and the idle timer are not, and stop once the note has changed. */
   const saveToVault = useCallback(
     (asked: boolean) => {
@@ -294,7 +340,7 @@ function useEssaySave(
     };
   }, [flush, saveToVault]);
 
-  return { draft, vault, path, reloadError, change, saveToVault, reload };
+  return { draft, vault, path, reloadError, change, saveToVault, reload, finish };
 }
 
 /**
@@ -408,7 +454,7 @@ function TargetForm({ id, target, onSet }: { id: string; target: number | null; 
  * above the draft; once it is done or skipped the brief sits folded there
  * instead, and every answer can be edited in place.
  *
- * The rail holds the length and the vault note (plan #1866); later steps add
+ * The rail holds the length and the vault note (plan #1866) and Finish (plan #1873); later steps add
  * the margin notes and what you studied. On a phone it follows the text, so
  * the vault note and its save are there too; focus mode is laptop only.
  *
@@ -448,6 +494,8 @@ export function EssayView({
   originStudy,
   research = NO_RESEARCH,
   researchRunning = null,
+  finishView,
+  finishStage,
 }: {
   essay: Essay;
   initialVault?: VaultState;
@@ -465,6 +513,10 @@ export function EssayView({
   research?: EssayResearchRuns;
   /** A level drawn as running, for the gallery. */
   researchRunning?: 'first' | 'deeper' | null;
+  /** The Finish card drawn in this state, for the gallery (plan #1873). */
+  finishView?: FinishView;
+  /** The stage the gallery's finished essay is at. */
+  finishStage?: EssayStage;
 }) {
   const [doc, setDoc] = useState({ text: essay.draftBody, marks: essay.marks, version: 0 });
   const [words, setWords] = useState(() => countWords(essay.draftBody));
@@ -513,7 +565,7 @@ export function EssayView({
     },
     [essay.path],
   );
-  const { draft, vault, path, reloadError, change, saveToVault, reload } = useEssaySave(
+  const { draft, vault, path, reloadError, change, saveToVault, reload, finish } = useEssaySave(
     essay,
     initialVault,
     onReloaded,
@@ -739,6 +791,15 @@ export function EssayView({
           </Button>
         </CardSection>
       </Card>
+      <EssayFinishCard
+        essayId={essay.id}
+        finishedAt={essay.finishedAt}
+        inEvidenceBank={essay.inEvidenceBank}
+        canFinish={words > 0 && vault.kind !== 'saving'}
+        onFinish={finish}
+        initial={finishView}
+        stage={finishStage}
+      />
     </div>
   );
 

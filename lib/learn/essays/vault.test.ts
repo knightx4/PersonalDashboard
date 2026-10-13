@@ -155,6 +155,26 @@ describe('saveEssayToVault', () => {
     expect(stripAuthorshipBlock(parseNote(text, first.path).body)).toBe(`${next}\n`);
   });
 
+  it('raises the stage to seedling when finishing, on a first save and on a later one, and never lowers it', async () => {
+    const w = world();
+    const first = await saveEssayToVault(w.ports, { id: 'essay-1', body: DRAFT, blobSha: null, today: '2026-10-12', marks: [], self: 'Selvey', stage: 'seedling' });
+    if (!first.ok) throw new Error(first.error);
+    expect(w.files.get(first.path)!.text).toContain('stage: seedling\n');
+    expect(first.stage).toBe('seedling');
+
+    const w2 = world();
+    const draft = await saveEssayToVault(w2.ports, { id: 'essay-1', body: DRAFT, blobSha: null, today: '2026-10-12', marks: [], self: 'Selvey' });
+    if (!draft.ok) throw new Error(draft.error);
+    expect(w2.files.get(draft.path)!.text).toContain('stage: draft\n');
+    const finished = await saveEssayToVault(w2.ports, { id: 'essay-1', body: DRAFT, blobSha: draft.blobSha, today: '2026-10-13', marks: [], self: 'Selvey', stage: 'seedling' });
+    if (!finished.ok) throw new Error(finished.error);
+    expect(w2.files.get(draft.path)!.text).toContain('stage: seedling\n');
+    expect(finished.stage).toBe('seedling');
+
+    const again = await saveEssayToVault(w2.ports, { id: 'essay-1', body: DRAFT, blobSha: finished.blobSha, today: '2026-10-14', marks: [], self: 'Selvey', stage: 'seedling' });
+    expect(again).toMatchObject({ ok: true, commitSha: null, stage: 'seedling' });
+  });
+
   it('makes no commit when the vault already has the text', async () => {
     const w = world();
     const first = await saveEssayToVault(w.ports, { id: 'essay-1', body: DRAFT, blobSha: null, today: '2026-10-12', marks: [], self: 'Selvey' });

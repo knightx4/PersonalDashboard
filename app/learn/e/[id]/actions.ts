@@ -46,6 +46,7 @@ import {
 import { relatedNotes } from '@/lib/vault/notes/related';
 import {
   BRIEF_FIELDS,
+  essayTitle,
   parseWordTarget,
   readBrief,
   readInterview,
@@ -53,7 +54,7 @@ import {
   type EssayBrief,
   type EssayInterview,
 } from '@/lib/learn/essays/model';
-import { essayDay } from '@/lib/learn/essays/note';
+import { essayDay, type EssayStage } from '@/lib/learn/essays/note';
 import { collectSpend, recordLearnSpend } from '@/lib/learn/spend';
 import {
   adoptNoteVersion,
@@ -74,6 +75,21 @@ import { JUDGE_MODEL, RESEARCH_MODEL, runDeeperPass, runFirstPass } from '@/lib/
 import { insertEssayResearch } from '@/lib/learn/essays/research-store';
 import { costMicrosFor, totalMicros, type SpendReport } from '@/lib/core/spend/pricing';
 import { essayFromVault, saveEssayToVault, type EssayVaultFailure } from '@/lib/learn/essays/vault';
+import {
+  claimNote,
+  essayEvidence,
+  logEntry,
+  MAX_CLAIMS,
+  type EssayClaim,
+  type OfferedClaim,
+} from '@/lib/learn/essays/finish';
+import { nameEssayClaims } from '@/lib/learn/essays/finish-model';
+import { loadFinishRow, markFinished, recordEvidenceItem } from '@/lib/learn/essays/finish-store';
+import { logChatSession } from '@/lib/learn/chat/readings';
+import { addEvidenceItems } from '@/lib/jobs/evidence/bank';
+import { createClient as createJobsClient } from '@/lib/jobs/auth/server';
+import { createCapturedNote } from '@/lib/vault/notes/create';
+import { INBOX_FOLDER, noteHref } from '@/lib/vault/paths';
 import { createVaultClient } from '@/lib/vault/auth/server';
 import { noteCreatePorts, noteSavePorts, openConnectedSource } from '@/lib/vault/db/ports';
 import { embedVaultNotes } from '@/lib/vault/notes/embed';
@@ -146,7 +162,7 @@ export async function setEssayWordTarget(_prev: TargetState, formData: FormData)
 }
 
 export type VaultSaveResult =
-  | { ok: true; savedAt: string; path: string; blobSha: string }
+  | { ok: true; savedAt: string; path: string; blobSha: string; stage?: EssayStage }
   | { ok: false; reason: EssayVaultFailure; error: string };
 
 const VaultInput = DraftInput.extend({
@@ -177,12 +193,21 @@ export async function saveEssayToVaultAction(
   if (!parsed.success) {
     return { ok: false, reason: 'error', error: parsed.error.issues[0]?.message ?? 'Could not save.' };
   }
+  return writeEssayToVault(user.id, parsed.data);
+}
+
+/** The vault save both Save to vault and Finish make; `stage` raises the note's stage (plan #1873). */
+async function writeEssayToVault(
+  userId: string,
+  data: z.infer<typeof VaultInput>,
+  stage?: EssayStage,
+): Promise<VaultSaveResult> {
   const [supabase, vault] = await Promise.all([createLearnClient(), createVaultClient()]);
   const embed = () => {
     after(async () => {
       try {
         await embedVaultNotes(vault, await createCoreClient(), {
-          userId: user.id,
+          userId: userId,
           deadline: Date.now() + EMBED_AFTER_SAVE_MS,
         });
       } catch (error) {
@@ -193,7 +218,7 @@ export async function saveEssayToVaultAction(
 
   const now = new Date();
   try {
-    const self = await selfName(user.id);
+    const self = await selfName(userId);
     const result = await saveEssayToVault(
       {
         loadEssay: (essayId) => loadVaultEssay(supabase, essayId),
@@ -204,18 +229,19 @@ export async function saveEssayToVaultAction(
         now: () => now,
       },
       {
-        id: parsed.data.id,
-        body: parsed.data.body,
-        blobSha: parsed.data.blobSha,
-        today: essayDay(now, parsed.data.timeZone),
-        marks: marksOf(parsed.data),
+        id: data.id,
+        body: data.body,
+        blobSha: data.blobSha,
+        today: essayDay(now, data.timeZone),
+        marks: marksOf(data),
         self,
+        stage,
       },
     );
     if (!result.ok) return result;
     revalidatePath('/learn/essays');
     revalidatePath('/vault');
-    return { ok: true, savedAt: now.toISOString(), path: result.path, blobSha: result.blobSha };
+    return { ok: true, savedAt: now.toISOString(), path: result.path, blobSha: result.blobSha, stage: result.stage };
   } catch (error) {
     console.error('[essay vault]', error instanceof Error ? error.message : error);
     return { ok: false, reason: 'error', error: 'The essay could not be saved to your vault. Try again in a moment.' };
@@ -852,4 +878,232 @@ export async function researchEssay(id: string, level: string, doc: string): Pro
 function runCost(reports: SpendReport[]): number | null {
   const { micros, unpriced } = totalMicros(reports.map((report) => costMicrosFor(report.model, report.usage)));
   return unpriced > 0 ? null : micros;
+}
+
+/** A note this close to a claim is taken to hold it already, so no new note is offered. */
+const CLAIM_IN_VAULT_SIMILARITY = 0.78;
+
+export type FinishResult =
+  | {
+      ok: true;
+      savedAt: string;
+      path: string;
+      blobSha: string;
+      /** The claims the essay argues, each with the vault note that already holds it, if any. */
+      claims: OfferedClaim[];
+      /** True when the essay is already in the evidence bank, so the offer is not made again. */
+      inEvidenceBank: boolean;
+      finishedAt: string;
+      /** The stage the note is at after the save, seedling or later. */
+      stage: EssayStage;
+    }
+  | {
+      ok: false;
+      error: string;
+      /** Set when the note was written before Finish stopped, so the editor keeps its new blob SHA. */
+      saved?: { savedAt: string; path: string; blobSha: string };
+      reason?: EssayVaultFailure;
+    };
+
+/**
+ * Finish the essay (plan #1873; spec, "Finishing and publishing"). It writes
+ * the note to the vault with its stage raised to at least seedling, has Dash
+ * name the claims the essay argues, logs the essay in the learning log with
+ * them, and finds which claims your vault has no note for. The notes and the
+ * evidence-bank item are offered, not made: `acceptEssayFinish` makes the
+ * ones chosen. Pressing Finish again updates the log entry and offers again.
+ */
+// latency: pending
+export async function finishEssay(
+  id: string,
+  body: string,
+  marks: MarksPayload,
+  blobSha: string | null,
+  timeZone: string | null,
+): Promise<FinishResult> {
+  const user = await requireUser();
+  const parsed = VaultInput.safeParse({ id, body, marks, blobSha, timeZone });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Could not finish the essay.' };
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return { ok: false, error: 'Finish needs the Anthropic key, which is not set on this deployment.' };
+
+  const saved = await writeEssayToVault(user.id, parsed.data, 'seedling');
+  if (!saved.ok) return { ok: false, error: saved.error, reason: saved.reason };
+  const kept = { savedAt: saved.savedAt, path: saved.path, blobSha: saved.blobSha };
+
+  try {
+    const learn = await createLearnClient();
+    const row = await loadFinishRow(learn, parsed.data.id);
+    if (!row) return { ok: false, error: 'That essay is not there any more.', saved: kept };
+    const brief = readBrief(row.brief);
+    const title = essayTitle(parsed.data.body, row.path);
+
+    const spend = collectSpend();
+    const named = await nameEssayClaims({
+      title,
+      claim: brief.claim,
+      draft: parsed.data.body,
+      anthropicApiKey: apiKey,
+      onSpend: spend.sink,
+    });
+    await recordLearnSpend(user.id, 'name-essay-claims', spend.reports);
+    if (!named.ok) {
+      console.error('[essay finish] claims', named.detail);
+      return {
+        ok: false,
+        error:
+          'Your essay is saved to the vault, but Dash could not read its claims just now. Press Finish again in a moment.',
+        saved: kept,
+      };
+    }
+
+    const entry = logEntry({ title, claim: brief.claim, claims: named.claims });
+    await logChatSession(learn, user.id, {
+      ...entry,
+      ideas: named.claims,
+      subject: null,
+      essayId: parsed.data.id,
+    });
+
+    // Which claims the vault already holds: the nearest note to each, kept
+    // when it is close enough. An embedding that fails leaves the claim new.
+    const [vault, core] = await Promise.all([createVaultClient(), createCoreClient()]);
+    const claims: OfferedClaim[] = await Promise.all(
+      named.claims.map(async (claim) => {
+        const [near] = await relatedNotes(vault, user.id, `${claim.name}. ${claim.claim}`, {
+          core,
+          limit: 1,
+          minSimilarity: CLAIM_IN_VAULT_SIMILARITY,
+          exclude: row.noteId ? [row.noteId] : [],
+        });
+        return { ...claim, existing: near ? { title: near.title, href: near.href } : null };
+      }),
+    );
+
+    const finishedAt = new Date().toISOString();
+    await markFinished(learn, parsed.data.id, finishedAt);
+    revalidatePath('/learn/essays');
+    return {
+      ok: true,
+      ...kept,
+      claims,
+      inEvidenceBank: Boolean(row.evidenceItemId),
+      finishedAt,
+      stage: saved.stage ?? 'seedling',
+    };
+  } catch (error) {
+    console.error('[essay finish]', error instanceof Error ? error.message : error);
+    return {
+      ok: false,
+      error: 'Your essay is saved to the vault, but Finish could not complete. Press Finish again in a moment.',
+      saved: kept,
+    };
+  }
+}
+
+const AcceptInput = z.object({
+  id: z.string().uuid(),
+  claims: z
+    .array(z.object({ name: z.string().trim().min(1).max(120), claim: z.string().trim().min(1).max(600) }))
+    .max(MAX_CLAIMS),
+  /** The names of the claims to make a note for. */
+  create: z.array(z.string().max(120)).max(MAX_CLAIMS),
+  evidence: z.boolean(),
+  timeZone: z.string().max(64).nullable(),
+});
+
+export type AcceptFinishResult =
+  | {
+      ok: true;
+      created: { name: string; href: string }[];
+      failed: string[];
+      evidence: 'added' | 'already' | 'skipped' | 'failed';
+      error: string | null;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Make what the person chose after Finish: a short note in `Inbox/` for each
+ * claim ticked, and one evidence-bank item linking to the essay. The
+ * evidence item is made once an essay: asking again finds it there.
+ */
+// latency: pending
+export async function acceptEssayFinish(
+  id: string,
+  claims: EssayClaim[],
+  create: string[],
+  evidence: boolean,
+  timeZone: string | null,
+): Promise<AcceptFinishResult> {
+  const user = await requireUser();
+  const parsed = AcceptInput.safeParse({ id, claims, create, evidence, timeZone });
+  if (!parsed.success) return { ok: false, error: 'Could not add those.' };
+  const input = parsed.data;
+
+  try {
+    const learn = await createLearnClient();
+    const row = await loadFinishRow(learn, input.id);
+    if (!row) return { ok: false, error: 'That essay is not there any more.' };
+    const brief = readBrief(row.brief);
+    const title = essayTitle(row.draftBody, row.path);
+
+    const chosen = input.claims.filter((claim) => input.create.includes(claim.name));
+    const created: { name: string; href: string }[] = [];
+    const failed: string[] = [];
+    let error: string | null = null;
+    if (chosen.length > 0) {
+      const vault = await createVaultClient();
+      const embed = () => {
+        after(async () => {
+          try {
+            await embedVaultNotes(vault, await createCoreClient(), {
+              userId: user.id,
+              deadline: Date.now() + EMBED_AFTER_SAVE_MS,
+            });
+          } catch (e) {
+            console.error('[essay finish] note embedding', e instanceof Error ? e.message : e);
+          }
+        });
+      };
+      const ports = noteCreatePorts({ supabase: vault, afterSave: embed });
+      // One at a time: each is a commit to the same repository.
+      for (const claim of chosen) {
+        const made = await createCapturedNote(ports, claimNote(claim, title), claim.name, INBOX_FOLDER);
+        if (made.ok) created.push({ name: claim.name, href: noteHref(made.path) });
+        else {
+          failed.push(claim.name);
+          error = made.error;
+        }
+      }
+      if (created.length > 0) revalidatePath('/vault');
+    }
+
+    let bank: 'added' | 'already' | 'skipped' | 'failed' = 'skipped';
+    if (input.evidence) {
+      if (row.evidenceItemId) bank = 'already';
+      else {
+        const item = essayEvidence({
+          id: input.id,
+          title,
+          claim: brief.claim,
+          claims: input.claims,
+          finishedOn: essayDay(new Date(), input.timeZone),
+        });
+        const added = await addEvidenceItems(await createJobsClient(), user.id, [item]);
+        if (added.ok && added.ids[0]) {
+          await recordEvidenceItem(learn, input.id, added.ids[0]);
+          bank = 'added';
+          revalidatePath('/jobs/material');
+        } else {
+          bank = 'failed';
+          if (!added.ok) console.error('[essay finish] evidence', added.error);
+          error = error ?? 'The essay could not be added to your evidence bank. Try again in a moment.';
+        }
+      }
+    }
+    return { ok: true, created, failed, evidence: bank, error };
+  } catch (error) {
+    console.error('[essay finish] accept', error instanceof Error ? error.message : error);
+    return { ok: false, error: 'Could not add those just now. Try again in a moment.' };
+  }
 }
