@@ -143,7 +143,7 @@ const DRAWINGS: Record<Exclude<MarkShape, 'dash'>, Drawing> = {
   },
 };
 
-export type MarkFinish = 'solid' | 'glow' | 'soft' | 'rim' | 'lens' | 'lens-crisp' | 'glint' | 'glint-tint';
+export type MarkFinish = 'solid' | 'glow' | 'soft' | 'rim' | 'lens' | 'lens-crisp' | 'glint' | 'glint-tint' | 'glint-glow' | 'glint-color';
 
 /**
  * How each finish lights the pane. `top` and `bottom` are how much of the
@@ -174,6 +174,8 @@ const FINISHES: Record<
   'lens-crisp': { top: 0, bottom: 0, sheen: 0, halo: 0, core: 0, highlight: 0, back: 0, rim: 0, shadow: true },
   glint: { top: 0, bottom: 0, sheen: 0, halo: 0, core: 0, highlight: 0, back: 0, rim: 0, shadow: true },
   'glint-tint': { top: 0, bottom: 0, sheen: 0, halo: 0, core: 0, highlight: 0, back: 0, rim: 0, shadow: true },
+  'glint-glow': { top: 0, bottom: 0, sheen: 0, halo: 0, core: 0, highlight: 0, back: 0, rim: 0, shadow: true },
+  'glint-color': { top: 0, bottom: 0, sheen: 0, halo: 0, core: 0, highlight: 0, back: 0, rim: 0, shadow: true },
 };
 
 /**
@@ -187,15 +189,16 @@ function GlintObject({
   from,
   to,
   px,
-  tint,
+  mode,
 }: {
   id: string;
   drawing: Drawing;
   from: string;
   to: string;
   px: number;
-  tint: boolean;
+  mode: 'smoke' | 'tint' | 'glow' | 'color';
 }) {
+  const tint = mode !== 'smoke';
   const { back, front, frontTransform, lines, dots, onBack } = drawing;
   const pane = (props: React.SVGProps<SVGPathElement>) => <path d={front} transform={frontTransform} {...props} />;
   const weight = px <= 22 ? 2 : px <= 34 ? 1.65 : 1.35;
@@ -209,8 +212,14 @@ function GlintObject({
     </>
   );
   // Smoked, but not near-black: enough of the hue in the glass that it reads as coloured glass.
-  const glassTop = tint ? `color-mix(in srgb, ${from} 55%, ${to})` : `color-mix(in srgb, ${to} 50%, #2a2e3d)`;
-  const glassBottom = tint ? `color-mix(in srgb, ${to} 80%, #1a1c26)` : `color-mix(in srgb, ${to} 34%, #1b1e29)`;
+  const GLASS = {
+    smoke: [`color-mix(in srgb, ${to} 50%, #2a2e3d)`, `color-mix(in srgb, ${to} 34%, #1b1e29)`],
+    tint: [`color-mix(in srgb, ${from} 55%, ${to})`, `color-mix(in srgb, ${to} 80%, #1a1c26)`],
+    // No dark in either: the glass stays within the hue, light to mid.
+    glow: [`color-mix(in srgb, ${from} 70%, ${to})`, `color-mix(in srgb, ${from} 40%, ${to})`],
+    color: [from, `color-mix(in srgb, ${from} 50%, ${to})`],
+  } as const;
+  const [glassTop, glassBottom] = GLASS[mode];
 
   return (
     <>
@@ -262,6 +271,10 @@ function GlintObject({
       <g opacity={0.4} filter={`url(#${id}-blur)`} transform="translate(0 1.6)" fill="#000">
         {pane({})}
       </g>
+      {mode === 'glow' && (
+        // A soft halo of the colour round the glass.
+        <g opacity={0.35} filter={`url(#${id}-blur)`}>{pane({ fill: from })}</g>
+      )}
       {/* The colour behind the glass. */}
       <g fill={`url(#${id}-back)`}>{back}</g>
       {onBack && (
@@ -278,6 +291,12 @@ function GlintObject({
         {!tint && (
           <g filter={`url(#${id}-blur)`} opacity={0.5} transform="translate(12 15) scale(.7 .55) translate(-12 -15)">
             {pane({ fill: from })}
+          </g>
+        )}
+        {mode === 'glow' && (
+          // Light from inside, held low in the pane so the detail stays clear of it.
+          <g filter={`url(#${id}-blur)`} opacity={0.7} transform="translate(12 19) scale(.75 .4) translate(-12 -19)">
+            {pane({ style: { fill: `color-mix(in srgb, ${from} 50%, #fff)` } })}
           </g>
         )}
       </g>
@@ -565,14 +584,16 @@ export function ModuleMark({
         {key.shape === 'dash' ? (
           <HomePlate id={id} />
         ) : (
-          finish === 'glint' || finish === 'glint-tint' ? (
+          finish === 'glint' || finish === 'glint-tint' || finish === 'glint-glow' || finish === 'glint-color' ? (
             <GlintObject
               id={id}
               drawing={DRAWINGS[key.shape]}
               from={key.from}
               to={key.to}
               px={sizing.px}
-              tint={finish === 'glint-tint'}
+              mode={
+                finish === 'glint-tint' ? 'tint' : finish === 'glint-glow' ? 'glow' : finish === 'glint-color' ? 'color' : 'smoke'
+              }
             />
           ) : finish === 'lens' || finish === 'lens-crisp' ? (
             <LensObject
