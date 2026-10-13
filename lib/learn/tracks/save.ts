@@ -413,6 +413,32 @@ export async function setReadingNote(
 }
 
 /**
+ * Keep Dash's summary on the reading, replacing any it had (plan #1876.4).
+ *
+ * Returns false when no row of yours matched, the same as setReadingText.
+ */
+export async function setReadingSummary(
+  supabase: LearnSupabaseClient,
+  readingId: string,
+  summary: { text: string; from: 'given' | 'link'; label: string; truncated: boolean },
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('readings')
+    .update({
+      summary: summary.text,
+      summary_at: new Date().toISOString(),
+      summary_from: summary.from,
+      summary_label: summary.label,
+      summary_truncated: summary.truncated,
+    })
+    .eq('id', readingId)
+    .select('id');
+  assertSchemaExposed(error, LEARN_SCHEMA);
+  if (error) throw messageFor('Saving the summary', error);
+  return (data?.length ?? 0) > 0;
+}
+
+/**
  * Keep the text of a reading on the reading, or clear it with null.
  *
  * Returns false when no row of yours matched, so a reading that is not yours

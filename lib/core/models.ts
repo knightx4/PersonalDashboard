@@ -134,6 +134,8 @@ export const MODELS = {
   learnWriteLesson: SONNET,
   /** lib/learn/locate/locate.ts */
   learnLocate: HAIKU,
+  /** lib/learn/tracks/reading-summary-model.ts, Summarize on a reading's page */
+  learnReadingSummary: SONNET,
   /** lib/learn/quiz/generate.ts */
   learnQuiz: HAIKU,
   /** lib/learn/survey/goal-idea.ts */
