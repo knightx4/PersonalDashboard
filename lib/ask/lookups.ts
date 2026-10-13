@@ -16,7 +16,7 @@ import { noteHref } from '@/lib/vault/paths';
 import { transcriptHref } from '@/lib/vault/education';
 import { recordSpend, type SpendClient } from '@/lib/core/spend/record';
 import { fileHref } from '@/lib/files/files';
-import { refHref } from '@/lib/core/refs';
+import { refHref, toRef } from '@/lib/core/refs';
 import type { Author } from '@/lib/memory/passages';
 import {
   DEV_MEMORY_SOURCES,
@@ -199,6 +199,8 @@ export async function openLookup(ctx: AskContext, input: Input): Promise<AskTool
   const href = (BETTER_HREFS[table] ?? source.href!)(canonical);
   const detail: Record<string, string | null> = {};
   for (const column of source.search) detail[column] = clip(asText(row[column]), 1500);
+  const comments = typeof row.id === 'string' ? await rowThread(ctx, table, row.id) : null;
+  if (comments) detail.comments = comments;
 
   return {
     ok: true,
@@ -212,6 +214,42 @@ export async function openLookup(ctx: AskContext, input: Input): Promise<AskTool
       },
     ],
   };
+}
+
+/** The most recent comments open_row reads from under a row. */
+export const ROW_THREAD_TURNS = 8;
+
+/**
+ * The newest comments under a row, oldest of them first, one line each.
+ *
+ * Prepare with Dash and a comment tagged @dash both answer on the row's own
+ * thread, so this is where "did that finish, and where is it" is answered
+ * (notes 1527e0bf, ae78d95e). A thread that cannot be read leaves the row as
+ * it was rather than failing the open.
+ */
+async function rowThread(ctx: AskContext, table: string, id: string): Promise<string | null> {
+  try {
+    const { data, error } = await (await ctx.db('core'))
+      .from('thread_turns')
+      .select('author, body, created_at')
+      .eq('user_id', ctx.userId)
+      .eq('ref', toRef(table, id))
+      .order('created_at', { ascending: false })
+      .limit(ROW_THREAD_TURNS);
+    if (error) throw new Error(error.message);
+    const turns = (data ?? []) as unknown as { author: string; body: string; created_at: string }[];
+    if (turns.length === 0) return null;
+    return turns
+      .reverse()
+      .map((turn) => {
+        const who = turn.author === 'claude' ? 'Dash' : turn.author === 'me' ? 'You' : turn.author;
+        return `[${turn.created_at.slice(0, 16).replace('T', ' ')}] ${who}: ${clip(turn.body, 1200)}`;
+      })
+      .join('\n');
+  } catch (error) {
+    console.error('ask open_row thread', error instanceof Error ? error.message : error);
+    return null;
+  }
 }
 
 function asText(value: unknown): string | null {

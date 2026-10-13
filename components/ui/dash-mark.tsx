@@ -227,6 +227,7 @@ export function DashGlyph({
   tone = 'current',
   runner,
   moment,
+  still = false,
 }: {
   /** Unique per mark: names its gradients, filter and clip. */
   id: string;
@@ -235,6 +236,8 @@ export function DashGlyph({
   tone?: DashTone;
   runner?: DashRunner;
   moment?: DashMoment;
+  /** Unlit: no glow past the visor and no breathing. See DashMark's `still`. */
+  still?: boolean;
 }) {
   const visor: Visor = runner ? RUNNERS[runner].visor : 'capsule';
   const ramp: readonly string[] = runner
@@ -254,14 +257,16 @@ export function DashGlyph({
   const d = visorPath(visor, cy);
   const ey = visor === 'shield' ? cy - 0.6 : cy;
 
-  const coreMotion = lean
+  const coreMotion = still
+    ? undefined
+    : lean
     ? 'dash-mark-pulse'
     : state === 'asleep'
       ? 'dash-mark-ember'
       : failed
         ? undefined
         : 'dash-mark-glow';
-  const coreStrength = state === 'asleep' ? 0.35 : 1;
+  const coreStrength = still || state === 'asleep' ? 0.35 : 1;
   const core =
     visor === 'capsule' ? (
       <rect x={6.4} y={cy - 2.8} width={11.2} height={5.6} rx={2.8} fill={paint} />
@@ -331,7 +336,7 @@ export function DashGlyph({
 
   let body = (
     <>
-      {!failed && (
+      {!failed && !still && (
         <g opacity={coreStrength * 0.85}>
           <g filter={`url(#${id}-blur)`} className={coreMotion}>
             {core}
@@ -510,6 +515,7 @@ export function DashMark({
   size = 'icon',
   label,
   decorative = false,
+  still = false,
   className,
 }: {
   state?: DashState;
@@ -535,6 +541,12 @@ export function DashMark({
    * and what it is doing, where the name would be read twice.
    */
   decorative?: boolean;
+  /**
+   * Unlit: the core is dimmed, nothing glows past the visor and nothing
+   * breathes. For a Dash that is not running, such as a runner slot asleep
+   * or off, so only the ones at work glow (note bfe0d726).
+   */
+  still?: boolean;
   className?: string;
 }) {
   const id = `dash-mark-${useId().replace(/:/g, '')}`;
@@ -553,7 +565,15 @@ export function DashMark({
       {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': name })}
     >
       <svg width={sizing.px} height={sizing.px} viewBox="0 0 24 24" fill="none" overflow="visible" aria-hidden>
-        <DashGlyph id={id} state={state} activity={kind} tone={tone} runner={runner} moment={moment} />
+        <DashGlyph
+          id={id}
+          state={state}
+          activity={kind}
+          tone={tone}
+          runner={runner}
+          moment={moment}
+          still={still}
+        />
       </svg>
     </span>
   );

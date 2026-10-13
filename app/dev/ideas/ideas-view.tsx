@@ -150,7 +150,7 @@ function AddIdea() {
  * has happened the button becomes the link to what it became, because
  * shaping the same idea twice would put two features in the plan.
  */
-function ShapeIdea({ idea }: { idea: IdeaRow }) {
+export function ShapeIdea({ idea }: { idea: IdeaRow }) {
   const [state, action, pending] = useActionState(shapeIdea, {} as IdeaActionState);
 
   if (idea.planItem) {
