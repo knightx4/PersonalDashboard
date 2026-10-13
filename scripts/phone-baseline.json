@@ -22,7 +22,7 @@
   },
   "dev-ui": {
     "targets": 55,
-    "contrast": 11
+    "contrast": 3
   },
   "goals-all": {
     "targets": 3
@@ -67,7 +67,7 @@
     "targets": 1
   },
   "jobs-role-new": {
-    "targets": 8
+    "targets": 7
   },
   "jobs-role-posting": {
     "targets": 1
@@ -100,23 +100,20 @@
   "news-issue-digest-no-pictures": {
     "targets": 2
   },
-  "news-quick-caught-up": {
-    "targets": 3
-  },
   "news-quick-essay": {
-    "targets": 4
+    "targets": 1
   },
   "news-quick-in-shell": {
-    "targets": 8
+    "targets": 5
   },
   "news-quick-page": {
-    "targets": 8
+    "targets": 5
   },
   "news-quick-page-full": {
-    "targets": 8
+    "targets": 5
   },
   "news-quick-story": {
-    "targets": 8
+    "targets": 5
   },
   "news-saved": {
     "targets": 3
