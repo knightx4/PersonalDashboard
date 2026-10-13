@@ -67,6 +67,10 @@ describe('visionRunText', () => {
     expect(text).toContain('user_id 11111111-1111-4111-8111-111111111111');
     expect(text).toContain('.claude/skills/vision-review/SKILL.md');
   });
+
+  it('tells the run to end itself, since nothing else does', () => {
+    expect(visionRunText('u')).toContain('mark the run finished');
+  });
 });
 
 describe('opensText', () => {

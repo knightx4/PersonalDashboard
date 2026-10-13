@@ -50,6 +50,8 @@ export const PAID_ACTIONS = {
   'app/learn/e/[id]/actions.ts#rephraseEssaySelection': ['rephrase-essay-selection'],
   // Learn: Summarize and Redo on a reading's page (plan #1876.4)
   'app/learn/r/[id]/actions.ts#summarizeReading': ['summarize-reading'],
+  // Learn: a question in the chat on a reading's page (plan #1876.5)
+  'app/learn/r/[id]/actions.ts#addReadingComment': ['reply-about-card'],
   // Learn: a named check on an essay, one call per paragraph it reads (plan
   // #1869). Already Said also finds your notes nearest each paragraph.
   'app/learn/e/[id]/actions.ts#runEssayCheck:model': ['check-essay-paragraph'],

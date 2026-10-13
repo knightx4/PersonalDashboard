@@ -437,6 +437,22 @@ identify it, and so does the keyboard focus ring.
 The person asked for this on 12 October 2026, comparing the app's buttons
 with the thinner outlines on the Idea Space sketch.
 
+## Part 12: One focal point, and a face for figures
+
+Two habits make a dense page look composed.
+
+**One focal point to a region.** Each card or region has one element set to
+draw the eye first, by size and weight before colour. A second bold element
+in the same region competes with the first, so the less important one goes
+back to regular weight.
+
+**Figures in a second face.** Numbers and the facts about a row, such as
+scores, counts, dates, sizes and similarities, are set in the monospace face
+already defined as `--font-mono`, in tabular figures, a step smaller than the
+text beside them. Running text stays in the sans face. The change of face
+gives a page texture without decoration, and it keeps law 7: the figures are
+still set plainly.
+
 ## Rules
 
 Written in the form [SPEC-LAYER-SPEC.md](SPEC-LAYER-SPEC.md) describes. A rule
@@ -490,6 +506,12 @@ Checked by: audit.
 Checked by: audit.
 
 **R15.** Buttons and segmented controls are outlined in the light border colour; text inputs and focus rings keep the control border.
+Checked by: audit.
+
+**R16.** A card or region has at most one bold element.
+Checked by: audit.
+
+**R17.** Numbers and the facts about a row are set in the monospace face, in tabular figures.
 Checked by: audit.
 
 **R18.** A surface with a reference design is judged against it as well as the laws.

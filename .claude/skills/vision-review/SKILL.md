@@ -349,6 +349,20 @@ where user_id = '…' and kind = 'like' and status = 'open'
   and created_at <= '<when the run read them>';
 ```
 
+## Ending the run
+
+The fire left a row in `plan_runs` with job `vision`, and nothing but the run
+marks it finished: it pushes nothing and closes no step. Left `started`, it
+is written back as failed two hours later however well the review went, as
+the review of 11 October was. As the run's last write:
+
+```sql
+update plan_runs set status = 'finished', error = null
+where id = (select id from plan_runs
+            where user_id = '…' and job = 'vision' and status = 'started'
+            order by created_at desc limit 1);
+```
+
 Then report:
 
 - The run's `review_id`.

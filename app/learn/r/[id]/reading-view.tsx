@@ -13,6 +13,7 @@ import { FindSources } from './find-sources';
 import { ReadingMenu } from './reading-menu';
 import { NoteForm } from './note-form';
 import { ReadingSummary, type SummaryFailure } from './reading-summary';
+import { ReadingChat } from './reading-chat';
 import { NoteToGraph } from './note-to-graph';
 import { StatusButtons } from './status-buttons';
 import { ReadNowButton } from './read-now-button';
@@ -21,6 +22,7 @@ import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
 
 import type { ReadingDetail } from '@/lib/learn/tracks/load';
+import type { DevComment } from '@/lib/comments/load';
 import type { Subject } from '@/lib/learn/graph/load';
 import type { StoryOrigin } from '@/lib/news/saved/stories';
 
@@ -60,6 +62,10 @@ export type ReadingViewProps = {
   tab?: ReadingTab;
   /** A failed Summarize press, drawn by the gallery; the page passes none. */
   summaryFailure?: SummaryFailure | null;
+  /** The chat with Dash under the reading, oldest turn first (plan #1876.5). */
+  thread?: readonly DevComment[];
+  /** Gallery only: the chat's waiting line and open box. */
+  chatState?: { awaitingReply?: boolean; composerOpen?: boolean };
 };
 
 /**
@@ -74,6 +80,8 @@ export function ReadingView({
   origin,
   tab = 'reading',
   summaryFailure = null,
+  thread = [],
+  chatState,
 }: ReadingViewProps) {
   const byline =
     [reading.source?.author, reading.source?.year ? String(reading.source.year) : null]
@@ -105,6 +113,7 @@ export function ReadingView({
           summary={reading.summary}
           given={reading.givenText}
           failure={summaryFailure}
+          chat={<ReadingChat readingId={reading.id} turns={thread} {...chatState} />}
         />
       ) : (
         <ReadingTabBody reading={reading} subjects={subjects} alreadyRead={alreadyRead} />

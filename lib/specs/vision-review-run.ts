@@ -111,7 +111,8 @@ export function visionRunText(userId: string, opens?: WindowOpens | null): strin
     '.claude/skills/vision-review/SKILL.md first and follow it: one vision_reviews row per ' +
     'workspace under one review_id, a dated "still holds" or a proposed edit citing its ' +
     'evidence, the likes it read closed, and nothing written to module_visions. You change ' +
-    'rows, not code. Do not commit or push.' +
+    'rows, not code. Do not commit or push. As the last write, mark the run finished as ' +
+    'SKILL.md\'s "Ending the run" shows, under job `vision`: nothing else ends it.' +
     (opens === undefined ? '' : `\n\n${opensText(opens)}`)
   );
 }

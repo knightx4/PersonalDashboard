@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { THREAD_TABLES, threadRef, threadSubject, type ThreadTarget } from './subjects';
+import { answersEvery, THREAD_TABLES, threadRef, threadSubject, type ThreadTarget } from './subjects';
 
 const ID = '00000000-0000-4000-8000-000000000001';
 
@@ -24,6 +24,13 @@ describe('thread subjects', () => {
     expect(threadRef('story', ID)).toBe(`news.saved_stories:${ID}`);
     // A vault note by its id, never its path.
     expect(threadRef('vault_note', ID)).toBe(`obsidian.notes:${ID}`);
+  });
+
+  it('keys a reading by learn.readings, and answers everything written under it', () => {
+    expect(threadRef('reading', ID)).toBe(`learn.readings:${ID}`);
+    expect(answersEvery('reading')).toBe(true);
+    expect(answersEvery('raise')).toBe(true);
+    expect(answersEvery('task')).toBe(false);
   });
 
   it('has nothing for a malformed ref or a table with no thread yet', () => {

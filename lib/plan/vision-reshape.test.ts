@@ -64,6 +64,12 @@ describe('visionReshapeText', () => {
     expect(text).toContain('do not commit or push');
   });
 
+  it('ends its own run under its own job name', () => {
+    // Nothing else closes a run about no step; one closed as `reshape` stays
+    // started and is written back as failed.
+    expect(text).toContain("where job = 'vision_reshape' and status = 'started'");
+  });
+
   it('says when there was no vision before', () => {
     const first = visionReshapeText({ scope: 'app', before: null, after: 'A dashboard.', features: [] });
     expect(first).toContain('Nothing was written before.');

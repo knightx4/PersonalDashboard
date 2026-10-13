@@ -254,7 +254,11 @@ export const LEARN_OPERATIONS = [
   // answer.
   'mark-review-question',
   // Dash's reply in a conversation about a Learn now card (plan #1053), made
-  // by lib/talk/reply.ts. One Sonnet call per question asked on a card.
+  // by lib/talk/reply.ts. One Sonnet call per question asked on a card. The
+  // chat on a reading's page (plan #1876.5) records here too, one Sonnet call
+  // per question over the reading's text (at most 200,000 characters, cached
+  // across a thread): the same kind of reply, kept to one operation by the
+  // conversational-model-paths count.
   'reply-about-card',
   // Explaining a phrase selected on a Learn now card (plan #1057). One Sonnet
   // call per phrase per card; selecting it again reads the stored one.
