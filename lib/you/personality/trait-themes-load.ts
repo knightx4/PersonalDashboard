@@ -14,8 +14,8 @@ import {
 } from './trait-themes';
 
 /**
- * The vault themes closest to each of your traits (plan #1634), for the Know
- * page. See trait-themes.ts for how they are chosen.
+ * The vault themes closest to each of your traits (plan #1634), for You's
+ * Personality tab. See trait-themes.ts for how they are chosen.
  *
  * The trait sentences are embedded through the related-notes cache, so each
  * is embedded once per person and kept by its hash; the cost goes on the
@@ -52,7 +52,7 @@ export async function loadTraitThemes(
     );
     return shareOutThemes(Object.fromEntries(found) as Record<BigFiveFactor, ThemeCandidate[]>);
   } catch (error) {
-    console.error('[learn personality themes]', error instanceof Error ? error.message : error);
+    console.error('[you personality themes]', error instanceof Error ? error.message : error);
     return null;
   }
 }

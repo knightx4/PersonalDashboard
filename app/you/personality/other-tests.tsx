@@ -20,7 +20,7 @@ import {
   TYPED_VALUE_MAX,
   type TypedKind,
   type TypedResult,
-} from '@/lib/learn/personality/model';
+} from '@/lib/you/personality/model';
 import { deleteTypedAction, restoreTypedAction, saveTypedAction } from './actions';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { IconButton } from '@/components/ui/icon-button';
@@ -284,7 +284,7 @@ function TypedForm({
           {pending ? 'Saving…' : 'Save'}
         </Button>
         <PaidHint
-          action="app/learn/know/personality/actions.ts#saveTypedAction"
+          action="app/you/personality/actions.ts#saveTypedAction"
           what="Cost of Dash reading your type against your notes"
         />
         <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>

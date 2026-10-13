@@ -9,9 +9,9 @@ import { DashMark } from '@/components/ui/dash-mark';
 import { PaidHint } from '@/components/ui/paid-hint';
 import { cn } from '@/lib/cn';
 import { formatDay } from '@/lib/goals/dates';
-import { readCount, type PersonalityRead, type ReadStatus } from '@/lib/learn/personality/model';
+import { readCount, type PersonalityRead, type ReadStatus } from '@/lib/you/personality/model';
 import { noteHref } from '@/lib/vault/paths';
-import { readAgainAction } from './personality/actions';
+import { readAgainAction } from './actions';
 
 /**
  * Dash's read of one personality result against your notes (plan #1635):
@@ -138,7 +138,7 @@ export function PersonalityReadPanel({
               {pending ? 'Reading…' : read ? 'Read again' : status === 'failed' ? 'Try again' : 'Ask Dash to read it'}
             </Button>
             <PaidHint
-              action="app/learn/know/personality/actions.ts#readAgainAction"
+              action="app/you/personality/actions.ts#readAgainAction"
               what="Cost of a fresh read from Dash"
             />
           </span>

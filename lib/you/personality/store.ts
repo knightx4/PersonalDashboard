@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { assertSchemaExposed } from '@/lib/core/db/schema-errors';
-import { LEARN_SCHEMA, type LearnSupabaseClient } from '@/lib/learn/db/schema-name';
+import { YOU_SCHEMA, type YouSupabaseClient } from '@/lib/you/db/schema-name';
 import { isCompleteAnswers, scoreBigFive, IPIP_ITEM_COUNT } from './ipip';
 import {
   fromRow,
@@ -15,7 +15,7 @@ import {
 
 /**
  * Reading and writing personality results: the Big Five (plan #1632) and a
- * type typed in from another test (#1633). Through the person's own learn client, so RLS keeps every
+ * type typed in from another test (#1633). Through the person's own you client, so RLS keeps every
  * row to its owner.
  */
 
@@ -25,7 +25,7 @@ function fail(action: string, error: { message: string }): Error {
 
 /** Every result, newest first. */
 export async function loadPersonalityResults(
-  supabase: LearnSupabaseClient,
+  supabase: YouSupabaseClient,
 ): Promise<PersonalityResult[]> {
   const { data, error } = await supabase
     .from('personality_results')
@@ -33,7 +33,7 @@ export async function loadPersonalityResults(
     .order('taken_at', { ascending: false })
     .order('created_at', { ascending: false });
 
-  assertSchemaExposed(error, LEARN_SCHEMA);
+  assertSchemaExposed(error, YOU_SCHEMA);
   if (error) throw fail('Reading your personality results', error);
   return ((data ?? []) as unknown as ResultRow[])
     .map(fromRow)
@@ -46,7 +46,7 @@ export async function loadPersonalityResults(
  * earlier is replaced.
  */
 export async function saveBigFiveResult(
-  supabase: LearnSupabaseClient,
+  supabase: YouSupabaseClient,
   userId: string,
   answers: unknown,
   takenAt: string,
@@ -69,7 +69,7 @@ export async function saveBigFiveResult(
     .select(RESULT_COLUMNS)
     .single();
 
-  assertSchemaExposed(error, LEARN_SCHEMA);
+  assertSchemaExposed(error, YOU_SCHEMA);
   if (error || !data) throw fail('Saving your result', error ?? { message: 'no row' });
   const result = fromRow(data as unknown as ResultRow);
   if (!result || result.kind !== 'big_five') {
@@ -92,7 +92,7 @@ function asTyped(data: unknown, action: string): TypedResult {
  * the row comes back as it was.
  */
 export async function saveTypedResult(
-  supabase: LearnSupabaseClient,
+  supabase: YouSupabaseClient,
   userId: string,
   input: TypedInput,
   id?: string,
@@ -111,7 +111,7 @@ export async function saveTypedResult(
     .select(RESULT_COLUMNS)
     .single();
 
-  assertSchemaExposed(error, LEARN_SCHEMA);
+  assertSchemaExposed(error, YOU_SCHEMA);
   if (error || !data) throw fail('Saving your type', error ?? { message: 'no row' });
   return asTyped(data, 'Saving your type');
 }
@@ -122,7 +122,7 @@ export async function saveTypedResult(
  * whatever id is passed.
  */
 export async function deleteTypedResult(
-  supabase: LearnSupabaseClient,
+  supabase: YouSupabaseClient,
   id: string,
 ): Promise<TypedResult> {
   const { data, error } = await supabase
@@ -133,7 +133,7 @@ export async function deleteTypedResult(
     .select(RESULT_COLUMNS)
     .maybeSingle();
 
-  assertSchemaExposed(error, LEARN_SCHEMA);
+  assertSchemaExposed(error, YOU_SCHEMA);
   if (error) throw fail('Deleting your type', error);
   if (!data) throw new Error('Deleting your type failed: it was not there.');
   return asTyped(data, 'Deleting your type');

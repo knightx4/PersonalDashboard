@@ -309,11 +309,6 @@ export const LEARN_OPERATIONS = [
   // score questions in one request per clip, and one Haiku call for up to
   // forty clips Jev could not rate. One row per model per person per run.
   'rate-clips',
-  // Dash's read of a personality result against your notes (plan #1635): one
-  // Sonnet call when a result is saved, after the page has answered, and one
-  // more each time the button on the Know page asks for a fresh read. The
-  // notes are found with the cached trait sentences, under 'embed-note-match'.
-  'read-personality',
   // Matching the subject names a Claude chat gives to the person's own
   // subjects (plan #1809): one Haiku call per reading list or session added
   // through the connector, made only when a name is not an exact match.

@@ -6,7 +6,7 @@ import {
   factorPercent,
   type BigFiveFactor,
   type BigFiveScores,
-} from '@/lib/learn/personality/ipip';
+} from '@/lib/you/personality/ipip';
 import { Tooltip } from '@/components/ui/tooltip';
 
 /**

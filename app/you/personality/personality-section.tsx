@@ -1,6 +1,6 @@
 import Link, { linkVariants } from '@/components/ui/link';
 import { buttonVariants } from '@/components/ui/button';
-import { Disclosure, SectionFold } from '@/components/ui/disclosure';
+import { Disclosure } from '@/components/ui/disclosure';
 import { Meter } from '@/components/ui/meter';
 import { cardVariants } from '@/components/ui/card';
 import { cn } from '@/lib/cn';
@@ -10,20 +10,21 @@ import {
   FACTOR_WORDS,
   factorPercent,
   type BigFiveFactor,
-} from '@/lib/learn/personality/ipip';
+} from '@/lib/you/personality/ipip';
 import {
   readCount,
   readStatus,
   type BigFiveResult,
   type ReadStatus,
   type TypedResult,
-} from '@/lib/learn/personality/model';
-import type { TraitThemes } from '@/lib/learn/personality/trait-themes';
+} from '@/lib/you/personality/model';
+import type { TraitThemes } from '@/lib/you/personality/trait-themes';
 import { PersonalityReadPanel } from './personality-read';
 import { Note } from '@/components/ui/note';
 
 /**
- * Your personality result on the Know page (plan #1634): the latest Big Five
+ * Your personality result on You's Personality tab (plan #1634, moved from
+ * Learn's Know page by #1991.2): the latest Big Five
  * as five traits in words, the vault themes closest to each, the types you
  * typed in from other tests, and earlier results folded beneath. With no Big
  * Five yet, one line offering the test.
@@ -37,7 +38,8 @@ function clock(): number {
   return Date.now();
 }
 
-export const PERSONALITY_HREF = '/learn/know/personality';
+/** The test and the types typed in, a press away from the tab. */
+export const PERSONALITY_HREF = '/you/personality/test';
 
 function leaning(factor: BigFiveFactor, percent: number): string {
   const words = FACTOR_WORDS[factor];
@@ -138,87 +140,82 @@ export function PersonalitySection({
 }) {
   const at = now ?? clock();
   return (
-    <div id="personality" className="mt-8 scroll-mt-6">
-      <SectionFold
-        title="Personality"
-        hint={latest ? `Big Five, taken ${formatDay(latest.takenAt, true)}` : undefined}
-      >
-        {!latest ? (
-          <div className={cn(cardVariants({ padding: 'standard' }), 'max-w-2xl space-y-4')}>
-            <p className="text-ui text-ink-muted">
-              <Link
-                href={PERSONALITY_HREF}
-                className={linkVariants()}
-              >
-                Take the personality test
-              </Link>{' '}
-              to see your five traits beside the themes in your notes.
+    <div id="personality">
+      {!latest ? (
+        <div className={cn(cardVariants({ padding: 'standard' }), 'max-w-2xl space-y-4')}>
+          <p className="text-ui text-ink-muted">
+            <Link
+              href={PERSONALITY_HREF}
+              className={linkVariants()}
+            >
+              Take the personality test
+            </Link>{' '}
+            to see your five traits beside the themes in your notes.
+          </p>
+          <OtherTests typed={typed} now={at} />
+        </div>
+      ) : (
+        <div className={cn(cardVariants({ padding: 'standard' }), 'max-w-2xl space-y-4')}>
+          <ul className="space-y-4">
+            {BIG_FIVE_FACTORS.map((factor) => {
+              const percent = factorPercent(latest.scores[factor]);
+              const { name } = FACTOR_WORDS[factor];
+              return (
+                <li key={factor}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-body font-medium text-ink">{name}</span>
+                    <span className="text-ui tabular-nums text-ink-muted">{percent} / 100</span>
+                  </div>
+                  <Meter
+                    className="mt-1"
+                    value={percent}
+                    max={100}
+                    minFraction={0.02}
+                    label={`${name}: ${percent} of 100`}
+                  />
+                  <p className="mt-1 text-small text-ink-muted">{leaning(factor, percent)}</p>
+                  {themes && <ThemeLinks themes={themes[factor]} />}
+                </li>
+              );
+            })}
+          </ul>
+
+          {!themes && (
+            <p className="text-small text-ink-muted">
+              The themes in your notes could not be matched to the traits just now.
             </p>
-            <OtherTests typed={typed} now={at} />
-          </div>
-        ) : (
-          <div className={cn(cardVariants({ padding: 'standard' }), 'max-w-2xl space-y-4')}>
-            <ul className="space-y-4">
-              {BIG_FIVE_FACTORS.map((factor) => {
-                const percent = factorPercent(latest.scores[factor]);
-                const { name } = FACTOR_WORDS[factor];
-                return (
-                  <li key={factor}>
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-body font-medium text-ink">{name}</span>
-                      <span className="text-ui tabular-nums text-ink-muted">{percent} / 100</span>
-                    </div>
-                    <Meter
-                      className="mt-1"
-                      value={percent}
-                      max={100}
-                      minFraction={0.02}
-                      label={`${name}: ${percent} of 100`}
-                    />
-                    <p className="mt-1 text-small text-ink-muted">{leaning(factor, percent)}</p>
-                    {themes && <ThemeLinks themes={themes[factor]} />}
+          )}
+
+          {/* Dash's read on its own panel inside the card, so its words
+              stand apart from the scores and the note titles (plan #1764). */}
+          <Note>
+            <PersonalityReadPanel
+              resultId={latest.id}
+              read={latest.read}
+              status={readStatus(latest, at)}
+            />
+          </Note>
+
+          <OtherTests typed={typed} now={at} />
+
+          <Link href={PERSONALITY_HREF} className={buttonVariants({ variant: 'secondary' })}>
+            Retake or add a type
+          </Link>
+
+          {earlier.length > 0 && (
+            <Disclosure title="Earlier results" meta={`${earlier.length}`}>
+              <ul className="space-y-2">
+                {earlier.map((result) => (
+                  <li key={result.id} className="text-small text-ink-muted">
+                    <span className="text-ink">{formatDay(result.takenAt, true)}</span>:{' '}
+                    {shortLine(result)}
                   </li>
-                );
-              })}
-            </ul>
-
-            {!themes && (
-              <p className="text-small text-ink-muted">
-                The themes in your notes could not be matched to the traits just now.
-              </p>
-            )}
-
-            {/* Dash's read on its own panel inside the card, so its words
-                stand apart from the scores and the note titles (plan #1764). */}
-            <Note>
-              <PersonalityReadPanel
-                resultId={latest.id}
-                read={latest.read}
-                status={readStatus(latest, at)}
-              />
-            </Note>
-
-            <OtherTests typed={typed} now={at} />
-
-            <Link href={PERSONALITY_HREF} className={buttonVariants({ variant: 'secondary' })}>
-              Retake or add a type
-            </Link>
-
-            {earlier.length > 0 && (
-              <Disclosure title="Earlier results" meta={`${earlier.length}`}>
-                <ul className="space-y-2">
-                  {earlier.map((result) => (
-                    <li key={result.id} className="text-small text-ink-muted">
-                      <span className="text-ink">{formatDay(result.takenAt, true)}</span>:{' '}
-                      {shortLine(result)}
-                    </li>
-                  ))}
-                </ul>
-              </Disclosure>
-            )}
-          </div>
-        )}
-      </SectionFold>
+                ))}
+              </ul>
+            </Disclosure>
+          )}
+        </div>
+      )}
     </div>
   );
 }

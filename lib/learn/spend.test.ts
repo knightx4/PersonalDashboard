@@ -125,7 +125,6 @@ describe('the operation names', () => {
       'tag-clips',
       'score-clips',
       'rate-clips',
-      'read-personality',
       'match-subjects',
       'embed-idea',
       'word-essay-question',

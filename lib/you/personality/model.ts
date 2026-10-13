@@ -2,7 +2,7 @@ import { BIG_FIVE_FACTORS, type BigFiveScores } from './ipip';
 
 /**
  * A personality result as the app reads it (plan #1632), from a row of
- * `learn.personality_results` (plan #1631).
+ * `you.personality_results` (plan #1631).
  *
  * A Big Five result carries its scores and answers; any other kind carries
  * the type as it was typed in (#1633). Dash's read (#1635) rides on either.
@@ -221,7 +221,7 @@ export function parseTypedInput(
 }
 
 /**
- * Where Dash's read of a result stands (plan #1635), for the Know page.
+ * Where Dash's read of a result stands (plan #1635), for the Personality tab.
  *
  * ready    a read is kept and nothing has failed since.
  * failed   the last attempt failed; any earlier read is still kept.
