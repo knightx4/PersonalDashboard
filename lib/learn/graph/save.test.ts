@@ -26,6 +26,7 @@ vi.mock('@/lib/learn/areas/place-track', () => ({
 vi.mock('@/lib/learn/embed/idea-embedding', () => import('@/tests/stubs/idea-embedding'));
 
 type Insert = { table: string; rows: unknown };
+type Update = { table: string; values: Record<string, unknown>; filters: [string, string, unknown][] };
 
 /**
  * A stand-in for the session client.
@@ -35,6 +36,7 @@ type Insert = { table: string; rows: unknown };
  */
 function clientReturningIds(existingSubject: string | null = null, placed = true) {
   const inserts: Insert[] = [];
+  const updates: Update[] = [];
 
   const client = {
     from(table: string) {
@@ -51,6 +53,18 @@ function clientReturningIds(existingSubject: string | null = null, placed = true
             // The track lookup names the person before the name (plan #978).
             eq: () => ({ order: async () => ({ data: [], error: null }), ilike: () => found }),
           };
+        },
+        // The review schedule is set by an update filtered on the row (plan #1145).
+        update: (values: Record<string, unknown>) => {
+          const entry: Update = { table, values, filters: [] };
+          updates.push(entry);
+          const builder = {
+            eq: (column: string, value: unknown) => (entry.filters.push(['eq', column, value]), builder),
+            in: (column: string, value: unknown) => (entry.filters.push(['in', column, value]), builder),
+            is: (column: string, value: unknown) => (entry.filters.push(['is', column, value]), builder),
+            then: (resolve: (v: { error: null }) => void) => resolve({ error: null }),
+          };
+          return builder;
         },
         upsert: (rows: unknown) => {
           inserts.push({ table, rows });
@@ -76,7 +90,7 @@ function clientReturningIds(existingSubject: string | null = null, placed = true
     },
   };
 
-  return { client: client as never, inserts };
+  return { client: client as never, inserts, updates };
 }
 
 const CHAIN: ProposedChain = {
@@ -372,6 +386,26 @@ describe('waving a case through', () => {
       expect(row.tested_at).toBeNull();
       expect(new Date(row.declared_at!).toDateString()).toBe(new Date().toDateString());
     }
+  });
+
+  it('puts what was declared on the review schedule, three days out, unless it is on it already', async () => {
+    const { client, updates } = clientReturningIds('subject-1');
+    await declareKnown(client, 'user-1', ['concept-1', 'concept-2']);
+    await declareConceptKnown(client, 'user-1', 'concept-3');
+
+    const schedules = updates.filter((update) => update.table === 'concept_state');
+    expect(schedules).toHaveLength(2);
+    const today = new Date().toISOString().slice(0, 10);
+    const inThree = new Date(`${today}T00:00:00Z`);
+    inThree.setUTCDate(inThree.getUTCDate() + 3);
+    for (const update of schedules) {
+      expect(update.values).toEqual({ review_interval_days: 3, review_due_on: inThree.toISOString().slice(0, 10) });
+      expect(update.filters).toContainEqual(['eq', 'user_id', 'user-1']);
+      expect(update.filters).toContainEqual(['in', 'state', ['shaky', 'recognised', 'known', 'sharp']]);
+      expect(update.filters).toContainEqual(['is', 'review_due_on', null]);
+    }
+    expect(schedules[0].filters).toContainEqual(['in', 'concept_id', ['concept-1', 'concept-2']]);
+    expect(schedules[1].filters).toContainEqual(['in', 'concept_id', ['concept-3']]);
   });
 });
 

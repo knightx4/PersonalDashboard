@@ -15,6 +15,7 @@ import {
 } from '@/lib/learn/graph/probe-payload';
 import { inferredFrom, type Concept, type Graph, type KnowledgeState } from '@/lib/learn/graph/model';
 import { conceptToRecheck, isRecheckTurn } from '@/lib/learn/graph/recheck';
+import { scheduleIdeas } from '@/lib/learn/lessons/review-store';
 
 /**
  * A probe session: what to ask about next, and what an answer settles.
@@ -794,6 +795,7 @@ async function settleConcept(
 
   assertSchemaExposed(error, LEARN_SCHEMA);
   if (error) throw fail('Recording what that answer showed', error);
+  await scheduleIdeas(supabase, userId, [input.conceptId]);
 
   // Growth trigger 3: answering correctly about a node says the things it
   // rests on are probably in place. Weakly, and never over an answer somebody
